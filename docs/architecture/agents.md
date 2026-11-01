@@ -218,6 +218,14 @@ changed, on this computer and on a joined host.
   extra due source. An occurrence is skipped while the workflow has an open run, and missed
   occurrences become one run. A webhook trigger has a route of its own owner kind (`workflow`); see
   [Route lifecycle](events.md#route-lifecycle).
+- A GitHub trigger starts a run for each event of the OpenBot GitHub App that matches it
+  (`github-matching.ts`); see [Workflow GitHub triggers](events.md#workflow-github-triggers). A
+  GitHub run blocks only its own issue or pull request: a second event for the same item waits, and
+  events for other items run at the same time. Schedule and webhook triggers keep one open run per
+  workflow. A GitHub output (`github-output.ts`) changes GitHub as the App's bot through
+  `src/main/github-rest.ts`, with 10 actions. "Agent chooses" asks a model to choose labels or a
+  person from the repository's own lists, and drops other values. `workflow_github_actions` keeps
+  each change, so a restart does not post a comment, review or issue again.
 - A restart keeps approvals and agent steps, because their state is in the database and the
   mailbox. The first pass fails a model step that was running, and ends a run that was stopping. An
   agent step fails with `agentMissing` when its agent is deleted. A post that did not start is sent; a

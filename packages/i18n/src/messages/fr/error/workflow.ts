@@ -39,4 +39,25 @@ export const messages = {
     "Ce workflow est trop volumineux pour être envoyé à un autre ordinateur. Ouvrez-le sur l’ordinateur qui exécute le serveur.",
   "error.workflow.webhookMissing":
     "Cette étape n’est pas un déclencheur webhook. Enregistrez le workflow, puis réessayez.",
+  "error.workflow.githubActionMissing": "Choisissez ce que cette sortie fait sur GitHub.",
+  "error.workflow.githubRepositoryMissing": "Choisissez un dépôt pour cette sortie.",
+  "error.workflow.githubItemMissing":
+    "Cette sortie n’a ni issue ni pull request. Lancez l’exécution depuis un événement GitHub, ou mettez le numéro dans son entrée.",
+  "error.workflow.githubPullRequestOnly": "Cette action ne fonctionne que sur les pull requests.",
+  "error.workflow.githubTextMissing": "Cette sortie n’a aucun texte à envoyer. Connectez une étape qui l’écrit.",
+  "error.workflow.githubEventText":
+    "Cette sortie ne peut pas envoyer l’événement brut du déclencheur. Placez un agent entre le déclencheur et cette sortie.",
+  "error.workflow.githubChoiceMissing": "Choisissez les étiquettes ou la personne pour cette sortie.",
+  "error.workflow.githubChoseNothing": "Le modèle n’a choisi aucune étiquette ni personne de ce dépôt.",
+  "error.workflow.githubNotConnected": "Connectez GitHub sur l’ordinateur qui exécute ce workflow.",
+  "error.workflow.githubNoAccess":
+    "L’application GitHub d’OpenBot ne peut pas voir ce dépôt ou cet élément. Ouvrez GitHub et donnez-lui l’accès.",
+  "error.workflow.githubNoWrite":
+    "L’application GitHub d’OpenBot ne peut pas modifier ce dépôt. Ouvrez GitHub et donnez-lui l’accès.",
+  "error.workflow.githubLocked": "Cette conversation est verrouillée sur GitHub.",
+  "error.workflow.githubRefused": "GitHub a refusé la modification : {detail}",
+  "error.workflow.githubUnreachable": "OpenBot n’a pas pu joindre GitHub. Relancez l’étape.",
+  "error.workflow.githubUncertain":
+    "La modification s’est arrêtée en chemin. Elle peut déjà être sur GitHub. Vérifiez avant de relancer l’étape.",
+  "error.workflow.githubNoEvent": "GitHub n’a aucune issue ni pull request sur laquelle ce déclencheur démarre.",
 } as const satisfies PartialTranslation<typeof source>;

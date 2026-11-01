@@ -11,6 +11,7 @@ import type { AgentTemplateService } from "../agent-template-service";
 import type { BrowserProfileService } from "../browser-profile-service";
 import type { CustomAgentChanges } from "../custom-agent-changes";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
+import type { WorkflowGitHubDirectory } from "../github-rest";
 import type { HostEventsApi } from "../host-events-api";
 import type { HostEventsService } from "../host-events-service";
 import type { HostReleaseService } from "../host-release-service";
@@ -327,8 +328,16 @@ export type TeamApiWorkflows = Pick<
   | "runs"
   | "run"
   | "workflowOf"
+  | "githubHistory"
+  | "githubLastEvent"
 > &
-  Pick<HostEventsService, "rotateWorkflowSecret">;
+  Pick<HostEventsService, "rotateWorkflowSecret"> & {
+    /**
+     * Its presence is what `#protocolSupport` advertises `workflows-github-v1` on; see
+     * `workflows-github-v1.ts` for the grant.
+     */
+    github?: WorkflowGitHubDirectory;
+  };
 
 /** The setup choice of this computer: the same file and the same service step as the local Settings save. */
 interface TeamApiDefaultProvider {

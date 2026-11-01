@@ -12,6 +12,8 @@ import {
   isRunWorkflowStepInput,
   isSaveWorkflowGraphInput,
   isStartWorkflowRunInput,
+  isWorkflowGitHubLastEventInput,
+  isWorkflowGitHubRepositoryInput,
   isWorkflowRunsInput,
   isWorkflowTriggerInput,
   isWorkflowVersionInput,
@@ -21,6 +23,8 @@ import {
   type SaveWorkflowGraphInput,
   type StartWorkflowRunInput,
   type WorkflowEdge,
+  type WorkflowGitHubLastEventInput,
+  type WorkflowGitHubRepositoryInput,
   type WorkflowGraph,
   type WorkflowNode,
   type WorkflowNodeSize,
@@ -153,4 +157,14 @@ export function parseWorkflowRuns(value: unknown): WorkflowRunsInput {
 export function parseWorkflowTrigger(value: unknown): WorkflowTriggerInput {
   if (!isWorkflowTriggerInput(value)) throw new Error("Invalid workflow trigger.");
   return { workflowId: value.workflowId, nodeId: value.nodeId };
+}
+
+export function parseWorkflowGitHubRepository(value: unknown): WorkflowGitHubRepositoryInput {
+  if (!isWorkflowGitHubRepositoryInput(value)) throw new Error("Invalid GitHub repository.");
+  return { repository: value.repository };
+}
+
+export function parseWorkflowGitHubLastEvent(value: unknown): WorkflowGitHubLastEventInput {
+  if (!isWorkflowGitHubLastEventInput(value)) throw new Error("Invalid GitHub trigger run.");
+  return { workflowId: value.workflowId, nodeId: value.nodeId, requestId: value.requestId };
 }

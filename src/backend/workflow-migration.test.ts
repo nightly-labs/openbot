@@ -14,6 +14,9 @@ afterEach(() => {
 
 const WORKFLOW_TABLES = [
   "workflow_edges",
+  "workflow_github_actions",
+  "workflow_github_deliveries",
+  "workflow_github_runs",
   "workflow_nodes",
   "workflow_output_deliveries",
   "workflow_runs",
@@ -85,7 +88,7 @@ function workflowTables(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 48 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 49 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -167,9 +170,9 @@ describe("workflow migration", () => {
     const db = databaseAt(45);
     seed(db, 45);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(49,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(50,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=49; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=50; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(workflowTables(db)).toEqual([]);
@@ -238,6 +241,162 @@ describe("workflow migration", () => {
     fails(step("workflow-2", "step-6", "agent").replace("request-2", "request-6").replace("'done'", "'waiting'"));
     expect(count(db, "workflow_runs")).toBe(2);
     expect(count(db, "workflow_steps")).toBe(3);
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
+});
+
+// Migration 49 rebuilds the run table to add the GitHub run source, and adds the GitHub tables. Failure
+// modes: the rebuild loses or changes a run, or a step or output delivery loses its run; a failed
+// upgrade leaves the staging table, the GitHub tables or the marker; the old CHECK survives; a GitHub
+// row can point to nothing, or outlive its workflow, run or trigger node.
+const GITHUB_TABLES = ["workflow_github_actions", "workflow_github_deliveries", "workflow_github_runs"];
+const EMPTY_GITHUB_TABLES = Object.fromEntries(GITHUB_TABLES.map((table) => [table, []]));
+
+function runSourceCheck(db: DatabaseSync): string {
+  return String(db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='workflow_runs'").get()?.sql);
+}
+
+function githubRun(runId: string, number: number): string {
+  return `INSERT INTO workflow_runs (run_id, workflow_id, number, trigger_node_id, source, idempotency_key,
+      graph_revision, graph_json, status, started_at, updated_at)
+    VALUES ('${runId}', 'workflow-1', ${number}, 'trigger', 'github', 'github:trigger:${runId}', 0,
+      '{"nodes":[],"edges":[],"strokes":[]}', 'done', '2026-01-05', '2026-01-05')`;
+}
+
+/** A GitHub run of the seeded workflow, with its item, its delivery and one change it made. */
+function seedGitHub(db: DatabaseSync): void {
+  db.exec(githubRun("run-2", 2));
+  db.exec(`
+    INSERT INTO workflow_github_runs (run_id, workflow_id, node_id, delivery_id, repository, number, pull_request,
+        title, caused_by_bot, started_at)
+      VALUES ('run-2', 'workflow-1', 'trigger', 'delivery-2', 'octo/repo', 7, 1, 'Fix 界', 0, '2026-01-05');
+    INSERT INTO workflow_github_deliveries (workflow_id, node_id, delivery_id, event, repository, number,
+        pull_request, title, received_at, outcome, reason, run_id, payload)
+      VALUES ('workflow-1', 'trigger', 'delivery-2', 'pr.opened', 'octo/repo', 7, 1, 'Fix 界', '2026-01-05',
+          'started', NULL, 'run-2', NULL),
+        ('workflow-1', 'trigger', 'offline:2026-01-04', 'pr.opened', NULL, NULL, NULL, NULL, '2026-01-04',
+          'skipped', 'offline', NULL, NULL);
+    INSERT INTO workflow_github_actions (action_key, workflow_id, run_id, step_id, repository, number, action, status,
+        object_id, created_at, updated_at)
+      VALUES ('run-2:output:comment', 'workflow-1', 'run-2', 'step-9', 'octo/repo', 7, 'comment', 'done', '901',
+        '2026-01-05', '2026-01-05');
+  `);
+}
+
+describe("workflow GitHub migration", () => {
+  it.each([46, 47, 48])("keeps every run, step and delivery from released schema %i", (version) => {
+    const db = databaseAt(version);
+    seed(db, version);
+    seedWorkflow(db);
+    const before = contents(db);
+    expect(() => db.exec(githubRun("run-2", 2))).toThrow("constraint failed");
+
+    migrateOpenBotDatabase(db);
+
+    expect(contents(db)).toEqual({ ...before, ...EMPTY_GITHUB_TABLES });
+    expectHealthy(db);
+    expect(runSourceCheck(db)).toContain("'github'");
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name LIKE '%_v49'").all()).toEqual([]);
+    expect(
+      db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='workflow_runs' ORDER BY name").all(),
+    ).toEqual([
+      { name: "sqlite_autoindex_workflow_runs_1" },
+      { name: "sqlite_autoindex_workflow_runs_2" },
+      { name: "sqlite_autoindex_workflow_runs_3" },
+      { name: "workflow_runs_open" },
+      { name: "workflow_runs_recent" },
+    ]);
+    // The steps still belong to the run: deleting it deletes the step and its delivery.
+    db.exec("DELETE FROM workflow_runs WHERE run_id='run-1'");
+    expect(count(db, "workflow_steps")).toBe(1);
+    expect(count(db, "workflow_output_deliveries")).toBe(0);
+  });
+
+  it("rolls back the rebuild, the tables and the marker after a late failure, then retries", () => {
+    const db = databaseAt(48);
+    seed(db, 48);
+    seedWorkflow(db);
+    const before = contents(db);
+    const schemaBefore = db.prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name").all();
+    db.exec(`CREATE TEMP TRIGGER fail_marker BEFORE INSERT ON schema_migrations WHEN new.version=49
+      BEGIN SELECT RAISE(ABORT, 'late failure'); END;`);
+    expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 49 failed");
+    expect(contents(db)).toEqual(before);
+    expect(db.prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name").all()).toEqual(schemaBefore);
+    expect(db.prepare("SELECT version FROM schema_migrations WHERE version=49").all()).toEqual([]);
+    expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
+    db.exec("DROP TRIGGER fail_marker");
+    migrateOpenBotDatabase(db);
+    expect(contents(db)).toEqual({ ...before, ...EMPTY_GITHUB_TABLES });
+    expectHealthy(db);
+  });
+
+  it("rejects newer and incomplete migration histories before it rebuilds the run table", () => {
+    const db = databaseAt(48);
+    seed(db, 48);
+    seedWorkflow(db);
+    const before = contents(db);
+    const check = runSourceCheck(db);
+    db.exec("INSERT INTO schema_migrations VALUES(50,'now')");
+    expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
+    db.exec("DELETE FROM schema_migrations WHERE version=50; DELETE FROM schema_migrations WHERE version=46");
+    expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 46");
+    expect(contents(db)).toEqual(before);
+    expect(runSourceCheck(db)).toBe(check);
+  });
+
+  it("refuses GitHub rows that point to nothing or contradict themselves", () => {
+    const db = databaseAt(48);
+    seed(db, 48);
+    migrateOpenBotDatabase(db);
+    seedWorkflow(db);
+    seedGitHub(db);
+    const fails = (sql: string) => expect(() => db.exec(sql)).toThrow("constraint failed");
+    fails(`INSERT INTO workflow_github_runs (run_id, workflow_id, node_id, repository, number, pull_request, title,
+        caused_by_bot, started_at)
+      VALUES ('run-unknown', 'workflow-1', 'trigger', 'octo/repo', 7, 0, 'Title', 0, '2026-01-05')`);
+    fails(`INSERT INTO workflow_github_deliveries (workflow_id, node_id, delivery_id, event, received_at, outcome)
+      VALUES ('workflow-1', 'node-unknown', 'delivery-3', 'comment', '2026-01-05', 'started')`);
+    const delivery = (values: string) =>
+      `INSERT INTO workflow_github_deliveries (workflow_id, node_id, delivery_id, event, repository, number,
+          pull_request, title, received_at, outcome, reason, payload)
+        VALUES ('workflow-1', 'trigger', 'delivery-3', 'comment', ${values})`;
+    // An item with a missing part, a skip with no reason, a reason with no skip, a payload on a started row.
+    fails(delivery("'octo/repo', NULL, 0, 'Title', '2026-01-05', 'started', NULL, NULL"));
+    fails(delivery("'octo/repo', 8, 0, 'Title', '2026-01-05', 'skipped', NULL, NULL"));
+    fails(delivery("'octo/repo', 8, 0, 'Title', '2026-01-05', 'started', 'filter', NULL"));
+    fails(delivery("'octo/repo', 8, 0, 'Title', '2026-01-05', 'started', NULL, 'body'"));
+    fails(delivery("'octo/repo', 8, 0, 'Title', '2026-01-05', 'queued', NULL, NULL"));
+    db.exec(delivery("'octo/repo', 8, 0, 'Title', '2026-01-05', 'waiting', NULL, 'body'"));
+    fails(delivery("'octo/repo', 8, 0, 'Title', '2026-01-06', 'waiting', NULL, 'body'"));
+    fails(`INSERT INTO workflow_github_actions (action_key, workflow_id, run_id, step_id, repository, action, status,
+        created_at, updated_at)
+      VALUES ('run-unknown:output:comment', 'workflow-1', 'run-unknown', 'step-9', 'octo/repo', 'comment', 'done',
+        '2026-01-05', '2026-01-05')`);
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
+
+  it("removes GitHub rows with their run, trigger node and workflow", () => {
+    const db = databaseAt(48);
+    seed(db, 48);
+    migrateOpenBotDatabase(db);
+    seedWorkflow(db);
+    seedGitHub(db);
+
+    db.exec("DELETE FROM workflow_runs WHERE run_id='run-2'");
+    expect(count(db, "workflow_github_runs")).toBe(0);
+    expect(count(db, "workflow_github_actions")).toBe(0);
+    expect(count(db, "workflow_github_deliveries")).toBe(2);
+
+    db.exec("DELETE FROM workflow_nodes WHERE workflow_id='workflow-1' AND node_id='trigger'");
+    expect(count(db, "workflow_github_deliveries")).toBe(0);
+
+    db.exec(`INSERT INTO workflow_nodes (workflow_id, node_id, position, kind, x, y, fields_json)
+      VALUES ('workflow-1', 'trigger', 0, 'trigger', 0, 0, '{"trigger":"github"}')`);
+    db.exec("DELETE FROM workflow_runs WHERE run_id='run-2'");
+    seedGitHub(db);
+    db.exec("DELETE FROM workflows WHERE workflow_id='workflow-1'");
+    for (const table of WORKFLOW_TABLES) expect(count(db, table)).toBe(0);
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   });
 });

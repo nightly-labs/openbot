@@ -55,7 +55,7 @@ function typeIndexColumns(db: DatabaseSync) {
 const TYPE_INDEX_COLUMNS = ["aggregate_id", "event_type", "sequence"];
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 48 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 49 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -110,9 +110,9 @@ describe("event type index migration", () => {
     const db = databaseAt(42);
     seedEvents(db);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(49, 'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(50, 'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version = 49; DELETE FROM schema_migrations WHERE version = 20");
+    db.exec("DELETE FROM schema_migrations WHERE version = 50; DELETE FROM schema_migrations WHERE version = 20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(typeIndexColumns(db)).toEqual([]);

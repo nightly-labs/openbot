@@ -93,6 +93,7 @@ export function serverSupportsCapability(
       capability === "agent-thread-branches-v1" ||
       capability === "channel-task-cancel-v1" ||
       capability === "side-question-v1" ||
+      capability === "workflows-github-v1" ||
       capability === "agent-notification-levels-v1") &&
     server?.kind === "remote"
   ) {

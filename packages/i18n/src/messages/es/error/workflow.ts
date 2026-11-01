@@ -39,4 +39,26 @@ export const messages = {
     "Este flujo de trabajo es demasiado grande para enviarlo a otro ordenador. Ábrelo en el ordenador que ejecuta el servidor.",
   "error.workflow.webhookMissing":
     "Este paso no es un disparador de webhook. Guarda el flujo de trabajo y vuelve a intentarlo.",
+  "error.workflow.githubActionMissing": "Elige qué hace esta salida en GitHub.",
+  "error.workflow.githubRepositoryMissing": "Elige un repositorio para esta salida.",
+  "error.workflow.githubItemMissing":
+    "Esta salida no tiene ninguna incidencia ni pull request. Inicia la ejecución desde un evento de GitHub o pon el número en su entrada.",
+  "error.workflow.githubPullRequestOnly": "Esta acción solo funciona en pull requests.",
+  "error.workflow.githubTextMissing": "Esta salida no tiene texto para enviar. Conecta un paso que lo escriba.",
+  "error.workflow.githubEventText":
+    "Esta salida no puede enviar el evento sin procesar del activador. Pon un agente entre el activador y esta salida.",
+  "error.workflow.githubChoiceMissing": "Elige las etiquetas o la persona para esta salida.",
+  "error.workflow.githubChoseNothing": "El modelo no eligió ninguna etiqueta ni persona de este repositorio.",
+  "error.workflow.githubNotConnected": "Conecta GitHub en el ordenador que ejecuta este flujo de trabajo.",
+  "error.workflow.githubNoAccess":
+    "La aplicación de GitHub de OpenBot no puede ver este repositorio ni este elemento. Abre GitHub y dale acceso.",
+  "error.workflow.githubNoWrite":
+    "La aplicación de GitHub de OpenBot no puede cambiar este repositorio. Abre GitHub y dale acceso.",
+  "error.workflow.githubLocked": "Esta conversación está bloqueada en GitHub.",
+  "error.workflow.githubRefused": "GitHub rechazó el cambio: {detail}",
+  "error.workflow.githubUnreachable": "OpenBot no pudo conectar con GitHub. Ejecuta el paso de nuevo.",
+  "error.workflow.githubUncertain":
+    "El cambio se detuvo a medio camino. Puede que ya esté en GitHub. Revísalo antes de ejecutar el paso de nuevo.",
+  "error.workflow.githubNoEvent":
+    "GitHub no tiene ninguna incidencia ni pull request con la que se inicie este activador.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -282,6 +282,7 @@
     "./features/workflows/workflow-model": "./src/features/workflows/workflow-model.ts",
     "./features/workflows/workflow-run-view": "./src/features/workflows/workflow-run-view.ts",
     "./features/workflows/workflow-board": "./src/features/workflows/workflow-board.tsx",
+    "./features/workflows/workflow-github": "./src/features/workflows/workflow-github.ts",
     "./features/workflows/workflow-camera": "./src/features/workflows/workflow-camera.ts",
     "./features/workflows/workflow-node-parts": "./src/features/workflows/workflow-node-parts.tsx",
     "./features/workflows/workflow-tool-art": "./src/features/workflows/workflow-tool-art.tsx",

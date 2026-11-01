@@ -67,6 +67,8 @@ export const messages = defineMessages("mobile.workflow", {
   "mobile.workflow.trigger.webhookHint": "Runs when its address gets a request.",
   "mobile.workflow.trigger.message": "Message",
   "mobile.workflow.trigger.messageHint": "Change this trigger in OpenBot on your computer.",
+  "mobile.workflow.trigger.github": "GitHub",
+  "mobile.workflow.trigger.githubHint": "Runs when something happens in a GitHub repository.",
   "mobile.workflow.trigger.startsWhen": "Starts",
   "mobile.workflow.trigger.timezone": "Time zone: {zone}",
   "mobile.workflow.trigger.serverZone": "The schedule uses the time zone of the server.",

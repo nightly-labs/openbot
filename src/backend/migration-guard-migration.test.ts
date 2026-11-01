@@ -67,7 +67,7 @@ function range(from: number, to: number): number[] {
 
 describe("migration guards", () => {
   // Migrations 13, 17, 19, 22 to 24, 26 and 28 turn foreign keys off for their rebuilds, and the others do not.
-  it.each([9, 13, 17, 19, 22, 23, 24, 26, 28, 39, 40, 43, 44, 45, 46, 47])(
+  it.each([9, 13, 17, 19, 22, 23, 24, 26, 28, 39, 40, 43, 44, 45, 46, 47, 49])(
     "runs migration %i past broken foreign keys from before the upgrade",
     (version) => {
       const db = databaseAt(version - 1);
@@ -78,7 +78,7 @@ describe("migration guards", () => {
 
       migrateOpenBotDatabase(db);
 
-      expect(versions(db)).toEqual(range(8, 48));
+      expect(versions(db)).toEqual(range(8, 49));
       // Migration 40 adds order columns to the message; every column the row had keeps its value.
       expect(contents(db)).toMatchObject(before);
       // A rebuild moves its table in the schema, which changes only the order of the rows.
@@ -122,7 +122,7 @@ describe("migration guards", () => {
 
     db.exec("DROP TRIGGER break_reference");
     migrateOpenBotDatabase(db);
-    expect(versions(db)).toEqual(range(8, 48));
+    expect(versions(db)).toEqual(range(8, 49));
     expect(contents(db)).toMatchObject(before);
   });
 
@@ -134,7 +134,7 @@ describe("migration guards", () => {
     expect(() => migrateOpenBotDatabase(db)).toThrow(
       `OpenBot database migration history is missing version ${missing}.`,
     );
-    expect(versions(db)).toEqual(range(8, 48).filter((version) => version !== missing));
+    expect(versions(db)).toEqual(range(8, 49).filter((version) => version !== missing));
     expect(db.prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name").all()).toEqual(schemaBefore);
   });
 });

@@ -23,6 +23,12 @@ import {
 } from "./messaging/messaging-schema";
 import { ROUTINE_FLOW_SCHEMA_SQL } from "./routine-flows/routine-flow-schema";
 import { ROUTINE_RESULT_SCHEMA_SQL } from "./routine-results/routine-result-schema";
+import {
+  addGitHubWorkflows,
+  V46_WORKFLOW_RUN_SOURCE_SQL,
+  V49_WORKFLOW_RUN_SOURCE_SQL,
+  WORKFLOW_GITHUB_SCHEMA_SQL,
+} from "./workflows/workflow-github-schema";
 import { WORKFLOW_SCHEMA_SQL } from "./workflows/workflow-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
@@ -606,8 +612,9 @@ const LATEST_SCHEMA_SQL =
   V43_THREAD_EVENT_TYPE_INDEX_SQL +
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL +
   BROWSER_PROFILE_SCHEMA_SQL +
-  WORKFLOW_SCHEMA_SQL +
-  AGENT_THREAD_SCHEMA_SQL;
+  substituteOnce(WORKFLOW_SCHEMA_SQL, V46_WORKFLOW_RUN_SOURCE_SQL, V49_WORKFLOW_RUN_SOURCE_SQL) +
+  AGENT_THREAD_SCHEMA_SQL +
+  WORKFLOW_GITHUB_SCHEMA_SQL;
 
 /** The end of the thread message table with the migration 40 columns before its PRIMARY KEY constraint. */
 function withThreadMessageOrderColumns(tableEnd: string): string {
@@ -882,6 +889,14 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // Adds three columns with no default: no rebuild, so no foreign-key pause and no vacuum. Every existing
     // thread gets null, which is a thread that is not a branch, as it was before.
     up: addAgentThreadBranch,
+  },
+  {
+    version: 49,
+    // Rebuilds the run table to add the GitHub run source, so foreign keys pause while steps point to
+    // runs that move to the new table. Run ids do not change, so every step keeps its run. Few rows, so
+    // no vacuum. The GitHub tables start empty.
+    disableForeignKeys: true,
+    up: addGitHubWorkflows,
   },
 ];
 

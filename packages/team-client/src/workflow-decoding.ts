@@ -2,10 +2,14 @@
 // carries kinds and statuses as open names, so a newer host can add one. The decoders below map a
 // name that this app does not know to a known one before the closed IPC guards run: a status or a
 // source to the nearest neutral value, and a node kind or a port type to a locked note that the app
-// shows but does not save.
+// shows but does not save. A trigger type or an output target that it does not know keeps its node,
+// but the app shows the workflow read-only, as a save from a choice that falls back would change it.
 
 import {
   isWorkflowDetail,
+  isWorkflowGitHubCatalog,
+  isWorkflowGitHubHistory,
+  isWorkflowGitHubRepositoryOptions,
   isWorkflowGraph,
   isWorkflowRunDetail,
   isWorkflowRunPage,
@@ -14,7 +18,11 @@ import {
   isWorkflowSummary,
   isWorkflowVersion,
   isWorkflowWebhookSecret,
+  WORKFLOW_GITHUB_DELIVERY_OUTCOMES,
+  WORKFLOW_GITHUB_EVENTS,
+  WORKFLOW_GITHUB_SKIP_REASONS,
   WORKFLOW_NODE_KINDS,
+  WORKFLOW_OUTPUT_TARGETS,
   WORKFLOW_PORT_TYPES,
   WORKFLOW_RUN_SOURCES,
   WORKFLOW_RUN_STATUSES,
@@ -63,15 +71,25 @@ const version = onRecord((record) => withKnown(record, "kind", WORKFLOW_VERSION_
 
 const trigger = onRecord((record) => withKnown(record, "type", WORKFLOW_TRIGGER_TYPES, "manual"));
 
+/** A trigger type or an output target that this app does not know. */
+function hasUnknownSetting(node: Json): boolean {
+  const fields = isDynamicRecord(node.fields) ? node.fields : {};
+  if (node.kind === "trigger") return isUnknownName(WORKFLOW_TRIGGER_TYPES, fields.trigger);
+  if (node.kind === "output") return isUnknownName(WORKFLOW_OUTPUT_TARGETS, fields.target);
+  return false;
+}
+
 /**
  * The detail with each node of an unknown kind as a locked note in its place, without the edges of
- * such nodes and the edges of an unknown port type, and marked so the app does not save it.
+ * such nodes and the edges of an unknown port type, and marked so the app does not save it. A node
+ * with an unknown trigger type or output target stays, and it also marks the detail.
  */
 const detail = onRecord((record) => {
   const base = mapList({ ...record, summary: summary(record.summary) }, "triggers", trigger);
   const graph = base.graph;
   if (!isDynamicRecord(graph) || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) return base;
   const placeholders = new Set<unknown>();
+  const settings = graph.nodes.some((node) => isDynamicRecord(node) && hasUnknownSetting(node));
   const nodes = graph.nodes.map(
     onRecord((node) => {
       if (!isUnknownName(WORKFLOW_NODE_KINDS, node.kind)) return node;
@@ -85,7 +103,7 @@ const detail = onRecord((record) => {
       !isDynamicRecord(edge) ||
       !(isUnknownName(WORKFLOW_PORT_TYPES, edge.type) || placeholders.has(edge.from) || placeholders.has(edge.to)),
   );
-  const newer = placeholders.size > 0 || edges.length < graph.edges.length;
+  const newer = settings || placeholders.size > 0 || edges.length < graph.edges.length;
   return { ...base, graph: { ...graph, nodes, edges }, ...(newer ? { needsNewerApp: true } : {}) };
 });
 
@@ -137,3 +155,35 @@ export function decodeRemoteWorkflowVersions(value: unknown) {
   if (!isDynamicRecord(value) || !Array.isArray(value.versions)) throw new Error("Invalid remote workflow versions.");
   return decodeWorkflowVersions(value.versions.map(version));
 }
+
+/**
+ * A delivery of `workflows-github-v1` with names that this app knows. The capability carries the event,
+ * the outcome and the reason as open names. An event that this app does not know has no text to show,
+ * so its delivery is dropped. An outcome that it does not know shows as skipped, and a reason as none.
+ */
+const githubDelivery = (value: unknown): unknown[] => {
+  if (!isDynamicRecord(value)) return [value];
+  if (isUnknownName(WORKFLOW_GITHUB_EVENTS, value.event)) return [];
+  const outcome = withKnown(value, "outcome", WORKFLOW_GITHUB_DELIVERY_OUTCOMES, "skipped");
+  return [isUnknownName(WORKFLOW_GITHUB_SKIP_REASONS, outcome.reason) ? { ...outcome, reason: null } : outcome];
+};
+
+const githubHistory = onRecord((record) =>
+  Array.isArray(record.deliveries) ? { ...record, deliveries: record.deliveries.flatMap(githubDelivery) } : record,
+);
+
+/** The `workflows-github-v1` event history of a workflow, newest first. */
+export const decodeRemoteWorkflowGitHubHistory = mapped(
+  githubHistory,
+  guardedDecoder(isWorkflowGitHubHistory, "remote workflow GitHub history"),
+);
+/** The `workflows-github-v1` catalog of the host's GitHub connection. */
+export const decodeRemoteWorkflowGitHubCatalog = guardedDecoder(
+  isWorkflowGitHubCatalog,
+  "remote workflow GitHub catalog",
+);
+/** The `workflows-github-v1` labels and people of one repository. */
+export const decodeRemoteWorkflowGitHubOptions = guardedDecoder(
+  isWorkflowGitHubRepositoryOptions,
+  "remote workflow GitHub options",
+);

@@ -26,7 +26,11 @@ import {
   type RemoteSession,
   type RemoteSessionTicket,
 } from "@openbot/contracts/remote-control-plane";
-import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  GITHUB_REPOSITORY_NAME_PATTERN,
+  type GitHubRouteRepository,
+} from "@openbot/contracts/signal-protocol/github-route";
 import { TELEGRAM_LINK_CODE_PATTERN } from "@openbot/contracts/signal-protocol/telegram-route";
 import {
   REMOTE_TICKET_AUDIENCE,
@@ -684,6 +688,31 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/webhook-route`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
         (value) => requiredString(decodeRecord(value, "Webhook route"), "ticket"),
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
+   * The GitHub route ticket for the repositories that this host's GitHub triggers watch. The account
+   * service checks, with the GitHub sign-in, which of them it can see, and stores none of it.
+   */
+  readonly issueGitHubRoute = Effect.fn("CentralAuth.issueGitHubRoute")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      githubToken: string,
+      repositories: readonly string[],
+    ): Effect.fn.Return<GitHubRouteTicket, CentralAuthOperationError, CentralAuthTransport> {
+      const machineToken = yield* this.#hostMachineToken(hostId);
+      return yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/github-route`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ machineToken, githubToken, repositories }),
+        },
+        decodeGitHubRouteTicket,
       );
     },
     (operation) => this.#owned(operation),
@@ -2199,4 +2228,43 @@ function restoreMobileConnectLink(value: unknown): StoredMobileConnectLink | nul
   if (!isMobileConnectHostBinding(host) || !isString(token) || !MOBILE_CONNECT_LINK_TOKEN.test(token)) return null;
   if (!isNumber(createdAt) || !Number.isFinite(createdAt)) return null;
   return { host: { hostId: host.hostId, fingerprint: host.fingerprint }, token, createdAt };
+}
+
+/** A repository that a GitHub route ticket names. */
+export interface GitHubRouteTicketRepository extends GitHubRouteRepository {
+  /** `owner/name`, as GitHub spells it. */
+  fullName: string;
+  /** Whether the installation sends every event that GitHub triggers need. */
+  events: boolean;
+}
+
+export interface GitHubRouteTicket {
+  ticket: string;
+  repositories: GitHubRouteTicketRepository[];
+}
+
+function decodeGitHubRouteTicket(value: unknown): GitHubRouteTicket {
+  const record = decodeRecord(value, "GitHub route");
+  const repositories = record.repositories;
+  if (!Array.isArray(repositories)) throw new Error("The GitHub route has no repository list.");
+  return {
+    ticket: requiredString(record, "ticket"),
+    repositories: repositories.map((repository) => {
+      if (
+        !isDynamicRecord(repository) ||
+        !isNumber(repository.id) ||
+        !isNumber(repository.installationId) ||
+        !isString(repository.fullName) ||
+        !GITHUB_REPOSITORY_NAME_PATTERN.test(repository.fullName) ||
+        !isBoolean(repository.events)
+      )
+        throw new Error("The GitHub route has an invalid repository.");
+      return {
+        id: repository.id,
+        installationId: repository.installationId,
+        fullName: repository.fullName,
+        events: repository.events,
+      };
+    }),
+  };
 }

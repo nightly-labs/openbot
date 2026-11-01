@@ -913,14 +913,14 @@ export function parseReorderQueue(value: unknown): ReorderQueueInput {
   if (!isObject(value)) throw new Error("Invalid queue reorder request.");
   return {
     agentId: requireString(value.agentId, "agentId"),
-    deliveryIds: parseIdentifierList(value.deliveryIds, "delivery ids"),
+    deliveryIds: parseIdentifierList(value.deliveryIds, "delivery ids", INPUT_LIMITS.queueReorder),
   };
 }
 
-function parseIdentifierList(value: unknown, label: string): string[] {
+function parseIdentifierList(value: unknown, label: string, limit: number = INPUT_LIMITS.messageRecipients): string[] {
   if (
     !Array.isArray(value) ||
-    value.length > INPUT_LIMITS.messageRecipients ||
+    value.length > limit ||
     !value.every((item) => isString(item) && item.length <= INPUT_LIMITS.identifier)
   ) {
     throw new Error(`Invalid ${label}.`);

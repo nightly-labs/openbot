@@ -2,7 +2,7 @@
 
 The Remote API is the Signal service. It verifies remote tickets, issues resume tokens and TURN
 credentials, and relays WebRTC signalling between peers. It does not carry team chats, files, or
-commands. The exceptions are Slack, Discord and Telegram. `POST /v1/slack/events` checks the OpenBot Slack
+commands. The exceptions are Slack, Discord, Telegram and GitHub. `POST /v1/slack/events` checks the OpenBot Slack
 app's signature, reads only the app ID (`api_app_id`), the workspace ID (`team_id`), the
 `url_verification` challenge, and the event's `type`, `channel_type`, `thread_ts`, `bot_id` and
 `subtype` (to know whether it addresses OpenBot, never the text), and passes the body to the `ingress`
@@ -10,7 +10,9 @@ socket of the workspace's host in transit. `POST /v1/telegram/updates/<bot ID>` 
 the callback query ID, a `/start <code>` link code, and the chat type, the entity types and whether the
 message replies, is in a thread, or renames or leaves the chat (to know whether it can address
 OpenBot, never the text), and passes the body to the `ingress` socket of
-the chat's host in the same way. Do not log these bodies, and do not read more of them. The one store
+the chat's host in the same way. `POST /v1/github/events` checks the OpenBot GitHub App's signature,
+reads only the installation ID and the repository ID, and passes the body to the `ingress` socket of
+every host whose GitHub route names the repository. Do not log these bodies, and do not read more of them. The one store
 is `src/ingress-queue.ts`: for a hosted server that sleeps, and for the `/start` update of a Telegram
 chat that was just linked to a host, it keeps an event in memory only, sealed to the host's queue key
 before it is queued, for at most 10 minutes. Never keep a body that is not
@@ -36,7 +38,7 @@ let a host call Discord in a guild or channel that is not routed to its socket.
 - The message shapes come from `@openbot/contracts/signal-protocol`. `src/protocol.ts` only
   re-exports them for the server. Change them there, and keep released messages compatible.
 - `src/tokens.ts` holds the secrets. Compare secrets in constant time (`timingSafeEqual`), and keep
-  the TTL limits. Never log a ticket, a token, a Slack, Discord or Telegram route ticket, a request
+  the TTL limits. Never log a ticket, a token, a Slack, Discord, Telegram or GitHub route ticket, a request
   or update body, a bot token, a file or upload token, a TURN credential, or a secret from
   `src/config.ts`. Log only the error
   message, as `src/app.ts` does.

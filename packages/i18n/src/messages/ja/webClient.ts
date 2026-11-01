@@ -34,6 +34,9 @@ export const messages = {
   "webClient.notice.createServer": "ホスト型サーバーを作成",
   "webClient.notice.join": "招待で参加",
   "webClient.notice.refreshHosts": "サーバーを更新",
+  "webClient.otherTab.title": "{name} は別のタブで開かれています",
+  "webClient.otherTab.description": "OpenBot は一度に 1 つのタブでのみサーバーを使用できます。",
+  "webClient.otherTab.useHere": "ここで使用",
   "webClient.agent.modelsFailed": "サーバーのモデルを読み込めませんでした。",
   "webClient.agent.refreshFailed":
     "エージェントは作成されましたが、ワークスペースを更新できませんでした。再試行する前に再読み込みしてください。",

@@ -59,7 +59,7 @@ import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
 import { createHostRestartToasts, type HostRestartView } from "../updates/host-restart-toast";
 import type { WebHostNotice } from "./web-host-connections";
 import { createWebHostLifecycle } from "./web-host-lifecycle";
-import type { WebHostState } from "./web-host-lock";
+import { WebHostOtherTabError, type WebHostState } from "./web-host-lock";
 import {
   createWebWorkspaceRuntime,
   WebHostConnectionError,
@@ -147,6 +147,8 @@ interface WebWorkspaceState {
   connectionError: UserErrorDetails | null;
   /** Signal holds the connection because the host is not online. */
   hostOffline: boolean;
+  /** Another tab of this browser has the host open. The workspace shows this in full, with "Use here". */
+  otherTab: boolean;
   recovery: RemoteRecoveryStatus | null;
   workspaceLoaded: boolean;
   panelsFailed: boolean;
@@ -228,6 +230,7 @@ export function createWebWorkspace(
     hostedStart: null,
     connectionError: null,
     hostOffline: false,
+    otherTab: false,
     recovery: null,
     workspaceLoaded: false,
     panelsFailed: false,
@@ -371,6 +374,19 @@ export function createWebWorkspace(
           });
       },
       hostSessionRevoked: () => void retryHosts(),
+      hostTaken(id) {
+        if (disposed || id !== hostId) return;
+        // The user moved the host to another tab. This tab waits for "Use here" and does not reconnect.
+        generation += 1;
+        hostLifecycle.endSleep();
+        recoveryBlocked = true;
+        recovery.suspend();
+        setState((draft) => {
+          draft.otherTab = true;
+          draft.status = "offline";
+          draft.connectionError = null;
+        });
+      },
       connection(update) {
         if (disposed || update.hostId !== hostId) return;
         if (recoveryBlocked && update.state === "offline" && !update.code) return;
@@ -993,27 +1009,33 @@ export function createWebWorkspace(
       throw new Error(currentText().t("webClient.error.invitationOffline"));
     acceptedInvite = null;
   }
-  async function connect(host: RemoteTeamHost) {
+  /** With `takeOver`, the tab that has the host open gives it to this tab. */
+  async function connect(host: RemoteTeamHost, takeOver = false) {
     recoveryBlocked = false;
     recovery.dispose();
     recovery = makeRecovery();
     if (!connectionPromise || connectionPromise.hostId !== host.hostId) hostLifecycle.endSleep();
     try {
-      await attemptConnection(host, true);
+      await attemptConnection(host, true, takeOver);
     } catch (error) {
       if (!disposed && hostId === host.hostId) noteConnectionFailure(error);
       if (!disposed && hostId === host.hostId && state.recovery?.phase !== "suspended") recover();
     }
   }
-  function attemptConnection(host: RemoteTeamHost, opened = false): Promise<void> {
+  /** Moves the opened host from another tab of this browser to this tab. */
+  async function useHere(): Promise<void> {
+    const host = state.host;
+    if (host && state.otherTab) await connect(host, true);
+  }
+  function attemptConnection(host: RemoteTeamHost, opened = false, takeOver = false): Promise<void> {
     if (connectionPromise?.hostId === host.hostId) return connectionPromise.promise;
-    const promise = connectWorkspace(host, opened).finally(() => {
+    const promise = connectWorkspace(host, opened, takeOver).finally(() => {
       if (connectionPromise?.promise === promise) connectionPromise = null;
     });
     connectionPromise = { hostId: host.hostId, opened, promise };
     return promise;
   }
-  async function connectWorkspace(host: RemoteTeamHost, opened: boolean) {
+  async function connectWorkspace(host: RemoteTeamHost, opened: boolean, takeOver: boolean) {
     const current = ++generation;
     const sameHost = hostId === host.hostId;
     // A hosted server that sleeps or wakes keeps the workspace visible, so each retry keeps its agents and the selection.
@@ -1033,6 +1055,7 @@ export function createWebWorkspace(
       // A retry keeps the last failure on screen until it ends.
       if (!sameHost) draft.connectionError = null;
       if (!sameHost) draft.hostOffline = false;
+      if (!sameHost) draft.otherTab = false;
       if (!sameHost) {
         draft.workspaceLoaded = false;
         draft.agentStatus = null;
@@ -1079,12 +1102,15 @@ export function createWebWorkspace(
       };
       const readGate = () => Promise.all([runtime.listAgents(), runtime.status(), runtime.models()]);
       const connecting = runtime.connect(host, {
-        start: () => {
-          early.gate = readGate();
-          early.gate.catch(() => undefined);
-        },
-        drop: () => {
-          early.gate = null;
+        takeOver,
+        early: {
+          start: () => {
+            early.gate = readGate();
+            early.gate.catch(() => undefined);
+          },
+          drop: () => {
+            early.gate = null;
+          },
         },
       });
       // The frame is read-only: no capabilities, so no feature reads the host before it connects.
@@ -1134,6 +1160,7 @@ export function createWebWorkspace(
         draft.agentStatus = agentStatus;
         draft.models = models;
         draft.connectionError = null;
+        draft.otherTab = false;
         draft.status = "online";
       });
       syncedAt = Date.now();
@@ -1185,6 +1212,7 @@ export function createWebWorkspace(
       if (disposed || current !== generation) return;
       setState((draft) => {
         draft.status = "offline";
+        draft.otherTab = error instanceof WebHostOtherTabError;
         // The workspace shows an incompatible host in full, so it is not also reported as an error.
         if (error instanceof WebHostIncompatibleError)
           draft.incompatibility = {
@@ -1196,7 +1224,15 @@ export function createWebWorkspace(
           };
       });
       if (blockAccess(error)) throw error;
-      if (error instanceof WebHostIncompatibleError || error instanceof WebHostConnectionError) {
+      // The server can run while another tab holds it. A wake would show a start that never ends.
+      if (error instanceof WebHostOtherTabError) {
+        hostLifecycle.endSleep();
+        recoveryBlocked = true;
+        recovery.suspend();
+        setState((draft) => {
+          draft.connectionError = null;
+        });
+      } else if (error instanceof WebHostIncompatibleError || error instanceof WebHostConnectionError) {
         hostLifecycle.endSleep();
         recoveryBlocked = true;
         recovery.suspend();
@@ -1687,6 +1723,7 @@ export function createWebWorkspace(
     removeOwnedHost,
     retryHosts,
     reconnect,
+    useHere,
     joinInvite,
     connect,
     select,

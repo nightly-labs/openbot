@@ -5,6 +5,11 @@ import {
   type DiscordRouteGuild,
 } from "@openbot/contracts/signal-protocol/discord-route";
 import {
+  GITHUB_ROUTE_AUDIENCE,
+  GITHUB_ROUTE_REPOSITORIES_LIMIT,
+  type GitHubRouteRepository,
+} from "@openbot/contracts/signal-protocol/github-route";
+import {
   SLACK_ROUTE_AUDIENCE,
   SLACK_ROUTE_TEAMS_LIMIT,
   type SlackRouteTeam,
@@ -93,6 +98,12 @@ const webhookRouteClaimsSchema = z.object({
   routes: z
     .array(z.object({ id: identifierSchema, linkedAt: z.number().int().nonnegative() }))
     .max(WEBHOOK_ROUTES_LIMIT),
+});
+const githubRouteClaimsSchema = z.object({
+  hid: identifierSchema,
+  repositories: z
+    .array(z.object({ id: z.int().positive(), installationId: z.int().positive() }))
+    .max(GITHUB_ROUTE_REPOSITORIES_LIMIT),
 });
 const telegramRouteClaimsSchema = z.object({
   hid: identifierSchema,
@@ -317,6 +328,28 @@ export class RemoteTokenService {
     (hostId: string, routes: WebhookRoute[]) => this.#validateWebhookRoute(hostId, routes),
   );
 
+  /**
+   * The account service checked the repositories with the user's GitHub sign-in when it signed the
+   * ticket, and keeps no link, so there is nothing to validate after a restart: the ticket expires.
+   */
+  readonly verifyGitHubRoute = Effect.fn("RemoteTokens.verifyGitHubRoute")(
+    (token: string, hostId: string, now = new Date()) =>
+      Effect.gen({ self: this }, function* () {
+        const { payload } = yield* tokenCall(() =>
+          jwtVerify(token, this.#ticketKey, {
+            audience: GITHUB_ROUTE_AUDIENCE,
+            algorithms: ["ES256"],
+            requiredClaims: ["exp"],
+            currentDate: now,
+          }),
+        );
+        const claims = yield* tokenDecode(() => githubRouteClaimsSchema.parse(payload));
+        if (claims.hid !== hostId)
+          return yield* new RemoteTokenError({ message: "The GitHub route belongs to another host." });
+        return { repositories: claims.repositories satisfies GitHubRouteRepository[] };
+      }),
+  );
+
   readonly verifyTelegramRoute = Effect.fn("RemoteTokens.verifyTelegramRoute")(
     (token: string, hostId: string, now = new Date()) =>
       Effect.gen({ self: this }, function* () {
@@ -499,6 +532,14 @@ export function verifySlackSignature(
   if (Math.abs(now / 1_000 - Number(timestamp)) > SLACK_SIGNATURE_TOLERANCE_SECONDS) return false;
   const expected = `v0=${createHmac("sha256", secret).update(`v0:${timestamp}:`).update(body).digest("hex")}`;
   const actualBytes = Buffer.from(signature);
+  const expectedBytes = Buffer.from(expected);
+  return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
+}
+
+/** GitHub's webhook signature: `sha256=` and the hex HMAC-SHA256 of the body with the App's webhook secret. */
+export function verifyGitHubSignature(body: Uint8Array, signature: string, secret: string): boolean {
+  const expected = `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
+  const actualBytes = Buffer.from(signature.toLowerCase());
   const expectedBytes = Buffer.from(expected);
   return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
 }

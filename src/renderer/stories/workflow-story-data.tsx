@@ -6,12 +6,16 @@
 
 import type {
   RoutineSchedule,
+  WorkflowGitHubDelivery,
+  WorkflowGitHubHistory,
+  WorkflowGitHubItem,
   WorkflowGraph,
   WorkflowRunDetail,
   WorkflowStep,
   WorkflowVersion,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { EMPTY_GITHUB_HISTORY, type WorkflowGitHubCanvas } from "@openbot/ui/features/workflows/workflow-github";
 import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
 import type { WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
 import { FILES_ROWS } from "./files-fixtures";
@@ -98,6 +102,8 @@ export interface StoryWorkflow {
   runs?: WorkflowRunView;
   /** Versions from before the story, newest first. */
   versions?: readonly StoryVersion[];
+  /** GitHub events from before the story, and the items of the fixture runs that they started. */
+  github?: WorkflowGitHubHistory;
 }
 
 const COLUMN = 460;
@@ -473,3 +479,188 @@ export const newCompetitorAlert = (): StoryWorkflow => ({
   title: "New competitor alert",
   graph: NEW_COMPETITOR_ALERT,
 });
+
+/* ------------------------------------------------------------ GitHub */
+
+const TRIAGE_REPOSITORY = "openbot-preview/app";
+
+/** Issue help: a new comment on an issue goes to an agent, which answers on the issue and labels it. */
+const GITHUB_TRIAGE: WorkflowGraph = {
+  nodes: [
+    {
+      kind: "trigger",
+      id: "comment",
+      at: { x: 0, y: 40 },
+      fields: { trigger: "github", repository: TRIAGE_REPOSITORY, event: "comment", filters: "notBot" },
+    },
+    {
+      kind: "agent",
+      id: "triage",
+      at: { x: 420, y: 0 },
+      fields: {
+        agentId: "research",
+        task: "Read the comment and the issue, find the likely cause, and answer in 5 lines",
+      },
+    },
+    {
+      kind: "output",
+      id: "answer",
+      at: { x: 840, y: -120 },
+      fields: { target: "github", action: "comment" },
+    },
+    {
+      kind: "output",
+      id: "label",
+      at: { x: 840, y: 240 },
+      fields: { target: "github", action: "label.add", labelsFrom: "agent", labels: "bug\nenhancement" },
+    },
+  ],
+  edges: [
+    { id: "comment>triage:text", from: "comment", to: "triage", type: "text" },
+    { id: "triage>answer:text", from: "triage", to: "answer", type: "text" },
+    { id: "triage>label:text", from: "triage", to: "label", type: "text" },
+  ],
+  strokes: [],
+};
+
+/** A run of Issue help that a comment started. An open run has its trigger done and its agent at work. */
+function triageRun(
+  workflowId: string,
+  number: number,
+  item: WorkflowGitHubItem,
+  startedAt: string,
+  open: boolean,
+): WorkflowRunDetail {
+  const id = `story-github-run-${number}`;
+  const start = Date.parse(startedAt);
+  const at = (seconds: number) => new Date(start + seconds * 1000).toISOString();
+  const step = (nodeId: string, times: { startedAt: string; endedAt: string }, output: string) =>
+    storyStep(GITHUB_TRIAGE, workflowId, id, `${id}:${nodeId}`, nodeId, times, { output });
+  const steps = [step("comment", { startedAt: at(0), endedAt: at(0) }, STEP_ANSWER.trigger ?? "")];
+  if (open) {
+    steps.push({ ...step("triage", { startedAt: at(1), endedAt: at(1) }, ""), status: "running", endedAt: null });
+  } else {
+    steps.push(
+      step("triage", { startedAt: at(1), endedAt: at(40) }, AGENT_RESULT),
+      step("answer", { startedAt: at(40), endedAt: at(42) }, `Commented on #${item.number}.`),
+      step("label", { startedAt: at(40), endedAt: at(43) }, `Added the label bug to #${item.number}.`),
+    );
+  }
+  return {
+    run: {
+      id,
+      workflowId,
+      number,
+      triggerNodeId: "comment",
+      source: "github",
+      status: open ? "running" : "done",
+      error: null,
+      startedAt,
+      endedAt: open ? null : at(43),
+    },
+    steps,
+  };
+}
+
+/**
+ * Issue help with two runs open at the same time, one for each of two issues. A second comment on one
+ * of them waits until the run of its issue ends. An earlier run ended.
+ */
+export function githubTriage(): StoryWorkflow {
+  const id = "github-triage";
+  const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+  const item = (number: number, title: string): WorkflowGitHubItem => ({
+    repository: TRIAGE_REPOSITORY,
+    number,
+    pullRequest: false,
+    title,
+  });
+  const started = [
+    { item: item(42, "Crash when the export folder is missing"), minutes: 1, open: true },
+    { item: item(41, "Settings window opens off screen"), minutes: 2, open: true },
+    { item: item(38, "Export fails when the folder name has a space"), minutes: 90, open: false },
+  ].map((entry, index) => ({
+    item: entry.item,
+    detail: triageRun(id, 3 - index, entry.item, ago(entry.minutes), entry.open),
+  }));
+  const waiting = started[0]?.item ?? null;
+  return {
+    id,
+    title: "Issue help",
+    graph: GITHUB_TRIAGE,
+    runs: { runs: started.map((entry) => entry.detail), soloSteps: [], nextBefore: null },
+    github: {
+      deliveries: [
+        {
+          id: "story-delivery-4",
+          nodeId: "comment",
+          event: "comment",
+          item: waiting,
+          receivedAt: ago(0.5),
+          outcome: "waiting",
+          reason: null,
+          runId: null,
+        },
+        ...started.map(
+          ({ item, detail }): WorkflowGitHubDelivery => ({
+            id: `story-delivery-${detail.run.number}`,
+            nodeId: "comment",
+            event: "comment",
+            item,
+            receivedAt: detail.run.startedAt,
+            outcome: "started",
+            reason: null,
+            runId: detail.run.id,
+          }),
+        ),
+      ],
+      runs: started.map(({ item, detail }) => ({ runId: detail.run.id, item })),
+    },
+  };
+}
+
+/**
+ * The GitHub of the node stories: connected, with one repository that the bot can change and one that
+ * it can only read. The buttons do nothing.
+ */
+export const STORY_GITHUB: WorkflowGitHubCanvas = {
+  catalog: () => ({
+    connected: true,
+    repositories: [
+      { fullName: TRIAGE_REPOSITORY, private: false, canWrite: true, events: true },
+      { fullName: "openbot-preview/docs", private: true, canWrite: false, events: true },
+    ],
+  }),
+  history: () => EMPTY_GITHUB_HISTORY,
+  run: () => undefined,
+  options: () => ({
+    labels: [
+      { name: "bug", color: "d73a4a" },
+      { name: "enhancement", color: "a2eeef" },
+      { name: "needs triage", color: "fbca04" },
+    ],
+    people: ["octocat", "hubot"],
+  }),
+  connection: () => ({
+    status: {
+      available: true,
+      state: "connected",
+      login: "octocat",
+      avatarUrl: null,
+      userCode: null,
+      verificationUri: null,
+      error: null,
+    },
+    busy: false,
+    repositories: null,
+    repositoriesError: null,
+    onConnect: () => undefined,
+    onCancel: () => undefined,
+    onOpenVerification: () => undefined,
+    onOpenInstall: () => undefined,
+  }),
+  openGitHub: () => undefined,
+  opening: () => false,
+  openItem: () => undefined,
+  runLastEvent: () => undefined,
+};

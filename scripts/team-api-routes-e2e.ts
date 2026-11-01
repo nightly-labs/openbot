@@ -3909,14 +3909,25 @@ try {
       token: bobToken,
       json: { deliveryIds: "delivery-1" },
     });
+    const longQueue = Array.from({ length: 33 }, (_, index) => `delivery-${index + 1}`).toReversed();
+    const reorderLong = await call("POST", TEAM_API_ROUTES.agent.queueReorder("agent-ada"), {
+      token: bobToken,
+      json: { deliveryIds: longQueue },
+    });
+    const reorderTooLong = await call("POST", TEAM_API_ROUTES.agent.queueReorder("agent-ada"), {
+      token: bobToken,
+      json: { deliveryIds: Array.from({ length: INPUT_LIMITS.queueReorder + 1 }, (_, index) => `delivery-${index}`) },
+    });
     check(
       "reorder gives 204 with the new order, and a non-array order gets 400",
       reorder.status === 204 &&
         isDeepStrictEqual(callsOf("reorderQueue"), [
           [{ agentId: "agent-ada", deliveryIds: ["delivery-2", "delivery-1"] }],
+          [{ agentId: "agent-ada", deliveryIds: longQueue }],
         ]) &&
-        reorderBad.status === 400,
-      [summary(reorder), summary(reorderBad)],
+        reorderBad.status === 400 &&
+        reorderTooLong.status === 400,
+      [summary(reorder), summary(reorderLong), summary(reorderBad), summary(reorderTooLong)],
     );
     const interrupt = await call("POST", TEAM_API_ROUTES.agent.interrupt("agent-ada"), {
       token: bobToken,

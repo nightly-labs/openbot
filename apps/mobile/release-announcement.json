@@ -1,10 +1,10 @@
 {
-  "version": "1.4.4",
+  "version": "1.4.5",
   "highlights": [
-    "The app now works on iPad, iPhone Duo and Android foldables. On a wide screen, the chat list stays beside the open chat.",
-    "Tap the activity row of a working agent to read each thought of the turn in full, live.",
-    "Settings › Notifications is the one place for notifications: choose All, Needs me or Off for each server and agent, on all your devices.",
-    "When a new version is available, home shows an update header, and What's new shows the release notes.",
-    "Code blocks in chat wrap long lines, so you can read a long command without scrolling sideways."
+    "Tap the speaker under an agent message to hear it read aloud with your reply voice.",
+    "Manage the server from the phone: providers and their accounts, custom providers, the ACP registry, browser profiles, agent folders and backup models.",
+    "Move a server with the new Transfer page, or import agents from a Grok Bot or Hermes Agent export.",
+    "The server Usage screen shows how much of each provider plan limit is left and when it resets.",
+    "The app reconnects within about 30 seconds after the server comes back, and keeps working when a server changes its key."
   ]
 }

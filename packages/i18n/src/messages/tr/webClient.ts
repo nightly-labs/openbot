@@ -34,6 +34,9 @@ export const messages = {
   "webClient.notice.createServer": "Barındırılan sunucu oluştur",
   "webClient.notice.join": "Davet ile katıl",
   "webClient.notice.refreshHosts": "Sunucuları yenile",
+  "webClient.otherTab.title": "{name} başka bir sekmede açık",
+  "webClient.otherTab.description": "OpenBot bir sunucuyu aynı anda yalnızca bir sekmede kullanabilir.",
+  "webClient.otherTab.useHere": "Burada kullan",
   "webClient.agent.modelsFailed": "Sunucu modelleri yüklenemedi.",
   "webClient.agent.refreshFailed":
     "Ajan oluşturuldu, ancak çalışma alanı yenilenemedi. Tekrar denemeden önce sayfayı yeniden yükleyin.",

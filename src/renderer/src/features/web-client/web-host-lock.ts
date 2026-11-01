@@ -1,6 +1,13 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { currentText } from "@openbot/ui/text";
 
+/** Another tab of this browser has the host open. The host itself can be online. */
+export class WebHostOtherTabError extends Error {
+  constructor() {
+    super(currentText().t("webClient.error.otherTab"));
+  }
+}
+
 /**
  * A logical host session belongs to one account credential. Prevent tabs from replacing each other's peer.
  * With `wait`, the request queues until the lock is free or the signal aborts.
@@ -20,7 +27,7 @@ export async function acquireWebHostLock(
     void navigator.locks
       .request(`openbot.web.host:${accountId}:${hostId}`, lockOptions, async (lock) => {
         if (!lock) {
-          reject(new Error(currentText().t("webClient.error.otherTab")));
+          reject(new WebHostOtherTabError());
           return;
         }
         resolve(release);
@@ -35,10 +42,12 @@ export type WebHostState = "unknown" | "connecting" | "online" | "offline" | "er
 
 /**
  * The messages between the tabs of one account. A tab that opens a host asks the tab that holds it
- * for a status connection to let it go; a tab that has the host open answers `busy`.
+ * for a status connection to let it go; a tab that has the host open answers `busy`. With `take`, the
+ * user moves the host to the tab that asks, so every tab lets it go. A tab of an older build ignores `take`.
  */
 export type WebHostTabMessage =
   | { type: "release"; hostId: string; requestId: string }
+  | { type: "take"; hostId: string; requestId: string }
   | { type: "busy"; hostId: string; requestId: string }
   | { type: "state"; hostId: string; state: WebHostState }
   | { type: "query" };
@@ -60,7 +69,7 @@ export function decodeWebHostTabMessage(value: unknown): WebHostTabMessage | nul
   if (!isDynamicRecord(value)) return null;
   if (value.type === "query") return { type: "query" };
   if (!isString(value.hostId)) return null;
-  if ((value.type === "release" || value.type === "busy") && isString(value.requestId))
+  if ((value.type === "release" || value.type === "take" || value.type === "busy") && isString(value.requestId))
     return { type: value.type, hostId: value.hostId, requestId: value.requestId };
   if (value.type === "state" && isWebHostState(value.state))
     return { type: "state", hostId: value.hostId, state: value.state };
@@ -74,7 +83,8 @@ export function openWebHostChannel(accountId: string): BroadcastChannel | null {
 
 /**
  * The lock of a host this tab opens. When another tab holds it, asks that tab to let its status
- * connection go and waits for the lock. A tab that has the host open refuses at once.
+ * connection go and waits for the lock. A tab that has the host open refuses at once, unless `takeOver`
+ * asks it to close the host.
  */
 export async function acquireOpenedWebHostLock(
   accountId: string,
@@ -83,6 +93,7 @@ export async function acquireOpenedWebHostLock(
   acquire: typeof acquireWebHostLock = acquireWebHostLock,
   // The other tab ends its session before it gives up the lock, which is a request to the account service.
   timeoutMs = 15_000,
+  takeOver = false,
 ): Promise<() => void> {
   try {
     return await acquire(accountId, hostId);
@@ -98,11 +109,11 @@ export async function acquireOpenedWebHostLock(
   };
   channel.addEventListener("message", listen);
   try {
-    channel.postMessage({ type: "release", hostId, requestId } satisfies WebHostTabMessage);
+    channel.postMessage({ type: takeOver ? "take" : "release", hostId, requestId } satisfies WebHostTabMessage);
     return await acquire(accountId, hostId, { wait: stop.signal });
   } catch (error) {
     if (!stop.signal.aborted) throw error;
-    throw new Error(currentText().t("webClient.error.otherTab"));
+    throw new WebHostOtherTabError();
   } finally {
     clearTimeout(timer);
     channel.removeEventListener("message", listen);

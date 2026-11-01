@@ -34,6 +34,9 @@ export const messages = {
   "webClient.notice.createServer": "Создать облачный сервер",
   "webClient.notice.join": "Войти по приглашению",
   "webClient.notice.refreshHosts": "Обновить серверы",
+  "webClient.otherTab.title": "{name} открыт в другой вкладке",
+  "webClient.otherTab.description": "OpenBot может использовать сервер только в одной вкладке одновременно.",
+  "webClient.otherTab.useHere": "Использовать здесь",
   "webClient.agent.modelsFailed": "Не удалось загрузить модели сервера.",
   "webClient.agent.refreshFailed":
     "Агент создан, но рабочее пространство обновить не удалось. Перезагрузите страницу, прежде чем повторять.",

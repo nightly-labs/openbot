@@ -1,7 +1,7 @@
 // Starts the real Signal service (`remote/api`) on a free local port with throwaway secrets and a
 // fake account service, then checks its secret and authentication rules over real HTTP and
 // WebSocket connections: the Telegram secret header, the Slack signature, the signed account
-// events, the body limits, the remote and route tickets, a failed account service during an initial ticket check after a start, the limit on parallel account service checks during a burst of hellos, the generic webhook headers, the hello deadline, the reuse of
+// events, the GitHub App signature and the fan-out of a GitHub event to each host that watches its repository, the body limits, the remote and route tickets, a failed account service during an initial ticket check after a start, the limit on parallel account service checks during a burst of hellos, the generic webhook headers, the hello deadline, the reuse of
 // TURN credentials, the pick of one TURN relay that allocates for each host, the `signal` ticket claim and the entry rule of
 // two Signal machines (with a second Signal and a fake DNS server), and that no frame or log line holds the Telegram bot token. Writes .openbot-build/signal-security-e2e/report.json and exits
 // non-zero when a check fails. It makes no request to Telegram, Slack or Discord.
@@ -12,6 +12,14 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { createServer as createNetServer } from "node:net";
 import { resolve } from "node:path";
+import {
+  GITHUB_DELIVERY_BODY_BYTES_LIMIT,
+  GITHUB_DELIVERY_HEADER,
+  GITHUB_EVENT_HEADER,
+  GITHUB_EVENTS_PATH,
+  GITHUB_ROUTE_AUDIENCE,
+  GITHUB_SIGNATURE_HEADER,
+} from "@openbot/contracts/signal-protocol/github-route";
 import {
   createIngressQueueKeyPair,
   importIngressQueuePrivateKey,
@@ -52,6 +60,10 @@ const HOST_ID = "host-e2e";
 const ROUTED_CHAT = "-100";
 const SECOND_CHAT = "-300";
 const WEBHOOK_ROUTE = "route-e2e";
+const GITHUB_WEBHOOK_SECRET = randomBytes(32).toString("hex");
+const GITHUB_HOST_ID = "host-github-e2e";
+const GITHUB_INSTALLATION = 7;
+const GITHUB_REPOSITORY = 77;
 const LINK_HOST_ID = "host-link-e2e";
 const LINK_CHAT = "-500";
 const LINK_CODE = randomBytes(32).toString("base64url");
@@ -392,6 +404,7 @@ const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
     REMOTE_METRICS_TOKEN: METRICS_TOKEN,
     SIGNAL_ID,
     SLACK_SIGNING_SECRET: `${SLACK_APP_ID}:${SLACK_SECRET}`,
+    GITHUB_WEBHOOK_SECRET,
     TELEGRAM_BOT_TOKENS: BOT_TOKEN,
     TELEGRAM_WEBHOOK_SECRET,
     // All sockets of the burst check come from one address.
@@ -437,6 +450,52 @@ const postSlack = (body: string, timestamp: string, signature: string) =>
 const slackSignature = (body: string, timestamp: string, secret = SLACK_SECRET) =>
   `v0=${hmac(secret, `v0:${timestamp}:${body}`, "hex")}`;
 const nowSeconds = () => String(Math.floor(Date.now() / 1_000));
+const postGitHub = (
+  body: string,
+  deliveryId: string,
+  signature = `sha256=${hmac(GITHUB_WEBHOOK_SECRET, body, "hex")}`,
+) =>
+  fetch(`${base}${GITHUB_EVENTS_PATH}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      [GITHUB_EVENT_HEADER]: "issues",
+      [GITHUB_DELIVERY_HEADER]: deliveryId,
+      [GITHUB_SIGNATURE_HEADER]: signature,
+    },
+    body,
+  });
+const githubEvent = (installation: number, repository: number) =>
+  JSON.stringify({ action: "opened", installation: { id: installation }, repository: { id: repository } });
+
+/** An ingress socket of `hostId` with a GitHub route for the one repository of this run. */
+async function githubIngress(hostId: string, routeHostId = hostId): Promise<Peer> {
+  const peer = await connect(signalUrl);
+  peer.socket.send(
+    JSON.stringify({
+      type: "hello",
+      version: 1,
+      peer: "ingress",
+      token: await remoteTicket({ hostId, membershipId: `${hostId}:host` }),
+      githubRoute: await sign(
+        { hid: routeHostId, repositories: [{ id: GITHUB_REPOSITORY, installationId: GITHUB_INSTALLATION }] },
+        GITHUB_ROUTE_AUDIENCE,
+      ),
+    }),
+  );
+  return peer;
+}
+
+/** Answers each `github-delivery` of `peer` with `status`. */
+function answerGitHub(peer: Peer, status: number) {
+  peer.socket.addEventListener("message", (event) => {
+    const frame = JSON.parse(String(event.data));
+    if (frame.type === "github-delivery")
+      peer.socket.send(
+        JSON.stringify({ type: "github-delivery-result", version: 1, requestId: frame.requestId, status }),
+      );
+  });
+}
 
 /** Sends a host hello and returns the socket. */
 async function hello(url: string, token: string): Promise<Peer> {
@@ -731,6 +790,89 @@ try {
     expect(delivered.length === 0, "A refused webhook request reached the host.");
     return "missing 401, malformed 401, bad timestamp 401, unheld route 503, nothing delivered";
   });
+
+  // GitHub: Signal checks the App's signature, and passes an event to every host that watches its
+  // repository in the same installation.
+  await check("A GitHub route ticket of another host is refused", async () => {
+    const peer = await githubIngress(HOST_ID, GITHUB_HOST_ID);
+    const code = await withDeadline(peer.closed, "close after a GitHub route of another host");
+    expect(!peer.frames.some((frame) => frame.includes('"type":"ready"')), "Signal sent ready.");
+    return `closed with ${code}`;
+  });
+
+  const githubFirst = await githubIngress(HOST_ID);
+  const githubSecond = await githubIngress(GITHUB_HOST_ID);
+  await githubFirst.next((frame) => frame.includes('"type":"github-ready"'), "first github-ready");
+  await githubSecond.next((frame) => frame.includes('"type":"github-ready"'), "second github-ready");
+  answerGitHub(githubFirst, 202);
+  answerGitHub(githubSecond, 404);
+
+  await check("A GitHub event with a bad, missing or other-secret signature gets 401 and reaches no host", async () => {
+    const body = githubEvent(GITHUB_INSTALLATION, GITHUB_REPOSITORY);
+    const bad = await postGitHub(body, "github-bad", `sha256=${"a".repeat(64)}`);
+    const missing = await postGitHub(body, "github-missing", "");
+    const other = await postGitHub(body, "github-other", `sha256=${hmac("z".repeat(64), body, "hex")}`);
+    expect(bad.status === 401, `bad signature: ${bad.status}`);
+    expect(missing.status === 401, `missing signature: ${missing.status}`);
+    expect(other.status === 401, `other secret: ${other.status}`);
+    const delivered = [...githubFirst.frames, ...githubSecond.frames].filter((frame) => frame.includes("github-bad"));
+    expect(delivered.length === 0, "A refused GitHub event reached a host.");
+    return "bad 401, missing 401, other secret 401, nothing delivered";
+  });
+
+  await check("A signed GitHub event reaches every host of its repository, and only them", async () => {
+    const otherRepository = await postGitHub(githubEvent(GITHUB_INSTALLATION, 78), "github-other-repository");
+    const otherInstallation = await postGitHub(githubEvent(8, GITHUB_REPOSITORY), "github-other-installation");
+    const ping = await postGitHub(JSON.stringify({ zen: "e2e", hook_id: 1 }), "github-ping");
+    expect(otherRepository.status === 204, `repository that no host watches: ${otherRepository.status}`);
+    expect(otherInstallation.status === 204, `same repository ID, other installation: ${otherInstallation.status}`);
+    expect(ping.status === 204, `ping: ${ping.status}`);
+    const routed = await postGitHub(githubEvent(GITHUB_INSTALLATION, GITHUB_REPOSITORY), "github-routed");
+    expect(routed.status === 202, `routed event: ${routed.status}`);
+    for (const peer of [githubFirst, githubSecond]) {
+      const frame = JSON.parse(await peer.next((text) => text.includes('"github-routed"'), "routed GitHub event"));
+      expect(frame.type === "github-delivery" && frame.event === "issues", `frame: ${JSON.stringify(frame)}`);
+      const body = JSON.parse(Buffer.from(frame.bodyBase64, "base64").toString());
+      expect(body.repository.id === GITHUB_REPOSITORY, "The body changed on the way.");
+    }
+    // An issue and its comment at GitHub's longest text, as CJK, fit; a larger body gets 413.
+    const long = JSON.stringify({
+      ...JSON.parse(githubEvent(GITHUB_INSTALLATION, GITHUB_REPOSITORY)),
+      issue: { body: "文".repeat(65_536) },
+      comment: { body: "字".repeat(65_536) },
+    });
+    const large = await postGitHub(long, "github-large");
+    expect(large.status === 202, `largest event: ${large.status}`);
+    const largeFrame = JSON.parse(
+      await githubFirst.next((text) => text.includes('"github-large"'), "large GitHub event"),
+    );
+    expect(Buffer.from(largeFrame.bodyBase64, "base64").toString() === long, "The large body changed on the way.");
+    const tooLarge = await postGitHub(
+      JSON.stringify({ ...JSON.parse(long), padding: "x".repeat(GITHUB_DELIVERY_BODY_BYTES_LIMIT) }),
+      "github-too-large",
+    );
+    expect(tooLarge.status === 413, `event above the limit: ${tooLarge.status}`);
+    const leaked = [...githubFirst.frames, ...githubSecond.frames].filter(
+      (frame) => frame.includes("github-other-") || frame.includes("github-ping"),
+    );
+    expect(leaked.length === 0, "An event of another repository or installation reached a host.");
+    return "other repository 204, other installation 204, ping 204, routed 202 with the exact body on both hosts, largest event 202, larger 413";
+  });
+
+  await check(
+    "A GitHub event that every connected host refuses gets 204, so GitHub does not count a failure",
+    async () => {
+      githubFirst.socket.close();
+      await withDeadline(githubFirst.closed, "first GitHub socket closed");
+      const refused = await postGitHub(githubEvent(GITHUB_INSTALLATION, GITHUB_REPOSITORY), "github-refused");
+      expect(refused.status === 204, `only a host that answers 404: ${refused.status}`);
+      githubSecond.socket.close();
+      await withDeadline(githubSecond.closed, "second GitHub socket closed");
+      const gone = await postGitHub(githubEvent(GITHUB_INSTALLATION, GITHUB_REPOSITORY), "github-gone");
+      expect(gone.status === 204, `after both hosts closed: ${gone.status}`);
+      return "a host that answers 404 only 204, no host left 204";
+    },
+  );
 
   // 4. Slack: Signal checks the signature, its age, and that the secret belongs to the named app.
   await check("A Slack request with a bad, stale or other-app signature gets 401", async () => {

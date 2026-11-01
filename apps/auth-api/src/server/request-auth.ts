@@ -348,6 +348,12 @@ export function remoteControlPlaneErrorResponse(error: unknown): Response {
   return authErrorResponse(error);
 }
 
+/** A GitHub route ticket checks the host credential and then the GitHub sign-in. */
+export function githubRouteErrorResponse(error: unknown): Response {
+  if (error instanceof RemoteControlPlaneError) return remoteControlPlaneErrorResponse(error);
+  return githubInstallationTokensErrorResponse(error);
+}
+
 export function requestSlackApp(): SlackAppService {
   const bindings = requireWorkerBindings(env);
   // The events are already in D1 and the cron redelivers them, so the answer does not wait.

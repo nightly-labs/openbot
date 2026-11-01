@@ -519,6 +519,13 @@ import type {
   VoiceTranscriptionResult,
 } from "./ipc-voice";
 import type {
+  WorkflowGitHubCatalog,
+  WorkflowGitHubHistory,
+  WorkflowGitHubLastEventInput,
+  WorkflowGitHubRepositoryInput,
+  WorkflowGitHubRepositoryOptions,
+} from "./ipc-workflow-github";
+import type {
   CreateWorkflowInput,
   DecideWorkflowStepInput,
   RenameWorkflowInput,
@@ -1533,6 +1540,17 @@ export const IPC_ENDPOINTS = {
     /** Makes a new signing secret for a webhook trigger; the first one also makes its address. */
     rotateWebhookSecret: scopedRequest<WorkflowTriggerInput, WorkflowWebhookSecret>()(
       "workflows:rotate-webhook-secret",
+    ),
+    /** The repositories of the host's GitHub connection. A joined server gives them only to an owner or admin. */
+    githubCatalog: scopedQuery<WorkflowGitHubCatalog>()("workflows:github-catalog"),
+    /** The labels and people of one repository. A joined server gives them only to an owner or admin. */
+    githubOptions: scopedRequest<WorkflowGitHubRepositoryInput, WorkflowGitHubRepositoryOptions>()(
+      "workflows:github-options",
+    ),
+    githubHistory: scopedRequest<string, WorkflowGitHubHistory>()("workflows:github-history"),
+    /** Runs a GitHub trigger with the newest item that matches it, as GitHub has it now. */
+    githubRunLastEvent: scopedRequest<WorkflowGitHubLastEventInput, WorkflowRunDetail>()(
+      "workflows:github-run-last-event",
     ),
   },
   /**

@@ -406,7 +406,7 @@ export function createWebHostConnections(options: {
       if (selected?.held) post({ type: "state", hostId: selected.hostId, state: selected.state });
     } else if (message.type === "state") {
       if (!holds(message.hostId)) setState(message.hostId, message.state, false);
-    } else if (message.type === "release" && entries.has(message.hostId)) {
+    } else if ((message.type === "release" || message.type === "take") && entries.has(message.hostId)) {
       // Also leave the queue: a queued request here would take the lock before the tab that asked.
       restingUntil.set(message.hostId, Date.now() + RELEASED_HOST_REST_MS);
       const timer = setTimeout(() => {
