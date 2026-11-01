@@ -179,12 +179,12 @@ export interface WebFile {
   base64: string;
 }
 
-export interface WebEarlyReads {
+interface WebEarlyReads {
   start(): void;
   drop(): void;
 }
 
-export interface WebConnectOptions {
+interface WebConnectOptions {
   takeOver?: boolean;
   early?: WebEarlyReads;
 }

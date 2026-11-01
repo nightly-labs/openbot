@@ -41,7 +41,7 @@ type Peer = ReturnType<typeof createRemoteTeamPeer>;
 type PeerActions = Parameters<typeof createRemoteTeamPeer>[0];
 
 /** A live status connection that the opened host takes over, with the host's tab lock. */
-export interface WebHostHandover {
+interface WebHostHandover {
   peer: Peer;
   /** Set `current` to the opened host's actions: the status connection no longer hears the peer. */
   actions: PeerActions;
