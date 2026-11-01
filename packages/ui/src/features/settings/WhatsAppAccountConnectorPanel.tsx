@@ -16,7 +16,6 @@ import {
   ItemGroup,
   ItemMedia,
   ItemTitle,
-  MessageCircle,
   QrCode,
   SettingsSection,
   SlidingTabs,
@@ -27,6 +26,7 @@ import {
 } from "@openbot/ui";
 import { createEffect, createStore, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
+import { WhatsAppAccountMark } from "./brand-marks";
 import { IntegrationPage, type IntegrationPageSlots } from "./IntegrationLayout";
 import { VaultDangerZone, type VaultStatus, vaultFailure, vaultHeader } from "./VaultParts";
 
@@ -125,7 +125,7 @@ export function WhatsAppAccountConnectorPanel(props: WhatsAppAccountConnectorPan
   return (
     <IntegrationPage
       class="whatsapp-account-connector"
-      logo={<MessageCircle aria-hidden="true" />}
+      logo={<WhatsAppAccountMark />}
       name={t("connector.whatsappAccount.title")}
       status={header().status}
       statusLabel={t(header().label)}
