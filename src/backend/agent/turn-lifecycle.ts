@@ -951,35 +951,20 @@ export class TurnLifecycle {
       // A refused session is closed below, and a spent plan would refuse the summary turn too, so
       // neither is compacted.
       // A routine run's own session closes after this turn, so it is not compacted either. Nor is a
-      // turn that a provider error ended before it did work: it can run again on a backup model.
+      // turn that a provider error ended before it did work: it can run again on a backup model. Nor
+      // is a turn whose messages return to the queue below: the turn that runs them compacts.
       const routineSession = this.#conversation.isRoutineSession(threadId);
-      const mayRunAgain =
-        failover !== undefined && !limited && status === "failed" && running !== undefined && !running.acted;
-      const shouldCompact =
-        !refused && !limited && !mayRunAgain && !routineSession && this.#compaction.reserve(agentId, threadId);
-      this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
       const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
       snapshot.activeTurnId = null;
       const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
       // A task turn ends as a turn of the agent's own chat does, in the task's own lane.
       const taskTurn = this.#conversation.isTaskThread(snapshot.threadId);
-      // A channel task is not run again: an unfinished turn pauses it, and its Resume opens the new session.
-      const retry =
-        refused &&
-        !running.produced &&
-        deliveries.length > 0 &&
-        (taskTurn || !this.#conversation.isExecutionThread(snapshot.threadId)) &&
-        deliveries.every(({ delivery }) => !this.#refusedRetries.has(delivery.id));
-      if (retry) {
-        yield* this.#retryRefusedTurn(agentId, threadId, turnId, snapshot, deliveries);
-        return;
-      }
       const channelTurn = !taskTurn && this.#conversation.isExecutionThread(snapshot.threadId);
       // A failed turn that no provider work reached never read the messages it ended with. A stalled
       // model request held such a turn open (#4304) while the messages sent meanwhile steered into
       // it, and settling them with the turn dropped them unread — no run, no failure of their own
-      // (#4326). Each one goes back to the queue, once, as its own turn; a second such failure ends
-      // it.
+      // (#4326). Each message goes back to the queue, once, as its own turn; a second such failure
+      // ends the message.
       const unworkedReplay =
         running !== undefined &&
         replaysUnworkedTurn({
@@ -993,6 +978,29 @@ export class TurnLifecycle {
         }) &&
         deliveries.length > 0 &&
         deliveries.every(({ delivery }) => !this.#unworkedReplays.has(delivery.id));
+      const mayRunAgain =
+        failover !== undefined && !limited && status === "failed" && running !== undefined && !running.acted;
+      const shouldCompact =
+        !refused &&
+        !limited &&
+        !mayRunAgain &&
+        // The replay below returns before the compaction request: a reservation it cannot release
+        // holds the lane until a restart.
+        !unworkedReplay &&
+        !routineSession &&
+        this.#compaction.reserve(agentId, threadId);
+      this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
+      // A channel task is not run again: an unfinished turn pauses it, and its Resume opens the new session.
+      const retry =
+        refused &&
+        !running.produced &&
+        deliveries.length > 0 &&
+        (taskTurn || !this.#conversation.isExecutionThread(snapshot.threadId)) &&
+        deliveries.every(({ delivery }) => !this.#refusedRetries.has(delivery.id));
+      if (retry) {
+        yield* this.#retryRefusedTurn(agentId, threadId, turnId, snapshot, deliveries);
+        return;
+      }
       if (unworkedReplay) {
         for (const { delivery } of deliveries) this.#unworkedReplays.add(delivery.id);
         yield* this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
@@ -1739,7 +1747,7 @@ export interface UnworkedTurnReplay {
   status: string;
   /** A tool step or answer text ran. Running the turn again would repeat work. */
   acted: boolean;
-  /** Any item or delta arrived, an echo included. The provider read the messages. */
+  /** Any item or delta arrived, with an echo included. The provider read the messages. */
   produced: boolean;
   /** The turn ended refused; the refused retry owns it. */
   refused: boolean;
@@ -1747,7 +1755,7 @@ export interface UnworkedTurnReplay {
   limited: boolean;
   /** A provider error can move the turn to a backup model; that requeue owns it. */
   failover: boolean;
-  /** A turn of an execution thread — a channel task or a channel — runs by its own rules. */
+  /** A turn of a channel or messaging thread, not a task lane, runs by its own rules. */
   executionThread: boolean;
 }
 
