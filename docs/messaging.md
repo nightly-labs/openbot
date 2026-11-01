@@ -50,6 +50,9 @@ browser. A joined server shows no Slack page.
   chat.
 - The agent sees earlier messages of the thread as context, and the files of the message. A
   mention of a person shows that person's Slack name.
+- The agent also gets the files of earlier messages of the thread, after the message's own files and
+  within the attachment limits, so "@OpenBot make an issue" under another person's screenshot refers
+  to that screenshot. A file that an earlier message of the conversation gave is not given again.
 - The agent can save short facts about the workspace, such as who owns a project. Every new
   conversation of the workspace sees them, in every channel. The agent's own chat does not. A fact
   from a direct message is not saved. See [Workspace memories](#workspace-memories).

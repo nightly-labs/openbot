@@ -987,7 +987,9 @@ message. The answers go from the computer to the Slack Web API directly.
 - **Read from Slack.** The messages that mention OpenBot, the replies in a thread an agent answers,
   its direct messages, the files in them, the display names of their authors and of the people they
   mention, the names of the channels, earlier messages of a thread as context, and, when an agent
-  asks for them, the newest messages of the channel or thread it answers in. OpenBot joins every public channel of the
+  asks for them, the newest messages of the channel or thread it answers in. When someone mentions
+  OpenBot in a thread, the computer also downloads from Slack the files of the thread's earlier
+  messages, also of messages that do not mention OpenBot. OpenBot joins every public channel of the
   workspace, and Slack sends every message of each channel that OpenBot is in; the computer keeps
   only the messages that address OpenBot or continue a conversation.
 - **Given to the Slack Orchestrator.** Every new Slack request goes first to the orchestrator agent,

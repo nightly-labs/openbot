@@ -382,6 +382,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:messaging-discord-access
 
+      - name: Run the Slack earlier thread files E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-slack-thread-files
+
       - name: Run the turn input E2E test
         if: ${{ !cancelled() }}
         run: bun run test:turn-input
@@ -555,6 +559,7 @@ jobs:
             .openbot-build/agent-hide-restore-e2e/
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
+            .openbot-build/messaging-slack-thread-files-e2e/
             .openbot-build/turn-input-e2e/
             .openbot-build/zero-filled-settings-e2e/
             .openbot-build/provider-update-busy-e2e/

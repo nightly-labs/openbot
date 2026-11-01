@@ -49,6 +49,7 @@ import {
 } from "./messaging-threads";
 import {
   type ConnectionIdentity,
+  type ContextEntry,
   DiscordApiError,
   type InboundAction,
   type InboundFile,
@@ -179,6 +180,8 @@ const FINAL_POST_ATTEMPTS = 5;
 const RECEIVE_NAME_DEADLINE_MS = 5_000;
 /** How long a new message waits for the files of the earlier messages; past it, it runs without them. */
 const RECEIVE_CONTEXT_DEADLINE_MS = 5_000;
+/** How many reads of earlier messages wait for their prompt. A message that gets no prompt leaves one. */
+const EARLIER_READS = 200;
 /** The marker `mention` uses. Text that did not come from the host has it taken out. */
 const MENTION_MARKERS = /[\uE000-\uE001]/g;
 
@@ -220,6 +223,12 @@ export class MessagingService {
   readonly #finalFailures = new Map<string, number>();
   readonly #chains = new Map<string, Deferred.Deferred<void>>();
   readonly #recent = new Set<string>();
+  /**
+   * The earlier messages that each inbound message read when it arrived, by `messageKey`, until its
+   * prompt takes them. One read serves both: until the Slack Marketplace approves OpenBot, Slack
+   * allows one thread read a minute.
+   */
+  readonly #earlier = new Map<string, { afterId: string | null; entries: ContextEntry[] }>();
   readonly #unsubscribe: Array<() => void> = [];
   readonly #ingress: MessagingIngress | null;
   readonly #connect: SlackConnect | null;
@@ -1173,6 +1182,8 @@ export class MessagingService {
       }
     }
     const { adapter } = live;
+    const afterId = existing?.historyCursor ?? null;
+    const earlierKey = messageKey(live.record.connectionId, message.platformChannelId, message.platformMessageId);
     // A slow lookup must not hold the message: past the deadline, the id stands for the name.
     const [authorName, mentioned, place, earlier] = yield* Effect.all(
       [
@@ -1195,21 +1206,23 @@ export class MessagingService {
                 orElse: () => Effect.succeed(message.platformChannelId),
               }),
             ),
-        // Only Discord's earlier messages have files, such as an image that a person posted without a
-        // mention just before this message. The agent gets them with this message. Slack is not asked:
-        // before Marketplace approval it allows one thread read a minute, which the prompt needs.
-        adapter.platform === "discord" && !message.isDirect
-          ? adapter
-              .history(
-                message.platformChannelId,
-                message.threadKey,
-                existing?.historyCursor ?? null,
-                message.platformMessageId,
-              )
-              .pipe(
-                Effect.timeoutOrElse({ duration: RECEIVE_CONTEXT_DEADLINE_MS, orElse: () => Effect.succeed([]) }),
-                Effect.catch(() => Effect.succeed([])),
-              )
+        // The files of earlier messages, such as an image that a person posted without a mention just
+        // before this message, go with this message. The prompt takes the same read; only a read that
+        // succeeds is kept, so the prompt can still try when this one fails.
+        (adapter.platform === "discord" || adapter.platform === "slack") && !message.isDirect
+          ? adapter.history(message.platformChannelId, message.threadKey, afterId, message.platformMessageId).pipe(
+              Effect.tap((entries) =>
+                Effect.sync(() => {
+                  this.#earlier.set(earlierKey, { afterId, entries });
+                  if (this.#earlier.size > EARLIER_READS) {
+                    const oldest = this.#earlier.keys().next().value;
+                    if (oldest !== undefined) this.#earlier.delete(oldest);
+                  }
+                }),
+              ),
+              Effect.timeoutOrElse({ duration: RECEIVE_CONTEXT_DEADLINE_MS, orElse: () => Effect.succeed([]) }),
+              Effect.catch(() => Effect.succeed([])),
+            )
           : Effect.succeed([]),
       ],
       { concurrency: "unbounded" },
@@ -1393,9 +1406,16 @@ export class MessagingService {
     const place = link.isDirect
       ? "direct message"
       : yield* live.adapter.placeName(link.platformChannelId).pipe(toMessagingOperationFailed);
-    const messages = yield* live.adapter
-      .history(link.platformChannelId, link.threadKey, link.historyCursor, origin.platformMessageId)
-      .pipe(Effect.catch(() => Effect.succeed([])));
+    const key = messageKey(link.connectionId, link.platformChannelId, origin.platformMessageId);
+    const read = this.#earlier.get(key);
+    this.#earlier.delete(key);
+    // A read made before another prompt moved the cursor holds messages that the other prompt gave.
+    const messages =
+      read && read.afterId === link.historyCursor
+        ? read.entries
+        : yield* live.adapter
+            .history(link.platformChannelId, link.threadKey, link.historyCursor, origin.platformMessageId)
+            .pipe(Effect.catch(() => Effect.succeed([])));
     return { workspaceName, place, messages, cursor: origin.platformMessageId, skippedFiles: [] };
   });
 
@@ -1916,6 +1936,11 @@ function integrationsSection(layout: SidebarLayoutSnapshot): SidebarSection | un
 /** Where to answer when the message that started the work is not known: the conversation's thread. */
 function linkTarget(link: MessagingLink): MessageTarget {
   return { platformChannelId: link.platformChannelId, replyThreadId: link.threadKey };
+}
+
+/** One inbound message of one connection, as `#earlier` keeps its read. */
+function messageKey(connectionId: string, platformChannelId: string, platformMessageId: string): string {
+  return `${connectionId}:${platformChannelId}:${platformMessageId}`;
 }
 
 /** The platform's error code, such as Slack's `not_in_channel`, and never its text or a token. */
