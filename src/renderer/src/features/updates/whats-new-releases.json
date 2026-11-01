@@ -1,5 +1,38 @@
 [
   {
+    "version": "0.58.0",
+    "date": "2026-11-01",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Start a workflow from GitHub: a GitHub trigger runs on new issues, comments, pull requests, reviews, failed checks or a mention of @openbotgit.",
+          "Change GitHub from a workflow: comment, label, assign, review, close or create an issue as the OpenBot GitHub App.",
+          "Marketplace has 17 new OpenBot agents, such as QA Tester, PR Shepherd and Chief of Staff, and 15 new skills for them.",
+          "Usage shows the OpenCode Go monthly limit as a third bar."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A joined server opens much faster. The agents and sidebar from your last visit show at once while the app connects.",
+          "On the web, a switch to another server takes about 1 second, not 2 to 3 seconds.",
+          "The window opens about 3 seconds sooner when the Dynamic Island is on."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "You can move a queued message when more than 32 messages wait in the queue.",
+          "A Pi turn that sends nothing for 10 minutes now stops with a message.",
+          "A custom provider shows in the model picker when OpenCode or Pi is not installed.",
+          "Long model names in the model picker go to a second line."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.57.0",
     "date": "2026-10-31",
     "notices": [],

@@ -1,10 +1,10 @@
 {
-  "version": "0.57.0",
+  "version": "0.58.0",
   "highlights": [
-    "Branch a conversation from the last agent reply of a turn: right-click the reply and select Branch from here.",
-    "Each agent has an Instructions page that shows its AGENTS.md file, and you can undo a change that the agent makes to its instructions.",
-    "The Marketplace is on openbot.run, with a page and a share link for each agent and skill.",
-    "Agents send fewer tokens with every provider, and idle browser tabs use much less memory.",
-    "In-app updates now install on slow Macs, such as Intel Macs."
+    "Start a workflow from a GitHub issue, comment, pull request or failed check, and let it comment, label or review on GitHub.",
+    "A joined server opens much faster: the agents and sidebar from your last visit show at once while the app connects.",
+    "On the web, a switch to another server takes about 1 second.",
+    "Marketplace has 17 new OpenBot agents, such as QA Tester, PR Shepherd and Chief of Staff.",
+    "You can move queued messages in a queue of more than 32 messages."
   ]
 }
