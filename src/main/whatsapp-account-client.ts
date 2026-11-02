@@ -5,15 +5,21 @@
 // Baileys depends on `libsignal`, which is GPL-3.0. The workspace `vendor/whatsapp-signal`, named
 // `libsignal`, takes its place, so no GPL code is installed (see that package's README).
 
+import { createWriteStream } from "node:fs";
+import { rename, rm } from "node:fs/promises";
+import { Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import makeWASocket, {
+  type AnyMessageContent,
   type AuthenticationCreds,
   type AuthenticationState,
   type BaileysEventMap,
   type Chat,
   type Contact,
   DisconnectReason,
+  downloadMediaMessage,
   fetchLatestWaWebVersion,
   initAuthCreds,
   isJidBroadcast,
@@ -31,7 +37,13 @@ import makeWASocket, {
   type WASocket,
 } from "@whiskeysockets/baileys";
 import { whatsappStatusCode } from "./whatsapp-account-effects";
-import type { WhatsAppHistory, WhatsAppStoredMessage } from "./whatsapp-account-history";
+import type { WhatsAppFileToSend } from "./whatsapp-account-files";
+import type {
+  WhatsAppAttachmentKind,
+  WhatsAppHistory,
+  WhatsAppStoredAttachment,
+  WhatsAppStoredMessage,
+} from "./whatsapp-account-history";
 
 const baileysLogger = createOpenBotLogger("whatsapp-account-connector");
 
@@ -203,6 +215,113 @@ function mediaLabel(content: proto.IMessage): string | null {
   }
   if (content.eventMessage) return `event: ${content.eventMessage.name ?? ""}`;
   return null;
+}
+
+function lengthNumber(value: number | { toNumber(): number } | null | undefined): number | null {
+  if (typeof value === "number") return value;
+  return value ? value.toNumber() : null;
+}
+
+/**
+ * The file of a message, with the media part that downloads it again. Thumbnails and the reply
+ * context are left out, so a stored message stays small.
+ */
+export function messageAttachment(content: proto.IMessage): WhatsAppStoredAttachment | null {
+  const encode = (media: proto.IMessage) => Buffer.from(proto.Message.encode(media).finish()).toString("base64");
+  const image = content.imageMessage;
+  if (image?.directPath || image?.url) {
+    return {
+      kind: "photo",
+      fileName: null,
+      mimeType: image.mimetype ?? "image/jpeg",
+      size: lengthNumber(image.fileLength),
+      seconds: null,
+      media: encode({ imageMessage: { ...image, jpegThumbnail: null, contextInfo: null } }),
+    };
+  }
+  const video = content.videoMessage ?? content.ptvMessage;
+  if (video?.directPath || video?.url) {
+    const kind: WhatsAppAttachmentKind = content.ptvMessage ? "video_note" : video.gifPlayback ? "gif" : "video";
+    const stripped = { ...video, jpegThumbnail: null, contextInfo: null };
+    return {
+      kind,
+      fileName: null,
+      mimeType: video.mimetype ?? "video/mp4",
+      size: lengthNumber(video.fileLength),
+      seconds: video.seconds ?? null,
+      media: encode(content.ptvMessage ? { ptvMessage: stripped } : { videoMessage: stripped }),
+    };
+  }
+  const audio = content.audioMessage;
+  if (audio?.directPath || audio?.url) {
+    return {
+      kind: audio.ptt ? "voice" : "audio",
+      fileName: null,
+      mimeType: audio.mimetype ?? "audio/ogg",
+      size: lengthNumber(audio.fileLength),
+      seconds: audio.seconds ?? null,
+      media: encode({ audioMessage: { ...audio, waveform: null, contextInfo: null } }),
+    };
+  }
+  const document = content.documentMessage ?? content.documentWithCaptionMessage?.message?.documentMessage;
+  if (document?.directPath || document?.url) {
+    return {
+      kind: "document",
+      fileName: document.fileName ?? null,
+      mimeType: document.mimetype ?? null,
+      size: lengthNumber(document.fileLength),
+      seconds: null,
+      media: encode({ documentMessage: { ...document, jpegThumbnail: null, contextInfo: null } }),
+    };
+  }
+  const sticker = content.stickerMessage;
+  if (sticker?.directPath || sticker?.url) {
+    return {
+      kind: "sticker",
+      fileName: null,
+      mimeType: sticker.mimetype ?? "image/webp",
+      size: lengthNumber(sticker.fileLength),
+      seconds: null,
+      media: encode({ stickerMessage: { ...sticker, pngThumbnail: null, contextInfo: null } }),
+    };
+  }
+  return null;
+}
+
+/** A file to send, after the service checked its path and chose how WhatsApp shows it. */
+export interface WhatsAppOutgoingFile extends WhatsAppFileToSend {
+  caption: string | null;
+}
+
+function outgoingContent(file: WhatsAppOutgoingFile): AnyMessageContent {
+  const upload = { url: file.path };
+  const caption = file.caption ? { caption: file.caption } : {};
+  switch (file.kind) {
+    case "photo":
+      return { image: upload, mimetype: file.mimeType, ...caption };
+    case "video":
+      return { video: upload, mimetype: file.mimeType, ...caption };
+    case "video_note":
+      return { video: upload, mimetype: file.mimeType, ptv: true };
+    case "voice":
+      return { audio: upload, mimetype: file.mimeType, ptt: true };
+    case "audio":
+      return { audio: upload, mimetype: file.mimeType };
+    case "document":
+      return { document: upload, mimetype: file.mimeType, fileName: file.fileName, ...caption };
+  }
+}
+
+/** A stream that fails when more than `maxBytes` pass through it. */
+function byteLimit(maxBytes: number): Transform {
+  let total = 0;
+  return new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      total += chunk.length;
+      if (total > maxBytes) callback(new Error(`The file is larger than ${Math.ceil(maxBytes / (1024 * 1024))} MB.`));
+      else callback(null, chunk);
+    },
+  });
 }
 
 function messageText(content: proto.IMessage): string {
@@ -420,19 +539,76 @@ export class WhatsAppAccountClient {
   }
 
   async sendText(chat: string, text: string, replyTo: WhatsAppStoredMessage | null): Promise<WhatsAppStoredMessage> {
+    return this.#send(chat, { text }, replyTo);
+  }
+
+  /** Uploads a file from this computer and sends it. The caller checked the path. */
+  async sendFile(
+    chat: string,
+    file: WhatsAppOutgoingFile,
+    replyTo: WhatsAppStoredMessage | null,
+  ): Promise<WhatsAppStoredMessage> {
+    return this.#send(chat, outgoingContent(file), replyTo);
+  }
+
+  /**
+   * Downloads the file of a stored message to `path`, through a temporary file, so a stopped download
+   * leaves nothing under the final name. When WhatsApp's media server no longer has the file, the
+   * phone is asked to upload it again; that works only while the phone is online.
+   */
+  async downloadMedia(message: WhatsAppStoredMessage, path: string, maxBytes: number): Promise<void> {
+    const attachment = message.attachment;
+    if (!attachment) throw new Error("This message has no file.");
+    const target: WAMessage = {
+      key: this.#key(message.chat, message),
+      message: proto.Message.decode(Buffer.from(attachment.media, "base64")),
+    };
+    const socket = this.#socket;
+    const stream = await downloadMediaMessage(
+      target,
+      "stream",
+      {},
+      socket
+        ? {
+            logger: baileysLog(),
+            reuploadRequest: async (old) => {
+              const updated = await socket.updateMediaMessage(old);
+              // The new address is kept, so the next download does not ask the phone again.
+              this.#message(updated);
+              return updated;
+            },
+          }
+        : undefined,
+    );
+    const partial = `${path}.${process.pid}-${Date.now()}.part`;
+    try {
+      await pipeline(stream, byteLimit(maxBytes), createWriteStream(partial, { mode: 0o600 }));
+      await rename(partial, path);
+    } catch (error) {
+      await rm(partial, { force: true });
+      throw error;
+    }
+  }
+
+  #key(chat: string, message: Pick<WhatsAppStoredMessage, "id" | "fromMe" | "sender">): WAMessageKey {
+    return {
+      remoteJid: chat,
+      id: message.id,
+      fromMe: message.fromMe,
+      ...(isJidGroup(chat) && message.sender ? { participant: message.sender } : {}),
+    };
+  }
+
+  async #send(
+    chat: string,
+    content: AnyMessageContent,
+    replyTo: WhatsAppStoredMessage | null,
+  ): Promise<WhatsAppStoredMessage> {
     const socket = this.#requireOpenSocket();
     const quoted: WAMessage | undefined = replyTo
-      ? {
-          key: {
-            remoteJid: chat,
-            id: replyTo.id,
-            fromMe: replyTo.fromMe,
-            ...(isJidGroup(chat) && replyTo.sender ? { participant: replyTo.sender } : {}),
-          },
-          message: { conversation: replyTo.text },
-        }
+      ? { key: this.#key(chat, replyTo), message: { conversation: replyTo.text } }
       : undefined;
-    const sent = await socket.sendMessage(chat, { text }, quoted ? { quoted } : undefined);
+    const sent = await socket.sendMessage(chat, content, quoted ? { quoted } : undefined);
     if (!sent?.key.id) throw new Error("WhatsApp did not confirm the message.");
     if (sent.message) {
       this.#sent.set(sent.key.id, sent.message);
@@ -666,6 +842,7 @@ export class WhatsAppAccountClient {
       replyTo: (content && contextInfo(content)?.stanzaId) || null,
       edited: false,
       deleted: false,
+      attachment: content ? messageAttachment(content) : null,
     });
   }
 

@@ -3,6 +3,9 @@
 // user turns sending on, send messages as the user.
 
 import { randomBytes } from "node:crypto";
+import { mkdir, stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
   DISCONNECTED_WHATSAPP_ACCOUNT_CONNECTOR,
   type McpServerConfig,
@@ -37,7 +40,19 @@ import {
   whatsappErrorMessage,
   whatsappToolFailure,
 } from "./whatsapp-account-effects";
-import { jidPhone, WhatsAppHistory, type WhatsAppStoredChat } from "./whatsapp-account-history";
+import {
+  whatsappAttachmentFileName,
+  whatsappChatFolder,
+  whatsappFileToSend,
+  whatsappOutgoingFile,
+} from "./whatsapp-account-files";
+import {
+  attachmentItem,
+  jidPhone,
+  WhatsAppHistory,
+  type WhatsAppStoredChat,
+  type WhatsAppStoredMessage,
+} from "./whatsapp-account-history";
 import { WhatsAppAccountMcpServer, type WhatsAppAccountMcpTools } from "./whatsapp-account-mcp-server";
 
 const logger = createOpenBotLogger("whatsapp-account-connector");
@@ -83,6 +98,8 @@ export type WhatsAppClientLike = Pick<
   | "requestPairingCode"
   | "lookUp"
   | "sendText"
+  | "sendFile"
+  | "downloadMedia"
   | "markRead"
   | "fetchOlder"
   | "logOut"
@@ -106,6 +123,12 @@ export interface WhatsAppAccountConnectorServiceOptions {
   /** The chats and messages that WhatsApp sent to this device. */
   historyFile: WhatsAppDataFile;
   appVersion: string;
+  /** Where downloaded media goes, one folder per chat. */
+  mediaDirectory: string;
+  /** OpenBot's own data. A file in it is never sent, so an agent cannot send the device keys. */
+  protectedDirectory: string;
+  /** The home folder, whose hidden folders keep keys. A test passes its own. */
+  homeDirectory?: string;
   /** Loads the client module. A test passes a fake; the default loads Baileys at its first use. */
   loadClient?: () => Effect.Effect<WhatsAppClientModule, WhatsAppAccountOperationError>;
 }
@@ -189,6 +212,9 @@ export class WhatsAppAccountConnectorService {
   readonly #authFile: WhatsAppDataFile;
   readonly #historyFile: WhatsAppDataFile;
   readonly #appVersion: string;
+  readonly #mediaDirectory: string;
+  readonly #protectedDirectory: string;
+  readonly #homeDirectory: string;
   readonly #loadClient: NonNullable<WhatsAppAccountConnectorServiceOptions["loadClient"]>;
   readonly #statusListeners = new Set<(status: WhatsAppAccountConnectorStatus) => void>();
   readonly #accessListeners = new Set<() => void>();
@@ -206,6 +232,9 @@ export class WhatsAppAccountConnectorService {
     this.#authFile = options.authFile;
     this.#historyFile = options.historyFile;
     this.#appVersion = options.appVersion;
+    this.#mediaDirectory = options.mediaDirectory;
+    this.#protectedDirectory = options.protectedDirectory;
+    this.#homeDirectory = options.homeDirectory ?? homedir();
     this.#loadClient = options.loadClient ?? loadBaileysClient;
     registerSecretValue(this.#mcpSecret);
   }
@@ -724,6 +753,37 @@ export class WhatsAppAccountConnectorService {
     });
   }
 
+  /**
+   * The chat that a send goes to. A number with no chat yet is checked with WhatsApp, which says
+   * whether it has an account and under which id.
+   */
+  #sendTarget(
+    session: Session,
+    client: WhatsAppClientLike,
+    reference: string,
+  ): Effect.Effect<WhatsAppStoredChat, WhatsAppAccountOperationError> {
+    return Effect.gen({ self: this }, function* () {
+      const chat = yield* this.#resolve(session, reference, true);
+      if (session.history.chat(chat.id) || !jidPhone(chat.id)) return chat;
+      const phone = jidPhone(chat.id) ?? "";
+      const id = yield* whatsappAccountCall(() => client.lookUp(phone));
+      if (!id) return yield* whatsappToolFailure(`+${phone} has no WhatsApp account.`);
+      return session.history.chat(id) ?? { ...chat, id };
+    });
+  }
+
+  #replyTarget(
+    session: Session,
+    chat: string,
+    replyToId: string | null,
+  ): Effect.Effect<WhatsAppStoredMessage | null, WhatsAppAccountOperationError> {
+    if (!replyToId) return Effect.succeed(null);
+    const message = session.history.message(chat, replyToId);
+    return message
+      ? Effect.succeed(message)
+      : Effect.fail(whatsappToolFailure(`No message with id ${replyToId} is in this chat.`));
+  }
+
   /** The tools of the MCP server. Sending and marking as read check the user's switch at each call. */
   #tools(): WhatsAppAccountMcpTools {
     return {
@@ -773,20 +833,10 @@ export class WhatsAppAccountConnectorService {
         Effect.gen({ self: this }, function* () {
           yield* this.#requireSending();
           const session = yield* this.#requireSession();
-          let chat = yield* this.#resolve(session, options.chat, true);
+          yield* this.#resolve(session, options.chat, true);
           const client = yield* this.#openClient(session);
-          // A number with no chat yet: WhatsApp says whether it has an account and which id.
-          if (!session.history.chat(chat.id) && jidPhone(chat.id)) {
-            const phone = jidPhone(chat.id) ?? "";
-            const id = yield* whatsappAccountCall(() => client.lookUp(phone));
-            if (!id) return yield* whatsappToolFailure(`+${phone} has no WhatsApp account.`);
-            chat = session.history.chat(id) ?? { ...chat, id };
-          }
-          const replyTo = options.replyToId
-            ? (session.history.messages(chat.id).find((message) => message.id === options.replyToId) ?? null)
-            : null;
-          if (options.replyToId && !replyTo)
-            return yield* whatsappToolFailure(`No message with id ${options.replyToId} is in this chat.`);
+          const chat = yield* this.#sendTarget(session, client, options.chat);
+          const replyTo = yield* this.#replyTarget(session, chat.id, options.replyToId);
           // The switch can change while the connection opens.
           yield* this.#requireSending();
           const sent = yield* whatsappAccountCall(() => client.sendText(chat.id, options.text, replyTo));
@@ -795,6 +845,76 @@ export class WhatsAppAccountConnectorService {
             sent: true,
             chat: { id: chat.id, name: session.history.chatName(session.history.chat(chat.id) ?? chat) },
             message: { id: sent.id, date: new Date(sent.at * 1000).toISOString() },
+          };
+        }),
+      downloadMedia: (options) =>
+        Effect.gen({ self: this }, function* () {
+          const session = yield* this.#requireSession();
+          const chat = yield* this.#resolve(session, options.chat, false);
+          const message = session.history.message(chat.id, options.messageId);
+          if (!message)
+            return yield* whatsappToolFailure(
+              `No message with id ${options.messageId} is in ${session.history.chatName(chat)} on this computer.`,
+            );
+          const attachment = message.attachment;
+          if (!attachment || message.deleted)
+            return yield* whatsappToolFailure(
+              message.media
+                ? `Message ${options.messageId} has no file to download: it is a ${message.media}.`
+                : `Message ${options.messageId} has no file.`,
+            );
+          const megabytes = (bytes: number) => Math.ceil(bytes / (1024 * 1024));
+          if (attachment.size !== null && attachment.size > options.maxBytes)
+            return yield* whatsappToolFailure(
+              `The file is ${megabytes(attachment.size)} MB, more than max_mb (${megabytes(options.maxBytes)}). Pass a larger max_mb to download it.`,
+            );
+          const folder = whatsappChatFolder(this.#mediaDirectory, chat.id);
+          const path = join(folder, whatsappAttachmentFileName(message, attachment));
+          const answer = {
+            chat: { id: chat.id, name: session.history.chatName(chat) },
+            message: { id: message.id, date: new Date(message.at * 1000).toISOString(), text: message.text },
+            attachment: attachmentItem(attachment),
+            path,
+          };
+          const existing = yield* whatsappAccountCall(() => stat(path)).pipe(Effect.orElseSucceed(() => null));
+          if (existing?.isFile() && (attachment.size === null || existing.size === attachment.size)) return answer;
+          const client = session.client;
+          if (!client) return yield* whatsappToolFailure(OFFLINE_FOR_AGENT);
+          yield* whatsappAccountCall(() => mkdir(folder, { recursive: true }));
+          yield* whatsappAccountCall(() => client.downloadMedia(message, path, options.maxBytes));
+          logger.info("An agent downloaded a WhatsApp file.", { kind: attachment.kind });
+          return answer;
+        }),
+      sendFile: (options) =>
+        Effect.gen({ self: this }, function* () {
+          yield* this.#requireSending();
+          const checked = yield* whatsappFileToSend(options.path, {
+            protected: this.#protectedDirectory,
+            home: this.#homeDirectory,
+          });
+          const file = whatsappOutgoingFile(checked.path, options.kind);
+          if (typeof file === "string") return yield* whatsappToolFailure(file);
+          if (options.caption && (file.kind === "voice" || file.kind === "audio" || file.kind === "video_note"))
+            return yield* whatsappToolFailure(
+              `WhatsApp shows no caption under a ${file.kind.replace("_", " ")}. Send the text with whatsapp_send_message.`,
+            );
+          const session = yield* this.#requireSession();
+          yield* this.#resolve(session, options.chat, true);
+          const client = yield* this.#openClient(session);
+          const chat = yield* this.#sendTarget(session, client, options.chat);
+          const replyTo = yield* this.#replyTarget(session, chat.id, options.replyToId);
+          // The switch can change while the connection opens.
+          yield* this.#requireSending();
+          const sent = yield* whatsappAccountCall(() =>
+            client.sendFile(chat.id, { ...file, caption: options.caption }, replyTo),
+          );
+          logger.info("An agent sent a WhatsApp file.", { kind: file.kind });
+          return {
+            sent: true,
+            chat: { id: chat.id, name: session.history.chatName(session.history.chat(chat.id) ?? chat) },
+            message: { id: sent.id, date: new Date(sent.at * 1000).toISOString() },
+            kind: file.kind,
+            file_name: file.fileName,
           };
         }),
       markRead: (reference) =>

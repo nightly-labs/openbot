@@ -1167,18 +1167,20 @@ it thinks is automated.
 - **Sent to WhatsApp.** The keys of the new linked device, as WhatsApp Web sends them, and the name
   "OpenBot". A link with a QR code sends nothing else: you scan the code on your phone. A link with
   a code sends your phone number, and WhatsApp answers the code that you type on the phone. Then, only
-  when you turn on sending, the messages that agents send as you and the read receipts of the chats
-  that they mark as read. Reading sends nothing: OpenBot does not show as online and does not send
+  when you turn on sending, the messages and files that agents send as you and the read receipts of
+  the chats that they mark as read. Reading sends nothing: OpenBot does not show as online and does not send
   read receipts. When an agent asks for messages older than the ones on the computer, OpenBot asks
   the phone for them.
 - **Received from WhatsApp.** As WhatsApp Web does, the phone sends the device recent history when it
-  links, then every new message. History can have gaps.
+  links, then every new message. History can have gaps. A file comes from WhatsApp's media servers
+  only when an agent downloads it; for an older file, OpenBot asks the phone to upload it again.
 - **Kept on the computer.** In `~/Library/Application Support/OpenBot/`, encrypted by the operating
   system's secret storage: the account name and phone number, the sending switch and the port and
   secret of the local WhatsApp MCP server (`openbot-whatsapp-account-connector-v1.json`); the keys of
   the linked device (`openbot-whatsapp-account-keys-v1.json`); and the chats, contact names and up to
-  200 messages per chat, as text with a word for each media item
-  (`openbot-whatsapp-account-chats-v1.json`). Media files are not downloaded. The keys give access to
+  200 messages per chat, as text with a word for each media item and, for a file, its address on
+  WhatsApp's media servers and the key that decrypts it (`openbot-whatsapp-account-chats-v1.json`).
+  The keys give access to
   new messages of the account. Unlink logs the device out at WhatsApp, when WhatsApp answers,
   deletes the keys and the chats, and removes the account from the first file. When you log the device out on the phone, OpenBot deletes the
   keys and the chats too. The phone number, the pairing code and the MCP secret are redacted from
@@ -1187,7 +1189,16 @@ it thinks is automated.
 - **Given to agents and their model provider.** While the account is linked, every agent on the
   computer gets the WhatsApp tools. What a tool reads, such as chat names, contact names, phone
   numbers and message text, goes into the agent's conversation and so to the agent's model provider.
-  The tools never give an agent the keys of the device.
+  The tools never give an agent the keys of the device or the keys of a file.
+- **Downloaded files.** When an agent downloads the photo, voice message, video or file of a message,
+  OpenBot saves it unencrypted in `~/Downloads/OpenBot WhatsApp/<chat>/`, so that the agent and you
+  can open it. Unlink does not remove these files; delete the folder when you no longer need it. A
+  photo or image of up to 5 MB also goes into the agent's conversation, and so to the agent's model
+  provider.
+- **Sent files.** With sending on, an agent can send a file from the computer by its path. OpenBot
+  refuses files in its own data folder and in the hidden folders of your home folder, such as
+  `~/.ssh`, because they keep keys and sessions. Any other file that the agent can name can be sent,
+  so turn on sending only for agents that you trust with your files.
 - **On a joined server.** An owner or admin can link the server to their own WhatsApp account from
   their computer. The server sends the QR code or the pairing code to that owner or admin only. The
   phone number of a link with a code goes once over the encrypted connection to the server, which

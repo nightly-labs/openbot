@@ -6,22 +6,27 @@
 // Cases: a QR link that saves the device; the MCP server's host and bearer checks; reading and
 // searching the chats; sending refused until the user turns it on, then sent; mark-read; a restart
 // that keeps the device, the chats and the MCP port; a link with a phone number and a pairing code;
-// a device that WhatsApp removed; unlink; and redaction of the phone number.
+// a device that WhatsApp removed; unlink; and redaction of the phone number. Media: attachments in
+// the messages that agents read, a download (with the image returned inline, no second download,
+// the size limit), and the files that whatsapp_send_file takes or refuses.
 //
 // `bun scripts/whatsapp-account-connector-e2e.ts`. Writes .openbot-build/whatsapp-account-connector-e2e/report.json.
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
+import { proto } from "@whiskeysockets/baileys";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { SecretCipher } from "../src/main/provider-credential-store";
 import {
+  messageAttachment,
   newWhatsAppAuth,
   readWhatsAppStoredAuth,
   type WhatsAppAccountClientEvents,
+  type WhatsAppOutgoingFile,
   type WhatsAppStoredAuth,
 } from "../src/main/whatsapp-account-client";
 import {
@@ -31,12 +36,38 @@ import {
 } from "../src/main/whatsapp-account-connector-service";
 import { WhatsAppAccountConnectorStore } from "../src/main/whatsapp-account-connector-store";
 import { WhatsAppDataFile } from "../src/main/whatsapp-account-data-file";
-import type { WhatsAppHistory, WhatsAppStoredMessage } from "../src/main/whatsapp-account-history";
+import { whatsappAttachmentFileName, whatsappOutgoingFile } from "../src/main/whatsapp-account-files";
+import type {
+  WhatsAppHistory,
+  WhatsAppStoredAttachment,
+  WhatsAppStoredMessage,
+} from "../src/main/whatsapp-account-history";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/whatsapp-account-connector-e2e");
 const OWN_ID = "48600100200@s.whatsapp.net";
 const FRIEND = "48600999888@s.whatsapp.net";
 const GROUP = "120363000000000001@g.us";
+// A 1×1 PNG, as the downloaded photo.
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "base64",
+);
+const PHOTO: WhatsAppStoredAttachment = {
+  kind: "photo",
+  fileName: null,
+  mimeType: "image/png",
+  size: PNG.length,
+  seconds: null,
+  media: "c2VjcmV0LW1lZGlhLWtleQ==",
+};
+const VOICE: WhatsAppStoredAttachment = {
+  kind: "voice",
+  fileName: null,
+  mimeType: "audio/ogg; codecs=opus",
+  size: 60 * 1024 * 1024,
+  seconds: 12,
+  media: "c2VjcmV0LXZvaWNlLWtleQ==",
+};
 
 const cipher: SecretCipher = {
   encrypt: (value) => Buffer.from(`fake:${Buffer.from(value, "utf8").toString("base64")}`, "utf8"),
@@ -58,6 +89,8 @@ class FakeClient implements WhatsAppClientLike {
   readonly sent: Array<{ chat: string; text: string; replyTo: string | null }> = [];
   readonly read: Array<{ chat: string; ids: string[] }> = [];
   readonly pairingRequests: string[] = [];
+  readonly downloads: string[] = [];
+  readonly files: Array<{ chat: string; file: WhatsAppOutgoingFile; replyTo: string | null }> = [];
 
   constructor(options: { auth: WhatsAppStoredAuth; history: WhatsAppHistory; events: WhatsAppAccountClientEvents }) {
     this.events = options.events;
@@ -93,9 +126,37 @@ class FakeClient implements WhatsAppClientLike {
       replyTo: replyTo?.id ?? null,
       edited: false,
       deleted: false,
+      attachment: null,
     };
     this.history.upsertMessage(message);
     return message;
+  }
+  async sendFile(
+    chat: string,
+    file: WhatsAppOutgoingFile,
+    replyTo: WhatsAppStoredMessage | null,
+  ): Promise<WhatsAppStoredMessage> {
+    this.files.push({ chat, file, replyTo: replyTo?.id ?? null });
+    const message: WhatsAppStoredMessage = {
+      id: `FILE${this.files.length}`,
+      chat,
+      sender: null,
+      fromMe: true,
+      pushName: null,
+      at: 1_800_000_200 + this.files.length,
+      text: file.caption ?? "",
+      media: file.kind,
+      replyTo: replyTo?.id ?? null,
+      edited: false,
+      deleted: false,
+      attachment: null,
+    };
+    this.history.upsertMessage(message);
+    return message;
+  }
+  async downloadMedia(message: WhatsAppStoredMessage, path: string): Promise<void> {
+    this.downloads.push(message.id);
+    await writeFile(path, PNG);
   }
   async markRead(chat: string, messages: readonly WhatsAppStoredMessage[]): Promise<void> {
     this.read.push({ chat, ids: messages.map((message) => message.id) });
@@ -131,12 +192,39 @@ class FakeClient implements WhatsAppClientLike {
         replyTo: null,
         edited: false,
         deleted: false,
+        attachment: null,
       });
     message("M1", FRIEND, "Are we meeting on Friday?", 1_800_000_001, FRIEND);
     message("M2", FRIEND, "Yes, at 10.", 1_800_000_002, null);
     message("M3", FRIEND, "Bring the compiler notes.", 1_800_000_003, FRIEND);
     message("M4", FRIEND, "And the Friday agenda.", 1_800_000_004, FRIEND);
     message("G1", GROUP, "Release on Friday", 1_800_000_010, FRIEND);
+    // The user's own photo and voice message in the group, before G1, so G1 stays unread.
+    const own = {
+      chat: GROUP,
+      sender: null,
+      fromMe: true,
+      pushName: null,
+      replyTo: null,
+      edited: false,
+      deleted: false,
+    };
+    this.history.upsertMessage({
+      ...own,
+      id: "P1",
+      at: 1_800_000_005,
+      text: "The plan",
+      media: "image",
+      attachment: PHOTO,
+    });
+    this.history.upsertMessage({
+      ...own,
+      id: "V1",
+      at: 1_800_000_006,
+      text: "",
+      media: "voice message (12s)",
+      attachment: VOICE,
+    });
     this.open = true;
     this.events.open({ id: OWN_ID, name: "Ada Lovelace" });
   }
@@ -148,7 +236,7 @@ interface Harness {
   accessChanges: number;
 }
 
-async function harness(root: string): Promise<Harness> {
+async function harness(root: string, work: string): Promise<Harness> {
   const clients: FakeClient[] = [];
   // The real keys and their real storage; only the connection to WhatsApp is a stand-in.
   const module: WhatsAppClientModule = {
@@ -165,6 +253,9 @@ async function harness(root: string): Promise<Harness> {
     authFile: new WhatsAppDataFile({ path: join(root, "keys.json"), cipher, maxBytes: 1024 * 1024, delayMs: 10 }),
     historyFile: new WhatsAppDataFile({ path: join(root, "chats.json"), cipher, maxBytes: 1024 * 1024, delayMs: 10 }),
     appVersion: "0.0.0-e2e",
+    mediaDirectory: join(work, "media"),
+    protectedDirectory: root,
+    homeDirectory: join(work, "home"),
     loadClient: () => Effect.succeed(module),
   });
   const result: Harness = { service, clients, accessChanges: 0 };
@@ -193,7 +284,17 @@ async function exists(path: string): Promise<boolean> {
 }
 
 const toolAnswer = z.object({
-  result: z.object({ content: z.array(z.object({ text: z.string() })), isError: z.boolean().optional() }),
+  result: z.object({
+    content: z.array(
+      z.object({
+        type: z.string(),
+        text: z.string().optional(),
+        data: z.string().optional(),
+        mimeType: z.string().optional(),
+      }),
+    ),
+    isError: z.boolean().optional(),
+  }),
 });
 const chatList = z.object({ chats: z.array(z.object({ id: z.string(), name: z.string(), unread_count: z.number() })) });
 const messagePage = z.object({
@@ -208,7 +309,7 @@ async function mcp(
   name: string,
   args: Record<string, string | number | boolean>,
   options: { bearer?: string | null; host?: string } = {},
-): Promise<{ status: number; text: string; isError: boolean }> {
+): Promise<{ status: number; text: string; isError: boolean; images: string[] }> {
   const server = service.mcpServer();
   assert.ok(server, "the MCP server is given to agents");
   const bearer = options.bearer === undefined ? await Effect.runPromise(service.mcpAuthorization()) : options.bearer;
@@ -224,17 +325,128 @@ async function mcp(
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }),
   });
   const body = await response.text();
-  if (response.status !== 200) return { status: response.status, text: body, isError: true };
+  if (response.status !== 200) return { status: response.status, text: body, isError: true, images: [] };
   const line = body.split("\n").find((item) => item.startsWith("data: ")) ?? `data: ${body}`;
   const parsed = toolAnswer.parse(JSON.parse(line.slice("data: ".length)));
-  return { status: 200, text: parsed.result.content[0]?.text ?? "", isError: parsed.result.isError === true };
+  return {
+    status: 200,
+    text: parsed.result.content[0]?.text ?? "",
+    isError: parsed.result.isError === true,
+    images: parsed.result.content.flatMap((item) => (item.type === "image" && item.data ? [item.data] : [])),
+  };
 }
 
 await mkdir(OUT, { recursive: true });
 const root = await mkdtemp(join(tmpdir(), "openbot-whatsapp-e2e-"));
+const work = await mkdtemp(join(tmpdir(), "openbot-whatsapp-e2e-files-"));
 try {
+  const files = join(work, "files");
+  await mkdir(files, { recursive: true });
+  await mkdir(join(work, "home", ".ssh"), { recursive: true });
+  await writeFile(join(files, "plan.png"), PNG);
+  await writeFile(join(files, "notes.pdf"), "%PDF-1.7");
+  await writeFile(join(files, "hello.ogg"), "OggS");
+  await writeFile(join(work, "home", ".ssh", "id_ed25519"), "secret key");
+  await symlink(join(root, "connector.json"), join(files, "innocent.pdf"));
+
+  // 0. What Baileys' media messages become: the kind, the size and a media part without thumbnails
+  // that still holds the address and the key; and how a file to send is shown.
+  const media = { url: "https://mmg.whatsapp.net/x", directPath: "/v/t62/x", mediaKey: Buffer.alloc(32, 7) };
+  const thumbnail = Buffer.alloc(4_000, 1);
+  const image = messageAttachment({
+    imageMessage: {
+      ...media,
+      mimetype: "image/jpeg",
+      fileLength: 181_234,
+      caption: "Look",
+      jpegThumbnail: thumbnail,
+      contextInfo: { stanzaId: "Q1" },
+    },
+  });
+  assert.ok(image);
+  assert.deepEqual(
+    { ...image, media: "" },
+    {
+      kind: "photo",
+      fileName: null,
+      mimeType: "image/jpeg",
+      size: 181_234,
+      seconds: null,
+      media: "",
+    },
+  );
+  const decoded = proto.Message.decode(Buffer.from(image.media, "base64"));
+  assert.equal(decoded.imageMessage?.directPath, "/v/t62/x");
+  assert.deepEqual(Buffer.from(decoded.imageMessage?.mediaKey ?? []), media.mediaKey);
+  assert.equal(decoded.imageMessage?.jpegThumbnail?.length ?? 0, 0);
+  assert.ok(image.media.length < 400, "the media part stays small");
+  const kinds = [
+    messageAttachment({ audioMessage: { ...media, ptt: true, seconds: 12, mimetype: "audio/ogg; codecs=opus" } }),
+    messageAttachment({ audioMessage: { ...media, seconds: 180, mimetype: "audio/mpeg" } }),
+    messageAttachment({ videoMessage: { ...media, seconds: 30, mimetype: "video/mp4" } }),
+    messageAttachment({ videoMessage: { ...media, gifPlayback: true, mimetype: "video/mp4" } }),
+    messageAttachment({ ptvMessage: { ...media, seconds: 9, mimetype: "video/mp4" } }),
+    messageAttachment({ stickerMessage: { ...media, mimetype: "image/webp" } }),
+    messageAttachment({
+      documentWithCaptionMessage: {
+        message: { documentMessage: { ...media, fileName: "../Faktura 11/2026.pdf", mimetype: "application/pdf" } },
+      },
+    }),
+  ];
+  assert.deepEqual(
+    kinds.map((item) => [item?.kind, item?.seconds ?? null]),
+    [
+      ["voice", 12],
+      ["audio", 180],
+      ["video", 30],
+      ["gif", null],
+      ["video_note", 9],
+      ["sticker", null],
+      ["document", null],
+    ],
+  );
+  assert.equal(messageAttachment({ conversation: "hi" }), null);
+  assert.equal(messageAttachment({ imageMessage: { caption: "no media yet" } }), null);
+  const stored = (id: string, attachment: WhatsAppStoredAttachment): string =>
+    whatsappAttachmentFileName(
+      {
+        id,
+        chat: FRIEND,
+        sender: FRIEND,
+        fromMe: false,
+        pushName: null,
+        at: 0,
+        text: "",
+        media: null,
+        replyTo: null,
+        edited: false,
+        deleted: false,
+        attachment,
+      },
+      attachment,
+    );
+  assert.equal(stored("3EB0", VOICE), "3EB0-voice.ogg");
+  const documentAttachment = kinds[6];
+  assert.ok(documentAttachment);
+  assert.equal(stored("3EB1", documentAttachment), "3EB1-_Faktura 11_2026.pdf");
+  assert.equal(stored("../../x", PHOTO), "_.._x-photo.png");
+  const outgoing = ["a.JPG", "b.mp4", "c.mp3", "d.ogg", "e.pdf", "f.gif", "g"].map((name) => {
+    const file = whatsappOutgoingFile(join(files, name), "auto");
+    return typeof file === "string" ? file : [file.kind, file.mimeType];
+  });
+  assert.deepEqual(outgoing, [
+    ["photo", "image/jpeg"],
+    ["video", "video/mp4"],
+    ["audio", "audio/mpeg"],
+    ["audio", "audio/ogg; codecs=opus"],
+    ["document", "application/pdf"],
+    ["document", "image/gif"],
+    ["document", "application/octet-stream"],
+  ]);
+  const attachments = { ok: true, kinds: kinds.length + 1 };
+
   // 1. A QR link saves the device, gives agents the tools, and keeps every file encrypted.
-  const first = await harness(root);
+  const first = await harness(root, work);
   assert.equal(first.service.status().state, "disconnected");
   assert.equal(first.service.mcpServer(), null);
   await Effect.runPromise(first.service.connect({ method: "qr" }));
@@ -309,10 +521,54 @@ try {
   assert.equal(linkClient.read.length, 0);
   const reading = { ok: true, chats: listed.chats.length, searchResults: search.results.length };
 
+  // 3b. Messages with a file have an attachment, without the key that downloads it. A download goes
+  // to the chat's folder, returns a small image inline, and is not repeated.
+  const groupRead = await mcp(first.service, "whatsapp_read_messages", { chat: "Lab team" });
+  const groupPage = z
+    .object({
+      messages: z.array(
+        z.object({
+          id: z.string(),
+          attachment: z.object({ kind: z.string(), size_bytes: z.number().nullable() }).nullable(),
+        }),
+      ),
+    })
+    .parse(JSON.parse(groupRead.text));
+  assert.deepEqual(
+    groupPage.messages.map((message) => [message.id, message.attachment?.kind ?? null]),
+    [
+      ["P1", "photo"],
+      ["V1", "voice"],
+      ["G1", null],
+    ],
+  );
+  assert.ok(!groupRead.text.includes(PHOTO.media) && !groupRead.text.includes("c2VjcmV0"), "no media key for agents");
+  const photo = await mcp(first.service, "whatsapp_download_media", { chat: GROUP, message_id: "P1" });
+  assert.equal(photo.isError, false, photo.text);
+  const photoPath = z.object({ path: z.string() }).parse(JSON.parse(photo.text)).path;
+  assert.equal(photoPath, join(work, "media", "120363000000000001_g.us", "P1-photo.png"));
+  assert.deepEqual(await readFile(photoPath), PNG);
+  assert.deepEqual(photo.images, [PNG.toString("base64")]);
+  await mcp(first.service, "whatsapp_download_media", { chat: "Lab team", message_id: "P1" });
+  assert.deepEqual(linkClient.downloads, ["P1"]);
+  const tooLarge = await mcp(first.service, "whatsapp_download_media", { chat: GROUP, message_id: "V1" });
+  assert.equal(tooLarge.isError, true);
+  assert.match(tooLarge.text, /more than max_mb/u);
+  const voice = await mcp(first.service, "whatsapp_download_media", { chat: GROUP, message_id: "V1", max_mb: 100 });
+  assert.equal(voice.isError, false, voice.text);
+  assert.deepEqual(voice.images, []);
+  assert.match(voice.text, /V1-voice\.ogg/u);
+  const noFile = await mcp(first.service, "whatsapp_download_media", { chat: GROUP, message_id: "G1" });
+  assert.equal(noFile.isError, true);
+  assert.match(noFile.text, /has no file/u);
+  const downloading = { ok: true, downloads: linkClient.downloads.length };
+
   // 4. Sending is off until the user turns it on; then a send needs the exact chat.
   const refused = await mcp(first.service, "whatsapp_send_message", { chat: FRIEND, text: "Hi" });
   assert.equal(refused.isError, true);
   assert.match(refused.text, /Sending is turned off/u);
+  const refusedFile = await mcp(first.service, "whatsapp_send_file", { chat: FRIEND, path: join(files, "plan.png") });
+  assert.match(refusedFile.text, /Sending is turned off/u);
   assert.equal(linkClient.sent.length, 0);
   await Effect.runPromise(first.service.setSending(true));
   const partial = await mcp(first.service, "whatsapp_send_message", { chat: "Grace", text: "Hi" });
@@ -333,6 +589,48 @@ try {
   assert.equal(linkClient.sent.at(-1)?.chat, "48600777666@s.whatsapp.net");
   const sending = { ok: true, sent: linkClient.sent.length };
 
+  // 4b. Files: the kind follows the extension, and paths that keep keys are refused.
+  const photoSent = await mcp(first.service, "whatsapp_send_file", {
+    chat: "Grace Hopper",
+    path: join(files, ".", "plan.png"),
+    caption: "The plan",
+    reply_to_id: "M4",
+  });
+  assert.equal(photoSent.isError, false, photoSent.text);
+  const pdfSent = await mcp(first.service, "whatsapp_send_file", { chat: FRIEND, path: join(files, "notes.pdf") });
+  assert.equal(pdfSent.isError, false, pdfSent.text);
+  const voiceSent = await mcp(first.service, "whatsapp_send_file", {
+    chat: FRIEND,
+    path: join(files, "hello.ogg"),
+    kind: "voice",
+  });
+  assert.equal(voiceSent.isError, false, voiceSent.text);
+  assert.deepEqual(
+    linkClient.files.map(({ chat, file, replyTo }) => [chat, file.kind, file.mimeType, file.caption, replyTo]),
+    [
+      [FRIEND, "photo", "image/png", "The plan", "M4"],
+      [FRIEND, "document", "application/pdf", null, null],
+      [FRIEND, "voice", "audio/ogg; codecs=opus", null, null],
+    ],
+  );
+  const refusals: Array<[Record<string, string>, RegExp]> = [
+    [{ path: "plan.png" }, /not an absolute path/u],
+    [{ path: join(files, "missing.png") }, /No file at/u],
+    [{ path: join(root, "connector.json") }, /keeps keys or sessions/u],
+    [{ path: join(files, "innocent.pdf") }, /keeps keys or sessions/u],
+    [{ path: join(work, "home", ".ssh", "id_ed25519") }, /keeps keys or sessions/u],
+    [{ path: join(files, "notes.pdf"), kind: "photo" }, /is not an image/u],
+    [{ path: join(files, "hello.ogg"), kind: "voice", caption: "Hi" }, /no caption/u],
+    [{ path: join(files, "plan.png"), kind: "hologram" }, /Invalid arguments/u],
+  ];
+  for (const [args, words] of refusals) {
+    const answer = await mcp(first.service, "whatsapp_send_file", { chat: FRIEND, ...args });
+    assert.equal(answer.isError, true, JSON.stringify(args));
+    assert.match(answer.text, words, JSON.stringify(args));
+  }
+  assert.equal(linkClient.files.length, 3);
+  const sendingFiles = { ok: true, sent: linkClient.files.length, refused: refusals.length };
+
   // 5. Mark-read sends receipts for the messages after the user's last one.
   const marked = await mcp(first.service, "whatsapp_mark_read", { chat: "Lab team" });
   assert.equal(marked.isError, false, marked.text);
@@ -343,7 +641,7 @@ try {
   const port = new URL(first.service.mcpServer()?.url ?? "").port;
   const bearer = await Effect.runPromise(first.service.mcpAuthorization());
   await Effect.runPromise(first.service.dispose());
-  const second = await harness(root);
+  const second = await harness(root, work);
   const restored = second.service.status();
   assert.equal(restored.state, "connected");
   assert.equal(restored.sendingEnabled, true);
@@ -425,9 +723,24 @@ try {
   await Effect.runPromise(second.service.dispose());
   const cancel = { ok: true };
 
-  const cases = { qrLink, mcpChecks, reading, sending, markRead, restart, removed, phoneLink, unlink, cancel };
+  const cases = {
+    attachments,
+    qrLink,
+    mcpChecks,
+    reading,
+    downloading,
+    sending,
+    sendingFiles,
+    markRead,
+    restart,
+    removed,
+    phoneLink,
+    unlink,
+    cancel,
+  };
   await writeFile(join(OUT, "report.json"), `${JSON.stringify({ ok: true, cases }, null, 2)}\n`);
   process.stdout.write(`whatsapp-account-connector-e2e: ${Object.keys(cases).length} cases passed\n`);
 } finally {
   await rm(root, { recursive: true, force: true });
+  await rm(work, { recursive: true, force: true });
 }

@@ -1,7 +1,7 @@
 // The chats and messages that WhatsApp sent to this linked device. WhatsApp has no server-side
 // history to ask: the phone sends recent history when the device links, then every new message. The
-// connector keeps them here, encrypted on disk, and the agent tools read them from here. Only text
-// and a word for media are kept, never the media itself.
+// connector keeps them here, encrypted on disk, and the agent tools read them from here. Text, a word
+// for media and, for a file, what WhatsApp needs to download it are kept, never the file itself.
 
 import { z } from "zod";
 
@@ -17,6 +17,30 @@ export interface WhatsAppStoredChat {
   archived: boolean;
   /** The time of the last message, in seconds since the epoch, or 0. */
   lastAt: number;
+}
+
+export type WhatsAppAttachmentKind =
+  | "photo"
+  | "voice"
+  | "audio"
+  | "video"
+  | "video_note"
+  | "gif"
+  | "sticker"
+  | "document";
+
+/** The file of a message. `media` is what WhatsApp needs to download it again. */
+export interface WhatsAppStoredAttachment {
+  kind: WhatsAppAttachmentKind;
+  fileName: string | null;
+  mimeType: string | null;
+  size: number | null;
+  seconds: number | null;
+  /**
+   * The media part of the message, as protobuf in base64, without thumbnails: the address on
+   * WhatsApp's media servers and the key that decrypts the file. It never goes to agents.
+   */
+  media: string;
 }
 
 export interface WhatsAppStoredMessage {
@@ -35,6 +59,8 @@ export interface WhatsAppStoredMessage {
   replyTo: string | null;
   edited: boolean;
   deleted: boolean;
+  /** The file of the message, or null. Files that came before media downloads have none. */
+  attachment: WhatsAppStoredAttachment | null;
 }
 
 const chatSchema = z.object({
@@ -58,6 +84,20 @@ const messageSchema = z.object({
   replyTo: z.string().nullable(),
   edited: z.boolean(),
   deleted: z.boolean(),
+  attachment: z
+    .object({
+      kind: z.enum(["photo", "voice", "audio", "video", "video_note", "gif", "sticker", "document"]),
+      fileName: z.string().nullable(),
+      mimeType: z.string().nullable(),
+      size: z.number().nullable(),
+      seconds: z.number().nullable(),
+      media: z
+        .string()
+        .min(1)
+        .max(64 * 1024),
+    })
+    .nullable()
+    .default(null),
 });
 
 const historySchema = z.object({
@@ -100,6 +140,25 @@ export interface WhatsAppChatListItem {
   last_message: { date: string; from: string; text: string } | null;
 }
 
+/** The file of a message, as agents see it. */
+export interface WhatsAppAttachmentItem {
+  kind: WhatsAppAttachmentKind;
+  file_name: string | null;
+  mime_type: string | null;
+  size_bytes: number | null;
+  duration_seconds: number | null;
+}
+
+export function attachmentItem(attachment: WhatsAppStoredAttachment): WhatsAppAttachmentItem {
+  return {
+    kind: attachment.kind,
+    file_name: attachment.fileName,
+    mime_type: attachment.mimeType,
+    size_bytes: attachment.size,
+    duration_seconds: attachment.seconds,
+  };
+}
+
 export interface WhatsAppMessageItem {
   id: string;
   date: string;
@@ -107,6 +166,7 @@ export interface WhatsAppMessageItem {
   from_me: boolean;
   text: string;
   media: string | null;
+  attachment: WhatsAppAttachmentItem | null;
   reply_to: string | null;
   edited: boolean;
   deleted: boolean;
@@ -240,6 +300,7 @@ export class WhatsAppHistory {
       message.deleted = true;
       message.text = "";
       message.media = null;
+      message.attachment = null;
     }
     if (change.text !== undefined) {
       message.text = clip(change.text);
@@ -298,6 +359,10 @@ export class WhatsAppHistory {
     return this.#messages.get(chat) ?? [];
   }
 
+  message(chat: string, id: string): WhatsAppStoredMessage | null {
+    return this.#messages.get(chat)?.find((message) => message.id === id) ?? null;
+  }
+
   #item(message: WhatsAppStoredMessage): WhatsAppMessageItem {
     return {
       id: message.id,
@@ -306,6 +371,7 @@ export class WhatsAppHistory {
       from_me: message.fromMe,
       text: message.deleted ? "" : message.text,
       media: message.media,
+      attachment: message.deleted || !message.attachment ? null : attachmentItem(message.attachment),
       reply_to: message.replyTo,
       edited: message.edited,
       deleted: message.deleted,

@@ -1550,6 +1550,8 @@ export async function createApplicationServices({
       delayMs: 3_000,
     }),
     appVersion: app.getVersion(),
+    mediaDirectory: join(app.getPath("downloads"), "OpenBot WhatsApp"),
+    protectedDirectory: app.getPath("userData"),
   });
   await Effect.runPromise(whatsappAccountConnector.load());
   teardown.push(TEARDOWN_ORDER.whatsappAccountConnector, "the WhatsApp account connection", () =>
