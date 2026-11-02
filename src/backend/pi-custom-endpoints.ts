@@ -65,6 +65,9 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
     headers: Object.fromEntries(endpoint.headers.map((header) => [header.name, header.value])),
     models: endpoint.models.map((model) => {
       const contextWindow = model.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
+      // Pi cuts `maxTokens` to the room that the prompt leaves in the window, so a saved max output
+      // above the window does not overflow (`clampMaxTokensToContext`, Pi 1.1.0:
+      // https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/simple-options.ts#L18-L22).
       return { id: model.id, name: model.name, contextWindow, maxTokens: customModelOutputLimit(model, contextWindow) };
     }),
   };
