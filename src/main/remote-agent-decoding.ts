@@ -23,8 +23,10 @@ import {
 import type {
   AccountUsage,
   AgentExclusionChange,
+  AgentFastModeSettings,
   AgentFolderChange,
   AgentMemory,
+  AgentNewChatSettings,
   AgentStatus,
   AgentSummary,
   ClientAgentModelOption,
@@ -59,7 +61,7 @@ import {
   isSidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
-import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
@@ -163,6 +165,19 @@ export function decodeRemoteAgentFolderChange(value: unknown): AgentFolderChange
 export function decodeRemoteAgentExclusionChange(value: unknown): AgentExclusionChange {
   if (!isDynamicRecord(value) || !isAgentExclusionChange(value)) throw new Error("Invalid remote agent folder change.");
   return value;
+}
+
+// The `agent-new-chat-v1` and `agent-fast-mode-v1` replies. The preload reads the same shapes from main
+// with its own decoders.
+export function decodeRemoteAgentNewChatSettings(value: unknown): AgentNewChatSettings {
+  if (!isDynamicRecord(value) || !isBoolean(value.allowNewChat)) throw new Error("Invalid remote new chat setting.");
+  return { allowNewChat: value.allowNewChat };
+}
+
+export function decodeRemoteAgentFastModeSettings(value: unknown): AgentFastModeSettings {
+  if (!isDynamicRecord(value) || (value.fastMode !== null && !isBoolean(value.fastMode)))
+    throw new Error("Invalid remote fast mode setting.");
+  return { fastMode: value.fastMode };
 }
 
 export function decodeAgentStatusFromHost(value: unknown): AgentStatus {

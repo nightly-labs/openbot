@@ -10,8 +10,6 @@ import {
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
   decodeAgentBrowserProfile,
-  decodeAgentFastModeSettings,
-  decodeAgentNewChatSettings,
   decodeAgentPlanCardSettings,
   decodeAgentTaskLimitSettings,
   decodeBrowserProfileList,
@@ -77,7 +75,11 @@ import type { AgentHostSettingsService } from "../agent-host-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
 import type { BrowserProfileService } from "../browser-profile-service";
-import { decodeAgentHostSettingsFromHost } from "../remote-agent-decoding";
+import {
+  decodeAgentHostSettingsFromHost,
+  decodeRemoteAgentFastModeSettings,
+  decodeRemoteAgentNewChatSettings,
+} from "../remote-agent-decoding";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
@@ -362,13 +364,17 @@ export function agentAdminIpcHandlers({
   function remoteNewChat(serverId: string, path: string, body: unknown) {
     if (!remoteServers.supportsCapability(serverId, AGENT_NEW_CHAT_CAPABILITY))
       throw new Error(sourceText("error.team.agentSettingsUnsupported"));
-    return runCauseEffect(remoteServers.request(serverId, path, decodeAgentNewChatSettings, { method: "POST", body }));
+    return runCauseEffect(
+      remoteServers.request(serverId, path, decodeRemoteAgentNewChatSettings, { method: "POST", body }),
+    );
   }
 
   function remoteFastMode(serverId: string, path: string, body: unknown) {
     if (!remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY))
       throw new Error(sourceText("error.team.agentSettingsUnsupported"));
-    return runCauseEffect(remoteServers.request(serverId, path, decodeAgentFastModeSettings, { method: "POST", body }));
+    return runCauseEffect(
+      remoteServers.request(serverId, path, decodeRemoteAgentFastModeSettings, { method: "POST", body }),
+    );
   }
 }
 
