@@ -14,6 +14,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { isCursorOwnModel, usageWindowsForModel } from "@openbot/contracts/ipc";
 import { normalizeAccountUsage } from "../src/backend/agent/account-usage";
 import type { AgentClient } from "../src/backend/agent-client";
 import { cursorAuthFile } from "../src/backend/cursor-usage";
@@ -159,6 +160,16 @@ async function readUsage(status: number, body: unknown, planInfo: Answer = NOT_M
 const cycle = { windowDurationMins: 43_200, resetsAt: CYCLE_END / 1_000 };
 
 try {
+  const splitQuota = { primary: { usedPercent: 10 }, secondary: { usedPercent: 100 } };
+  assert.deepEqual(usageWindowsForModel("cursor", "composer-2", splitQuota), ["primary"]);
+  assert.deepEqual(usageWindowsForModel("cursor", "auto", splitQuota), ["primary"]);
+  assert.equal(isCursorOwnModel("composer-2[context=200k]"), true);
+  assert.deepEqual(usageWindowsForModel("cursor", "gpt-5.6-sol[context=272k]", splitQuota), ["secondary"]);
+  assert.deepEqual(usageWindowsForModel("cursor", "composer-2", { primary: splitQuota.primary, secondary: null }), [
+    "primary",
+    "secondary",
+  ]);
+
   await mkdir(dirname(authFile), { recursive: true });
   await writeFile(authFile, JSON.stringify({ accessToken: FAKE_TOKEN, refreshToken: "fake-refresh" }));
 

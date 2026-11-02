@@ -690,7 +690,7 @@ then `~/.cursor/auth.json`; on Linux `$XDG_CONFIG_HOME/cursor/auth.json` or
 `~/.config/cursor/auth.json`; on Windows `%APPDATA%\Cursor\auth.json`. Cursor does not document
 this API. `autoPercentUsed` (Cursor's own models) fills the primary window and `apiPercentUsed`
 (all other models) the secondary one, both for the billing cycle; the dock names them by slot for a
-`cursor` row, because both windows have the same length. A plan with only `totalPercentUsed` fills
+`cursor` row, because both windows have the same length. The composer notice uses only the window of the selected model (`usageWindowsForModel`): a spent API window does not warn while the agent runs Auto or Composer, and the reverse. A plan with only `totalPercentUsed` fills
 the primary window. The reader also sends `GetPlanInfo`: on a merged plan (`isMerged`), such as an X
 subscription, the included usage covers Grok and Composer only, so `totalPercentUsed` alone fills the
 primary window and the dock shows no other models window, as the Cursor app does. The Cursor app
