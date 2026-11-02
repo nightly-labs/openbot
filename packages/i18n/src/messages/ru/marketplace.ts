@@ -142,6 +142,7 @@ export const messages = {
   "marketplace.app.setup.account": "Войдите в аккаунт {name} в браузере.",
   "marketplace.app.setup.key": "Нужен ключ API из аккаунта {name}.",
   "marketplace.app.setup.keySaved": "{field} хранится на {host}.",
+  "marketplace.app.account.removeDescription": "OpenBot удалит данные входа этого аккаунта на {host}.",
   "marketplace.app.setup.desktop": "Работает в настольном приложении {name} по адресу {address}.",
   "marketplace.app.setup.desktopConnected": "Подключено к {address}.",
   "marketplace.app.setup.open": "Вход и ключ не нужны.",

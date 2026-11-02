@@ -118,6 +118,7 @@ export const messages = {
   "marketplace.app.setup.account": "Connectez-vous avec votre compte {name} dans le navigateur.",
   "marketplace.app.setup.key": "Nécessite une clé API de votre compte {name}.",
   "marketplace.app.setup.keySaved": "{field} est enregistré sur {host}.",
+  "marketplace.app.account.removeDescription": "OpenBot supprime la connexion de ce compte sur {host}.",
   "marketplace.app.setup.desktop": "S’exécute dans l’app de bureau {name} à l’adresse {address}.",
   "marketplace.app.setup.desktopConnected": "Connecté à {address}.",
   "marketplace.app.setup.open": "Aucune connexion ni clé requise.",
