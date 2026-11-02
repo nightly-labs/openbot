@@ -110,6 +110,7 @@ import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { configureLinuxGpu } from "./linux-gpu-mode";
 import { configureLinuxPasswordStore } from "./linux-password-store";
 import { takeLocalServerChildEnvironment } from "./local-server-child";
+import { hideMacDockWhenNoWindowShows, setDockIcon, showMacDock } from "./mac-dock";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   configureApplicationMenu,
@@ -468,10 +469,6 @@ const windows = createMainWindowController({
   onMainWindowCreated: (window) => {
     attachWindowsSessionEndHandlers(window);
     attachQuitOnMainWindowClose(window);
-    if (process.platform === "darwin") {
-      window.on("hide", syncMacDock);
-      window.on("show", syncMacDock);
-    }
   },
   reportError: (message, error) => logger.error(message, toLogValue(error)),
   quitFromShortcut: () => quitFor("shortcut"),
@@ -499,7 +496,7 @@ function applyAppIconColor(color: AppLogoColor): void {
   );
   if (icon.isEmpty()) return;
   if (process.platform === "darwin") {
-    app.dock?.setIcon(icon);
+    setDockIcon(icon);
     return;
   }
   // A window takes `appIconPath` when it is created, so a window opened after the choice gets the
@@ -512,20 +509,13 @@ function applyAppIconColor(color: AppLogoColor): void {
 }
 
 /**
- * On macOS, a user who keeps OpenBot in the menu bar sees no Dock icon while the main window is
- * hidden. The Dock icon comes back when the window shows. A window hidden with the app (Cmd + H) keeps
- * the Dock icon: it is the way back to that window.
+ * The menu bar setting changed. Turned off, it shows the Dock icon again. Turned on while the main
+ * window is closed, it hides the Dock icon. Closing the window and showing it again do the rest.
  */
-function syncMacDock(): void {
-  if (process.platform !== "darwin" || !app.dock || localServerChild) return;
-  const window = windowHolder.current;
-  const windowShown = window !== null && !window.isDestroyed() && window.isVisible();
-  if (services?.appBehavior.keepRunningInBackground && !windowShown && !app.isHidden()) {
-    app.dock.hide();
-    return;
-  }
-  if (!app.dock.isVisible())
-    void app.dock.show().catch((error) => logger.warn("Unable to show the Dock icon:", toLogValue(error)));
+function syncMacDock(menuBar: boolean): void {
+  if (process.platform !== "darwin" || localServerChild) return;
+  if (menuBar) hideMacDockWhenNoWindowShows();
+  else void showMacDock();
 }
 
 /**
@@ -1206,7 +1196,7 @@ if (!hasSingleInstanceLock) {
       performance.mark("openbot:when-ready");
       // Set the Dock icon before `dock.show()` below. A development build runs the stock Electron.app,
       // so until this call its Dock tile shows the Electron logo.
-      if (process.platform === "darwin" && !localServerChild) app.dock?.setIcon(appIconPath);
+      if (process.platform === "darwin" && !localServerChild) setDockIcon(appIconPath);
       if (!(await runCauseEffect(hostAllowsTenantLaunch()))) {
         app.quit();
         return;
@@ -1436,16 +1426,7 @@ if (!hasSingleInstanceLock) {
       // The way back to a window hidden in the background.
       backgroundTray = createBackgroundTray({
         icon: appIconColorImage ?? nativeImage.createFromPath(appIconPath),
-        menuBarIcon:
-          process.platform === "darwin"
-            ? nativeImage.createFromPath(
-                resolveMenuBarIconPath({
-                  isPackaged: app.isPackaged,
-                  resourcesPath: process.resourcesPath,
-                  sourceRoot: resolve(__dirname, "../.."),
-                }),
-              )
-            : null,
+        menuBarIcon: loadMenuBarIcon(),
         translate: language.translate,
         open: reopenMainWindow,
         quit: () => quitFor("tray"),
@@ -1454,7 +1435,7 @@ if (!hasSingleInstanceLock) {
       tray.sync(appBehavior.keepRunningInBackground);
       const unsubscribeBackgroundTray = appBehavior.subscribe(() => {
         tray.sync(appBehavior.keepRunningInBackground);
-        syncMacDock();
+        syncMacDock(appBehavior.keepRunningInBackground);
       });
       teardown.push(0, "background tray", () => {
         unsubscribeBackgroundTray();
@@ -1672,6 +1653,21 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   void prepareForShutdown().finally(() => app.quit());
 });
+
+/** Null outside macOS, or when the file is missing: the tray then shows the app icon. */
+function loadMenuBarIcon(): NativeImage | null {
+  if (process.platform !== "darwin") return null;
+  const icon = nativeImage.createFromPath(
+    resolveMenuBarIconPath({
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      sourceRoot: resolve(__dirname, "../.."),
+    }),
+  );
+  if (!icon.isEmpty()) return icon;
+  logger.warn("The menu bar icon is missing.");
+  return null;
+}
 
 function reopenMainWindow(): void {
   void windows
