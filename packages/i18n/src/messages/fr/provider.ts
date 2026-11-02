@@ -167,6 +167,10 @@ export const messages = {
   "provider.openrouterKey.description":
     "Enregistrez une clé d’API OpenRouter sur cet ordinateur pour utiliser les modèles d’OpenRouter. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
   "provider.openrouterKey.label": "Clé d’API OpenRouter",
+  "provider.opperKey.title": "Clé d’API Opper",
+  "provider.opperKey.description":
+    "Enregistrez une clé d’API Opper sur cet ordinateur pour utiliser les modèles d’Opper. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.opperKey.label": "Clé d’API Opper",
   "provider.openCodeKey.title": "Se connecter à OpenCode Go",
   "provider.openCodeKey.description":
     "Les modèles gratuits ne demandent pas de compte. Une clé donne accès aux modèles Go payants.",

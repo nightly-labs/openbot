@@ -96,6 +96,51 @@ const KEY_EXTENSIONS = {
 }
 `,
   },
+  // Opper is a gateway with an OpenAI-compatible endpoint. Pi has no built-in Opper provider, so this
+  // extension registers one for this process only, as for Inception. Model ids are Opper's bare ids.
+  // The limits are the smallest that Opper's public catalog (https://api.opper.ai/v3/models) lists for
+  // a route of the id, and the prices are those of the lab's own route. A model takes OpenAI's
+  // `reasoning_effort` only with the levels that the catalog lists for every route of the id.
+  opper: {
+    variable: "OPENBOT_PI_OPPER_API_KEY",
+    source: `export default function (pi) {${readKey("opper", "OPENBOT_PI_OPPER_API_KEY")}
+  const LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"];
+  const levels = (efforts) => ({
+    ...(efforts.includes("none") ? { off: "none" } : {}),
+    ...Object.fromEntries(LEVELS.map((level) => [level, efforts.includes(level) ? level : null])),
+  });
+  const model = (id, name, input, contextWindow, maxTokens, cost, efforts = []) => ({
+    id, name, reasoning: efforts.length > 0, input, contextWindow, maxTokens, cost,
+    ...(efforts.length > 0 ? { thinkingLevelMap: levels(efforts) } : {}),
+  });
+  const price = (input, output, cacheRead) => ({ input, output, cacheRead, cacheWrite: 0 });
+  const text = ["text"];
+  const image = ["text", "image"];
+  const fromLow = ["low", "medium", "high", "xhigh", "max"];
+  const fromNone = ["none", ...fromLow];
+  const all = ["none", "minimal", ...fromLow];
+  pi.registerProvider("opper", {
+    baseUrl: "https://api.opper.ai/v3/compat",
+    api: "openai-completions",
+    apiKey,
+    headers: { Authorization: "Bearer " + literal },
+    models: [
+      model("claude-sonnet-5-5", "Claude Sonnet 5.5", image, 1000000, 128000, price(2, 10, 0.1), fromLow),
+      model("claude-opus-5-5", "Claude Opus 5.5", image, 1000000, 128000, price(4, 20, 0.2), fromLow),
+      model("claude-haiku-5-5", "Claude Haiku 5.5", image, 1000000, 128000, price(0.1, 0.5, 0.01), fromLow),
+      model("gpt-6-astra", "GPT-6 Astra", image, 1050000, 128000, price(10, 50, 1), fromLow),
+      model("gpt-6.1-sol", "GPT-6.1 Sol", image, 1000000, 128000, price(2, 10, 0.1), fromLow),
+      model("gpt-6.1-terra", "GPT-6.1 Terra", image, 1050000, 128000, price(1, 5, 0.05), fromNone),
+      model("gemini-4-argon", "Gemini 4 Argon", image, 1048576, 65536, price(2, 10, 0.1)),
+      model("gemini-3.8-flash", "Gemini 3.8 Flash", image, 1048576, 65536, price(0.75, 3.75, 0.075)),
+      model("qwen3.8-max", "Qwen3.8-Max", image, 983616, 131072, price(1.65, 4.951, 0.25), all),
+      model("glm-5.3", "GLM-5.3", text, 1000000, 131072, price(1.4, 4.4, 0.26)),
+      model("kimi-k3", "Kimi K3", text, 1048576, 1048576, price(3, 15, 0.3)),
+    ],
+  });
+}
+`,
+  },
 } as const satisfies Record<KeyOnlyProviderId, { variable: string; source: string }>;
 
 /** Owns one temporary, key-free extension file that gives a key-only provider its key in Pi. */

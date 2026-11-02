@@ -159,6 +159,10 @@ export const messages = {
   "provider.openrouterKey.description":
     "OpenRouter のモデルを使うには、このコンピューターに OpenRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.openrouterKey.label": "OpenRouter API キー",
+  "provider.opperKey.title": "Opper API キー",
+  "provider.opperKey.description":
+    "Opper のモデルを使うには、このコンピューターに Opper API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.opperKey.label": "Opper API キー",
 
   "provider.openCodeKey.title": "OpenCode Go にサインイン",
   "provider.openCodeKey.description": "無料モデルにアカウントは不要です。キーがあると有料の Go モデルを使えます。",

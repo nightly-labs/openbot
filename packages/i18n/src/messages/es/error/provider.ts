@@ -395,6 +395,7 @@ export const messages = {
   "error.provider.inceptionSignIn": "Añade una clave de API de Inception para continuar.",
   "error.provider.deepseekSignIn": "Añade una clave de API de DeepSeek para continuar.",
   "error.provider.openrouterSignIn": "Añade una clave de API de OpenRouter para continuar.",
+  "error.provider.opperSignIn": "Añade una clave de API de Opper para continuar.",
   "error.provider.terminalLoginFailed":
     "No se pudo abrir la terminal de inicio de sesión. Abre la CLI del proveedor en este host, inicia sesión allí y actualiza los proveedores.",
   "error.provider.nativeArchiveInvalid": "La descarga del proveedor no contiene una instalación válida.",

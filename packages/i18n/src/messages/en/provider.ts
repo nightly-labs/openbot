@@ -173,6 +173,10 @@ export const messages = defineMessages("provider", {
   "provider.openrouterKey.description":
     "Save an OpenRouter API key on this computer to use the models that OpenRouter serves. OpenBot runs them in the Pi CLI that it downloads.",
   "provider.openrouterKey.label": "OpenRouter API key",
+  "provider.opperKey.title": "Opper API key",
+  "provider.opperKey.description":
+    "Save an Opper API key on this computer to use the models that Opper serves. OpenBot runs them in the Pi CLI that it downloads.",
+  "provider.opperKey.label": "Opper API key",
 
   // The optional OpenCode Go key dialog.
   "provider.openCodeKey.title": "Sign in to OpenCode Go",

@@ -47,6 +47,7 @@ export const messages = {
   "onboarding.provider.inceptionKey": "Inception API anahtarıyla Mercury modelleri",
   "onboarding.provider.deepseekKey": "DeepSeek API anahtarıyla DeepSeek modelleri",
   "onboarding.provider.openrouterKey": "OpenRouter API anahtarıyla birçok model",
+  "onboarding.provider.opperKey": "Opper API anahtarıyla birçok model",
   "onboarding.provider.tryFree": "Ücretsiz deneyin",
   "onboarding.provider.noSignIn": "Oturum açmak gerekmez",
   "onboarding.provider.more": "Daha fazla sağlayıcı",

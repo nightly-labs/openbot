@@ -158,6 +158,10 @@ export const messages = {
   "provider.openrouterKey.description":
     "OpenRouter modellerini kullanmak için bu bilgisayara bir OpenRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.openrouterKey.label": "OpenRouter API anahtarı",
+  "provider.opperKey.title": "Opper API anahtarı",
+  "provider.opperKey.description":
+    "Opper modellerini kullanmak için bu bilgisayara bir Opper API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.opperKey.label": "Opper API anahtarı",
   "provider.openCodeKey.title": "OpenCode Go'da oturum açın",
   "provider.openCodeKey.description":
     "Ücretsiz modeller hesap gerektirmez. Bir anahtar, ücretli Go modellerinin kilidini açar.",

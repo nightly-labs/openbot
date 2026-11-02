@@ -83,6 +83,12 @@ const KEY_TEXT = {
     description: "provider.openrouterKey.description",
     label: "provider.openrouterKey.label",
   },
+  opper: {
+    name: "Opper",
+    title: "provider.opperKey.title",
+    description: "provider.opperKey.description",
+    label: "provider.opperKey.label",
+  },
 } as const satisfies Record<string, { name: string; title: AppTextKey; description: AppTextKey; label: AppTextKey }>;
 
 /** A provider whose API key this dialog saves. */
