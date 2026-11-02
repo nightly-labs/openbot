@@ -316,6 +316,18 @@ closed. The WebRTC host peer encodes the local response and the events again wit
 The iPhone app advertises it through the shared team client, but it still shows the question as a
 single choice.
 
+### Reasoning efforts
+
+`reasoning-efforts-v1` lets an agent `reasoningEffort`, a model `defaultReasoningEffort` and each of
+its `supportedReasoningEfforts` be `none`, `minimal` or `ultra`, in addition to the five protocol 8
+levels (see `team-protocol/reasoning-efforts-v1.ts`). The routes and events do not change. Only
+protocol 9 advertises it. For a connection without the capability, the host changes each of these
+fields in every response, event and agent view to the nearest released level: `none` and `minimal`
+become `low`, `ultra` becomes `max`, and a list keeps each level once. A workflow step `effort` and
+text do not change. A released peer that saves an agent with the changed level replaces the exact
+level. The WebRTC host peer sends the local request and the events socket with the peer's
+capabilities, so a relayed peer gets the same levels.
+
 ### Context usage
 
 `context-usage-v1` carries how full the context window of each agent is, so a desktop joined to a

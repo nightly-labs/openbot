@@ -36,6 +36,8 @@ export const messages = {
   "settings.launchAtLogin.description": "Abrir la aplicación al iniciar sesión en este equipo.",
   "settings.keepRunning.title": "Mantener OpenBot en segundo plano",
   "settings.keepRunning.description": "Mantener las tareas activas al cerrar la ventana.",
+  "settings.menuBar.title": "Mostrar OpenBot en la barra de menús",
+  "settings.menuBar.description": "Oculta el icono del Dock al cerrar la ventana. Las tareas activas siguen en marcha.",
   "settings.keepAwake.title": "Mantener el ordenador activo",
   "settings.keepAwake.description":
     "Las rutinas se ejecutan a tiempo mientras el ordenador está conectado a la corriente. La pantalla puede apagarse.",

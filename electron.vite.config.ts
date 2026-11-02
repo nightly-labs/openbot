@@ -54,7 +54,9 @@ export default defineConfig({
   renderer: {
     plugins: [solidPlugin(), tailwindcss({ optimize: false })],
     optimizeDeps: {
-      include: ["@norbert_bodziony/bloub"],
+      // bloub finds its plush images with `new URL(..., import.meta.url)`. A pre-bundle moves the
+      // code away from the images, so Vite serves the package as it is.
+      exclude: ["@norbert_bodziony/bloub", "@norbert_bodziony/bloub/plush"],
     },
     resolve: {
       dedupe: ["solid-js", "@solidjs/web"],

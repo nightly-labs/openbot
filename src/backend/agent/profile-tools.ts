@@ -56,7 +56,7 @@ export const createAgentToolSchema = z
     reasoningEffort: z
       .enum(AGENT_REASONING_EFFORTS)
       .describe(
-        "Reasoning effort that the model supports, from list_models. Omit to use your own effort when the new agent gets your model, else the model's default.",
+        "An effort of the model from list_models. Omit for your own effort when the new agent gets your model, else the model's default.",
       )
       .optional(),
   })
@@ -102,7 +102,7 @@ export const updateProfileToolSchema = z
     reasoningEffort: z
       .enum(AGENT_REASONING_EFFORTS)
       .describe(
-        "New reasoning effort that the model supports, from list_models. Omit to keep the current effort when the model supports it, else to use the model's default.",
+        "New effort of the model from list_models. Omit to keep the current effort when the model supports it, else the model's default.",
       )
       .optional(),
     providerAccountId: providerAccountId

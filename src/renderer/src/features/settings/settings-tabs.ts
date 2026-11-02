@@ -34,7 +34,14 @@ export type SettingsTab =
 type SettingsRow = {
   titleKey: AppTextKey;
   descriptionKey?: AppTextKey;
+  /** True: the row shows only on macOS. False: never on macOS. Missing: on each platform. */
+  macOS?: boolean;
 };
+
+/** False for a row that this platform does not show, so the search does not find it. */
+export function settingsRowShown(row: { macOS?: boolean }, platform: AppInfo["platform"] | undefined): boolean {
+  return row.macOS === undefined || row.macOS === (platform === "darwin");
+}
 
 /**
  * A tab holds the keys of its label and its header text, not the text itself. The list is read at
@@ -64,7 +71,8 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.externalLinks.title", descriptionKey: "settings.externalLinks.description" },
       { titleKey: "settings.launchAtLogin.title", descriptionKey: "settings.launchAtLogin.description" },
       { titleKey: "settings.keepRemoteSessions.title", descriptionKey: "settings.keepRemoteSessions.description" },
-      { titleKey: "settings.keepRunning.title", descriptionKey: "settings.keepRunning.description" },
+      { titleKey: "settings.keepRunning.title", descriptionKey: "settings.keepRunning.description", macOS: false },
+      { titleKey: "settings.menuBar.title", descriptionKey: "settings.menuBar.description", macOS: true },
       { titleKey: "settings.keepAwake.title", descriptionKey: "settings.keepAwake.description" },
       { titleKey: "settings.keepAwakeOnBattery.title", descriptionKey: "settings.keepAwakeOnBattery.description" },
       { titleKey: "settings.restoreWorkspace.title", descriptionKey: "settings.restoreWorkspace.description" },

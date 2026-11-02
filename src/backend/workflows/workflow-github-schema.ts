@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 // Migration v49: GitHub triggers and outputs of workflows. The text below is the migration; the latest
-// schema takes the same run source line and tables, so do not edit it after release.
+// schema takes the same tables, and the run source line of migration 50, so do not edit it after release.
 //
 // `workflow_runs` gets `github` in its source CHECK. SQLite cannot change a CHECK in place, so the
 // migration rebuilds the table; its rows keep their run ids, so the steps and output deliveries that
@@ -24,7 +24,7 @@ import type { DatabaseSync } from "node:sqlite";
 // review or issue that GitHub made, or the labels, people and state it set. The loop guard reads them
 // to know an event that this workflow caused.
 export const V46_WORKFLOW_RUN_SOURCE_SQL = "source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook')),";
-export const V49_WORKFLOW_RUN_SOURCE_SQL =
+const V49_WORKFLOW_RUN_SOURCE_SQL =
   "source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github')),";
 
 const V49_WORKFLOW_RUN_INDEXES_SQL = `

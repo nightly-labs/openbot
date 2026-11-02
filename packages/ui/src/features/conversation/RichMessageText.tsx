@@ -55,14 +55,24 @@ type UnavailableTagKind = Exclude<ChatTagKind, "quote">;
 
 export function RichMessageText(props: RichMessageTextProps) {
   const { t } = useText();
+  // The parent gives new props when an agent changes. These memos keep the same lists, so the maps
+  // below, the parsed parts and their chips are not made again.
+  const citationList = createMemo(() => props.citations);
+  const attachmentList = createMemo(() => props.attachments);
+  const skillList = createMemo(() => props.skills);
   const citationsByNumber = createMemo(
-    () => new Map((props.citations ?? []).map((citation) => [citation.number, citation])),
+    () => new Map((citationList() ?? []).map((citation) => [citation.number, citation])),
   );
   const attachmentsById = createMemo(
-    () => new Map((props.attachments ?? []).map((attachment) => [attachment.id, attachment])),
+    () => new Map((attachmentList() ?? []).map((attachment) => [attachment.id, attachment])),
   );
+  // The parser reads only the id and the name of each agent. So a new avatar does not parse each
+  // message again and build its chips again: a chip gets its agent's avatar from `agentsById`.
+  const taggedAgents = createMemo(() => props.agents, { equals: sameAgentNames });
+  const agentsById = createMemo(() => new Map(props.agents.map((agent) => [agent.id, agent])));
+  const liveAgent = (agent: ComposerAgent) => agentsById().get(agent.id) ?? agent;
   const parts = createMemo(() =>
-    richMessageParts(props.body, props.agents, props.skills ?? [], citationsByNumber(), attachmentsById()),
+    richMessageParts(props.body, taggedAgents(), skillList() ?? [], citationsByNumber(), attachmentsById()),
   );
   const trail = useStreamingReveal();
   const tailAfter = createMemo(
@@ -151,14 +161,15 @@ export function RichMessageText(props: RichMessageTextProps) {
               </MessageLink>
             );
           }
-          if (part.agent) {
+          const agent = part.agent;
+          if (agent) {
             return (
               <ReferenceChip
                 kind="agent"
-                name={part.agent.name}
+                name={agent.name}
                 class="message-reference-chip message-agent-tag"
-                icon={<AgentAvatar agent={part.agent} />}
-                onClick={() => props.onSelectAgent(part.agent?.id ?? "")}
+                icon={<AgentAvatar agent={liveAgent(agent)} />}
+                onClick={() => props.onSelectAgent(agent.id)}
               />
             );
           }
@@ -361,6 +372,14 @@ interface RichMessagePart {
   attachment?: AttachmentSummary;
   sharedPath?: string;
   url?: string;
+}
+
+/** True when both lists have the same agents, in the same order, with the same names. */
+function sameAgentNames(left: ComposerAgent[], right: ComposerAgent[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((agent, index) => agent.id === right[index]?.id && agent.name === right[index]?.name)
+  );
 }
 
 function richMessageParts(

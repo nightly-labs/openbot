@@ -422,6 +422,73 @@ try {
     return { base: DISCORD_GATEWAY_INTENTS, messageContent: DISCORD_MESSAGE_CONTENT_INTENT };
   });
 
+  await step("a mention of OpenBot's own role reaches OpenBot; a mention of another role does not", async () => {
+    // Discord's autocomplete can choose the role that Discord made for the bot instead of the bot.
+    const BOT_ROLE = "1300000000000000001";
+    const OTHER_ROLE = "1300000000000000002";
+    const state = new DiscordState(APP);
+    state.handle(
+      gateway("READY", {
+        v: 10,
+        user: { id: APP, username: "OpenBot", bot: true },
+        application: { id: APP, flags: 0 },
+        guilds: [{ id: GUILD_ONE, unavailable: true }],
+        session_id: "session",
+        resume_gateway_url: "wss://gateway.discord.gg",
+        shard: [0, 1],
+      }),
+    );
+    const guild = (roles: unknown[]) =>
+      gateway("GUILD_CREATE", {
+        id: GUILD_ONE,
+        name: "Nightly",
+        channels: [{ id: CHANNEL_ONE, type: 0, name: "general" }],
+        roles,
+      });
+    const botRole = { id: BOT_ROLE, name: "OpenBot", managed: true, tags: { bot_id: APP } };
+    const otherRole = { id: OTHER_ROLE, name: "Mods", managed: false };
+    /** The text that Signal gives the host for a message that mentions only the role, or null. */
+    const roleMention = (roleId: string): string | null => {
+      const actions = state.handle(
+        gateway("MESSAGE_CREATE", {
+          id: nextId(),
+          channel_id: CHANNEL_ONE,
+          guild_id: GUILD_ONE,
+          content: `<@&${roleId}> hello`,
+          timestamp: "2026-11-02T10:00:00.000Z",
+          author: { id: BOB, username: "Bob" },
+          mentions: [],
+          mention_roles: [roleId],
+          attachments: [],
+        }),
+      );
+      const action = actions[0];
+      if (action?.type !== "deliver") return null;
+      const delivery = decodeDiscordDelivery(JSON.parse(JSON.stringify(action.delivery)));
+      assert.equal(delivery.kind, "message");
+      return delivery.kind === "message" ? delivery.message.content : null;
+    };
+
+    state.handle(guild([otherRole]));
+    assert.equal(roleMention(BOT_ROLE), null, "A role that the Gateway did not name as the bot's was delivered.");
+    state.handle(gateway("GUILD_ROLE_CREATE", { guild_id: GUILD_ONE, role: botRole }));
+    assert.equal(state.botRoleId(GUILD_ONE), BOT_ROLE);
+    // The host gets the text without the role mention, as without a bot mention.
+    assert.equal(roleMention(BOT_ROLE), "hello");
+    assert.equal(roleMention(OTHER_ROLE), null, "A mention of another role was delivered.");
+    state.handle(gateway("GUILD_ROLE_DELETE", { guild_id: GUILD_ONE, role_id: BOT_ROLE }));
+    assert.equal(roleMention(BOT_ROLE), null, "A deleted bot role was still delivered.");
+    // After a reconnect, the guild's role list gives the role again.
+    state.handle(guild([otherRole, botRole]));
+    assert.equal(roleMention(BOT_ROLE), "hello");
+    state.handle(gateway("GUILD_ROLE_UPDATE", { guild_id: GUILD_ONE, role: { ...botRole, tags: {} } }));
+    assert.equal(state.botRoleId(GUILD_ONE), null, "A role that lost its bot tag stayed the bot's role.");
+    state.handle(guild([botRole]));
+    state.handle(gateway("GUILD_DELETE", { id: GUILD_ONE }));
+    assert.equal(state.botRoleId(GUILD_ONE), null, "A guild that removed the bot kept its bot role.");
+    return { botRole: BOT_ROLE, otherRole: OTHER_ROLE };
+  });
+
   // Two Discord servers connect to one OpenBot server, as after two installs.
   await boot(async ({ threads }) => {
     for (const [guildId, name] of [

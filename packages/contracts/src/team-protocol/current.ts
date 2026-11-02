@@ -88,6 +88,7 @@ import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-andr
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { QUIET_TURN_CAPABILITY } from "./quiet-turn-v1";
+import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
@@ -252,6 +253,7 @@ export {
   TEAM_HISTORY_EXTENT_CAPABILITY,
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
+  TEAM_REASONING_EFFORTS_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
@@ -394,6 +396,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MCP_ACCOUNTS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
+  TEAM_REASONING_EFFORTS_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
 ] as const;
 
@@ -543,6 +546,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== MCP_ACCOUNTS_CAPABILITY &&
     capability !== SIDEBAR_PINS_CAPABILITY &&
     capability !== SIDEBAR_FOLDERS_CAPABILITY &&
+    capability !== TEAM_REASONING_EFFORTS_CAPABILITY &&
     capability !== SERVER_AUDIT_CAPABILITY,
 );
 /**
@@ -567,6 +571,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MCP_ACCOUNTS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
+  TEAM_REASONING_EFFORTS_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -675,6 +680,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== MCP_ACCOUNTS_CAPABILITY &&
       capability !== SIDEBAR_PINS_CAPABILITY &&
       capability !== SIDEBAR_FOLDERS_CAPABILITY &&
+      capability !== TEAM_REASONING_EFFORTS_CAPABILITY &&
       capability !== SERVER_AUDIT_CAPABILITY,
   );
 }

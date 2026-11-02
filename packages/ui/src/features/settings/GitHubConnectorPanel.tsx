@@ -20,9 +20,9 @@ import {
   ItemTitle,
   Link2Off,
   Lock,
+  PlushLoader,
   Search,
   SettingsSection,
-  Spinner,
   Text,
   TriangleAlert,
   UserAvatar,
@@ -467,7 +467,7 @@ function ConnectDialog(props: GitHubConnection & { open: boolean; onClose: () =>
       <Switch>
         <Match when={step() === "waiting"}>
           <div class="github-connector-center">
-            <Spinner label={t("connector.github.waiting")} />
+            <PlushLoader size={48} label={t("connector.github.waiting")} />
           </div>
         </Match>
         <Match when={step() === "code" && props.status.userCode}>
@@ -475,7 +475,7 @@ function ConnectDialog(props: GitHubConnection & { open: boolean; onClose: () =>
             <>
               <DeviceCode code={code()} />
               <div class="github-connector-waiting" aria-live="polite">
-                <Spinner size="sm" />
+                <PlushLoader size={32} />
                 <Text variant="caption" tone="muted">
                   {t("connector.github.waiting")}
                 </Text>

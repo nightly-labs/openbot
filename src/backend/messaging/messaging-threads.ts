@@ -109,7 +109,41 @@ export interface MessagingOutbound {
     | { posted: true; messageId: string; url?: string }
     | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }
   >;
+  /** A Discord output of a workflow: a reply, a post or a reaction. */
+  discord(
+    connectionId: string,
+    send: MessagingDiscordSend,
+  ): Effect.Effect<{ posted: true } | { failure: Exclude<MessagingPostFailure, "gone"> }>;
 }
+
+/** A post or a reaction of a workflow's Discord output, in one channel of the connection's server. */
+export type MessagingDiscordSend =
+  | { action: "reply"; channelId: string; messageId: string; text: string }
+  | { action: "post"; channelId: string; text: string }
+  | { action: "react"; channelId: string; messageId: string; emoji: string };
+
+/** A message in a Discord server that mentions OpenBot, for the Discord triggers of workflows. */
+export interface MessagingDiscordMention {
+  connectionId: string;
+  serverName: string;
+  channelId: string;
+  channelName: string;
+  messageId: string;
+  authorId: string;
+  authorName: string;
+  authorRoleIds: readonly string[];
+  /** The text with each mention as `@name`. */
+  text: string;
+  /** ISO time. */
+  receivedAt: string;
+}
+
+/**
+ * What the workflows did with a mention: none of their triggers takes it (`none`), so an agent answers
+ * it; a trigger started a run (`started`); or a trigger takes it but its workflow did not start
+ * (`skipped`), such as while a run of it is open.
+ */
+export type MessagingMentionResult = "none" | "started" | "skipped";
 
 export interface MessagingThreadsHooks {
   schedule(agentId: string): void;
@@ -193,6 +227,7 @@ export class MessagingThreads {
       ) => Effect.Effect<MessagingHistory | null, MessagingOperationFailed>)
     | null = null;
   #outbound: MessagingOutbound | null = null;
+  #mentionHandler: ((mention: MessagingDiscordMention) => Effect.Effect<MessagingMentionResult>) | null = null;
 
   constructor(database: OpenBotDatabase, mailbox: MailboxStore, hooks: MessagingThreadsHooks) {
     this.store = new MessagingStore(database);
@@ -234,6 +269,34 @@ export class MessagingThreads {
   setOutbound(outbound: MessagingOutbound | null): void {
     this.#outbound = outbound;
   }
+
+  /** The workflows' side of a Discord mention. Without it, every mention goes to an agent. */
+  setMentionHandler(
+    handler: ((mention: MessagingDiscordMention) => Effect.Effect<MessagingMentionResult>) | null,
+  ): void {
+    this.#mentionHandler = handler;
+  }
+
+  /** Gives a Discord mention to the workflows first. */
+  workflowMention(mention: MessagingDiscordMention): Effect.Effect<MessagingMentionResult> {
+    return this.#mentionHandler ? this.#mentionHandler(mention) : Effect.succeed("none");
+  }
+
+  /**
+   * A Discord output of a workflow. Only an enabled connection of this host can take it. The server is
+   * outside this computer, so the messaging side removes secrets from the text.
+   */
+  readonly discordSend = Effect.fn("MessagingThreads.discordSend")(function* (
+    this: MessagingThreads,
+    connectionId: string,
+    send: MessagingDiscordSend,
+  ): Effect.fn.Return<{ posted: true } | { failure: MessagingPostFailure }> {
+    const record = this.store.connection(connectionId);
+    if (!record?.enabled || record.platform !== "discord") return { failure: "gone" };
+    const outbound = this.#outbound;
+    if (!outbound) return { failure: "not-running" };
+    return yield* outbound.discord(connectionId, send);
+  });
 
   /**
    * One outbound tool call, from any turn of any agent. The arguments name the connection and the
