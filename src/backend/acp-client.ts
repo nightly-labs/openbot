@@ -179,6 +179,8 @@ interface AcpTurn {
   toolItems: Map<string, ThreadItem>;
   /** The user stopped the turn. */
   stopped: boolean;
+  /** Aborts when the user stops the turn: a permission request that waits gets its answer then. */
+  readonly stop: AbortController;
   completing: boolean;
   task: Fiber.Fiber<void, ProviderClientOperationError> | null;
   /** When the agent last sent an update for this turn, or the user last answered it. */
@@ -1115,6 +1117,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         if (!turn || (requestedTurnId !== null && requestedTurnId !== turn.id))
           return yield* providerSync(() => decoder({}));
         turn.stopped = true;
+        turn.stop.abort();
         const cancel = providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id }));
         if (turn.unprompted) {
           // No prompt answers for the agent's own turn, so its open tool calls end as stopped.
@@ -2071,6 +2074,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       toolKinds: new Map(),
       toolItems: new Map(),
       stopped: false,
+      stop: new AbortController(),
       completing: false,
       task: null,
       lastActivityAt: Date.now(),
@@ -2886,10 +2890,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           reason: params.toolCall.title ?? null,
           permissions: requestedPermissions,
         },
+        turn?.stop.signal,
       ),
-    ).pipe(toProviderClientOperationError);
-    // After `session/cancel` the protocol requires the `cancelled` outcome, and the answer that a
-    // turn's end gives is not the user's choice (#4165).
+    ).pipe(
+      toProviderClientOperationError,
+      Effect.catchIf(
+        () => turn?.stopped === true,
+        () => Effect.succeed(null),
+      ),
+    );
+    // With `session/cancel` the protocol requires the `cancelled` outcome at once, and the answer
+    // that a turn's end gives is not the user's choice (#4165).
     if (turn?.stopped || turn?.completing) return { outcome: { outcome: "cancelled" } };
     const accepted =
       isRecord(result) &&

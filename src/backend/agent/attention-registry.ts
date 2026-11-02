@@ -1525,12 +1525,12 @@ export class AttentionRegistry {
    * own failures, so this only keeps one from interrupting the remaining removals. A native approval
    * that the provider still waits on gets the refusal a `respondToApproval` answer would send, so
    * its request does not wait forever; a client that forgot the request ignores the answer (#4165).
-   * A client that no longer runs has nobody to answer.
+   * A client that no longer runs has nobody to answer, for a hosted site too: its write fails.
    */
   #cancelApproval(pending: PendingApproval): void {
     this.#emitInputResolved("approval", pending.id, pending.approval.agentId);
     pending.decide?.("cancel");
-    if (pending.decide) return;
+    if (pending.decide || !pending.client.running) return;
     if (pending.hostedSiteMutation) {
       const report = (error: unknown) =>
         Effect.sync(() => this.#emitError("approval_cleanup_failed", error, pending.approval.agentId));
@@ -1545,7 +1545,6 @@ export class AttentionRegistry {
       );
       return;
     }
-    if (!pending.client.running) return;
     try {
       pending.client.respond(
         pending.id,
