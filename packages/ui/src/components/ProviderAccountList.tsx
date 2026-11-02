@@ -165,6 +165,8 @@ export function ProviderAccountRenameField(props: {
   value: string;
   placeholder: string;
   label: string;
+  /** The longest name the owner of the account keeps. A provider account keeps a short label. */
+  maxLength?: number | undefined;
   onDone: (value: string | null) => void;
 }) {
   // Enter and Escape remove the field, and the removal blurs it. Finish only once.
@@ -180,7 +182,7 @@ export function ProviderAccountRenameField(props: {
       aria-label={props.label}
       value={props.value}
       placeholder={props.placeholder}
-      maxlength={PROVIDER_ACCOUNT_LABEL_MAX_LENGTH}
+      maxlength={props.maxLength ?? PROVIDER_ACCOUNT_LABEL_MAX_LENGTH}
       size="sm"
       ref={(element) => queueMicrotask(() => element.select())}
       onKeyDown={(event) => {

@@ -65,6 +65,22 @@ the request. A LAN or localhost MCP URL has no such check. The check does not pi
 DNS can change between the check and the connection; this residual risk is accepted.
 Run `bun run test:mcp-oauth` to check the sign-in paths against a local authorization server.
 
+### More than one account of one MCP server
+
+An app on a fixed address that signs in with a browser, such as Notion, can have more than one
+account. Each account is one http row on the same address. The row name is the account name, and a
+message tags the account with `@<row name>`.
+
+| Part | Rule |
+| --- | --- |
+| Address | A new account adds `#account-<id>` to the URL ([`mcp-accounts.ts`](../../packages/contracts/src/mcp-accounts.ts)). A row from before accounts has no fragment and keeps its sign-in. |
+| Sign-in | `McpOAuth` keeps one record for each address with its fragment (`mcpOAuthAccountKey`). Discovery, registration, tokens and revocation use the address without the fragment, so the fragment never leaves the computer. |
+| Provider | `McpGateway.endpoint` and the proxy target remove the fragment. The proxy route is a digest of the row id and its URL, so each account has its own route. |
+| Catalog | `isPluginAppConfig` gives each row with an account fragment to the catalog app, whatever its name. A row with no fragment needs the catalog name, so it has no Rename. Disconnect removes all accounts of the app. |
+| Joined server | The client offers Add account only when the host sends `mcp-accounts-v1`. An older host keys sign-ins by the address without the fragment, so two accounts would share one sign-in. |
+
+Run `bun scripts/mcp-oauth-store-e2e.ts` to check that two accounts keep separate sign-ins.
+
 ### How an agent reaches a signed-in MCP server
 
 An agent never gets an OAuth token. `McpGateway.endpoint` gives a provider a route of
