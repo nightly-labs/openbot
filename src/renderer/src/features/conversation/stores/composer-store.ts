@@ -4,6 +4,7 @@ import { appendVoiceTranscript } from "../../../voice-recording";
 import { EMPTY_DRAFT, type StoredQueueEdit } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
+import type { PastePreview } from "./composer-actions";
 
 export interface ComposerStoreDeps {
   props: ConversationProps;
@@ -17,6 +18,7 @@ export interface ComposerStoreDeps {
   editingServerId: () => string | null;
   editingDeliveryId: () => string | null;
   editingPendingSave: () => StoredQueueEdit["pendingSave"] | null;
+  pastePreviews: () => readonly PastePreview[];
   seenMessageIds: Set<string>;
 }
 
@@ -54,6 +56,18 @@ export function createComposerStore(deps: ComposerStoreDeps) {
   const unreferencedDraftAttachments = createMemo(() => {
     const referencedIds = attachmentReferenceIds(currentDraft().text);
     return currentDraft().attachments.filter((attachment) => !referencedIds.has(attachment.id));
+  });
+  /** The thumbnail row: each image, also one that the text names, and each other file that the text does not name. */
+  const rowDraftAttachments = createMemo(() => {
+    const referencedIds = attachmentReferenceIds(currentDraft().text);
+    return currentDraft().attachments.filter(
+      (attachment) => attachment.kind === "image" || !referencedIds.has(attachment.id),
+    );
+  });
+  const currentPastePreviews = createMemo(() => {
+    const target = currentTarget();
+    const key = target ? composerDraftKey(target) : undefined;
+    return deps.pastePreviews().filter((preview) => preview.draftKey === key);
   });
   const composerHasContent = createMemo(
     () => Boolean(currentDraft().text.trim()) || currentDraft().attachments.length > 0,
@@ -164,6 +178,8 @@ export function createComposerStore(deps: ComposerStoreDeps) {
     currentComposerError,
     currentChatError,
     unreferencedDraftAttachments,
+    rowDraftAttachments,
+    currentPastePreviews,
     composerHasContent,
     replyTarget,
     markMessageSeen,

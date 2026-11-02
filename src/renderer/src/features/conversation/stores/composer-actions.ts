@@ -1,3 +1,4 @@
+import { rasterImageMimeType } from "@openbot/contracts/attachment-files";
 import {
   attachmentReferenceIds,
   expandAttachmentReferences,
@@ -43,11 +44,70 @@ export interface VoiceSend {
   onFailed: () => void;
 }
 
+/** A pasted image that is still importing. The composer shows it until the import ends. */
+export interface PastePreview {
+  id: string;
+  draftKey: string;
+  name: string;
+  /** A `data:` URL: the desktop CSP allows no `blob:` image. */
+  url: string;
+}
+
+/** A paste that imports faster than this shows no preview, so the row does not flash. */
+const PASTE_PREVIEW_DELAY_MS = 150;
+
+/** The local previews of the raster images in `files`. A file that cannot be read gets none. */
+async function readPastePreviews(files: readonly File[], draftKey: string): Promise<PastePreview[]> {
+  const previews = await Promise.all(
+    files.map(async (file) => {
+      const type = rasterImageMimeType(file.name);
+      if (!type) return null;
+      const url = await new Promise<string | null>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(new Blob([file], { type }));
+      });
+      return url ? { id: crypto.randomUUID(), draftKey, name: file.name, url } : null;
+    }),
+  );
+  return previews.filter((preview) => preview !== null);
+}
+
+type SetPastePreviews = (update: (current: readonly PastePreview[]) => readonly PastePreview[]) => void;
+
+/**
+ * Shows the local previews of a paste that imports for longer than `PASTE_PREVIEW_DELAY_MS`.
+ * `onAccepted` starts it when the files pass the limits; `stop` removes the previews.
+ */
+export function pastePreviewTracker(draftKey: string, setPastePreviews: SetPastePreviews) {
+  let importing = true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const ids = new Set<string>();
+  return {
+    onAccepted(files: readonly File[]): void {
+      timer = setTimeout(() => {
+        void readPastePreviews(files, draftKey).then((ready) => {
+          if (!importing || ready.length === 0) return;
+          for (const preview of ready) ids.add(preview.id);
+          setPastePreviews((current) => [...current, ...ready]);
+        });
+      }, PASTE_PREVIEW_DELAY_MS);
+    },
+    stop(): void {
+      importing = false;
+      clearTimeout(timer);
+      if (ids.size) setPastePreviews((current) => current.filter((preview) => !ids.has(preview.id)));
+    },
+  };
+}
+
 export interface ComposerActionsDeps {
   props: ConversationProps;
   agentReady: () => boolean;
   attachmentBusy: () => boolean;
   setAttachmentBusy: (busy: boolean) => void;
+  setPastePreviews: SetPastePreviews;
   attachmentImports: Map<string, ConversationTarget>;
   drafts: () => Record<string, ComposerDraft>;
   setDrafts: (update: (current: Record<string, ComposerDraft>) => Record<string, ComposerDraft>) => void;
@@ -117,6 +177,7 @@ export async function importPastedFiles(
   files: ReadonlyArray<File | Promise<File>>,
   attached: () => number,
   importData: (data: AttachmentDataInput[]) => Promise<DraftAttachment[]>,
+  onAccepted?: (files: readonly File[]) => void,
 ): Promise<DraftAttachment[]> {
   const originals = await Promise.all(files);
   if (originals.length + attached() > INPUT_LIMITS.attachments)
@@ -126,6 +187,7 @@ export async function importPastedFiles(
     throw new Error(t("error.attachment.fileTooLarge"));
   if (originals.reduce((total, file) => total + file.size, 0) > ATTACHMENT_LIMITS.totalBytes)
     throw new Error(t("error.attachment.totalTooLarge"));
+  onAccepted?.(originals);
   const data = await Promise.all(
     originals.map(async (file) => ({
       name: file.name,
@@ -266,16 +328,19 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     deps.attachmentImports.set(requestId, target);
     deps.setAttachmentBusy(true);
     deps.clearConversationError(target);
+    const previews = pastePreviewTracker(key, deps.setPastePreviews);
     try {
       const imported = await importPastedFiles(
         files,
         () => (deps.drafts()[key] ?? EMPTY_DRAFT).attachments.length,
         (data) => runtime.agent.importAttachmentData(data, target.serverId),
+        previews.onAccepted,
       );
       const accepted = await addAttachments(imported, target);
       // The draft refused the files and shows why. The text of a copy still comes, with their names.
       if (!accepted.length) return copy?.text ? insert(expandAttachmentReferences(copy.text)) : undefined;
       const replacements = new Map((copy?.sourceIds ?? []).map((id, index) => [id, accepted[index]]));
+      // Each file goes in the text where it was pasted. An image also shows in the thumbnail row.
       const text =
         copy === undefined
           ? accepted.map((attachment) => serializeAttachmentReference(attachment.name, attachment.id)).join(" ")
@@ -292,6 +357,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       // When the files of a copy cannot come, its text comes with their names, as in another app.
       return copy?.text ? insert(expandAttachmentReferences(copy.text)) : undefined;
     } finally {
+      previews.stop();
       deps.attachmentImports.delete(requestId);
       deps.setAttachmentBusy(deps.attachmentImports.size > 0);
     }

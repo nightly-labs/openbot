@@ -4,6 +4,7 @@ import {
   AGENT_THREAD_BRANCHES_CAPABILITY,
   withAgentThreadBranches,
 } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
+import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { runTeamEffect } from "@openbot/team-client";
@@ -94,6 +95,7 @@ export function createWebAgentThreads(options: {
     editable: () => workspace.state.capabilities.includes(AGENT_THREADS_CAPABILITY),
     readable: () => workspace.state.capabilities.includes(AGENT_THREAD_READS_CAPABILITY),
     branchable,
+    filesAccepted: () => workspace.state.capabilities.includes(AGENT_THREAD_FILES_CAPABILITY),
     // A reconnect sends a runtime snapshot, which reads the threads again.
     reloadKey: () => null,
   });

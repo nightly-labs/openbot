@@ -33,6 +33,7 @@ import type {
   VoiceLiveTranscript,
 } from "./conversation-types";
 import type { TurnRuntime } from "./stores/activity-store";
+import type { PastePreview } from "./stores/composer-actions";
 import type { SidePanelsState } from "./stores/panels-store";
 import { createPendingSendStore } from "./stores/pending-send-store";
 import type { SideQuestionState } from "./stores/side-question-store";
@@ -392,6 +393,7 @@ export function createStableConversationState(
 export function createServerConversationState() {
   const [showComposerActions, setShowComposerActions] = createSignal(false);
   const [attachmentBusy, setAttachmentBusy] = createSignal(false);
+  const [pastePreviews, setPastePreviews] = createSignal<readonly PastePreview[]>([]);
   const [submitting, setSubmitting] = createSignal(false);
   const [markingRead, setMarkingRead] = createSignal(false);
   const [dropActive, setDropActive] = createSignal(false);
@@ -431,6 +433,8 @@ export function createServerConversationState() {
     setShowComposerActions,
     attachmentBusy,
     setAttachmentBusy,
+    pastePreviews,
+    setPastePreviews,
     submitting,
     setSubmitting,
     markingRead,

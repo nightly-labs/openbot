@@ -1,6 +1,7 @@
 import {
   assertSupportedAttachmentName,
   attachmentFileExtension,
+  rasterImageMimeType,
   supportedAttachmentExtensions,
 } from "@openbot/contracts/attachment-files";
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
@@ -531,6 +532,24 @@ export function createWebWorkspaceRuntime(
   const duplicateOperationIds = new Map<string, string>();
   const completedDraftIdsByHost = new Map<string, Set<string>>();
   const draftCleanupRetryHosts = new Set<string>();
+  // The host names a draft's preview with the desktop `openbot-attachment:` scheme, so a draft image
+  // shows from its local bytes. Each URL lives until its draft is sent or discarded.
+  const localDraftPreviews = new Map<string, string>();
+  function localDraftPreview(id: string, file: File): string | null {
+    const type = rasterImageMimeType(file.name);
+    if (!type) return null;
+    const url = URL.createObjectURL(new Blob([file], { type }));
+    localDraftPreviews.set(id, url);
+    return url;
+  }
+  function revokeLocalDraftPreviews(ids: Iterable<string>): void {
+    for (const id of ids) {
+      const url = localDraftPreviews.get(id);
+      if (!url) continue;
+      URL.revokeObjectURL(url);
+      localDraftPreviews.delete(id);
+    }
+  }
   function trackCompletedDraft(id: string, hostId = lockedHostId): void {
     if (!hostId) return;
     // The released API has no draft listing. A request that commits before returning cannot be
@@ -543,6 +562,7 @@ export function createWebWorkspaceRuntime(
     ids.add(id);
   }
   function removeCompletedDrafts(idsToRemove: string[], hostId = lockedHostId): void {
+    revokeLocalDraftPreviews(idsToRemove);
     if (!hostId) return;
     const ids = completedDraftIdsByHost.get(hostId);
     if (!ids) return;
@@ -1147,8 +1167,7 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("webClient.error.uploadCancelled"));
       }
       trackCompletedDraft(value.id, uploadHostGeneration === generation ? lockedHostId : null);
-      // The host names the draft's preview with the desktop `openbot-attachment:` scheme.
-      return { ...value, previewUrl: null };
+      return { ...value, previewUrl: value.kind === "image" ? localDraftPreview(value.id, file) : null };
     },
     setTyping(agentId, typing) {
       peer.setTyping(agentId, typing);
@@ -1312,6 +1331,7 @@ export function createWebWorkspaceRuntime(
       generation += 1;
       connectedHost = null;
       duplicateOperationIds.clear();
+      revokeLocalDraftPreviews([...localDraftPreviews.keys()]);
       try {
         await Promise.all([peer.dispose(), hosts?.dispose(), ...retiring]);
       } finally {

@@ -128,6 +128,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setShowComposerActions,
     attachmentBusy,
     setAttachmentBusy,
+    pastePreviews,
+    setPastePreviews,
     composerErrors,
     setComposerErrors,
     composerErrorReferences,
@@ -330,6 +332,7 @@ export function createConversationViewScope(props: ConversationProps) {
     editingServerId,
     editingDeliveryId,
     editingPendingSave,
+    pastePreviews,
     seenMessageIds: resources.seenMessageIds,
   });
   const {
@@ -340,6 +343,8 @@ export function createConversationViewScope(props: ConversationProps) {
     currentComposerError,
     currentChatError,
     unreferencedDraftAttachments,
+    rowDraftAttachments,
+    currentPastePreviews,
     composerHasContent,
     replyTarget,
     markMessageSeen,
@@ -700,6 +705,8 @@ export function createConversationViewScope(props: ConversationProps) {
     props,
     threadDrafts: controller.threadDrafts,
     setThreadDrafts: controller.setThreadDrafts,
+    pastePreviews,
+    setPastePreviews,
   });
   /** Moves the open thread's caret to the end of the dictated text. */
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
@@ -823,6 +830,7 @@ export function createConversationViewScope(props: ConversationProps) {
     props,
     attachmentBusy,
     setAttachmentBusy,
+    setPastePreviews,
     attachmentImports: resources.importTargetAgents,
     agentReady: () => agentReady() && !providerUpdateRequired(),
     drafts,
@@ -2143,6 +2151,8 @@ export function createConversationViewScope(props: ConversationProps) {
     submitting,
     unreadDividerVisible,
     unreferencedDraftAttachments,
+    rowDraftAttachments,
+    currentPastePreviews,
     updateCurrentDraft,
     updateScrollFade,
     updateTeamTyping,

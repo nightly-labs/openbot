@@ -16,11 +16,10 @@ import {
   TEAM_ZIP_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
-import { Button, ImageRemoveButton, Input } from "@openbot/ui";
-import { fileBadge } from "@openbot/ui/features/conversation/AttachmentCards";
-import { attachmentReferenceTone } from "@openbot/ui/features/conversation/AttachmentReference";
+import { Button, Input } from "@openbot/ui";
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
+import { ComposerAttachmentRow } from "@openbot/ui/features/conversation/ComposerAttachmentRow";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
 import {
@@ -41,7 +40,7 @@ import { ReplyQuote } from "@openbot/ui/features/conversation/ReplyQuote";
 import { SpeakingBar } from "@openbot/ui/features/conversation/SpeakingBar";
 import { ComposerVoiceControls } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, createStore, For, Loading, lazy, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { speechReading } from "../speech/speech-playback";
@@ -102,7 +101,8 @@ export function ConversationComposer() {
     steerComposer,
     composerAnswersPrompt,
     submitting,
-    unreferencedDraftAttachments,
+    rowDraftAttachments,
+    currentPastePreviews,
     updateCurrentDraft,
     updateTeamTyping,
     voiceElapsedSeconds,
@@ -150,6 +150,7 @@ export function ConversationComposer() {
   const openVoiceConversation = () => (voiceConversationAvailable() ? () => openSidePanelPane("voice") : undefined);
   // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
+  const composerAttachmentRow = () => rowDraftAttachments().length > 0 || currentPastePreviews().length > 0;
   // A provider start, restart or server reconnect is short. Keys typed in it must not drop, so only a
   // lasting stop locks the text. Sending still waits for the agent. Without an agent, no draft keeps the text.
   const editorLocked = () =>
@@ -614,10 +615,8 @@ export function ConversationComposer() {
         </div>
         <div
           class="composer"
-          data-compact={
-            currentDraft().text.includes("\n") || unreferencedDraftAttachments().length > 0 ? undefined : ""
-          }
-          data-has-attachments={unreferencedDraftAttachments().length > 0 ? "" : undefined}
+          data-compact={currentDraft().text.includes("\n") || composerAttachmentRow() ? undefined : ""}
+          data-has-attachments={composerAttachmentRow() ? "" : undefined}
           onPointerDown={(event) => {
             if (!(event.target instanceof Element)) return;
             // The "+" menu is in a portal, but its events come here too. Focus taken from it closes the menu
@@ -627,39 +626,12 @@ export function ConversationComposer() {
             setComposerFocusRequest((current) => current + 1);
           }}
         >
-          <Show when={unreferencedDraftAttachments().length > 0}>
-            <div class="composer-attachments">
-              <For each={unreferencedDraftAttachments()}>
-                {(attachment) => {
-                  // An image with no preview (the web client) shows as a file, with its name.
-                  const chip = () => (attachment.kind === "image" && attachment.previewUrl ? "image" : "file");
-                  return (
-                    <div class="composer-attachment ui-removable-image" data-kind={chip()}>
-                      <span
-                        class="composer-attachment-preview"
-                        data-file-tone={chip() === "file" ? attachmentReferenceTone(attachment.name) : undefined}
-                      >
-                        <Show when={chip() === "image"} fallback={fileBadge(attachment)}>
-                          <img src={attachment.previewUrl ?? ""} alt="" />
-                        </Show>
-                      </span>
-                      <Show when={chip() === "file"}>
-                        <span class="composer-attachment-copy">
-                          <strong title={attachment.name}>{attachment.name}</strong>
-                          <small>{format.fileSize(attachment.size)}</small>
-                        </span>
-                      </Show>
-                      <ImageRemoveButton
-                        label={t("composer.attachment.remove", { name: attachment.name })}
-                        disabled={voicePhase() === "transcribing" || savePending()}
-                        onClick={() => removeAttachment(attachment.id)}
-                      />
-                    </div>
-                  );
-                }}
-              </For>
-            </div>
-          </Show>
+          <ComposerAttachmentRow
+            attachments={rowDraftAttachments()}
+            pending={currentPastePreviews()}
+            removeDisabled={voicePhase() === "transcribing" || savePending()}
+            onRemove={(attachment) => removeAttachment(attachment.id)}
+          />
           <div class="composer-input-label">
             <ComposerEditor
               agentId={props.agent?.id}
