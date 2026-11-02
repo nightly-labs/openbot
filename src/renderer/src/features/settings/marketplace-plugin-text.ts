@@ -369,6 +369,18 @@ const PLUGIN_TEXT = {
       "prompt-new-cards": "marketplace.plugin.trello.prompt.newCards",
     },
   },
+  ninebot: {
+    tagline: "marketplace.plugin.ninebot.tagline",
+    description: "marketplace.plugin.ninebot.description",
+    apps: {
+      "app-9bot-mcp": "marketplace.plugin.ninebot.app",
+    },
+    prompts: {
+      "prompt-active-groups": "marketplace.plugin.ninebot.prompt.activeGroups",
+      "prompt-list-channels": "marketplace.plugin.ninebot.prompt.listChannels",
+      "prompt-weekly-report": "marketplace.plugin.ninebot.prompt.weeklyReport",
+    },
+  },
   huggingface: {
     tagline: "marketplace.plugin.huggingface.tagline",
     description: "marketplace.plugin.huggingface.description",
