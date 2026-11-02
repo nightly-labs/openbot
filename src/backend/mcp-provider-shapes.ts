@@ -373,7 +373,8 @@ const lookUpMcpCommand = Effect.fn("McpShape.lookUpCommand")(
     // The assignment goes inside the command, not into the shell's environment: a login shell reads
     // the user's profile first, and a profile that appends to `PATH` would undo an inherited one.
     const search = path === null ? "" : `PATH=${shellWord(path)} `;
-    const stdout = yield* runInLoginShell(`${search}command -v -- ${shellWord(trimmed)}`).pipe(
+    // A profile may print control sequences without a trailing newline before the command runs.
+    const stdout = yield* runInLoginShell(`printf '\\n'; ${search}command -v -- ${shellWord(trimmed)}`).pipe(
       Effect.mapError(({ cause }) => new McpShapeFailed({ cause })),
     );
     // Only the last line: an interactive profile can print a greeting before the command runs. The
@@ -405,7 +406,7 @@ const loginShellPath = Effect.fn("McpShape.loginShellPath")(function* () {
 const readLoginShellPath = Effect.fn("McpShape.readLoginShellPath")(
   function* () {
     if (process.platform === "win32") return null;
-    const stdout = yield* runInLoginShell('printf %s "$PATH"').pipe(
+    const stdout = yield* runInLoginShell('printf "\\n%s" "$PATH"').pipe(
       Effect.mapError(({ cause }) => new McpShapeFailed({ cause })),
     );
     return stdout.split(/\r?\n/u).pop()?.trim() || null;

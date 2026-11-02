@@ -482,6 +482,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-mcp-tools
 
+      - name: Run the MCP noisy shell E2E test
+        if: ${{ !cancelled() }}
+        run: bun scripts/mcp-noisy-shell-e2e.ts
+
       - name: Run the MCP sign-in client refusal E2E test
         if: ${{ !cancelled() }}
         run: bun run test:mcp-sign-in-client-refused
