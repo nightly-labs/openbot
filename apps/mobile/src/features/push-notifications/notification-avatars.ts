@@ -2,7 +2,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Directory, File, Paths } from "expo-file-system";
 import { Platform } from "react-native";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
-import { type AvatarFileAgent, agentAvatarFile } from "@/features/workspace/model/agent-avatar-file";
+import { type AvatarFileAgent, agentAvatarFile, syncAvatarFolder } from "@/features/workspace/model/agent-avatar-file";
 
 /**
  * `OpenBotMessagingService.kt` reads this file and the pictures of its folder in the files folder of
@@ -62,20 +62,8 @@ export function writeNotificationAvatars(
   const text = JSON.stringify({ version: 1, agents: index });
   if (!notificationAvatarsSupported || text === writtenIndex) return;
   try {
-    const folder = new Directory(Paths.document, AVATAR_FOLDER);
-    folder.create({ intermediates: true, idempotent: true });
     const named = new Set(index.map((agent) => agent.avatar));
-    for (const agent of agents) {
-      const source = agentAvatarFile(agent, AVATAR_PIXELS);
-      const file = new File(folder, source.name);
-      if (!named.has(source.name) || file.exists) continue;
-      try {
-        source.write(file);
-      } catch (error) {
-        supportLog.add("warn", "app", `Notification avatar not saved: ${supportLogValue(error)}`);
-      }
-    }
-    for (const entry of folder.list()) if (!named.has(entry.name)) entry.delete();
+    syncAvatarFolder(new Directory(Paths.document, AVATAR_FOLDER), named, agents, AVATAR_PIXELS, "Notification avatar");
     new File(Paths.document, INDEX_FILE).writeSync(text);
     writtenIndex = text;
   } catch (error) {

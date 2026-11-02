@@ -1,5 +1,6 @@
-import { File } from "expo-file-system";
+import { type Directory, File } from "expo-file-system";
 import { renderBloubAvatar } from "@/features/live-activity/model/live-activity-bloub";
+import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { savedAgentAvatar } from "./agent-avatar-cache";
 import type { MobileAgent } from "./workspace-types";
 
@@ -31,4 +32,29 @@ export function agentAvatarFile(agent: AvatarFileAgent, pixels: number): { name:
       if (image) file.writeSync(image.slice(image.indexOf(",") + 1), { encoding: "base64" });
     },
   };
+}
+
+/**
+ * Writes the pictures of `agents` that `named` holds and `folder` does not have, and deletes the
+ * files that `named` does not hold. A picture that fails is logged as `label` and left out.
+ */
+export function syncAvatarFolder(
+  folder: Directory,
+  named: ReadonlySet<string>,
+  agents: readonly AvatarFileAgent[],
+  pixels: number,
+  label: string,
+): void {
+  folder.create({ intermediates: true, idempotent: true });
+  for (const agent of agents) {
+    const source = agentAvatarFile(agent, pixels);
+    const file = new File(folder, source.name);
+    if (!named.has(source.name) || file.exists) continue;
+    try {
+      source.write(file);
+    } catch (error) {
+      supportLog.add("warn", "app", `${label} not saved: ${supportLogValue(error)}`);
+    }
+  }
+  for (const entry of folder.list()) if (!named.has(entry.name)) entry.delete();
 }

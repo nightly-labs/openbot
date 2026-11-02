@@ -84,7 +84,8 @@ enum AgentSender {
     let intent = INSendMessageIntent(
       recipients: nil,
       outgoingMessageType: .outgoingMessageText,
-      content: content.body,
+      // The donation keeps no message text. The notification shows the text of `content`.
+      content: nil,
       speakableGroupName: nil,
       conversationIdentifier: conversationId,
       serviceName: nil,
@@ -93,6 +94,8 @@ enum AgentSender {
     )
     let interaction = INInteraction(intent: intent, response: nil)
     interaction.direction = .incoming
+    // The app removes the suggestions of an agent by this group (`ShareExtensionModule.swift`).
+    interaction.groupIdentifier = conversationId
     interaction.donate(completion: nil)
     // Fails without the Communication Notifications entitlement.
     return try? content.updating(from: intent)

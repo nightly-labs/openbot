@@ -2,7 +2,11 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type NativeModule, requireOptionalNativeModule } from "expo";
 import { Directory, File, Paths } from "expo-file-system";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
-import { type AvatarFileAgent as AvatarAgent, agentAvatarFile } from "@/features/workspace/model/agent-avatar-file";
+import {
+  type AvatarFileAgent as AvatarAgent,
+  agentAvatarFile,
+  syncAvatarFolder,
+} from "@/features/workspace/model/agent-avatar-file";
 
 /**
  * What the iOS share extension needs to send a share without the app. It reads this file from the
@@ -115,19 +119,8 @@ let avatarUris = new Map<string, string>();
 function writeAvatars(directory: ShareExtensionDirectory, avatars: readonly AvatarAgent[]): void {
   const folder = avatarFolder();
   if (!folder) return;
-  folder.create({ intermediates: true, idempotent: true });
   const named = new Set(directory.agents.flatMap((agent) => agent.avatar ?? []));
-  for (const agent of avatars) {
-    const source = agentAvatarFile(agent, AVATAR_PIXELS);
-    const file = new File(folder, source.name);
-    if (!named.has(source.name) || file.exists) continue;
-    try {
-      source.write(file);
-    } catch (error) {
-      supportLog.add("warn", "app", `Share extension avatar not saved: ${supportLogValue(error)}`);
-    }
-  }
-  for (const entry of folder.list()) if (!named.has(entry.name)) entry.delete();
+  syncAvatarFolder(folder, named, avatars, AVATAR_PIXELS, "Share extension avatar");
   avatarUris = new Map(
     directory.agents.flatMap((agent) =>
       agent.avatar ? [[shareConversationId(agent.serverId, agent.id), new File(folder, agent.avatar).uri]] : [],
