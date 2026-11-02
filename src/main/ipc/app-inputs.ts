@@ -289,6 +289,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "changelog" &&
     input !== "guides" &&
     input !== "discord" &&
+    input !== "github" &&
     input !== "x" &&
     input !== "grok-bot-export" &&
     input !== "hosted-server-contact" &&
