@@ -139,6 +139,7 @@ import {
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import { SIDEBAR_FOLDERS_CAPABILITY, sidebarFoldersEvent } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
@@ -268,6 +269,7 @@ import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutineResults } from "./team-api/route-routine-results";
 import { routeSharedTables } from "./team-api/route-shared-tables";
 import { routeSideQuestion } from "./team-api/route-side-question";
+import { routeSidebarFolders } from "./team-api/route-sidebar-folders";
 import { routeSignInRelay } from "./team-api/route-sign-in-relay";
 import { routeSkillsAdmin } from "./team-api/route-skills-admin";
 import { routeStorage } from "./team-api/route-storage";
@@ -979,6 +981,8 @@ export class TeamApiServer {
       if ((await routeAgentSessionSettings(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFolders(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentHidden(context, this.#options.hiddenAgents, hidden)) === "handled") return;
+      if ((await routeSidebarFolders(context, this.#options.sidebarLayout, this.#options.agents, hidden)) === "handled")
+        return;
       if (
         (await routeAgentNotificationLevels(
           context,
@@ -1375,12 +1379,18 @@ export class TeamApiServer {
                 status: event.status,
                 ...(event.origin === undefined ? {} : { origin: event.origin }),
               }
-            : optionalTeamEvent(
-                event.type === "agent-task-conversation"
-                  ? { ...event, snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities) }
-                  : event,
-                { agentTaskUiBlocks: connection.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY) },
-              );
+            : event.type === "sidebar-layout-changed" && connection.capabilities.has(SIDEBAR_FOLDERS_CAPABILITY)
+              ? // The layout with the parents. `sidebar-layout-changed` goes through the frozen adapter, which drops them.
+                sidebarFoldersEvent({ type: "sidebar-folders-changed", layout: event.layout })
+              : optionalTeamEvent(
+                  event.type === "agent-task-conversation"
+                    ? {
+                        ...event,
+                        snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities),
+                      }
+                    : event,
+                  { agentTaskUiBlocks: connection.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY) },
+                );
       } catch (error) {
         // As for `encodeEvent`: a malformed optional event is skipped for this client only.
         (this.#options.logger ?? logger).warn("Team API event could not be encoded:", toLogValue(error));

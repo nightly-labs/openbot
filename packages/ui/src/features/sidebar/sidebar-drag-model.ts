@@ -60,6 +60,8 @@ export interface ChatDragSlot {
 export interface SectionDragSlot {
   bottom: number;
   centerY: number;
+  /** The bottom of the section's header row. A section with no header has it at `top`. */
+  headerBottom: number;
   sectionId: string;
   top: number;
 }
@@ -87,7 +89,9 @@ export type SidebarDropTarget =
   | { kind: "chat"; target: ChatDropTarget }
   | { kind: "section"; sectionId: string }
   | { kind: "person"; target: PersonDropTarget }
-  | { kind: "section-order"; target: SectionDropTarget };
+  | { kind: "section-order"; target: SectionDropTarget }
+  /** A folder dropped into another folder, after the folders that are in it. */
+  | { kind: "section-into"; sectionId: string };
 
 export interface SidebarDragPoint {
   clientX: number;
@@ -154,9 +158,21 @@ export interface SidebarDragWorld {
   sectionAcceptsChat: (sectionId: string) => boolean;
   sectionScrollDelta: number;
   sectionSlots: Map<string, SectionDragSlot>;
+  /**
+   * The folder rules, when the host keeps folders in folders (`foldersSupported`). Without them, a
+   * dragged section only changes its place in the flat order.
+   */
+  folders: SidebarDragFolders | null;
   session: SidebarDragSession;
   /** Used by the pinned and people hit tests, both of which key off the session's own start. */
   sessionScrollDelta: number;
+}
+
+/** What the resolver asks about folders. Each answer comes from the layout that is on the screen. */
+export interface SidebarDragFolders {
+  canNest: (sectionId: string, parentId: string | null) => boolean;
+  isInside: (sectionId: string, ancestorId: string) => boolean;
+  parent: (sectionId: string) => string | null;
 }
 
 export function sidebarDropTargetsEqual(left: SidebarDropTarget | null, right: SidebarDropTarget | null): boolean {
@@ -164,6 +180,7 @@ export function sidebarDropTargetsEqual(left: SidebarDropTarget | null, right: S
   if (!left || !right || left.kind !== right.kind) return false;
   if (left.kind === "pinned" && right.kind === "pinned") return left.key === right.key;
   if (left.kind === "section" && right.kind === "section") return left.sectionId === right.sectionId;
+  if (left.kind === "section-into" && right.kind === "section-into") return left.sectionId === right.sectionId;
   if (left.kind === "chat" && right.kind === "chat") {
     return (
       left.target.chatId === right.target.chatId &&
@@ -283,6 +300,8 @@ export function sidebarDropTargetAt(world: SidebarDragWorld, point: SidebarDragP
   if (!pointInRect(point, world.geometry.list)) return null;
   const pinnedTarget = pinnedTargetAtPoint(world, point);
   if (pinnedTarget) return pinnedTarget;
+  if (session.source.kind === "section" && world.folders)
+    return folderTargetAtPoint(world, world.folders, session.source.id, point);
   const section = sectionAtPoint(world, point);
   if (!section) return null;
 
@@ -326,6 +345,50 @@ export function sidebarDropTargetAt(world: SidebarDragWorld, point: SidebarDragP
     if (target) return { kind: "chat", target };
   }
   return { kind: "section", sectionId: section.sectionId };
+}
+
+/**
+ * Where a dragged folder lands. On the header of a folder, the top and bottom quarters put it before
+ * or after that folder, and the middle puts it in. Below the header, in the folder's own rows, it goes
+ * in. Between two sections, it goes before or after the nearer one. A place that would make the
+ * folder hold itself or go deeper than the limit is no target.
+ */
+function folderTargetAtPoint(
+  world: SidebarDragWorld,
+  folders: SidebarDragFolders,
+  sourceId: string,
+  point: SidebarDragPoint,
+): SidebarDropTarget | null {
+  const scrollDelta = world.sectionScrollDelta;
+  const y = point.clientY + scrollDelta;
+  const sourceSlot = world.sectionSlots.get(sourceId);
+  if (sourceSlot && y >= sourceSlot.top && y <= sourceSlot.bottom) return null;
+  // Slots come in document order, so of the sections that hold the point, the deepest one wins.
+  const slot = closestVerticalSlot(
+    world.sectionSlots.values(),
+    point.clientY,
+    scrollDelta,
+    (candidate) => !folders.isInside(candidate.sectionId, sourceId),
+  );
+  if (!slot) return null;
+  const parentId = folders.parent(slot.sectionId);
+  const beside = (placement: "before" | "after"): SidebarDropTarget | null =>
+    folders.canNest(sourceId, parentId)
+      ? { kind: "section-order", target: { sectionId: slot.sectionId, placement } }
+      : null;
+  const into: SidebarDropTarget | null = folders.canNest(sourceId, slot.sectionId)
+    ? { kind: "section-into", sectionId: slot.sectionId }
+    : null;
+  const headerHeight = slot.headerBottom - slot.top;
+  if (y >= slot.top && y <= slot.headerBottom && headerHeight > 0) {
+    const ratio = (y - slot.top) / headerHeight;
+    if (ratio < 0.25) return beside("before") ?? into;
+    if (ratio > 0.75) return beside("after") ?? into;
+    return into ?? beside(ratio < 0.5 ? "before" : "after");
+  }
+  if (y < slot.top) return beside("before");
+  if (y > slot.bottom) return beside("after");
+  return into ?? beside(y < slot.centerY ? "before" : "after");
 }
 
 /**

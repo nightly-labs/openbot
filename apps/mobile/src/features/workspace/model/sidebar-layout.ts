@@ -1,5 +1,10 @@
 import type { ChannelSummary, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
-import { SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
+import {
+  SIDEBAR_UNASSIGNED_SECTION_ID,
+  sidebarFolderAncestors,
+  sidebarFolderParents,
+  sidebarFolderPath,
+} from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { currentText } from "@/shared/lib/text";
 import type { MobileAgent } from "./workspace-types";
@@ -33,9 +38,17 @@ export function mobileSidebarItems(
     group.push(chat);
     groups.set(sectionId, group);
   }
+  // The list is flat: a folder in a folder shows its path, such as "Acme / Engineering", and a closed
+  // folder hides the folders in it too.
+  const parents = sidebarFolderParents(layout);
   return layout.order.flatMap((id) => {
+    if (sidebarFolderAncestors(parents, id).some((ancestorId) => collapsedSectionIds.has(ancestorId))) return [];
     const group = groups.get(id) ?? [];
-    const name = names.get(id) ?? (id === SIDEBAR_UNASSIGNED_SECTION_ID ? t("mobile.workspace.section.agents") : null);
+    const name = names.has(id)
+      ? sidebarFolderPath(layout, parents, id).join(" / ")
+      : id === SIDEBAR_UNASSIGNED_SECTION_ID
+        ? t("mobile.workspace.section.agents")
+        : null;
     if (!name || (id === SIDEBAR_UNASSIGNED_SECTION_ID && group.length === 0)) return [];
     return [
       { kind: "section" as const, id, name, empty: group.length === 0 },

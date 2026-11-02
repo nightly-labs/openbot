@@ -20,6 +20,7 @@ import type {
  */
 export const SIDEBAR_DRAG_SELECTORS = {
   chatRow: "[data-chat-id]",
+  closedBody: ".sidebar-section-collapse[data-collapsed]",
   personRow: "[data-person-id]",
   pinnedEmptyDrop: ".sidebar-pinned-empty-drop",
   pinnedGroup: ".sidebar-pinned-group",
@@ -53,18 +54,20 @@ export function measureSidebarDragSlots(
   };
   for (const section of list.querySelectorAll<HTMLElement>(SIDEBAR_DRAG_SELECTORS.sectionRegion)) {
     const sectionId = section.dataset.sectionId;
-    if (!sectionId) continue;
+    if (!sectionId || isInClosedSection(section)) continue;
     const bounds = section.getBoundingClientRect();
+    const header = section.querySelector<HTMLElement>(":scope > header");
     sections.set(sectionId, {
       bottom: bounds.bottom,
       sectionId,
       top: bounds.top,
       centerY: bounds.top + bounds.height / 2,
+      headerBottom: header?.getBoundingClientRect().bottom ?? bounds.top,
     });
   }
   for (const row of list.querySelectorAll<HTMLElement>(SIDEBAR_DRAG_SELECTORS.chatRow)) {
     const chatId = row.dataset.chatId;
-    if (!chatId) continue;
+    if (!chatId || isInClosedSection(row)) continue;
     const bounds = row.getBoundingClientRect();
     chats.set(chatId, {
       bottom: bounds.bottom,
@@ -105,6 +108,14 @@ export function measureSidebarDragSlots(
   return { chats, geometry, people, pinned, sections };
 }
 
+/**
+ * A closed section keeps its rows and its folders in the DOM, at a height of zero. They take no drop,
+ * so a drop there goes to the closed section itself.
+ */
+function isInClosedSection(element: HTMLElement): boolean {
+  return Boolean(element.parentElement?.closest(SIDEBAR_DRAG_SELECTORS.closedBody));
+}
+
 /** Takes the drop highlight off every section and off the pinned group. */
 export function clearSidebarDragDecorations(list: HTMLElement | undefined): void {
   list?.querySelector(SIDEBAR_DRAG_SELECTORS.pinnedGroup)?.classList.remove("sidebar-pinned-group-agent-drop-target");
@@ -113,6 +124,7 @@ export function clearSidebarDragDecorations(list: HTMLElement | undefined): void
       "sidebar-section-agent-drop-target",
       "sidebar-section-drop-before",
       "sidebar-section-drop-after",
+      "sidebar-section-drop-into",
     );
   }
 }
