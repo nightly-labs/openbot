@@ -804,7 +804,9 @@ export class SignalService {
         retryReason: delivery.retryReason,
         bodyBase64,
       }) as const;
-    // A hosted server that sleeps: Slack gets 200, so it does not count a failure or send again.
+    // A hosted server that sleeps, or an event that does not address OpenBot: Slack gets 200, so it
+    // does not count a failure or send again. Slack turns off events for the whole app when more than
+    // 95% of deliveries fail for 60 minutes, and a computer that is off gets every channel message.
     if (!socketId || !this.#peers.has(socketId)) {
       this.#undelivered("slack");
       return this.#keep(
@@ -813,7 +815,10 @@ export class SignalService {
         delivery.wakes,
         frame(randomIdentifier(), Buffer.from(delivery.body).toString("base64")),
       ).pipe(
-        Effect.map((outcome): SlackDeliveryResponse => (outcome === "unavailable" ? UNAVAILABLE : { status: 200 })),
+        Effect.map(
+          (outcome): SlackDeliveryResponse =>
+            outcome === "unavailable" && delivery.wakes ? UNAVAILABLE : { status: 200 },
+        ),
       );
     }
     return this.#deliver("slack", socketId, delivery.body, frame).pipe(

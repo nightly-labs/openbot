@@ -904,6 +904,23 @@ try {
     return "bad 401, stale 401, unknown secret 401, other app 401, valid challenge 200";
   });
 
+  // Slack turns off events for the whole app when more than 95% of deliveries fail for 60 minutes.
+  // A channel message of a workspace whose computer is off must not count as a failure (#4345).
+  await check("A Slack event for a host with no socket gets 503 only when it addresses OpenBot", async () => {
+    const post = async (event: Record<string, string>) => {
+      const body = JSON.stringify({ type: "event_callback", api_app_id: SLACK_APP_ID, team_id: "T0E2EOFF", event });
+      const time = nowSeconds();
+      return (await postSlack(body, time, slackSignature(body, time))).status;
+    };
+    const chatter = await post({ type: "message", channel_type: "channel" });
+    const mention = await post({ type: "app_mention", channel_type: "channel" });
+    const direct = await post({ type: "message", channel_type: "im" });
+    expect(chatter === 200, `channel message: ${chatter}`);
+    expect(mention === 503, `mention: ${mention}`);
+    expect(direct === 503, `direct message: ${direct}`);
+    return "channel message 200, mention 503, direct message 503";
+  });
+
   // A body with no declared length: Signal must stop at its limit, so it answers before the body ends.
   await check("A Slack request or an account event with a body that does not end gets 413", async () => {
     const endless = () => {
