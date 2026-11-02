@@ -1,0 +1,646 @@
+{
+  "version": 1,
+  "checkedAt": "2026-11-02T04:52:42.888Z",
+  "services": {
+    "accounts": {
+      "result": "ok",
+      "changedAt": "2026-10-17T10:04:25.629Z",
+      "failedRuns": 0,
+      "healthyRuns": 1404,
+      "openIssue": null,
+      "days": [
+        {
+          "date": "2026-10-17",
+          "checks": 6,
+          "minutes": 80,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-18",
+          "checks": 8,
+          "minutes": 120,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-19",
+          "checks": 4,
+          "minutes": 60,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-20",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-21",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-22",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-23",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-24",
+          "checks": 7,
+          "minutes": 105,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-25",
+          "checks": 7,
+          "minutes": 105,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-26",
+          "checks": 5,
+          "minutes": 75,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-27",
+          "checks": 5,
+          "minutes": 75,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-28",
+          "checks": 149,
+          "minutes": 779.1465499999999,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-29",
+          "checks": 287,
+          "minutes": 1436.197016666667,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-30",
+          "checks": 286,
+          "minutes": 1439.9596166666652,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-31",
+          "checks": 289,
+          "minutes": 1441.5068833333323,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-11-01",
+          "checks": 268,
+          "minutes": 1353.0722833333325,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-11-02",
+          "checks": 59,
+          "minutes": 292.9859499999999,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        }
+      ]
+    },
+    "connections": {
+      "result": "ok",
+      "changedAt": "2026-10-17T10:04:25.629Z",
+      "failedRuns": 0,
+      "healthyRuns": 1404,
+      "openIssue": null,
+      "days": [
+        {
+          "date": "2026-10-17",
+          "checks": 6,
+          "minutes": 80,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-18",
+          "checks": 8,
+          "minutes": 120,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-19",
+          "checks": 4,
+          "minutes": 60,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-20",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-21",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-22",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-23",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-24",
+          "checks": 7,
+          "minutes": 105,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-25",
+          "checks": 7,
+          "minutes": 105,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-26",
+          "checks": 5,
+          "minutes": 75,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-27",
+          "checks": 5,
+          "minutes": 75,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-28",
+          "checks": 149,
+          "minutes": 779.1465499999999,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-29",
+          "checks": 287,
+          "minutes": 1436.197016666667,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-30",
+          "checks": 286,
+          "minutes": 1439.9596166666652,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-31",
+          "checks": 289,
+          "minutes": 1441.5068833333323,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-11-01",
+          "checks": 268,
+          "minutes": 1353.0722833333325,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-11-02",
+          "checks": 59,
+          "minutes": 292.9859499999999,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        }
+      ]
+    },
+    "hosted": {
+      "result": "ok",
+      "changedAt": "2026-10-31T11:10:28.306Z",
+      "failedRuns": 0,
+      "healthyRuns": 483,
+      "openIssue": null,
+      "days": [
+        {
+          "date": "2026-10-17",
+          "checks": 6,
+          "minutes": 80,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-18",
+          "checks": 8,
+          "minutes": 120,
+          "failedMinutes": 0,
+          "degradedMinutes": 15
+        },
+        {
+          "date": "2026-10-19",
+          "checks": 4,
+          "minutes": 60,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-20",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-21",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-22",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-23",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-24",
+          "checks": 7,
+          "minutes": 105,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-25",
+          "checks": 7,
+          "minutes": 105,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-26",
+          "checks": 5,
+          "minutes": 75,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-27",
+          "checks": 5,
+          "minutes": 75,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-28",
+          "checks": 149,
+          "minutes": 779.1465499999999,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-29",
+          "checks": 287,
+          "minutes": 1436.197016666667,
+          "failedMinutes": 15.122983333333334,
+          "degradedMinutes": 5.110433333333333
+        },
+        {
+          "date": "2026-10-30",
+          "checks": 286,
+          "minutes": 1439.9596166666652,
+          "failedMinutes": 15.29195,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-31",
+          "checks": 289,
+          "minutes": 1441.5068833333323,
+          "failedMinutes": 5.071933333333333,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-11-01",
+          "checks": 268,
+          "minutes": 1353.0722833333325,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-11-02",
+          "checks": 59,
+          "minutes": 292.9859499999999,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        }
+      ]
+    },
+    "updates": {
+      "result": "ok",
+      "changedAt": "2026-10-17T10:04:25.629Z",
+      "failedRuns": 0,
+      "healthyRuns": 1404,
+      "openIssue": null,
+      "days": [
+        {
+          "date": "2026-10-17",
+          "checks": 6,
+          "minutes": 80,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-18",
+          "checks": 8,
+          "minutes": 120,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-19",
+          "checks": 4,
+          "minutes": 60,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-20",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-21",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-22",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-23",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-24",
+          "checks": 7,
+          "minutes": 105,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-25",
+          "checks": 7,
+          "minutes": 105,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-26",
+          "checks": 5,
+          "minutes": 75,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-27",
+          "checks": 5,
+          "minutes": 75,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-28",
+          "checks": 149,
+          "minutes": 779.1465499999999,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-29",
+          "checks": 287,
+          "minutes": 1436.197016666667,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-30",
+          "checks": 286,
+          "minutes": 1439.9596166666652,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-31",
+          "checks": 289,
+          "minutes": 1441.5068833333323,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-11-01",
+          "checks": 268,
+          "minutes": 1353.0722833333325,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-11-02",
+          "checks": 59,
+          "minutes": 292.9859499999999,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        }
+      ]
+    },
+    "marketplace": {
+      "result": "ok",
+      "changedAt": "2026-10-17T10:04:25.629Z",
+      "failedRuns": 0,
+      "healthyRuns": 1404,
+      "openIssue": null,
+      "days": [
+        {
+          "date": "2026-10-17",
+          "checks": 6,
+          "minutes": 80,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-18",
+          "checks": 8,
+          "minutes": 120,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-19",
+          "checks": 4,
+          "minutes": 60,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-20",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-21",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-22",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-23",
+          "checks": 6,
+          "minutes": 90,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-24",
+          "checks": 7,
+          "minutes": 105,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-25",
+          "checks": 7,
+          "minutes": 105,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-26",
+          "checks": 5,
+          "minutes": 75,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-27",
+          "checks": 5,
+          "minutes": 75,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-28",
+          "checks": 149,
+          "minutes": 779.1465499999999,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-29",
+          "checks": 287,
+          "minutes": 1436.197016666667,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-30",
+          "checks": 286,
+          "minutes": 1439.9596166666652,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-10-31",
+          "checks": 289,
+          "minutes": 1441.5068833333323,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-11-01",
+          "checks": 268,
+          "minutes": 1353.0722833333325,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        },
+        {
+          "date": "2026-11-02",
+          "checks": 59,
+          "minutes": 292.9859499999999,
+          "failedMinutes": 0,
+          "degradedMinutes": 0
+        }
+      ]
+    }
+  }
+}
