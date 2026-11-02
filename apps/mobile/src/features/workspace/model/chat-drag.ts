@@ -86,8 +86,20 @@ export function chatDropTarget(
     if (!dragged.pinned && !options.canPin) return null;
     return pinTarget(frames, dragged, x, y);
   }
-  if (!options.sections && !dragged.pinned) return null;
+  if (!options.sections) return dragged.pinned ? unpinTarget(frames.list, y) : null;
   return listTarget(frames.list, dragged, y);
+}
+
+/** With no layout, the list has no sections: a pinned chat dropped on it is unpinned, nothing more. */
+function unpinTarget(list: readonly ListFrame[], y: number): { target: ChatDropTarget; mark: DropMark } | null {
+  const entry = list.find((candidate) => y >= candidate.rect.y && y < candidate.rect.y + candidate.rect.height);
+  const last = list.at(-1);
+  const mark = entry
+    ? line(entry.rect, entry.rect.y)
+    : last && y >= last.rect.y
+      ? line(last.rect, last.rect.y + last.rect.height)
+      : null;
+  return mark ? { target: { area: "list", sectionId: SIDEBAR_UNASSIGNED_SECTION_ID, beforeChatId: null }, mark } : null;
 }
 
 function pinTarget(

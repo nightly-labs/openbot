@@ -711,8 +711,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
    */
   const pushSidebarPins = useCallback(
     (serverId: string) => {
-      if (!hasCapability(serverCapabilities.current, serverId, SIDEBAR_PINS_CAPABILITY)) return;
       const current = preferenceStore.read(serverId);
+      // A list from the host is in `pinOrder`, so the host keeps the pins.
       if (!current.pinOrder) return;
       const change = (pinChanges.current.get(serverId) ?? 0) + 1;
       pinChanges.current.set(serverId, change);
@@ -722,6 +722,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         preferenceStore.write(serverId, pending);
         setPreferences((saved) => ({ ...saved, [serverId]: pending }));
       }
+      // Before the connect, the change stays pending, and the connect sends it first.
+      if (!hasCapability(serverCapabilities.current, serverId, SIDEBAR_PINS_CAPABILITY)) return;
       void runTeamEffect(setSidebarPins(teamApi(serverId), phoneSidebarPins(current)))
         .then((snapshot) => applyHostSidebarPins(serverId, snapshot.items, change))
         .catch(() => undefined);
