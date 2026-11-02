@@ -104,6 +104,8 @@ export const messages = {
   "marketplace.app.discordTagline": "Menciones y mensajes directos en Discord",
   "marketplace.app.telegramTagline": "Grupos y chats directos en Telegram",
   "marketplace.app.bitwardenTagline": "Inicia sesión en sitios con credenciales de una carpeta compartida",
+  "marketplace.app.telegramAccountTagline": "Lee y envía mensajes en tu nombre en Telegram",
+  "marketplace.app.whatsappAccountTagline": "Lee y envía mensajes en tu nombre en WhatsApp",
   "marketplace.app.onePasswordCategory": "Gestión de inicios de sesión y credenciales",
   "marketplace.app.yourApps": "Tus apps",
   "marketplace.app.addCustom": "Añadir personalizada",

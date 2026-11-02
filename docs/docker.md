@@ -495,6 +495,8 @@ does not use systemd.
 - Bitwarden and Vaultwarden connect with an API key and the master password (`bitwarden-connector-v1`).
   The container must reach the vault server over HTTPS. On a host with several instances, the
   firewall blocks private addresses, so a Vaultwarden server on the local network cannot be used.
+- The Telegram account connection (`telegram-account-connector-v1`) needs outbound connections to
+  Telegram's data centers. It was not tested in a container.
 
 ## Not confirmed
 

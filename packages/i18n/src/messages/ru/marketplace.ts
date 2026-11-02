@@ -122,6 +122,8 @@ export const messages = {
   "marketplace.app.discordTagline": "Упоминания и личные сообщения в Discord",
   "marketplace.app.telegramTagline": "Группы и личные чаты в Telegram",
   "marketplace.app.bitwardenTagline": "Вход на сайты с учётными данными из общей папки",
+  "marketplace.app.telegramAccountTagline": "Чтение и отправка сообщений от вашего имени в Telegram",
+  "marketplace.app.whatsappAccountTagline": "Чтение и отправка сообщений от вашего имени в WhatsApp",
   "marketplace.app.onePasswordCategory": "Управление логинами и учётными данными",
   "marketplace.app.yourApps": "Ваши приложения",
   "marketplace.app.addCustom": "Добавить своё",

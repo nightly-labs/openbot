@@ -249,7 +249,8 @@ export const messages = {
   "connector.discord.accessHostUpdate": "ロールを選択するには、{host} の OpenBot を更新してください。",
 
   // Marketplace > Apps > Telegram.
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "OpenBot ボットを Telegram グループに追加するか、ボットとのダイレクトチャットを開きます。Telegram Orchestrator が適切なエージェントに依頼して回答します。",
   "connector.telegram.statusConnected": "接続済み",
@@ -420,4 +421,145 @@ export const messages = {
   "connector.bitwarden.clientSecret": "API キーの client_secret",
   "connector.bitwarden.masterPassword": "マスターパスワード",
   "connector.bitwarden.connecting": "接続中",
+  "connector.telegramAccount.title": "Telegram アカウント",
+  "connector.telegramAccount.description":
+    "エージェントがあなたの Telegram のチャットを読み、許可すればあなたとしてメッセージを送信できます。",
+  "connector.telegramAccount.descriptionHost":
+    "{host} のエージェントがあなたの Telegram のチャットを読み、許可すればあなたとしてメッセージを送信できます。",
+  "connector.telegramAccount.statusConnecting": "サインイン中",
+  "connector.telegramAccount.statusConnected": "接続済み",
+  "connector.telegramAccount.actionFailed": "OpenBot は Telegram アカウントの接続を変更できませんでした。",
+  "connector.telegramAccount.disconnectTitle": "Telegram アカウントの接続を解除",
+  "connector.telegramAccount.disconnectSummary":
+    "OpenBot はこのセッションからサインアウトします。エージェントはメッセージを読むことも送ることもできなくなり、送信はオフになります。",
+  "connector.telegramAccount.disconnectSummaryHost":
+    "{host} はこのセッションからサインアウトします。{host} のエージェントはメッセージを読むことも送ることもできなくなり、送信はオフになります。",
+  "connector.telegramAccount.disconnect": "接続解除",
+  "connector.telegramAccount.signInTitle": "サインイン",
+  "connector.telegramAccount.howItWorks":
+    "OpenBot は Telegram Desktop と同じように、あなた自身の Telegram アカウントにサインインします。セッションはこのコンピューターに暗号化して保存されます。Telegram の「設定 › デバイス」に OpenBot として表示されます。",
+  "connector.telegramAccount.howItWorksHost":
+    "{host} は Telegram Desktop と同じように、あなた自身の Telegram アカウントにサインインします。セッションは {host} に暗号化して保存されます。Telegram の「設定 › デバイス」に OpenBot として表示されます。",
+  "connector.telegramAccount.signInProgress":
+    "サインインするには、下の手順を行ってください。キャンセルするとサインインを中止します。",
+  "connector.telegramAccount.methodTitle": "サインイン方法",
+  "connector.telegramAccount.methodQrDescription": "スマートフォンの Telegram でコードをスキャンします。",
+  "connector.telegramAccount.methodPhoneDescription": "電話番号と、Telegram から届くコードを入力します。",
+  "connector.telegramAccount.methodQr": "QR コード",
+  "connector.telegramAccount.methodPhone": "電話番号",
+  "connector.telegramAccount.credentialsTitle": "api_id と api_hash",
+  "connector.telegramAccount.credentialsStored":
+    "OpenBot は my.telegram.org で作成したあなた自身の Telegram アプリを使います。最初のサインイン後は、このコンピューターがその api_id と api_hash を保持します。",
+  "connector.telegramAccount.credentialsStoredHost":
+    "OpenBot は my.telegram.org で作成したあなた自身の Telegram アプリを使います。最初のサインイン後は、{host} がその api_id と api_hash を保持します。",
+  "connector.telegramAccount.credentialsOpen": "入力",
+  "connector.telegramAccount.credentialsHelp":
+    "my.telegram.org にサインインし、API development tools を開いてアプリを作成します。その api_id と api_hash をここにコピーしてください。",
+  "connector.telegramAccount.apiId": "api_id",
+  "connector.telegramAccount.apiHash": "api_hash",
+  "connector.telegramAccount.openApps": "my.telegram.org を開く",
+  "connector.telegramAccount.openAppsFailed": "OpenBot は my.telegram.org を開けませんでした。",
+  "connector.telegramAccount.connect": "接続",
+  "connector.telegramAccount.sendingOffNote": "送信をオンにするまで、エージェントはチャットを読むことしかできません。",
+  "connector.telegramAccount.devicesNote":
+    "Telegram の「設定 › デバイス」に、このセッションが OpenBot として表示されます。そこで終了すると、OpenBot の接続は解除されます。",
+  "connector.telegramAccount.devicesNoteHost":
+    "Telegram の「設定 › デバイス」に、このセッションが OpenBot として表示されます。そこで終了すると、{host} の接続は解除されます。",
+  "connector.telegramAccount.connecting": "Telegram に接続中",
+  "connector.telegramAccount.connectingDescription":
+    "このコンピューターが Telegram と通信しています。数秒かかることがあります。",
+  "connector.telegramAccount.connectingHost": "{host} が Telegram と通信しています。数秒かかることがあります。",
+  "connector.telegramAccount.qrLabel": "Telegram にサインインする QR コード",
+  "connector.telegramAccount.qrTitle": "スマートフォンの Telegram でこのコードをスキャン",
+  "connector.telegramAccount.qrStepOpen": "スマートフォンで Telegram を開きます。",
+  "connector.telegramAccount.qrStepDevices": "「設定 › デバイス › デスクトップ端末をリンク」を開きます。",
+  "connector.telegramAccount.qrStepScan": "スマートフォンをこのコードに向けます。",
+  "connector.telegramAccount.qrRefresh": "コードは約 30 秒ごとに変わります。最新のコードをスキャンしてください。",
+  "connector.telegramAccount.usePhone": "電話番号を使う",
+  "connector.telegramAccount.phoneDescription": "Telegram アカウントの電話番号を国番号付きで入力してください。",
+  "connector.telegramAccount.phoneLabel": "電話番号",
+  "connector.telegramAccount.sendCode": "コードを送信",
+  "connector.telegramAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.telegramAccount.useQr": "QR コードを使う",
+  "connector.telegramAccount.codeViaApp": "Telegram が、ほかのデバイスの Telegram アプリにコードを送信しました。",
+  "connector.telegramAccount.codeViaSms": "Telegram が SMS でコードを送信しました。",
+  "connector.telegramAccount.codeDescription": "Telegram から届いたコードを入力してください。",
+  "connector.telegramAccount.codeLabel": "コード",
+  "connector.telegramAccount.signIn": "サインイン",
+  "connector.telegramAccount.passwordDescription":
+    "このアカウントには 2 段階認証が設定されています。そのパスワードを入力してください。",
+  "connector.telegramAccount.passwordHint": "ヒント: {hint}",
+  "connector.telegramAccount.passwordLabel": "2 段階認証のパスワード",
+  "connector.telegramAccount.accountTitle": "アカウント",
+  "connector.telegramAccount.accountDescription":
+    "このコンピューターのエージェントは、この Telegram アカウントを使います。",
+  "connector.telegramAccount.accountDescriptionHost": "{host} のエージェントは、この Telegram アカウントを使います。",
+  "connector.telegramAccount.sendingLabel": "エージェントにメッセージの送信とチャットの既読化を許可",
+  "connector.telegramAccount.sendingDescription": "オフの場合、エージェントはチャットを読むことしかできません。",
+  "connector.whatsappAccount.title": "WhatsApp アカウント",
+  "connector.whatsappAccount.developer": "WhatsApp",
+  "connector.whatsappAccount.description":
+    "エージェントがあなたの WhatsApp のチャットを読み、許可すればあなたとしてメッセージを送信できます。",
+  "connector.whatsappAccount.descriptionHost":
+    "{host} のエージェントがあなたの WhatsApp のチャットを読み、許可すればあなたとしてメッセージを送信できます。",
+  "connector.whatsappAccount.statusConnecting": "リンク中",
+  "connector.whatsappAccount.statusConnected": "接続済み",
+  "connector.whatsappAccount.actionFailed": "OpenBot は WhatsApp アカウントの接続を変更できませんでした。",
+  "connector.whatsappAccount.disconnectTitle": "WhatsApp アカウントのリンクを解除",
+  "connector.whatsappAccount.disconnectSummary":
+    "OpenBot はこのリンク済みデバイスからログアウトし、その鍵とチャットをこのコンピューターから削除します。送信はオフになります。",
+  "connector.whatsappAccount.disconnectSummaryHost":
+    "{host} はこのリンク済みデバイスからログアウトし、その鍵とチャットを削除します。送信はオフになります。",
+  "connector.whatsappAccount.disconnect": "リンク解除",
+  "connector.whatsappAccount.linkTitle": "リンク",
+  "connector.whatsappAccount.howItWorks":
+    "OpenBot は WhatsApp Web と同じように、あなたの WhatsApp アカウントのリンク済みデバイスになります。スマートフォンは引き続きメインのデバイスです。鍵とチャットはこのコンピューターに暗号化して保存されます。",
+  "connector.whatsappAccount.howItWorksHost":
+    "{host} は WhatsApp Web と同じように、あなたの WhatsApp アカウントのリンク済みデバイスになります。スマートフォンは引き続きメインのデバイスです。鍵とチャットは {host} に暗号化して保存されます。",
+  "connector.whatsappAccount.riskNote":
+    "WhatsApp には個人アカウント向けの公式なアクセス手段がありません。OpenBot は非公式の WhatsApp Web クライアントを使います。WhatsApp は、自動化されていると判断した番号を制限したり利用停止にしたりすることがあります。自分でも送る内容だけを送信してください。",
+  "connector.whatsappAccount.linkProgress":
+    "リンクするには、下の手順を行ってください。キャンセルするとリンクを中止します。",
+  "connector.whatsappAccount.methodTitle": "リンク方法",
+  "connector.whatsappAccount.methodQrDescription": "スマートフォンの WhatsApp でコードをスキャンします。",
+  "connector.whatsappAccount.methodPhoneDescription": "スキャンする代わりに、スマートフォンでコードを入力します。",
+  "connector.whatsappAccount.methodQr": "QR コード",
+  "connector.whatsappAccount.methodPhone": "電話番号",
+  "connector.whatsappAccount.connect": "リンク",
+  "connector.whatsappAccount.sendingOffNote": "送信をオンにするまで、エージェントはチャットを読むことしかできません。",
+  "connector.whatsappAccount.connecting": "WhatsApp に接続中",
+  "connector.whatsappAccount.connectingDescription":
+    "このコンピューターが WhatsApp と通信しています。数秒かかることがあります。",
+  "connector.whatsappAccount.connectingHost": "{host} が WhatsApp と通信しています。数秒かかることがあります。",
+  "connector.whatsappAccount.qrLabel": "WhatsApp をリンクする QR コード",
+  "connector.whatsappAccount.qrTitle": "スマートフォンの WhatsApp でこのコードをスキャン",
+  "connector.whatsappAccount.stepOpen": "スマートフォンで WhatsApp を開きます。",
+  "connector.whatsappAccount.stepDevices": "「設定 › リンク済みデバイス › デバイスをリンク」を開きます。",
+  "connector.whatsappAccount.qrStepScan": "スマートフォンをこのコードに向けます。",
+  "connector.whatsappAccount.qrRefresh": "コードは約 20 秒ごとに変わります。最新のコードをスキャンしてください。",
+  "connector.whatsappAccount.usePhone": "電話番号を使う",
+  "connector.whatsappAccount.useQr": "QR コードを使う",
+  "connector.whatsappAccount.phoneDescription":
+    "WhatsApp アカウントの電話番号を国番号付きで入力してください。その後、スマートフォンで入力するコードを WhatsApp が表示します。",
+  "connector.whatsappAccount.phoneLabel": "電話番号",
+  "connector.whatsappAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.whatsappAccount.getCode": "コードを取得",
+  "connector.whatsappAccount.codeTitle": "このコードをスマートフォンで入力",
+  "connector.whatsappAccount.codeStepPhone": "「代わりに電話番号でリンク」をタップします。",
+  "connector.whatsappAccount.codeStepType": "このコードを入力します。",
+  "connector.whatsappAccount.codeLabel": "スマートフォンで入力するコード",
+  "connector.whatsappAccount.accountTitle": "アカウント",
+  "connector.whatsappAccount.accountDescription":
+    "このコンピューターのエージェントは、この WhatsApp アカウントを使います。",
+  "connector.whatsappAccount.accountDescriptionHost": "{host} のエージェントは、この WhatsApp アカウントを使います。",
+  "connector.whatsappAccount.historyChats": { other: "{count} 件のチャット" },
+  "connector.whatsappAccount.historyMessages": { other: "{count} 件のメッセージ" },
+  "connector.whatsappAccount.historyNote":
+    "WhatsApp はデバイスのリンク時に最近の履歴を送り、その後は新しいメッセージをすべて送ります。古いメッセージは含まれないことがあります。",
+  "connector.whatsappAccount.sendingLabel": "エージェントにメッセージの送信とチャットの既読化を許可",
+  "connector.whatsappAccount.sendingDescription": "オフの場合、エージェントはチャットを読むことしかできません。",
+  "connector.whatsappAccount.devicesNote":
+    "WhatsApp の「設定 › リンク済みデバイス」に OpenBot が表示されます。そこでログアウトすると、OpenBot の接続は解除されます。",
+  "connector.whatsappAccount.devicesNoteHost":
+    "WhatsApp の「設定 › リンク済みデバイス」に OpenBot が表示されます。そこでログアウトすると、{host} の接続は解除されます。",
 } as const satisfies PartialTranslation<typeof source>;

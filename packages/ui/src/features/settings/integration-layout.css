@@ -23,6 +23,24 @@
   height: 55%;
 }
 
+/* A mark that draws its own tile, such as the Telegram account's, has rounded corners wherever it shows. */
+.brand-mark-tile {
+  border-radius: var(--openbot-radius-logo);
+}
+
+/* In a logo tile, it fills the tile like an app icon. */
+.integration-logo-tile:has(> .brand-mark-tile) {
+  overflow: hidden;
+  border-color: transparent;
+  background: none;
+}
+
+.integration-logo-tile > .brand-mark-tile {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
 /* An app icon fills its tile. */
 .integration-logo-tile > img {
   width: 100%;

@@ -26,11 +26,21 @@ import {
   slackOrchestrator,
 } from "../settings/SlackIntegrationPanel";
 import {
+  TelegramAccountConnectorPanel,
+  type TelegramAccountConnectorPanelProps,
+  telegramAccountStatus,
+} from "../settings/TelegramAccountConnectorPanel";
+import {
   TelegramIntegrationPanel,
   type TelegramIntegrationPanelProps,
   telegramIntegrationState,
   telegramOrchestrator,
 } from "../settings/TelegramIntegrationPanel";
+import {
+  WhatsAppAccountConnectorPanel,
+  type WhatsAppAccountConnectorPanelProps,
+  whatsappAccountStatus,
+} from "../settings/WhatsAppAccountConnectorPanel";
 
 /**
  * The page of one connector, with its live state and actions, as Marketplace › Apps shows it. Read the props through getters, so the page follows them.
@@ -40,7 +50,9 @@ export type ConnectorDetail =
   | { id: "onepassword"; props: OnePasswordConnectorPanelProps }
   | { id: "bitwarden"; props: BitwardenConnectorPanelProps }
   | { id: "slack" | "discord"; props: SlackIntegrationPanelProps }
-  | { id: "telegram"; props: TelegramIntegrationPanelProps };
+  | { id: "telegram"; props: TelegramIntegrationPanelProps }
+  | { id: "telegram-account"; props: TelegramAccountConnectorPanelProps }
+  | { id: "whatsapp-account"; props: WhatsAppAccountConnectorPanelProps };
 
 /** What a list of connectors shows for one connector: its status and one line about it. */
 export interface ConnectorSummary {
@@ -158,7 +170,39 @@ export function connectorSummary(detail: ConnectorDetail, t: TextValue["t"]): Co
         agents: orchestrator ? [orchestrator] : [],
       };
     }
+    case "telegram-account": {
+      if (detail.props.statusError) return unknownSummary(t);
+      const header = telegramAccountStatus(detail.props);
+      const account = detail.props.status.state === "connected" ? detail.props.status.account : null;
+      return {
+        status: header.status,
+        statusLabel: t(header.label),
+        summary: account
+          ? account.username
+            ? `@${account.username}`
+            : account.name
+          : telegramAccountDescription(detail.props.hostName, t),
+      };
+    }
+    case "whatsapp-account": {
+      if (detail.props.statusError) return unknownSummary(t);
+      const header = whatsappAccountStatus(detail.props);
+      const account = detail.props.status.state === "connected" ? detail.props.status.account : null;
+      return {
+        status: header.status,
+        statusLabel: t(header.label),
+        summary: account ? account.name : whatsappAccountDescription(detail.props.hostName, t),
+      };
+    }
   }
+}
+
+function whatsappAccountDescription(host: string | undefined, t: TextValue["t"]): string {
+  return host ? t("connector.whatsappAccount.descriptionHost", { host }) : t("connector.whatsappAccount.description");
+}
+
+function telegramAccountDescription(host: string | undefined, t: TextValue["t"]): string {
+  return host ? t("connector.telegramAccount.descriptionHost", { host }) : t("connector.telegramAccount.description");
 }
 
 /** What the connector gives, for its information: the text that its page header shows without a tagline. */
@@ -181,6 +225,10 @@ export function connectorDescription(detail: ConnectorDetail, t: TextValue["t"])
       return t(messagingPlatformText(detail.id).description);
     case "telegram":
       return t("connector.telegram.description");
+    case "telegram-account":
+      return telegramAccountDescription(detail.props.hostName, t);
+    case "whatsapp-account":
+      return whatsappAccountDescription(detail.props.hostName, t);
   }
 }
 
@@ -194,6 +242,8 @@ export function ConnectorDetailPanel(props: { detail: ConnectorDetail } & Integr
   const bitwarden = () => (props.detail.id === "bitwarden" ? props.detail : undefined);
   const workspace = () => (props.detail.id === "slack" || props.detail.id === "discord" ? props.detail : undefined);
   const telegram = () => (props.detail.id === "telegram" ? props.detail : undefined);
+  const telegramAccount = () => (props.detail.id === "telegram-account" ? props.detail : undefined);
+  const whatsappAccount = () => (props.detail.id === "whatsapp-account" ? props.detail : undefined);
   return (
     <Switch>
       <Match when={github()}>
@@ -240,6 +290,26 @@ export function ConnectorDetailPanel(props: { detail: ConnectorDetail } & Integr
       <Match when={telegram()}>
         {(detail) => (
           <TelegramIntegrationPanel
+            {...detail().props}
+            tagline={props.tagline}
+            intro={props.intro}
+            details={props.details}
+          />
+        )}
+      </Match>
+      <Match when={telegramAccount()}>
+        {(detail) => (
+          <TelegramAccountConnectorPanel
+            {...detail().props}
+            tagline={props.tagline}
+            intro={props.intro}
+            details={props.details}
+          />
+        )}
+      </Match>
+      <Match when={whatsappAccount()}>
+        {(detail) => (
+          <WhatsAppAccountConnectorPanel
             {...detail().props}
             tagline={props.tagline}
             intro={props.intro}
