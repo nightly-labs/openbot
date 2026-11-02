@@ -1563,7 +1563,7 @@ export class AttentionRegistry {
   ) {
     const vault = this.#passwordVault;
     const request = pending.secret?.request;
-    if (!vault || !request || request.method === "otp") return false;
+    if (!vault?.connected() || !request || request.method === "otp") return false;
     const kind = request.method === "password" ? "password" : "totp";
     const skip = (reason: string, note: string, loginId?: string) => {
       logger.info("Shared vault fill skipped", { origin: request.origin, method: request.method, loginId, reason });

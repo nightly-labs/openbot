@@ -309,8 +309,7 @@ export class BrowserCdpEngine {
     submitTarget?: BrowserTarget,
   ): Effect.fn.Return<
     {
-      /** `vault` blocks a native GET submission of the filled fields, which would put the value in a URL. */
-      enter: (secret: string, vault: boolean) => Effect.Effect<void, BrowserOperationError>;
+      enter: (secret: string) => Effect.Effect<void, BrowserOperationError>;
       clear: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
       /**
        * Which secret the fields are built for, so a fill that no user approves goes only there: every
@@ -381,8 +380,8 @@ export class BrowserCdpEngine {
             return yield* browserFailure(new Error(`${labels[index]} is no longer available. Take a fresh snapshot.`));
           fingerprints.push(value);
         }
-        // A native GET submission would put the value in a URL. `enter` blocks that for a vault fill
-        // at submit time, as many sign-in forms have no method and send with their own script.
+        // The form method does not count: many sign-in forms have no method and send with their own
+        // script. The host blocks a navigation that would carry a vault value in its URL.
         const fields = { password: inputs.length > 0, oneTimeCode: inputs.length > 0 };
         for (const node of inputs) {
           const kind = yield* this.#callOnNode(
@@ -401,7 +400,7 @@ export class BrowserCdpEngine {
     );
     if (generation !== this.#navigationGeneration)
       return yield* browserFailure(new Error("Authentication page changed."));
-    const enter = (secret: string, vault: boolean) =>
+    const enter = (secret: string) =>
       Effect.gen({ self: this }, function* () {
         yield* Effect.gen({ self: this }, function* () {
           yield* this.#leaseEffect((send) =>
@@ -419,24 +418,6 @@ export class BrowserCdpEngine {
                 );
                 if (valid !== true) return yield* browserFailure(new Error("Authentication target changed."));
               }
-              // Runs after the submit handlers of the form and the document, so a form that the page sends
-              // with its script still works. `form.submit()` fires no event, but it is the page's choice, like any URL
-              // that its script makes from the value.
-              if (vault)
-                for (const node of nodes.inputs)
-                  yield* this.#callOnNode(
-                    send,
-                    node.backendNodeId,
-                    `function() {
-                const field = this;
-                window.addEventListener('submit', (event) => {
-                  if (event.target !== field.form || event.defaultPrevented || field.value === '') return;
-                  const method = event.submitter?.hasAttribute('formmethod') ? event.submitter.formMethod : field.form.method;
-                  if (method !== 'post') event.preventDefault();
-                });
-              }`,
-                    [],
-                  );
               for (const [index, node] of nodes.inputs.entries()) {
                 if (generation !== this.#navigationGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));

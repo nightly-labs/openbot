@@ -39,6 +39,7 @@ import {
   BrowserWindow,
   type BrowserWindowConstructorOptions,
   clipboard,
+  type Event as ElectronEvent,
   type Input,
   Menu,
   type NativeImage,
@@ -47,6 +48,7 @@ import {
   session,
   type WebContents,
   WebContentsView,
+  type WebContentsWillFrameNavigateEventParams,
   webContents,
 } from "electron";
 import { writeJsonFileAtomically } from "./atomic-json-file";
@@ -290,7 +292,10 @@ export interface PreparedBrowserSecret {
    * search box, could put the value in a URL the agent reads.
    */
   vaultFillable: boolean;
-  /** `vault` is true for a value that no user typed: a native GET submission of it is then blocked. */
+  /**
+   * `vault` is true for a value that no user typed. A navigation that would carry it in its URL, such as
+   * a GET form submission, is then blocked, and the user finishes in the tab.
+   */
   submit(secret: string, vault: boolean): Effect.Effect<"submitted" | "takeover", BrowserOperationError>;
   cancel(): void;
 }
@@ -320,6 +325,21 @@ function runBrowserTool<Name extends BrowserToolName>(
 
 function urlOrigin(value: string): string | null {
   return URL.canParse(value) ? new URL(value).origin : null;
+}
+
+/** Whether `url` carries `secret` as typed, percent-encoded, or form-encoded. */
+function urlCarriesSecret(url: string, secret: string): boolean {
+  if (url.includes(secret)) return true;
+  try {
+    if (decodeURIComponent(url.replaceAll("+", " ")).includes(secret)) return true;
+  } catch {
+    // A malformed escape elsewhere in the URL; the query values below still decode.
+  }
+  try {
+    return [...new URL(url).searchParams.values()].some((value) => value.includes(secret));
+  } catch {
+    return false;
+  }
 }
 
 function rejectTakeoverTool(): Effect.Effect<DynamicToolResult, BrowserOperationError> {
@@ -1242,6 +1262,14 @@ export class BrowserHost {
             protection.running = true;
             this.#syncAttachedView();
             let kept = false;
+            let leaked = false;
+            const contents = tab.contents;
+            const blockLeak = (event: ElectronEvent<WebContentsWillFrameNavigateEventParams>) => {
+              if (!urlCarriesSecret(event.url, secret)) return;
+              leaked = true;
+              event.preventDefault();
+            };
+            if (vault) contents.on("will-frame-navigate", blockLeak);
             yield* Effect.gen({ self: this }, function* () {
               yield* this.#enqueue(
                 args.tabId,
@@ -1249,7 +1277,7 @@ export class BrowserHost {
                   Effect.gen({ self: this }, function* () {
                     yield* boundEngineOperation(
                       tab,
-                      entry.enter(secret, vault),
+                      entry.enter(secret),
                       10_000,
                       "Authentication submission timed out.",
                       keepQueueBlocked,
@@ -1303,6 +1331,7 @@ export class BrowserHost {
             }).pipe(
               Effect.ensuring(
                 Effect.sync(() => {
+                  contents.off("will-frame-navigate", blockLeak);
                   protection.running = false;
                   tab.diagnostics.clearDiagnostics();
                   if (protection.replaced) {
@@ -1318,7 +1347,7 @@ export class BrowserHost {
                 }),
               ),
             );
-            return protection.replaced || kept ? "submitted" : "takeover";
+            return !leaked && (protection.replaced || kept) ? "submitted" : "takeover";
           }),
       };
     }).pipe(

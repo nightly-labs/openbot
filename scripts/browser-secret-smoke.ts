@@ -28,7 +28,8 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       <form action="/search"><label>Default password<input id="default-password" name="password" type="password"></label></form>
       <form method="post" action="/search"><label>Override password<input id="override-password" name="password" type="password"></label><button id="override-submit" formmethod="get">Go</button></form>
       <form method="post" action="/session"><label>Post password<input id="post-password" type="password"></label></form>
-      <form action="/search" onsubmit="event.preventDefault(); location.href = '/complete'"><label>Script password<input id="script-password" name="password" type="password"></label></form>`
+      <form action="/search" onsubmit="event.preventDefault(); location.href = '/complete'"><label>Script password<input id="script-password" name="password" type="password"></label></form>
+      <form action="/search" onsubmit="event.preventDefault(); setTimeout(() => this.submit())"><label>Checked password<input id="checked-password" name="password" type="password"></label></form>`
           : ""
       }
       <div>${Array.from({ length: 6 }, (_, index) => `<input aria-label="Digit ${index + 1}" id="digit-${index}" maxlength="1">`).join("")}</div>
@@ -105,16 +106,18 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       }
     }
     // A field built for something else must not take a vault password: its value can reach a URL.
-    // A password field may, in any form, but a native GET submission of a vault value is blocked. A form
-    // that the page sends with its own script, as many sign-in forms with no method do, still signs in.
-    const vaultPassword = "fixture-vault-password-518302";
-    for (const [selector, fillable, path] of [
-      ["#code", false, undefined],
-      ["#get-password", true, "/login"],
-      ["#default-password", true, "/login"],
-      ["#override-password", true, "/login"],
-      ["#post-password", true, "/session"],
-      ["#script-password", true, "/complete"],
+    // A password field may, in any form, but a navigation that carries a vault value is blocked and the
+    // user finishes. A form that the page sends with its own script, as many sign-in forms with no
+    // method do, still signs in.
+    const vaultPassword = "fixture vault+password/518302";
+    for (const [selector, fillable, path, outcome] of [
+      ["#code", false, undefined, undefined],
+      ["#get-password", true, "/login", "takeover"],
+      ["#default-password", true, "/login", "takeover"],
+      ["#override-password", true, "/login", "takeover"],
+      ["#checked-password", true, "/login", "takeover"],
+      ["#post-password", true, "/session", "submitted"],
+      ["#script-password", true, "/complete", "submitted"],
     ] as const) {
       const tab = await runCauseEffect(
         browser.open("https://authentication.openbot.test/login", "secret-thread", "secret-agent"),
@@ -144,10 +147,12 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
           handoff.cancel();
           continue;
         }
-        await runCauseEffect(handoff.submit(vaultPassword, true));
+        const result = await runCauseEffect(handoff.submit(vaultPassword, true));
         const snapshot = await runCauseEffect(browser.snapshot(tab.id));
-        if (new URL(snapshot.url).pathname !== path || snapshot.url.includes(vaultPassword))
-          throw new Error(`A vault password in ${selector} reached ${snapshot.url}, not ${path}.`);
+        if (new URL(snapshot.url).pathname !== path || result !== outcome)
+          throw new Error(
+            `A vault password in ${selector} reached ${snapshot.url} (${result}), not ${path} (${outcome}).`,
+          );
       } finally {
         await runCauseEffect(browser.close(tab.id));
       }
