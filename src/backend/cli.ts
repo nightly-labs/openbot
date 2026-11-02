@@ -3,7 +3,7 @@ import { constants } from "node:fs";
 import { access, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
-import { promisify } from "node:util";
+import { promisify, stripVTControlCharacters } from "node:util";
 import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -19,8 +19,7 @@ const MINIMUM_GROK_VERSION = [1, 0, 5] as const;
 // The first Cline CLI that OpenBot was checked with: its sessions run in-process and it answers a lost
 // session with the ACP resource-not-found error.
 const MINIMUM_CLINE_VERSION = [3, 0, 68] as const;
-// The first Kimi Code CLI that OpenBot was checked with: `kimi acp`, `kimi login --json` and
-// `kimi logout`.
+// The first checked Python Kimi CLI. Login capabilities are probed before code sign-in.
 const MINIMUM_KIMI_VERSION = [1, 52, 0] as const;
 
 /** What every resolved provider CLI carries. */
@@ -603,6 +602,44 @@ export const resolveKimiCli: (input?: {
   },
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
+
+/** The Python CLI supports JSON; Kimi Code 2.x prints a device code as text. */
+export const kimiCodeLoginArgs = Effect.fn("Cli.kimiCodeLoginArgs")(function* (
+  cli: { executable: string; launchPath?: string },
+  env: Readonly<Record<string, string>>,
+): Effect.fn.Return<readonly string[], ProviderClientOperationError> {
+  const target = cliSpawnTarget(cli.executable, ["login", "--help"]);
+  const output = yield* Effect.tryPromise({
+    try: (signal) =>
+      execFileAsync(target.command, target.args, {
+        signal,
+        timeout: CLI_VERSION_TIMEOUT_MS,
+        maxBuffer: 64 * 1024,
+        windowsHide: process.platform === "win32",
+        windowsVerbatimArguments: target.windowsVerbatimArguments,
+        env: { ...process.env, ...cliPathEnvironment(cli), ...env },
+      }),
+    catch: (cause) => {
+      const timedOut = isDynamicRecord(cause) && cause.killed === true;
+      return providerFailure(
+        new CodexCliError(
+          timedOut
+            ? sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName("kimi") })
+            : sourceText("error.provider.noCodeSignIn", { provider: agentProviderName("kimi") }),
+          timedOut ? "timeout" : "invalid",
+        ),
+      );
+    },
+  });
+  const help = stripVTControlCharacters(`${output.stdout}\n${output.stderr}`);
+  if (/\bkimi\b/i.test(help)) {
+    if (/--json(?:\s|[,=]|$)/u.test(help)) return ["login", "--json"];
+    if (/--region\b/u.test(help) && /device-code/u.test(help)) return ["login"];
+  }
+  return yield* providerFailure(
+    new CodexCliError(sourceText("error.provider.noCodeSignIn", { provider: agentProviderName("kimi") }), "invalid"),
+  );
+});
 
 function bundledOpencodeExecutable(
   platform = process.platform,

@@ -2,7 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { pasteCodeSignInSupported } from "@openbot/contracts/agent-providers";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
-import { Effect, Fiber, Option, Schema } from "effect";
+import { Deferred, Effect, Fiber, Option, Schema } from "effect";
 import { shellQuote } from "../automation-command";
 import { cliSpawnTarget } from "../cli";
 import { stopProcessTree } from "../windows-process-tree";
@@ -90,6 +90,9 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
   child.stdin?.on("error", () => undefined);
   if (options.closeInput && options.flow !== "paste") child.stdin?.end();
   let submitted = false;
+  // Keep the result after the completion task closes the process scope. Joining a prompt fiber
+  // in that scope can otherwise replace an early CLI failure with interruption.
+  const prompt = Deferred.makeUnsafe<CliCodePrompt | null, CliCodeLoginFailed>();
   // After a pasted code, an exit with a failure code is the provider refusing it. A timeout is a
   // signal, so it keeps its own message.
   const done = yield* Effect.forkScoped(
@@ -103,14 +106,18 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
                 : failure.cause,
           }),
       ),
+      Effect.tapError((failure) => Deferred.fail(prompt, failure)),
+      Effect.tap(() => Deferred.succeed(prompt, null)),
     ),
     { startImmediately: true },
   );
-  const prompt = yield* Effect.forkScoped(readCodePrompt(child, options.flow), { startImmediately: true });
+  yield* Effect.forkScoped(Deferred.complete(prompt, readCodePrompt(child, options.flow)), {
+    startImmediately: true,
+  });
   return {
     child,
     done: Fiber.join(done),
-    prompt: Fiber.join(prompt),
+    prompt: Deferred.await(prompt),
     submit(code) {
       if (options.flow !== "paste") throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
       const value = normalizePastedCode(code);

@@ -1813,13 +1813,16 @@ export class ProviderRuntime implements ProviderPort {
       .startCode(
         provider,
         (cli) =>
-          startCliCodeLogin({
-            flow,
-            executable: cli.executable,
-            argv: command.argv,
-            env: { ...cliPathEnvironment(cli), ...command.env(cli) },
-            timeoutMs: command.timeoutMs,
-            ...(command.closeInput ? { closeInput: true } : {}),
+          Effect.gen(function* () {
+            const argv = typeof command.argv === "function" ? yield* command.argv(cli) : command.argv;
+            return yield* startCliCodeLogin({
+              flow,
+              executable: cli.executable,
+              argv,
+              env: { ...cliPathEnvironment(cli), ...command.env(cli) },
+              timeoutMs: command.timeoutMs,
+              ...(command.closeInput ? { closeInput: true } : {}),
+            });
           }),
         command.timeoutMs,
       )
