@@ -870,8 +870,9 @@ export class BrowserHost {
       (tab) =>
         Effect.gen({ self: this }, function* () {
           tab.loadGeneration += 1;
-          // The person entered this address, so the page keeps the focus when its document commits.
-          this.#focusTab(tab);
+          // The person entered this address, so the page keeps the focus that its document takes when it
+          // commits. The view can be hidden under the address suggestions, and then `#focusTab` does nothing.
+          tab.focusOnCommit = true;
           yield* untilStopped(
             tab,
             navigateAndWait(tab.contents, () => tab.contents.loadURL(normalizedUrl, browserLoadOptions())),

@@ -2363,11 +2363,14 @@ async function runFocusScenario(browser: BrowserHost, origin: string, window: Br
   // A person who enters an address moves to the page when its document commits, not only after the load.
   window.webContents.focus();
   await waitFor(async () => webContents.getFocusedWebContents() === window.webContents, "app window focus again");
+  // The address suggestions hide the page while the person types.
+  await runCauseEffect(browser.setVisible({ visible: false, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
   let addressFocusedTab = false;
   sameWindowContents.once("did-navigate", () => {
     addressFocusedTab = webContents.getFocusedWebContents() === sameWindowContents;
   });
   await runCauseEffect(browser.loadUrl(sameWindowTab.id, `${origin}/`));
+  await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
   await runCauseEffect(browser.close(sameWindowTab.id));
   // A tab that a person opens with focus has it when its document commits.
   window.webContents.focus();
