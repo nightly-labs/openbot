@@ -275,21 +275,24 @@ function isAgentFolderBrowseEntry(value: unknown): value is AgentFolderBrowseEnt
   );
 }
 
+export function isAgentFolderBrowse(value: unknown): value is AgentFolderBrowse {
+  return (
+    isDynamicRecord(value) &&
+    isBoundedString(value.path, INPUT_LIMITS.path) &&
+    (value.parentPath === null || isBoundedString(value.parentPath, INPUT_LIMITS.path)) &&
+    Array.isArray(value.entries) &&
+    value.entries.length <= AGENT_FOLDER_BROWSE_LIMIT &&
+    value.entries.every(isAgentFolderBrowseEntry) &&
+    isBoolean(value.truncated) &&
+    isBoundedString(value.home, INPUT_LIMITS.path) &&
+    Array.isArray(value.volumes) &&
+    value.volumes.length <= AGENT_FOLDER_VOLUME_LIMIT &&
+    value.volumes.every(isAgentFolderBrowseEntry)
+  );
+}
+
 export function decodeAgentFolderBrowse(value: unknown): AgentFolderBrowse {
-  if (
-    !isDynamicRecord(value) ||
-    !isBoundedString(value.path, INPUT_LIMITS.path) ||
-    !(value.parentPath === null || isBoundedString(value.parentPath, INPUT_LIMITS.path)) ||
-    !Array.isArray(value.entries) ||
-    value.entries.length > AGENT_FOLDER_BROWSE_LIMIT ||
-    !value.entries.every(isAgentFolderBrowseEntry) ||
-    !isBoolean(value.truncated) ||
-    !isBoundedString(value.home, INPUT_LIMITS.path) ||
-    !Array.isArray(value.volumes) ||
-    value.volumes.length > AGENT_FOLDER_VOLUME_LIMIT ||
-    !value.volumes.every(isAgentFolderBrowseEntry)
-  )
-    throw new Error("Invalid agent folder browse.");
+  if (!isAgentFolderBrowse(value)) throw new Error("Invalid agent folder browse.");
   return {
     path: value.path,
     parentPath: value.parentPath,

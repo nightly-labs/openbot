@@ -5,7 +5,6 @@
 import { join } from "node:path";
 import {
   type AgentExclusionChange,
-  decodeAgentFolderBrowse,
   parseAddAgentFolderInput,
   parseAgentFolderInput,
   parseBrowseAgentFoldersInput,
@@ -21,6 +20,7 @@ import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentFolders } from "../agent-folders";
 import {
   decodeRemoteAgentExclusionChange,
+  decodeRemoteAgentFolderBrowse,
   decodeRemoteAgentFolderChange,
   decodeRemoteAgentFolderList,
 } from "../remote-agent-decoding";
@@ -124,13 +124,12 @@ export function agentFolderIpcHandlers({
           remote(serverId, AGENT_FOLDERS_ROUTES.remove, decodeRemoteAgentFolderChange, input),
       }),
       browseAgentFolders: scopedHandler(parseBrowseAgentFoldersInput, {
-        local: async ({ agentId, path }) => {
-          folders.requireAgent(agentId);
-          const listing = await folders.browse(path);
-          if (!listing) throw new Error(sourceText("error.team.folderUnavailable"));
-          return listing;
+        // Only a joined server needs this list: this computer has the native folder picker.
+        local: () => {
+          throw new Error(sourceText("error.team.folderUnavailable"));
         },
-        remote: (input, serverId) => remote(serverId, AGENT_FOLDERS_ROUTES.browse, decodeAgentFolderBrowse, input),
+        remote: (input, serverId) =>
+          remote(serverId, AGENT_FOLDERS_ROUTES.browse, decodeRemoteAgentFolderBrowse, input),
       }),
     },
   };

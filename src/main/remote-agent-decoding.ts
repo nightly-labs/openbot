@@ -41,6 +41,7 @@ import type {
 import {
   isAccountUsage,
   isAgentExclusionChange,
+  isAgentFolderBrowse,
   isAgentFolderChange,
   isAgentFolderList,
   isAgentInstructionsFile,
@@ -151,6 +152,7 @@ function decodeMarketplaceSource(value: unknown): AgentSummary["marketplaceSourc
 // The `agent-folders-v1` and `agent-instructions-v1` replies. The preload has its own `FromMain`
 // decoders for the same shapes, because the main process is a different sender from a joined server.
 export const decodeRemoteAgentFolderList = guardedDecoder(isAgentFolderList, "remote agent folders");
+export const decodeRemoteAgentFolderBrowse = guardedDecoder(isAgentFolderBrowse, "remote agent folder browse");
 export const decodeRemoteAgentInstructionsFile = guardedDecoder(isAgentInstructionsFile, "remote agent instructions");
 
 export function decodeRemoteAgentFolderChange(value: unknown): AgentFolderChange {
