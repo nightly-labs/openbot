@@ -73,17 +73,39 @@ export interface DeveloperInstructionOptions {
   instructionsFile?: PromptInstructionsFile | null;
 }
 
-/** The agent's instruction file, after its profile. */
-function instructionsFileSection(file: PromptInstructionsFile | null | undefined): string[] {
-  if (!file?.text) return [];
+/** The text of the instruction file in its block, and the note when the prompt carries only its start. */
+function instructionsFileText(file: PromptInstructionsFile): string[] {
   return [
-    `Your instruction file, ${file.fileName} at your workspace root:`,
     "<agent_instructions>",
     // A closing tag in the file must not end the block early.
     redactText(file.text).replace(/<(\/?agent_instructions)/giu, "&lt;$1"),
     "</agent_instructions>",
     ...(file.truncated ? [`This is the start of the file only; read the rest in ${file.fileName}.`] : []),
   ];
+}
+
+/** The agent's instruction file, after its profile. */
+function instructionsFileSection(file: PromptInstructionsFile | null | undefined): string[] {
+  if (!file?.text) return [];
+  return [`Your instruction file, ${file.fileName} at your workspace root:`, ...instructionsFileText(file)];
+}
+
+const INSTRUCTIONS_UPDATE_START = "<openbot_instructions_update>";
+
+/**
+ * The block that the next turn of a running session gets after the instruction file changed, such as
+ * when the user accepts a learned rule. The session keeps its context: before, a change started a new
+ * Codex session. The file keeps the authority that it had at the session start.
+ */
+export function instructionsUpdateBlock(fileName: string, file: PromptInstructionsFile | null): string {
+  return [
+    INSTRUCTIONS_UPDATE_START,
+    file?.text
+      ? `Your instruction file, ${fileName} at your workspace root, changed after this session read it. The text below replaces the text that you read before, with the same authority.`
+      : `Your instruction file, ${fileName} at your workspace root, is now empty or gone. The rules that you read from it before no longer apply.`,
+    ...(file?.text ? instructionsFileText(file) : []),
+    "</openbot_instructions_update>",
+  ].join("\n");
 }
 
 /** When and how to use the OpenBot Vault. */
@@ -230,7 +252,7 @@ export function memoryContextUpdate(delivered: MemoryContext | null, current: Me
  * text that a person wrote.
  */
 export function isTurnContextBlock(text: string): boolean {
-  return [MEMORY_BLOCK_START, MEMORY_UPDATE_START, TEAMMATES_BLOCK_START].some((start) =>
+  return [MEMORY_BLOCK_START, MEMORY_UPDATE_START, TEAMMATES_BLOCK_START, INSTRUCTIONS_UPDATE_START].some((start) =>
     text.startsWith(`${start}\n`),
   );
 }

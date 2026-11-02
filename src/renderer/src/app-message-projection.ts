@@ -1,6 +1,7 @@
 import type { ClientAgentSummary, ConversationMessage, QueueDeliveryStatus } from "@openbot/contracts/ipc";
 import {
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
+  AGENT_RULE_PROPOSAL_ITEM_TYPE,
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
@@ -78,6 +79,10 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
   const plan = messagePlan(message);
   const subagents = message.itemType === CONVERSATION_SUBAGENTS_ITEM_TYPE ? message.subagents : undefined;
   const memoryChanges = message.author === "system" && message.itemType === CONVERSATION_MEMORY_CHANGES_ITEM_TYPE;
+  const ruleProposal =
+    message.author === "system" && message.itemType === AGENT_RULE_PROPOSAL_ITEM_TYPE
+      ? message.ruleProposal
+      : undefined;
   const senderMember = message.author === "user" ? message.senderMember : undefined;
   const status =
     message.exchange || message.routine
@@ -110,7 +115,9 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
             ? "subagents"
             : memoryChanges
               ? "memory-changes"
-              : "text",
+              : ruleProposal
+                ? "rule-proposal"
+                : "text",
     ...(exchangeSenderId === undefined ? {} : { senderAgentId: exchangeSenderId }),
     ...(senderMember === undefined ? {} : { senderMember }),
     ...(message.replyToMessageId === undefined ? {} : { replyToMessageId: message.replyToMessageId }),
@@ -128,6 +135,7 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     ...(plan ? { plan } : {}),
     ...(subagents?.length ? { subagents } : {}),
     ...(memoryChanges && message.memoryChanges ? { memoryChanges: message.memoryChanges } : {}),
+    ...(ruleProposal ? { ruleProposal } : {}),
     ...(message.trace === undefined ? {} : { trace: message.trace }),
     ...(status === undefined ? {} : { status }),
   };
@@ -302,7 +310,8 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     JSON.stringify(left.items) === JSON.stringify(right.items) &&
     JSON.stringify(left.itemIds) === JSON.stringify(right.itemIds) &&
     JSON.stringify(left.plan) === JSON.stringify(right.plan) &&
-    JSON.stringify(left.subagents) === JSON.stringify(right.subagents)
+    JSON.stringify(left.subagents) === JSON.stringify(right.subagents) &&
+    JSON.stringify(left.ruleProposal) === JSON.stringify(right.ruleProposal)
   );
 }
 

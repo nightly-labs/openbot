@@ -5,6 +5,7 @@ import type {
   AgentInstructionsChange,
   AgentModelId,
   AgentReasoningEffort,
+  AgentRuleProposal,
   AttachmentSummary,
   AvatarHue,
   ChannelRoutingConversationEvent,
@@ -42,6 +43,7 @@ export type MessageKind =
   | "plan"
   | "subagents"
   | "memory-changes"
+  | "rule-proposal"
   | "error";
 
 /** The plan of one turn. `stopped` is true when the turn was stopped or failed before it ended. */
@@ -235,6 +237,8 @@ export interface AgentMessage {
    * that sends only the text, such as a Team API host.
    */
   memoryChanges?: ConversationMemoryChange[] | undefined;
+  /** The rule that the memory review suggests, on a `rule-proposal` message. */
+  ruleProposal?: AgentRuleProposal | undefined;
   /**
    * The real times of the turn's steps, with its tokens and cost, on the one message of a finished
    * turn that holds them. Absent on an older turn and from a Team API host.

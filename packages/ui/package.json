@@ -96,6 +96,7 @@
     "./features/conversation/AgentFolders": "./src/features/conversation/AgentFolders.tsx",
     "./features/conversation/HostFolderPicker": "./src/features/conversation/HostFolderPicker.tsx",
     "./features/conversation/AgentInstructionsView": "./src/features/conversation/AgentInstructionsView.tsx",
+    "./features/conversation/RuleProposalCard": "./src/features/conversation/RuleProposalCard.tsx",
     "./features/conversation/AgentMemoriesEmpty": "./src/features/conversation/AgentMemoriesEmpty.tsx",
     "./features/conversation/AgentMemoriesView": "./src/features/conversation/AgentMemoriesView.tsx",
     "./features/conversation/AgentSteps": "./src/features/conversation/AgentSteps.tsx",

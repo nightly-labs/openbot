@@ -35,6 +35,8 @@ export const INPUT_LIMITS = {
   // whole block, so the cap matches the channel one.
   messagingMemories: 32,
   agentMemoryText: 500,
+  // One rule that the memory review suggests for an agent's instruction file, and the reason for it.
+  agentLearnedRule: 300,
   agentRoutines: 64,
   routineName: 80,
   routineInstruction: 100_000,

@@ -2513,6 +2513,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         memories.delete(agentId);
         emitAgentEvent({ type: "memories-changed", agentId });
       },
+      decideRuleProposal: async (input) => {
+        const snapshot = getSnapshot(input.agentId);
+        const message = snapshot.messages.find((candidate) => candidate.id === input.messageId);
+        if (!message?.ruleProposal || (message.ruleProposal.status === "proposed") === (input.decision === "proposed"))
+          throw new Error("This suggested rule was already answered.");
+        message.ruleProposal = { ...message.ruleProposal, status: input.decision };
+        snapshot.revision += 1;
+        snapshots[input.agentId] = snapshot;
+        emitAgentEvent({ type: "conversation-invalidated", agentId: input.agentId, revision: snapshot.revision });
+      },
       listTables: async () => clone(tables),
       deleteTable: async (input) => {
         tables = tables.filter((table) => table.name !== input.name);

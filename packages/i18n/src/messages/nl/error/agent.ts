@@ -26,6 +26,9 @@ export const messages = {
   "error.agent.instructionsOutside":
     "Het instructiebestand verwijst naar een plek buiten de werkruimte van de agent, dus OpenBot opent het niet.",
   "error.agent.instructionsReadFailed": "Kan het instructiebestand niet lezen.",
+  "error.agent.ruleProposalMissing": "Deze voorgestelde regel staat niet meer in de chat.",
+  "error.agent.ruleProposalAnswered": "Deze voorgestelde regel is al beantwoord.",
+  "error.agent.ruleProposalFailed": "Kan de regel niet toevoegen aan het instructiebestand.",
   "error.agent.instructionsSaveFailed": "Kan het instructiebestand niet opslaan.",
   "error.agent.profileGenerationBusy": "Er wordt al een profiel gemaakt. Probeer het zo opnieuw.",
   "error.agent.instructionsChanged":

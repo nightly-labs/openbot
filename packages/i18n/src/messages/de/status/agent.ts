@@ -56,6 +56,7 @@ export const messages = {
   "status.agent.agentResponseReviewing": "Die Antwort des anderen Agenten wird geprüft…",
   "status.agent.toolStepWorking": "Der nächste toolgestützte Schritt wird abgearbeitet…",
   "status.agent.memoryChanges": "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen.",
+  "status.agent.ruleProposal": "Vorgeschlagene Regel: {rule}",
   "status.agent.memoryChangesWithConflicts":
     "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen, {notChanged} nicht geändert, weil ein anderer Thread sie zuerst geändert hat.",
   "status.agent.nextStepContinues":

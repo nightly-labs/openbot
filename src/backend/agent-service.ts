@@ -48,6 +48,7 @@ import type {
   CreateRoutineInput,
   CustomProviderHarness,
   CustomProviderRestart,
+  DecideRuleProposalInput,
   DeleteAgentMemoryInput,
   DeleteChannelMemoryInput,
   DeleteChannelRoutineInput,
@@ -120,6 +121,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   isContextResetMarker,
   isCustomProviderHarness,
+  learnedRules,
   MODEL_SWITCH_ITEM_TYPES,
   type ModelSwitchReason,
   type QueueSteerFallback,
@@ -215,6 +217,7 @@ import { memoryReviewUsageObserver, workflowUsageObserver } from "./agent/usage-
 import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/usage-limit-gate";
 import { WarmGenerations } from "./agent/warm-generations";
 import type { WebhookRoutineWriter } from "./agent/webhook-routine-tool";
+import { readAgentInstructionsFile } from "./agent/workspace-instructions";
 import type { AgentApiKeys } from "./agent-api-keys";
 import type { AgentProvider } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
@@ -641,6 +644,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         sideThreadId
           ? this.#appendSideThreadSystemMessage(agentId, sideThreadId, message, "thread.memory-reviewed")
           : this.#appendSystemMessage(agentId, message, "thread.memory-reviewed"),
+      learnedRules: (agent) =>
+        readAgentInstructionsFile(agent.workspacePath).pipe(Effect.map((file) => learnedRules(file.text))),
       redact: (text) => this.#mcp.redact(text),
       stopping: () => this.#stopping,
       ...(options.memoryReviewIdleMs === undefined ? {} : { idleMs: options.memoryReviewIdleMs }),
@@ -1768,6 +1773,35 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    */
   instructionsSaving(agentId: string, text: string): (written: boolean) => void {
     return this.#instructionChanges.saving(agentId, text);
+  }
+
+  /**
+   * Marks a rule that the memory review suggested as accepted or dismissed, or opens it again (Undo).
+   * The renderer changes the instruction file first. A line that is gone, or that has that answer
+   * state already, is refused.
+   */
+  decideRuleProposal(input: DecideRuleProposalInput): void {
+    const database = this.#store.database;
+    const decide = ({ threadId, snapshot }: { threadId: string; snapshot: ConversationSnapshot }) => {
+      const index = snapshot.messages.findIndex((message) => message.id === input.messageId);
+      const message = snapshot.messages[index];
+      if (!message?.ruleProposal) throw new Error(sourceText("error.agent.ruleProposalMissing"));
+      // An answer needs an open line; Undo (`proposed`) needs an answered one.
+      if ((message.ruleProposal.status === "proposed") === (input.decision === "proposed"))
+        throw new Error(sourceText("error.agent.ruleProposalAnswered"));
+      const changed = { ...message, ruleProposal: { ...message.ruleProposal, status: input.decision } };
+      snapshot.messages[index] = changed;
+      snapshot.revision = database.persistConversationChanges({
+        agentId: input.agentId,
+        threadId,
+        activeTurnId: snapshot.activeTurnId,
+        changedMessages: [changed],
+        eventType: "thread.rule-proposal-decided",
+      });
+      return { result: undefined, snapshot };
+    };
+    if (input.threadId) this.#conversation.withThreadTransaction(input.agentId, input.threadId, decide);
+    else this.#conversation.withConversationTransaction(input.agentId, decide);
   }
 
   listMemories(agentId: string): AgentMemory[] {

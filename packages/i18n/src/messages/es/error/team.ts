@@ -72,6 +72,7 @@ export const messages = {
   "error.team.sidebarPinsUnsupported":
     "Este servidor no puede guardar tus chats fijados para todos tus dispositivos. Actualiza OpenBot en el ordenador que lo ejecuta.",
   "error.team.agentInstructionsUnsupported": "Esta conexión no permite editar las instrucciones de los agentes.",
+  "error.team.ruleProposalsUnsupported": "Esta conexión no admite reglas sugeridas.",
   "error.team.agentPublishUnsupported": "Esta conexión no permite publicar agentes.",
   "error.team.agentUpdateUnsupported": "Esta conexión no permite actualizar agentes.",
   "error.team.contextResetUnsupported": "Esta conexión no permite iniciar un nuevo chat.",

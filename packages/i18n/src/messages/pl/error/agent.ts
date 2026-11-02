@@ -23,6 +23,9 @@ export const messages = {
   "error.agent.instructionsOutside":
     "Plik instrukcji wskazuje miejsce poza obszarem roboczym agenta, więc OpenBot go nie otwiera.",
   "error.agent.instructionsReadFailed": "Nie udało się odczytać pliku instrukcji.",
+  "error.agent.ruleProposalMissing": "Tej proponowanej reguły nie ma już w czacie.",
+  "error.agent.ruleProposalAnswered": "Na tę proponowaną regułę już odpowiedziano.",
+  "error.agent.ruleProposalFailed": "Nie udało się dodać reguły do pliku instrukcji.",
   "error.agent.instructionsSaveFailed": "Nie udało się zapisać pliku instrukcji.",
   "error.agent.profileGenerationBusy": "Generowanie profilu już trwa. Spróbuj ponownie za chwilę.",
   "error.agent.instructionsChanged":

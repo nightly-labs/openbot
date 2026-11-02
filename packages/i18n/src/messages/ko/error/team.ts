@@ -70,6 +70,7 @@ export const messages = {
   "error.team.sidebarPinsUnsupported":
     "이 서버는 고정한 채팅을 모든 기기에서 유지할 수 없습니다. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
   "error.team.agentInstructionsUnsupported": "이 연결에서는 에이전트 지침 편집을 지원하지 않아요.",
+  "error.team.ruleProposalsUnsupported": "이 연결은 제안된 규칙을 지원하지 않습니다.",
   "error.team.agentPublishUnsupported": "이 연결에서는 에이전트 게시를 지원하지 않아요.",
   "error.team.agentUpdateUnsupported": "이 연결에서는 에이전트 업데이트를 지원하지 않아요.",
   "error.team.contextResetUnsupported": "이 연결에서는 새 채팅 시작을 지원하지 않아요.",

@@ -25,6 +25,9 @@ export const messages = {
   "error.agent.instructionsOutside":
     "Il file delle istruzioni rimanda a una posizione fuori dallo spazio di lavoro dell'agente, quindi OpenBot non lo apre.",
   "error.agent.instructionsReadFailed": "Impossibile leggere il file delle istruzioni.",
+  "error.agent.ruleProposalMissing": "Questa regola suggerita non è più nella chat.",
+  "error.agent.ruleProposalAnswered": "Questa regola suggerita ha già una risposta.",
+  "error.agent.ruleProposalFailed": "Impossibile aggiungere la regola al file delle istruzioni.",
   "error.agent.instructionsSaveFailed": "Impossibile salvare il file delle istruzioni.",
   "error.agent.profileGenerationBusy": "La generazione del profilo è occupata. Riprova tra poco.",
   "error.agent.instructionsChanged":

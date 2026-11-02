@@ -21,6 +21,7 @@ import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-marke
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
+import { RuleProposalCard } from "@openbot/ui/features/conversation/RuleProposalCard";
 import { SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
@@ -42,7 +43,7 @@ import {
   toggleRecording,
   toggleSpokenReply,
 } from "../speech/speech-replies";
-import { agentInstructionsCalls } from "./agent-folders-port";
+import { agentInstructionsCalls, ruleProposalCalls } from "./agent-folders-port";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
@@ -1021,6 +1022,55 @@ export function ConversationTimeline() {
                                 subagents={current()}
                                 selectedId={shownSubagentId()}
                                 onOpen={toggleSubagentPanel}
+                              />
+                            )}
+                          </Show>
+                        </article>
+                      </ChatRowBoundary>
+                    </div>
+                  );
+                }
+                if (untrack(() => initialMessage.kind === "rule-proposal")) {
+                  const proposal = () => (message() ?? initialMessage).ruleProposal;
+                  // Only the agent's own chat on this computer answers: a channel or a joined server shows the rule.
+                  const calls = () => {
+                    const agentId = props.agent?.id;
+                    const rule = proposal()?.rule;
+                    return agentId && rule && !channel && localInstructionsCalls()
+                      ? ruleProposalCalls(agentId, initialMessage.id, rule)
+                      : undefined;
+                  };
+                  return (
+                    <div
+                      data-index={virtualRow.index}
+                      ref={messageVirtualizer.measureElement}
+                      class="virtual-chat-row"
+                      style={{
+                        transform: messageVirtualizer.isVirtualized()
+                          ? `translateY(${virtualRow.start - messageVirtualizer.scrollMargin()}px)`
+                          : "none",
+                      }}
+                    >
+                      <ChatRowBoundary>
+                        <article data-chat-search-message={message()?.id}>
+                          <Show when={proposal()}>
+                            {(current) => (
+                              <RuleProposalCard
+                                proposal={current()}
+                                onAccept={calls()?.accept}
+                                onDismiss={calls()?.dismiss}
+                                onUndo={
+                                  calls() && current().status !== "proposed"
+                                    ? () =>
+                                        calls()?.undo(current().status === "accepted" ? "accepted" : "dismissed") ??
+                                        Promise.resolve()
+                                    : undefined
+                                }
+                                onView={
+                                  calls() && props.agent
+                                    ? () => openInstructionsSettings(props.agent?.id ?? "")
+                                    : undefined
+                                }
                               />
                             )}
                           </Show>

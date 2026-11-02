@@ -56,6 +56,7 @@ export const messages = {
   "status.agent.agentResponseReviewing": "Просмотр ответа другого агента…",
   "status.agent.toolStepWorking": "Обработка следующего шага с инструментом…",
   "status.agent.memoryChanges": "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}.",
+  "status.agent.ruleProposal": "Предложенное правило: {rule}",
   "status.agent.memoryChangesWithConflicts":
     "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}, не изменено {notChanged}, потому что другая ветка изменила их раньше.",
   "status.agent.nextStepContinues": "Агент остановился перед следующим шагом. Он продолжает ({current} из {limit}).",

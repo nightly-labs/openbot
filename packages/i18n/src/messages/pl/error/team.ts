@@ -71,6 +71,7 @@ export const messages = {
   "error.team.sidebarPinsUnsupported":
     "Ten serwer nie może zapisać przypiętych czatów dla wszystkich Twoich urządzeń. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "error.team.agentInstructionsUnsupported": "To połączenie nie obsługuje edytowania instrukcji agentów.",
+  "error.team.ruleProposalsUnsupported": "To połączenie nie obsługuje proponowanych reguł.",
   "error.team.agentPublishUnsupported": "To połączenie nie obsługuje publikowania agentów.",
   "error.team.agentUpdateUnsupported": "To połączenie nie obsługuje aktualizowania agentów.",
   "error.team.contextResetUnsupported": "To połączenie nie obsługuje rozpoczynania nowego czatu.",

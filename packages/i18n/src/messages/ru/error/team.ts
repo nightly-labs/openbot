@@ -72,6 +72,7 @@ export const messages = {
   "error.team.sidebarPinsUnsupported":
     "Этот сервер не может хранить закреплённые чаты для всех ваших устройств. Обновите OpenBot на компьютере, на котором он работает.",
   "error.team.agentInstructionsUnsupported": "Это подключение не поддерживает редактирование инструкций агентов.",
+  "error.team.ruleProposalsUnsupported": "Это подключение не поддерживает предложенные правила.",
   "error.team.agentPublishUnsupported": "Это подключение не поддерживает публикацию агентов.",
   "error.team.agentUpdateUnsupported": "Это подключение не поддерживает обновление агентов.",
   "error.team.contextResetUnsupported": "Это подключение не поддерживает начало нового чата.",
