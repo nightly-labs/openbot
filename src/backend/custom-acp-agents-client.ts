@@ -648,7 +648,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
    * `#startChild` and `request`, so the cause is added once.
    */
   #deniedWrite(message: string): boolean {
-    return this.#confined && WRITE_DENIED.test(message) && !message.endsWith(WORKSPACE_ONLY_HINT);
+    return this.#confined && WRITE_DENIED.test(message) && !message.includes(WORKSPACE_ONLY_HINT);
   }
 
   #explain(message: string): string {
@@ -657,15 +657,15 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
 
   /**
    * The error a caller may show: saved values masked, and the cause of a denied write named. The
-   * denial of an exit is only in its stderr line. That line is read here, but it stays out of the
-   * message: the runtime masks the MCP values in it, and this client does not know them.
+   * denial of an exit is only in its stderr line. That line is read here but stays apart from the
+   * message: the runtime adds it after it masks the MCP values, which this client does not know.
    */
   #publicError<E>(error: E): E | Error {
     const redacted = this.#redactError(error);
     if (!(redacted instanceof Error)) return redacted;
     if (redacted instanceof AgentProcessExitError) {
       return this.#deniedWrite(redacted.withDetail((text) => this.#redact(text)).message)
-        ? new AgentProcessExitError(withWorkspaceOnlyHint(redacted.message), null, { cause: redacted })
+        ? redacted.withMessage(withWorkspaceOnlyHint(redacted.message))
         : redacted;
     }
     return this.#deniedWrite(redacted.message)
