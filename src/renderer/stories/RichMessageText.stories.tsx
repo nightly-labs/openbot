@@ -2,6 +2,7 @@ import { serializeAttachmentReference } from "@openbot/contracts/attachment-refe
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { MessageCitation } from "@openbot/ui/data";
+import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -89,6 +90,14 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const LinksAndMentions: Story = {};
+
+export const LinkPreview: Story = {
+  args: { body: "[OpenBot documentation](https://openbot.run/docs) and https://example.com/path" },
+};
+
+export const MarkdownLinkPreview: Story = {
+  render: () => <MarkdownMessageText {...args} body="Read [OpenBot documentation](https://openbot.run/docs)." />,
+};
 
 export const SkillChip: Story = {
   args: {

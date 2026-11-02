@@ -1,7 +1,7 @@
 import { type ChatTagKind, chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { Blocks, Button, Puzzle, TextQuote } from "@openbot/ui";
+import { Blocks, Button, ExternalLink, Puzzle, TextQuote, Tooltip } from "@openbot/ui";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
@@ -143,6 +143,7 @@ export function RichMessageText(props: RichMessageTextProps) {
             return (
               <MessageLink
                 url={part.url}
+                label={part.text}
                 title={linkTitle(part.text, part.url)}
                 favicon={props.linkFavicons !== false}
                 onOpenLink={props.onOpenLink}
@@ -294,7 +295,8 @@ function StreamingTailText(props: { body: string; after: number }) {
 
 export function MessageLink(props: {
   url: string;
-  /** The native tooltip. Omit it when the link text already shows the URL. */
+  label?: string | undefined;
+  /** A Markdown link can provide a title distinct from its label and URL. */
   title?: string | undefined;
   children: JSX.Element;
   /** False keeps the request for the linked site's favicon from being made. */
@@ -302,32 +304,62 @@ export function MessageLink(props: {
   onOpenLink: (url: string) => void;
 }) {
   return (
-    <a
-      class="message-link"
-      href={props.url}
-      data-cuelume-navigate=""
-      data-cuelume-emphasis="subtle"
-      title={props.title}
-      onClick={(event) => {
-        event.preventDefault();
-        props.onOpenLink(props.url);
-      }}
-    >
-      <span class="message-link-icon" aria-hidden="true">
-        <LinkIcon />
-        <Show when={props.favicon !== false}>
-          <img
-            src={faviconUrl(props.url)}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            referrerpolicy="no-referrer"
-            onError={(event) => event.currentTarget.remove()}
-          />
-        </Show>
-      </span>
-      {props.children}
-    </a>
+    <Tooltip.Root placement="top" gutter={8} openDelay={250} closeDelay={100}>
+      <Tooltip.Trigger
+        as="a"
+        class="message-link"
+        href={props.url}
+        data-cuelume-navigate=""
+        data-cuelume-emphasis="subtle"
+        onClick={(event) => {
+          event.preventDefault();
+          props.onOpenLink(props.url);
+        }}
+      >
+        <span class="message-link-icon" aria-hidden="true">
+          <LinkIcon />
+          <Show when={props.favicon !== false}>
+            <img
+              src={faviconUrl(props.url)}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              referrerpolicy="no-referrer"
+              onError={(event) => event.currentTarget.remove()}
+            />
+          </Show>
+        </span>
+        {props.children}
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content class="message-link-preview">
+          <Show when={(props.title && props.title !== props.url ? props.title : props.label) || ""}>
+            {(label) => (
+              <Show when={label() !== props.url && `${label()}/` !== props.url}>
+                <span class="message-link-preview-title">{label()}</span>
+              </Show>
+            )}
+          </Show>
+          <span class="message-link-preview-address">
+            <span class="message-link-icon" aria-hidden="true">
+              <LinkIcon />
+              <Show when={props.favicon !== false}>
+                <img
+                  src={faviconUrl(props.url)}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  referrerpolicy="no-referrer"
+                  onError={(event) => event.currentTarget.remove()}
+                />
+              </Show>
+            </span>
+            <span class="message-link-preview-url">{props.url.replace(/^https?:\/\//u, "")}</span>
+            <ExternalLink class="message-link-preview-arrow" aria-hidden="true" />
+          </span>
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 
