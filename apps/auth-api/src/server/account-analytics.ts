@@ -27,9 +27,9 @@ const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
  * `reactivated` and `end_reason` on plan events. Generation 11 adds the license to the billing events
  * (`product`, `users`, `direction`), `entry_point` on `checkout_started`, and the license totals of
  * `billing_snapshot`. A billing event without `product` is from a server plan. No generation 10
- * property changes. Generation 12 adds `email_sent`.
+ * property changes. Generation 12 adds `email_sent`. Generation 13 adds the `license` kind of `email_sent`.
  */
-export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 12;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 13;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
@@ -99,8 +99,8 @@ export type AccountSurface = (typeof ACCOUNT_SURFACES)[number];
 const ATTRIBUTION_SOURCES = ["sign_in", "checkout"] as const;
 export type AttributionSource = (typeof ATTRIBUTION_SOURCES)[number];
 
-/** The kinds of email that the Worker sends from the shared SMTP mailbox. */
-const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome"] as const;
+/** The kinds of email that the Worker sends through the shared SMTP mailbox. */
+const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome", "license"] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 /** `unknown`: the server got the message but did not confirm it, so it can count against the quota. */
 const EMAIL_RESULTS = ["accepted", "rate_limited", "unknown", "failed"] as const;

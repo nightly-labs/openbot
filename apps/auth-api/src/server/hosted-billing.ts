@@ -1,8 +1,9 @@
 import { Effect } from "effect";
-import { type AccountAnalytics, createAccountAnalytics } from "./account-analytics";
+import { createAccountAnalytics } from "./account-analytics";
 import { BillingSales } from "./billing-sales";
-import { BillingService, type FirstPlanStart } from "./billing-service";
-import { createWelcomeEmailDelivery, type EmailDeliveryBindings } from "./email-delivery";
+import { BillingService } from "./billing-service";
+import { createLicenseEmailDelivery, createWelcomeEmailDelivery, type EmailDeliveryBindings } from "./email-delivery";
+import type { LicenseEmailInput } from "./email-templates";
 import {
   type HostedServerBindings,
   HostedServerService,
@@ -10,6 +11,7 @@ import {
 } from "./hosted-server-service";
 import { parseLicenseTrialEnd } from "./license-service";
 import type { RemoteFailure } from "./remote-control-plane";
+import type { SmtpFailure } from "./smtp-email-delivery";
 import type { WorkerBindings } from "./types";
 
 export type HostedBillingBindings = HostedServerBindings &
@@ -66,7 +68,18 @@ export function createHostedBilling(
         fetch: (input, init) => fetch(input, init),
         analytics,
         ...(sales ? { sales } : {}),
-        onFirstPlanStarted: (start) => options.schedule(sendWelcomeEmail(bindings, analytics, start)),
+        onFirstPlanStarted: (start) =>
+          options.schedule(
+            sendBillingEmail("welcome email", () => createWelcomeEmailDelivery(bindings, analytics), start),
+          ),
+        onLicenseEmail: (message) =>
+          options.schedule(
+            sendBillingEmail(
+              `license email ${message.kind}`,
+              () => createLicenseEmailDelivery(bindings, analytics),
+              message,
+            ),
+          ),
         onSubscriptionSynced: (sync) =>
           hosting.onSubscriptionSynced(sync).pipe(Effect.andThen(() => options.planChanged(sync.serverId))),
         onLicenseChanged: options.licenseChanged,
@@ -83,23 +96,23 @@ export function createHostedBilling(
 }
 
 /**
- * A deployment without SMTP sends no welcome email. A failed send is not sent again. Each result logs
+ * A deployment without SMTP sends no billing email. A failed send is not sent again. Each result logs
  * one line with no address.
  */
-function sendWelcomeEmail(
-  bindings: EmailDeliveryBindings,
-  analytics: AccountAnalytics,
-  start: FirstPlanStart,
+function sendBillingEmail<Message>(
+  name: "welcome email" | `license email ${LicenseEmailInput["kind"]}`,
+  createDelivery: () => { send(message: Message): Effect.Effect<void, SmtpFailure> } | null,
+  message: Message,
 ): Effect.Effect<void> {
   return Effect.try({
-    try: () => createWelcomeEmailDelivery(bindings, analytics),
+    try: createDelivery,
     catch: () => ({ message: "smtp_config_incomplete" }),
   }).pipe(
     Effect.flatMap((delivery) =>
       delivery
-        ? delivery.send(start).pipe(Effect.andThen(Effect.sync(() => console.log("billing: welcome email sent"))))
-        : Effect.sync(() => console.log("billing: welcome email not sent: SMTP is not set")),
+        ? delivery.send(message).pipe(Effect.andThen(Effect.sync(() => console.log(`billing: ${name} sent`))))
+        : Effect.sync(() => console.log(`billing: ${name} not sent: SMTP is not set`)),
     ),
-    Effect.catch((error) => Effect.sync(() => console.warn("billing: welcome email failed", error.message))),
+    Effect.catch((error) => Effect.sync(() => console.warn(`billing: ${name} failed`, error.message))),
   );
 }

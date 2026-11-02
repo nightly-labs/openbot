@@ -54,6 +54,7 @@
     "EMAIL_SMTP_PORT": "465",
     "EMAIL_SMTP_USERNAME": "hello@openbot.run",
     "EMAIL_FROM": "hello@openbot.run",
+    "EMAIL_LICENSE_FROM": "licenses@openbot.run",
     "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
     "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
     // Two active Signal machines (docs/remote-session-deployment.md): a is sui-alexandria, b is signal2.
@@ -153,6 +154,7 @@
         "EMAIL_SMTP_PORT": "465",
         "EMAIL_SMTP_USERNAME": "hello@openbot.run",
         "EMAIL_FROM": "hello@openbot.run",
+        "EMAIL_LICENSE_FROM": "licenses@openbot.run",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
@@ -247,6 +249,7 @@
         "EMAIL_SMTP_PORT": "465",
         "EMAIL_SMTP_USERNAME": "hello@openbot.run",
         "EMAIL_FROM": "hello@openbot.run",
+        "EMAIL_LICENSE_FROM": "licenses@openbot.run",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",

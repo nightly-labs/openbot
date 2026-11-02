@@ -226,10 +226,27 @@ export function requestedToolModel(request: ModelRequest, models: AgentModelOpti
         (candidate) => candidate.id === model && (provider === undefined || candidate.provider === provider),
       ) ?? null;
     if (!chosen && models.length === 0) throw new AgentSettingsRefused(sourceText("error.agent.modelUnavailable"));
-    if (!chosen)
-      throw new AgentSettingsRefused(
-        sourceText("error.agent.modelNotListed", { model, models: modelList(models, provider) }),
+    if (!chosen) {
+      // Cursor puts the settings of a model in its value (`grok-4.7[context=256k,…]`) and lists only
+      // some of them. The short list can leave them out, so name the listed values of that model (#4411).
+      // `grok-4.7` and `grok-4.7[context=500k]` both name the model `grok-4.7`.
+      const base = `${model.includes("[") ? model.slice(0, model.indexOf("[")) : model}[`;
+      const first = models.find(
+        (candidate) => candidate.id.startsWith(base) && (provider === undefined || candidate.provider === provider),
       );
+      const variants = first
+        ? models.filter((candidate) => candidate.provider === first.provider && candidate.id.startsWith(base))
+        : [];
+      throw new AgentSettingsRefused(
+        first
+          ? sourceText("error.agent.modelVariantNotListed", {
+              model,
+              provider: providerLabel(first.provider),
+              models: variants.map((candidate) => candidate.id).join(", "),
+            })
+          : sourceText("error.agent.modelNotListed", { model, models: modelList(models, provider) }),
+      );
+    }
   } else if (provider !== undefined) {
     chosen = providerDefault(provider, models);
   }

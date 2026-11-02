@@ -537,6 +537,8 @@ export interface ApplicationServices {
   providerCredentials: ProviderCredentialStore;
   /** The Slack and Telegram connections of the agents on this host. */
   messaging: MessagingService;
+  /** The WebRTC peers of this host and of its joined servers. */
+  teamWebRtcBridge: TeamWebRtcBridge;
   /** Reached by the entry point for one thing only: handing a returning grant to its sign-in. */
   mcpOAuth: McpOAuth;
   /** The sign-ins of joined servers that wait in this computer's browser, and the callbacks they take. */
@@ -3276,6 +3278,7 @@ export async function createApplicationServices({
     providerRuntimes,
     providerCredentials,
     messaging,
+    teamWebRtcBridge,
     mcpOAuth,
     signInRelayClient,
     relayedMessagingInstalls: new RelayedMessagingInstalls(remoteServers),

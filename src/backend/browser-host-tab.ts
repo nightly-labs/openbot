@@ -88,6 +88,8 @@ export interface BrowserHostTab {
   /** When a person or an agent last used the tab. A preview request does not count as use. */
   lastUsedAt: number;
   focusOnVisible: boolean;
+  /** The next document keeps the focus that it takes when it commits: a person opened the tab or entered its address. */
+  focusOnCommit?: boolean | undefined;
   /** Whether the tab had focus when its page closed itself, so its opener can take focus over. */
   focusedAtPageClose?: boolean | undefined;
   environment: BrowserEnvironment;

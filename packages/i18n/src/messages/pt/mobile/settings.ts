@@ -70,9 +70,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Desative Animações para reduzir o movimento em todo o app. Quando Reduzir Movimento está ativado nas configurações do celular, o app também reduz o movimento. As animações abaixo ficam desativadas.",
   "mobile.settings.animations.all": "Animações",
-  "mobile.settings.animations.chatZoom": "Zoom ao abrir chats",
-  "mobile.settings.animations.chatZoomFooter":
-    "Um chat abre a partir do avatar na lista e fecha de volta nele. Quando desativado, o chat desliza pela lateral.",
   "mobile.settings.animations.agentFaces": "Rostos animados dos agentes",
   "mobile.settings.animations.agentFacesFooter":
     "Os avatares dos agentes mexem o rosto enquanto os agentes trabalham e descansam. Quando desativado, os rostos ficam parados.",

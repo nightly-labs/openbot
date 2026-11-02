@@ -238,9 +238,11 @@ export function isUsageLimitDiagnostic(message: string): boolean {
  * your session limit · resets 8:40pm", "You've hit your usage limit. Try again at 10:34 AM.",
  * "You've reached your weekly usage limit for your plan. Your limit resets at …". The OpenCode Go
  * plan's rolling, weekly and monthly windows name no reset: `429: {"type":"GoUsageLimitError",
- * "message":"Go usage limit exceeded"}` (#4256). A spent credit balance or quota does not reset,
- * so it is not one: holding work for it would wait forever and hide the provider's reason. A short
- * request-rate throttle says "rate limit".
+ * "message":"Go usage limit exceeded"}` (#4256). The z.ai GLM Coding Plan writes "Usage limit reached
+ * for 5 hour. Your limit will reset at 2026-11-02 17:37:38" and "Weekly/Monthly Limit Exhausted. Your
+ * limit will reset at …" (#4469). Its reset names no zone, so it is not read. A spent credit
+ * balance or quota does not reset, so it is not one: holding work for it would wait forever and hide
+ * the provider's reason. A short request-rate throttle says "rate limit".
  */
 export function isPlanLimitDiagnostic(message: string): boolean {
   // Codex offers credits next to the reset on Plus and Pro: "… to purchase more credits or try again at 3:00 PM."
@@ -248,7 +250,9 @@ export function isPlanLimitDiagnostic(message: string): boolean {
   return (
     /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet) )*limit\b/iu.test(message) ||
     /\b(?:session|weekly) (?:usage )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message) ||
-    /\b(?:GoUsageLimitError|Go usage limit exceeded)\b/u.test(message)
+    /\b(?:GoUsageLimitError|Go usage limit exceeded)\b/u.test(message) ||
+    /\busage limit reached for \d+ ?hours?\b/iu.test(message) ||
+    /\b(?:daily|weekly|monthly) limit exhausted\b/iu.test(message)
   );
 }
 

@@ -129,6 +129,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, par défaut",
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Effort de raisonnement de l’agent",
+  "provider.picker.effortFixed": "{effort}, fixé par {provider}",
   "provider.picker.fast": "Rapide",
   "provider.picker.fastLabel": "Mode rapide",
   "provider.picker.selectEffort": "Choisir l’effort",
@@ -214,6 +215,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot déconnecte {provider} sur cet ordinateur. La CLI {provider} de votre terminal est aussi déconnectée.",
   "provider.settings.disconnectHost": "OpenBot déconnecte {provider} sur le serveur.",
+  "provider.settings.versionInstalledByUser": "{version} · installée par vous",
+  "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompt",
   "provider.settings.promptCacheDescription":

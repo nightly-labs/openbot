@@ -1269,7 +1269,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     cancelProviderRestart: async () => clone(agentStatus),
     // A code that never completes: the preview has no provider to finish the sign-in, so this shows
     // the waiting screen and leaves it there. Claude signs in with a code its page shows, which the
-    // user pastes back, and Cursor with a page that signs its CLI in by itself.
+    // user pastes back, Cursor with a page that signs its CLI in by itself, and Hermes with a Nous
+    // Portal code.
     startProviderCodeLogin: async (provider) =>
       provider === "claude"
         ? {
@@ -1283,12 +1284,19 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
               verificationUrl: "https://cursor.com/loginDeepControl?mode=login&redirectTarget=cli",
               expiresAt: Date.now() + 10 * 60_000,
             }
-          : {
-              kind: "code",
-              userCode: "KTQ4-B62MX",
-              verificationUrl: "https://auth.openai.com/codex/device",
-              expiresAt: Date.now() + 10 * 60_000,
-            },
+          : provider === "hermes"
+            ? {
+                kind: "code",
+                userCode: "NOUS-1234",
+                verificationUrl: "https://portal.nousresearch.com",
+                expiresAt: Date.now() + 10 * 60_000,
+              }
+            : {
+                kind: "code",
+                userCode: "KTQ4-B62MX",
+                verificationUrl: "https://auth.openai.com/codex/device",
+                expiresAt: Date.now() + 10 * 60_000,
+              },
     cancelProviderCodeLogin: async () => clone(agentStatus),
     cancelProviderSignIn: async () => clone(agentStatus),
     setProviderApiKey: async ({ provider, key }) => {
@@ -2729,7 +2737,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
                   id: `${turnId}:plan-continuation`,
                   author: "system",
                   source: "system",
-                  text: sourceText("status.agent.planContinues", { current: 1, limit: 3 }),
+                  text: sourceText("status.agent.planContinues", { current: 1, limit: 8 }),
                   createdAt: new Date().toISOString(),
                   status: "completed",
                   itemType: PLAN_CONTINUATION_ITEM_TYPE,

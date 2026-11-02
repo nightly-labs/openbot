@@ -74,9 +74,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Wyłącz animacje, aby ograniczyć ruch w całej aplikacji. Gdy w ustawieniach telefonu jest włączona opcja Ogranicz ruch, aplikacja także ogranicza ruch. Poniższe animacje pozostają wtedy wyłączone.",
   "mobile.settings.animations.all": "Animacje",
-  "mobile.settings.animations.chatZoom": "Powiększanie czatów",
-  "mobile.settings.animations.chatZoomFooter":
-    "Czat otwiera się z awatara na liście i zamyka się z powrotem do niego. Gdy to jest wyłączone, czat wsuwa się z boku.",
   "mobile.settings.animations.agentFaces": "Animowane twarze agentów",
   "mobile.settings.animations.agentFacesFooter":
     "Awatary agentów poruszają twarzami, gdy agenci pracują i odpoczywają. Gdy to jest wyłączone, twarze są nieruchome.",

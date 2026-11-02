@@ -6,7 +6,8 @@
 OpenBot is a local-first desktop workspace for persistent AI teammates. It supports the local
 [Codex App Server](https://learn.chatgpt.com/docs/app-server) and
 [Claude Code](https://code.claude.com/docs/en/overview), plus [Grok CLI](https://docs.x.ai/build/overview),
-OpenCode, Gemini, [Cursor CLI](https://cursor.com/cli), and [Cline CLI](https://cline.bot/cli) through ACP. It gives every agent its own workspace and
+OpenCode, Gemini, [Cursor CLI](https://cursor.com/cli), [Cline CLI](https://cline.bot/cli), [Kimi Code CLI](https://github.com/MoonshotAI/kimi-cli),
+and [Hermes Agent](https://hermes-agent.nousresearch.com) through ACP. It gives every agent its own workspace and
 conversation, and provides local queues, file transfers, an embedded browser, and agent-to-agent
 messaging in one desktop app.
 
@@ -19,7 +20,7 @@ messaging in one desktop app.
 ## What works
 
 - Prompt-driven agent creation and editing on desktop and mobile, with editable instructions, avatar, and section review before saving.
-- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, Cursor, or Cline sessions and local workspaces.
+- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, Cursor, Cline, Kimi, or Hermes sessions and local workspaces.
 - Custom OpenAI-compatible endpoints and custom ACP agents, with detection of local model servers (Ollama, LM Studio) and installed agents.
 - Per-agent context monitoring with automatic compaction before long threads exhaust the model window.
 - FIFO message queues with pause, resume, cancellation, and crash-safe persistence.
@@ -33,6 +34,7 @@ messaging in one desktop app.
 
 OpenBot is local-first, not offline-only. Codex connects to OpenAI, Claude connects to Anthropic,
 Grok connects to xAI, Gemini connects to Google, Cursor connects to Cursor, Cline connects to Cline,
+Kimi connects to Moonshot AI, Hermes connects to Nous Portal and to the providers you set up in Hermes,
 visited pages use the network, and installed plugins may connect to their own services.
 
 ## Install
@@ -198,6 +200,23 @@ Cline's sign-in page in your browser. You can also set `CLINE_API_KEY` in the en
 launch OpenBot. If you installed `cline` 3.0.68 or newer yourself, OpenBot uses it until a download
 exists. Set `OPENBOT_CLINE_PATH` to select an executable yourself. Cline agents stay on this
 computer: team members do not see them.
+
+Kimi uses a Kimi Code account. OpenBot downloads and pins the Kimi Code CLI (`kimi`) when you select
+Download on the Kimi row in More providers, and starts it with `kimi acp`. Sign in runs `kimi login`,
+which opens Kimi's sign-in page in your browser. If you installed `kimi` 1.52.0 or newer yourself,
+OpenBot uses it until a download exists. Set `OPENBOT_KIMI_PATH` to select an executable yourself.
+When a Full access Kimi agent changes its model, the CLI saves that model as its default in
+`~/.kimi/config.toml`, so a Kimi session that you start in a terminal also uses it. Kimi agents run
+on this computer. Team members see them when their app supports Kimi.
+
+Hermes uses the Hermes Agent (`hermes`) that you install yourself, with your own `~/.hermes` (or
+`$HERMES_HOME`): its memories, skills, sign-ins and `SOUL.md` apply to OpenBot agents too. OpenBot
+does not download Hermes; when it is missing, the Hermes row opens the installation guide. OpenBot
+starts it with `hermes acp`. Sign in runs `hermes auth add nous` for a Nous Portal plan, or run
+`hermes setup` in a terminal for other providers. The model menu lists the models of each provider
+that Hermes is signed in to. Hermes reads `AGENTS.md` only in a workspace with no `.hermes.md`, and
+`.agents/skills` only in a git project that `skills.trusted_project_dirs` in `config.yaml` names.
+Team members see the host's Hermes agents when their app uses Team API protocol 8 or newer.
 
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
@@ -533,6 +552,10 @@ original file and extracts it with its own tools. An agent sends a ZIP archive b
 archive in the file manager instead of opening it. Remote hosts must advertise the `zip-attachments`
 capability.
 
+SVG images use the same limits. The chat shows an SVG as an image, but the agent gets it as a file,
+not as an image: providers take only raster images, so the agent reads the SVG text. Open shows an SVG
+in the file manager. Remote hosts must advertise the `svg-attachments` capability.
+
 ## Local data and network boundaries
 
 - `~/OpenBot/Agents/<agent-id>` — one working directory per agent. A profile written before the
@@ -558,6 +581,10 @@ capability.
 - `~/.cursor` — login and session history managed exclusively by the Cursor CLI. A confined Cursor
   process keeps its settings in `~/.cursor/openbot-confined`, so it never changes yours.
 - `~/.cline` (or `$CLINE_DIR`) — login and session history managed exclusively by the Cline CLI.
+- `~/.kimi` (or `$KIMI_SHARE_DIR`) — login and session history managed exclusively by the Kimi Code CLI.
+- `~/.hermes` (or `$HERMES_HOME`) — your own Hermes Agent settings, memories, skills, sign-ins and
+  session history. OpenBot reads only the change time of `auth.json`, `.env` and `config.yaml`, to
+  see a sign-in.
 
 Deleting an agent removes its workspace, owned generated attachments, and deliveries addressed only
 to that agent. A transfer remains when another agent still uses the same message.

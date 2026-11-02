@@ -1,4 +1,4 @@
-import type { ClientSideConnection, SessionConfigOption } from "@agentclientprotocol/sdk";
+import { type ClientSideConnection, RequestError, type SessionConfigOption } from "@agentclientprotocol/sdk";
 import type {
   AgentSessionSettingOption,
   AgentSessionSettingsSnapshot,
@@ -86,6 +86,8 @@ export interface AcpConfigurationOptions {
   discoveryCwd?: (() => string) | undefined;
   /** `AcpFlavor.processWideModel`. */
   processWideModel?: boolean;
+  /** `AcpFlavor.modelSetUnsaved`. */
+  modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
   /**
    * `AcpFlavor.closeKeepsSession` with `session/resume`: a closed session keeps its resources until
    * the process ends, so each discovery resumes the probe session of the process, not a new one.
@@ -350,6 +352,15 @@ export class AcpConfiguration {
             this.#connection(thread).request("session/set_model", {
               sessionId: thread.id,
               modelId: value,
+            }),
+          ).pipe(
+            Effect.catch((failure) => {
+              const unsaved = this.options.modelSetUnsaved;
+              if (!(failure.cause instanceof RequestError && unsaved?.(failure.cause))) return Effect.fail(failure);
+              logger.warn("An agent changed the session model but did not save it as its default.", {
+                provider: this.options.provider,
+              });
+              return Effect.void;
             }),
           );
           thread.currentModelId = value;

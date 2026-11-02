@@ -36,7 +36,7 @@ import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
 import {
   app,
-  type BrowserWindow,
+  BrowserWindow,
   type BrowserWindowConstructorOptions,
   clipboard,
   type Input,
@@ -777,6 +777,8 @@ export class BrowserHost {
     this.#bindTabEvents(tab);
     this.#activeTabId = tab.id;
     tab.focusOnVisible = focus;
+    // A view without a document cannot hold focus, so the first commit gives it.
+    tab.focusOnCommit = focus;
     this.#syncAttachedView();
     if (!focus) restoreWebContentsFocus(previouslyFocused, tab.contents);
     this.#emitChanged();
@@ -868,9 +870,19 @@ export class BrowserHost {
       (tab) =>
         Effect.gen({ self: this }, function* () {
           tab.loadGeneration += 1;
+          // The person entered this address, so the page keeps the focus that its document takes when it
+          // commits. The view can be hidden under the address suggestions, and then `#focusTab` does nothing.
+          tab.focusOnCommit = true;
           yield* untilStopped(
             tab,
             navigateAndWait(tab.contents, () => tab.contents.loadURL(normalizedUrl, browserLoadOptions())),
+          ).pipe(
+            // A same-document load or a load that does not start leaves the flag for the next navigation.
+            Effect.ensuring(
+              Effect.sync(() => {
+                tab.focusOnCommit = false;
+              }),
+            ),
           );
           this.#focusTab(tab);
         }),
@@ -2841,6 +2853,27 @@ export class BrowserHost {
       this.#emitChanged();
     });
     contents.on("page-title-updated", changed);
+    // Chromium gives a visible page the focus when a new document commits. A navigation that an
+    // agent or the page starts must not take the keys from a person who types in the app.
+    let focusedBeforeCommit: WebContents | null = null;
+    const restoreFocusAfterCommit = () => {
+      const previous = focusedBeforeCommit;
+      focusedBeforeCommit = null;
+      // With no focused window the app is in the background, and a restore would raise it.
+      if (previous && contents.isFocused() && BrowserWindow.getFocusedWindow())
+        restoreWebContentsFocus(previous, contents);
+    };
+    contents.on("did-start-navigation", (details) => {
+      if (!details.isMainFrame || details.isSameDocument) return;
+      focusedBeforeCommit = tab.focusOnCommit ? null : this.#focusedContentsOutsideTabs();
+      tab.focusOnCommit = false;
+    });
+    contents.on("did-navigate", restoreFocusAfterCommit);
+    // An error page also commits, but Electron reports it as a failed load. A load that a newer
+    // navigation cancels has no commit, so the tab has no focus and the newer start stays recorded.
+    contents.on("did-fail-load", (_event, _code, _description, _url, isMainFrame) => {
+      if (isMainFrame && contents.isFocused()) restoreFocusAfterCommit();
+    });
     contents.on("did-navigate", (_event, url) => {
       tab.documents += 1;
       if (tab.secretDocument) {

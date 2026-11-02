@@ -92,7 +92,7 @@ export const messages = defineMessages("conversation", {
   "conversation.threads.error.start": "Could not start the thread.",
   "conversation.threads.error.branch": "Could not branch the chat.",
   "conversation.threads.error.send": "Could not send the message to the thread.",
-  "conversation.threads.error.files": "Files can go to a thread only for an agent on this computer.",
+  "conversation.threads.error.files": "This server does not take files in a thread. Update OpenBot on it.",
   "conversation.threads.error.stop": "Could not stop the thread.",
   "conversation.threads.error.archive": "Could not archive the thread.",
   "conversation.threads.error.restore": "Could not restore the thread.",

@@ -65,6 +65,7 @@ export const messages = {
   "composer.reply.attachment": "Ek",
   "composer.reply.cancel": "Yanıtı iptal et",
   "composer.attachment.remove": "{name} öğesini kaldır",
+  "composer.attachment.adding": "{name} ekleniyor",
   "composer.placeholder.hostSetup": "Başlamak için ana makinenizde sağlayıcı kurulumunu tamamlayın",
   "composer.placeholder.connectHost": "Başlamak için ana makinenize bağlanın",
   "composer.placeholder.hostSleeping": "Bu sunucu uykuda. Uyandırmak için bir tuşa basın veya tıklayın",

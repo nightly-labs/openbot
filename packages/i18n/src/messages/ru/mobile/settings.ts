@@ -74,9 +74,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Выключите «Анимации», чтобы убрать движение во всём приложении. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение, и анимации ниже остаются выключенными.",
   "mobile.settings.animations.all": "Анимации",
-  "mobile.settings.animations.chatZoom": "Увеличение чатов",
-  "mobile.settings.animations.chatZoomFooter":
-    "Чат открывается из своего аватара в списке и сворачивается обратно в него. Если выключить, чат выезжает сбоку.",
   "mobile.settings.animations.agentFaces": "Живые лица агентов",
   "mobile.settings.animations.agentFacesFooter":
     "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными.",

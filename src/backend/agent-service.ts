@@ -481,7 +481,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** The agents that asked for a new chat with `start_new_chat`. A restart forgets the request. */
   readonly #requestedNewChats = new Set<string>();
   /** A turn that ends with open plan steps runs again, at most 3 times for one request. */
-  readonly #planContinuation = new PlanContinuation({ limit: 3 });
+  readonly #planContinuation = new PlanContinuation({ limit: 8 });
   #initialized = false;
   #stopping = false;
 

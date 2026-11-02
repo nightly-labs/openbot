@@ -13,6 +13,7 @@ function snapshot(availableVersion?: string | number | null) {
       antigravity: runtime,
       cursor: runtime,
       cline: runtime,
+      kimi: runtime,
       pi: runtime,
       muse: runtime,
     },
