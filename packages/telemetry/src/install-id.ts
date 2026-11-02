@@ -4,14 +4,14 @@ import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-
  * The analytics ID of one install when the user does not share analytics with their account. It is
  * random and has no part of the account, the device or the email. It changes after 13 months.
  */
-export interface AnalyticsInstallId {
+interface AnalyticsInstallId {
   id: string;
   /** Milliseconds since the epoch. */
   createdAt: number;
 }
 
 /** 13 months, rounded down to whole days. */
-export const ANALYTICS_INSTALL_ID_MAX_AGE_MS = 395 * 24 * 60 * 60 * 1_000;
+const ANALYTICS_INSTALL_ID_MAX_AGE_MS = 395 * 24 * 60 * 60 * 1_000;
 const INSTALL_ID_PATTERN = /^install-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 
 /** `uuid` comes from the platform's random UUID function. */

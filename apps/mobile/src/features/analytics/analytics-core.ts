@@ -104,10 +104,6 @@ export class MobileAnalytics {
     }
   }
 
-  isEnabled(): boolean {
-    return this.enabled;
-  }
-
   /** True when events go out: with the account when tracking is on, with the install ID when it is off. */
   isSending(): boolean {
     return this.enabled || this.installId !== null;
