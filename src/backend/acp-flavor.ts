@@ -141,6 +141,16 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
 };
 
 /**
+ * Kimi CLI 1.52.0 refuses `session/load` and `session/resume` for a session that it does not have
+ * with "Invalid params" and `{ session_id: "Session not found" }`. Only that exact data counts: other
+ * invalid parameters, such as an unknown model, must not cause a provider session to be replaced.
+ */
+export const KIMI_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: (error) =>
+    error.code === -32602 ? isRecord(error.data) && error.data.session_id === "Session not found" : null,
+};
+
+/**
  * omp 18.8.4 wraps its exact missing-ID error in an internal error (#1690). Other internal failures,
  * including an error for another session, are not lifecycle signals.
  */

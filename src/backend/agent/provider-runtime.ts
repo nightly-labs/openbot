@@ -179,6 +179,7 @@ const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = [
   "antigravity",
   "cursor",
   "cline",
+  "kimi",
   "acp",
 ];
 

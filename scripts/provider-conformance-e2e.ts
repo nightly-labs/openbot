@@ -30,7 +30,7 @@ const NOT_COVERED = ["codex", "claude", "pi", "inception", "deepseek", "openrout
 interface DriverCase {
   provider: AgentProviderId;
   /** The form of the missing-session error that this provider's CLI gives. */
-  missing: "protocol" | "opencode" | "antigravity" | "cursor";
+  missing: "protocol" | "opencode" | "antigravity" | "cursor" | "kimi";
   /** Why the sign-in case does not apply, when it does not. */
   noSignIn?: string;
 }
@@ -40,6 +40,7 @@ const DRIVERS: readonly DriverCase[] = [
   { provider: "antigravity", missing: "antigravity" },
   { provider: "cursor", missing: "cursor" },
   { provider: "cline", missing: "protocol" },
+  { provider: "kimi", missing: "kimi" },
   { provider: "grok", missing: "protocol" },
   {
     provider: "acp",

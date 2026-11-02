@@ -29,6 +29,8 @@ const MISSING_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => Acp
   }),
   // Antigravity 1.3.0, on a load or a resume.
   antigravity: (sessionId) => ({ code: -32002, message: "Resource not found", data: { sessionId } }),
+  // Kimi CLI 1.52.0.
+  kimi: () => ({ code: -32602, message: "Invalid params", data: { session_id: "Session not found" } }),
   // Cursor.
   cursor: (sessionId) => ({
     code: -32602,

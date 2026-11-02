@@ -782,7 +782,7 @@ browser client at `/app`. A provider API key, a custom endpoint key or header, t
 provider sign-in page shows, and a new server logo then travel from that computer or browser to the host over the same encrypted team connection. The
 browser does not store a key. The host stores them as it stores a change made on the host.
 No response returns a key, and neither computer writes request bodies to its logs. For a sign-in on
-another device, the host sends the provider's sign-in link, and for Codex, Grok and Cline its
+another device, the host sends the provider's sign-in link, and for Codex, Grok, Cline and Kimi its
 one-time code, to that computer or browser, which shows them and opens the link only when the admin
 asks. The provider's CLI on the host receives the login; no token travels to the admin.
 
@@ -872,7 +872,7 @@ Network traffic can also occur when:
   the right token to each call;
 - an installed build checks GitHub Releases for updates;
 - OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
-  `Check for updates`. It asks `api.github.com` for Codex, `registry.npmjs.org` for Claude,
+  `Check for updates`. It asks `api.github.com` for Codex and Kimi, `registry.npmjs.org` for Claude,
   OpenCode and Cline, `x.ai/cli` for Grok, and `raw.githubusercontent.com/agentclientprotocol/registry` and
   `dl.google.com` (for the download size) for Gemini, and the same registry and
   `downloads.cursor.com` (for the download size) for Cursor, and it reads a list of blocked
@@ -1275,6 +1275,19 @@ models, which the CLI does not list. The request has no account, key, or prompt 
 sees the IP address of this computer. Cline's terms apply:
 <https://cline.bot/tos>. Team members see the host's Cline agents, as
 for the other providers, when their app supports Cline.
+
+### Kimi
+
+OpenBot downloads the Kimi Code CLI from `github.com` (GitHub release assets), and its license file
+from `github.com`, when you select Download on the Kimi row. OpenBot starts the CLI as a local
+process. Prompts, attachments, and tool results go to that process, and the CLI sends them to
+Moonshot AI (`api.kimi.com`). Sign in runs `kimi login`, which opens Kimi's sign-in page
+(`auth.kimi.com`) in your browser. The CLI keeps its login, device ID, session files, and settings
+in `~/.kimi`, or in `$KIMI_SHARE_DIR`. OpenBot does not read, copy, or upload these files. Unless you
+set `telemetry = false` in `~/.kimi/config.toml`, or set `KIMI_DISABLE_TELEMETRY=1` in the
+environment that starts OpenBot, the CLI sends anonymous usage events to
+`telemetry-logs.kimi.com`. OpenBot does not change this setting. Moonshot AI's terms for Kimi Code
+apply. Team members see the host's Kimi agents when their app supports Kimi.
 
 ### Inception
 

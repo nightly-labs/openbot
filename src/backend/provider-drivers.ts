@@ -14,7 +14,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
-import { CURSOR_ACP_FLAVOR, customAgentFlavor, DEFAULT_ACP_FLAVOR } from "./acp-flavor";
+import { CURSOR_ACP_FLAVOR, customAgentFlavor, DEFAULT_ACP_FLAVOR, KIMI_ACP_FLAVOR } from "./acp-flavor";
 import { ANTIGRAVITY_ACP_FLAVOR } from "./acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
 import { readMuseAccount } from "./agent/muse-login";
@@ -39,6 +39,7 @@ import {
   resolveCodexCli,
   resolveCursorCli,
   resolveGrokCli,
+  resolveKimiCli,
   resolveMuseCli,
   resolveOpencodeCli,
   resolvePiCli,
@@ -69,6 +70,7 @@ import {
   cursorConfinedEnv,
   cursorStatePaths,
   customAgentStatePaths,
+  kimiStatePaths,
   museStatePaths,
   OPENCODE_CONFINED_ENV,
   openCodeStatePaths,
@@ -286,6 +288,24 @@ const CLINE_ENV: Readonly<Record<string, string>> = {
  */
 function confineClineTarget(target: SpawnTarget, confinement: ProcessConfinement): SpawnTarget {
   const state = clineStatePaths();
+  for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
+  return confineSpawnTarget(target, confinement, state);
+}
+
+/** The managed Kimi CLI must not replace itself. */
+const KIMI_ENV: Readonly<Record<string, string>> = { KIMI_CLI_NO_AUTO_UPDATE: "1" };
+
+/**
+ * `kimi login` opens Kimi's page in a browser by itself. A device code that another computer
+ * confirms must not open a page on this one, so `BROWSER` names `true`, which Python's `webbrowser`
+ * runs instead of a browser. Windows has no `true`, so there the page opens.
+ */
+const KIMI_CODE_LOGIN_ENV: Readonly<Record<string, string>> =
+  process.platform === "win32" ? KIMI_ENV : { ...KIMI_ENV, BROWSER: "true" };
+
+/** The sandbox lets a Kimi process write in `~/.kimi`, not create it, so OpenBot makes it. */
+function confineKimiTarget(target: SpawnTarget, confinement: ProcessConfinement): SpawnTarget {
+  const state = kimiStatePaths();
   for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
   return confineSpawnTarget(target, confinement, state);
 }
@@ -995,6 +1015,52 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "cline", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "kimi",
+    // Kimi's ACP `login` method only checks the sign-in that `kimi login` stored: the user signs in
+    // with the CLI. `login` prints a device code and its page, opens the page, and waits until the
+    // user confirms the code. A sign-in also writes the account's models into `~/.kimi/config.toml`.
+    signIn: {
+      kind: "cli-command",
+      command: { argv: ["login"], env: () => ({ ...KIMI_ENV }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    },
+    // `login --json` prints the same device code as one JSON line.
+    codeSignIn: {
+      kind: "cli",
+      flow: "device",
+      command: { argv: ["login", "--json"], env: () => ({ ...KIMI_CODE_LOGIN_ENV }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    },
+    signOut: { argv: ["logout"], env: () => ({ ...KIMI_ENV }), timeoutMs: 30_000 },
+    resolveCli: resolveKimiCli,
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "kimi",
+        flavor: KIMI_ACP_FLAVOR,
+        argv: ["acp"],
+        env: { ...KIMI_ENV },
+        ...(confinement ? { confine: (target) => confineKimiTarget(target, confinement) } : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        signInMessage: sourceText("error.provider.kimiSignIn"),
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpEndpoint: context.mcpEndpoint,
+        history: context.history?.("kimi"),
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "kimi",
+        flavor: KIMI_ACP_FLAVOR,
+        argv: ["acp"],
+        profileGeneration: true,
+        env: { ...KIMI_ENV },
+        signInMessage: sourceText("error.provider.kimiSignIn"),
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "kimi", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
   {
