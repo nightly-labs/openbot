@@ -184,6 +184,23 @@ export function isIgnoredConfigDiagnostic(message: string): boolean {
   return IGNORED_CONFIG_SUMMARY.test(message);
 }
 
+const UNMATCHED_MODEL_PATTERN = /^Warning:\s+No models match pattern\s+"[^"]+"/iu;
+
+/**
+ * Whether a provider diagnostic is Pi's warning about a model pattern in `enabledModels` that
+ * matches none of the running provider's models.
+ *
+ * Pi's CLI and the providers that share its runtime (such as DeepSeek, Inception and OpenRouter)
+ * read the shared `~/.pi/agent/settings.json` on start. When `enabledModels` holds a model from
+ * another provider, such as `"openai-codex/gpt-5.5"`, a provider that registers only its own
+ * models writes `Warning: No models match pattern "…"` to stderr and starts as usual. OpenBot
+ * reads the model list and sets the model through the RPC protocol, not `enabledModels`, so the
+ * warning needs no action from the user and belongs in the log (#4157).
+ */
+export function isUnmatchedModelPatternDiagnostic(message: string): boolean {
+  return UNMATCHED_MODEL_PATTERN.test(message.replace(LOG_TIMESTAMP_PREFIX, "").trim());
+}
+
 /**
  * A glog record whose own severity is info or warning, as in
  * `W0927 21:23:15.702056 14876 step_string_converters.go:923] Checkpoint summary was too long…`.

@@ -93,6 +93,7 @@ import {
   isMcpSubsystemDiagnostic,
   isTelemetryExportDiagnostic,
   isToolCallDiagnostic,
+  isUnmatchedModelPatternDiagnostic,
   isUsageLimitDiagnostic,
   isUsageReadDiagnostic,
   LOG_TIMESTAMP_PREFIX,
@@ -3598,6 +3599,10 @@ export class ProviderRuntime implements ProviderPort {
           provider: client.provider,
           message,
         });
+        return;
+      }
+      if (isUnmatchedModelPatternDiagnostic(message)) {
+        stderrLogger.warn("A provider reported an unmatched model pattern.", { provider: client.provider, message });
         return;
       }
       // The usage notice reports the limit only for a provider with a usage reading. Another
