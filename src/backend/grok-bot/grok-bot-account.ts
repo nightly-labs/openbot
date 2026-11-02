@@ -1,4 +1,5 @@
 import { readFile, rm } from "node:fs/promises";
+import { dirname } from "node:path";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
@@ -26,9 +27,8 @@ export interface GrokBotGatewaySession {
   token: string;
   headers: Readonly<Record<string, string>>;
   /**
-   * BotAI `vncProxy`: where `EnsureSandBox` says the box screen is reachable. The forever box reports
-   * loopback noVNC URLs (`127.0.0.1:6080` primary, `:6081` forks); these rewrite them. Absent on
-   * records saved before the computer existed, and when the broker returns no VNC URLs.
+   * The private host screen. The primary display is `http://127.0.0.1:6080` and a fork display
+   * uses `http://127.0.0.1:6081`. Absent when this host has no screen.
    */
   vnc?: GrokBotVncProxy | null;
 }
@@ -145,6 +145,11 @@ export class GrokBotAccountStore {
   constructor(path: string, cipher: SecretCipher) {
     this.#path = path;
     this.#cipher = cipher;
+  }
+
+  /** The directory that holds this account file and the private host token. */
+  supportDirectory(): string {
+    return dirname(this.#path);
   }
 
   cachedGateway(): GrokBotCachedGateway {
@@ -312,8 +317,19 @@ function decodeGateway(value: unknown): GrokBotGatewaySession | null {
     if (typeof header !== "string") throw new Error(sourceText("error.provider.grokBotSignInEnded"));
     headers[name] = header;
   }
+  if (isSharedCursorVmUrl(value.url)) return null;
   const vnc = decodeVnc(value.vnc);
   return { url: value.url, token: value.token, headers, ...(vnc ? { vnc } : {}) };
+}
+
+/** A stored shared-box gateway. OpenBot drops it and does not connect to it. */
+export function isSharedCursorVmUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.hostname === "cursorvm.com" || url.hostname.endsWith(".cursorvm.com");
+  } catch {
+    return false;
+  }
 }
 
 /** Lenient: a bad or missing `vnc` drops the computer, never the sign-in. */

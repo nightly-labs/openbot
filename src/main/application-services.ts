@@ -1359,6 +1359,7 @@ export async function createApplicationServices({
     agentStore: store,
   });
   teardown.push(TEARDOWN_ORDER.grokBotAccount, "the Grok Bot account poll", () => grokBotAccount.dispose());
+  void Effect.runPromise(grokBotAccount.ensurePrivateHost()).catch(() => undefined);
   const customProviders = new CustomProviderStore({
     path: join(app.getPath("userData"), CUSTOM_PROVIDERS_FILE),
     cipher: secretCipher,

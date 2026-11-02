@@ -1,4 +1,4 @@
-import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
@@ -7,14 +7,21 @@ import {
   type GrokBotAccountRecord,
   type GrokBotAccountStore,
   type GrokBotGatewaySession,
+  isSharedCursorVmUrl,
 } from "./grok-bot-account";
-import { buildGrokBotVncProxy, type GrokBotComputerStatus, parseGrokBotComputerStatus } from "./grok-bot-computer";
+import { type GrokBotComputerStatus, parseGrokBotComputerStatus } from "./grok-bot-computer";
+import {
+  type GrokBotLocalHost,
+  GrokBotLocalHostFailed,
+  grokBotLocalHost,
+  OPENBOT_LOCAL_GATEWAY_URL,
+  openBotLocalGatewaySession,
+} from "./grok-bot-local-host";
 
 /** `grokbot_api` 1.2.0 `DEFAULT_CLIENT_VERSION`. This is a header, not a protocol registration. */
 export const GROK_BOT_CURSOR_CLIENT_VERSION = "0.70.2";
 const BODY_LIMIT = 2 * 1024 * 1024;
 const TIMEOUT_MS = 30_000;
-const DEFAULT_API_BASE_URL = "https://api2.cursor.sh";
 
 export interface GrokBotAgentSummary {
   id: string;
@@ -34,7 +41,13 @@ export interface GrokBotGatewayCallOptions {
   fetchImpl?: typeof fetch;
   apiBaseUrl?: string;
   now?: () => number;
+  /**
+   * Test hook for a fake gateway on `127.0.0.1`. The product path leaves this false.
+   * It does not select the shared box.
+   */
   allowLoopback?: boolean;
+  /** The private host. Absent, the host for the account directory is used. */
+  localHost?: GrokBotLocalHost;
   /** How many status reads follow `ensureForeverBox` while the desktop is still starting. */
   readyAttempts?: number;
   readyDelayMs?: number;
@@ -218,11 +231,14 @@ const gatewayJson = Effect.fn("GrokBotGateway.call")(function* (
 ) {
   let record = yield* store.load();
   if (!record) return yield* Effect.fail(accountFailure("error.provider.grokBotNotSignedIn"));
-  if (!record.gateway) record = yield* ensureSandbox(store, options);
+  record = yield* attachLocalGateway(store, record, options);
   let response = yield* postSession(record.gateway, path, body, options.fetchImpl);
   if (response.status === 401 || response.status === 417) {
-    record = yield* ensureSandbox(store, options);
+    record = yield* retryLocalGatewayToken(store, record, options);
     response = yield* postSession(record.gateway, path, body, options.fetchImpl);
+  }
+  if (response.status === 401 || response.status === 417) {
+    return yield* Effect.fail(accountFailure("error.provider.grokBotLocalHostFailed"));
   }
   if (response.status < 200 || response.status >= 300) {
     return yield* Effect.fail(accountFailure("error.provider.grokBotSessionEnded"));
@@ -230,54 +246,66 @@ const gatewayJson = Effect.fn("GrokBotGateway.call")(function* (
   return yield* readJson(response);
 });
 
-const ensureSandbox = Effect.fn("GrokBotGateway.ensure")(function* (
+const attachLocalGateway = Effect.fn("GrokBotGateway.attach")(function* (
   store: GrokBotAccountStore,
+  record: GrokBotAccountRecord,
   options: GrokBotGatewayCallOptions,
 ) {
-  let record = yield* store.load();
-  if (!record) return yield* Effect.fail(accountFailure("error.provider.grokBotNotSignedIn"));
-  let response = yield* postEnsure(record.accessToken, options);
-  if (response.status === 401) {
-    const refreshed = yield* store.refreshAccess(options);
-    if (!refreshed) return yield* Effect.fail(accountFailure("error.provider.grokBotSessionEnded"));
-    record = refreshed;
-    response = yield* postEnsure(record.accessToken, options);
+  const loopback = options.allowLoopback === true;
+  const current = record.gateway;
+  if (loopback && current && acceptGatewayUrl(current.url, true)) return record;
+  if (loopback) return yield* Effect.fail(accountFailure("error.provider.grokBotLocalHostFailed"));
+  if (current && isSharedCursorVmUrl(current.url)) {
+    const cleared: GrokBotAccountRecord = { ...record, gateway: null };
+    yield* store.save(cleared);
+    record = cleared;
   }
-  if (response.status < 200 || response.status >= 300) {
-    return yield* Effect.fail(accountFailure("error.provider.grokBotSessionEnded"));
+  const host = options.localHost ?? grokBotLocalHost(store.supportDirectory());
+  const ready = yield* host
+    .ensure()
+    .pipe(
+      Effect.mapError((error) =>
+        accountFailure(
+          error instanceof GrokBotLocalHostFailed && error.reason === "stopped"
+            ? "error.provider.grokBotLocalHostStopped"
+            : "error.provider.grokBotLocalHostFailed",
+        ),
+      ),
+    );
+  const gateway = openBotLocalGatewaySession(ready.token);
+  if (
+    record.gateway?.url === gateway.url &&
+    record.gateway.token === gateway.token &&
+    record.gateway.url === OPENBOT_LOCAL_GATEWAY_URL
+  ) {
+    return record;
   }
-  const body = yield* readJson(response);
-  const gateway = parseGatewaySession(body, options.allowLoopback === true);
-  if (!gateway) return yield* Effect.fail(accountFailure("error.provider.grokBotSessionEnded"));
-  registerSecretValue(gateway.token);
-  for (const value of Object.values(gateway.headers)) registerSecretValue(value);
   const next: GrokBotAccountRecord = { ...record, gateway };
   yield* store.save(next);
   return next;
 });
 
-function postEnsure(accessToken: string, options: GrokBotGatewayCallOptions) {
-  const apiBaseUrl = stripTrailingSlash(options.apiBaseUrl ?? DEFAULT_API_BASE_URL);
-  const fetchImpl = options.fetchImpl ?? fetch;
-  return Effect.tryPromise({
-    try: () =>
-      fetchImpl(new URL("/aiserver.v1.GrokBotService/EnsureSandBox", apiBaseUrl), {
-        method: "POST",
-        redirect: "manual",
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-          "connect-protocol-version": "1",
-          "x-cursor-client-type": "sand",
-          "x-cursor-client-version": GROK_BOT_CURSOR_CLIENT_VERSION,
-          "x-sand-box-namespace": "prod",
-        },
-        body: "{}",
-      }),
-    catch: () => accountFailure("error.provider.grokBotSessionEnded"),
-  });
-}
+const retryLocalGatewayToken = Effect.fn("GrokBotGateway.retryLocal")(function* (
+  store: GrokBotAccountStore,
+  record: GrokBotAccountRecord,
+  options: GrokBotGatewayCallOptions,
+) {
+  const gateway = record.gateway;
+  if (!gateway || !acceptGatewayUrl(gateway.url, options.allowLoopback === true)) {
+    return yield* Effect.fail(accountFailure("error.provider.grokBotLocalHostFailed"));
+  }
+  if (!options.allowLoopback && gateway.url !== OPENBOT_LOCAL_GATEWAY_URL) {
+    return yield* Effect.fail(accountFailure("error.provider.grokBotLocalHostFailed"));
+  }
+  const host = options.localHost ?? grokBotLocalHost(store.supportDirectory());
+  const token = yield* host.readToken();
+  if (!token) return yield* Effect.fail(accountFailure("error.provider.grokBotLocalHostFailed"));
+  if (token === gateway.token) return record;
+  registerSecretValue(token);
+  const next: GrokBotAccountRecord = { ...record, gateway: { ...gateway, token } };
+  yield* store.save(next);
+  return next;
+});
 
 function postSession(
   session: GrokBotGatewaySession | null,
@@ -315,24 +343,6 @@ function readJson(response: Response) {
   });
 }
 
-function parseGatewaySession(value: unknown, allowLoopback: boolean): GrokBotGatewaySession | null {
-  if (!isDynamicRecord(value)) return null;
-  const url = stringField(value, "gatewayUrl", "gateway_url");
-  const token = stringField(value, "gatewayToken", "gateway_token");
-  if (!url || !token || !acceptGatewayUrl(url, allowLoopback)) return null;
-  const headers = headerMap(value.gatewayHeaders ?? value.gateway_headers);
-  const anyrun = stringField(value, "anyrunNetworkToken", "anyrun_network_token", "networkToken");
-  if (anyrun && headers["x-anyrun-network-token"] === undefined) headers["x-anyrun-network-token"] = anyrun;
-  const vnc = buildGrokBotVncProxy(
-    stringField(value, "vncUrl", "vnc_url"),
-    stringField(value, "forkVncBaseUrl", "fork_vnc_base_url"),
-    anyrun,
-  );
-  // BotAI's passthrough token is the literal `local`; only a real per-box token is a secret.
-  if (vnc && vnc.networkToken.length >= 16) registerSecretValue(vnc.networkToken);
-  return { url, token, headers, ...(vnc ? { vnc } : {}) };
-}
-
 function acceptGatewayUrl(value: string, allowLoopback: boolean): boolean {
   let url: URL;
   try {
@@ -341,9 +351,16 @@ function acceptGatewayUrl(value: string, allowLoopback: boolean): boolean {
     return false;
   }
   if (url.username !== "" || url.password !== "") return false;
+  if (isSharedCursorVmUrl(value)) return false;
   if (allowLoopback && url.hostname === "127.0.0.1") return url.protocol === "http:" || url.protocol === "https:";
-  if (url.protocol !== "https:") return false;
-  return url.hostname === "cursorvm.com" || url.hostname.endsWith(".cursorvm.com");
+  return (
+    url.protocol === "http:" &&
+    url.hostname === "127.0.0.1" &&
+    url.port === "1340" &&
+    (url.pathname === "" || url.pathname === "/") &&
+    url.search === "" &&
+    url.hash === ""
+  );
 }
 
 function parseAgents(value: unknown): readonly GrokBotAgentSummary[] {
@@ -384,33 +401,14 @@ function parseAgent(value: unknown): GrokBotAgentSummary | null {
   };
 }
 
-function headerMap(value: unknown): Record<string, string> {
-  if (!isDynamicRecord(value)) return {};
-  const headers: Record<string, string> = {};
-  for (const [name, header] of Object.entries(value)) {
-    if (typeof header === "string") headers[name] = header;
-  }
-  return headers;
-}
-
-function stringField(value: DynamicRecord, ...names: string[]): string | null {
-  for (const name of names) {
-    const field = value[name];
-    if (typeof field === "string" && field.length > 0) return field;
-  }
-  return null;
-}
-
 function accountFailure(
   key:
     | "error.provider.grokBotNameRequired"
     | "error.provider.grokBotAgentRejected"
     | "error.provider.grokBotNotSignedIn"
-    | "error.provider.grokBotSessionEnded",
+    | "error.provider.grokBotSessionEnded"
+    | "error.provider.grokBotLocalHostFailed"
+    | "error.provider.grokBotLocalHostStopped",
 ): GrokBotAccountFailed {
   return new GrokBotAccountFailed({ cause: new Error(sourceText(key)) });
-}
-
-function stripTrailingSlash(url: string): string {
-  return url.replace(/\/+$/u, "");
 }

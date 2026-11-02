@@ -56,7 +56,7 @@ async function fixture() {
     store.save({
       accessToken: "registered-access-secret",
       refreshToken: "registered-refresh-secret",
-      gateway: { url: "https://fixture.cursorvm.com", token: "registered-gateway-secret", headers: {} },
+      gateway: { url: "http://127.0.0.1:1340", token: "registered-gateway-secret", headers: {} },
     }),
   );
   await Effect.runPromise(store.load());
@@ -130,7 +130,7 @@ it("logs only allowlisted status/shape evidence, with no raw identifiers, transc
     expect(lines[1]).not.toContain(PRIVATE);
   } finally {
     stop();
-    service.dispose();
+    await service.dispose();
   }
 });
 it.each(["sign-out", "dispose"] as const)(
@@ -158,7 +158,7 @@ it.each(["sign-out", "dispose"] as const)(
       await Effect.runPromise(service.diagnoseCachedUsage(true));
       expect(fetcher).toHaveBeenCalledTimes(1);
       if (operation === "sign-out") await Effect.runPromise(service.signOut());
-      else service.dispose();
+      else await service.dispose();
       await pending;
       expect(decrypts()).toBe(before);
       expect(fetcher).toHaveBeenCalledTimes(1);
@@ -168,7 +168,7 @@ it.each(["sign-out", "dispose"] as const)(
       expect(lines[0]).not.toContain(PRIVATE);
     } finally {
       stop();
-      service.dispose();
+      await service.dispose();
     }
   },
 );

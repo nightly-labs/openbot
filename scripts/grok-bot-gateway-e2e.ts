@@ -24,6 +24,7 @@ const report = {
   created: false,
   rejectedBlank: false,
   sandboxCalls: 0,
+  ensureSandBox: 0,
 };
 
 const paths: string[] = [];
@@ -84,41 +85,16 @@ try {
     }
     response.writeHead(404).end();
   });
-  let sandboxCalls = 0;
-  const backend = await listen(async (request, response) => {
-    if (request.url === "/oauth/token") {
-      await readBody(request);
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ access_token: "grok-access-e2e", refresh_token: "grok-refresh-e2e" }));
-      return;
-    }
-    if (request.url !== "/aiserver.v1.GrokBotService/EnsureSandBox") {
-      response.writeHead(404).end();
-      return;
-    }
-    sandboxCalls += 1;
-    assert.equal(request.headers.authorization, "Bearer grok-access-e2e");
-    assert.equal(request.headers["x-cursor-client-type"], "sand");
-    assert.equal(request.headers["connect-protocol-version"], "1");
-    if (sandboxCalls === 1) {
-      response.writeHead(401).end();
-      return;
-    }
-    response.writeHead(200, { "content-type": "application/json" });
-    response.end(
-      JSON.stringify({
-        gatewayUrl: gateway.url,
-        gatewayToken: "gw-e2e",
-        anyrunNetworkToken: "net-e2e",
-      }),
-    );
-  });
   try {
     const store = new GrokBotAccountStore(authFile, cipher);
     await Effect.runPromise(
-      store.save({ accessToken: "grok-access-e2e", refreshToken: "grok-refresh-e2e", gateway: null }),
+      store.save({
+        accessToken: "grok-access-e2e",
+        refreshToken: "grok-refresh-e2e",
+        gateway: { url: gateway.url, token: "gw-e2e", headers: { "x-anyrun-network-token": "net-e2e" } },
+      }),
     );
-    const options = { apiBaseUrl: backend.url, allowLoopback: true };
+    const options = { allowLoopback: true };
     const listed = await Effect.runPromise(listGrokBotAgents(store, options));
     report.listed = listed.length;
     assert.equal(listed.length, 2);
@@ -158,11 +134,12 @@ try {
     report.rejectedBlank = Result.isFailure(blank);
     assert.equal(report.rejectedBlank, true);
     await Effect.runPromise(listGrokBotAgents(store, options));
-    report.sandboxCalls = sandboxCalls;
-    assert.equal(report.sandboxCalls, 2);
+    report.sandboxCalls = paths.filter((path) => path.includes("GrokBotService/EnsureSandBox")).length;
+    report.ensureSandBox = report.sandboxCalls;
+    assert.equal(report.ensureSandBox, 0);
     assert.equal(
       paths.some((path) => path.includes("GrokBotService/EnsureSandBox")),
-      true,
+      false,
     );
     assert.equal(
       paths.some((path) => path.includes("createAgentFromTemplate")),
@@ -170,7 +147,6 @@ try {
     );
     report.passed = true;
   } finally {
-    await backend.close();
     await gateway.close();
   }
 } finally {

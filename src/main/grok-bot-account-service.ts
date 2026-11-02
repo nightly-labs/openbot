@@ -1,3 +1,4 @@
+import { dirname } from "node:path";
 import type { CreateGrokBotAgentInput, GrokBotComputerSummary } from "@openbot/contracts/ipc";
 import { IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -16,10 +17,17 @@ import type { GrokBotComputerStatus } from "../backend/grok-bot/grok-bot-compute
 import {
   createGrokBotAgent,
   ensureGrokBotComputerReady,
+  type GrokBotGatewayCallOptions,
   handBackGrokBotComputer,
   listGrokBotAgents,
   readGrokBotComputer,
 } from "../backend/grok-bot/grok-bot-gateway";
+import {
+  bindGrokBotLocalHost,
+  type GrokBotLocalHost,
+  grokBotLocalHost,
+  openBotLocalGatewaySession,
+} from "../backend/grok-bot/grok-bot-local-host";
 import { readGrokBotUsageSummary } from "../backend/grok-bot/grok-bot-usage";
 import { readGrokBotUsageDiagnostic } from "../backend/grok-bot/grok-bot-usage-diagnostic";
 import { type GrokBotImportStore, importGrokBotAgents } from "./grok-bot-agent-import";
@@ -44,6 +52,7 @@ export class GrokBotAccountService {
   readonly #cipher: SecretCipher;
   readonly #getMainWindow: () => RendererIpcWindow | null;
   readonly #store: GrokBotAccountStore;
+  readonly #host: GrokBotLocalHost;
   readonly #agentStore: GrokBotImportStore | undefined;
   #abort: AbortController | null = null;
   #computer = new GrokBotComputerWindow();
@@ -57,6 +66,8 @@ export class GrokBotAccountService {
     this.#getMainWindow = options.getMainWindow;
     this.#agentStore = options.agentStore;
     this.#store = new GrokBotAccountStore(options.path, options.cipher);
+    this.#host = grokBotLocalHost(dirname(options.path));
+    bindGrokBotLocalHost(dirname(options.path), this.#host);
   }
 
   /** The sand account the Grok Bot provider reads. The renderer does not receive this store. */
@@ -107,20 +118,22 @@ export class GrokBotAccountService {
     this.#diagnosticAbort?.abort();
     this.#abort?.abort();
     this.#abort = null;
+    this.#host.abort();
+    yield* this.#host.stop().pipe(Effect.ignore);
     yield* this.#store.clear();
     sendToRenderer(this.#getMainWindow(), IPC_ENDPOINTS.grokBot.account, { phase: "signed-out" });
     return { signedIn: false };
   });
 
   readonly list = Effect.fn("GrokBotAccountService.list")(function* (this: GrokBotAccountService) {
-    return yield* listGrokBotAgents(this.#store, callOptions());
+    return yield* listGrokBotAgents(this.#store, this.#callOptions());
   });
 
   /** Lists Grok Bot agents and mirrors them locally. Read-only toward Grok Bot: no create call. */
   readonly importAgents = Effect.fn("GrokBotAccountService.importAgents")(function* (this: GrokBotAccountService) {
     const store = this.#agentStore;
     if (!store) return yield* Effect.die(new Error("Grok Bot import has no local agent store."));
-    const remote = yield* listGrokBotAgents(this.#store, callOptions());
+    const remote = yield* listGrokBotAgents(this.#store, this.#callOptions());
     return yield* importGrokBotAgents(remote, store);
   });
 
@@ -156,12 +169,12 @@ export class GrokBotAccountService {
     this: GrokBotAccountService,
     input: CreateGrokBotAgentInput,
   ) {
-    return yield* createGrokBotAgent(this.#store, input, callOptions());
+    return yield* createGrokBotAgent(this.#store, input, this.#callOptions());
   });
 
   /** The sand computer (BotAI forever box). The screen URL stays in main. */
   readonly computerStatus = Effect.fn("GrokBotAccountService.computerStatus")(function* (this: GrokBotAccountService) {
-    return computerSummary(yield* readGrokBotComputer(this.#store, callOptions()), this.#computer.isOpen());
+    return computerSummary(yield* readGrokBotComputer(this.#store, this.#callOptions()), this.#computer.isOpen());
   });
 
   /**
@@ -170,7 +183,7 @@ export class GrokBotAccountService {
    * in-box host keeps click, type, and screenshot, and this window only shows the desktop.
    */
   readonly openComputer = Effect.fn("GrokBotAccountService.openComputer")(function* (this: GrokBotAccountService) {
-    const status = yield* ensureGrokBotComputerReady(this.#store, callOptions());
+    const status = yield* ensureGrokBotComputerReady(this.#store, this.#callOptions());
     yield* this.#connectBoxComputer();
     if (status.vncUrl) this.#computer.open(status.vncUrl, status.networkToken, "Grok Bot computer");
     return computerSummary(status, this.#computer.isOpen());
@@ -180,12 +193,29 @@ export class GrokBotAccountService {
   readonly handBackComputer = Effect.fn("GrokBotAccountService.handBackComputer")(function* (
     this: GrokBotAccountService,
   ) {
-    const status = yield* readGrokBotComputer(this.#store, callOptions());
-    if (status.handoffAgentId) yield* handBackGrokBotComputer(this.#store, status.handoffAgentId, callOptions());
-    return computerSummary(yield* readGrokBotComputer(this.#store, callOptions()), this.#computer.isOpen());
+    const status = yield* readGrokBotComputer(this.#store, this.#callOptions());
+    if (status.handoffAgentId) {
+      yield* handBackGrokBotComputer(this.#store, status.handoffAgentId, this.#callOptions());
+    }
+    return computerSummary(yield* readGrokBotComputer(this.#store, this.#callOptions()), this.#computer.isOpen());
   });
 
-  dispose(): void {
+  /**
+   * Starts the private host when this computer is already signed in.
+   * Other providers do not call this. A failure stays on the next Grok call.
+   */
+  readonly ensurePrivateHost = Effect.fn("GrokBotAccountService.ensurePrivateHost")(function* (
+    this: GrokBotAccountService,
+  ) {
+    const record = yield* this.#store.load();
+    if (!record) return;
+    const ready = yield* this.#host.ensure();
+    const gateway = openBotLocalGatewaySession(ready.token);
+    if (record.gateway?.url === gateway.url && record.gateway.token === gateway.token) return;
+    yield* this.#store.save({ ...record, gateway });
+  });
+
+  dispose(): Promise<void> {
     this.#diagnosticAbort?.abort();
     this.#store.forgetCachedGateway();
     this.#boxExec?.close();
@@ -194,6 +224,13 @@ export class GrokBotAccountService {
     this.#computer.close();
     this.#abort?.abort();
     this.#abort = null;
+    this.#host.abort();
+    return Effect.runPromise(this.#host.stop().pipe(Effect.ignore));
+  }
+
+  #callOptions(): GrokBotGatewayCallOptions {
+    const apiBaseUrl = sandApiBase();
+    return { allowLoopback: false, localHost: this.#host, ...(apiBaseUrl ? { apiBaseUrl } : {}) };
   }
 
   /**
@@ -224,11 +261,6 @@ function computerSummary(status: GrokBotComputerStatus, windowOpen: boolean): Gr
     needsYou: status.handoffAgentId !== null,
     handoffReason: status.handoffReason,
   };
-}
-
-function callOptions(): { allowLoopback: false; apiBaseUrl?: string } {
-  const apiBaseUrl = sandApiBase();
-  return { allowLoopback: false, ...(apiBaseUrl ? { apiBaseUrl } : {}) };
 }
 
 function boxExecPort(): number | null {

@@ -25,7 +25,7 @@ const NONCE = "synthetic-nonce";
 const ECHO = "synthetic-echo";
 const TOKEN = "synthetic-gateway-credential";
 const session: GrokBotGatewaySession = {
-  url: "https://fixture.cursorvm.com",
+  url: "http://127.0.0.1:1340",
   token: TOKEN,
   headers: {
     "x-anyrun-network-token": "synthetic-network-credential",
@@ -185,7 +185,7 @@ const local = `http://127.0.0.1:${address.port}`;
 const transport: typeof fetch = Object.assign(
   async (url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const target = new URL(String(url));
-    assert.equal(target.origin, "https://fixture.cursorvm.com");
+    assert.equal(target.origin, "http://127.0.0.1:1340");
     assert.equal(init?.redirect, "manual");
     assert.equal(init?.credentials, "omit");
     assert.equal(init?.referrerPolicy, "no-referrer");
@@ -328,13 +328,17 @@ try {
   });
   mode = "normal";
   for (const url of [
+    "https://fixture.cursorvm.com",
     "http://fixture.cursorvm.com",
+    "https://cursorvm.com",
     "https://cursorvm.com.evil.example",
     "https://127.0.0.1",
+    "http://127.0.0.1:1341",
     "https://user:secret@fixture.cursorvm.com",
     "https://fixture.cursorvm.com:8443",
     "https://fixture.cursorvm.com/?token=secret",
     "https://fixture.cursorvm.com/#secret",
+    "http://127.0.0.1:1340/?token=secret",
   ]) {
     await check("invalid-cached-origin", "invalid-session", () => ({ state: "loaded", session: { ...session, url } }));
     assert.equal(paths.length, 0);

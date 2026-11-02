@@ -1088,9 +1088,12 @@ Grok Bot is the sand account from Settings. It is not the Grok CLI (`grok` in `A
 There is no local binary. `GROK_BOT_RUNTIME` has `remote: true` and an empty executable, and the
 provider is not in `MANAGED_RUNTIME_PROVIDERS`.
 
-Sign-in is the Grok Bot account file. A new agent calls `EnsureSandBox`, then `POST /api/createAgent`
-on the gateway, and stores that sand agent id as the provider thread. A later turn calls
-`POST /api/sendPrompt` on that gateway. The sand host runs the model. The text the user sees is a
+Sign-in is the Grok Bot account file. A new agent calls `POST /api/createAgent` on the private
+gateway `http://127.0.0.1:1340`, and stores that sand agent id as the provider thread. A later turn
+calls `POST /api/sendPrompt` on that same gateway. The desktop does not call shared `EnsureSandBox`.
+A stored `*.cursorvm.com` gateway is dropped. The sand host inside `openbot-local-vm` runs the model.
+A missing host bundle fails in OpenBot. The turn does not move to a shared box.
+The text the user sees is a
 `send-message` card. `message.type` is `text` and `message.content` is the reply. OpenBot reads that
 card from `POST /api/getAgentTranscriptTail` and stores it as the assistant message. A card with
 `message.channel` is not the chat reply. The same account's

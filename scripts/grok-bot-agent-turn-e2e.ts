@@ -84,16 +84,7 @@ const server = createServer((request, response: ServerResponse) => {
       return;
     }
     if (url.pathname === "/aiserver.v1.GrokBotService/EnsureSandBox") {
-      assert.equal(request.headers.authorization, `Bearer ${ACCESS}`);
-      assert.equal(request.headers["x-cursor-client-type"], "sand");
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(
-        JSON.stringify({
-          gatewayUrl: `http://127.0.0.1:${addressPort}`,
-          gatewayToken: "gw-e2e",
-          anyrunNetworkToken: "net-e2e",
-        }),
-      );
+      response.writeHead(500).end("shared box");
       return;
     }
     if (url.pathname === "/api/createAgent") {
@@ -250,7 +241,13 @@ try {
   await Effect.runPromise(signedOut.stop());
 
   const store = new GrokBotAccountStore(authFile, cipher);
-  await Effect.runPromise(store.save({ accessToken: ACCESS, refreshToken: REFRESH, gateway: null }));
+  await Effect.runPromise(
+    store.save({
+      accessToken: ACCESS,
+      refreshToken: REFRESH,
+      gateway: { url: apiBaseUrl, token: "gw-e2e", headers: { "x-anyrun-network-token": "net-e2e" } },
+    }),
+  );
   const client = clientFor(store);
   const notes: Array<{ method: string; params: unknown }> = [];
   const diagnostics: string[] = [];

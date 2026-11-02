@@ -823,8 +823,8 @@ Server settings on this computer has a Grok Bot section. It signs in with the sa
 `loginDeepControl` poll as the Cursor provider (`redirectTarget=cli`) and stores the tokens in
 `openbot-grok-bot-account-v1.json` under user data. It does not write the Cursor CLI auth file.
 
-The section lists and creates agents on the Grok Bot gateway (`EnsureSandBox`, then
-`listAgents` and `createAgent`). Those agents stay on the Grok Bot account. Import still reads a
+The section lists and creates agents on the private Grok gateway `http://127.0.0.1:1340`
+(`listAgents` and `createAgent`). Those agents stay on that private host. Import still reads a
 Grok Bot zip into local OpenBot agents. Connect on the Cursor provider still writes the CLI
 sign-in. The web client and a joined server do not show this section.
 

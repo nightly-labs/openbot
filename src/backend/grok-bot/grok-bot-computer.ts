@@ -6,9 +6,8 @@ import type { GrokBotVncProxy } from "./grok-bot-account";
  * Ported from BotAI 0.27 (`source/node-agent-coordinator/gateway/box-vnc-proxy.ts`,
  * `source/packages/constants/sand-box.ts`, `frontend/src/production/model.ts#projectComputerStatus`).
  *
- * The box reports its screen as a loopback noVNC page. `EnsureSandBox` returns `vncUrl` (primary
- * display, already proxied) and `forkVncBaseUrl` (fork displays) plus a network token; the token
- * rides in the viewer URL and in the `x-anyrun-network-token` header of every viewer request.
+ * The box screen is the private VM's loopback noVNC page (`127.0.0.1:6080` primary, `:6081` forks).
+ * A viewer whose host is not `127.0.0.1` is not opened.
  */
 
 const SAND_BOX_PRIMARY_NOVNC_PORT = 6080;
@@ -36,7 +35,7 @@ export function buildSandBoxNoVncUrl(proxyBaseUrl: string, networkToken: string,
   return `${stripTrailingSlash(proxyBaseUrl)}/vnc.html?network_token=${encodeURIComponent(networkToken)}&${WAKE}&path=${encodeURIComponent(websockifyPath)}`;
 }
 
-/** The `vncProxy` descriptor from `EnsureSandBox` fields, or null when the broker exposes no screen. */
+/** A loopback noVNC descriptor, or null when a URL is not `http://127.0.0.1`. */
 export function buildGrokBotVncProxy(
   vncUrl: string | null,
   forkVncBaseUrl: string | null,
@@ -49,6 +48,7 @@ export function buildGrokBotVncProxy(
 
 /** BotAI `proxifyBoxVncUrl`: loopback noVNC → the public box proxy. Other URLs pass through. */
 export function proxifyBoxVncUrl(vncUrl: string, proxy: GrokBotVncProxy): string {
+  if (!isAllowedViewerUrl(proxy.primaryUrl)) return vncUrl;
   let parsed: URL;
   try {
     parsed = new URL(vncUrl);
@@ -77,7 +77,6 @@ export function parseGrokBotComputerStatus(value: unknown, proxy: GrokBotVncProx
   if (!isDynamicRecord(value)) return empty;
   const reported = typeof value.vncUrl === "string" && value.vncUrl.length > 0 ? value.vncUrl : null;
   const proxied = reported && proxy ? proxifyBoxVncUrl(reported, proxy) : reported;
-  // A loopback URL left unproxied points at this Mac, not the box; never open it.
   const vncUrl = proxied && isAllowedViewerUrl(proxied) ? proxied : null;
   const pull = isDynamicRecord(value.pull) ? value.pull : null;
   const phase: GrokBotComputerPhase =
@@ -104,7 +103,7 @@ export function parseGrokBotComputerStatus(value: unknown, proxy: GrokBotVncProx
   };
 }
 
-/** https only, no credentials in the URL. A loopback screen is never opened from OpenBot. */
+/** `http://127.0.0.1` only, with no user or password in the URL. */
 function isAllowedViewerUrl(value: string): boolean {
   let url: URL;
   try {
@@ -113,7 +112,7 @@ function isAllowedViewerUrl(value: string): boolean {
     return false;
   }
   if (url.username !== "" || url.password !== "") return false;
-  return url.protocol === "https:";
+  return url.protocol === "http:" && url.hostname === "127.0.0.1";
 }
 
 function forkDisplayToken(parsed: URL): string | undefined {

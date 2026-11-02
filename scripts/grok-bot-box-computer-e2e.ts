@@ -317,7 +317,7 @@ try {
       response.end(
         JSON.stringify({
           state: "running",
-          vncUrl: "https://box.example.cursorvm.com/vnc.html?network_token=tok",
+          vncUrl: "http://127.0.0.1:6080/vnc.html?network_token=tok",
         }),
       );
       return;
@@ -355,7 +355,7 @@ try {
     const ready = await Effect.runPromise(ensureGrokBotComputerReady(store, options));
     report.readyPhase = ready.phase;
     assert.equal(ready.phase, "running");
-    assert.equal(ready.vncUrl, "https://box.example.cursorvm.com/vnc.html?network_token=tok");
+    assert.equal(ready.vncUrl, "http://127.0.0.1:6080/vnc.html?network_token=tok");
     assert.deepEqual(seen.slice(0, 2), ["/api/ensureForeverBox", "/api/getForeverBoxStatus"]);
 
     mode = "off";

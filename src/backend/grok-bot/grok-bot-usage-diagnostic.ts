@@ -161,13 +161,14 @@ function validSession(session: GrokBotGatewaySession): boolean {
   try {
     const url = new URL(session.url);
     return (
-      url.protocol === "https:" &&
-      (url.hostname === "cursorvm.com" || url.hostname.endsWith(".cursorvm.com")) &&
+      url.protocol === "http:" &&
+      url.hostname === "127.0.0.1" &&
+      url.port === "1340" &&
       url.username === "" &&
       url.password === "" &&
       url.search === "" &&
       url.hash === "" &&
-      url.port === "" &&
+      (url.pathname === "" || url.pathname === "/") &&
       session.token.length > 0 &&
       session.token.length <= 8192 &&
       (session.headers["x-anyrun-network-token"]?.length ?? 0) <= 8192

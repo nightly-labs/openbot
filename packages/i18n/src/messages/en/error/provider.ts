@@ -409,4 +409,6 @@ export const messages = defineMessages("error.provider", {
   "error.provider.grokBotAgentRejected": "Grok Bot did not accept this agent.",
   "error.provider.grokBotNameRequired": "Enter a name.",
   "error.provider.grokBotTurnFailed": "Grok Bot did not finish this turn.",
+  "error.provider.grokBotLocalHostFailed": "The private Grok host did not start.",
+  "error.provider.grokBotLocalHostStopped": "The private Grok host is stopped.",
 });

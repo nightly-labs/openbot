@@ -437,8 +437,7 @@ const server = createServer((request, response: ServerResponse) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     const body = await readBody(request);
     if (url.pathname === "/aiserver.v1.GrokBotService/EnsureSandBox") {
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ gatewayUrl: `http://127.0.0.1:${addressPort}`, gatewayToken: "gw-e2e" }));
+      response.writeHead(500).end("shared box");
       return;
     }
     if (url.pathname === "/api/createAgent") {
@@ -593,7 +592,11 @@ async function runTurn(
 try {
   const store = new GrokBotAccountStore(authFile, cipher);
   await Effect.runPromise(
-    store.save({ accessToken: "grok-access-e2e", refreshToken: "grok-refresh-e2e", gateway: null }),
+    store.save({
+      accessToken: "grok-access-e2e",
+      refreshToken: "grok-refresh-e2e",
+      gateway: { url: `http://127.0.0.1:${addressPort}`, token: "gw-e2e", headers: {} },
+    }),
   );
   const client = new GrokBotAgentClient({
     store,

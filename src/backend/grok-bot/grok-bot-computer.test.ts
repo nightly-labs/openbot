@@ -7,8 +7,8 @@ import {
 } from "./grok-bot-computer";
 
 const proxy = {
-  primaryUrl: "https://vnc.example.cursorvm.com/vnc.html?network_token=tok",
-  forkBaseUrl: "https://fork.example.cursorvm.com",
+  primaryUrl: "http://127.0.0.1:6080/vnc.html?network_token=tok",
+  forkBaseUrl: "http://127.0.0.1:6081",
   networkToken: "tok",
 };
 
@@ -27,8 +27,11 @@ describe("grok bot computer", () => {
       parseGrokBotComputerStatus({ state: "running", vncUrl: "http://127.0.0.1:6080/vnc.html" }, proxy).phase,
     ).toBe("running");
     expect(parseGrokBotComputerStatus({ state: "running", vncUrl: "http://127.0.0.1:6080/vnc.html" }, null).phase).toBe(
-      "local",
+      "running",
     );
+    expect(
+      parseGrokBotComputerStatus({ state: "running", vncUrl: "https://box.example.cursorvm.com/vnc.html" }, null).phase,
+    ).toBe("local");
     expect(parseGrokBotComputerStatus({ state: "hibernated", vncUrl: null }, proxy).phase).toBe("sleeping");
     expect(parseGrokBotComputerStatus({ state: "absent", vncUrl: null }, proxy).phase).toBe("off");
     expect(parseGrokBotComputerStatus({ state: "running", pull: { percent: 40 } }, proxy)).toMatchObject({
@@ -45,12 +48,12 @@ describe("grok bot computer", () => {
     expect(status).toMatchObject({ handoffAgentId: "a1", handoffReason: "Log in" });
   });
 
-  it("refuses non-https or credentialed viewer URLs from the broker", () => {
-    expect(buildGrokBotVncProxy("http://vnc.example.com/vnc.html", "https://f.example.com", "t")).toBeNull();
-    expect(buildGrokBotVncProxy("https://u:p@vnc.example.com/vnc.html", "https://f.example.com", "t")).toBeNull();
-    expect(buildGrokBotVncProxy("https://vnc.example.com/vnc.html", "https://f.example.com/", "t")).toEqual({
-      primaryUrl: "https://vnc.example.com/vnc.html",
-      forkBaseUrl: "https://f.example.com",
+  it("accepts only a loopback viewer", () => {
+    expect(buildGrokBotVncProxy("https://vnc.example.cursorvm.com/vnc.html", "https://f.example.com", "t")).toBeNull();
+    expect(buildGrokBotVncProxy("http://user:pass@127.0.0.1:6080/vnc.html", "http://127.0.0.1:6081", "t")).toBeNull();
+    expect(buildGrokBotVncProxy("http://127.0.0.1:6080/vnc.html", "http://127.0.0.1:6081", "t")).toEqual({
+      primaryUrl: "http://127.0.0.1:6080/vnc.html",
+      forkBaseUrl: "http://127.0.0.1:6081",
       networkToken: "t",
     });
   });
