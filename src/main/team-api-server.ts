@@ -141,6 +141,10 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
+import {
+  TEAM_REASONING_EFFORTS_CAPABILITY,
+  withLegacyReasoningEfforts,
+} from "@openbot/contracts/team-protocol/reasoning-efforts-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_FOLDERS_CAPABILITY, sidebarFoldersEvent } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
@@ -1227,7 +1231,8 @@ export class TeamApiServer {
     const protocol = eventProtocol(capabilities);
     const hidden = hiddenProviderAgentIds(this.#options.agents.listAgents(), protocol);
     for (const id of blocked) hidden.add(id);
-    return protocol === 1 ? legacyProviderView(value, hidden) : hiddenAgentView(value, hidden, protocol);
+    const visible = protocol === 1 ? legacyProviderView(value, hidden) : hiddenAgentView(value, hidden, protocol);
+    return capabilities.has(TEAM_REASONING_EFFORTS_CAPABILITY) ? visible : withLegacyReasoningEfforts(visible);
   }
 
   #encodeProviderEvent(
@@ -1949,12 +1954,17 @@ export class TeamApiServer {
               route.protocol < 5 ? 4 : route.protocol < 6 ? 5 : route.protocol < 7 ? 6 : route.protocol < 8 ? 7 : 8,
             )
         : value;
+    // The levels after the five that released peers know go only to a peer that reads them.
+    const effortValue =
+      status < 400 && !route.capabilities.has(TEAM_REASONING_EFFORTS_CAPABILITY)
+        ? withLegacyReasoningEfforts(visibleValue)
+        : visibleValue;
     const sideRoute = teamSideRouteCodec(route.path);
     const encoded = sideRoute
-      ? JSON.stringify(sideRoute.response(route.path, status, visibleValue, options))
-      : teamHttpCodec(route.protocol).encodeResponse(route.method, route.path, status, visibleValue, options);
+      ? JSON.stringify(sideRoute.response(route.path, status, effortValue, options))
+      : teamHttpCodec(route.protocol).encodeResponse(route.method, route.path, status, effortValue, options);
     const body = route.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
-      ? withUiBlockAutoAnswers(encoded, visibleValue)
+      ? withUiBlockAutoAnswers(encoded, effortValue)
       : encoded;
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
@@ -1976,7 +1986,11 @@ export class TeamApiServer {
     const hidden = new Set<string>();
     for (const agent of agents) {
       try {
-        codec.encodeResponse("GET", TEAM_API_ROUTES.agents.all, 200, [agent], options);
+        // The list route sends a peer without reasoning-efforts-v1 the nearest level it knows.
+        const listed = capabilities.has(TEAM_REASONING_EFFORTS_CAPABILITY)
+          ? [agent]
+          : withLegacyReasoningEfforts([agent]);
+        codec.encodeResponse("GET", TEAM_API_ROUTES.agents.all, 200, listed, options);
       } catch {
         hidden.add(agent.id);
         const key = `${protocol}:${agent.id}`;

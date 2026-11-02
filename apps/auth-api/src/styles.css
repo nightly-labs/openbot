@@ -11917,9 +11917,9 @@ a {
 }
 
 /* The drawn bloub leaves a third of its box empty for its motion; here the body fills the box, so
-   it reads at the size of the skill icon beside it. */
+   it reads at the size of the skill icon beside it. The avatar already scales its plush body by 1.15. */
 .marketplace-site-avatar .bloub-avatar-svg {
-  scale: 1.45;
+  scale: calc(1.45 / 1.15);
 }
 
 /* The glyph a skill shows when the catalog has no icon for it. */

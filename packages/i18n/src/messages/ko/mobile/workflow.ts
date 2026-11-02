@@ -70,6 +70,8 @@ export const messages = {
   "mobile.workflow.trigger.messageHint": "이 트리거는 컴퓨터의 OpenBot에서 변경하세요.",
   "mobile.workflow.trigger.github": "GitHub",
   "mobile.workflow.trigger.githubHint": "GitHub 저장소에서 일이 생기면 실행돼요.",
+  "mobile.workflow.trigger.discord": "Discord",
+  "mobile.workflow.trigger.discordHint": "누군가 Discord 서버에서 OpenBot을 멘션하면 실행됩니다.",
   "mobile.workflow.trigger.startsWhen": "시작 조건",
   "mobile.workflow.trigger.timezone": "시간대: {zone}",
   "mobile.workflow.trigger.serverZone": "일정은 서버의 시간대를 사용해요.",

@@ -44,6 +44,7 @@ import { decodeProfileV8Request, decodeProfileV8Response } from "./profile-v8";
 import { withConversationPromptMultiSelect } from "./prompt-multi-select-v1";
 import { OPEN_PROVIDER_ID } from "./provider-aware-codec";
 import { decodeQueueEditRequest, isQueueEditRoute } from "./queue-edit-v1";
+import { TEAM_REASONING_EFFORTS } from "./reasoning-efforts-v1";
 import {
   decodeRemoteDesktopSetupRequest,
   decodeRemoteDesktopSetupResponse,
@@ -370,12 +371,13 @@ function decodeFrozenResponse(
 }
 
 /**
- * The model ids and reasoning efforts v8 shipped with, as in the `v8-base.ts` agent validator. A
- * provider is open: any id that `OPEN_PROVIDER_ID` matches. The host still refuses an id it cannot
- * run, so a client may name a provider that only a newer host knows.
+ * The model ids and reasoning efforts of the `v8-base.ts` agent validator. A provider is open: any id
+ * that `OPEN_PROVIDER_ID` matches. The host still refuses an id it cannot run, so a client may name a
+ * provider that only a newer host knows. A client names a reasoning-efforts-v1 level only when the
+ * host lists it for the model.
  */
 const V8_AGENT_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/[\],=-]{0,159}$/u;
-const V8_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+const V8_REASONING_EFFORTS = TEAM_REASONING_EFFORTS;
 
 /**
  * The provider, model and reasoning effort of an agent creation request, validated and fail-closed:

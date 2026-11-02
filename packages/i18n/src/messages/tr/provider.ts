@@ -129,11 +129,14 @@ export const messages = {
   "provider.status.signInRequired": "Oturum açılmalı",
   "provider.model.free": "Ücretsiz",
   "provider.model.default": "varsayılan",
+  "provider.effort.none": "Yok",
+  "provider.effort.minimal": "Minimum",
   "provider.effort.low": "Düşük",
   "provider.effort.medium": "Orta",
   "provider.effort.high": "Yüksek",
   "provider.effort.xhigh": "Ekstra yüksek",
   "provider.effort.max": "Maksimum",
+  "provider.effort.ultra": "Ultra",
 
   "provider.museKey.title": "Muse için Meta API anahtarı",
   "provider.museKey.description":

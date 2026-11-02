@@ -1358,9 +1358,8 @@
   white-space: nowrap;
 }
 
+/* No optical offset: the inline face's margin below already lifts the plush body to the chip's centre. */
 .message-agent-tag .agent-avatar {
-  --agent-avatar-optical-offset: -2px;
-
   width: 16px;
   height: 16px;
 }

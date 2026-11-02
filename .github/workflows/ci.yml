@@ -514,6 +514,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-model-steps
 
+      - name: Run the workflow Discord E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-discord
+
       - name: Run the OpenCode usage metering E2E test
         if: ${{ !cancelled() }}
         run: bun run test:opencode-usage-metering
@@ -590,6 +594,7 @@ jobs:
             .openbot-build/antigravity-accounts-e2e/
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/workflow-model-steps-e2e/
+            .openbot-build/workflow-discord-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/
             .openbot-build/cursor-usage-e2e/

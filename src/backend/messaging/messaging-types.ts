@@ -151,6 +151,8 @@ export interface MessagingAdapter {
     reaction: StatusReaction,
     on: boolean,
   ): Effect.Effect<void, MessagingAdapterError>;
+  /** Adds one emoji to a message, for a platform where a workflow can choose it (Discord). */
+  addEmoji?(target: MessageTarget, messageId: string, emoji: string): Effect.Effect<void, MessagingAdapterError>;
   /**
    * Posts the agent's answer, in as many posts as the platform needs. The first part replaces
    * `replaceMessageId` when it is given. Returns the id of the first post.

@@ -213,8 +213,8 @@ export interface ConversationLoadNoticeProps {
 }
 
 /**
- * While an agent's history loads for the first time, the crew of the app loading screen covers the
- * chat, and jumps out when the history is ready. A failed load shows the notice with Retry.
+ * While an agent's history loads for the first time, the lilac plush of the app loading screen covers
+ * the chat and watches its balls, and the screen fades when the history is ready. A failed load shows the notice with Retry.
  */
 export function ConversationLoadNotice(props: ConversationLoadNoticeProps) {
   const { t } = useText();
@@ -240,6 +240,7 @@ export function ConversationLoadNotice(props: ConversationLoadNoticeProps) {
       <Show when={screen()} keyed>
         {(key) => (
           <AppLoadingScreen
+            scene="thinking"
             ready={key === exiting() || !waiting()}
             label={t("server.connection.loading", { name: props.name })}
             title={t("server.connection.loading", { name: props.name })}

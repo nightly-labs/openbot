@@ -48,6 +48,15 @@ export interface WorkflowPlace {
   label: string;
 }
 
+/** A Discord server that a Discord trigger listens to or that a Discord output acts on. */
+export interface WorkflowDiscordServer {
+  /** The messaging connection of the server. */
+  connectionId: string;
+  name: string;
+  channels: readonly { id: string; name: string }[];
+  roles: readonly { id: string; name: string }[];
+}
+
 /** A model that an image step can draw with. */
 export interface WorkflowImageModel {
   id: string;
@@ -68,6 +77,8 @@ export interface WorkflowCatalogs {
   /** The providers of the host, so a model list leaves out the ones that are not connected. */
   status: AgentStatus;
   places: readonly WorkflowPlace[];
+  /** The Discord servers of the host. Only the host that runs the workflow has them. */
+  discord?: readonly WorkflowDiscordServer[] | undefined;
   imageModels: readonly WorkflowImageModel[];
   /** The workspace files that an asset node can take, and the images that image steps made. */
   files: readonly StoredFileRow[];
