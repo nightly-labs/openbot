@@ -5,7 +5,7 @@
  */
 
 import { SIDEBAR_UNASSIGNED_SECTION_ID, type SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
-import { type SidebarPinnedItem, sidebarPinnedItemKey } from "./sidebar-pins";
+import type { SidebarPinnedItem } from "./sidebar-pins";
 
 /**
  * Sorts chats by the persisted `agentOrder`. An id that the layout does not carry yet keeps its place in
@@ -48,26 +48,25 @@ export function sidebarAgentOrder<T extends { id: string }>(
 ): T[] {
   const byId = new Map(agents.map((agent) => [agent.id, agent]));
   const pinned: T[] = [];
-  const pinnedKeys = new Set<string>();
+  const pinnedIds = new Set<string>();
   for (const ref of view.pinnedItems) {
     const agent = ref.kind === "agent" ? byId.get(ref.id) : undefined;
-    // A hidden agent keeps its pin but is drawn in the hidden group.
-    if (!agent || view.hiddenAgentIds.has(agent.id)) continue;
+    // A hidden agent keeps its pin but is drawn in the hidden group. A repeated pin adds no second row.
+    if (!agent || view.hiddenAgentIds.has(agent.id) || pinnedIds.has(agent.id)) continue;
     pinned.push(agent);
-    pinnedKeys.add(sidebarPinnedItemKey(ref));
+    pinnedIds.add(agent.id);
   }
   const listed = sortByLayoutOrder(
-    agents.filter(
-      (agent) =>
-        !view.hiddenAgentIds.has(agent.id) && !pinnedKeys.has(sidebarPinnedItemKey({ kind: "agent", id: agent.id })),
-    ),
+    agents.filter((agent) => !view.hiddenAgentIds.has(agent.id) && !pinnedIds.has(agent.id)),
     view.layout.agentOrder,
   );
   const sectionOf = sidebarSectionResolver(view.layout);
   const bySection = new Map<string, T[]>();
   for (const agent of listed) {
     const sectionId = sectionOf(agent.id);
-    bySection.set(sectionId, [...(bySection.get(sectionId) ?? []), agent]);
+    const group = bySection.get(sectionId);
+    if (group) group.push(agent);
+    else bySection.set(sectionId, [agent]);
   }
   const hidden = sortByLayoutOrder(
     agents.filter((agent) => view.hiddenAgentIds.has(agent.id)),

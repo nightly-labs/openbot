@@ -664,12 +664,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     openAccountSettings();
   }
   const [searchOpen, setSearchOpen] = createSignal(false);
+  const hiddenAgentIds = createMemo(() => new Set(workspace.state.userHiddenAgents.map((entry) => entry.agentId)));
   // In sidebar order, so that ⌘1-9 opens the agents the user put at the top.
   const searchAgents = createMemo(() =>
     sidebarAgentOrder(workspace.profiles(), {
       layout: workspace.state.sidebarLayout,
       pinnedItems: workspace.preferences.pinnedSidebarItems(),
-      hiddenAgentIds: new Set(workspace.state.userHiddenAgents.map((entry) => entry.agentId)),
+      hiddenAgentIds: hiddenAgentIds(),
     }),
   );
   const communityCard = createCommunityCardVisibility();
@@ -2494,7 +2495,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       },
                       approvals: () => workspace.state.approvals,
                       takeovers: () => workspace.state.takeovers,
-                      hiddenAgentIds: () => new Set(workspace.state.userHiddenAgents.map((entry) => entry.agentId)),
+                      hiddenAgentIds,
                     });
                     return (
                       <Conversation
