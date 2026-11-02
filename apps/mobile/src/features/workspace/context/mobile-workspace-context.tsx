@@ -167,6 +167,7 @@ import { applyBrowserEvent, syncEventQueries } from "@/features/workspace/model/
 import { runTeamRequest } from "@/features/workspace/model/team-request";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import { appendTurnStepLine, latestThoughtId } from "@/features/workspace/model/turn-step-lines";
+import { createWorkspaceCache } from "@/features/workspace/model/workspace-cache";
 import {
   decodeAgent,
   decodeAgentSummaries,
@@ -296,6 +297,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [sidebarByServer, setSidebarByServer] = useState<
     Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>
   >({});
+  const sidebarByServerRef = useRef(sidebarByServer);
+  sidebarByServerRef.current = sidebarByServer;
   const applySidebarLayout = useCallback((serverId: string, layout: SidebarLayoutSnapshot) => {
     if (removedServers.current.has(serverId)) return;
     setSidebarByServer((current) => {
@@ -331,6 +334,16 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [],
   );
   useEffect(() => () => conversationStore.dispose(), [conversationStore]);
+  const workspaceCache = useMemo(
+    () => createWorkspaceCache(`${session.apiUrl}:${session.user.id}`),
+    [session.apiUrl, session.user.id],
+  );
+  /** The last agent list of each server, as the host sent it, for the phone's cache. */
+  const cachedSummaries = useRef(new Map<string, RemoteAgent[]>());
+  /** Servers whose cache this run read, once each. */
+  const restoredServers = useRef(new Set<string>());
+  /** Servers shown from the cache whose connection did not register yet. */
+  const quietStarts = useRef(new Set<string>());
   const [liveState] = useState(() => new LiveWorkspaceStore());
   const preferenceStore = useMemo(
     () =>
@@ -417,6 +430,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         readRefresh.invalidate(serverId);
         for (const id of serverAgentIds.current.get(serverId) ?? []) removedAgentIds.add(id);
         serverAgentIds.current.delete(serverId);
+        cachedSummaries.current.delete(serverId);
+        void workspaceCache?.remove(serverId).catch(() => undefined);
         presenceSignatures.current.delete(serverId);
         for (const queryKey of [
           queryKeys.chatQueue(serverId),
@@ -439,13 +454,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState.update("browserRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserTabs", (current) => withoutKeys(current, serverIds));
     },
-    [connectionWaits, readRefresh, queryClient, queryScope, conversationStore, liveState],
+    [connectionWaits, readRefresh, queryClient, queryScope, conversationStore, liveState, workspaceCache],
   );
 
   const installHosts = useCallback(
     (hosts: RemoteTeamHost[]) => {
       const available = new Set(hosts.map((host) => host.hostId));
       dropServerState(new Set(serversRef.current.filter((server) => !available.has(server.id)).map(({ id }) => id)));
+      // Also the copies of servers that the account left while the app was closed.
+      void workspaceCache?.retain([...available]).catch(() => undefined);
       for (const host of hosts) removedServers.current.delete(host.hostId);
       setServers((current) => {
         const previousServers = new Map(current.map((server) => [server.id, server]));
@@ -459,7 +476,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           : (sortByPreference(hosts.map((host) => ({ id: host.hostId })))[0]?.id ?? null),
       );
     },
-    [dropServerState, session.host?.hostId, sortByPreference],
+    [dropServerState, session.host?.hostId, sortByPreference, workspaceCache],
   );
 
   const directoryRefresh = useMemo(
@@ -638,6 +655,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
       for (const agent of summaries) knownIds.add(agent.id);
       serverAgentIds.current.set(serverId, knownIds);
+      cachedSummaries.current.set(serverId, summaries);
       setAgents((current) => {
         const previous = new Map(
           current.filter((agent) => agent.serverId === serverId).map((agent) => [agent.id, agent]),
@@ -653,6 +671,49 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     },
     [preferenceStore],
   );
+
+  /** Saves what the phone shows for a server, so the next start shows it before the connection. */
+  const persistServer = useCallback(
+    (serverId: string) => {
+      const agents = cachedSummaries.current.get(serverId);
+      if (!workspaceCache || !agents || removedServers.current.has(serverId)) return;
+      void workspaceCache
+        .write(serverId, {
+          agents,
+          hidden: hostHiddenRef.current[serverId] ?? null,
+          sidebar: sidebarByServerRef.current[serverId]?.layout ?? null,
+          conversations: agents.flatMap((agent) => conversationStore.cachedPage(agent.id) ?? []),
+        })
+        .catch(() => undefined);
+    },
+    [workspaceCache, conversationStore],
+  );
+  // The first time a server is listed in this run, it shows what the phone kept, until its own reads
+  // replace it. Its first attempt is then quiet, as a return to the app.
+  useEffect(() => {
+    if (!workspaceCache) return;
+    for (const { id } of servers) {
+      if (restoredServers.current.has(id)) continue;
+      restoredServers.current.add(id);
+      void workspaceCache
+        .read(id)
+        .then((cached) => {
+          if (!cached || removedServers.current.has(id) || cachedSummaries.current.has(id)) return;
+          if (cached.hidden)
+            applyHostHidden(
+              id,
+              cached.hidden.map((agentId) => ({ agentId })),
+            );
+          if (cached.sidebar) applySidebarLayout(id, cached.sidebar);
+          replaceServerAgents(id, cached.agents);
+          for (const page of cached.conversations) conversationStore.restore(page);
+          const connection = connections.current.get(id);
+          if (connection) connection.quietStart();
+          else quietStarts.current.add(id);
+        })
+        .catch(() => undefined);
+    }
+  }, [servers, workspaceCache, applyHostHidden, applySidebarLayout, replaceServerAgents, conversationStore]);
 
   const loadConversation = useCallback(
     async (agentId: string, serverId = activeServerIdRef.current, refresh = false, attach = false) => {
@@ -867,10 +928,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             )
             .catch(() => undefined);
         }
+        if (context.isCurrent()) persistServer(serverId);
       })();
       context.stage = "connection";
     },
     [
+      persistServer,
       replaceServerAgents,
       applyHostHidden,
       preferenceStore,
@@ -886,6 +949,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const registerConnection = useCallback((hostId: string, handle: ServerConnectionHandle | null) => {
     if (handle) connections.current.set(hostId, handle);
     else connections.current.delete(hostId);
+    if (handle && quietStarts.current.delete(hostId)) handle.quietStart();
   }, []);
   const wakeHostedServer = useMemo(
     () =>
@@ -1000,11 +1064,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       loadGeneration.current += 1;
       conversationStore.cancelRequests();
       conversationStore.flush();
+      // iOS can end the app in the background, so the phone keeps what it shows now.
+      for (const { id } of serversRef.current) persistServer(id);
       // The peer refuses requests in the background too. The next return starts a new quiet time.
       connectionWaits.dropAll(new Error(sourceText("error.remote.appInBackground")));
     }
     directoryRefresh.setActive(foreground);
-  }, [foreground, directoryRefresh, conversationStore, connectionWaits]);
+  }, [foreground, directoryRefresh, conversationStore, connectionWaits, persistServer]);
 
   // On a return to the app the selected server connects first; the others follow when it is online,
   // or after a short wait. The phone then sets up the connection the user waits for alone, and the
