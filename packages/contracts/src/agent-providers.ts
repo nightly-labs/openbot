@@ -33,6 +33,7 @@ export const AGENT_PROVIDERS = [
   "inception",
   "deepseek",
   "openrouter",
+  "hermes",
   "acp",
 ] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
@@ -480,6 +481,34 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     approvalsInFullAccess: true,
     foldersInFullAccess: false,
   },
+  // Hermes Agent (`hermes acp`) from Nous Research, which the user installs. It keeps its memories,
+  // skills and sign-ins in `~/.hermes`, as the user's own Hermes does. A Nous Portal subscription
+  // signs it in (`hermes auth add nous`); the models of every provider Hermes is signed in to are listed.
+  // Hermes reads `.agents/skills` only in a git project that `skills.trusted_project_dirs` names, and
+  // it reads `AGENTS.md` only when the workspace has no `.hermes.md`.
+  hermes: {
+    id: "hermes",
+    displayName: "Hermes",
+    cliName: "Hermes Agent",
+    onboardingDescription: "Nous Portal plan or your Hermes setup",
+    signInMessage: "Sign in with Nous Portal or run `hermes setup` to use Hermes.",
+    installGuideLink: "hermes-install",
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "hermes",
+    pickerOrder: 12,
+    localCodeSignIn: "device",
+    signInPageEnd: "page",
+    skillFolders: [".agents/skills"],
+    homeSkills: "instructions",
+    workspaceInstructionFiles: ["AGENTS.md"],
+    workspaceEnforcement: "confined-process",
+    steer: "deferred",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
   // One provider for every Agent Client Protocol agent the user adds by command. The model id names
   // the agent (`<customAgentId>/<agentModel>`), so one provider row serves them all and the shipped
   // provider CHECK lists grow by one word only once.
@@ -570,7 +599,7 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
 /**
  * The providers that only newer Team API protocols carry: Gemini and custom ACP agents from protocol
  * 5, Cursor and Cline from protocol 6, Pi and Muse from protocol 7, Inception, DeepSeek and OpenRouter
- * from protocol 8.
+ * from protocol 8. Hermes is not in a protocol list; protocol 8 carries any provider id.
  * A joined server's settings list one only when the host's status names it.
  */
 export const LOCAL_ONLY_PROVIDERS = [
@@ -582,6 +611,7 @@ export const LOCAL_ONLY_PROVIDERS = [
   "inception",
   "deepseek",
   "openrouter",
+  "hermes",
   "acp",
 ] as const satisfies readonly AgentProviderId[];
 

@@ -179,6 +179,7 @@ const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = [
   "antigravity",
   "cursor",
   "cline",
+  "hermes",
   "acp",
 ];
 
@@ -1805,6 +1806,7 @@ export class ProviderRuntime implements ProviderPort {
             argv: command.argv,
             env: { ...cliPathEnvironment(cli), ...command.env(cli) },
             timeoutMs: command.timeoutMs,
+            ...(command.closeInput ? { closeInput: true } : {}),
           }),
         command.timeoutMs,
       )
@@ -3040,7 +3042,9 @@ export class ProviderRuntime implements ProviderPort {
               ? sourceText("error.provider.deepseekSignIn")
               : provider === "openrouter"
                 ? sourceText("error.provider.openrouterSignIn")
-                : agentProviderDescriptor(provider).signInMessage)
+                : provider === "hermes"
+                  ? sourceText("error.provider.hermesSignIn")
+                  : agentProviderDescriptor(provider).signInMessage)
     );
   }
 
@@ -3618,6 +3622,14 @@ export class ProviderRuntime implements ProviderPort {
         // a folder that is not trusted, one "ChatGPT error" toast per start (#4265). An exit keeps
         // the last error record in its message.
         stderrLogger.warn("Codex logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
+      if (client.provider === "hermes") {
+        // Hermes Agent 0.21.5 reports each failure in the protocol: a failed turn in its prompt error,
+        // a missing sign-in in the auth methods of `initialize`, and a crash as the process exit. Its
+        // stderr is the Python log, `2026-11-02 10:00:00 [WARNING] mcp: …`, which repeats them as
+        // records and tracebacks, one "Hermes error" toast per line at each start.
+        stderrLogger.warn("Hermes logged a diagnostic.", { provider: client.provider, message });
         return;
       }
       if (isGlogBelowErrorDiagnostic(message)) {

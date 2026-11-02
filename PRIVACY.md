@@ -1276,6 +1276,18 @@ sees the IP address of this computer. Cline's terms apply:
 <https://cline.bot/tos>. Team members see the host's Cline agents, as
 for the other providers, when their app supports Cline.
 
+### Hermes
+
+OpenBot does not download Hermes Agent. It starts the `hermes` that you installed, with `hermes acp`,
+as a local process. Prompts, attachments, and tool results go to that process, and Hermes sends them
+to Nous Portal or to the model provider that you select in Hermes. Sign in runs
+`hermes auth add nous`, which opens Nous Portal's sign-in page in your browser. Hermes keeps its
+sign-ins, settings, memories, skills and session history in `~/.hermes`, or in `$HERMES_HOME`, and
+it can change them during a turn. OpenBot does not read, copy, or upload these files. It reads only
+the change time of `~/.hermes/auth.json`, to see that you signed in. Hermes can also use the network
+for its own tools and plugins, as you set them up in Hermes. Nous Research's terms apply. Team
+members see the host's Hermes agents, as for the other providers, when their app supports Hermes.
+
 ### Inception
 
 Inception agents run in the Pi CLI that OpenBot downloads for Pi. On this computer, Sign in on the

@@ -228,6 +228,10 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline 无法启动。请在终端中运行 `cline --version`。",
   "error.provider.clineVersionUnreadable": "无法读取 Cline CLI 版本。",
   "error.provider.clineSignIn": "请使用 Cline 登录，或设置 CLINE_API_KEY 以使用 Cline。",
+  "error.provider.hermesMissing": "未安装 Hermes Agent。请安装后重试。",
+  "error.provider.hermesNotStarted": "无法启动 Hermes Agent。请在终端中运行 `hermes --version`。",
+  "error.provider.hermesVersionUnreadable": "无法读取 Hermes Agent 的版本。",
+  "error.provider.hermesSignIn": "要使用 Hermes，请使用 Nous Portal 登录，或在终端中运行 `hermes setup`。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",
   "error.provider.foreignReasoning":
     "此前的推理内容由另一个账号或 API 密钥接收，因此 {provider} 未接受它。OpenBot 已带着聊天记录开启新的 {provider} 会话，请重试。",

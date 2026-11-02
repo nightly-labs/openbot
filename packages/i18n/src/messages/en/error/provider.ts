@@ -247,6 +247,10 @@ export const messages = defineMessages("error.provider", {
   "error.provider.clineNotStarted": "Cline could not start. Run `cline --version` in a terminal.",
   "error.provider.clineVersionUnreadable": "Unable to read the Cline CLI version.",
   "error.provider.clineSignIn": "Sign in with Cline or set CLINE_API_KEY to use Cline.",
+  "error.provider.hermesMissing": "Hermes Agent is not installed. Install it, then try again.",
+  "error.provider.hermesNotStarted": "Hermes Agent could not start. Run `hermes --version` in a terminal.",
+  "error.provider.hermesVersionUnreadable": "Unable to read the Hermes Agent version.",
+  "error.provider.hermesSignIn": "Sign in with Nous Portal, or run `hermes setup` in a terminal, to use Hermes.",
   "error.provider.usageLimitReached": "The account reached its usage limit.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",

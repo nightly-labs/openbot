@@ -1,5 +1,5 @@
 import { win32 } from "node:path";
-import type { NewSessionRequest, RequestError } from "@agentclientprotocol/sdk";
+import type { LoadSessionResponse, NewSessionRequest, RequestError } from "@agentclientprotocol/sdk";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
 
@@ -116,10 +116,25 @@ export interface AcpFlavor {
   noiseChunk?: RegExp;
   /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
   sessionMeta?: NewSessionRequest["_meta"];
+  /**
+   * OpenBot opens a saved session with `session/load`, also when the agent advertises
+   * `session/resume`, and this tells from a successful load reply that the session is missing.
+   */
+  loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
 }
 
 /** The protocol's own behavior: Grok and Cline. */
 export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
+
+/**
+ * Hermes Agent 0.21.5 answers a `session/resume` of a missing session with a new session, and the
+ * reply does not give its id: each later prompt to the saved id then ends as "refusal". Its
+ * `session/load` of a missing session answers null, which the SDK gives as an empty reply. A load of
+ * a session that exists always gives its `modes`.
+ */
+export const HERMES_ACP_FLAVOR: AcpFlavor = {
+  loadInsteadOfResume: { missing: (response) => response.modes == null },
+};
 
 /**
  * Cursor puts the missing session in `data.message` and reports only "Invalid params" in `message`.

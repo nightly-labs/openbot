@@ -417,6 +417,7 @@ export type ExternalDestination =
   | "opencode-auth"
   | "agent-setup"
   | "claude-install"
+  | "hermes-install"
   | "feedback"
   | "message"
   // The release notes, the guides and the Discord community of OpenBot, from the Help menu of the window rail.

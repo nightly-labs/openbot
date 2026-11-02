@@ -256,6 +256,12 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline başlatılamadı. Bir terminalde `cline --version` komutunu çalıştırın.",
   "error.provider.clineVersionUnreadable": "Cline CLI sürümü okunamıyor.",
   "error.provider.clineSignIn": "Cline'ı kullanmak için Cline ile oturum açın veya CLINE_API_KEY ayarlayın.",
+  "error.provider.hermesMissing": "Hermes Agent yüklü değil. Yükleyin ve yeniden deneyin.",
+  "error.provider.hermesNotStarted":
+    "Hermes Agent başlatılamadı. Bir terminalde `hermes --version` komutunu çalıştırın.",
+  "error.provider.hermesVersionUnreadable": "Hermes Agent sürümü okunamıyor.",
+  "error.provider.hermesSignIn":
+    "Hermes'i kullanmak için Nous Portal ile oturum açın veya bir terminalde `hermes setup` komutunu çalıştırın.",
   "error.provider.usageLimitReached": "Hesap kullanım sınırına ulaştı.",
   "error.provider.foreignReasoning":
     "Farklı bir hesap veya API anahtarı aldığı için {provider} bu sohbetteki önceki akıl yürütmeyi kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",

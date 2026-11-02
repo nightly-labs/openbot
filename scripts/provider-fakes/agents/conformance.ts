@@ -2,7 +2,11 @@
 // every provider must pass, and differs only where the real CLIs differ:
 // - `FAKE_MISSING` names the error that `session/load` and `session/resume` give for a session that
 //   the agent does not have (`gone-…`). Each form is the one that the provider's flavor recognizes.
-// - `FAKE_SIGNED_OUT=1` refuses each new session, as an agent does before its sign-in.
+//   `hermes` acts as Hermes Agent 0.21.5: it advertises `session/resume`, which makes a new session for
+//   a missing one, and `session/load` of a missing session answers null. Each session it opens has `modes`.
+//   It lists its provider as an auth method only when it is signed in, and its stderr is a Python log.
+// - `FAKE_SIGNED_OUT=1` refuses each new session, as an agent does before its sign-in. Hermes refuses
+//   it with "Internal error", and writes the cause only to stderr.
 // A prompt with the text `wait` runs until the client cancels it. Each other prompt answers at once.
 import {
   type AcpError,
@@ -37,6 +41,12 @@ const MISSING_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => Acp
   }),
 };
 
+const hermes = process.env.FAKE_MISSING === "hermes";
+/** What Hermes 0.21.5 lists: its provider while that provider's credential resolves, and its terminal setup. */
+const HERMES_AUTH_METHODS = [
+  { id: "nous", name: "nous runtime credentials" },
+  { id: "hermes-setup", name: "Configure Hermes provider", type: "terminal", args: ["--setup"] },
+];
 const missingError = MISSING_ERRORS[process.env.FAKE_MISSING ?? "protocol"];
 const signedOut = process.env.FAKE_SIGNED_OUT === "1";
 const models = new Map<string, string>();
@@ -60,13 +70,21 @@ function setup(sessionId: string) {
       },
     ],
     models: { availableModels: MODELS, currentModelId: current },
+    ...(hermes ? { modes: { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }] } } : {}),
   };
 }
 
 function restore(request: AcpRequest, peer: AcpPeer): void {
   const sessionId = request.params.sessionId ?? "";
   logEntry({ event: request.method, sessionId });
-  if (sessionId.startsWith("gone-") && missingError) peer.fail(request, missingError(sessionId));
+  if (sessionId.startsWith("gone-") && hermes) {
+    count += 1;
+    // The new session's id is not in a resume reply.
+    peer.reply(
+      request,
+      request.method === "session/load" ? null : { ...setup(`s-${process.pid}-${count}`), sessionId: undefined },
+    );
+  } else if (sessionId.startsWith("gone-") && missingError) peer.fail(request, missingError(sessionId));
   else peer.reply(request, setup(sessionId));
 }
 
@@ -80,10 +98,17 @@ serveFakeAcpAgent(
       peer.reply(request, {
         protocolVersion: 1,
         agentInfo: { name: "conformance", version: "1.0.0" },
-        agentCapabilities: { loadSession: true },
-        authMethods: [],
+        agentCapabilities: { loadSession: true, ...(hermes ? { sessionCapabilities: { resume: {} } } : {}) },
+        authMethods: hermes ? HERMES_AUTH_METHODS.filter((method) => !signedOut || method.id === "hermes-setup") : [],
       }),
     "session/new": (request, peer) => {
+      if (signedOut && hermes) {
+        process.stderr.write(
+          "2026-11-02 10:00:00,000 [WARNING] agent.auxiliary_client: resolve_provider_client: nous requested but Nous Portal not configured (run: hermes auth)\n",
+        );
+        peer.fail(request, { code: -32603, message: "Internal error" });
+        return;
+      }
       if (signedOut) {
         peer.fail(request, { code: -32000, message: "Authentication required" });
         return;

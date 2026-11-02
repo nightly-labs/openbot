@@ -54,6 +54,8 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
   argv: readonly string[];
   env: Record<string, string>;
   timeoutMs: number;
+  /** Closes the CLI's input at once: see `ProviderCliCommand.closeInput`. */
+  closeInput?: boolean;
   platform?: NodeJS.Platform;
 }) {
   const platform = options.platform ?? process.platform;
@@ -82,6 +84,7 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
     (child) => stopProcessTree(child).pipe(Effect.orDie),
   );
   child.stdin?.on("error", () => undefined);
+  if (options.closeInput && options.flow !== "paste") child.stdin?.end();
   let submitted = false;
   // After a pasted code, an exit with a failure code is the provider refusing it. A timeout is a
   // signal, so it keeps its own message.
@@ -190,12 +193,16 @@ function terminalCommand(platform: NodeJS.Platform, argv: readonly string[]): { 
 /**
  * Reads the link, and the code for a device sign-in, from what the CLI has printed so far. Returns
  * null until all of it is there. The shapes are the pinned CLIs' (Grok 1.0.22, Claude 2.1.263,
- * Cursor 2026.10.01, Cline 3.0.68); the tests hold samples of each.
+ * Cursor 2026.10.01, Cline 3.0.68); the tests hold samples of each. Hermes 0.21.5 prints its Nous
+ * Portal sign-in in the shape of `_print_device_code_instructions` in `hermes_cli/auth_device_flow.py`.
  */
 function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCodePrompt | null {
   const text = stripTerminalCodes(output);
-  // Only a link that something has ended: a chunk can stop in the middle of one.
-  const url = text.match(/https:\/\/[^\s"'<>]+(?=[\s"'<>])/)?.[0];
+  // Only a link that something has ended: a chunk can stop in the middle of one. Hermes prints its
+  // portal's address before the device page, which follows "Open:".
+  const url =
+    (flow === "device" ? text.match(/\bopen:[ \t]*(https:\/\/[^\s"'<>]+)(?=[\s"'<>])/i)?.[1] : undefined) ??
+    text.match(/https:\/\/[^\s"'<>]+(?=[\s"'<>])/)?.[0];
   if (!url) return null;
   let parsed: URL;
   try {
@@ -232,9 +239,12 @@ function codeAfterConfirmLine(text: string): string | null {
   return code && /^[A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*$/.test(code) ? code : null;
 }
 
-/** The code at the end of an "Enter this code in your browser: CODE" line that has ended (Cline). */
+/**
+ * The code at the end of an "Enter this code in your browser: CODE" line (Cline) or an "If prompted,
+ * enter code: CODE" line (Hermes) that has ended.
+ */
 function codeOnEnterLine(text: string): string | null {
-  return text.match(/enter this code[^:\n]*:[ \t]*([A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*)[ \t]*\n/i)?.[1] ?? null;
+  return text.match(/enter (?:this )?code[^:\n]*:[ \t]*([A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*)[ \t]*\n/i)?.[1] ?? null;
 }
 
 const ESC = 0x1b;

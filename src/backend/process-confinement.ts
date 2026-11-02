@@ -246,6 +246,57 @@ export function clineStatePaths(env: NodeJS.ProcessEnv = process.env, home = hom
 }
 
 /**
+ * The folder where Hermes Agent keeps its sign-ins, settings, sessions and memories: `HERMES_HOME`,
+ * else `~/.hermes`, or `%LOCALAPPDATA%\hermes` on Windows. OpenBot shares it with the user's own Hermes.
+ */
+export function hermesHome(
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir(),
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const configured = env.HERMES_HOME?.trim();
+  if (configured)
+    return configured === "~" || configured.startsWith("~/") ? join(home, configured.slice(1)) : configured;
+  if (platform === "win32") return join(env.LOCALAPPDATA?.trim() || join(home, "AppData", "Local"), "hermes");
+  return join(home, ".hermes");
+}
+
+/**
+ * Hermes writes its sessions, memories, sign-in refreshes, caches and logs across its whole folder.
+ * Its install, settings, `.env`, identity, skills, hooks, schedules, plugins, profiles and the tools
+ * it downloads load code, commands or instructions for every other Hermes process, so they stay
+ * read-only.
+ */
+export function hermesStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const root = hermesHome(env, home);
+  return {
+    writable: [root],
+    protected: [
+      "hermes-agent",
+      "hermes-setup",
+      "config.yaml",
+      ".env",
+      "SOUL.md",
+      "skills",
+      "skill-bundles",
+      "hooks",
+      "cron",
+      "scripts",
+      "plugins",
+      "desktop-plugins",
+      "relay-plugins.toml",
+      "profiles",
+      "active_profile",
+      "pairing",
+      "platforms",
+      "installs",
+      "bootstrap-cache",
+      "tools",
+    ].map((name) => join(root, name)),
+  };
+}
+
+/**
  * A custom agent keeps its state where it wants, and OpenBot cannot know where. A Workspace only
  * custom agent gets no state folder: an agent that must write in its home folder to run needs Full
  * access.

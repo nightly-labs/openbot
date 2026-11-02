@@ -59,6 +59,15 @@ export interface ClineCliInfo extends ResolvedCli {
   source?: "system" | "managed";
 }
 
+/**
+ * OpenBot never installs Hermes: the user's own `hermes` runs, with the user's own `~/.hermes`, and
+ * `resolveHermesCli` gives only `system`. The type keeps `managed`, as each other CLI does, so a
+ * `managed` test value does not narrow `AgentCliInfo`.
+ */
+export interface HermesCliInfo extends ResolvedCli {
+  source?: "system" | "managed";
+}
+
 export type AgentCliInfo =
   | CodexCliInfo
   | ClaudeCliInfo
@@ -66,7 +75,8 @@ export type AgentCliInfo =
   | OpencodeCliInfo
   | AntigravityCliInfo
   | CursorCliInfo
-  | ClineCliInfo;
+  | ClineCliInfo
+  | HermesCliInfo;
 
 export class CodexCliError extends Error {
   constructor(
@@ -418,6 +428,56 @@ export const resolveCursorCli: (input?: {
   },
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
+
+/**
+ * Finds the user's own Hermes Agent. OpenBot has no copy of its own: a newer Hermes moves the
+ * user's `~/.hermes` database and settings forward, and the user's older Hermes then cannot read them.
+ */
+export const resolveHermesCli: (input?: {
+  systemCandidates?: string[];
+}) => Effect.Effect<HermesCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveHermesCli")(
+  function* (
+    input: { systemCandidates?: string[] } = {},
+  ): Effect.fn.Return<HermesCliInfo, ProviderClientOperationError> {
+    const candidates = yield* cliCandidates("hermes", input.systemCandidates, null);
+    let found = false;
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
+      found = true;
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const { stdout, launch } = yield* readCliVersion(candidate, "hermes");
+          return {
+            executable: candidate.executable,
+            version: parseHermesVersion(stdout),
+            source: "system" as const,
+            ...launch,
+          };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+      const error = attempt.failure.cause;
+
+      if (isCliTimeout(error)) throw error;
+      /* Try the remaining installed candidates. */
+    }
+    throw new CodexCliError(
+      found ? sourceText("error.provider.hermesNotStarted") : sourceText("error.provider.hermesMissing"),
+      found ? "invalid" : "missing",
+    );
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
+
+/**
+ * Hermes prints its release and its build on the first line, such as
+ * `Hermes Agent v0.21.5+5805.g54bc5e5 (2026.9.24) · upstream 54bc5e50`. A line about an update can follow.
+ */
+export function parseHermesVersion(output: string): string {
+  const version = output.match(/^Hermes Agent v(\d+\.\d+\.\d+)\b/mu)?.[1];
+  if (!version) throw new CodexCliError(sourceText("error.provider.hermesVersionUnreadable"), "invalid");
+  return version;
+}
 
 /**
  * Cursor prints its build as a date and a commit, such as `2026.09.28-64d2043`. The newer form that

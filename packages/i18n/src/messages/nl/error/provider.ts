@@ -254,6 +254,11 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline kon niet starten. Voer `cline --version` uit in een terminal.",
   "error.provider.clineVersionUnreadable": "Kan de versie van Cline CLI niet lezen.",
   "error.provider.clineSignIn": "Log in met Cline of stel CLINE_API_KEY in om Cline te gebruiken.",
+  "error.provider.hermesMissing": "Hermes Agent is niet geïnstalleerd. Installeer het en probeer het opnieuw.",
+  "error.provider.hermesNotStarted": "Hermes Agent kon niet starten. Voer `hermes --version` uit in een terminal.",
+  "error.provider.hermesVersionUnreadable": "De versie van Hermes Agent kan niet worden gelezen.",
+  "error.provider.hermesSignIn":
+    "Log in met Nous Portal of voer `hermes setup` uit in een terminal om Hermes te gebruiken.",
   "error.provider.usageLimitReached": "Het account heeft de gebruikslimiet bereikt.",
   "error.provider.foreignReasoning":
     "{provider} heeft het eerdere redeneren in deze chat niet geaccepteerd, omdat een ander account of een andere API-sleutel het heeft ontvangen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",

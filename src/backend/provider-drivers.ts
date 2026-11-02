@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import type { ClientSideConnection, InitializeResponse } from "@agentclientprotocol/sdk";
+import { type ClientSideConnection, type InitializeResponse, RequestError } from "@agentclientprotocol/sdk";
 import {
   type AgentAuthState,
   type AgentModelOption,
@@ -14,7 +14,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
-import { CURSOR_ACP_FLAVOR, customAgentFlavor, DEFAULT_ACP_FLAVOR } from "./acp-flavor";
+import { CURSOR_ACP_FLAVOR, customAgentFlavor, DEFAULT_ACP_FLAVOR, HERMES_ACP_FLAVOR } from "./acp-flavor";
 import { ANTIGRAVITY_ACP_FLAVOR } from "./acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
 import { readMuseAccount } from "./agent/muse-login";
@@ -39,6 +39,7 @@ import {
   resolveCodexCli,
   resolveCursorCli,
   resolveGrokCli,
+  resolveHermesCli,
   resolveMuseCli,
   resolveOpencodeCli,
   resolvePiCli,
@@ -69,6 +70,8 @@ import {
   cursorConfinedEnv,
   cursorStatePaths,
   customAgentStatePaths,
+  hermesHome,
+  hermesStatePaths,
   museStatePaths,
   OPENCODE_CONFINED_ENV,
   openCodeStatePaths,
@@ -85,6 +88,11 @@ interface ProviderCliCommand {
   readonly argv: readonly string[];
   readonly env: (cli: AgentCliInfo) => Record<string, string>;
   readonly timeoutMs: number;
+  /**
+   * A code sign-in closes the CLI's input at once, so that a question the CLI asks first gets its
+   * default answer instead of waiting. Only for a `device` or `link` sign-in, which reads no code.
+   */
+  readonly closeInput?: true;
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -288,6 +296,32 @@ function confineClineTarget(target: SpawnTarget, confinement: ProcessConfinement
   const state = clineStatePaths();
   for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
   return confineSpawnTarget(target, confinement, state);
+}
+
+/** `hermes acp` serves the Agent Client Protocol on stdio. */
+const HERMES_ARGV: readonly string[] = ["acp"];
+
+/** The Nous Portal sign-in, which `hermes auth add` keeps beside the user's other Hermes sign-ins. */
+const HERMES_NOUS_SIGN_IN: readonly string[] = ["auth", "add", "nous", "--type", "oauth"];
+
+/**
+ * Hermes Agent 0.21.5 lists its provider as an auth method only when the provider's credential
+ * resolves: a keyless local endpoint gets a placeholder key, so it counts. Without one, it lists only
+ * its terminal setup, and each new session fails with "Internal error". The real cause is only in
+ * its stderr, so the sign-in state comes from this list.
+ */
+const HERMES_SETUP_METHOD = "hermes-setup";
+function requireHermesProvider(_connection: ClientSideConnection, initialization: InitializeResponse) {
+  const methods = initialization.authMethods ?? [];
+  return methods.length > 0 && methods.every((method) => method.id === HERMES_SETUP_METHOD)
+    ? Effect.fail(providerFailure(RequestError.authRequired()))
+    : Effect.void;
+}
+
+/** The sandbox lets a Hermes process write in its folder, not create it, so OpenBot makes it. */
+function confineHermesTarget(target: SpawnTarget, confinement: ProcessConfinement): SpawnTarget {
+  mkdirSync(hermesHome(), { recursive: true, mode: 0o700 });
+  return confineSpawnTarget(target, confinement, hermesStatePaths());
 }
 
 /**
@@ -995,6 +1029,60 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "cline", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "hermes",
+    // `auth add nous --type oauth` signs in with a Nous Portal subscription: it opens the Nous Portal
+    // device page, and waits until the user approves it. Without a terminal, the CLI takes the
+    // Nous sign-in that another Hermes profile saved before it asks for a new one.
+    signIn: {
+      kind: "cli-command",
+      command: { argv: HERMES_NOUS_SIGN_IN, env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    },
+    // With `--no-browser`, the CLI prints the page and the code, and waits until the user approves it.
+    codeSignIn: {
+      kind: "cli",
+      flow: "device",
+      command: {
+        argv: [...HERMES_NOUS_SIGN_IN, "--no-browser"],
+        env: () => ({}),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+        closeInput: true,
+      },
+    },
+    // `hermes setup`, `hermes model` and `hermes auth` in a terminal write this file, for any provider.
+    signInFile: () => join(hermesHome(), "auth.json"),
+    resolveCli: () => resolveHermesCli(),
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "hermes",
+        flavor: HERMES_ACP_FLAVOR,
+        argv: HERMES_ARGV,
+        env: {},
+        ...(confinement ? { confine: (target) => confineHermesTarget(target, confinement) } : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        signInMessage: sourceText("error.provider.hermesSignIn"),
+        authenticate: requireHermesProvider,
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpEndpoint: context.mcpEndpoint,
+        history: context.history?.("hermes"),
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "hermes",
+        flavor: HERMES_ACP_FLAVOR,
+        argv: HERMES_ARGV,
+        profileGeneration: true,
+        env: {},
+        signInMessage: sourceText("error.provider.hermesSignIn"),
+        authenticate: requireHermesProvider,
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "hermes", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
   {
