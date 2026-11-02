@@ -157,6 +157,7 @@ import {
   decodeHostedSite,
   decodeHostedSiteList,
   decodeLicenseState,
+  decodeLinkAccountStatus,
   decodeMobileConnectedDevices,
   decodeMobileConnectLink,
   decodeMobileConnectTicket,
@@ -873,6 +874,13 @@ const openbotApi: OpenBotDesktopApi = {
     hostRepositories: decodeGitHubConnectorRepositories,
     hostOpenVerification: decodeVoid,
     hostOpenInstall: decodeVoid,
+  }),
+  linkAccount: bridgeGroup(IPC_ENDPOINTS.linkAccount, {
+    status: decodeLinkAccountStatus,
+    connect: decodeLinkAccountStatus,
+    cancel: decodeLinkAccountStatus,
+    disconnect: decodeLinkAccountStatus,
+    changed: decodeLinkAccountStatus,
   }),
   bitwardenConnector: bridgeGroup(IPC_ENDPOINTS.bitwardenConnector, {
     status: decodeBitwardenConnectorStatus,

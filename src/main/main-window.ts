@@ -46,6 +46,7 @@ import type { HighlightDisplay } from "./computer-use-highlight-window";
 import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
+import { preventPanelActivation } from "./mac-panel-activation";
 import {
   createMainWindowBoundsRecorder,
   presentMainWindow,
@@ -545,6 +546,9 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
       webSecurity: true,
     },
   });
+  // The island is the topmost window on every Space. Without this, macOS can give it activation
+  // when the user switches to an application that has no window there.
+  preventPanelActivation(window);
   // Chromium shares zoom per origin. The main window zoom would shrink this fixed-size window's
   // viewport and move the shared avatar out of the expanded panel.
   window.webContents.setZoomMode("isolated");

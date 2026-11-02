@@ -72,6 +72,7 @@ import type { UserErrorDetails } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createStore, For, Match, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
+import { VaultLinkAccount, type VaultLinkAccountProps } from "./VaultLinkAccount";
 
 export interface VaultPanelProps {
   state: VaultState;
@@ -92,6 +93,8 @@ export interface VaultPanelProps {
   onReset: () => Promise<void>;
   /** Where the menus open, so they stay inside the settings page. */
   menuMount?: HTMLElement | undefined;
+  /** The Link account of this computer, above the cards. Absent for a joined server. */
+  link?: Omit<VaultLinkAccountProps, "menuMount"> | undefined;
 }
 
 type Filter = VaultItemKind | "all";
@@ -539,6 +542,17 @@ export function VaultPanel(props: VaultPanelProps) {
               <For each={filters()}>
                 {(tab) => (
                   <SlidingTabs.Content value={tab.value}>
+                    <Show when={tab.value === "card" && props.link}>
+                      {(link) => (
+                        <VaultLinkAccount
+                          status={link().status}
+                          onConnect={link().onConnect}
+                          onCancel={link().onCancel}
+                          onDisconnect={link().onDisconnect}
+                          menuMount={props.menuMount}
+                        />
+                      )}
+                    </Show>
                     <ItemGroup class="settings-modal-card" surface="subtle" aria-label={t(tab.label)}>
                       <Show
                         when={visible(tab.value).length > 0}

@@ -217,6 +217,8 @@ import { InstanceTransferService } from "./instance-transfer-service";
 import { InterfaceSizeService } from "./interface-size-service";
 import { prepareToolRuntimeForTest } from "./ipc/mcp-server-handlers";
 import { LanguageService } from "./language-service";
+import { LinkAccountService } from "./link-account-service";
+import { LinkAccountStore } from "./link-account-store";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import { type LocalServerChildEnvironment, startLocalServerChild } from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
@@ -391,6 +393,7 @@ const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
 const MCP_OAUTH_PROXY_FILE = "openbot-mcp-oauth-proxy-v1.json";
 /** The one GitHub sign-in of this computer, with the same cipher as the MCP sign-ins. */
 const GITHUB_CONNECTOR_FILE = "openbot-github-connector-v1.json";
+const LINK_ACCOUNT_FILE = "openbot-link-account-v1.json";
 /** The 1Password service account token of this computer, with the same cipher. */
 const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 /** The Bitwarden API key and master password of a host connection (`bitwarden-connector-v1`), with the same cipher. */
@@ -470,6 +473,8 @@ const TEARDOWN_ORDER = {
   bitwardenConnector: 106.5,
   // Before the agent service, so no agent is handed a token file that is being removed.
   githubConnector: 107,
+  // Before the agent service, so no payment wait outlives the agents that asked for it.
+  linkAccount: 107.5,
   // Before the agent service, so no script starts a run while the service stops.
   automation: 108,
   storageUsage: 109,
@@ -548,6 +553,8 @@ export interface ApplicationServices {
   /** The Slack and Discord installs that this computer opened for a joined server. */
   relayedMessagingInstalls: RelayedMessagingInstalls;
   githubConnector: GitHubConnectorService;
+  /** The Link account (link.com) that agents ask for one-time cards. */
+  linkAccount: LinkAccountService;
   onePasswordConnector: OnePasswordConnectorService;
   bitwardenConnector: BitwardenConnectorService;
   vault: VaultService;
@@ -1471,6 +1478,13 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.githubConnector, "the GitHub connection", () =>
     runCauseEffect(githubConnector.dispose()),
   );
+  /* The Link account. Agents ask it for one-time cards that the user approves in Link. */
+  const linkAccount = new LinkAccountService({
+    store: new LinkAccountStore(join(app.getPath("userData"), LINK_ACCOUNT_FILE), secretCipher),
+    openExternal: openLink,
+  });
+  await Effect.runPromise(linkAccount.load());
+  teardown.push(TEARDOWN_ORDER.linkAccount, "the Link account", () => Effect.runPromise(linkAccount.dispose()));
   /*
    * The Bitwarden connection. A host connection's API key and master password are stored, so the
    * host unlocks again after a restart; its CLI data and OpenBot's copy of `bw` stay outside every
@@ -1794,6 +1808,7 @@ export async function createApplicationServices({
       { prefix: "openbot:", vault: vault.logins },
     ]),
     vaultItems: vault.items,
+    linkWallet: linkAccount,
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     routineFlowTools: () => routineFlowRuntime,
@@ -3293,6 +3308,7 @@ export async function createApplicationServices({
     signInRelayClient,
     relayedMessagingInstalls: new RelayedMessagingInstalls(remoteServers),
     githubConnector,
+    linkAccount,
     onePasswordConnector,
     bitwardenConnector,
     vault,

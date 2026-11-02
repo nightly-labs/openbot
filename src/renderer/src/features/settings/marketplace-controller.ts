@@ -17,7 +17,8 @@ import type {
 } from "@openbot/contracts/ipc";
 import { assignedSkillCount, isRemovableSkill, isSkillEnabled, mcpConfigErrors } from "@openbot/contracts/ipc";
 import { createMarketplaceShareUrl, type MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
-import type { McpConnectFlow } from "@openbot/contracts/mcp-connect-flows";
+import { mcpAccountFragment, mcpAccountUrl } from "@openbot/contracts/mcp-accounts";
+import { type McpConnectFlow, mcpFlowFields } from "@openbot/contracts/mcp-connect-flows";
 import { createPluginShareUrl } from "@openbot/contracts/plugin-links";
 import { TOAST_DURATION, toast } from "@openbot/ui";
 import { connectorSummary } from "@openbot/ui/features/connectors/ConnectorDetailPanel";
@@ -99,6 +100,8 @@ export interface MarketplaceControllerProps {
   pluginHostName?: string | undefined;
   /** The joined server in `pluginServerId` relays its sign-ins to this computer (`sign-in-relay-v1`). */
   pluginSignInRelay?: boolean | undefined;
+  /** The server in `pluginServerId` keeps a separate sign-in for each account of an app (`mcp-accounts-v1`). */
+  pluginAccounts?: boolean | undefined;
   /** The joined server whose agents `agents` lists, when this account manages it. Absent: this computer. */
   hostServerId?: string | undefined;
   /** The joined server that a marketplace agent is added to. Absent: this computer. */
@@ -734,13 +737,51 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
    * a name alone cannot say which row an app's name belongs to.
    */
   const [servers, setServers] = createSignal<readonly McpServerConfig[]>([]);
-  /** The row this app installed as, or nothing: a name on its own is not enough to claim a row. */
-  const heldApp = (app: MarketplacePluginApp) => servers().find((held) => isPluginAppConfig(held, app));
+  /**
+   * The rows this app installed, one for each account: the row that the first connect saved comes
+   * first, then the accounts that the user added. A name on its own is not enough to claim a row.
+   */
+  const heldApps = (app: MarketplacePluginApp) => {
+    const rows = servers().filter((held) => isPluginAppConfig(held, app));
+    return [
+      ...rows.filter((row) => mcpAccountFragment(row.url) === null),
+      ...rows.filter((row) => mcpAccountFragment(row.url) !== null),
+    ];
+  };
+  /** The first row of this app, or nothing. */
+  const heldApp = (app: MarketplacePluginApp): McpServerConfig | undefined => heldApps(app)[0];
   /** Which held http rows have a sign-in, by row id. Read with the rows. */
   const [signIns, setSignIns] = createSignal<Readonly<Record<string, McpSignInState>>>({});
+  /**
+   * An app on a fixed address that signs in with a browser can have more than one account, when the
+   * host keeps a separate sign-in for each one. An app whose address the user types has one.
+   */
+  const accountsOffered = (app: MarketplacePluginApp) => {
+    const flow = app.server.auth?.[0];
+    return (
+      props.pluginAccounts === true &&
+      app.server.transport === "http" &&
+      flow?.kind === "link" &&
+      !mcpFlowFields(flow).some((field) => field.url)
+    );
+  };
+  /** The catalog gives the server a short name, such as `notion`; the user knows the app's. */
+  const accountName = (app: MarketplacePluginApp, row: McpServerConfig) =>
+    row.name === app.server.name ? app.name : row.name;
   function appConnection(app: MarketplacePluginApp): MarketplaceAppConnection {
-    const held = heldApp(app);
-    return { held: Boolean(held), signInNeeded: held ? signIns()[held.id]?.needsSignIn === true : false };
+    const accounts = heldApps(app).map((row) => ({
+      id: row.id,
+      name: accountName(app, row),
+      signInNeeded: signIns()[row.id]?.needsSignIn === true,
+      signedIn: signIns()[row.id]?.signedIn ?? true,
+      renamable: mcpAccountFragment(row.url) !== null,
+    }));
+    return {
+      held: accounts.length > 0,
+      signInNeeded: accounts.some((account) => account.signInNeeded),
+      accounts,
+      multipleAccounts: accounts.length > 0 && accountsOffered(app),
+    };
   }
   /** The agent that a plugin's skills go to: the open conversation, else the first agent. */
   const pluginAgentId = () => activeAgentId() || agents()[0]?.id || "";
@@ -999,7 +1040,16 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
    * step replaces only the fields it asks for, so the user's own changes to the row stay.
    */
   function pluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
+    // The first account keeps the listing address and name, as a released client matches it by them.
     return heldApp(app) ?? createPluginAppConfig(app);
+  }
+
+  /** `<app> 2`, `<app> 3`, …: the first name that no row of the host has, in any case. */
+  function newAccountName(app: MarketplacePluginApp): string {
+    const taken = new Set(servers().map((server) => server.name.toLocaleLowerCase()));
+    let count = 2;
+    while (taken.has(`${app.name} ${count}`.toLocaleLowerCase())) count += 1;
+    return `${app.name} ${count}`;
   }
 
   /** Takes back only what this attempt installed. A skill the agent already had is the user's. */
@@ -1131,20 +1181,28 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
    * The connect step of one held app again, saved over its row: a new key, a new sign-in, or a
    * desktop app that answers again. The plugin's other apps and its skills do not change.
    */
-  async function reconnectPluginApp(plugin: MarketplacePluginDetail, appId: string): Promise<boolean> {
+  async function reconnectPluginApp(
+    plugin: MarketplacePluginDetail,
+    appId: string,
+    accountId?: string | undefined,
+  ): Promise<boolean> {
     const serverId = props.pluginServerId;
     if (!serverId) {
       setError(t("marketplace.error.connectNoServer"));
       return false;
     }
     const app = plugin.apps.find((candidate) => candidate.id === appId);
-    if (!app || !heldApp(app) || !canConnectHere(plugin, [app])) return false;
+    const rows = app ? heldApps(app) : [];
+    // With no account named, the account whose sign-in the server refused, as the page warns about it.
+    const refused = rows.find((candidate) => signIns()[candidate.id]?.needsSignIn) ?? rows[0];
+    const row = accountId === undefined ? refused : rows.find((candidate) => candidate.id === accountId);
+    if (!app || !row || !canConnectHere(plugin, [app])) return false;
     const key = `app:${plugin.slug}`;
     if (busy[key]) return false;
     mark(key, true);
     const analytics = desktopAnalytics.scope();
     const saved = await run(async () => {
-      const connected = await connectStep(app, pluginAppConfig(app));
+      const connected = await connectStep(app, row);
       if (!connected) return false;
       setServers(await calls().mcp.saveMcpServer({ config: connected }, serverId));
       return true;
@@ -1165,13 +1223,81 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   }
 
   /**
+   * One more account of a held app: a new row on the same address, with its own sign-in. The row is
+   * saved only after the sign-in, so closing the connect step adds nothing.
+   */
+  async function addPluginAccount(plugin: MarketplacePluginDetail, app: MarketplacePluginApp): Promise<boolean> {
+    const serverId = props.pluginServerId;
+    if (!serverId) {
+      setError(t("marketplace.error.connectNoServer"));
+      return false;
+    }
+    if (!heldApp(app) || !accountsOffered(app) || !canConnectHere(plugin, [app])) return false;
+    const key = `app:${plugin.slug}`;
+    if (busy[key]) return false;
+    mark(key, true);
+    const base = createPluginAppConfig(app);
+    const config = { ...base, name: newAccountName(app), url: mcpAccountUrl(base.url, crypto.randomUUID()) };
+    const saved = await run(async () => {
+      const connected = await connectStep(app, config);
+      if (!connected) return false;
+      setServers(await calls().mcp.saveMcpServer({ config: connected }, serverId));
+      return true;
+    });
+    if (saved) await readSignIns(serverId);
+    mark(key, false);
+    if (saved) setNotice(t("marketplace.notice.appConnected", { name: config.name }));
+    return saved === true;
+  }
+
+  /** A new name for one account of an app. The name is also how a message tags the account. */
+  async function renamePluginAccount(
+    plugin: MarketplacePluginDetail,
+    app: MarketplacePluginApp,
+    accountId: string,
+    name: string,
+  ): Promise<boolean> {
+    const serverId = props.pluginServerId;
+    const row = heldApps(app).find((candidate) => candidate.id === accountId);
+    const next = name.trim();
+    // Another name would take a row with no account address out of the app; see `isPluginAppConfig`.
+    if (!serverId || !row || mcpAccountFragment(row.url) === null) return false;
+    if (next === row.name) return true;
+    const key = `app:${plugin.slug}`;
+    if (busy[key]) return false;
+    mark(key, true);
+    const saved = await run(() => calls().mcp.saveMcpServer({ config: { ...row, name: next } }, serverId));
+    if (saved) setServers(saved);
+    mark(key, false);
+    return Boolean(saved);
+  }
+
+  /** Removes one account of an app and its sign-in. The last account goes with Disconnect, as the app. */
+  async function removePluginAccount(
+    plugin: MarketplacePluginDetail,
+    app: MarketplacePluginApp,
+    accountId: string,
+  ): Promise<boolean> {
+    const serverId = props.pluginServerId;
+    const rows = heldApps(app);
+    if (!serverId || rows.length < 2 || !rows.some((row) => row.id === accountId)) return false;
+    const key = `app:${plugin.slug}`;
+    if (busy[key]) return false;
+    mark(key, true);
+    const removed = await removeServer(accountId);
+    if (removed) await readSignIns(serverId);
+    mark(key, false);
+    return removed;
+  }
+
+  /**
    * What a disconnect would really take, read from the host rather than from the listing. A plugin
    * can name two apps while the host holds one.
    */
   function uninstallPlan(plugin: MarketplacePluginDetail): PluginUninstallPlan {
     return {
       pluginName: plugin.name,
-      appNames: plugin.apps.map((app) => heldApp(app)?.name).filter((name): name is string => Boolean(name)),
+      appNames: plugin.apps.flatMap((app) => heldApps(app).map((row) => row.name)),
       skillSlugs: plugin.skills.filter((skill) => pluginSkillHeld(skill.id)).map((skill) => skill.slug),
       agentName: agentName(pluginAgentId()),
     };
@@ -1196,13 +1322,11 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     const analytics = desktopAnalytics.scope();
     const failures: string[] = [];
     let lastCause: unknown;
-    for (const app of plugin.apps) {
-      const config = heldApp(app);
-      if (!config) continue;
+    for (const [app, config] of plugin.apps.flatMap((app) => heldApps(app).map((row) => [app, row] as const))) {
       try {
         setServers(await calls().mcp.removeMcpServer({ mcpServerId: config.id }, serverId));
       } catch (cause) {
-        failures.push(`${app.name}: ${marketplaceErrorMessage(cause)}`);
+        failures.push(`${accountName(app, config)}: ${marketplaceErrorMessage(cause)}`);
         lastCause = cause;
       }
     }
@@ -1359,7 +1483,19 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     canConnectApps: () => Boolean(props.pluginServerId),
     appBusy: (id) => Boolean(busy[`app:${id}`]) || connector(id)?.busy() === true,
     connectApp: (app) => installPlugin(app.plugin),
-    reconnectApp: (app, appId) => reconnectPluginApp(app.plugin, appId),
+    reconnectApp: (app, appId, accountId) => reconnectPluginApp(app.plugin, appId, accountId),
+    addAccount: (app, appId) => {
+      const entry = app.plugin.apps.find((candidate) => candidate.id === appId);
+      return entry ? addPluginAccount(app.plugin, entry) : Promise.resolve(false);
+    },
+    renameAccount: (app, accountId, name) => {
+      const entry = app.plugin.apps.find((candidate) => heldApps(candidate).some((row) => row.id === accountId));
+      return entry ? renamePluginAccount(app.plugin, entry, accountId, name) : Promise.resolve(false);
+    },
+    removeAccount: (app, accountId) => {
+      const entry = app.plugin.apps.find((candidate) => heldApps(candidate).some((row) => row.id === accountId));
+      return entry ? removePluginAccount(app.plugin, entry, accountId) : Promise.resolve(false);
+    },
     get appHostName() {
       return props.pluginHostName;
     },

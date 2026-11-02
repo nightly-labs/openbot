@@ -451,6 +451,7 @@
     "./features/browser/BrowserDock": "./src/features/browser/BrowserDock.tsx",
     "./features/browser/browser-action-labels": "./src/features/browser/browser-action-labels.ts",
     "./features/vault/VaultPanel": "./src/features/vault/VaultPanel.tsx",
+    "./features/vault/VaultLinkAccount": "./src/features/vault/VaultLinkAccount.tsx",
     "./features/vault/VaultRequestCard": "./src/features/vault/VaultRequestCard.tsx",
     "./features/vault/vault.css": "./src/features/vault/vault.css",
     "./features/sidebar/sidebar-agent-states": "./src/features/sidebar/sidebar-agent-states.ts",

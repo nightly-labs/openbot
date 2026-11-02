@@ -339,6 +339,34 @@ const BROWSER_TOOL_DEFINITIONS = [
     },
   }),
   browserTool({
+    name: "request_link_payment",
+    description:
+      "Pay with the user's Link account (link.com). The user approves this one payment in Link; the call waits up to 5 minutes. On approval it returns a cardId of a one-time card for fill_card. Call it once per purchase, with the final total.",
+    shape: {
+      amount: z
+        .number()
+        .int()
+        .positive()
+        .max(100_000_000)
+        .describe("The total in the smallest currency unit, such as cents."),
+      currency: z
+        .string()
+        .regex(/^[A-Za-z]{3}$/)
+        .optional()
+        .describe("ISO 4217 code. Default: the currency of the Link card."),
+      merchantName: requiredString(200),
+      merchantUrl: requiredString(2048).refine((value) => URL.canParse(value) && new URL(value).protocol === "https:", {
+        message: "Use the https address of the merchant's site.",
+      }),
+      context: z
+        .string()
+        .trim()
+        .min(100)
+        .max(2000)
+        .describe("What you buy, the quantity, and why. The user reads it in Link."),
+    },
+  }),
+  browserTool({
     name: "request_takeover",
     description:
       "Ask the user to take over a tab for unclear OAuth account selection, CAPTCHA, passkeys, payment confirmation such as 3-D Secure, or when secure password/code handoff or card fill is unavailable.",

@@ -231,6 +231,7 @@ import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { ProviderSession } from "./database/provider-sessions";
 import { reportOriginalFailure } from "./effect-boundary";
 import type { HostMemory } from "./host-memory";
+import type { LinkWallet } from "./link-wallet";
 import type { MailboxStore } from "./mailbox-store";
 import { toMcpOperationError } from "./mcp-effects";
 import type { McpSignInOpener } from "./mcp-oauth-provider";
@@ -256,6 +257,8 @@ import {
 } from "./workspace-paths";
 
 const logger = createOpenBotLogger("agent-service");
+/** Its lines also go to `main.log`, so a support report can show why channel routing failed (#3041). */
+const routingLogger = createOpenBotLogger("channel-routing");
 
 /**
  * Only the application knows which managed CLIs it downloaded, so a caller that says nothing gets
@@ -391,6 +394,8 @@ export interface AgentServiceOptions {
   passwordVault?: PasswordVault | null;
   /** The cards and contact info of the Vault, or `null`. The browser fills cards from it. */
   vaultItems?: VaultItems | null;
+  /** The Link account of this computer, or `null`. Agents ask it for one-time cards. */
+  linkWallet?: LinkWallet | null;
   /** Where the API keys that users enter through `request_api_key` are saved, or `null`. */
   agentApiKeys?: AgentApiKeys | null;
   /**
@@ -918,6 +923,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
       ...(options.passwordVault === undefined ? {} : { passwordVault: options.passwordVault }),
       ...(options.vaultItems === undefined ? {} : { vaultItems: options.vaultItems }),
+      linkWallet: options.linkWallet ?? null,
       agentName: (agentId) => store.list().find((candidate) => candidate.id === agentId)?.name,
       // The router is made later; a note comes only from a tool call, after both exist.
       noteVaultChange: (agentId, threadId, turnId, text) => this.#tools.postVaultNote(agentId, threadId, turnId, text),
@@ -1030,6 +1036,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         available: options.vaultItems?.ready() ?? false,
         cards: options.vaultItems?.hasCards() ?? false,
         contacts: options.vaultItems?.hasContacts() ?? false,
+        link: options.linkWallet?.connected() ?? false,
       }),
       // Only a server has a memory reading.
       serverHost: hostMemory !== null,
@@ -1176,6 +1183,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           if (this.#mailbox.queuedDeliveryIds(agent.id).length) this.#mailboxSync.emitQueue(agent.id);
       },
       error: (error) => this.#emitError("channel_coordination_failed", error),
+      routingFailed: ({ channelId, taskId, lead, error }) =>
+        routingLogger.warn("channel_coordination_failed", {
+          channelId,
+          taskId,
+          ...(lead ? { provider: lead.provider, model: lead.model, effort: lead.reasoningEffort } : {}),
+          // Redacted as the error event is: a provider text can quote a header or a key that only
+          // the MCP gateway knows. The logger redacts again and limits the length.
+          cause: failureMessages(error).map((message) => this.#mcp.redact(message)),
+        }),
     });
     this.#channelRoutines = new ChannelRoutineScheduler({
       channels: this.channels,
@@ -5180,4 +5196,14 @@ function settleLifecycleTasks<A>(
       discard: true,
     },
   );
+}
+
+/** The messages of a failure and of its causes, from the outside in. */
+function failureMessages(error: unknown): string[] {
+  const messages: string[] = [];
+  for (let cause = error; cause !== undefined && cause !== null && messages.length < 4; ) {
+    messages.push(cause instanceof Error ? cause.message : String(cause));
+    cause = cause instanceof Error ? cause.cause : undefined;
+  }
+  return messages;
 }
