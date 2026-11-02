@@ -9,6 +9,7 @@ const OPENAI = "https://developers.openai.com/api/docs/pricing";
 const CLAUDE = "https://platform.claude.com/docs/en/about-claude/pricing";
 const GROK = "https://docs.x.ai/developers/pricing";
 const GEMINI = "https://ai.google.dev/gemini-api/docs/pricing";
+const DEEPSEEK = "https://api-docs.deepseek.com/quick_start/pricing";
 interface Rates {
   input: number;
   cached: number;
@@ -46,6 +47,7 @@ const claude = (input: number, cached: number, output: number): Price => ({
 // caches only implicitly), and each list doubles on a set date. Antigravity also runs Claude models.
 // Its cache lifetime is unknown, so a Claude update through it that writes the cache stays unpriced.
 const ANTIGRAVITY_VERIFIED = "2026-10-28";
+const DEEPSEEK_VERIFIED = "2026-11-02";
 const antigravityClaude = (input: number, cached: number, output: number): Price => ({
   source: CLAUDE,
   verified: ANTIGRAVITY_VERIFIED,
@@ -137,6 +139,19 @@ const PRICES: Readonly<Record<string, Price>> = {
   },
   "antigravity:claude-opus-5-5": antigravityClaude(4, 0.2, 20),
   "antigravity:claude-sonnet-5-5": antigravityClaude(2, 0.1, 10),
+  // DeepSeek, read 2026-11-02: one rate for the whole 1M context, and no cache-write charge. It bills
+  // off-peak at half these rates (peak is 01:00-04:00 and 06:00-10:00 UTC, Monday-Friday, excluding
+  // Chinese public holidays). These are the peak rates, so an off-peak turn can cost up to half this.
+  "deepseek:deepseek-flash": {
+    source: DEEPSEEK,
+    verified: DEEPSEEK_VERIFIED,
+    short: { input: 0.3, cached: 0.006, cacheWrite: 0, output: 1.2 },
+  },
+  "deepseek:deepseek-v4-pro": {
+    source: DEEPSEEK,
+    verified: DEEPSEEK_VERIFIED,
+    short: { input: 1.32, cached: 0.044, cacheWrite: 0, output: 3.96 },
+  },
 };
 
 function priceOf(provider: string, model: string): Price | undefined {
