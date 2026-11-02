@@ -414,6 +414,15 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Quelles cartes Trello me sont attribuées ?",
   "marketplace.plugin.trello.prompt.board": "Résume ce qui est en cours sur mon tableau Trello.",
   "marketplace.plugin.trello.prompt.newCards": "Ajoute ces actions comme cartes à mon tableau Trello.",
+  "marketplace.plugin.clickup.tagline": "Tâches, documents et nouvelles de l'équipe",
+  "marketplace.plugin.clickup.description":
+    "ClickUp permet aux agents de rechercher des tâches, des documents, des commentaires et des messages de chat, de créer et modifier des tâches, des listes et des documents, de publier des commentaires, d'envoyer des messages de chat et de suivre le temps. Chaque utilisateur se connecte à son propre compte ClickUp dans le navigateur. Les agents ont les mêmes droits que l'utilisateur. Ils peuvent mettre des tâches à la corbeille et supprimer des commentaires.",
+  "marketplace.plugin.clickup.app":
+    "Tâches, documents, commentaires, chat et suivi du temps, via le serveur MCP de ClickUp avec connexion dans le navigateur.",
+  "marketplace.plugin.clickup.prompt.findTasks": "Trouve mes tâches ClickUp ouvertes à échéance cette semaine.",
+  "marketplace.plugin.clickup.prompt.createTask": "Crée une tâche ClickUp avec ces actions et assigne-la-moi.",
+  "marketplace.plugin.clickup.prompt.summarizeDoc":
+    "Trouve la dernière mise à jour du projet dans ClickUp et résume les questions ouvertes.",
   "marketplace.plugin.huggingface.tagline": "Modèles, jeux de données et articles sur le Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face permet aux agents de rechercher des modèles, des jeux de données, des Spaces, des collections et des articles sur le Hugging Face Hub, de lire les model cards et les fichiers des dépôts, de prévisualiser des jeux de données et de rechercher dans la documentation de Hugging Face. Il utilise les données publiques du Hub et ne demande ni compte ni clé. Les outils ne font que lire : les agents ne peuvent pas créer de dépôts ni lancer de jobs.",
