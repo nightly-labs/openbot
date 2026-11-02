@@ -530,6 +530,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Agenten",
   "mobile.agent.section.moveFailed": "Chat konnte nicht verschoben werden",
   "mobile.agent.section.moveTo": "In Ordner verschieben",
+  "mobile.agent.noMessages": "Noch keine Nachrichten",
   "mobile.agent.section.newInside": "Neuer Unterordner",
   "mobile.agent.section.moveFolder": "Verschieben nach",
   "mobile.agent.section.topLevel": "Oberste Ebene",

@@ -523,6 +523,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Agents",
   "mobile.agent.section.moveFailed": "Kan chat niet verplaatsen",
   "mobile.agent.section.moveTo": "Naar map verplaatsen",
+  "mobile.agent.noMessages": "Nog geen berichten",
   "mobile.agent.section.newInside": "Nieuwe submap",
   "mobile.agent.section.moveFolder": "Verplaatsen naar",
   "mobile.agent.section.topLevel": "Hoogste niveau",

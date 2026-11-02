@@ -1,0 +1,1 @@
+- An agent with no messages shows the localized empty preview in the sidebar instead of the English stored placeholder.

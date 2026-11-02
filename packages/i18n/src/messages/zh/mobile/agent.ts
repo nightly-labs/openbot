@@ -497,6 +497,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "助手",
   "mobile.agent.section.moveFailed": "无法移动对话",
   "mobile.agent.section.moveTo": "移动到文件夹",
+  "mobile.agent.noMessages": "还没有消息",
   "mobile.agent.section.newInside": "新建子文件夹",
   "mobile.agent.section.moveFolder": "移动到",
   "mobile.agent.section.topLevel": "顶层",

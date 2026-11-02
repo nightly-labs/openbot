@@ -1,0 +1,1 @@
+- Italian settings include the voice server section (OpenAI-compatible server setup).

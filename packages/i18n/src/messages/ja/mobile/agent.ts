@@ -524,6 +524,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "エージェント",
   "mobile.agent.section.moveFailed": "チャットを移動できませんでした",
   "mobile.agent.section.moveTo": "フォルダーへ移動",
+  "mobile.agent.noMessages": "まだメッセージはありません",
   "mobile.agent.section.newInside": "新しいサブフォルダー",
   "mobile.agent.section.moveFolder": "移動先",
   "mobile.agent.section.topLevel": "最上位",

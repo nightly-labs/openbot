@@ -1,0 +1,1 @@
+- Italian settings include agent default labels (defaults section and per-agent counts).

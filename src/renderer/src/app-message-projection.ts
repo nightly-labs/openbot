@@ -1,10 +1,11 @@
 import { feedbackSentIssue } from "@openbot/contracts/feedback";
 import { serverInstallEvent } from "@openbot/contracts/hosted-servers";
-import type {
-  ClientAgentSummary,
-  ConversationMessage,
-  ConversationSearchPage,
-  QueueDeliveryStatus,
+import {
+  type ClientAgentSummary,
+  type ConversationMessage,
+  type ConversationSearchPage,
+  isAgentStoredEmptyPreview,
+  type QueueDeliveryStatus,
 } from "@openbot/contracts/ipc";
 import {
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
@@ -542,6 +543,7 @@ export function withoutAgent<T>(values: Record<string, T>, agentId: string): Rec
 }
 
 function cleanPreview(preview: string): string {
+  if (isAgentStoredEmptyPreview(preview)) return currentText().t("app.agent.noMessages");
   // The stored preview is the start of the message as written, Markdown and all.
   const cleaned = markdownPreviewText(cleanAgentMessageText(preview))
     .replace(/\binbox\s+at\s+zero\b[:,]?\s*/gi, "")

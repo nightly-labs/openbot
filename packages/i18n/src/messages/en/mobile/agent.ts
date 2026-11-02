@@ -511,6 +511,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.section.unassigned": "Agents",
   "mobile.agent.section.moveFailed": "Could not move chat",
   "mobile.agent.section.moveTo": "Move to folder",
+  "mobile.agent.noMessages": "No messages yet",
   "mobile.agent.section.newInside": "New folder inside",
   "mobile.agent.section.moveFolder": "Move to",
   "mobile.agent.section.topLevel": "Top level",

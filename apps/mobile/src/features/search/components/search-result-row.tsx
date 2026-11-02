@@ -1,3 +1,4 @@
+import { isAgentStoredEmptyPreview } from "@openbot/contracts/ipc";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -236,11 +237,13 @@ export function MobileSearchResultRow({
   switch (result.kind) {
     case "agent": {
       const { agent } = result;
+      const title = agent.title.trim();
+      const detail = title || (isAgentStoredEmptyPreview(agent.preview) ? t("mobile.agent.noMessages") : agent.preview);
       return (
         <SearchRow
           leading={<AgentAvatar agent={agent} />}
           title={agent.name}
-          detail={agent.title.trim() || agent.preview}
+          detail={detail}
           trailing={agent.updatedLabel}
           query={query}
           onPress={() => openChat(agent.id)}
