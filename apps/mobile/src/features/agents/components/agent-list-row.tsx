@@ -3,7 +3,6 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import { BlurView } from "expo-blur";
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
-import { useThemeColor } from "heroui-native/hooks";
 import { memo, type PropsWithChildren, useEffect, useId, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, {
@@ -25,7 +24,7 @@ import { useAgentPinTransition } from "@/features/agents/components/agent-pin-tr
 import { AGENT_WAIT_STATE, AgentWaitBadge, AgentWaitChip } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
+import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
 import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
@@ -102,7 +101,7 @@ interface AgentListRowProps {
  */
 export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, rightInset = 20 }: AgentListRowProps) {
   const { t } = useText();
-  const [background] = useThemeColor(["background"]);
+  const background = useChatRowBackground(agent.id);
   const pinBlocked = useMobileWorkspaceSelector(
     ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id),
   );
@@ -132,12 +131,10 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   );
   const waitBadge = waitReason ? <AgentWaitBadge reason={waitReason} /> : null;
   const avatar = (
-    <ChatZoomSource>
-      <AgentPinAvatar agentId={agent.id} location="row" size={54}>
-        {bloub}
-        {waitBadge}
-      </AgentPinAvatar>
-    </ChatZoomSource>
+    <AgentPinAvatar agentId={agent.id} location="row" size={54}>
+      {bloub}
+      {waitBadge}
+    </AgentPinAvatar>
   );
   const openLabel = agent.title.trim()
     ? t("mobile.agent.list.openWithTitle", { name: agent.name, title: agent.title.trim() })

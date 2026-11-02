@@ -13,7 +13,7 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
  * held in memory after `load` rather than read from disk each time.
  *
  * A file that is missing, unreadable as JSON or names a value that is not a choice reads as the
- * default, which was the fixed cap before the setting existed. Writes are chained for the reason
+ * default. Writes are chained for the reason
  * `update-preference-store.ts` chains its own.
  */
 export class AgentMemoryLimitPreferenceStore {

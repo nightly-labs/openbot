@@ -264,8 +264,10 @@ try {
   assert.ok(session, "the agent has a provider session");
   const killedPid = protocol().find((entry) => entry.start)?.pid ?? 0;
   assert.ok(killedPid, "the fake server logged its start");
+  // Each session has a process of its own, so a start before the kill is not the restart.
+  const startsBefore = protocol().filter((entry) => entry.start).length;
   process.kill(killedPid, "SIGTERM");
-  await waitFor("Antigravity to start again", () => protocol().find((entry) => entry.start && entry.pid !== killedPid));
+  await waitFor("Antigravity to start again", () => protocol().filter((entry) => entry.start).length > startsBefore);
   await waitFor("the provider to be ready again", () => agents.getStatus().phase === "ready");
   await send(agent.id, { input: 7_000, cached: 6_500, output: 100, thought: 50 }, "turn after a restart");
   await check("turn after a restart", threadId, 3, { input: 7_000, cached: 6_500, output: 100, thought: 50 });

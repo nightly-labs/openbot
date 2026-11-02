@@ -47,7 +47,7 @@ export const messages = {
   "provider.status.checking": "Проверка",
   "provider.status.off": "Выключено",
   "provider.gemini.hostSignIn":
-    "Чтобы подключить Gemini, откройте OpenBot на хосте и нажмите «Подключить» в разделе «Настройки» > «Провайдеры». Для входа в Google на этом хосте нужен браузер. Удалённый вход не поддерживается.",
+    "Чтобы подключить Gemini, откройте OpenBot на хосте и нажмите «Подключить» в разделе «Настройки сервера» > «Провайдеры». Для входа в Google на этом хосте нужен браузер. Удалённый вход не поддерживается.",
 
   "provider.key.free": "Бесплатно",
 
@@ -137,6 +137,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, по умолчанию",
   "provider.picker.effort": "Усилие",
   "provider.picker.effortLabel": "Уровень усилий агента",
+  "provider.picker.effortFixed": "{effort}, задаёт {provider}",
   "provider.picker.fast": "Быстро",
   "provider.picker.fastLabel": "Быстрый режим",
   "provider.picker.selectEffort": "Выбрать уровень усилий",
@@ -205,6 +206,7 @@ export const messages = {
   "provider.account.cancelSignIn": "Отменить вход",
   "provider.account.finishSignIn": "Завершите вход в браузере.",
   "provider.account.remove": "Удалить аккаунт",
+  "provider.account.disconnect": "Отключить",
   "provider.account.actionFailed": "Не удалось изменить аккаунт {name}.",
   "provider.account.resetUsage": "Сбросить использование",
   "provider.account.resetUsageTitle": "Сбросить использование {name}?",
@@ -221,6 +223,13 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "У {name} не осталось кредитов сброса использования.",
   "provider.account.resetUsageAlreadyRedeemed": "Этот кредит сброса {name} уже использован.",
   "provider.account.resetUsageFailed": "Не удалось сбросить использование {name}.",
+  "provider.settings.disconnectTitle": "Отключить {name}?",
+  "provider.settings.disconnectOthers": "Другие аккаунты {provider} ждут, пока вы снова не подключите {provider}.",
+  "provider.settings.disconnectLocal":
+    "OpenBot выйдет из {provider} на этом компьютере. CLI {provider} в терминале тоже выйдет из аккаунта.",
+  "provider.settings.disconnectHost": "OpenBot выйдет из {provider} на сервере.",
+  "provider.settings.versionInstalledByUser": "{version} · установлена вами",
+  "provider.settings.versionDownloaded": "{version} · загружена OpenBot",
   "provider.settings.cache": "Кэш",
   "provider.settings.promptCache": "Кэш промптов",
   "provider.settings.promptCacheDescription": "Как долго Claude хранит контекст агента в кэше между ходами.",

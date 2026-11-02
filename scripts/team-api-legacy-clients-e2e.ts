@@ -7,7 +7,10 @@
 // - v3: agent duplication, its idempotent retry, and the refused request shapes.
 // - v7 and v8: a v7 client on this host gets no v8 field; the v8 decoder reads the released v4-v7
 //   fixtures; the v7 decoder still refuses a provider that it does not know.
-// - v8 over WebRTC: a browser tab opened from an agent's panel keeps its owner agent.
+// - v9: the v9 decoder reads the v9 fixtures, which have more than 128 capabilities; the v8 decoder
+//   refuses them.
+// - v8 over WebRTC: a browser tab opened from an agent's panel keeps its owner agent, and a secure
+//   authentication answer and an agent profile save keep their agent (#3949).
 // - context-usage-v1: a v8 client that asks for it gets the context of each agent it can see; any other
 //   client gets the released runtime snapshot (#3584).
 // Run: `bun scripts/team-api-legacy-clients-e2e.ts`.
@@ -18,7 +21,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentContextState } from "@openbot/contracts/ipc";
+import { type AgentContextState, BROWSER_SECRET_RESPONSE_PATH } from "@openbot/contracts/ipc";
 import {
   createTeamProtocolV2Request,
   createTeamProtocolV8Event,
@@ -38,6 +41,7 @@ import {
   encodeTeamProtocolV8WebRtcHttpRequest,
   highestCommonTeamProtocol,
   TEAM_APP_VERSION_HEADER,
+  TEAM_BOOTSTRAP_CAPABILITIES,
   TEAM_CAPABILITIES_HEADER,
   TEAM_CONTEXT_USAGE_CAPABILITY,
   TEAM_PROTOCOL_V1,
@@ -50,7 +54,16 @@ import {
   teamCapabilitiesForProtocol,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { decodeTeamProtocolSupportV8Base } from "@openbot/contracts/team-protocol/v8-base";
 import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
+import {
+  decodeTeamProtocolSupportV9,
+  TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
+  TEAM_PROTOCOL_V9,
+  TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
+} from "@openbot/contracts/team-protocol/v9";
+import { sourceText } from "@openbot/i18n/source";
 import { plugin } from "bun";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
@@ -597,6 +610,28 @@ try {
     return { read };
   });
 
+  await step("v9 decoder: reads the v9 fixtures; the v8 decoder refuses more than 128 capabilities", async () => {
+    const client = fixture("v9/client-capabilities.json");
+    assert.ok(Array.isArray(client), "v9/client-capabilities.json is not a list.");
+    assert.ok(
+      client.length > 128 && client.length <= TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
+      `v9/client-capabilities.json has ${client.length} capabilities.`,
+    );
+    assert.ok(client.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "The v9 client list has no marker.");
+    const host = decodeTeamProtocolSupportV9(fixture("v9/host-compatibility.json"));
+    assert.equal(host.protocol.maximum, TEAM_PROTOCOL_V9);
+    assert.ok(
+      host.capabilities.length > 128,
+      `v9/host-compatibility.json has ${host.capabilities.length} capabilities.`,
+    );
+    assert.ok(host.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "The v9 host list has no marker.");
+    assert.throws(
+      () => decodeTeamProtocolSupportV8Base(fixture("v9/host-compatibility.json")),
+      "The v8 decoder read v9/host-compatibility.json.",
+    );
+    return { client: client.length, host: host.capabilities.length };
+  });
+
   await step("v7 client: this host serves protocol 7 without the v8 `displayName`", async () => {
     const compatibility = await wire(port, { protocol: null, method: "GET", path: "/v1/compatibility" });
     const host = record(record(compatibility.body, "compatibility").protocol, "protocol");
@@ -630,9 +665,11 @@ try {
       v8Rows.every((row) => typeof row.displayName === "string" && row.displayName.length > 0),
       "A v8 row has no displayName.",
     );
+    // Protocol 7 knows only these providers. The host leaves out the rows of later ones, such as OpenRouter.
+    const v7Providers = ["codex", "claude", "grok", "opencode", "antigravity", "acp", "cursor", "cline", "pi", "muse"];
     assert.deepEqual(
-      v8Rows.map((row) => row.id),
       v7Rows.map((row) => row.id),
+      v8Rows.map((row) => row.id).filter((id) => v7Providers.includes(String(id))),
       "v7 and v8 list different providers.",
     );
     return { providers: v8Rows.map((row) => `${String(row.id)}: ${String(row.displayName)}`) };
@@ -1010,6 +1047,123 @@ try {
       `The host failed the DELETE: ${JSON.stringify(frame)}.`,
     );
     return { status };
+  });
+
+  await step("v9 RPC: a protocol 9 peer gets the full list; a protocol 8 peer gets at most 128", async () => {
+    // A WebRTC request has no protocol header: the host reads the protocol from the marker
+    // capabilities. Protocols 7 and 8 read at most 128 capabilities, so their list leaves out the
+    // protocol 9 ones.
+    const compatibility = async (capabilities: readonly string[]) => {
+      const requestId = randomUUID();
+      const from = v2.bridge.sent.length;
+      v2.bridge.emit(
+        "data",
+        "peer-v2",
+        "rpc",
+        encodeTeamProtocolV2Frame(
+          createTeamProtocolV2Request(requestId, "http.request", {
+            method: "GET",
+            path: "/v1/compatibility",
+            body: null,
+            capabilities: [...capabilities],
+          }),
+        ),
+      );
+      const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
+      assert.ok("result" in frame, `The compatibility frame failed: ${JSON.stringify(frame)}.`);
+      return record(frame.result, "RPC result").body;
+    };
+    // The bootstrap list of a protocol 9 client has the marker, so its first read is complete.
+    const first = decodeTeamProtocolSupportV9(await compatibility(TEAM_BOOTSTRAP_CAPABILITIES));
+    assert.equal(first.protocol.maximum, TEAM_PROTOCOL_V9);
+    assert.ok(first.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "The protocol 9 list has no marker.");
+    // A protocol 9 request may carry more than 128 capabilities.
+    const full = decodeTeamProtocolSupportV9(await compatibility(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)));
+    assert.deepEqual(full.capabilities, first.capabilities);
+    // The released protocol 8 decoder still reads what a protocol 8 peer gets.
+    const v8 = decodeTeamProtocolSupportV8Base(await compatibility(teamCapabilitiesForProtocol(8)));
+    assert.ok(v8.capabilities.length <= 128, `A protocol 8 peer got ${v8.capabilities.length} capabilities.`);
+    assert.ok(!v8.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "A protocol 8 peer got the marker.");
+    assert.ok(
+      !v8.capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY),
+      "A protocol 8 peer got a protocol 9 capability.",
+    );
+    return { protocol9: first.capabilities.length, protocol8: v8.capabilities.length };
+  });
+
+  await step("v8 RPC: a secure authentication answer over WebRTC reaches the agent (#3949)", async () => {
+    // The answer names its agent as `agentId` on every protocol. With `botId`, the Team API refused
+    // the body with 400 before the agent service read it.
+    const path = BROWSER_SECRET_RESPONSE_PATH;
+    const requestId = randomUUID();
+    const from = v2.bridge.sent.length;
+    v2.bridge.emit(
+      "data",
+      "peer-v2",
+      "rpc",
+      encodeTeamProtocolV2Frame(
+        createTeamProtocolV2Request(requestId, "http.request", {
+          method: "POST",
+          path,
+          body: encodeTeamProtocolV8WebRtcHttpRequest("POST", path, {
+            requestId: "no-such-request",
+            agentId: source.id,
+            decision: "cancel",
+          }),
+          capabilities: [...teamCapabilitiesForProtocol(8)],
+        }),
+      ),
+    );
+    const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
+    // No secure card is open, so the agent service answers that the request is no longer active.
+    const error = "error" in frame ? frame.error : undefined;
+    assert.equal(
+      error?.message,
+      sourceText("error.backend.authRequestInactive"),
+      `The answer did not reach the agent service: ${JSON.stringify(frame)}.`,
+    );
+    return { status: error?.status };
+  });
+
+  await step("v8 RPC: an agent profile save over WebRTC keeps its agent", async () => {
+    // The profile routes also read `agentId` on the wire. With `botId`, the Team API read a save of an
+    // agent as a new agent with no first message and refused it with 400.
+    const path = "/v1/agents/profile/save";
+    const requestId = randomUUID();
+    const from = v2.bridge.sent.length;
+    v2.bridge.emit(
+      "data",
+      "peer-v2",
+      "rpc",
+      encodeTeamProtocolV2Frame(
+        createTeamProtocolV2Request(requestId, "http.request", {
+          method: "POST",
+          path,
+          body: encodeTeamProtocolV8WebRtcHttpRequest("POST", path, {
+            operationId: randomUUID(),
+            agentId: "no-such-agent",
+            draft: {
+              name: "Smoke",
+              title: "",
+              description: "Profile check",
+              avatarSeed: "smoke",
+              avatarHue: null,
+              sectionId: null,
+            },
+          }),
+          capabilities: [...teamCapabilitiesForProtocol(8)],
+        }),
+      ),
+    );
+    const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
+    // The agent does not exist, so the agent service answers for that agent and not for a new one.
+    const error = "error" in frame ? frame.error : undefined;
+    assert.equal(
+      error?.message,
+      sourceText("error.agent.gone"),
+      `The save did not keep its agent: ${JSON.stringify(frame)}.`,
+    );
+    return { status: error?.status };
   });
 
   await step("v2 path: a failed ICE path marks the session away and keeps it open (#3583)", async () => {

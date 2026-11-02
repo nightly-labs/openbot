@@ -7,12 +7,14 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   AGENT_EXCHANGE_ITEM_TYPE,
+  AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
   CONTEXT_RESET_ITEM_TYPE,
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
   MODEL_SWITCH_ITEM_TYPE_PREFIX,
+  PLAN_CONTINUATION_ITEM_TYPE,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
@@ -67,6 +69,8 @@ function isIncoming(message: { itemType?: string | undefined }, fromUser: boolea
     message.itemType !== "plan" &&
     message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
     message.itemType !== CONVERSATION_MEMORY_CHANGES_ITEM_TYPE &&
+    message.itemType !== PLAN_CONTINUATION_ITEM_TYPE &&
+    message.itemType !== AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE &&
     message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE &&
     !isRoutineEventItem(message)
   );
@@ -85,7 +89,7 @@ function isIncomingConversationMessage(message: {
  * kinds of row the renderer synthesizes itself: streamed thinking and UI notices.
  * Neither exists in main, so neither can be read.
  */
-function isIncomingAgentMessage(message: AgentMessage): boolean {
+export function isIncomingAgentMessage(message: AgentMessage): boolean {
   return (
     isIncoming(message, message.author === "you") &&
     !message.id.startsWith("thinking:") &&

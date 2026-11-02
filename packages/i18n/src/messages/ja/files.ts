@@ -111,12 +111,15 @@ export const messages = {
   "files.cleanup.description.caches": "サーバーのファイルのコピーです。開くと OpenBot がもう一度ダウンロードします。",
   "files.cleanup.description.logs": "診断ログです。新しいログがすぐに始まります。",
   "files.cleanup.description.runtimes":
-    "どのエージェントも使っていない、古いプロバイダー CLI のバージョンです。OpenBot は使用中のバージョンと、動作する古いバージョンを 1 つ残します。",
+    "どのエージェントも使っていない、古いプロバイダー CLI のバージョンです。OpenBot は使用中のバージョンを残します。",
+  "files.cleanup.description.runtimeDownloads":
+    "{providers} の CLI のダウンロードと、ある場合は古い CLI のバージョンです。どのエージェントも使っていません。これらのプロバイダーはオフか、インストール済みの CLI を使っています。プロバイダーが必要とするとき、OpenBot は CLI をもう一度ダウンロードします。",
   "files.cleanup.clear": "消去",
   "files.cleanup.clearCategory": "{category}を消去",
   "files.cleanup.confirm.caches": "キャッシュされたサーバーのファイルを消去しますか？",
   "files.cleanup.confirm.logs": "ログを消去しますか？",
   "files.cleanup.confirm.runtimes": "古いプロバイダー CLI のバージョンを削除しますか？",
+  "files.cleanup.confirm.runtimeDownloads": "プロバイダー CLI のダウンロードを削除しますか？",
   "files.cleanup.confirmDescription": "{size} が空きます。{description}",
   "files.cleanup.clearing": "消去中…",
   "files.cleanup.failed": "データを消去できませんでした。",

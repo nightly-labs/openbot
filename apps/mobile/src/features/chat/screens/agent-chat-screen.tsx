@@ -4,6 +4,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { useCallback } from "react";
 import { Pressable, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MobileChatView } from "@/features/chat/components/agent-chat-view";
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
@@ -18,6 +19,7 @@ export function AgentChatScreen() {
 
   const { agentId, messageId } = useLocalSearchParams<{ agentId: string; messageId?: string }>();
   const foreground = useThemeColor("foreground");
+  const insets = useSafeAreaInsets();
   const resolvedAgentId = Array.isArray(agentId) ? agentId[0] : agentId;
   const resolvedMessageId = Array.isArray(messageId) ? messageId[0] : messageId;
   // Only this agent: a change elsewhere in the workspace does not render the whole chat again.
@@ -44,7 +46,10 @@ export function AgentChatScreen() {
   }
 
   return (
-    <View className="flex-1 items-center justify-center gap-5 bg-background px-8">
+    <View
+      className="flex-1 items-center justify-center gap-5 bg-background"
+      style={{ paddingLeft: insets.left + 32, paddingRight: insets.right + 32 }}
+    >
       <Typography.Heading type="h4" align="center">
         {t("mobile.chat.agentUnavailable.title")}
       </Typography.Heading>

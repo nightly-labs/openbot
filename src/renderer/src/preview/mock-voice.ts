@@ -9,6 +9,9 @@ import {
   VOICE_MODEL_IDS,
   type VoiceModelId,
   type VoiceModelStatus,
+  type VoiceServerModels,
+  type VoiceServerProbe,
+  type VoiceServerSettings,
   type VoiceSettings,
   type VoiceStreamTranscript,
 } from "@openbot/contracts/ipc";
@@ -21,6 +24,34 @@ export interface MockVoiceOptions {
   /** True when the speech model is downloaded. */
   speechModelReady?: boolean;
   speechSettings?: SpeechSettings;
+  /** The user's own voice server. None when not given. */
+  voiceServer?: VoiceServerSettings | null;
+}
+
+/** A Speaches server: Whisper for dictation and Kokoro for replies. */
+const MOCK_SERVER_MODELS: VoiceServerModels = {
+  transcription: ["Systran/faster-whisper-large-v3", "Systran/faster-distil-whisper-small.en"],
+  speech: ["speaches-ai/Kokoro-82M-v1.0-ONNX"],
+  voices: ["af_heart", "af_sky", "am_adam", "bm_george"],
+};
+
+/** Kokoro-FastAPI: speech only. */
+const MOCK_SPEECH_ONLY_MODELS: VoiceServerModels = {
+  transcription: [],
+  speech: ["kokoro"],
+  voices: ["af_heart", "af_bella", "am_michael", "bf_emma"],
+};
+
+/**
+ * What a test of the preview finds. Port 8880 has speech only, a host with "offline" does not
+ * answer, the key "wrong" is refused, and every other address has both routes.
+ */
+function probeMockServer(address: string, apiKey: string | null): VoiceServerProbe {
+  const url = new URL(address);
+  if (url.hostname.includes("offline"))
+    return { ok: false, field: "address", message: `OpenBot could not connect to ${url.host}.` };
+  if (apiKey === "wrong") return { ok: false, field: "apiKey", message: `${url.host} refused the API key.` };
+  return { ok: true, models: clone(url.port === "8880" ? MOCK_SPEECH_ONLY_MODELS : MOCK_SERVER_MODELS) };
 }
 
 /** The sample rate of Supertonic 3. */
@@ -47,6 +78,8 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
     : { modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null };
   const speechListeners = new Set<Listener<SpeechModelStatus>>();
   let speechTransfer: { settle: (status: SpeechModelStatus) => void } | null = null;
+  let server: VoiceServerSettings | null = clone(options.voiceServer ?? null);
+  const serverListeners = new Set<Listener<VoiceServerSettings | null>>();
   const setSpeechStatus = (next: SpeechModelStatus) => {
     speechStatus = next;
     emit(speechListeners, clone(next));
@@ -183,6 +216,22 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
     onSpeechModelStatus: (listener) => {
       speechListeners.add(listener);
       return () => speechListeners.delete(listener);
+    },
+    getServer: async () => clone(server),
+    probeServer: ({ address, apiKey }) =>
+      new Promise((resolve) => schedule(() => resolve(probeMockServer(address, apiKey)), 600)),
+    setServer: async ({ server: next }) => {
+      server = next && {
+        address: next.address,
+        hasApiKey: next.apiKey !== null || (server?.hasApiKey ?? false),
+        routes: clone(next.routes),
+      };
+      emit(serverListeners, clone(server));
+      return clone(server);
+    },
+    onServerSettings: (listener) => {
+      serverListeners.add(listener);
+      return () => serverListeners.delete(listener);
     },
   };
   return { voice };

@@ -7,10 +7,13 @@ import {
 } from "@openbot/contracts/chat-tag-references";
 import {
   customProviderOfModel,
+  isCustomProviderHarness,
   type McpSignInRelayPage,
   relayableSignInLink,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
+import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
 import { currentText } from "@openbot/ui/text";
 import { usesTouchLayout } from "@openbot/ui/utils";
@@ -20,6 +23,7 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  flush,
   onCleanup,
   onSettled,
   untrack,
@@ -27,7 +31,9 @@ import {
 } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { createScopeGuard } from "../../scope-lifetime";
+import { appendVoiceTranscript } from "../../voice-recording";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
+import type { ChatSearchMatch } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey } from "./conversation-keys";
 import { conversationRuntime } from "./conversation-runtime";
@@ -120,8 +126,10 @@ export function createConversationViewScope(props: ConversationProps) {
     pendingSends,
     showComposerActions,
     setShowComposerActions,
-    attachmentBusy,
-    setAttachmentBusy,
+    importingDrafts,
+    setImportingDrafts,
+    pastePreviews,
+    setPastePreviews,
     composerErrors,
     setComposerErrors,
     composerErrorReferences,
@@ -137,6 +145,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setVoiceElapsedSeconds,
     voiceLiveTranscript,
     setVoiceLiveTranscript,
+    voiceThreadKey,
+    setVoiceThreadKey,
     voiceLevels,
     setVoiceLevels,
     voiceLimitReached,
@@ -253,12 +263,16 @@ export function createConversationViewScope(props: ConversationProps) {
   const {
     skillSettingsRequest,
     openSkillSettings,
+    instructionsSettingsRequest,
+    openInstructionsSettings,
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,
     filesOpen,
     panelSubagentId,
     openSubagentPanel,
+    panelThreadId,
+    openPanelThread,
     sidePanel,
     sidePanelOpen,
     setSidePanelMaximized,
@@ -279,6 +293,7 @@ export function createConversationViewScope(props: ConversationProps) {
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
     previewQuoteId,
+    previewFileKey,
     previewWorkspaceAgentId,
     sidebarFileBack,
     openSidebarFileBack,
@@ -317,6 +332,7 @@ export function createConversationViewScope(props: ConversationProps) {
     editingServerId,
     editingDeliveryId,
     editingPendingSave,
+    pastePreviews,
     seenMessageIds: resources.seenMessageIds,
   });
   const {
@@ -327,6 +343,8 @@ export function createConversationViewScope(props: ConversationProps) {
     currentComposerError,
     currentChatError,
     unreferencedDraftAttachments,
+    rowDraftAttachments,
+    currentPastePreviews,
     composerHasContent,
     replyTarget,
     markMessageSeen,
@@ -354,7 +372,18 @@ export function createConversationViewScope(props: ConversationProps) {
     const entry = conversationErrorRuns()[composerDraftKey(target)];
     return entry?.message === message ? entry.run : null;
   });
-  const queue = createQueueStore({ props, hiddenAwaitingReplyIds });
+  /** True while a file import for the chat waits. An import for another chat does not stop this one. */
+  const attachmentBusy = (target = currentTarget()) =>
+    target !== undefined && importingDrafts().has(composerDraftKey(target));
+  const syncAttachmentImports = () =>
+    setImportingDrafts(new Set(Array.from(resources.importTargetAgents.values(), composerDraftKey)));
+  const currentPendingSends = createMemo(() => pendingSends.list(currentTarget()));
+  // The host queues a message for a moment before it starts it. A send made while the agent was idle
+  // stays in the chat for that moment, so it does not jump to the queue panel and back.
+  const startingDeliveryIds = createMemo(
+    () => new Set(currentPendingSends().flatMap((send) => (send.starting && send.messageId ? [send.messageId] : []))),
+  );
+  const queue = createQueueStore({ props, hiddenAwaitingReplyIds, startingDeliveryIds });
   const { activeDeliveries, orderedQueuedDeliveries, presentedQueueDeliveries, queuePanelVisible } = queue;
   const awaitingReplies = channel
     ? createMemo(() => {
@@ -384,12 +413,13 @@ export function createConversationViewScope(props: ConversationProps) {
     providerSilentMinutes,
     providerOffline,
   } = activity;
-  /** The name of what the agent's turns wait for. OpenCode serves a custom endpoint, so it names the endpoint (#3234). */
+  /** The name of what the agent's turns wait for. OpenCode or Pi serves a custom endpoint, so it names the endpoint (#3234). */
   const agentProviderName = () => {
     const agent = props.agent;
     if (!agent) return undefined;
-    const endpoint =
-      agent.provider === "opencode" ? customProviderOfModel(agent.model, props.customProviders ?? []) : undefined;
+    const endpoint = isCustomProviderHarness(agent.provider)
+      ? customProviderOfModel(agent.model, props.customProviders ?? [])
+      : undefined;
     return endpoint?.name ?? providerDisplayName(agent.provider);
   };
   const browser = createBrowserStore({
@@ -438,17 +468,78 @@ export function createConversationViewScope(props: ConversationProps) {
     if (pane === "browser") showBrowserPanel();
     else setActiveRightPanel(SIDE_PANEL_MODES[pane]);
   }
-  /** The panel button opens the side panel at its last pane, or at the list of panes when none is open. */
+  const sideThreadIds = () => props.threads?.side.tabs.map((thread) => thread.id) ?? [];
+  /** The side thread that the side panel shows, or null when its tab is gone. */
+  const shownPanelThreadId = () => {
+    const id = panelThreadId();
+    return id !== null && sideThreadIds().includes(id) ? id : null;
+  };
+  /**
+   * The panel button opens the side panel at its last pane or side thread, or at the list of panes
+   * when no tab is open.
+   */
   function toggleSidePanel() {
     if (sidePanelOpen()) {
       hideBrowserPanel();
       return;
     }
     const { panes, selected } = sidePanel();
-    const pane = selected && panes.includes(selected) ? selected : (panes[0] ?? null);
+    const pane = selected && panes.includes(selected) ? selected : null;
+    const thread = shownPanelThreadId() ?? sideThreadIds()[0];
     if (pane) openSidePanelPane(pane);
+    else if (thread && selected === null) openPanelThread(thread);
+    else if (panes[0]) openSidePanelPane(panes[0]);
     else setActiveRightPanel("side-panel");
   }
+  /**
+   * A side thread tab left the side panel. When it showed, the side thread next to it shows, else the
+   * last pane. With no tab, the panel lists the panes.
+   */
+  function leavePanelThread(id: string, leave: () => void) {
+    const shown = activeRightPanel() === "thread" && shownPanelThreadId() === id;
+    const ids = sideThreadIds();
+    const index = ids.indexOf(id);
+    leave();
+    if (!shown) return;
+    const rest = ids.filter((other) => other !== id);
+    const thread = rest[Math.min(Math.max(index, 0), rest.length - 1)];
+    const pane = sidePanel().panes.at(-1);
+    if (thread) openPanelThread(thread);
+    else if (pane) openSidePanelPane(pane);
+    else setActiveRightPanel("side-panel");
+  }
+  /** Closes the tab of a side thread in the side panel. The thread stays in the thread list. */
+  function closePanelThread(id: string) {
+    leavePanelThread(id, () => props.threads?.side.onClose(id));
+  }
+  /** Moves the tab of a side panel thread back to the chat, and opens it there. */
+  function movePanelThreadToChat(id: string) {
+    leavePanelThread(id, () => props.threads?.side.onToChat(id));
+  }
+  /** Moves a chat tab to the side panel, and shows its thread there. */
+  function moveThreadToPanel(id: string) {
+    props.threads?.side.onToSide(id);
+    openPanelThread(id);
+  }
+  // A side thread that shows can also leave the side panel from outside it: the thread list or a
+  // notification opens it in the chat, or it is archived. The side thread next to it then shows, else
+  // the last pane, as when its tab closes. A thread that is not in the list yet, as before the threads
+  // load after a start, did not show, so the panel keeps it.
+  createEffect(
+    () => ({
+      shown: activeRightPanel() === "thread" ? shownPanelThreadId() : null,
+      requested: activeRightPanel() === "thread" ? panelThreadId() : null,
+      ids: sideThreadIds(),
+      pane: sidePanel().panes.at(-1),
+    }),
+    (next, previous) => {
+      if (next.shown !== null || !previous?.shown || next.requested !== previous.shown) return;
+      const index = previous.ids.indexOf(previous.shown);
+      const thread = next.ids[Math.min(Math.max(index, 0), next.ids.length - 1)];
+      if (thread) openPanelThread(thread);
+      else if (next.pane) openSidePanelPane(next.pane);
+    },
+  );
   /** The subagent that the side panel shows now, or null. */
   const shownSubagentId = () => (activeRightPanel() === "subagent" ? panelSubagentId() : null);
   /** A click on a subagent opens it on the side; a click on the subagent that shows closes its pane. */
@@ -462,12 +553,13 @@ export function createConversationViewScope(props: ConversationProps) {
     const shown = sidePanelOpen() && sidePanel().selected === pane;
     const next = removeSidePanelPane(pane);
     if (!shown) return;
+    const thread = sideThreadIds()[0];
     if (next) openSidePanelPane(next);
+    else if (thread) openPanelThread(thread);
     else setActiveRightPanel("side-panel");
   }
   const viewIsMounted = createScopeGuard();
   let attachmentPicker: HTMLInputElement | undefined;
-  const currentPendingSends = createMemo(() => pendingSends.list(currentTarget()));
   // The host rows on screen: a sent message hands over to its row in the transcript or the queue.
   // Built only while a send waits for its row, so a streaming reply does not rebuild it for nothing.
   const drawnHostIds = createMemo(() =>
@@ -478,12 +570,18 @@ export function createConversationViewScope(props: ConversationProps) {
         ])
       : new Set<string>(),
   );
-  // Filtered here as well as settled below, so the two rows never stand together for a frame.
-  const pendingMessages = createMemo(() =>
-    currentPendingSends()
+  // Filtered here as well as settled below, so the two rows never stand together for a frame. A send
+  // made while the agent works goes to the queue panel; drawn here first, it would jump there.
+  // A send behind a failed one waits for Retry or Dismiss, and the host does not have it yet, so the
+  // queue panel cannot show it: the chat shows it, queued or not.
+  const pendingMessages = createMemo(() => {
+    const sends = currentPendingSends();
+    const firstFailed = sends.findIndex((send) => send.state === "failed");
+    return sends
       .filter((send) => !(send.messageId && drawnHostIds().has(send.messageId)))
-      .map(pendingSendMessage),
-  );
+      .filter((send) => !send.queued || (firstFailed !== -1 && sends.indexOf(send) >= firstFailed))
+      .map(pendingSendMessage);
+  });
   /** The pending send a timeline row draws, by the row's message id. */
   const pendingSendFor = (messageId: string | undefined) =>
     messageId?.startsWith(PENDING_SEND_ID_PREFIX)
@@ -560,10 +658,63 @@ export function createConversationViewScope(props: ConversationProps) {
     setActiveChatSearchIndex,
   });
   const { closeChatSearch, moveChatSearch, setChatSearchInputElement } = search;
-  /** The search finds messages of the agent's own chat. A side thread covers it, so the shortcut does nothing there. */
+  // The open side thread has its own search. It finds text only in the thread rows on the page, because
+  // the host search (`onSearchMessages`) finds messages of the agent's own chat. The thread shows all
+  // the messages that its snapshot has.
+  const [threadSearchOpen, setThreadSearchOpen] = createSignal(false);
+  const [threadSearchQuery, setThreadSearchQuery] = createSignal("");
+  const [threadSearchMatches, setThreadSearchMatches] = createSignal<ChatSearchMatch[]>([]);
+  const [activeThreadSearchIndex, setActiveThreadSearchIndex] = createSignal(-1);
+  const [threadSearchMessageIds, setThreadSearchMessageIds] = createSignal<string[]>([]);
+  const [threadScrollElement, setThreadScrollElement] = createSignal<HTMLElement>();
+  const threadSearch = createSearchStore({
+    props: {
+      get messages() {
+        return props.threads?.conversation?.messages.map((message) => ({ id: message.id, body: message.text })) ?? [];
+      },
+    },
+    chatSearchOpen: threadSearchOpen,
+    chatSearchQuery: threadSearchQuery,
+    activeChatSearchIndex: activeThreadSearchIndex,
+    scrollElement: threadScrollElement,
+    revealMatch: () => undefined,
+    setChatSearchOpen: setThreadSearchOpen,
+    setChatSearchQuery: setThreadSearchQuery,
+    chatSearchMatches: threadSearchMatches,
+    setChatSearchMatches: setThreadSearchMatches,
+    chatSearchMessageIds: threadSearchMessageIds,
+    setChatSearchMessageIds: setThreadSearchMessageIds,
+    setChatSearchTotal: () => undefined,
+    setActiveChatSearchIndex: setActiveThreadSearchIndex,
+  });
+  // Another thread, or the agent's own chat, has other messages, so the search of the thread closes.
+  // A new thread has no task (`null`), and the agent's own chat has no thread (`undefined`).
+  createEffect(
+    () => {
+      const open = props.threads?.open;
+      return open === undefined ? undefined : (open?.id ?? null);
+    },
+    () => {
+      if (untrack(threadSearchOpen)) threadSearch.closeChatSearch(false);
+    },
+  );
+  // Both searches show the same highlights, so the search of the covered chat closes.
+  createEffect(threadSearchOpen, (open) => {
+    if (open && untrack(chatSearchOpen)) closeChatSearch(false);
+  });
+  /** The shortcut searches the chat that the user sees: the open side thread, or the agent's own chat. */
   const handleChatSearchShortcut = (event: KeyboardEvent) => {
-    if (!sideThreadOpen()) search.handleChatSearchShortcut(event);
+    (sideThreadOpen() ? threadSearch : search).handleChatSearchShortcut(event);
   };
+  const threadComposer = createThreadComposerActions({
+    props,
+    threadDrafts: controller.threadDrafts,
+    setThreadDrafts: controller.setThreadDrafts,
+    pastePreviews,
+    setPastePreviews,
+  });
+  /** Moves the open thread's caret to the end of the dictated text. */
+  const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
   const voice = createVoiceStore({
     props,
     resources,
@@ -573,6 +724,8 @@ export function createConversationViewScope(props: ConversationProps) {
     voiceElapsedSeconds,
     setVoiceElapsedSeconds,
     setVoiceLiveTranscript,
+    voiceThreadKey,
+    setVoiceThreadKey,
     setVoiceLevels,
     drafts,
     setDrafts,
@@ -592,14 +745,70 @@ export function createConversationViewScope(props: ConversationProps) {
       submit: (...args) => actions.submitMessage(...args),
       restoreTranscript: (...args) => composer.restoreVoiceTranscript(...args),
     },
+    thread: {
+      openDraftKey: () => threadComposer.openDraftKey(),
+      appendTranscript: (key, text) => {
+        threadComposer.setText(key, appendVoiceTranscript(threadComposer.draft(key).text, text));
+        if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
+      },
+      send: async (key) => {
+        // The transcript was just appended; the send reads the draft, so apply that write first.
+        flush();
+        const threads = props.threads;
+        if (!threads || threadComposer.openDraftKey() !== key) return;
+        await threadComposer.send(threads, threadComposer.draft(key).text.trim());
+        // The locked editor did not take the earlier focus request.
+        if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
+      },
+      reportError: (message) => actionToast.error(message),
+      // The stop chime already played, so the notice is silent.
+      reportLimit: () => toast.warning(currentText().t("composer.voice.limitReached")),
+    },
   });
-  const { startVoiceRecording, stopVoiceRecording, cancelVoiceRecording } = voice;
+  const { startVoiceRecording, stopVoiceRecording, stopVoiceRecordingAndSend, cancelVoiceRecording } = voice;
+  /**
+   * Copies a conversation through an answer into a new thread. The branch opens in the chat, and its
+   * composer takes the focus, so the user can type the new direction at once.
+   */
+  const branchThread = async (sourceTaskId: string | null, messageId: string) => {
+    const onBranch = props.threads?.onBranch;
+    if (!onBranch || !(await onBranch(sourceTaskId, messageId))) return;
+    // The branch shows first, so that its editor takes the request.
+    flush();
+    setThreadFocusRequest((current) => current + 1);
+  };
+  /** Dictates into the open side thread's draft. */
+  const startThreadVoiceRecording = () => {
+    const key = threadComposer.openDraftKey();
+    if (key !== undefined) void startVoiceRecording(key);
+  };
+  /** The recording, or its preparation, is for the open side thread. */
+  const threadVoiceOwned = () => {
+    const key = threadComposer.openDraftKey();
+    return key !== undefined && voicePhase() !== "idle" && voiceThreadKey() === key;
+  };
+  // A recording ends when the message box that it writes to closes or is covered: its text then stays
+  // in the draft that it was for.
+  createEffect(
+    () => ({ key: threadComposer.openDraftKey(), owner: voiceThreadKey(), recording: voicePhase() === "recording" }),
+    ({ key, owner, recording }) => {
+      if (recording && owner !== key) stopVoiceRecording();
+    },
+  );
   // Live text belongs to the conversation it is dictated into, not to whichever one is open.
   const voiceLiveText = () => {
     const live = voiceLiveTranscript();
-    return live && live.agentId === conversationOwnerId(props) && live.serverId === (props.server?.id ?? "local")
+    return live &&
+      live.threadKey === undefined &&
+      live.agentId === conversationOwnerId(props) &&
+      live.serverId === (props.server?.id ?? "local")
       ? live.text
       : "";
+  };
+  const threadVoiceLiveText = () => {
+    const live = voiceLiveTranscript();
+    const key = threadComposer.openDraftKey();
+    return live && key !== undefined && live.threadKey === key ? live.text : "";
   };
   const voiceLimitNotice = () => {
     const reached = voiceLimitReached();
@@ -615,15 +824,18 @@ export function createConversationViewScope(props: ConversationProps) {
       if (emptied) dismissVoiceLimitNotice();
     },
   );
-  const threadComposer = createThreadComposerActions({
-    props,
-    threadDrafts: controller.threadDrafts,
-    setThreadDrafts: controller.setThreadDrafts,
-  });
+  // The open question form. The composer text answers it instead of steering the turn.
+  const [promptComposerAnswer, setPromptComposerAnswer] = createSignal<QuestionPromptComposerAnswer>();
+  const registerPromptComposerAnswer = (answer: QuestionPromptComposerAnswer) => {
+    setPromptComposerAnswer(() => answer);
+    // A new form can arrive before the old one goes, so the old one takes back only its own answer.
+    return () => setPromptComposerAnswer((current) => (current === answer ? undefined : current));
+  };
   const actions = createComposerActions({
     props,
     attachmentBusy,
-    setAttachmentBusy,
+    syncAttachmentImports,
+    setPastePreviews,
     attachmentImports: resources.importTargetAgents,
     agentReady: () => agentReady() && !providerUpdateRequired(),
     drafts,
@@ -646,6 +858,7 @@ export function createConversationViewScope(props: ConversationProps) {
     submitting,
     setSubmitting,
     voicePhase,
+    voiceThreadKey,
     setComposerError: setScopedComposerError,
     setComposerFocusRequest,
     setShowComposerActions,
@@ -697,6 +910,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setStickToLatest,
     pendingSends,
     attachmentPicker: () => attachmentPicker,
+    promptComposerAnswer,
   });
   const {
     updateTeamTyping,
@@ -704,11 +918,12 @@ export function createConversationViewScope(props: ConversationProps) {
     pasteFiles,
     releaseCutAttachments,
     openAttachmentPicker,
-    openAttachmentPickerFromKey,
     editQueuedMessage,
     cancelQueuedMessageEdit,
     reorderPresentedQueue,
     submitComposer,
+    steerComposer,
+    composerAnswersPrompt,
     sendSelectionInstruction,
     sendCardMessage,
     retryPendingSend,
@@ -856,7 +1071,7 @@ export function createConversationViewScope(props: ConversationProps) {
           clearConversationError(target);
           importSounds.started(event.requestId);
         }
-        setAttachmentBusy(true);
+        syncAttachmentImports();
         setScopedComposerError(null);
       } else if (threadKey !== undefined) {
         if (event.type === "error") {
@@ -871,7 +1086,7 @@ export function createConversationViewScope(props: ConversationProps) {
       } else if (event.type === "error") {
         const target = resources.importTargetAgents.get(event.requestId);
         resources.importTargetAgents.delete(event.requestId);
-        setAttachmentBusy(resources.importTargetAgents.size > 0);
+        syncAttachmentImports();
         if (target) {
           importSounds.finished(event.requestId, "error");
           setConversationErrors((current) => ({
@@ -887,10 +1102,10 @@ export function createConversationViewScope(props: ConversationProps) {
           else importSounds.cancel(event.requestId);
           void addAttachments(event.attachments, target).finally(() => {
             resources.importTargetAgents.delete(event.requestId);
-            setAttachmentBusy(resources.importTargetAgents.size > 0);
+            syncAttachmentImports();
           });
         } else {
-          setAttachmentBusy(resources.importTargetAgents.size > 0);
+          syncAttachmentImports();
           for (const attachment of event.attachments) {
             void conversationRuntime(props).agent.discardDraftAttachment(attachment.id, event.serverId);
           }
@@ -910,6 +1125,11 @@ export function createConversationViewScope(props: ConversationProps) {
       if (browserExpandedOpen() && !props.globalOverlayOpen) {
         event.preventDefault();
         setActiveRightPanel("browser");
+        return;
+      }
+      if (threadSearchOpen() && sideThreadOpen()) {
+        event.preventDefault();
+        threadSearch.closeChatSearch();
         return;
       }
       // A side thread covers the search and the queued message edit of the agent's own chat. Escape in
@@ -1659,6 +1879,18 @@ export function createConversationViewScope(props: ConversationProps) {
   const setUnreadMessagesDividerElement = (element: HTMLDivElement) => {
     unreadMessagesDivider = element;
   };
+  // The NEW line animates in when it shows a place that the last line did not mark: a chat that
+  // opens at its unread messages, or Mark unread. The virtualizer draws a row again when it scrolls
+  // back into view, and that draw shows the line at once.
+  let animatedUnreadBoundary: string | undefined;
+  const unreadDividerArrives = (): boolean => {
+    const boundary = untrack(
+      () => `${props.server?.id ?? "local"}:${conversationOwnerId(props) ?? ""}:${unreadBoundaryMessageId() ?? ""}`,
+    );
+    if (boundary === animatedUnreadBoundary) return false;
+    animatedUnreadBoundary = boundary;
+    return true;
+  };
   const setAgentActivitySlotElement = (element: HTMLDivElement) => {
     agentActivitySlot = element;
     scrollResizeObserver?.observe(element);
@@ -1692,7 +1924,18 @@ export function createConversationViewScope(props: ConversationProps) {
 
   return {
     sideThreadOpen,
+    threadSearch,
+    threadSearchOpen,
+    threadSearchQuery,
+    threadSearchMatches,
+    activeThreadSearchIndex,
+    setThreadSearchQuery,
+    setThreadScrollElement,
     threadComposer,
+    threadFocusRequest,
+    branchThread,
+    threadVoiceLiveText,
+    threadVoiceOwned,
     replyJump,
     voiceConversationAvailable,
     startVoiceConversation,
@@ -1711,6 +1954,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setStickToLatest,
     followReaderScroll,
     setUnreadMessagesDividerElement,
+    unreadDividerArrives,
     setVirtualRootElement,
     activeBrowserControl,
     actingBrowserControl,
@@ -1786,6 +2030,11 @@ export function createConversationViewScope(props: ConversationProps) {
     activeRightPanel,
     panelSubagentId,
     shownSubagentId,
+    shownPanelThreadId,
+    openPanelThread,
+    closePanelThread,
+    movePanelThreadToChat,
+    moveThreadToPanel,
     toggleSubagentPanel,
     sidePanel,
     sidePanelOpen,
@@ -1810,7 +2059,6 @@ export function createConversationViewScope(props: ConversationProps) {
     moveChatSearch,
     newMessageCount,
     openAttachmentPicker,
-    openAttachmentPickerFromKey,
     openBrowserAddress,
     openExternalMessageUrl,
     messageLinkRelay,
@@ -1829,6 +2077,7 @@ export function createConversationViewScope(props: ConversationProps) {
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
     previewQuoteId,
+    previewFileKey,
     previewWorkspaceAgentId,
     sidebarFileBack,
     openSidebarFileBack,
@@ -1858,6 +2107,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setPageContext,
     skillSettingsRequest,
     openSkillSettings,
+    instructionsSettingsRequest,
+    openInstructionsSettings,
     routineSettingsRequest,
     updateRuntimeSettings,
     scheduleUnreadDividerVisibilityUpdate,
@@ -1881,6 +2132,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setExpandedEmojiMessageId,
     setOpenReactionMessageId,
     setRequiredInteractionElement,
+    registerPromptComposerAnswer,
     handleRoutineSettingsRequest,
     setSettingsPanelWidth,
     setShowComposerActions,
@@ -1894,12 +2146,18 @@ export function createConversationViewScope(props: ConversationProps) {
     showComposerActions,
     showScrollToLatest,
     startVoiceRecording,
+    startThreadVoiceRecording,
     stopVoiceRecording,
+    stopVoiceRecordingAndSend,
     cancelVoiceRecording,
     submitComposer,
+    steerComposer,
+    composerAnswersPrompt,
     submitting,
     unreadDividerVisible,
     unreferencedDraftAttachments,
+    rowDraftAttachments,
+    currentPastePreviews,
     updateCurrentDraft,
     updateScrollFade,
     updateTeamTyping,

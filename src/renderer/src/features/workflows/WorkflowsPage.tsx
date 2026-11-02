@@ -53,7 +53,7 @@ export function WorkflowsPage(props: { serverId: string }) {
 
 /** `admin`: an owner or admin of the server, who may make a webhook secret. The host checks it again. */
 function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
-  const { agentList, modelOptions } = useAgents();
+  const { agentList, agentStatus, modelOptions } = useAgents();
   const { signedInAccount } = useAuth();
   // The keyed parent mounts a new canvas for each server, so the host does not change.
   const workflows = createWorkflowsController(
@@ -67,6 +67,9 @@ function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
     get models() {
       return modelOptions();
     },
+    get status() {
+      return agentStatus();
+    },
     get places() {
       return workflows.places();
     },
@@ -76,12 +79,19 @@ function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
       return signedInAccount()?.name ?? undefined;
     },
   };
-  // A channel output needs a messaging place. Without one, a new output posts a notification.
-  const features = createMemo<WorkflowFeatures>(() =>
-    workflows.places().length > 0
-      ? WORKFLOW_FEATURES_V1
-      : { ...WORKFLOW_FEATURES_V1, outputs: WORKFLOW_FEATURES_V1.outputs.filter((output) => output !== "channel") },
-  );
+  // A channel output needs a messaging place. Without one, a new output posts a notification. Only an
+  // owner or admin adds a GitHub step, on a host that runs them.
+  const features = createMemo<WorkflowFeatures>(() => {
+    const github = props.admin && props.host.githubSupported();
+    const outputs = WORKFLOW_FEATURES_V1.outputs.filter(
+      (output) => output !== "channel" || workflows.places().length > 0,
+    );
+    return {
+      ...WORKFLOW_FEATURES_V1,
+      triggers: github ? [...WORKFLOW_FEATURES_V1.triggers, "github"] : WORKFLOW_FEATURES_V1.triggers,
+      outputs: github ? [...outputs, "github"] : outputs,
+    };
+  });
   // The canvas is a direct child of the window page, which gives it the height of the pane.
   return (
     <Show when={workflows.detail()}>
@@ -90,6 +100,7 @@ function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
           workflow={workflow()}
           features={features()}
           catalogs={catalogs}
+          github={workflows.github}
           frame="window"
           readOnly={workflows.readOnly()}
           {...workflows.props}

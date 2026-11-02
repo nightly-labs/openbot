@@ -1,10 +1,10 @@
 {
-  "version": "1.4.2",
+  "version": "1.4.5",
   "highlights": [
-    "The iPhone app is now on the App Store.",
-    "The server drawer has a Marketplace: add agents, skills and apps, then try a skill or an app in a chat.",
-    "Type `@` in a chat to pick a skill or a connected app as well as a teammate.",
-    "The app previews text, code, JSON, emails, HTML pages, PDFs and spreadsheets, and shows visual replies as live pages.",
-    "Faster reconnects and chat loading, and Korean and Simplified Chinese interfaces."
+    "Tap the speaker under an agent message to hear it read aloud with your reply voice.",
+    "Manage the server from the phone: providers and their accounts, custom providers, the ACP registry, browser profiles, agent folders and backup models.",
+    "Move a server with the new Transfer page, or import agents from a Grok Bot or Hermes Agent export.",
+    "The server Usage screen shows how much of each provider plan limit is left and when it resets.",
+    "The app reconnects within about 30 seconds after the server comes back, and keeps working when a server changes its key."
   ]
 }

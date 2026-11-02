@@ -21,6 +21,7 @@ export const messages = {
   "mobile.channel.task.paused": "In pausa",
   "mobile.channel.task.resume": "Riprendi",
   "mobile.channel.task.reassign": "Riassegna",
+  "mobile.channel.task.cancel": "Annulla attività",
   "mobile.channel.loadFailed": "Impossibile caricare i canali. Riprova.",
   "mobile.channel.actions.historyStale":
     "L'attività è stata modificata, ma non è stato possibile aggiornare la cronologia della chat.",

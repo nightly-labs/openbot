@@ -1,10 +1,13 @@
 import {
+  AGENT_IMPORT_EXPORT_AGENT_NAME,
+  AGENT_IMPORT_PROMPT,
   type AgentImportPreview,
   type AgentImportPreviewAgent,
   type AgentImportPreviewChannel,
   type AgentImportResult,
   type AgentImportSkillSource,
-  HERMES_EXPORT_SKILL_ID,
+  HERMES_EXPORT_PROMPT,
+  HERMES_SKILL_COMMAND,
 } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import {
@@ -37,9 +40,6 @@ import { AgentAvatar } from "../agents/AgentAvatar";
  */
 export type AgentImportPhase = "idle" | "reading" | "review" | "importing" | "done";
 
-/** What the user says to the export agent. It is also the copy button's value. */
-export const AGENT_IMPORT_PROMPT = "Export my agents for OpenBot";
-
 /**
  * How the user starts the export. Grok Bot: `agent` installs the ready export agent from its link,
  * `skill` adds the export skill to a new agent by hand. Hermes: `folder` reads the Hermes folder on
@@ -50,12 +50,6 @@ export type AgentImportSetup = "agent" | "skill" | "folder" | "command";
 
 const SETUPS: readonly AgentImportSetup[] = ["agent", "skill", "folder", "command"];
 
-/** What the user types in a Hermes chat to install the export skill, and then to run it. */
-export const HERMES_SKILL_COMMAND = `/skills install ${HERMES_EXPORT_SKILL_ID}`;
-const HERMES_EXPORT_PROMPT = "/openbot-export";
-
-/** The name of the export agent on its Grok Bot page. */
-const EXPORT_AGENT_NAME = "OpenBot export";
 const EXPORT_SKILL_FILE = "SKILL.md";
 const EXPORT_SKILL_ID = "openbot-export";
 
@@ -216,7 +210,7 @@ function ImportGuide(props: {
                       <div class="agent-import-card">
                         <AgentAvatar seed="openbot-export" class="storage-row-avatar" />
                         <span class="agent-import-card-copy">
-                          <span class="agent-import-card-name">{EXPORT_AGENT_NAME}</span>
+                          <span class="agent-import-card-name">{AGENT_IMPORT_EXPORT_AGENT_NAME}</span>
                           <span class="agent-import-card-meta">{t("import.guide.agentMeta")}</span>
                         </span>
                         <Button type="button" variant="ghost" size="sm" onClick={() => props.onOpenExportAgent()}>

@@ -36,7 +36,7 @@ function addUser(database: DatabaseSync, id: string): AuthUser {
   database
     .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
     .run(id, `email:${id}`, email);
-  return { id, email, name: null, avatarUrl: null };
+  return { id, email, name: null, avatarUrl: null, analyticsEnabled: null };
 }
 
 async function ticketKeys() {

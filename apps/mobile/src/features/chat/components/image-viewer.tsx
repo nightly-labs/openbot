@@ -26,7 +26,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 import { useUniwind } from "uniwind";
 import { haptics } from "@/shared/lib/haptics";
@@ -615,12 +615,10 @@ export function ImageViewer({
             ))}
           </View>
         </GestureDetector>
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <View
-            pointerEvents="box-none"
-            className="absolute inset-x-4 flex-row items-center justify-between"
-            style={{ top: insets.top + 8 }}
-          >
+        {/* The viewer covers the window, and the chat can be one column of it. This view reads the
+            window's insets, so the buttons keep clear of the rail of iPhone Duo on either side. */}
+        <SafeAreaView edges={["top", "left", "right"]} style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <View pointerEvents="box-none" className="flex-row items-center justify-between px-4 pt-2">
             {/* Close at the leading edge, where the platform puts the way out of a full-screen view,
                 and the position beside it on the same glass. */}
             <View className="flex-row items-center gap-2">
@@ -690,7 +688,7 @@ export function ImageViewer({
               </ChatGlassIconButton>
             </View>
           </View>
-        </View>
+        </SafeAreaView>
       </GestureHandlerRootView>
     </Modal>
   );

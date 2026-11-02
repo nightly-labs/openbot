@@ -28,9 +28,12 @@ import {
   decodeMobileConnectTicket,
   decodeNotificationOpenedEvent,
   decodeNotificationPreference,
+  decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
   decodeUpdatePreference,
   decodeUpdateStatus,
+  decodeVoiceServerProbe,
+  decodeVoiceServerSettings,
 } from "./app-decoding";
 
 const updateStatus = {
@@ -69,7 +72,31 @@ const codeSent = {
 } satisfies CentralAuthState;
 
 // Each value is what main sends, typed as its contract, so it must come back unchanged.
+const voiceServer = {
+  address: "http://studio.local:8000/v1",
+  hasApiKey: true,
+  routes: {
+    dictation: true,
+    speech: false,
+    transcriptionModel: "Systran/faster-whisper-large-v3",
+    speechModel: null,
+    voice: null,
+  },
+};
+
 const valid: [string, (value: unknown) => unknown, unknown][] = [
+  ["a voice server", decodeVoiceServerSettings, voiceServer],
+  ["no voice server", decodeVoiceServerSettings, null],
+  [
+    "a voice server test that found models",
+    decodeVoiceServerProbe,
+    { ok: true, models: { transcription: ["whisper-1"], speech: ["kokoro"], voices: ["af_heart"] } },
+  ],
+  [
+    "a voice server test that failed",
+    decodeVoiceServerProbe,
+    { ok: false, field: "apiKey", message: "studio.local:8000 refused the API key." },
+  ],
   [
     "app info",
     decodeAppInfo,
@@ -108,6 +135,14 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     {
       status: "signed_in",
       user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null },
+    } satisfies CentralAuthState,
+  ],
+  [
+    "signed in with an analytics answer",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, analyticsEnabled: true },
     } satisfies CentralAuthState,
   ],
   [
@@ -167,6 +202,24 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
 ];
 
 const malformed: [string, (value: unknown) => unknown, unknown][] = [
+  // The key never comes back to the renderer, so a record that carries one fails closed.
+  ["a voice server with its key", decodeVoiceServerSettings, { ...voiceServer, apiKey: "sk-secret" }],
+  [
+    "a voice server that dictates with no model",
+    decodeVoiceServerSettings,
+    { ...voiceServer, routes: { ...voiceServer.routes, transcriptionModel: null } },
+  ],
+  [
+    "a voice server that speaks with no voice",
+    decodeVoiceServerSettings,
+    { ...voiceServer, routes: { ...voiceServer.routes, speech: true, speechModel: "kokoro", voice: null } },
+  ],
+  ["a voice server test with an unknown field", decodeVoiceServerProbe, { ok: false, field: "model", message: "" }],
+  [
+    "a voice server test with an empty model",
+    decodeVoiceServerProbe,
+    { ok: true, models: { transcription: [""], speech: [], voices: [] } },
+  ],
   [
     "app info on an unknown platform",
     decodeAppInfo,
@@ -214,6 +267,14 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   ["a custom agent with a two-line usage prompt", decodeCustomAgents, [{ ...customAgent, usagePrompt: "/usage\nrm" }]],
   ["custom agent usage of an invalid id", decodeCustomAgentUsage, [{ id: "Not An Id", text: "42%" }]],
   ["custom agent usage with no text", decodeCustomAgentUsage, [{ id: "devin", text: null }]],
+  [
+    "an account analytics answer that is not a yes or a no",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, analyticsEnabled: "yes" },
+    },
+  ],
   ["a model list with an empty id", decodeDiscoverModelsResult, { models: [{ id: "" }] }],
   [
     "detection settings without a switch",
@@ -229,5 +290,40 @@ describe("app decoding", () => {
 
   it.each(malformed)("rejects %s", (_name, decode, value) => {
     expect(() => decode(value)).toThrow(/^Invalid /);
+  });
+});
+
+const AGENT_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
+
+// A Marketplace link began in a URL a web page chose. Only an agent id or a skill slug of the right
+// form reaches the renderer, with no other field; anything else is no link at all.
+describe("pending Marketplace listing", () => {
+  it.each([
+    ["an agent", { kind: "agent", id: AGENT_ID }],
+    ["a skill", { kind: "skill", id: "release-notes" }],
+  ])("keeps %s", (_name, value) => {
+    expect(decodePendingMarketplaceListing(value)).toEqual(value);
+  });
+
+  it("drops a field main did not name", () => {
+    expect(decodePendingMarketplaceListing({ kind: "skill", id: "release-notes", install: true })).toEqual({
+      kind: "skill",
+      id: "release-notes",
+    });
+  });
+
+  it.each([
+    ["no link", null],
+    ["a bare slug", "release-notes"],
+    ["an unknown kind", { kind: "plugin", id: "release-notes" }],
+    ["an agent with a slug", { kind: "agent", id: "release-notes" }],
+    ["an agent id in upper case", { kind: "agent", id: AGENT_ID.toUpperCase() }],
+    ["a skill with a path", { kind: "skill", id: "../account" }],
+    ["a skill with a dot", { kind: "skill", id: "notes.md" }],
+    ["a skill slug over 64 characters", { kind: "skill", id: "a".repeat(65) }],
+    ["an empty id", { kind: "skill", id: "" }],
+    ["an id that is not text", { kind: "agent", id: 42 }],
+  ])("refuses %s", (_name, value) => {
+    expect(decodePendingMarketplaceListing(value)).toBeNull();
   });
 });

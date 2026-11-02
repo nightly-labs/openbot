@@ -17,7 +17,6 @@ import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AGENT_WAIT_STATE, AgentWaitBadge } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
 import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
@@ -38,10 +37,17 @@ const PINNED_EXIT = FadeOut.duration(140).easing(EASE_OUT).reduceMotion(ReduceMo
 const PINNED_COLUMNS = 4;
 const PINNED_PADDING_X = 12;
 
-/** The pinned agents, then `children`: the pinned channels. */
-export function PinnedAgentsGrid({ agents, children }: PropsWithChildren<{ agents: MobileAgent[] }>) {
+/**
+ * The pinned agents, then `children`: the pinned channels. `animateLayout` false stops the grid from
+ * animating to a new place, while something above it changes height on every frame.
+ */
+export function PinnedAgentsGrid({
+  agents,
+  animateLayout = true,
+  children,
+}: PropsWithChildren<{ agents: MobileAgent[]; animateLayout?: boolean }>) {
   return (
-    <Animated.View layout={PINNED_LAYOUT}>
+    <Animated.View layout={animateLayout ? PINNED_LAYOUT : undefined}>
       {agents.length > 0 || children ? (
         <Animated.View exiting={PINNED_EXIT} style={{ width: "100%" }}>
           <View
@@ -95,26 +101,24 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
       }}
       style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
     >
-      <ChatZoomSource>
-        <AgentPinAvatar agentId={agent.id} location="pinned" size={64}>
-          <BloubAvatar
-            agentId={agent.id}
-            serverId={agent.serverId}
-            hue={agent.avatarHue}
-            seed={agent.avatarSeed}
-            size={64}
-            animateIdle={false}
-            rings
+      <AgentPinAvatar agentId={agent.id} location="pinned" size={64}>
+        <BloubAvatar
+          agentId={agent.id}
+          serverId={agent.serverId}
+          hue={agent.avatarHue}
+          seed={agent.avatarSeed}
+          size={64}
+          animateIdle={false}
+          rings
+        />
+        {isUnread ? (
+          <View
+            className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
+            style={{ borderColor: background, backgroundColor: accent }}
           />
-          {isUnread ? (
-            <View
-              className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
-              style={{ borderColor: background, backgroundColor: accent }}
-            />
-          ) : null}
-          {waitReason ? <AgentWaitBadge reason={waitReason} size={22} /> : null}
-        </AgentPinAvatar>
-      </ChatZoomSource>
+        ) : null}
+        {waitReason ? <AgentWaitBadge reason={waitReason} size={22} /> : null}
+      </AgentPinAvatar>
       <View className="w-full gap-0.5">
         <Typography.Paragraph
           align="center"

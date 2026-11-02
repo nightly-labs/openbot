@@ -190,7 +190,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       className: "sidebar-agent-drag-preview",
       createPreview: createSidebarChatDragCard,
       data: `openbot-chat:${chatId}`,
-      previewSize: { height: 94, width: 72 },
+      previewSize: { height: 102, width: 72 },
       source: { kind: "chat", id: chatId, origin: "section" },
     });
   }
@@ -200,7 +200,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       className: "sidebar-person-drag-preview",
       createPreview: createSidebarChatDragCard,
       data: `openbot-person:${member.id}`,
-      previewSize: { height: 94, width: 72 },
+      previewSize: { height: 102, width: 72 },
       source: { kind: "person", id: member.id, origin: "people" },
     });
     personDragSlots.get(member.id)?.element.classList.add("sidebar-person-item-dragging");

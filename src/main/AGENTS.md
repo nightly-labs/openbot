@@ -16,7 +16,7 @@ below.
   `Pick<IpcGroupHandlers, …>` return type. Do not import from `index.ts`.
 - `registerIpcHandlers` in `index.ts` only supplies dependencies and passes all groups to
   `registerIpcGroups`. The declared types check endpoint and group coverage; do not add a test for
-  this type check. Read [IPC binding rules](ipc/AGENTS.md) for the four handler forms.
+  this type check. Read [IPC binding rules](ipc/AGENTS.md) for the five handler forms.
 - `handleTrusted` and `handleTrustedWithEvent` from `trusted-ipc.ts` are the only registration
   primitives. Only `ipc/define-ipc-group.ts` may call them or use `ipcMain`.
 - Parse every argument with `payloadHandler(decode, handler)`. Use `ipc/validation.ts` primitives

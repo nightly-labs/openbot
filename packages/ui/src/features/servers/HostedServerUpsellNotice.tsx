@@ -41,11 +41,11 @@ export function HostedServerUpsellNotice(props: HostedServerUpsellNoticeProps) {
         <AlertTitle>{title()}</AlertTitle>
         <AlertDescription>{t("server.upsell.notice.description")}</AlertDescription>
         <AlertActions>
-          <Button size="sm" onClick={() => props.onSeePlans()}>
-            {t("server.upsell.seePlans")}
-          </Button>
           <Button size="sm" variant="ghost" onClick={() => props.onDismiss()}>
             {t("server.upsell.notNow")}
+          </Button>
+          <Button size="sm" onClick={() => props.onSeePlans()}>
+            {t("server.upsell.seePlans")}
           </Button>
         </AlertActions>
       </AlertContent>

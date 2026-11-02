@@ -39,11 +39,19 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { ChatBubbleMessage } from "@/features/chat/model/chat-messages";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { useColumnWidth } from "@/shared/components/adaptive-split";
+import {
+  COMPOSER_FIELD_VERTICAL_PADDING,
+  COMPOSER_TOOLBAR_HEIGHT,
+  composerBottomGap,
+  restingComposerHeight,
+} from "@/shared/lib/composer-metrics";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
@@ -73,8 +81,8 @@ const FIELD_INSET = 16;
 const BAR_INSET = 16;
 // The controls are 40 pt with a 4 pt inset, and one text line sits in the same
 // box: a line plus 13 pt above and below. One formula then covers both shapes.
-const TOOLBAR_HEIGHT = 48;
-const FIELD_VERTICAL_PADDING = 26;
+const TOOLBAR_HEIGHT = COMPOSER_TOOLBAR_HEIGHT;
+const FIELD_VERTICAL_PADDING = COMPOSER_FIELD_VERTICAL_PADDING;
 // A 112 pt tile plus its 8 pt inset. Known, so the block can open and close.
 const ATTACHMENT_BLOCK_HEIGHT = 120;
 // Typing is what drives this, and the user is looking straight at the line they
@@ -90,7 +98,6 @@ const TOOLBAR_PADDING = 8;
 // taken off the single line the field would otherwise be, so it follows the
 // text size instead of clipping the placeholder at a large one.
 const REST_TEXT_GAP = 10;
-const REST_HEIGHT_LOSS = 8;
 // The controls keep their layout box, so the touch target never shrinks with
 // the bar: only the drawing scales, and it then slides out to the bar's edge.
 const REST_CONTROL_SCALE = 0.8;
@@ -376,11 +383,14 @@ export const ChatComposer = memo(function ChatComposer({
     setSkillsOnly(true);
     inputRef.current?.focus();
   }, [skillPickerVersion, onChangeDraft]);
-  const { fontScale, width: windowWidth } = useWindowDimensions();
+  const { fontScale } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // The bar keeps clear of the side insets: the rail of iPhone Duo and the edges in landscape.
+  const barWidth = useColumnWidth() - insets.left - insets.right;
   const lineHeight = 22 * fontScale;
   // Without the plus, the text starts at the card's own inset.
   const leadingInset = attachments ? ROW_CONTROL_INSET : FIELD_INSET;
-  const rowTextWidth = windowWidth - BAR_INSET * 2 - ROW_CONTROL_INSET - leadingInset;
+  const rowTextWidth = barWidth - BAR_INSET * 2 - ROW_CONTROL_INSET - leadingInset;
   // One reading drives both the shape and the height. Measuring the two widths
   // separately gave the card two targets in two frames, so it animated twice.
   const [wrap, setWrap] = useState({ lines: 1, width: 0 });
@@ -403,8 +413,8 @@ export const ChatComposer = memo(function ChatComposer({
   // frame by frame instead of snapping when the keyboard finally commits.
   const [placeholderWidth, setPlaceholderWidth] = useState(0);
   const placeholderText = placeholder ?? t("mobile.chat.composer.ask", { name: agentName });
-  const cardWidth = windowWidth - BAR_INSET * 2;
-  const restHeight = Math.max(TOOLBAR_HEIGHT, lineHeight + FIELD_VERTICAL_PADDING) - REST_HEIGHT_LOSS;
+  const cardWidth = barWidth - BAR_INSET * 2;
+  const restHeight = restingComposerHeight(fontScale);
   // The toolbar keeps its height and the control rides down into the smaller
   // bar, so the box fills that bar's height.
   const restControlOffset = (TOOLBAR_HEIGHT - restHeight) / 2;
@@ -688,7 +698,12 @@ export const ChatComposer = memo(function ChatComposer({
   const plusDrawn = CONTROL_SIZE * (restingPlus ? REST_CONTROL_SCALE : 1);
   const plusInset = (CONTROL_SIZE - plusDrawn) / 2;
   const attachmentAnchor = {
-    left: BAR_INSET + TOOLBAR_PADDING + plusInset + (restingPlus ? (cardWidth - restWidth) / 2 - restControlShift : 0),
+    left:
+      insets.left +
+      BAR_INSET +
+      TOOLBAR_PADDING +
+      plusInset +
+      (restingPlus ? (cardWidth - restWidth) / 2 - restControlShift : 0),
     bottom: Math.max(bottomInset, 10) + 4 + plusInset - (restingPlus ? restControlOffset : 0),
     size: plusDrawn,
   };
@@ -752,7 +767,8 @@ export const ChatComposer = memo(function ChatComposer({
         <GlassView
           glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
           style={{
-            marginHorizontal: 16,
+            marginLeft: insets.left + 16,
+            marginRight: insets.right + 16,
             flexGrow: 0,
             maxHeight: 240,
             borderRadius: 24,
@@ -846,9 +862,10 @@ export const ChatComposer = memo(function ChatComposer({
         pointerEvents="box-none"
         style={{
           alignItems: "center",
-          paddingHorizontal: BAR_INSET,
+          paddingLeft: insets.left + BAR_INSET,
+          paddingRight: insets.right + BAR_INSET,
           paddingTop: 8,
-          paddingBottom: Math.max(bottomInset, 10),
+          paddingBottom: composerBottomGap(bottomInset),
         }}
       >
         {/* Measured in the bar, not the card: inside, the card's animating width
@@ -875,8 +892,8 @@ export const ChatComposer = memo(function ChatComposer({
             pointerEvents={voice.sides ? "box-none" : "none"}
             style={{
               position: "absolute",
-              left: 0,
-              right: 0,
+              left: insets.left,
+              right: insets.right,
               bottom: Math.max(bottomInset, 10),
               height: VOICE_BUTTON_SIZE,
               alignItems: "center",
@@ -1316,7 +1333,10 @@ export const ChatComposer = memo(function ChatComposer({
             importantForAccessibility={voiceOpen ? "no-hide-descendants" : "auto"}
             // Absolute insets here are measured from the bar's outer edge, so they
             // have to carry the bar's own padding to land on the card.
-            style={[{ position: "absolute", left: BAR_INSET + 8, bottom: Math.max(bottomInset, 10) + 4 }, plusStyle]}
+            style={[
+              { position: "absolute", left: insets.left + BAR_INSET + 8, bottom: Math.max(bottomInset, 10) + 4 },
+              plusStyle,
+            ]}
           >
             <Pressable
               accessibilityRole="button"

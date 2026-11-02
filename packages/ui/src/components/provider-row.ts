@@ -133,9 +133,10 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
   };
   /**
    * A sign-in that Connect started and that waits for the browser. A download or an update also
-   * marks the row connecting, until its new runtime is ready.
+   * marks the row connecting, until its new runtime is ready, and so does a check again after a key
+   * change or a restart, which `signInPending` marks false.
    */
-  const signingIn = () => connecting() && browserConnect() && runtimeReady();
+  const signingIn = () => connecting() && option().signInPending !== false && browserConnect() && runtimeReady();
   const hostSignInHint = () =>
     !off() &&
     option().id === "antigravity" &&
@@ -206,11 +207,15 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
    * stays reachable in every state, Connected included: a refused key must stay replaceable and
    * removable. A released host stores a Gemini key but never reads it, so only this computer offers it.
    * Claude's key works the same way. Its row has a key status only where the host reads the key.
+   * Codex's key is a login on this computer, so its row has a key status only here.
    */
   const apiKeyOffered = () =>
     Boolean(host.onSignInProvider) &&
     ((option().id === "antigravity" && browserConnect() && runtimeStatus()?.phase === "ready") ||
-      (option().id === "claude" && option().keyStatus !== undefined && runtimeReady() && state() !== "not-installed"));
+      ((option().id === "claude" || option().id === "codex") &&
+        option().keyStatus !== undefined &&
+        runtimeReady() &&
+        state() !== "not-installed"));
   /** OpenCode runs free models while no key is saved. */
   const freeKey = () =>
     option().id === "opencode" && (option().keyStatus === "missing" || option().keyStatus === "unreadable");

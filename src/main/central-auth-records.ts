@@ -85,11 +85,15 @@ export function decodeCentralAuthUser(value: unknown): CentralAuthUser {
   const avatarUrl = record.avatarUrl;
   if (name !== null && !isString(name)) throw new Error("Invalid account name.");
   if (avatarUrl !== null && !isString(avatarUrl)) throw new Error("Invalid account avatar.");
+  // An account service from before the analytics answer sends no field: the user never answered.
+  const analyticsEnabled = record.analyticsEnabled ?? null;
+  if (analyticsEnabled !== null && !isBoolean(analyticsEnabled)) throw new Error("Invalid account analytics answer.");
   return {
     id: requiredString(record, "id"),
     email: requiredString(record, "email"),
     name,
     avatarUrl,
+    analyticsEnabled,
   };
 }
 

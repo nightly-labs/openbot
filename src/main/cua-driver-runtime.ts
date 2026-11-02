@@ -369,8 +369,8 @@ export class CuaDriverRuntime {
    * is given.
    *
    * The command is absolute, so `resolveMcpCommand` accepts it without a login shell. The working
-   * directory stays empty on purpose: ACP has no field for one and Codex accepts none, so both
-   * would drop this entry with no error if it carried one.
+   * directory stays empty on purpose: ACP has no field for one, so ACP providers would drop this
+   * entry with no error if it carried one.
    */
   mcpServerConfig(): McpServerConfig | null {
     const command = this.#command ?? this.#executable;

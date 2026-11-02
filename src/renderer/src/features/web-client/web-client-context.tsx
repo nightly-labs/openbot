@@ -8,6 +8,7 @@ import type {
   BrowserControlState,
   BrowserTab,
   BrowserTakeoverRequest,
+  ChannelSummary,
   ClientAgentModelOption,
   ClientAgentSummary,
   ConversationMessage,
@@ -37,6 +38,7 @@ import {
   type RemoteRecoveryStatus,
 } from "@openbot/team-client/remote-recovery";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
+import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { duplicateSection as duplicateSectionWith } from "@openbot/ui/features/sidebar/duplicate-section";
 import { currentText } from "@openbot/ui/text";
 import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
@@ -45,13 +47,19 @@ import { toAgentProfile } from "../../app-message-projection";
 import { mergeConversationPage, missingReplyOriginals } from "../conversation/conversation-merge";
 import type { PromptAnswerOptions } from "../conversation/conversation-types";
 import { appendTurnStepLine, type TurnStepLines } from "../conversation/turn-step-lines";
+import {
+  deleteRemoteWorkspaceFrame,
+  deleteRemoteWorkspaceFrames,
+  readRemoteWorkspaceFrame,
+  saveRemoteWorkspaceFrame,
+} from "../servers/remote-workspace-frame";
 import { followsServerUpdate } from "../servers/server-update-flow";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
 import { createHostRestartToasts, type HostRestartView } from "../updates/host-restart-toast";
 import type { WebHostNotice } from "./web-host-connections";
 import { createWebHostLifecycle } from "./web-host-lifecycle";
-import type { WebHostState } from "./web-host-lock";
+import { WebHostOtherTabError, type WebHostState } from "./web-host-lock";
 import {
   createWebWorkspaceRuntime,
   WebHostConnectionError,
@@ -107,6 +115,10 @@ interface WebWorkspaceState {
   agents: ClientAgentSummary[];
   /** The host answered an agent list. Until then, an empty `agents` does not mean the host has none. */
   agentsLoaded: boolean;
+  /** `agents` come from the saved frame, which holds no message text, until the host answers. */
+  agentsFromFrame: boolean;
+  /** The channel rows of the saved frame, with no text. The sidebar shows them until the host lists channels. */
+  frameChannels: ChannelSummary[];
   selectedId: string | null;
   conversations: Record<string, WebConversation>;
   /** The queues read from the host, by agent. Each agent's queue is read on connect and on each change. */
@@ -135,6 +147,8 @@ interface WebWorkspaceState {
   connectionError: UserErrorDetails | null;
   /** Signal holds the connection because the host is not online. */
   hostOffline: boolean;
+  /** Another tab of this browser has the host open. The workspace shows this in full, with "Use here". */
+  otherTab: boolean;
   recovery: RemoteRecoveryStatus | null;
   workspaceLoaded: boolean;
   panelsFailed: boolean;
@@ -196,6 +210,8 @@ export function createWebWorkspace(
     host: null,
     agents: [],
     agentsLoaded: false,
+    agentsFromFrame: false,
+    frameChannels: [],
     selectedId: null,
     conversations: {},
     queues: {},
@@ -214,6 +230,7 @@ export function createWebWorkspace(
     hostedStart: null,
     connectionError: null,
     hostOffline: false,
+    otherTab: false,
     recovery: null,
     workspaceLoaded: false,
     panelsFailed: false,
@@ -306,6 +323,13 @@ export function createWebWorkspace(
     recovery.offline();
     recovery.setActive(!document.hidden);
   }
+  /** The user is back on the page. `offline` keeps the wait after failed attempts, up to two minutes; this ends it. */
+  function recoverNow() {
+    if (disposed || !hostId || recoveryBlocked) return;
+    if (state.recovery?.phase !== "waiting" && state.recovery?.phase !== "cooldown") return recover();
+    recovery.refresh();
+    recovery.setActive(!document.hidden);
+  }
   const hostLifecycle = createWebHostLifecycle({
     accountFetch: props.accountFetch,
     hostId: () => hostId,
@@ -350,6 +374,19 @@ export function createWebWorkspace(
           });
       },
       hostSessionRevoked: () => void retryHosts(),
+      hostTaken(id) {
+        if (disposed || id !== hostId) return;
+        // The user moved the host to another tab. This tab waits for "Use here" and does not reconnect.
+        generation += 1;
+        hostLifecycle.endSleep();
+        recoveryBlocked = true;
+        recovery.suspend();
+        setState((draft) => {
+          draft.otherTab = true;
+          draft.status = "offline";
+          draft.connectionError = null;
+        });
+      },
       connection(update) {
         if (disposed || update.hostId !== hostId) return;
         if (recoveryBlocked && update.state === "offline" && !update.code) return;
@@ -591,6 +628,20 @@ export function createWebWorkspace(
       if (id) runtime.hosts?.reportSelected(id, status);
     },
   );
+  // A hide, a restore or a move updates the frame at once, so the next page does not show the old sidebar.
+  createEffect(
+    () =>
+      state.status === "online" && state.host && !state.panelsLoading && !state.panelsFailed
+        ? { hostId: state.host.hostId, sidebarLayout: state.sidebarLayout, hiddenAgents: state.userHiddenAgents }
+        : null,
+    (frame) => {
+      if (frame)
+        saveRemoteWorkspaceFrame(props.accountId, frame.hostId, {
+          sidebarLayout: frame.sidebarLayout,
+          hiddenAgents: frame.hiddenAgents,
+        });
+    },
+  );
   // A hosted server keeps running while this tab is visible and has focus (`focus-use-v1`).
   const [duplicatingSectionIds, setDuplicatingSectionIds] = createSignal<ReadonlySet<string>>(new Set());
   const [pageFocused, setPageFocused] = createSignal(!document.hidden && document.hasFocus());
@@ -639,9 +690,13 @@ export function createWebWorkspace(
   createEffect(
     () => ({
       hostId: state.host?.hostId ?? null,
-      sources: state.agents.flatMap((agent) =>
-        agent.avatarUrl?.startsWith("openbot-avatar:") ? [{ id: agent.id, source: agent.avatarUrl }] : [],
-      ),
+      // A saved frame shows its agents before the host connects. Their images wait for the connection.
+      sources:
+        state.status === "online"
+          ? state.agents.flatMap((agent) =>
+              agent.avatarUrl?.startsWith("openbot-avatar:") ? [{ id: agent.id, source: agent.avatarUrl }] : [],
+            )
+          : [],
     }),
     ({ hostId, sources }) => {
       if (hostId !== avatarHost) {
@@ -666,7 +721,13 @@ export function createWebWorkspace(
       return avatar && avatar.source === agent.avatarUrl ? { ...agent, avatarUrl: avatar.url } : agent;
     }),
   );
-  const profiles = createMemo(() => shownAgents().map(toAgentProfile));
+  // A frame agent's last message is not known: its row shows no preview, not "No messages yet".
+  const profiles = createMemo(() =>
+    shownAgents().map((agent) => {
+      const profile = toAgentProfile(agent);
+      return state.agentsFromFrame ? { ...profile, preview: "" } : profile;
+    }),
+  );
   const selected = createMemo(() => profiles().find((agent) => agent.id === state.selectedId));
   const conversation = createMemo(() => (state.selectedId ? state.conversations[state.selectedId] : undefined));
 
@@ -719,6 +780,7 @@ export function createWebWorkspace(
       const removed = draft.agents.filter((agent) => !ids.has(agent.id)).map((agent) => agent.id);
       draft.agents = agents;
       draft.agentsLoaded = true;
+      draft.agentsFromFrame = false;
       draft.hiddenIds = draft.hiddenIds.filter((id) => ids.has(id));
       draft.duplicatingAgentIds = draft.duplicatingAgentIds.filter((id) => ids.has(id));
       for (const id of removed) {
@@ -749,8 +811,15 @@ export function createWebWorkspace(
         draft.hostsError = null;
       });
       try {
+        markRemoteSync("hosts-start");
         const hosts = await runtime.listHosts();
+        markRemoteSync("hosts");
         if (disposed) return;
+        // A server that left the list takes its frame with it.
+        deleteRemoteWorkspaceFrames(
+          props.accountId,
+          hosts.map((host) => host.hostId),
+        );
         const activeGeneration = refreshGeneration === generation && refreshHostId === hostId;
         if (!activeGeneration) return;
         if (refreshHostId && !hosts.some((host) => host.hostId === refreshHostId)) {
@@ -874,6 +943,7 @@ export function createWebWorkspace(
     // A revoked session must not leave private conversations visible while the directory
     // decides whether this membership still exists. Keep the host shell for a possible
     // authorized reconnect, but invalidate every private read and pending action now.
+    if (hostId) deleteRemoteWorkspaceFrame(props.accountId, hostId);
     generation += 1;
     selectedId = null;
     setState((draft) => {
@@ -939,32 +1009,42 @@ export function createWebWorkspace(
       throw new Error(currentText().t("webClient.error.invitationOffline"));
     acceptedInvite = null;
   }
-  async function connect(host: RemoteTeamHost) {
+  /** With `takeOver`, the tab that has the host open gives it to this tab. */
+  async function connect(host: RemoteTeamHost, takeOver = false) {
     recoveryBlocked = false;
     recovery.dispose();
     recovery = makeRecovery();
     if (!connectionPromise || connectionPromise.hostId !== host.hostId) hostLifecycle.endSleep();
     try {
-      await attemptConnection(host, true);
+      await attemptConnection(host, true, takeOver);
     } catch (error) {
       if (!disposed && hostId === host.hostId) noteConnectionFailure(error);
       if (!disposed && hostId === host.hostId && state.recovery?.phase !== "suspended") recover();
     }
   }
-  function attemptConnection(host: RemoteTeamHost, opened = false): Promise<void> {
+  /** Moves the opened host from another tab of this browser to this tab. */
+  async function useHere(): Promise<void> {
+    const host = state.host;
+    if (host && state.otherTab) await connect(host, true);
+  }
+  function attemptConnection(host: RemoteTeamHost, opened = false, takeOver = false): Promise<void> {
     if (connectionPromise?.hostId === host.hostId) return connectionPromise.promise;
-    const promise = connectWorkspace(host, opened).finally(() => {
+    const promise = connectWorkspace(host, opened, takeOver).finally(() => {
       if (connectionPromise?.promise === promise) connectionPromise = null;
     });
     connectionPromise = { hostId: host.hostId, opened, promise };
     return promise;
   }
-  async function connectWorkspace(host: RemoteTeamHost, opened: boolean) {
+  async function connectWorkspace(host: RemoteTeamHost, opened: boolean, takeOver: boolean) {
     const current = ++generation;
     const sameHost = hostId === host.hostId;
     // A hosted server that sleeps or wakes keeps the workspace visible, so each retry keeps its agents and the selection.
     const keepWorkspace = sameHost && state.workspaceLoaded;
-    const previousSelected = sameHost ? selectedId : null;
+    // A new page shows the frame of the last load while it connects (`remote-workspace-frame`).
+    const savedFrame = keepWorkspace ? null : readRemoteWorkspaceFrame(props.accountId, host.hostId);
+    const frame = savedFrame?.agents.length ? savedFrame : null;
+    const frameSelected = frame?.agents.find((agent) => agent.id === frame.selectedAgentId) ?? frame?.agents[0];
+    const previousSelected = (sameHost ? selectedId : null) ?? frameSelected?.id ?? null;
     hostId = host.hostId;
     writeWebServerSelection(props.accountId, host.hostId);
     if (!keepWorkspace) selectedId = null;
@@ -975,6 +1055,7 @@ export function createWebWorkspace(
       // A retry keeps the last failure on screen until it ends.
       if (!sameHost) draft.connectionError = null;
       if (!sameHost) draft.hostOffline = false;
+      if (!sameHost) draft.otherTab = false;
       if (!sameHost) {
         draft.workspaceLoaded = false;
         draft.agentStatus = null;
@@ -986,6 +1067,8 @@ export function createWebWorkspace(
       if (!keepWorkspace) {
         draft.agents = [];
         draft.agentsLoaded = false;
+        draft.agentsFromFrame = false;
+        draft.frameChannels = [];
         draft.selectedId = null;
       }
       if (!sameHost) {
@@ -1011,12 +1094,51 @@ export function createWebWorkspace(
       draft.incompatibility = null;
     });
     try {
-      const capabilities = await runtime.connect(host);
-      const [agents, agentStatus, models] = await Promise.all([
-        runtime.listAgents(),
-        runtime.status(),
-        runtime.models(),
-      ]);
+      markRemoteSync("connect-start");
+      // The connect starts first: the frame render then runs while the connect waits for the network.
+      // With the host protocol of the last visit, the gate reads go beside the compatibility read.
+      const early: { gate: Promise<[ClientAgentSummary[], AgentStatus, ClientAgentModelOption[]]> | null } = {
+        gate: null,
+      };
+      const readGate = () => Promise.all([runtime.listAgents(), runtime.status(), runtime.models()]);
+      const connecting = runtime.connect(host, {
+        takeOver,
+        early: {
+          start: () => {
+            early.gate = readGate();
+            early.gate.catch(() => undefined);
+          },
+          drop: () => {
+            early.gate = null;
+          },
+        },
+      });
+      // The frame is read-only: no capabilities, so no feature reads the host before it connects.
+      if (frame) {
+        // A retry after a failed connect keeps the workspace and reads no frame, so it needs this selection.
+        if (frameSelected) selectedId = frameSelected.id;
+        setState((draft) => {
+          draft.agents = frame.agents;
+          draft.agentsLoaded = true;
+          draft.agentsFromFrame = true;
+          draft.workspaceLoaded = true;
+          draft.models = frame.models;
+          draft.sidebarLayout = frame.sidebarLayout ?? {
+            ...defaultSidebarLayout(),
+            agentOrder: frame.agents.map((agent) => agent.id),
+          };
+          draft.userHiddenAgents = frame.hiddenAgents;
+          draft.frameChannels = frame.channels;
+          if (frameSelected) {
+            draft.selectedId = frameSelected.id;
+            draft.conversations[frameSelected.id] ??= { page: null, draft: "", attachments: [], loading: true };
+          }
+        });
+        markRemoteSync("workspace-frame");
+      }
+      const capabilities = await connecting;
+      markRemoteSync("connected");
+      const [agents, agentStatus, models] = await (early.gate ?? readGate());
       if (disposed || current !== generation) return;
       revokedReconnect = false;
       hostLifecycle.endSleep();
@@ -1033,19 +1155,33 @@ export function createWebWorkspace(
         draft.capabilities = capabilities;
         draft.agents = agents;
         draft.agentsLoaded = true;
+        draft.agentsFromFrame = false;
         draft.workspaceLoaded = true;
         draft.agentStatus = agentStatus;
         draft.models = models;
         draft.connectionError = null;
+        draft.otherTab = false;
         draft.status = "online";
       });
       syncedAt = Date.now();
+      markRemoteSync("workspace-ready");
+      // From the read values: the store applies the write above only at the next flush.
+      saveRemoteWorkspaceFrame(props.accountId, host.hostId, { agents, models });
+      preferences.reconcileActiveServerPins(agents.map((agent) => agent.id));
+      // The open conversation and its queue go out first. One queue read for each agent sent before
+      // them held the first page behind ~50 answers on a large host (`bun run perf:remote`).
+      // An agent the user opened in the frame stays open.
+      const wanted = selectedId ?? previousSelected;
+      const first = agents.find((agent) => agent.id === wanted) ?? agents[0];
+      const opened = first ? select(first.id) : null;
+      if (first) loadQueue(first.id);
       void loadPanels(
         capabilities,
         agents.map((agent) => agent.id),
-      );
-      preferences.reconcileActiveServerPins(agents.map((agent) => agent.id));
-      for (const agent of agents) loadQueue(agent.id);
+      ).then(() => {
+        if (!disposed && current === generation) saveFrame();
+        markRemoteSync("panels-ready");
+      });
       void runtime
         .currentMemberId?.()
         .then((memberId) => {
@@ -1065,12 +1201,18 @@ export function createWebWorkspace(
         },
         () => undefined,
       );
-      const first = agents.find((agent) => agent.id === previousSelected) ?? agents[0];
-      if (first) await select(first.id);
+      if (opened) {
+        await opened;
+        markRemoteSync("conversation-ready");
+      }
+      if (disposed || current !== generation) return;
+      // The other queues only give the sidebar its marks.
+      for (const agent of agents) if (agent.id !== first?.id) loadQueue(agent.id);
     } catch (error) {
       if (disposed || current !== generation) return;
       setState((draft) => {
         draft.status = "offline";
+        draft.otherTab = error instanceof WebHostOtherTabError;
         // The workspace shows an incompatible host in full, so it is not also reported as an error.
         if (error instanceof WebHostIncompatibleError)
           draft.incompatibility = {
@@ -1082,7 +1224,15 @@ export function createWebWorkspace(
           };
       });
       if (blockAccess(error)) throw error;
-      if (error instanceof WebHostIncompatibleError || error instanceof WebHostConnectionError) {
+      // The server can run while another tab holds it. A wake would show a start that never ends.
+      if (error instanceof WebHostOtherTabError) {
+        hostLifecycle.endSleep();
+        recoveryBlocked = true;
+        recovery.suspend();
+        setState((draft) => {
+          draft.connectionError = null;
+        });
+      } else if (error instanceof WebHostIncompatibleError || error instanceof WebHostConnectionError) {
         hostLifecycle.endSleep();
         recoveryBlocked = true;
         recovery.suspend();
@@ -1100,6 +1250,17 @@ export function createWebWorkspace(
       }
       throw error;
     }
+  }
+  /** Saves the frame of the open host for the next page. The layout waits for its read. */
+  function saveFrame(): void {
+    if (state.status !== "online" || !state.host) return;
+    const panelsRead = !state.panelsLoading && !state.panelsFailed;
+    saveRemoteWorkspaceFrame(props.accountId, state.host.hostId, {
+      agents: state.agents,
+      models: state.models,
+      selectedAgentId: state.selectedId,
+      ...(panelsRead ? { sidebarLayout: state.sidebarLayout, hiddenAgents: state.userHiddenAgents } : {}),
+    });
   }
   async function loadPanels(capabilities = state.capabilities, agentIds = state.agents.map((agent) => agent.id)) {
     const current = generation;
@@ -1306,6 +1467,8 @@ export function createWebWorkspace(
   async function select(id: string) {
     const current = generation;
     selectedId = id;
+    if (state.status === "online" && state.host)
+      saveRemoteWorkspaceFrame(props.accountId, state.host.hostId, { selectedAgentId: id });
     setState((draft) => {
       const previous = draft.selectedId;
       if (previous && previous !== id) {
@@ -1487,7 +1650,7 @@ export function createWebWorkspace(
           // While the host stays online, its events keep the workspace current. A focus soon after a
           // full read, such as a switch between windows, does not read the host again.
           if (state.status === "online") return Date.now() - syncedAt < FOCUS_RESYNC_MS ? undefined : resync();
-          if (state.recovery?.phase !== "suspended") recover();
+          if (state.recovery?.phase !== "suspended") recoverNow();
         })
         .catch(report);
     };
@@ -1499,7 +1662,7 @@ export function createWebWorkspace(
         recovery.setActive(false);
       } else {
         hostLifecycle.resume();
-        if (state.status !== "online" && state.recovery?.phase !== "suspended") recover();
+        if (state.status !== "online" && state.recovery?.phase !== "suspended") recoverNow();
       }
     };
     const network = () => {
@@ -1560,6 +1723,7 @@ export function createWebWorkspace(
     removeOwnedHost,
     retryHosts,
     reconnect,
+    useHere,
     joinInvite,
     connect,
     select,
@@ -1568,7 +1732,16 @@ export function createWebWorkspace(
     cancelQueued: (deliveryId: string) => changeQueue((agentId) => runtime.cancelQueued({ agentId, deliveryId })),
     steerQueued(deliveryId: string) {
       const expectedTurnId = conversation()?.page?.activeTurnId;
-      if (expectedTurnId) changeQueue((agentId) => runtime.steerQueued({ agentId, deliveryId, expectedTurnId }));
+      if (!expectedTurnId) return;
+      changeQueue((agentId) =>
+        runtime.steerQueued({ agentId, deliveryId, expectedTurnId }).catch((error: unknown) => {
+          // A message that left the queue is in the turn already: an agent that steers each message
+          // sent while it works can take it first.
+          const delivery = state.queues[agentId]?.deliveries.find((item) => item.id === deliveryId);
+          if (delivery && delivery.status !== "queued") return;
+          throw error;
+        }),
+      );
     },
     reorderQueue: (deliveryIds: string[]) => changeQueue((agentId) => runtime.reorderQueue({ agentId, deliveryIds })),
     async updateQueued(

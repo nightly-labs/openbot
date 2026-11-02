@@ -1020,29 +1020,6 @@ a {
   background: var(--openbot-bg-sidebar);
   padding: clamp(32px, 7vw, 56px);
   text-align: center;
-  box-shadow: 0 24px 80px var(--openbot-glass-shadow);
-}
-
-.join-card-signal {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 26px;
-}
-
-.join-card-signal span {
-  height: 1px;
-  background: var(--openbot-border-strong);
-}
-
-.join-card-signal i {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-logo-production);
-  box-shadow: 0 0 0 6px var(--openbot-accent-strong);
 }
 
 .join-card-logo {
@@ -1089,6 +1066,26 @@ a {
   justify-content: center;
 }
 
+/* The one action on the join page fills the card. */
+.join-card-actions-full {
+  grid-template-columns: 1fr;
+}
+
+/* The line under the join action: the browser and the download, as links in a sentence. */
+.join-card-alternatives {
+  margin: 16px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.join-card-alternatives a {
+  color: var(--openbot-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--openbot-text-muted);
+  text-underline-offset: 3px;
+}
+
 .join-card-error {
   margin: 26px 0 0;
   color: var(--openbot-text-primary);
@@ -1099,10 +1096,6 @@ a {
   color: var(--openbot-text-muted);
   font-size: 12px;
   line-height: 1.5;
-}
-
-.join-card-status-empty {
-  margin: 0;
 }
 
 @media (max-width: 520px) {
@@ -11495,7 +11488,6 @@ a {
   display: grid;
   place-items: center;
   padding: clamp(32px, 6vw, 72px) 16px clamp(48px, 8vw, 96px);
-  background: radial-gradient(circle at 50% 42%, var(--openbot-accent-strong), var(--openbot-transparent) 38%);
 }
 
 /* A form reads from the start edge, and needs more width than a message. */
@@ -11534,17 +11526,6 @@ a {
   width: 14px;
   height: 14px;
   flex: 0 0 auto;
-}
-
-.transactional-notes {
-  display: grid;
-  gap: 6px;
-  margin: 24px 0 0;
-  padding: 0;
-  color: var(--openbot-text-muted);
-  font-size: 12px;
-  line-height: 1.5;
-  list-style: none;
 }
 
 /* The brand page --------------------------------------------------------- */
@@ -11788,5 +11769,572 @@ a {
   .brand-cards,
   .brand-cards[data-wide="true"] {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The public Marketplace at /marketplace. The pages borrow the plugin index and plugin page classes
+   above; these rules are only for what those pages do not have: the switch, the search, the rows,
+   the agent avatar, and the shield. They come last, so they win over the plugin classes they share
+   an element with. */
+
+.marketplace-site a {
+  text-decoration: none;
+}
+
+/* The title on the left and Agents / Skills / Apps on the right, as one track in the search field's
+   fill. The current option is filled as a pressed category is, so the two rows read as one family. */
+.marketplace-site-intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+
+.marketplace-site-switch {
+  display: flex;
+  gap: 2px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface);
+  padding: 4px;
+}
+
+.marketplace-site-switch-option {
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  border-radius: var(--openbot-radius-pill);
+  padding: 0 20px;
+  color: var(--openbot-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background-color var(--openbot-duration-normal) ease,
+    color var(--openbot-duration-normal) ease;
+}
+
+.marketplace-site-switch-option[aria-current="page"] {
+  background: var(--openbot-surface-light);
+  color: var(--openbot-text-on-light);
+}
+
+/* One field as wide as the page, filled like the rows' Add, with the magnifier inside it. */
+.marketplace-site-search {
+  position: relative;
+  margin-bottom: clamp(28px, 3.4vw, 40px);
+}
+
+.marketplace-site-search-icon {
+  position: absolute;
+  top: 50%;
+  left: 18px;
+  width: 17px;
+  height: 17px;
+  color: var(--openbot-text-dim);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.marketplace-site-search-input {
+  width: 100%;
+  height: 48px;
+  border: 1px solid transparent;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface);
+  padding: 0 20px 0 46px;
+  color: var(--openbot-text-primary);
+  font: inherit;
+  font-size: 15px;
+}
+
+.marketplace-site-search-input::placeholder {
+  color: var(--openbot-text-dim);
+}
+
+.marketplace-site-search-input:focus-visible {
+  border-color: var(--openbot-border-strong);
+  outline: 0;
+}
+
+.marketplace-site-switch-option:focus-visible,
+.marketplace-site-crumb:focus-visible,
+.marketplace-site-view-all:focus-visible,
+.marketplace-site-row:focus-visible,
+.marketplace-site-feature:focus-visible {
+  outline: 2px solid var(--openbot-border-strong);
+  outline-offset: 2px;
+}
+
+.marketplace-site-list {
+  margin-top: clamp(24px, 3vw, 36px);
+}
+
+/* The category links take the filter switches' look; the current one is filled like a pressed switch. */
+.marketplace-site-categories .plugin-tag-button[aria-current="page"] {
+  border-color: var(--openbot-surface-light);
+  background: var(--openbot-surface-light);
+  color: var(--openbot-text-on-light);
+}
+
+.marketplace-site-empty {
+  padding: clamp(32px, 5vw, 56px) 0;
+}
+
+.marketplace-site-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  min-width: 0;
+}
+
+.marketplace-site-verified {
+  flex: 0 0 auto;
+  width: 0.9em;
+  height: 0.9em;
+  color: var(--openbot-text-dim);
+}
+
+/* The avatar box. The Worker renders it empty and the browser draws the agent in it. It fills the
+   box a row, a card or a page header gives it, and takes no pointer, for the reason the plugin
+   card's mark gives. */
+.marketplace-site-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--openbot-accent-text);
+  pointer-events: none;
+}
+
+.marketplace-site-avatar-art,
+.marketplace-site-avatar-art > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The drawn bloub leaves a third of its box empty for its motion; here the body fills the box, so
+   it reads at the size of the skill icon beside it. */
+.marketplace-site-avatar .bloub-avatar-svg {
+  scale: 1.45;
+}
+
+/* The glyph a skill shows when the catalog has no icon for it. */
+.marketplace-site-glyph {
+  position: relative;
+  width: auto;
+  height: 28%;
+  color: var(--openbot-text-primary);
+}
+
+.marketplace-site-trust {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 0;
+  color: var(--openbot-text-dim);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.marketplace-site-trust > svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+}
+
+.marketplace-site-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* The open buttons sit at the end of a plugin hero; here they start the line, before Copy link. */
+.marketplace-site-actions .plugin-actions-row {
+  justify-content: flex-start;
+}
+
+.marketplace-site-missing {
+  max-width: 34em;
+}
+
+.marketplace-site-missing-actions {
+  display: flex;
+  margin: 28px 0 clamp(80px, 12vw, 160px);
+}
+
+/* The index, as x.ai's bot marketplace lays it out: Featured as cards, then each group as two
+   columns of rows. */
+.marketplace-site-group + .marketplace-site-group {
+  margin-top: clamp(40px, 5vw, 56px);
+}
+
+.marketplace-site-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.marketplace-site-group-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.marketplace-site-view-all {
+  color: var(--openbot-text-dim);
+  font-size: 14px;
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+.marketplace-site-features {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marketplace-site-feature {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  height: 100%;
+  border-radius: 16px;
+  background: var(--openbot-bg-surface);
+  padding: 22px 16px 20px;
+  color: var(--openbot-text-primary);
+  text-align: center;
+  transition: background-color var(--openbot-duration-normal) ease;
+}
+
+.marketplace-site-feature-mark {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 12px;
+}
+
+/* A block, so a long name wraps with the shield after its last word, not beside the whole name. */
+.marketplace-site-feature-name {
+  display: block;
+  font-size: 15px;
+  font-weight: 500;
+  text-wrap: balance;
+}
+
+.marketplace-site-feature-name .marketplace-site-verified {
+  display: inline;
+  margin-left: 0.3em;
+  vertical-align: -0.1em;
+}
+
+.marketplace-site-feature-by {
+  color: var(--openbot-text-dim);
+  font-size: 13px;
+}
+
+.marketplace-site-rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px clamp(24px, 4vw, 56px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The whole row is one link; Add is its label's end, not a second control. */
+.marketplace-site-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-radius: 14px;
+  padding: 12px;
+  margin-inline: -12px;
+  color: var(--openbot-text-primary);
+  transition: background-color var(--openbot-duration-normal) ease;
+}
+
+.marketplace-site-row-mark {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+}
+
+.marketplace-site-row-text {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+}
+
+.marketplace-site-row-title,
+.marketplace-site-row-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketplace-site-row-title {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.marketplace-site-row-by {
+  color: var(--openbot-text-secondary);
+  font-weight: 400;
+}
+
+.marketplace-site-row-line {
+  color: var(--openbot-text-dim);
+  font-size: 14px;
+}
+
+.marketplace-site-row-add {
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface);
+  padding: 7px 16px;
+  color: var(--openbot-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color var(--openbot-duration-normal) ease;
+}
+
+/* A skill's square icon, at the size an avatar fills. */
+.marketplace-site-skill-icon {
+  display: block;
+  width: 88%;
+  height: 88%;
+  border-radius: 22%;
+}
+
+/* A listing page. The header borrows the plugin page's hero row: the mark and the name on the left,
+   Add on the right of the same line, and the description under both. Under a rule, the rows and
+   the information side by side. */
+.marketplace-site-detail-head {
+  padding-bottom: clamp(32px, 4vw, 44px);
+  border-bottom: 1px solid var(--openbot-border-strong);
+}
+
+/* Where the listing is, each step a link: it replaces the single back link. */
+.marketplace-site-crumbs {
+  margin-top: clamp(28px, 3.5vw, 50px);
+}
+
+.marketplace-site-crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.marketplace-site-crumbs li + li::before {
+  content: "/";
+  margin-inline: 8px;
+  color: var(--openbot-text-dim);
+}
+
+.marketplace-site-crumb {
+  color: var(--openbot-text-dim);
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+/* The name starts at the top of the mark, with or without a trust line under it, and the buttons
+   start on the same line, so the two always line up. */
+.marketplace-site-detail-row {
+  align-items: flex-start;
+  margin-top: clamp(24px, 3vw, 32px);
+}
+
+/* The heading takes what the buttons leave, so a long trust line wraps beside them rather than
+   pushing them under it. Below the width that holds both, the buttons wrap under the heading. */
+.marketplace-site-detail-row .plugin-hero-heading {
+  flex: 1 1 0;
+  align-items: flex-start;
+  min-width: min(100%, 440px);
+}
+
+.marketplace-site-detail-row .marketplace-site-actions {
+  margin-top: 0;
+}
+
+.marketplace-site-detail-mark {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+}
+
+.marketplace-site-detail-title {
+  margin: 0;
+}
+
+/* As in a Featured card: a long name wraps with the shield after its last word. */
+.marketplace-site-detail-title .marketplace-site-name {
+  display: inline;
+}
+
+.marketplace-site-detail-title .marketplace-site-verified {
+  display: inline;
+  margin-left: 0.25em;
+  vertical-align: -0.08em;
+}
+
+.marketplace-site-detail-by {
+  margin: 6px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+}
+
+.marketplace-site-detail-head .marketplace-site-trust {
+  margin-top: 8px;
+}
+
+.marketplace-site-detail-description {
+  max-width: 46em;
+  margin: clamp(20px, 2.4vw, 28px) 0 0;
+  color: var(--openbot-text-readable);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.marketplace-site-detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: start;
+  padding-top: clamp(32px, 4vw, 44px);
+}
+
+.marketplace-site-detail-main:empty {
+  display: none;
+}
+
+/* One column, and the line may take two lines: here it says what the skill or the routine does. */
+.marketplace-site-detail-rows {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.marketplace-site-detail-rows .marketplace-site-row-line {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+
+.marketplace-site-routine-mark {
+  display: grid;
+  place-items: center;
+  width: 88%;
+  height: 88%;
+  border-radius: 22%;
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-secondary);
+}
+
+.marketplace-site-routine-mark > svg {
+  width: 45%;
+  height: 45%;
+}
+
+.marketplace-site-facts .plugin-fact {
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .marketplace-site-view-all:hover,
+  .marketplace-site-crumb:hover,
+  .marketplace-site-switch-option:not([aria-current="page"]):hover {
+    color: var(--openbot-text-primary);
+  }
+
+  a.marketplace-site-row:hover,
+  .marketplace-site-feature:hover {
+    background: var(--openbot-bg-surface);
+  }
+
+  .marketplace-site-feature:hover,
+  a.marketplace-site-row:hover .marketplace-site-row-add {
+    background: var(--openbot-bg-surface-raised);
+  }
+}
+
+@media (max-width: 900px) {
+  .marketplace-site-detail-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  /* The track goes under the title and takes the page's width, each option a third of it. */
+  .marketplace-site-switch {
+    flex: 1 1 100%;
+  }
+
+  /* One line of categories that scrolls sideways to the page's edges, not three lines of pills. */
+  .marketplace-site-categories {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-inline: -20px;
+    padding-inline: 20px;
+    scrollbar-width: none;
+  }
+
+  .marketplace-site-categories > * {
+    flex: 0 0 auto;
+  }
+
+  .marketplace-site-features {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .marketplace-site-feature-mark {
+    width: 72px;
+    height: 72px;
+  }
+
+  .marketplace-site-rows {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .marketplace-site-detail-mark {
+    width: 72px;
+    height: 72px;
+  }
+
+  /* The plugin page's phone size for a name beside its mark. */
+  .marketplace-site-detail-title {
+    font-size: 26px;
+  }
+
+  /* One button per line, each as wide as the page. */
+  .marketplace-site-actions,
+  .marketplace-site-actions .plugin-actions-row,
+  .marketplace-site-missing-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Add wraps under the name and takes the page's width. */
+  .marketplace-site-detail-row .marketplace-site-actions {
+    flex: 1 1 100%;
   }
 }

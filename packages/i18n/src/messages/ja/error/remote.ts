@@ -127,7 +127,6 @@ export const messages = {
   "error.remote.serverDisconnected": "サーバーの接続が切れました。",
   "error.remote.preferencesUnreadable": "保存したチャットの設定を読み取れませんでした。",
   "error.remote.accountAuthRequired": "アカウントの認証が必要です。",
-  "error.remote.serverIdentityChanged": "サーバーの ID が変わりました。信頼済みのホストキーは置き換えません。",
   "error.remote.pairedIdentityChanged":
     "ペアリングしたデスクトップの ID がないか、変わっています。そのデスクトップで新しいコードをスキャンしてください。",
   "error.remote.permanentInviteNoEmail": "永続的な招待はメールで送信できません。",

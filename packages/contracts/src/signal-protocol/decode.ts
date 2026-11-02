@@ -10,6 +10,7 @@
 import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
 import { decodeDiscordDelivery } from "./discord-api";
 import { DISCORD_ROUTE_GUILDS_LIMIT } from "./discord-route";
+import { GITHUB_DELIVERY_BODY_BYTES_LIMIT, GITHUB_DELIVERY_ID_PATTERN, GITHUB_EVENT_PATTERN } from "./github-route";
 import {
   type IceServer,
   QUEUED_DELIVERY_SEALED_LIMIT,
@@ -132,7 +133,17 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
     case "discord-session":
       return { type: kind, version, token: identifier(value.token), guilds: guildList(value.guilds) };
     case "webhook-ready":
+    case "github-ready":
       return { type: kind, version };
+    case "github-delivery":
+      return {
+        type: kind,
+        version,
+        requestId: identifier(value.requestId),
+        event: matching(value.event, GITHUB_EVENT_PATTERN),
+        deliveryId: matching(value.deliveryId, GITHUB_DELIVERY_ID_PATTERN),
+        bodyBase64: deliveryBody(value.bodyBase64, GITHUB_DELIVERY_BODY_BYTES_LIMIT),
+      };
     case "discord-delivery":
       return {
         type: kind,

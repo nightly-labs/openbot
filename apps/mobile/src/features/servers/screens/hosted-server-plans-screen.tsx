@@ -1,4 +1,4 @@
-import type { BillingPlanId } from "@openbot/contracts/billing";
+import { type BillingPlanId, siteLimitForPlan } from "@openbot/contracts/billing";
 import type { HostedServerCatalogPlan, HostedServerList, HostedServerSummary } from "@openbot/contracts/hosted-servers";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { skipToken, useQuery } from "@tanstack/react-query";
@@ -331,6 +331,8 @@ function PlanRow({ plan, current }: { plan: HostedServerCatalogPlan; current: bo
   const facts = t("mobile.server.hosted.planFacts", {
     members: t("mobile.server.hosted.members", { count: plan.memberLimit }),
     storage: t("mobile.server.hosted.storage", { count: plan.diskGb }),
+    // The catalog does not send the site limit, so it comes from the plan.
+    sites: t("mobile.server.hosted.sites", { count: siteLimitForPlan(plan.id) }),
     speed:
       plan.relativeSpeed === 1
         ? t("mobile.server.hosted.speedBase")

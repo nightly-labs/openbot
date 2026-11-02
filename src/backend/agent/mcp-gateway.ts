@@ -19,7 +19,7 @@ import { causeHelpers } from "../effect-boundary";
 import type { McpOperationError } from "../mcp-effects";
 import { McpHandoffLog } from "../mcp-handoff-log";
 import { type McpOAuthAuthority, type McpSignInOpener, normalizeResource } from "../mcp-oauth-provider";
-import { McpOAuthProxy, type McpOAuthProxyTarget, mcpOAuthProxyRoute } from "../mcp-oauth-proxy";
+import { McpOAuthProxy, type McpOAuthProxyTarget, mcpOAuthProxyAgentKey, mcpOAuthProxyRoute } from "../mcp-oauth-proxy";
 import { inspectMcpServer, type McpSignInPlace, testMcpServer } from "../mcp-probe";
 import {
   type McpEndpoint,
@@ -74,6 +74,8 @@ export interface McpGatewayOptions {
   credentials: ProviderClientContext;
   computerUseMcpServer: () => McpServerConfig | null;
   githubConnector?: GitHubConnectorSource | null;
+  /** The agents, read when a server signed in through the proxy opens a session, for their names. */
+  agents?: () => ReadonlyArray<{ id: string; name: string }>;
   /** The agent service logger, so a drop report keeps the `agent-service` prefix it always had. */
   logger: Logger;
   hooks: McpGatewayHooks;
@@ -128,10 +130,22 @@ export class McpGateway {
     this.#logger = options.logger;
     this.#hooks = options.hooks;
     const oauth = this.#oauth;
+    const agents = options.agents;
     this.#proxy = new McpOAuthProxy({
       settings: credentials.mcpOAuthProxySettings ?? null,
       target: (route) => this.#proxyTarget(route),
       refresh: (url, rejected) => (oauth ? oauth.refreshAccessToken(url, rejected) : Effect.succeed(null)),
+      ...(credentials.appVersion
+        ? {
+            client: {
+              version: credentials.appVersion,
+              // A scan, not a map filled by `endpoint`: a Codex session resumed after a restart sends
+              // its agent route before this process hands out any route.
+              agentName: (agentKey) =>
+                agents?.().find((agent) => mcpOAuthProxyAgentKey(agent.id) === agentKey)?.name ?? null,
+            },
+          }
+        : {}),
     });
   }
 
@@ -151,10 +165,15 @@ export class McpGateway {
    * route and that route's bearer, and the OAuth token stays in this process. The GitHub row keeps
    * its own proxy. Every other row is handed as the user wrote it, with no bearer added. A proxy that
    * cannot start leaves the row out of the hand-off: the raw token is never the fallback.
+   *
+   * A session of an agent gets a route of its own, so the proxy can name the agent to the server.
+   * Codex is given these routes too; its fingerprint does not change, so a resumed Codex session
+   * keeps the route without an agent until it is replaced.
    */
   readonly endpoint = Effect.fnUntraced(function* (
     this: McpGateway,
     config: McpServerConfig,
+    agentId: string | null = null,
   ): Effect.fn.Return<McpEndpoint | McpEndpointRefusal, McpGatewayFailed> {
     if (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID) {
       const github = this.#githubConnector;
@@ -163,7 +182,9 @@ export class McpGateway {
       return { url: config.url, authorization: token, proxied: false };
     }
     if (!this.#proxied(config)) return { url: config.url, authorization: null, proxied: false };
-    const route = yield* this.#proxy.route(mcpOAuthProxyRoute(config.id, config.url)).pipe(Effect.result);
+    const route = yield* this.#proxy
+      .route(mcpOAuthProxyRoute(config.id, config.url), agentId === null ? null : mcpOAuthProxyAgentKey(agentId))
+      .pipe(Effect.result);
     if (Result.isFailure(route)) {
       this.#logger.warn("The MCP sign-in proxy did not start.", { cause: toLogValue(route.failure.cause) });
       return { error: sourceText("error.backend.mcpOAuthProxyUnavailable") };

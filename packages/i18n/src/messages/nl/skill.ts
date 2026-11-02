@@ -63,4 +63,18 @@ export const messages = {
   "skill.preview.examplePrompt": "Help me deze vaardigheid te gebruiken.",
   "skill.preview.try": "Vaardigheid proberen",
   "skill.preview.linkFailed": "Kan de link niet openen.",
+
+  "skill.marketplace.changed": {
+    one: "{name} gewijzigd bij {count} agent.",
+    other: "{name} gewijzigd bij {count} agents.",
+  },
+  "skill.marketplace.updated": {
+    one: "{name} bijgewerkt bij {count} agent.",
+    other: "{name} bijgewerkt bij {count} agents.",
+  },
+  "skill.marketplace.undone": "De wijziging van {name} is ongedaan gemaakt.",
+  "skill.marketplace.confirmAgents": "Agents: {agents}.",
+  "skill.marketplace.limitReason": "Een agent kan tot {limit} vaardigheden hebben.",
+  "skill.marketplace.cannotRemove":
+    "OpenBot kan geen ingebouwde vaardigheid verwijderen, en ook geen vaardigheid die het niet heeft geïnstalleerd.",
 } as const satisfies PartialTranslation<typeof source>;

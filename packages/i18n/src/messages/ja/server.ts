@@ -87,6 +87,14 @@ export const messages = {
   "server.add.billing.monthly": "月払い",
   "server.add.billing.yearly": "年払い",
   "server.add.billing.save": "{percent}% お得",
+  "server.add.use.label": "用途",
+  "server.add.use.personal": "個人",
+  "server.add.use.work": "業務",
+  "server.add.license.people": "業務で使う人数",
+  "server.add.license.minimum": { other: "現在 {count} 人がサーバーを使っているため、これより少なくは選べません。" },
+  "server.add.license.bundle": "セット −{percent}%",
+  "server.add.license.included": "{license}付き",
+  "server.add.license.includedTrial": "{license}付き（{date}まで無料）",
   "server.add.billedMonthly": "毎月請求",
   "server.add.billedYearly": "年額 {price} を請求",
   "server.add.yearlySaving": "{amount} お得",
@@ -95,8 +103,22 @@ export const messages = {
   "server.add.custom.title": "より高い性能やカスタムソリューションが必要ですか？",
   "server.add.custom.description": "専用インフラ、追加ストレージ、ワークフローに合わせた機能をご用意できます。",
   "server.add.custom.action": "お問い合わせ",
-  "server.add.join.title": "招待をお持ちですか？",
   "server.add.join.action": "サーバーに参加",
+  "server.add.otherOptions": "その他のオプション",
+  "server.local.createTitle": "このコンピューター上の新しいサーバー",
+  "server.local.createDescription":
+    "このサーバーには専用のエージェント、チャット、ファイルがあります。このコンピューター上で動作します。",
+  "server.local.nameLabel": "サーバー名",
+  "server.local.create": "サーバーを作成",
+  "server.local.creating": "サーバーを作成中…",
+  "server.local.createFailed": "サーバーを作成できませんでした。",
+  "server.local.limitReached":
+    "このコンピューターに作成できるサーバーは最大 {limit} 台です。新しく作成するには、1 台を削除してください。",
+  "server.local.deleteConfirmTitle": "{name} を削除しますか？",
+  "server.local.deleteConfirmDescription":
+    "OpenBot はサーバーを停止し、エージェント、チャット、ファイルをゴミ箱に移動します。",
+  "server.local.deleting": "サーバーを削除中…",
+  "server.local.deletedTitle": "{name} を削除しました",
   "server.add.limit.title": "このアカウントのサーバー数が上限に達しています",
   "server.add.limit.description": {
     other:
@@ -161,6 +183,7 @@ export const messages = {
   "server.rail.addRemote": "リモートサーバーを追加",
   "server.rail.add": "サーバーを追加",
   "server.rail.buttonLabel": "{name} サーバー",
+  "server.rail.thisComputer": "このコンピューター上",
   "server.rail.notificationsMuted": "通知はミュート中",
   "server.rail.actions": "サーバーの操作",
   "server.rail.unmute": "サーバーのミュートを解除",
@@ -171,6 +194,8 @@ export const messages = {
   "server.rail.restart": "サーバーを再起動",
   "server.rail.leave": "サーバーから退出",
   "server.rail.delete": "サーバーを削除",
+  "server.rail.hide": "サーバーを非表示",
+  "server.rail.showLocal": "{name} を表示",
   "server.select.failedTitle": "サーバーを選択できませんでした",
   "server.select.failedDescription": "サーバーを切り替えられませんでした。もう一度お試しください。",
   "server.select.openAgentFailed": "{name} を開けませんでした。サイドバーで探してください。",
@@ -271,13 +296,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "別のコンピューターからこの Mac を表示して操作します。",
   "server.settings.later": "後で",
   "server.settings.setUp": "設定",
-  "server.settings.notifications": "通知",
-  "server.settings.muteNotifications": "通知をミュート",
-  "server.settings.muteDescription":
-    "このサーバーからのデスクトップ通知、サウンド、MacBook のノッチの更新を停止します。",
-  "server.settings.mutedUntilDescription": "{until}。今すぐミュートを解除するにはオフにしてください。",
-  "server.settings.notifyAbout": "通知する内容",
-  "server.settings.notifyAboutDescription": "デスクトップ通知を表示するエージェントのイベントです。",
   "server.settings.agents": "エージェント",
   "server.settings.timezone": "タイムゾーン",
   "server.settings.timezoneDescription":
@@ -287,6 +305,12 @@ export const messages = {
   "server.settings.memoryLimit": "エージェントごとのメモリー数",
   "server.settings.memoryLimitDescription": "このサーバーの各エージェントが保持できるメモリーの数です。",
   "server.settings.memoryLimitLoadFailed": "このサーバーのメモリー上限を読み込めませんでした。",
+  "server.settings.memoryReview": "メモリーの見直し",
+  "server.settings.memoryReviewDescription":
+    "このサーバーのエージェントが、チャットから長く使う事実をバックグラウンドで保存する頻度です。",
+  "server.settings.memoryReviewOff": "オフ",
+  "server.settings.memoryReviewTurns": { other: "{count} ターンごと" },
+  "server.settings.memoryReviewLoadFailed": "メモリーの見直しの設定を読み込めませんでした。",
   "server.settings.remoteOnline": "ホストはオンラインです。公開設定はオーナーが管理しています。",
   "server.settings.remoteOffline": "ホストはオフラインです。公開設定はオーナーが管理しています。",
   "server.settings.reachable": "オンラインでアクセスできます。招待されたユーザーのみがサインインできます。",
@@ -302,6 +326,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "現在のキーと新しいキーの両方が引き継ぎに署名します。メンバーのアプリは次回の接続時に新しいキーに切り替わります。キーファイルがコピーまたは漏えいした場合に実行してください。",
   "server.settings.hostKeyRotated": "サーバーキーを変更しました",
+  "server.settings.hostKeyChanged": "最終変更",
+  "server.settings.hostKeyChangedDescription": "{date}。以前のキーと新しいキーの両方がこの変更に署名しました。",
   "server.settings.hostKeyLocalOnly": "ここでキーを変更できるのは、このコンピューターのサーバーだけです。",
   "server.settings.removeTitle": "サーバーを削除",
   "server.settings.removeDescription":
@@ -377,8 +403,9 @@ export const messages = {
   "server.invite.showQr": "招待の QR コードを表示",
   "server.invite.permaHint":
     "期限切れにならず、何度でも使用できます。このリンクを持つすべてのユーザーが参加できます。無効にするには取り消してください。",
-  "server.invite.full":
-    "このサーバーのメンバーは上限の {limit} 人です。新しい人を招待するには、メンバーを削除してください。",
+  "server.invite.full": {
+    other: "このサーバーのメンバーは上限の {count} 人です。新しい人を招待するには、メンバーを削除してください。",
+  },
   "server.invite.qrLabel": "招待の QR コード",
   "server.invite.qrDescription": "OpenBot Mobile でこのコードをスキャンすると、このサーバーに参加できます。",
   "server.invite.accepted": "招待が承諾されました",

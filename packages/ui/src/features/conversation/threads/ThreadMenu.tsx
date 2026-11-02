@@ -3,7 +3,8 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { sidebarMessageTime } from "@openbot/ui/features/sidebar/sidebar-filtering";
 import { useText } from "@openbot/ui/text";
 import { For, onSettled, Show } from "solid-js";
-import { ThreadStatusMark } from "./ThreadStatusMark";
+import { ThreadStatusMark, ThreadStatusText, ThreadTabIcon, threadAttention } from "./ThreadStatusMark";
+import { ThreadTitle } from "./ThreadTitle";
 import type { ThreadHeaderProps, ThreadRowMode } from "./thread-types";
 
 /** The threads in the menu. The list scrolls without a scrollbar, and fades at an edge with more threads. */
@@ -21,7 +22,17 @@ function ThreadMenuList(props: ThreadHeaderProps) {
             aria-current={current(thread.id)}
             onSelectAfterClose={() => props.onOpen(thread.id)}
           >
-            <span class="agent-threads-menu-title">{thread.title}</span>
+            <Show when={thread.stem}>
+              {(stem) => (
+                <span class="agent-threads-menu-stem" aria-hidden="true">
+                  <For each={stem().through}>
+                    {(line) => <span class={["agent-threads-stem-rail", line && "agent-threads-stem-line"]} />}
+                  </For>
+                  <span class={["agent-threads-stem-elbow", stem().last && "agent-threads-stem-last"]} />
+                </span>
+              )}
+            </Show>
+            <ThreadTitle class="agent-threads-menu-title" title={thread.title} />
             <ThreadStatusMark status={thread.status} />
             <span class="agent-threads-menu-time ui-menu-trailing">{sidebarMessageTime(thread.updatedAt, format)}</span>
           </DropdownMenu.Item>
@@ -59,11 +70,16 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
       {(thread) => (
         <DropdownMenu.Trigger
           class={buttonVariants({ variant: "ghost", size: "sm", class: "agent-threads-switcher no-drag" })}
+          data-attention={threadAttention(thread().status)}
           title={thread().title}
           aria-label={t("conversation.threads.current", { title: thread().title })}
         >
-          <span class="agent-threads-tab-title">{thread().title}</span>
-          <ThreadStatusMark status={thread().status} />
+          {/* The open thread as its selected tab shows it: the icon slot, the title, then the chevron. */}
+          <span class="agent-threads-switcher-icon" aria-hidden="true">
+            <ThreadTabIcon status={thread().status} />
+          </span>
+          <ThreadTitle class="agent-threads-tab-title" title={thread().title} />
+          <ThreadStatusText status={thread().status} />
           <ChevronDown class="agent-threads-switcher-chevron" aria-hidden="true" />
         </DropdownMenu.Trigger>
       )}
@@ -104,7 +120,7 @@ export function ThreadMenu(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
                         class="agent-threads-menu-item"
                         onSelectAfterClose={() => props.onRestore(thread.id)}
                       >
-                        <span class="agent-threads-menu-title">{thread.title}</span>
+                        <ThreadTitle class="agent-threads-menu-title" title={thread.title} />
                         <span class="agent-threads-menu-time ui-menu-trailing">
                           {sidebarMessageTime(thread.updatedAt, format)}
                         </span>

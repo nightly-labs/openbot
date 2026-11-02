@@ -3,20 +3,26 @@ import {
   isSpeechVoice,
   isVoiceLanguage,
   isVoiceModelId,
+  isVoiceServerRoutes,
   SPEECH_LIMITS,
   type SpeechInput,
   type SpeechSettings,
   VOICE_API_KEY_MAX_LENGTH,
   VOICE_AUDIO_LIMITS,
+  VOICE_SERVER_LIMITS,
   VOICE_STREAM_LIMITS,
   type VoiceApiKeyInput,
   type VoiceModelRequest,
+  type VoiceServerConnection,
+  type VoiceServerSave,
   type VoiceSettings,
   type VoiceStream,
   type VoiceStreamAudio,
   type VoiceTranscriptionInput,
 } from "@openbot/contracts/ipc";
+import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { parseBaseUrl } from "./custom-provider-inputs";
 import { isObject } from "./validation";
 
 export function parseVoiceTranscription(input: unknown): VoiceTranscriptionInput {
@@ -118,4 +124,39 @@ export function parseSpeechInput(input: unknown): SpeechInput {
     throw new Error("Speech needs text and a known language.");
   if (input.text.length > SPEECH_LIMITS.maximumTextLength) throw new Error("The speech text is too long.");
   return { text: input.text, language: input.language };
+}
+
+/** The address and key of a voice server to test. The key can be a credential: no message quotes it. */
+export function parseVoiceServerConnection(input: unknown): VoiceServerConnection {
+  if (!isObject(input)) throw new Error("A voice server is required.");
+  // The same rules as a custom provider's base URL: http or https, and no password in it.
+  const address = parseBaseUrl(input.address);
+  if (input.apiKey !== null && input.apiKey !== undefined && !isString(input.apiKey))
+    throw new Error("The API key is not text.");
+  const apiKey = isString(input.apiKey) ? input.apiKey.trim() || null : null;
+  if (apiKey && apiKey.length > VOICE_SERVER_LIMITS.apiKey) throw new Error(sourceText("error.provider.apiKeyTooLong"));
+  // The key goes into an HTTP header, which refuses other characters.
+  if (apiKey && !/^[\x21-\x7e]+$/u.test(apiKey)) throw new Error(sourceText("error.provider.keyInvalidCharacters"));
+  return { address, apiKey };
+}
+
+/** A server to save with its routes, or null to remove it. */
+export function parseVoiceServerSave(input: unknown): VoiceServerSave {
+  if (!isObject(input)) throw new Error("A voice server is required.");
+  if (input.server === null) return { server: null };
+  if (!isObject(input.server) || !isVoiceServerRoutes(input.server.routes))
+    throw new Error("A voice server needs valid routes.");
+  const { routes } = input.server;
+  return {
+    server: {
+      ...parseVoiceServerConnection(input.server),
+      routes: {
+        dictation: routes.dictation,
+        speech: routes.speech,
+        transcriptionModel: routes.transcriptionModel,
+        speechModel: routes.speechModel,
+        voice: routes.voice,
+      },
+    },
+  };
 }

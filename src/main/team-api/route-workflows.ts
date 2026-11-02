@@ -9,6 +9,10 @@ import {
   type WorkflowStep,
 } from "@openbot/contracts/ipc";
 import {
+  WORKFLOWS_GITHUB_CAPABILITY,
+  WORKFLOWS_GITHUB_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-github-v1";
+import {
   WORKFLOW_RUN_STEP_LIMIT,
   WORKFLOW_STEP_TEXT_LIMIT,
   WORKFLOWS_CAPABILITY,
@@ -27,6 +31,8 @@ import {
   parseRunWorkflowStep,
   parseSaveWorkflowGraph,
   parseStartWorkflowRun,
+  parseWorkflowGitHubLastEvent,
+  parseWorkflowGitHubRepository,
   parseWorkflowRuns,
   parseWorkflowTrigger,
   parseWorkflowVersion,
@@ -39,6 +45,7 @@ import { readJson, requireAdmin, requireAgentLevel, stringField, WEBRTC_FRAME_BO
 import { runEventsEffect } from "./route-events";
 
 const WORKFLOW_PATHS = new Set<string>(Object.values(WORKFLOWS_ROUTES));
+const WORKFLOW_GITHUB_PATHS = new Set<string>(Object.values(WORKFLOWS_GITHUB_ROUTES));
 
 function workflowMissing(): never {
   throw new HttpError(404, sourceText("error.workflow.missing"));
@@ -75,6 +82,26 @@ function placeOutputs(graph: WorkflowGraph): Map<string, string> {
     places.set(node.id, JSON.stringify([node.fields.connectionId ?? null, node.fields.placeId ?? null]));
   }
   return places;
+}
+
+/**
+ * The settings of each GitHub trigger and each GitHub output, by node. Their changes act as the host's
+ * GitHub App bot, so only an owner or admin can add or change one (`workflows-github-v1`).
+ */
+function githubNodes(graph: WorkflowGraph): Map<string, string> {
+  const nodes = new Map<string, string>();
+  for (const node of graph.nodes) {
+    const github =
+      node.kind === "trigger"
+        ? node.fields.trigger === "github"
+        : node.kind === "output" && node.fields.target === "github";
+    if (!github) continue;
+    const fields = Object.keys(node.fields)
+      .sort()
+      .map((key) => [key, node.fields[key] ?? null]);
+    nodes.set(node.id, JSON.stringify([node.kind, fields]));
+  }
+  return nodes;
 }
 
 function clip(text: string | null): string | null {
@@ -115,7 +142,9 @@ function trimmed<A>(whole: A, lists: readonly WorkflowStep[][]): A {
  * needs the chat level for each of those agents; a change, a delete or a restore needs the manage
  * level, before and after the change. A graph that names no agent needs no level, by product decision.
  * A change to an output that posts to a messaging place needs an owner or admin, as routine results
- * do. Frozen by `workflows-v1`.
+ * do. Frozen by `workflows-v1`. A GitHub trigger or a GitHub output, and the GitHub catalog and
+ * options, need an owner or admin; the GitHub event history needs a member who reads the workflow, and
+ * a run with the last event needs the chat level, as a start does. Frozen by `workflows-github-v1`.
  */
 export async function routeWorkflows(
   context: TeamApiRequestContext,
@@ -125,8 +154,12 @@ export async function routeWorkflows(
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json, protocol } = context;
   const path = url.pathname;
-  if (method !== "POST" || !WORKFLOW_PATHS.has(path)) return "unmatched";
+  const githubPath = WORKFLOW_GITHUB_PATHS.has(path);
+  if (method !== "POST" || !(githubPath || WORKFLOW_PATHS.has(path))) return "unmatched";
   if (!workflows || !capabilities.has(WORKFLOWS_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  const github = workflows.github;
+  if (githubPath && (!github || !capabilities.has(WORKFLOWS_GITHUB_CAPABILITY)))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   // `readJson` has already run the body through the workflows wire codec.
   const body = await readJson(request);
@@ -148,6 +181,8 @@ export async function routeWorkflows(
     requireUsable(after, "manage");
     const old = placeOutputs(before);
     for (const [nodeId, place] of placeOutputs(after)) if (old.get(nodeId) !== place) requireAdmin(member);
+    const oldGitHub = githubNodes(before);
+    for (const [nodeId, settings] of githubNodes(after)) if (oldGitHub.get(nodeId) !== settings) requireAdmin(member);
   };
   const visibleDetail = async (workflowId: string) => {
     const detail = await run(workflows.get(workflowId));
@@ -321,6 +356,27 @@ export async function routeWorkflows(
       const input = parse(parseWorkflowTrigger, body);
       await usableDetail(input.workflowId, "manage");
       return json(200, await runEventsEffect(workflows.rotateWorkflowSecret(input)));
+    }
+  }
+  if (!github) return "unmatched";
+  switch (path) {
+    case WORKFLOWS_GITHUB_ROUTES.catalog:
+      requireAdmin(member);
+      return json(200, fitted(await run(github.catalog())));
+    case WORKFLOWS_GITHUB_ROUTES.options: {
+      requireAdmin(member);
+      const input = parse(parseWorkflowGitHubRepository, body);
+      return json(200, fitted(await run(github.options(input.repository))));
+    }
+    case WORKFLOWS_GITHUB_ROUTES.history: {
+      const workflowId = stringField(body, "workflowId");
+      await visibleDetail(workflowId);
+      return json(200, fitted(await run(workflows.githubHistory(workflowId))));
+    }
+    case WORKFLOWS_GITHUB_ROUTES.runLastEvent: {
+      const input = parse(parseWorkflowGitHubLastEvent, body);
+      await usableDetail(input.workflowId, "chat");
+      return json(200, fittedRun(await run(workflows.githubLastEvent(input))));
     }
   }
   return "unmatched";

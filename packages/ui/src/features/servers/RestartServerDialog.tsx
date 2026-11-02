@@ -69,10 +69,12 @@ export function RestartServerDialog(props: {
   }
 
   // A new request opens the confirmation. A request for the server that restarts shows its progress.
+  // The effect also runs when a new summary of the same server arrives; that is not a new request, and
+  // must not reset a finished restart to the confirmation.
   createEffect(
     () => props.server?.id ?? null,
-    (id) => {
-      if (id === null) return;
+    (id, previous) => {
+      if (id === null || id === previous) return;
       untrack(() => {
         if (!restarting()) return reset();
         if (id === restartId()) {
@@ -110,19 +112,22 @@ export function RestartServerDialog(props: {
 
   /**
    * The server goes offline when it stops, and comes back online when it starts again. The client that
-   * waits for the start sets a hosted issue when the start fails or takes too long.
+   * waits for the start sets a hosted issue when the start fails or takes too long. A server on this
+   * computer goes offline and comes back before its request returns.
    */
   function follow(server: Pick<RestartServer, "state" | "hostedIssue"> | null): void {
-    if (!requestDone || !restarting() || !server) return;
+    if (!restarting() || !server) return;
+    // An incompatible server runs; only its version differs from this app.
+    const down = server.state !== "online" && server.state !== "incompatible";
+    if (down) wentDown = true;
+    if (!requestDone) return;
     const issue = server.hostedIssue ?? null;
     if (issue !== null && issue !== lastIssue) {
       finish("failed");
       return;
     }
     lastIssue = issue;
-    // An incompatible server runs; only its version differs from this app.
-    if (server.state !== "online" && server.state !== "incompatible") {
-      wentDown = true;
+    if (down) {
       if (phase() === "stopping") setPhase("starting");
     } else if (wentDown) finish("online");
   }

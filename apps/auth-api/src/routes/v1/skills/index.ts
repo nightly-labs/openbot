@@ -1,4 +1,4 @@
-import { isSkillCategory } from "@openbot/contracts/ipc";
+import { isSkillCategory, type MarketplaceSkillSort } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
@@ -25,16 +25,21 @@ export const Route = createFileRoute("/v1/skills/")({
           Effect.gen(function* () {
             const url = new URL(request.url);
             const category = url.searchParams.get("category") ?? undefined;
-            const sort = url.searchParams.get("sort") ?? undefined;
+            const sortParam = url.searchParams.get("sort") ?? undefined;
+            const verifiedParam = url.searchParams.get("verified");
             if (category && !isSkillCategory(category))
               return apiError(400, "invalid_category", "Unknown skill category.");
-            if (sort && sort !== "installs") return apiError(400, "invalid_sort", "Unknown skill sort order.");
+            const sort = sortParam ? skillSort(sortParam) : undefined;
+            if (sort === null) return apiError(400, "invalid_sort", "Unknown skill sort order.");
+            if (verifiedParam !== null && verifiedParam !== "true" && verifiedParam !== "false")
+              return apiError(400, "invalid_verified", "The verified filter must be true or false.");
             return publicMarketplaceJson(
               yield* requestSkillMarketplace().list({
                 query: normalizeMarketplaceQuery(url.searchParams.get("query") ?? undefined),
                 category,
                 featured: url.searchParams.get("featured") === "true",
-                sort: sort === "installs" ? sort : undefined,
+                verified: verifiedParam === null ? undefined : verifiedParam === "true",
+                sort,
                 cursor: url.searchParams.get("cursor") ?? undefined,
                 limit: parseMarketplaceLimit(url.searchParams.get("limit")),
               }),
@@ -80,3 +85,7 @@ export const Route = createFileRoute("/v1/skills/")({
     },
   },
 });
+
+function skillSort(value: string): MarketplaceSkillSort | null {
+  return value === "installs" || value === "updated" || value === "name" ? value : null;
+}

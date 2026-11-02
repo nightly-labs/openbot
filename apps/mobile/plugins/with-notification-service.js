@@ -1,12 +1,15 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { withDangerousMod, withXcodeProject } = require("expo/config-plugins");
+const { withDangerousMod, withEntitlementsPlist, withInfoPlist, withXcodeProject } = require("expo/config-plugins");
 
 // Adds the Notification Service Extension that opens a sealed OpenBot notification before iOS shows
 // it (`notification-service/NotificationService.swift`). It reads the keys that the app writes into
-// the App Group, so it has the App Group entitlement and nothing else.
+// the App Group, so it has the App Group entitlement and nothing else. It also makes an agent
+// notification a communication notification with the agent picture, so the app has the Communication
+// Notifications entitlement and declares `INSendMessageIntent`.
 
 const SOURCE = "NotificationService.swift";
+const SEND_MESSAGE_INTENT = "INSendMessageIntent";
 
 /**
  * @typedef {{ targetName: string; bundleIdentifier: string; groupIdentifier: string }} NotificationServiceProps
@@ -42,6 +45,13 @@ function infoPlist({ targetName, groupIdentifier }) {
     <string>com.apple.usernotifications.service</string>
     <key>NSExtensionPrincipalClass</key>
     <string>$(PRODUCT_MODULE_NAME).NotificationService</string>
+    <key>NSExtensionAttributes</key>
+    <dict>
+      <key>IntentsSupported</key>
+      <array>
+        <string>${SEND_MESSAGE_INTENT}</string>
+      </array>
+    </dict>
   </dict>
   <key>OpenBotAppGroup</key>
   <string>${groupIdentifier}</string>
@@ -161,9 +171,30 @@ const withNotificationServiceSigning = (config, { targetName, bundleIdentifier, 
   return config;
 };
 
+/**
+ * iOS shows the sender picture only for an app with the Communication Notifications entitlement that
+ * declares the intent. Without them, `updating(from:)` fails and the notification shows as before.
+ * EAS turns the capability on for the app from its entitlements.
+ *
+ * @type {import('expo/config-plugins').ConfigPlugin}
+ */
+const withCommunicationNotifications = (config) =>
+  withInfoPlist(
+    withEntitlementsPlist(config, (mod) => {
+      mod.modResults["com.apple.developer.usernotifications.communication"] = true;
+      return mod;
+    }),
+    (mod) => {
+      const types = mod.modResults.NSUserActivityTypes ?? [];
+      if (!types.includes(SEND_MESSAGE_INTENT)) types.push(SEND_MESSAGE_INTENT);
+      mod.modResults.NSUserActivityTypes = types;
+      return mod;
+    },
+  );
+
 /** @type {import('expo/config-plugins').ConfigPlugin<NotificationServiceProps>} */
 module.exports = (config, props) =>
   withNotificationServiceTarget(
-    withNotificationServiceFiles(withNotificationServiceSigning(config, props), props),
+    withNotificationServiceFiles(withNotificationServiceSigning(withCommunicationNotifications(config), props), props),
     props,
   );

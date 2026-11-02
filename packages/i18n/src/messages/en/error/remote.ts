@@ -121,7 +121,6 @@ export const messages = defineMessages("error.remote", {
   "error.remote.serverDisconnected": "The server disconnected.",
   "error.remote.preferencesUnreadable": "The saved chat preferences could not be read.",
   "error.remote.accountAuthRequired": "Account authentication is required.",
-  "error.remote.serverIdentityChanged": "The server identity changed. Refusing to replace the trusted host key.",
   "error.remote.pairedIdentityChanged":
     "The paired desktop identity is missing or changed. Scan a new code from that desktop.",
   "error.remote.permanentInviteNoEmail": "Permanent invitations cannot be sent by email.",
@@ -195,4 +194,11 @@ export const messages = defineMessages("error.remote", {
   "error.remote.channelDeleteUnsupported": "Update this desktop server to delete channels.",
   "error.remote.historyRefreshFailed": "The message was sent, but chat history could not refresh.",
   "error.remote.taskHistoryRefreshFailed": "The task was changed, but chat history could not refresh.",
+  // Servers that the desktop app starts on this computer.
+  "error.remote.localServerStartFailed": "The server on this computer did not start.",
+  "error.remote.localServerNotFound": "This server is not on this computer.",
+  "error.remote.localServerLimit":
+    "You can have at most {limit} servers on this computer. Delete one to create another.",
+  "error.remote.localServersReadOnly":
+    "This version of OpenBot cannot read the list of servers on this computer. Update OpenBot.",
 });

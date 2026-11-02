@@ -190,7 +190,9 @@ class DiscordAdapter implements MessagingAdapter {
     replaceMessageId: string | null,
   ) {
     const [first = "", ...rest] = chunkMarkdown(markdown, CHUNK_CHARACTERS);
+    let firstId: string;
     if (replaceMessageId) {
+      firstId = replaceMessageId;
       const updated = yield* Effect.result(this.edit(target, replaceMessageId, { text: first }));
       if (Result.isFailure(updated)) {
         yield* this.#call(
@@ -202,10 +204,11 @@ class DiscordAdapter implements MessagingAdapter {
           },
           ignoreAnswer,
         ).pipe(Effect.catch(() => Effect.void));
-        yield* this.post(target, { text: first });
+        firstId = yield* this.post(target, { text: first });
       }
-    } else yield* this.post(target, { text: first });
+    } else firstId = yield* this.post(target, { text: first });
     for (const chunk of rest) yield* this.post(target, { text: chunk });
+    return firstId;
   });
 
   readonly upload = Effect.fnUntraced(function* (

@@ -1,6 +1,8 @@
 // The text of the privacy policy. Legal wording: change it only from the approved source text,
 // and move `PRIVACY_POLICY_UPDATED_AT` with it.
 
+import { Link } from "@tanstack/solid-router";
+
 const PRIVACY_EMAIL = "privacy@openbot.run";
 
 function PrivacyEmail() {
@@ -81,9 +83,10 @@ export function PrivacyPolicy() {
         providing the software used to process such data.
       </p>
       <p>
-        Where required under Article 28 GDPR, OpenBot enters into a Data Processing Agreement (DPA) with customers
-        governing the processing of personal data on their behalf. Any international transfers carried out in this
-        capacity are subject to applicable contractual requirements and appropriate data protection safeguards.
+        Where required under Article 28 GDPR, OpenBot enters into a{" "}
+        <Link to="/dpa">Data Processing Agreement (DPA)</Link> with customers governing the processing of personal data
+        on their behalf. Any international transfers carried out in this capacity are subject to applicable contractual
+        requirements and appropriate data protection safeguards.
       </p>
 
       <h2>Data We Collect</h2>
@@ -93,7 +96,7 @@ export function PrivacyPolicy() {
         through account management, platform operation, analytics, and connected services.
       </p>
 
-      <h3>Information We Collect Automatically</h3>
+      <h3>Information we collect automatically</h3>
       <p>When users access or interact with the Services, OpenBot may process the following information:</p>
       <ul>
         <li>
@@ -409,8 +412,8 @@ export function PrivacyPolicy() {
         <li>
           <strong>Service Providers</strong> – third-party providers that support the operation, maintenance, and
           security of the Services, including cloud infrastructure, hosted servers, authentication, payment processing,
-          email delivery, technical support, and communication services. These providers include Cloudflare, boat,
-          Stripe, and other providers supporting specific functionalities of the Services.
+          email delivery, technical support, and communication services. These providers include Cloudflare, Dedale AI,
+          Corp. (operating as boat), and Stripe.
         </li>
         <li>
           <strong>Third-Party AI Providers</strong> – external AI providers, including OpenAI, Anthropic, Google, xAI,
@@ -459,17 +462,31 @@ export function PrivacyPolicy() {
 
       <h2>Third-Party Service Providers</h2>
       <p>
-        OpenBot uses Stripe as an external payment service provider to process payments and manage subscriptions for
-        paid Services.
+        OpenBot uses the following third-party service providers in connection with the operation and provision of the
+        Services:
+      </p>
+      <ul>
+        <li>
+          <strong>Cloudflare</strong> – provides infrastructure and security services supporting the operation of the
+          OpenBot website and related online functionalities.
+        </li>
+        <li>
+          <strong>Dedale AI, Corp. (operating as boat)</strong> – provides cloud-based virtual server infrastructure
+          used to host OpenBot Hosted Server environments.
+        </li>
+        <li>
+          <strong>Stripe</strong> – processes payments and manages subscriptions for paid Services.
+        </li>
+      </ul>
+      <p>
+        These providers process personal data in accordance with their respective privacy policies, contractual
+        arrangements, and applicable Data Protection Laws.
       </p>
       <p>
         Payment card and billing details are provided directly to Stripe through its payment pages. OpenBot receives
         only the information necessary to administer subscriptions and related transactions, including subscription
         plans, billing periods, payment statuses, amounts, and transaction references. OpenBot does not collect or store
         complete payment card numbers.
-      </p>
-      <p>
-        Stripe processes personal data in accordance with its applicable privacy policy and contractual arrangements.
       </p>
 
       <h2>AI Providers and Optional Integrations</h2>
@@ -728,7 +745,7 @@ export function PrivacyPolicy() {
         requirements applicable in your jurisdiction.
       </p>
 
-      <h2>Use of Cookies</h2>
+      <h2>Use of cookies</h2>
       <p>
         OpenBot does not use cookies or similar technologies for advertising, marketing, behavioural profiling,
         analytics, or cross-site tracking.
@@ -747,7 +764,7 @@ export function PrivacyPolicy() {
         to delete such information without undue delay.
       </p>
 
-      <h2>External Services</h2>
+      <h2>External services</h2>
       <p>
         The Platform may integrate with or provide access to external services. The collection and processing of
         information by such services are governed by their own privacy policies and terms. OpenBot is not responsible

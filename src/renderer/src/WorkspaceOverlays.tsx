@@ -1,4 +1,10 @@
-import { type CentralAuthUser, LOCAL_SERVER_ID, type RoutineFields, type ServerSummary } from "@openbot/contracts/ipc";
+import {
+  type CentralAuthUser,
+  LOCAL_SERVER_ID,
+  LOCAL_SERVER_LIMIT,
+  type RoutineFields,
+  type ServerSummary,
+} from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
@@ -10,6 +16,7 @@ import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnosti
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import { RestartServerDialog } from "@openbot/ui/features/servers/RestartServerDialog";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
+import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, Loading, Show, untrack } from "solid-js";
 import { actionToast } from "./action-toast";
@@ -44,6 +51,7 @@ import { useServers } from "./features/servers/servers-context";
 import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
 import { useSettings } from "./features/settings/settings-context";
 import { settingsPort } from "./features/settings/settings-port";
+import { useSidebar } from "./features/sidebar/sidebar-context";
 import { useUpdates } from "./features/updates/updates-context";
 import { useWhatsNew } from "./features/updates/whats-new-context";
 import { usePlanLimitRows } from "./features/usage/plan-limit-rows";
@@ -51,7 +59,7 @@ import { createVaultStore } from "./features/vault/stores/vault-store";
 import { desktopVaultCalls, hostVaultCalls } from "./features/vault/vault-port";
 import { useWindowPage } from "./features/window/window-page-context";
 import { useGlobalSearchSources } from "./global-search-sources";
-import { RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
+import { CreateLocalServerDialog, RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
 import { useNavigation } from "./navigation";
 import { usePlatform } from "./platform";
 import { useProviders } from "./providers";
@@ -99,6 +107,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <SharedAgentInstall />
       <JoinServer account={props.account} />
       <AddServer />
+      <CreateLocalServer />
       <HostedUpsell account={props.account} />
       <LeaveServer />
       <RestartServer />
@@ -128,6 +137,8 @@ export function SkillsMarketplace() {
     setPendingPluginSlug,
     pendingPluginConnect,
     setPendingPluginConnect,
+    pendingMarketplaceListing,
+    setPendingMarketplaceListing,
   } = useSettings();
   const { agentList, activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
   const { selectAgent } = useNavigation();
@@ -159,6 +170,8 @@ export function SkillsMarketplace() {
         setPendingPluginSlug(null);
         setPendingPluginConnect(false);
       }}
+      marketplaceListing={pendingMarketplaceListing()}
+      onMarketplaceListingConsumed={() => setPendingMarketplaceListing(null)}
       connectors={connectors.active}
       macOS={platform.appInfo()?.platform === "darwin"}
       onAddServer={(serverId) => {
@@ -210,17 +223,43 @@ function JoinServer(props: AccountProps) {
   );
 }
 
+/** A new server on this computer, with its own agents, chats and files. */
+function CreateLocalServer() {
+  const { servers, createLocalServerOpen, setCreateLocalServerOpen } = useServers();
+  const { createLocalServer } = useServerSelection();
+  // Main refuses one more server too. This only tells the user before they type a name.
+  const limitReached = () => servers().filter((server) => server.thisComputer).length >= LOCAL_SERVER_LIMIT;
+  return (
+    <Show when={createLocalServerOpen()}>
+      <Loading>
+        <CreateLocalServerDialog
+          limitReached={limitReached()}
+          onClose={() => setCreateLocalServerOpen(false)}
+          onCreate={createLocalServer}
+        />
+      </Loading>
+    </Show>
+  );
+}
+
 /** A hosted server: the plans, the payment, then the setup. */
 function AddServer() {
   const { servers, addServerOpen, addServerEntryPoint, setAddServerOpen, setJoinServerOpen } = useServers();
-  const { select } = useServerActions();
+  const { select, createLocal } = useServerActions();
   const { openAppSettings } = useSettings();
+  const onCreateLocal =
+    createLocal &&
+    (() => {
+      setAddServerOpen(false);
+      createLocal();
+    });
 
   return (
     <AddServerOverlay
       open={addServerOpen()}
       entryPoint={addServerEntryPoint() ?? undefined}
       calls={appPort().hostedServers}
+      license={appPort().license}
       servers={servers()}
       onClose={() => setAddServerOpen(false)}
       onOpenServer={(serverId) => {
@@ -232,6 +271,7 @@ function AddServer() {
         setAddServerOpen(false);
         setJoinServerOpen(true);
       }}
+      onCreateLocal={onCreateLocal}
       onManageServers={() => openAppSettings(null, "hosted-servers")}
     />
   );
@@ -259,6 +299,25 @@ function HostedUpsell(props: AccountProps) {
       }
     }
   });
+  // Named functions, not conditional props: the controller reads these props in an effect callback,
+  // where the memo of a conditional prop halts the renderer.
+  function canOfferHostedServer(): boolean {
+    return (
+      !platform.landingPreview &&
+      hostedServersAvailable() &&
+      hostedServersLoaded() &&
+      hostedServerIds().size === 0 &&
+      (activeServer()?.kind === "local" || activeServer()?.role === "owner") &&
+      activeServer()?.hosted !== true
+    );
+  }
+  function upsellServerId(): string {
+    return activeServer()?.id ?? "local";
+  }
+  function upsellHost() {
+    const server = activeServer();
+    return server?.kind === "remote" ? { name: server.name ?? "" } : ("this-computer" as const);
+  }
   // The calendar lists every routine of the host. A range in the future reads no run history.
   function localActiveRoutineIds(): Promise<readonly string[] | null> {
     if (untrack(activeServer)?.kind !== "local") return Promise.resolve(null);
@@ -270,17 +329,10 @@ function HostedUpsell(props: AccountProps) {
   return (
     <HostedServerUpsell
       accountId={props.account().id}
-      canOffer={
-        !platform.landingPreview &&
-        hostedServersAvailable() &&
-        hostedServersLoaded() &&
-        hostedServerIds().size === 0 &&
-        (activeServer()?.kind === "local" || activeServer()?.role === "owner") &&
-        activeServer()?.hosted !== true
-      }
-      serverId={activeServer()?.id ?? "local"}
+      canOffer={canOfferHostedServer()}
+      serverId={upsellServerId()}
       activeHostRoutineIds={localActiveRoutineIds}
-      host={activeServer()?.kind === "remote" ? { name: activeServer()?.name ?? "" } : "this-computer"}
+      host={upsellHost()}
       busy={(agentId) => Boolean(activeTurns()[agentId])}
       openPlans={() => setAddServerOpen(true, "upsell")}
       track={(action, entryPoint) =>
@@ -297,6 +349,7 @@ function LeaveServer() {
     <LeaveServerDialog
       server={leaveConfirmServer()}
       removeOwned={leaveConfirmServer()?.role === "owner"}
+      deleteLocal={leaveConfirmServer()?.thisComputer === true}
       onClose={cancelLeaveServer}
       onLeave={leaveConfirmedServer}
       restoreFocusTarget={leaveRestoreTarget()}
@@ -304,7 +357,7 @@ function LeaveServer() {
   );
 }
 
-/** The hosted server restart that the server menu opens. */
+/** The restart of a hosted server, or of a server on this computer, that the server menu opens. */
 function RestartServer() {
   const { servers } = useServers();
   const { restartConfirmServer, restartRestoreTarget, cancelRestartServer, restartConfirmedServer } =
@@ -328,7 +381,7 @@ function ServerSettings() {
   const windowPage = useWindowPage();
   const usageRows = usePlanLimitRows();
   const platform = usePlatform();
-  const { hostStatus, setServerMuted, setServerNotificationLevel, hostedServerIds, hostedServersLoaded } = useServers();
+  const { hostStatus, hostedServerIds, hostedServersAvailable, hostedServersLoaded, setAddServerOpen } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
@@ -626,6 +679,21 @@ function ServerSettings() {
     );
   };
 
+  /** A server at its site limit offers the server plans, which have more sites, to its owner. */
+  function canOfferServerPlans(server: ServerSummary): boolean {
+    return (
+      !platform.landingPreview &&
+      hostedServersAvailable() &&
+      hostedServersLoaded() &&
+      (server.kind === "local" || server.role === "owner") &&
+      server.hosted !== true
+    );
+  }
+  function openServerPlans(): void {
+    setServerSettingsOpen(false);
+    setAddServerOpen(true, "upsell");
+  }
+
   const storageOptions = (server: ServerSummary): Omit<ServerStorageOptions, "canManage"> => ({
     hostName:
       server.kind === "local"
@@ -657,8 +725,6 @@ function ServerSettings() {
           onSaveIdentity={saveServerIdentity}
           onSetPublished={setServerPublished}
           onRotateHostKey={server().kind === "local" ? rotateHostKey : undefined}
-          onSetMuted={(muted) => setServerMuted(server().id, muted)}
-          onSetNotificationLevel={(level) => setServerNotificationLevel(server().id, level)}
           onCreateInvite={createServerInvite}
           license={appPort().license}
           onContactUs={() => void appPort().openExternal("hosted-server-contact")}
@@ -731,12 +797,14 @@ function ServerSettings() {
                   api: appPort().hostedSites,
                   onOpenSite: (url) => void appPort().openUrl(url),
                   trackDelete: trackHostedSiteDelete,
+                  onSeePlans: canOfferServerPlans(server()) ? openServerPlans : undefined,
                 }
               : undefined
           }
           hostUpdate={{}}
           hostTimezone={{}}
           hostMemoryLimit={{}}
+          memoryReview={{}}
           hostPromptCacheTtl={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}
@@ -797,9 +865,10 @@ function AppSettings(props: AccountProps) {
   const auth = useAuth();
   const updates = useUpdates();
   const whatsNew = useWhatsNew();
-  const { servers, setAddServerOpen } = useServers();
+  const { servers, setAddServerOpen, setServerMuted, setServerNotificationLevel } = useServers();
   const {
     appSettingsOpen,
+    notificationFocusRequest,
     setAppSettingsOpen,
     appSettingsTab,
     hostedServerDeleteRequest,
@@ -864,6 +933,9 @@ function AppSettings(props: AccountProps) {
         }}
         onTestNotification={sendTestNotification}
         onOpenNotificationSettings={openNotificationSettings}
+        onSetServerNotificationLevel={setServerNotificationLevel}
+        onSetServerMuted={setServerMuted}
+        notificationFocusRequest={notificationFocusRequest()}
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
         hostedServerDeleteRequest={hostedServerDeleteRequest()}
@@ -874,7 +946,16 @@ function AppSettings(props: AccountProps) {
 
 /** Search across the agents, channels, conversations, routines and commands of the active server. */
 function GlobalMessageSearch() {
-  const { agentList } = useAgents();
+  const { agentList, userHiddenAgentIds } = useAgents();
+  const { sidebarLayout, pinnedSidebarItems } = useSidebar();
+  // In sidebar order, so that ⌘1-9 opens the agents the user put at the top.
+  const agents = createMemo(() =>
+    sidebarAgentOrder(agentList(), {
+      layout: sidebarLayout(),
+      pinnedItems: pinnedSidebarItems(),
+      hiddenAgentIds: userHiddenAgentIds(),
+    }),
+  );
   const { globalSearchOpen, searchGlobalMessages, setGlobalSearchVisibility, selectAgent, selectGlobalSearchMessage } =
     useNavigation();
   const sources = useGlobalSearchSources(globalSearchOpen);
@@ -882,7 +963,7 @@ function GlobalMessageSearch() {
   return (
     <GlobalSearchOverlay
       open={globalSearchOpen()}
-      agents={agentList()}
+      agents={agents()}
       channels={sources.channels()}
       routines={sources.routines()}
       routinesLoading={sources.routinesLoading()}

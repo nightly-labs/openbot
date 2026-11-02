@@ -27,6 +27,8 @@ export function normalizeAccountUsage(rateLimits: AccountRateLimitsReadResult | 
   if (groups?.length && limits.length === 1 && limits[0]) limits[0] = { ...limits[0], groups };
   if (rateLimits?.sharedQuotaWith && limits.length === 1 && limits[0])
     limits[0] = { ...limits[0], sharedQuotaWith: rateLimits.sharedQuotaWith };
+  const tertiary = normalizeUsageWindow(rateLimits?.tertiary);
+  if (tertiary && limits.length === 1 && limits[0]) limits[0] = { ...limits[0], tertiary };
 
   return { limits };
 }
@@ -47,8 +49,24 @@ function normalizeUsageGroup(group: AccountRateLimitGroupResult): AccountUsageGr
 export function usageWindowHasReset(limit: AccountUsageLimit): boolean {
   const now = Date.now() / 1_000;
   return [limit, ...(limit.groups ?? [])].some((group) =>
-    [group.primary, group.secondary].some((window) => window?.resetsAt != null && window.resetsAt <= now),
+    usageWindows(group).some((window) => window?.resetsAt != null && window.resetsAt <= now),
   );
+}
+
+/**
+ * True when a window of the reading, or of one of its groups, reset after `sinceMs` and before now. A window
+ * that had already reset when the reading was taken does not count, so it cannot ask for a read each time.
+ */
+export function usageWindowResetSince(limit: AccountUsageLimit, sinceMs: number): boolean {
+  const now = Date.now() / 1_000;
+  const since = sinceMs / 1_000;
+  return [limit, ...(limit.groups ?? [])].some((group) =>
+    usageWindows(group).some((window) => window?.resetsAt != null && window.resetsAt > since && window.resetsAt <= now),
+  );
+}
+
+function usageWindows(limit: Pick<AccountUsageLimit, "primary" | "secondary" | "tertiary">) {
+  return [limit.primary, limit.secondary, limit.tertiary];
 }
 
 function selectModelRateLimits(

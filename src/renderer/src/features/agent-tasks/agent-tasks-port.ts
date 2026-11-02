@@ -20,6 +20,8 @@ export interface AgentTasksPort
   ): Promise<unknown>;
   /** Missing where the server cannot move a queued message of the agent's own chat to a new thread. */
   runQueuedMessageAsTask?: OpenBotDesktopApi["agent"]["runQueuedMessageAsTask"];
+  /** Missing where the server cannot branch a conversation. The branch actions then do not show. */
+  branchTask?: OpenBotDesktopApi["agent"]["branchTask"];
 }
 
 /**
@@ -35,6 +37,7 @@ export function agentTasksPort(): AgentTasksPort {
     startTask: (input) => agent.startTask(input),
     sendToTask: (input) => agent.sendMessage(input),
     runQueuedMessageAsTask: (input) => agent.runQueuedMessageAsTask(input),
+    branchTask: (input) => agent.branchTask(input),
     stopTask: (input) => agent.stopTask(input),
     closeTask: (input, serverId) => agent.closeTask(input, serverId),
     reopenTask: (input, serverId) => agent.reopenTask(input, serverId),

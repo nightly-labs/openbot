@@ -23,6 +23,7 @@ import type { AgentStore } from "../agent-store";
 import { normalizeMemoryText } from "../memory-store";
 import { type DynamicToolCallParams, isRecord } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
+import type { MemoryReviewOperation } from "./memory-review-prompt";
 import { listMemoriesInput, searchMemoriesInput, setMemoryInclusionInput } from "./memory-tool-inputs";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 
@@ -57,6 +58,14 @@ type PendingMemoryMutation =
       expectedUpdatedAt: string;
       expectedSelectionRevision: number;
     };
+
+/** The memories that a background review read, and the epoch it read them in. */
+export interface MemoryReviewBase {
+  epoch: number;
+  limit: number;
+  essentialBytes: number;
+  memories: { memory: AgentMemory; inclusion: "essential" | "searchable"; userControlled: boolean }[];
+}
 
 export interface AgentMemoriesOptions {
   store: AgentStore;
@@ -164,6 +173,85 @@ export class AgentMemories {
 
   duplicate(sourceAgentId: string, targetAgentId: string): void {
     this.#memories.duplicate(sourceAgentId, targetAgentId);
+  }
+
+  /** The memories that a background review reads, with the epoch that its changes must still match. */
+  reviewBase(agentId: string): MemoryReviewBase {
+    const selections = new Map(this.#memories.listSelections(agentId).map((entry) => [entry.memoryId, entry]));
+    const memories = this.#memories.list(agentId).map((memory) => ({
+      memory,
+      inclusion: selections.get(memory.id)?.inclusion ?? ("searchable" as const),
+      userControlled: selections.get(memory.id)?.userControlled ?? false,
+    }));
+    return {
+      epoch: this.#epoch(agentId),
+      limit: this.#memories.limit(),
+      essentialBytes: essentialMemoryBytes(
+        memories.filter((entry) => entry.inclusion === "essential").map((entry) => entry.memory),
+      ),
+      memories,
+    };
+  }
+
+  /**
+   * Commits the changes of a background review as one turn of the agent, through the checks of the
+   * memory tools: the cap, the essential budget, duplicates and the user's choices. A review changes
+   * only the memories that the agent saved, and only while they hold the text that the review read.
+   * A clear since `reviewBase` drops every change.
+   */
+  applyReview(
+    agentId: string,
+    base: MemoryReviewBase,
+    operations: readonly MemoryReviewOperation[],
+    turnId: string,
+  ): ConversationMemoryChange[] {
+    if (base.epoch !== this.#epoch(agentId)) return [];
+    const read = new Map(base.memories.map((entry) => [entry.memory.id, entry]));
+    // Forgets first, so that the adds find the room they free.
+    const ordered = [
+      ...operations.filter((operation) => operation.type === "forget"),
+      ...operations.filter((operation) => operation.type === "update"),
+      ...operations.filter((operation) => operation.type === "add"),
+    ];
+    const changed = new Set(operations.flatMap((operation) => (operation.type === "add" ? [] : [operation.memoryId])));
+    const saved = new Set(
+      this.#memories
+        .list(agentId)
+        .filter((memory) => !changed.has(memory.id))
+        .map((memory) => memory.text),
+    );
+    ordered.forEach((operation, index) => {
+      // An add of a saved text would only change that memory's inclusion, which can be the user's choice.
+      if (operation.type === "add" && saved.has(normalizeMemoryText(operation.text))) return;
+      if (operation.type !== "add") {
+        const entry = read.get(operation.memoryId);
+        const current = this.#memories.get(agentId, operation.memoryId);
+        if (
+          !entry ||
+          entry.userControlled ||
+          entry.memory.origin === "manual" ||
+          current?.updatedAt !== entry.memory.updatedAt
+        )
+          return;
+      }
+      this.handleTool(
+        {
+          threadId: "",
+          turnId,
+          callId: `${turnId}:${index}`,
+          namespace: null,
+          tool: operation.type === "forget" ? "forget_memory" : "remember",
+          arguments:
+            operation.type === "forget"
+              ? { memoryId: operation.memoryId }
+              : operation.type === "update"
+                ? { memoryId: operation.memoryId, text: operation.text }
+                : { text: operation.text, inclusion: operation.inclusion },
+        },
+        agentId,
+      );
+    });
+    return this.finishTurn(turnId, "completed").get(agentId) ?? [];
   }
 
   /** Return expected memory failures to the agent without exposing database errors or memory text. */

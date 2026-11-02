@@ -3,6 +3,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentPublicationPreview,
   type AgentSubmission,
+  isAgentTemplateCardPng,
   isAvatarHue,
   isAvatarSeed,
   isReleasedRoutineSchedule,
@@ -47,11 +48,15 @@ interface AgentRow {
   avatar_seed: string;
   avatar_hue: number | null;
   avatar_key: string | null;
+  /** Absent from the rows of a submission and of the catalog list. */
+  card_key?: string | null;
   skills_json: string;
   routines_json: string;
   creator_name: string | null;
   installs: number;
   featured: number;
+  /** Absent from the rows of a submission, which shows no catalog state. */
+  verified?: number;
   updated_at: number;
   created_at: number;
   status?: string;
@@ -96,6 +101,7 @@ export class AgentMarketplace {
           values.push(input.category);
         }
         if (input.featured) clauses.push("agents.featured = 1");
+        if (input.verified !== undefined) clauses.push(`agents.verified = ${input.verified ? 1 : 0}`);
         const sort: MarketplaceSort = input.sort === "installs" ? "installs" : "updated";
         const cursor = decodeMarketplaceCursor(input.cursor, sort);
         // A v0 cursor holds only a timestamp. The order also leads with featured and ends with id, so a
@@ -114,7 +120,7 @@ export class AgentMarketplace {
             : "agents.featured DESC, agents.updated_at DESC, agents.id DESC";
         const result = yield* marketplaceCall(() =>
           bindings.DB.prepare(
-            `SELECT agents.id, agents.installs, agents.featured, agents.updated_at,
+            `SELECT agents.id, agents.installs, agents.featured, agents.verified, agents.updated_at,
               versions.id AS version_id, versions.version, versions.name, versions.title, versions.description,
               versions.avatar_seed, versions.avatar_hue, versions.avatar_key,
               versions.skills_json, versions.routines_json, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name
@@ -153,6 +159,26 @@ export class AgentMarketplace {
             marketplaceError(new AgentMarketplaceError(404, "agent_not_found", "The agent was not found.")),
           );
         return yield* marketplaceDecode(() => publicDetail(row));
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
+  }
+
+  /**
+   * The agent a shared link names: the approved version, or, before the first review, the newest
+   * version that waits for it, marked `pending`. A pending agent is in no list; only its link finds
+   * it, as a shared agent template. A rejected agent with no approved version stays not found.
+   */
+  getListing(agentId: string) {
+    return Effect.fn("AgentMarketplace.getListing")(() =>
+      Effect.gen({ self: this }, function* () {
+        const approved = yield* this.approvedRowEffect(agentId);
+        if (approved) return yield* marketplaceDecode(() => publicDetail(approved));
+        const pending = yield* this.firstPendingRowEffect(agentId);
+        if (!pending)
+          return yield* Effect.fail(
+            marketplaceError(new AgentMarketplaceError(404, "agent_not_found", "The agent was not found.")),
+          );
+        return yield* marketplaceDecode((): MarketplaceAgentDetail => ({ ...publicDetail(pending), pending: true }));
       }),
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
@@ -362,7 +388,7 @@ export class AgentMarketplace {
       Effect.gen({ self: this }, function* () {
         const bindings = yield* MarketplaceStorage;
 
-        const row = yield* this.approvedRowEffect(agentId);
+        const row = (yield* this.approvedRowEffect(agentId)) ?? (yield* this.firstPendingRowEffect(agentId));
         if (!row?.avatar_key)
           return yield* Effect.fail(
             marketplaceError(new AgentMarketplaceError(404, "avatar_not_found", "The avatar was not found.")),
@@ -378,12 +404,72 @@ export class AgentMarketplace {
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
+  /** The share card of the version the agent's page shows. Public, like the page. */
+  card(agentId: string, conditions?: Headers) {
+    return Effect.fn("AgentMarketplace.card")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        const row = (yield* this.approvedRowEffect(agentId)) ?? (yield* this.firstPendingRowEffect(agentId));
+        const key = row?.card_key;
+        if (!key)
+          return yield* Effect.fail(
+            marketplaceError(new AgentMarketplaceError(404, "card_not_found", "The share card was not found.")),
+          );
+        const object = yield* marketplaceCall(() =>
+          bindings.SKILLS.get(key, conditions ? { onlyIf: conditions } : undefined),
+        );
+        if (!object)
+          return yield* Effect.fail(
+            marketplaceError(new AgentMarketplaceError(404, "card_not_found", "The share card was not found.")),
+          );
+        return object;
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
+  }
+
+  /** Stores the share card the reviewer's script drew for an approved version. */
+  setCard(versionId: string, card: Uint8Array) {
+    return Effect.fn("AgentMarketplace.setCard")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        if (!isAgentTemplateCardPng(card))
+          return yield* Effect.fail(
+            marketplaceError(
+              new AgentMarketplaceError(400, "invalid_card", "The share card must be a 1200 × 630 PNG."),
+            ),
+          );
+        const row = yield* marketplaceCall(() =>
+          bindings.DB.prepare("SELECT agent_id FROM marketplace_agent_versions WHERE id = ? AND status = 'approved'")
+            .bind(versionId)
+            .first<{ agent_id: string }>(),
+        );
+        if (!row)
+          return yield* Effect.fail(
+            marketplaceError(
+              new AgentMarketplaceError(404, "submission_not_found", "The approved version was not found."),
+            ),
+          );
+        const key = `agents/${row.agent_id}/versions/${versionId}.card.png`;
+        yield* marketplaceCall(() => bindings.SKILLS.put(key, card, { httpMetadata: { contentType: "image/png" } }));
+        yield* marketplaceCall(() =>
+          bindings.DB.prepare("UPDATE marketplace_agent_versions SET card_key = ? WHERE id = ?")
+            .bind(key, versionId)
+            .run(),
+        );
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
+  }
+
   recordInstall(agentId: string, userId: string, receiptId: string) {
     return Effect.fn("AgentMarketplace.recordInstall")(() =>
       Effect.gen({ self: this }, function* () {
         const bindings = yield* MarketplaceStorage;
 
-        if (!(yield* this.approvedRowEffect(agentId)))
+        // A pending agent can be added from its shared link, as a shared agent template can.
+        const listed = (yield* this.approvedRowEffect(agentId)) ?? (yield* this.firstPendingRowEffect(agentId));
+        if (!listed)
           return yield* Effect.fail(
             marketplaceError(new AgentMarketplaceError(404, "agent_not_found", "The agent was not found.")),
           );
@@ -489,6 +575,27 @@ export class AgentMarketplace {
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
+  setVerified(agentId: string, verified: boolean) {
+    return Effect.fn("AgentMarketplace.setVerified")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        const result = yield* marketplaceCall(() =>
+          // A check is not a change of the agent, so "Recently updated" keeps its order.
+          bindings.DB.prepare(
+            "UPDATE marketplace_agents SET verified = ? WHERE id = ? AND approved_version_id IS NOT NULL",
+          )
+            .bind(verified ? 1 : 0, agentId)
+            .run(),
+        );
+        if (result.meta.changes !== 1)
+          return yield* Effect.fail(
+            marketplaceError(new AgentMarketplaceError(404, "agent_not_found", "The agent was not found.")),
+          );
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
+  }
+
   private validateSkillsEffect(
     skills: MarketplaceAgentSkill[],
   ): Effect.Effect<void, AgentMarketplaceError | AgentMarketplaceStorageError, MarketplaceStorage> {
@@ -524,12 +631,36 @@ export class AgentMarketplace {
 
         return yield* marketplaceCall(() =>
           bindings.DB.prepare(
-            `SELECT agents.id, agents.installs, agents.featured, agents.updated_at,
+            `SELECT agents.id, agents.installs, agents.featured, agents.verified, agents.updated_at,
               versions.id AS version_id, versions.version, versions.name, versions.title, versions.description,
-              versions.avatar_seed, versions.avatar_hue, versions.avatar_key, versions.skills_json,
+              versions.avatar_seed, versions.avatar_hue, versions.avatar_key, versions.card_key, versions.skills_json,
               versions.routines_json, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name
        FROM marketplace_agents agents JOIN marketplace_agent_versions versions ON versions.id = agents.approved_version_id
        JOIN users ON users.id = agents.owner_user_id WHERE agents.id = ?`,
+          )
+            .bind(agentId)
+            .first<AgentRow>(),
+        );
+      }),
+    )();
+  }
+
+  private firstPendingRowEffect(agentId: string) {
+    return Effect.fn("AgentMarketplace.firstPendingRow")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        return yield* marketplaceCall(() =>
+          bindings.DB.prepare(
+            `SELECT agents.id, agents.installs, agents.featured, agents.verified, agents.updated_at,
+              versions.id AS version_id, versions.version, versions.name, versions.title, versions.description,
+              versions.avatar_seed, versions.avatar_hue, versions.avatar_key, versions.card_key, versions.skills_json,
+              versions.routines_json, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name
+       FROM marketplace_agents agents
+       JOIN marketplace_agent_versions versions ON versions.agent_id = agents.id AND versions.status = 'pending'
+       JOIN users ON users.id = agents.owner_user_id
+       WHERE agents.id = ? AND agents.approved_version_id IS NULL
+       ORDER BY versions.created_at DESC, versions.id DESC LIMIT 1`,
           )
             .bind(agentId)
             .first<AgentRow>(),
@@ -655,6 +786,7 @@ function publicSummary(row: AgentRow): MarketplaceAgentSummary {
     version: row.version,
     installs: row.installs,
     featured: row.featured === 1,
+    verified: row.verified === 1,
     avatarSeed: row.avatar_seed,
     avatarHue: row.avatar_hue !== null && isAvatarHue(row.avatar_hue) ? row.avatar_hue : null,
     avatarUrl: avatarUrl(row),
@@ -666,7 +798,14 @@ function publicSummary(row: AgentRow): MarketplaceAgentSummary {
 }
 
 function publicDetail(row: AgentRow): MarketplaceAgentDetail {
-  return { ...publicSummary(row), versionId: row.version_id ?? row.id, ...dependencies(row) };
+  const agentId = row.agent_id ?? row.id;
+  const versionId = row.version_id ?? row.id;
+  return {
+    ...publicSummary(row),
+    versionId,
+    cardUrl: row.card_key ? `/v1/marketplace/agents/${agentId}/card?v=${versionId}` : null,
+    ...dependencies(row),
+  };
 }
 
 /**

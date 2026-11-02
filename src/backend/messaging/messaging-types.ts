@@ -153,13 +153,13 @@ export interface MessagingAdapter {
   ): Effect.Effect<void, MessagingAdapterError>;
   /**
    * Posts the agent's answer, in as many posts as the platform needs. The first part replaces
-   * `replaceMessageId` when it is given.
+   * `replaceMessageId` when it is given. Returns the id of the first post.
    */
   postAnswer(
     target: MessageTarget,
     markdown: string,
     replaceMessageId: string | null,
-  ): Effect.Effect<void, MessagingAdapterError>;
+  ): Effect.Effect<string, MessagingAdapterError>;
   /** Uploads files to the conversation, and returns the names it did not send. */
   upload(target: MessageTarget, files: MessagingAnswerFile[]): Effect.Effect<string[], MessagingAdapterError>;
   /** Earlier messages of the conversation, oldest first, after `afterId` and before `beforeId`. */

@@ -1,9 +1,11 @@
 import { type AgentAccessEvent, agentAccessEvent } from "./agent-access-v1";
 import { type AgentHiddenEvent, agentHiddenEvent } from "./agent-hidden-v1";
+import { type AgentNotificationLevelsEvent, agentNotificationLevelsEvent } from "./agent-notification-levels-v1";
 import { type AgentSessionSettingsEvent, agentSessionSettingsEvent } from "./agent-session-settings-v1";
 import { withAgentTaskEventUiBlocks } from "./agent-task-ui-blocks-v1";
 import { type AgentTasksEvent, agentTasksEvent } from "./agent-tasks-v1";
 import { type BrowserPageStateEvent, browserPageStateEvent } from "./browser-page-state-v1";
+import { type BrowserProfilesEvent, browserProfilesEvent } from "./browser-profiles-events-v1";
 import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser-user-control-v1";
 // Events that optional capabilities add outside the frozen base event vocabularies. The base event
 // adapters reject them, so each transport asks here first and sends or decodes them as they are.
@@ -19,8 +21,10 @@ import { type WorkflowsEvent, workflowsEvent } from "./workflows-v1";
 export type OptionalTeamEvent =
   | AgentAccessEvent
   | AgentHiddenEvent
+  | AgentNotificationLevelsEvent
   | AgentSessionSettingsEvent
   | BrowserPageStateEvent
+  | BrowserProfilesEvent
   | BrowserUserControlEvent
   | AgentTasksEvent
   | ChannelEvent
@@ -45,8 +49,10 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
   const event =
     agentAccessEvent(value) ??
     agentHiddenEvent(value) ??
+    agentNotificationLevelsEvent(value) ??
     agentSessionSettingsEvent(value) ??
     browserPageStateEvent(value) ??
+    browserProfilesEvent(value) ??
     browserUserControlEvent(value) ??
     agentTasksEvent(value) ??
     channelEvent(value) ??

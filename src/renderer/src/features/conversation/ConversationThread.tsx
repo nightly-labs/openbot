@@ -4,20 +4,32 @@ import type { AppTextKey } from "@openbot/i18n";
 import { classifyFailure } from "@openbot/telemetry";
 import { Input } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
+import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { contextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
-import { AgentThreadView } from "@openbot/ui/features/conversation/threads/AgentThreadView";
+import { AgentThreadView, type AgentThreadVoice } from "@openbot/ui/features/conversation/threads/AgentThreadView";
+import type { AgentThreadBranchSource } from "@openbot/ui/features/conversation/threads/BranchDivider";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createProjection, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createProjection, createSignal, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
+import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
 import { usePlatform } from "../../platform";
+import { deviceSendShortcut } from "../../send-shortcut-preference";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { useConversationViewScope } from "./conversation-scope";
+import type { ConversationThreads } from "./conversation-types";
+import { createTurnSteps } from "./turn-steps";
 
 /** A thread takes files only from this computer, which reads every supported type. */
-const THREAD_ATTACHMENT_ACCEPT = supportedAttachmentExtensions({ eml: true, media: true, zip: true, mp4: true })
+const THREAD_ATTACHMENT_ACCEPT = supportedAttachmentExtensions({
+  eml: true,
+  media: true,
+  zip: true,
+  mp4: true,
+  svg: true,
+})
   .map((extension) => `.${extension}`)
   .join(",");
 
@@ -33,6 +45,29 @@ export function ConversationThread() {
     installedSkillsLoadFailed,
     mcpServers,
     threadComposer,
+    threadFocusRequest,
+    threadVoiceLiveText,
+    threadVoiceOwned,
+    startThreadVoiceRecording,
+    stopVoiceRecording,
+    stopVoiceRecordingAndSend,
+    cancelVoiceRecording,
+    voicePhase,
+    voiceLevels,
+    voiceElapsedSeconds,
+    voiceModelProgress,
+    sideQuestionAvailable,
+    openSideQuestion,
+    threadSearch,
+    threadSearchOpen,
+    threadSearchQuery,
+    threadSearchMatches,
+    activeThreadSearchIndex,
+    setThreadSearchQuery,
+    setThreadScrollElement,
+    copyMessage,
+    copiedMessageId,
+    branchThread,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
   const [picker, setPicker] = createSignal<HTMLInputElement>();
@@ -59,6 +94,14 @@ export function ConversationThread() {
     [],
     { key: "id" },
   );
+  // The thread gets only the latest progress line of a running turn, so its steps are the thoughts,
+  // and after the turn the tool steps of its stored trace.
+  const turnSteps = createTurnSteps({
+    messages: () => messages,
+    lines: () => undefined,
+    activeTurnId: () => props.threads?.open?.activeTurnId,
+  });
+  const showAgentSteps = useShowAgentSteps();
   const { appFocused } = usePlatform();
   // The person reads the open thread while the window has focus. The mark is the member's, so the
   // phone no longer shows the thread as unread.
@@ -82,12 +125,71 @@ export function ConversationThread() {
     const key = threadComposer.openDraftKey();
     return key ? threadComposer.draft(key) : undefined;
   };
+  const rowImages = () => {
+    const key = threadComposer.openDraftKey();
+    return key ? threadComposer.rowImages(key) : [];
+  };
   // The preload imports the picked files, and the view routes them to the open thread.
   const openPicker = () => {
     const input = picker();
     if (!input) return;
     input.value = "";
     input.click();
+  };
+  /** As in the agent's own chat: the draft goes to the side question, unless it names files. */
+  const askSideQuestion = () => {
+    if (!sideQuestionAvailable()) return undefined;
+    return () => {
+      const current = draft();
+      const text = current?.attachments.length === 0 ? current.text : "";
+      if (text) threadComposer.setText(threadComposer.openDraftKey(), "");
+      openSideQuestion(text);
+    };
+  };
+  // The editor is new each time a thread opens. A focus request from before is not for it: it would take
+  // the focus from where the user clicked.
+  const shownAt = untrack(threadFocusRequest);
+  const focusRequest = () => {
+    const request = threadFocusRequest();
+    return request > shownAt ? request : undefined;
+  };
+  /** Dictation as in the agent's own chat. The web client has no speech model. */
+  const voice = (): AgentThreadVoice | undefined => {
+    if (props.runtime) return undefined;
+    const owned = threadVoiceOwned();
+    return {
+      phase: owned ? voicePhase() : "idle",
+      blocked: !owned && voicePhase() !== "idle",
+      liveText: threadVoiceLiveText(),
+      levels: voiceLevels(),
+      elapsedSeconds: voiceElapsedSeconds(),
+      modelProgress: voiceModelProgress(),
+      onStart: startThreadVoiceRecording,
+      onCancel: cancelVoiceRecording,
+      onFinish: stopVoiceRecording,
+      onSend: stopVoiceRecordingAndSend,
+    };
+  };
+  /** Branches the open thread through an answer. A new thread has no answer to branch from. */
+  const branch = (threads: ConversationThreads) => {
+    const taskId = threads.open?.id;
+    if (!threads.onBranch || !taskId) return undefined;
+    return (messageId: string) => void branchThread(taskId, messageId);
+  };
+  /** Where the open thread came from, when it is a branch. The agent's own chat shows the agent's name. */
+  const branchSource = (threads: ConversationThreads, agentName: string): AgentThreadBranchSource | undefined => {
+    const source = threads.open ? threads.branchSource(threads.open) : undefined;
+    if (!source) return undefined;
+    return {
+      throughMessageId: source.throughMessageId,
+      label: source.deleted ? null : (source.title ?? agentName),
+      onOpen: source.onOpen,
+    };
+  };
+  /** The message that the open thread scrolls to once, after a click on "Branched from". */
+  const focusMessage = (threads: ConversationThreads) => {
+    const focus = threads.focusMessage;
+    return focus && focus.taskId === threads.open?.id ? focus : undefined;
   };
   /** The cards that the thread waits for: its browser takeover, and its question as a form. */
   const attention = () => {
@@ -118,7 +220,20 @@ export function ConversationThread() {
               data-openbot-attachment-picker="true"
             />
           </Show>
+          <Show when={threadSearchOpen()}>
+            <ChatSearch
+              query={threadSearchQuery()}
+              current={activeThreadSearchIndex()}
+              total={threadSearchMatches().length}
+              inputRef={threadSearch.setChatSearchInputElement}
+              onQueryChange={setThreadSearchQuery}
+              onPrevious={() => threadSearch.moveChatSearch(-1)}
+              onNext={() => threadSearch.moveChatSearch(1)}
+              onClose={threadSearch.closeChatSearch}
+            />
+          </Show>
           <AgentThreadView
+            scrollRef={setThreadScrollElement}
             task={current().threads.open ?? null}
             limit={current().threads.limit}
             agent={current().agent}
@@ -129,19 +244,28 @@ export function ConversationThread() {
             mcpServers={mcpServers()}
             draft={draft()?.text ?? ""}
             draftAttachments={draft()?.attachments}
+            rowAttachments={rowImages()}
+            pendingImages={threadComposer.pendingImages(threadComposer.openDraftKey())}
+            onRemoveAttachment={(attachment) =>
+              threadComposer.removeAttachment(threadComposer.openDraftKey(), attachment.id)
+            }
             onDraftChange={(text) => threadComposer.setText(threadComposer.openDraftKey(), text)}
-            onPasteFiles={threadComposer.pasteFiles}
+            onPasteFiles={(files, selection) => threadComposer.pasteFiles(files, selection)}
             onOpenDraftAttachment={(attachment) =>
               canPreviewAttachment(attachment)
                 ? void previewAttachment(attachment)
                 : attachmentAction(attachment, "open")
             }
             onAttachFiles={current().threads.acceptsFiles ? openPicker : undefined}
+            onSideQuestion={askSideQuestion()}
+            voice={voice()}
+            focusRequest={focusRequest()}
             onSend={(text) => threadComposer.send(current().threads, text)}
             onStop={() => current().threads.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
+            mediaSource={props.runtime?.attachmentMedia}
             macWindowControls={props.platform === "darwin"}
             approval={current().threads.approval}
             onRespondApproval={(decision) =>
@@ -151,6 +275,16 @@ export function ConversationThread() {
             onCompactContext={current().threads.onCompactContext}
             waitsForAnswer={props.prompt !== undefined || props.browserTakeover !== undefined}
             attention={attention()}
+            stepsAbove={turnSteps.stepsAbove}
+            factsAbove={turnSteps.factsAbove}
+            activeSteps={turnSteps.activeSteps()}
+            stepsOpenByDefault={showAgentSteps()}
+            sendShortcut={deviceSendShortcut(props.platform)}
+            onCopyMessage={(message) => void copyMessage(message)}
+            copiedMessageId={copiedMessageId()}
+            onBranch={branch(current().threads)}
+            branchSource={branchSource(current().threads, current().agent.name)}
+            focusMessage={focusMessage(current().threads)}
           />
         </>
       )}

@@ -8,6 +8,8 @@ export const messages = {
     "OpenBot이 Codex 구성에 컴퓨터 제어를 등록할 수 없었어요. Codex config.toml이 올바르고 쓰기 가능한지 확인한 후 OpenBot을 다시 시작하세요. 에이전트 설정에서 컴퓨터 제어를 끄면 그 기능 없이 계속할 수 있어요.",
   "error.provider.codexUnresponsive": "Codex가 응답하지 않아 OpenBot이 프로세스를 종료했습니다.",
   "error.provider.acpUnresponsive": "{provider}가 제시간에 응답하지 않아 OpenBot이 프로세스를 종료했습니다.",
+  "error.provider.acpMcpNotLoaded":
+    "{provider}가 OpenBot 도구를 불러오지 않아 이 에이전트는 도구를 사용하거나 팀원에게 연락할 수 없습니다. {provider} 팀 정책이 로컬 MCP 서버를 차단할 수 있습니다. 팀 관리자에게 허용을 요청한 다음 다시 시도하세요.",
   "error.provider.endpointsReadOnly":
     "저장된 엔드포인트가 더 새로운 버전의 OpenBot에서 작성되었거나 파일을 읽을 수 없어요. 변경하려면 OpenBot을 업데이트하세요.",
   "error.provider.endpointNoSecureStorage":
@@ -61,6 +63,7 @@ export const messages = {
   "error.provider.removeWhileOn": "다운로드를 삭제하기 전에 제공자를 끄세요.",
   "error.provider.removeWhileDownloading": "다운로드가 끝난 뒤 삭제하세요.",
   "error.provider.removeIncomplete": "다른 프로그램이 이 CLI의 파일을 사용하고 있어요. 닫은 뒤 다시 시도하세요.",
+  "error.provider.removeDownloadsFailed": "{providers}의 CLI 다운로드를 제거할 수 없었어요.",
   "error.provider.cliOverride": "OpenBot에서 업데이트하기 전에 명시적인 CLI 경로 재정의를 제거하세요.",
   "error.provider.runtimeUpdateIncomplete": "런타임 업데이트가 완료되지 않았어요.",
   "error.provider.downloadHttp": "런타임 다운로드가 HTTP {status}(으)로 실패했어요.",
@@ -98,6 +101,8 @@ export const messages = {
   "error.provider.modelsTooMany": "모델이 너무 많아요.",
   "error.provider.modelIdCharacter": "모델 ID에 사용할 수 없는 문자가 있어요.",
   "error.provider.modelIdDuplicate": "모델 두 개의 ID가 같아요.",
+  "error.provider.contextWindowInvalid": "모델의 컨텍스트 창은 {min}에서 {max} 사이의 정수 토큰 수여야 해요.",
+  "error.provider.maxOutputInvalid": "모델의 최대 출력은 {min}에서 {max} 사이의 정수 토큰 수여야 해요.",
   "error.provider.headersTooMany": "헤더가 너무 많아요.",
   "error.provider.headerNameCharacter": "헤더 이름에 HTTP에서 허용하지 않는 문자가 있어요.",
   "error.provider.headerNameTooLong": "헤더 이름이 너무 길어요.",
@@ -121,13 +126,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "ChatGPT를 다운로드했지만 시작할 수 없었어요. OpenBot에서 다시 다운로드하세요.",
   "error.provider.codexMissing": "ChatGPT가 다운로드되지 않았어요. 계속하려면 OpenBot에서 다운로드하세요.",
-  "error.provider.codexConfigIgnored": {
-    other:
-      "Codex가 구성에서 설정 {count}개를 무시했어요: {settings}. 수정하거나 제거하고, 아니면 Codex를 업데이트하세요.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    other: "Codex가 구성에서 설정 {count}개를 무시했어요. 수정하거나 제거하고, 아니면 Codex를 업데이트하세요.",
-  },
   "error.provider.claudeOutdated":
     "Claude Code {version}이(가) 너무 오래되었어요. OpenBot에는 2.1.232 이상이 필요해요.",
   "error.provider.claudeNotStarted": "Claude CLI를 찾았지만 시작할 수 없었어요.",
@@ -178,13 +176,20 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider}이(가) 인증된 계정을 반환하지 않았어요.",
   "error.provider.signInExpired": "{provider} 로그인이 만료되었어요. 계속하려면 다시 로그인하세요.",
   "error.provider.cliActivateFailed": "OpenBot이 관리형 CLI를 활성화할 수 없었어요.",
+  "error.provider.cliNewVersionNotStarted": "새 버전이 시작되지 않았어요.",
   "error.provider.cliBusyReconnect": "{provider} CLI가 턴을 처리하는 중이에요. 끝날 때까지 기다린 후 다시 연결하세요.",
+  "error.provider.cliBusySignOut":
+    "{provider} CLI가 턴을 처리하고 있습니다. 끝날 때까지 기다린 다음 연결을 해제하세요.",
   "error.provider.opencodeCredentialsRejected":
     "모델 제공자가 API 키를 거부했어요. 설정에서 OpenCode 키를 수정하거나 `opencode auth login`으로 제공자 키를 수정하세요. 그런 다음 다시 시도하거나 다른 모델을 선택하세요.\n{detail}",
   "error.provider.opencodeAuthRequired":
     'OpenCode에 모델 제공자 "{provider}"의 로그인 정보가 없어요. 무료 라벨이 있는 모델을 선택하거나 제공자를 연결하세요. OpenCode 설정에 OpenCode Go 키를 붙여넣거나 터미널에서 `opencode auth login`을 실행하면 돼요. 그런 다음 다시 시도해 주세요.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode에 이 모델 제공자의 로그인 정보가 없어요. 무료 라벨이 있는 모델을 선택하거나 제공자를 연결하세요. OpenCode 설정에 OpenCode Go 키를 붙여넣거나 터미널에서 `opencode auth login`을 실행하면 돼요. 그런 다음 다시 시도해 주세요.",
+  "error.provider.customEndpointKeyRefused":
+    '엔드포인트 "{provider}"이(가) API 키 또는 헤더를 거부했어요. 서버 설정 → 제공자에서 다시 입력한 다음 다시 시도해 주세요.',
+  "error.provider.customEndpointKeyMissing":
+    '엔드포인트 "{provider}"에는 API 키가 필요해요. 서버 설정 → 제공자에서 키를 추가한 다음 다시 시도해 주세요.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API 키가 만료되었어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
   "error.provider.opencodeServiceFailure":
@@ -248,6 +253,19 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline을 시작할 수 없었어요. 터미널에서 `cline --version`을 실행해 보세요.",
   "error.provider.clineVersionUnreadable": "Cline CLI 버전을 읽을 수 없어요.",
   "error.provider.clineSignIn": "Cline을 사용하려면 Cline으로 로그인하거나 CLINE_API_KEY를 설정하세요.",
+  "error.provider.kimiArchivePath": "Kimi 아카이브에 예상하지 못한 경로가 있어요.",
+  "error.provider.kimiChecksum": "Kimi 런타임 체크섬이 일치하지 않아요.",
+  "error.provider.kimiLicenseChecksum": "Kimi 라이선스 체크섬이 일치하지 않아요.",
+  "error.provider.kimiMissing": "Kimi가 다운로드되지 않았어요. 계속하려면 OpenBot에서 다운로드하세요.",
+  "error.provider.kimiOutdated": "Kimi CLI {version}이(가) 너무 오래되었어요. OpenBot에는 1.52.0 이상이 필요해요.",
+  "error.provider.kimiNotStarted": "Kimi를 시작할 수 없었어요. 터미널에서 `kimi --version`을 실행해 보세요.",
+  "error.provider.kimiVersionUnreadable": "Kimi CLI 버전을 읽을 수 없어요.",
+  "error.provider.kimiSignIn": "Kimi를 사용하려면 Kimi Code로 로그인하세요.",
+  "error.provider.hermesMissing": "Hermes Agent가 설치되어 있지 않습니다. 설치한 후 다시 시도하세요.",
+  "error.provider.hermesNotStarted": "Hermes Agent를 시작할 수 없습니다. 터미널에서 `hermes --version`을 실행하세요.",
+  "error.provider.hermesVersionUnreadable": "Hermes Agent 버전을 읽을 수 없습니다.",
+  "error.provider.hermesSignIn":
+    "Hermes를 사용하려면 Nous Portal로 로그인하거나 터미널에서 `hermes setup`을 실행하세요.",
   "error.provider.usageLimitReached": "계정이 사용 한도에 도달했어요.",
   "error.provider.foreignReasoning":
     "다른 계정이나 API 키가 받은 추론이라서 {provider}이(가) 이 채팅의 이전 추론을 수락하지 않았어요. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했어요. 다시 시도해 주세요.",
@@ -301,6 +319,7 @@ export const messages = {
     "이 컴퓨터에는 보안 저장소가 없어서 환경 값을 저장할 수 없어요. 제거한 후 다시 시도해 주세요.",
   "error.provider.customAgentNotSaved":
     "이 사용자 지정 에이전트는 저장되지 않았어요. 목록을 새로 고친 후 다시 시도해 주세요.",
+  "error.provider.customAgentWorkspaceOnly": "{reason}. '워크스페이스만'이 이를 막습니다. '전체 접근'을 사용해 보세요.",
   "error.provider.customAgentTooMany": "사용자 지정 에이전트는 최대 {count}개까지 저장할 수 있어요.",
   "error.provider.customAgentEnvValueMissing": "{name}의 값을 입력하세요.",
   "error.provider.off": "OpenBot에서 {provider}이(가) 꺼져 있어요. 먼저 제공자 설정에서 켜세요.",
@@ -312,6 +331,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider}은(는) 계정을 하나만 둘 수 있어요.",
   "error.provider.accountNeedsConnection": "다른 계정을 추가하기 전에 {provider}을(를) 연결하세요.",
   "error.provider.usageResetUnsupported": "{provider}은(는) 사용 한도를 초기화할 수 없어요.",
+  "error.provider.signOutUnsupported": "OpenBot은 {provider} 로그인의 연결을 해제할 수 없습니다.",
   "error.provider.usageResetNotConnected": "사용량을 초기화하기 전에 이 {provider} 계정에 다시 로그인하세요.",
   "error.provider.accountLimit": "{provider}은(는) 계정을 최대 {limit}개까지 둘 수 있어요.",
   "error.provider.accountNotFound": "이 {provider} 계정이 이 컴퓨터에 없어요. 새로 고친 후 다시 시도해 주세요.",

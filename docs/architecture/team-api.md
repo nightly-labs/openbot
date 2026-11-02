@@ -2,7 +2,7 @@
 
 ## Team API compatibility boundary
 
-Current remote connections use Team API protocol v8 over three ordered WebRTC DataChannels: `rpc`,
+Current remote connections use Team API protocol v9 over three ordered WebRTC DataChannels: `rpc`,
 `events`, and `files`. A sandboxed hidden Chromium page owns each `RTCPeerConnection`. Electron main
 uses a `MessagePort` and transfers binary data as `ArrayBuffer`. Signal carries SDP and ICE only,
 except the Slack requests of an agent's Slack app (see [Messaging connections](channels-and-messaging.md#messaging-connections)).
@@ -272,6 +272,13 @@ new protocol. A client keeps an agent of a provider that it does not know, and s
 with an update prompt. See [Providers](providers.md) for the frozen lists that hide new providers
 from peers below 8.
 
+Protocol 9 is the protocol 8 wire with capability lists of up to 256 names (`v9.ts`). Protocols 7
+and 8 read at most 128 capabilities, and their lists are full. A capability added after them is in
+`TEAM_PROTOCOL_V9_ONLY_CAPABILITIES` (`current.ts`): a host leaves it out of the compatibility list
+of a peer below 9, and a client sends it only to a host that negotiated 9. On WebRTC, where no
+protocol header is sent, the marker `long-capability-lists-v1` says that a peer reads 256. It is in
+the bootstrap list, so the first compatibility read of a protocol 9 host is already complete.
+
 Capabilities describe additive behavior. The client sends its capability list when it sets the event scope. The host sends optional events only when the client declared the related capability. A missing capability disables only that feature. An unknown optional event is ignored. A malformed known event closes the connection as `protocol_error` because the client cannot safely apply it.
 
 The optional `agent-memories-v1` capability adds three POST routes. `/v1/agent-memories/page`
@@ -294,8 +301,9 @@ Claude gets that block with a user turn instead: the full block in the first tur
 compaction, and only the change after a memory edit. A memory change then keeps the cached
 system prompt and does not restart the Claude query. A profile change still restarts it.
 Saved memories stay on the host in SQLite. Agents can use bounded local search and ID-paged
-listing to recall other entries. FTS5 uses `unicode61` and BM25. Queries match any literal term;
-equal scores use the newest update, then the memory ID. Search returns at most 10 entries,
+listing to recall other entries. FTS5 uses `unicode61` and BM25. Queries match any literal term.
+`unicode61` has no stemming, so a term of 6 or more characters also matches as a prefix of its first
+characters, all but the last 3 and at least 4: "closing" also finds "closes". Equal scores use the newest update, then the memory ID. Search returns at most 10 entries,
 and maintenance pages return at most 25. Both responses are limited to 8,192 UTF-8 bytes.
 The search index stays local. Essential prompt text and requested tool results go to the active
 provider through the existing secret-redaction path.

@@ -2,7 +2,14 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
-import type { AgentSummary, AgentWait, ConversationSnapshot, QueueDelivery, RoutineRun } from "@openbot/contracts/ipc";
+import type {
+  AgentSummary,
+  AgentWait,
+  ConversationPlanStep,
+  ConversationSnapshot,
+  QueueDelivery,
+  RoutineRun,
+} from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
 import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
@@ -199,7 +206,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       ? [
           "This is a reply to a message you sent earlier.",
           "Surface or summarize the result naturally for the user, and start with the name of the teammate.",
-          "When the reply reports blocked work, do not repeat that work with the same tools. Give the user the blocker and the action from its Unblock line. When OpenBot has a plugin for the service and that plugin is not in your tools, call openbot.suggest_marketplace_app and end your answer as its guidance says.",
+          "When the reply reports blocked work, do not repeat that work with the same tools. Give the user the blocker and the action from its Unblock line. When OpenBot has a plugin for the service and that plugin is not in your tools, call openbot.suggest_marketplace_app and end your answer with the next field of its result.",
           "Reply to the teammate only when the message requests another action, or when you have new information that unblocks its work. Do not send it the same request again. Otherwise do not send an acknowledgement and avoid reply loops.",
         ]
       : delivery.expectsReply === false
@@ -211,7 +218,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
         : [
             `After completing the request, send a concise result back to ${senderName} with openbot.send_message.`,
             `Use recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", and expectsReply false.`,
-            "Format the reply as three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>. When Status is blocked, add a fourth line, Unblock: <the one action that unblocks the task>. When OpenBot has a plugin for the service and that plugin is not in your tools, call openbot.suggest_marketplace_app, and that action is the plugin sentence from its guidance.",
+            "Format the reply as three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>. When Status is blocked, add a fourth line, Unblock: <the one action that unblocks the task>. When OpenBot has a plugin for the service and that plugin is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.",
             "Do not acknowledge without a Status line. Do not leave the sender waiting for a result.",
           ];
     text = [
@@ -288,6 +295,29 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
           : { type: "mention", name: attachment.name, path: attachment.path },
     ),
   ];
+}
+
+/**
+ * The input of an automatic continuation: the turn ended while the agent's own plan had open steps.
+ * The request is already in the provider session, so only this note goes in. The steps come from the
+ * stored plan, which is already in its bounds.
+ */
+export function planContinuationPrompt(steps: readonly ConversationPlanStep[], count: number, limit: number): string {
+  return [
+    "OpenBot note, not a message from the user. Your last turn ended while your plan still had open steps:",
+    ...steps.map((step) => `- [${step.status === "inProgress" ? "in progress" : "pending"}] ${step.text}`),
+    "Continue the work now, from where you stopped. Do not repeat finished work or restate the plan. Keep the plan current and mark each step done when you finish it. If a step is already done, mark it done; if it no longer applies, remove it. Do not ask whether to continue. This note does not approve a risky action. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    `Automatic continuation ${count} of ${limit}.`,
+  ].join("\n");
+}
+
+/** The note for a turn that ended before the next step: it named the step, or asked whether to continue. */
+export function nextStepContinuationPrompt(count: number, limit: number): string {
+  return [
+    "OpenBot note, not a message from the user. Your last turn ended before the next step: you named the step or asked whether to continue, but you did not do it.",
+    "Do the next step now, and continue until the request is done. Do not repeat finished work or restate earlier answers. Do not ask whether to continue. This note does not approve a risky action. If the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    `Automatic continuation ${count} of ${limit}.`,
+  ].join("\n");
 }
 
 /**

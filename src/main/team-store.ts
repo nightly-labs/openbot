@@ -1661,7 +1661,7 @@ function normalizeAvatarUrl(value: string | null): string | null {
   return url.toString();
 }
 
-function validateServerName(value: string): void {
+export function validateServerName(value: string): void {
   const normalized = value.trim();
   if (normalized.length < INPUT_LIMITS.serverNameMin || normalized.length > INPUT_LIMITS.serverName) {
     throw new TeamStoreError(

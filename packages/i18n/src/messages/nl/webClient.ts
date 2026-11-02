@@ -34,6 +34,9 @@ export const messages = {
   "webClient.notice.createServer": "Gehoste server maken",
   "webClient.notice.join": "Lid worden met uitnodiging",
   "webClient.notice.refreshHosts": "Servers vernieuwen",
+  "webClient.otherTab.title": "{name} is geopend in een ander tabblad",
+  "webClient.otherTab.description": "OpenBot kan een server in één tabblad tegelijk gebruiken.",
+  "webClient.otherTab.useHere": "Hier gebruiken",
   "webClient.agent.modelsFailed": "Kan de modellen van de server niet laden.",
   "webClient.agent.refreshFailed":
     "De agent is gemaakt, maar de werkruimte kan niet worden vernieuwd. Laad opnieuw voordat je het nog eens probeert.",

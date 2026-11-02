@@ -1,5 +1,208 @@
 [
   {
+    "version": "0.58.0",
+    "date": "2026-11-01",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Start a workflow from GitHub: a GitHub trigger runs on new issues, comments, pull requests, reviews, failed checks or a mention of @openbotgit.",
+          "Change GitHub from a workflow: comment, label, assign, review, close or create an issue as the OpenBot GitHub App.",
+          "Marketplace has 17 new OpenBot agents, such as QA Tester, PR Shepherd and Chief of Staff, and 15 new skills for them.",
+          "Usage shows the OpenCode Go monthly limit as a third bar."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A joined server opens much faster. The agents and sidebar from your last visit show at once while the app connects.",
+          "On the web, a switch to another server takes about 1 second, not 2 to 3 seconds.",
+          "The window opens about 3 seconds sooner when the Dynamic Island is on."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "You can move a queued message when more than 32 messages wait in the queue.",
+          "A Pi turn that sends nothing for 10 minutes now stops with a message.",
+          "A custom provider shows in the model picker when OpenCode or Pi is not installed.",
+          "Long model names in the model picker go to a second line."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.57.0",
+    "date": "2026-10-31",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Branch a conversation: right-click the last agent message of a turn and select Branch from here. A new thread opens with the conversation up to that message.",
+          "Agent settings have an Instructions page that shows the agent's AGENTS.md file. When the agent changes its instructions, the chat shows the change with Undo.",
+          "The Marketplace is on openbot.run. Each agent and skill has its own page, and Copy link shares it.",
+          "An agent can answer a website's alert or confirmation that its own browser action opened.",
+          "A stopped or failed channel task has a Cancel task button."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Memories open in the agent's settings pane, with a short title for each memory and a search field.",
+          "Agents send fewer tokens in each request, with every provider.",
+          "Each routine shows as its own card with a switch that pauses or resumes it.",
+          "Settings › Notifications shows one card for each server, with All, Needs me and Nothing as one control."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "In-app updates install on slow Macs, such as Intel Macs.",
+          "An idle agent browser tab uses much less memory.",
+          "An agent on an OpenCode Go model moves to its backup model at the Go usage limit.",
+          "The file preview panel updates when the agent changes the open file."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.56.0",
+    "date": "2026-10-30",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agents do many browser actions in one step, such as typing a search, pressing Enter and waiting for results. Browser tasks finish sooner and use fewer tokens.",
+          "Right-click an agent message and select Mark unread to read it again later.",
+          "When you have another server, you can hide the Local server from its menu. Its agents, chats and files stay on your computer.",
+          "Choose the sound that plays when a task finishes in Settings › Notifications."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A provider uses the CLI that you installed when it is the same version as OpenBot's copy or newer.",
+          "Your analytics answer follows your account to your other devices. If you turned analytics off before this version, it stays off on this computer until you change it here.",
+          "Drag the grip of the Instructions field to make it taller."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Cloudflare checks pass in the built-in browser.",
+          "Each provider CLI uses about half the disk space: OpenBot keeps one version.",
+          "A message that you send to an agent at a usage limit tries the provider again at once.",
+          "In the sidebar, a chat that you drag lands in the section below the pointer."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.55.0",
+    "date": "2026-10-30",
+    "notices": [
+      "In a Telegram group that you connected before this version, remove OpenBot from the group and connect the group again, or make OpenBot a group admin."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Settings › Notifications is the one place for notifications. Choose All activity, Only when it needs me, or Nothing for each server and agent. The choice applies on your computer, in the web client and on your phones.",
+          "Create more servers on this computer. Each one is a separate workspace. Click the plus button on the server rail, then Other options › New server on this computer.",
+          "Exclude folders on an agent's Folders page, so the agent cannot change files in them.",
+          "Connect your own OpenAI-compatible voice server in Settings › Voice for dictation and spoken replies.",
+          "Settings › Agents lists the background processes that agents left running, and Stop ends them.",
+          "Press Tab in the message box to send a message into the agent's running turn.",
+          "Log in to ChatGPT with an OpenAI API key, and disconnect the Claude and Codex sign-in from the ⋯ menu."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "In a channel, more than one agent can answer the same request.",
+          "The Tasks page is back on desktop and the web. It lists the side threads of all agents.",
+          "The Marketplace Skills tab shows your skills first, with the agents that have them and an Update button.",
+          "An agent that ends a turn with open plan steps continues by itself, up to 3 times."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Gemini no longer fills the memory of a computer or server over hours of use.",
+          "A self-hosted server takes as many members as your license has users.",
+          "The web app connects to your server again at once when you go back to it.",
+          "Picture in Picture shows the page of a joined server's browser."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.54.0",
+    "date": "2026-10-29",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "A Workspace only agent can change files in folders that you add. Open the agent's settings, then Folders, or drop a folder on the chat.",
+          "Set the context window of each model of a custom provider, so OpenCode compacts the conversation at the correct size.",
+          "Ctrl+F (⌘F on macOS) searches the open side thread.",
+          "Buy a commercial license for work from Billing or from Add server: Starter for 1 user, or Team for 2 to 10 users. A new license is free until 1 December 2026."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A new server allows fewer members: Starter 1, Standard 5 and Pro 10. Servers that already exist keep their limits.",
+          "An agent's post to Slack, Discord or Telegram gives the agent the ID of the post, so it can link to it."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Remote desktop pairing on macOS 27 works again.",
+          "OpenBot keeps working when a page in the browser requests an address that it cannot read.",
+          "Gemini continues when one MCP server does not start. OpenBot tells you which server it left out.",
+          "A new Gemini account stays added when its first usage reading fails.",
+          "The chat stays steady when you switch between agents that have queued messages.",
+          "A side thread shows the agent's steps, as in the agent's own chat.",
+          "An agent that a Codex usage limit moved to a backup model goes back to its model when Codex ends the limit early."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.53.2",
+    "date": "2026-10-28",
+    "notices": [
+      "On Windows, if OpenBot was installed in the folder that holds your agents, it now runs from a new folder. If the taskbar pin no longer opens OpenBot, pin it again from the Start menu."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agents now save lasting preferences and facts from your chats and side threads in the background. The conversation shows each change.",
+          "Server settings → General → Memory review sets how often agents review their memories: every 10, 20 or 40 turns, or Off.",
+          "Memory search also finds other forms of a word, so \"closing\" finds \"closes\"."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": ["An agent can keep 256 memories by default instead of 64. A limit that you set stays as it is."]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "On Windows, updates work again when OpenBot was installed in the folder that holds your agents. Your agents, Shared and Downloads stay where they are.",
+          "The Windows installer no longer lets you choose the folder that holds your agents or your user data."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.53.1",
     "date": "2026-10-28",
     "notices": [],

@@ -1,5 +1,9 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentPromptQuestion, AgentPromptResolution } from "@openbot/contracts/ipc";
+import {
+  type AgentPromptQuestion,
+  type AgentPromptResolution,
+  MCP_ELICITATION_DECISION_QUESTION_ID,
+} from "@openbot/contracts/ipc";
 import {
   Badge,
   Bubble,
@@ -24,8 +28,16 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
-import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "../features/conversation/send-shortcut";
+
+/** Lets the chat composer answer the open question with its text, as the custom answer field does. */
+export interface QuestionPromptComposerAnswer {
+  /** Whether the current question takes a typed answer from the composer now. */
+  available: () => boolean;
+  /** Answers the current question with `text`. False when the form cannot take it. */
+  answer: (text: string) => boolean;
+}
 
 export interface QuestionPromptBubbleProps {
   questions: AgentPromptQuestion[];
@@ -41,6 +53,16 @@ export interface QuestionPromptBubbleProps {
   sendShortcut?: SendShortcut | undefined;
   onSubmit: (answers: Record<string, string[]>) => Promise<boolean>;
   onResolutionPresented?: () => void;
+  /** Gives the composer answer of this form to the composer. The returned function takes it back. */
+  registerComposerAnswer?: ((answer: QuestionPromptComposerAnswer) => () => void) | undefined;
+}
+
+/**
+ * A private answer has its own masked field, never the composer. A plugin consent takes only one of
+ * its options, so a typed answer would cancel it.
+ */
+function acceptsComposerAnswer(question: AgentPromptQuestion): boolean {
+  return !question.isSecret && question.id !== MCP_ELICITATION_DECISION_QUESTION_ID;
 }
 
 type QuestionAnswers = Record<string, string>;
@@ -337,31 +359,32 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   }
 
   /** The ticked options, in the order the question lists them, then the typed answer. */
-  function multiSelectAnswer(question: AgentPromptQuestion): string[] {
+  function multiSelectAnswer(question: AgentPromptQuestion, draft?: string): string[] {
     const picked = picks()[question.id] ?? [];
     const labels = (question.options ?? []).map((option) => option.label).filter((label) => picked.includes(label));
-    const custom = customDrafts()[question.id]?.trim();
+    const custom = (draft ?? customDrafts()[question.id])?.trim();
     return custom ? [...labels, custom] : labels;
   }
 
-  function confirmMultiSelect(question: AgentPromptQuestion, questionIndex: number): void {
+  function confirmMultiSelect(question: AgentPromptQuestion, questionIndex: number, draft?: string): void {
     performWhenReady(() => {
-      const values = multiSelectAnswer(question);
+      const values = multiSelectAnswer(question, draft);
       if (values.length === 0) return;
       const nextAnswers = { ...answers(), [question.id]: values };
       const nextSkipped = { ...skipped(), [question.id]: false };
-      setCustomAnswers((current) => ({ ...current, [question.id]: Boolean(customDrafts()[question.id]?.trim()) }));
+      const custom = (draft ?? customDrafts()[question.id])?.trim();
+      setCustomAnswers((current) => ({ ...current, [question.id]: Boolean(custom) }));
       finishQuestion(questionIndex, nextAnswers, nextSkipped);
     });
   }
 
-  function commitCustomAnswer(question: AgentPromptQuestion, questionIndex: number): void {
+  function commitCustomAnswer(question: AgentPromptQuestion, questionIndex: number, draft?: string): void {
     if (question.multiSelect) {
-      confirmMultiSelect(question, questionIndex);
+      confirmMultiSelect(question, questionIndex, draft);
       return;
     }
     performWhenReady(() => {
-      const value = customDrafts()[question.id]?.trim() ?? "";
+      const value = (draft ?? customDrafts()[question.id])?.trim() ?? "";
       if (!value) return;
       const nextAnswers = { ...answers(), [question.id]: [value] };
       const nextSkipped = { ...skipped(), [question.id]: false };
@@ -369,6 +392,27 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
       finishQuestion(questionIndex, nextAnswers, nextSkipped);
     });
   }
+
+  function composerAnswerAvailable(): boolean {
+    const question = props.questions[step()];
+    return Boolean(question && acceptsComposerAnswer(question) && !interactionDisabled());
+  }
+
+  /**
+   * The text goes in the custom answer field, so it stays there when the send fails. The draft
+   * signal does not show the new value until the next flush, so the value goes to the commit too.
+   */
+  function answerFromComposer(text: string): boolean {
+    const questionIndex = step();
+    const question = props.questions[questionIndex];
+    const value = text.trim();
+    if (!question || !value || value.length > INPUT_LIMITS.promptAnswerText || !composerAnswerAvailable()) return false;
+    setCustomDrafts((drafts) => ({ ...drafts, [question.id]: value }));
+    commitCustomAnswer(question, questionIndex, value);
+    return true;
+  }
+
+  onSettled(() => props.registerComposerAnswer?.({ available: composerAnswerAvailable, answer: answerFromComposer }));
 
   function skipQuestion(question: AgentPromptQuestion, questionIndex: number): void {
     performWhenReady(() => finishQuestion(questionIndex, answers(), { ...skipped(), [question.id]: true }));

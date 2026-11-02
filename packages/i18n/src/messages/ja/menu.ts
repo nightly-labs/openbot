@@ -12,4 +12,12 @@ export const messages = {
   "menu.trayOpen": "OpenBot を開く",
   "menu.trayQuit": "OpenBot を終了",
   "menu.trayTooltip": "OpenBot",
+  "menu.undo": "取り消す",
+  "menu.redo": "やり直す",
+  "menu.cut": "カット",
+  "menu.copy": "コピー",
+  "menu.paste": "ペースト",
+  "menu.pasteAndMatchStyle": "ペーストしてスタイルを合わせる",
+  "menu.delete": "削除",
+  "menu.selectAll": "すべてを選択",
 } as const satisfies PartialTranslation<typeof source>;

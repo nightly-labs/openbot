@@ -10,7 +10,7 @@ import { type SettingsKind, useWindowPage } from "./window-page-context";
 
 /**
  * The page of the desktop window that covers the conversation: a settings page, usage, schedule,
- * workflows or the Marketplace.
+ * workflows or the Marketplace. The tasks page shows in the middle pane, in `WorkspaceShell`.
  */
 export function WindowPageView() {
   const { t } = useText();

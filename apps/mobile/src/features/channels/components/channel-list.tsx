@@ -12,7 +12,7 @@ import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
+import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { PinnedChatItem } from "@/features/agents/components/pinned-agents-grid";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -249,6 +249,7 @@ export const ChannelListRow = memo(function ChannelListRow({
 }) {
   const { t, format } = useText();
   const [background, accent] = useThemeColor(["background", "accent"]);
+  const rowBackground = useChatRowBackground(channel.id);
   const { toggleChannelPinAnimated } = useAgentPinTransition();
   const isPinned = useMobileWorkspaceSelector(({ pinnedChannelIds }) => pinnedChannelIds.includes(channel.id));
   const pinBlocked = useMobileWorkspaceSelector(
@@ -271,17 +272,15 @@ export const ChannelListRow = memo(function ChannelListRow({
     : t("mobile.channel.list.open", { name: channel.name });
   const size = pinned ? 64 : 54;
   const avatar = (
-    <ChatZoomSource>
-      <AgentPinAvatar agentId={channel.id} location={pinned ? "pinned" : "row"} size={size}>
-        <ChannelAvatar channel={channel} agents={agents} size={size} disconnected={disconnected} />
-        {pinned && unread ? (
-          <View
-            className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
-            style={{ borderColor: background, backgroundColor: accent }}
-          />
-        ) : null}
-      </AgentPinAvatar>
-    </ChatZoomSource>
+    <AgentPinAvatar agentId={channel.id} location={pinned ? "pinned" : "row"} size={size}>
+      <ChannelAvatar channel={channel} agents={agents} size={size} disconnected={disconnected} />
+      {pinned && unread ? (
+        <View
+          className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
+          style={{ borderColor: background, backgroundColor: accent }}
+        />
+      ) : null}
+    </AgentPinAvatar>
   );
 
   const trigger = (
@@ -337,7 +336,7 @@ export const ChannelListRow = memo(function ChannelListRow({
           <View
             className="min-h-20 w-full flex-row items-center gap-3 py-1"
             style={{
-              backgroundColor: background,
+              backgroundColor: rowBackground,
               opacity: pressed ? 0.58 : 1,
               paddingLeft: leftInset,
               paddingRight: rightInset,

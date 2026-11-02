@@ -3,6 +3,13 @@
   gap: var(--openbot-space-1);
 }
 
+.hosted-sites-usage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
 .hosted-sites-list .hosted-sites-row {
   min-height: 72px;
   align-items: center;

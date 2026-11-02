@@ -3,21 +3,32 @@
 // from the contract; main rechecks on save, so a drifted copy would pass the form and fail save.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { CustomProviderSummary, SaveCustomProviderInput, UpdateCustomProviderInput } from "@openbot/contracts/ipc";
+import type {
+  CustomProviderHarness,
+  CustomProviderSummary,
+  SaveCustomProviderInput,
+  UpdateCustomProviderInput,
+} from "@openbot/contracts/ipc";
 import {
   AGENT_PROVIDERS,
   CUSTOM_PROVIDER_ID_PATTERN,
   CUSTOM_PROVIDER_LIMITS,
   composedCustomModelId,
   isAgentModel,
+  isCustomProviderContextWindow,
   isCustomProviderHeaderName,
+  isCustomProviderMaxOutput,
 } from "@openbot/contracts/ipc";
-import type { AppTranslate } from "@openbot/i18n";
+import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import { currentText } from "../../text";
 
 export interface CustomModelDraft {
   id: string;
   name: string;
+  /** Tokens, as typed. Blank keeps OpenCode's default. */
+  contextWindow?: string;
+  /** The largest completion, as typed. Blank keeps the guess from the context window. */
+  maxOutput?: string;
 }
 
 export interface CustomHeaderDraft {
@@ -34,6 +45,8 @@ export interface CustomProviderDraft {
   apiKey: string;
   models: CustomModelDraft[];
   headers: CustomHeaderDraft[];
+  /** The provider that runs the endpoint. Absent: the form sends none, and main keeps OpenCode. */
+  harness?: CustomProviderHarness;
 }
 
 /** One message per field, plus one per repeatable row, indexed the way the form renders them. */
@@ -78,15 +91,42 @@ export function savedCustomProviderDraft(provider: CustomProviderSummary): Custo
     apiKey: "",
     models:
       provider.models.length > 0
-        ? provider.models.map((model) => ({ id: model.id, name: model.name }))
+        ? provider.models.map((model) => ({
+            id: model.id,
+            name: model.name,
+            contextWindow: model.contextWindow?.toString() ?? "",
+            maxOutput: model.maxOutput?.toString() ?? "",
+          }))
         : [{ id: "", name: "" }],
     headers: savedHeaderDrafts(provider.headerNames),
+    ...(provider.harness ? { harness: provider.harness } : {}),
   };
 }
 
 /** A row the user has not filled in yet: carried by the form, ignored by validation and submit. */
-function blankModel(model: CustomModelDraft): boolean {
-  return !model.id.trim() && !model.name.trim();
+export function blankModel(model: CustomModelDraft): boolean {
+  return !model.id.trim() && !model.name.trim() && !model.contextWindow?.trim() && !model.maxOutput?.trim();
+}
+
+/**
+ * A typed token count: undefined when blank, null when it is not a usable count. The text is plain
+ * digits, or groups of three digits with one separator, so `128,000`, `128 000` and `128.000` are
+ * all 128000. A decimal such as `200000.0` or `1300.5` is refused, not read as a larger number.
+ */
+function tokenCount(text: string | undefined, inRange: (value: number) => boolean): number | null | undefined {
+  const typed = text?.trim() ?? "";
+  if (!typed) return undefined;
+  if (!/^(?:\d+|\d{1,3}(?:([\s,._'’])\d{3})(?:\1\d{3})*)$/u.test(typed)) return null;
+  const value = Number(typed.replace(/\D/gu, ""));
+  return inRange(value) ? value : null;
+}
+
+function contextWindowValue(model: CustomModelDraft): number | null | undefined {
+  return tokenCount(model.contextWindow, isCustomProviderContextWindow);
+}
+
+function maxOutputValue(model: CustomModelDraft): number | null | undefined {
+  return tokenCount(model.maxOutput, isCustomProviderMaxOutput);
 }
 
 function blankHeader(header: CustomHeaderDraft): boolean {
@@ -106,6 +146,7 @@ export function validateCustomProvider(
   draft: CustomProviderDraft,
   ids: { taken?: readonly string[] | undefined; locked?: boolean | undefined } = {},
   t: AppTranslate = currentText().t,
+  format: AppFormat = currentText().format,
 ): CustomProviderErrors {
   const providerId = draft.providerId.trim();
   const errors: CustomProviderErrors = {
@@ -161,6 +202,26 @@ export function validateCustomProvider(
     seen.add(id);
     if (model.name.trim().length > INPUT_LIMITS.modelName) {
       errors.modelRows[index] = t("customProvider.error.displayNameLength", { max: INPUT_LIMITS.modelName });
+      return;
+    }
+    if (contextWindowValue(model) === null) {
+      errors.modelRows[index] = t("customProvider.error.contextWindowInvalid", {
+        min: format.number(CUSTOM_PROVIDER_LIMITS.contextWindowMin),
+        max: format.number(CUSTOM_PROVIDER_LIMITS.contextWindowMax),
+      });
+      return;
+    }
+    if (maxOutputValue(model) === null) {
+      errors.modelRows[index] = t("customProvider.error.maxOutputInvalid", {
+        min: format.number(CUSTOM_PROVIDER_LIMITS.maxOutputMin),
+        max: format.number(CUSTOM_PROVIDER_LIMITS.maxOutputMax),
+      });
+      return;
+    }
+    if (model.maxOutput?.trim() && contextWindowValue(model) === undefined) {
+      // The backend writes a saved output cap into the same `limit` as the window, so a cap with no
+      // window has nowhere to land and would be stored and silently ignored.
+      errors.modelRows[index] = t("customProvider.error.maxOutputNeedsWindow");
       return;
     }
     // OpenCode reports this model as `<provider id>/<model id>`, and both the IPC and Team API list
@@ -241,7 +302,18 @@ export function hasCustomProviderError(errors: CustomProviderErrors): boolean {
 export function customProviderValue(draft: CustomProviderDraft): SaveCustomProviderInput {
   const models = draft.models
     .filter((model) => !blankModel(model))
-    .map((model) => ({ id: model.id.trim(), name: model.name.trim() || model.id.trim() }));
+    .map((model) => {
+      const id = model.id.trim();
+      const name = model.name.trim() || id;
+      const contextWindow = contextWindowValue(model);
+      const maxOutput = maxOutputValue(model);
+      return {
+        id,
+        name,
+        ...(typeof contextWindow === "number" ? { contextWindow } : {}),
+        ...(typeof maxOutput === "number" ? { maxOutput } : {}),
+      };
+    });
   return {
     id: draft.providerId.trim(),
     name: draft.displayName.trim(),
@@ -253,6 +325,7 @@ export function customProviderValue(draft: CustomProviderDraft): SaveCustomProvi
     headers: draft.headers
       .filter((header) => !blankHeader(header))
       .map((header) => ({ name: header.name.trim(), value: header.value.trim() })),
+    ...(draft.harness ? { harness: draft.harness } : {}),
   };
 }
 
@@ -270,6 +343,7 @@ export function customProviderUpdate(value: SaveCustomProviderInput): UpdateCust
     models: value.models,
     ...(value.apiKey === null ? {} : { apiKey: value.apiKey }),
     headers: value.headers.map((header) => ({ name: header.name, value: header.value || null })),
+    ...(value.harness ? { harness: value.harness } : {}),
   };
 }
 
@@ -285,6 +359,10 @@ export interface CustomProviderEndpoint {
 export interface DiscoveredModel {
   id: string;
   name?: string;
+  /** For a saved model: the context window the user set, which Edit must keep. */
+  contextWindow?: number;
+  /** For a saved model: the max output the user set, which Edit must keep. */
+  maxOutput?: number;
 }
 
 /** The state of one `GET {baseUrl}/models` request, owned by the host that makes it. */

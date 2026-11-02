@@ -1,12 +1,19 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import {
+  AGENT_THREAD_BRANCHES_CAPABILITY,
+  withAgentThreadBranches,
+} from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
+import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   agentTaskControl,
+  branchAgentThread,
   deleteAgentThread,
   listAgentTasks,
+  listAgentThreadBranches,
   markAgentThreadRead,
   readAgentTask,
   renameAgentThread,
@@ -16,14 +23,14 @@ import {
   type TeamRequestError,
 } from "@openbot/team-client/team-api-requests";
 import { Effect } from "effect";
-import { onCleanup } from "solid-js";
+import { onCleanup, untrack } from "solid-js";
 import type { AgentTasksPort } from "../agent-tasks/agent-tasks-port";
 import { createAgentTasks, isAgentTaskEvent } from "../agent-tasks/agent-tasks-state";
 import { createAgentThreadTabs } from "../agent-threads/agent-thread-tabs";
 import type { WebWorkspace } from "./web-client-context";
 
 /** The host names attachment previews with the desktop `openbot-attachment:` scheme, which a browser cannot load. */
-function withoutPreviewUrls(snapshot: ConversationSnapshot): ConversationSnapshot {
+export function withoutPreviewUrls(snapshot: ConversationSnapshot): ConversationSnapshot {
   return {
     ...snapshot,
     messages: snapshot.messages.map((message) =>
@@ -35,14 +42,25 @@ function withoutPreviewUrls(snapshot: ConversationSnapshot): ConversationSnapsho
 }
 
 /**
- * The side threads of one host: the `agent-tasks-v1` routes, and rename and delete through
- * `agent-threads-v1`. Each call reads the request again: it fails once the tab leaves the host.
+ * The side threads of one host: the `agent-tasks-v1` routes, rename and delete through
+ * `agent-threads-v1`, and branches through `agent-thread-branches-v1` when `branchable` is true. The
+ * branch links are read after the tasks, so that each listed branch has its link. Each call reads the
+ * request again: it fails once the tab leaves the host.
  */
-function webAgentTasksPort(request: () => TeamApiRequest): AgentTasksPort {
+function webAgentTasksPort(request: () => TeamApiRequest, branchable: () => boolean): AgentTasksPort {
   const run = async <A>(call: (request: TeamApiRequest) => Effect.Effect<A, TeamRequestError>) =>
     runTeamEffect(call(request()).pipe(Effect.mapError((error) => error.cause)));
   return {
-    listTasks: (agentId) => run((host) => listAgentTasks(host, agentId)),
+    listTasks: (agentId) =>
+      run((host) =>
+        // An effect callback can ask for the list: the capability is input here, not a dependency.
+        untrack(branchable)
+          ? Effect.gen(function* () {
+              const snapshot = yield* listAgentTasks(host, agentId);
+              return withAgentThreadBranches(snapshot, yield* listAgentThreadBranches(host, agentId));
+            })
+          : listAgentTasks(host, agentId),
+      ),
     readTask: (input) => run((host) => readAgentTask(host, input).pipe(Effect.map(withoutPreviewUrls))),
     startTask: (input) => run((host) => startAgentTask(host, input)),
     sendToTask: (input) => run((host) => sendAgentTaskMessage(host, input)),
@@ -52,6 +70,7 @@ function webAgentTasksPort(request: () => TeamApiRequest): AgentTasksPort {
     renameTask: (input) => run((host) => renameAgentThread(host, input)),
     deleteTask: (input) => run((host) => deleteAgentThread(host, input)),
     markTaskRead: (input) => run((host) => markAgentThreadRead(host, input)),
+    branchTask: (input) => run((host) => branchAgentThread(host, input)),
   };
 }
 
@@ -66,7 +85,8 @@ export function createWebAgentThreads(options: {
   request: () => TeamApiRequest;
 }) {
   const { workspace, hostId } = options;
-  const port = webAgentTasksPort(options.request);
+  const branchable = () => workspace.state.capabilities.includes(AGENT_THREAD_BRANCHES_CAPABILITY);
+  const port = webAgentTasksPort(options.request, branchable);
   const tasks = createAgentTasks({
     port: () => port,
     activeAgentId: () => workspace.state.selectedId ?? undefined,
@@ -74,6 +94,8 @@ export function createWebAgentThreads(options: {
     available: () => workspace.state.capabilities.includes(AGENT_TASKS_CAPABILITY),
     editable: () => workspace.state.capabilities.includes(AGENT_THREADS_CAPABILITY),
     readable: () => workspace.state.capabilities.includes(AGENT_THREAD_READS_CAPABILITY),
+    branchable,
+    filesAccepted: () => workspace.state.capabilities.includes(AGENT_THREAD_FILES_CAPABILITY),
     // A reconnect sends a runtime snapshot, which reads the threads again.
     reloadKey: () => null,
   });

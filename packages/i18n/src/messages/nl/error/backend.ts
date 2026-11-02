@@ -68,11 +68,14 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
   "error.backend.channelTaskNotFound": "Kanaaltaak niet gevonden.",
   "error.backend.channelTaskComplete": "Deze taak is al voltooid.",
+  "error.backend.channelTaskNotStopped": "Alleen een gestopte of mislukte taak kan worden geannuleerd.",
   "error.backend.channelSelectAgent": "Kies een agent.",
   "error.backend.channelLeadRequired": "Kies een beschikbare kanaalleider of wijs deze taak toe aan een lid.",
   "error.backend.channelRoutingTooLong":
     "Dit verzoek overschrijdt de contextlimiet voor routering. Kies een lid of stuur een korter verzoek.",
   "error.backend.channelTaskMemberRequired": "Kies een lid voor deze taak.",
+  "error.backend.channelTaskStopped": "Gestopt. Ga verder of wijs deze taak opnieuw toe.",
+  "error.backend.channelRoutingUnreadable": "De leider kon dit bericht niet toewijzen. Wijs het toe aan een lid.",
   "error.backend.channelRoutingFailed": "Routering is mislukt. Kies een lid of probeer het opnieuw.",
   "error.backend.channelLeadTimedOut": "De kanaalleider reageerde niet op tijd. Kies een lid of probeer het opnieuw.",
   "error.backend.channelLeadFailed":
@@ -81,6 +84,8 @@ export const messages = {
   "error.backend.channelDeliveryNotCreated": "De bezorging in het kanaal is niet gemaakt.",
   "error.backend.channelAssignmentStopped": "Deze kanaalopdracht is gestopt of vervangen.",
   "error.backend.channelAssigneeUnavailable": "De toegewezen agent is niet beschikbaar.",
+  "error.backend.channelAssigneeRemoved": "Het toegewezen lid is verwijderd.",
+  "error.backend.channelAssigneeReassign": "Het toegewezen lid is niet beschikbaar. Wijs deze taak opnieuw toe.",
   "error.backend.channelAssignmentChanged": "Deze kanaalopdracht is gewijzigd.",
   "error.backend.channelMemberRequired": "Kies een beschikbaar lid van dit kanaal.",
   "error.backend.memoryEssentialBudget":
@@ -137,8 +142,6 @@ export const messages = {
   "error.backend.recipientHidden": "Deze agent is verborgen. Herstel de agent om berichten te sturen.",
   "error.backend.attachBetween": "Voeg tussen 1 en {limit} bestanden toe.",
   "error.backend.attachmentNotFile": "Bijlage is geen bestand: {path}",
-  "error.backend.attachSvg":
-    "{name} is een SVG-bestand en kan niet worden bijgevoegd. Schrijf het absolute pad in je antwoord: de chat toont de afbeelding daar.",
   "error.backend.generatedImageTooLarge": "De gemaakte afbeelding is groter dan de limiet van 100 MB.",
   "error.backend.attachmentNotRegularFile": "Alleen gewone bestanden kunnen worden bijgevoegd: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot kon {name} niet kopiëren.",
@@ -196,6 +199,8 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "Alleen een run van een van je routines wekt een wachtpunt, en je hebt geen routine. Maak er een met openbot.create_routine en open dan het wachtpunt.",
   "error.backend.agentWaitRemoteUnsupported": "Open wachtpunten zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Een bericht als ongelezen markeren is alleen beschikbaar voor agents op deze computer.",
   "error.backend.routineFlowHandoffFailed": "De routine kon het werk niet aan deze agent doorgeven.",
   "error.backend.mcpServerLimit": "OpenBot bewaart maximaal {limit} MCP-servers.",
   "error.backend.mcpServerNameTaken": "Er bestaat al een MCP-server met de naam {name}.",
@@ -224,6 +229,7 @@ export const messages = {
     "OpenBot kon de inloggegevens van deze server niet lezen. Controleer het serveradres en probeer het opnieuw.",
   "error.backend.mcpServerExited":
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
+  "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot kon de lokale inlogverbinding voor deze server niet starten. Start OpenBot opnieuw en probeer het nog eens.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -341,6 +347,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Deze agent heeft {count} open threads. Archiveer een thread en start of herstel dan een andere.",
   "error.backend.threadRemoteUnsupported": "Threads zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.branchSourceBusy": "Stop de huidige beurt voordat je een aftakking van deze chat maakt.",
+  "error.backend.branchMessageNotFound": "Je kunt alleen aftakken vanaf een voltooid antwoord van de agent.",
+  "error.backend.branchRemoteUnsupported": "Aftakkingen zijn alleen beschikbaar voor agents op deze computer.",
   "error.backend.threadMoveRefused":
     "Alleen een bericht dat je alleen naar deze agent hebt gestuurd, kan in een nieuwe thread draaien.",
   "error.backend.taskTitleRequired": "Geef de taak een korte titel.",

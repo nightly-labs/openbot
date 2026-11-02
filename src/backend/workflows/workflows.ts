@@ -16,6 +16,12 @@
  * not sent again by itself: a long text goes in more than one post, so part of it can be in the
  * place. The user retries the step.
  *
+ * A GitHub event starts the run of each GitHub trigger that watches it (`github-matching.ts`). A
+ * GitHub run blocks only its own item: an event of an item whose run is open waits in the trigger's
+ * history and starts when that run ends, and runs of other items run at the same time. Schedules and
+ * webhooks keep one open run per workflow. An event that a step of the same workflow caused, or the
+ * next of a long chain of runs that OpenBot's bot caused on one item, starts nothing.
+ *
  * A restart keeps approvals and agent steps: their state is in the database and in the mailbox. A
  * model step lives in this process only, so the first pass after a restart fails it. A post that
  * did not start is sent then; one that was on its way fails as uncertain.
@@ -37,7 +43,10 @@ import {
   type RunWorkflowStepInput,
   type SaveWorkflowGraphInput,
   type StartWorkflowRunInput,
+  WORKFLOW_GITHUB_EVENTS,
   type WorkflowDetail,
+  type WorkflowGitHubHistory,
+  type WorkflowGitHubLastEventInput,
   type WorkflowGraph,
   type WorkflowNode,
   type WorkflowNodeKind,
@@ -52,6 +61,7 @@ import {
   type WorkflowVersion,
   type WorkflowVersionInput,
 } from "@openbot/contracts/ipc";
+import { isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Cause, Context, Effect, Exit, Fiber, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
@@ -61,6 +71,25 @@ import { coalescedPasses } from "../coalesced-passes";
 import type { MessagingPostFailure } from "../messaging/messaging-threads";
 import { resultText } from "../routine-results/routine-results";
 import type { ReceivedWebhookEvent } from "../routine-store";
+import {
+  githubEventFacts,
+  githubFilterRefuses,
+  githubTriggerMatches,
+  githubTriggerRepository,
+  workflowGitHubPayload,
+} from "./github-matching";
+import {
+  type GitHubOutputPlan,
+  githubChangeKeys,
+  githubChoicePrompt,
+  githubChoices,
+  githubOutputInput,
+  githubOutputPlan,
+  githubOutputText,
+  githubResultKeys,
+} from "./github-output";
+import { REPEATABLE_GITHUB_ACTIONS, type WorkflowGitHubApi } from "./workflow-github-api";
+import type { WaitingGitHubDelivery, WorkflowGitHubStore } from "./workflow-github-store";
 import {
   isOpenStep,
   publicRun,
@@ -87,6 +116,12 @@ import {
 } from "./workflow-walk";
 
 const logger = createOpenBotLogger("workflows");
+
+/** A chain of runs that OpenBot's bot caused on one item stops after this many in the window. */
+const GITHUB_CHAIN_RUNS = 3;
+const GITHUB_CHAIN_WINDOW_MS = 10 * 60_000;
+/** How long a change that a GitHub output made is known as this workflow's own. */
+const GITHUB_SELF_WINDOW_MS = 60 * 60_000;
 
 class WorkflowFailed extends Schema.TaggedError<WorkflowFailed>()("WorkflowFailed", {
   cause: Schema.Defect(),
@@ -169,6 +204,14 @@ export interface WorkflowsDependencies {
   timezone(): string;
   /** A run ended. */
   runEnded?: (end: WorkflowRunEnd) => void;
+  /** The GitHub tables; see `workflow-github-store.ts`. */
+  github: WorkflowGitHubStore;
+  /** The slug of the OpenBot GitHub App, whose bot makes the changes of GitHub outputs. */
+  githubApp(): string | null;
+  /** The repositories that the saved GitHub triggers watch, after each change of them. */
+  watchGitHub?: (repositories: string[]) => void;
+  /** GitHub as OpenBot's bot; absent where this host has no GitHub connection to give. */
+  githubApi?: WorkflowGitHubApi;
   now?: () => Date;
 }
 
@@ -189,6 +232,18 @@ export type WorkflowWebhookResult =
   | { kind: "duplicate" }
   | { kind: "gone" }
   | { kind: "too-large" };
+
+/** One event of the OpenBot GitHub App, as Signal relayed it. */
+interface WorkflowGitHubEventInput {
+  /** The `X-GitHub-Event` header. */
+  event: string;
+  deliveryId: string;
+  /** The decoded JSON body. */
+  body: unknown;
+}
+
+/** Whether a GitHub trigger of this host watches the event: it is then in the trigger's history. */
+type WorkflowGitHubResult = { kind: "saved" } | { kind: "unwatched" };
 
 /** The workflow of a run or a step, and the agents that the run can still reach. */
 interface WorkflowRunScope {
@@ -216,6 +271,18 @@ interface WorkflowsShape {
   startScheduled(start: ScheduledWorkflowStart): Effect.Effect<void, WorkflowFailed>;
   /** Starts the run of a verified webhook request. The same delivery again starts nothing. */
   receiveWebhook(delivery: WorkflowWebhookDelivery): Effect.Effect<WorkflowWebhookResult, WorkflowFailed>;
+  /**
+   * Starts the runs of a GitHub event, or puts it in the queue of its item. Each trigger records the
+   * same delivery once.
+   */
+  receiveGitHub(event: WorkflowGitHubEventInput): Effect.Effect<WorkflowGitHubResult, WorkflowFailed>;
+  /** Records in each GitHub trigger's history that the host got no GitHub events from `from` to `to`. */
+  githubOffline(from: Date, to: Date): Effect.Effect<void, WorkflowFailed>;
+  githubHistory(workflowId: string): Effect.Effect<WorkflowGitHubHistory, WorkflowFailed>;
+  /** Runs a GitHub trigger with the newest item that matches it, as GitHub has it now. */
+  githubLastEvent(input: WorkflowGitHubLastEventInput): Effect.Effect<WorkflowRunDetail, WorkflowFailed>;
+  /** The repositories that the saved GitHub triggers watch, for the GitHub route at start. */
+  githubRepositories(): Effect.Effect<string[], WorkflowFailed>;
   /** Runs one node alone, with the newest answers of the nodes before it. */
   runStep(input: RunWorkflowStepInput): Effect.Effect<WorkflowStep, WorkflowFailed>;
   stopStep(stepId: string): Effect.Effect<void, WorkflowFailed>;
@@ -247,7 +314,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         const lock = yield* Semaphore.make(1);
         /** One model step at a time, so a run does not take every generation slot of the computer. */
         const generationLock = yield* Semaphore.make(1);
-        const { store, runs, changed, rearm } = dependencies;
+        const { store, runs, github, changed, rearm } = dependencies;
         const now = () => (dependencies.now ?? (() => new Date()))();
         /** The model steps that generate and the posts on their way, by step. */
         const working = new Map<string, Fiber.Fiber<void>>();
@@ -462,6 +529,172 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           }
         };
 
+        /**
+         * The key of a GitHub output's change: one for each pass of a node through a run, or one for a step
+         * that runs alone. A loop brings the node back after a done step, so that pass gets a new key; a
+         * retry or a restart of the same pass keeps it, and does not make the change a second time.
+         */
+        const githubActionKey = (step: StoredWorkflowStep) => {
+          if (!step.runId) return `step:${step.id}`;
+          const pass = runs
+            .steps(step.runId)
+            .filter((other) => other.nodeId === step.nodeId && other.status === "done" && other.id !== step.id).length;
+          return `${step.runId}:${step.nodeId}:${pass}`;
+        };
+
+        /**
+         * Makes the change of a GitHub output in a fiber of its own; the pass does not wait for it. When the
+         * output says "Agent chooses", a model chooses its labels or its person from the repository's first.
+         */
+        const startGitHubChange = (
+          step: StoredWorkflowStep,
+          plan: Extract<GitHubOutputPlan, { kind: "change" }>,
+          api: WorkflowGitHubApi,
+        ): Effect.Effect<void> => {
+          const key = githubActionKey(step);
+          const repeatable = REPEATABLE_GITHUB_ACTIONS.includes(plan.change.action);
+          const work = Effect.gen(function* () {
+            let change = plan.change;
+            if (plan.choose.labels || plan.choose.person) {
+              const options = yield* api.options(change.repository);
+              const answer = yield* generationLock.withPermit(
+                dependencies.generateText({
+                  provider: null,
+                  model: null,
+                  effort: null,
+                  prompt: githubChoicePrompt(step.input, options, plan.choose),
+                }),
+              );
+              const chosen = githubChoices(answer, options, plan.choose);
+              if (!chosen) return yield* Effect.fail({ message: sourceText("error.workflow.githubChoseNothing") });
+              change = {
+                ...change,
+                labels: plan.choose.labels ? chosen.labels : change.labels,
+                people: plan.choose.person ? chosen.people : change.people,
+              };
+            }
+            github.startAction(
+              {
+                actionKey: key,
+                workflowId: step.workflowId,
+                runId: step.runId,
+                stepId: step.id,
+                repository: change.repository,
+                number: change.number,
+                action: change.action,
+                objectKeys: githubChangeKeys(change),
+              },
+              now(),
+            );
+            const result = yield* api.change(change).pipe(
+              Effect.tapError(() => Effect.sync(() => github.dropAction(key))),
+              // A change that GitHub may have made before the connection broke is not sent again by itself.
+              Effect.mapError((failure) => ({
+                message:
+                  failure.code === "unreachable" && !repeatable
+                    ? sourceText("error.workflow.githubUncertain")
+                    : failure.message,
+              })),
+            );
+            const created = result.created;
+            github.finishAction(
+              key,
+              created?.kind === "issue" ? created.number : null,
+              githubResultKeys(change, result),
+              now(),
+            );
+            return githubOutputText(change, result);
+          }).pipe(
+            Effect.result,
+            Effect.flatMap((result) =>
+              Effect.gen(function* () {
+                if (Result.isFailure(result)) {
+                  logger.warn("A workflow GitHub output failed.", { stepId: step.id });
+                  settle(step, { status: "failed", error: result.failure.message });
+                } else settle(step, { status: "done", output: result.success });
+                yield* requestSweep();
+              }),
+            ),
+            // A stop or a restart can come while GitHub makes the change: the row stays `sending`, so a
+            // restart does not send it again, and the loop guard takes its events as the workflow's own.
+            Effect.onExit((exit) =>
+              Exit.isSuccess(exit) || Cause.hasInterruptsOnly(exit.cause)
+                ? Effect.void
+                : Effect.gen(function* () {
+                    logger.warn("A workflow GitHub output stopped with a defect.", {
+                      stepId: step.id,
+                      cause: String(exit.cause),
+                    });
+                    settle(step, { status: "failed", error: sourceText("error.workflow.githubUncertain") });
+                    yield* requestSweep();
+                  }),
+            ),
+            Effect.ensuring(Effect.sync(() => working.delete(step.id))),
+          );
+          return Effect.forkIn(work, scope).pipe(
+            Effect.tap((fiber) => Effect.sync(() => working.set(step.id, fiber))),
+            Effect.asVoid,
+          );
+        };
+
+        /**
+         * Starts the change of a GitHub output, or ends the step when there is none to make. A change that
+         * is done already is not made again. A restart that finds the step's own change on its way sends
+         * it again only when a second call repeats nothing.
+         */
+        const sendGitHub = (
+          step: StoredWorkflowStep,
+          node: WorkflowNode,
+          run: StoredWorkflowRun | null,
+        ): Effect.Effect<void> => {
+          const api = dependencies.githubApi;
+          if (!api) {
+            settle(step, { status: "failed", error: sourceText("error.workflow.githubNotConnected") });
+            return Effect.void;
+          }
+          const plan = githubOutputPlan(
+            node,
+            step.input,
+            run?.graph ?? null,
+            run?.triggerNodeId ?? null,
+            step.runId ? github.runItem(step.runId) : null,
+          );
+          if (plan.kind === "failed") {
+            settle(step, { status: "failed", error: plan.error });
+            return Effect.void;
+          }
+          if (plan.kind === "quiet") {
+            settle(step, { status: "done", output: "" });
+            return Effect.void;
+          }
+          const key = githubActionKey(step);
+          const record = github.action(key);
+          if (record?.status === "done") {
+            settle(step, { status: "done", output: githubOutputText({ ...plan.change, number: record.number }, null) });
+            return Effect.void;
+          }
+          if (
+            record?.status === "sending" &&
+            record.stepId === step.id &&
+            !REPEATABLE_GITHUB_ACTIONS.includes(plan.change.action)
+          ) {
+            github.dropAction(key);
+            settle(step, { status: "failed", error: sourceText("error.workflow.githubUncertain") });
+            return Effect.void;
+          }
+          return startGitHubChange(step, plan, api);
+        };
+
+        /** Ends or resumes an output step that has no fiber, after a restart. Answers whether it ended. */
+        const resumeOutputStep = Effect.fn("Workflows.resumeOutputStep")(function* (step: StoredWorkflowStep) {
+          const run = step.runId ? runs.run(step.runId) : null;
+          const graph = run?.graph ?? store.detail(step.workflowId)?.graph;
+          const node = graph?.nodes.find((candidate) => candidate.id === step.nodeId);
+          if (!node || fieldText(node, "target") !== "github") return yield* resumeOutput(step);
+          yield* sendGitHub(step, node, run);
+          return runs.step(step.id)?.status !== "running";
+        });
+
         /** Does what a new running step of `node` does. */
         const execute = Effect.fn("Workflows.execute")(function* (
           step: StoredWorkflowStep,
@@ -502,6 +735,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 yield* sendOutput(step, node);
                 return;
               }
+              if (fieldText(node, "target") === "github") {
+                yield* sendGitHub(step, node, run);
+                return;
+              }
               dependencies.notify({
                 kind: "output",
                 workflowId: step.workflowId,
@@ -515,8 +752,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           }
         });
 
-        /** The text a new step of `node` keeps as its input: the message itself for an agent. */
+        /**
+         * The text a new step of `node` keeps as its input: the message itself for an agent, and the text
+         * apart from the trigger's event for a GitHub output.
+         */
         const stepInput = (node: WorkflowNode, workflowId: string, inputs: readonly string[]) => {
+          if (node.kind === "output" && fieldText(node, "target") === "github") return githubOutputInput(inputs);
           const text = inputText(inputs);
           return node.kind === "agent" ? agentStepText(titleOf(workflowId), fieldText(node, "task"), text) : text;
         };
@@ -614,6 +855,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           changed(run.workflowId);
           if (status === "running" || status === "approval" || status === "stopping") return;
           rearm();
+          // The next event of the run's item can start now. A manual run with a GitHub event has an item too.
+          if (run.source === "github" || github.runItem(run.id)) yield* requestSweep();
           dependencies.runEnded?.({
             runId: run.id,
             status,
@@ -645,7 +888,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               if (working.has(step.id)) continue;
               ended =
                 step.kind === "output"
-                  ? yield* resumeOutput(step)
+                  ? yield* resumeOutputStep(step)
                   : settle(step, { status: "failed", error: sourceText("error.workflow.interrupted") });
             } else {
               // A restart came between the step and what it does at once, such as an approval's wait.
@@ -659,6 +902,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             if (ended && step.runId) runIds.add(step.runId);
           }
           for (const runId of runIds) yield* advance(runId);
+          for (const workflowId of github.waitingWorkflows()) yield* startWaiting(workflowId);
         });
 
         const sweep = coalescedPasses(() =>
@@ -705,6 +949,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           );
           changed(detail.summary.id);
           rearm();
+          watchGitHub();
           return detail;
         });
 
@@ -724,6 +969,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               if (!removed) return;
               changed(workflowId);
               rearm();
+              watchGitHub();
             }),
           );
         });
@@ -741,6 +987,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           if (result.ok) {
             changed(input.workflowId);
             rearm();
+            watchGitHub();
           }
           return result;
         });
@@ -756,6 +1003,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const detail = yield* attempt(() => store.restoreVersion(input.workflowId, input.versionId, now()));
           changed(input.workflowId);
           rearm();
+          watchGitHub();
           return detail;
         });
 
@@ -903,6 +1151,256 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               return { kind: "started", run: publicRun(started.success.run) };
             }),
           );
+        });
+
+        // --- GitHub --------------------------------------------------------------------------------
+
+        /** The GitHub triggers of every workflow that name a repository and an event. */
+        const githubTriggers = () =>
+          store.listWithGraphs().flatMap(({ summary, graph }) =>
+            graph.nodes.flatMap((node) => {
+              const event = node.fields.event;
+              return githubTriggerRepository(node) && isOneOf(WORKFLOW_GITHUB_EVENTS, event)
+                ? [{ workflowId: summary.id, node, event }]
+                : [];
+            }),
+          );
+
+        const watchedRepositories = () => [
+          ...new Set(githubTriggers().flatMap((trigger) => githubTriggerRepository(trigger.node) ?? [])),
+        ];
+
+        /** Tells the GitHub route which repositories the saved triggers watch. The change it follows stays. */
+        const watchGitHub = () => {
+          const watch = dependencies.watchGitHub;
+          if (!watch) return;
+          try {
+            watch(watchedRepositories());
+          } catch (cause) {
+            logger.warn("The GitHub triggers could not be read for the GitHub route.", { cause: String(cause) });
+          }
+        };
+
+        /** Whether a chain of runs that OpenBot's bot caused on the item is long enough to stop. */
+        const chainTooLong = (item: Pick<WaitingGitHubDelivery["item"], "repository" | "number">) =>
+          github.botRunsSince(item, new Date(now().getTime() - GITHUB_CHAIN_WINDOW_MS)) >= GITHUB_CHAIN_RUNS;
+
+        /**
+         * Starts the run of a GitHub event. `record` writes what the event leaves in the trigger's
+         * history in the same transaction as the run. Answers null when the graph cannot start.
+         */
+        const beginGitHub = Effect.fn("Workflows.beginGitHub")(function* (
+          detail: WorkflowDetail,
+          trigger: WorkflowNode,
+          delivery: Pick<WaitingGitHubDelivery, "deliveryId" | "item" | "payload" | "causedByBot">,
+          record: (run: StoredWorkflowRun) => void,
+        ) {
+          const workflowId = detail.summary.id;
+          const started = yield* begin(
+            detail,
+            trigger,
+            {
+              source: "github",
+              scheduledFor: null,
+              idempotencyKey: `github:${trigger.id}:${delivery.deliveryId}`,
+              payload: delivery.payload,
+            },
+            (run) => {
+              github.addRun({
+                runId: run.id,
+                workflowId,
+                nodeId: trigger.id,
+                deliveryId: delivery.deliveryId,
+                item: delivery.item,
+                causedByBot: delivery.causedByBot,
+                startedAt: run.startedAt,
+              });
+              record(run);
+            },
+          ).pipe(Effect.result);
+          if (Result.isSuccess(started)) return started.success.run;
+          // A fault of this host fails the event, so Signal tells GitHub that it was not saved.
+          if (!(started.failure.cause instanceof WorkflowStoreError)) return yield* started.failure;
+          logger.warn("A GitHub event did not start a workflow run.", {
+            workflowId,
+            nodeId: trigger.id,
+            cause: String(started.failure.cause),
+          });
+          return null;
+        });
+
+        /** Starts the oldest waiting event of each item of the workflow whose run ended. Call it under the lock. */
+        const startWaiting = Effect.fn("Workflows.startWaiting")(function* (workflowId: string) {
+          const detail = store.detail(workflowId);
+          for (const delivery of github.waiting(workflowId)) {
+            if (github.runOpen(workflowId, delivery.item)) continue;
+            const trigger = detail?.graph.nodes.find(
+              (node) => node.id === delivery.nodeId && githubTriggerRepository(node) !== null,
+            );
+            if (!detail || !trigger) github.endWaiting(delivery, { reason: "refused" });
+            else if (delivery.causedByBot && chainTooLong(delivery.item))
+              github.endWaiting(delivery, { reason: "chain" });
+            else {
+              const run = yield* beginGitHub(detail, trigger, delivery, (started) =>
+                github.endWaiting(delivery, { runId: started.id }),
+              );
+              if (!run) github.endWaiting(delivery, { reason: "refused" });
+            }
+            changed(workflowId);
+          }
+        });
+
+        const receiveGitHub = Effect.fn("Workflows.receiveGitHub")(function* (input: WorkflowGitHubEventInput) {
+          return yield* locked(
+            Effect.gen(function* (): Effect.fn.Return<WorkflowGitHubResult, WorkflowFailed> {
+              const facts = githubEventFacts(input.event, input.body, dependencies.githubApp());
+              if (!facts) return { kind: "unwatched" };
+              const receivedAt = now();
+              const triggers = (yield* attempt(githubTriggers)).filter((trigger) =>
+                githubTriggerMatches(trigger.node, facts),
+              );
+              if (triggers.length === 0) return { kind: "unwatched" };
+              for (const { workflowId, node, event } of triggers) {
+                if (yield* attempt(() => github.hasDelivery(workflowId, node.id, input.deliveryId))) continue;
+                const delivery = {
+                  workflowId,
+                  nodeId: node.id,
+                  deliveryId: input.deliveryId,
+                  event,
+                  item: facts.item,
+                  receivedAt: receivedAt.toISOString(),
+                  causedByBot: facts.causedByBot,
+                  runId: null,
+                  payload: null,
+                };
+                const skip = (reason: "filter" | "self" | "chain" | "refused") =>
+                  attempt(() => github.addDelivery({ ...delivery, outcome: "skipped", reason }));
+                changed(workflowId);
+                if (githubFilterRefuses(node, facts)) {
+                  yield* skip("filter");
+                  continue;
+                }
+                // Only OpenBot's bot makes the changes of GitHub outputs, so only its events can be a step's own.
+                if (
+                  facts.causedByBot &&
+                  github.selfCaused(
+                    workflowId,
+                    facts.item,
+                    facts.objectKey,
+                    new Date(receivedAt.getTime() - GITHUB_SELF_WINDOW_MS),
+                  )
+                ) {
+                  yield* skip("self");
+                  continue;
+                }
+                if (facts.causedByBot && chainTooLong(facts.item)) {
+                  yield* skip("chain");
+                  continue;
+                }
+                const payload = workflowGitHubPayload(node.id, input.deliveryId, event, facts, delivery.receivedAt);
+                if (github.itemBusy(workflowId, facts.item)) {
+                  yield* attempt(() => github.addDelivery({ ...delivery, outcome: "waiting", reason: null, payload }));
+                  continue;
+                }
+                const detail = yield* attempt(() => store.detail(workflowId));
+                const run = detail
+                  ? yield* beginGitHub(
+                      detail,
+                      node,
+                      { deliveryId: input.deliveryId, item: facts.item, payload, causedByBot: facts.causedByBot },
+                      (started) =>
+                        github.addDelivery({ ...delivery, outcome: "started", reason: null, runId: started.id }),
+                    )
+                  : null;
+                if (!run) yield* skip("refused");
+              }
+              return { kind: "saved" };
+            }),
+          );
+        });
+
+        const githubOffline = Effect.fn("Workflows.githubOffline")(function* (from: Date, to: Date) {
+          yield* locked(
+            Effect.gen(function* () {
+              const triggers = yield* attempt(githubTriggers);
+              if (triggers.length === 0) return;
+              yield* attempt(() =>
+                github.addOffline(
+                  triggers.map(({ workflowId, node, event }) => ({ workflowId, nodeId: node.id, event })),
+                  from,
+                  to,
+                ),
+              );
+              for (const workflowId of new Set(triggers.map((trigger) => trigger.workflowId))) changed(workflowId);
+            }),
+          );
+        });
+
+        const githubHistory = Effect.fn("Workflows.githubHistory")(function* (workflowId: string) {
+          return yield* attempt(() => {
+            detailOf(workflowId);
+            return github.history(workflowId);
+          });
+        });
+
+        const githubLastEvent = Effect.fn("Workflows.githubLastEvent")(function* (input: WorkflowGitHubLastEventInput) {
+          const api = dependencies.githubApi;
+          if (!api) return yield* refuse("refused", sourceText("error.workflow.githubNotConnected"));
+          const detail = yield* attempt(() => detailOf(input.workflowId));
+          const trigger = detail.graph.nodes.find((node) => node.id === input.nodeId);
+          const repository = trigger ? githubTriggerRepository(trigger) : null;
+          const event = trigger?.fields.event;
+          if (!trigger || !repository || !isOneOf(WORKFLOW_GITHUB_EVENTS, event))
+            return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
+          // GitHub is asked outside the lock: the other runs do not wait for it.
+          const recent = yield* api
+            .recentEvents(repository, event)
+            .pipe(Effect.mapError((failure) => refuse("refused", failure.message)));
+          const bot = dependencies.githubApp();
+          const facts = recent
+            .map((candidate) => githubEventFacts(candidate.event, candidate.body, bot))
+            .find(
+              (candidate) =>
+                candidate !== null &&
+                githubTriggerMatches(trigger, candidate) &&
+                !githubFilterRefuses(trigger, candidate),
+            );
+          if (!facts) return yield* refuse("refused", sourceText("error.workflow.githubNoEvent"));
+          return yield* locked(
+            Effect.gen(function* () {
+              const current = yield* attempt(() => detailOf(input.workflowId));
+              const node = current.graph.nodes.find((candidate) => candidate.id === trigger.id);
+              if (!node || githubTriggerRepository(node) !== repository)
+                return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
+              const deliveryId = `last:${input.requestId}`;
+              const { run } = yield* begin(
+                current,
+                node,
+                {
+                  source: "manual",
+                  scheduledFor: null,
+                  idempotencyKey: `manual:${input.requestId}`,
+                  payload: workflowGitHubPayload(node.id, deliveryId, event, facts, now().toISOString()),
+                },
+                // A run that a person starts does not wait for the run of its item.
+                (started) =>
+                  github.addRun({
+                    runId: started.id,
+                    workflowId: current.summary.id,
+                    nodeId: node.id,
+                    deliveryId: null,
+                    item: facts.item,
+                    causedByBot: false,
+                    startedAt: started.startedAt,
+                  }),
+              );
+              return runDetail(run);
+            }),
+          );
+        });
+
+        const githubRepositories = Effect.fn("Workflows.githubRepositories")(function* () {
+          return yield* attempt(watchedRepositories);
         });
 
         const runStep = Effect.fn("Workflows.runStep")(function* (input: RunWorkflowStepInput) {
@@ -1080,6 +1578,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           startRun,
           startScheduled,
           receiveWebhook,
+          receiveGitHub,
+          githubOffline,
+          githubHistory,
+          githubLastEvent,
+          githubRepositories,
           runStep,
           stopStep,
           stopRun,

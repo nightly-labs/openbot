@@ -126,8 +126,6 @@ export const messages = {
   "error.remote.serverDisconnected": "De verbinding met de server is verbroken.",
   "error.remote.preferencesUnreadable": "De opgeslagen chatvoorkeuren konden niet worden gelezen.",
   "error.remote.accountAuthRequired": "Verificatie van het account is verplicht.",
-  "error.remote.serverIdentityChanged":
-    "De identiteit van de server is gewijzigd. De vertrouwde hostsleutel wordt niet vervangen.",
   "error.remote.pairedIdentityChanged":
     "De identiteit van de gekoppelde desktop ontbreekt of is gewijzigd. Scan een nieuwe code van die desktop.",
   "error.remote.permanentInviteNoEmail": "Permanente uitnodigingen kunnen niet per e-mail worden verstuurd.",

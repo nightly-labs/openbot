@@ -18,14 +18,19 @@
 //   - **The directory owns the list.** A stored WebRTC host missing from the directory is dropped,
 //     and so is every non-WebRTC server unless `keepOtherTransports` is set. That flag is on only
 //     in development builds, which is why a released build treats the account directory as the
-//     complete answer rather than a set of additions.
+//     complete answer rather than a set of additions. The one exception is a local server of this
+//     computer (`local-servers/`): the account service never knows it.
 //
 // Order is preserved deliberately: surviving stored servers keep their positions, and hosts the
 // user has not seen before are appended in directory order. The user drags this list.
 
 import { verify } from "node:crypto";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
-import { followHostKeyHandovers, type HostKeySignatureCheck } from "@openbot/team-client/host-key-handover";
+import {
+  followHostKeyHandovers,
+  type HostKeySignatureCheck,
+  hostKeyChangedAt,
+} from "@openbot/team-client/host-key-handover";
 import { Effect } from "effect";
 import type { RemoteHostSummary } from "./central-auth-records";
 import type { PreservedHostIdentity, StoredRemoteServerView } from "./remote-server-store";
@@ -82,6 +87,8 @@ export interface WebRtcHostReconciliationInput {
   readonly username: string;
   /** Development only: keep HTTPS servers that the account directory does not know about. */
   readonly keepOtherTransports: boolean;
+  /** The local servers of this computer. The account directory never lists them, and they stay. */
+  readonly isThisComputer?: (serverId: string) => boolean;
   readonly isConnected: (hostId: string) => boolean;
   /** Hosts whose advertised key a verified handover chain leads to, from `followedHostKeyHandovers`. */
   readonly followedHandovers?: ReadonlySet<string>;
@@ -122,6 +129,30 @@ export const followedHostKeyHandovers = Effect.fn("RemoteHostDirectory.followedH
   return followed;
 });
 
+/**
+ * When each host last changed its key: the handover to the key that this computer uses for it, with
+ * both signatures checked. A host without such a handover has no entry. `trustedKey` gives the key
+ * that this computer uses, or null for a host it does not use.
+ */
+export const hostKeyChangeTimes = Effect.fn("RemoteHostDirectory.hostKeyChangeTimes")(function* (
+  hosts: readonly RemoteHostSummary[],
+  trustedKey: (host: RemoteHostSummary) => string | null | undefined,
+) {
+  const times = new Map<string, number>();
+  for (const host of hosts) {
+    const publicKey = trustedKey(host);
+    if (!publicKey || host.keyHandovers.length === 0) continue;
+    const changedAt = yield* hostKeyChangedAt({
+      hostId: host.hostId,
+      publicKey,
+      handovers: host.keyHandovers,
+      verify: verifyHostKeySignature,
+    });
+    if (changedAt !== null) times.set(host.hostId, changedAt);
+  }
+  return times;
+});
+
 export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebRtcHostReconciliation {
   const pinnedKeys: HostKeyPin[] = [];
   const listed = input.hosts
@@ -157,7 +188,8 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
       // same host reached over WebRTC -- keeping the stored entry as well as appending the listing
       // below would put one id in the list twice, and every lookup by id then answers whichever
       // copy it reached first.
-      if (input.keepOtherTransports && !listedById.has(server.id)) return [{ ...server }];
+      if ((input.keepOtherTransports || input.isThisComputer?.(server.id)) && !listedById.has(server.id))
+        return [{ ...server }];
       // The entry goes, so whatever it opened has to go with it, and nothing else here says so:
       // `removedHostIds` reports WebRTC ids, and a replaced id is still in `servers`, so a caller
       // diffing the two lists sees this host as kept.

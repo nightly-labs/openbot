@@ -12,7 +12,9 @@ import { CHANGELOG_ROUTE } from "./changelog";
 import { HEADER_COLLECTIONS } from "./content";
 import type { CollectionArticle, ContentCollection } from "./content-collection";
 import { OPENBOT_LINKS } from "./landing-links";
-import { PLUGIN_INDEX_ROUTE, SITE_PLUGINS, type SitePlugin } from "./plugins";
+import { MARKETPLACE_APPS_ROUTE } from "./marketplace-routes";
+import { SITE_PLUGINS, type SitePlugin } from "./plugins";
+import { PRICING_ROUTE } from "./pricing-page";
 import { TEAMS_ROUTE } from "./teams-page";
 
 /** How many articles a panel lists: one featured, and the rest under it. */
@@ -41,7 +43,7 @@ export interface PluginNavigationSection {
   label: string;
   summary: string;
   indexLabel: string;
-  indexRoute: typeof PLUGIN_INDEX_ROUTE;
+  indexRoute: typeof MARKETPLACE_APPS_ROUTE;
   plugins: readonly SitePlugin[];
   pluginCount: number;
 }
@@ -91,7 +93,7 @@ export const SITE_NAVIGATION_SECTIONS: readonly SiteNavigationSection[] = [
     label: "Plugins",
     summary: "Apps and skills an agent can use.",
     indexLabel: "Browse plugins",
-    indexRoute: PLUGIN_INDEX_ROUTE,
+    indexRoute: MARKETPLACE_APPS_ROUTE,
     // Featured first, and otherwise in the order the catalog declares.
     plugins: SITE_PLUGINS.toSorted((left, right) => Number(right.featured) - Number(left.featured)).slice(
       0,
@@ -103,7 +105,7 @@ export const SITE_NAVIGATION_SECTIONS: readonly SiteNavigationSection[] = [
     kind: "resources",
     id: "resources",
     label: "Resources",
-    summary: "OpenBot is open source.",
+    summary: "The source code of OpenBot is open.",
     footer: { label: "Source code", href: OPENBOT_LINKS.repository },
     links: [
       { label: "Download", description: "macOS, Windows and Linux", icon: "download", to: "/download" },
@@ -124,8 +126,11 @@ export const SITE_NAVIGATION_SECTIONS: readonly SiteNavigationSection[] = [
 /** A header entry with no panel: one page, reached in one press. */
 export interface SiteNavigationLink {
   label: string;
-  to: typeof TEAMS_ROUTE;
+  to: typeof TEAMS_ROUTE | typeof PRICING_ROUTE;
 }
 
 /** After the sections, in both the desktop menu and the mobile sheet. */
-export const SITE_NAVIGATION_LINKS: readonly SiteNavigationLink[] = [{ label: "For Teams", to: TEAMS_ROUTE }];
+export const SITE_NAVIGATION_LINKS: readonly SiteNavigationLink[] = [
+  { label: "For Teams", to: TEAMS_ROUTE },
+  { label: "Pricing", to: PRICING_ROUTE },
+];

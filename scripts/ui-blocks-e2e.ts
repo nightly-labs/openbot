@@ -19,6 +19,11 @@ import {
   teamCapabilitiesForProtocol,
 } from "@openbot/contracts/team-protocol/current";
 import {
+  addUiBlockAutoAnswers,
+  TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
+  withUiBlockAutoAnswers,
+} from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import {
   decodeTeamProtocolV6CurrentHttpResponse,
   encodeTeamProtocolV6CurrentHttpResponse,
 } from "@openbot/contracts/team-protocol/v6-adapter";
@@ -449,6 +454,63 @@ try {
       { uiBlocks: true },
     );
     assert.ok(event && !event.includes('"autoAnswer"'));
+  });
+
+  await step("ui-block-auto-answer-v1: a protocol 9 capability only", () => {
+    assert.ok(TEAM_CURRENT_CAPABILITIES.includes(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY));
+    assert.ok(!teamCapabilitiesForProtocol(8).includes(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY));
+    assert.ok(teamCapabilitiesForProtocol(9).includes(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY));
+  });
+
+  await step("ui-block-auto-answer-v1: page and event carry the host's auto-answer state", () => {
+    const encoded = withUiBlockAutoAnswers(
+      encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, current, { uiBlocks: true }),
+      current,
+    );
+    assert.ok(!encoded.includes(SECRET));
+    // As the team client reads it: the frozen codec leaves the key out, and the client copies it back.
+    const wire = JSON.parse(encoded);
+    const decoded = decodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, wire);
+    assert(decoded && typeof decoded === "object" && !Array.isArray(decoded));
+    addUiBlockAutoAnswers(decoded, wire);
+    const messages: unknown[] = Array.isArray(decoded.messages) ? decoded.messages : [];
+    const autoAnswers = messages.map((message) => {
+      assert.ok(isConversationMessage(message));
+      return message.uiBlock?.state.autoAnswer;
+    });
+    assert.deepEqual(
+      autoAnswers,
+      current.messages.map((message) => message.uiBlock?.state.autoAnswer),
+    );
+    assert.ok(
+      autoAnswers.some((autoAnswer) => autoAnswer?.done === true),
+      "no plan card that the host answered",
+    );
+
+    const plain = encodeTeamProtocolV7BaseCurrentEvent(
+      { type: "conversation-page", page: current },
+      { uiBlocks: true },
+    );
+    assert.ok(plain);
+    const event = JSON.parse(withUiBlockAutoAnswers(plain, { type: "conversation-page", page: current }));
+    const read = decodeTeamProtocolV7BaseCurrentEvent(event);
+    assert(read.kind === "known" && read.event.type === "conversation-page");
+    addUiBlockAutoAnswers(read.event, event);
+    assert.deepEqual(
+      read.event.page.messages.map((message) => message.uiBlock?.state.autoAnswer),
+      current.messages.map((message) => message.uiBlock?.state.autoAnswer),
+    );
+    return { autoAnswers: autoAnswers.filter(Boolean).length };
+  });
+
+  await step("ui-block-auto-answer-v1: a body without an automatic answer keeps its bytes", () => {
+    const withoutAuto = page(
+      current.messages.map((message) =>
+        message.uiBlock ? { ...message, uiBlock: onV1Wire(message.uiBlock) } : message,
+      ),
+    );
+    const encoded = encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, withoutAuto, { uiBlocks: true });
+    assert.equal(withUiBlockAutoAnswers(encoded, withoutAuto), encoded);
   });
 
   await step("a malformed block fails closed in both directions", () => {

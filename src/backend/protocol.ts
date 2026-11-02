@@ -75,6 +75,14 @@ export interface AppServerRequest {
 /** The account type of Claude's own sign-in when it runs on the saved key, with no claude.ai account. */
 export const CLAUDE_API_KEY_ACCOUNT_TYPE = "claude-api-key";
 
+/**
+ * Whether Codex can run on a login of this type: a ChatGPT plan, or an OpenAI API key that Codex
+ * keeps in its own home (`codex login --with-api-key`). Turns on a key use API credits.
+ */
+export function isCodexLoginType(type: string | undefined): boolean {
+  return type === "chatgpt" || type === "apiKey";
+}
+
 export interface AccountReadResult {
   account: null | {
     type: string;
@@ -136,6 +144,8 @@ export interface AccountRateLimitsReadResult {
   rateLimits?: AccountRateLimitResult | null | undefined;
   /** Antigravity only: every quota group of the plan. `rateLimits` is one of them. */
   groups?: AccountRateLimitGroupResult[] | undefined;
+  /** OpenCode only: the weekly or monthly window that `rateLimits.secondary` does not hold. */
+  tertiary?: AccountRateLimitWindowResult | undefined;
   /** Cursor only: the provider whose plan quota this reading also counts, such as Grok on a merged plan. */
   sharedQuotaWith?: AgentProviderId | undefined;
   rateLimitsByLimitId?: Record<string, AccountRateLimitResult | undefined> | null | undefined;
@@ -297,6 +307,7 @@ export function decodeAccountLoginCompletedResult(value: unknown): AccountLoginC
 export function decodeAccountRateLimitsReadResult(value: unknown): AccountRateLimitsReadResult {
   const record = decodeRecord(value, "rate limits response");
   const rateLimits = decodeRateLimit(record.rateLimits);
+  const tertiary = decodeRateLimitWindow(record.tertiary);
   const rateLimitsByLimitId = decodeRateLimitsById(record.rateLimitsByLimitId);
   const rateLimitResetCredits = decodeRateLimitResetCredits(record.rateLimitResetCredits);
   const groups = decodeRateLimitGroups(record.groups);
@@ -305,6 +316,7 @@ export function decodeAccountRateLimitsReadResult(value: unknown): AccountRateLi
     throw new Error("Invalid rate limit shared quota provider.");
   return {
     ...(rateLimits === undefined ? {} : { rateLimits }),
+    ...(tertiary ? { tertiary } : {}),
     ...(rateLimitsByLimitId === undefined ? {} : { rateLimitsByLimitId }),
     ...(groups === undefined ? {} : { groups }),
     ...(sharedQuotaWith === undefined ? {} : { sharedQuotaWith }),

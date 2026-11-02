@@ -33,7 +33,9 @@ import type {
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import type { AgentInstructionsFileCalls } from "./AgentInstructionsView";
 import { formatChatTimestamp } from "./chat-timestamp";
+import { InstructionsChangeActions } from "./InstructionsChangeActions";
 
 interface ChatActionMarkerProps {
   marker: ChatActionMarkerModel;
@@ -50,6 +52,10 @@ interface ChatActionMarkerProps {
   onToggleAgentMessage?: ((messageId: string) => void) | undefined;
   /** Draws the text of an open agent message under its marker, by its `messageId`. */
   agentMessageText?: ((messageId: string) => JSX.Element) | undefined;
+  /** The instruction file of a local agent, for View and Undo on its change line. */
+  instructions?: AgentInstructionsFileCalls | undefined;
+  /** Opens the Instructions page of the agent. Absent where the chat has no settings page for it. */
+  onOpenInstructions?: ((agentId: string) => void) | undefined;
 }
 
 /** The parts of a marker that open the text of an agent message, for the markers in a group. */
@@ -118,6 +124,8 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
                   onToggleRoutineRun={props.onToggleRoutineRun}
                   onToggleAgentMessage={props.onToggleAgentMessage}
                   agentMessageText={props.agentMessageText}
+                  instructions={props.instructions}
+                  onOpenInstructions={props.onOpenInstructions}
                 />
               )}
             </Show>
@@ -496,6 +504,16 @@ function SingleChatActionMarker(
                 name={marker().skillName}
                 icon={Puzzle}
                 onOpen={props.onOpenSkill ? () => props.onOpenSkill?.({ skillId: marker().skillId }) : undefined}
+              />
+            )}
+          </Show>
+          <Show when={instructionsChange(props.marker, props.instructions)}>
+            {(target) => (
+              <InstructionsChangeActions
+                agentId={target().agentId}
+                change={target().change}
+                calls={target().calls}
+                onView={props.onOpenInstructions}
               />
             )}
           </Show>
@@ -886,13 +904,25 @@ const SKILL_ACTION_LABELS = {
   installed: "chat.marker.skill.installed",
 } as const satisfies Record<Extract<ChatActionMarkerModel, { kind: "skill-lifecycle" }>["action"], AppTextKey>;
 
+/** The change line of a local agent, which can show View and Undo. */
+function instructionsChange(marker: SingleChatActionMarkerModel, calls: AgentInstructionsFileCalls | undefined) {
+  if (marker.kind !== "instructions-change" || !marker.agentId || !calls) return undefined;
+  return { agentId: marker.agentId, change: marker.change, calls };
+}
+
 function markerLabel(
   marker: SingleChatActionMarkerModel,
   t: AppTranslate,
   sourceText: (text: string) => string,
 ): string {
   if (marker.kind === "unavailable") return marker.label;
-  if (marker.kind === "model-switch" || marker.kind === "channel-change" || marker.kind === "vault-change")
+  if (
+    marker.kind === "model-switch" ||
+    marker.kind === "channel-change" ||
+    marker.kind === "vault-change" ||
+    marker.kind === "plan-continuation" ||
+    marker.kind === "instructions-change"
+  )
     return sourceText(marker.text);
   if (marker.kind === "context-reset") return t("chat.marker.contextReset");
   if (marker.kind === "marketplace-suggestion") return t("chat.marker.marketplaceSuggestion");
@@ -970,7 +1000,9 @@ function markerAccessibleLabel(
     marker.kind === "mcp-sign-in" ||
     marker.kind === "model-switch" ||
     marker.kind === "channel-change" ||
-    marker.kind === "vault-change"
+    marker.kind === "vault-change" ||
+    marker.kind === "plan-continuation" ||
+    marker.kind === "instructions-change"
   )
     return label;
   if (marker.kind === "skill-lifecycle") return t("chat.marker.accessible.named", { label, name: marker.skillName });

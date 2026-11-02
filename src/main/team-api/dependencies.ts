@@ -3,17 +3,22 @@ import type { ChannelService } from "../../backend/channel-service";
 import type { AcpRegistry } from "../acp-registry";
 import type { AgentAccessStore } from "../agent-access-store";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
+import type { AgentFolders } from "../agent-folders";
 import type { AgentHostSettingsService } from "../agent-host-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { AgentTemplateService } from "../agent-template-service";
 import type { BrowserProfileService } from "../browser-profile-service";
+import type { CustomAgentChanges } from "../custom-agent-changes";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
+import type { WorkflowGitHubDirectory } from "../github-rest";
 import type { HostEventsApi } from "../host-events-api";
 import type { HostEventsService } from "../host-events-service";
 import type { HostReleaseService } from "../host-release-service";
 import type { HostService } from "../host-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
+import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
+import type { PreferenceFileFailure } from "../preference-file";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
@@ -32,6 +37,7 @@ import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import type {
   AgentEvent,
   AgentModelId,
+  AgentNotificationLevelsSnapshot,
   AgentProviderId,
   CentralAuthUser,
   DirectMessageRealtimeEvent,
@@ -40,6 +46,8 @@ import type {
   RoutineResultDestination,
   RoutineResultRoutineInput,
   SaveSetupInput,
+  ServerNotificationLevel,
+  SetAgentNotificationLevelInput,
   SetRoutineResultDestinationInput,
   SidebarLayoutSnapshot,
   TeamPresenceSnapshot,
@@ -221,6 +229,9 @@ export type TeamApiProviderAccounts = Pick<
 /** Its presence is what `#protocolSupport` advertises `provider-usage-reset-v1` on. The routes are admin-only. */
 export type TeamApiProviderUsageResets = Pick<AgentService, "providerUsageResets" | "resetProviderUsage">;
 
+/** Its presence is what `#protocolSupport` advertises `provider-sign-out-v1` on. The route is admin-only. */
+export type TeamApiProviderSignOut = Pick<AgentService, "signOutProvider">;
+
 /** Its presence is what `#protocolSupport` advertises `storage-v1` and `storage-disk-v1` on. */
 export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk">;
 /** `machine-resources-v1`: the machine use and its alerts. The routes are admin-only. */
@@ -233,6 +244,19 @@ export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "listServerSites
 
 /** Its presence is what `#protocolSupport` advertises `agent-hidden-v1` on. Any member can use it. */
 export type TeamApiHiddenAgents = Pick<AgentService, "listHiddenAgents" | "setAgentHidden">;
+
+/**
+ * `agent-notification-levels-v1`: the level that each member chose for this server and for each agent.
+ * The host keeps the levels of the owner under one key, so its desktop app and its phones read the
+ * same levels.
+ */
+export interface TeamApiAgentNotificationLevels {
+  snapshot(memberId: string, hidden: ReadonlySet<string>): AgentNotificationLevelsSnapshot;
+  set(memberId: string, input: SetAgentNotificationLevelInput): Effect.Effect<unknown, PreferenceFileFailure>;
+  setServer(memberId: string, level: ServerNotificationLevel | null): Effect.Effect<unknown, PreferenceFileFailure>;
+  /** Calls `listener` with the member after each change of their levels, from any of their devices. */
+  subscribe(listener: (memberId: string) => void): () => void;
+}
 
 /**
  * Its presence is what `#protocolSupport` advertises `agent-tasks-v1` and `agent-threads-v1` on. A member
@@ -252,6 +276,7 @@ export type TeamApiAgentTasks = Pick<
   | "deleteTask"
   | "listTaskReads"
   | "markTaskRead"
+  | "branchTask"
 >;
 
 /**
@@ -303,8 +328,16 @@ export type TeamApiWorkflows = Pick<
   | "runs"
   | "run"
   | "workflowOf"
+  | "githubHistory"
+  | "githubLastEvent"
 > &
-  Pick<HostEventsService, "rotateWorkflowSecret">;
+  Pick<HostEventsService, "rotateWorkflowSecret"> & {
+    /**
+     * Its presence is what `#protocolSupport` advertises `workflows-github-v1` on; see
+     * `workflows-github-v1.ts` for the grant.
+     */
+    github?: WorkflowGitHubDirectory;
+  };
 
 /** The setup choice of this computer: the same file and the same service step as the local Settings save. */
 interface TeamApiDefaultProvider {
@@ -327,6 +360,8 @@ export interface TeamApiAdmin {
       AcpRegistry[Method]
     >;
   };
+  /** `custom-agents-v1`: the custom ACP agents of this host. */
+  customAgents?: Pick<CustomAgentChanges, "list" | "save" | "remove">;
   /** Read-only release discovery, independent of permission to install. */
   release?: Pick<HostReleaseService, "snapshot" | "check">;
   /** `agent-admin-v1`: access and auto-approve of one agent. */
@@ -335,8 +370,12 @@ export interface TeamApiAdmin {
    * `agent-host-settings-v1`: Computer Use, local scripts and the busy-message mode of one agent.
    * `agent-backup-models-v1`: its backup models.
    * `agent-task-limit-v1`: how many of its tasks run at the same time.
+   * `agent-new-chat-v1`: whether it starts a new chat itself when its chat gets long.
+   * `agent-plan-card-v1`: whether it shows its plan card before a long task.
    */
   agentHost?: AgentHostSettingsService;
+  /** `agent-folders-v1`: the folders that one agent can change besides its workspace. */
+  folders?: Omit<AgentFolders, "requireAgent">;
   sessionSettings?: Pick<
     AgentService,
     "readAgentSessionSettings" | "setAgentSessionSetting" | "resetAgentSessionSetting"
@@ -360,8 +399,12 @@ export interface TeamApiAdmin {
   update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "requestWhenIdle" | "cancel" | "changeSettings">;
   /** `host-timezone-v1`: the server timezone. */
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  /** `host-key-rotation-v1`: the owner changes this host's key. Resolves with the new public key. */
+  hostKey?: { rotate(): Effect.Effect<{ publicKey: string }, RemoteWorkflowError> };
   /** `agent-memory-limit-v1`: how many memories each agent of this computer can keep. */
   memoryLimit?: AgentMemoryLimitSetting;
+  /** `memory-review-v1`: how often this computer's agents review their memories in the background. */
+  memoryReview?: MemoryReviewPreferenceStore;
   /** `prompt-cache-ttl-v1`: how long the provider keeps the prompt cache of this computer's agents. */
   promptCacheTtl?: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   /** `provider-default-v1`: the provider and model that a new agent of this computer starts on. */
@@ -491,6 +534,7 @@ export interface TeamApiOptions {
   providerHostSignIns?: TeamApiProviderHostSignIns | undefined;
   providerAccounts?: TeamApiProviderAccounts | undefined;
   providerUsageResets?: TeamApiProviderUsageResets | undefined;
+  providerSignOut?: TeamApiProviderSignOut | undefined;
   /** Starts and waits for the managed tool runtimes behind the MCP save, enable, and test routes. */
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   storage?: TeamApiStorage;
@@ -501,6 +545,7 @@ export interface TeamApiOptions {
   routineFlows?: TeamApiRoutineFlows;
   workflows?: TeamApiWorkflows;
   hiddenAgents?: TeamApiHiddenAgents;
+  agentNotificationLevels?: TeamApiAgentNotificationLevels;
   /** `agent-access-v1`: the roles that limit what a member can do with each agent. */
   agentAccess?: TeamApiAgentAccess;
   agentTasks?: TeamApiAgentTasks;
@@ -510,8 +555,9 @@ export interface TeamApiOptions {
   store: TeamStore;
   agents: TeamApiAgents;
   /**
-   * Waits for the agent initialization in progress. A host that wakes publishes before its agents
-   * load, and an empty roster then would tell a peer that the server has no agents.
+   * Waits until the agent initialization in progress has loaded the agents. A host that wakes
+   * publishes before its agents load, and an empty roster then would tell a peer that the server has
+   * no agents. The later startup steps, such as the routine sweeps, do not hold the list.
    */
   agentsReady?: (() => Effect.Effect<void>) | undefined;
   skills?: Pick<SkillMarketplaceService, "listInstalledForChatTags"> | undefined;

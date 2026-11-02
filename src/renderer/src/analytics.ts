@@ -40,7 +40,7 @@ type AnalyticsResult = "succeeded" | "failed";
 /** For a step that the user can stop before it ends. */
 type AnalyticsOutcome = AnalyticsResult | "cancelled";
 /** Where the words are heard: a model on this computer, or a cloud model. */
-type TranscriptionKind = "local" | "cloud";
+type TranscriptionKind = "local" | "cloud" | "server";
 
 interface AgentAnalyticsProperties {
   provider: AgentProviderId;
@@ -85,7 +85,7 @@ interface DesktopAnalyticsEvents {
         failure_code?: string;
       })
     | (Partial<AgentAnalyticsProperties> & {
-        action: "delete" | "duplicate";
+        action: "delete" | "duplicate" | "branch";
         result: AnalyticsResult;
         failure_code?: string;
       });
@@ -297,6 +297,7 @@ interface DesktopAnalyticsEvents {
       | "buy_opened"
       | "checkout_opened"
       | "users_change_requested"
+      | "plan_change_requested"
       | "cancel_requested"
       | "cancel_kept"
       | "renewal_resumed"
@@ -554,7 +555,7 @@ const SAFE_FAILURE_CODES = new Set([
 ]);
 
 const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
-  agent_action: ["create", "update", "delete", "duplicate"],
+  agent_action: ["create", "update", "delete", "duplicate", "branch"],
   agent_input_action: ["prompt", "approval"],
   queue_action: ["cancel", "steer", "edit", "reorder", "interrupt"],
   routine_action: ["create", "update", "delete", "test"],
@@ -619,6 +620,7 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
     "buy_opened",
     "checkout_opened",
     "users_change_requested",
+    "plan_change_requested",
     "cancel_requested",
     "cancel_kept",
     "renewal_resumed",
@@ -661,7 +663,7 @@ const PROPERTY_ENUMS: Readonly<Record<string, readonly string[]>> = {
   role: ["admin", "member"],
   server_kind: ["local", "remote", "unknown"],
   transport: ["unknown", "p2p", "relay"],
-  transcription: ["local", "cloud"],
+  transcription: ["local", "cloud", "server"],
   trigger: ["voice_conversation", "dictation", "read_aloud"],
   voice: SPEECH_VOICES,
   plan: BILLING_PLAN_IDS,
@@ -749,6 +751,8 @@ function sanitizeDesktopAnalyticsEvent(
  * "custom". The main process uses the same rule.
  */
 function reportedModel(value: string): string {
+  // Hermes names a model of the user's own endpoint `custom:<endpoint name>:<model>`.
+  if (value.startsWith("custom:")) return "custom";
   const separator = value.indexOf("/");
   if (separator < 0) return value;
   // A key-only provider never puts its own id before a model id, so that prefix comes from OpenCode.

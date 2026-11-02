@@ -73,6 +73,8 @@ export interface SidebarProps {
   agentStates: Record<string, SidebarAgentState>;
   /** The wait of each channel that waits for the user, from `sidebarChannelWaits`. A missing entry does not wait. */
   channelWaits?: Record<string, SidebarChannelWait> | undefined;
+  /** The channel rows come from a saved frame, which holds no last message. A row with none shows no preview and no time. */
+  channelPreviewsPending?: boolean | undefined;
   /** The face each agent wears, from `computeAgentAvatarMoods`. A missing entry rests. */
   agentMoods: Record<string, AvatarMood>;
   layout: SidebarLayoutSnapshot;

@@ -71,9 +71,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "アニメーションをオフにすると、アプリ全体の動きを減らします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。その場合、下のアニメーションはオフのままです。",
   "mobile.settings.animations.all": "アニメーション",
-  "mobile.settings.animations.chatZoom": "チャットへのズーム",
-  "mobile.settings.animations.chatZoomFooter":
-    "チャットはリストのアバターから開き、閉じるとアバターに戻ります。オフにすると、チャットは横からスライドして開きます。",
   "mobile.settings.animations.agentFaces": "エージェントの表情アニメーション",
   "mobile.settings.animations.agentFacesFooter":
     "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動きません。",
@@ -122,7 +119,6 @@ export const messages = {
     "通知とライブアクティビティはこのサウンドを再生します。ライブアクティビティは画面も点灯します。OpenBot のサウンドは、デスクトップアプリがタスク完了時に鳴らすサウンドです。その次の 4 つは、デスクトップアプリのサウンドテーマのサウンドです。",
   "mobile.settings.notifications.soundFooterAndroid":
     "通知はこのサウンドを再生します。OpenBot のサウンドは、デスクトップアプリがタスク完了時に鳴らすサウンドです。その次の 4 つは、デスクトップアプリのサウンドテーマのサウンドです。",
-  "mobile.settings.notifications.notifyAbout": "通知する内容",
   "mobile.settings.notifications.level.all": "すべてのアクティビティ",
   "mobile.settings.notifications.level.needsMe": "自分が必要なときのみ",
   "mobile.settings.notifications.level.nothing": "なし",
@@ -139,6 +135,25 @@ export const messages = {
     "このサーバーのどのイベントをこのスマートフォンに通知するかを選びます。デスクトップアプリには別の設定があります。",
   "mobile.settings.notifications.serverUnsupported":
     "このサーバーは通知を送信できません。サーバーを実行しているコンピューターで OpenBot をアップデートしてください。",
+  "mobile.settings.notifications.thisPhone": "このスマートフォン",
+  "mobile.settings.notifications.whatYouHear": "通知を受け取る内容",
+  "mobile.settings.notifications.wholeServer": "サーバー全体",
+  "mobile.settings.notifications.levelShort.all": "すべて",
+  "mobile.settings.notifications.levelShort.needsMe": "要対応",
+  "mobile.settings.notifications.levelShort.nothing": "オフ",
+  "mobile.settings.notifications.thisPhoneOnly": "このスマートフォンのみ",
+  "mobile.settings.notifications.offForEveryone": "このサーバーの全員に対してオフ",
+  "mobile.settings.notifications.turnOn": "オンにする",
+  "mobile.settings.notifications.turnOnFor": "このサーバーの全員に対して {name} の通知をオンにする",
+  "mobile.settings.notifications.chooseAgent": "エージェントごとに選ぶ",
+  "mobile.settings.notifications.chooseAnotherAgent": "別のエージェントを選ぶ",
+  "mobile.settings.notifications.levelsFooter":
+    "エージェントのレベルをもう一度タップすると、サーバーの設定に従います。",
+  "mobile.settings.notifications.agentsUnsupported":
+    "エージェントごとに選ぶには、このサーバーの OpenBot をアップデートしてください。",
+  "mobile.settings.notifications.agentsOffline": "このサーバーがオンラインになると、エージェントが表示されます。",
+  "mobile.settings.notifications.scopeFooter":
+    "選んだ内容はあなたのすべてのデバイスに適用されます。ミュートはこのスマートフォンだけに適用されます。",
   "mobile.settings.notifications.channel": "エージェントの通知（{sound}）",
   "mobile.settings.notifications.channelSilent": "エージェントの通知（サウンドなし）",
   "mobile.settings.privacy.title": "プライバシー",

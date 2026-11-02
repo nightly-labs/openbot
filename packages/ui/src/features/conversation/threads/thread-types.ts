@@ -19,6 +19,20 @@ export interface ThreadItem {
   title: string;
   updatedAt: string;
   status: ThreadStatus;
+  /**
+   * The tree lines before the title in the thread menu, for a branch under its source thread. Absent
+   * at the top level and in the tabs.
+   */
+  stem?: ThreadStem | undefined;
+}
+
+/**
+ * The tree lines of a branch. `through` has one entry for each outer level, true where the line of
+ * that level continues to a later thread. `last` ends the line of this level at this branch.
+ */
+export interface ThreadStem {
+  through: readonly boolean[];
+  last: boolean;
 }
 
 /** The thread row as tabs, as one button with the open thread, or as a chevron only. */
@@ -53,6 +67,8 @@ export interface ThreadHeaderProps {
   onRestore: (id: string) => void;
   onRename?: ((id: string, title: string) => void) | undefined;
   onDelete?: ((id: string) => void) | undefined;
+  /** Opens a side thread in the side panel. Missing when the chat has no side panel. */
+  onMoveToSide?: ((id: string) => void) | undefined;
 }
 
 /** The id of the agent's own chat in the thread lists. A side thread has the id of its task. */

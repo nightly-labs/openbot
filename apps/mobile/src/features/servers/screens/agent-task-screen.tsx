@@ -2,18 +2,16 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentTask, AgentTasksSnapshot, RespondToPromptInput } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
-import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
+import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
-import Ellipsis from "lucide-react-native/icons/ellipsis";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Keyboard, Pressable, useColorScheme, View } from "react-native";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useUniwind } from "uniwind";
 import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
@@ -38,17 +36,18 @@ import { VoiceOverlay } from "@/features/chat/components/voice-overlay";
 import { mentionDraft } from "@/features/chat/model/chat-mentions";
 import { latestReadableMessage, projectChatMessages } from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
+import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { uploadChatAttachments } from "@/features/chat/model/upload-chat-attachments";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
+import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
-import { MenuView } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
@@ -91,8 +90,12 @@ export function AgentTaskScreen() {
 function TaskNote({ note, retry }: { note: string; retry?: () => void }) {
   const { t } = useText();
   const foreground = useThemeColor("foreground");
+  const insets = useSafeAreaInsets();
   return (
-    <View className="flex-1 items-center justify-center gap-5 bg-background px-8">
+    <View
+      className="flex-1 items-center justify-center gap-5 bg-background"
+      style={{ paddingLeft: insets.left + 32, paddingRight: insets.right + 32 }}
+    >
       <Typography.Paragraph align="center" className="text-text-secondary">
         {note}
       </Typography.Paragraph>
@@ -114,7 +117,6 @@ function TaskNote({ note, retry }: { note: string; retry?: () => void }) {
 
 function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: string }) {
   const { t, errorMessage } = useText();
-  const { theme } = useUniwind();
   const { serverId, id: agentId } = target;
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
@@ -162,6 +164,19 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
     [conversation.data],
   );
   const activeTurnId = task?.activeTurnId ?? null;
+  // As in the agent's chat: the steps row of a finished turn and the activity row open the thinking sheet.
+  const turnLines = useTurnStepLines(serverId);
+  const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
+  const turnSummaries = useMemo(() => {
+    lastTurnSummaries.current = conversation.data
+      ? finishedTurnSummaries(conversation.data.messages, activeTurnId, turnLines, lastTurnSummaries.current)
+      : undefined;
+    return lastTurnSummaries.current;
+  }, [conversation.data, activeTurnId, turnLines]);
+  const openTurn = useCallback(
+    (turnId: string) => router.push({ pathname: "/turn-thinking", params: { agentId, serverId, taskId, turnId } }),
+    [agentId, serverId, taskId],
+  );
   // As in the agent's chat: the open question of the running turn has the form; earlier ones show their result.
   const activePrompt = messages.findLast(
     (row) => row.kind === "question" && !row.prompt.resolution && activeTurnId !== null && row.turnId === activeTurnId,
@@ -381,31 +396,13 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
   }
 
   const hold = task ? agentTaskHoldText(task, list.data?.limit ?? 1, t) : null;
-  const actions = task ? (
-    <MenuView
-      colorScheme={theme === "dark" ? "dark" : "light"}
-      actions={threadActions.menu(task)}
-      onPressAction={({ nativeEvent }) => threadActions.run(task, nativeEvent.event)}
-    >
-      <GlassView
-        accessible
-        accessibilityRole="button"
-        accessibilityLabel={t("mobile.server.threads.actions")}
-        glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
-        isInteractive
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: liquidGlassAvailable ? "transparent" : fieldBackground,
-        }}
-      >
-        <Ellipsis color={String(foreground)} size={24} strokeWidth={2} />
-      </GlassView>
-    </MenuView>
-  ) : null;
+  const actionsMenu = task
+    ? {
+        label: t("mobile.server.threads.actions"),
+        actions: threadActions.menu(task),
+        onPressAction: (id: string) => threadActions.run(task, id),
+      }
+    : null;
 
   // Under the activity, as the desktop task panel: why the task waits, its queued messages and its failure.
   const taskNotes = isDraft ? (
@@ -427,7 +424,7 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
           {task.queuedMessages.map((queued) => (
             <View
               key={queued.deliveryId}
-              className="max-w-[88%] self-end rounded-[30px] bg-control/40 px-4 py-3"
+              className="max-w-[92%] self-end rounded-[30px] bg-control/40 px-4 py-3"
               style={{ borderCurve: "circular" }}
             >
               <Typography.Paragraph numberOfLines={3} className="text-text-secondary">
@@ -463,7 +460,7 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
           kicker={target.name}
           title={isDraft ? t("mobile.chat.threads.new") : (task?.title ?? "")}
           threadMenu={threadMenu}
-          trailing={actions}
+          actionsMenu={actionsMenu}
           fallbackBackground={fieldBackground}
           foreground={foreground}
           liquidGlassAvailable={liquidGlassAvailable}
@@ -507,6 +504,8 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
           fieldBackground={fieldBackground}
           foreground={foreground}
           messages={messages}
+          turnSummaries={turnSummaries}
+          onOpenTurn={isDraft ? undefined : openTurn}
           messageAliases={NO_ALIASES}
           referenceMessages={NO_MESSAGES}
           hasOlder={false}
@@ -540,7 +539,9 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
           pointerEvents="box-none"
           onLayout={motion.onComposerLayout}
         >
-          <ConnectionStatus server={server} />
+          <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
+            <ConnectionStatus server={server} />
+          </View>
           {showBrowserRequests
             ? taskBrowserRequests
                 .filter((request) => !asksForSecret(request))
@@ -564,7 +565,11 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
                 ))
             : null}
           {sendError ? (
-            <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger-text">
+            <Typography.Paragraph
+              accessibilityRole="alert"
+              className="bg-background py-2 text-danger-text"
+              style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
+            >
               {sendError}
             </Typography.Paragraph>
           ) : null}
@@ -573,8 +578,12 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
             <Typography.Paragraph
               type="body-xs"
               align="center"
-              className="px-6 pt-2 text-text-secondary"
-              style={{ paddingBottom: Math.max(insets.bottom, 10) + 6 }}
+              className="pt-2 text-text-secondary"
+              style={{
+                paddingLeft: insets.left + 24,
+                paddingRight: insets.right + 24,
+                paddingBottom: Math.max(insets.bottom, 10) + 6,
+              }}
             >
               {t("mobile.server.threads.closedNote")}
             </Typography.Paragraph>

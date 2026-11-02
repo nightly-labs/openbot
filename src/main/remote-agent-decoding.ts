@@ -8,6 +8,7 @@ import {
   decodeProviderUsageResets,
   type HostProviderAccounts,
   isAgentHostSettings,
+  isAgentNotificationLevelsSnapshot,
   isAgentSessionSettings,
   isAgentTask,
   isAgentTaskReadState,
@@ -51,11 +52,17 @@ import {
 } from "@openbot/contracts/ipc";
 import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
 export const decodeHiddenAgentsFromHost = guardedDecoder(isHiddenAgentsSnapshot, "hidden agents response");
+export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
+  isAgentNotificationLevelsSnapshot,
+  "agent notification levels response",
+);
 export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remote agent tasks");
 export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
+export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "remote thread branches");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
 export const decodeRemoteTaskReadState = guardedDecoder(isAgentTaskReadState, "remote thread read state");
 

@@ -33,7 +33,7 @@ export const messages = {
   "provider.status.checking": "確認中",
   "provider.status.off": "オフ",
   "provider.gemini.hostSignIn":
-    "Gemini を接続するには、ホストで OpenBot を開き、「設定」>「プロバイダー」で「接続」を選択してください。Google へのサインインには、そのホストのブラウザーが必要です。リモートでのサインインには対応していません。",
+    "Gemini を接続するには、ホストで OpenBot を開き、「サーバーの設定」>「プロバイダー」で「接続」を選択してください。Google へのサインインには、そのホストのブラウザーが必要です。リモートでのサインインには対応していません。",
 
   "provider.key.free": "無料",
 
@@ -123,6 +123,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}、デフォルト",
   "provider.picker.effort": "推論の強さ",
   "provider.picker.effortLabel": "エージェントの推論の強さ",
+  "provider.picker.effortFixed": "{effort}（{provider} が固定）",
   "provider.picker.fast": "高速",
   "provider.picker.fastLabel": "高速モード",
   "provider.picker.selectEffort": "推論の強さを選択",
@@ -186,6 +187,7 @@ export const messages = {
   "provider.account.cancelSignIn": "サインインをキャンセル",
   "provider.account.finishSignIn": "ブラウザーでサインインを完了してください。",
   "provider.account.remove": "アカウントを削除",
+  "provider.account.disconnect": "切断",
   "provider.account.actionFailed": "{name} のアカウントを変更できませんでした。",
   "provider.account.resetUsage": "使用量をリセット",
   "provider.account.resetUsageTitle": "{name} の使用量をリセットしますか？",
@@ -199,6 +201,13 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} には使用量リセットのクレジットが残っていません。",
   "provider.account.resetUsageAlreadyRedeemed": "{name} のこのリセットのクレジットはすでに使われています。",
   "provider.account.resetUsageFailed": "{name} の使用量をリセットできませんでした。",
+  "provider.settings.disconnectTitle": "{name} を切断しますか？",
+  "provider.settings.disconnectOthers": "{provider} を再接続するまで、ほかの {provider} アカウントは待機します。",
+  "provider.settings.disconnectLocal":
+    "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI もサインアウトします。",
+  "provider.settings.disconnectHost": "OpenBot はサーバーで {provider} からサインアウトします。",
+  "provider.settings.versionInstalledByUser": "{version} · 自分でインストール",
+  "provider.settings.versionDownloaded": "{version} · OpenBot がダウンロード",
   "provider.settings.cache": "キャッシュ",
   "provider.settings.promptCache": "プロンプトキャッシュ",
   "provider.settings.promptCacheDescription":

@@ -25,7 +25,6 @@ import {
   type PropsWithChildren,
   type RefObject,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -59,7 +58,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
-import { ChatNavigationGateContext } from "@/features/agents/components/chat-link-pressable";
+import { openChatFromPane, useChatListPane } from "@/features/agents/components/chat-list-pane-context";
 import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { MobileSearchResults, SearchCaption } from "@/features/search/components/mobile-search-results";
@@ -74,15 +73,25 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { BlurSwap } from "@/shared/components/blur-swap";
+import { useBottomFieldMetrics } from "@/shared/components/bottom-field-metrics";
 import { ANDROID_BLUR, GLASS_CAPSULE_HEIGHT, GlassCapsule } from "@/shared/components/glass-capsule";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion, useTransitionMode } from "@/shared/lib/motion";
-import { isAndroid } from "@/shared/lib/platform";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { currentText, useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
+
+/**
+ * Opens an agent chat from the search. In the chat list pane, the chat takes the place of the open
+ * one.
+ */
+function openSearchedChat(pane: ReturnType<typeof useChatListPane>, agentId: string): void {
+  const open = () => router.push({ pathname: "/chat/[agentId]", params: { agentId } });
+  if (pane) openChatFromPane(pane, agentId, open);
+  else open();
+}
 
 /** The height of the search field at the bottom of home. */
 export const HOME_SEARCH_HEIGHT = GLASS_CAPSULE_HEIGHT;
@@ -490,6 +499,8 @@ export function HomeSearchResults({
         contentContainerStyle={{
           paddingTop: insets.top + RESULTS_TOP_GAP,
           paddingBottom: HOME_SEARCH_HEIGHT + Math.max(insets.bottom, 12) + 24,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
         }}
         mode="insets"
         bottomOffset={HOME_SEARCH_HEIGHT + KEYBOARD_GAP}
@@ -643,9 +654,7 @@ export function HomeSearchBar({
     : danger;
   // As the prototype: the color at 18% over the field, so the text in the same color stays readable.
   const resultTint = `${resultColor}2e`;
-  // iOS sets the field into the home indicator area. The Android gesture handle is lower in the
-  // inset and the field must stay above it.
-  const bottomGap = isAndroid ? insets.bottom + 8 : Math.max(insets.bottom - 8, 12);
+  const { height: fieldHeight, bottomGap } = useBottomFieldMetrics();
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
   // The field rises only when the keyboard reaches it, and then stays 8 pt above it. Android can
   // report an open keyboard with no height (a hardware or floating keyboard); the field stays.
@@ -677,9 +686,9 @@ export function HomeSearchBar({
 
   return (
     <Animated.View
-      className="absolute right-4 left-4 flex-row items-center gap-2"
+      className="absolute flex-row items-center gap-2"
       pointerEvents="box-none"
-      style={[{ bottom: bottomGap }, barStyle]}
+      style={[{ bottom: bottomGap, left: insets.left + 16, right: insets.right + 16 }, barStyle]}
     >
       {search.mounted ? (
         // While the results leave, the button is out of the layout, so the field grows under it as its
@@ -704,7 +713,8 @@ export function HomeSearchBar({
             <GlassCapsule
               liquidGlass={liquidGlass}
               fallbackBackground={fieldBackground}
-              width={HOME_SEARCH_HEIGHT}
+              width={fieldHeight}
+              height={fieldHeight}
               animateGlass
               glassHidden={!search.open}
             >
@@ -736,6 +746,7 @@ export function HomeSearchBar({
       ) : null}
       <Animated.View className="min-w-0 flex-1" layout={layout}>
         <HomeFieldCapsule
+          height={fieldHeight}
           liquidGlass={liquidGlass}
           fallbackBackground={fieldBackground}
           tint={resultTint}
@@ -1029,7 +1040,7 @@ interface Shortcut {
 /** Before the user types: the pages to go to, and the agents of the server. */
 function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseTasks: boolean }) {
   const { t } = useText();
-  const gate = useContext(ChatNavigationGateContext);
+  const pane = useChatListPane();
   const serverId = useMobileWorkspaceSelector((current) => current.activeServer.id);
   const hasServer = useMobileWorkspaceSelector((current) =>
     current.servers.some((server) => server.id === current.activeServer.id),
@@ -1086,7 +1097,7 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
   );
   const openChat = (agent: MobileAgent) => {
     onLeave();
-    if (!gate?.openFromHome(agent.id)) router.push({ pathname: "/chat/[agentId]", params: { agentId: agent.id } });
+    openSearchedChat(pane, agent.id);
   };
   return (
     <View className="pb-2">
@@ -1135,7 +1146,7 @@ const NAME_MARK = "\u2063";
  */
 function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSearch }) {
   const { t } = useText();
-  const gate = useContext(ChatNavigationGateContext);
+  const pane = useChatListPane();
   const muted = String(useThemeColor("muted"));
   const color = getBloubAvatarColor(agent.avatarSeed, agent.avatarHue);
   const { tasks } = useServerTasks(agent.serverId, { agentId: agent.id });
@@ -1147,7 +1158,7 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
   const [before = "", after = ""] = t("mobile.search.thread.newFor", { name: NAME_MARK }).split(NAME_MARK);
   const message = () => {
     search.leave();
-    if (!gate?.openFromHome(agent.id)) router.push({ pathname: "/chat/[agentId]", params: { agentId: agent.id } });
+    openSearchedChat(pane, agent.id);
   };
   return (
     // The spacing of the prototype: 4 pt above the page, 8 pt beside the avatar, 10 pt above the line.

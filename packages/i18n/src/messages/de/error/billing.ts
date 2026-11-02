@@ -10,11 +10,15 @@ export const messages = {
   "error.billing.planSoldOut": "Dieser Tarif ist ausverkauft. Wähle einen anderen Tarif.",
   "error.billing.licenseExists": "Dieses Konto hat bereits eine Lizenz. Ändern Sie stattdessen ihre Nutzerzahl.",
   "error.billing.licenseCurrency": "Die Lizenz muss die Währung Ihrer anderen Pläne verwenden.",
+  "error.billing.planCurrency": "Ein neuer Plan muss die Währung Ihrer anderen Pläne verwenden.",
   "error.billing.licenseUsersInUse":
     "Die Lizenz kann nicht weniger Nutzer haben als die Personen, die sie jetzt nutzen.",
   "error.billing.licensePaymentFailed":
     "Die Zahlung für die zusätzlichen Nutzer ist fehlgeschlagen. Aktualisieren Sie die Zahlungsmethode und versuchen Sie es erneut.",
   "error.billing.licenseUnavailable": "Lizenzen sind derzeit nicht verfügbar.",
+  "error.billing.licenseOneUser": "Diese Lizenz gilt für 1 Nutzer. Wechsle zu Team, um Nutzer hinzuzufügen.",
+  "error.billing.licensePlanChange":
+    "Diese Lizenz kann nicht zu diesem Tarif wechseln. Kündige sie und kaufe den neuen Tarif.",
   "error.billing.noLicense": "Dieses Konto hat keine Lizenz.",
   "error.billing.invalidRequest": "Die Abrechnungsanfrage ist ungültig.",
   "error.billing.invalidResponse": "Die Abrechnungsantwort ist ungültig.",

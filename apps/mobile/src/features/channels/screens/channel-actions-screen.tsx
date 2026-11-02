@@ -45,7 +45,11 @@ export function ChannelActionsScreen() {
       setPending(false);
     }
   }
-  async function command(taskId: string, type: "resume" | "reassign", recipientAgentId: string | null = null) {
+  async function command(
+    taskId: string,
+    type: "resume" | "reassign" | "cancel",
+    recipientAgentId: string | null = null,
+  ) {
     if (
       lock.current ||
       historyPending ||
@@ -94,6 +98,7 @@ export function ChannelActionsScreen() {
         members={members}
         online={online}
         archived={channel?.archived ?? false}
+        canCancel={state.canCancelTasks}
         pending={pending || historyPending}
         onCommand={(...args) => {
           void command(...args);

@@ -3,6 +3,7 @@ import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import type {
   AgentProviderId,
   AgentProviderState,
+  AgentProviderStatus,
   CustomProviderSummary,
   ProviderApiKeyStatus,
   ProviderRuntimeStatus,
@@ -79,10 +80,14 @@ export interface ProviderPickerOption {
   message?: string | null | undefined;
   email?: string | null | undefined;
   connectionState?: "connecting" | undefined;
+  /** False while a connecting row is checked again, with no sign-in that waits for the user. */
+  signInPending?: boolean | undefined;
   checkError?: string | null | undefined;
   /** A restart the user asked for waits for the provider's tasks to stop. */
   restartPending?: boolean | undefined;
   runtimeStatus?: ProviderRuntimeStatus | undefined;
+  /** The CLI that the provider ran last: the one the user installed, or the one OpenBot downloaded. */
+  cliSource?: AgentProviderStatus["cliSource"];
   /**
    * Whether the provider's key is saved: the optional OpenCode key, a Gemini key in use, or a Claude
    * key on a host that reads it. Absent while unknown, so the row shows no badge rather than a

@@ -28,7 +28,7 @@ const CONTEXT_COMPACTION_TIMEOUT_MS = 120_000;
  */
 const CONTEXT_COMPACTION_RUN_FACTOR = 10;
 /** Usage arrives after each model step; one runtime snapshot carries the latest value of a burst. */
-const USAGE_CHANGE_DELAY_MS = 250;
+export const USAGE_CHANGE_DELAY_MS = 250;
 
 export interface ContextCompactionOptions {
   /**
@@ -48,6 +48,8 @@ export interface ContextCompactionOptions {
   ): Effect.Effect<string | null, ThreadOperationFailed>;
   /** Whether `rotateSession` can replace this session. See `ThreadLifecycle.rotatesSession`. */
   rotatesSession(agentId: string, threadId: string): boolean;
+  /** The service stops: its database can close before a provider stops reporting usage. */
+  isStopping(): boolean;
   changed?(): void;
   /** A provider session finished a compaction: its summary replaces what it read before. */
   compacted?(threadId: string): void;
@@ -86,6 +88,7 @@ export class ContextCompaction {
   readonly #scheduleDrain: (agentId: string) => void;
   readonly #rotateSession: ContextCompactionOptions["rotateSession"];
   readonly #rotatesSession: ContextCompactionOptions["rotatesSession"];
+  readonly #isStopping: () => boolean;
   readonly #budgets = new Map<string, ThreadContextBudget>();
   /** The agent of each provider thread that compacts, and the client that runs it once `request` sends it. */
   readonly #compacting = new Map<string, { agentId: string; client: AgentClient | null }>();
@@ -115,6 +118,7 @@ export class ContextCompaction {
     this.#scheduleDrain = options.scheduleDrain;
     this.#rotateSession = options.rotateSession;
     this.#rotatesSession = options.rotatesSession;
+    this.#isStopping = options.isStopping;
   }
 
   /** Only personal sessions appear in the desktop snapshot; execution threads remain separate. */
@@ -174,6 +178,8 @@ export class ContextCompaction {
   }
 
   #scheduleUsageChange(): void {
+    // While the service stops: a timer could read the snapshot after the database closes (#3808).
+    if (this.#isStopping()) return;
     this.#usageTimer ??= setTimeout(() => {
       this.#usageTimer = null;
       this.#changed();
@@ -418,6 +424,18 @@ export class ContextCompaction {
     this.#awaitingPostCompaction.delete(threadId);
     if (displayed) this.#emitChanged();
     this.#clearTimer(threadId);
+  }
+
+  /**
+   * The thread was deleted, so no turn of it ends its compaction or a refusal hold. Its hold stayed
+   * until a restart, and the agent's own chat, to which a deleted session maps, waited behind it.
+   */
+  endThread(threadId: string): void {
+    const compaction = this.#compacting.get(threadId);
+    this.#compacting.delete(threadId);
+    this.forgetThread(threadId);
+    this.#endRefusal(threadId);
+    if (compaction) this.#scheduleDrain(compaction.agentId);
   }
 
   forgetAgent(agentId: string): void {

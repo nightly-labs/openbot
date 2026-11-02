@@ -125,8 +125,6 @@ export const messages = {
   "error.remote.serverDisconnected": "Der Server hat die Verbindung getrennt.",
   "error.remote.preferencesUnreadable": "Die gespeicherten Chateinstellungen konnten nicht gelesen werden.",
   "error.remote.accountAuthRequired": "Eine Kontoauthentifizierung ist erforderlich.",
-  "error.remote.serverIdentityChanged":
-    "Die Serveridentität wurde geändert. Der vertrauenswürdige Host-Schlüssel wird nicht ersetzt.",
   "error.remote.pairedIdentityChanged":
     "Die Identität des gekoppelten Desktops fehlt oder wurde geändert. Scanne einen neuen Code von diesem Desktop.",
   "error.remote.permanentInviteNoEmail": "Dauerhafte Einladungen können nicht per E-Mail gesendet werden.",

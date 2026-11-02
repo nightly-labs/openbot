@@ -20,7 +20,9 @@ import { type ProviderClientOperationError, providerCall, providerFailure } from
  *   the roots and the temporary folders. Unlike `canUseTool`, a hook runs even when an allow rule in the user's Claude settings
  *   matches the tool, and `ask` then sends the write to `canUseTool`, which asks the user.
  *
- * Reads, the network and the MCP servers stay open, as the Access setting says.
+ * Reads, the network and the MCP servers stay open, as the Access setting says. The folders that the
+ * user excluded are denied in both parts: the sandbox denies Bash writes there, and the hook denies a
+ * file tool's write there with no question to the user.
  *
  * The files in `.claude` of the workspace are not trusted: a Codex agent can write them before a
  * switch to Claude, because Codex cannot deny one path in a writable root while it takes a sandbox
@@ -29,13 +31,16 @@ import { type ProviderClientOperationError, providerCall, providerFailure } from
  * only, the workspace skills come back through `claudeWorkspaceSkillPlugin`, and
  * `CLAUDE_WORKSPACE_MANAGED_SETTINGS` stops the hooks of settings and skills.
  */
-export function claudeWorkspaceSandbox(roots: readonly string[]): NonNullable<Options["sandbox"]> {
+export function claudeWorkspaceSandbox(
+  roots: readonly string[],
+  excluded: readonly string[] = [],
+): NonNullable<Options["sandbox"]> {
   return {
     enabled: true,
     failIfUnavailable: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
-    filesystem: { allowWrite: writableRoots(roots) },
+    filesystem: { allowWrite: writableRoots(roots), ...(excluded.length ? { denyWrite: [...excluded] } : {}) },
   };
 }
 
@@ -132,20 +137,36 @@ const currentLink = Effect.fn("ClaudeWorkspace.currentLink")((path: string) =>
 
 const WRITE_TOOLS = ["Write", "Edit", "MultiEdit", "NotebookEdit"];
 
-/** The `PreToolUse` hook that sends a file tool's write outside the roots to `canUseTool`. */
-export function claudeWorkspaceHooks(cwd: string, roots: readonly string[]): NonNullable<Options["hooks"]> {
+/**
+ * The `PreToolUse` hook that denies a file tool's write in an excluded folder and sends one outside
+ * the roots to `canUseTool`.
+ */
+export function claudeWorkspaceHooks(
+  cwd: string,
+  roots: readonly string[],
+  excluded: readonly string[] = [],
+): NonNullable<Options["hooks"]> {
   const matcher: HookCallbackMatcher = {
     matcher: WRITE_TOOLS.join("|"),
     hooks: [
       async (input) => {
         if (input.hook_event_name !== "PreToolUse") return {};
+        const denied = await runCauseEffect(claudeWriteInExcluded(input.tool_name, input.tool_input, cwd, excluded));
+        if (denied)
+          return {
+            hookSpecificOutput: {
+              hookEventName: "PreToolUse",
+              permissionDecision: "deny",
+              permissionDecisionReason: claudeExcludedWriteMessage(denied),
+            },
+          };
         const target = await runCauseEffect(claudeWriteOutsideRoots(input.tool_name, input.tool_input, cwd, roots));
         if (!target) return {};
         return {
           hookSpecificOutput: {
             hookEventName: "PreToolUse",
             permissionDecision: "ask",
-            permissionDecisionReason: `Workspace only: ${target} is outside the agent's workspace, the shared folder and the temporary folders.`,
+            permissionDecisionReason: `Workspace only: ${target} is outside the agent's workspace, the shared folder, the folders the user gave it and the temporary folders.`,
           },
         };
       },
@@ -177,6 +198,33 @@ export const claudeWriteOutsideRoots = Effect.fn("ClaudeWorkspace.writeOutsideRo
       concurrency: "unbounded",
     });
     return realRoots.some((root) => isPathInside(root, target)) ? null : path;
+  }).pipe(Effect.catch(() => Effect.succeed(path)));
+});
+
+/** What Claude reads when the hook or `canUseTool` denies a write in an excluded folder. */
+export function claudeExcludedWriteMessage(path: string): string {
+  return `Workspace only: the user excluded the folder that holds ${path}. Do not write there.`;
+}
+
+/**
+ * The path a file tool would write in an excluded folder, or null. A path that cannot be resolved
+ * counts as in one when there are excluded folders, the same as `claudeWriteOutsideRoots`.
+ */
+export const claudeWriteInExcluded = Effect.fn("ClaudeWorkspace.writeInExcluded")(function* (
+  toolName: string,
+  toolInput: unknown,
+  cwd: string,
+  excluded: readonly string[],
+) {
+  if (excluded.length === 0 || !WRITE_TOOLS.includes(toolName)) return null;
+  const path = isDynamicRecord(toolInput) ? writePath(toolInput.file_path ?? toolInput.notebook_path) : null;
+  if (!path) return null;
+  return yield* Effect.gen(function* () {
+    const target = yield* resolveExisting(resolve(cwd, path));
+    const realExcluded = yield* Effect.forEach(excluded, (folder) => resolveExisting(resolve(folder)), {
+      concurrency: "unbounded",
+    });
+    return realExcluded.some((folder) => isPathInside(folder, target)) ? path : null;
   }).pipe(Effect.catch(() => Effect.succeed(path)));
 });
 

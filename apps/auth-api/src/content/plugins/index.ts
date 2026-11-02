@@ -3,6 +3,7 @@ import { AIRTABLE_PLUGIN_GUIDE } from "./airtable";
 import { ATLASSIAN_PLUGIN_GUIDE } from "./atlassian";
 import { BRAVE_SEARCH_PLUGIN_GUIDE } from "./brave-search";
 import { CANVA_PLUGIN_GUIDE } from "./canva";
+import { CLICKUP_PLUGIN_GUIDE } from "./clickup";
 import { COBRAIN_PLUGIN_GUIDE } from "./cobrain";
 import { COMPOSIO_PLUGIN_GUIDE } from "./composio";
 import { CONTEXT7_PLUGIN_GUIDE } from "./context7";
@@ -49,6 +50,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   vercel: VERCEL_PLUGIN_GUIDE,
   todoist: TODOIST_PLUGIN_GUIDE,
   trello: TRELLO_PLUGIN_GUIDE,
+  clickup: CLICKUP_PLUGIN_GUIDE,
   railway: RAILWAY_PLUGIN_GUIDE,
   render: RENDER_PLUGIN_GUIDE,
   prisma: PRISMA_PLUGIN_GUIDE,

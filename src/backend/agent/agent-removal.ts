@@ -23,6 +23,8 @@ export interface AgentRemovalHooks {
   listAgents(): AgentSummary[];
   /** Removes the agent's tasks, with their threads and provider session files. */
   deleteTasks(agentId: string): Effect.Effect<void, AgentRemovalFailed>;
+  /** Ends the agent's background memory review, so that it does not write to a deleted agent. */
+  cancelMemoryReview(agentId: string): Effect.Effect<void>;
   /** Stops the agent's own provider process, which runs in its workspace. */
   stopAgentProcess(agentId: string): Effect.Effect<void, AgentRemovalFailed>;
 }
@@ -164,6 +166,7 @@ export class AgentRemoval {
     this: AgentRemoval,
     agent: Pick<AgentSummary, "id" | "threadId">,
   ) {
+    yield* this.#hooks.cancelMemoryReview(agent.id);
     const providerSessions = yield* removalStep(() =>
       agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [],
     );

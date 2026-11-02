@@ -10,7 +10,7 @@ import {
   type SignInRelayStatus,
   type TestMcpServerInput,
 } from "@openbot/contracts/ipc";
-import type { PROVIDER_ACCOUNT_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/provider-account-relay-v1";
+import type { ProviderAccountRelayProvider } from "@openbot/contracts/team-protocol/provider-account-relays";
 import type { SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
@@ -22,7 +22,6 @@ import type { ProviderHostSignIns } from "./provider-host-sign-ins";
 import { HttpError } from "./team-api/http-error";
 
 export type SignInRelayProvider = (typeof SIGN_IN_RELAY_PROVIDERS)[number];
-export type AccountRelayProvider = (typeof PROVIDER_ACCOUNT_RELAY_PROVIDERS)[number];
 
 /** How long a flow can complete. The sign-in on this host has its own, equal deadline. */
 const SIGN_IN_RELAY_TTL_MS = 10 * 60_000;
@@ -30,6 +29,11 @@ const SIGN_IN_RELAY_TTL_MS = 10 * 60_000;
 const FLOW_LIMIT = 16;
 /** How long the listener of a sign-in on this host can take to answer its callback. */
 const REPLAY_TIMEOUT = Duration.seconds(10);
+/**
+ * How long the success page that a callback redirects to can take. The client waits 15 s for
+ * `complete`, and cancels the sign-in after it: the callback and this page stay under that.
+ */
+const SUCCESS_PAGE_TIMEOUT = Duration.seconds(3);
 /** How long after its message an agent's sign-in link can start a flow. A CLI's own page ends sooner. */
 const PRINTED_LINK_AGE_MS = 60 * 60_000;
 /** What `status` and `complete` answer, as `sign-in-relay-v1` sends it. */
@@ -149,16 +153,16 @@ export class SignInRelayHost {
 
   /**
    * Starts the sign-in of a provider account after the first with no tab, and returns its flow at once
-   * (`provider-account-relay-v1`). A null `accountId` signs in a new account.
+   * (`provider-account-relay-v1` and `-v2`). A null `accountId` signs in a new account.
    */
-  startProviderAccount(memberId: string, provider: AccountRelayProvider, accountId: string | null) {
+  startProviderAccount(memberId: string, provider: ProviderAccountRelayProvider, accountId: string | null) {
     return this.#startProviderAccount(memberId, provider, accountId);
   }
 
   readonly #startProviderAccount = Effect.fn("SignInRelayHost.startProviderAccount")(function* (
     this: SignInRelayHost,
     memberId: string,
-    provider: AccountRelayProvider,
+    provider: ProviderAccountRelayProvider,
     accountId: string | null,
   ) {
     const { accounts } = this.#dependencies;
@@ -325,9 +329,8 @@ function view(flow: Flow): SignInRelayView {
 
 /**
  * Sends the callback to the loopback address that the page of this host's own sign-in names. The
- * address comes only from that page, so a client cannot choose it. The request follows no redirect,
- * and only its status is kept: the answer is a page for a browser. The query holds a grant, so
- * nothing here logs the address.
+ * address comes only from that page, so a client cannot choose it. Only the status of the callback is
+ * kept: the answer is a page for a browser. The query holds a grant, so nothing here logs the address.
  */
 const replay = Effect.fn("SignInRelayHost.replay")(function* (query: URLSearchParams, pageUrl: string) {
   if (!loopbackCallback(pageUrl)) return false;
@@ -336,12 +339,27 @@ const replay = Effect.fn("SignInRelayHost.replay")(function* (query: URLSearchPa
   const address = new URL(new URL(pageUrl).searchParams.get("redirect_uri") ?? "");
   address.search = query.toString();
   address.hash = "";
-  return yield* Effect.tryPromise(async (signal) => {
+  const answer = yield* load(address, REPLAY_TIMEOUT);
+  if (!answer?.delivered) return false;
+  // `codex login` answers its callback with a redirect to its own success page, and ends only when
+  // that page loads, as in a browser on this host. Only that one redirect, to the same address and
+  // port, is followed. The callback has its sign-in already, so this load does not change the result.
+  if (answer.next?.origin === address.origin) {
+    const token = answer.next.searchParams.get("id_token");
+    if (token) registerSecretValue(token);
+    yield* load(answer.next, SUCCESS_PAGE_TIMEOUT);
+  }
+  return true;
+});
+
+/** Loads `address` with no redirect. Null when it does not answer in time. */
+const load = (address: URL, timeout: Duration.Duration) =>
+  Effect.tryPromise(async (signal) => {
     const response = await fetch(address, { redirect: "manual", signal });
     await response.body?.cancel();
-    return response.status < 400;
+    const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
+    return { delivered: response.status < 400, next: location ? URL.parse(location, address) : null };
   }).pipe(
-    Effect.timeout(REPLAY_TIMEOUT),
-    Effect.orElseSucceed(() => false),
+    Effect.timeout(timeout),
+    Effect.orElseSucceed(() => null),
   );
-});

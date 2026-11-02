@@ -69,9 +69,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Disattiva le animazioni per ridurre il movimento in tutta l'app. Se «Riduci movimento» è attivo nelle impostazioni del telefono, anche l'app riduce il movimento. Le animazioni qui sotto restano allora disattivate.",
   "mobile.settings.animations.all": "Animazioni",
-  "mobile.settings.animations.chatZoom": "Zoom sulle chat",
-  "mobile.settings.animations.chatZoomFooter":
-    "Una chat si apre dall'avatar nella lista e si richiude su di esso. Se è disattivato, la chat scorre da lato.",
   "mobile.settings.animations.agentFaces": "Volti degli agenti animati",
   "mobile.settings.animations.agentFacesFooter":
     "Gli avatar degli agenti muovono il volto mentre gli agenti lavorano e riposano. Se è disattivato, i volti restano fermi.",
@@ -121,7 +118,6 @@ export const messages = {
     "Le notifiche e la Live Activity riproducono questo suono. La Live Activity accende anche lo schermo. Il suono OpenBot è quello che l'app desktop riproduce quando un'attività finisce. I quattro suoni successivi sono quelli dei temi sonori dell'app desktop.",
   "mobile.settings.notifications.soundFooterAndroid":
     "Le notifiche riproducono questo suono. Il suono OpenBot è quello che l'app desktop riproduce quando un'attività finisce. I quattro suoni successivi sono quelli dei temi sonori dell'app desktop.",
-  "mobile.settings.notifications.notifyAbout": "Avvisami per",
   "mobile.settings.notifications.level.all": "Tutta l'attività",
   "mobile.settings.notifications.level.needsMe": "Solo quando ha bisogno di me",
   "mobile.settings.notifications.level.nothing": "Niente",
@@ -138,6 +134,23 @@ export const messages = {
     "Gli eventi di questo server che inviano notifiche a questo telefono. L'app desktop ha le sue impostazioni.",
   "mobile.settings.notifications.serverUnsupported":
     "Questo server non può inviare notifiche. Aggiorna OpenBot sul computer che lo esegue.",
+  "mobile.settings.notifications.thisPhone": "Questo telefono",
+  "mobile.settings.notifications.whatYouHear": "Cosa ti arriva",
+  "mobile.settings.notifications.wholeServer": "Tutto il server",
+  "mobile.settings.notifications.levelShort.all": "Tutto",
+  "mobile.settings.notifications.levelShort.needsMe": "Mi chiede",
+  "mobile.settings.notifications.levelShort.nothing": "Niente",
+  "mobile.settings.notifications.thisPhoneOnly": "Solo questo telefono",
+  "mobile.settings.notifications.offForEveryone": "Disattivato per tutti su questo server",
+  "mobile.settings.notifications.turnOn": "Attiva",
+  "mobile.settings.notifications.turnOnFor": "Attiva le notifiche di {name} per tutti su questo server",
+  "mobile.settings.notifications.chooseAgent": "Scegli per un agente",
+  "mobile.settings.notifications.chooseAnotherAgent": "Scegli un altro agente",
+  "mobile.settings.notifications.levelsFooter": "Tocca di nuovo il livello di un agente perché segua il server.",
+  "mobile.settings.notifications.agentsUnsupported": "Aggiorna OpenBot su questo server per scegliere gli agenti.",
+  "mobile.settings.notifications.agentsOffline": "Gli agenti compaiono quando questo server è online.",
+  "mobile.settings.notifications.scopeFooter":
+    "Le tue scelte valgono su tutti i tuoi dispositivi. Il silenzio vale solo per questo telefono.",
   "mobile.settings.notifications.channel": "Notifiche degli agenti ({sound})",
   "mobile.settings.notifications.channelSilent": "Notifiche degli agenti (senza suono)",
   "mobile.settings.privacy.title": "Privacy",

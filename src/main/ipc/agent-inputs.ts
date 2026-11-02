@@ -5,6 +5,7 @@ import {
   type AgentMemorySelectionChange,
   type AgentTaskInput,
   agentThreadTitle,
+  type BranchAgentTaskInput,
   type CancelAgentWaitInput,
   type CancelMessageLinkInput,
   type CancelQueuedMessageInput,
@@ -40,6 +41,7 @@ import {
   type ListRoutineRunsInput,
   type MarkAgentTaskReadInput,
   type MarkConversationReadInput,
+  type MarkConversationUnreadInput,
   type OpenAttachmentInput,
   type OpenMessageLinkInput,
   type OpenSharedFileInput,
@@ -573,6 +575,16 @@ export function parseAgentTask(value: unknown): AgentTaskInput {
   };
 }
 
+export function parseBranchAgentTask(value: unknown): BranchAgentTaskInput {
+  if (!isObject(value)) throw new Error("Invalid branch request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    taskId: value.taskId === null ? null : requireString(value.taskId, "taskId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    requestId: requireString(value.requestId, "requestId", INPUT_LIMITS.identifier),
+  };
+}
+
 export function parseRenameAgentTask(value: unknown): RenameAgentTaskInput {
   const task = parseAgentTask(value);
   if (!isObject(value)) throw new Error("Invalid task request.");
@@ -610,6 +622,14 @@ export function parseMarkConversationRead(value: unknown): MarkConversationReadI
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     throughMessageId:
       throughMessageId === null ? null : requireString(throughMessageId, "throughMessageId", INPUT_LIMITS.identifier),
+  };
+}
+
+export function parseMarkConversationUnread(value: unknown): MarkConversationUnreadInput {
+  if (!isObject(value)) throw new Error("Invalid conversation unread request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    fromMessageId: requireString(value.fromMessageId, "fromMessageId", INPUT_LIMITS.identifier),
   };
 }
 
@@ -893,14 +913,14 @@ export function parseReorderQueue(value: unknown): ReorderQueueInput {
   if (!isObject(value)) throw new Error("Invalid queue reorder request.");
   return {
     agentId: requireString(value.agentId, "agentId"),
-    deliveryIds: parseIdentifierList(value.deliveryIds, "delivery ids"),
+    deliveryIds: parseIdentifierList(value.deliveryIds, "delivery ids", INPUT_LIMITS.queueReorder),
   };
 }
 
-function parseIdentifierList(value: unknown, label: string): string[] {
+function parseIdentifierList(value: unknown, label: string, limit: number = INPUT_LIMITS.messageRecipients): string[] {
   if (
     !Array.isArray(value) ||
-    value.length > INPUT_LIMITS.messageRecipients ||
+    value.length > limit ||
     !value.every((item) => isString(item) && item.length <= INPUT_LIMITS.identifier)
   ) {
     throw new Error(`Invalid ${label}.`);

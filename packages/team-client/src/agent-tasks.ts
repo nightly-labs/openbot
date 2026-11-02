@@ -26,7 +26,8 @@ const taskWaits = (task: AgentTask) => task.state === "queued" || (task.state ==
 const newestFirst = (a: AgentTask, b: AgentTask) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
 
 /**
- * The tasks by what they need: needs you, working, waiting, then the newest closed tasks. With
+ * The tasks by what they need: needs you, working, waiting, then the newest closed tasks. A running
+ * task that `waitsForYou` (an approval, a question or a browser takeover) needs you too. With
  * `isUnread`, the person's read marks: working (a turn runs or waits to start), unread, read, then
  * the newest closed tasks.
  */
@@ -34,6 +35,7 @@ export function taskSections(
   tasks: readonly AgentTask[],
   showAllClosed: boolean,
   isUnread?: (task: AgentTask) => boolean,
+  waitsForYou?: (task: AgentTask) => boolean,
 ): TasksSection[] {
   const open = tasks.filter(isAgentTaskOpen).sort(newestFirst);
   const closed = tasks
@@ -57,11 +59,15 @@ export function taskSections(
       closedSection,
     ];
   }
+  const blocked = (task: AgentTask) => task.state === "running" && (waitsForYou?.(task) ?? false);
   return [
-    section("needsYou", open.filter(taskNeedsYou)),
+    section(
+      "needsYou",
+      open.filter((task) => taskNeedsYou(task) || blocked(task)),
+    ),
     section(
       "working",
-      open.filter((task) => task.state === "running"),
+      open.filter((task) => task.state === "running" && !blocked(task)),
     ),
     section("waiting", open.filter(taskWaits)),
     closedSection,

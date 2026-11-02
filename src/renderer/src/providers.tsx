@@ -2,16 +2,18 @@ import {
   type AgentProviderId,
   type AgentStatus,
   agentProviderDescriptor,
+  type CustomProviderSummary,
   isManagedRuntimeProvider,
   LOCAL_SERVER_ID,
   type ProviderRuntimeDownload,
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import {
-  PROVIDER_ACCOUNT_RELAY_CAPABILITY,
-  PROVIDER_ACCOUNT_RELAY_PROVIDERS,
-} from "@openbot/contracts/team-protocol/provider-account-relay-v1";
+  type ProviderAccountRelay,
+  providerAccountRelay,
+} from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
@@ -22,6 +24,7 @@ import { type DesktopAnalyticsProperties, desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
 import { useAgents } from "./features/agents/agents-context";
 import { conversationPort } from "./features/conversation/conversation-port";
+import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { hostCustomProvidersApi } from "./features/custom-providers/custom-providers-port";
 import { createCustomProvidersStore } from "./features/custom-providers/stores/custom-providers-store";
 import { createProviderConnection } from "./features/provider-updates/provider-connection";
@@ -98,14 +101,24 @@ const Providers = createSimpleContext({
         },
       };
     });
-    /**
-     * The host's own endpoints, for Settings. The machine-local list in `CustomProvidersProvider`
-     * stays what the model picker reads.
-     */
+    /** The host's own endpoints, for Settings and for the picker of a joined server. */
     const hostCustomProviders = createCustomProvidersStore(() => {
       const serverId = providerAdminServerId();
       return serverId ? hostCustomProvidersApi(providerAdmin, serverId) : undefined;
     });
+    const localCustomProviders = useCustomProviders();
+    /**
+     * The endpoints whose models the active server's OpenCode or Pi lists, which is how the picker puts
+     * those models on its Custom tab. Each computer runs its own endpoints, so a joined server's agents
+     * read the host's list, and this computer's list would file the host's models under OpenCode.
+     * Undefined for a member who does not administer the host: the Team API gives the list only to
+     * an administrator, and the picker then shows those models on the OpenCode tab.
+     */
+    function activeCustomProviders(): CustomProviderSummary[] | undefined {
+      if (activeServer()?.kind === "local") return localCustomProviders.customProviders();
+      if (providerAdminServerId()) return hostCustomProviders.customProviders();
+      return undefined;
+    }
     createEffect(providerAdminServerId, (serverId) => {
       // As for this computer's list: a failure leaves it empty, and nothing retries it from here.
       if (serverId) void hostCustomProviders.refreshCustomProviders().catch(() => undefined);
@@ -275,6 +288,8 @@ const Providers = createSimpleContext({
     const accountsAdminServerId = createMemo(() => remoteAdminServer(activeServer(), PROVIDER_ACCOUNTS_CAPABILITY)?.id);
     /** The joined server whose host spends the usage reset credits of its accounts (`provider-usage-reset-v1`). */
     const usageResetServerId = createMemo(() => remoteAdminServer(activeServer(), PROVIDER_USAGE_RESET_CAPABILITY)?.id);
+    /** The joined server whose host signs its own provider sign-ins out (`provider-sign-out-v1`). */
+    const signOutServerId = createMemo(() => remoteAdminServer(activeServer(), PROVIDER_SIGN_OUT_CAPABILITY)?.id);
 
     /**
      * The accounts of the providers of this computer, or of a joined server's host that serves
@@ -308,6 +323,9 @@ const Providers = createSimpleContext({
                 },
               }
             : {}),
+          ...(signOutServerId() === hostServerId
+            ? { signOut: (provider: AgentProviderId) => changed(providerAdmin().signOut(provider, hostServerId)) }
+            : {}),
         };
       }
       if (activeServer()?.kind !== "local") return undefined;
@@ -330,6 +348,8 @@ const Providers = createSimpleContext({
         remove: (provider, accountId) => apply(providersPort().removeProviderAccount({ provider, accountId })),
         usageResets: (provider) => providersPort().providerUsageResets(provider),
         resetUsage: (provider, accountId) => providersPort().resetProviderUsage({ provider, accountId }),
+        signOut: (provider) => apply(providersPort().signOutProvider(provider)),
+        local: true,
       };
     });
 
@@ -390,12 +410,13 @@ const Providers = createSimpleContext({
     }
 
     /**
-     * An account sign-in that the host relays to this computer's browser (`provider-account-relay-v1`).
-     * The other relay requests run it by its provider, and the accounts are read again when it ends.
+     * An account sign-in that the host relays to this computer's browser (`provider-account-relay-v1`
+     * or `-v2`). The other relay requests run it by its provider, and the accounts are read again when
+     * it ends.
      */
-    function accountRelay(serverId: string) {
+    function accountRelay(serverId: string, relayed: ProviderAccountRelay) {
       return {
-        providers: PROVIDER_ACCOUNT_RELAY_PROVIDERS,
+        providers: relayed.providers,
         hostName: activeServer()?.name ?? "",
         start: (provider: AgentProviderId, accountId: string | null) =>
           providerAdmin().startAccountRelaySignIn({ provider, accountId }, serverId),
@@ -424,6 +445,10 @@ const Providers = createSimpleContext({
       applyStatus: applyAgentStatus,
       target: () => {
         const serverId = providerAdminServerId();
+        const relayed =
+          serverId && accountsAdminServerId() === serverId
+            ? providerAccountRelay((capability) => serverSupportsCapability(activeServer(), capability))
+            : null;
         return serverId
           ? {
               start: (provider) => providerAdmin().startCodeLogin(provider, serverId),
@@ -438,10 +463,7 @@ const Providers = createSimpleContext({
                 cancel: (provider) => providerAdmin().cancelHostSignIn(provider, serverId),
               },
               ...(accountsAdminServerId() === serverId ? { accountSignIn: accountSignIn(serverId) } : {}),
-              ...(accountsAdminServerId() === serverId &&
-              serverSupportsCapability(activeServer(), PROVIDER_ACCOUNT_RELAY_CAPABILITY)
-                ? { accountRelay: accountRelay(serverId) }
-                : {}),
+              ...(relayed ? { accountRelay: accountRelay(serverId, relayed) } : {}),
               relay: {
                 hostName: activeServer()?.name ?? "",
                 start: (provider) => providerAdmin().startRelaySignIn(provider, serverId),
@@ -480,6 +502,7 @@ const Providers = createSimpleContext({
       providerAdminServerId,
       providerKeys,
       hostCustomProviders,
+      activeCustomProviders,
       refreshingProviders,
       applyAgentStatus,
       connectProvider,

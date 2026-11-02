@@ -12,4 +12,12 @@ export const messages = {
   "menu.trayOpen": "Abrir o OpenBot",
   "menu.trayQuit": "Sair do OpenBot",
   "menu.trayTooltip": "OpenBot",
+  "menu.undo": "Desfazer",
+  "menu.redo": "Refazer",
+  "menu.cut": "Recortar",
+  "menu.copy": "Copiar",
+  "menu.paste": "Colar",
+  "menu.pasteAndMatchStyle": "Colar e manter estilo",
+  "menu.delete": "Excluir",
+  "menu.selectAll": "Selecionar tudo",
 } as const satisfies PartialTranslation<typeof source>;

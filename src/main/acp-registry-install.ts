@@ -11,7 +11,13 @@ import { checkAcpAgent } from "../backend/acp-agent-check";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "../backend/acp-agent-command";
 import { type RegistryAgent, registryDownload } from "./acp-registry-catalog";
 import { runRegistryInstaller } from "./acp-registry-process";
-import { assertSafeArchive, extractArchive, extractZipTree, rejectNonRegularFiles } from "./provider-runtime-archive";
+import {
+  archiveEntryName,
+  assertSafeArchive,
+  extractArchive,
+  extractZipTree,
+  rejectNonRegularFiles,
+} from "./provider-runtime-archive";
 import { ProviderRuntimeFailure, runtimeIO, runtimeSync, toProviderRuntimeFailure } from "./provider-runtime-effects";
 
 const execFileAsync = promisify(execFile);
@@ -89,7 +95,7 @@ export const prepareRegistryAgent = Effect.fn("AcpRegistry.prepare")(function* (
       const roots = listing.stdout
         .split(/\r?\n/u)
         .filter(Boolean)
-        .map((name) => name.split("/")[0] ?? "");
+        .map((name) => archiveEntryName(name).split("/")[0] ?? "");
       yield* assertSafeArchive(archive, roots, sourceText("error.provider.nativeArchiveInvalid"));
       yield* extractArchive(archive, payload);
     } else {

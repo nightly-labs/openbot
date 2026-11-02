@@ -7,6 +7,11 @@ import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtim
 export const CHANNEL_CHATS_CAPABILITY = "channel-chats-v1";
 export const CHANNEL_DELETE_CAPABILITY = "channel-delete-v1";
 /**
+ * The host takes the channel command `cancel`, which ends a stopped or failed task and the open tasks
+ * below it. A host without it rejects the command, so a client shows Cancel only with it.
+ */
+export const CHANNEL_TASK_CANCEL_CAPABILITY = "channel-task-cancel-v1";
+/**
  * The id a channel row carries for the reader, and for its own author, while no account is signed
  * in. The person behind it does not change when they sign in, so their read cursors follow them and
  * their own messages stay their own in the transcript.
@@ -146,7 +151,7 @@ export type ChannelCommand =
       origin: { kind: "routine"; routineId: string; routineName: string; runId: string };
     }
   | {
-      type: "stop" | "resume" | "reassign";
+      type: "stop" | "resume" | "reassign" | "cancel";
       operationId: string;
       channelId: string;
       taskId: string;
@@ -355,7 +360,7 @@ export function parseChannelCommand(value: unknown): ChannelCommand {
   if (value.type === "read" && sequence(value.throughSequence))
     return { ...common, type: value.type, throughSequence: value.throughSequence };
   if (
-    (value.type === "stop" || value.type === "resume" || value.type === "reassign") &&
+    (value.type === "stop" || value.type === "resume" || value.type === "reassign" || value.type === "cancel") &&
     isIdentifier(value.taskId) &&
     (value.recipientAgentId === null || isIdentifier(value.recipientAgentId))
   ) {

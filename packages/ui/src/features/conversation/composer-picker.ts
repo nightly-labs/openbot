@@ -1,5 +1,5 @@
 import type { DraftAttachment } from "@openbot/contracts/ipc";
-import { Bot, File, Folder, Plug, type Puzzle, ShieldCheck, Store } from "@openbot/ui";
+import { Bot, File, Folder, Plug, type Puzzle, ShieldCheck, Store, UsersRound } from "@openbot/ui";
 import type { ComposerAgent, ComposerMcpServer, ComposerSkill } from "../../data";
 import type { TextValue } from "../../text";
 
@@ -16,6 +16,8 @@ export interface PickerFrame {
 
 export type PickerOption =
   | { type: "agent"; agent: ComposerAgent }
+  /** Addresses every member of a channel. It inserts the text `@everyone`. */
+  | { type: "everyone" }
   /** `showSlug` is set when another listed skill has the same name: the slug tells them apart. */
   | { type: "skill"; skill: ComposerSkill; showSlug: boolean }
   | { type: "mcp"; server: ComposerMcpServer }
@@ -23,12 +25,14 @@ export type PickerOption =
 
 export function pickerOptionKey(option: PickerOption): string {
   if (option.type === "agent") return `agent:${option.agent.id}`;
+  if (option.type === "everyone") return "everyone";
   if (option.type === "skill") return `skill:${option.skill.skillId}`;
   return option.type === "mcp" ? `mcp:${option.server.id}` : `attachment:${option.attachment.id}`;
 }
 
 export function pickerOptionText(option: PickerOption, t: TextValue["t"]): string {
   if (option.type === "agent") return t("composer.picker.option.agent", { name: option.agent.name });
+  if (option.type === "everyone") return t("composer.picker.everyone");
   if (option.type === "skill") {
     const name = option.showSlug ? `${option.skill.name} ${option.skill.slug}` : option.skill.name;
     return t("composer.picker.option.skill", { name });
@@ -38,13 +42,19 @@ export function pickerOptionText(option: PickerOption, t: TextValue["t"]): strin
     : t("composer.picker.option.file", { name: option.attachment.name });
 }
 
-export function pickerOptionName(option: PickerOption): string {
+export function pickerOptionName(option: PickerOption, t: TextValue["t"]): string {
   if (option.type === "agent") return option.agent.name;
+  if (option.type === "everyone") return t("composer.picker.everyone");
   if (option.type === "skill") return option.skill.name;
   return option.type === "mcp" ? option.server.name : option.attachment.name;
 }
 
-export function pickerOptionDescription(option: PickerOption, format: TextValue["format"]): string | undefined {
+export function pickerOptionDescription(
+  option: PickerOption,
+  t: TextValue["t"],
+  format: TextValue["format"],
+): string | undefined {
+  if (option.type === "everyone") return t("composer.picker.everyoneDescription");
   if (option.type === "attachment") return format.fileSize(option.attachment.size);
   if (option.type === "skill") return skillDescription(option.skill);
   if (option.type === "mcp") return mcpServerDescription(option.server);
@@ -71,6 +81,7 @@ export function measurePickerFrame(editor: HTMLElement): PickerFrame {
  */
 export function pickerOptionBadge(option: PickerOption, t: TextValue["t"]): { label: string; icon: typeof Puzzle } {
   if (option.type === "agent") return { label: t("composer.picker.badge.agent"), icon: Bot };
+  if (option.type === "everyone") return { label: t("composer.picker.badge.channel"), icon: UsersRound };
   if (option.type === "attachment") return { label: t("composer.picker.badge.file"), icon: File };
   if (option.type === "mcp") return { label: MCP_BADGE, icon: Plug };
   switch (option.skill.origin ?? "marketplace") {

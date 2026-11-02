@@ -69,7 +69,7 @@ index 42a5dbe1..9ef25249 100644
 +target_compile_features(openbot-setup-test PRIVATE cxx_std_20)
 +target_link_libraries(openbot-setup-test PRIVATE nlohmann_json::nlohmann_json ${APP_KIT_LIBRARY} ${APP_SERVICES_LIBRARY})
 diff --git a/package-lock.json b/package-lock.json
-index f8381b16..7a10c5e9 100644
+index f8381b16..049b6fbb 100644
 --- a/package-lock.json
 +++ b/package-lock.json
 @@ -12,109 +12,42 @@
@@ -77,8 +77,9 @@ index f8381b16..7a10c5e9 100644
          "lucide-vue-next": "1.0.0",
          "marked": "18.0.3",
 -        "vue": "3.5.34",
+-        "vue-i18n": "11.4.2",
 +        "vue": "3.5.43",
-         "vue-i18n": "11.4.2",
++        "vue-i18n": "11.4.16",
          "vue3-simple-icons": "16.10.0"
        },
        "devDependencies": {
@@ -253,7 +254,90 @@ index f8381b16..7a10c5e9 100644
      "node_modules/@esbuild/aix-ppc64": {
        "version": "0.25.12",
        "resolved": "https://registry.npmjs.org/@esbuild/aix-ppc64/-/aix-ppc64-0.25.12.tgz",
-@@ -675,149 +573,11 @@
+@@ -614,210 +512,72 @@
+       }
+     },
+     "node_modules/@intlify/core-base": {
+-      "version": "11.4.2",
+-      "resolved": "https://registry.npmjs.org/@intlify/core-base/-/core-base-11.4.2.tgz",
+-      "integrity": "sha512-7fpuCcVmeLv2T9qHsARqGvh8xt+sV2fH+Q+gMHFwB/rPXzo85DpbJFKn7dBH1L5p0c2cSh2DW+2h/64EKrISmA==",
++      "version": "11.4.16",
++      "resolved": "https://registry.npmjs.org/@intlify/core-base/-/core-base-11.4.16.tgz",
++      "integrity": "sha512-xB8nMdMRLNx7b0zPvrHy0+N9uq9Vfi1aUxHqWgn2e2/TbjCKy8HfoFpnUXXxVP8I0p1ccd6LFSC3XsFjZ3vweA==",
+       "license": "MIT",
+       "dependencies": {
+-        "@intlify/devtools-types": "11.4.2",
+-        "@intlify/message-compiler": "11.4.2",
+-        "@intlify/shared": "11.4.2"
++        "@intlify/devtools-types": "11.4.16",
++        "@intlify/message-compiler": "11.4.16",
++        "@intlify/shared": "11.4.16"
+       },
+       "engines": {
+-        "node": ">= 16"
++        "node": ">= 22"
+       },
+       "funding": {
+         "url": "https://github.com/sponsors/kazupon"
+       }
+     },
+     "node_modules/@intlify/devtools-types": {
+-      "version": "11.4.2",
+-      "resolved": "https://registry.npmjs.org/@intlify/devtools-types/-/devtools-types-11.4.2.tgz",
+-      "integrity": "sha512-3u8EN1kB6EMSi96KXs5k7a8y2X2g4+h3X6iwVZU47cP4n+mTuq//WMjG588BzSp/2XQ/dTXo2BLUXX+XS+PNfA==",
++      "version": "11.4.16",
++      "resolved": "https://registry.npmjs.org/@intlify/devtools-types/-/devtools-types-11.4.16.tgz",
++      "integrity": "sha512-Bl7arICsKgwcSEQuZJun3swenN4jwSpg35lCpijFznYbW9GvkfH4wLxcI5+gz7d/EHqu66UT9CZDIdnQdgMAGg==",
+       "license": "MIT",
+       "dependencies": {
+-        "@intlify/core-base": "11.4.2",
+-        "@intlify/shared": "11.4.2"
++        "@intlify/core-base": "11.4.16",
++        "@intlify/shared": "11.4.16"
+       },
+       "engines": {
+-        "node": ">= 16"
++        "node": ">= 22"
+       },
+       "funding": {
+         "url": "https://github.com/sponsors/kazupon"
+       }
+     },
+     "node_modules/@intlify/message-compiler": {
+-      "version": "11.4.2",
+-      "resolved": "https://registry.npmjs.org/@intlify/message-compiler/-/message-compiler-11.4.2.tgz",
+-      "integrity": "sha512-a6CDSGSMTGrg0BjD97x8TBYPf7qQMDlZipJ6UDfv/pd4OIym8TMlHu3MsH0bTNnRdAG2D6EFEykIgiQPqvtTkA==",
++      "version": "11.4.16",
++      "resolved": "https://registry.npmjs.org/@intlify/message-compiler/-/message-compiler-11.4.16.tgz",
++      "integrity": "sha512-p4lDWmBAsi3ja+PuEfPRavYyvqkYn/Upxz7UpnyI9LgIIy8XawcGIDzN+k99Z+99etO3HmDXGeTxnJIJGgSZ+g==",
+       "license": "MIT",
+       "dependencies": {
+-        "@intlify/shared": "11.4.2",
++        "@intlify/shared": "11.4.16",
+         "source-map-js": "^1.0.2"
+       },
+       "engines": {
+-        "node": ">= 16"
++        "node": ">= 22"
+       },
+       "funding": {
+         "url": "https://github.com/sponsors/kazupon"
+       }
+     },
+     "node_modules/@intlify/shared": {
+-      "version": "11.4.2",
+-      "resolved": "https://registry.npmjs.org/@intlify/shared/-/shared-11.4.2.tgz",
+-      "integrity": "sha512-NzpHbguRCsOHDwxmlBa9qu/imc+/QWgsYUaK6FZeNC0wK8QfAbhqrktEp/haVzxU1aikH8IX4ytD+mfFEMi/9A==",
++      "version": "11.4.16",
++      "resolved": "https://registry.npmjs.org/@intlify/shared/-/shared-11.4.16.tgz",
++      "integrity": "sha512-xehmkbEgbbNh/V+d8r3hFup0ViaN29YTJSAfRr28C54rxjyZEO0RNQKqW7VVajj16gLdglotNjiq+sIVNtHGzw==",
+       "license": "MIT",
+       "engines": {
+-        "node": ">= 16"
++        "node": ">= 22"
+       },
+       "funding": {
+         "url": "https://github.com/sponsors/kazupon"
        }
      },
      "node_modules/@jridgewell/sourcemap-codec": {
@@ -1028,6 +1112,32 @@ index f8381b16..7a10c5e9 100644
        },
        "peerDependencies": {
          "typescript": "*"
+@@ -2923,18 +2563,18 @@
+       }
+     },
+     "node_modules/vue-i18n": {
+-      "version": "11.4.2",
+-      "resolved": "https://registry.npmjs.org/vue-i18n/-/vue-i18n-11.4.2.tgz",
+-      "integrity": "sha512-sADDeKXqAGsPX6tK3t3y2ZiMpbVWN12tG+MhTiJ06rVoh58eGtM4wFyw3uWGbVkXByVp9Ne/AP+nSSzI+J9OAQ==",
++      "version": "11.4.16",
++      "resolved": "https://registry.npmjs.org/vue-i18n/-/vue-i18n-11.4.16.tgz",
++      "integrity": "sha512-Kv9tp6iTmaAeOwop7hkAo28N1IBsbSVpnxyE26b6gqc4Q2E9Ke3ZHHA3oqqwS6/cYLT1henZU4etTaLQxrK98Q==",
+       "license": "MIT",
+       "dependencies": {
+-        "@intlify/core-base": "11.4.2",
+-        "@intlify/devtools-types": "11.4.2",
+-        "@intlify/shared": "11.4.2",
++        "@intlify/core-base": "11.4.16",
++        "@intlify/devtools-types": "11.4.16",
++        "@intlify/shared": "11.4.16",
+         "@vue/devtools-api": "^6.5.0"
+       },
+       "engines": {
+-        "node": ">= 16"
++        "node": ">= 22"
+       },
+       "funding": {
+         "url": "https://github.com/sponsors/kazupon"
 @@ -2952,13 +2592,6 @@
          "vue": "^3"
        }
@@ -1060,7 +1170,7 @@ index f8381b16..7a10c5e9 100644
    }
  }
 diff --git a/package.json b/package.json
-index f95d49f9..62b87fbc 100644
+index f95d49f9..c85fcf15 100644
 --- a/package.json
 +++ b/package.json
 @@ -13,15 +13,19 @@
@@ -1068,8 +1178,9 @@ index f95d49f9..62b87fbc 100644
      "lucide-vue-next": "1.0.0",
      "marked": "18.0.3",
 -    "vue": "3.5.34",
+-    "vue-i18n": "11.4.2",
 +    "vue": "3.5.43",
-     "vue-i18n": "11.4.2",
++    "vue-i18n": "11.4.16",
      "vue3-simple-icons": "16.10.0"
    },
    "devDependencies": {
@@ -3160,7 +3271,7 @@ index 00000000..24572465
 +}
 +#endif
 diff --git a/src/platform/macos/input.cpp b/src/platform/macos/input.cpp
-index de721819..db7bf802 100644
+index de721819..fbf8d310 100644
 --- a/src/platform/macos/input.cpp
 +++ b/src/platform/macos/input.cpp
 @@ -15,6 +15,7 @@
@@ -3188,20 +3299,30 @@ index de721819..db7bf802 100644
      CGEventPost(kCGHIDEventTap, event);
      // For why this is here, see:
      // https://stackoverflow.com/questions/15194409/simulated-mouseevent-not-working-properly-osx
-@@ -489,7 +491,7 @@ const KeyCodeMap kKeyCodesMap[] = {
-     int wheelY = high_res_distance / 120;
+@@ -485,19 +487,21 @@ const KeyCodeMap kKeyCodesMap[] = {
+     macos_input->last_mouse_event[mac_button][release] = now;
+   }
+ 
++  // Moonlight Web sends the browser's pixel deltas, which are mostly less than one 120 notch. A line
++  // count of distance / 120 is then 0, so the distance goes as pixels.
+   void scroll(input_t &input, const int high_res_distance) {
+-    int wheelY = high_res_distance / 120;
++    int wheelY = high_res_distance;
      int wheelX = 0;
-     CGEventRef upEvent = CGEventCreateScrollWheelEvent(nullptr, kCGScrollEventUnitLine, 2, wheelY, wheelX);
+-    CGEventRef upEvent = CGEventCreateScrollWheelEvent(nullptr, kCGScrollEventUnitLine, 2, wheelY, wheelX);
 -    CGEventPost(kCGHIDEventTap, upEvent);
++    CGEventRef upEvent = CGEventCreateScrollWheelEvent(nullptr, kCGScrollEventUnitPixel, 2, wheelY, wheelX);
 +    if (!openbot_test_input(upEvent)) CGEventPost(kCGHIDEventTap, upEvent);
      CFRelease(upEvent);
    }
  
-@@ -497,7 +499,7 @@ const KeyCodeMap kKeyCodesMap[] = {
+   void hscroll(input_t &input, int high_res_distance) {
      int wheelY = 0;
-     int wheelX = high_res_distance / 120;
-     CGEventRef upEvent = CGEventCreateScrollWheelEvent(nullptr, kCGScrollEventUnitLine, 2, wheelY, wheelX);
+-    int wheelX = high_res_distance / 120;
+-    CGEventRef upEvent = CGEventCreateScrollWheelEvent(nullptr, kCGScrollEventUnitLine, 2, wheelY, wheelX);
 -    CGEventPost(kCGHIDEventTap, upEvent);
++    int wheelX = high_res_distance;
++    CGEventRef upEvent = CGEventCreateScrollWheelEvent(nullptr, kCGScrollEventUnitPixel, 2, wheelY, wheelX);
 +    if (!openbot_test_input(upEvent)) CGEventPost(kCGHIDEventTap, upEvent);
      CFRelease(upEvent);
    }

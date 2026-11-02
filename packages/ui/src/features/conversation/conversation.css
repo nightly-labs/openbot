@@ -6,6 +6,7 @@
 @import "./styles/remote-desktop.css";
 @import "./styles/browser-panel.css";
 @import "./styles/agent-settings.css";
+@import "./styles/agent-folders.css";
 @import "./styles/routine-schedule.css";
 @import "./styles/routine-calendar.css";
 @import "./styles/chat-action-card.css";
@@ -30,6 +31,7 @@
 @import "./styles/attachments.css";
 @import "./styles/image-lightbox.css";
 @import "./styles/queue.css";
+@import "./styles/agent-tasks.css";
 @import "./styles/agent-threads.css";
 @import "./styles/side-question.css";
 @import "./styles/voice.css";

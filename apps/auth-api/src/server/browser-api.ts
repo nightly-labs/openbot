@@ -4,6 +4,7 @@ import { parseHostedServerLifecycleInput } from "@openbot/contracts/hosted-serve
 import {
   LICENSE_UNAVAILABLE_STATE,
   parseLicenseCheckoutRequest,
+  parseLicensePlanRequest,
   parseLicenseRenewalRequest,
   parseLicenseUsersRequest,
 } from "@openbot/contracts/license";
@@ -11,7 +12,7 @@ import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/cont
 import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect } from "effect";
 import { type AccountAttribution, requestFirstTouch } from "./account-attribution";
-import { type AuthService, AuthServiceError } from "./auth-service";
+import { type AuthService, AuthServiceError, readAnalyticsAnswer } from "./auth-service";
 import { AvatarUploadError, readAvatarUpload, removeAccountAvatar, storeAccountAvatar } from "./avatar-storage";
 import { BILLING_UNAVAILABLE_STATE, BillingError, type BillingService } from "./billing-service";
 import { sha256 } from "./crypto";
@@ -36,6 +37,7 @@ export interface BrowserApiServices {
     | "verifyEmailCode"
     | "authenticate"
     | "enforceTeamInviteRateLimit"
+    | "updateAnalytics"
     | "updateName"
     | "updateAvatar"
     | "listAccountSessions"
@@ -71,7 +73,6 @@ export interface BrowserApiServices {
   billing: () => Pick<BillingService, "getState" | "createPortal" | "license"> | null;
   avatarBucket: () => R2Bucket;
   hostedSites: () => Pick<HostedSiteService, "list" | "delete">;
-  signalUrl: () => string;
   sourceIp: (request: Request) => string;
   errorResponse: (error: unknown) => Response;
 }
@@ -257,15 +258,14 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
       yield* services.remote.endSession(user.id, sessionId, yield* sha256(token));
       return json({ ended: true });
     }
-    return json({
-      ...(yield* services.remote.issueSessionTicket(
+    return json(
+      yield* services.remote.issueSessionTicket(
         user.id,
         sessionId,
         yield* requiredString(body, "clientPublicKey"),
         yield* sha256(token),
-      )),
-      signalUrl: services.signalUrl(),
-    });
+      ),
+    );
   }
   if (path === "v2/remote/invites/preview")
     return json(yield* services.remote.previewInvite(yield* requiredString(body, "token")));
@@ -299,6 +299,12 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
     if (!isString(body.name))
       return yield* new AuthServiceError(400, "invalid_profile_name", "Enter a valid display name.");
     return json(yield* services.auth.updateName(token, body.name));
+  }
+  if (path === "v1/me/analytics" && request.method === "PUT") {
+    const answer = readAnalyticsAnswer(yield* readJsonObject(request));
+    if (!answer)
+      return yield* new AuthServiceError(400, "invalid_analytics_preference", "The analytics setting is not valid.");
+    return json(yield* services.auth.updateAnalytics(token, answer));
   }
   if (path === AVATAR_PATH && request.method === "PUT") {
     return yield* Effect.gen(function* () {
@@ -356,6 +362,11 @@ const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
     if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
     return json(yield* billing.license.setUsers(user.id, input.users));
   }
+  if (path === "v1/me/license/plan") {
+    const input = parseLicensePlanRequest(body);
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    return json(yield* billing.license.changePlan(user.id, input));
+  }
   if (path === "v1/me/license/renewal") {
     const input = parseLicenseRenewalRequest(body);
     if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
@@ -387,6 +398,7 @@ const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
           interval: body.interval,
           currency: body.currency,
           entryPoint: body.entryPoint,
+          license: body.license,
         },
         request.headers.get("Idempotency-Key"),
         returnTo,

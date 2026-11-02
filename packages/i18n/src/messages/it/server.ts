@@ -87,6 +87,17 @@ export const messages = {
   "server.add.billing.monthly": "Mensile",
   "server.add.billing.yearly": "Annuale",
   "server.add.billing.save": "Risparmia il {percent}%",
+  "server.add.use.label": "Uso",
+  "server.add.use.personal": "Personale",
+  "server.add.use.work": "Lavoro",
+  "server.add.license.people": "Persone al lavoro",
+  "server.add.license.minimum": {
+    one: "{count} persona usa già i tuoi server, quindi non puoi sceglierne meno.",
+    other: "{count} persone usano già i tuoi server, quindi non puoi sceglierne meno.",
+  },
+  "server.add.license.bundle": "Pacchetto −{percent}%",
+  "server.add.license.included": "Include: {license}",
+  "server.add.license.includedTrial": "Include: {license}, gratis fino al {date}",
   "server.add.billedMonthly": "Fatturato mensilmente",
   "server.add.billedYearly": "{price} fatturati annualmente",
   "server.add.yearlySaving": "Risparmia {amount}",
@@ -96,8 +107,20 @@ export const messages = {
   "server.add.custom.description":
     "Ottieni un'infrastruttura dedicata, spazio di archiviazione aggiuntivo o funzionalità su misura per il tuo modo di lavorare.",
   "server.add.custom.action": "Contattaci",
-  "server.add.join.title": "Hai un invito?",
   "server.add.join.action": "Unisciti a un server",
+  "server.add.otherOptions": "Altre opzioni",
+  "server.local.createTitle": "Nuovo server su questo computer",
+  "server.local.createDescription": "Il server ha agenti, chat e file propri. Funziona su questo computer.",
+  "server.local.nameLabel": "Nome del server",
+  "server.local.create": "Crea server",
+  "server.local.creating": "Creazione del server…",
+  "server.local.createFailed": "Impossibile creare il server.",
+  "server.local.limitReached":
+    "Puoi avere al massimo {limit} server su questo computer. Eliminane uno per crearne un altro.",
+  "server.local.deleteConfirmTitle": "Eliminare {name}?",
+  "server.local.deleteConfirmDescription": "OpenBot arresta il server e sposta i suoi agenti, chat e file nel cestino.",
+  "server.local.deleting": "Eliminazione del server…",
+  "server.local.deletedTitle": "{name} eliminato",
   "server.add.limit.title": "Questo account ha il numero massimo di server",
   "server.add.limit.description": {
     one: "Un account può avere {count} server a pagamento. Per aggiungerne un altro, eliminane prima uno.",
@@ -162,6 +185,7 @@ export const messages = {
   "server.rail.addRemote": "Aggiungi un server remoto",
   "server.rail.add": "Aggiungi un server",
   "server.rail.buttonLabel": "Server {name}",
+  "server.rail.thisComputer": "su questo computer",
   "server.rail.notificationsMuted": "notifiche silenziate",
   "server.rail.actions": "Azioni del server",
   "server.rail.unmute": "Riattiva le notifiche",
@@ -172,6 +196,8 @@ export const messages = {
   "server.rail.restart": "Riavvia il server",
   "server.rail.leave": "Esci dal server",
   "server.rail.delete": "Elimina il server",
+  "server.rail.hide": "Nascondi il server",
+  "server.rail.showLocal": "Mostra {name}",
   "server.select.failedTitle": "Impossibile selezionare il server",
   "server.select.failedDescription": "Impossibile cambiare server. Riprova.",
   "server.select.openAgentFailed": "Impossibile aprire {name}. Trovalo nella barra laterale.",
@@ -273,13 +299,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Visualizza e controlla questo Mac da un altro computer.",
   "server.settings.later": "Più tardi",
   "server.settings.setUp": "Configura",
-  "server.settings.notifications": "Notifiche",
-  "server.settings.muteNotifications": "Silenzia le notifiche",
-  "server.settings.muteDescription":
-    "Ferma le notifiche del desktop, i suoni e gli aggiornamenti nel notch del MacBook da questo server.",
-  "server.settings.mutedUntilDescription": "{until}. Disattiva per riattivare ora.",
-  "server.settings.notifyAbout": "Avvisami per",
-  "server.settings.notifyAboutDescription": "Quali eventi degli agenti mostrano una notifica sul desktop.",
   "server.settings.agents": "Agenti",
   "server.settings.timezone": "Fuso orario",
   "server.settings.timezoneDescription":
@@ -289,6 +308,12 @@ export const messages = {
   "server.settings.memoryLimit": "Memorie per agente",
   "server.settings.memoryLimitDescription": "Quante memorie può conservare ogni agente su questo server.",
   "server.settings.memoryLimitLoadFailed": "Impossibile caricare il limite di memorie di questo server.",
+  "server.settings.memoryReview": "Revisione delle memorie",
+  "server.settings.memoryReviewDescription":
+    "Ogni quanto gli agenti di questo server salvano in background i fatti duraturi delle loro chat.",
+  "server.settings.memoryReviewOff": "Disattivata",
+  "server.settings.memoryReviewTurns": { one: "Ogni {count} turno", other: "Ogni {count} turni" },
+  "server.settings.memoryReviewLoadFailed": "Impossibile caricare l'impostazione della revisione delle memorie.",
   "server.settings.remoteOnline": "L'host è online. La pubblicazione è controllata dal suo proprietario.",
   "server.settings.remoteOffline": "L'host è offline. La pubblicazione è controllata dal suo proprietario.",
   "server.settings.reachable": "Raggiungibile online. Solo le persone invitate possono accedere.",
@@ -304,6 +329,9 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "La chiave attuale e quella nuova firmano un passaggio. Le app dei membri passano alla nuova chiave alla prossima connessione. Fallo se il file della chiave è stato copiato o esposto.",
   "server.settings.hostKeyRotated": "Chiave del server cambiata",
+  "server.settings.hostKeyChanged": "Ultima modifica",
+  "server.settings.hostKeyChangedDescription":
+    "{date}. La chiave precedente e la nuova chiave hanno firmato questa modifica.",
   "server.settings.hostKeyLocalOnly": "Qui solo il server su questo computer può cambiare la sua chiave.",
   "server.settings.removeTitle": "Rimuovi il server",
   "server.settings.removeDescription":
@@ -381,8 +409,10 @@ export const messages = {
   "server.invite.showQr": "Mostra il codice QR dell'invito",
   "server.invite.permaHint":
     "Non scade mai e può essere usato più volte. Chiunque abbia questo link può unirsi; revocalo per disattivarlo.",
-  "server.invite.full":
-    "Questo server ha il massimo di {limit} membri. Rimuovi un membro per invitare una nuova persona.",
+  "server.invite.full": {
+    one: "Questo server ha il massimo di {count} membro. Rimuovi un membro per invitare una nuova persona.",
+    other: "Questo server ha il massimo di {count} membri. Rimuovi un membro per invitare una nuova persona.",
+  },
   "server.invite.qrLabel": "Codice QR dell'invito",
   "server.invite.qrDescription": "Inquadra questo codice in OpenBot Mobile per unirti a questo server.",
   "server.invite.accepted": "Invito accettato",

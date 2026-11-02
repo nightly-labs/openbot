@@ -34,7 +34,11 @@ class OpenBotMessagingService : ExpoFirebaseMessagingService() {
     val sound = remoteMessage.data["sound"]
     val opened = SealedNotification.open(this, sealed)
     val identifier = remoteMessage.messageId ?: UUID.randomUUID().toString()
-    val request = NotificationRequest(identifier, content(opened, sound), ChannelAwareTrigger(channelId(sound)))
+    val base = content(opened, sound)
+    // The agent picture is the large icon. Without one, the notification shows as before.
+    val avatar = opened?.let { NotificationAvatars.file(this, it.serverId, it.agentId) }
+    val shown = if (avatar == null) base else AgentNotificationContent(base, avatar.path)
+    val request = NotificationRequest(identifier, shown, ChannelAwareTrigger(channelId(sound)))
     val sent = remoteMessage.sentTime
     NotificationsService.receive(this, Notification(request, if (sent > 0) Date(sent) else Date()))
   }

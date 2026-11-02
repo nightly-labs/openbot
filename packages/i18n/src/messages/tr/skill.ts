@@ -62,4 +62,17 @@ export const messages = {
   "skill.preview.examplePrompt": "Bu beceriyi kullanmama yardım et.",
   "skill.preview.try": "Beceriyi dene",
   "skill.preview.linkFailed": "Bağlantı açılamadı.",
+
+  "skill.marketplace.changed": {
+    one: "{name} {count} ajanda değiştirildi.",
+    other: "{name} {count} ajanda değiştirildi.",
+  },
+  "skill.marketplace.updated": {
+    one: "{name} {count} ajanda güncellendi.",
+    other: "{name} {count} ajanda güncellendi.",
+  },
+  "skill.marketplace.undone": "{name} değişikliği geri alındı.",
+  "skill.marketplace.confirmAgents": "Ajanlar: {agents}.",
+  "skill.marketplace.limitReason": "Bir ajanın en fazla {limit} becerisi olabilir.",
+  "skill.marketplace.cannotRemove": "OpenBot yerleşik bir beceriyi veya kendisinin kurmadığı bir beceriyi kaldıramaz.",
 } as const satisfies PartialTranslation<typeof source>;

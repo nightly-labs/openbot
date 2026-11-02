@@ -191,6 +191,7 @@ export function OnboardingFlow({
   onFinish: (welcome?: WelcomeHandOff) => void;
 }) {
   const { t, errorMessage } = useText();
+  const insets = useSafeAreaInsets();
   const motion = useOnboardingMotion();
   const { session, signOut } = useMobileSession();
   const { servers, createAgent } = useMobileWorkspace();
@@ -627,7 +628,12 @@ export function OnboardingFlow({
           ]}
         />
       </FadeLayer>
-      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+      {/* The steps keep clear of the side insets (the iPhone Duo rail, the landscape cutout). The tints
+          above stay edge to edge. */}
+      <KeyboardAvoidingView
+        behavior="padding"
+        style={{ flex: 1, paddingLeft: insets.left, paddingRight: insets.right }}
+      >
         {/* Steps overlap while one leaves and the next arrives, so neither pushes the other. The
             inner view takes the keyboard padding. A step with a text field fills it; the others
             keep their height with no keyboard. The last step only fades in: its hero lands with

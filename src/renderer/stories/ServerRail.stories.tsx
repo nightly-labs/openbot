@@ -8,7 +8,7 @@ const args: Parameters<typeof ServerRail>[0] = {
   servers: STORY_SERVERS,
   onSelect: fn(),
   onSetMuted: fn(),
-  onSetNotificationLevel: fn(),
+  onOpenNotificationSettings: fn(),
   onReorder: fn(),
   onAdd: fn(),
   onOpenSettings: fn(),
@@ -63,7 +63,7 @@ function InteractiveServerRail(props: Parameters<typeof ServerRail>[0]) {
         props.onReorder(serverIds);
       }}
       onSetMuted={props.onSetMuted}
-      onSetNotificationLevel={props.onSetNotificationLevel}
+      onOpenNotificationSettings={props.onOpenNotificationSettings}
       onAdd={props.onAdd}
       onOpenSettings={props.onOpenSettings}
       onLeave={props.onLeave}

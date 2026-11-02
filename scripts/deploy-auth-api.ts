@@ -71,6 +71,12 @@ async function main(): Promise<void> {
     label: "Auth API build",
     env: cloudflareEnvironment ? { CLOUDFLARE_ENV: cloudflareEnvironment } : undefined,
   });
+  // A deploy replaces every file under /assets/. Open tabs keep loading the files of their build.
+  if (!cloudflareEnvironment) {
+    await run(bunExecutable, [join(apiRoot, "scripts", "keep-previous-assets.ts")], {
+      label: "Earlier code files",
+    });
+  }
   await run(wranglerExecutable, ["deploy", "--keep-vars", ...environmentArgs], {
     label: "Auth API deployment",
   });

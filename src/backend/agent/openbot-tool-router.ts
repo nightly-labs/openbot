@@ -17,7 +17,6 @@ import {
   agentComputerUseEnabled,
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
-  CONNECTOR_IDS,
   isMessageReaction,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
@@ -31,7 +30,6 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { Effect, Result } from "effect";
 import { z } from "zod";
-import pluginCatalog from "../../../resources/plugin-catalog/catalog.json";
 import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentTables } from "../agent-data/agent-tables";
@@ -52,6 +50,7 @@ import {
   CHAT_VISUAL_PREVIEW_DEFAULT_WIDTH,
   htmlPreviewToolSchema,
   htmlRenderToolSchema,
+  MARKETPLACE_APP_IDS,
   removeApiKeyToolSchema,
   requestApiKeyToolSchema,
   routineReportFailureToolSchema,
@@ -75,7 +74,14 @@ import { HistoryTools } from "./history-tools";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
 import type { MailboxSync } from "./mailbox-sync";
-import { type AgentMcpServers, handleMcpServerTool, isMcpServerTool, searchSignIns } from "./mcp-tools";
+import {
+  type AgentMcpServers,
+  handleMcpServerTool,
+  isMcpServerTool,
+  type MarketplaceAppServer,
+  marketplaceAppStatus,
+  searchSignIns,
+} from "./mcp-tools";
 import {
   agentAccountSetup,
   listModelsPayload,
@@ -135,12 +141,6 @@ function listedDescription(description: string): string {
     .join("")
     .trimEnd()}…`;
 }
-
-/** The Marketplace apps that the chat draws a card for: the bundled catalog plugins and the connectors. */
-const MARKETPLACE_APP_IDS: readonly string[] = [
-  ...pluginCatalog.plugins.map((plugin) => plugin.slug),
-  ...CONNECTOR_IDS,
-];
 
 /** The reason says what to grant or to correct, and holds no screen content. */
 function captureFailure(failure: ScreenCaptureFailed) {
@@ -213,6 +213,8 @@ export interface OpenBotToolRouterOptions {
   screenCapture?: ScreenCaptureHost | null | undefined;
   /** The MCP servers of this OpenBot server, for the MCP tools; null where nothing holds them. */
   mcpServers?: AgentMcpServers | null | undefined;
+  /** The saved server that a Marketplace app installs, or null when it is not installed. */
+  marketplaceAppServer?: ((appId: string) => MarketplaceAppServer | null) | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
   apiKeys?: AgentApiKeys | null | undefined;
   hooks: OpenBotToolRouterHooks;
@@ -251,6 +253,7 @@ export class OpenBotToolRouter {
   readonly #visualPreview: ChatVisualPreviewHost | null;
   readonly #screenCapture: ScreenCaptureHost | null;
   readonly #mcpServers: AgentMcpServers | null;
+  readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #hooks: OpenBotToolRouterHooks;
   readonly #interruptTool: AgentInterruptTool;
@@ -285,6 +288,7 @@ export class OpenBotToolRouter {
     this.#visualPreview = options.visualPreview ?? null;
     this.#screenCapture = options.screenCapture ?? null;
     this.#mcpServers = options.mcpServers ?? null;
+    this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
     this.#apiKeys = options.apiKeys ?? null;
     this.#hooks = options.hooks;
     this.#interruptTool = new AgentInterruptTool({
@@ -1005,15 +1009,32 @@ export class OpenBotToolRouter {
       const args = params.arguments;
       if (!isRecord(args) || !isString(args.app)) throw new Error("app must be a Marketplace app slug.");
       if (!MARKETPLACE_APP_IDS.includes(args.app)) {
-        return openBotToolResult({ status: "not_found", app: args.app, apps: MARKETPLACE_APP_IDS });
+        return openBotToolResult({
+          status: "not_found",
+          app: args.app,
+          apps: MARKETPLACE_APP_IDS,
+          next: "Marketplace has no app with this name. Call this again only with a listed name for the same service, such as brave-search for Brave. Otherwise say that Marketplace has no app for it, and do not mention a card or an install.",
+        });
       }
+      const installed = this.#marketplaceAppServer(args.app);
+      if (installed && this.#mcpServers)
+        return yield* marketplaceAppStatus(this.#mcpServers, installed, (config) =>
+          toolStep(() => this.#postMcpSignInCard(senderAgentId, executionThreadId, params.turnId, config)),
+        );
       this.#postSystemCard(senderAgentId, executionThreadId, params.turnId, {
         itemType: marketplaceSuggestionItemType({ appId: args.app }),
         text: sourceText("status.agent.marketplaceSuggested", { app: args.app }),
         eventType: "marketplace.suggested",
         detail: { appId: args.app },
       });
-      return openBotToolResult({ status: "suggested", app: args.app });
+      return openBotToolResult({
+        status: "suggested",
+        app: args.app,
+        next:
+          args.app === "github"
+            ? "The card is in the chat. End your answer: tell the user to connect GitHub in Server settings, Connectors. This connection also signs in gh and git."
+            : "The card is in the chat. End your answer: tell the user to connect the app with the card or in Marketplace, on the Apps tab, so that every agent can use it directly. You have no tools for it until then.",
+      });
     }
 
     if (params.tool === "react_to_user_message") return yield* this.#react(params, senderAgentId);

@@ -19,6 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
+import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
@@ -31,9 +32,18 @@ import type { ChatAttachmentAnchor, ChatAttachments } from "./use-chat-attachmen
 // back, so it is ours. This is the documented exception to the native
 // system-chrome rule in apps/mobile/AGENTS.md, taken as a product decision.
 const OPTION_ROW = 48;
-const OPTIONS_WIDTH = 236;
+// The list is at least this wide and grows to its longest label, so a long
+// translation is read in full. Past the camera's width a label wraps.
+const OPTIONS_MIN_WIDTH = 236;
 const OPTIONS_PADDING = 8;
-/** The card's height as the options list: Files, Photos and Camera, and Use skill when the chat has skills. */
+// Room the list leaves to the right of the safe area.
+const OPTIONS_EDGE_GAP = 12;
+// A row's width besides its label: the side padding, the icon and the gap.
+const ROW_PADDING = 16;
+const ROW_ICON = 21;
+const ROW_GAP = 14;
+const ROW_CHROME = ROW_PADDING * 2 + ROW_ICON + ROW_GAP;
+/** The list's height before it is measured: Files, Photos and Camera, and Use skill when the chat has skills. */
 const optionsHeight = (rows: number) => OPTION_ROW * rows + OPTIONS_PADDING * 2;
 const SURFACE_RADIUS = 28;
 // One shape change, no overshoot: there is no finger on the card, and a card
@@ -94,7 +104,14 @@ function AttachmentOption({
           accessibilityState={{ disabled }}
           disabled={disabled}
           pressRetentionOffset={12}
-          style={{ height: OPTION_ROW, flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 16 }}
+          style={{
+            minHeight: OPTION_ROW,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: ROW_GAP,
+            paddingHorizontal: ROW_PADDING,
+            paddingVertical: 10,
+          }}
           onPressIn={() => {
             setPressed(true);
             void haptics.selection();
@@ -102,8 +119,8 @@ function AttachmentOption({
           onPressOut={() => setPressed(false)}
           onPress={onPress}
         >
-          <Icon color={String(foreground)} size={21} strokeWidth={1.9} />
-          <Typography.Paragraph className="flex-1">{label}</Typography.Paragraph>
+          <Icon color={String(foreground)} size={ROW_ICON} strokeWidth={1.9} />
+          <Typography.Paragraph className="min-w-0 shrink">{label}</Typography.Paragraph>
         </Pressable>
       </Animated.View>
     </Animated.View>
@@ -150,8 +167,10 @@ export function ChatAttachmentPanel({
    */
   progress: SharedValue<number>;
 }) {
-  const { width, height } = useWindowDimensions();
+  const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  // The camera centres between the side insets: the rail of iPhone Duo and the edges in landscape.
+  const safeWidth = useColumnWidth() - insets.left - insets.right;
   const { t } = useText();
   const [mode, setMode] = useState<"options" | "camera">("options");
   const [closing, setClosing] = useState(false);
@@ -165,7 +184,7 @@ export function ChatAttachmentPanel({
   // A photo taken but not yet held. It waits for the card to be gone.
   const captured = useRef<string | null>(null);
   const morph = useSharedValue(0);
-  const cameraWidth = Math.min(440, width - 24);
+  const cameraWidth = Math.min(440, safeWidth - 24);
   // Read once, for this card's whole life: the keyboard is not dismissed for
   // the camera any more, and the glass behind the card must never be resized.
   // The card already rides the keyboard's lift, so the camera takes the room
@@ -174,12 +193,24 @@ export function ChatAttachmentPanel({
   const cameraHeight = Math.min(height * 0.58, height - insets.top - anchor.bottom - keyboardInset - CAMERA_TOP_GAP);
   // The card keeps the plus's left edge while it is the options list, and
   // centres itself once it is the camera.
-  const cameraShift = (width - cameraWidth) / 2 - anchor.left;
-  const listHeight = optionsHeight(onUseSkill ? 4 : 3);
-
-  useEffect(() => {
-    progress.set(withSpring(1, MORPH));
-  }, [progress]);
+  const cameraShift = insets.left + (safeWidth - cameraWidth) / 2 - anchor.left;
+  const maxListWidth = Math.max(
+    OPTIONS_MIN_WIDTH,
+    Math.min(cameraWidth, insets.left + safeWidth - anchor.left - OPTIONS_EDGE_GAP),
+  );
+  const labels = {
+    useSkill: t("mobile.chat.attachment.useSkill"),
+    files: t("mobile.chat.attachment.files"),
+    photos: t("mobile.chat.attachment.photos"),
+    camera: t("mobile.chat.attachment.camera"),
+  };
+  // The list's width comes from its longest label, measured once off the card.
+  // The list must have a width of its own: inside the card it would be laid
+  // out against the card's animated width on every frame. The card starts to
+  // grow once the list's height is known, so it grows in one motion.
+  const [listWidth, setListWidth] = useState<number | null>(null);
+  const listHeight = useSharedValue(optionsHeight(onUseSkill ? 4 : 3));
+  const openedRef = useRef(false);
 
   // Runs once the card has finished leaving, so the heavy part of holding a
   // photo has the thread to itself.
@@ -227,8 +258,8 @@ export function ChatAttachmentPanel({
   const surfaceStyle = useAnimatedStyle(() => {
     const presented = progress.get();
     const shape = morph.get();
-    const openWidth = interpolate(shape, [0, 1], [OPTIONS_WIDTH, cameraWidth]);
-    const openHeight = interpolate(shape, [0, 1], [listHeight, cameraHeight]);
+    const openWidth = interpolate(shape, [0, 1], [listWidth ?? OPTIONS_MIN_WIDTH, cameraWidth]);
+    const openHeight = interpolate(shape, [0, 1], [listHeight.get(), cameraHeight]);
     return {
       // The card is the plus until it is anything else, so it never appears
       // from nothing and never has to travel to reach its own corner.
@@ -248,7 +279,7 @@ export function ChatAttachmentPanel({
   // because the card widens from the plus while the rows kept their full size.
   const optionsStyle = useAnimatedStyle(() => ({
     opacity: 1 - morph.get(),
-    transform: [{ scale: interpolate(progress.get(), [0, 1], [anchor.size / OPTIONS_WIDTH, 1]) }],
+    transform: [{ scale: interpolate(progress.get(), [0, 1], [anchor.size / (listWidth ?? OPTIONS_MIN_WIDTH), 1]) }],
   }));
   const cameraStyle = useAnimatedStyle(() => ({ opacity: morph.get() }));
 
@@ -271,6 +302,26 @@ export function ChatAttachmentPanel({
   return (
     <View style={StyleSheet.absoluteFill} accessibilityViewIsModal onAccessibilityEscape={dismiss}>
       <Pressable style={StyleSheet.absoluteFill} accessible={false} onPress={dismiss} />
+      {listWidth === null ? (
+        <View
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{ position: "absolute", left: 0, top: 0, width: maxListWidth - ROW_CHROME, opacity: 0 }}
+        >
+          <View
+            style={{ alignSelf: "flex-start" }}
+            onLayout={({ nativeEvent }) => {
+              const width = Math.ceil(nativeEvent.layout.width) + ROW_CHROME;
+              setListWidth(Math.min(maxListWidth, Math.max(OPTIONS_MIN_WIDTH, width)));
+            }}
+          >
+            {(onUseSkill ? [labels.useSkill] : []).concat(labels.files, labels.photos, labels.camera).map((label) => (
+              <Typography.Paragraph key={label}>{label}</Typography.Paragraph>
+            ))}
+          </View>
+        </View>
+      ) : null}
       <Animated.View
         pointerEvents={closing ? "none" : "box-none"}
         accessibilityElementsHidden={closing}
@@ -307,12 +358,20 @@ export function ChatAttachmentPanel({
               outside it does either. */}
           <Animated.View
             pointerEvents={mode === "options" ? "auto" : "none"}
+            onLayout={({ nativeEvent }) => {
+              listHeight.set(nativeEvent.layout.height);
+              if (openedRef.current || closingRef.current) return;
+              openedRef.current = true;
+              progress.set(withSpring(1, MORPH));
+            }}
             style={[
               {
                 position: "absolute",
                 left: 0,
                 bottom: 0,
-                width: OPTIONS_WIDTH,
+                width: listWidth ?? OPTIONS_MIN_WIDTH,
+                // Hidden until it has its width, so it is laid out only once.
+                display: listWidth === null ? "none" : "flex",
                 paddingVertical: OPTIONS_PADDING,
                 // The card grows from its own bottom-left, so the rows do too.
                 transformOrigin: "0% 100%",
@@ -324,7 +383,7 @@ export function ChatAttachmentPanel({
               <AttachmentOption
                 index={3}
                 icon={Sparkles}
-                label={t("mobile.chat.attachment.useSkill")}
+                label={labels.useSkill}
                 foreground={foreground}
                 progress={progress}
                 disabled={false}
@@ -334,7 +393,7 @@ export function ChatAttachmentPanel({
             <AttachmentOption
               index={2}
               icon={Paperclip}
-              label={t("mobile.chat.attachment.files")}
+              label={labels.files}
               foreground={foreground}
               progress={progress}
               disabled={attachments.preparing}
@@ -343,7 +402,7 @@ export function ChatAttachmentPanel({
             <AttachmentOption
               index={1}
               icon={Images}
-              label={t("mobile.chat.attachment.photos")}
+              label={labels.photos}
               foreground={foreground}
               progress={progress}
               disabled={attachments.preparing}
@@ -352,7 +411,7 @@ export function ChatAttachmentPanel({
             <AttachmentOption
               index={0}
               icon={Camera}
-              label={t("mobile.chat.attachment.camera")}
+              label={labels.camera}
               foreground={foreground}
               progress={progress}
               disabled={attachments.preparing}

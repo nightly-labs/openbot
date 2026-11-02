@@ -1,4 +1,5 @@
-import { isOneOf } from "./runtime-values";
+import { isBoundedString } from "./ipc-bounded-values";
+import { isBoolean, isDynamicRecord, isOneOf } from "./runtime-values";
 
 export const VOICE_AUDIO_LIMITS = {
   sampleRate: 16_000,
@@ -345,4 +346,123 @@ export function isSpeechVoice(value: unknown): value is SpeechVoice {
 
 export function isSpeechLanguage(value: unknown): value is SpeechLanguage {
   return isOneOf(SPEECH_LANGUAGES, value);
+}
+
+// ---------------------------------------------------------------------------------------------
+// The user's own voice server: an OpenAI-compatible `/v1/audio` API on their network or online.
+
+export const VOICE_SERVER_LIMITS = {
+  address: 2_048,
+  apiKey: 4_096,
+  /** A model or voice name, such as `Systran/faster-whisper-large-v3`. */
+  name: 256,
+  /** The models or voices of one kind that a server lists. */
+  entries: 500,
+  message: 2_000,
+} as const;
+
+/**
+ * What the server does for OpenBot. Dictation uses `POST /audio/transcriptions` and spoken replies
+ * use `POST /audio/speech`. A route that is on has its model, and speech also has its voice.
+ */
+export interface VoiceServerRoutes {
+  dictation: boolean;
+  speech: boolean;
+  transcriptionModel: string | null;
+  speechModel: string | null;
+  voice: string | null;
+}
+
+/** Main to renderer. The key never comes back; `hasApiKey` is all the renderer may know about it. */
+export interface VoiceServerSettings {
+  /** The base address of the API, such as `http://studio.local:8000/v1`. */
+  address: string;
+  hasApiKey: boolean;
+  routes: VoiceServerRoutes;
+}
+
+/**
+ * A server to test or to save. A null key keeps the saved key, but only when the address keeps the
+ * saved origin, so an edited address never receives the old key.
+ */
+export interface VoiceServerConnection {
+  address: string;
+  apiKey: string | null;
+}
+
+export interface VoiceServerInput extends VoiceServerConnection {
+  routes: VoiceServerRoutes;
+}
+
+/** Null removes the server, and dictation and spoken replies go back to this computer. */
+export interface VoiceServerSave {
+  server: VoiceServerInput | null;
+}
+
+/** What the server lists, by route. A list is empty when the server has nothing for that route. */
+export interface VoiceServerModels {
+  transcription: string[];
+  speech: string[];
+  voices: string[];
+}
+
+/** The form field that the user must change after a failed test. */
+export type VoiceServerProbeField = "address" | "apiKey";
+
+export type VoiceServerProbe =
+  | { ok: true; models: VoiceServerModels }
+  | { ok: false; field: VoiceServerProbeField; message: string };
+
+function isNameList(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= VOICE_SERVER_LIMITS.entries &&
+    value.every((entry) => isBoundedString(entry, VOICE_SERVER_LIMITS.name) && entry.length > 0)
+  );
+}
+
+function isOptionalName(value: unknown): value is string | null {
+  return value === null || (isBoundedString(value, VOICE_SERVER_LIMITS.name) && value.length > 0);
+}
+
+/** A route that is on names its model, and spoken replies also name a voice. */
+export function isVoiceServerRoutes(value: unknown): value is VoiceServerRoutes {
+  return (
+    isDynamicRecord(value) &&
+    isBoolean(value.dictation) &&
+    isBoolean(value.speech) &&
+    isOptionalName(value.transcriptionModel) &&
+    isOptionalName(value.speechModel) &&
+    isOptionalName(value.voice) &&
+    (!value.dictation || value.transcriptionModel !== null) &&
+    (!value.speech || (value.speechModel !== null && value.voice !== null))
+  );
+}
+
+/** Fails closed like `isCustomProviderSummary`: a record that carries an `apiKey` is refused. */
+export function isVoiceServerSettings(value: unknown): value is VoiceServerSettings {
+  return (
+    isDynamicRecord(value) &&
+    !("apiKey" in value) &&
+    isBoundedString(value.address, VOICE_SERVER_LIMITS.address) &&
+    isBoolean(value.hasApiKey) &&
+    isVoiceServerRoutes(value.routes)
+  );
+}
+
+export function isVoiceServerProbe(value: unknown): value is VoiceServerProbe {
+  if (!isDynamicRecord(value)) return false;
+  if (value.ok === false)
+    return (
+      isOneOf<VoiceServerProbeField>(["address", "apiKey"], value.field) &&
+      isBoundedString(value.message, VOICE_SERVER_LIMITS.message)
+    );
+  const models = value.models;
+  return (
+    value.ok === true &&
+    isDynamicRecord(models) &&
+    isNameList(models.transcription) &&
+    isNameList(models.speech) &&
+    isNameList(models.voices)
+  );
 }

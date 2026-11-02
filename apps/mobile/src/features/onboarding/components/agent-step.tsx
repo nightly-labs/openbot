@@ -2,7 +2,7 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type AccessibilityActionEvent, Pressable, useWindowDimensions, View } from "react-native";
+import { type AccessibilityActionEvent, Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   cancelAnimation,
@@ -35,6 +35,7 @@ import {
   CUSTOM_CHOICE,
   ONBOARDING_ROLES,
 } from "@/features/onboarding/model/onboarding-roles";
+import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";
@@ -211,8 +212,9 @@ export function AgentStep({
   const { t } = useText();
   const insets = useSafeAreaInsets();
   const muted = String(useThemeColor("muted"));
-  const { width: screenWidth } = useWindowDimensions();
-  const side = (screenWidth - ITEM_WIDTH) / 2;
+  // The flow pads the steps by the side insets, so the stage is that much narrower than the column.
+  const stageWidth = useColumnWidth() - insets.left - insets.right;
+  const side = (stageWidth - ITEM_WIDTH) / 2;
   const last = CHOICE_COUNT - 1;
   const full = motion === "full";
 

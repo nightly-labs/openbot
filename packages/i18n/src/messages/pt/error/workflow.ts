@@ -38,4 +38,25 @@ export const messages = {
     "Este fluxo de trabalho é grande demais para ser enviado a outro computador. Abra-o no computador que executa o servidor.",
   "error.workflow.webhookMissing":
     "Esta etapa não é um gatilho de webhook. Salve o fluxo de trabalho e tente novamente.",
+  "error.workflow.githubActionMissing": "Escolha o que esta saída faz no GitHub.",
+  "error.workflow.githubRepositoryMissing": "Escolha um repositório para esta saída.",
+  "error.workflow.githubItemMissing":
+    "Esta saída não tem issue nem pull request. Inicie a execução a partir de um evento do GitHub ou coloque o número na entrada dela.",
+  "error.workflow.githubPullRequestOnly": "Esta ação funciona apenas em pull requests.",
+  "error.workflow.githubTextMissing": "Esta saída não tem texto para enviar. Conecte uma etapa que o escreva.",
+  "error.workflow.githubEventText":
+    "Esta saída não pode enviar o evento bruto do gatilho. Coloque um agente entre o gatilho e esta saída.",
+  "error.workflow.githubChoiceMissing": "Escolha os rótulos ou a pessoa para esta saída.",
+  "error.workflow.githubChoseNothing": "O modelo não escolheu nenhum rótulo ou pessoa deste repositório.",
+  "error.workflow.githubNotConnected": "Conecte o GitHub no computador que executa este fluxo de trabalho.",
+  "error.workflow.githubNoAccess":
+    "O GitHub App do OpenBot não consegue ver este repositório ou item. Abra o GitHub e dê acesso ao app.",
+  "error.workflow.githubNoWrite":
+    "O GitHub App do OpenBot não pode alterar este repositório. Abra o GitHub e dê acesso ao app.",
+  "error.workflow.githubLocked": "Esta conversa está bloqueada no GitHub.",
+  "error.workflow.githubRefused": "O GitHub recusou a alteração: {detail}",
+  "error.workflow.githubUnreachable": "O OpenBot não conseguiu acessar o GitHub. Execute a etapa novamente.",
+  "error.workflow.githubUncertain":
+    "A alteração parou no caminho. Ela pode já estar no GitHub. Verifique lá antes de executar a etapa novamente.",
+  "error.workflow.githubNoEvent": "O GitHub não tem issue nem pull request para este gatilho iniciar.",
 } as const satisfies PartialTranslation<typeof source>;

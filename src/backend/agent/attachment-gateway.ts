@@ -311,6 +311,12 @@ export class AttachmentGateway {
     const [workspaceRoot, sharedRoot] = yield* attachmentCall(() =>
       Promise.all([realpath(agent.workspacePath), realpath(this.#sharedRoot)]),
     );
+    // The folders the user gave the agent. One that was moved or deleted is left out.
+    const folderRoots = yield* attachmentCall(async () =>
+      (await Promise.allSettled((agent.additionalFolders ?? []).map((folder) => realpath(folder)))).flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : [],
+      ),
+    );
     const normalized = value.replaceAll("\\", "/");
     const sharedReference = ["~/OpenBot/Shared/", "OpenBot/Shared/", "Shared/"].some((prefix) =>
       normalized.startsWith(prefix),
@@ -332,7 +338,10 @@ export class AttachmentGateway {
         )
           continue;
         const resolved = attachmentResult(yield* Effect.result(attachmentCall(() => realpath(candidate))));
-        if (!scope.allowAnyReadablePath && !isWithin(workspaceRoot, resolved) && !isWithin(sharedRoot, resolved)) {
+        if (
+          !scope.allowAnyReadablePath &&
+          ![workspaceRoot, sharedRoot, ...folderRoots].some((root) => isWithin(root, resolved))
+        ) {
           continue;
         }
         const authorizedMetadata = attachmentResult(yield* Effect.result(attachmentCall(() => lstat(resolved))));

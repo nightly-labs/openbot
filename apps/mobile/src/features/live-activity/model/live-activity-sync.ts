@@ -4,11 +4,22 @@ export interface LiveActivityInstance<Props> {
    * that an older version started. iOS stops its updates 8 hours later.
    */
   readonly startedAt: number | null;
+  /**
+   * Whether iOS still shows and updates the activity. An update of an ended activity does nothing and
+   * does not fail, so an activity that iOS or the host ended needs this check.
+   */
+  isActive(): boolean;
   update(props: Props, staleDate?: Date): Promise<void>;
   end(dismissalPolicy: "default" | "immediate"): Promise<void>;
   /** Calls `receive` with the push token of this activity, now and each time iOS changes it. */
   watchPushToken(receive: (token: string) => void): () => void;
 }
+
+/**
+ * iOS ends an activity 8 hours after its start. One that is older than this when the app comes back
+ * starts again, so it does not stop while the app is away.
+ */
+const RESTART_AFTER_MS = 7 * 60 * 60 * 1000;
 
 export interface LiveActivityStarter<Props> {
   start(props: Props, staleDate?: Date): LiveActivityInstance<Props>;
@@ -65,9 +76,21 @@ export class LiveActivitySync<Props> {
     return this.#queue;
   }
 
-  /** The host updated or ended the activity while the app was away, so the app no longer knows what it shows. */
-  forget(): void {
+  /**
+   * The host updated or ended the activity while the app was away, so the app no longer knows what it
+   * shows. Call it when the app comes back: an activity that ended, or that iOS ends soon, starts again
+   * with the next state. iOS starts an activity only while the app is on screen.
+   */
+  forget(now = Date.now()): void {
     this.#shown = null;
+    const activity = this.#activity;
+    if (!activity) return;
+    const active = activity.isActive();
+    if (active && (activity.startedAt === null || now - activity.startedAt < RESTART_AFTER_MS)) return;
+    this.#setActivity(null);
+    if (!active) return;
+    // The end goes before the next start, so the old activity does not stay beside the new one.
+    this.#queue = this.#queue.then(() => activity.end("immediate")).catch(() => undefined);
   }
 
   async #apply(props: Props | null, staleDate: Date | undefined): Promise<void> {

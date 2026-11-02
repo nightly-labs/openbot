@@ -1,13 +1,14 @@
-// A custom provider is an OpenAI-compatible endpoint the user names themselves. OpenBot serves it by
-// merging a `provider` entry into the OpenCode CLI's config, so the wire identity stays `opencode`
-// and no new `AgentProviderId` exists. What makes this file a contract rather than renderer state is
+// A custom provider is an OpenAI-compatible endpoint the user names themselves. OpenBot serves it
+// through the harness the user chooses: OpenCode, which reads a `provider` entry merged into its
+// config, or Pi, which reads an extension that registers the endpoint. The wire identity stays the
+// harness, `opencode` or `pi`, and no new `AgentProviderId` exists. What makes this file a contract rather than renderer state is
 // the API key: it travels renderer-to-main on `save` and must never come back, so both directions
 // need one agreed shape and the guard below is what enforces the asymmetry.
 
-import { AGENT_PROVIDERS } from "./agent-providers";
+import { AGENT_PROVIDERS, type AgentProviderId } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString } from "./ipc-bounded-values";
-import { isDynamicRecord, isOneOf, isString } from "./runtime-values";
+import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 /**
  * A custom provider is served by the OpenCode CLI, so its bounds are OpenCode's config shape rather
@@ -20,6 +21,18 @@ export const CUSTOM_PROVIDER_LIMITS = {
   baseUrl: 2_048,
   models: 64,
   headers: 32,
+  /**
+   * The context window of one model, in tokens. OpenCode's own prompt and tools take about 12K
+   * tokens, so a smaller window compacts on every turn.
+   */
+  contextWindowMin: 1_024,
+  contextWindowMax: 100_000_000,
+  /**
+   * The largest completion of one model, in tokens. No model returns a million, so the ceiling only
+   * stops a typo from reaching the endpoint as `max_completion_tokens`.
+   */
+  maxOutputMin: 256,
+  maxOutputMax: 1_000_000,
 } as const;
 
 /** A `provider` key in OpenCode's config, so lowercase and free of separators. */
@@ -28,9 +41,49 @@ export const CUSTOM_PROVIDER_ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 /** RFC 9110 field-name token characters. */
 export const CUSTOM_PROVIDER_HEADER_NAME_PATTERN = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 
+/** The providers that can run a custom endpoint. The first one is the default and the released one. */
+export const CUSTOM_PROVIDER_HARNESSES = ["opencode", "pi"] as const satisfies readonly AgentProviderId[];
+export type CustomProviderHarness = (typeof CUSTOM_PROVIDER_HARNESSES)[number];
+export const DEFAULT_CUSTOM_PROVIDER_HARNESS: CustomProviderHarness = "opencode";
+
+export function isCustomProviderHarness(value: unknown): value is CustomProviderHarness {
+  return isOneOf(CUSTOM_PROVIDER_HARNESSES, value);
+}
+
 export interface CustomProviderModel {
   id: string;
   name: string;
+  /**
+   * The context window in tokens. Absent: OpenCode assumes its own default, 200K tokens in OpenCode
+   * 2.1.4. This computer only: a Team API list and save keep their released model fields.
+   */
+  contextWindow?: number;
+  /**
+   * The largest completion the model returns, in tokens (#4234). Absent: OpenBot writes a guess of
+   * at most 16,384, or half a small window. The form asks for a `contextWindow` with it, because the
+   * OpenCode entry writes no limit without a window. This computer only, like `contextWindow`.
+   */
+  maxOutput?: number;
+}
+
+/** A context window that OpenCode can use for a model. */
+export function isCustomProviderContextWindow(value: unknown): value is number {
+  return (
+    isNumber(value) &&
+    Number.isSafeInteger(value) &&
+    value >= CUSTOM_PROVIDER_LIMITS.contextWindowMin &&
+    value <= CUSTOM_PROVIDER_LIMITS.contextWindowMax
+  );
+}
+
+/** A completion cap that OpenCode can use for a model. */
+export function isCustomProviderMaxOutput(value: unknown): value is number {
+  return (
+    isNumber(value) &&
+    Number.isSafeInteger(value) &&
+    value >= CUSTOM_PROVIDER_LIMITS.maxOutputMin &&
+    value <= CUSTOM_PROVIDER_LIMITS.maxOutputMax
+  );
 }
 
 export interface CustomProviderHeader {
@@ -58,6 +111,8 @@ export interface SaveCustomProviderInput {
   apiKey: string | null;
   models: CustomProviderModel[];
   headers: CustomProviderHeader[];
+  /** The provider that runs the endpoint. Absent: OpenCode. This computer only, like `headerNames`. */
+  harness?: CustomProviderHarness;
 }
 
 /**
@@ -75,6 +130,8 @@ export interface UpdateCustomProviderInput {
   models: CustomProviderModel[];
   apiKey?: string;
   headers?: CustomProviderHeaderInput[];
+  /** Absent: the saved harness stays. */
+  harness?: CustomProviderHarness;
 }
 
 export interface DeleteCustomProviderInput {
@@ -98,6 +155,8 @@ export interface CustomProviderSummary {
    * may have been saved in an earlier run. A model id and its label are not credentials.
    */
   models: CustomProviderModel[];
+  /** The provider that runs the endpoint. Absent in a Team API list, which keeps its released fields. */
+  harness?: CustomProviderHarness;
 }
 
 /**
@@ -150,6 +209,7 @@ export function isCustomProviderSummary(value: unknown): value is CustomProvider
     isBoundedString(value.baseUrl, CUSTOM_PROVIDER_LIMITS.baseUrl) &&
     typeof value.hasApiKey === "boolean" &&
     (value.headerNames === undefined || isHeaderNames(value.headerNames)) &&
+    (value.harness === undefined || isCustomProviderHarness(value.harness)) &&
     Array.isArray(value.models) &&
     value.models.length <= CUSTOM_PROVIDER_LIMITS.models &&
     value.models.every(isCustomProviderModel)
@@ -168,7 +228,9 @@ function isCustomProviderModel(value: unknown): value is CustomProviderModel {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.id, INPUT_LIMITS.identifier) &&
-    isBoundedString(value.name, INPUT_LIMITS.modelName)
+    isBoundedString(value.name, INPUT_LIMITS.modelName) &&
+    (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow)) &&
+    (value.maxOutput === undefined || isCustomProviderMaxOutput(value.maxOutput))
   );
 }
 

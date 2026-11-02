@@ -112,7 +112,7 @@ export const messages = {
   "files.cleanup.description.caches": "Kopieën van serverbestanden. OpenBot downloadt ze opnieuw wanneer je ze opent.",
   "files.cleanup.description.logs": "Diagnostische logboeken. Nieuwe logboeken beginnen meteen.",
   "files.cleanup.description.runtimes":
-    "Oudere CLI-versies van aanbieders die geen agent gebruikt. OpenBot bewaart de gebruikte versie en één oudere versie die werkt.",
+    "Oudere CLI-versies van aanbieders die geen agent gebruikt. OpenBot bewaart de gebruikte versie.",
   "files.cleanup.clear": "Wissen",
   "files.cleanup.clearCategory": "{category} wissen",
   "files.cleanup.confirm.caches": "Gecachete serverbestanden wissen?",

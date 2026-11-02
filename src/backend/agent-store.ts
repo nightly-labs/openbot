@@ -20,6 +20,7 @@ import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@open
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentProfileDraft } from "@openbot/contracts/ipc";
 import {
+  AGENT_FOLDER_LIMIT,
   AGENT_PROVIDERS,
   type AgentAccess,
   type AgentBackupModels,
@@ -42,6 +43,7 @@ import {
   decodeSaveAgentProfileResult,
   defaultProviderModel,
   isAgentAccess,
+  isAgentAdditionalFolders,
   isAgentBackupModels,
   isAgentModel,
   isAgentPendingRuntime,
@@ -84,6 +86,10 @@ type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access
   access?: AgentAccess;
   // Absent on every agent stored before the setting existed, which keeps Computer Use on.
   computerUse?: boolean;
+  // Absent on every agent stored before folders existed, and on an agent with none.
+  additionalFolders?: string[];
+  // Absent on every agent stored before excluded folders existed, and on an agent with none.
+  excludedFolders?: string[];
   // Absent means the account default, which is off until the user changes it in Settings › Agents.
   allowAutomation?: boolean;
   // Absent means the account default, which is off until the user changes it in Settings › Agents.
@@ -197,8 +203,9 @@ export class AgentStore {
     homePath: string,
     database = new OpenBotDatabase(userDataPath),
     agentDefaults: () => AgentDefaults = () => DEFAULT_AGENT_DEFAULTS,
+    /** The folder of the agents, shared files and downloads. A local server has its own. */
+    openbotRoot = join(homePath, "OpenBot"),
   ) {
-    const openbotRoot = join(homePath, "OpenBot");
     this.#statePath = join(userDataPath, LEGACY_AGENTS_STATE_FILE);
     this.#agentsRoot = join(openbotRoot, "Agents");
     this.#legacyAgentsRoot = join(openbotRoot, "Bots");
@@ -403,6 +410,14 @@ export class AgentStore {
       if (source.sessionSettingOverrides)
         record.sessionSettingOverrides = structuredClone(source.sessionSettingOverrides);
       record.access = source.access;
+      if (source.additionalFolders) record.additionalFolders = [...source.additionalFolders];
+      // An exclusion in the source workspace applies to the same folder in the copied workspace.
+      if (source.excludedFolders)
+        record.excludedFolders = source.excludedFolders.map((folder) =>
+          isPathInside(source.workspacePath, folder)
+            ? join(record.workspacePath, relative(source.workspacePath, folder))
+            : folder,
+        );
       record.computerUse = source.computerUse;
       if (source.busyMessageMode) record.busyMessageMode = source.busyMessageMode;
       if (source.taskLimit !== undefined) record.taskLimit = source.taskLimit;
@@ -672,6 +687,10 @@ export class AgentStore {
       ownBrowserSession?: boolean;
       /** The named browser profile. `null` removes it. The caller checks that the profile exists. */
       browserProfileId?: string | null;
+      /** The whole list. The caller checks each folder; an empty list removes it. */
+      additionalFolders?: string[];
+      /** The whole list, like `additionalFolders`. */
+      excludedFolders?: string[];
     },
     initiatingAgentId?: string,
   ): Effect.fn.Return<AgentSummary, StoredStateFailure> {
@@ -708,6 +727,16 @@ export class AgentStore {
       if (input.access !== undefined) {
         if (!isAgentAccess(input.access)) throw new Error("Invalid agent access.");
         next.access = input.access;
+      }
+      if (input.additionalFolders !== undefined) {
+        if (!isAgentAdditionalFolders(input.additionalFolders)) throw new Error("Invalid agent folders.");
+        if (input.additionalFolders.length === 0) delete next.additionalFolders;
+        else next.additionalFolders = [...input.additionalFolders];
+      }
+      if (input.excludedFolders !== undefined) {
+        if (!isAgentAdditionalFolders(input.excludedFolders)) throw new Error("Invalid agent folders.");
+        if (input.excludedFolders.length === 0) delete next.excludedFolders;
+        else next.excludedFolders = [...input.excludedFolders];
       }
       if (input.computerUse !== undefined) {
         if (!isBoolean(input.computerUse)) throw new Error("Invalid Computer Use value.");
@@ -821,6 +850,8 @@ export class AgentStore {
       if (next.taskLimit === undefined) delete agent.taskLimit;
       if (next.providerAccountId === undefined) delete agent.providerAccountId;
       if (next.backupModels === undefined) delete agent.backupModels;
+      if (next.additionalFolders === undefined) delete agent.additionalFolders;
+      if (next.excludedFolders === undefined) delete agent.excludedFolders;
       if (next.usageLimitReturn === undefined) delete agent.usageLimitReturn;
       if (next.pendingRuntime === undefined) delete agent.pendingRuntime;
       if (next.browserProfileId === undefined) delete agent.browserProfileId;
@@ -835,6 +866,8 @@ export class AgentStore {
         if (previous.taskLimit === undefined) delete agent.taskLimit;
         if (previous.providerAccountId === undefined) delete agent.providerAccountId;
         if (previous.backupModels === undefined) delete agent.backupModels;
+        if (previous.additionalFolders === undefined) delete agent.additionalFolders;
+        if (previous.excludedFolders === undefined) delete agent.excludedFolders;
         if (previous.usageLimitReturn === undefined) delete agent.usageLimitReturn;
         if (previous.pendingRuntime === undefined) delete agent.pendingRuntime;
         if (previous.browserProfileId === undefined) delete agent.browserProfileId;
@@ -1842,6 +1875,8 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
     (record.sessionSettingOverrides === undefined || isAgentSessionSettingOverrides(record.sessionSettingOverrides)) &&
     (record.sessionSettingResets === undefined || isAgentSessionSettingResets(record.sessionSettingResets)) &&
     (record.access === undefined || isAgentAccess(record.access)) &&
+    (record.additionalFolders === undefined || isAgentAdditionalFolders(record.additionalFolders)) &&
+    (record.excludedFolders === undefined || isAgentAdditionalFolders(record.excludedFolders)) &&
     (record.computerUse === undefined || isBoolean(record.computerUse)) &&
     (record.allowAutomation === undefined || isBoolean(record.allowAutomation)) &&
     (record.allowNewChat === undefined || isBoolean(record.allowNewChat)) &&
@@ -1908,6 +1943,16 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     : reset("model", provider === undefined ? DEFAULT_AGENT_MODEL : defaultProviderModel(provider));
   const access =
     value.access === undefined || isAgentAccess(value.access) ? value.access : reset("access", DEFAULT_AGENT_ACCESS);
+  // A list that this build cannot read keeps the folders it can, so the agent loses no more access than it must.
+  const additionalFolders =
+    value.additionalFolders === undefined || isAgentAdditionalFolders(value.additionalFolders)
+      ? value.additionalFolders
+      : readableFolders(value.additionalFolders, () => repaired.push("additionalFolders"));
+  // The same for excluded folders: a write block that this build cannot read stays for the paths it can.
+  const excludedFolders =
+    value.excludedFolders === undefined || isAgentAdditionalFolders(value.excludedFolders)
+      ? value.excludedFolders
+      : readableFolders(value.excludedFolders, () => repaired.push("excludedFolders"));
   const computerUse =
     value.computerUse === undefined || isBoolean(value.computerUse) ? value.computerUse : reset("computerUse", true);
   const allowAutomation =
@@ -2002,6 +2047,8 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
     ...(provider === undefined ? {} : { provider }),
     ...(access === undefined ? {} : { access }),
+    ...(additionalFolders === undefined || additionalFolders.length === 0 ? {} : { additionalFolders }),
+    ...(excludedFolders === undefined || excludedFolders.length === 0 ? {} : { excludedFolders }),
     ...(computerUse === undefined ? {} : { computerUse }),
     ...(allowAutomation === undefined ? {} : { allowAutomation }),
     ...(allowNewChat === undefined ? {} : { allowNewChat }),
@@ -2085,6 +2132,14 @@ function migrateLegacyAgent(agent: LegacyStoredAgent): StoredAgent {
     avatarHue: null,
     avatarUrl: null,
   };
+}
+
+function readableFolders(value: unknown, repair: () => void): string[] {
+  repair();
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((path): path is string => isString(path) && path.length > 0 && path.length <= INPUT_LIMITS.path)
+    .slice(0, AGENT_FOLDER_LIMIT);
 }
 
 function normalizeStoredAgent(agent: PersistedStoredAgent): StoredAgent {

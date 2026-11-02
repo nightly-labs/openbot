@@ -1,26 +1,27 @@
+import type { AnalyticsAgent } from "@openbot/contracts/ipc";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import { useUniwind } from "uniwind";
-import { AgentUsageReport } from "@/features/agents/components/agent-usage-report";
+import { AgentProviderAvatar } from "@/features/agents/components/agent-provider-avatar";
+import { AgentUsageReport, type UsageAgentRow } from "@/features/agents/components/agent-usage-report";
 import { UsageLoading } from "@/features/agents/components/usage-motion";
 import { lastUsageDays, UsageRangePicker } from "@/features/agents/components/usage-range-picker";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
-import { SettingsPicker } from "@/features/settings/components/settings-controls";
+import { PlanLimitsSummary } from "@/features/servers/components/plan-limits-summary";
+import { SettingsNote } from "@/features/settings/components/settings-content";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { LargeTitleScrollView } from "@/shared/components/large-title";
-import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** The usage of every agent of one server, as the desktop Usage panel shows it, with an agent filter. */
+const AGENT_AVATAR_SIZE = 36;
+
+/** The usage of every agent of one server, as the desktop Usage panel shows it. An agent row opens that agent's usage. */
 export function ServerUsageScreen() {
   const { t } = useText();
-  const { theme } = useUniwind();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
   const queryScope = useQueryScope();
   const { servers, agents, loadHostAnalytics } = useMobileWorkspace();
@@ -28,25 +29,35 @@ export function ServerUsageScreen() {
   const online = server?.state === "online";
   const serverAgents = agents.filter((agent) => agent.serverId === serverId);
   const [range, setRange] = useState(() => lastUsageDays());
-  const [agentId, setAgentId] = useState<string>();
   useEffect(() => {
     mobileAnalytics.track("usage_viewed", { scope: "server" });
   }, []);
   const usage = useQuery({
-    queryKey: queryKeys.serverUsage(queryScope, serverId, range, agentId),
-    queryFn: () => loadHostAnalytics({ ...range, ...(agentId ? { agentId } : {}) }, serverId),
+    queryKey: queryKeys.serverUsage(queryScope, serverId, range),
+    queryFn: () => loadHostAnalytics(range, serverId),
     enabled: online,
-    // The last report stays on screen while the next range or agent loads, so its values change in place.
+    // The last report stays on screen while the next range loads, so its values change in place.
     placeholderData: keepPreviousData,
     retry: false,
     staleTime: 0,
     gcTime: 0,
   });
   // As on desktop: an agent the phone does not list, such as one removed since, keeps its ID as its name.
-  const agentName = (id: string) => serverAgents.find((agent) => agent.id === id)?.name ?? id;
-  function selectAgent(id: string | undefined) {
-    void haptics.selection();
-    setAgentId(id);
+  function agentRow(row: AnalyticsAgent): UsageAgentRow {
+    const agent = serverAgents.find((item) => item.id === row.agentId);
+    return agent
+      ? {
+          ...row,
+          name: agent.name,
+          avatar: <AgentProviderAvatar agent={agent} size={AGENT_AVATAR_SIZE} />,
+          onPress: () =>
+            router.push({
+              pathname: "/agent-info/[agentId]/usage",
+              // The agent's usage opens on the range of this screen.
+              params: { agentId: agent.id, serverId: agent.serverId, ...range },
+            }),
+        }
+      : { ...row, name: row.agentId };
   }
 
   const title = t("mobile.app.route.usage");
@@ -60,25 +71,8 @@ export function ServerUsageScreen() {
   return (
     <LargeTitleScrollView title={title} caption={server.name} contentContainerClassName="px-4 pt-3">
       <View className="gap-4">
-        <SettingsSection>
-          <SettingsRow
-            trailing={
-              <SettingsPicker
-                value={agentId ?? ""}
-                options={[
-                  { value: "", label: t("mobile.server.usage.allAgents") },
-                  ...serverAgents.map((agent) => ({ value: agent.id, label: agent.name })),
-                ]}
-                enabled
-                dark={theme === "dark"}
-                label={t("mobile.server.usage.agent")}
-                onChange={(value) => selectAgent(value || undefined)}
-              />
-            }
-          >
-            <Typography.Paragraph>{t("mobile.server.usage.agent")}</Typography.Paragraph>
-          </SettingsRow>
-        </SettingsSection>
+        {/* Above the range: the limits are the provider's now, not of a range. */}
+        <PlanLimitsSummary serverId={server.id} />
         <UsageRangePicker range={range} onChange={setRange} />
         {!online ? (
           <Typography.Paragraph>{t("mobile.agent.info.usage.reconnect")}</Typography.Paragraph>
@@ -93,14 +87,7 @@ export function ServerUsageScreen() {
           </View>
         ) : usage.data ? (
           <UsageLoading loading={usage.isPlaceholderData}>
-            <AgentUsageReport
-              result={usage.data}
-              // A filtered report splits into one row that restates the totals.
-              agents={
-                agentId ? undefined : usage.data.agents.map((agent) => ({ ...agent, name: agentName(agent.agentId) }))
-              }
-              onSelectAgent={selectAgent}
-            />
+            <AgentUsageReport result={usage.data} agents={usage.data.agents.map(agentRow)} />
           </UsageLoading>
         ) : (
           <Typography.Paragraph>{t("mobile.server.usage.unsupported")}</Typography.Paragraph>

@@ -1,8 +1,13 @@
 import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
-import { type ColorValue, View } from "react-native";
-import Animated, { Easing, ReduceMotion, withTiming } from "react-native-reanimated";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import { useState } from "react";
+import { type ColorValue, Pressable, View } from "react-native";
+import Animated, { cubicBezier, Easing, ReduceMotion, withTiming } from "react-native-reanimated";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { haptics } from "@/shared/lib/haptics";
+import { useReducedMotion } from "@/shared/lib/motion";
+import { useText } from "@/shared/lib/text";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -30,6 +35,7 @@ const MOVE_OUT = {
 };
 // As on desktop. The label can be a whole commentary step, which must not make the row tall.
 const LABEL_LINES = 2;
+const PRESS_EASING = cubicBezier(0.23, 1, 0.32, 1);
 
 function activityEntering() {
   "worklet";
@@ -70,6 +76,8 @@ export interface ChatActivitySpec {
   online: boolean;
   animateAvatar: boolean;
   shimmer: boolean;
+  /** Opens every thought of the turn. Absent when the chat cannot show them. */
+  onPress?: () => void;
 }
 
 export function ChatActivityRow({
@@ -81,37 +89,60 @@ export function ChatActivityRow({
   foreground: ColorValue;
   muted: ColorValue;
 }) {
+  const { t } = useText();
+  const reducedMotion = useReducedMotion();
+  const [pressed, setPressed] = useState(false);
+  const { onPress } = spec;
+  // The same views with or without `onPress`, so the row does not enter again when its turn starts.
   return (
-    <Animated.View
-      entering={activityEntering}
-      exiting={activityExiting}
-      className="flex-row items-center gap-2 px-1 py-2"
-      accessible
-      accessibilityLiveRegion="polite"
-      accessibilityRole="text"
-      accessibilityLabel={spec.accessibilityLabel}
-    >
-      {spec.agent ? (
-        <BloubAvatarPreview
-          agentId={spec.agent.id}
-          serverId={spec.agent.serverId}
-          hue={spec.agent.avatarHue}
-          seed={spec.agent.avatarSeed}
-          size={36}
-          disconnected={!spec.online}
-          mood={spec.mood}
-          animateIdle={spec.animateAvatar}
-        />
-      ) : null}
-      <View className="min-w-0 flex-1">
-        <ThinkingTextGradient
-          text={spec.label}
-          numberOfLines={LABEL_LINES}
-          foreground={foreground}
-          muted={muted}
-          enabled={spec.shimmer}
-        />
-      </View>
+    <Animated.View entering={activityEntering} exiting={activityExiting}>
+      <Pressable
+        accessible
+        accessibilityLiveRegion="polite"
+        accessibilityRole={onPress ? "button" : "text"}
+        accessibilityLabel={spec.accessibilityLabel}
+        accessibilityHint={onPress ? t("mobile.chat.thinking.openHint") : undefined}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+        onPress={() => {
+          if (!onPress) return;
+          void haptics.selection();
+          onPress();
+        }}
+      >
+        <Animated.View
+          className="flex-row items-center gap-2 px-1 py-2"
+          style={{
+            transform: [{ scale: pressed && onPress && !reducedMotion ? 0.98 : 1 }],
+            transitionProperty: "transform",
+            transitionDuration: 120,
+            transitionTimingFunction: PRESS_EASING,
+          }}
+        >
+          {spec.agent ? (
+            <BloubAvatarPreview
+              agentId={spec.agent.id}
+              serverId={spec.agent.serverId}
+              hue={spec.agent.avatarHue}
+              seed={spec.agent.avatarSeed}
+              size={36}
+              disconnected={!spec.online}
+              mood={spec.mood}
+              animateIdle={spec.animateAvatar}
+            />
+          ) : null}
+          <View className="min-w-0 flex-1">
+            <ThinkingTextGradient
+              text={spec.label}
+              numberOfLines={LABEL_LINES}
+              foreground={foreground}
+              muted={muted}
+              enabled={spec.shimmer}
+            />
+          </View>
+          {onPress ? <ChevronRight size={16} color={muted} /> : null}
+        </Animated.View>
+      </Pressable>
     </Animated.View>
   );
 }

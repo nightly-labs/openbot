@@ -1,0 +1,23 @@
+diff --git a/ios/ReservedRegionsView.mm b/ios/ReservedRegionsView.mm
+index 04b38972d2cf73c56a128c977e121b1b8533d5e9..e268fe04d7c11d5f719c4af3aac1169a941409f5 100644
+--- a/ios/ReservedRegionsView.mm
++++ b/ios/ReservedRegionsView.mm
+@@ -116,12 +116,12 @@ using namespace facebook::react;
+     return;
+   }
+   _hasDispatchedRegions = YES;
+-  eventEmitter->experimental_flushSync([eventEmitter, regions = std::move(regionPayloads)]() mutable {
+-    eventEmitter->dispatchEvent(
+-        "regionsChange",
+-        folly::dynamic::object("regions", std::move(regions)),
+-        RawEvent::Category::Discrete);
+-  });
++  // Do not flush synchronously: the main thread then waits for the JS thread, and deadlocks when
++  // JS waits for the main thread (an Expo view function that looks up its view at start).
++  eventEmitter->dispatchEvent(
++      "regionsChange",
++      folly::dynamic::object("regions", std::move(regionPayloads)),
++      RawEvent::Category::Discrete);
+ }
+ 
+ - (void)prepareForRecycle

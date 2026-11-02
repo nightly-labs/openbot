@@ -4,6 +4,12 @@ import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 /** What a waiting agent needs from the user, as the desktop sidebar names it. */
 export type MobileAgentWaitReason = "question" | "approval" | "takeover";
 
+/** What stops an agent until the user acts, with the question or the command when the host sent one. */
+export interface MobileAgentWait {
+  reason: MobileAgentWaitReason;
+  detail: string | null;
+}
+
 export interface MobileAgentActivity {
   agentId?: string;
   turnId: string | null;
@@ -13,6 +19,7 @@ export interface MobileAgentActivity {
    */
   threadId?: string;
   phase: "working" | "responding" | "waiting";
+  /** What the agent does now. While it waits, the question or the command that it waits on. */
   detail: string | null;
   /** Set only while `phase` is `waiting`. */
   reason?: MobileAgentWaitReason;
@@ -94,16 +101,28 @@ export function reduceAgentActivity(
     }
     // The later list wins, so a question names the wait over a takeover, and both over an approval.
     const waits = [
-      ...event.snapshot.pendingApprovals.map((request) => ({ request, reason: "approval" as const })),
-      ...event.snapshot.pendingBrowserTakeovers.map((request) => ({ request, reason: "takeover" as const })),
-      ...event.snapshot.pendingPrompts.map((request) => ({ request, reason: "question" as const })),
+      ...event.snapshot.pendingApprovals.map((request) => ({
+        request,
+        reason: "approval" as const,
+        detail: approvalDetail(request),
+      })),
+      ...event.snapshot.pendingBrowserTakeovers.map((request) => ({
+        request,
+        reason: "takeover" as const,
+        detail: null,
+      })),
+      ...event.snapshot.pendingPrompts.map((request) => ({
+        request,
+        reason: "question" as const,
+        detail: questionDetail(request.questions),
+      })),
     ];
-    for (const { request, reason } of waits) {
+    for (const { request, reason, detail } of waits) {
       next[request.agentId] = {
         turnId: request.turnId,
         threadId: request.threadId,
         phase: "waiting",
-        detail: null,
+        detail,
         reason,
       };
     }
@@ -173,19 +192,27 @@ export function reduceAgentActivity(
   if (event.type === "prompt" || event.type === "approval" || event.type === "browser-takeover-requested") {
     const request = event.type === "approval" ? event.approval : event.type === "prompt" ? event : event.request;
     const reason = event.type === "approval" ? "approval" : event.type === "prompt" ? "question" : "takeover";
+    const detail =
+      event.type === "approval"
+        ? approvalDetail(event.approval)
+        : event.type === "prompt"
+          ? questionDetail(event.questions)
+          : null;
     const previous = current[request.agentId];
-    const kept =
-      previous?.phase === "waiting" && previous.turnId === request.turnId && previous.reason
-        ? WAIT_RANK[previous.reason] > WAIT_RANK[reason]
-          ? previous.reason
-          : reason
-        : reason;
+    // The wait of the higher rank keeps its detail with its reason.
+    const kept: MobileAgentWait =
+      previous?.phase === "waiting" &&
+      previous.turnId === request.turnId &&
+      previous.reason &&
+      WAIT_RANK[previous.reason] > WAIT_RANK[reason]
+        ? { reason: previous.reason, detail: previous.detail }
+        : { reason, detail };
     return withActivity(current, request.agentId, {
       turnId: request.turnId,
       threadId: request.threadId,
       phase: "waiting",
-      detail: null,
-      reason: kept,
+      detail: kept.detail,
+      reason: kept.reason,
     });
   }
   if (event.type === "agent-input-resolved") {
@@ -201,4 +228,14 @@ export function reduceAgentActivity(
     }
   }
   return current;
+}
+
+/** The first question of a prompt, as the desktop sidebar shows it. */
+function questionDetail(questions: readonly { question: string }[]): string | null {
+  return questions[0]?.question.trim() || null;
+}
+
+/** The command of an approval, else its reason. */
+function approvalDetail(approval: { command: string | null; reason: string | null }): string | null {
+  return approval.command?.trim() || approval.reason?.trim() || null;
 }

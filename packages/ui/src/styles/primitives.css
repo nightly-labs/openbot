@@ -592,6 +592,55 @@
   background-size: 50% 50%;
 }
 
+.ui-textarea-resizable {
+  position: relative;
+  display: grid;
+}
+
+/* The grip sits inside the bottom-right corner. It changes only the height. */
+.ui-textarea-resizer {
+  --ui-textarea-grip: var(--openbot-text-dim);
+
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: 0;
+  border-bottom-right-radius: var(--openbot-radius-md);
+  padding: 0;
+  background-image: linear-gradient(
+    135deg,
+    transparent 48%,
+    var(--ui-textarea-grip) 48% 56%,
+    transparent 56% 68%,
+    var(--ui-textarea-grip) 68% 76%,
+    transparent 76%
+  );
+  background-repeat: no-repeat;
+  background-position: right 3px bottom 3px;
+  background-size: 12px 12px;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.ui-textarea-resizer:hover,
+.ui-textarea-resizer:focus-visible,
+.ui-textarea-resizer[data-active] {
+  --ui-textarea-grip: var(--openbot-text-primary);
+}
+
+.ui-textarea-resizer:focus-visible {
+  outline: 0;
+}
+
+html.ui-textarea-resizing {
+  cursor: ns-resize;
+  user-select: none;
+}
+
 :where(.ui-input, .ui-textarea)::placeholder {
   color: var(--openbot-text-placeholder);
 }
@@ -1686,9 +1735,7 @@
   border-color: transparent;
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-surface-raised);
-  box-shadow:
-    0 0 0 1px var(--openbot-border),
-    var(--openbot-shadow-raised);
+  box-shadow: 0 0 0 1px var(--openbot-border);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-sans);
   font-size: var(--openbot-text-md);

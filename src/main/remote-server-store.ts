@@ -241,6 +241,22 @@ export class RemoteServerStore implements RemoteServerDirectory {
     yield* this.persist();
   });
 
+  // A local server that started again: a new port and a new session, in the slot it had. Only a new
+  // one is added at the end, and only a new one is selected - a restart must not move the user.
+
+  readonly attachLocal = Effect.fn("RemoteStore.attachLocal")(function* (
+    this: RemoteServerStore,
+    server: StoredRemoteServer,
+    select: boolean,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    this.#forgetUnreadable(server.id);
+    this.#state.servers = this.has(server.id)
+      ? this.#state.servers.map((candidate) => (candidate.id === server.id ? server : candidate))
+      : [...this.#state.servers, server];
+    if (select) this.setActiveServerId(server.id);
+    yield* this.persist();
+  });
+
   // Returns the updated server so a caller that needs the new credentials for its next request does
   // not have to look them up again -- and null when the server is gone, which a live event can race.
 

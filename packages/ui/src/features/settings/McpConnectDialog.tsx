@@ -30,7 +30,7 @@ export interface McpConnectDialogProps {
   hostName?: string | undefined;
   /** The joined server whose host signs in, when it relays the sign-in. */
   signInHostName?: string | undefined;
-  /** Stops a relayed sign-in, for the user who closes the dialog while it waits. */
+  /** Stops the sign-in, for the user who closes the dialog while it waits. */
   onCancelSignIn?: (() => void) | undefined;
   /** What opens over a sign-in while it waits, such as the page of a relayed sign-in. */
   signInExtra?: JSX.Element;

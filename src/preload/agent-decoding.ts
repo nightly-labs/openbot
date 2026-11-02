@@ -1,6 +1,8 @@
 import {
+  type AgentNotificationLevelsSnapshot,
   type AgentSessionSettings,
   type HiddenAgentsSnapshot,
+  isAgentNotificationLevelsSnapshot,
   isAgentSessionSettings,
   isHiddenAgentsSnapshot,
 } from "@openbot/contracts/ipc";
@@ -227,5 +229,10 @@ export function decodeAgentSessionSettingsFromMain(value: unknown): AgentSession
 
 export function decodeHiddenAgentsFromMain(value: unknown): HiddenAgentsSnapshot {
   if (!isHiddenAgentsSnapshot(value)) throw new Error("Invalid hidden agents response.");
+  return value;
+}
+
+export function decodeAgentNotificationLevelsFromMain(value: unknown): AgentNotificationLevelsSnapshot {
+  if (!isAgentNotificationLevelsSnapshot(value)) throw new Error("Invalid agent notification levels response.");
   return value;
 }

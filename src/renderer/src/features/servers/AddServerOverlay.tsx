@@ -1,6 +1,12 @@
-import type { BillingInterval } from "@openbot/contracts/billing";
+import {
+  type BillingCurrency,
+  type BillingInterval,
+  type BillingPlanId,
+  isOpenBillingStatus,
+} from "@openbot/contracts/billing";
 import type { HostedServerEntryPoint, HostedServerList, HostedServerSummary } from "@openbot/contracts/hosted-servers";
-import type { HostedServersDesktopApi, ServerSummary } from "@openbot/contracts/ipc";
+import type { HostedServersDesktopApi, LicenseDesktopApi, ServerSummary } from "@openbot/contracts/ipc";
+import type { LicenseOrder, LicenseState, PricingOrder } from "@openbot/contracts/license";
 import { classifyFailure } from "@openbot/telemetry";
 import type {
   CreatedHostedServer,
@@ -9,6 +15,8 @@ import type {
 } from "@openbot/ui/features/servers/AddServerDialog";
 import {
   HOSTED_BILLING_CURRENCY,
+  HOSTED_CURRENCIES,
+  type HostedCurrency,
   type HostedServerPlan,
   hostedServerPlansFromCatalog,
 } from "@openbot/ui/features/servers/HostedServerPricing";
@@ -45,10 +53,16 @@ interface AddServerOverlayProps {
    */
   onRefreshServers?: (() => Promise<void>) | undefined;
   resume?: AddServerResume | null | undefined;
+  /** The order from the pricing page. The dialog fills it in and goes on to the payment page. */
+  order?: PricingOrder | null | undefined;
+  /** Reads the account's license. When the account has none, the dialog sells one with the server for work use. */
+  license?: Pick<LicenseDesktopApi, "getState"> | undefined;
   onClose: () => void;
   onOpenServer: (serverId: string) => void;
   onContactUs?: (() => void) | undefined;
   onJoinWithInvite?: (() => void) | undefined;
+  /** Opens the dialog that creates a server on this computer. The web client has no such server. */
+  onCreateLocal?: (() => void) | undefined;
   /** Opens the list of the account's hosted servers, so that the user can delete one at the limit. */
   onManageServers?: (() => void) | undefined;
 }
@@ -63,6 +77,37 @@ interface AddServerState {
   maxServers: number | null;
   server: HostedServerSummary | null;
   paid: boolean;
+  /** Set when the account has no open license, so the dialog offers one. */
+  licenseOffer: { used: number; trialEnd?: number } | null;
+  /** The currency of the account's open subscriptions. A Stripe customer pays in one currency. */
+  currency: HostedCurrency | null;
+  /** The pricing page order, as the dialog's choices. */
+  order: CreateHostedServerInput | null;
+}
+
+/** The license offer of an account with no open license. A failed read offers no license. */
+function licenseOfferOf(state: LicenseState | null): { used: number; trialEnd?: number } | null {
+  if (!state?.available) return null;
+  if (state.license && isOpenBillingStatus(state.license.status)) return null;
+  return { used: state.used, ...(state.trialEnd === undefined ? {} : { trialEnd: state.trialEnd }) };
+}
+
+/**
+ * The pricing page order as the dialog's choices. An account with its own license buys the server alone. When the
+ * license read failed, the dialog cannot sell the license, so it gets no order and the user chooses again.
+ */
+function dialogOrderOf(order: PricingOrder | null, state: LicenseState | null): CreateHostedServerInput | null {
+  if (!order?.server) return null;
+  const currency = HOSTED_CURRENCIES.find((entry) => HOSTED_BILLING_CURRENCY[entry] === order.currency);
+  if (!currency) return null;
+  const ownLicense = state?.license ? isOpenBillingStatus(state.license.status) : false;
+  if (order.license && !ownLicense && !licenseOfferOf(state)) return null;
+  return {
+    plan: order.server,
+    billing: order.interval === "year" ? "yearly" : "monthly",
+    currency,
+    license: ownLicense ? undefined : (order.license ?? undefined),
+  };
 }
 
 /**
@@ -111,6 +156,9 @@ function AddServerSession(
     maxServers: null,
     server: null,
     paid: false,
+    licenseOffer: null,
+    currency: null,
+    order: null,
   });
   const requestIds = untrack(() => props.requestIds);
   const resume = untrack(() => props.resume) ?? null;
@@ -129,7 +177,12 @@ function AddServerSession(
 
   async function load(): Promise<void> {
     try {
-      const [catalog, list] = await Promise.all([props.calls.plans(), props.calls.list()]);
+      const license = untrack(() => props.license);
+      const [catalog, list, licenseState] = await Promise.all([
+        props.calls.plans(),
+        props.calls.list(),
+        license ? license.getState().catch(() => null) : Promise.resolve(null),
+      ]);
       const resumed = resume
         ? list.servers.find((server) => server.serverId === resume.serverId)
         : newestInSetup(
@@ -150,6 +203,10 @@ function AddServerSession(
         draft.maxServers = list.maxServers;
         draft.server = resumed ?? null;
         draft.paid = resume?.paid ?? false;
+        draft.licenseOffer = licenseOfferOf(licenseState);
+        draft.currency =
+          HOSTED_CURRENCIES.find((currency) => HOSTED_BILLING_CURRENCY[currency] === licenseState?.currency) ?? null;
+        draft.order = resume ? null : dialogOrderOf(untrack(() => props.order) ?? null, licenseState);
       });
       trackPlans("viewed");
       if (serverLimit() !== null) analytics.track("limit_reached", { kind: "servers", action: "shown" });
@@ -240,25 +297,36 @@ function AddServerSession(
       : text.t("server.hosted.defaultNameNumbered", { number: state.serverCount + 1 });
   }
 
-  async function create(input: CreateHostedServerInput): Promise<CreatedHostedServer> {
+  function create(input: CreateHostedServerInput): Promise<CreatedHostedServer> {
     const interval: BillingInterval = input.billing === "yearly" ? "year" : "month";
-    const currency = HOSTED_BILLING_CURRENCY[input.currency];
-    const choice = `${input.plan}:${interval}:${currency}`;
+    return createPlan(input.plan, interval, HOSTED_BILLING_CURRENCY[input.currency], input.license ?? null);
+  }
+
+  async function createPlan(
+    plan: BillingPlanId,
+    interval: BillingInterval,
+    currency: BillingCurrency,
+    license: LicenseOrder | null,
+  ): Promise<CreatedHostedServer> {
+    const choice = license
+      ? `${plan}:${interval}:${currency}:${license.tier}:${license.users}`
+      : `${plan}:${interval}:${currency}`;
     const key = requestIds.get(choice) ?? { requestId: crypto.randomUUID(), serverId: null };
     requestIds.set(choice, key);
-    trackPlans("plan_selected", { plan: input.plan, interval, currency });
+    trackPlans("plan_selected", { plan, interval, currency });
     const server = await props.calls
       .create({
         name: nextName(),
-        plan: input.plan,
+        plan,
         interval,
         currency,
         requestId: key.requestId,
         ...(entryPoint ? { entryPoint } : {}),
+        ...(license ? { license } : {}),
       })
       .catch(async (error: unknown) => {
         await refreshCount();
-        trackPlans("create_failed", { plan: input.plan, interval, currency, failure_code: "create_failed" });
+        trackPlans("create_failed", { plan, interval, currency, failure_code: "create_failed" });
         if (serverLimit() !== null) analytics.track("limit_reached", { kind: "servers", action: "shown" });
         throw error;
       });
@@ -309,6 +377,10 @@ function AddServerSession(
           <AddServerDialog
             plans={plans()}
             recommendedPlan="standard"
+            licenseOffer={state.licenseOffer ?? undefined}
+            currency={state.currency ?? undefined}
+            currencyLocked={state.currency !== null}
+            order={state.order ?? undefined}
             setupStatus={setupStatus()}
             serverLimit={serverLimit()}
             onManageServers={
@@ -337,6 +409,7 @@ function AddServerSession(
                 props.onJoinWithInvite?.();
               })
             }
+            onCreateLocal={props.onCreateLocal}
             onCurrencyChange={(next) => trackPlans("currency_changed", { currency: HOSTED_BILLING_CURRENCY[next] })}
             onBillingChange={(next) =>
               trackPlans("interval_changed", { interval: next === "yearly" ? "year" : "month" })

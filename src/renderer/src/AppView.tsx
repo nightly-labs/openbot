@@ -8,8 +8,10 @@ import { SetupReadError } from "./features/onboarding/SetupReadError";
 import { useSetupProviderProps } from "./features/onboarding/setup-provider-props";
 import { useServerScope } from "./features/servers/server-scope";
 import { useServerSelection } from "./features/servers/server-selection";
+import { useSettings } from "./features/settings/settings-context";
 import { StartupSplash } from "./features/startup/StartupSplash";
 import { WhatsNewOverlay } from "./features/updates/WhatsNewOverlay";
+import { useI18n } from "./i18n-context";
 import { AccountLogin, FirstRunFlow, InitialSetup, LanguageStep } from "./lazy-views";
 import { usePlatform } from "./platform";
 import { WorkspaceShell } from "./WorkspaceShell";
@@ -39,18 +41,22 @@ function LoadingScreen() {
  */
 export function AppAccessGate() {
   const platform = usePlatform();
+  const i18n = useI18n();
   const auth = useAuth();
   const setup = useSetup();
   const scope = useServerScope();
   // Setup actions run against this computer. The view waits for its first status before offering them.
   const setupProviders = useSetupProviderProps();
   const detection = useProviderDetection();
+  const settings = useSettings();
   const { joinRemoteDuringSetup } = useServerSelection();
   const started = () => setup.setupLoaded() && platform.appInfo() !== null;
   const [splashShown, setSplashShown] = createSignal(true);
   const languageStep = createLanguageStep();
   // Only a settled sign-out: a code in flight or a retry keeps the sign-in screen it belongs to.
-  const languageStepShown = () => auth.centralAuth().status === "signed_out" && !languageStep.done();
+  // The language button reopens the wheel from an error too, so that state does not hide it.
+  const languageStepShown = () =>
+    !languageStep.done() && (languageStep.reopened() || auth.centralAuth().status === "signed_out");
   // A computer signed in before the wheel existed has its language already, so a later sign-out skips the wheel.
   createEffect(
     () => auth.centralAuth().status === "signed_in",
@@ -80,10 +86,16 @@ export function AppAccessGate() {
                     onRequestEmailCode={auth.requestEmailCode}
                     onVerifyEmailCode={auth.verifyEmailCode}
                     onReset={auth.logoutCentralAccount}
+                    language={i18n.locale()}
+                    onChangeLanguage={languageStep.reopen}
                   />
                 }
               >
-                <LanguageStep variant={platform.appInfo()?.variant ?? "production"} onDone={languageStep.complete} />
+                <LanguageStep
+                  variant={platform.appInfo()?.variant ?? "production"}
+                  reopened={languageStep.reopened()}
+                  onDone={languageStep.complete}
+                />
               </Show>
             </Loading>
           }
@@ -105,6 +117,12 @@ export function AppAccessGate() {
                             }
                             platform={platform.appInfo()?.platform ?? "darwin"}
                             onSave={setup.saveSetup}
+                            onAnalyticsChoice={(enabled, chosen) =>
+                              settings.updateGeneralSettings(
+                                { ...settings.generalSettings(), productAnalytics: enabled },
+                                { analyticsChosen: chosen },
+                              )
+                            }
                             onProviderStepShown={detection.scanOnce}
                             logoVariant={platform.appInfo()?.variant ?? "production"}
                           />

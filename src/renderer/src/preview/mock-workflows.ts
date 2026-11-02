@@ -1,19 +1,26 @@
-// The workflow group of the preview: workflows, graphs, versions and runs in memory. A save checks
-// the revision as the host does; the graph rules stay the host's. A run walks the graph as the host
-// does: each step ends after `STEP_MS` with a fixed answer, a condition answers yes, an approval
-// waits for `decide`, and a node with the field `mockFail` fails.
+// The workflow group of the preview: workflows, graphs, versions and runs in memory, and a fixed
+// GitHub connection. A save checks the revision as the host does; the graph rules stay the host's. A
+// run walks the graph as the host does: each step ends after `STEP_MS` with a fixed answer, a
+// condition answers yes, an approval waits for `decide`, and a node with the field `mockFail` fails.
 
 import {
+  isGitHubRepositoryName,
   isWorkflowStepKind,
   nodeAgentId,
   type OpenBotDesktopApi,
+  type StartWorkflowRunInput,
   WORKFLOW_AUTO_VERSION_INTERVAL_MS,
   WORKFLOW_MAX_VERSIONS,
   type WorkflowDetail,
+  type WorkflowGitHubCatalog,
+  type WorkflowGitHubDelivery,
+  type WorkflowGitHubItem,
+  type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
   type WorkflowNode,
   type WorkflowRun,
   type WorkflowRunDetail,
+  type WorkflowRunSource,
   type WorkflowStep,
   type WorkflowSummary,
   type WorkflowTriggerState,
@@ -23,6 +30,35 @@ import { sourceText } from "@openbot/i18n/source";
 import { nextValidRoutineOccurrence } from "@openbot/team-client/routine-schedule";
 
 const PREVIEW_HOOKS = "https://hooks.openbot.run/wf";
+
+/** The GitHub connection of the preview: two repositories, and the bot cannot change the second one. */
+const PREVIEW_GITHUB_CATALOG: WorkflowGitHubCatalog = {
+  connected: true,
+  repositories: [
+    { fullName: "openbot-preview/app", private: false, canWrite: true, events: true },
+    { fullName: "openbot-preview/docs", private: true, canWrite: false, events: true },
+  ],
+};
+
+const PREVIEW_GITHUB_OPTIONS: WorkflowGitHubRepositoryOptions = {
+  labels: [
+    { name: "bug", color: "d73a4a" },
+    { name: "enhancement", color: "a2eeef" },
+    { name: "needs triage", color: "fbca04" },
+  ],
+  people: ["octocat", "hubot"],
+};
+
+/** An issue of the repository that a GitHub trigger watches, or of the first preview repository. */
+function previewItem(node: WorkflowNode, number: number, title: string): WorkflowGitHubItem {
+  const repository = node.fields.repository;
+  return {
+    repository: isGitHubRepositoryName(repository) ? repository : "openbot-preview/app",
+    number,
+    pullRequest: false,
+    title,
+  };
+}
 
 /** The next time of a schedule trigger, in its zone. A schedule without a next time, such as a past once, has none. */
 function nextDue(node: WorkflowNode): string | null {
@@ -279,6 +315,44 @@ export function mockWorkflows(
     return seen;
   };
   const runRequests = new Map<string, string>();
+  /** Starts a run from `fromNodeId`, or of the whole workflow. A repeat of one request gives the same run. */
+  const beginRun = (input: StartWorkflowRunInput, source: WorkflowRunSource) => {
+    const known = runRequests.get(input.requestId);
+    if (known) return runDetail(known);
+    const { detail } = record(input.workflowId);
+    const graph = structuredClone(detail.graph);
+    const stepNodes = graph.nodes.filter((node) => isWorkflowStepKind(node.kind)).map((node) => node.id);
+    const from = input.fromNodeId;
+    if (from !== undefined && !stepNodes.includes(from)) throw new Error(sourceText("error.workflow.nodeMissing"));
+    const scope = from === undefined ? new Set(stepNodes) : reach(graph, from);
+    const number = [...runs.values()].filter((entry) => entry.run.workflowId === input.workflowId).length + 1;
+    const triggerNodeId =
+      from !== undefined && graph.nodes.find((node) => node.id === from)?.kind === "trigger" ? from : null;
+    const run: WorkflowRun = {
+      id: crypto.randomUUID(),
+      workflowId: input.workflowId,
+      number,
+      triggerNodeId,
+      source,
+      status: "running",
+      error: null,
+      startedAt: stamp(),
+      endedAt: null,
+    };
+    runs.set(run.id, { run, graph, scope });
+    runRequests.set(input.requestId, run.id);
+    addVersion(input.workflowId, "run");
+    advance(run.id);
+    emit(input.workflowId);
+    return runDetail(run.id);
+  };
+  /** The GitHub trigger `nodeId` of a workflow, or the same failure as the host's. */
+  const githubTriggerOf = (workflowId: string, nodeId: string) => {
+    const node = nodeOf(workflowId, nodeId);
+    if (node.kind !== "trigger" || node.fields.trigger !== "github")
+      throw new Error(sourceText("error.workflow.nodeMissing"));
+    return node;
+  };
 
   return {
     list: async () =>
@@ -328,36 +402,7 @@ export function mockWorkflows(
       emit(input.workflowId);
       return structuredClone(next);
     },
-    startRun: async (input) => {
-      const known = runRequests.get(input.requestId);
-      if (known) return runDetail(known);
-      const { detail } = record(input.workflowId);
-      const graph = structuredClone(detail.graph);
-      const stepNodes = graph.nodes.filter((node) => isWorkflowStepKind(node.kind)).map((node) => node.id);
-      const from = input.fromNodeId;
-      if (from !== undefined && !stepNodes.includes(from)) throw new Error(sourceText("error.workflow.nodeMissing"));
-      const scope = from === undefined ? new Set(stepNodes) : reach(graph, from);
-      const number = [...runs.values()].filter((entry) => entry.run.workflowId === input.workflowId).length + 1;
-      const triggerNodeId =
-        from !== undefined && graph.nodes.find((node) => node.id === from)?.kind === "trigger" ? from : null;
-      const run: WorkflowRun = {
-        id: crypto.randomUUID(),
-        workflowId: input.workflowId,
-        number,
-        triggerNodeId,
-        source: "manual",
-        status: "running",
-        error: null,
-        startedAt: stamp(),
-        endedAt: null,
-      };
-      runs.set(run.id, { run, graph, scope });
-      runRequests.set(input.requestId, run.id);
-      addVersion(input.workflowId, "run");
-      advance(run.id);
-      emit(input.workflowId);
-      return runDetail(run.id);
-    },
+    startRun: async (input) => beginRun(input, "manual"),
     runStep: async (input) => {
       const node = nodeOf(input.workflowId, input.nodeId);
       const step = addStep(input.workflowId, null, node, "");
@@ -437,6 +482,56 @@ export function mockWorkflows(
       detail.triggers = triggersOf(input.workflowId, detail.graph);
       emit(input.workflowId);
       return { secret: `whsec_preview_${crypto.randomUUID()}` };
+    },
+    githubCatalog: async () => structuredClone(PREVIEW_GITHUB_CATALOG),
+    githubOptions: async (input) => {
+      if (!PREVIEW_GITHUB_CATALOG.repositories.some((repository) => repository.fullName === input.repository))
+        throw new Error(sourceText("error.workflow.githubNoAccess"));
+      return structuredClone(PREVIEW_GITHUB_OPTIONS);
+    },
+    // Two events of each GitHub trigger: one that started a run of the preview, and one that a filter skipped.
+    githubHistory: async (workflowId) => {
+      const { detail } = record(workflowId);
+      const triggers = detail.graph.nodes.filter((node) => node.kind === "trigger" && node.fields.trigger === "github");
+      const started = [...runs.values()]
+        .map((entry) => entry.run)
+        .filter((run) => run.workflowId === workflowId && run.source === "github");
+      const now = Date.now();
+      return {
+        deliveries: triggers.flatMap((node, index): WorkflowGitHubDelivery[] => [
+          {
+            id: `${node.id}-opened`,
+            nodeId: node.id,
+            event: "issue.opened",
+            item: previewItem(node, 42, "Crash when the export folder is missing"),
+            receivedAt: new Date(now - (index * 2 + 1) * 60_000).toISOString(),
+            outcome: "started",
+            reason: null,
+            runId: started[0]?.id ?? null,
+          },
+          {
+            id: `${node.id}-skipped`,
+            nodeId: node.id,
+            event: "issue.opened",
+            item: previewItem(node, 41, "Add a dark theme to the settings"),
+            receivedAt: new Date(now - (index * 2 + 2) * 60_000).toISOString(),
+            outcome: "skipped",
+            reason: "filter",
+            runId: null,
+          },
+        ]),
+        runs: started.flatMap((run) => {
+          const node = triggers.find((trigger) => trigger.id === run.triggerNodeId);
+          return node
+            ? [{ runId: run.id, item: previewItem(node, 42, "Crash when the export folder is missing") }]
+            : [];
+        }),
+      };
+    },
+    // The preview has no GitHub: the newest matching item is a fixed one, and the run starts at once.
+    githubRunLastEvent: async (input) => {
+      githubTriggerOf(input.workflowId, input.nodeId);
+      return beginRun({ workflowId: input.workflowId, requestId: input.requestId, fromNodeId: input.nodeId }, "github");
     },
   };
 }

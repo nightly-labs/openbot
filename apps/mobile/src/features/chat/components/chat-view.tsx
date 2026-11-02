@@ -42,8 +42,10 @@ import {
   type PendingChatMessage,
   presentChatMessages,
 } from "@/features/chat/model/chat-messages";
+import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { replyVoiceReady } from "@/features/voice/model/reply-voice";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
+import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
 import { useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import {
@@ -343,27 +345,59 @@ export function ChatView({
   const sendingUpload = sendingMessage ? outboxSnapshot.uploads.get(sendingMessage.clientMessageId) : undefined;
   // While the agent works, the host queues a sent message: the queue sheet shows it, not the chat.
   const sendsToQueue = Boolean(queue && (activeTurnId || queue.queued.length || queue.replies.length));
-  const queuePending = useMemo(
-    () =>
-      sendsToQueue && sendingMessage
-        ? {
-            message: outboxRow(outbox, sendingMessage),
-            progress: sendingUpload?.completed ?? 0,
-            total: sendingMessage.files.length,
-            cancel: () => outbox.cancelUpload(sendingMessage.clientMessageId),
-          }
-        : null,
-    [sendsToQueue, sendingMessage, sendingUpload?.completed, outbox],
-  );
+  // A message sent while the agent works stays in the queue sheet until the chat draws the host row.
+  const queueSends = useRef(new Set<string>());
+  if (sendingMessage && sendsToQueue) queueSends.current.add(sendingMessage.clientMessageId);
+  // The host accepts a sent message before its queue row arrives. The queue keeps it until then, so
+  // the message does not leave the queue for a moment.
+  const queueDeliveries = queue?.deliveries;
+  const sentToQueue =
+    outboxMessages.find(
+      (message) =>
+        message.state === "sent" &&
+        queueSends.current.has(message.clientMessageId) &&
+        !queueDeliveries?.some((delivery) => delivery.id === message.messageId),
+    ) ?? null;
+  // A message that sends comes first, so its upload progress and cancel stay reachable.
+  const queuePending = useMemo(() => {
+    if (sendsToQueue && sendingMessage)
+      return {
+        message: outboxRow(outbox, sendingMessage),
+        progress: sendingUpload?.completed ?? 0,
+        total: sendingMessage.files.length,
+        cancel: () => outbox.cancelUpload(sendingMessage.clientMessageId),
+      };
+    return sentToQueue ? { message: outboxRow(outbox, sentToQueue), progress: 0, total: 0, cancel: () => {} } : null;
+  }, [sentToQueue, sendsToQueue, sendingMessage, sendingUpload?.completed, outbox]);
   // The sheet keeps a held edit in its rows when the host hides it. Count it here as
   // well, so a saved edit with a lost response stays reachable after a restart.
   const queued = queue?.queued;
   const heldQueueEdit = queue?.edit?.delivery ?? null;
-  const queueCount = useMemo(
-    () => (queued ? queueRowsWithHeldEdit(queued, heldQueueEdit).length : 0) + (queuePending ? 1 : 0),
-    [queued, heldQueueEdit, queuePending],
+  const queueRows = useMemo(
+    () => (queued ? queueRowsWithHeldEdit(queued, heldQueueEdit) : []),
+    [queued, heldQueueEdit],
   );
+  const queueCount = queueRows.length + (queuePending ? 1 : 0);
   usePublishedQueuedChat(queue?.chatId ?? `${target.serverId}:${target.id}`, queue ?? null, queuePending);
+  // The thinking sheet reads the agent's conversation, so a channel does not open it. A thread opens it with its task.
+  const turnLines = useTurnStepLines(target.serverId);
+  const conversationMessages = conversation?.messages;
+  const conversationTurnId = conversation?.activeTurnId ?? null;
+  const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
+  const turnSummaries = useMemo(() => {
+    lastTurnSummaries.current =
+      conversationMessages && target.kind === "agent"
+        ? finishedTurnSummaries(conversationMessages, conversationTurnId, turnLines, lastTurnSummaries.current)
+        : undefined;
+    return lastTurnSummaries.current;
+  }, [conversationMessages, conversationTurnId, turnLines, target.kind]);
+  const thinkingAgentId = target.kind === "agent" ? target.id : null;
+  const openTurn = useCallback(
+    (turnId: string) => {
+      if (thinkingAgentId) router.push({ pathname: "/turn-thinking", params: { agentId: thinkingAgentId, turnId } });
+    },
+    [thinkingAgentId],
+  );
   const queuedMessageIds = useMemo(
     () =>
       new Set(
@@ -383,9 +417,6 @@ export function ChatView({
     !sendBaselines.current.has(sendingMessage.clientMessageId)
   )
     sendBaselines.current.set(sendingMessage.clientMessageId, new Set(projectedMessages.map((message) => message.id)));
-  // A message sent while the agent works stays in the queue sheet until the chat draws the host row.
-  const queueSends = useRef(new Set<string>());
-  if (sendingMessage && sendsToQueue) queueSends.current.add(sendingMessage.clientMessageId);
   const pendingMessages = useMemo(
     () =>
       outboxMessages.flatMap((message): PendingChatMessage[] =>
@@ -982,6 +1013,8 @@ export function ChatView({
               }
               appActive={appActive}
               activeTurnId={activeTurnId}
+              turnSummaries={turnSummaries}
+              onOpenTurn={thinkingAgentId ? openTurn : undefined}
               // The form is a new object on each render. Without a question the list does not read it,
               // so it is left out and does not draw the list again.
               questionForm={questionForm?.messageId ? questionForm : undefined}
@@ -1053,13 +1086,17 @@ export function ChatView({
                   </ChatGlassIconButton>
                 </View>
               ) : null}
-              <ConnectionStatus
-                server={server}
-                // The history waits for the server: the chat says so under the reconnect status.
-                note={
-                  !ready && !server?.initialConnectionPending && !serverOnline ? t("mobile.chat.history.waiting") : null
-                }
-              />
+              <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
+                <ConnectionStatus
+                  server={server}
+                  // The history waits for the server: the chat says so under the reconnect status.
+                  note={
+                    !ready && !server?.initialConnectionPending && !serverOnline
+                      ? t("mobile.chat.history.waiting")
+                      : null
+                  }
+                />
+              </View>
               {showBrowserRequests
                 ? chatBrowserRequests
                     .filter((request) => !asksForSecret(request))
@@ -1090,21 +1127,29 @@ export function ChatView({
                     ))
                 : null}
               {sendError?.agentId === target.id ? (
-                <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger-text">
+                <Typography.Paragraph
+                  accessibilityRole="alert"
+                  className="bg-background py-2 text-danger-text"
+                  style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
+                >
                   {sendError.message}
                 </Typography.Paragraph>
               ) : null}
               {outboxSnapshot.storageFailed && outboxMessages.length ? (
-                <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger-text">
+                <Typography.Paragraph
+                  accessibilityRole="alert"
+                  className="bg-background py-2 text-danger-text"
+                  style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
+                >
                   {t("mobile.chat.outbox.saveFailed")}
                 </Typography.Paragraph>
               ) : null}
               {queue && !notice ? (
                 <ChatQueueButton
-                  chatId={queue.chatId}
+                  queue={queue}
                   count={queueCount}
-                  error={Boolean(queue.error)}
-                  waiting={queue.waiting.length > 0}
+                  rows={queueRows}
+                  pending={queuePending}
                   liquidGlassAvailable={liquidGlassAvailable}
                   fallbackBackground={fieldBackground}
                 />
@@ -1122,8 +1167,12 @@ export function ChatView({
                 <Typography.Paragraph
                   type="body-xs"
                   align="center"
-                  className="px-6 pt-2 text-text-secondary"
-                  style={{ paddingBottom: Math.max(insets.bottom, 10) + 6 }}
+                  className="pt-2 text-text-secondary"
+                  style={{
+                    paddingLeft: insets.left + 24,
+                    paddingRight: insets.right + 24,
+                    paddingBottom: Math.max(insets.bottom, 10) + 6,
+                  }}
                 >
                   {notice}
                 </Typography.Paragraph>

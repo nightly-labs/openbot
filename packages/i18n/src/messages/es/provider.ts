@@ -40,7 +40,7 @@ export const messages = {
   "provider.status.checking": "Comprobando",
   "provider.status.off": "Desactivado",
   "provider.gemini.hostSignIn":
-    "Para conectar Gemini, abre OpenBot en el host y selecciona Conectar en Ajustes > Proveedores. El inicio de sesión de Google necesita un navegador en ese host. No se admite el inicio de sesión remoto.",
+    "Para conectar Gemini, abre OpenBot en el host y selecciona Conectar en Ajustes del servidor > Proveedores. El inicio de sesión de Google necesita un navegador en ese host. No se admite el inicio de sesión remoto.",
   "provider.key.free": "Gratis",
   "provider.action.connect": "Conectar",
   "provider.action.reconnect": "Reconectar",
@@ -123,6 +123,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, predeterminado",
   "provider.picker.effort": "Esfuerzo",
   "provider.picker.effortLabel": "Esfuerzo de razonamiento del agente",
+  "provider.picker.effortFixed": "{effort}, fijado por {provider}",
   "provider.picker.fast": "Rápido",
   "provider.picker.fastLabel": "Modo rápido",
   "provider.picker.selectEffort": "Seleccionar esfuerzo",
@@ -187,6 +188,7 @@ export const messages = {
   "provider.account.cancelSignIn": "Cancelar inicio de sesión",
   "provider.account.finishSignIn": "Termina de iniciar sesión en el navegador.",
   "provider.account.remove": "Eliminar cuenta",
+  "provider.account.disconnect": "Desconectar",
   "provider.account.actionFailed": "No se pudo cambiar la cuenta de {name}.",
   "provider.account.resetUsage": "Restablecer uso",
   "provider.account.resetUsageTitle": "¿Restablecer el uso de {name}?",
@@ -201,6 +203,14 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} no tiene más créditos de restablecimiento de uso.",
   "provider.account.resetUsageAlreadyRedeemed": "Este crédito de restablecimiento de {name} ya se usó.",
   "provider.account.resetUsageFailed": "No se pudo restablecer el uso de {name}.",
+  "provider.settings.disconnectTitle": "¿Desconectar {name}?",
+  "provider.settings.disconnectOthers":
+    "Las otras cuentas de {provider} esperan hasta que vuelvas a conectar {provider}.",
+  "provider.settings.disconnectLocal":
+    "OpenBot cierra la sesión de {provider} en este ordenador. La CLI de {provider} de tu terminal también cierra la sesión.",
+  "provider.settings.disconnectHost": "OpenBot cierra la sesión de {provider} en el servidor.",
+  "provider.settings.versionInstalledByUser": "{version} · instalada por ti",
+  "provider.settings.versionDownloaded": "{version} · descargada por OpenBot",
   "provider.settings.cache": "Caché",
   "provider.settings.promptCache": "Caché de prompts",
   "provider.settings.promptCacheDescription":

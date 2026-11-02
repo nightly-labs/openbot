@@ -351,6 +351,8 @@ function storyBrowserProfiles(initial: readonly BrowserProfileSummary[]): Server
     store: {
       state,
       refresh: async () => undefined,
+      // The story is one window, so no other device changes the profiles.
+      follow: () => () => undefined,
       create: async (name) => {
         if (state.profiles?.some((profile) => profile.name.toLowerCase() === name.toLowerCase()))
           throw new Error(sourceText("error.backend.browserProfileNameTaken"));

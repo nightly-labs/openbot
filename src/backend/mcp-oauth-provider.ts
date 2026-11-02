@@ -855,6 +855,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * Some servers also issue a secret they never accept: Railway registers `client_secret_basic` and
    * then refuses that secret at the token endpoint (#3429). A server that does not list `none` still
    * picks its own method, and the SDK uses the one it registered.
+   *
+   * Except a server that lists only `client_secret_post`. A request with no method asks for the RFC
+   * 7591 default, `client_secret_basic`, and Make refuses that registration with a 400: "No supported
+   * Token Endpoint Auth Method provided."
    */
   get clientMetadata(): OAuthClientMetadata {
     const scope = this.#record().app?.scope;
@@ -866,7 +870,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       redirect_uris: [this.#options.redirectUrl],
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
-      ...(methods?.includes("none") ? { token_endpoint_auth_method: "none" } : {}),
+      ...tokenEndpointAuthMethod(methods),
       ...(scope ? { scope } : {}),
     };
   }
@@ -1666,6 +1670,16 @@ const revokeToken = Effect.fn("McpOAuth.revokeToken")(function* (
   yield* mcpCall(() => response.body?.cancel()).pipe(Effect.catch(() => Effect.void));
   return response.ok ? "ok" : `http ${response.status}`;
 });
+
+/** The method a registration asks for, from the ones the authorization server lists. */
+function tokenEndpointAuthMethod(
+  methods: string[] | undefined,
+): Pick<OAuthClientMetadata, "token_endpoint_auth_method"> {
+  if (methods?.includes("none")) return { token_endpoint_auth_method: "none" };
+  if (methods?.includes("client_secret_post") && !methods.includes("client_secret_basic"))
+    return { token_endpoint_auth_method: "client_secret_post" };
+  return {};
+}
 
 /** The class of a failure, for a log line that must not carry the failure's own text. */
 function errorKind(error: unknown): string {
