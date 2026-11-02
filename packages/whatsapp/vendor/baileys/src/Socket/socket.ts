@@ -390,6 +390,8 @@ export const makeSocket = (config: SocketConfig) => {
 	let epoch = 1
 	let keepAliveReq: NodeJS.Timeout
 	let qrTimer: NodeJS.Timeout
+	// OPENBOT PATCH: draws the pairing code that is on screen again (see companion_reg_refresh).
+	let renderPairQR: (() => void) | undefined
 	let closed = false
 
 	const socketEndHandlers: Array<(error: Error | undefined) => void | Promise<void>> = []
@@ -884,7 +886,6 @@ export const makeSocket = (config: SocketConfig) => {
 		const refNodes = getBinaryNodeChildren(pairDeviceNode, 'ref')
 		const noiseKeyB64 = Buffer.from(creds.noiseKey.public).toString('base64')
 		const identityKeyB64 = Buffer.from(creds.signedIdentityKey.public).toString('base64')
-		const advB64 = creds.advSecretKey
 
 		let qrMs = qrTimeout || 60_000 // time to let a QR live
 		const genPairQR = () => {
@@ -899,9 +900,13 @@ export const makeSocket = (config: SocketConfig) => {
 			}
 
 			const ref = (refNode.content as Buffer).toString('utf-8')
-			const qr = buildPairingQRData(ref, noiseKeyB64, identityKeyB64, advB64, browser)
-
-			ev.emit('connection.update', { qr })
+			// OPENBOT PATCH: the adv secret is read for each code, because companion_reg_refresh replaces it,
+			// and the code on screen can be drawn again with the same ref (upstream #2737, #2765).
+			renderPairQR = () => {
+				const qr = buildPairingQRData(ref, noiseKeyB64, identityKeyB64, creds.advSecretKey, browser)
+				ev.emit('connection.update', { qr })
+			}
+			renderPairQR()
 
 			qrTimer = setTimeout(genPairQR, qrMs)
 			qrMs = qrTimeout || 20_000 // shorter subsequent qrs
@@ -909,6 +914,27 @@ export const makeSocket = (config: SocketConfig) => {
 
 		genPairQR()
 	})
+	// OPENBOT PATCH: since July 2026 WhatsApp sends companion_reg_refresh after the phone scans the code.
+	// It retires the adv secret that the code carries: a new secret and the same code drawn again let the
+	// phone finish the link. A linked device keeps its secret, which its pairing was verified with
+	// (upstream #2737, #2765). The notification is acknowledged by the notification handler.
+	ws.on('CB:notification,type:companion_reg_refresh', (node: BinaryNode) => {
+		if (creds.me?.id) {
+			return
+		}
+
+		const valid = getBinaryNodeChild(node, 'companion_reg_refresh') || getBinaryNodeChild(node, 'pair-device-rotate-qr')
+		if (!valid) {
+			logger.warn('companion_reg_refresh without a known child, ignored')
+			return
+		}
+
+		const advSecretKey = randomBytes(32).toString('base64')
+		creds.advSecretKey = advSecretKey
+		ev.emit('creds.update', { advSecretKey })
+		renderPairQR?.()
+	})
+
 	// device paired for the first time
 	// if device pairs successfully, the server asks to restart the connection
 	ws.on('CB:iq,,pair-success', async (stanza: BinaryNode) => {
