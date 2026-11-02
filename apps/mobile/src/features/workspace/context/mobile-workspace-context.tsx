@@ -460,6 +460,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (hosts: RemoteTeamHost[]) => {
       const available = new Set(hosts.map((host) => host.hostId));
       dropServerState(new Set(serversRef.current.filter((server) => !available.has(server.id)).map(({ id }) => id)));
+      // Also the copies of servers that the account left while the app was closed.
+      void workspaceCache?.retain([...available]).catch(() => undefined);
       for (const host of hosts) removedServers.current.delete(host.hostId);
       setServers((current) => {
         const previousServers = new Map(current.map((server) => [server.id, server]));
@@ -473,7 +475,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           : (sortByPreference(hosts.map((host) => ({ id: host.hostId })))[0]?.id ?? null),
       );
     },
-    [dropServerState, session.host?.hostId, sortByPreference],
+    [dropServerState, session.host?.hostId, sortByPreference, workspaceCache],
   );
 
   const directoryRefresh = useMemo(

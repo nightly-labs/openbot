@@ -19,13 +19,18 @@ export interface WorkspaceCache {
   read(serverId: string): Promise<CachedServer | null>;
   write(serverId: string, value: CachedServer): Promise<void>;
   remove(serverId: string): Promise<void>;
+  /** Deletes the files of the servers that the account no longer lists, also those removed while the app was closed. */
+  retain(serverIds: readonly string[]): Promise<void>;
 }
 
 const FORMAT = 1;
 const ROOT = "workspace-cache-v1/";
 const KEY_NAME = "openbot.mobile.workspace-cache-key.v1";
-/** A server file larger than this keeps its agents and the chats that fit, newest first. */
-const MAX_JSON_LENGTH = 4 * 1024 * 1024;
+/**
+ * The escaped JSON of a server file. Base64 adds a third, so the file stays under 4 MB. A server with
+ * more keeps its agents and the chats that fit, newest first.
+ */
+const MAX_JSON_LENGTH = 3 * 1024 * 1024;
 
 const segment = (value: string) => value.replace(/[^A-Za-z0-9._-]/gu, "_").replace(/^\.+/u, "_");
 const rootDirectory = () => (FileSystem.cacheDirectory ? `${FileSystem.cacheDirectory}${ROOT}` : null);
@@ -62,11 +67,14 @@ function cacheKey(): Promise<Crypto.AESEncryptionKey | null> {
  * JSON in ASCII only: each other UTF-16 unit is a `\u` escape, so the bytes are the characters. No
  * `u` flag: with it, a character outside the Basic Multilingual Plane would not match.
  */
-function asciiBytes(value: unknown): Uint8Array {
-  const text = JSON.stringify(value).replace(
+function asciiJson(value: unknown): string {
+  return JSON.stringify(value).replace(
     /[\u007f-\uffff]/g,
     (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`,
   );
+}
+
+function asciiBytes(text: string): Uint8Array {
   const bytes = new Uint8Array(text.length);
   for (let index = 0; index < text.length; index += 1) bytes[index] = text.charCodeAt(index);
   return bytes;
@@ -109,7 +117,7 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
     const folder = `${root}${await account}/`;
     return { folder, file: `${folder}${segment(serverId)}.bin`, next: `${folder}${segment(serverId)}.next.bin` };
   };
-  const binding = async (serverId: string) => asciiBytes([FORMAT, await account, serverId]);
+  const binding = async (serverId: string) => asciiBytes(asciiJson([FORMAT, await account, serverId]));
   // A remove that follows a write of the same server runs after it, so the file does not come back.
   const queues = new Map<string, Promise<unknown>>();
   const inOrder = <T>(serverId: string, operation: () => Promise<T>): Promise<T> => {
@@ -146,22 +154,23 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
       inOrder(serverId, async () => {
         const key = await cacheKey();
         if (!key) return;
-        const conversations: ConversationPage[] = [];
-        let length = JSON.stringify(value.agents).length + JSON.stringify(value.sidebar).length;
-        for (const page of [...value.conversations].sort((a, b) =>
-          (b.messages.at(-1)?.createdAt ?? "").localeCompare(a.messages.at(-1)?.createdAt ?? ""),
-        )) {
-          length += JSON.stringify(page).length;
-          if (length > MAX_JSON_LENGTH) break;
-          conversations.push(page);
-        }
         // A provider that this build does not know goes back to `provider`, where the decoder reads it.
         const agents = value.agents.map(({ foreignProvider, ...agent }) => ({
           ...agent,
           provider: agent.provider ?? foreignProvider,
         }));
+        // Each page counts with its escapes and the comma before it.
+        const conversations: ConversationPage[] = [];
+        let length = asciiJson({ format: FORMAT, ...value, agents, conversations }).length;
+        for (const page of [...value.conversations].sort((a, b) =>
+          (b.messages.at(-1)?.createdAt ?? "").localeCompare(a.messages.at(-1)?.createdAt ?? ""),
+        )) {
+          length += asciiJson(page).length + 1;
+          if (length > MAX_JSON_LENGTH) break;
+          conversations.push(page);
+        }
         const sealed = await Crypto.aesEncryptAsync(
-          asciiBytes({ format: FORMAT, ...value, agents, conversations }),
+          asciiBytes(asciiJson({ format: FORMAT, ...value, agents, conversations })),
           key,
           { additionalData: await binding(serverId) },
         );
@@ -177,6 +186,13 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
         await FileSystem.deleteAsync(file, { idempotent: true });
         await FileSystem.deleteAsync(next, { idempotent: true });
       }),
+    retain: async (serverIds) => {
+      const folder = `${root}${await account}/`;
+      if (!(await FileSystem.getInfoAsync(folder)).exists) return;
+      const kept = new Set(serverIds.flatMap((id) => [`${segment(id)}.bin`, `${segment(id)}.next.bin`]));
+      for (const name of await FileSystem.readDirectoryAsync(folder))
+        if (!kept.has(name)) await FileSystem.deleteAsync(`${folder}${name}`, { idempotent: true });
+    },
   };
 }
 

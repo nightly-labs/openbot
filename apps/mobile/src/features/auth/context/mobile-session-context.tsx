@@ -69,6 +69,8 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       // The hosted server plans keep the last answer for the life of the app; a new session drops it.
       queryClient.removeQueries({ queryKey: queryKeys.hostedServerPlans() });
     }
+    // Sign-out, and a session that the account service refused or that expired, delete the phone's copy.
+    if (sessionRef.current && !session) void deleteWorkspaceCaches();
     mobileAnalytics.setUser(session?.user ?? null);
     sessionRef.current = session;
     setSessionState(session);
@@ -80,10 +82,8 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
         error instanceof MobileSessionExpiredError &&
         sessionRef.current?.sessionToken === initiatingSession.sessionToken &&
         sessionRef.current?.apiUrl === initiatingSession.apiUrl
-      ) {
-        void deleteWorkspaceCaches();
+      )
         setCurrentSession(null);
-      }
     },
     [setCurrentSession],
   );
@@ -148,7 +148,6 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     if (!current) return;
     await mobileAnalytics.operation("account_sign_out", {}, () => logoutMobileSession(current));
     deleteAgentAvatars();
-    await deleteWorkspaceCaches();
     if (sessionRef.current?.sessionToken === current.sessionToken && sessionRef.current?.apiUrl === current.apiUrl) {
       setCurrentSession(null);
     }
