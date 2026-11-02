@@ -2841,6 +2841,16 @@ export class BrowserHost {
       this.#emitChanged();
     });
     contents.on("page-title-updated", changed);
+    // Chromium gives a visible page the focus when a new document commits. A navigation that an
+    // agent or the page starts must not take the keys from a person who types in the app.
+    let focusedBeforeCommit: WebContents | null = null;
+    contents.on("did-start-navigation", (details) => {
+      if (details.isMainFrame && !details.isSameDocument) focusedBeforeCommit = this.#focusedContentsOutsideTabs();
+    });
+    contents.on("did-navigate", () => {
+      if (focusedBeforeCommit && contents.isFocused()) restoreWebContentsFocus(focusedBeforeCommit, contents);
+      focusedBeforeCommit = null;
+    });
     contents.on("did-navigate", (_event, url) => {
       tab.documents += 1;
       if (tab.secretDocument) {
