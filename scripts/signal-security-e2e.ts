@@ -906,7 +906,7 @@ try {
 
   // Slack turns off events for the whole app when more than 95% of deliveries fail for 60 minutes.
   // A channel message of a workspace whose computer is off must not count as a failure (#4345).
-  await check("A Slack event for a host with no socket gets 503 only when it addresses OpenBot", async () => {
+  await check("A Slack event for a host with no socket gets 200 only when it is chatter", async () => {
     const post = async (event: Record<string, string>) => {
       const body = JSON.stringify({ type: "event_callback", api_app_id: SLACK_APP_ID, team_id: "T0E2EOFF", event });
       const time = nowSeconds();
@@ -915,10 +915,14 @@ try {
     const chatter = await post({ type: "message", channel_type: "channel" });
     const mention = await post({ type: "app_mention", channel_type: "channel" });
     const direct = await post({ type: "message", channel_type: "im" });
+    const reply = await post({ type: "message", channel_type: "channel", thread_ts: "1.0" });
+    const uninstalled = await post({ type: "app_uninstalled" });
     expect(chatter === 200, `channel message: ${chatter}`);
     expect(mention === 503, `mention: ${mention}`);
     expect(direct === 503, `direct message: ${direct}`);
-    return "channel message 200, mention 503, direct message 503";
+    expect(reply === 503, `thread reply: ${reply}`);
+    expect(uninstalled === 503, `app_uninstalled: ${uninstalled}`);
+    return "channel message 200; mention, direct message, thread reply, app_uninstalled 503";
   });
 
   // A body with no declared length: Signal must stop at its limit, so it answers before the body ends.

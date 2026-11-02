@@ -462,8 +462,8 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   `/invite`.
 - **Deduplication.** An in-memory set drops a redelivered event at once; the mailbox idempotency key
   covers a restart, and a kept event that Signal sends again. Events that arrive while no socket is
-  open are lost after Slack's retries, except for a hosted server that starts. Signal answers 503
-  only to an event that addresses OpenBot; any other event gets 200 and is lost at once. Slack turns
+  open are lost after Slack's retries, except for a hosted server that starts. A message that does
+  not address OpenBot gets 200 from Signal and is lost at once; other events get 503. Slack turns
   off events for the whole app when more than 95% of deliveries fail for 60 minutes, and a computer
   that is off would otherwise fail every channel message of its workspace.
 - **Screen.** **Marketplace → Apps → Slack** on the computer that runs the agents shows
