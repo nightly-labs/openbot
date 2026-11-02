@@ -91,7 +91,8 @@ the `mp4-attachments` capability, because a host with only `media-attachments` r
 SVG attachments are stored as `image/svg+xml` with `kind: "file"` and `previewKind: "image"`. The
 type comes from the file extension. Providers take only raster image blocks, so delivery sends the
 path as a mention and the agent reads the SVG text. The attachment schemes serve SVG with a `sandbox`
-policy, and the browser client gives it no object URL. Remote support is additive through the
+policy. The browser client shows an SVG thumbnail from a `data:` URL, never from an object URL: an
+object URL has the origin of the app. Remote support is additive through the
 `svg-attachments` capability, which only protocol 9 peers get.
 
 ## Browser tool execution
