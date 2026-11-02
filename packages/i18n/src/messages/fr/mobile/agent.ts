@@ -16,6 +16,7 @@ export const messages = {
   "mobile.agent.pin.unpinNamed": "Désépingler {name}",
   "mobile.agent.pin.limitReached": "Limite d’épingles atteinte. Désépinglez d’abord une discussion.",
   "mobile.agent.pin.closeAction": "Fermer l’action d’épingle pour {name}",
+  "mobile.agent.drag.pinHere": "Déposez ici pour épingler",
   "mobile.agent.appearance.preview": "Aperçu de l’avatar de {name}",
   "mobile.agent.appearance.newAgent": "Nouvel agent",
   "mobile.agent.appearance.faces": "Forme et expression",

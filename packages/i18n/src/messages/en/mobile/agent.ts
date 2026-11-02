@@ -14,6 +14,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.pin.unpinNamed": "Unpin {name}",
   "mobile.agent.pin.limitReached": "Pin limit reached. Unpin a chat first.",
   "mobile.agent.pin.closeAction": "Close pin action for {name}",
+  "mobile.agent.drag.pinHere": "Drop here to pin",
   "mobile.agent.appearance.preview": "Avatar preview for {name}",
   "mobile.agent.appearance.newAgent": "New agent",
   "mobile.agent.appearance.faces": "Shape and expression",

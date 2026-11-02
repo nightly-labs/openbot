@@ -63,7 +63,8 @@ import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifac
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { RemoteScreenGateway, type RemoteScreenGatewayCreateRuntime } from "./remote-screen-gateway";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
-import type { TeamApiAgentNotificationLevels } from "./team-api/dependencies";
+import { OWNER_PIN_KEY, type SidebarPinStore } from "./sidebar-pin-store";
+import type { TeamApiAgentNotificationLevels, TeamApiSidebarPins } from "./team-api/dependencies";
 import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -113,6 +114,8 @@ interface HostServiceOptions {
   hiddenAgents?: ForwardedApiOptions["hiddenAgents"];
   /** The level that each person chose for each agent (`agent-notification-levels-v1`). */
   agentNotificationLevels?: AgentNotificationLevelStore;
+  /** The chats that each person pinned (`sidebar-pins-v1`). */
+  sidebarPins?: SidebarPinStore;
   agentAccess?: AgentAccessStore;
   agentTasks?: ForwardedApiOptions["agentTasks"];
   browserProfiles?: ForwardedApiOptions["browserProfiles"];
@@ -431,6 +434,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.agentNotificationLevels === undefined
         ? {}
         : { agentNotificationLevels: this.#agentNotificationLevels(options.agentNotificationLevels) }),
+      ...(options.sidebarPins === undefined ? {} : { sidebarPins: this.#sidebarPins(options.sidebarPins) }),
       ...(options.agentAccess === undefined ? {} : { agentAccess: options.agentAccess }),
       ...(options.agentTasks === undefined ? {} : { agentTasks: options.agentTasks }),
       ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),
@@ -1364,11 +1368,13 @@ export class HostService extends EventEmitter<HostEvents> {
         yield* this.#revokeMemberSessions(memberId);
         yield* this.#forgetMemberRoles(hostId, memberId);
         yield* this.#forgetNotificationLevels(memberId);
+        yield* this.#forgetSidebarPins(memberId);
         return;
       }
       yield* this.#options.store.removeMember(memberId);
       if (hostId) yield* this.#forgetMemberRoles(hostId, memberId);
       yield* this.#forgetNotificationLevels(memberId);
+      yield* this.#forgetSidebarPins(memberId);
       yield* this.#remoteScreen.revokeMember(memberId);
       this.#options.browser.releaseUserControlHeldBy({ kind: "member", memberId });
       this.#api.refreshPresence();
@@ -1398,6 +1404,38 @@ export class HostService extends EventEmitter<HostEvents> {
           if (memberId) listener(memberId);
         }),
     };
+  }
+
+  /** The key of a member's pins. The owner shares them with the desktop app of this computer. */
+  #sidebarPinKey(memberId: string): string {
+    return memberId === this.#options.store.getOwnerMemberId() ? OWNER_PIN_KEY : memberId;
+  }
+
+  #sidebarPins(store: SidebarPinStore): TeamApiSidebarPins {
+    return {
+      snapshot: (memberId, hidden) => store.snapshot(this.#sidebarPinKey(memberId), hidden),
+      set: (memberId, items, hidden) => store.set(this.#sidebarPinKey(memberId), items, hidden),
+      seed: (memberId, items, hidden) => store.seed(this.#sidebarPinKey(memberId), items, hidden),
+      subscribe: (listener) =>
+        store.subscribe((key) => {
+          // The owner's pins have one key for the desktop app of this computer and the owner's phones.
+          const memberId = key === OWNER_PIN_KEY ? this.#options.store.getOwnerMemberId() : key;
+          if (memberId) listener(memberId);
+        }),
+    };
+  }
+
+  /** A removed member keeps no pins. The member is gone either way, so a failed write only logs. */
+  #forgetSidebarPins(memberId: string): Effect.Effect<void> {
+    const store = this.#options.sidebarPins;
+    if (!store || memberId === this.#options.store.getOwnerMemberId()) return Effect.void;
+    return store
+      .removeMember(memberId)
+      .pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => logger.warn("The removed member's pinned chats did not save.", toLogValue(error))),
+        ),
+      );
   }
 
   /** A removed member keeps no levels. The member is gone either way, so a failed write only logs. */
