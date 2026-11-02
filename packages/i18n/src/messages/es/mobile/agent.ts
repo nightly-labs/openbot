@@ -495,6 +495,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Agentes",
   "mobile.agent.section.moveFailed": "No se pudo mover el chat",
   "mobile.agent.section.moveTo": "Mover a una sección",
+  "mobile.agent.noMessages": "Aún no hay mensajes",
   "mobile.agent.list.open": "Abrir el chat con {name}",
   "mobile.agent.list.openWithTitle": "Abrir el chat con {name}, {title}",
   "mobile.agent.list.openPinned": "Abrir el chat fijado con {name}",

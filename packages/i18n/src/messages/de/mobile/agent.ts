@@ -504,6 +504,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Agenten",
   "mobile.agent.section.moveFailed": "Chat konnte nicht verschoben werden",
   "mobile.agent.section.moveTo": "In Abschnitt verschieben",
+  "mobile.agent.noMessages": "Noch keine Nachrichten",
   "mobile.agent.list.open": "Chat mit {name} öffnen",
   "mobile.agent.list.openWithTitle": "Chat mit {name} öffnen, {title}",
   "mobile.agent.list.openPinned": "Angehefteten Chat mit {name} öffnen",

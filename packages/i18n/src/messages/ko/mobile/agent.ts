@@ -489,6 +489,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "에이전트",
   "mobile.agent.section.moveFailed": "채팅을 이동할 수 없어요",
   "mobile.agent.section.moveTo": "섹션으로 이동",
+  "mobile.agent.noMessages": "아직 메시지가 없어요",
   "mobile.agent.list.open": "{name}과(와) 채팅 열기",
   "mobile.agent.list.openWithTitle": "{name}과(와) 채팅 열기, {title}",
   "mobile.agent.list.openPinned": "{name}과(와) 고정된 채팅 열기",

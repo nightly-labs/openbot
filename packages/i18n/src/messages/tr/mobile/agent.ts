@@ -507,6 +507,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Ajanlar",
   "mobile.agent.section.moveFailed": "Sohbet taşınamadı",
   "mobile.agent.section.moveTo": "Bölüme taşı",
+  "mobile.agent.noMessages": "Henüz mesaj yok",
   "mobile.agent.list.open": "{name} ile sohbeti aç",
   "mobile.agent.list.openWithTitle": "{name} ile sohbeti aç, {title}",
   "mobile.agent.list.openPinned": "{name} ile sabitlenmiş sohbeti aç",

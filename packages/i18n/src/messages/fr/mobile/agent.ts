@@ -508,6 +508,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Agents",
   "mobile.agent.section.moveFailed": "Impossible de déplacer la discussion",
   "mobile.agent.section.moveTo": "Déplacer vers une section",
+  "mobile.agent.noMessages": "Aucun message pour l’instant",
   "mobile.agent.list.open": "Ouvrir la discussion avec {name}",
   "mobile.agent.list.openWithTitle": "Ouvrir la discussion avec {name}, {title}",
   "mobile.agent.list.openPinned": "Ouvrir la discussion épinglée avec {name}",

@@ -533,6 +533,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Агенты",
   "mobile.agent.section.moveFailed": "Не удалось переместить чат",
   "mobile.agent.section.moveTo": "Переместить в раздел",
+  "mobile.agent.noMessages": "Сообщений пока нет",
   "mobile.agent.list.open": "Открыть чат с {name}",
   "mobile.agent.list.openWithTitle": "Открыть чат с {name}, {title}",
   "mobile.agent.list.openPinned": "Открыть закреплённый чат с {name}",

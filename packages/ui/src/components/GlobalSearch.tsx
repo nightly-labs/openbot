@@ -1,4 +1,5 @@
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
+import { isAgentStoredEmptyPreview } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   ArrowDown,
@@ -520,16 +521,21 @@ function MessageResultRow(props: { result: MessageResult; query: string }) {
 }
 
 function ResultRow(props: { result: GlobalSearchResult; query: string }) {
+  const { t } = useText();
   // The row is keyed by its result, so the kind and the parts to show do not change.
   const result = untrack(() => props.result);
   switch (result.kind) {
-    case "agent":
+    case "agent": {
+      const title = result.agent.title.trim();
+      const detail =
+        title || (isAgentStoredEmptyPreview(result.agent.preview) ? t("app.agent.noMessages") : result.agent.preview);
       return (
         <>
           <AgentAvatar agent={result.agent} motion="hover" class="global-search-avatar" />
-          <NamedRow name={result.agent.name} detail={result.agent.title || result.agent.preview} query={props.query} />
+          <NamedRow name={result.agent.name} detail={detail} query={props.query} />
         </>
       );
+    }
     case "channel":
       return (
         <>

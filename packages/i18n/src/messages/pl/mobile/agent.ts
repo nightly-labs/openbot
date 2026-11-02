@@ -532,6 +532,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Agenci",
   "mobile.agent.section.moveFailed": "Nie udało się przenieść czatu",
   "mobile.agent.section.moveTo": "Przenieś do sekcji",
+  "mobile.agent.noMessages": "Brak wiadomości",
   "mobile.agent.list.open": "Otwórz czat: {name}",
   "mobile.agent.list.openWithTitle": "Otwórz czat: {name}, {title}",
   "mobile.agent.list.openPinned": "Otwórz przypięty czat: {name}",

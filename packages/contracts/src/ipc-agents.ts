@@ -200,6 +200,13 @@ export function isAgentMarketplaceSource(value: unknown): value is NonNullable<A
   );
 }
 
+/** Stored on the host when an agent has no messages. UI maps this to a catalog string; it is not localized on the wire. */
+export const AGENT_STORED_EMPTY_PREVIEW = "No messages yet";
+
+export function isAgentStoredEmptyPreview(preview: string): boolean {
+  return preview.trim() === AGENT_STORED_EMPTY_PREVIEW;
+}
+
 export interface AgentSummary {
   id: string;
   name: string;
