@@ -172,7 +172,8 @@ used only by OpenBot is safer than your personal one.
 3. Select **QR code** and scan it in WhatsApp → **Linked devices** → **Link a device**, or select
    **Pairing code**, type the number of the phone, and type the code that OpenBot shows on the phone.
 4. Pick the model of the WhatsApp Orchestrator and select **Add agent**. One orchestrator answers every
-   linked number. It goes in the **Integrations** section of the sidebar.
+   linked number. It goes in the **Integrations** section of the sidebar. OpenBot posts a 👋 welcome in
+   the number's own "Message yourself" chat, so the chat shows at the top of WhatsApp.
 5. Under **Who can write**, add contacts by phone number, and groups from the list of the number's
    groups.
 
@@ -185,8 +186,8 @@ the WhatsApp Orchestrator is deleted with its conversations, as for Slack.
 
 - A direct chat is one conversation. In a group, a mention of the number starts a conversation, and
   a reply to a message of it continues it without a mention. Other messages of the group start nothing.
-- 👀 means the message arrived. "Working on it…" is replaced by the answer within 15 minutes; later,
-  the answer is a new message. 👌, 💔 or 🫡 shows the end.
+- 👀 on your message means it arrived. "Working on it…" is replaced by the answer within 15 minutes;
+  later, the answer is a new message. ✅ (done), ❌ (failed) or 🫡 (stopped) on your message shows the end.
 - Personal WhatsApp has no buttons. An approval ends with "Reply 1 to approve or 2 to deny." Only the
   person who wrote the request can answer it. `stop` stops the request.
 - Short messages that one person sends within 1.5 seconds become one request.

@@ -47,10 +47,9 @@ export const messages = {
     "Este número solo responde a las personas que su propietario permitió. Dale este código al propietario: {code}",
   "status.messaging.whatsappPairingApproved": "Ya puedes enviar solicitudes a este número.",
   "status.messaging.whatsappOwnChat": "Envíate un mensaje",
-  "status.messaging.whatsappWelcomeOwn":
-    "👋 OpenBot está conectado a este número. Escribe aquí para preguntar a tus agentes. Responde 1 o 2 para aprobar o rechazar una solicitud, y stop para detenerla.",
+  "status.messaging.whatsappWelcomeOwn": "👋 OpenBot está conectado. Escribe aquí para preguntar a tus agentes.",
   "status.messaging.whatsappWelcomeDedicated":
-    "👋 OpenBot está conectado a este número. Las personas que permitas en OpenBot ya pueden escribirle, y una persona nueva recibe un código para darte.",
+    "👋 OpenBot está conectado. Las personas que permitas ya pueden escribir a este número.",
   "status.messaging.whatsappOrchestratorName": "Orquestador de WhatsApp",
   "status.messaging.whatsappOrchestratorTitle": "Responde en WhatsApp y consulta al equipo",
 } as const satisfies PartialTranslation<typeof source>;

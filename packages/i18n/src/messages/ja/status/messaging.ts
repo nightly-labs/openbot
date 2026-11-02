@@ -49,10 +49,9 @@ export const messages = {
     "この番号は、所有者が許可した人にだけ回答します。所有者にこのコードを伝えてください: {code}",
   "status.messaging.whatsappPairingApproved": "この番号にリクエストを送れるようになりました。",
   "status.messaging.whatsappOwnChat": "自分にメッセージ",
-  "status.messaging.whatsappWelcomeOwn":
-    "👋 OpenBot がこの番号に接続しました。ここに書いてエージェントに依頼できます。依頼を承認するには 1、拒否するには 2、止めるには stop と返信してください。",
+  "status.messaging.whatsappWelcomeOwn": "👋 OpenBot が接続しました。ここに書いてエージェントに依頼できます。",
   "status.messaging.whatsappWelcomeDedicated":
-    "👋 OpenBot がこの番号に接続しました。OpenBot で許可した人がこの番号に書けるようになりました。新しい人には、あなたに伝えるコードが届きます。",
+    "👋 OpenBot が接続しました。許可した人がこの番号に書けるようになりました。",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "WhatsApp で回答し、チームに依頼します",
 } as const satisfies PartialTranslation<typeof source>;

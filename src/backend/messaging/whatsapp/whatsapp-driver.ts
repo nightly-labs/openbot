@@ -45,10 +45,11 @@ const WHATSAPP_FILE_BYTES_LIMIT = 64 * 1024 * 1024;
 const EDIT_WINDOW_MS = 14 * 60_000;
 const PLACE_NAME_TIMEOUT_MS = 5_000;
 
+/** The reaction on the person's message: arrived, then done, failed or stopped. */
 const REACTIONS: Record<StatusReaction, string> = {
   received: "👀",
-  done: "👌",
-  failed: "💔",
+  done: "✅",
+  failed: "❌",
   stopped: "🫡",
 };
 

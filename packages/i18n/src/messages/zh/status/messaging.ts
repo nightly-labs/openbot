@@ -52,10 +52,8 @@ export const messages = {
   "status.messaging.whatsappPairingCode": "该号码只回答其所有者允许的人。请把这个代码交给所有者：{code}",
   "status.messaging.whatsappPairingApproved": "你现在可以向该号码发送请求了。",
   "status.messaging.whatsappOwnChat": "给自己发消息",
-  "status.messaging.whatsappWelcomeOwn":
-    "👋 OpenBot 已连接到此号码。在这里写下内容即可向你的智能体提问。回复 1 或 2 可批准或拒绝请求，回复 stop 可停止请求。",
-  "status.messaging.whatsappWelcomeDedicated":
-    "👋 OpenBot 已连接到此号码。你在 OpenBot 中允许的人现在可以给它发消息，新的联系人会收到一个代码，用于转交给你。",
+  "status.messaging.whatsappWelcomeOwn": "👋 OpenBot 已连接。在这里写下内容即可向你的智能体提问。",
+  "status.messaging.whatsappWelcomeDedicated": "👋 OpenBot 已连接。你允许的人现在可以给这个号码发消息。",
   "status.messaging.whatsappOrchestratorName": "WhatsApp 调度助手",
   "status.messaging.whatsappOrchestratorTitle": "在 WhatsApp 中回答并调度团队",
 } as const satisfies PartialTranslation<typeof source>;

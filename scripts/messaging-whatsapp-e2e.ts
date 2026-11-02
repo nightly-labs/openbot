@@ -534,7 +534,10 @@ try {
       );
       assert.equal(phone.sockets.length, sockets, "The connection opened a second socket after the link.");
       await until(
-        () => phone.textsTo(OWNER_JID).some((text) => text.includes("OpenBot is connected to this number")),
+        () =>
+          phone
+            .textsTo(OWNER_JID)
+            .some((text) => text.includes("OpenBot is connected. Write here to ask your agents.")),
         "the welcome message in the owner's own chat",
       );
       // No orchestrator exists yet, so the service answers that no agent can answer: it read the message.
@@ -906,7 +909,7 @@ try {
         await linkState(messaging, (state) => state.status === "linked", "the second link");
         await until(() => connection(messaging)?.state === "connected", "connected after the second link");
         await until(
-          () => phone.textsTo(OWNER_JID).some((text) => text.includes("can now write to it")),
+          () => phone.textsTo(OWNER_JID).some((text) => text.includes("can now write to this number")),
           "the welcome message of a number only for OpenBot",
         );
         const account = messaging.whatsappOverview().accounts[0];

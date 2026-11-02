@@ -47,10 +47,9 @@ export const messages = {
     "Dit nummer antwoordt alleen mensen die de eigenaar heeft toegestaan. Geef de eigenaar deze code: {code}",
   "status.messaging.whatsappPairingApproved": "Je kunt nu verzoeken naar dit nummer sturen.",
   "status.messaging.whatsappOwnChat": "Bericht aan jezelf",
-  "status.messaging.whatsappWelcomeOwn":
-    "👋 OpenBot is verbonden met dit nummer. Schrijf hier om je agents iets te vragen. Antwoord 1 of 2 om een verzoek goed te keuren of te weigeren, en stop om het te stoppen.",
+  "status.messaging.whatsappWelcomeOwn": "👋 OpenBot is verbonden. Schrijf hier om je agents iets te vragen.",
   "status.messaging.whatsappWelcomeDedicated":
-    "👋 OpenBot is verbonden met dit nummer. De mensen die je in OpenBot toestaat, kunnen er nu naar schrijven, en een nieuw persoon krijgt een code om aan jou te geven.",
+    "👋 OpenBot is verbonden. De mensen die je toestaat, kunnen nu naar dit nummer schrijven.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp-orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Antwoordt in WhatsApp en vraagt het team",
 } as const satisfies PartialTranslation<typeof source>;
