@@ -51,6 +51,8 @@ export interface AgentTasksOptions {
    * routes. The list of such a server gives the link of each branch; its events do not.
    */
   branchable: () => boolean;
+  /** The server takes files in a side thread: this computer, or the `agent-thread-files-v1` routes. */
+  filesAccepted: () => boolean;
   /**
    * A change of this value reads the lists of the active agent and of each agent with a running thread
    * again, for example when the agent starts again.
@@ -65,7 +67,7 @@ export interface AgentTasksOptions {
  * server: a reply that arrives after that owner ends changes nothing.
  */
 export function createAgentTasks(options: AgentTasksOptions) {
-  const { port, activeAgentId, local, available, editable, readable, branchable } = options;
+  const { port, activeAgentId, local, available, editable, readable, branchable, filesAccepted } = options;
   const scopeIsCurrent = createScopeGuard();
   const [state, setState] = createStore<AgentTasksState>({ snapshots: {}, conversations: {} });
   const listRequests = new Map<string, number>();
@@ -394,6 +396,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     available,
     editable,
     local,
+    filesAccepted,
     snapshot: (agentId: string): AgentTasksSnapshot | undefined => state.snapshots[agentId],
     conversation: (taskId: string): ConversationSnapshot | undefined => state.conversations[taskId],
     applyEvent,

@@ -27,6 +27,7 @@ import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
@@ -2388,6 +2389,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       agentsOpen={!tasksAgentsHidden()}
                       onToggleAgents={() => setTasksAgentsOpen(tasksAgentsHidden())}
                       source={tasksSource}
+                      mediaSource={runtime.attachmentMedia}
+                      files={{
+                        accepted: () => workspace.state.capabilities.includes(AGENT_THREAD_FILES_CAPABILITY),
+                        import: (data, serverId) => runtime.agent.importAttachmentData(data, serverId),
+                        discard: (id, serverId) => runtime.agent.discardDraftAttachment(id, serverId),
+                      }}
                       agents={workspace.profiles()}
                       onOpenLink={(url) => void openWebLink(url)}
                       // The browser only downloads a file.

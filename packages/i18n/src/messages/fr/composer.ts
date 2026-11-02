@@ -66,6 +66,7 @@ export const messages = {
   "composer.reply.attachment": "Pièce jointe",
   "composer.reply.cancel": "Annuler la réponse",
   "composer.attachment.remove": "Retirer {name}",
+  "composer.attachment.adding": "Ajout de {name}",
   "composer.placeholder.hostSetup": "Terminez la configuration du fournisseur sur votre hôte pour commencer",
   "composer.placeholder.connectHost": "Connectez-vous à votre hôte pour commencer",
   "composer.placeholder.hostSleeping": "Ce serveur est en veille. Appuyez sur une touche ou cliquez pour le réveiller",

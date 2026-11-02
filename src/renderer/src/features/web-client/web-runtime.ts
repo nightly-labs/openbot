@@ -1,6 +1,7 @@
 import {
   assertSupportedAttachmentName,
   attachmentFileExtension,
+  rasterImageMimeType,
   supportedAttachmentExtensions,
 } from "@openbot/contracts/attachment-files";
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
@@ -532,6 +533,25 @@ export function createWebWorkspaceRuntime(
   const duplicateOperationIds = new Map<string, string>();
   const completedDraftIdsByHost = new Map<string, Set<string>>();
   const draftCleanupRetryHosts = new Set<string>();
+  // The host names a draft's preview with the desktop `openbot-attachment:` scheme, so a draft image
+  // shows from its local bytes. A discard revokes the URL. A sent draft keeps it until the runtime ends:
+  // the pending row of the message shows it until the host's row comes.
+  const localDraftPreviews = new Map<string, string>();
+  function localDraftPreview(id: string, file: File): string | null {
+    const type = rasterImageMimeType(file.name);
+    if (!type) return null;
+    const url = URL.createObjectURL(new Blob([file], { type }));
+    localDraftPreviews.set(id, url);
+    return url;
+  }
+  function revokeLocalDraftPreviews(ids: Iterable<string>): void {
+    for (const id of ids) {
+      const url = localDraftPreviews.get(id);
+      if (!url) continue;
+      URL.revokeObjectURL(url);
+      localDraftPreviews.delete(id);
+    }
+  }
   function trackCompletedDraft(id: string, hostId = lockedHostId): void {
     if (!hostId) return;
     // The released API has no draft listing. A request that commits before returning cannot be
@@ -1149,8 +1169,7 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("webClient.error.uploadCancelled"));
       }
       trackCompletedDraft(value.id, uploadHostGeneration === generation ? lockedHostId : null);
-      // The host names the draft's preview with the desktop `openbot-attachment:` scheme.
-      return { ...value, previewUrl: null };
+      return { ...value, previewUrl: value.kind === "image" ? localDraftPreview(value.id, file) : null };
     },
     setTyping(agentId, typing) {
       peer.setTyping(agentId, typing);
@@ -1162,6 +1181,7 @@ export function createWebWorkspaceRuntime(
     async discard(id) {
       await Effect.runPromise(discardAttachmentDraft(teamApi, id).pipe(Effect.mapError((error) => error.cause)));
       removeCompletedDrafts([id]);
+      revokeLocalDraftPreviews([id]);
     },
     async download(id) {
       return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id)));
@@ -1314,6 +1334,7 @@ export function createWebWorkspaceRuntime(
       generation += 1;
       connectedHost = null;
       duplicateOperationIds.clear();
+      revokeLocalDraftPreviews([...localDraftPreviews.keys()]);
       try {
         await Promise.all([peer.dispose(), hosts?.dispose(), ...retiring]);
       } finally {
