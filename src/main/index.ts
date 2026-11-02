@@ -119,6 +119,7 @@ import {
 } from "./main-window";
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
 import { MessageLinkRelay, openHttpLink } from "./message-link-relay";
+import { NetworkReturned } from "./network-returned";
 import { startMainLog } from "./provider-log";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
@@ -1437,6 +1438,17 @@ if (!hasSingleInstanceLock) {
       screen.on("display-metrics-changed", reconcileDynamicIsland);
       powerMonitor.on("resume", reconcileDynamicIsland);
       powerMonitor.on("resume", () => void Effect.runPromise(remoteServers.wake()));
+      // A wake from sleep is not the only way the network goes away: a plain disconnect leaves the
+      // remote servers on their retry backoff while the computer is already back online, and the
+      // main process has no online event to hear about it, only this poll of the link.
+      const networkReturned = new NetworkReturned({
+        isOnline: () => net.isOnline(),
+        onReturned: () =>
+          void Effect.runPromise(remoteServers.wake()).catch((error) =>
+            logger.error("Unable to retry the remote servers after the network returned:", toLogValue(error)),
+          ),
+      });
+      teardown.push(0, "network returned", () => networkReturned.dispose());
       // A Slack socket can be dead after sleep without knowing it; reconnect instead of waiting for a ping.
       powerMonitor.on("resume", () => built.messaging.resume());
       const routineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
