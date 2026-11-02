@@ -112,7 +112,8 @@ export class AgentRemoval {
   }
 
   /**
-   * Fails as `delete` would when the agent is being deleted, has an active turn or an unfinished delivery.
+   * Fails as `delete` would when the agent is being deleted, has an active turn or compaction, or an
+   * unfinished delivery.
    * While a usage limit holds the agent, only started work blocks: the hold can last for days, and
    * the messages that wait for it go with the agent.
    */
@@ -137,8 +138,6 @@ export class AgentRemoval {
           yield* this.#hooks.settleModelMoves(agentId);
           const current = yield* removalStep(() => {
             this.#assertIdle(agentId);
-            if (this.#compaction.heldThreads(agentId).length > 0)
-              throw new Error(sourceText("error.agent.stopBeforeDelete"));
             return this.#store.list().find((entry) => entry.id === agentId) ?? agent;
           });
           yield* removalStep(() => this.#routines.arm());
@@ -171,7 +170,11 @@ export class AgentRemoval {
     const pendingWork = this.#hooks.usageLimitHolds(agentId)
       ? this.#mailbox.hasStartedDelivery(agentId) || this.#channels.queueHold(agentId) !== null
       : this.#mailbox.hasUnfinishedDelivery(agentId);
-    if (pendingWork || this.#conversation.anyWorkingSnapshot(agentId)?.activeTurnId) {
+    if (
+      pendingWork ||
+      this.#conversation.anyWorkingSnapshot(agentId)?.activeTurnId ||
+      this.#compaction.heldThreads(agentId).length > 0
+    ) {
       throw new Error(sourceText("error.agent.stopBeforeDelete"));
     }
   }
