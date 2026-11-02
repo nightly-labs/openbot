@@ -6,7 +6,7 @@
 OpenBot is a local-first desktop workspace for persistent AI teammates. It supports the local
 [Codex App Server](https://learn.chatgpt.com/docs/app-server) and
 [Claude Code](https://code.claude.com/docs/en/overview), plus [Grok CLI](https://docs.x.ai/build/overview),
-OpenCode, Gemini, [Cursor CLI](https://cursor.com/cli), and [Cline CLI](https://cline.bot/cli) through ACP. It gives every agent its own workspace and
+OpenCode, Gemini, [Cursor CLI](https://cursor.com/cli), [Cline CLI](https://cline.bot/cli), and [Kimi Code CLI](https://github.com/MoonshotAI/kimi-cli) through ACP. It gives every agent its own workspace and
 conversation, and provides local queues, file transfers, an embedded browser, and agent-to-agent
 messaging in one desktop app.
 
@@ -19,7 +19,7 @@ messaging in one desktop app.
 ## What works
 
 - Prompt-driven agent creation and editing on desktop and mobile, with editable instructions, avatar, and section review before saving.
-- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, Cursor, or Cline sessions and local workspaces.
+- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, Cursor, Cline, or Kimi sessions and local workspaces.
 - Custom OpenAI-compatible endpoints and custom ACP agents, with detection of local model servers (Ollama, LM Studio) and installed agents.
 - Per-agent context monitoring with automatic compaction before long threads exhaust the model window.
 - FIFO message queues with pause, resume, cancellation, and crash-safe persistence.
@@ -33,7 +33,7 @@ messaging in one desktop app.
 
 OpenBot is local-first, not offline-only. Codex connects to OpenAI, Claude connects to Anthropic,
 Grok connects to xAI, Gemini connects to Google, Cursor connects to Cursor, Cline connects to Cline,
-visited pages use the network, and installed plugins may connect to their own services.
+Kimi connects to Moonshot AI, visited pages use the network, and installed plugins may connect to their own services.
 
 ## Install
 
@@ -198,6 +198,14 @@ Cline's sign-in page in your browser. You can also set `CLINE_API_KEY` in the en
 launch OpenBot. If you installed `cline` 3.0.68 or newer yourself, OpenBot uses it until a download
 exists. Set `OPENBOT_CLINE_PATH` to select an executable yourself. Cline agents stay on this
 computer: team members do not see them.
+
+Kimi uses a Kimi Code account. OpenBot downloads and pins the Kimi Code CLI (`kimi`) when you select
+Download on the Kimi row in More providers, and starts it with `kimi acp`. Sign in runs `kimi login`,
+which opens Kimi's sign-in page in your browser. If you installed `kimi` 1.52.0 or newer yourself,
+OpenBot uses it until a download exists. Set `OPENBOT_KIMI_PATH` to select an executable yourself.
+When a Full access Kimi agent changes its model, the CLI saves that model as its default in
+`~/.kimi/config.toml`, so a Kimi session that you start in a terminal also uses it. Kimi agents run
+on this computer. Team members see them when their app supports Kimi.
 
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
@@ -562,6 +570,7 @@ in the file manager. Remote hosts must advertise the `svg-attachments` capabilit
 - `~/.cursor` — login and session history managed exclusively by the Cursor CLI. A confined Cursor
   process keeps its settings in `~/.cursor/openbot-confined`, so it never changes yours.
 - `~/.cline` (or `$CLINE_DIR`) — login and session history managed exclusively by the Cline CLI.
+- `~/.kimi` (or `$KIMI_SHARE_DIR`) — login and session history managed exclusively by the Kimi Code CLI.
 
 Deleting an agent removes its workspace, owned generated attachments, and deliveries addressed only
 to that agent. A transfer remains when another agent still uses the same message.

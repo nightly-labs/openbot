@@ -2,7 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { pasteCodeSignInSupported } from "@openbot/contracts/agent-providers";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
-import { Effect, Fiber, Schema } from "effect";
+import { Effect, Fiber, Option, Schema } from "effect";
 import { shellQuote } from "../automation-command";
 import { cliSpawnTarget } from "../cli";
 import { stopProcessTree } from "../windows-process-tree";
@@ -12,7 +12,7 @@ import { waitForSuccessfulProcess } from "./provider-status";
  * What a provider CLI prints for a sign-in the user finishes on another device.
  *
  * `device` is a device code: the user opens the page, confirms the code, and the CLI sees the
- * approval by itself (Grok, Cline). `paste` is an authorization code the provider's page shows after
+ * approval by itself (Grok, Cline, Kimi). `paste` is an authorization code the provider's page shows after
  * the sign-in, which the user copies back and OpenBot types into the CLI's prompt (Claude). `link` is
  * a page that signs the CLI in by itself, with no code to confirm or copy (Cursor).
  */
@@ -190,10 +190,14 @@ function terminalCommand(platform: NodeJS.Platform, argv: readonly string[]): { 
 /**
  * Reads the link, and the code for a device sign-in, from what the CLI has printed so far. Returns
  * null until all of it is there. The shapes are the pinned CLIs' (Grok 1.0.22, Claude 2.1.263,
- * Cursor 2026.10.01, Cline 3.0.68); the tests hold samples of each.
+ * Cursor 2026.10.01, Cline 3.0.68, Kimi 1.52.0); the tests hold samples of each but Kimi's.
  */
 function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCodePrompt | null {
   const text = stripTerminalCodes(output);
+  if (flow === "device") {
+    const event = deviceCodeEvent(text);
+    if (event) return event;
+  }
   // Only a link that something has ended: a chunk can stop in the middle of one.
   const url = text.match(/https:\/\/[^\s"'<>]+(?=[\s"'<>])/)?.[0];
   if (!url) return null;
@@ -230,6 +234,36 @@ function codeAfterConfirmLine(text: string): string | null {
   if (confirm < 0) return null;
   const code = lines.slice(confirm + 1, -1).find(Boolean);
   return code && /^[A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*$/.test(code) ? code : null;
+}
+
+const DeviceCodeEvent = Schema.Struct({
+  type: Schema.Literal("verification_url"),
+  data: Schema.Struct({ verification_url: Schema.String, user_code: Schema.String }),
+});
+const decodeDeviceCodeEvent = Schema.decodeUnknownOption(Schema.fromJsonString(DeviceCodeEvent));
+
+/**
+ * The device code from a JSON line that has ended (Kimi's `login --json`):
+ * `{"type": "verification_url", "data": {"verification_url": "<page with the code>", "user_code": "<code>"}}`.
+ */
+function deviceCodeEvent(text: string): CliCodePrompt | null {
+  for (const line of text.split("\n").slice(0, -1)) {
+    const event = decodeDeviceCodeEvent(line.trim());
+    if (Option.isNone(event)) continue;
+    const { verification_url: url, user_code: userCode } = event.value.data;
+    if (!/^[A-Za-z0-9]{3,12}(?:-[A-Za-z0-9]{3,12})*$/.test(userCode) || !URL.canParse(url)) continue;
+    const page = new URL(url);
+    if (page.protocol !== "https:") continue;
+    const base = new URL(page.href);
+    base.search = "";
+    return {
+      flow: "device",
+      userCode,
+      verificationUrl: base.href,
+      verificationUrlComplete: page.search ? page.href : null,
+    };
+  }
+  return null;
 }
 
 /** The code at the end of an "Enter this code in your browser: CODE" line that has ended (Cline). */

@@ -10,7 +10,7 @@ import { isPathInside } from "./path-containment";
  * The folders one Workspace only agent may write: its workspace and the shared folder. The temporary
  * folders and the provider's state are added to them.
  *
- * Grok, OpenCode, Antigravity, Cursor and Cline take no sandbox per session, so a Workspace only
+ * Grok, OpenCode, Antigravity, Cursor, Cline and Kimi take no sandbox per session, so a Workspace only
  * agent on them gets a provider process of its own, and OpenBot starts that process inside an
  * operating system sandbox. The whole process is confined: the file edit tools, the shell, and every
  * command and MCP server it starts. Nothing inside the process can take the sandbox away. Only macOS
@@ -246,6 +246,22 @@ export function clineStatePaths(env: NodeJS.ProcessEnv = process.env, home = hom
 }
 
 /**
+ * The Kimi Code CLI keeps its sign-in, sessions, logs and caches in `KIMI_SHARE_DIR`, `~/.kimi` by
+ * default, and writes its plans in `~/.kimi/plans`. Its settings and hooks (`config.toml`), MCP
+ * servers, plugins, skills and downloaded tools are in that folder too, and every other Kimi process
+ * loads them, so they stay read-only.
+ */
+export function kimiStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const kimiHome = env.KIMI_SHARE_DIR?.trim() || join(home, ".kimi");
+  return {
+    writable: unique([kimiHome, join(home, ".kimi", "plans")]),
+    protected: ["config.toml", "config.json", "mcp.json", "plugins", "skills", "bin"].map((name) =>
+      join(kimiHome, name),
+    ),
+  };
+}
+
+/**
  * A custom agent keeps its state where it wants, and OpenBot cannot know where. A Workspace only
  * custom agent gets no state folder: an agent that must write in its home folder to run needs Full
  * access.
@@ -309,6 +325,8 @@ const PROJECT_SETTINGS = [
   // Cline reads its project rules, workflows, hooks, skills and agents from these two.
   ".cline",
   ".clinerules",
+  // Kimi reads its project skills and instructions from `.kimi`.
+  ".kimi",
   ".pi",
   ".muse",
   // Antigravity reads project skills from `.gemini` and its customizations from these four.

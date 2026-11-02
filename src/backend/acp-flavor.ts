@@ -51,6 +51,11 @@ export interface AcpFlavor {
    */
   processWideModel?: true;
   /**
+   * A `session/set_model` failure after which the session already runs on the new model. The agent
+   * changes the session first and then fails to save the model as its default.
+   */
+  modelSetUnsaved?(error: RequestError): boolean;
+  /**
    * The agent frees what a session holds only when its process ends, not at `session/close`. Model
    * discovery then resumes one probe session for each process rather than opening another.
    */
@@ -138,6 +143,23 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   // finds no OpenBot tools (#3058).
   mcpServersLoadWithSession: true,
   enableMcpServers: enableCursorMcpServers,
+};
+
+/**
+ * Kimi CLI 1.52.0 refuses `session/load` and `session/resume` for a session that it does not have
+ * with "Invalid params" and `{ session_id: "Session not found" }`. Only that exact data counts: other
+ * invalid parameters, such as an unknown model, must not cause a provider session to be replaced.
+ */
+export const KIMI_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: (error) =>
+    error.code === -32602 ? isRecord(error.data) && error.data.session_id === "Session not found" : null,
+  // Kimi CLI 1.52.0 moves the session to the new model, and then saves it as the default model in
+  // its config.toml. In a confined process that file is protected, and the save fails with -32603.
+  modelSetUnsaved: (error) =>
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    typeof error.data.details === "string" &&
+    error.data.details.includes("config.toml"),
 };
 
 /**
