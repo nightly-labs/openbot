@@ -71,6 +71,7 @@ export const messages = {
     "Deze server kan geen eigen meldingsniveau per agent bewaren. Werk OpenBot bij op de computer waarop de server draait.",
   "error.team.sidebarPinsUnsupported":
     "Deze server kan je vastgezette chats niet voor al je apparaten bewaren. Werk OpenBot bij op de computer waarop hij draait.",
+  "error.team.agentInstructionsUnsupported": "Deze verbinding ondersteunt het bewerken van agentinstructies niet.",
   "error.team.agentPublishUnsupported": "Deze verbinding ondersteunt het publiceren van agents niet.",
   "error.team.agentUpdateUnsupported": "Deze verbinding ondersteunt het bijwerken van agents niet.",
   "error.team.contextResetUnsupported": "Deze verbinding ondersteunt het starten van een nieuwe chat niet.",

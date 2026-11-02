@@ -98,7 +98,12 @@ export function serverSupportsCapability(
       capability === "side-question-v1" ||
       capability === "workflows-github-v1" ||
       capability === "agent-notification-levels-v1" ||
-      capability === "sidebar-pins-v1") &&
+      capability === "sidebar-pins-v1" ||
+      capability === "agent-new-chat-v1" ||
+      capability === "agent-folders-v1" ||
+      capability === "agent-fast-mode-v1" ||
+      capability === "context-compact-v1" ||
+      capability === "agent-instructions-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;

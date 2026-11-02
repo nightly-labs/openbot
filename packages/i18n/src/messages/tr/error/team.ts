@@ -70,6 +70,7 @@ export const messages = {
     "Bu sunucu her ajan için kendi bildirim düzeyinizi saklayamıyor. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
   "error.team.sidebarPinsUnsupported":
     "Bu sunucu sabitlenmiş sohbetlerinizi tüm cihazlarınız için saklayamaz. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
+  "error.team.agentInstructionsUnsupported": "Ajan talimatlarını düzenleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentPublishUnsupported": "Ajan yayımlama bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentUpdateUnsupported": "Ajan güncelleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.contextResetUnsupported": "Yeni bir sohbet başlatma bu bağlantı tarafından desteklenmiyor.",

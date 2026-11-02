@@ -13,7 +13,9 @@ import {
   type ClientAgentModelOption,
   canAdministerServer,
   decodeAgentBackupModelSettings,
+  decodeAgentFastModeSettings,
   decodeAgentHostSettings,
+  decodeAgentNewChatSettings,
   decodeAgentPlanCardSettings,
   decodeAgentTaskLimitSettings,
   type ServerConnectionState,
@@ -22,8 +24,10 @@ import {
 import type { PricingOrder } from "@openbot/contracts/license";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_FAST_MODE_ROUTES } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
+import { AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
@@ -817,12 +821,26 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           agentId,
           taskLimit,
         }),
+      getAgentNewChat: (agentId, serverId) =>
+        hostRequest(serverId)("POST", AGENT_NEW_CHAT_ROUTES.settings, decodeAgentNewChatSettings, { agentId }),
+      updateAgentNewChat: ({ agentId, allowNewChat }, serverId) =>
+        hostRequest(serverId)("POST", AGENT_NEW_CHAT_ROUTES.update, decodeAgentNewChatSettings, {
+          agentId,
+          allowNewChat,
+        }),
       getAgentPlanCard: (agentId, serverId) =>
         hostRequest(serverId)("POST", AGENT_PLAN_CARD_ROUTES.settings, decodeAgentPlanCardSettings, { agentId }),
       updateAgentPlanCard: ({ agentId, quickAcknowledgement }, serverId) =>
         hostRequest(serverId)("POST", AGENT_PLAN_CARD_ROUTES.update, decodeAgentPlanCardSettings, {
           agentId,
           quickAcknowledgement,
+        }),
+      getAgentFastMode: (agentId, serverId) =>
+        hostRequest(serverId)("POST", AGENT_FAST_MODE_ROUTES.settings, decodeAgentFastModeSettings, { agentId }),
+      updateAgentFastMode: ({ agentId, fastMode }, serverId) =>
+        hostRequest(serverId)("POST", AGENT_FAST_MODE_ROUTES.update, decodeAgentFastModeSettings, {
+          agentId,
+          fastMode,
         }),
       getAgentAdminSettings: (agentId, serverId) =>
         runTeamEffect(
@@ -846,6 +864,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
     const taskLimit = remoteAgentAdmin.taskLimit();
     const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
+    const fastMode = remoteAgentAdmin.fastMode();
+    const computerUse = remoteAgentAdmin.computerUse();
+    const allowNewChat = remoteAgentAdmin.allowNewChat();
     return agent
       ? {
           ...agent,
@@ -856,6 +877,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           ...(usageLimitReturn ? { usageLimitReturn } : {}),
           ...(typeof taskLimit === "number" ? { taskLimit } : {}),
           ...(quickAcknowledgement === undefined ? {} : { quickAcknowledgement }),
+          ...(typeof fastMode === "boolean" ? { fastMode } : {}),
+          ...(computerUse === undefined ? {} : { computerUse }),
+          ...(allowNewChat === undefined ? {} : { allowNewChat }),
         }
       : agent;
   });
@@ -2772,6 +2796,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
                   remoteTaskLimitLoaded={remoteAgentAdmin.taskLimit() !== undefined}
                   remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
+                  remoteComputerUseLoaded={remoteAgentAdmin.computerUse() !== undefined}
+                  remoteNewChatLoaded={remoteAgentAdmin.allowNewChat() !== undefined}
                   remoteBusyMessageModeLoaded={remoteAgentAdmin.busyMessageMode() !== undefined}
                   defaultBusyMessageMode={remoteAgentAdmin.defaultBusyMessageMode()}
                   onUpdateAgentPermissions={remoteAgentAdmin.settings() ? remoteAgentAdmin.update : undefined}

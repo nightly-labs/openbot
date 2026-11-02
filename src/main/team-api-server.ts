@@ -30,8 +30,10 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
@@ -215,6 +217,7 @@ import { routeAgentAccess } from "./team-api/route-agent-access";
 import {
   routeAgentAdmin,
   routeAgentBackupModels,
+  routeAgentFastMode,
   routeAgentHostSettings,
   routeAgentNewChat,
   routeAgentPlanCard,
@@ -224,6 +227,7 @@ import { routeAgentFolders } from "./team-api/route-agent-folders";
 import { routeAgentHidden, visibleSnapshot } from "./team-api/route-agent-hidden";
 import { routeAgentImport } from "./team-api/route-agent-import";
 import { routeAgentInstall } from "./team-api/route-agent-install";
+import { routeAgentInstructions } from "./team-api/route-agent-instructions";
 import { routeAgentMemoryPage } from "./team-api/route-agent-memories";
 import { routeAgentMemoryLimit } from "./team-api/route-agent-memory-limit";
 import { routeAgentNotificationLevels } from "./team-api/route-agent-notification-levels";
@@ -242,6 +246,7 @@ import { routeBrowser } from "./team-api/route-browser";
 import { routeBrowserProfiles } from "./team-api/route-browser-profiles";
 import { routeChannels } from "./team-api/route-channels";
 import { routeConnectors } from "./team-api/route-connectors";
+import { routeContextCompact } from "./team-api/route-context-compact";
 import { routeContextReset } from "./team-api/route-context-reset";
 import { routeConversationFiles } from "./team-api/route-conversation-files";
 import { routeCustomAgents } from "./team-api/route-custom-agents";
@@ -1006,6 +1011,7 @@ export class TeamApiServer {
       if ((await routeAgentTaskLimit(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentNewChat(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentPlanCard(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeAgentFastMode(context, this.#options.admin, hidden)) === "handled") return;
       if (
         (await routeBrowserProfiles(context, this.#options.browserProfiles, this.#options.browser, hidden)) ===
         "handled"
@@ -1014,6 +1020,7 @@ export class TeamApiServer {
       if ((await routeRoutineResults(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentSessionSettings(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFolders(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeAgentInstructions(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentHidden(context, this.#options.hiddenAgents, hidden)) === "handled") return;
       if ((await routeSidebarFolders(context, this.#options.sidebarLayout, this.#options.agents, hidden)) === "handled")
         return;
@@ -1063,6 +1070,7 @@ export class TeamApiServer {
       )
         return;
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentMemoryPage(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeConversationFiles(context, this.#options.agents)) === "handled") return;
@@ -2146,6 +2154,7 @@ export class TeamApiServer {
           if (capability === AGENT_SESSION_SETTINGS_CAPABILITY)
             return this.#options.admin?.sessionSettings !== undefined;
           if (capability === AGENT_FOLDERS_CAPABILITY) return this.#options.admin?.folders !== undefined;
+          if (capability === AGENT_INSTRUCTIONS_CAPABILITY) return this.#options.admin?.instructions !== undefined;
           if (capability === AGENT_HIDDEN_CAPABILITY) return this.#options.hiddenAgents !== undefined;
           if (capability === AGENT_TASKS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREADS_CAPABILITY) return this.#options.agentTasks !== undefined;
@@ -2158,6 +2167,7 @@ export class TeamApiServer {
           if (capability === AGENT_TASK_LIMIT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_NEW_CHAT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_PLAN_CARD_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+          if (capability === AGENT_FAST_MODE_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === BROWSER_PROFILES_CAPABILITY || capability === BROWSER_PROFILES_EVENTS_CAPABILITY)
             return this.#options.browserProfiles !== undefined;
           if (capability === SKILLS_ADMIN_CAPABILITY) return this.#options.admin?.skills !== undefined;

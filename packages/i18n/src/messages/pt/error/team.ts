@@ -72,6 +72,7 @@ export const messages = {
     "Este servidor não pode guardar seu próprio nível de notificações para cada agente. Atualize o OpenBot no computador que o executa.",
   "error.team.sidebarPinsUnsupported":
     "Este servidor não consegue guardar as suas conversas fixadas para todos os seus dispositivos. Atualize o OpenBot no computador que o executa.",
+  "error.team.agentInstructionsUnsupported": "Esta conexão não oferece suporte à edição das instruções dos agentes.",
   "error.team.agentPublishUnsupported": "Esta conexão não oferece suporte à publicação de agentes.",
   "error.team.agentUpdateUnsupported": "Esta conexão não oferece suporte à atualização de agentes.",
   "error.team.contextResetUnsupported": "Esta conexão não oferece suporte ao início de um novo chat.",

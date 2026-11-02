@@ -26,6 +26,7 @@ import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-display";
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
+import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
 import { type BrowserProfileService, createBrowserProfileService } from "./browser-profile-service";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import {
@@ -587,6 +588,8 @@ export interface ApplicationServices {
   agentHostSettings: AgentHostSettingsService;
   /** The folders each agent can change besides its workspace, for the desktop settings and `agent-folders-v1`. */
   agentFolders: AgentFolders;
+  /** The instruction file of each agent, for the desktop page and `agent-instructions-v1`. */
+  agentInstructions: AgentInstructionsFiles;
   browserProfiles: BrowserProfileService;
   language: LanguageService;
   logoColor: LogoColorService;
@@ -2309,6 +2312,7 @@ export async function createApplicationServices({
   const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
   const agentHostSettings = createAgentHostSettings({ agents: service, busyMessageMode, agentDefaults });
   const agentFolders = createAgentFolders({ service, userDataPath: app.getPath("userData") });
+  const agentInstructions = createAgentInstructionsFiles(service);
   const browserProfiles = createBrowserProfileService({
     store: browserProfileStore,
     agents: service,
@@ -2522,6 +2526,7 @@ export async function createApplicationServices({
       agents: agentAdminSettings,
       agentHost: agentHostSettings,
       folders: agentFolders,
+      instructions: agentInstructions,
       sessionSettings: service,
       acpRegistry,
       customAgents: customAgentChanges,
@@ -3365,6 +3370,7 @@ export async function createApplicationServices({
     agentAdminSettings,
     agentHostSettings,
     agentFolders,
+    agentInstructions,
     browserProfiles,
     language,
     logoColor,

@@ -130,6 +130,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { AGENT_THREAD_READS_LIMIT } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { ContextCompactRefusedError } from "@openbot/contracts/team-protocol/context-compact-v1";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -3334,12 +3335,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId) ||
         this.#threads.mainContextBusy(agent)
       )
-        throw new Error(sourceText("error.agent.waitBeforeCompactContext"));
+        throw new ContextCompactRefusedError(sourceText("error.agent.waitBeforeCompactContext"));
       const session = agent.threadId
         ? this.#store.database.activeProviderSession(agent.threadId, agent.provider)
         : null;
       if (!session || !this.#compaction.reserve(agentId, session.externalSessionId, true))
-        throw new Error(sourceText("error.agent.compactContextUnavailable"));
+        throw new ContextCompactRefusedError(sourceText("error.agent.compactContextUnavailable"));
       return session.externalSessionId;
     });
     yield* this.#compaction.request(agentId, externalThreadId);
@@ -3361,9 +3362,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#mailbox.taskBusy(agent.id, task.taskId) ||
         (session && this.#compaction.heldThreads(agent.id).includes(session.externalSessionId))
       )
-        throw new Error(sourceText("error.agent.waitBeforeCompactContext"));
+        throw new ContextCompactRefusedError(sourceText("error.agent.waitBeforeCompactContext"));
       if (!session || !this.#compaction.reserve(agent.id, session.externalSessionId, true))
-        throw new Error(sourceText("error.agent.compactContextUnavailable"));
+        throw new ContextCompactRefusedError(sourceText("error.agent.compactContextUnavailable"));
       return session.externalSessionId;
     });
     yield* this.#compaction.request(input.agentId, externalThreadId);
