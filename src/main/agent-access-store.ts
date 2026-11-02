@@ -100,6 +100,17 @@ function mergeShown(
   return merged;
 }
 
+/** A copy of `state` with the levels of the agents in `agents` only. */
+function onlyAgents(state: AgentAccessState, agents: ReadonlySet<string>): AgentAccessState {
+  const only = (levels: AgentAccessLevels) =>
+    Object.fromEntries(Object.entries(levels).filter(([agentId]) => agents.has(agentId)));
+  return {
+    revision: state.revision,
+    everyone: only(state.everyone),
+    roles: state.roles.map((role) => ({ ...role, agents: only(role.agents), memberIds: [...role.memberIds] })),
+  };
+}
+
 function copyState(state: AgentAccessState): AgentAccessState {
   return {
     revision: state.revision,
@@ -192,8 +203,9 @@ export class AgentAccessStore {
         })),
       };
     });
+    // A save drops the levels of a deleted agent. Nobody changed those, so the log does not show them.
     if (before && this.#audit && saved.revision !== before.revision)
-      yield* this.#audit(serverId, before, copyState(saved), actor);
+      yield* this.#audit(serverId, onlyAgents(before, existing), onlyAgents(saved, existing), actor);
     return saved;
   }).bind(this);
 

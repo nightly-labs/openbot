@@ -56,6 +56,25 @@ export interface ServerAuditLog {
   entries: ServerAuditEntry[];
 }
 
+/**
+ * A name cut to the length that the log keeps. An email or an agent name can be longer, and a longer
+ * name would fail the codec of the file and of the wire. The cut does not split a character.
+ */
+export function serverAuditText(name: string): string {
+  if (name.length <= NAME_LIMIT) return name;
+  let cut = "";
+  for (const character of name) {
+    if (cut.length + character.length > NAME_LIMIT) break;
+    cut += character;
+  }
+  return cut;
+}
+
+/** A member, role or agent with its name of now, cut as `serverAuditText` says. */
+export function serverAuditName(id: string, name: string): ServerAuditName {
+  return { id, name: serverAuditText(name) };
+}
+
 function isName(value: unknown): value is ServerAuditName {
   return isDynamicRecord(value) && isIdentifier(value.id) && isBoundedString(value.name, NAME_LIMIT);
 }
@@ -165,9 +184,9 @@ export function agentAccessAuditChanges(
   after: AgentAccessRoles,
   names: ServerAuditNames,
 ): ServerAuditChange[] {
-  const member = (id: string): ServerAuditName => ({ id, name: names.member(id) });
-  const agent = (id: string): ServerAuditName => ({ id, name: names.agent(id) });
-  const roleName = (role: AgentAccessRole): ServerAuditName => ({ id: role.id, name: role.name });
+  const member = (id: string) => serverAuditName(id, names.member(id));
+  const agent = (id: string) => serverAuditName(id, names.agent(id));
+  const roleName = (role: AgentAccessRole) => serverAuditName(role.id, role.name);
   const previous = new Map(before.roles.map((role) => [role.id, role]));
   const next = new Set(after.roles.map((role) => role.id));
   const named: ServerAuditChange[] = [];
@@ -190,7 +209,12 @@ export function agentAccessAuditChanges(
     const old = previous.get(role.id);
     if (!old) named.push({ kind: "role-created", role: roleName(role) });
     else if (old.name !== role.name)
-      named.push({ kind: "role-renamed", roleId: role.id, from: old.name, to: role.name });
+      named.push({
+        kind: "role-renamed",
+        roleId: role.id,
+        from: serverAuditText(old.name),
+        to: serverAuditText(role.name),
+      });
     const oldMembers = new Set(old?.memberIds ?? []);
     const newMembers = new Set(role.memberIds);
     for (const id of newMembers)

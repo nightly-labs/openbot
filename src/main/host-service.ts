@@ -93,6 +93,12 @@ interface HostEvents {
  * changes at the call site - `index.ts` still passes the real services - but it lets an
  * account switch be tested without standing up a database and a browser host.
  */
+/** The admin who changed a member, or the member who left, and that member's ID. */
+interface MemberAuditActor {
+  actor: ServerAuditName | null;
+  memberId: string;
+}
+
 type ForwardedApiOptions = ConstructorParameters<typeof TeamApiServer>[0];
 
 interface HostServiceOptions {
@@ -270,6 +276,8 @@ export class HostService extends EventEmitter<HostEvents> {
   #startOperation: Fiber.Fiber<HostStatus, RemoteWorkflowError> | null = null;
   /** A registration and a key rotation each read the host key, so only one of them runs at a time. */
   readonly #hostKeyLock = Semaphore.makeUnsafe(1);
+  /** One directory sync at a time, so each audit compares the list before and after its own sync. */
+  readonly #directorySync = Semaphore.makeUnsafe(1);
   #webRtcOnline = false;
   /**
    * The home Signal of the last start that got a ticket but did not reach Signal. The next start names
@@ -1333,7 +1341,7 @@ export class HostService extends EventEmitter<HostEvents> {
         const updated = members.find((member) => member.membershipId === input.memberId);
         if (!updated)
           return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.memberNotFound")) });
-        yield* this.#syncRemoteDirectory(hostId, members, actor);
+        yield* this.#syncRemoteDirectory(hostId, members, { actor, memberId: input.memberId });
         // Recording the directory is a write too, so the switch can land inside it and the
         // member below would be the previous account's.
         yield* remoteDecode(() => this.#assertStillActiveHost(hostId));
@@ -1355,7 +1363,7 @@ export class HostService extends EventEmitter<HostEvents> {
         ...(input.role ? { role: input.role } : {}),
         ...(input.disabled === undefined ? {} : { disabled: input.disabled }),
       });
-      if (hostId) yield* this.#auditMembers(hostId, actor, before);
+      if (hostId) yield* this.#auditMembers(hostId, before, { actor, memberId: input.memberId });
       if (member.disabled) {
         yield* this.#remoteScreen.revokeMember(member.id);
         this.#options.browser.releaseUserControlHeldBy({ kind: "member", memberId: member.id });
@@ -1383,7 +1391,7 @@ export class HostService extends EventEmitter<HostEvents> {
         yield* optionalRemoveRemoteMember(hostId, memberId);
         if (optionalListRemoteMembers) {
           const members = yield* optionalListRemoteMembers(hostId);
-          yield* this.#syncRemoteDirectory(hostId, members, actor);
+          yield* this.#syncRemoteDirectory(hostId, members, { actor, memberId });
         }
         yield* this.#revokeMemberSessions(memberId);
         yield* this.#forgetMemberRoles(hostId, memberId);
@@ -1393,7 +1401,7 @@ export class HostService extends EventEmitter<HostEvents> {
       }
       const before = this.#options.store.listStoredMembers();
       yield* this.#options.store.removeMember(memberId);
-      if (hostId) yield* this.#auditMembers(hostId, actor, before);
+      if (hostId) yield* this.#auditMembers(hostId, before, { actor, memberId });
       if (hostId) yield* this.#forgetMemberRoles(hostId, memberId);
       yield* this.#forgetNotificationLevels(memberId);
       yield* this.#forgetSidebarPins(memberId);
@@ -1504,32 +1512,42 @@ export class HostService extends EventEmitter<HostEvents> {
     return owner ? memberAuditName(owner) : null;
   }
 
-  /** Records the member changes since `before`. The change is made, so a failed write only logs. */
-  #auditMembers(
-    hostId: string,
-    actor: ServerAuditName | null,
-    before: readonly TeamMemberSummary[],
-  ): Effect.Effect<void> {
+  /**
+   * Records the member changes since `before`. `by` names the admin and the member that they changed:
+   * only the changes to that member are theirs, and other changes have no known actor. The change is
+   * made, so a failed write only logs.
+   */
+  #auditMembers(hostId: string, before: readonly TeamMemberSummary[], by?: MemberAuditActor): Effect.Effect<void> {
     const audit = this.#options.serverAudit;
     if (!audit) return Effect.void;
-    return Effect.suspend(() =>
-      audit.record(hostId, actor, memberAuditChanges(before, this.#options.store.listStoredMembers())),
-    );
+    return Effect.suspend(() => {
+      const changes = memberAuditChanges(before, this.#options.store.listStoredMembers());
+      const isTheirs = ({ change }: (typeof changes)[number]) =>
+        "member" in change && change.member.id === by?.memberId;
+      const theirs = changes.filter(isTheirs);
+      const others = changes.filter((change) => !isTheirs(change));
+      return Effect.andThen(audit.record(hostId, null, others), audit.record(hostId, by?.actor ?? null, theirs));
+    });
   }
 
   /**
-   * Records the directory, and closes the sessions that it no longer allows. `actor` made the change
-   * that the directory shows; null for a change from another place, such as a member who joined.
+   * Records the directory, and closes the sessions that it no longer allows. `by` names the admin
+   * and the member that they changed; see `#auditMembers`.
    */
   readonly #syncRemoteDirectory = Effect.fn("HostService.syncRemoteDirectory")(function* (
     this: HostService,
     hostId: string,
     members: RemoteDirectoryMember[],
-    actor: ServerAuditName | null = null,
+    by?: MemberAuditActor,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
-    const before = this.#options.store.listStoredMembers();
-    const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members);
-    yield* this.#auditMembers(hostId, actor, before);
+    const closed = yield* this.#directorySync.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const before = this.#options.store.listStoredMembers();
+        const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members);
+        yield* this.#auditMembers(hostId, before, by);
+        return closed;
+      }),
+    );
     if (closed.length === 0) return;
     for (const sessionId of closed) yield* this.#closeLocalSession(sessionId);
     this.#api.refreshPresence();

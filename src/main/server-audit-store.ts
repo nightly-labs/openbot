@@ -10,6 +10,7 @@ import {
   type ServerAuditLog,
   type ServerAuditName,
   type ServerAuditNames,
+  serverAuditName,
   type TeamMemberSummary,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -24,7 +25,7 @@ const logger = createOpenBotLogger("server-audit");
 
 /** The name that the log keeps for a member: the display name, else the username. */
 export function memberAuditName(member: Pick<TeamMemberSummary, "id" | "name" | "username">): ServerAuditName {
-  return { id: member.id, name: member.name?.trim() || member.username };
+  return serverAuditName(member.id, member.name?.trim() || member.username);
 }
 
 type AuditMember = Pick<TeamMemberSummary, "id" | "name" | "username" | "role" | "disabled" | "createdAt">;
@@ -83,11 +84,24 @@ export function serverAuditNames(
   };
 }
 
+/** The entries of one server that decode. An entry that does not, or of a kind this build does not know, is left out. */
+function decodeEntries(value: unknown): ServerAuditEntry[] {
+  if (!Array.isArray(value)) return [];
+  const entries: ServerAuditEntry[] = [];
+  for (const entry of value.slice(0, SERVER_AUDIT_ENTRY_LIMIT)) {
+    try {
+      entries.push(...decodeServerAuditLog({ entries: [entry] }).entries);
+    } catch {
+      // One damaged entry does not empty the log of its server.
+    }
+  }
+  return entries;
+}
+
 function decodeServers(parsed: unknown): Map<string, ServerAuditEntry[]> | null {
   if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isDynamicRecord(parsed.servers)) return null;
   const servers = new Map<string, ServerAuditEntry[]>();
-  for (const [serverId, value] of Object.entries(parsed.servers))
-    servers.set(serverId, decodeServerAuditLog({ entries: value }).entries);
+  for (const [serverId, value] of Object.entries(parsed.servers)) servers.set(serverId, decodeEntries(value));
   return servers;
 }
 
@@ -96,7 +110,8 @@ function decodeServers(parsed: unknown): Map<string, ServerAuditEntry[]> | null 
  * server ID, newest first. A preference file beside the roles file: it needs no migration, and an
  * older build ignores it. Each server keeps its newest `SERVER_AUDIT_ENTRY_LIMIT` entries.
  *
- * A missing or damaged file reads as an empty log, and the next change replaces it. The log records
+ * A missing or damaged file reads as an empty log, and an entry that does not decode is left out;
+ * the next change writes the file again without them. The log records
  * what happened; a failed write never stops the change itself, so `record` only logs a failure.
  */
 export class ServerAuditStore {
@@ -132,11 +147,11 @@ export class ServerAuditStore {
     after: AgentAccessRoles,
     names: () => ServerAuditNames,
   ): Effect.Effect<void> {
-    return Effect.suspend(() =>
-      this.record(
-        serverId,
-        actor,
-        agentAccessAuditChanges(before, after, names()).map((change) => ({ change })),
+    // The roles are saved already, so a failure to name the changes only logs.
+    return Effect.try(() => agentAccessAuditChanges(before, after, names()).map((change) => ({ change }))).pipe(
+      Effect.flatMap((changes) => this.record(serverId, actor, changes)),
+      Effect.catch((error) =>
+        Effect.sync(() => logger.warn("The server audit log did not record a change.", toLogValue(error))),
       ),
     );
   }

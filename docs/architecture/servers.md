@@ -703,17 +703,21 @@ gate, so a member gets 403. A client that does not send the capability gets 400
 protocol 7 and 8 lists are full.
 
 Each entry keeps the names of the time of the change, so a removed member or a deleted agent keeps its
-name. `actor` is the member who made the change: the admin of a Team API request, the owner of this
-computer for a local change, the member for a member who leaves, and null for a join. A client leaves
-out an entry whose `kind` it does not know, so a later kind needs no new capability.
+name, cut to 200 characters. `actor` is the member who made the change: the admin of a Team API
+request, the owner of this computer for a local change, the member for a member who leaves, and null
+for a join. A member update or removal gives the actor only to the changes of that member; other
+changes that the same directory sync finds have a null actor. A client leaves out an entry whose
+`kind` it does not know, so a later kind needs no new capability.
 
 The host keeps the log in `openbot-server-audit-v1.json`, by server ID (`src/main/server-audit-store.ts`),
 with the newest 500 entries of each server. Like the roles file it is a preference file: no migration,
-and an older build ignores it. A file that does not decode reads as an empty log. A failed write only
-logs; it never stops the change. The roles store records each save that changes the revision
-(`agentAccessAuditChanges`). `HostService` compares the stored members before and after a member
-update, a removal, and each account directory sync (`memberAuditChanges`). A join keeps the time when
-the membership was made.
+and an older build ignores it. A file that does not decode reads as an empty log, and an entry that
+does not decode is left out. The next write removes those entries, so a downgrade loses the entries
+of a kind that the older build does not know. A failed write only logs; it never stops the change.
+The roles store records each save that changes the revision (`agentAccessAuditChanges`), except the
+levels of an agent that was deleted. `HostService` compares the stored members before and after a
+member update, a removal, and each account directory sync (`memberAuditChanges`); one directory sync
+runs at a time. A join keeps the time when the membership was made.
 
 Server settings → Audit log (`ServerAuditSection.tsx`, `@openbot/ui/features/servers/ServerAuditLog`)
 shows the log on desktop and web, with a filter by kind and a search. The tab shows for an owner or

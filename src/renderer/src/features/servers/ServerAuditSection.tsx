@@ -52,7 +52,9 @@ export function createServerAuditSection(host: ServerSettingsSectionHost, visibl
     const options = props.serverAudit;
     if (!options) return;
     const current = ++generation;
-    Promise.all([calls().getAuditLog(serverId), options.listAgents()]).then(
+    // The agents give only the faces, so the log shows with fallback faces when they do not load.
+    const agents = options.listAgents().catch((): readonly RoleAgent[] => []);
+    Promise.all([calls().getAuditLog(serverId), agents]).then(
       ([log, agents]) => {
         if (current !== generation) return;
         setState((draft) => {

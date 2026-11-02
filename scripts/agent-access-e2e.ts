@@ -664,7 +664,7 @@ try {
     return { agents: 2, legal: response.status, audit: auditLines(log)[0] };
   });
 
-  await step("delete: the next save drops the levels of a deleted agent", async () => {
+  await step("delete: the next save drops the levels of a deleted agent, and logs nothing", async () => {
     const { agents, access, team } = current();
     await runCauseEffect(agents.deleteAgent(finance));
     const saved = await setAccess(ownerToken, { ...restricted, revision: 2, roles: [{ ...legalRole, memberIds: [] }] });
@@ -672,7 +672,11 @@ try {
     const stored = access.get(team.getIdentity()?.serverId ?? "");
     assert.equal(stored.revision, 3);
     assert.deepEqual(stored.everyone, { [legal]: "none", [ops]: "view" }, "The deleted agent kept its level.");
-    return { everyone: stored.everyone };
+    // Nobody changed the level of the deleted agent, so the log has no entry for it.
+    const { log } = await readAudit(ownerToken);
+    assert.ok(log, "The owner cannot read the audit log.");
+    assert.equal(log.entries.length, 7, `The save of a deleted agent's levels was logged: ${auditLines(log)[0]}.`);
+    return { everyone: stored.everyone, auditEntries: log.entries.length };
   });
 
   await step("duplicate: the copy of a closed agent gets the levels of its source", async () => {
