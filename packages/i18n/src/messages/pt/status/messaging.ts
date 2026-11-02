@@ -51,9 +51,9 @@ export const messages = {
   "status.messaging.whatsappPairingApproved": "Agora você pode enviar solicitações para este número.",
   "status.messaging.whatsappOwnChat": "Mensagem para você mesmo",
   "status.messaging.whatsappWelcomeOwn":
-    "👋 *O OpenBot está conectado*\n\nEscreva aqui para pedir aos seus agentes. O WhatsApp Orchestrator responde ou passa o trabalho para o agente certo.\n\n*O que as reações significam*\n👀 O OpenBot recebeu a mensagem\n✅ O pedido está concluído\n❌ O pedido falhou\n🫡 O pedido foi parado\n\n*Aprovações*\nResponda *1* para aprovar ou *2* para recusar.\nEnvie *stop* para parar um pedido.",
+    "👋 *O OpenBot está conectado*\n\nEscreva aqui para pedir aos seus agentes. O WhatsApp Orchestrator responde ou passa o trabalho para o agente certo.\n\nEnvie *stop* para parar um pedido.",
   "status.messaging.whatsappWelcomeDedicated":
-    "👋 *O OpenBot está conectado*\n\nAs pessoas que você permitir no OpenBot já podem escrever para este número. Uma pessoa nova recebe um código: aprove-o no OpenBot, em Pedidos.\n\n*O que as reações significam*\n👀 O OpenBot recebeu a mensagem\n✅ O pedido está concluído\n❌ O pedido falhou\n🫡 O pedido foi parado\n\n*Aprovações*\nResponda *1* para aprovar ou *2* para recusar.\nEnvie *stop* para parar um pedido.",
+    "👋 *O OpenBot está conectado*\n\nAs pessoas que você permitir no OpenBot já podem escrever para este número. Uma pessoa nova recebe um código: aprove-o no OpenBot, em Pedidos.\n\nEnvie *stop* para parar um pedido.",
   "status.messaging.whatsappOrchestratorName": "Orquestrador do WhatsApp",
   "status.messaging.whatsappOrchestratorTitle": "Responde no WhatsApp e consulta a equipe",
 } as const satisfies PartialTranslation<typeof source>;

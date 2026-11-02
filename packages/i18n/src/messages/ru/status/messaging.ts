@@ -49,9 +49,9 @@ export const messages = {
   "status.messaging.whatsappPairingApproved": "Теперь вы можете отправлять запросы на этот номер.",
   "status.messaging.whatsappOwnChat": "Сообщение себе",
   "status.messaging.whatsappWelcomeOwn":
-    "👋 *OpenBot подключён*\n\nПишите сюда, чтобы обратиться к своим агентам. WhatsApp Orchestrator отвечает сам или передаёт работу нужному агенту.\n\n*Что значат реакции*\n👀 OpenBot получил сообщение\n✅ Запрос выполнен\n❌ Запрос не удался\n🫡 Запрос остановлен\n\n*Одобрения*\nОтветьте *1*, чтобы одобрить, или *2*, чтобы отклонить.\nОтправьте *stop*, чтобы остановить запрос.",
+    "👋 *OpenBot подключён*\n\nПишите сюда, чтобы обратиться к своим агентам. WhatsApp Orchestrator отвечает сам или передаёт работу нужному агенту.\n\nОтправьте *stop*, чтобы остановить запрос.",
   "status.messaging.whatsappWelcomeDedicated":
-    "👋 *OpenBot подключён*\n\nЛюди, которым вы разрешите в OpenBot, теперь могут писать на этот номер. Новый человек получит код: одобрите его в OpenBot в разделе «Запросы».\n\n*Что значат реакции*\n👀 OpenBot получил сообщение\n✅ Запрос выполнен\n❌ Запрос не удался\n🫡 Запрос остановлен\n\n*Одобрения*\nОтветьте *1*, чтобы одобрить, или *2*, чтобы отклонить.\nОтправьте *stop*, чтобы остановить запрос.",
+    "👋 *OpenBot подключён*\n\nЛюди, которым вы разрешите в OpenBot, теперь могут писать на этот номер. Новый человек получит код: одобрите его в OpenBot в разделе «Запросы».\n\nОтправьте *stop*, чтобы остановить запрос.",
   "status.messaging.whatsappOrchestratorName": "Оркестратор WhatsApp",
   "status.messaging.whatsappOrchestratorTitle": "Отвечает в WhatsApp и обращается к команде",
 } as const satisfies PartialTranslation<typeof source>;

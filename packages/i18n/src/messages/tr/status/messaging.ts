@@ -54,9 +54,9 @@ export const messages = {
   "status.messaging.whatsappPairingApproved": "Artık bu numaraya istek gönderebilirsiniz.",
   "status.messaging.whatsappOwnChat": "Kendine mesaj gönder",
   "status.messaging.whatsappWelcomeOwn":
-    "👋 *OpenBot bağlandı*\n\nAjanlarına sormak için buraya yaz. WhatsApp Orchestrator yanıtlar ya da işi doğru ajana verir.\n\n*Tepkilerin anlamı*\n👀 OpenBot mesajı aldı\n✅ İstek tamamlandı\n❌ İstek başarısız oldu\n🫡 İstek durduruldu\n\n*Onaylar*\nOnaylamak için *1*, reddetmek için *2* yanıtını ver.\nBir isteği durdurmak için *stop* gönder.",
+    "👋 *OpenBot bağlandı*\n\nAjanlarına sormak için buraya yaz. WhatsApp Orchestrator yanıtlar ya da işi doğru ajana verir.\n\nBir isteği durdurmak için *stop* gönder.",
   "status.messaging.whatsappWelcomeDedicated":
-    "👋 *OpenBot bağlandı*\n\nOpenBot'ta izin verdiğin kişiler artık bu numaraya yazabilir. Yeni bir kişi bir kod alır: OpenBot'ta İstekler altında onayla.\n\n*Tepkilerin anlamı*\n👀 OpenBot mesajı aldı\n✅ İstek tamamlandı\n❌ İstek başarısız oldu\n🫡 İstek durduruldu\n\n*Onaylar*\nOnaylamak için *1*, reddetmek için *2* yanıtını ver.\nBir isteği durdurmak için *stop* gönder.",
+    "👋 *OpenBot bağlandı*\n\nOpenBot'ta izin verdiğin kişiler artık bu numaraya yazabilir. Yeni bir kişi bir kod alır: OpenBot'ta İstekler altında onayla.\n\nBir isteği durdurmak için *stop* gönder.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Düzenleyicisi",
   "status.messaging.whatsappOrchestratorTitle": "WhatsApp'ta yanıt verir ve ekibe sorar",
 } as const satisfies PartialTranslation<typeof source>;

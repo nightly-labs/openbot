@@ -53,9 +53,9 @@ export const messages = {
   "status.messaging.whatsappPairingApproved": "你现在可以向该号码发送请求了。",
   "status.messaging.whatsappOwnChat": "给自己发消息",
   "status.messaging.whatsappWelcomeOwn":
-    "👋 *OpenBot 已连接*\n\n在这里写下内容即可向你的智能体提问。WhatsApp Orchestrator 会直接回答，或把工作交给合适的智能体。\n\n*表情回应的含义*\n👀 OpenBot 已收到消息\n✅ 请求已完成\n❌ 请求失败\n🫡 请求已停止\n\n*审批*\n回复 *1* 批准，回复 *2* 拒绝。\n发送 *stop* 可停止请求。",
+    "👋 *OpenBot 已连接*\n\n在这里写下内容即可向你的智能体提问。WhatsApp Orchestrator 会直接回答，或把工作交给合适的智能体。\n\n发送 *stop* 可停止请求。",
   "status.messaging.whatsappWelcomeDedicated":
-    "👋 *OpenBot 已连接*\n\n你在 OpenBot 中允许的人现在可以给这个号码发消息。新的联系人会收到一个代码：请在 OpenBot 的“请求”中批准。\n\n*表情回应的含义*\n👀 OpenBot 已收到消息\n✅ 请求已完成\n❌ 请求失败\n🫡 请求已停止\n\n*审批*\n回复 *1* 批准，回复 *2* 拒绝。\n发送 *stop* 可停止请求。",
+    "👋 *OpenBot 已连接*\n\n你在 OpenBot 中允许的人现在可以给这个号码发消息。新的联系人会收到一个代码：请在 OpenBot 的“请求”中批准。\n\n发送 *stop* 可停止请求。",
   "status.messaging.whatsappOrchestratorName": "WhatsApp 调度助手",
   "status.messaging.whatsappOrchestratorTitle": "在 WhatsApp 中回答并调度团队",
 } as const satisfies PartialTranslation<typeof source>;

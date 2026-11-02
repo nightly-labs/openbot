@@ -48,9 +48,9 @@ export const messages = {
   "status.messaging.whatsappPairingApproved": "Je kunt nu verzoeken naar dit nummer sturen.",
   "status.messaging.whatsappOwnChat": "Bericht aan jezelf",
   "status.messaging.whatsappWelcomeOwn":
-    "👋 *OpenBot is verbonden*\n\nSchrijf hier om je agents iets te vragen. De WhatsApp Orchestrator antwoordt, of geeft het werk aan de juiste agent.\n\n*Wat de reacties betekenen*\n👀 OpenBot heeft het bericht\n✅ Het verzoek is klaar\n❌ Het verzoek is mislukt\n🫡 Het verzoek is gestopt\n\n*Goedkeuringen*\nAntwoord *1* om goed te keuren of *2* om te weigeren.\nStuur *stop* om een verzoek te stoppen.",
+    "👋 *OpenBot is verbonden*\n\nSchrijf hier om je agents iets te vragen. De WhatsApp Orchestrator antwoordt, of geeft het werk aan de juiste agent.\n\nStuur *stop* om een verzoek te stoppen.",
   "status.messaging.whatsappWelcomeDedicated":
-    "👋 *OpenBot is verbonden*\n\nDe mensen die je in OpenBot toestaat, kunnen nu naar dit nummer schrijven. Een nieuw persoon krijgt een code: keur die goed in OpenBot onder Verzoeken.\n\n*Wat de reacties betekenen*\n👀 OpenBot heeft het bericht\n✅ Het verzoek is klaar\n❌ Het verzoek is mislukt\n🫡 Het verzoek is gestopt\n\n*Goedkeuringen*\nAntwoord *1* om goed te keuren of *2* om te weigeren.\nStuur *stop* om een verzoek te stoppen.",
+    "👋 *OpenBot is verbonden*\n\nDe mensen die je in OpenBot toestaat, kunnen nu naar dit nummer schrijven. Een nieuw persoon krijgt een code: keur die goed in OpenBot onder Verzoeken.\n\nStuur *stop* om een verzoek te stoppen.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp-orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Antwoordt in WhatsApp en vraagt het team",
 } as const satisfies PartialTranslation<typeof source>;
