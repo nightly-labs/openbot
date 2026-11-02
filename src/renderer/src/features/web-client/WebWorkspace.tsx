@@ -60,6 +60,7 @@ import {
   getAgentAdminSettings,
   getHostAgentAccess,
   getHostAgentMemoryLimit,
+  getHostAuditLog,
   getHostMemoryReview,
   getHostPromptCacheTtl,
   getHostReleaseStatus,
@@ -182,6 +183,7 @@ import type { ScheduleRoutine } from "../schedule/SchedulePanel";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
+import type { HostServerAuditCalls } from "../servers/ServerAuditSection";
 import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
 import type { HostMemoryReviewCalls } from "../servers/ServerMemoryReviewSetting";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
@@ -1181,6 +1183,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(getHostAgentAccess(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setAgentAccess: async (change, serverId) =>
       runTeamEffect(setHostAgentAccess(hostRequest(serverId), change).pipe(Effect.mapError((error) => error.cause))),
+  };
+  const hostServerAuditCalls: HostServerAuditCalls = {
+    getAuditLog: async (serverId) =>
+      runTeamEffect(getHostAuditLog(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
   };
   const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
   /** Set when the Marketplace asked for the form that adds an MCP server, until the MCP section opens it. */
@@ -2340,6 +2346,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         memoryReview={{ calls: hostMemoryReviewCalls }}
                         hostPromptCacheTtl={{ calls: hostPromptCacheTtlCalls }}
                         agentAccess={{ calls: hostAgentAccessCalls, listAgents: () => workspace.runtime.listAgents() }}
+                        serverAudit={{ calls: hostServerAuditCalls, listAgents: () => workspace.runtime.listAgents() }}
                         browserProfiles={browserProfileSettings()}
                         vault={vaultSettings()}
                         // Any member imports into a host with `agent-import-v1`.

@@ -102,6 +102,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "이 연결에서는 기본 제공자를 지원하지 않아요.",
   "error.team.agentAccessUnsupported": "이 연결에서는 역할을 지원하지 않아요.",
   "error.team.agentAccessStale": "다른 사람이 역할을 변경했어요. 역할을 다시 열어서 변경해 주세요.",
+  "error.team.serverAuditUnsupported": "이 연결은 감사 로그를 지원하지 않아요.",
   "error.team.agentViewOnly": "이 에이전트는 볼 수만 있어요.",
   "error.team.agentManageDenied": "이 에이전트를 변경할 수 없어요.",
   "error.team.attachmentNameRequired": "안전한 첨부 파일 이름이 필요해요.",

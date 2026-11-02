@@ -899,6 +899,14 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
+  /**
+   * The members that this host keeps, with no member of a live session only. Empty before the
+   * host is set up. The audit log compares two of these lists.
+   */
+  listStoredMembers(): TeamMemberSummary[] {
+    return this.#state?.members.map(publicMember) ?? [];
+  }
+
   listMembers(): TeamMemberSummary[] {
     const members = this.#requireState().members.map(publicMember);
     const known = new Set(members.map((member) => member.id));

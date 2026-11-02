@@ -481,7 +481,7 @@ try {
       const all = new Set([shown.id, closed.id]);
       // The member cannot see `Ledger`, so the sidebar must refuse to place it for them.
       await Effect.runPromise(
-        current().access.set(serverId, { revision: 0, everyone: { [closed.id]: "none" }, roles: [] }, all, all),
+        current().access.set(serverId, { revision: 0, everyone: { [closed.id]: "none" }, roles: [] }, all, all, null),
       );
       const memberToken = await login(MEMBER);
       return { shownId: shown.id, closedId: closed.id, memberToken };

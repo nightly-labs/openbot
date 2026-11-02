@@ -296,6 +296,7 @@ import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
 import { ScreenCapturer } from "./screen-capture";
+import { SERVER_AUDIT_FILE, ServerAuditStore, serverAuditNames } from "./server-audit-store";
 import { AGENT_PROCESS_VARIABLE, agentProcessEnvironment, ServerMemory } from "./server-memory";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import { ServerTimezonePreferenceStore } from "./server-timezone-preference-store";
@@ -602,6 +603,7 @@ export interface ApplicationServices {
   agentNotificationLevels: AgentNotificationLevelStore;
   sidebarPins: SidebarPinStore;
   agentAccess: AgentAccessStore;
+  serverAudit: ServerAuditStore;
   serverTimezone: ServerTimezonePreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
   remoteSessionReuse: RemoteSessionReusePreferenceStore;
@@ -1229,7 +1231,15 @@ export async function createApplicationServices({
   const sidebarPins = new SidebarPinStore(join(app.getPath("userData"), SIDEBAR_PINS_FILE));
   await runCauseEffect(sidebarPins.load());
   await runCauseEffect(memoryReview.load());
-  const agentAccess = new AgentAccessStore(join(app.getPath("userData"), AGENT_ACCESS_FILE));
+  const serverAudit = new ServerAuditStore(join(app.getPath("userData"), SERVER_AUDIT_FILE));
+  await runCauseEffect(serverAudit.load());
+  const agentAccess = new AgentAccessStore(join(app.getPath("userData"), AGENT_ACCESS_FILE), {
+    // Called only on a save, after `service` and `teamStore` exist.
+    audit: (serverId, before, after, actor) =>
+      serverAudit.recordAgentAccess(serverId, actor, before, after, () =>
+        serverAuditNames(teamStore.configured ? teamStore.listMembers() : [], service.listAgents()),
+      ),
+  });
   if (!(await runCauseEffect(agentAccess.load())))
     logger.warn("The roles file did not load. Members get no access to agents until an admin saves the roles.");
   const serverTimezone = new ServerTimezonePreferenceStore(
@@ -2502,6 +2512,8 @@ export async function createApplicationServices({
     sidebarPins,
     // Present, so the host advertises `agent-access-v1`. Only owners and admins change the roles.
     agentAccess,
+    // Present, so the host advertises `server-audit-v1`. Only owners and admins read the log.
+    serverAudit,
     // Present, so the host advertises `agent-tasks-v1`. Any member who can send a message to the agent.
     agentTasks: service,
     // Present, so the host advertises `browser-profiles-v1`. Only owners and admins change profiles;
@@ -3372,6 +3384,7 @@ export async function createApplicationServices({
     agentNotificationLevels,
     sidebarPins,
     agentAccess,
+    serverAudit,
     serverTimezone,
     promptCacheTtl,
     remoteSessionReuse,

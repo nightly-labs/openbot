@@ -12,6 +12,7 @@
           "On a Mac, OpenBot has an icon in the menu bar. After you close the window, the Dock icon hides and tasks keep running.",
           "Start a workflow when someone mentions OpenBot in Discord, and send its result back as a reply, a post or a reaction.",
           "Sidebar folders can hold folders, up to three levels. Drag a chat or a folder into a folder.",
+          "Choose the None, Minimal and Ultra reasoning levels when a model offers them.",
           "Pinned agents and channels stay the same on each device that connects to a server.",
           "Attach SVG images to a chat. The agent reads the SVG text.",
           "Connect more than one Notion account, and connect ClickUp from Apps.",

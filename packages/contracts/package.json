@@ -130,6 +130,7 @@
     "./team-protocol/agent-memory-limit-v1": "./src/team-protocol/agent-memory-limit-v1.ts",
     "./team-protocol/memory-review-v1": "./src/team-protocol/memory-review-v1.ts",
     "./team-protocol/prompt-cache-ttl-v1": "./src/team-protocol/prompt-cache-ttl-v1.ts",
+    "./team-protocol/server-audit-v1": "./src/team-protocol/server-audit-v1.ts",
     "./team-protocol/custom-agents-v1": "./src/team-protocol/custom-agents-v1.ts",
     "./team-protocol/custom-provider-harness-v1": "./src/team-protocol/custom-provider-harness-v1.ts",
     "./team-protocol/provider-default-v1": "./src/team-protocol/provider-default-v1.ts",

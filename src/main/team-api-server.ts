@@ -145,6 +145,7 @@ import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   withLegacyReasoningEfforts,
 } from "@openbot/contracts/team-protocol/reasoning-efforts-v1";
+import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_FOLDERS_CAPABILITY, sidebarFoldersEvent } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
@@ -278,6 +279,7 @@ import { routePushNotifications } from "./team-api/route-push-notifications";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutineResults } from "./team-api/route-routine-results";
+import { routeServerAudit } from "./team-api/route-server-audit";
 import { routeSharedTables } from "./team-api/route-shared-tables";
 import { routeSideQuestion } from "./team-api/route-side-question";
 import { routeSidebarFolders } from "./team-api/route-sidebar-folders";
@@ -1060,6 +1062,11 @@ export class TeamApiServer {
           this.#options.store.getIdentity()?.serverId,
           hidden,
         )) === "handled"
+      )
+        return;
+      if (
+        (await routeServerAudit(context, this.#options.serverAudit, this.#options.store.getIdentity()?.serverId)) ===
+        "handled"
       )
         return;
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
@@ -2193,6 +2200,7 @@ export class TeamApiServer {
           if (capability === PROMPT_CACHE_TTL_CAPABILITY) return this.#options.admin?.promptCacheTtl !== undefined;
           if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;
           if (capability === AGENT_ACCESS_CAPABILITY) return this.#options.agentAccess !== undefined;
+          if (capability === SERVER_AUDIT_CAPABILITY) return this.#options.serverAudit !== undefined;
           if (capability === HOST_UPDATE_CAPABILITY || capability === HOST_MEMBER_UPDATE_CAPABILITY)
             return this.#options.admin?.update !== undefined;
           if (capability === EVENTS_CAPABILITY) return this.#options.events !== undefined;

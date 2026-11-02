@@ -42,6 +42,7 @@ import {
   type AppSetupState,
   type AttachmentImportEvent,
   type AvatarHue,
+  agentAccessAuditChanges,
   agentAutoApprovalEnabled,
   agentAutomationAllowed,
   agentBrowserProfile,
@@ -136,6 +137,7 @@ import {
   type RoutineRun,
   type RoutineSchedule,
   type SendMessageInput,
+  type ServerAuditEntry,
   type SetAgentAvatarInput,
   type SetMessageReactionInput,
   type SharedTable,
@@ -181,7 +183,9 @@ import {
   STORY_MARKETPLACE_AGENTS,
   STORY_MCP_SERVERS,
   STORY_MODELS,
+  STORY_PRESENCE,
   STORY_QUEUES,
+  STORY_SERVER_AUDIT_ENTRIES,
   STORY_SHARED_TABLES,
   STORY_SNAPSHOTS,
   STORY_UPDATE_STATUS,
@@ -452,6 +456,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let machineAlerts: MachineAlertSettings = { ...DEFAULT_MACHINE_ALERT_SETTINGS, diskPercent: 80 };
   let promptCacheTtl: PromptCacheTtlSetting = { ...DEFAULT_PROMPT_CACHE_TTL };
   let agentAccess: AgentAccessChange = { revision: 0, everyone: {}, roles: [] };
+  let serverAudit: ServerAuditEntry[] = clone(STORY_SERVER_AUDIT_ENTRIES);
   const agentMemoryLimitListeners = new Set<(preference: AgentMemoryLimitPreference) => void>();
   let remoteSessionReuse: RemoteSessionReusePreference = { ...DEFAULT_REMOTE_SESSION_REUSE_PREFERENCE };
   let externalLinks: ExternalLinkPreference = clone(DEFAULT_EXTERNAL_LINK_PREFERENCE);
@@ -3225,12 +3230,25 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       setAgentAccess: async (input) => {
         const change = parseAgentAccessChange(input);
         if (change.revision !== agentAccess.revision) throw new Error(sourceText("error.team.agentAccessStale"));
+        const names = {
+          member: (id: string) => STORY_PRESENCE.members.find((member) => member.id === id)?.name ?? id,
+          agent: (id: string) => agents.find((agent) => agent.id === id)?.name ?? id,
+        };
+        const at = new Date().toISOString();
+        const actor = { id: "member-self", name: "Norbert" };
+        serverAudit = [
+          ...agentAccessAuditChanges(agentAccess, change, names)
+            .reverse()
+            .map((auditChange) => ({ id: crypto.randomUUID(), at, actor, change: auditChange })),
+          ...serverAudit,
+        ];
         agentAccess = { ...change, revision: change.revision + 1 };
         return {
           ...clone(agentAccess),
           mine: Object.fromEntries(agents.map((agent) => [agent.id, "manage" as const])),
         };
       },
+      getAuditLog: async () => ({ entries: clone(serverAudit) }),
     },
     storage: createMockStorage(),
     agentImport: {
