@@ -105,6 +105,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.discordTagline": "Mentions and direct messages in Discord",
   "marketplace.app.telegramTagline": "Groups and direct chats in Telegram",
   "marketplace.app.bitwardenTagline": "Sign in to sites with logins from a shared folder",
+  "marketplace.app.telegramAccountTagline": "Read and send messages as you in Telegram",
   // The category row in the information of a password manager page: 1Password and Bitwarden.
   "marketplace.app.onePasswordCategory": "Login and Credential Management",
   "marketplace.app.yourApps": "Your apps",

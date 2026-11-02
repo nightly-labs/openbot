@@ -57,6 +57,7 @@
 @import "@openbot/ui/features/settings/provider-settings-page.css";
 @import "@openbot/ui/features/settings/github-connector.css";
 @import "@openbot/ui/features/settings/onepassword-connector.css";
+@import "@openbot/ui/features/settings/telegram-account-connector.css";
 @import "@openbot/ui/features/settings/slack-integration.css";
 @import "@openbot/ui/features/settings/hosted-servers.css";
 @import "@openbot/ui/features/settings/profile.css";

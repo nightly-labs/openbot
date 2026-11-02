@@ -34,4 +34,34 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "Não foi possível instalar a CLI do Bitwarden neste servidor. Verifique a conexão de rede dele e conecte de novo.",
   "error.connector.bitwardenFileUnreadable": "O arquivo de conexão do Bitwarden não pode ser lido.",
+  "error.connector.telegramAccountCredentialsMissing":
+    "Digite o api_id e o api_hash do seu app do Telegram. Você os obtém em my.telegram.org.",
+  "error.connector.telegramAccountCredentialsInvalid":
+    "O api_id é um número e o api_hash tem 32 caracteres de 0-9 e a-f. Copie-os de novo em my.telegram.org.",
+  "error.connector.telegramAccountApiRejected":
+    "O Telegram não aceita este api_id e api_hash. Copie-os de novo em my.telegram.org.",
+  "error.connector.telegramAccountPhoneFormat":
+    "Digite o número de telefone com o código do país, por exemplo +48 600 100 200.",
+  "error.connector.telegramAccountPhoneInvalid":
+    "O Telegram não reconhece este número. Inclua o código do país, por exemplo +48.",
+  "error.connector.telegramAccountCodeInvalid": "Este código não está correto. Confira e tente de novo.",
+  "error.connector.telegramAccountCodeEmpty": "Digite o código que o Telegram enviou para você.",
+  "error.connector.telegramAccountCodeExpired": "O código expirou. Comece de novo para receber um novo código.",
+  "error.connector.telegramAccountPasswordInvalid": "Esta senha não está correta. Tente de novo.",
+  "error.connector.telegramAccountPasswordEmpty": "Digite sua senha de verificação em duas etapas.",
+  "error.connector.telegramAccountPasswordNeeded": "O Telegram precisa da sua senha de verificação em duas etapas.",
+  "error.connector.telegramAccountNoAccount":
+    "Este número não tem conta no Telegram. Entre com um número que já usa o Telegram.",
+  "error.connector.telegramAccountPhoneBanned": "O Telegram baniu este número.",
+  "error.connector.telegramAccountQrExpired": "O código QR expirou antes de você escaneá-lo. Comece de novo.",
+  "error.connector.telegramAccountFloodWait": "O Telegram pede que você aguarde. Tente de novo em {count} min.",
+  "error.connector.telegramAccountCancelled": "O login no Telegram foi cancelado.",
+  "error.connector.telegramAccountTimedOut": "O login parou após 10 minutos sem atividade. Comece de novo.",
+  "error.connector.telegramAccountMovedOn": "O login passou para outra etapa. Comece de novo.",
+  "error.connector.telegramAccountRefused": "O Telegram recusou o login: {detail}",
+  "error.connector.telegramAccountSaveFailed": "O OpenBot não conseguiu salvar a conexão com o Telegram: {detail}",
+  "error.connector.telegramAccountSessionEnded":
+    "O Telegram encerrou esta sessão, por exemplo em Configurações > Dispositivos. Conecte sua conta do Telegram de novo.",
+  "error.connector.telegramAccountFileUnreadable": "O arquivo de conexão da conta do Telegram não pode ser lido.",
+  "error.connector.telegramAccountFileTooLarge": "O arquivo de conexão da conta do Telegram é muito grande.",
 } as const satisfies PartialTranslation<typeof source>;

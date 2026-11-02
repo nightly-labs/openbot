@@ -113,6 +113,7 @@ const CONNECTOR_SETUP = {
   onepassword: "vault",
   bitwarden: "vault",
   github: "account",
+  "telegram-account": "account",
 } as const satisfies Record<ConnectorId, AppSetup>;
 
 const FLOW_SETUP = {

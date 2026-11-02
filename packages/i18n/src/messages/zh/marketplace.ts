@@ -104,6 +104,7 @@ export const messages = {
   "marketplace.app.discordTagline": "Discord 中的提及和私信",
   "marketplace.app.telegramTagline": "Telegram 中的群组和私聊",
   "marketplace.app.bitwardenTagline": "用共享文件夹中的登录信息登录网站",
+  "marketplace.app.telegramAccountTagline": "在 Telegram 中以你的身份读取和发送消息",
   // The category row in the 1Password page's information.
   "marketplace.app.onePasswordCategory": "登录与凭据管理",
   "marketplace.app.yourApps": "你的应用",

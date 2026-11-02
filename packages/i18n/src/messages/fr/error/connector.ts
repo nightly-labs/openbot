@@ -34,4 +34,35 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "Impossible d’installer la CLI Bitwarden sur ce serveur. Vérifiez sa connexion réseau, puis connectez-vous à nouveau.",
   "error.connector.bitwardenFileUnreadable": "Le fichier de connexion Bitwarden est illisible.",
+  "error.connector.telegramAccountCredentialsMissing":
+    "Saisissez l’api_id et l’api_hash de votre application Telegram. Vous les obtenez sur my.telegram.org.",
+  "error.connector.telegramAccountCredentialsInvalid":
+    "L’api_id est un nombre et l’api_hash compte 32 caractères parmi 0-9 et a-f. Copiez-les à nouveau depuis my.telegram.org.",
+  "error.connector.telegramAccountApiRejected":
+    "Telegram n’accepte pas cet api_id et cet api_hash. Copiez-les à nouveau depuis my.telegram.org.",
+  "error.connector.telegramAccountPhoneFormat":
+    "Saisissez le numéro de téléphone avec son indicatif de pays, par exemple +48 600 100 200.",
+  "error.connector.telegramAccountPhoneInvalid":
+    "Telegram ne connaît pas ce numéro. Ajoutez l’indicatif de pays, par exemple +48.",
+  "error.connector.telegramAccountCodeInvalid": "Ce code n’est pas correct. Vérifiez-le et réessayez.",
+  "error.connector.telegramAccountCodeEmpty": "Saisissez le code que Telegram vous a envoyé.",
+  "error.connector.telegramAccountCodeExpired": "Le code a expiré. Recommencez pour recevoir un nouveau code.",
+  "error.connector.telegramAccountPasswordInvalid": "Ce mot de passe n’est pas correct. Réessayez.",
+  "error.connector.telegramAccountPasswordEmpty": "Saisissez votre mot de passe de validation en deux étapes.",
+  "error.connector.telegramAccountPasswordNeeded":
+    "Telegram a besoin de votre mot de passe de validation en deux étapes.",
+  "error.connector.telegramAccountNoAccount":
+    "Ce numéro n’a pas de compte Telegram. Connectez-vous avec un numéro qui utilise déjà Telegram.",
+  "error.connector.telegramAccountPhoneBanned": "Telegram a banni ce numéro.",
+  "error.connector.telegramAccountQrExpired": "Le code QR a expiré avant que vous le scanniez. Recommencez.",
+  "error.connector.telegramAccountFloodWait": "Telegram vous demande de patienter. Réessayez dans {count} min.",
+  "error.connector.telegramAccountCancelled": "La connexion à Telegram a été annulée.",
+  "error.connector.telegramAccountTimedOut": "La connexion s’est arrêtée après 10 minutes sans activité. Recommencez.",
+  "error.connector.telegramAccountMovedOn": "La connexion est passée à une autre étape. Recommencez.",
+  "error.connector.telegramAccountRefused": "Telegram a refusé la connexion : {detail}",
+  "error.connector.telegramAccountSaveFailed": "OpenBot n’a pas pu enregistrer la connexion Telegram : {detail}",
+  "error.connector.telegramAccountSessionEnded":
+    "Telegram a fermé cette session, par exemple dans Paramètres > Appareils. Connectez à nouveau votre compte Telegram.",
+  "error.connector.telegramAccountFileUnreadable": "Le fichier de connexion du compte Telegram est illisible.",
+  "error.connector.telegramAccountFileTooLarge": "Le fichier de connexion du compte Telegram est trop volumineux.",
 } as const satisfies PartialTranslation<typeof source>;

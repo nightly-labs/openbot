@@ -100,6 +100,7 @@ import { sharedTableIpcHandlers } from "./ipc/shared-table-handlers";
 import { skillIpcHandlers } from "./ipc/skill-handlers";
 import { storageIpcHandlers } from "./ipc/storage-handlers";
 import { teamIpcHandlers } from "./ipc/team-handlers";
+import { telegramAccountConnectorIpcHandlers } from "./ipc/telegram-account-connector-handlers";
 import { updateIpcHandlers } from "./ipc/update-handlers";
 import { vaultIpcHandlers } from "./ipc/vault-handlers";
 import { voiceIpcHandlers } from "./ipc/voice-handlers";
@@ -417,6 +418,7 @@ const {
   forwardLinkAccountStatus,
   forwardOnePasswordConnectorStatus,
   forwardBitwardenConnectorStatus,
+  forwardTelegramAccountConnectorStatus,
   forwardVaultState,
   forwardHostStatus,
   forwardRemoteDesktopSessions,
@@ -633,6 +635,7 @@ function registerIpcHandlers({
   linkAccount,
   onePasswordConnector,
   bitwardenConnector,
+  telegramAccountConnector,
   vault,
   billing,
   license,
@@ -737,6 +740,7 @@ function registerIpcHandlers({
     ...linkAccountIpcHandlers({ linkAccount }),
     ...onePasswordConnectorIpcHandlers({ onePasswordConnector, remoteServers }),
     ...bitwardenConnectorIpcHandlers({ bitwardenConnector, remoteServers }),
+    ...telegramAccountConnectorIpcHandlers({ telegramAccountConnector, remoteServers }),
     ...vaultIpcHandlers({ vault, getMainWindow: getDialogParent, translate: language.translate, remoteServers }),
     ...billingIpcHandlers({ billing }),
     ...licenseIpcHandlers({ license }),
@@ -1342,6 +1346,7 @@ if (!hasSingleInstanceLock) {
       built.linkAccount.onChanged(forwardLinkAccountStatus);
       built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
       built.bitwardenConnector.onChanged(forwardBitwardenConnectorStatus);
+      built.telegramAccountConnector.onChanged(forwardTelegramAccountConnectorStatus);
       built.vault.onChanged(forwardVaultState);
       remoteServers.on("changed", forwardServers);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {

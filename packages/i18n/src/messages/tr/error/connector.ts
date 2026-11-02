@@ -35,4 +35,32 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "Bu sunucuya Bitwarden CLI yüklenemedi. Ağ bağlantısını kontrol edin, sonra tekrar bağlanın.",
   "error.connector.bitwardenFileUnreadable": "Bitwarden bağlantı dosyası okunamıyor.",
+  "error.connector.telegramAccountCredentialsMissing":
+    "Telegram uygulamanızın api_id ve api_hash değerlerini girin. Bunları my.telegram.org adresinden alabilirsiniz.",
+  "error.connector.telegramAccountCredentialsInvalid":
+    "api_id bir sayıdır ve api_hash 0-9 ile a-f arasındaki 32 karakterden oluşur. Bunları my.telegram.org adresinden yeniden kopyalayın.",
+  "error.connector.telegramAccountApiRejected":
+    "Telegram bu api_id ve api_hash değerlerini kabul etmiyor. Bunları my.telegram.org adresinden yeniden kopyalayın.",
+  "error.connector.telegramAccountPhoneFormat": "Telefon numarasını ülke koduyla girin, örneğin +48 600 100 200.",
+  "error.connector.telegramAccountPhoneInvalid": "Telegram bu numarayı tanımıyor. Ülke kodunu ekleyin, örneğin +48.",
+  "error.connector.telegramAccountCodeInvalid": "Bu kod doğru değil. Kontrol edip yeniden deneyin.",
+  "error.connector.telegramAccountCodeEmpty": "Telegram'ın size gönderdiği kodu girin.",
+  "error.connector.telegramAccountCodeExpired": "Kodun süresi doldu. Yeni bir kod almak için yeniden başlayın.",
+  "error.connector.telegramAccountPasswordInvalid": "Bu parola doğru değil. Yeniden deneyin.",
+  "error.connector.telegramAccountPasswordEmpty": "İki adımlı doğrulama parolanızı girin.",
+  "error.connector.telegramAccountPasswordNeeded": "Telegram iki adımlı doğrulama parolanıza ihtiyaç duyuyor.",
+  "error.connector.telegramAccountNoAccount":
+    "Bu numaranın Telegram hesabı yok. Zaten Telegram kullanan bir numarayla giriş yapın.",
+  "error.connector.telegramAccountPhoneBanned": "Telegram bu numarayı yasakladı.",
+  "error.connector.telegramAccountQrExpired": "QR kodun süresi siz taramadan önce doldu. Yeniden başlayın.",
+  "error.connector.telegramAccountFloodWait": "Telegram beklemenizi istiyor. {count} dk sonra yeniden deneyin.",
+  "error.connector.telegramAccountCancelled": "Telegram girişi iptal edildi.",
+  "error.connector.telegramAccountTimedOut": "Giriş, 10 dakika boyunca etkinlik olmadığı için durdu. Yeniden başlayın.",
+  "error.connector.telegramAccountMovedOn": "Giriş başka bir adıma geçti. Yeniden başlayın.",
+  "error.connector.telegramAccountRefused": "Telegram girişi reddetti: {detail}",
+  "error.connector.telegramAccountSaveFailed": "OpenBot Telegram bağlantısını kaydedemedi: {detail}",
+  "error.connector.telegramAccountSessionEnded":
+    "Telegram bu oturumu sonlandırdı, örneğin Ayarlar > Cihazlar bölümünde. Telegram hesabınızı yeniden bağlayın.",
+  "error.connector.telegramAccountFileUnreadable": "Telegram hesabı bağlantı dosyası okunamıyor.",
+  "error.connector.telegramAccountFileTooLarge": "Telegram hesabı bağlantı dosyası çok büyük.",
 } as const satisfies PartialTranslation<typeof source>;

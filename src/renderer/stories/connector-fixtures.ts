@@ -1,6 +1,7 @@
 import {
   DISCONNECTED_BITWARDEN_CONNECTOR,
   DISCONNECTED_ONEPASSWORD_CONNECTOR,
+  DISCONNECTED_TELEGRAM_ACCOUNT_CONNECTOR,
   type MessagingConnection,
 } from "@openbot/contracts/ipc";
 import type { ConnectorDetail } from "@openbot/ui/features/connectors/ConnectorDetailPanel";
@@ -21,7 +22,7 @@ const workspace = {
   onAddOrchestrator: fn(),
 };
 
-/** GitHub is connected; Slack, Discord, Telegram, 1Password and Bitwarden are not set up. */
+/** GitHub is connected; Slack, Discord, Telegram, 1Password, Bitwarden and the Telegram account are not set up. */
 export const STORY_CONNECTOR_DETAILS: readonly ConnectorDetail[] = [
   { id: "slack", props: { ...workspace, platform: "slack" } },
   { id: "discord", props: { ...workspace, platform: "discord" } },
@@ -89,6 +90,19 @@ export const STORY_CONNECTOR_DETAILS: readonly ConnectorDetail[] = [
     id: "bitwarden",
     props: { status: DISCONNECTED_BITWARDEN_CONNECTOR, busy: false, onConnect: fn(), onDisconnect: fn() },
   },
+  {
+    id: "telegram-account",
+    props: {
+      status: DISCONNECTED_TELEGRAM_ACCOUNT_CONNECTOR,
+      busy: false,
+      onConnect: fn(),
+      onSubmit: fn(),
+      onCancel: fn(),
+      onDisconnect: fn(),
+      onSetSending: fn(),
+      onOpenApps: fn(),
+    },
+  },
 ];
 
 const ORCHESTRATOR: SlackIntegrationAgent = {
@@ -115,7 +129,10 @@ function channel(update: Partial<MessagingConnection> & Pick<MessagingConnection
   };
 }
 
-/** Every connector is set up: a Slack workspace, a Discord server, two Telegram chats, both vaults. */
+/**
+ * Every connector is set up: a Slack workspace, a Discord server, two Telegram chats, both vaults and a
+ * Telegram account.
+ */
 export const CONNECTED_CONNECTOR_DETAILS: readonly ConnectorDetail[] = STORY_CONNECTOR_DETAILS.map((detail) => {
   switch (detail.id) {
     case "slack":
@@ -154,6 +171,18 @@ export const CONNECTED_CONNECTOR_DETAILS: readonly ConnectorDetail[] = STORY_CON
       };
     case "bitwarden":
       return { ...detail, props: { ...detail.props, status: { ...detail.props.status, connected: true } } };
+    case "telegram-account":
+      return {
+        ...detail,
+        props: {
+          ...detail.props,
+          status: {
+            ...detail.props.status,
+            state: "connected",
+            account: { name: "Ada Lovelace", username: "ada", phone: "+4860***200" },
+          },
+        },
+      };
     default:
       return detail;
   }

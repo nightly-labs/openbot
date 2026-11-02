@@ -1,0 +1,65 @@
+/* The Telegram account page: the sign-in steps and the account. */
+
+/* A row's text is its instruction, so it wraps instead of ending in an ellipsis. */
+.telegram-account-row .ui-item-description {
+  white-space: normal;
+}
+
+.telegram-account-row .ui-item-media {
+  color: var(--openbot-text-muted);
+}
+
+.telegram-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
+  align-items: center;
+}
+
+/* api_id and api_hash side by side, one under the other on a narrow page. */
+.telegram-account-credential-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--openbot-space-3);
+}
+
+/* One step's field, and its button in line with the field, not with the label. */
+.telegram-account-step-form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--openbot-space-3);
+}
+
+.telegram-account-step-form > .ui-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The QR code and the three steps in Telegram on the phone, next to it. */
+.telegram-account-qr {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-4);
+  align-items: center;
+}
+
+.telegram-account-qr .ui-qr-code {
+  flex: none;
+}
+
+.telegram-account-qr-copy {
+  display: grid;
+  flex: 1;
+  gap: var(--openbot-space-2);
+  min-width: min(100%, 14rem);
+}
+
+.telegram-account-qr-steps {
+  display: grid;
+  gap: var(--openbot-space-1);
+  margin: 0;
+  padding-inline-start: var(--openbot-space-4);
+  list-style: decimal;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}

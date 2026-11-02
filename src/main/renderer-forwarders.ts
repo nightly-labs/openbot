@@ -571,6 +571,12 @@ export function createRendererForwarders({
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.bitwardenConnector.changed, status);
   }
 
+  function forwardTelegramAccountConnectorStatus(
+    status: import("@openbot/contracts/ipc").TelegramAccountConnectorStatus,
+  ): void {
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.telegramAccountConnector.changed, status);
+  }
+
   function forwardVaultState(state: import("@openbot/contracts/ipc").VaultState): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.vault.changed, state);
   }
@@ -639,6 +645,7 @@ export function createRendererForwarders({
     forwardLinkAccountStatus,
     forwardOnePasswordConnectorStatus,
     forwardBitwardenConnectorStatus,
+    forwardTelegramAccountConnectorStatus,
     forwardVaultState,
     forwardHostStatus,
     forwardRemoteDesktopSessions,

@@ -78,6 +78,7 @@ export type HostedSitesDesktopApi = GroupApi<IpcEndpoints["hostedSites"]>;
 export type GitHubConnectorDesktopApi = GroupApi<IpcEndpoints["githubConnector"]>;
 export type LinkAccountDesktopApi = GroupApi<IpcEndpoints["linkAccount"]>;
 export type OnePasswordConnectorDesktopApi = GroupApi<IpcEndpoints["onePasswordConnector"]>;
+export type TelegramAccountConnectorDesktopApi = GroupApi<IpcEndpoints["telegramAccountConnector"]>;
 export type BillingDesktopApi = GroupApi<IpcEndpoints["billing"]>;
 export type LicenseDesktopApi = GroupApi<IpcEndpoints["license"]>;
 export type RoutineFeedDesktopApi = GroupApi<IpcEndpoints["routineFeed"]>;

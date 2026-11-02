@@ -98,6 +98,7 @@ import {
   parseGitHubConnectorStatus,
   parseLinkAccountStatus,
   parseOnePasswordConnectorStatus,
+  parseTelegramAccountConnectorStatus,
   type RemoteDesktopSetupStatus,
   type RemoteDesktopTestStatus,
   type RemoteNetworkRouteState,
@@ -106,6 +107,7 @@ import {
   type SpeechAudio,
   type SpeechModelStatus,
   type SpeechSettings,
+  type TelegramAccountConnectorStatus,
   UPDATE_PHASES,
   type UpdatePreference,
   type UpdateStatus,
@@ -593,6 +595,12 @@ export function decodeLinkAccountStatus(value: unknown): LinkAccountStatus {
 export function decodeOnePasswordConnectorStatus(value: unknown): OnePasswordConnectorStatus {
   const status = parseOnePasswordConnectorStatus(value);
   if (!status) throw new Error("Invalid 1Password connector response.");
+  return status;
+}
+
+export function decodeTelegramAccountConnectorStatus(value: unknown): TelegramAccountConnectorStatus {
+  const status = parseTelegramAccountConnectorStatus(value);
+  if (!status) throw new Error("Invalid Telegram account connector response.");
   return status;
 }
 
