@@ -81,6 +81,9 @@ const subscriptionSchema = Schema.Struct({
   cancel_at: Schema.optional(Schema.NullOr(Schema.Int)),
   metadata: Metadata,
   current_period_end: Schema.optional(Schema.Int),
+  /** The end of the trial. Stripe keeps it after the trial ends. */
+  trial_end: Schema.optional(Schema.NullOr(Schema.Int)),
+  discounts: Schema.optional(Schema.NullOr(Schema.Array(expandable))),
   latest_invoice: Schema.optional(Schema.NullOr(expandable)),
   default_payment_method: Schema.optional(Schema.NullOr(expandable)),
   items: Schema.Struct({
@@ -89,6 +92,7 @@ const subscriptionSchema = Schema.Struct({
         id: Schema.String,
         current_period_end: Schema.optional(Schema.Int),
         quantity: Schema.optional(Schema.Int),
+        discounts: Schema.optional(Schema.NullOr(Schema.Array(expandable))),
         price: Schema.Struct({
           id: Schema.String,
           lookup_key: Schema.NullOr(Schema.String),

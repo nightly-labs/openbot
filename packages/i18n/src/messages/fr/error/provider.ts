@@ -115,6 +115,8 @@ export const messages = {
   "error.provider.modelIdDuplicate": "Deux modèles ont le même ID.",
   "error.provider.contextWindowInvalid":
     "La fenêtre de contexte d’un modèle doit être un nombre entier de jetons entre {min} et {max}.",
+  "error.provider.maxOutputInvalid":
+    "La sortie maximale d’un modèle doit être un nombre entier de jetons entre {min} et {max}.",
   "error.provider.headersTooMany": "Il y a trop d’en-têtes.",
   "error.provider.headerNameCharacter": "Un nom d’en-tête contient un caractère que HTTP n’autorise pas.",
   "error.provider.headerNameTooLong": "Un nom d’en-tête est trop long.",
@@ -192,6 +194,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} n’a renvoyé aucun compte authentifié.",
   "error.provider.signInExpired": "Votre connexion à {provider} a expiré. Reconnectez-vous pour continuer.",
   "error.provider.cliActivateFailed": "OpenBot n’a pas pu activer la CLI gérée.",
+  "error.provider.cliNewVersionNotStarted": "La nouvelle version n’a pas démarré.",
   "error.provider.cliBusyReconnect": "La CLI {provider} traite un tour. Attendez la fin, puis reconnectez-vous.",
   "error.provider.cliBusySignOut": "La CLI {provider} traite un tour. Attendez la fin, puis déconnectez-vous.",
   "error.provider.opencodeCredentialsRejected":
@@ -272,6 +275,20 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline n’a pas pu démarrer. Exécutez `cline --version` dans un terminal.",
   "error.provider.clineVersionUnreadable": "Impossible de lire la version de la CLI Cline.",
   "error.provider.clineSignIn": "Connectez-vous avec Cline ou définissez CLINE_API_KEY pour utiliser Cline.",
+  "error.provider.kimiArchivePath": "L’archive Kimi contient un chemin inattendu.",
+  "error.provider.kimiChecksum": "La somme de contrôle de l’environnement d’exécution Kimi ne correspond pas.",
+  "error.provider.kimiLicenseChecksum": "La somme de contrôle de la licence Kimi ne correspond pas.",
+  "error.provider.kimiMissing": "Kimi n’est pas téléchargé. Téléchargez-le dans OpenBot pour continuer.",
+  "error.provider.kimiOutdated":
+    "La CLI Kimi {version} est trop ancienne. OpenBot nécessite la version 1.52.0 ou ultérieure.",
+  "error.provider.kimiNotStarted": "Kimi n’a pas pu démarrer. Exécutez `kimi --version` dans un terminal.",
+  "error.provider.kimiVersionUnreadable": "Impossible de lire la version de la CLI Kimi.",
+  "error.provider.kimiSignIn": "Connectez-vous avec Kimi Code pour utiliser Kimi.",
+  "error.provider.hermesMissing": "Hermes Agent n’est pas installé. Installez-le, puis réessayez.",
+  "error.provider.hermesNotStarted": "Hermes Agent n’a pas pu démarrer. Exécutez `hermes --version` dans un terminal.",
+  "error.provider.hermesVersionUnreadable": "Impossible de lire la version de Hermes Agent.",
+  "error.provider.hermesSignIn":
+    "Connectez-vous avec Nous Portal ou exécutez `hermes setup` dans un terminal pour utiliser Hermes.",
   "error.provider.usageLimitReached": "Le compte a atteint sa limite d’utilisation.",
   "error.provider.foreignReasoning":
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
@@ -327,6 +344,8 @@ export const messages = {
     "Cet ordinateur n’a pas de stockage sécurisé : impossible d’enregistrer les valeurs d’environnement. Supprimez-les et réessayez.",
   "error.provider.customAgentNotSaved":
     "Cet agent personnalisé n’est pas enregistré. Actualisez la liste et réessayez.",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}. « Espace de travail seul » bloque cette action. Essayez « Accès complet ».",
   "error.provider.customAgentTooMany": "Vous pouvez enregistrer au plus {count} agents personnalisés.",
   "error.provider.customAgentEnvValueMissing": "Saisissez une valeur pour {name}.",
   "error.provider.off": "{provider} est désactivé dans OpenBot. Activez-le d’abord dans les réglages des fournisseurs.",

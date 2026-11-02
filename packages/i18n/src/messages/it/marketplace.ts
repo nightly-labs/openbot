@@ -118,6 +118,7 @@ export const messages = {
   "marketplace.app.setup.account": "Accedi con il tuo account {name} nel browser.",
   "marketplace.app.setup.key": "Richiede una chiave API del tuo account {name}.",
   "marketplace.app.setup.keySaved": "{field} si trova su {host}.",
+  "marketplace.app.account.removeDescription": "OpenBot elimina l'accesso di questo account su {host}.",
   "marketplace.app.setup.desktop": "Funziona nell'app desktop di {name} all'indirizzo {address}.",
   "marketplace.app.setup.desktopConnected": "Connessa a {address}.",
   "marketplace.app.setup.open": "Non servono accesso né chiave.",
@@ -402,6 +403,15 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Quali schede di Trello sono assegnate a me?",
   "marketplace.plugin.trello.prompt.board": "Riassumi cosa è in corso sulla mia bacheca Trello.",
   "marketplace.plugin.trello.prompt.newCards": "Aggiungi queste azioni come schede alla mia bacheca Trello.",
+  "marketplace.plugin.clickup.tagline": "Attività, documenti e aggiornamenti del team",
+  "marketplace.plugin.clickup.description":
+    "ClickUp permette agli agenti di cercare attività, documenti, commenti e chat, creare e aggiornare attività, liste e documenti, pubblicare commenti, inviare messaggi in chat e registrare il tempo. Ogni utente accede al proprio account ClickUp dal browser. Gli agenti hanno gli stessi permessi dell'utente. Possono spostare attività nel cestino ed eliminare commenti.",
+  "marketplace.plugin.clickup.app":
+    "Attività, documenti, commenti, chat e registrazione del tempo, tramite il server MCP di ClickUp con accesso dal browser.",
+  "marketplace.plugin.clickup.prompt.findTasks": "Trova le mie attività ClickUp aperte in scadenza questa settimana.",
+  "marketplace.plugin.clickup.prompt.createTask": "Crea un'attività ClickUp con queste azioni e assegnala a me.",
+  "marketplace.plugin.clickup.prompt.summarizeDoc":
+    "Trova l'ultimo aggiornamento del progetto in ClickUp e riassumi le domande aperte.",
   "marketplace.plugin.huggingface.tagline": "Modelli, dataset e paper sull'Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face permette agli agenti di cercare modelli, dataset, Spaces, collezioni e paper sull'Hugging Face Hub, leggere model card e file dei repository, vedere un'anteprima dei dataset e cercare nella documentazione di Hugging Face. Usa dati pubblici dell'Hub e non richiede account né chiave. Gli strumenti leggono soltanto: gli agenti non possono creare repository né eseguire job.",

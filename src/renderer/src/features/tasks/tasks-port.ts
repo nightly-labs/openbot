@@ -27,7 +27,10 @@ export interface TasksSource {
   read(input: AgentTaskInput, serverId: string): Promise<ConversationSnapshot>;
   start(input: StartAgentTaskInput, serverId: string): Promise<AgentTask>;
   /** Steers the task's running turn, or queues the message in the task. */
-  send(input: AgentTaskInput & { text: string; clientMessageId: string }, serverId: string): Promise<unknown>;
+  send(
+    input: AgentTaskInput & { text: string; clientMessageId: string; attachmentDraftIds?: string[] },
+    serverId: string,
+  ): Promise<unknown>;
   stop(input: AgentTaskInput, serverId: string): Promise<void>;
   close(input: AgentTaskInput, serverId: string): Promise<void>;
   reopen(input: AgentTaskInput, serverId: string): Promise<void>;

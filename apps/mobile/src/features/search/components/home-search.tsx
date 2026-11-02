@@ -25,7 +25,6 @@ import {
   type PropsWithChildren,
   type RefObject,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -59,10 +58,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
-import { ChatNavigationGateContext } from "@/features/agents/components/chat-link-pressable";
 import { openChatFromPane, useChatListPane } from "@/features/agents/components/chat-list-pane-context";
 import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
-import type { createChatNavigationGate } from "@/features/agents/model/chat-navigation-gate";
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { MobileSearchResults, SearchCaption } from "@/features/search/components/mobile-search-results";
 import { setHomeSearchOpener } from "@/features/search/model/home-search-request";
@@ -88,16 +85,12 @@ import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
 /**
  * Opens an agent chat from the search. In the chat list pane, the chat takes the place of the open
- * one; on home, the chat zooms from its row when the row is on screen.
+ * one.
  */
-function openSearchedChat(
-  pane: ReturnType<typeof useChatListPane>,
-  gate: ReturnType<typeof createChatNavigationGate> | null,
-  agentId: string,
-): void {
+function openSearchedChat(pane: ReturnType<typeof useChatListPane>, agentId: string): void {
   const open = () => router.push({ pathname: "/chat/[agentId]", params: { agentId } });
   if (pane) openChatFromPane(pane, agentId, open);
-  else if (!gate?.openFromHome(agentId)) open();
+  else open();
 }
 
 /** The height of the search field at the bottom of home. */
@@ -1047,7 +1040,6 @@ interface Shortcut {
 /** Before the user types: the pages to go to, and the agents of the server. */
 function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseTasks: boolean }) {
   const { t } = useText();
-  const gate = useContext(ChatNavigationGateContext);
   const pane = useChatListPane();
   const serverId = useMobileWorkspaceSelector((current) => current.activeServer.id);
   const hasServer = useMobileWorkspaceSelector((current) =>
@@ -1105,7 +1097,7 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
   );
   const openChat = (agent: MobileAgent) => {
     onLeave();
-    openSearchedChat(pane, gate, agent.id);
+    openSearchedChat(pane, agent.id);
   };
   return (
     <View className="pb-2">
@@ -1154,7 +1146,6 @@ const NAME_MARK = "\u2063";
  */
 function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSearch }) {
   const { t } = useText();
-  const gate = useContext(ChatNavigationGateContext);
   const pane = useChatListPane();
   const muted = String(useThemeColor("muted"));
   const color = getBloubAvatarColor(agent.avatarSeed, agent.avatarHue);
@@ -1167,7 +1158,7 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
   const [before = "", after = ""] = t("mobile.search.thread.newFor", { name: NAME_MARK }).split(NAME_MARK);
   const message = () => {
     search.leave();
-    openSearchedChat(pane, gate, agent.id);
+    openSearchedChat(pane, agent.id);
   };
   return (
     // The spacing of the prototype: 4 pt above the page, 8 pt beside the avatar, 10 pt above the line.

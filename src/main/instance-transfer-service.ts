@@ -42,6 +42,7 @@ import {
   isAgentImportKey,
   isCustomProviderContextWindow,
   isCustomProviderHarness,
+  isCustomProviderMaxOutput,
   type McpServerConfig,
   type Routine,
   type RoutineFlowLink,
@@ -691,9 +692,12 @@ export class InstanceTransferService {
           name: provider.name,
           baseUrl: provider.baseUrl,
           apiKey: null,
-          models: provider.models.map(({ id, name, contextWindow }) =>
-            isCustomProviderContextWindow(contextWindow) ? { id, name, contextWindow } : { id, name },
-          ),
+          models: provider.models.map(({ id, name, contextWindow, maxOutput }) => ({
+            id,
+            name,
+            ...(isCustomProviderContextWindow(contextWindow) ? { contextWindow } : {}),
+            ...(isCustomProviderMaxOutput(maxOutput) ? { maxOutput } : {}),
+          })),
           headers: [],
           ...(isCustomProviderHarness(provider.harness) ? { harness: provider.harness } : {}),
         }),

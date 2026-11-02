@@ -35,6 +35,8 @@ export const messages = {
   "settings.launchAtLogin.description": "Otwieraj aplikację, gdy logujesz się na tym komputerze.",
   "settings.keepRunning.title": "Utrzymuj OpenBot w tle",
   "settings.keepRunning.description": "Aktywne zadania działają dalej po zamknięciu okna.",
+  "settings.menuBar.title": "Pokazuj OpenBot na pasku menu",
+  "settings.menuBar.description": "Ukryj ikonę w Docku po zamknięciu okna. Aktywne zadania nadal działają.",
   "settings.keepAwake.title": "Nie usypiaj komputera",
   "settings.keepAwake.description":
     "Rutyny działają o czasie, gdy komputer jest podłączony do zasilania. Ekran nadal może się wyłączyć.",
@@ -146,11 +148,11 @@ export const messages = {
   "settings.notch.size.height": "Wysokość",
   "settings.notch.size.previewNotch": "Wbudowany ekran",
   "settings.notch.size.previewIsland": "Ekran zewnętrzny",
-  "settings.analytics.title": "Udostępniaj analitykę produktu",
+  "settings.analytics.title": "Łącz analitykę z moim kontem",
   "settings.analytics.description":
-    "Wysyłaj metadane użycia i niezawodności wraz z ID konta i adresem e-mail do samodzielnie hostowanej analityki OpenBot.",
+    "Włączone: metadane użycia i niezawodności trafiają do samodzielnie hostowanej analityki OpenBot wraz z ID konta i adresem e-mail, a także strony odwiedzane przez Ciebie i Twoich agentów, użycie narzędzi i dzienne podsumowanie konfiguracji. Wyłączone: trafia tylko podstawowe użycie, takie jak tury i liczba tokenów, z losowym ID instalacji. Czaty, pliki i prompty nigdy nie są wysyłane.",
   "settings.analytics.webDescription":
-    "Wysyłaj metadane użycia i niezawodności wraz z ID konta i adresem e-mail do samodzielnie hostowanej analityki OpenBot. To ustawienie dotyczy tej przeglądarki.",
+    "Włączone: metadane użycia i niezawodności trafiają do samodzielnie hostowanej analityki OpenBot wraz z ID konta i adresem e-mail. Wyłączone: te same metadane trafiają tylko z losowym ID instalacji. Czaty, pliki i prompty nigdy nie są wysyłane. To ustawienie dotyczy tej przeglądarki.",
   "settings.tab.general.title": "Ogólne",
   "settings.tab.general.description": "Określ, jak OpenBot działa na tym komputerze.",
   "settings.tab.notifications.title": "Powiadomienia",

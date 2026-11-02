@@ -11,8 +11,22 @@ import { type DynamicRecord, isBoolean, isDynamicRecord, isOneOf, isString } fro
 
 export type AgentModelId = string;
 
-export const AGENT_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+/** From the least reasoning to the most. Each provider lists the levels that a model takes. */
+export const AGENT_REASONING_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"] as const;
 export type AgentReasoningEffort = (typeof AGENT_REASONING_EFFORTS)[number];
+
+/**
+ * The levels that released IPC and Team API peers know. Do not change this list: a peer that reads
+ * only these levels refuses a model list that has another one.
+ */
+export const LEGACY_AGENT_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type LegacyAgentReasoningEffort = (typeof LEGACY_AGENT_REASONING_EFFORTS)[number];
+
+/** The nearest level that a released peer knows: `none` and `minimal` are `low`, `ultra` is `max`. */
+export function legacyReasoningEffort(effort: AgentReasoningEffort): LegacyAgentReasoningEffort {
+  if (effort === "none" || effort === "minimal") return "low";
+  return effort === "ultra" ? "max" : effort;
+}
 
 export const AVATAR_HUES = [0, 30, 55, 100, 150, 185, 215, 245, 280, 320] as const;
 export type AvatarHue = (typeof AVATAR_HUES)[number];

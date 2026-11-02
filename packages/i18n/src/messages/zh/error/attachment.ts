@@ -12,5 +12,6 @@ export const messages = {
   "error.attachment.emlUnsupported": "该服务器不支持 EML 附件。请更新主机上的 OpenBot 后重试。",
   "error.attachment.zipUnsupported": "该服务器不支持 ZIP 附件。请更新主机上的 OpenBot 后重试。",
   "error.attachment.mp4Unsupported": "该服务器不支持 MP4 附件。请更新主机上的 OpenBot 后重试。",
+  "error.attachment.svgUnsupported": "该服务器不支持 SVG 附件。请更新主机上的 OpenBot 后重试。",
   "error.attachment.previewTooLarge": "该文件超过了 100 MB 上限。",
 } as const satisfies PartialTranslation<typeof source>;

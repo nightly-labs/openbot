@@ -26,6 +26,7 @@ import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-display";
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
+import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
 import { type BrowserProfileService, createBrowserProfileService } from "./browser-profile-service";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import {
@@ -144,6 +145,7 @@ import {
 import { AgentNotificationLevelStore, OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { AgentTemplateService } from "./agent-template-service";
 import { HostAnalytics } from "./analytics";
+import { readAnalyticsInstallId } from "./analytics-install-id";
 import { analyticsInventoryDayStore, collectAnalyticsInventory } from "./analytics-inventory";
 import { catalogPluginSlug, isReportedMcpServerName, loadCatalogPluginServers } from "./analytics-plugin-catalog";
 import { AnalyticsPreferenceService } from "./analytics-preference-service";
@@ -216,6 +218,8 @@ import { InstanceTransferService } from "./instance-transfer-service";
 import { InterfaceSizeService } from "./interface-size-service";
 import { prepareToolRuntimeForTest } from "./ipc/mcp-server-handlers";
 import { LanguageService } from "./language-service";
+import { LinkAccountService } from "./link-account-service";
+import { LinkAccountStore } from "./link-account-store";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import { type LocalServerChildEnvironment, startLocalServerChild } from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
@@ -292,6 +296,7 @@ import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
 import { ScreenCapturer } from "./screen-capture";
+import { SERVER_AUDIT_FILE, ServerAuditStore, serverAuditNames } from "./server-audit-store";
 import { AGENT_PROCESS_VARIABLE, agentProcessEnvironment, ServerMemory } from "./server-memory";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import { ServerTimezonePreferenceStore } from "./server-timezone-preference-store";
@@ -301,6 +306,7 @@ import {
   configureServerLogoProtocols,
 } from "./session-configuration";
 import { readSetupState, writeSetupState } from "./setup-store";
+import { SidebarPinStore } from "./sidebar-pin-store";
 import { SignInRelayClient } from "./sign-in-relay-client";
 import { agentPrintedLink, SignInRelayHost } from "./sign-in-relay-host";
 import { SignalIngress } from "./signal-ingress";
@@ -346,6 +352,7 @@ const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
 const ANALYTICS_INVENTORY_FILE = "openbot-analytics-inventory-v1.json";
+const ANALYTICS_INSTALL_ID_FILE = "openbot-analytics-install-id-v1.json";
 const APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v3.json";
 const V2_APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v2.json";
 const ROUTINE_FEED_FILE = "openbot-routine-feed-v1.json";
@@ -363,6 +370,7 @@ const AGENT_DEFAULTS_PREFERENCE_FILE = "openbot-agent-defaults-v1.json";
 const AGENT_MEMORY_LIMIT_PREFERENCE_FILE = "openbot-agent-memory-limit-v1.json";
 const MEMORY_REVIEW_PREFERENCE_FILE = "openbot-memory-review-v1.json";
 const AGENT_NOTIFICATION_LEVELS_FILE = "openbot-agent-notification-levels-v1.json";
+const SIDEBAR_PINS_FILE = "openbot-sidebar-pins-v1.json";
 const SERVER_TIMEZONE_PREFERENCE_FILE = "openbot-server-timezone-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
 const REMOTE_SESSION_REUSE_PREFERENCE_FILE = "openbot-remote-session-reuse-preference-v1.json";
@@ -389,6 +397,7 @@ const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
 const MCP_OAUTH_PROXY_FILE = "openbot-mcp-oauth-proxy-v1.json";
 /** The one GitHub sign-in of this computer, with the same cipher as the MCP sign-ins. */
 const GITHUB_CONNECTOR_FILE = "openbot-github-connector-v1.json";
+const LINK_ACCOUNT_FILE = "openbot-link-account-v1.json";
 /** The 1Password service account token of this computer, with the same cipher. */
 const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 /** The Bitwarden API key and master password of a host connection (`bitwarden-connector-v1`), with the same cipher. */
@@ -468,6 +477,8 @@ const TEARDOWN_ORDER = {
   bitwardenConnector: 106.5,
   // Before the agent service, so no agent is handed a token file that is being removed.
   githubConnector: 107,
+  // Before the agent service, so no payment wait outlives the agents that asked for it.
+  linkAccount: 107.5,
   // Before the agent service, so no script starts a run while the service stops.
   automation: 108,
   storageUsage: 109,
@@ -537,6 +548,8 @@ export interface ApplicationServices {
   providerCredentials: ProviderCredentialStore;
   /** The Slack and Telegram connections of the agents on this host. */
   messaging: MessagingService;
+  /** The WebRTC peers of this host and of its joined servers. */
+  teamWebRtcBridge: TeamWebRtcBridge;
   /** Reached by the entry point for one thing only: handing a returning grant to its sign-in. */
   mcpOAuth: McpOAuth;
   /** The sign-ins of joined servers that wait in this computer's browser, and the callbacks they take. */
@@ -544,6 +557,8 @@ export interface ApplicationServices {
   /** The Slack and Discord installs that this computer opened for a joined server. */
   relayedMessagingInstalls: RelayedMessagingInstalls;
   githubConnector: GitHubConnectorService;
+  /** The Link account (link.com) that agents ask for one-time cards. */
+  linkAccount: LinkAccountService;
   onePasswordConnector: OnePasswordConnectorService;
   bitwardenConnector: BitwardenConnectorService;
   vault: VaultService;
@@ -565,12 +580,16 @@ export interface ApplicationServices {
   setupFile: string;
   /** The analytics answer of this computer, kept the same as the account's latest answer. */
   analyticsPreferences: AnalyticsPreferenceService;
+  /** The random analytics ID of this install. Null when analytics is not built in or it cannot be saved. */
+  analyticsInstallId: string | null;
   updatePreferenceFile: string;
   approvalAutomation: ApprovalAutomation;
   agentAdminSettings: AgentAdminSettingsService;
   agentHostSettings: AgentHostSettingsService;
   /** The folders each agent can change besides its workspace, for the desktop settings and `agent-folders-v1`. */
   agentFolders: AgentFolders;
+  /** The instruction file of each agent, for the desktop page and `agent-instructions-v1`. */
+  agentInstructions: AgentInstructionsFiles;
   browserProfiles: BrowserProfileService;
   language: LanguageService;
   logoColor: LogoColorService;
@@ -582,7 +601,9 @@ export interface ApplicationServices {
   agentMemoryLimit: AgentMemoryLimitSetting;
   memoryReview: MemoryReviewPreferenceStore;
   agentNotificationLevels: AgentNotificationLevelStore;
+  sidebarPins: SidebarPinStore;
   agentAccess: AgentAccessStore;
+  serverAudit: ServerAuditStore;
   serverTimezone: ServerTimezonePreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
   remoteSessionReuse: RemoteSessionReusePreferenceStore;
@@ -1126,6 +1147,7 @@ export async function createApplicationServices({
       return agent ? agentBrowserProfile(agent) : { kind: "shared" };
     },
     profileExists: (profileId) => browserProfileStore.get(profileId) !== undefined,
+    quitShortcut: (input) => windows.handleQuitShortcut(mainWindow, input),
   });
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => runCauseEffect(browser.destroy()));
   await runCauseEffect(browser.restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId }))));
@@ -1153,7 +1175,7 @@ export async function createApplicationServices({
     mainWindow,
     preloadPath: join(__dirname, "../preload/index.cjs"),
     load: loadBrowserDockRenderer,
-    forwardShortcut: (input) => browser.forwardDockShortcut(input),
+    forwardShortcut: (input) => windows.handleQuitShortcut(mainWindow, input) || browser.forwardDockShortcut(input),
   });
   browser.setMainPageListener((page) => browserDock.setPage(page));
   teardown.push(TEARDOWN_ORDER.browserDock, "the browser dock", () => {
@@ -1206,8 +1228,18 @@ export async function createApplicationServices({
     join(app.getPath("userData"), AGENT_NOTIFICATION_LEVELS_FILE),
   );
   await runCauseEffect(agentNotificationLevels.load());
+  const sidebarPins = new SidebarPinStore(join(app.getPath("userData"), SIDEBAR_PINS_FILE));
+  await runCauseEffect(sidebarPins.load());
   await runCauseEffect(memoryReview.load());
-  const agentAccess = new AgentAccessStore(join(app.getPath("userData"), AGENT_ACCESS_FILE));
+  const serverAudit = new ServerAuditStore(join(app.getPath("userData"), SERVER_AUDIT_FILE));
+  await runCauseEffect(serverAudit.load());
+  const agentAccess = new AgentAccessStore(join(app.getPath("userData"), AGENT_ACCESS_FILE), {
+    // Called only on a save, after `service` and `teamStore` exist.
+    audit: (serverId, before, after, actor) =>
+      serverAudit.recordAgentAccess(serverId, actor, before, after, () =>
+        serverAuditNames(teamStore.configured ? teamStore.listMembers() : [], service.listAgents()),
+      ),
+  });
   if (!(await runCauseEffect(agentAccess.load())))
     logger.warn("The roles file did not load. Members get no access to agents until an admin saves the roles.");
   const serverTimezone = new ServerTimezonePreferenceStore(
@@ -1233,7 +1265,8 @@ export async function createApplicationServices({
       appVariant,
       server: Boolean(hostedServer || serverModeEnvironment || localServerChild),
     }),
-    offersBackground: process.platform !== "darwin" && !hostedServer && !serverModeEnvironment && !localServerChild,
+    offersBackground: !hostedServer && !serverModeEnvironment && !localServerChild,
+    menuBar: process.platform === "darwin",
     offersKeepAwake: process.platform !== "linux" && !hostedServer && !serverModeEnvironment && !localServerChild,
   });
   await runCauseEffect(appBehavior.load());
@@ -1465,6 +1498,13 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.githubConnector, "the GitHub connection", () =>
     runCauseEffect(githubConnector.dispose()),
   );
+  /* The Link account. Agents ask it for one-time cards that the user approves in Link. */
+  const linkAccount = new LinkAccountService({
+    store: new LinkAccountStore(join(app.getPath("userData"), LINK_ACCOUNT_FILE), secretCipher),
+    openExternal: openLink,
+  });
+  await Effect.runPromise(linkAccount.load());
+  teardown.push(TEARDOWN_ORDER.linkAccount, "the Link account", () => Effect.runPromise(linkAccount.dispose()));
   /*
    * The Bitwarden connection. A host connection's API key and master password are stored, so the
    * host unlocks again after a restart; its CLI data and OpenBot's copy of `bw` stay outside every
@@ -1788,6 +1828,7 @@ export async function createApplicationServices({
       { prefix: "openbot:", vault: vault.logins },
     ]),
     vaultItems: vault.items,
+    linkWallet: linkAccount,
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     routineFlowTools: () => routineFlowRuntime,
@@ -1909,6 +1950,7 @@ export async function createApplicationServices({
       notify: forwardWorkflowNotice,
       connectionOn: (connectionId) => service.messaging.store.connection(connectionId)?.enabled === true,
       post: (connectionId, placeId, markdown) => service.messaging.deliver(connectionId, placeId, markdown),
+      discordSend: (connectionId, send) => service.messaging.discordSend(connectionId, send),
       // An agent event, so this window, joined clients and the web app hear it the same way.
       changed: (workflowId) => service.notifyWorkflowsChanged(workflowId),
       rearm: () => service.armRoutines(),
@@ -1927,7 +1969,22 @@ export async function createApplicationServices({
   vault.onChanged(() => service.notifyVaultChanged());
   // A changed or deleted Vault API key reaches the file that an agent reads at once.
   vault.onChanged(() => void Effect.runPromise(agentApiKeys.syncVault().pipe(Effect.ignore)));
-  teardown.push(TEARDOWN_ORDER.workflows, "the workflows", () => Effect.runPromise(workflowRuntime.close()));
+  // A Discord mention goes to the workflows' Discord triggers before an agent. When the workflows fail to
+  // read, the agent answers it, as it did before the trigger.
+  service.messaging.setMentionHandler((mention) =>
+    workflowRuntime.receiveDiscord(mention).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          logger.warn("A Discord mention could not reach the workflows.", { cause: String(failure.cause) });
+          return "none" as const;
+        }),
+      ),
+    ),
+  );
+  teardown.push(TEARDOWN_ORDER.workflows, "the workflows", () => {
+    service.messaging.setMentionHandler(null);
+    return Effect.runPromise(workflowRuntime.close());
+  });
   // An agent routine's answer sent on to a messaging place; see `routine-results.ts`.
   const routineResultRuntime = await Effect.runPromise(
     createRoutineResults({
@@ -2255,6 +2312,7 @@ export async function createApplicationServices({
   const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
   const agentHostSettings = createAgentHostSettings({ agents: service, busyMessageMode, agentDefaults });
   const agentFolders = createAgentFolders({ service, userDataPath: app.getPath("userData") });
+  const agentInstructions = createAgentInstructionsFiles(service);
   const browserProfiles = createBrowserProfileService({
     store: browserProfileStore,
     agents: service,
@@ -2450,8 +2508,12 @@ export async function createApplicationServices({
     hiddenAgents: service,
     // Present, so the host advertises `agent-notification-levels-v1`. Each member sets their own levels.
     agentNotificationLevels,
+    // Present, so the host advertises `sidebar-pins-v1`. Each member saves their own pins.
+    sidebarPins,
     // Present, so the host advertises `agent-access-v1`. Only owners and admins change the roles.
     agentAccess,
+    // Present, so the host advertises `server-audit-v1`. Only owners and admins read the log.
+    serverAudit,
     // Present, so the host advertises `agent-tasks-v1`. Any member who can send a message to the agent.
     agentTasks: service,
     // Present, so the host advertises `browser-profiles-v1`. Only owners and admins change profiles;
@@ -2464,6 +2526,7 @@ export async function createApplicationServices({
       agents: agentAdminSettings,
       agentHost: agentHostSettings,
       folders: agentFolders,
+      instructions: agentInstructions,
       sessionSettings: service,
       acpRegistry,
       customAgents: customAgentChanges,
@@ -2662,6 +2725,11 @@ export async function createApplicationServices({
   }
   performance.mark("openbot:services.remote-desktop");
   const analyticsEnabled = (app.isPackaged && appVariant === "production") || analyticsCaptureUrl !== null;
+  const analyticsInstallId = analyticsEnabled
+    ? await Effect.runPromise(
+        readAnalyticsInstallId(join(app.getPath("userData"), ANALYTICS_INSTALL_ID_FILE), Date.now()),
+      )
+    : null;
   const failureReports = analyticsEnabled
     ? new ReportQueue(
         fileReportStorage(join(app.getPath("userData"), "openbot-error-reports-v1.json")),
@@ -2696,6 +2764,7 @@ export async function createApplicationServices({
     enabled: analyticsEnabled,
     ...(analyticsCaptureUrl ? { apiUrl: analyticsCaptureUrl } : {}),
     trackingEnabled: analyticsPreference.enabled,
+    installId: analyticsInstallId,
     appVersion: app.getVersion(),
     platform: analyticsPlatform,
     // A function for a lifetime reason, not an ordering one: the signed-in account changes
@@ -3276,10 +3345,12 @@ export async function createApplicationServices({
     providerRuntimes,
     providerCredentials,
     messaging,
+    teamWebRtcBridge,
     mcpOAuth,
     signInRelayClient,
     relayedMessagingInstalls: new RelayedMessagingInstalls(remoteServers),
     githubConnector,
+    linkAccount,
     onePasswordConnector,
     bitwardenConnector,
     vault,
@@ -3293,11 +3364,13 @@ export async function createApplicationServices({
     updater,
     setupFile,
     analyticsPreferences,
+    analyticsInstallId,
     updatePreferenceFile,
     approvalAutomation,
     agentAdminSettings,
     agentHostSettings,
     agentFolders,
+    agentInstructions,
     browserProfiles,
     language,
     logoColor,
@@ -3309,7 +3382,9 @@ export async function createApplicationServices({
     agentMemoryLimit: agentMemoryLimitSetting,
     memoryReview,
     agentNotificationLevels,
+    sidebarPins,
     agentAccess,
+    serverAudit,
     serverTimezone,
     promptCacheTtl,
     remoteSessionReuse,

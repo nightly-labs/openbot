@@ -31,11 +31,14 @@ import { currentText, useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
 const EFFORT_LABEL = {
+  none: "mobile.agent.runtime.effort.none",
+  minimal: "mobile.agent.runtime.effort.minimal",
   low: "mobile.agent.runtime.effort.low",
   medium: "mobile.agent.runtime.effort.medium",
   high: "mobile.agent.runtime.effort.high",
   xhigh: "mobile.agent.runtime.effort.xhigh",
   max: "mobile.agent.runtime.effort.max",
+  ultra: "mobile.agent.runtime.effort.ultra",
 } as const satisfies Record<AgentReasoningEffort, MobileTextKey>;
 
 /** The longest text of a field that `workflows-v1` carries. */

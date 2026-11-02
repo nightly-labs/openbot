@@ -41,6 +41,8 @@ export const messages = defineMessages("onboarding", {
   "onboarding.provider.googlePlan": "Google AI Pro or Ultra plan",
   "onboarding.provider.cursorPlan": "Cursor plan or API key",
   "onboarding.provider.clineAccount": "Free models with a Cline account",
+  "onboarding.provider.kimiAccount": "Kimi models with a Kimi Code account",
+  "onboarding.provider.hermesNous": "Nous Portal plan or your Hermes setup",
   "onboarding.provider.inceptionKey": "Mercury models with an Inception API key",
   "onboarding.provider.deepseekKey": "DeepSeek models with a DeepSeek API key",
   "onboarding.provider.openrouterKey": "Many models with an OpenRouter API key",
@@ -81,7 +83,8 @@ export const messages = defineMessages("onboarding", {
   "onboarding.choice.startFreeInstead": "Start free instead",
   "onboarding.consent.notice": "By continuing, you accept the {terms} and acknowledge the {privacy}.",
   "onboarding.consent.analyticsTitle": "Help make OpenBot better",
-  "onboarding.consent.analyticsDetail": "Share which features you use. Never your chats, files or prompts.",
+  "onboarding.consent.analyticsDetail":
+    "Link feature use to your account and email, and share visited websites, tool use and a daily summary of your setup. Without this, only basic usage goes, with a random install ID. Never your chats, files or prompts.",
   "onboarding.consent.thanksTitle": "Thank you! The team owes you one.",
   "onboarding.consent.thanksToast": "Thanks for helping make OpenBot better 💜",
   "onboarding.consent.thanksToastDetail": "You can change this at any time in Settings.",

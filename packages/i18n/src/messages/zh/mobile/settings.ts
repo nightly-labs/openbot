@@ -66,8 +66,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "关闭“动画”可减少整个应用的动态效果。当手机设置中开启“减弱动态效果”时，应用也会减少动效，下面的动画选项将保持关闭。",
   "mobile.settings.animations.all": "动画",
-  "mobile.settings.animations.chatZoom": "对话缩放",
-  "mobile.settings.animations.chatZoomFooter": "对话从列表中的头像展开打开，关闭时收回。关闭该选项后，对话从侧边滑入。",
   "mobile.settings.animations.agentFaces": "助手表情动画",
   "mobile.settings.animations.agentFacesFooter": "助手工作时和休息时，头像上的表情会动。关闭该选项后表情保持静止。",
   "mobile.settings.animations.composerResize": "紧凑输入框",
@@ -146,8 +144,9 @@ export const messages = {
   "mobile.settings.notifications.channel": "助手通知（{sound}）",
   "mobile.settings.notifications.channelSilent": "助手通知（静音）",
   "mobile.settings.privacy.title": "隐私",
-  "mobile.settings.privacy.footer": "分享这台手机的功能使用情况与连接结果。不会发送消息内容和文件。",
-  "mobile.settings.privacy.analytics": "分享产品分析数据",
+  "mobile.settings.privacy.footer":
+    "这台手机的功能使用情况与连接结果始终会发送到 OpenBot 的分析服务。开启：连同你的账号 ID 和邮箱。关闭：仅随一个随机安装 ID。不会发送消息内容和文件。",
+  "mobile.settings.privacy.analytics": "将分析数据关联到我的账号",
   "mobile.settings.privacy.retry": "重试保存隐私设置",
   "mobile.settings.conversations.title": "对话",
   "mobile.settings.conversations.hiddenChats": "隐藏的对话",

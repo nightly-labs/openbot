@@ -40,6 +40,9 @@ export const messages = {
   "settings.launchAtLogin.description": "Ouvrir l’application lorsque vous vous connectez à cet ordinateur.",
   "settings.keepRunning.title": "Garder OpenBot actif en arrière-plan",
   "settings.keepRunning.description": "Poursuivre les tâches en cours après la fermeture de la fenêtre.",
+  "settings.menuBar.title": "Afficher OpenBot dans la barre des menus",
+  "settings.menuBar.description":
+    "Masque l’icône du Dock après la fermeture de la fenêtre. Les tâches actives continuent.",
   "settings.keepAwake.title": "Empêcher la mise en veille",
   "settings.keepAwake.description":
     "Les routines s’exécutent à l’heure tant que l’ordinateur est branché. L’écran peut quand même s’éteindre.",
@@ -152,11 +155,11 @@ export const messages = {
   "settings.notch.size.height": "Hauteur",
   "settings.notch.size.previewNotch": "Écran intégré",
   "settings.notch.size.previewIsland": "Écran externe",
-  "settings.analytics.title": "Partager les données analytiques du produit",
+  "settings.analytics.title": "Lier les données analytiques à mon compte",
   "settings.analytics.description":
-    "Envoyer des métadonnées d’utilisation et de fiabilité, avec l’identifiant et l’e-mail de votre compte, aux services analytiques auto-hébergés d’OpenBot.",
+    "Activé : les métadonnées d’utilisation et de fiabilité sont envoyées aux services analytiques auto-hébergés d’OpenBot avec l’identifiant et l’e-mail de votre compte, ainsi que les sites web que vous et vos agents visitez, l’utilisation des outils et un résumé quotidien de votre configuration. Désactivé : seule l’utilisation de base, comme les tours et le nombre de tokens, est envoyée avec un identifiant d’installation aléatoire. Les conversations, fichiers et prompts ne sont jamais envoyés.",
   "settings.analytics.webDescription":
-    "Envoyer des métadonnées d’utilisation et de fiabilité, avec l’identifiant et l’e-mail de votre compte, aux services analytiques auto-hébergés d’OpenBot. Ce réglage s’applique à ce navigateur.",
+    "Activé : les métadonnées d’utilisation et de fiabilité sont envoyées aux services analytiques auto-hébergés d’OpenBot avec l’identifiant et l’e-mail de votre compte. Désactivé : les mêmes métadonnées sont envoyées avec un identifiant d’installation aléatoire uniquement. Les conversations, fichiers et prompts ne sont jamais envoyés. Ce réglage s’applique à ce navigateur.",
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "Général",
   "settings.tab.general.description": "Contrôler le comportement d’OpenBot sur cet ordinateur.",

@@ -1,8 +1,15 @@
+import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
-import { isAttachmentSummary, type MarketplaceSkillDetail, SKILL_CREATION_REQUEST } from "@openbot/contracts/ipc";
+import {
+  type DraftAttachment,
+  isAttachmentSummary,
+  type MarketplaceSkillDetail,
+  SKILL_CREATION_REQUEST,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { decodeQueueEditRequest, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { skillExamplePrompt } from "@openbot/ui/components/SkillPreview";
+import type { ComposerSelection } from "@openbot/ui/features/conversation/ComposerEditor";
 import type { ComposerDraft } from "./conversation-types";
 
 export const EMPTY_DRAFT: ComposerDraft = {
@@ -120,4 +127,28 @@ function decodeStoredQueueEdit(value: unknown): StoredQueueEdit | null {
     backup: value.backup,
     ...(pendingSave ? { pendingSave } : {}),
   };
+}
+
+/** The thumbnail row of a message box: each image, also one that the text names, and each other file that the text does not name. */
+export function rowAttachments(text: string, attachments: readonly DraftAttachment[]): DraftAttachment[] {
+  const referencedIds = attachmentReferenceIds(text);
+  return attachments.filter((attachment) => attachment.kind === "image" || !referencedIds.has(attachment.id));
+}
+
+/**
+ * Puts `inserted` at the selection when the text is still `before`, else at the end. Returns the text
+ * and the caret after the inserted text.
+ */
+export function insertAtSelection(
+  current: string,
+  inserted: string,
+  at: { before: string; selection: ComposerSelection } | undefined,
+): { value: string; caret: number } {
+  const selection = at && current === at.before ? at.selection : undefined;
+  if (!selection) {
+    const value = [current, inserted].filter(Boolean).join(" ");
+    return { value, caret: value.length };
+  }
+  const value = `${current.slice(0, selection.start)}${inserted}${current.slice(selection.end)}`;
+  return { value, caret: selection.start + inserted.length };
 }

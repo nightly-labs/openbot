@@ -4,7 +4,9 @@ import {
   ANALYTICS_GENERATIONS,
   analyticsOnByDefault,
   classifyFailure,
+  currentAnalyticsInstallId,
   type FailureProperties,
+  newAnalyticsInstallId,
   openPanelTransport,
   ReportQueue,
   safeProperties,
@@ -21,12 +23,18 @@ let enabled = false;
 let configured = false;
 const startup: { properties: FailureProperties; timestamp: number }[] = [];
 let profileId: string | null = null;
+/** The random install ID. Reports go with it when the user does not share analytics. */
+let installId: string | null = null;
+/** The install ID of this page. Each read gives the same ID, so analytics and reports agree. */
+let webInstallId: string | null | undefined;
 /** The web analytics preference. The key keeps its first name, so stored choices stay. */
 export const WEB_PREFERENCE = "openbot:web:error-reports-enabled";
 /** A choice of this browser that the account has not saved yet, "true" or "false". */
 const WEB_ACCOUNT_PENDING = "openbot:web:analytics-account-pending";
 /** "true" or "false". Missing: an app from before the account kept answers saved the choice. */
 const WEB_KEEP_OFF = "openbot:web:analytics-keep-off";
+/** The random install ID of this browser and the time it was made. */
+const WEB_INSTALL_ID = "openbot:web:analytics-install-id";
 
 export function configureDesktopReports(
   info: AppInfo,
@@ -48,20 +56,28 @@ export function configureDesktopReports(
       event_schema_version: ANALYTICS_SCHEMA_VERSION,
     },
   );
+  installId = info.analyticsInstallId ?? null;
   configureErrorReports(tracking, user?.id ?? null);
 }
 
+/**
+ * `tracking` is the user's choice. On: reports go with the account, or with no ID while signed out.
+ * Off: they go with the install ID only, and not at all without one.
+ */
 export function configureErrorReports(tracking: boolean, accountId: string | null = profileId): void {
   enabled = tracking;
   profileId = accountId;
   if (queue) {
     const initial = !configured;
     configured = true;
+    const account = tracking ? accountId : null;
+    const subject = tracking ? accountId : installId;
+    const sending = tracking || subject !== null;
     Effect.runFork(
-      queue.configure(enabled, profileId).pipe(
+      queue.configure(sending, subject).pipe(
         Effect.andThen(() => {
           const pending = startup.splice(0);
-          return initial && enabled && profileId === null
+          return initial && sending && account === null
             ? Effect.forEach(pending, (entry) =>
                 queue ? queue.record("notification_shown", entry.properties, entry.timestamp) : Effect.void,
               )
@@ -119,7 +135,34 @@ export function configureWebReports(user: Pick<CentralAuthUser, "id" | "email"> 
     openPanelTransport({ clientId: "6c989975-87ef-4f0c-857e-ab449a65b5c2" }),
     { surface: "web", platform: "web", app_version: version, event_schema_version: ANALYTICS_GENERATIONS.web },
   );
+  installId = webAnalyticsInstallId();
   configureErrorReports(webReportsEnabled(), user?.id ?? null);
+}
+
+/**
+ * The install ID of this browser. A missing, damaged or 13-month-old ID is made again. Null when
+ * storage cannot keep it: an ID that changes at each page load would count one browser as many.
+ * After a write, the stored value is read again, so the page uses the ID that storage keeps.
+ */
+export function webAnalyticsInstallId(): string | null {
+  if (webInstallId !== undefined) return webInstallId;
+  const now = Date.now();
+  const stored = (): string | null => {
+    try {
+      return currentAnalyticsInstallId(JSON.parse(localStorage.getItem(WEB_INSTALL_ID) ?? "null"), now)?.id ?? null;
+    } catch {
+      return null;
+    }
+  };
+  webInstallId = stored();
+  if (webInstallId) return webInstallId;
+  try {
+    localStorage.setItem(WEB_INSTALL_ID, JSON.stringify(newAnalyticsInstallId(crypto.randomUUID(), now)));
+    webInstallId = stored();
+  } catch {
+    webInstallId = null;
+  }
+  return webInstallId;
 }
 
 /**

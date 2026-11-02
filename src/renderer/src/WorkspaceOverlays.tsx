@@ -16,6 +16,7 @@ import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnosti
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import { RestartServerDialog } from "@openbot/ui/features/servers/RestartServerDialog";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
+import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, Loading, Show, untrack } from "solid-js";
 import { actionToast } from "./action-toast";
@@ -50,9 +51,11 @@ import { useServers } from "./features/servers/servers-context";
 import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
 import { useSettings } from "./features/settings/settings-context";
 import { settingsPort } from "./features/settings/settings-port";
+import { useSidebar } from "./features/sidebar/sidebar-context";
 import { useUpdates } from "./features/updates/updates-context";
 import { useWhatsNew } from "./features/updates/whats-new-context";
 import { usePlanLimitRows } from "./features/usage/plan-limit-rows";
+import { createLinkAccountStore } from "./features/vault/stores/link-account-store";
 import { createVaultStore } from "./features/vault/stores/vault-store";
 import { desktopVaultCalls, hostVaultCalls } from "./features/vault/vault-port";
 import { useWindowPage } from "./features/window/window-page-context";
@@ -508,6 +511,8 @@ function ServerSettings() {
     return {
       store: createVaultStore(local ? desktopVaultCalls() : hostVaultCalls(serverId)),
       apiKeys: vaultApiKeys(),
+      // Link signs in on this computer only: a joined server's host has no Link account.
+      link: local ? createLinkAccountStore() : undefined,
     };
   });
   // The workspace belongs to the selected server. For another server, the switch comes first and
@@ -805,6 +810,7 @@ function ServerSettings() {
           memoryReview={{}}
           hostPromptCacheTtl={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
+          serverAudit={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}
           // Any member imports into this computer or a remote host with `agent-import-v1`.
           agentImport={
@@ -944,7 +950,16 @@ function AppSettings(props: AccountProps) {
 
 /** Search across the agents, channels, conversations, routines and commands of the active server. */
 function GlobalMessageSearch() {
-  const { agentList } = useAgents();
+  const { agentList, userHiddenAgentIds } = useAgents();
+  const { sidebarLayout, pinnedSidebarItems } = useSidebar();
+  // In sidebar order, so that ⌘1-9 opens the agents the user put at the top.
+  const agents = createMemo(() =>
+    sidebarAgentOrder(agentList(), {
+      layout: sidebarLayout(),
+      pinnedItems: pinnedSidebarItems(),
+      hiddenAgentIds: userHiddenAgentIds(),
+    }),
+  );
   const { globalSearchOpen, searchGlobalMessages, setGlobalSearchVisibility, selectAgent, selectGlobalSearchMessage } =
     useNavigation();
   const sources = useGlobalSearchSources(globalSearchOpen);
@@ -952,7 +967,7 @@ function GlobalMessageSearch() {
   return (
     <GlobalSearchOverlay
       open={globalSearchOpen()}
-      agents={agentList()}
+      agents={agents()}
       channels={sources.channels()}
       routines={sources.routines()}
       routinesLoading={sources.routinesLoading()}

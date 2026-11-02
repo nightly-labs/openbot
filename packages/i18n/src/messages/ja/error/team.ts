@@ -65,8 +65,12 @@ export const messages = {
   "error.team.sharedDataUnsupported": "この接続では共有データを利用できません。",
   "error.team.agentInstallUnsupported": "この接続ではエージェントを追加できません。",
   "error.team.agentHideUnsupported": "この接続ではエージェントを非表示にできません。",
+  "error.team.sidebarFoldersUnsupported": "この接続ではフォルダー内のフォルダーを使用できません。",
   "error.team.agentNotificationLevelsUnsupported":
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot を更新してください。",
+  "error.team.sidebarPinsUnsupported":
+    "このサーバーは、ピン留めしたチャットをすべてのデバイスで共有できません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
+  "error.team.agentInstructionsUnsupported": "この接続ではエージェントの指示を編集できません。",
   "error.team.agentPublishUnsupported": "この接続ではエージェントを公開できません。",
   "error.team.agentUpdateUnsupported": "この接続ではエージェントを更新できません。",
   "error.team.contextResetUnsupported": "この接続では新しいチャットを始められません。",

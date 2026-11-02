@@ -1,4 +1,4 @@
-import type { SidebarLayoutAction } from "@openbot/contracts/ipc";
+import { type SidebarLayoutAction, sidebarFolderParents } from "@openbot/contracts/ipc";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -47,7 +47,15 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
   const [saving, setSaving] = useState(false);
   const custom = layout?.sections.some((section) => section.id === id);
   const index = layout?.order.indexOf(id) ?? -1;
-  const visibleIndex = visibleSectionIds.indexOf(id);
+  // A folder moves among the folders next to it. Only a host with `sidebar-folders-v1` sends parents,
+  // and that host takes `nest`; a flat `move` over the order can leave a folder in a folder in place.
+  const parents = layout ? sidebarFolderParents(layout) : new Map<string, string>();
+  const nested = parents.size > 0;
+  const parentId = parents.get(id) ?? null;
+  const siblings = nested
+    ? visibleSectionIds.filter((sectionId) => (parents.get(sectionId) ?? null) === parentId)
+    : visibleSectionIds;
+  const visibleIndex = siblings.indexOf(id);
   const disabled = !online || saving;
   async function run(action: SidebarLayoutAction) {
     if (pending.current || disabled) return;
@@ -55,7 +63,7 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
     setSaving(true);
     try {
       await workspace().mutateSidebarLayout(serverId, action);
-      void (action.type === "move" ? haptics.selection() : haptics.notification("success"));
+      void (action.type === "move" || action.type === "nest" ? haptics.selection() : haptics.notification("success"));
     } catch (error) {
       void haptics.notification("error");
       const text = currentText();
@@ -75,7 +83,7 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
     {
       id: "down",
       title: t("mobile.agent.section.moveDown"),
-      attributes: { disabled: disabled || visibleIndex >= visibleSectionIds.length - 1 },
+      attributes: { disabled: disabled || visibleIndex >= siblings.length - 1 },
     },
     ...(custom
       ? [
@@ -117,7 +125,15 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
           actions={actions}
           onPressAction={({ nativeEvent }) => {
             const action = nativeEvent.event;
-            if (action === "up" || action === "down")
+            if ((action === "up" || action === "down") && nested)
+              void run({
+                type: "nest",
+                sectionId: id,
+                parentId,
+                beforeSectionId:
+                  action === "up" ? (siblings[visibleIndex - 1] ?? null) : (siblings[visibleIndex + 2] ?? null),
+              });
+            else if (action === "up" || action === "down")
               void run({
                 type: "move",
                 sectionId: id,

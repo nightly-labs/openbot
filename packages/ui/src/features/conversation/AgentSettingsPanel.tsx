@@ -1,3 +1,4 @@
+import type { ExpressionId } from "@norbert_bodziony/bloub";
 import { agentProviderDescriptor, agentProviderName, foreignProvider } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -50,7 +51,6 @@ import {
   Input,
   Pencil,
   Popover,
-  RefreshCw,
   RotateCcw,
   Select,
   SelectContent,
@@ -58,12 +58,22 @@ import {
   SelectTrigger,
   SelectValue,
   ShieldCheck,
+  Shuffle,
   SlidersHorizontal,
   Switch,
   Text,
 } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
-import { AVATAR_HUE_OPTIONS, avatarCandidateSeeds, avatarHueSwatch } from "@openbot/ui/bloub-avatar";
+import {
+  AVATAR_EXPRESSIONS,
+  AVATAR_HUE_CHOICES,
+  avatarHueForColor,
+  avatarHueSwatch,
+  avatarSeedForFace,
+  bloubAvatarProfile,
+  SUPPORTED_AVATAR_SILHOUETTES,
+  type SupportedAvatarSilhouetteId,
+} from "@openbot/ui/bloub-avatar";
 import { ProviderModelPicker, reasoningLabel } from "@openbot/ui/components/ProviderModelPicker";
 import { ResizableTextarea } from "@openbot/ui/components/ResizableTextarea";
 import {
@@ -237,8 +247,6 @@ interface AgentTextFields {
 }
 
 interface AvatarEditor {
-  batch: number;
-  candidateSeed: string;
   hue: AvatarHue | null;
   pickerOpen: boolean;
   seed: string;
@@ -287,8 +295,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const [newChatOpen, setNewChatOpen] = createSignal(false);
   const [draft, setDraft] = createStore<AgentSettingsDraft>({
     avatar: {
-      batch: 0,
-      candidateSeed: "agent",
       hue: null,
       pickerOpen: false,
       seed: "agent",
@@ -428,9 +434,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const agentForeignProvider = () => foreignProvider(props.agent.provider);
   /** The provider whose capabilities apply. A foreign agent leaves `draft.runtime.provider` stale. */
   const knownProvider = () => (agentForeignProvider() === undefined ? draft.runtime.provider : undefined);
-  const avatarCandidates = createMemo(() =>
-    avatarCandidateSeeds(props.agent.id, draft.avatar.candidateSeed, draft.avatar.batch),
-  );
+  /** The shape, eyes and automatic colour that the saved seed draws. */
+  const avatarFace = createMemo(() => bloubAvatarProfile(draft.avatar.seed, null));
+  /** Hues 100 and 280 have no swatch of their own: they draw the colour of 150 and 245. */
+  const avatarHueSelected = (hue: AvatarHue) =>
+    draft.avatar.hue !== null && avatarHueSwatch(draft.avatar.hue) === avatarHueSwatch(hue);
   let avatarPickerRoot: HTMLDivElement | undefined;
   let avatarFileInput: HTMLInputElement | undefined;
   let lastSignature: string | undefined;
@@ -515,11 +523,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.runtime.reasoningEffort = runtimeSettings.reasoningEffort;
           state.avatar.seed = agent.avatarSeed;
           state.avatar.hue = agent.avatarHue;
-          if (agentChanged) {
-            state.avatar.candidateSeed = agent.avatarSeed;
-            state.avatar.batch = 0;
-            state.avatar.pickerOpen = false;
-          }
+          if (agentChanged) state.avatar.pickerOpen = false;
         });
       }),
   );
@@ -731,6 +735,32 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       state.avatar.seed = seed;
     });
     await saveAgentPatch({ avatarSeed: seed });
+  }
+
+  /**
+   * Draws the chosen shape and eyes, and keeps the rest of the face. The automatic colour comes from
+   * the seed and changes with the eyes, so a face on the automatic colour keeps its colour as a
+   * chosen one.
+   */
+  async function selectAvatarFace(change: {
+    shape?: SupportedAvatarSilhouetteId;
+    expression?: ExpressionId;
+  }): Promise<void> {
+    const current = avatarFace();
+    const seed = avatarSeedForFace(props.agent.id, {
+      shape: change.shape ?? current.shape,
+      expression: change.expression ?? current.expression,
+    });
+    const keptHue =
+      draft.avatar.hue === null && bloubAvatarProfile(seed, null).color !== current.color
+        ? avatarHueForColor(current.color)
+        : null;
+    if (avatarUrl() && !(await setCustomAvatar(null))) return;
+    setDraft((state) => {
+      state.avatar.seed = seed;
+      if (keptHue !== null) state.avatar.hue = keptHue;
+    });
+    await saveAgentPatch(keptHue === null ? { avatarSeed: seed } : { avatarSeed: seed, avatarHue: keptHue });
   }
 
   async function selectModel(
@@ -1029,10 +1059,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   gutter={11}
                   onOpenChange={(open) =>
                     setDraft((state) => {
-                      if (open) {
-                        state.avatar.candidateSeed = state.avatar.seed;
-                        state.avatar.batch = 0;
-                      }
                       state.avatar.pickerOpen = open;
                     })
                   }
@@ -1096,20 +1122,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     </Button>
                     <div class="avatar-editor-divider" />
                     <div class="avatar-editor-heading">
-                      <span>{t("agentSettings.avatar.generatedFace")}</span>
+                      <span>{t("agentSettings.avatar.shape")}</span>
                       <div class="avatar-editor-actions">
                         <Show when={draft.avatar.seed !== props.agent.id}>
                           <IconButton
                             variant="outline"
                             type="button"
                             label={t("agentSettings.avatar.resetToId")}
-                            onClick={() => {
-                              setDraft((state) => {
-                                state.avatar.candidateSeed = props.agent.id;
-                                state.avatar.batch = 0;
-                              });
-                              void selectGeneratedAvatar(props.agent.id);
-                            }}
+                            onClick={() => void selectGeneratedAvatar(props.agent.id)}
                           >
                             <RotateCcw aria-hidden="true" />
                           </IconButton>
@@ -1117,38 +1137,66 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                         <IconButton
                           variant="outline"
                           type="button"
-                          label={t("agentSettings.avatar.newSet")}
-                          onClick={() =>
-                            setDraft((state) => {
-                              state.avatar.candidateSeed = state.avatar.seed;
-                              state.avatar.batch += 1;
-                            })
-                          }
+                          label={t("agentSettings.avatar.shuffle")}
+                          onClick={() => void selectAvatarFace(randomAvatarFace(avatarFace()))}
                         >
-                          <RefreshCw aria-hidden="true" />
+                          <Shuffle aria-hidden="true" />
                         </IconButton>
                       </div>
                     </div>
-                    <fieldset class="avatar-face-grid" aria-label={t("agentSettings.avatar.faces")}>
-                      <For each={avatarCandidates()}>
-                        {(seed, index) => (
+                    <fieldset class="avatar-face-grid avatar-shape-grid" aria-label={t("agentSettings.avatar.shapes")}>
+                      <For each={SUPPORTED_AVATAR_SILHOUETTES}>
+                        {(shape, index) => (
                           <Button
                             variant="ghost"
                             type="button"
                             class={[
                               "avatar-face-choice",
-                              { "avatar-choice-selected": !avatarUrl() && draft.avatar.seed === seed },
+                              { "avatar-choice-selected": !avatarUrl() && avatarFace().shape === shape },
                             ]}
-                            aria-label={
-                              !avatarUrl() && draft.avatar.seed === seed
-                                ? t("agentSettings.avatar.selected")
-                                : t("agentSettings.avatar.option", { number: index() + 1 })
-                            }
-                            aria-pressed={!avatarUrl() && draft.avatar.seed === seed ? "true" : "false"}
+                            aria-label={t("agentSettings.avatar.shapeOption", { number: index() + 1 })}
+                            aria-pressed={!avatarUrl() && avatarFace().shape === shape ? "true" : "false"}
                             data-cuelume-tap="select"
-                            onClick={() => void selectGeneratedAvatar(seed)}
+                            onClick={() => void selectAvatarFace({ shape })}
                           >
-                            <AgentAvatar seed={seed} hue={draft.avatar.hue} />
+                            <AgentAvatar
+                              seed={draft.avatar.seed}
+                              hue={draft.avatar.hue}
+                              shape={shape}
+                              transition="cut"
+                            />
+                          </Button>
+                        )}
+                      </For>
+                    </fieldset>
+                    <div class="avatar-editor-divider" />
+                    <div class="avatar-editor-heading">
+                      <span>{t("agentSettings.avatar.eyes")}</span>
+                    </div>
+                    <fieldset
+                      class="avatar-face-grid avatar-eyes-grid"
+                      aria-label={t("agentSettings.avatar.eyesLabel")}
+                    >
+                      <For each={AVATAR_EXPRESSIONS}>
+                        {(expression, index) => (
+                          <Button
+                            variant="ghost"
+                            type="button"
+                            class={[
+                              "avatar-face-choice",
+                              { "avatar-choice-selected": !avatarUrl() && avatarFace().expression === expression },
+                            ]}
+                            aria-label={t("agentSettings.avatar.eyesOption", { number: index() + 1 })}
+                            aria-pressed={!avatarUrl() && avatarFace().expression === expression ? "true" : "false"}
+                            data-cuelume-tap="select"
+                            onClick={() => void selectAvatarFace({ expression })}
+                          >
+                            <AgentAvatar
+                              seed={draft.avatar.seed}
+                              hue={draft.avatar.hue}
+                              expression={expression}
+                              transition="cut"
+                            />
                           </Button>
                         )}
                       </For>
@@ -1176,17 +1224,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                           {t("agentSettings.avatar.autoInitial")}
                         </span>
                       </Button>
-                      <For each={AVATAR_HUE_OPTIONS}>
+                      <For each={AVATAR_HUE_CHOICES}>
                         {(option) => (
                           <Button
                             variant="ghost"
                             type="button"
-                            class={[
-                              "avatar-color-choice",
-                              { "avatar-choice-selected": draft.avatar.hue === option.hue },
-                            ]}
+                            class={["avatar-color-choice", { "avatar-choice-selected": avatarHueSelected(option.hue) }]}
                             aria-label={t("agentSettings.avatar.hueColor", { hue: t(AVATAR_HUE_LABEL[option.hue]) })}
-                            aria-pressed={draft.avatar.hue === option.hue ? "true" : "false"}
+                            aria-pressed={avatarHueSelected(option.hue) ? "true" : "false"}
                             data-cuelume-tap="select"
                             onClick={() => {
                               setDraft((state) => {
@@ -1732,3 +1777,19 @@ const ACCESS_LABEL = {
   ask: "agentSettings.access.ask",
   full: "agentSettings.access.full",
 } as const satisfies Record<AgentPermissionLevel, AppTextKey>;
+
+/** Another shape and other eyes, never the ones the face has now. */
+function randomAvatarFace(current: { shape: SupportedAvatarSilhouetteId; expression: ExpressionId }): {
+  shape: SupportedAvatarSilhouetteId;
+  expression: ExpressionId;
+} {
+  return {
+    shape: randomOther(SUPPORTED_AVATAR_SILHOUETTES, current.shape),
+    expression: randomOther(AVATAR_EXPRESSIONS, current.expression),
+  };
+}
+
+function randomOther<T>(items: readonly T[], current: T): T {
+  const others = items.filter((item) => item !== current);
+  return others[Math.floor(Math.random() * others.length)] ?? current;
+}

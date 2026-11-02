@@ -120,6 +120,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, varsayılan",
   "provider.picker.effort": "Efor",
   "provider.picker.effortLabel": "Ajan akıl yürütme eforu",
+  "provider.picker.effortFixed": "{effort}, {provider} tarafından sabit",
   "provider.picker.fast": "Hızlı",
   "provider.picker.fastLabel": "Hızlı mod",
   "provider.picker.selectEffort": "Efor seçin",
@@ -128,11 +129,14 @@ export const messages = {
   "provider.status.signInRequired": "Oturum açılmalı",
   "provider.model.free": "Ücretsiz",
   "provider.model.default": "varsayılan",
+  "provider.effort.none": "Yok",
+  "provider.effort.minimal": "Minimum",
   "provider.effort.low": "Düşük",
   "provider.effort.medium": "Orta",
   "provider.effort.high": "Yüksek",
   "provider.effort.xhigh": "Ekstra yüksek",
   "provider.effort.max": "Maksimum",
+  "provider.effort.ultra": "Ultra",
 
   "provider.museKey.title": "Muse için Meta API anahtarı",
   "provider.museKey.description":
@@ -205,6 +209,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot bu bilgisayarda {provider} oturumunu kapatır. Terminalinizdeki {provider} CLI oturumu da kapanır.",
   "provider.settings.disconnectHost": "OpenBot sunucuda {provider} oturumunu kapatır.",
+  "provider.settings.versionInstalledByUser": "{version} · senin yüklediğin",
+  "provider.settings.versionDownloaded": "{version} · OpenBot tarafından indirildi",
   "provider.settings.cache": "Önbellek",
   "provider.settings.promptCache": "İstem önbelleği",
   "provider.settings.promptCacheDescription":

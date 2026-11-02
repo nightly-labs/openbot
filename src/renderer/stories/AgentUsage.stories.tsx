@@ -50,7 +50,9 @@ function UsageStory(props: {
   };
   onCleanup(() => {
     mock.dispose();
-    window.openbot = previous;
+    // Storybook can mount the next render before it disposes this one. Restore only our own mock,
+    // or the next render loses its bridge.
+    if (window.openbot === mock.api) window.openbot = previous;
   });
   return (
     <main

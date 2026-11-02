@@ -26,6 +26,7 @@ import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
+import { quitShortcutHintShown } from "../../quit-shortcut-hint";
 import { createScopeGuard } from "../../scope-lifetime";
 import { useTurns } from "../../turns";
 import { turnsPort } from "../../turns-port";
@@ -217,11 +218,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     return () => turnsPort().agent.clearContext(agent.id, server.id);
   });
 
-  /** Local only: the Team API has no route to compact a joined server's agent. */
+  /** "Compact now", on this computer or on a host that serves `context-compact-v1`. */
   const compactActiveAgentContext = createMemo(() => {
     const agent = activeAgent();
     const server = activeServer();
-    if (!agent || server?.kind !== "local") return undefined;
+    if (!agent || !server || !serverSupportsCapability(server, "context-compact-v1")) return undefined;
     return () => turnsPort().agent.compactContext(agent.id, server.id);
   });
 
@@ -229,7 +230,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const compactTaskContext = createMemo(() => {
     const agent = activeAgent();
     const server = activeServer();
-    if (!agent || server?.kind !== "local") return undefined;
+    if (!agent || !server || !serverSupportsCapability(server, "context-compact-v1")) return undefined;
     return (taskId: string) => turnsPort().agent.compactTaskContext({ agentId: agent.id, taskId }, server.id);
   });
 
@@ -243,6 +244,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
     const taskLimit = remoteAgentAdmin.taskLimit();
     const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
+    const fastMode = remoteAgentAdmin.fastMode();
+    const computerUse = remoteAgentAdmin.computerUse();
+    const allowNewChat = remoteAgentAdmin.allowNewChat();
     return agent
       ? {
           ...agent,
@@ -253,6 +257,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           ...(activeServer()?.kind === "remote" && usageLimitReturn ? { usageLimitReturn } : {}),
           ...(activeServer()?.kind === "remote" && typeof taskLimit === "number" ? { taskLimit } : {}),
           ...(activeServer()?.kind === "remote" && quickAcknowledgement !== undefined ? { quickAcknowledgement } : {}),
+          ...(activeServer()?.kind === "remote" && typeof fastMode === "boolean" ? { fastMode } : {}),
+          ...(activeServer()?.kind === "remote" && computerUse !== undefined ? { computerUse } : {}),
+          ...(activeServer()?.kind === "remote" && allowNewChat !== undefined ? { allowNewChat } : {}),
         }
       : agent;
   });
@@ -585,7 +592,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           serverSettingsOpen() ||
           appSettingsOpen() ||
           skillsMarketplaceOpen() ||
-          hasVisibleToasts()
+          hasVisibleToasts() ||
+          quitShortcutHintShown()
         }
         settingsRequest={settingsRequest()}
         messageFocusRequest={messageFocusRequest()}
@@ -623,6 +631,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
         remoteTaskLimitLoaded={remoteAgentAdmin.taskLimit() !== undefined}
         remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
+        remoteComputerUseLoaded={remoteAgentAdmin.computerUse() !== undefined}
+        remoteNewChatLoaded={remoteAgentAdmin.allowNewChat() !== undefined}
         remoteBusyMessageModeLoaded={remoteAgentAdmin.busyMessageMode() !== undefined}
         onUpdateAgentPermissions={permissionsEditable() ? writeAgentPermissions : undefined}
         defaultBusyMessageMode={

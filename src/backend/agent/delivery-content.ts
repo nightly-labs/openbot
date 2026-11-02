@@ -306,7 +306,16 @@ export function planContinuationPrompt(steps: readonly ConversationPlanStep[], c
   return [
     "OpenBot note, not a message from the user. Your last turn ended while your plan still had open steps:",
     ...steps.map((step) => `- [${step.status === "inProgress" ? "in progress" : "pending"}] ${step.text}`),
-    "Continue the work now, from where you stopped. Do not repeat finished work or restate the plan. Keep the plan current and mark each step done when you finish it. If a step is already done, mark it done; if it no longer applies, remove it. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    "Continue the work now, from where you stopped. Do not repeat finished work or restate the plan. Keep the plan current and mark each step done when you finish it. If a step is already done, mark it done; if it no longer applies, remove it. Do not ask whether to continue. This note does not approve a risky action. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    `Automatic continuation ${count} of ${limit}.`,
+  ].join("\n");
+}
+
+/** The note for a turn that ended before the next step: it named the step, or asked whether to continue. */
+export function nextStepContinuationPrompt(count: number, limit: number): string {
+  return [
+    "OpenBot note, not a message from the user. Your last turn ended before the next step: you named the step or asked whether to continue, but you did not do it.",
+    "Do the next step now, and continue until the request is done. Do not repeat finished work or restate earlier answers. Do not ask whether to continue. This note does not approve a risky action. If the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     `Automatic continuation ${count} of ${limit}.`,
   ].join("\n");
 }

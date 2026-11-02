@@ -103,6 +103,8 @@ export const messages = {
   "error.provider.modelIdDuplicate": "Due modelli hanno lo stesso ID.",
   "error.provider.contextWindowInvalid":
     "La finestra di contesto di un modello deve essere un numero intero di token tra {min} e {max}.",
+  "error.provider.maxOutputInvalid":
+    "L’output massimo di un modello deve essere un numero intero di token tra {min} e {max}.",
   "error.provider.headersTooMany": "Ci sono troppi header.",
   "error.provider.headerNameCharacter": "Il nome di un header contiene un carattere non consentito da HTTP.",
   "error.provider.headerNameTooLong": "Il nome di un header è troppo lungo.",
@@ -178,6 +180,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} non ha restituito un account autenticato.",
   "error.provider.signInExpired": "L'accesso a {provider} è scaduto. Accedi di nuovo per continuare.",
   "error.provider.cliActivateFailed": "OpenBot non è riuscito ad attivare la CLI gestita.",
+  "error.provider.cliNewVersionNotStarted": "La nuova versione non si è avviata.",
   "error.provider.cliBusyReconnect":
     "La CLI di {provider} sta lavorando a un turno. Attendi che finisca, poi riconnetti.",
   "error.provider.cliBusySignOut": "La CLI {provider} sta elaborando un turno. Attendi che finisca, poi disconnetti.",
@@ -257,6 +260,19 @@ export const messages = {
   "error.provider.clineNotStarted": "Impossibile avviare Cline. Esegui `cline --version` in un terminale.",
   "error.provider.clineVersionUnreadable": "Impossibile leggere la versione della CLI di Cline.",
   "error.provider.clineSignIn": "Accedi con Cline o imposta CLINE_API_KEY per usare Cline.",
+  "error.provider.kimiArchivePath": "L'archivio di Kimi ha un percorso inatteso.",
+  "error.provider.kimiChecksum": "Checksum del runtime di Kimi non corrispondente.",
+  "error.provider.kimiLicenseChecksum": "Checksum della licenza di Kimi non corrispondente.",
+  "error.provider.kimiMissing": "Kimi non è scaricato. Scaricalo in OpenBot per continuare.",
+  "error.provider.kimiOutdated":
+    "La CLI di Kimi {version} è troppo vecchia. OpenBot richiede la versione 1.52.0 o successiva.",
+  "error.provider.kimiNotStarted": "Impossibile avviare Kimi. Esegui `kimi --version` in un terminale.",
+  "error.provider.kimiVersionUnreadable": "Impossibile leggere la versione della CLI di Kimi.",
+  "error.provider.kimiSignIn": "Accedi con Kimi Code per usare Kimi.",
+  "error.provider.hermesMissing": "Hermes Agent non è installato. Installalo e riprova.",
+  "error.provider.hermesNotStarted": "Impossibile avviare Hermes Agent. Esegui `hermes --version` in un terminale.",
+  "error.provider.hermesVersionUnreadable": "Impossibile leggere la versione di Hermes Agent.",
+  "error.provider.hermesSignIn": "Accedi con Nous Portal o esegui `hermes setup` in un terminale per usare Hermes.",
   "error.provider.usageLimitReached": "L'account ha raggiunto il limite di utilizzo.",
   "error.provider.foreignReasoning":
     "{provider} non ha accettato il ragionamento precedente in questa chat, perché lo ha ricevuto un altro account o un'altra chiave API. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Riprova.",
@@ -310,6 +326,7 @@ export const messages = {
   "error.provider.customAgentNoSecureStorage":
     "Questo computer non ha un archivio sicuro, quindi non si possono salvare i valori d'ambiente. Rimuovili e riprova.",
   "error.provider.customAgentNotSaved": "Questo agente personalizzato non è salvato. Aggiorna l'elenco e riprova.",
+  "error.provider.customAgentWorkspaceOnly": "{reason}. «Solo workspace» lo blocca. Prova «Accesso completo».",
   "error.provider.customAgentTooMany": "Puoi salvare al massimo {count} agenti personalizzati.",
   "error.provider.customAgentEnvValueMissing": "Inserisci un valore per {name}.",
   "error.provider.off": "{provider} è disattivato in OpenBot. Attivalo prima nelle impostazioni dei provider.",

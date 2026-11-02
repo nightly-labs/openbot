@@ -12,11 +12,14 @@ const logger = createOpenBotLogger("app-behavior");
  * How OpenBot starts and stops on this computer, and if it keeps the computer awake.
  *
  * The keep-running choice is stored here, because main reads it each time the main window closes.
+ * On macOS it is the menu bar choice, stored as `menuBar`, and it is on unless the user turned it
+ * off. Older versions wrote `keepRunningInBackground: false` on macOS when they saved a keep-awake
+ * choice, but they did not offer the switch there, so that value is not a choice of the user.
  * The keep-awake choices are stored in the same file, and each write keeps all of them. The launch-at-login
  * choice is not stored: the operating system holds it, and the user can change it there.
  *
- * A file that is missing or unreadable as JSON reads as off, and so does a switch that it does not
- * have. Writes of the file
+ * A file that is missing or unreadable as JSON reads as the defaults, and so does a switch that it
+ * does not have: all off, except the menu bar on macOS. Writes of the file
  * and of the login item are chained for the reason `update-preference-store.ts` chains its own: on
  * Linux, a removal of the autostart entry must not finish before an earlier write of it.
  */
@@ -24,8 +27,10 @@ export class AppBehaviorService {
   readonly #path: string;
   /** Null where this run cannot open itself at login. */
   readonly #loginItem: LoginItem | null;
-  /** False on macOS, which always keeps running, and on a server, which has no window to close. */
+  /** False on a server, which has no window to close. */
   readonly #offersBackground: boolean;
+  /** On macOS the keep-running choice shows OpenBot in the menu bar. */
+  readonly #menuBar: boolean;
   /** False on Linux, where Electron does not report a change of the power source, and on a server. */
   readonly #offersKeepAwake: boolean;
   #keepRunningInBackground = false;
@@ -38,11 +43,14 @@ export class AppBehaviorService {
     path: string;
     loginItem: LoginItem | null;
     offersBackground: boolean;
+    menuBar: boolean;
     offersKeepAwake: boolean;
   }) {
     this.#path = input.path;
     this.#loginItem = input.loginItem;
     this.#offersBackground = input.offersBackground;
+    this.#menuBar = input.menuBar;
+    this.#keepRunningInBackground = input.menuBar;
     this.#offersKeepAwake = input.offersKeepAwake;
   }
 
@@ -52,7 +60,9 @@ export class AppBehaviorService {
         readPreferenceFile(this.#path, (parsed) =>
           isDynamicRecord(parsed) && parsed.version === 1
             ? {
-                keepRunningInBackground: parsed.keepRunningInBackground === true,
+                keepRunningInBackground: this.#menuBar
+                  ? parsed.menuBar !== false
+                  : parsed.keepRunningInBackground === true,
                 keepAwake: parsed.keepAwake === true,
                 keepAwakeOnBattery: parsed.keepAwakeOnBattery === true,
               }
@@ -131,7 +141,11 @@ export class AppBehaviorService {
               keepAwake: keepAwake ?? this.#keepAwake,
               keepAwakeOnBattery: keepAwakeOnBattery ?? this.#keepAwakeOnBattery,
             };
-            return writePreferenceFile(this.#path, { version: 1, ...next }).pipe(
+            const { keepRunningInBackground: running, ...awake } = next;
+            const file = this.#menuBar
+              ? { menuBar: running, ...awake }
+              : { keepRunningInBackground: running, ...awake };
+            return writePreferenceFile(this.#path, { version: 1, ...file }).pipe(
               Effect.tap(() =>
                 Effect.sync(() => {
                   this.#keepRunningInBackground = next.keepRunningInBackground;

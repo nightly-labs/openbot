@@ -106,6 +106,7 @@ export const messages = {
   "error.provider.modelIdDuplicate": "2 つのモデルの ID が同じです。",
   "error.provider.contextWindowInvalid":
     "モデルのコンテキストウィンドウは {min} から {max} までの整数のトークン数にしてください。",
+  "error.provider.maxOutputInvalid": "モデルの最大出力は {min} から {max} までの整数のトークン数にしてください。",
   "error.provider.headersTooMany": "ヘッダーが多すぎます。",
   "error.provider.headerNameCharacter": "ヘッダー名に HTTP で使用できない文字が含まれています。",
   "error.provider.headerNameTooLong": "ヘッダー名が長すぎます。",
@@ -183,6 +184,7 @@ export const messages = {
   "error.provider.signInExpired":
     "{provider} のサインインの有効期限が切れました。続けるには、もう一度サインインしてください。",
   "error.provider.cliActivateFailed": "OpenBot は管理対象 CLI を有効にできませんでした。",
+  "error.provider.cliNewVersionNotStarted": "新しいバージョンが起動しませんでした。",
   "error.provider.cliBusyReconnect": "{provider} CLI はターンを処理中です。終わるまで待ってから再接続してください。",
   "error.provider.cliBusySignOut": "{provider} CLI はターンを処理中です。終わるまで待ってから切断してください。",
   "error.provider.opencodeCredentialsRejected":
@@ -262,6 +264,21 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline を起動できませんでした。ターミナルで `cline --version` を実行してください。",
   "error.provider.clineVersionUnreadable": "Cline CLI のバージョンを読み取れません。",
   "error.provider.clineSignIn": "Cline を使うには Cline でサインインするか、CLINE_API_KEY を設定してください。",
+  "error.provider.kimiArchivePath": "Kimi のアーカイブに予期しないパスがあります。",
+  "error.provider.kimiChecksum": "Kimi ランタイムのチェックサムが一致しません。",
+  "error.provider.kimiLicenseChecksum": "Kimi のライセンスのチェックサムが一致しません。",
+  "error.provider.kimiMissing": "Kimi はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
+  "error.provider.kimiOutdated": "Kimi CLI {version} は古すぎます。OpenBot には 1.52.0 以降が必要です。",
+  "error.provider.kimiNotStarted": "Kimi を起動できませんでした。ターミナルで `kimi --version` を実行してください。",
+  "error.provider.kimiVersionUnreadable": "Kimi CLI のバージョンを読み取れません。",
+  "error.provider.kimiSignIn": "Kimi を使うには Kimi Code でサインインしてください。",
+  "error.provider.hermesMissing":
+    "Hermes Agent がインストールされていません。インストールしてから、もう一度お試しください。",
+  "error.provider.hermesNotStarted":
+    "Hermes Agent を起動できませんでした。ターミナルで `hermes --version` を実行してください。",
+  "error.provider.hermesVersionUnreadable": "Hermes Agent のバージョンを読み取れません。",
+  "error.provider.hermesSignIn":
+    "Hermes を使うには、Nous Portal でサインインするか、ターミナルで `hermes setup` を実行してください。",
   "error.provider.usageLimitReached": "アカウントが使用量の上限に達しました。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
@@ -317,6 +334,8 @@ export const messages = {
     "このコンピューターには安全なストレージがないため、環境変数の値を保存できません。値を削除して、もう一度お試しください。",
   "error.provider.customAgentNotSaved":
     "このカスタムエージェントは保存されていません。一覧を更新して、もう一度お試しください。",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}。「ワークスペースのみ」がこれをブロックしています。「フルアクセス」をお試しください。",
   "error.provider.customAgentTooMany": "保存できるカスタムエージェントは最大 {count} 個です。",
   "error.provider.customAgentEnvValueMissing": "{name} の値を入力してください。",
   "error.provider.off": "{provider} は OpenBot でオフになっています。まずプロバイダーの設定でオンにしてください。",

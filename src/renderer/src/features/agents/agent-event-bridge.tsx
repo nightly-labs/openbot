@@ -101,7 +101,7 @@ export function AgentEventBridge() {
     refreshRoutineIds,
   } = useTurns();
   const { setBrowserControlState, applyBrowserChange } = useBrowserTabs();
-  const { setSidebarLayout } = useSidebar();
+  const { setSidebarLayout, receiveServerPins } = useSidebar();
   // As on web, mute and the notification level of the server decide the sounds too. Before the
   // server list arrives, the sounds play as they did.
   const soundLevel = () => {
@@ -137,6 +137,9 @@ export function AgentEventBridge() {
         return;
       case "sidebar-layout-changed":
         setSidebarLayout(event.layout);
+        return;
+      case "sidebar-pins-changed":
+        receiveServerPins(activeServerId(), { items: event.items, updatedAt: event.updatedAt });
         return;
       case "hidden-agents-changed":
         applyUserHiddenAgents(event.agents);

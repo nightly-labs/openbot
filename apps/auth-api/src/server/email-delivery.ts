@@ -6,12 +6,14 @@ import {
   type SmtpEmailConfig,
   sendPrivateContactMessage,
   sendPrivateEmailCode,
+  sendPrivateLicenseEmail,
   sendPrivateTeamInvite,
   sendPrivateWelcomeEmail,
 } from "./smtp-email-delivery";
 import type {
   ContactMessageDelivery,
   EmailCodeDelivery,
+  LicenseEmailDelivery,
   TeamInviteEmailDelivery,
   WelcomeEmailDelivery,
   WorkerBindings,
@@ -28,6 +30,7 @@ export type EmailDeliveryBindings = Pick<
   | "EMAIL_SMTP_USERNAME"
   | "EMAIL_SMTP_PASSWORD"
   | "EMAIL_FROM"
+  | "EMAIL_LICENSE_FROM"
   | "EMAIL_DELIVERY_WEBHOOK_URL"
   | "EMAIL_DELIVERY_WEBHOOK_SECRET"
 >;
@@ -89,6 +92,20 @@ export function createWelcomeEmailDelivery(
 ): WelcomeEmailDelivery | null {
   const smtp = readSmtpConfig(bindings);
   return smtp ? { send: (message) => tracked(analytics, "welcome", sendPrivateWelcomeEmail(smtp, message)) } : null;
+}
+
+/**
+ * License emails go from `EMAIL_LICENSE_FROM` through the same SMTP account, so that account must be
+ * allowed to send as it. An empty value uses `EMAIL_FROM`.
+ */
+export function createLicenseEmailDelivery(
+  bindings: EmailDeliveryBindings,
+  analytics: AccountAnalytics,
+): LicenseEmailDelivery | null {
+  const smtp = readSmtpConfig(bindings);
+  if (!smtp) return null;
+  const config = { ...smtp, from: bindings.EMAIL_LICENSE_FROM?.trim() || smtp.from };
+  return { send: (message) => tracked(analytics, "license", sendPrivateLicenseEmail(config, message)) };
 }
 
 /**

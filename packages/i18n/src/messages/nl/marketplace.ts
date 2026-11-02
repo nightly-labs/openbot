@@ -112,6 +112,7 @@ export const messages = {
   "marketplace.app.setup.account": "Log via de browser in met je {name}-account.",
   "marketplace.app.setup.key": "Vereist een API-sleutel van je {name}-account.",
   "marketplace.app.setup.keySaved": "{field} opgeslagen op {host}.",
+  "marketplace.app.account.removeDescription": "OpenBot verwijdert de inloggegevens van dit account op {host}.",
   "marketplace.app.setup.desktop": "Draait in de desktop-app van {name} op {address}.",
   "marketplace.app.setup.desktopConnected": "Verbonden met {address}.",
   "marketplace.app.setup.open": "Geen login of sleutel nodig.",
@@ -391,6 +392,15 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Welke Trello-kaarten zijn aan mij toegewezen?",
   "marketplace.plugin.trello.prompt.board": "Vat samen wat er onderhanden is op mijn Trello-bord.",
   "marketplace.plugin.trello.prompt.newCards": "Zet deze actiepunten als kaarten op mijn Trello-bord.",
+  "marketplace.plugin.clickup.tagline": "Taken, docs en teamupdates",
+  "marketplace.plugin.clickup.description":
+    "Met ClickUp kunnen agents taken, docs, opmerkingen en chats doorzoeken, taken, lijsten en docs maken en bijwerken, opmerkingen plaatsen, chatberichten sturen en tijd registreren. Elke gebruiker meldt zich in de browser aan bij een eigen ClickUp-account. Agents krijgen dezelfde rechten als de gebruiker. Ze kunnen taken naar de prullenbak verplaatsen en opmerkingen verwijderen.",
+  "marketplace.plugin.clickup.app":
+    "Taken, docs, opmerkingen, chat en tijdregistratie, via de MCP-server van ClickUp met aanmelding in de browser.",
+  "marketplace.plugin.clickup.prompt.findTasks": "Zoek mijn open ClickUp-taken die deze week vervallen.",
+  "marketplace.plugin.clickup.prompt.createTask": "Maak een ClickUp-taak van deze actiepunten en wijs die aan mij toe.",
+  "marketplace.plugin.clickup.prompt.summarizeDoc":
+    "Zoek de nieuwste projectupdate in ClickUp en vat de open vragen samen.",
   "marketplace.plugin.huggingface.tagline": "Modellen, datasets en papers op de Hub",
   "marketplace.plugin.huggingface.description":
     "Met Hugging Face kunnen agents modellen, datasets, Spaces, collecties en papers op de Hugging Face Hub zoeken, modelkaarten en repositorybestanden lezen, datasets bekijken en de Hugging Face-documentatie doorzoeken. Het gebruikt openbare Hub-data en heeft geen account en geen sleutel nodig. De tools lezen alleen: agents kunnen geen repository’s maken of jobs uitvoeren.",

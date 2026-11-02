@@ -1995,6 +1995,231 @@ html.ui-textarea-resizing {
   }
 }
 
+/*
+ * The plush loader: the lilac plush watches three felt balls bounce in a wave, and its eyes follow
+ * the ball in the air. The parent sets --ui-plush-size, the width of the plush. With reduced motion
+ * the plush and the balls stay still.
+ */
+.ui-plush-loader {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  gap: calc(var(--ui-plush-size) * 0.18);
+}
+
+.ui-plush-loader[data-layout="stack"] {
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--ui-plush-size) * 0.3);
+}
+
+.ui-plush-mascot {
+  --ui-plush-look: calc(var(--ui-plush-size) * 0.035);
+  position: relative;
+  display: block;
+  width: var(--ui-plush-size);
+  flex: 0 0 auto;
+}
+
+.ui-plush-body {
+  position: relative;
+  display: block;
+  transform-origin: 50% 100%;
+}
+
+.ui-plush-body-image,
+.ui-plush-ball {
+  display: block;
+  width: 100%;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Each eye layer covers the whole body. Each eye turns about its own centre. */
+.ui-plush-eyes,
+.ui-plush-eye {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.ui-plush-eye {
+  transform-origin: 35.6% 48.1%;
+  transition: scale var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.ui-plush-eye[data-side="right"] {
+  transform-origin: 64.4% 48.1%;
+}
+
+.ui-plush-mascot[data-face="wide"] .ui-plush-eye {
+  scale: 1.18;
+}
+
+.ui-plush-balls {
+  display: flex;
+  gap: calc(var(--ui-plush-size) * 0.08);
+  padding-bottom: calc(var(--ui-plush-size) * 0.04);
+}
+
+.ui-plush-ball {
+  width: calc(var(--ui-plush-size) * 0.24);
+  transform-origin: 50% 100%;
+}
+
+.ui-plush-loader[data-layout="stack"] .ui-plush-balls {
+  padding-bottom: 0;
+}
+
+.ui-plush-loader[data-layout="stack"] .ui-plush-ball {
+  width: calc(var(--ui-plush-size) * 0.2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ui-plush-body {
+    animation: ui-plush-breathe 3.2s ease-in-out 600ms infinite;
+  }
+
+  .ui-plush-eye {
+    animation: ui-plush-blink 5.2s ease-in-out 1.8s infinite;
+  }
+
+  .ui-plush-eyes {
+    animation: ui-plush-look 6s ease-in-out 2.2s infinite;
+  }
+
+  .ui-plush-mascot[data-face="wink"] .ui-plush-eye[data-side="left"] {
+    animation: ui-plush-wink 600ms var(--openbot-ease-out);
+  }
+
+  .ui-plush-mascot[data-face="happy"] .ui-plush-eye {
+    animation: ui-plush-squint 220ms var(--openbot-ease-out) forwards;
+  }
+
+  .ui-plush-loader > .ui-plush-mascot {
+    animation: ui-plush-pop-in 520ms var(--openbot-ease-out) both;
+  }
+
+  .ui-plush-loader .ui-plush-eyes {
+    animation: ui-plush-follow 1.2s ease-in-out 700ms infinite;
+  }
+
+  .ui-plush-ball {
+    animation:
+      ui-plush-pop-in 360ms var(--openbot-ease-out) 300ms backwards,
+      ui-plush-ball-bounce 1.2s ease-in-out 700ms infinite;
+  }
+
+  .ui-plush-ball:nth-child(2) {
+    animation-delay: 380ms, 850ms;
+  }
+
+  .ui-plush-ball:nth-child(3) {
+    animation-delay: 460ms, 1s;
+  }
+}
+
+@keyframes ui-plush-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes ui-plush-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.012, 0.978);
+  }
+}
+
+@keyframes ui-plush-blink {
+  0%,
+  93%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes ui-plush-wink {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  30%,
+  60% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes ui-plush-squint {
+  to {
+    transform: translateY(-1.5%) scaleY(0.35);
+  }
+}
+
+@keyframes ui-plush-look {
+  0%,
+  28%,
+  86%,
+  100% {
+    transform: translate(0, 0);
+  }
+  34%,
+  50% {
+    transform: translate(calc(var(--ui-plush-look) * -1), calc(var(--ui-plush-look) * 0.2));
+  }
+  58%,
+  78% {
+    transform: translate(var(--ui-plush-look), calc(var(--ui-plush-look) * -0.3));
+  }
+}
+
+@keyframes ui-plush-follow {
+  0%,
+  18% {
+    transform: translate(calc(var(--ui-plush-look) * -0.9), calc(var(--ui-plush-look) * 0.6));
+  }
+  32% {
+    transform: translate(0, calc(var(--ui-plush-look) * 0.6));
+  }
+  46%,
+  70% {
+    transform: translate(calc(var(--ui-plush-look) * 0.9), calc(var(--ui-plush-look) * 0.6));
+  }
+  100% {
+    transform: translate(calc(var(--ui-plush-look) * -0.9), calc(var(--ui-plush-look) * 0.6));
+  }
+}
+
+@keyframes ui-plush-ball-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  22% {
+    transform: translateY(-110%) scale(0.95, 1.06);
+  }
+  42% {
+    transform: translateY(0) scale(1.14, 0.84);
+  }
+  50% {
+    transform: translateY(0) scale(1);
+  }
+}
+
 .ui-skeleton {
   min-height: var(--openbot-leading-md);
   border-radius: var(--openbot-radius-sm);

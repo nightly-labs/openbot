@@ -34,11 +34,14 @@ import { type WorkflowCatalogs, workflowModelProviders } from "./workflow-model"
 import { type WfProvider, wfProviderLogo } from "./workflow-node-parts";
 
 const EFFORT_LABEL = {
+  none: "provider.effort.none",
+  minimal: "provider.effort.minimal",
   low: "provider.effort.low",
   medium: "provider.effort.medium",
   high: "provider.effort.high",
   xhigh: "provider.effort.xhigh",
   max: "provider.effort.max",
+  ultra: "provider.effort.ultra",
 } as const satisfies Record<AgentReasoningEffort, AppTextKey>;
 
 /** The model with this id in a list of models. */
@@ -243,7 +246,17 @@ export function ModelPill(props: {
   );
 }
 
-const EFFORT_LEVEL: Record<AgentReasoningEffort, number> = { low: 1, medium: 2, high: 3, xhigh: 4, max: 5 };
+/** The label tells `minimal` from `low` and `ultra` from `max`; the meter keeps its five bars. */
+const EFFORT_LEVEL: Record<AgentReasoningEffort, number> = {
+  none: 0,
+  minimal: 1,
+  low: 1,
+  medium: 2,
+  high: 3,
+  xhigh: 4,
+  max: 5,
+  ultra: 5,
+};
 
 /** Five bars, lit up to the level of an effort. */
 function EffortMeter(props: { effort: AgentReasoningEffort }) {

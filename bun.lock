@@ -36,6 +36,7 @@
         "fflate": "catalog:",
         "jose": "catalog:",
         "katex": "catalog:",
+        "koffi": "3.3.5",
         "lucide-solid": "catalog:",
         "marked": "catalog:",
         "qrcode": "catalog:",
@@ -383,8 +384,8 @@
   "patchedDependencies": {
     "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch",
     "expo-splash-screen@58.0.11": "patches/expo-splash-screen@58.0.11.patch",
+    "react-native-screens@4.30.0": "patches/react-native-screens@4.30.0.patch",
     "expo@58.0.17": "patches/expo@58.0.17.patch",
-    "expo-router@58.0.25": "patches/expo-router@58.0.25.patch",
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "dmg-builder@26.18.0": "patches/dmg-builder@26.18.0.patch",
     "lucide-solid@1.33.0": "patches/lucide-solid@1.33.0.patch",
@@ -400,7 +401,7 @@
     "@fontsource-variable/inter": "5.3.0",
     "@kobalte/core": "2.0.0-alpha.0",
     "@noble/hashes": "2.4.0",
-    "@norbert_bodziony/bloub": "0.4.1",
+    "@norbert_bodziony/bloub": "0.6.1",
     "@openpanel/web": "1.4.2",
     "@paper-design/shaders": "0.0.80",
     "@solidjs/signals": "2.0.0-rc.18",
@@ -954,6 +955,46 @@
 
     "@kobalte/utils": ["@kobalte/utils@2.0.0-alpha.0", "", { "dependencies": { "@solid-primitives/event-listener": "3.0.0-next.3", "@solid-primitives/keyed": "3.0.0-next.2", "@solid-primitives/map": "1.0.0-next.2", "@solid-primitives/media": "4.0.0-next.2", "@solid-primitives/props": "4.0.0-next.3", "@solid-primitives/refs": "3.0.0-next.2", "@solid-primitives/utils": "7.0.0-next.4" }, "peerDependencies": { "@solidjs/web": "2.0.0-rc.0", "solid-js": "2.0.0-rc.0" } }, "sha512-LtMNLEDDJICPJXZiy5yQL23cBfbYSqzT02ItXky9sAaiLfVlasvguE5MmC/9BxC0FnwKrTDU1R3ysM18+TGd0A=="],
 
+    "@koromix/koffi-android-arm64": ["@koromix/koffi-android-arm64@3.3.5", "", { "os": "android", "cpu": "arm64" }, "sha512-h+cUD7Y6ZNICJ+teN9doFY+omGXAxMpEfEmlVhyVfNaF9zV6/d5Cicr2PRevBNSXY7zCMoyV+tWG8gEVRdGH+A=="],
+
+    "@koromix/koffi-android-x64": ["@koromix/koffi-android-x64@3.3.5", "", { "os": "android", "cpu": "x64" }, "sha512-pajWmSo+cXvtw13boNZ3O31LxUzGuJCzKkgmN6CqJTmQVoOGdn07tiWeZKZKzji4xmcziPvi7ec7bPswvSOB4Q=="],
+
+    "@koromix/koffi-darwin-arm64": ["@koromix/koffi-darwin-arm64@3.3.5", "", { "os": "darwin", "cpu": "arm64" }, "sha512-LJZfGh8xu/8v6EVOAxHUeQoUoldvjscYmihKbqPg5fCuw88d8hfrtj81YaiXhRNLmFhQ2XAa9AQijkPvRJxDHw=="],
+
+    "@koromix/koffi-darwin-x64": ["@koromix/koffi-darwin-x64@3.3.5", "", { "os": "darwin", "cpu": "x64" }, "sha512-CeRqH7MwBFPWby6viP82N5qwN3vzYkKb1UIKkzxitJIf5VBy13iXcBSt8gVyBA2L7NNgkcjvdsPN84mCkrqCOg=="],
+
+    "@koromix/koffi-freebsd-arm64": ["@koromix/koffi-freebsd-arm64@3.3.5", "", { "os": "freebsd", "cpu": "arm64" }, "sha512-676p7kq5bth5pgJ3D1qYRAfTX//khCCFbcGhCdXHS49FIKfQtvgJKW0NU5jfYVtt6/OcUtuj+TLYeOyUHs2WTA=="],
+
+    "@koromix/koffi-freebsd-ia32": ["@koromix/koffi-freebsd-ia32@3.3.5", "", { "os": "freebsd", "cpu": "ia32" }, "sha512-D2HTng9bQSNtyKaaisFNl9JS/DDDv1FVvrevEgpfvcb3DyMM2xWQ9gKOMzTS3pUxqDZ0dks04t84sKlLfoLhbg=="],
+
+    "@koromix/koffi-freebsd-x64": ["@koromix/koffi-freebsd-x64@3.3.5", "", { "os": "freebsd", "cpu": "x64" }, "sha512-sS8VkWH+QbDYU2O+JzecAOCqCf9iSfOu3Guh0uPJRR1VdGTLBRScahxaHrU8DBRjF7vnWbCq4pxSseEFnf0yWg=="],
+
+    "@koromix/koffi-linux-arm": ["@koromix/koffi-linux-arm@3.3.5", "", { "os": "linux", "cpu": "arm" }, "sha512-GIsUOvsGOn15SULi5NFpgDLPOi+L0AEQP+AGjziUhCjMiaC/zvEGc7Xn7mo/ueUeVFtUP1y0ibYzvWTF9rAabA=="],
+
+    "@koromix/koffi-linux-arm64": ["@koromix/koffi-linux-arm64@3.3.5", "", { "os": "linux", "cpu": "arm64" }, "sha512-9S/i9lgFfaWIKrwRBeh16VdxZzhRVPQ+hlK2cOGAkLeyLr+Oh8hF7IsCikCfp6LcVSiwHvPC4NH8XB66gYgGyw=="],
+
+    "@koromix/koffi-linux-ia32": ["@koromix/koffi-linux-ia32@3.3.5", "", { "os": "linux", "cpu": "ia32" }, "sha512-z5hlUZHz27cPNh+dqgLkGuUjTsZv7rnaxLGrxA5XecRrAXBv+Ml1Tby41c/Nyxo3+McgfKR5XhBDAWH1Al7iQw=="],
+
+    "@koromix/koffi-linux-loong64": ["@koromix/koffi-linux-loong64@3.3.5", "", { "os": "linux", "cpu": "none" }, "sha512-oR8I9UIJU+7m4oWBaHXV1AkWSOdPY0NdEK8z2ldjrwkvlyl0HTIZICvw9+etXkoQUmJWBVfgp4jJEEDSnwQsTw=="],
+
+    "@koromix/koffi-linux-ppc64": ["@koromix/koffi-linux-ppc64@3.3.5", "", { "os": "linux", "cpu": "ppc64" }, "sha512-iWjVAFV7fePzpis+LW7jyeZMVsaqGDdNL6iZzMnXTZby+J5ehXEQBkISA21JcY5EnNaJZDOEQZzIVf7JmVgquQ=="],
+
+    "@koromix/koffi-linux-riscv64": ["@koromix/koffi-linux-riscv64@3.3.5", "", { "os": "linux", "cpu": "none" }, "sha512-Kk4BXRJsRNGmCDASMRIIjrjgGMRfUV68zhoASLUD+D+tNzaLV3BZ0MrktYopXaJWSFawXdEozK5GZyo2CLv16Q=="],
+
+    "@koromix/koffi-linux-x64": ["@koromix/koffi-linux-x64@3.3.5", "", { "os": "linux", "cpu": "x64" }, "sha512-k3LPnsFxr4l/8pBXpT1bb7UwK2qgwB+L8wWB9c+6DkIC8bbzlwYJHIzWgn0WMTJCCy9jIYYsl+yZwqtQCzky8g=="],
+
+    "@koromix/koffi-openbsd-arm64": ["@koromix/koffi-openbsd-arm64@3.3.5", "", { "os": "openbsd", "cpu": "arm64" }, "sha512-vDHswia3qBLncBlNZDA39flU5bMVkHf7VdS3InBX4hY7yTkiU+KcnfqNCrhh8fo3wNQGmwNek5Hn3D84ZTOQtg=="],
+
+    "@koromix/koffi-openbsd-ia32": ["@koromix/koffi-openbsd-ia32@3.3.5", "", { "os": "openbsd", "cpu": "ia32" }, "sha512-J1clBUGLASySCiO/QQZNYI9xeXccYS8nbsA1AJFVoTIwSVjYIcTgtMFr+GruNJbCdTNawy6lPpLQ2jcG4lK0nA=="],
+
+    "@koromix/koffi-openbsd-x64": ["@koromix/koffi-openbsd-x64@3.3.5", "", { "os": "openbsd", "cpu": "x64" }, "sha512-3dRsU/BZbn09hqcdpHYHBVAT/Xfg8gLc1AVE62aPSyKkLilpsnmidm3EEIWXEM92j6TYiulN6b3mX0M9+W3d9g=="],
+
+    "@koromix/koffi-win32-arm64": ["@koromix/koffi-win32-arm64@3.3.5", "", { "os": "win32", "cpu": "arm64" }, "sha512-brKerPn9f/V5HOEkluBr/v/fpekZ7iKb9VJYfJC7sgxeGoR7A7wJrVc+aeqM8AHu1dAzF3dMLJQek6nMa0PTlg=="],
+
+    "@koromix/koffi-win32-ia32": ["@koromix/koffi-win32-ia32@3.3.5", "", { "os": "win32", "cpu": "ia32" }, "sha512-1ZG34+rJySRvLjhQ6b0wPWzCjM/0M05AlCHmGclSMSnQJxWBREebO7Vt+qeUFUF87VG7rtq1Pfs/JABA5brtqw=="],
+
+    "@koromix/koffi-win32-x64": ["@koromix/koffi-win32-x64@3.3.5", "", { "os": "win32", "cpu": "x64" }, "sha512-U3X9aeh8mVoZhNipOnQcxEPNL3urT1ehdg7MIrE3OAgATaBwHoEWhf5Hg9V0+bRtvzdc79qCctL2pXINwYAtNQ=="],
+
     "@legendapp/list": ["@legendapp/list@3.6.0", "", { "dependencies": { "use-sync-external-store": "^1.5.0" }, "peerDependencies": { "react": "*", "react-dom": "*", "react-native": "*" }, "optionalPeers": ["react-dom", "react-native"] }, "sha512-ndGQjSYdA32LWErJYbXEm4+eta+4bo0NxQO7eA3Xcvh0rXSb1mTGPbUtUkpea5w4MYciLKaE+0hoPxlMcaMtrw=="],
 
     "@malept/cross-spawn-promise": ["@malept/cross-spawn-promise@2.0.0", "", { "dependencies": { "cross-spawn": "^7.0.1" } }, "sha512-1DpKU0Z5ThltBwjNySMC14g0CkbyhCaz9FkhxqNsZI6uAPJXFS8cMXlBKo26FJ8ZuW6S9GCMcR9IO5k2X5/9Fg=="],
@@ -996,7 +1037,7 @@
 
     "@noble/hashes": ["@noble/hashes@2.4.0", "", {}, "sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA=="],
 
-    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.4.1", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-4hTQGn+UnBy3WYjQ60E+/EZ0+oMjeJM9u1hKKAXihHpSiEBhSpQstdFhPci/E9ob37Xx1UUtjKqTDaLFbZL7Lw=="],
+    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.6.1", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-75bXUZtdHCfUkyuLOSkoD9BKmSLUf1lz0D5q9Dz+MpdwtrUQ7UYie9gHDltgVrYH6lftydrer1HypYZWIO8sGQ=="],
 
     "@nothing-but/utils": ["@nothing-but/utils@0.17.0", "", {}, "sha512-TuCHcHLOqDL0SnaAxACfuRHBNRgNJcNn9X0GiH5H3YSDBVquCr3qEIG3FOQAuMyZCbu9w8nk2CHhOsn7IvhIwQ=="],
 
@@ -2487,6 +2528,8 @@
     "kleur": ["kleur@3.0.3", "", {}, "sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w=="],
 
     "knip": ["knip@6.42.1", "", { "dependencies": { "formatly": "^0.11.4", "get-tsconfig": "4.14.3", "jiti": "^2.7.0", "oxc-parser": "^0.154.0", "oxc-resolver": "11.24.2", "picomatch": "^4.0.7", "smol-toml": "^1.9.0", "strip-json-comments": "5.0.3", "tinyglobby": "^0.2.17", "unbash": "^6.0.0", "yaml": "^2.9.1", "zod": "^4.6.5" }, "bin": { "knip": "bin/knip.js", "knip-bun": "bin/knip-bun.js" } }, "sha512-gKJVsiT4LJQ0lfc8uSHOCzkOY8adAXNFGarIeODZbJOkBnQRVsG3e0UZFnO4LMwjA82A5tBWX/VgoeTYcjdKiQ=="],
+
+    "koffi": ["koffi@3.3.5", "", { "optionalDependencies": { "@koromix/koffi-android-arm64": "3.3.5", "@koromix/koffi-android-x64": "3.3.5", "@koromix/koffi-darwin-arm64": "3.3.5", "@koromix/koffi-darwin-x64": "3.3.5", "@koromix/koffi-freebsd-arm64": "3.3.5", "@koromix/koffi-freebsd-ia32": "3.3.5", "@koromix/koffi-freebsd-x64": "3.3.5", "@koromix/koffi-linux-arm": "3.3.5", "@koromix/koffi-linux-arm64": "3.3.5", "@koromix/koffi-linux-ia32": "3.3.5", "@koromix/koffi-linux-loong64": "3.3.5", "@koromix/koffi-linux-ppc64": "3.3.5", "@koromix/koffi-linux-riscv64": "3.3.5", "@koromix/koffi-linux-x64": "3.3.5", "@koromix/koffi-openbsd-arm64": "3.3.5", "@koromix/koffi-openbsd-ia32": "3.3.5", "@koromix/koffi-openbsd-x64": "3.3.5", "@koromix/koffi-win32-arm64": "3.3.5", "@koromix/koffi-win32-ia32": "3.3.5", "@koromix/koffi-win32-x64": "3.3.5" } }, "sha512-km61RNsnb+XyvCXqR6PxF4qoPVUOIh9huzD2tPYKYllPmURlHPq5SrQxGkBSLCcYJdPzEGpoRHa6Sb71IBcMsw=="],
 
     "lan-network": ["lan-network@0.2.1", "", { "bin": { "lan-network": "dist/lan-network-cli.js" } }, "sha512-ONPnazC96VKDntab9j9JKwIWhZ4ZUceB4A9Epu4Ssg0hYFmtHZSeQ+n15nIwTFmcBUKtExOer8WTJ4GF9MO64A=="],
 

@@ -15,13 +15,18 @@ import {
   isAgentTasksSnapshot,
   isConversationSnapshot,
   isHiddenAgentsSnapshot,
+  isSidebarPinsSnapshot,
 } from "@openbot/contracts/ipc";
 // Agent-shaped wire payloads: summaries, status, models, skills, memories, routines, queue.
 // See `remote-host-decoding.ts` for why the `FromHost` suffix exists and must not be merged away.
 
 import type {
   AccountUsage,
+  AgentExclusionChange,
+  AgentFastModeSettings,
+  AgentFolderChange,
   AgentMemory,
+  AgentNewChatSettings,
   AgentStatus,
   AgentSummary,
   ClientAgentModelOption,
@@ -37,6 +42,11 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   isAccountUsage,
+  isAgentExclusionChange,
+  isAgentFolderBrowse,
+  isAgentFolderChange,
+  isAgentFolderList,
+  isAgentInstructionsFile,
   isAgentMemory,
   isAgentStatus,
   isAttachmentSummary,
@@ -51,11 +61,12 @@ import {
   isSidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
-import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
 export const decodeHiddenAgentsFromHost = guardedDecoder(isHiddenAgentsSnapshot, "hidden agents response");
+export const decodeSidebarPinsFromHost = guardedDecoder(isSidebarPinsSnapshot, "pinned chats response");
 export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
   isAgentNotificationLevelsSnapshot,
   "agent notification levels response",
@@ -138,6 +149,35 @@ function decodeMarketplaceSource(value: unknown): AgentSummary["marketplaceSourc
     skillIds: [...skillIds],
     routineIds: [...routineIds],
   };
+}
+
+// The `agent-folders-v1` and `agent-instructions-v1` replies. The preload has its own `FromMain`
+// decoders for the same shapes, because the main process is a different sender from a joined server.
+export const decodeRemoteAgentFolderList = guardedDecoder(isAgentFolderList, "remote agent folders");
+export const decodeRemoteAgentFolderBrowse = guardedDecoder(isAgentFolderBrowse, "remote agent folder browse");
+export const decodeRemoteAgentInstructionsFile = guardedDecoder(isAgentInstructionsFile, "remote agent instructions");
+
+export function decodeRemoteAgentFolderChange(value: unknown): AgentFolderChange {
+  if (!isDynamicRecord(value) || !isAgentFolderChange(value)) throw new Error("Invalid remote agent folder change.");
+  return value;
+}
+
+export function decodeRemoteAgentExclusionChange(value: unknown): AgentExclusionChange {
+  if (!isDynamicRecord(value) || !isAgentExclusionChange(value)) throw new Error("Invalid remote agent folder change.");
+  return value;
+}
+
+// The `agent-new-chat-v1` and `agent-fast-mode-v1` replies. The preload reads the same shapes from main
+// with its own decoders.
+export function decodeRemoteAgentNewChatSettings(value: unknown): AgentNewChatSettings {
+  if (!isDynamicRecord(value) || !isBoolean(value.allowNewChat)) throw new Error("Invalid remote new chat setting.");
+  return { allowNewChat: value.allowNewChat };
+}
+
+export function decodeRemoteAgentFastModeSettings(value: unknown): AgentFastModeSettings {
+  if (!isDynamicRecord(value) || (value.fastMode !== null && !isBoolean(value.fastMode)))
+    throw new Error("Invalid remote fast mode setting.");
+  return { fastMode: value.fastMode };
 }
 
 export function decodeAgentStatusFromHost(value: unknown): AgentStatus {

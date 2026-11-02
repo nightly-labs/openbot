@@ -1,4 +1,5 @@
 import type { ServerSummary, SidebarLayoutAction, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
@@ -21,7 +22,9 @@ import { defaultSidebarLayout } from "./sidebar-sections";
  *
  * Those three are stored per server and read under `activeServerId()`, so they
  * are *not* torn down on a switch: `localStorage` holds every server's
- * arrangement at once and switching back has to restore it. The layout is the
+ * arrangement at once and switching back has to restore it. A server with
+ * `sidebar-pins-v1` also keeps the pins for the other devices of the user, and
+ * `localStorage` is the copy of this computer. The layout is the
  * opposite - it belongs to the host, is refetched on every mount of the keyed
  * server scope, and so is the only piece of this module a switch discards.
  *
@@ -34,13 +37,26 @@ import { defaultSidebarLayout } from "./sidebar-sections";
 const Sidebar = createSimpleContext({
   name: "Sidebar",
   init: () => {
-    const { activeServerId, activeServerSupportsCapability } = useServers();
+    const { servers, activeServerId, activeServerSupportsCapability } = useServers();
 
     const [sidebarLayout, setSidebarLayout] = createSignal<SidebarLayoutSnapshot>(defaultSidebarLayout());
     const [sidebarPeopleOrderByServer, setSidebarPeopleOrderByServer] = createSignal<SidebarPeopleOrderByServer>(
       readSidebarPeopleOrder(),
     );
-    const preferences = createSidebarPreferences({ scope: activeServerId });
+    const preferences = createSidebarPreferences({
+      scope: activeServerId,
+      // The scope is the server id.
+      sync: {
+        supports: (serverId) =>
+          serverSupportsCapability(
+            servers().find((server) => server.id === serverId),
+            SIDEBAR_PINS_CAPABILITY,
+          ),
+        read: (serverId) => sidebarPort().agent.getSidebarPins(serverId),
+        set: (serverId, items) => sidebarPort().agent.setSidebarPins({ items }, serverId),
+        seed: (serverId, items) => sidebarPort().agent.seedSidebarPins({ items }, serverId),
+      },
+    });
 
     const sidebarPeopleOrder = createMemo(() => sidebarPeopleOrderByServer()[activeServerId()] ?? []);
 

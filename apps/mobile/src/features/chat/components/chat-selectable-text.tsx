@@ -2,10 +2,11 @@ import { useEffect, useRef } from "react";
 import { type ColorValue, TextInput, type TextInputInstance, useWindowDimensions } from "react-native";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { CHAT_TEXT_STYLES } from "./chat-text-styles";
 
-/** The body text: 16 points on a 28-point line, as the HeroUI `body` type. */
-const FONT_SIZE = 16;
-const LINE_HEIGHT = 28;
+/** The body text of a message. */
+const FONT_SIZE = CHAT_TEXT_STYLES.body.fontSize;
+const LINE_HEIGHT = CHAT_TEXT_STYLES.body.lineHeight;
 /** The natural line height of Inter, as a multiple of its size: (1984 + 494) / 2048. */
 const FONT_LINE_RATIO = 1.21;
 /**

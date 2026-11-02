@@ -49,6 +49,8 @@ const TURN_START_GRACE_MS = 5 * 60_000;
 export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   isStopping(): boolean;
+  /** Whether this agent is being deleted. Its queued messages are deleted with it and never start. */
+  isDeleting(agentId: string): boolean;
   /**
    * Whether the catalogue still serves this model. A removed endpoint's models stay in the running
    * OpenCode process until it restarts, and the restart waits for a busy agent, so this is what
@@ -292,6 +294,7 @@ export class DrainScheduler {
   /** The first clause of `mayDrain` that holds this lane, or null when none does. */
   #heldBy(lane: Lane): string | null {
     const { agentId, taskId } = lane;
+    if (this.#hooks.isDeleting(agentId)) return "deleting";
     if (this.#settingsHolds.has(agentId)) return "session-settings";
     if (this.#laneTurnActive(lane)) return "active-turn";
     // The provider has one turn of the agent at a time, so each lane waits for the turn of any other.
@@ -318,6 +321,14 @@ export class DrainScheduler {
       return "agent-client-changing";
     // A hidden agent finishes the turn that runs. Its queued messages wait until the user restores it.
     if (agent?.hiddenAt !== undefined) return "hidden";
+    // No turn starts on a provider that waits for a sign-in, so its messages wait for the sign-in
+    // rather than fail (#4326). The provider runtime schedules the drain again when it is signed in.
+    if (
+      agent &&
+      this.#providers.signInRequired(providerForAgent(agent)) &&
+      this.#waitsForSignIn(this.#mailbox.nextQueued(agentId, taskId)?.delivery)
+    )
+      return "sign-in";
     // Channel work holds only the agent's own chat. Its tasks run beside a channel turn.
     if (taskId === null && !(this.#channels?.mayDrain(agentId) ?? true)) return "channel";
     if (!this.#profileSave.mayDrain(agentId)) return "profile-save";
@@ -948,9 +959,14 @@ export class DrainScheduler {
             );
             return;
           }
-          // The provider started a turn of its own after the check above. Nothing ran, and `mayDrain`
-          // holds the messages until that turn ends.
-          if (error instanceof ProviderTurnActiveError) {
+          // The provider started a turn of its own after the check above, or the start found the
+          // agent's provider signed out. Nothing ran, and `mayDrain` holds the messages until that turn
+          // ends or the provider is signed in again.
+          const recipient = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
+          if (
+            error instanceof ProviderTurnActiveError ||
+            (recipient && this.#providers.signInRequired(providerForAgent(recipient)) && this.#waitsForSignIn(delivery))
+          ) {
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
             return;
@@ -1105,6 +1121,16 @@ export class DrainScheduler {
 
   #starting(provider: AgentProvider): number {
     return this.#startingDeliveries.get(provider) ?? 0;
+  }
+
+  /**
+   * Whether this delivery waits while its agent's provider waits for a sign-in. Channel work and an
+   * external conversation still start and fail, so that their channel or their sender hears of it and
+   * the work does not hold a channel assignment.
+   */
+  #waitsForSignIn(delivery: DeliveryContext["delivery"] | undefined): boolean {
+    if (!delivery) return true;
+    return !(this.#channels?.store.assignmentForDelivery(delivery.id) || this.#messaging?.ownsDelivery(delivery.id));
   }
 
   /**

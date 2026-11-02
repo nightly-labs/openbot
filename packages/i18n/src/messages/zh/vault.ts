@@ -92,4 +92,11 @@ export const messages = {
   "vault.reset": "重置保险库",
   "vault.resetTitle": "重置保险库？",
   "vault.resetDescription": "OpenBot 会删除保险库文件和其中的所有项目。该操作无法撤销。",
+  "vault.request.private": "将保存到你的保险库。{agent} 永远看不到它。",
+  "vault.request.privateUnnamed": "将保存到你的保险库。助手永远看不到它。",
+  "vault.request.addLogin": "添加登录信息",
+  "vault.request.addCard": "添加银行卡",
+  "vault.request.addContact": "添加地址",
+  "vault.request.notNow": "暂不",
+  "vault.request.saved": "已保存到保险库",
 } as const satisfies PartialTranslation<typeof source>;

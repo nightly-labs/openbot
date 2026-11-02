@@ -65,6 +65,7 @@ export const messages = {
   "composer.reply.attachment": "Anexo",
   "composer.reply.cancel": "Cancelar resposta",
   "composer.attachment.remove": "Remover {name}",
+  "composer.attachment.adding": "Adicionando {name}",
   "composer.placeholder.hostSetup": "Conclua a configuração do provedor no computador anfitrião para começar",
   "composer.placeholder.connectHost": "Conecte-se ao computador anfitrião para começar",
   "composer.placeholder.hostSleeping": "Este servidor está em repouso. Pressione uma tecla ou clique para acordá-lo",

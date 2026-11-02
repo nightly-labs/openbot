@@ -478,6 +478,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:mp4-attachments
 
+      - name: Run the SVG attachment E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:svg-attachments
+
       - name: Run the agent MCP server tools E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-mcp-tools
@@ -509,6 +513,10 @@ jobs:
       - name: Run the workflow model steps E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-model-steps
+
+      - name: Run the workflow Discord E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-discord
 
       - name: Run the OpenCode usage metering E2E test
         if: ${{ !cancelled() }}
@@ -578,6 +586,7 @@ jobs:
             .openbot-build/backup-model-failover-e2e/
             .openbot-build/zip-attachment-e2e/
             .openbot-build/mp4-attachment-e2e/
+            .openbot-build/svg-attachment-e2e/
             .openbot-build/agent-mcp-tools-e2e/
             .openbot-build/mcp-server-unreadable-row-e2e/
             .openbot-build/agent-update-agents-e2e/
@@ -585,6 +594,7 @@ jobs:
             .openbot-build/antigravity-accounts-e2e/
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/workflow-model-steps-e2e/
+            .openbot-build/workflow-discord-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/
             .openbot-build/cursor-usage-e2e/
@@ -1141,7 +1151,7 @@ jobs:
             "$association_url")"
           require_status "$association_status" 200 "$association_url"
           require_header "$verification_dir/association.headers" '^content-type: application/json' "$association_url"
-          if ! jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]},{"appID":"ZTRDTUL87R.run.openbot.mobile","paths":["/join","/agents/*"]}]' \
+          if ! jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]},{"appID":"ZTRDTUL87R.run.openbot.mobile","paths":["/join","/agents/*"]},{"appID":"8A47NKRZSJ.run.openbot.mobile","paths":["/join","/agents/*"]}]' \
             "$verification_dir/association.json" >/dev/null; then
             echo "Response headers of $association_url:"
             tr -d '\r' < "$verification_dir/association.headers"

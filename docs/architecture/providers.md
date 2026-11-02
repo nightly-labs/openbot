@@ -170,12 +170,12 @@ adds its rule there, not in the catalog.
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
-`releases/latest` for Codex and Pi, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
+`releases/latest` for Codex, Pi and Kimi, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
 for Grok, the `muse-stable` channel for Muse, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex and Pi, the manifest `checksum` for Muse, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
+Codex, Pi and Kimi, the manifest `checksum` for Muse, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
 so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
 `dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
 the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
@@ -731,6 +731,38 @@ adds `cline` to `projection_provider_sessions`.
 Team API v1–v5 do not know `cline`. The host hides Cline agents, models, status, and sign-in state
 from peers on those versions, as for Cursor. Team API v6 and `providers-v4` carry it, as for Cursor.
 
+### Kimi
+
+The Kimi provider (id `kimi`) starts the Kimi Code CLI with `kimi acp`. The runtime manager
+downloads the PyInstaller onedir archive `kimi-<version>-<triple>-onedir.tar.gz` (`.zip` on Windows)
+from the GitHub release and renames its `kimi` folder to `bin`. The macOS and Linux archives hold
+relative symbolic links in `kimi/_internal`, and a copy of a link breaks the signature of the macOS
+Python framework. So `assertSafeArchive` and `rejectNonRegularFiles` accept a link when
+`isSafeLinkTarget` accepts its target: relative, with no `..` part, no backslash, no NUL and no drive.
+The install record keeps each link as `link:<target>`, and every start compares it. The archives
+have no license file, so staging downloads `LICENSE` from the version tag and checks the pinned
+hash. `resolveKimiCli` refuses a CLI older than 1.52.0.
+
+Every Kimi process gets `KIMI_CLI_NO_AUTO_UPDATE=1` (`KIMI_ENV` in `provider-drivers.ts`). The ACP
+`authenticate` call of Kimi only checks the stored token, so Sign in runs `kimi login` and the code
+sign-in runs `kimi login --json`, which prints the device code as JSON lines (`deviceCodeEvent` in
+`cli-code-login.ts`). On macOS and Linux the code sign-in gets `BROWSER=true`, so the CLI does not
+open a browser on the host. On Windows the page can open on the host. Sign out runs `kimi logout`. `kimiStatePaths` lets a confined process write
+`KIMI_SHARE_DIR` (`~/.kimi`) and protects `config.toml`, `config.json`, `mcp.json`, `plugins`,
+`skills` and `bin` there, because every other Kimi process loads them. Kimi answers a lost session
+with `-32602` and `{ session_id: "Session not found" }`, which `KIMI_ACP_FLAVOR` reads as a missing
+session.
+
+Kimi CLI 1.52.0 has no ACP configuration options, so OpenBot changes the model with
+`session/set_model`. Kimi moves the session to the model, and then saves the model as its default in
+`config.toml`. A Workspace only Kimi process cannot write that file, and the save fails with `-32603`
+and the path in `data.details`. `AcpFlavor.modelSetUnsaved` reads that failure as a model change
+that applied. A Full access Kimi agent saves the model, so it becomes the default model of each new
+Kimi session, also in a terminal.
+
+No frozen Team API protocol knows `kimi`. The host hides Kimi agents, models, status, and sign-in
+state from peers below protocol 8, and `providers-v8` carries it.
+
 Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
 with their released provider vocabulary. The host filters OpenCode agents, models, status,
 sidebar references, and runtime events before encoding an older client's response. Requests for
@@ -775,6 +807,35 @@ provider and model pickers show the agent disabled, with "Update OpenBot to use 
 neutral `unknown` logo. They do not reset the agent. The model picker and the backup models leave
 out the models of that provider. Host types (`AgentProviderId`, the database, the drivers) stay
 closed.
+
+### Hermes
+
+The Hermes provider (id `hermes`) starts the user's own Hermes Agent with `hermes acp`. OpenBot has
+no managed runtime for it: a newer Hermes moves `state.db` and `config.yaml` in `~/.hermes` forward,
+and the user's own older Hermes then cannot read them. `resolveHermesCli` looks for `hermes` on
+`PATH` and in `~/.local/bin`, and reads the version from `Hermes Agent vX.Y.Z` in `hermes --version`.
+A missing CLI is `not-installed`, and the row opens the `hermes-install` guide. The process keeps
+the user's `HERMES_HOME` (or `~/.hermes`, `%LOCALAPPDATA%\hermes` on Windows), so the user's memories,
+skills, sign-ins and `SOUL.md` apply. `hermesStatePaths` lets a confined process write that folder
+and protects the Hermes code, `config.yaml`, `.env`, `SOUL.md`, skills, hooks, cron, plugins and
+profiles in it.
+
+Sign in runs `hermes auth add nous --type oauth`, the Nous Portal device-code login. Its first
+question imports shared Nous credentials, and EOF answers yes, so the code sign-in closes the CLI's
+input (`closeInput`). `parseCliCodePrompt` takes the `Open:` URL, not the `Portal:` URL that Hermes
+prints first. `signInFile` watches the change time of `auth.json`, so a `hermes setup` or `hermes
+auth` in a terminal ends a `sign-in-required` state. Models are `provider:model` ids with the name
+`<Provider> · <model>`; the picker groups them by provider. A `nous:` model counts as a
+subscription in analytics.
+
+Hermes 0.21.5 advertises `session/resume`, but a resume of a missing session makes a new session
+and the reply does not carry its id: each later prompt to the saved id would end as "refusal".
+`HERMES_ACP_FLAVOR.loadInsteadOfResume` restores with `session/load`, whose reply for a missing
+session is null, which the SDK gives as `{}`; a reply with no `modes` is a missing session.
+Hermes reads only one project context file: `.hermes.md` or `HERMES.md` before `AGENTS.md`. It
+reads project skills only in a git root that `skills.trusted_project_dirs` names. A turn that fails
+with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API
+protocols below 8 hide Hermes; protocol 8 and newer carry it as any other provider id.
 
 ### Custom agents
 

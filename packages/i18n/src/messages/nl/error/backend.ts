@@ -142,8 +142,6 @@ export const messages = {
   "error.backend.recipientHidden": "Deze agent is verborgen. Herstel de agent om berichten te sturen.",
   "error.backend.attachBetween": "Voeg tussen 1 en {limit} bestanden toe.",
   "error.backend.attachmentNotFile": "Bijlage is geen bestand: {path}",
-  "error.backend.attachSvg":
-    "{name} is een SVG-bestand en kan niet worden bijgevoegd. Schrijf het absolute pad in je antwoord: de chat toont de afbeelding daar.",
   "error.backend.generatedImageTooLarge": "De gemaakte afbeelding is groter dan de limiet van 100 MB.",
   "error.backend.attachmentNotRegularFile": "Alleen gewone bestanden kunnen worden bijgevoegd: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot kon {name} niet kopiëren.",
@@ -257,6 +255,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Een server kan maximaal {limit} zijbalksecties hebben.",
   "error.backend.sectionNameRequired": "Een naam voor de sectie is verplicht.",
   "error.backend.sectionNameTooLong": "De naam van de sectie is te lang.",
+  "error.backend.sidebarFolderTooDeep": "Mappen kunnen maar drie niveaus diep zijn.",
+  "error.backend.sidebarFolderMoveInvalid": "Deze map kan daar niet naartoe worden verplaatst.",
   "error.backend.sectionNameDuplicate": "Namen van secties moeten uniek zijn.",
   "error.backend.directMessageRequired": "Schrijf eerst een bericht.",
   "error.backend.directMessageTooLong": "Een direct bericht kan maximaal {limit} tekens hebben.",
@@ -293,6 +293,9 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
   "error.backend.apiKeyNotAllowed": "Alleen de eigenaar van de server of een beheerder kan een API-sleutel invoeren.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
+  "error.backend.vaultItemNotAllowed":
+    "Alleen de eigenaar van de server of een beheerder kan een item aan de Kluis toevoegen.",
+  "error.backend.vaultItemSaving": "Het Kluis-item wordt al opgeslagen.",
   "error.backend.authRequestInactive": "Dit beveiligde verificatieverzoek is niet meer actief.",
   "error.backend.secureAuthUnavailable": "Beveiligde verificatie is niet beschikbaar.",
   "error.backend.browserUrlRequired": "Een URL voor de browser is verplicht.",

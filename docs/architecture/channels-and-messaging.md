@@ -301,7 +301,8 @@ responses. The mobile chat list and message history use virtualized lists. Chann
 uses static avatar thumbnails without activity subscriptions or animation timers. Channels appear
 next to agents in the same list, with up to four static member avatars that fade when the host
 is offline. Channel pins share the existing pinned grid and 16-chat limit; local preferences
-preserve agent pins and channel pins separately. Hide removes a channel from the home list and
+preserve agent pins and channel pins separately. A host with `sidebar-pins-v1` keeps both in one list
+for all devices of the user (see [servers](servers.md)). Hide removes a channel from the home list and
 unpins it; the shared Hidden chats sheet restores it. Channel and agent pinning use the same
 measured overlay movement, with static folder artwork for channels. Agent and channel screens
 use the same mobile `ChatView`, header, message list, reply gestures, composer, camera, and keyboard
@@ -462,7 +463,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   `/invite`.
 - **Deduplication.** An in-memory set drops a redelivered event at once; the mailbox idempotency key
   covers a restart, and a kept event that Signal sends again. Events that arrive while no socket is
-  open are lost after Slack's retries, except for a hosted server that starts.
+  open are lost after Slack's retries, except for a hosted server that starts. A message that does
+  not address OpenBot gets 200 from Signal and is lost at once; other events get 503. Slack turns
+  off events for the whole app when more than 95% of deliveries fail for 60 minutes, and a computer
+  that is off would otherwise fail every channel message of its workspace.
 - **Screen.** **Marketplace → Apps → Slack** on the computer that runs the agents shows
   each workspace and its orchestrator, and a two-step dialog connects the workspace and adds the
   orchestrator on the model the user picks (`messaging:*`). A remote server shows no Slack page,
@@ -485,9 +489,12 @@ the token and does the platform work for the hosts:
   Another account gets `discord_guild_taken`.
 - **Events.** Signal keeps one Gateway connection (`@discordjs/ws`) with the guilds, guild messages
   and direct messages intents, and no privileged intent. It passes on only a guild message that
-  mentions the bot, and a press of an OpenBot button, which it acknowledges to Discord at once. It
-  normalizes each into `DiscordDelivery` (`@openbot/contracts/signal-protocol/discord-api`), takes the
-  bot's own mention out, and sends a `discord-delivery` frame to the `ingress` socket that holds a
+  mentions the bot or the bot's own role, and a press of an OpenBot button, which it acknowledges to
+  Discord at once. Discord makes that role, with the bot's name, when the bot joins a guild, and its
+  autocomplete can choose it instead of the bot. Signal finds the role by its `tags.bot_id` in the
+  guild and role events, and keeps only its ID in memory. It normalizes each message into
+  `DiscordDelivery` (`@openbot/contracts/signal-protocol/discord-api`), takes the bot's own mention
+  and role mention out, and sends a `discord-delivery` frame to the `ingress` socket that holds a
   Discord route ticket for the guild. The ticket mirrors the Slack one (audience
   `openbot-discord-route`, `/v2/remote/hosts/:id/discord-route`, `discord-route-revoked`,
   `/v2/remote/discord-route/validate`). The socket asks for a route only for the platforms whose

@@ -36,6 +36,9 @@ export const messages = {
   "settings.launchAtLogin.description": "Apri l'app quando accedi a questo computer.",
   "settings.keepRunning.title": "Mantieni OpenBot attivo in background",
   "settings.keepRunning.description": "Le attività in corso continuano anche dopo aver chiuso la finestra.",
+  "settings.menuBar.title": "Mostra OpenBot nella barra dei menu",
+  "settings.menuBar.description":
+    "Nasconde l’icona nel Dock dopo la chiusura della finestra. Le attività in corso continuano.",
   "settings.keepAwake.title": "Mantieni attivo il computer",
   "settings.keepAwake.description":
     "Le routine partono in orario finché il computer è collegato alla corrente. Lo schermo può comunque spegnersi.",
@@ -144,11 +147,11 @@ export const messages = {
   "settings.notch.size.height": "Altezza",
   "settings.notch.size.previewNotch": "Schermo integrato",
   "settings.notch.size.previewIsland": "Schermo esterno",
-  "settings.analytics.title": "Condividi le analisi del prodotto",
+  "settings.analytics.title": "Collega le analisi al mio account",
   "settings.analytics.description":
-    "Invia metadati di utilizzo e affidabilità, con l'ID del tuo account e l'email, alle analisi self-hosted di OpenBot.",
+    "Attivo: i metadati di utilizzo e affidabilità vanno alle analisi self-hosted di OpenBot con l'ID del tuo account e l'email, insieme ai siti web che visitate tu e i tuoi agenti, all'uso degli strumenti e a un riepilogo giornaliero della tua configurazione. Disattivo: va solo l'uso di base, come turni e conteggi dei token, con un ID di installazione casuale. Chat, file e prompt non vengono mai inviati.",
   "settings.analytics.webDescription":
-    "Invia metadati di utilizzo e affidabilità, con l'ID del tuo account e l'email, alle analisi self-hosted di OpenBot. Questa impostazione vale per questo browser.",
+    "Attivo: i metadati di utilizzo e affidabilità vanno alle analisi self-hosted di OpenBot con l'ID del tuo account e l'email. Disattivo: gli stessi metadati vanno solo con un ID di installazione casuale. Chat, file e prompt non vengono mai inviati. Questa impostazione vale per questo browser.",
   "settings.tab.general.title": "Generali",
   "settings.tab.general.description": "Controlla come si comporta OpenBot su questo computer.",
   "settings.tab.notifications.title": "Notifiche",

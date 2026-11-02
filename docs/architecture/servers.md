@@ -106,6 +106,16 @@ The next provider session gets a handoff of only the messages after the last mar
 the request while a turn runs or a message waits in the queue. A client without the capability shows
 the marker as its text. Channel execution threads are not reset.
 
+### Compact now
+
+`context-compact-v1` adds `POST /v1/agent-context/compact` with `{ agentId }` and
+`POST /v1/agent-context/compact-task` with `{ agentId, taskId }`. Any member who can send the agent a
+message can send them. The host asks the provider to compact the session of the agent's own chat or of
+one open task, as "Compact now" on the host does; the messages stay. The answer is empty. The host
+refuses with 409 while a turn runs or a message waits, or when the provider cannot compact the session.
+The progress and the result arrive in the `compaction` of `context-usage-v1`. Protocol 9 only. The web
+client shows no context meter, so it does not use the capability.
+
 ### Workspace folders
 
 `workspace-directory-v1` adds `POST /v1/workspace-directory` with `{ agentId, path }`. Any member who
@@ -316,6 +326,18 @@ closed. The WebRTC host peer encodes the local response and the events again wit
 The iPhone app advertises it through the shared team client, but it still shows the question as a
 single choice.
 
+### Reasoning efforts
+
+`reasoning-efforts-v1` lets an agent `reasoningEffort`, a model `defaultReasoningEffort` and each of
+its `supportedReasoningEfforts` be `none`, `minimal` or `ultra`, in addition to the five protocol 8
+levels (see `team-protocol/reasoning-efforts-v1.ts`). The routes and events do not change. Only
+protocol 9 advertises it. For a connection without the capability, the host changes each of these
+fields in every response, event and agent view to the nearest released level: `none` and `minimal`
+become `low`, `ultra` becomes `max`, and a list keeps each level once. A workflow step `effort` and
+text do not change. A released peer that saves an agent with the changed level replaces the exact
+level. The WebRTC host peer sends the local request and the events socket with the peer's
+capabilities, so a relayed peer gets the same levels.
+
 ### Context usage
 
 `context-usage-v1` carries how full the context window of each agent is, so a desktop joined to a
@@ -439,7 +461,8 @@ does not count it. See [hosted servers](../hosted-servers.md) step 5.
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.
 Each capability has a frozen codec in `team-protocol/<name>-v1.ts`, registered in
 `team-protocol/optional-routes.ts`, and both transports use it. Every route calls `requireAdmin`,
-except two that also answer a member: `/v1/browser/tab-profiles` and `storage-disk-v1`. The
+except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1` and
+`agent-fast-mode-v1`. The
 host advertises a capability only when its `TeamApiAdmin` member exists.
 
 | Capability | Grants | IPC group |
@@ -448,15 +471,18 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-host-settings-v1` | Agent Computer Use, local scripts, and messages while it works; reads the host default | `agentAdmin` |
 | `agent-backup-models-v1` | Agent backup models: the order and whether to switch without asking. Unknown providers are refused | `agentAdmin` |
 | `agent-task-limit-v1` | Agent task limit: how many tasks run at the same time, 1 to 4, or the host default | `agentAdmin` |
-| `agent-new-chat-v1` | Whether the agent starts a new chat itself when its chat gets long. The read gives the agent's choice or the host default; a change saves the agent's choice. Protocol 9 only | none: only the mobile app sends it |
+| `agent-new-chat-v1` | Whether the agent starts a new chat itself when its chat gets long. The read gives the agent's choice or the host default; a change saves the agent's choice. Protocol 9 only | `agentAdmin` |
 | `agent-plan-card-v1` | Whether the agent shows its plan before a long task; reads the value that applies on the host. Protocol 9 only | `agentAdmin` |
-| `agent-folders-v1` | The folders that an agent can change besides its workspace, and the folders in them that it must not change: read, add, remove, exclude, include. Lists the folders in one host folder (no files, no hidden folders, at most 500), with the home folder and at most 32 disks, so that a phone can pick one. The host checks each folder as the desktop folder picker does (`src/main/agent-folders.ts`). Protocol 9 only | `agentFolders` |
+| `agent-fast-mode-v1` | Whether the agent asks for the fast service tier, and the host models that have one with the tier id (the released model list drops it). A member reads it with view access to the agent and changes it with manage access, as the model and effort. Protocol 9 only | `agentAdmin` |
+| `agent-folders-v1` | The folders that an agent can change besides its workspace, and the folders in them that it must not change: read, add, remove, exclude, include. Lists the folders in one host folder (no files, no hidden folders, at most 500), with the home folder and at most 32 disks, so that a phone or the desktop app of a member can pick one. The host checks each folder as the desktop folder picker does (`src/main/agent-folders.ts`). Protocol 9 only | `agentFolders` |
+| `agent-instructions-v1` | Read and save the instruction file at the root of an agent's workspace (`AGENTS.md`, or `CLAUDE.md` in an older workspace). A save sends the text that the edit started from; the host refuses it with 409 when the file changed. The workspace path does not cross the wire, and a client cannot show the file in its file manager. Protocol 9 only | `agentInstructions` |
 | `browser-profiles-v1` | Named browser profiles of the host: list, create, rename, recolor, clear, delete, and the profile of each agent. One route, `/v1/browser/tab-profiles`, also answers a member: the profile label of each tab that the member can see. Cookies and site data stay on the host. Advertised when the host has `browserProfiles` | `agentAdmin` |
 | `browser-profiles-events-v1` | One event with no data, `browser-profiles-changed`, after each change of the named browser profiles or of an agent's profile. A client reads the `browser-profiles-v1` routes again. Advertised when the host has `browserProfiles` | `browserProfiles` |
 | `skills-admin-v1` | List, install, remove, enable skills by marketplace id | `agentAdmin` |
 | `shared-tables-v1` | List and delete shared tables | `sharedTables` |
 | `agent-install-v1` | Add an agent from a listing or a shared template, by id | `agentAdmin` |
 | `agent-update-v1` | Update an agent added from a listing to the listing's current version, by id | `agentAdmin` |
+| `agent-publish-v1` | Preview, publish and unpublish an agent's share link. The host builds the template, checks it for secrets and publishes it with its own account; the client sends only the share card | `agentAdmin` |
 | `providers-v1` | Code sign-in, provider API keys, managed runtimes, custom endpoints | `providerAdmin` |
 | `instance-transfer-v1` | Export and import the server's agents and server settings as a transfer file | `instanceTransfer` |
 | `providers-v3` | Code sign-in for Codex, Claude and Grok; send the code a Claude sign-in page shows | `providerAdmin` |
@@ -473,10 +499,12 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
+| `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
 | `agent-access-v1` | Read and set the roles that give members access to agents (see [Roles](#roles)) | `hostAdmin` |
+| `server-audit-v1` | Read the changes to the members, roles and agent access of the server (see [Audit log](#audit-log)). Protocol 9 only | `hostAdmin` |
 | `discord-access-v1` | Read and set which Discord roles can use OpenBot in a Discord server; list its roles | `messaging` |
 | `events-v1` | Manage webhook routines, their secrets, and activity | `events` |
 | `routine-recovery-v1` | Read and set a routine's missed-run policy; read its runs with the missed occurrences | `events` |
@@ -578,6 +606,21 @@ notification section on any device; the server menu (desktop and web) and the ag
 current level and open the matrix. A joined server
 without the capability keeps the level of each device and shows "This computer only".
 
+`sidebar-pins-v1` keeps the agents and channels that the signed-in member pinned on this server, in
+their order, for all of their devices. The host keeps the lists in `openbot-sidebar-pins-v1.json` by
+member ID (`SidebarPinStore`); the owner's list has the key `owner`, so the desktop app of the host
+computer and the owner's phones read the same list. `set` replaces the list; `seed` saves it only when
+the member has no list yet (`updatedAt` is `null`), so the first connect after the upgrade moves the
+pins of the device to the host once, and a second device does not replace them. The read leaves out
+the agents that the member cannot see, and a save keeps their pins. After each change, the host sends
+`sidebar-pins-changed` with the whole list to each connection of that member only. A removed member's
+list is deleted. Each client keeps its own copy as a cache: the desktop and the web client in
+`localStorage` (`createSidebarPreferences`), the phone in its workspace preferences (`pinOrder`). A
+change that does not reach the host stays pending on that device and goes first at the next connect.
+The desktop shows agents and channels in one order; the phone keeps that order when it adds or removes
+a pin (`phoneSidebarPins`). Workflow pins stay on each phone. A server without the capability keeps the
+pins of each device, as before.
+
 `prompt-cache-ttl-v1` reads and sets how long Claude keeps the prompt cache of the host's agents
 (`openbot-prompt-cache-ttl-v1.json`; `5m` or `1h`, default `5m`). With `1h` the host starts each
 Claude process with `ENABLE_PROMPT_CACHING_1H=1`. Claude Code reads this flag before its subscription
@@ -674,6 +717,42 @@ Known limits:
 - `GET /v1/attachments/:id` does not check the agent of the attachment.
 - Channel messages of an agent that a member cannot see stay in the channel. A send to a channel does
   not check the levels of the agents in it; only a save that adds an agent checks `chat`.
+
+### Audit log
+
+`server-audit-v1` lets an owner or admin read the changes to the access of the server, newest first:
+a member joined, left, was removed, or got another server role; a role was made, renamed or deleted;
+a member was added to or removed from a role; and the level that a role or Everyone got for an agent.
+Its one route is `POST /v1/admin/host/audit` (`route-server-audit.ts`). `requireAdmin` is the only
+gate, so a member gets 403. A client that does not send the capability gets 400
+`error.team.serverAuditUnsupported`. The capability is in the protocol 9 list only, because the
+protocol 7 and 8 lists are full.
+
+Each entry keeps the names of the time of the change, so a removed member or a deleted agent keeps its
+name, cut to 200 characters. `actor` is the member who made the change: the admin of a Team API
+request, the owner of this computer for a local change, the member for a member who leaves, and null
+for a join. A member update or removal gives the actor only to the changes of that member; other
+changes that the same directory sync finds have a null actor. A client leaves out an entry whose
+`kind` it does not know, so a later kind needs no new capability.
+
+The host keeps the log in `openbot-server-audit-v1.json`, by server ID (`src/main/server-audit-store.ts`),
+with the newest 500 entries of each server. Like the roles file it is a preference file: no migration,
+and an older build ignores it. A file that does not decode reads as an empty log, and an entry that
+does not decode is left out. The next write removes those entries, so a downgrade loses the entries
+of a kind that the older build does not know. A failed write only logs; it never stops the change.
+The roles store records each save that changes the revision (`agentAccessAuditChanges`), except the
+levels of an agent that was deleted. `HostService` compares the stored members before and after a
+member update, a removal, and each account directory sync (`memberAuditChanges`). One member read
+or change runs at a time, from the read of the directory to the audit entry, so a slow read cannot
+apply an older list after a newer one. A join keeps the time when the membership was made.
+
+Server settings → Audit log (`ServerAuditSection.tsx`, `@openbot/ui/features/servers/ServerAuditLog`)
+shows the log on desktop and web, with a filter by kind and a search. The tab shows for an owner or
+admin of the local server and of a joined server whose host advertises the capability. It reads the log
+again each time it shows.
+
+Known limits: a host with no account directory records no join from a local-store invite, and the log
+has no page or date filter.
 
 ### Webhook routines
 

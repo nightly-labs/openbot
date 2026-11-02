@@ -183,6 +183,18 @@ class DiscordAdapter implements MessagingAdapter {
     );
   });
 
+  readonly addEmoji = Effect.fnUntraced(function* (
+    this: DiscordAdapter,
+    target: MessageTarget,
+    messageId: string,
+    emoji: string,
+  ): Effect.fn.Return<void, MessagingAdapterError> {
+    yield* this.#call(
+      { op: "react", guildId: this.#guildId, channelId: target.platformChannelId, messageId, emoji, on: true },
+      ignoreAnswer,
+    );
+  });
+
   readonly postAnswer = Effect.fnUntraced(function* (
     this: DiscordAdapter,
     target: MessageTarget,

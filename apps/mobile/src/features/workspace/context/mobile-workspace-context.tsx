@@ -6,6 +6,7 @@ import {
   MCP_SERVERS_CAPABILITY,
   type RespondToApprovalInput,
   type SidebarLayoutSnapshot,
+  type SidebarPin,
   type TeamRealtimeEvent,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -46,6 +47,11 @@ import { PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
+import {
+  SIDEBAR_FOLDERS_CAPABILITY,
+  SIDEBAR_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/sidebar-folders-v1";
+import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -73,7 +79,13 @@ import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import { rotateHostKey, updateHostIdentity } from "@openbot/team-client/team-admin-requests";
+import {
+  readSidebarPins,
+  rotateHostKey,
+  seedSidebarPins,
+  setSidebarPins,
+  updateHostIdentity,
+} from "@openbot/team-client/team-admin-requests";
 import {
   deleteAgent,
   discardAttachmentDraft,
@@ -96,6 +108,7 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { useLiveActivity } from "@/features/live-activity/use-live-activity";
+import { NotificationAvatarSync } from "@/features/push-notifications/notification-avatar-sync";
 import { usePushNotifications } from "@/features/push-notifications/use-push-notifications";
 import { useSyncedNotificationLevelsLoader } from "@/features/push-notifications/use-synced-notification-levels";
 import { QuickActionsSync } from "@/features/quick-actions/quick-actions-sync";
@@ -133,9 +146,13 @@ import {
 } from "@/features/workspace/model/agent-avatar-cache";
 import {
   canToggleAgentPin,
+  phoneSidebarPins,
   reconcileAgentPins,
   reconcileChannelPins,
   setChannelHidden,
+  sidebarPinsChanged,
+  withHostSidebarPins,
+  withPhoneSidebarPins,
 } from "@/features/workspace/model/agent-pins";
 import { ConnectionWaits } from "@/features/workspace/model/connection-waits";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
@@ -161,11 +178,13 @@ import {
   serverKind,
   showsOnline,
 } from "@/features/workspace/model/server-status";
+import { moveSidebarChat } from "@/features/workspace/model/sidebar-layout";
 import { taskThreadMessages, withoutTaskTurns } from "@/features/workspace/model/task-cache";
 import { applyBrowserEvent, syncEventQueries } from "@/features/workspace/model/team-events";
 import { runTeamRequest } from "@/features/workspace/model/team-request";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import { appendTurnStepLine, latestThoughtId } from "@/features/workspace/model/turn-step-lines";
+import { createWorkspaceCache } from "@/features/workspace/model/workspace-cache";
 import {
   decodeAgent,
   decodeAgentSummaries,
@@ -232,9 +251,12 @@ const EMPTY_SERVER: MobileServer = {
  * the last list and does not stop the connection.
  */
 function startWorkspaceReads(client: RemoteTeamTransportRef, capabilities: readonly string[]) {
-  const sections = capabilities.includes(SIDEBAR_LAYOUT_CAPABILITY)
-    ? client.request("GET", TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayout)
-    : null;
+  // With `sidebar-folders-v1`, the layout has the parent of each folder; the phone shows its path.
+  const sections = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
+    ? client.request("POST", SIDEBAR_FOLDERS_ROUTES.read, decodeSidebarLayout, {})
+    : capabilities.includes(SIDEBAR_LAYOUT_CAPABILITY)
+      ? client.request("GET", TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayout)
+      : null;
   const agents = client.request("GET", TEAM_API_ROUTES.agents.all, decodeAgentSummaries);
   // The hidden list loads with the agents, so a hidden agent does not show for a moment.
   const hidden = readHostHiddenAgents(
@@ -295,6 +317,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [sidebarByServer, setSidebarByServer] = useState<
     Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>
   >({});
+  const sidebarByServerRef = useRef(sidebarByServer);
+  sidebarByServerRef.current = sidebarByServer;
   const applySidebarLayout = useCallback((serverId: string, layout: SidebarLayoutSnapshot) => {
     if (removedServers.current.has(serverId)) return;
     setSidebarByServer((current) => {
@@ -330,6 +354,16 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [],
   );
   useEffect(() => () => conversationStore.dispose(), [conversationStore]);
+  const workspaceCache = useMemo(
+    () => createWorkspaceCache(`${session.apiUrl}:${session.user.id}`),
+    [session.apiUrl, session.user.id],
+  );
+  /** The last agent list of each server, as the host sent it, for the phone's cache. */
+  const cachedSummaries = useRef(new Map<string, RemoteAgent[]>());
+  /** Servers whose cache this run read, once each. */
+  const restoredServers = useRef(new Set<string>());
+  /** Servers shown from the cache whose connection did not register yet. */
+  const quietStarts = useRef(new Set<string>());
   const [liveState] = useState(() => new LiveWorkspaceStore());
   const preferenceStore = useMemo(
     () =>
@@ -416,6 +450,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         readRefresh.invalidate(serverId);
         for (const id of serverAgentIds.current.get(serverId) ?? []) removedAgentIds.add(id);
         serverAgentIds.current.delete(serverId);
+        cachedSummaries.current.delete(serverId);
+        void workspaceCache?.remove(serverId).catch(() => undefined);
         presenceSignatures.current.delete(serverId);
         for (const queryKey of [
           queryKeys.chatQueue(serverId),
@@ -438,13 +474,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState.update("browserRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserTabs", (current) => withoutKeys(current, serverIds));
     },
-    [connectionWaits, readRefresh, queryClient, queryScope, conversationStore, liveState],
+    [connectionWaits, readRefresh, queryClient, queryScope, conversationStore, liveState, workspaceCache],
   );
 
   const installHosts = useCallback(
     (hosts: RemoteTeamHost[]) => {
       const available = new Set(hosts.map((host) => host.hostId));
       dropServerState(new Set(serversRef.current.filter((server) => !available.has(server.id)).map(({ id }) => id)));
+      // Also the copies of servers that the account left while the app was closed.
+      void workspaceCache?.retain([...available]).catch(() => undefined);
       for (const host of hosts) removedServers.current.delete(host.hostId);
       setServers((current) => {
         const previousServers = new Map(current.map((server) => [server.id, server]));
@@ -458,7 +496,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           : (sortByPreference(hosts.map((host) => ({ id: host.hostId })))[0]?.id ?? null),
       );
     },
-    [dropServerState, session.host?.hostId, sortByPreference],
+    [dropServerState, session.host?.hostId, sortByPreference, workspaceCache],
   );
 
   const directoryRefresh = useMemo(
@@ -637,6 +675,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
       for (const agent of summaries) knownIds.add(agent.id);
       serverAgentIds.current.set(serverId, knownIds);
+      cachedSummaries.current.set(serverId, summaries);
       setAgents((current) => {
         const previous = new Map(
           current.filter((agent) => agent.serverId === serverId).map((agent) => [agent.id, agent]),
@@ -652,6 +691,117 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     },
     [preferenceStore],
   );
+
+  /** The count of pin changes of this phone for each server, so a slow host answer cannot undo a newer one. */
+  const pinChanges = useRef(new Map<string, number>());
+  /**
+   * Shows the pins that the host keeps for all devices of the user (`sidebar-pins-v1`). `change` is the
+   * pin change of this phone that the list answers; a newer change keeps its own list.
+   */
+  const applyHostSidebarPins = useCallback(
+    (serverId: string, items: readonly SidebarPin[], change = pinChanges.current.get(serverId) ?? 0) => {
+      if ((pinChanges.current.get(serverId) ?? 0) !== change) return;
+      try {
+        const next = withHostSidebarPins(preferenceStore.read(serverId), items);
+        preferenceStore.write(serverId, next);
+        setPreferences((current) => ({ ...current, [serverId]: next }));
+      } catch {
+        // The pins of this phone stay until the next list from the host.
+      }
+    },
+    [preferenceStore],
+  );
+  /**
+   * Sends the pins of this phone to a host that keeps them. The change stays pending until the host
+   * takes it, also after a restart of the app. Before the first read from the host, the pins stay on
+   * this phone; that read saves them on the host when the user has no list there.
+   */
+  const pushSidebarPins = useCallback(
+    (serverId: string) => {
+      const current = preferenceStore.read(serverId);
+      // A list from the host is in `pinOrder`, so the host keeps the pins.
+      if (!current.pinOrder) return;
+      const change = (pinChanges.current.get(serverId) ?? 0) + 1;
+      pinChanges.current.set(serverId, change);
+      if (!current.pinsPending) {
+        // In the state too: an event of another device does not replace the change while it is sent.
+        const pending = { ...current, pinsPending: true };
+        preferenceStore.write(serverId, pending);
+        setPreferences((saved) => ({ ...saved, [serverId]: pending }));
+      }
+      // Before the connect, the change stays pending, and the connect sends it first.
+      if (!hasCapability(serverCapabilities.current, serverId, SIDEBAR_PINS_CAPABILITY)) return;
+      void runTeamEffect(setSidebarPins(teamApi(serverId), phoneSidebarPins(current)))
+        .then((snapshot) => applyHostSidebarPins(serverId, snapshot.items, change))
+        .catch(() => undefined);
+    },
+    [preferenceStore, teamApi, applyHostSidebarPins],
+  );
+  /**
+   * Brings the pins of a server in line with its host after each connect. A pending change of this
+   * phone goes first. With no list on the host, the pins of this phone become the list.
+   */
+  const syncSidebarPins = useCallback(
+    async (serverId: string, request: TeamApiRequest) => {
+      const current = preferenceStore.read(serverId);
+      if (current.pinsPending && current.pinOrder) {
+        pushSidebarPins(serverId);
+        return;
+      }
+      const change = pinChanges.current.get(serverId) ?? 0;
+      const snapshot = await runTeamEffect(readSidebarPins(request));
+      const local = phoneSidebarPins(current);
+      const kept =
+        snapshot.updatedAt === null && local.length > 0
+          ? await runTeamEffect(seedSidebarPins(request, local))
+          : snapshot;
+      applyHostSidebarPins(serverId, kept.items, change);
+    },
+    [preferenceStore, pushSidebarPins, applyHostSidebarPins],
+  );
+
+  /** Saves what the phone shows for a server, so the next start shows it before the connection. */
+  const persistServer = useCallback(
+    (serverId: string) => {
+      const agents = cachedSummaries.current.get(serverId);
+      if (!workspaceCache || !agents || removedServers.current.has(serverId)) return;
+      void workspaceCache
+        .write(serverId, {
+          agents,
+          hidden: hostHiddenRef.current[serverId] ?? null,
+          sidebar: sidebarByServerRef.current[serverId]?.layout ?? null,
+          conversations: agents.flatMap((agent) => conversationStore.cachedPage(agent.id) ?? []),
+        })
+        .catch(() => undefined);
+    },
+    [workspaceCache, conversationStore],
+  );
+  // The first time a server is listed in this run, it shows what the phone kept, until its own reads
+  // replace it. Its first attempt is then quiet, as a return to the app.
+  useEffect(() => {
+    if (!workspaceCache) return;
+    for (const { id } of servers) {
+      if (restoredServers.current.has(id)) continue;
+      restoredServers.current.add(id);
+      void workspaceCache
+        .read(id)
+        .then((cached) => {
+          if (!cached || removedServers.current.has(id) || cachedSummaries.current.has(id)) return;
+          if (cached.hidden)
+            applyHostHidden(
+              id,
+              cached.hidden.map((agentId) => ({ agentId })),
+            );
+          if (cached.sidebar) applySidebarLayout(id, cached.sidebar);
+          replaceServerAgents(id, cached.agents);
+          for (const page of cached.conversations) conversationStore.restore(page);
+          const connection = connections.current.get(id);
+          if (connection) connection.quietStart();
+          else quietStarts.current.add(id);
+        })
+        .catch(() => undefined);
+    }
+  }, [servers, workspaceCache, applyHostHidden, applySidebarLayout, replaceServerAgents, conversationStore]);
 
   const loadConversation = useCallback(
     async (agentId: string, serverId = activeServerIdRef.current, refresh = false, attach = false) => {
@@ -779,6 +929,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);
+      // The pins do not hold the connection. Until the host answers, and when it cannot, the pins of
+      // this phone stay.
+      if (compatibility.capabilities.includes(SIDEBAR_PINS_CAPABILITY))
+        void syncSidebarPins(serverId, (method, path, decode, body) =>
+          client.request(method, path, decode, body),
+        ).catch(() => undefined);
       void channelStore.refresh(serverId);
       if (supportsBrowserView(compatibility.capabilities)) {
         // The tabs only add the browser button. A host that cannot list them still loads.
@@ -866,10 +1022,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             )
             .catch(() => undefined);
         }
+        if (context.isCurrent()) persistServer(serverId);
       })();
       context.stage = "connection";
     },
     [
+      persistServer,
       replaceServerAgents,
       applyHostHidden,
       preferenceStore,
@@ -879,12 +1037,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       applySidebarLayout,
       applyConversationReads,
       liveState,
+      syncSidebarPins,
     ],
   );
 
   const registerConnection = useCallback((hostId: string, handle: ServerConnectionHandle | null) => {
     if (handle) connections.current.set(hostId, handle);
     else connections.current.delete(hostId);
+    if (handle && quietStarts.current.delete(hostId)) handle.quietStart();
   }, []);
   const wakeHostedServer = useMemo(
     () =>
@@ -999,11 +1159,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       loadGeneration.current += 1;
       conversationStore.cancelRequests();
       conversationStore.flush();
+      // iOS can end the app in the background, so the phone keeps what it shows now.
+      for (const { id } of serversRef.current) persistServer(id);
       // The peer refuses requests in the background too. The next return starts a new quiet time.
       connectionWaits.dropAll(new Error(sourceText("error.remote.appInBackground")));
     }
     directoryRefresh.setActive(foreground);
-  }, [foreground, directoryRefresh, conversationStore, connectionWaits]);
+  }, [foreground, directoryRefresh, conversationStore, connectionWaits, persistServer]);
 
   // On a return to the app the selected server connects first; the others follow when it is online,
   // or after a short wait. The phone then sets up the connection the user waits for alone, and the
@@ -1071,6 +1233,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       if (event.type === "hidden-agents-changed") {
         applyHostHidden(serverId, event.agents);
+        return;
+      }
+      // The user changed their pins on another device. A pending change of this phone goes first.
+      if (event.type === "sidebar-pins-changed") {
+        if (!preferencesRef.current[serverId]?.pinsPending) applyHostSidebarPins(serverId, event.items);
         return;
       }
       // The user changed their levels on another device. A read that started before it is older.
@@ -1194,15 +1361,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       queryClient,
       queryScope,
       applyConversationReads,
+      applyHostSidebarPins,
     ],
   );
 
   const updatePreferences = useCallback(
     (serverId: string, change: (current: RemoteWorkspacePreferences) => RemoteWorkspacePreferences) => {
       try {
-        const next = change(preferenceStore.read(serverId));
+        const previous = preferenceStore.read(serverId);
+        const next = change(previous);
         preferenceStore.write(serverId, next);
         setPreferences((current) => ({ ...current, [serverId]: next }));
+        if (sidebarPinsChanged(next, previous)) pushSidebarPins(serverId);
         return next;
       } catch (error) {
         showFailureAlert(
@@ -1214,7 +1384,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return null;
       }
     },
-    [preferenceStore],
+    [preferenceStore, pushSidebarPins],
   );
   /**
    * Hides or restores an agent on a host that serves `agent-hidden-v1`. The list changes at once; the
@@ -1319,14 +1489,47 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           SIDEBAR_LAYOUT_CAPABILITY,
           "mobile.workspace.error.sectionsUnsupported",
         );
+        // The released route answers without the parents, and the list would show the folders flat.
         const layout = await request(
           "POST",
-          TEAM_API_ROUTES.sidebarLayout.actions,
+          hasCapability(serverCapabilities.current, serverId, SIDEBAR_FOLDERS_CAPABILITY)
+            ? SIDEBAR_FOLDERS_ROUTES.actions
+            : TEAM_API_ROUTES.sidebarLayout.actions,
           decodeSidebarLayout,
           action,
           serverId,
         );
         applySidebarLayout(serverId, layout);
+      },
+      moveSidebarChat: async (serverId, action) => {
+        requireCapability(
+          serverCapabilities.current,
+          serverId,
+          SIDEBAR_LAYOUT_CAPABILITY,
+          "mobile.workspace.error.sectionsUnsupported",
+        );
+        const previous = sidebarByServerRef.current[serverId]?.layout;
+        const moved = previous ? moveSidebarChat(previous, action) : null;
+        if (moved) setSidebarByServer((current) => ({ ...current, [serverId]: { layout: moved, error: null } }));
+        try {
+          const layout = await request(
+            "POST",
+            TEAM_API_ROUTES.sidebarLayout.actions,
+            decodeSidebarLayout,
+            action,
+            serverId,
+          );
+          applySidebarLayout(serverId, layout);
+        } catch (error) {
+          // A newer layout from the host stays; only the move of this phone goes back.
+          if (previous && moved)
+            setSidebarByServer((current) =>
+              current[serverId]?.layout === moved
+                ? { ...current, [serverId]: { layout: previous, error: null } }
+                : current,
+            );
+          throw error;
+        }
       },
       reorderServers,
       channelStore,
@@ -1579,7 +1782,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const server = currentActiveServer();
         const serverId = server.id;
         if (hostOwnsHide(serverCapabilities.current.get(serverId), server.role)) {
-          // The host owns the hide. The pin stays a preference of this phone.
+          // The host owns the hide. The phone removes the pin, as for a local hide.
           if (preferencesRef.current[serverId]?.pinned.includes(agentId))
             updatePreferences(serverId, (current) => ({
               ...current,
@@ -1643,6 +1846,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (!saved || (result === "pinned" && !saved.pinnedChannels?.includes(channelId))) return "error";
         return result;
       },
+      setChatPins: (serverId, items) => {
+        const saved = updatePreferences(serverId, (current) => withPhoneSidebarPins(current, items));
+        // The new order is in `pinOrder` too, so the check in `updatePreferences` sees no change to send.
+        if (saved?.pinOrder) pushSidebarPins(serverId);
+        return saved !== null;
+      },
+      readChatPins: (serverId) => phoneSidebarPins(preferencesRef.current[serverId] ?? preferenceStore.read(serverId)),
       toggleWorkflowPin: (workflowId, serverId) => {
         let result: "pinned" | "unpinned" = "pinned";
         const saved = updatePreferences(serverId, (current) => {
@@ -1716,6 +1926,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     markAllRead,
     updatePreferences,
     changeHostHidden,
+    pushSidebarPins,
+    preferenceStore,
   ]);
 
   const activeServer = useMemo(
@@ -1878,6 +2090,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             serversReady={serverDirectoryState === "ready"}
             agents={agents}
           />
+          <NotificationAvatarSync servers={servers} serversReady={serverDirectoryState === "ready"} agents={agents} />
           {servers.map((server) => (
             <ServerConnection
               key={server.id}

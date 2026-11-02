@@ -3089,3 +3089,11 @@ svg.wfn-shape-surface {
     transition: none;
   }
 }
+
+/* The emoji of a Discord reaction, in the place of an icon. */
+.wfn-emoji {
+  display: inline-flex;
+  flex: none;
+  justify-content: center;
+  width: var(--openbot-icon-xs);
+}

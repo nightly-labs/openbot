@@ -136,6 +136,23 @@
   justify-content: flex-end;
 }
 
+/* A person's images stand above the bubble, outside it, with a small gap. */
+.message-stack {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  justify-items: end;
+  gap: var(--openbot-space-1);
+}
+
+.message-media-before {
+  width: min(420px, 100%);
+}
+
+.message-media-before:has(.image-gallery) {
+  width: min(520px, 100%);
+}
+
 .message-actions {
   position: relative;
   z-index: 4;
@@ -448,7 +465,7 @@
 }
 
 .agent-activity-avatar {
-  --agent-avatar-optical-offset: -2px;
+  --agent-avatar-optical-offset: calc(32px * -0.14);
 
   width: 32px;
   height: 32px;
@@ -1023,12 +1040,13 @@ button.chat-action-target:active,
   max-width: min(500px, 100%);
 }
 
-.message-entry-agent .ui-bubble:has(.image-generation) {
+/* An image keeps its size in a person's bubble too: the bubble does not shrink to the text. */
+.message-entry .ui-bubble:has(.image-generation) {
   width: min(420px, 100%);
   max-width: min(420px, 100%);
 }
 
-.message-entry-agent .ui-bubble:has(.image-gallery) {
+.message-entry .ui-bubble:has(.image-gallery) {
   width: min(520px, 100%);
   max-width: min(520px, 100%);
 }
@@ -1038,6 +1056,10 @@ button.chat-action-target:active,
     :is(.choice-card, .image-generation, .image-gallery, .message-code-block, .message-data-table-scroll)
   )
   > .ui-bubble-content {
+  width: 100%;
+}
+
+.message-entry-user .ui-bubble:has(:is(.image-generation, .image-gallery)) > .ui-bubble-content {
   width: 100%;
 }
 

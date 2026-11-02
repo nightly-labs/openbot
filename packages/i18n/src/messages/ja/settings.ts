@@ -35,6 +35,8 @@ export const messages = {
   "settings.launchAtLogin.description": "このコンピューターにサインインするとアプリを開きます。",
   "settings.keepRunning.title": "OpenBot をバックグラウンドで実行し続ける",
   "settings.keepRunning.description": "ウィンドウを閉じたあとも実行中のタスクを続けます。",
+  "settings.menuBar.title": "OpenBot をメニューバーに表示",
+  "settings.menuBar.description": "ウィンドウを閉じると Dock のアイコンを隠します。実行中のタスクは続きます。",
   "settings.keepAwake.title": "このコンピュータをスリープさせない",
   "settings.keepAwake.description":
     "電源に接続している間、ルーティンが予定どおりに実行されます。ディスプレイはオフになることがあります。",
@@ -139,11 +141,11 @@ export const messages = {
   "settings.notch.size.height": "高さ",
   "settings.notch.size.previewNotch": "内蔵ディスプレイ",
   "settings.notch.size.previewIsland": "外部ディスプレイ",
-  "settings.analytics.title": "製品分析データを共有する",
+  "settings.analytics.title": "分析データをアカウントに関連付ける",
   "settings.analytics.description":
-    "利用状況と安定性のメタデータを、アカウント ID とメールアドレスとともに OpenBot の自社運用の分析基盤に送信します。",
+    "オン: 利用状況と安定性のメタデータを、アカウント ID とメールアドレスとともに OpenBot の自社運用の分析基盤に送信します。あなたとエージェントが閲覧した Web サイト、ツールの使用状況、セットアップの日次概要も含みます。オフ: ターン数やトークン数などの基本的な使用状況のみを、ランダムなインストール ID とともに送信します。チャット、ファイル、プロンプトは送信しません。",
   "settings.analytics.webDescription":
-    "利用状況と安定性のメタデータを、アカウント ID とメールアドレスとともに OpenBot の自社運用の分析基盤に送信します。この設定はこのブラウザーに適用されます。",
+    "オン: 利用状況と安定性のメタデータを、アカウント ID とメールアドレスとともに OpenBot の自社運用の分析基盤に送信します。オフ: 同じメタデータをランダムなインストール ID のみとともに送信します。チャット、ファイル、プロンプトは送信しません。この設定はこのブラウザーに適用されます。",
   "settings.tab.general.title": "一般",
   "settings.tab.general.description": "このコンピューターでの OpenBot の動作を設定します。",
   "settings.tab.notifications.title": "通知",

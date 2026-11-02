@@ -35,6 +35,8 @@ export const messages = {
   "settings.launchAtLogin.description": "이 컴퓨터에 로그인하면 앱을 열어요.",
   "settings.keepRunning.title": "OpenBot을 백그라운드에서 계속 실행",
   "settings.keepRunning.description": "창을 닫은 뒤에도 진행 중인 작업을 계속 실행해요.",
+  "settings.menuBar.title": "메뉴 막대에 OpenBot 표시",
+  "settings.menuBar.description": "창을 닫으면 Dock 아이콘을 숨겨요. 진행 중인 작업은 계속 실행돼요.",
   "settings.keepAwake.title": "이 컴퓨터를 절전 모드로 전환하지 않기",
   "settings.keepAwake.description": "컴퓨터가 전원에 연결되어 있으면 루틴이 제시간에 실행돼요. 화면은 꺼질 수 있어요.",
   "settings.keepAwakeOnBattery.title": "배터리 사용 중에도 적용",
@@ -155,11 +157,11 @@ export const messages = {
   "settings.notch.size.height": "높이",
   "settings.notch.size.previewNotch": "내장 디스플레이",
   "settings.notch.size.previewIsland": "외부 디스플레이",
-  "settings.analytics.title": "제품 분석 공유",
+  "settings.analytics.title": "분석 데이터를 내 계정에 연결",
   "settings.analytics.description":
-    "계정 ID와 이메일이 포함된 사용 및 안정성 메타데이터를 OpenBot의 자체 호스팅 분석 서비스로 보내요.",
+    "켜짐: 사용 및 안정성 메타데이터를 계정 ID 및 이메일과 함께 OpenBot의 자체 호스팅 분석 서비스로 보내요. 나와 에이전트가 방문한 웹사이트, 도구 사용 현황, 하루 단위 설정 요약도 함께 보내요. 꺼짐: 턴 수와 토큰 수 같은 기본 사용 현황만 임의의 설치 ID와 함께 보내요. 채팅, 파일, 프롬프트는 절대 보내지 않아요.",
   "settings.analytics.webDescription":
-    "계정 ID와 이메일이 포함된 사용 및 안정성 메타데이터를 OpenBot의 자체 호스팅 분석 서비스로 보내요. 이 설정은 이 브라우저에 적용돼요.",
+    "켜짐: 사용 및 안정성 메타데이터를 계정 ID 및 이메일과 함께 OpenBot의 자체 호스팅 분석 서비스로 보내요. 꺼짐: 같은 메타데이터를 임의의 설치 ID만 함께 보내요. 채팅, 파일, 프롬프트는 절대 보내지 않아요. 이 설정은 이 브라우저에 적용돼요.",
   "settings.tab.general.title": "일반",
   "settings.tab.general.description": "이 컴퓨터에서 OpenBot이 동작하는 방식을 설정해요.",
   "settings.tab.agents.title": "에이전트",

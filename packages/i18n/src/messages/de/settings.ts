@@ -36,6 +36,9 @@ export const messages = {
   "settings.launchAtLogin.description": "Die App öffnen, wenn du dich an diesem Computer anmeldest.",
   "settings.keepRunning.title": "OpenBot im Hintergrund weiter ausführen",
   "settings.keepRunning.description": "Aktive Aufgaben nach dem Schließen des Fensters weiter ausführen.",
+  "settings.menuBar.title": "OpenBot in der Menüleiste zeigen",
+  "settings.menuBar.description":
+    "Das Dock-Symbol nach dem Schließen des Fensters ausblenden. Aktive Aufgaben laufen weiter.",
   "settings.keepAwake.title": "Computer wach halten",
   "settings.keepAwake.description":
     "Routinen laufen pünktlich, solange der Computer am Strom hängt. Der Bildschirm kann sich trotzdem ausschalten.",
@@ -145,11 +148,11 @@ export const messages = {
   "settings.notch.size.height": "Höhe",
   "settings.notch.size.previewNotch": "Integriertes Display",
   "settings.notch.size.previewIsland": "Externes Display",
-  "settings.analytics.title": "Nutzungsdaten teilen",
+  "settings.analytics.title": "Analysedaten mit meinem Konto verknüpfen",
   "settings.analytics.description":
-    "Nutzungs- und Zuverlässigkeitsmetadaten mit deiner Konto-ID und E-Mail-Adresse an das von OpenBot selbst betriebene Analysesystem senden.",
+    "An: Nutzungs- und Zuverlässigkeitsmetadaten gehen mit deiner Konto-ID und E-Mail-Adresse an das von OpenBot selbst betriebene Analysesystem, mit den Websites, die du und deine Agenten besuchen, der Tool-Nutzung und einer täglichen Übersicht deiner Einrichtung. Aus: Nur die grundlegende Nutzung, etwa Durchläufe und Token-Zahlen, geht mit einer zufälligen Installations-ID. Chats, Dateien und Prompts werden nie gesendet.",
   "settings.analytics.webDescription":
-    "Nutzungs- und Zuverlässigkeitsmetadaten mit deiner Konto-ID und E-Mail-Adresse an das von OpenBot selbst betriebene Analysesystem senden. Diese Einstellung gilt für diesen Browser.",
+    "An: Nutzungs- und Zuverlässigkeitsmetadaten gehen mit deiner Konto-ID und E-Mail-Adresse an das von OpenBot selbst betriebene Analysesystem. Aus: Dieselben Metadaten gehen nur mit einer zufälligen Installations-ID. Chats, Dateien und Prompts werden nie gesendet. Diese Einstellung gilt für diesen Browser.",
   "settings.tab.general.title": "Allgemein",
   "settings.tab.general.description": "Lege fest, wie sich OpenBot auf diesem Computer verhält.",
   "settings.tab.notifications.title": "Mitteilungen",

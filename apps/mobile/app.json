@@ -24,6 +24,11 @@
     "android": {
       "package": "run.openbot.mobile",
       "icon": "./assets/icons/app-icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icons/android-adaptive-eyes.png",
+        "backgroundImage": "./assets/icons/android-adaptive-background.png",
+        "monochromeImage": "./assets/icons/android-adaptive-eyes.png"
+      },
       "predictiveBackGestureEnabled": false,
       "permissions": ["android.permission.CAMERA"],
       "blockedPermissions": [

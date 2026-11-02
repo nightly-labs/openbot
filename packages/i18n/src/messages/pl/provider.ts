@@ -137,6 +137,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, domyślny",
   "provider.picker.effort": "Wysiłek",
   "provider.picker.effortLabel": "Wysiłek rozumowania agenta",
+  "provider.picker.effortFixed": "{effort}, ustawia {provider}",
   "provider.picker.fast": "Szybki",
   "provider.picker.fastLabel": "Tryb szybki",
   "provider.picker.selectEffort": "Wybierz wysiłek",
@@ -145,11 +146,14 @@ export const messages = {
   "provider.status.signInRequired": "Wymagane logowanie",
   "provider.model.free": "Darmowy",
   "provider.model.default": "domyślny",
+  "provider.effort.none": "Brak",
+  "provider.effort.minimal": "Minimalny",
   "provider.effort.low": "Niski",
   "provider.effort.medium": "Średni",
   "provider.effort.high": "Wysoki",
   "provider.effort.xhigh": "Bardzo wysoki",
   "provider.effort.max": "Maks.",
+  "provider.effort.ultra": "Ultra",
 
   "provider.museKey.title": "Klucz API Meta dla Muse",
   "provider.museKey.description": "Zapisz klucz API Meta na hoście lub zaloguj się przez Muse CLI.",
@@ -228,6 +232,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot wyloguje {provider} na tym komputerze. CLI {provider} w terminalu również zostanie wylogowane.",
   "provider.settings.disconnectHost": "OpenBot wyloguje {provider} na serwerze.",
+  "provider.settings.versionInstalledByUser": "{version} · zainstalowana przez Ciebie",
+  "provider.settings.versionDownloaded": "{version} · pobrana przez OpenBot",
   "provider.settings.cache": "Pamięć podręczna",
   "provider.settings.promptCache": "Pamięć podręczna promptów",
   "provider.settings.promptCacheDescription":

@@ -347,6 +347,33 @@ try {
     passed: true,
   });
 
+  // The user deletes an agent that the spent plan holds. Its held message has not started, so it goes
+  // with the agent, and it never starts a turn.
+  await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Exhaust the plan again." }));
+  const heldForDelete = await waitFor("the spent plan to hold the message before the delete", () => {
+    const statuses = agents
+      .listQueue(agent.id)
+      .deliveries.map((delivery) => delivery.status)
+      .filter((status) => status !== "completed");
+    return (
+      statuses.length > 0 &&
+      statuses.every((status) => status === "queued") &&
+      agents.getRuntimeSnapshot().usageLimits?.some((limit) => limit.agentId === agent.id) &&
+      statuses
+    );
+  });
+  const turnsBeforeDelete = turnInputs().length;
+  await runCauseEffect(agents.ensureAgentDeletable(agent.id));
+  await runCauseEffect(agents.deleteAgent(agent.id));
+  assert.ok(!agents.listAgents().some((candidate) => candidate.id === agent.id), "The held agent is deleted.");
+  assert.equal(mailbox.hasUnfinishedDelivery(agent.id), false, "Its held message is deleted with it.");
+  assert.equal(turnInputs().length, turnsBeforeDelete, "The delete starts no turn.");
+  report.cases.push({
+    name: "an agent that a usage limit holds can be deleted",
+    details: { heldForDelete },
+    passed: true,
+  });
+
   const refused = await runCauseEffect(agents.resetProviderUsage("claude", DEFAULT_PROVIDER_ACCOUNT_ID)).then(
     () => null,
     (error: unknown) => (error instanceof Error ? error.message : String(error)),

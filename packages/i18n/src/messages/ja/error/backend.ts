@@ -259,6 +259,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "1 つのサーバーに置けるサイドバーのセクションは {limit} 個までです。",
   "error.backend.sectionNameRequired": "セクション名が必要です。",
   "error.backend.sectionNameTooLong": "セクション名が長すぎます。",
+  "error.backend.sidebarFolderTooDeep": "フォルダーは3階層までです。",
+  "error.backend.sidebarFolderMoveInvalid": "このフォルダーはそこへ移動できません。",
   "error.backend.sectionNameDuplicate": "セクション名は重複しないようにしてください。",
   "error.backend.directMessageRequired": "先にメッセージを入力してください。",
   "error.backend.directMessageTooLong": "ダイレクトメッセージは {limit} 文字までです。",

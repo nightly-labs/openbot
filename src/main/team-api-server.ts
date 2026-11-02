@@ -30,8 +30,10 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
@@ -77,6 +79,7 @@ import {
   isTeamCurrentCapability,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   legacyTeamCapabilities,
+  MCP_ACCOUNTS_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
@@ -138,7 +141,14 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
+import {
+  TEAM_REASONING_EFFORTS_CAPABILITY,
+  withLegacyReasoningEfforts,
+} from "@openbot/contracts/team-protocol/reasoning-efforts-v1";
+import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import { SIDEBAR_FOLDERS_CAPABILITY, sidebarFoldersEvent } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
+import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
@@ -207,6 +217,7 @@ import { routeAgentAccess } from "./team-api/route-agent-access";
 import {
   routeAgentAdmin,
   routeAgentBackupModels,
+  routeAgentFastMode,
   routeAgentHostSettings,
   routeAgentNewChat,
   routeAgentPlanCard,
@@ -216,6 +227,7 @@ import { routeAgentFolders } from "./team-api/route-agent-folders";
 import { routeAgentHidden, visibleSnapshot } from "./team-api/route-agent-hidden";
 import { routeAgentImport } from "./team-api/route-agent-import";
 import { routeAgentInstall } from "./team-api/route-agent-install";
+import { routeAgentInstructions } from "./team-api/route-agent-instructions";
 import { routeAgentMemoryPage } from "./team-api/route-agent-memories";
 import { routeAgentMemoryLimit } from "./team-api/route-agent-memory-limit";
 import { routeAgentNotificationLevels } from "./team-api/route-agent-notification-levels";
@@ -234,6 +246,7 @@ import { routeBrowser } from "./team-api/route-browser";
 import { routeBrowserProfiles } from "./team-api/route-browser-profiles";
 import { routeChannels } from "./team-api/route-channels";
 import { routeConnectors } from "./team-api/route-connectors";
+import { routeContextCompact } from "./team-api/route-context-compact";
 import { routeContextReset } from "./team-api/route-context-reset";
 import { routeConversationFiles } from "./team-api/route-conversation-files";
 import { routeCustomAgents } from "./team-api/route-custom-agents";
@@ -266,8 +279,11 @@ import { routePushNotifications } from "./team-api/route-push-notifications";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutineResults } from "./team-api/route-routine-results";
+import { routeServerAudit } from "./team-api/route-server-audit";
 import { routeSharedTables } from "./team-api/route-shared-tables";
 import { routeSideQuestion } from "./team-api/route-side-question";
+import { routeSidebarFolders } from "./team-api/route-sidebar-folders";
+import { routeSidebarPins } from "./team-api/route-sidebar-pins";
 import { routeSignInRelay } from "./team-api/route-sign-in-relay";
 import { routeSkillsAdmin } from "./team-api/route-skills-admin";
 import { routeStorage } from "./team-api/route-storage";
@@ -382,6 +398,7 @@ export class TeamApiServer {
   #stopAgentAccessListener: (() => void) | null = null;
   #stopMachineAlertListener: (() => void) | null = null;
   #stopNotificationLevelsListener: (() => void) | null = null;
+  #stopSidebarPinsListener: (() => void) | null = null;
   #localTypingAgentId: string | null = null;
   readonly #reportedUnrepresentableAgents = new Set<string>();
   #nextRateLimitSweepAt = 0;
@@ -484,6 +501,8 @@ export class TeamApiServer {
     // A change on one device of a member shows at once on their other devices.
     this.#stopNotificationLevelsListener =
       this.#options.agentNotificationLevels?.subscribe((memberId) => this.#sendNotificationLevels(memberId)) ?? null;
+    this.#stopSidebarPinsListener =
+      this.#options.sidebarPins?.subscribe((memberId) => this.#sendSidebarPins(memberId)) ?? null;
     this.#heartbeat = setInterval(() => {
       for (const [client, connection] of this.#eventClients) {
         if (!this.#options.store.authenticate(connection.token)) {
@@ -509,6 +528,8 @@ export class TeamApiServer {
     this.#stopMachineAlertListener = null;
     this.#stopNotificationLevelsListener?.();
     this.#stopNotificationLevelsListener = null;
+    this.#stopSidebarPinsListener?.();
+    this.#stopSidebarPinsListener = null;
     yield* Scope.close(this.#legacyConversationScope, Exit.void);
     this.#legacyConversationScope = Scope.makeUnsafe();
     for (const [client, connection] of this.#eventClients) {
@@ -693,6 +714,26 @@ export class TeamApiServer {
       const member = this.#connectionMember(connection);
       const hidden = this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member);
       client.send(JSON.stringify({ type: "agent-notification-levels-changed", ...levels.snapshot(memberId, hidden) }));
+    }
+  }
+
+  /**
+   * Sends a member's own pinned chats to each connection of that member, and to no other member. The
+   * list leaves out the agents that the connection cannot see, as `/v1/sidebar-pins` does.
+   */
+  #sendSidebarPins(memberId: string): void {
+    const pins = this.#options.sidebarPins;
+    if (!pins) return;
+    for (const [client, connection] of this.#eventClients) {
+      if (
+        connection.memberId !== memberId ||
+        !connection.capabilities.has(SIDEBAR_PINS_CAPABILITY) ||
+        client.readyState !== webSockets.WebSocket.OPEN
+      )
+        continue;
+      const member = this.#connectionMember(connection);
+      const hidden = this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member);
+      client.send(JSON.stringify({ type: "sidebar-pins-changed", ...pins.snapshot(memberId, hidden) }));
     }
   }
 
@@ -970,6 +1011,7 @@ export class TeamApiServer {
       if ((await routeAgentTaskLimit(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentNewChat(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentPlanCard(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeAgentFastMode(context, this.#options.admin, hidden)) === "handled") return;
       if (
         (await routeBrowserProfiles(context, this.#options.browserProfiles, this.#options.browser, hidden)) ===
         "handled"
@@ -978,7 +1020,10 @@ export class TeamApiServer {
       if ((await routeRoutineResults(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentSessionSettings(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFolders(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeAgentInstructions(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentHidden(context, this.#options.hiddenAgents, hidden)) === "handled") return;
+      if ((await routeSidebarFolders(context, this.#options.sidebarLayout, this.#options.agents, hidden)) === "handled")
+        return;
       if (
         (await routeAgentNotificationLevels(
           context,
@@ -988,6 +1033,7 @@ export class TeamApiServer {
         )) === "handled"
       )
         return;
+      if ((await routeSidebarPins(context, this.#options.sidebarPins, hidden)) === "handled") return;
       if ((await routeAgentTasks(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreads(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadReads(context, this.#options.agentTasks, hidden)) === "handled") return;
@@ -1018,7 +1064,13 @@ export class TeamApiServer {
         )) === "handled"
       )
         return;
+      if (
+        (await routeServerAudit(context, this.#options.serverAudit, this.#options.store.getIdentity()?.serverId)) ===
+        "handled"
+      )
+        return;
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentMemoryPage(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeConversationFiles(context, this.#options.agents)) === "handled") return;
@@ -1181,6 +1233,15 @@ export class TeamApiServer {
     this.#nextRateLimitSweepAt = now + RATE_LIMIT_SWEEP_MS;
   }
 
+  /** The value without the agents that this peer cannot see, as its event protocol describes them. */
+  #peerView(value: unknown, capabilities: ReadonlySet<string>, blocked: ReadonlySet<string>): unknown {
+    const protocol = eventProtocol(capabilities);
+    const hidden = hiddenProviderAgentIds(this.#options.agents.listAgents(), protocol);
+    for (const id of blocked) hidden.add(id);
+    const visible = protocol === 1 ? legacyProviderView(value, hidden) : hiddenAgentView(value, hidden, protocol);
+    return capabilities.has(TEAM_REASONING_EFFORTS_CAPABILITY) ? visible : withLegacyReasoningEfforts(visible);
+  }
+
   #encodeProviderEvent(
     event: AgentEvent | TeamRealtimeEvent,
     capabilities: ReadonlySet<string>,
@@ -1188,9 +1249,7 @@ export class TeamApiServer {
     blocked: ReadonlySet<string> = new Set(),
   ): string | null {
     const protocol = eventProtocol(capabilities);
-    const hidden = hiddenProviderAgentIds(this.#options.agents.listAgents(), protocol);
-    for (const id of blocked) hidden.add(id);
-    const visible = protocol === 1 ? legacyProviderView(event, hidden) : hiddenAgentView(event, hidden, protocol);
+    const visible = this.#peerView(event, capabilities, blocked);
     if (!isAgentEvent(visible) && !isTeamRealtimeEvent(visible)) return null;
     if (protocol !== 1) {
       const encoded = (
@@ -1375,12 +1434,22 @@ export class TeamApiServer {
                 status: event.status,
                 ...(event.origin === undefined ? {} : { origin: event.origin }),
               }
-            : optionalTeamEvent(
-                event.type === "agent-task-conversation"
-                  ? { ...event, snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities) }
-                  : event,
-                { agentTaskUiBlocks: connection.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY) },
-              );
+            : event.type === "sidebar-layout-changed" && connection.capabilities.has(SIDEBAR_FOLDERS_CAPABILITY)
+              ? // The layout with the parents. `sidebar-layout-changed` goes through the frozen adapter, which drops them.
+                // The layout leaves out the agents that this peer cannot see, as the read route does.
+                sidebarFoldersEvent({
+                  type: "sidebar-folders-changed",
+                  layout: this.#peerView(event.layout, connection.capabilities, blocked),
+                })
+              : optionalTeamEvent(
+                  event.type === "agent-task-conversation"
+                    ? {
+                        ...event,
+                        snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities),
+                      }
+                    : event,
+                  { agentTaskUiBlocks: connection.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY) },
+                );
       } catch (error) {
         // As for `encodeEvent`: a malformed optional event is skipped for this client only.
         (this.#options.logger ?? logger).warn("Team API event could not be encoded:", toLogValue(error));
@@ -1892,12 +1961,17 @@ export class TeamApiServer {
               route.protocol < 5 ? 4 : route.protocol < 6 ? 5 : route.protocol < 7 ? 6 : route.protocol < 8 ? 7 : 8,
             )
         : value;
+    // The levels after the five that released peers know go only to a peer that reads them.
+    const effortValue =
+      status < 400 && !route.capabilities.has(TEAM_REASONING_EFFORTS_CAPABILITY)
+        ? withLegacyReasoningEfforts(visibleValue)
+        : visibleValue;
     const sideRoute = teamSideRouteCodec(route.path);
     const encoded = sideRoute
-      ? JSON.stringify(sideRoute.response(route.path, status, visibleValue, options))
-      : teamHttpCodec(route.protocol).encodeResponse(route.method, route.path, status, visibleValue, options);
+      ? JSON.stringify(sideRoute.response(route.path, status, effortValue, options))
+      : teamHttpCodec(route.protocol).encodeResponse(route.method, route.path, status, effortValue, options);
     const body = route.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
-      ? withUiBlockAutoAnswers(encoded, visibleValue)
+      ? withUiBlockAutoAnswers(encoded, effortValue)
       : encoded;
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
@@ -1919,7 +1993,11 @@ export class TeamApiServer {
     const hidden = new Set<string>();
     for (const agent of agents) {
       try {
-        codec.encodeResponse("GET", TEAM_API_ROUTES.agents.all, 200, [agent], options);
+        // The list route sends a peer without reasoning-efforts-v1 the nearest level it knows.
+        const listed = capabilities.has(TEAM_REASONING_EFFORTS_CAPABILITY)
+          ? [agent]
+          : withLegacyReasoningEfforts([agent]);
+        codec.encodeResponse("GET", TEAM_API_ROUTES.agents.all, 200, listed, options);
       } catch {
         hidden.add(agent.id);
         const key = `${protocol}:${agent.id}`;
@@ -2039,6 +2117,9 @@ export class TeamApiServer {
               this.#options.remoteScreen?.checkSetup !== undefined && this.#options.remoteScreen?.test !== undefined
             );
           if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
+          // Each account signs in with the browser, so it needs the sign-in routes too.
+          if (capability === MCP_ACCOUNTS_CAPABILITY)
+            return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
           if (capability === MCP_SIGN_IN_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
           if (capability === MCP_SIGN_IN_APP_CAPABILITY)
@@ -2073,6 +2154,7 @@ export class TeamApiServer {
           if (capability === AGENT_SESSION_SETTINGS_CAPABILITY)
             return this.#options.admin?.sessionSettings !== undefined;
           if (capability === AGENT_FOLDERS_CAPABILITY) return this.#options.admin?.folders !== undefined;
+          if (capability === AGENT_INSTRUCTIONS_CAPABILITY) return this.#options.admin?.instructions !== undefined;
           if (capability === AGENT_HIDDEN_CAPABILITY) return this.#options.hiddenAgents !== undefined;
           if (capability === AGENT_TASKS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREADS_CAPABILITY) return this.#options.agentTasks !== undefined;
@@ -2085,6 +2167,7 @@ export class TeamApiServer {
           if (capability === AGENT_TASK_LIMIT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_NEW_CHAT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_PLAN_CARD_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+          if (capability === AGENT_FAST_MODE_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === BROWSER_PROFILES_CAPABILITY || capability === BROWSER_PROFILES_EVENTS_CAPABILITY)
             return this.#options.browserProfiles !== undefined;
           if (capability === SKILLS_ADMIN_CAPABILITY) return this.#options.admin?.skills !== undefined;
@@ -2117,6 +2200,7 @@ export class TeamApiServer {
           if (capability === PROMPT_CACHE_TTL_CAPABILITY) return this.#options.admin?.promptCacheTtl !== undefined;
           if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;
           if (capability === AGENT_ACCESS_CAPABILITY) return this.#options.agentAccess !== undefined;
+          if (capability === SERVER_AUDIT_CAPABILITY) return this.#options.serverAudit !== undefined;
           if (capability === HOST_UPDATE_CAPABILITY || capability === HOST_MEMBER_UPDATE_CAPABILITY)
             return this.#options.admin?.update !== undefined;
           if (capability === EVENTS_CAPABILITY) return this.#options.events !== undefined;
@@ -2134,6 +2218,7 @@ export class TeamApiServer {
           if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;
           if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
             return this.#options.agentNotificationLevels !== undefined;
+          if (capability === SIDEBAR_PINS_CAPABILITY) return this.#options.sidebarPins !== undefined;
           return true;
         },
       ),

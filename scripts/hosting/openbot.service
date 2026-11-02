@@ -15,8 +15,9 @@ User=@SERVICE_USER@
 RuntimeDirectory=openbot
 RuntimeDirectoryMode=0700
 Environment=XDG_RUNTIME_DIR=/run/openbot
-# As root (+), and OpenBot starts when it fails (-). It installs the update request units when an
-# older release moved this one into place; openbot-hosted-update says why.
+# As root (+), and OpenBot starts when it fails (-). It repairs the modes of the release, and installs
+# the update request units when an older release moved this one into place; openbot-hosted-update
+# says why.
 ExecStartPre=-+/opt/OpenBot/hosted/openbot-hosted-update trigger
 ExecStart=/opt/OpenBot/hosted/openbot-hosted-server
 # Stops OpenBot before its virtual displays, so that it closes its database first.

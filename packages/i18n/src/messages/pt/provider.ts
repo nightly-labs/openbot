@@ -114,6 +114,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, padrão",
   "provider.picker.effort": "Esforço",
   "provider.picker.effortLabel": "Esforço de raciocínio do agente",
+  "provider.picker.effortFixed": "{effort}, definido por {provider}",
   "provider.picker.fast": "Rápido",
   "provider.picker.fastLabel": "Modo rápido",
   "provider.picker.selectEffort": "Selecionar esforço",
@@ -122,11 +123,14 @@ export const messages = {
   "provider.status.signInRequired": "Login necessário",
   "provider.model.free": "Grátis",
   "provider.model.default": "padrão",
+  "provider.effort.none": "Nenhum",
+  "provider.effort.minimal": "Mínimo",
   "provider.effort.low": "Baixo",
   "provider.effort.medium": "Médio",
   "provider.effort.high": "Alto",
   "provider.effort.xhigh": "Muito alto",
   "provider.effort.max": "Máximo",
+  "provider.effort.ultra": "Ultra",
   "provider.museKey.title": "Chave de API da Meta para o Muse",
   "provider.museKey.description":
     "Salve uma chave de API da Meta no computador anfitrião ou use a CLI do Muse para entrar.",
@@ -199,6 +203,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "O OpenBot sai do {provider} neste computador. A CLI do {provider} no seu terminal também sai.",
   "provider.settings.disconnectHost": "O OpenBot sai do {provider} no servidor.",
+  "provider.settings.versionInstalledByUser": "{version} · instalada por você",
+  "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompts",
   "provider.settings.promptCacheDescription":

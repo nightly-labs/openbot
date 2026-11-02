@@ -86,6 +86,8 @@ export const messages = {
   "mobile.workflow.trigger.messageHint": "Измените этот триггер в OpenBot на компьютере.",
   "mobile.workflow.trigger.github": "GitHub",
   "mobile.workflow.trigger.githubHint": "Запускается, когда в репозитории GitHub что-то происходит.",
+  "mobile.workflow.trigger.discord": "Discord",
+  "mobile.workflow.trigger.discordHint": "Запускается, когда кто-то упоминает OpenBot на сервере Discord.",
   "mobile.workflow.trigger.startsWhen": "Запуск",
   "mobile.workflow.trigger.timezone": "Часовой пояс: {zone}",
   "mobile.workflow.trigger.serverZone": "Расписание использует часовой пояс сервера.",

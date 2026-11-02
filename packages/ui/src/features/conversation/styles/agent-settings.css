@@ -31,7 +31,8 @@
   height: 128%;
 }
 
-.agent-settings-avatar:hover {
+/* A photo keeps its own colours, as on mobile, so only a generated face lights up. */
+.agent-settings-avatar:hover:not(:has(.agent-avatar-custom)) {
   filter: brightness(1.08);
 }
 
@@ -168,10 +169,17 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
+/*
+ * Only the card shows hover. The ghost button hover would paint the row a second colour, so the row
+ * and the switch area would not match.
+ */
 @media (hover: hover) and (pointer: fine) {
-  .agent-routine-card:has(.agent-routine-row:hover),
-  .agent-routine-row:hover {
+  .agent-routine-card:has(.agent-routine-row:hover) {
     background: var(--openbot-hover);
+  }
+
+  .agent-routine-list-item > .agent-routine-row:hover:not(:disabled) {
+    background: transparent;
   }
 }
 
