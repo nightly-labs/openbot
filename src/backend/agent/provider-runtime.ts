@@ -42,6 +42,7 @@ import {
   CodexCliError,
   cliPathEnvironment,
   cliSpawnTarget,
+  kimiCodeLoginArgs,
   resolveInstalledFirst,
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
@@ -1813,13 +1814,16 @@ export class ProviderRuntime implements ProviderPort {
       .startCode(
         provider,
         (cli) =>
-          startCliCodeLogin({
-            flow,
-            executable: cli.executable,
-            argv: command.argv,
-            env: { ...cliPathEnvironment(cli), ...command.env(cli) },
-            timeoutMs: command.timeoutMs,
-            ...(command.closeInput ? { closeInput: true } : {}),
+          Effect.gen(function* () {
+            const argv = provider === "kimi" ? yield* kimiCodeLoginArgs(cli) : command.argv;
+            return yield* startCliCodeLogin({
+              flow,
+              executable: cli.executable,
+              argv,
+              env: { ...cliPathEnvironment(cli), ...command.env(cli) },
+              timeoutMs: command.timeoutMs,
+              ...(command.closeInput ? { closeInput: true } : {}),
+            });
           }),
         command.timeoutMs,
       )
