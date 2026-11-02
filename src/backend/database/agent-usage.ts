@@ -157,7 +157,10 @@ export class AgentUsage {
           ).run(sample.agentId, sample.costCounterId, JSON.stringify({ reportedCost }));
         if ((!before && sample.baseline) || sample.turnId === "baseline") return null;
         // A resumed Claude process reports its cost from 0, so the cost of its first turn is unknown.
-        // That turn, and a Claude report with no cost, are priced from list rates instead.
+        // That turn, and a Claude report with no cost, are priced from list rates instead. The basis
+        // names the source of a kept cost: an OpenCode report and an ACP cost counter book the
+        // session total that the provider itself reported, and a Claude report carries the SDK's
+        // list-price estimate.
         const reported =
           sample.reportedCost === undefined ||
           sample.reportedCost === null ||
@@ -169,7 +172,9 @@ export class AgentUsage {
                 basis:
                   sample.provider === "opencode"
                     ? "OpenCode session cost report; API-equivalent rates, not subscription charges"
-                    : "Claude SDK list-price estimate; https://platform.claude.com/docs/en/about-claude/pricing; verified 2026-09-07",
+                    : sample.costCounterId
+                      ? "ACP session cost report; the session total the agent reported in USD"
+                      : "Claude SDK list-price estimate; https://platform.claude.com/docs/en/about-claude/pricing; verified 2026-09-07",
               };
         const turn = databaseRow(
           db

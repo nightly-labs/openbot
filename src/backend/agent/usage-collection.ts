@@ -142,7 +142,8 @@ export function collectProviderUsage(
   // ACP `Usage` is session-cumulative by contract: its fields are documented as "Sum of all token
   // types across session" and "Total input tokens across all turns". So one counter per session,
   // like Codex, and the first report of a session that predates collection is a baseline: it
-  // carries tokens spent before analytics existed.
+  // carries tokens spent before analytics existed. The `usage_update` cost is the session's total,
+  // so its own counter keeps the last one, as for OpenCode (#4181).
   usage.record({
     agentId: agent.id,
     sessionId: session.id,
@@ -150,6 +151,8 @@ export function collectProviderUsage(
     provider: session.provider,
     model,
     counterId: `${session.id}:grok`,
+    costCounterId: `${session.id}:grok:cost`,
+    reportedCost: isDynamicRecord(params) ? cost(params.cost) : null,
     baseline: session.createdAt < usage.collectionStartedAt(),
     tokens: acpTokens(value),
   });
@@ -197,13 +200,16 @@ export function memoryReviewUsageObserver(
 /** An ACP `Usage`, whose `inputTokens` include the cache reads and writes. */
 function acpTokens(value: DynamicRecord): UsageTokens {
   const input = count(value.inputTokens);
-  const cached = count(value.cachedReadTokens);
-  const creation = count(value.cachedWriteTokens);
+  // The cache fields are optional in ACP `Usage` and agents leave them out when they are 0, so a
+  // missing one is 0 instead of an unknown that also blinds the uncached input (#4181). That read
+  // trusts the agent to leave a field out only when its count is 0.
+  const cached = count(value.cachedReadTokens ?? 0);
+  const creation = count(value.cachedWriteTokens ?? 0);
+  const cache = (cached ?? 0) + (creation ?? 0);
   return {
-    uncachedInput:
-      input !== null && cached !== null && creation !== null && input >= cached + creation
-        ? input - cached - creation
-        : null,
+    // An agent that reports the uncached input on its own sends `input` below the cache it used;
+    // keeping `input` as the uncached count then loses no report (#4181).
+    uncachedInput: input !== null && cache <= input ? input - cache : input,
     cachedInput: cached,
     cacheCreation: creation,
     output: count(value.outputTokens),
