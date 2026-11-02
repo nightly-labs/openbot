@@ -270,6 +270,13 @@ export const messages = {
   "error.provider.kimiNotStarted": "Kimi を起動できませんでした。ターミナルで `kimi --version` を実行してください。",
   "error.provider.kimiVersionUnreadable": "Kimi CLI のバージョンを読み取れません。",
   "error.provider.kimiSignIn": "Kimi を使うには Kimi Code でサインインしてください。",
+  "error.provider.hermesMissing":
+    "Hermes Agent がインストールされていません。インストールしてから、もう一度お試しください。",
+  "error.provider.hermesNotStarted":
+    "Hermes Agent を起動できませんでした。ターミナルで `hermes --version` を実行してください。",
+  "error.provider.hermesVersionUnreadable": "Hermes Agent のバージョンを読み取れません。",
+  "error.provider.hermesSignIn":
+    "Hermes を使うには、Nous Portal でサインインするか、ターミナルで `hermes setup` を実行してください。",
   "error.provider.usageLimitReached": "アカウントが使用量の上限に達しました。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",

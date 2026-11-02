@@ -1198,6 +1198,8 @@ function isRoutineRunFinished(status: RoutineRunConversationEventStatus): boolea
  * That costs the model breakdown for OpenCode, which is the cheaper of the two mistakes.
  */
 function reportedModel(value: string): string {
+  // Hermes names a model of the user's own endpoint `custom:<endpoint name>:<model>`.
+  if (value.startsWith("custom:")) return "custom";
   const separator = value.indexOf("/");
   if (separator < 0) return value;
   // A key-only provider never puts its own id before a model id, so that prefix comes from OpenCode.

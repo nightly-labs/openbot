@@ -44,6 +44,7 @@ export const messages = {
   "onboarding.provider.cursorPlan": "Cursor プランまたは API キー",
   "onboarding.provider.clineAccount": "Cline アカウントで無料モデル",
   "onboarding.provider.kimiAccount": "Kimi Code アカウントで Kimi モデル",
+  "onboarding.provider.hermesNous": "Nous Portal プランまたはお使いの Hermes の設定",
   "onboarding.provider.inceptionKey": "Inception API キーで Mercury モデル",
   "onboarding.provider.deepseekKey": "DeepSeek API キーで使う DeepSeek モデル",
   "onboarding.provider.openrouterKey": "OpenRouter API キーで使う多数のモデル",

@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import type { ClientSideConnection, InitializeResponse } from "@agentclientprotocol/sdk";
+import { type ClientSideConnection, type InitializeResponse, RequestError } from "@agentclientprotocol/sdk";
 import {
   type AgentAuthState,
   type AgentModelOption,
@@ -14,7 +14,13 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
-import { CURSOR_ACP_FLAVOR, customAgentFlavor, DEFAULT_ACP_FLAVOR, KIMI_ACP_FLAVOR } from "./acp-flavor";
+import {
+  CURSOR_ACP_FLAVOR,
+  customAgentFlavor,
+  DEFAULT_ACP_FLAVOR,
+  HERMES_ACP_FLAVOR,
+  KIMI_ACP_FLAVOR,
+} from "./acp-flavor";
 import { ANTIGRAVITY_ACP_FLAVOR } from "./acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
 import { readMuseAccount } from "./agent/muse-login";
@@ -39,6 +45,7 @@ import {
   resolveCodexCli,
   resolveCursorCli,
   resolveGrokCli,
+  resolveHermesCli,
   resolveKimiCli,
   resolveMuseCli,
   resolveOpencodeCli,
@@ -70,6 +77,8 @@ import {
   cursorConfinedEnv,
   cursorStatePaths,
   customAgentStatePaths,
+  hermesHome,
+  hermesStatePaths,
   kimiStatePaths,
   museStatePaths,
   OPENCODE_CONFINED_ENV,
@@ -87,6 +96,11 @@ interface ProviderCliCommand {
   readonly argv: readonly string[];
   readonly env: (cli: AgentCliInfo) => Record<string, string>;
   readonly timeoutMs: number;
+  /**
+   * A code sign-in closes the CLI's input at once, so that a question the CLI asks first gets its
+   * default answer instead of waiting. Only for a `device` or `link` sign-in, which reads no code.
+   */
+  readonly closeInput?: true;
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -290,6 +304,36 @@ function confineClineTarget(target: SpawnTarget, confinement: ProcessConfinement
   const state = clineStatePaths();
   for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
   return confineSpawnTarget(target, confinement, state);
+}
+
+/** `hermes acp` serves the Agent Client Protocol on stdio. */
+const HERMES_ARGV: readonly string[] = ["acp"];
+
+/** The Nous Portal sign-in, which `hermes auth add` keeps beside the user's other Hermes sign-ins. */
+const HERMES_NOUS_SIGN_IN: readonly string[] = ["auth", "add", "nous", "--type", "oauth"];
+
+/**
+ * Hermes Agent 0.21.5 lists its provider as an auth method only when the provider's credential
+ * resolves: a keyless local endpoint gets a placeholder key, so it counts. Without one, it lists only
+ * its terminal setup, and each new session fails with "Internal error". The real cause is only in
+ * its stderr, so the sign-in state comes from this list.
+ */
+const HERMES_SETUP_METHOD = "hermes-setup";
+function requireHermesProvider(_connection: ClientSideConnection, initialization: InitializeResponse) {
+  const methods = initialization.authMethods ?? [];
+  return methods.length > 0 && methods.every((method) => method.id === HERMES_SETUP_METHOD)
+    ? Effect.fail(providerFailure(RequestError.authRequired()))
+    : Effect.void;
+}
+
+/** The sandbox lets a Hermes process write in its folder, not create it, so OpenBot makes it. */
+function confineHermesTarget(
+  target: SpawnTarget,
+  confinement: ProcessConfinement,
+  env: NodeJS.ProcessEnv,
+): SpawnTarget {
+  mkdirSync(hermesHome(env), { recursive: true, mode: 0o700 });
+  return confineSpawnTarget(target, confinement, hermesStatePaths(env));
 }
 
 /** The managed Kimi CLI must not replace itself. */
@@ -496,11 +540,11 @@ export interface BuiltInProviderDriver {
   id: AgentProviderId;
   signIn: ProviderSignIn;
   /**
-   * The file the provider's CLI writes when the user signs in with it. The host checks the account
-   * again when this file changes, so a sign-in done outside OpenBot, such as over SSH, needs no
+   * The files the provider's CLI writes when the user signs in with it. The host checks the account
+   * again when one of them changes, so a sign-in done outside OpenBot, such as over SSH, needs no
    * restart. Absent for a provider that OpenBot always signs in itself.
    */
-  signInFile?(): string;
+  signInFiles?(): readonly string[];
   /** Absent for a provider that has no sign-in on another device. */
   codeSignIn?: ProviderCodeSignIn;
   /** Absent for a provider that holds one account only. */
@@ -600,7 +644,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   {
     id: "pi",
     signIn: { kind: "terminal", timeoutMs: CLI_LOGIN_TIMEOUT_MS },
-    signInFile: () => join(piAgentDirectory(), "auth.json"),
+    signInFiles: () => [join(piAgentDirectory(), "auth.json")],
     resolveCli: resolvePiCli,
     createClient: (cli, timeout, context, confinement) => piClient("pi", cli, timeout, context, confinement),
     createProfileClient: (cli, timeout, context) => piProfileClient("pi", cli, timeout, context),
@@ -1070,6 +1114,67 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "kimi", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "hermes",
+    // `auth add nous --type oauth` signs in with a Nous Portal subscription: it opens the Nous Portal
+    // device page, and waits until the user approves it. Without a terminal, the CLI takes the
+    // Nous sign-in that another Hermes profile saved before it asks for a new one.
+    signIn: {
+      kind: "cli-command",
+      command: { argv: HERMES_NOUS_SIGN_IN, env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    },
+    // With `--no-browser`, the CLI prints the page and the code, and waits until the user approves it.
+    codeSignIn: {
+      kind: "cli",
+      flow: "device",
+      command: {
+        argv: [...HERMES_NOUS_SIGN_IN, "--no-browser"],
+        env: () => ({}),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+        closeInput: true,
+      },
+    },
+    // `hermes auth` and an OAuth provider of `hermes setup` or `hermes model` write `auth.json`. An
+    // API key goes in `.env`, and the provider choice in `config.yaml`.
+    signInFiles: () => ["auth.json", ".env", "config.yaml"].map((name) => join(hermesHome(), name)),
+    resolveCli: () => resolveHermesCli(),
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "hermes",
+        flavor: HERMES_ACP_FLAVOR,
+        argv: HERMES_ARGV,
+        env: {},
+        // The agent environment can name another `HERMES_HOME`, and the process gets it.
+        ...(confinement
+          ? {
+              confine: (target) =>
+                confineHermesTarget(target, confinement, { ...process.env, ...context.agentEnvironment?.() }),
+            }
+          : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        signInMessage: sourceText("error.provider.hermesSignIn"),
+        authenticate: requireHermesProvider,
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpEndpoint: context.mcpEndpoint,
+        history: context.history?.("hermes"),
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "hermes",
+        flavor: HERMES_ACP_FLAVOR,
+        argv: HERMES_ARGV,
+        profileGeneration: true,
+        env: {},
+        signInMessage: sourceText("error.provider.hermesSignIn"),
+        authenticate: requireHermesProvider,
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "hermes", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
   {

@@ -265,6 +265,11 @@ export const messages = {
   "error.provider.kimiNotStarted": "Não foi possível iniciar o Kimi. Execute `kimi --version` em um terminal.",
   "error.provider.kimiVersionUnreadable": "Não foi possível ler a versão da CLI do Kimi.",
   "error.provider.kimiSignIn": "Entre com o Kimi Code para usar o Kimi.",
+  "error.provider.hermesMissing": "O Hermes Agent não está instalado. Instale-o e tente novamente.",
+  "error.provider.hermesNotStarted":
+    "Não foi possível iniciar o Hermes Agent. Execute `hermes --version` em um terminal.",
+  "error.provider.hermesVersionUnreadable": "Não é possível ler a versão do Hermes Agent.",
+  "error.provider.hermesSignIn": "Entre com o Nous Portal ou execute `hermes setup` em um terminal para usar o Hermes.",
   "error.provider.usageLimitReached": "A conta atingiu seu limite de uso.",
   "error.provider.foreignReasoning":
     "{provider} não aceitou o raciocínio anterior neste chat porque ele foi recebido por outra conta ou chave de API. O OpenBot iniciou uma nova sessão de {provider} com o histórico do chat. Tente novamente.",

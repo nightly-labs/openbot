@@ -259,6 +259,11 @@ export const messages = {
   "error.provider.kimiNotStarted": "Kimi를 시작할 수 없었어요. 터미널에서 `kimi --version`을 실행해 보세요.",
   "error.provider.kimiVersionUnreadable": "Kimi CLI 버전을 읽을 수 없어요.",
   "error.provider.kimiSignIn": "Kimi를 사용하려면 Kimi Code로 로그인하세요.",
+  "error.provider.hermesMissing": "Hermes Agent가 설치되어 있지 않습니다. 설치한 후 다시 시도하세요.",
+  "error.provider.hermesNotStarted": "Hermes Agent를 시작할 수 없습니다. 터미널에서 `hermes --version`을 실행하세요.",
+  "error.provider.hermesVersionUnreadable": "Hermes Agent 버전을 읽을 수 없습니다.",
+  "error.provider.hermesSignIn":
+    "Hermes를 사용하려면 Nous Portal로 로그인하거나 터미널에서 `hermes setup`을 실행하세요.",
   "error.provider.usageLimitReached": "계정이 사용 한도에 도달했어요.",
   "error.provider.foreignReasoning":
     "다른 계정이나 API 키가 받은 추론이라서 {provider}이(가) 이 채팅의 이전 추론을 수락하지 않았어요. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했어요. 다시 시도해 주세요.",

@@ -808,6 +808,35 @@ neutral `unknown` logo. They do not reset the agent. The model picker and the ba
 out the models of that provider. Host types (`AgentProviderId`, the database, the drivers) stay
 closed.
 
+### Hermes
+
+The Hermes provider (id `hermes`) starts the user's own Hermes Agent with `hermes acp`. OpenBot has
+no managed runtime for it: a newer Hermes moves `state.db` and `config.yaml` in `~/.hermes` forward,
+and the user's own older Hermes then cannot read them. `resolveHermesCli` looks for `hermes` on
+`PATH` and in `~/.local/bin`, and reads the version from `Hermes Agent vX.Y.Z` in `hermes --version`.
+A missing CLI is `not-installed`, and the row opens the `hermes-install` guide. The process keeps
+the user's `HERMES_HOME` (or `~/.hermes`, `%LOCALAPPDATA%\hermes` on Windows), so the user's memories,
+skills, sign-ins and `SOUL.md` apply. `hermesStatePaths` lets a confined process write that folder
+and protects the Hermes code, `config.yaml`, `.env`, `SOUL.md`, skills, hooks, cron, plugins and
+profiles in it.
+
+Sign in runs `hermes auth add nous --type oauth`, the Nous Portal device-code login. Its first
+question imports shared Nous credentials, and EOF answers yes, so the code sign-in closes the CLI's
+input (`closeInput`). `parseCliCodePrompt` takes the `Open:` URL, not the `Portal:` URL that Hermes
+prints first. `signInFile` watches the change time of `auth.json`, so a `hermes setup` or `hermes
+auth` in a terminal ends a `sign-in-required` state. Models are `provider:model` ids with the name
+`<Provider> · <model>`; the picker groups them by provider. A `nous:` model counts as a
+subscription in analytics.
+
+Hermes 0.21.5 advertises `session/resume`, but a resume of a missing session makes a new session
+and the reply does not carry its id: each later prompt to the saved id would end as "refusal".
+`HERMES_ACP_FLAVOR.loadInsteadOfResume` restores with `session/load`, whose reply for a missing
+session is null, which the SDK gives as `{}`; a reply with no `modes` is a missing session.
+Hermes reads only one project context file: `.hermes.md` or `HERMES.md` before `AGENTS.md`. It
+reads project skills only in a git root that `skills.trusted_project_dirs` names. A turn that fails
+with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API
+protocols below 8 hide Hermes; protocol 8 and newer carry it as any other provider id.
+
 ### Custom agents
 
 The provider `acp` runs ACP programs that the user saves. The model id names the agent:
