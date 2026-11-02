@@ -13,20 +13,25 @@ type ContinuationKind = "plan" | "nextStep";
 const NEXT_STEP_LIMIT = 2;
 /** A longer answer is a report, not a turn that stopped before the step it named. */
 const NEXT_STEP_ANSWER_MAX = 400;
-const CONTINUE_VERB = "(?:continue|proceed|keep going|go on|carry on|move on|go ahead)";
+/** Verbs that mean "go on with the same work". "Proceed" and "go ahead" ask for approval, so they block. */
+const CONTINUE_VERB = "(?:continue|keep going|go on|carry on|move on)";
 const REST_OF_WORK = String.raw`(?:\s+(?:with|to|on)\s+(?:the\s+)?(?:next(?:\s+(?:steps?|ones?|parts?|phases?|items?))?|rest(?:\s+of\s+(?:it|them|the\s+(?:steps|work|plan|list)))?|remaining(?:\s+(?:steps|work|items|parts|ones))?|steps?\s+\d+))?`;
 /**
- * A question that only asks whether to go on with the work, such as "Shall I continue?" or "Want me
- * to proceed with the next step?". A question about a named action, such as "Should I proceed with
- * the deploy?", does not match: the user must answer it.
+ * A last line that only asks whether to go on with the work, such as "Shall I continue?" or "Step
+ * one is done. Want me to continue with the next step?". Text in front of the question must end a
+ * statement, so another question in the line still blocks. A question about a named action, such as
+ * "Should I continue with the deploy?" or "Proceed?", does not match: the user must answer it.
  */
 const ASKS_TO_CONTINUE = new RegExp(
-  String.raw`(?:^|[.!?;:]\s+)(?:(?:(?:shall|should|can|may)\s+i|(?:do\s+you\s+)?want\s+me\s+to|would\s+you\s+like\s+me\s+to|ok(?:ay)?\s+(?:if\s+i|to))\s+)?${CONTINUE_VERB}${REST_OF_WORK}\s*\?+$`,
+  String.raw`^(?:[^?？]*[.!]\s+)?(?:(?:(?:shall|should|can|may)\s+i|(?:do\s+you\s+)?want\s+me\s+to|would\s+you\s+like\s+me\s+to|ok(?:ay)?\s+(?:if\s+i|to))\s+)?${CONTINUE_VERB}${REST_OF_WORK}\s*\?+$`,
   "i",
 );
-/** A short answer whose last words name a next step, such as "I'll now run the tests." */
+/**
+ * A short answer whose last words name the agent's next step, such as "I'll now run the tests." An
+ * answer that says the agent waits, holds or stops does not match.
+ */
 const NAMES_NEXT_STEP =
-  /(?:\blet me now\b|\bi(?:['\u2019])?ll now\b|\bi will now\b|\bnow i(?:['\u2019]ll| will)\b|\bnext[,:] i\b)[^.!?\n]{0,100}[.:\u2026]?\s*$/i;
+  /(?:\blet me now\b|\bnow let me\b|\bi['\u2019]ll now\b|\bi will now\b|\bnow i(?:['\u2019]ll| will)\b|\bnext,?\s+i(?:['\u2019]ll| will)\b)(?!\s+(?:wait|hold|pause|stop)\b)[^.!?\n]{0,100}[.:\u2026]?\s*$/i;
 
 /** The last line of an answer, without Markdown emphasis, code, quote or heading marks. */
 function lastLine(answer: string | undefined): string {

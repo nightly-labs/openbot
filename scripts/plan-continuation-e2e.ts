@@ -11,7 +11,8 @@
 //   3. A continuation that does not change the open steps stops the chain.
 //   4. An answer whose last line asks a question does not continue. A question about a named action
 //      does not continue either.
-//   4a. An answer that only asks whether to continue keeps a plan with open steps going.
+//   4a. An answer that only asks whether to continue keeps a plan with open steps going. An
+//       approval question ("Proceed?"), a real question before it, or a wait does not continue.
 //   4b. A turn with no plan continues when its answer ends on a next step or asks whether to
 //       continue, at most 2 times for one request. A long report that ends on a next step does not.
 //   5. A turn that opens a wait does not continue.
@@ -453,6 +454,41 @@ try {
     return { turns: 1 };
   });
 
+  await check("approval questions, hidden questions and waits do not continue", async () => {
+    const agent = await createAgent("Careful");
+    const answers = [
+      "This drops the users table in production. Proceed?",
+      "Should I go ahead?",
+      "Do you want Postgres or SQLite? Shall I continue?",
+      "Should I continue with the deploy?",
+      "I'll now wait for your approval.",
+      "Next, I would restart the production service.",
+    ];
+    for (const answer of answers) {
+      const mark = loggedTurns().length;
+      const id = await send(
+        agent.id,
+        `Check it. ${plan({
+          steps: [
+            ["Prepare", "completed"],
+            ["Run it", "pending"],
+          ],
+          answer,
+        })}`,
+      );
+      assert.equal(await settled(id), "completed");
+      assert.equal(turnsSince(mark).length, 1, `No continuation turn runs after: ${answer}`);
+    }
+    for (const answer of answers.slice(4)) {
+      const mark = loggedTurns().length;
+      const id = await send(agent.id, `Check it again. ${plan({ steps: [], answer })}`);
+      assert.equal(await settled(id), "completed");
+      assert.equal(turnsSince(mark).length, 1, `No next-step turn runs after: ${answer}`);
+    }
+    assert.equal(continuationLines(agent.id).length, 0);
+    return { answers: answers.length };
+  });
+
   await check("an answer that only asks whether to continue keeps the plan going", async () => {
     const agent = await createAgent("Permission");
     const mark = loggedTurns().length;
@@ -522,7 +558,7 @@ try {
   await check("a request with no plan continues at most 2 times for a next step", async () => {
     const agent = await createAgent("Repeater");
     const mark = loggedTurns().length;
-    const stalled: FakeTurn = { steps: [], answer: "Next, I run the tests." };
+    const stalled: FakeTurn = { steps: [], answer: "Next, I'll run the tests." };
     const id = await send(agent.id, `Test it. ${plan(stalled, stalled, stalled, stalled)}`);
     assert.equal(await settled(id), "completed");
     assert.deepEqual(
