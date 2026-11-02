@@ -108,7 +108,7 @@ const historySchema = z.object({
   pushNames: z.array(z.tuple([z.string(), z.string()])).default([]),
 });
 
-/** How many messages one chat keeps, newest first. Older ones go when new ones come. */
+/** How many recent messages one chat saves, and how many older messages it caches in memory. */
 export const MESSAGES_PER_CHAT = 200;
 /** How many chats are kept, by their last activity. */
 export const MAX_CHATS = 1_000;
@@ -172,6 +172,11 @@ export interface WhatsAppMessageItem {
   deleted: boolean;
 }
 
+interface WhatsAppOlderPage {
+  anchor: WhatsAppStoredMessage;
+  messages: WhatsAppStoredMessage[];
+}
+
 /**
  * The chats and messages of the linked device, in memory. `changed` is called after each change, so
  * the owner can schedule a write.
@@ -180,6 +185,9 @@ export class WhatsAppHistory {
   readonly #chats = new Map<string, WhatsAppStoredChat>();
   /** Per chat, oldest first. */
   readonly #messages = new Map<string, WhatsAppStoredMessage[]>();
+  /** Each page keeps its anchor, so eviction cannot join messages across a gap. */
+  readonly #olderPages = new Map<string, WhatsAppOlderPage[]>();
+  readonly #collectingPages = new Set<WhatsAppOlderPage>();
   /** The names that the user saved for people on the phone. */
   readonly #contacts = new Map<string, string>();
   /** The names that people set for themselves in WhatsApp. A saved name comes first. */
@@ -265,6 +273,7 @@ export class WhatsAppHistory {
   deleteChat(id: string): void {
     this.#chats.delete(id);
     this.#messages.delete(id);
+    this.#olderPages.delete(id);
     this.#changed();
   }
 
@@ -294,7 +303,7 @@ export class WhatsAppHistory {
 
   /** Applies an edit or a deletion that came as its own message. */
   changeMessage(chat: string, id: string, change: { text?: string; deleted?: boolean }): void {
-    const message = this.#messages.get(chat)?.find((item) => item.id === id);
+    const message = this.message(chat, id);
     if (!message) return;
     if (change.deleted) {
       message.deleted = true;
@@ -311,6 +320,17 @@ export class WhatsAppHistory {
 
   #insert(message: WhatsAppStoredMessage): void {
     const list = this.#messages.get(message.chat) ?? [];
+    for (const page of this.#olderPages.get(message.chat) ?? []) {
+      const index = page.messages.findIndex((item) => item.id === message.id);
+      if (index >= 0) page.messages[index] = message;
+      if (page.anchor.id === message.id) page.anchor = message;
+    }
+    for (const page of this.#collectingPages) {
+      if (page.anchor.chat !== message.chat || message.id === page.anchor.id || message.at > page.anchor.at) continue;
+      const index = page.messages.findIndex((item) => item.id === message.id);
+      if (index >= 0) page.messages[index] = message;
+      else if (page.messages.length < MESSAGES_PER_CHAT) page.messages.push(message);
+    }
     const index = list.findIndex((item) => item.id === message.id);
     if (index >= 0) list[index] = message;
     else {
@@ -323,12 +343,29 @@ export class WhatsAppHistory {
     this.#messages.set(message.chat, list);
   }
 
+  /** Collects a phone reply before the saved-history limit trims it. Call the result when the request ends. */
+  collectOlderPage(anchor: WhatsAppStoredMessage): () => void {
+    const page: WhatsAppOlderPage = { anchor, messages: [] };
+    this.#collectingPages.add(page);
+    return () => {
+      this.#collectingPages.delete(page);
+      if (!page.messages.length || !this.#chats.has(anchor.chat)) return;
+      page.messages.sort((a, b) => a.at - b.at);
+      const pages = (this.#olderPages.get(anchor.chat) ?? []).filter((item) => item.anchor.id !== anchor.id);
+      pages.push(page);
+      let count = pages.reduce((total, item) => total + item.messages.length, 0);
+      while (count > MESSAGES_PER_CHAT && pages.length > 1) count -= pages.shift()?.messages.length ?? 0;
+      this.#olderPages.set(anchor.chat, pages);
+    };
+  }
+
   #trimChats(): void {
     if (this.#chats.size <= MAX_CHATS) return;
     const oldest = [...this.#chats.values()].sort((a, b) => a.lastAt - b.lastAt);
     for (const chat of oldest.slice(0, this.#chats.size - MAX_CHATS)) {
       this.#chats.delete(chat.id);
       this.#messages.delete(chat.id);
+      this.#olderPages.delete(chat.id);
     }
   }
 
@@ -356,11 +393,23 @@ export class WhatsAppHistory {
   }
 
   messages(chat: string): readonly WhatsAppStoredMessage[] {
-    return this.#messages.get(chat) ?? [];
+    const messages = new Map<string, WhatsAppStoredMessage>();
+    for (const page of this.#olderPages.get(chat) ?? []) {
+      for (const message of page.messages) messages.set(message.id, message);
+    }
+    for (const message of this.#messages.get(chat) ?? []) messages.set(message.id, message);
+    return [...messages.values()].sort((a, b) => a.at - b.at);
   }
 
   message(chat: string, id: string): WhatsAppStoredMessage | null {
-    return this.#messages.get(chat)?.find((message) => message.id === id) ?? null;
+    const recent = this.#messages.get(chat)?.find((message) => message.id === id);
+    if (recent) return recent;
+    for (const page of this.#olderPages.get(chat) ?? []) {
+      const message = page.messages.find((message) => message.id === id);
+      if (message) return message;
+      if (page.anchor.id === id) return page.anchor;
+    }
+    return null;
   }
 
   #item(message: WhatsAppStoredMessage): WhatsAppMessageItem {
@@ -422,12 +471,35 @@ export class WhatsAppHistory {
     chat: string,
     options: { limit: number; beforeId: string | null; since: Date | null },
   ): { messages: WhatsAppMessageItem[]; has_more: boolean; before_found: boolean } {
+    const pages = this.#olderPages.get(chat) ?? [];
     let list = this.#messages.get(chat) ?? [];
     let beforeFound = true;
     if (options.beforeId) {
       const index = list.findIndex((message) => message.id === options.beforeId);
-      beforeFound = index >= 0;
-      list = index >= 0 ? list.slice(0, index) : [];
+      if (index >= 0) list = list.slice(0, index);
+      else {
+        const page = pages.findLast(
+          (page) =>
+            page.anchor.id === options.beforeId || page.messages.some((message) => message.id === options.beforeId),
+        );
+        beforeFound = page !== undefined;
+        list = page
+          ? page.anchor.id === options.beforeId
+            ? page.messages
+            : page.messages.slice(
+                0,
+                page.messages.findIndex((message) => message.id === options.beforeId),
+              )
+          : [];
+      }
+    }
+    const used = new Set<WhatsAppOlderPage>();
+    while (beforeFound) {
+      const first = list[0]?.id ?? options.beforeId;
+      const page = pages.findLast((page) => page.anchor.id === first && !used.has(page));
+      if (!page) break;
+      used.add(page);
+      list = [...page.messages, ...list];
     }
     if (options.since) {
       const since = options.since.getTime() / 1000;
@@ -452,7 +524,7 @@ export class WhatsAppHistory {
     for (const id of chats) {
       const chat = this.#chats.get(id);
       if (!chat) continue;
-      for (const message of this.#messages.get(id) ?? []) {
+      for (const message of this.messages(id)) {
         const text = `${message.text} ${message.media ?? ""}`.toLocaleLowerCase();
         if (!message.deleted && words.every((word) => text.includes(word))) found.push({ message, chat });
       }

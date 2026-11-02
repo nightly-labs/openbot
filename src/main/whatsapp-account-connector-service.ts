@@ -18,7 +18,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
-import { Duration, Effect, Option, Result } from "effect";
+import { Duration, Effect, Option, Result, Semaphore } from "effect";
 import type {
   WhatsAppAccountClient,
   WhatsAppAccountClientEvents,
@@ -174,6 +174,7 @@ interface Session {
   client: WhatsAppClientLike | null;
   auth: WhatsAppStoredAuth;
   history: WhatsAppHistory;
+  historyRequests: Map<string, Semaphore.Semaphore>;
   online: boolean;
 }
 
@@ -545,7 +546,13 @@ export class WhatsAppAccountConnectorService {
     this.#link = null;
     const phone = jidPhone(account.id);
     if (phone) registerPhoneNumber(phone);
-    const session: Session = { client: link.client, auth: link.auth, history: link.history, online: true };
+    const session: Session = {
+      client: link.client,
+      auth: link.auth,
+      history: link.history,
+      historyRequests: new Map(),
+      online: true,
+    };
     link.route.events = this.#sessionEvents(session);
     link.history.setOwnId(account.id || null);
     this.#attachSession(session);
@@ -625,7 +632,7 @@ export class WhatsAppAccountConnectorService {
       });
     const history = (Result.isSuccess(stored) ? stored.success : null) ?? new WhatsAppHistory();
     history.setOwnId(record.account.id);
-    const session: Session = { client: null, auth, history, online: false };
+    const session: Session = { client: null, auth, history, historyRequests: new Map(), online: false };
     session.client = module.success.createClient({
       auth,
       history,
@@ -799,7 +806,7 @@ export class WhatsAppAccountConnectorService {
     chat: string,
     message: WhatsAppStoredMessage,
   ): Effect.Effect<WhatsAppStoredAttachment | null, WhatsAppAccountOperationError> {
-    return Effect.gen(function* () {
+    return Effect.gen({ self: this }, function* () {
       if (message.deleted || !message.media || !FILE_LABEL.test(message.media)) return null;
       const messages = session.history.messages(chat);
       const next = messages[messages.findIndex((item) => item.id === message.id) + 1];
@@ -811,9 +818,7 @@ export class WhatsAppAccountConnectorService {
       if (!client) return yield* whatsappToolFailure(OFFLINE_FOR_AGENT);
       const open = yield* whatsappAccountCall(() => client.whenOpen(OPEN_WAIT_MS));
       if (!open) return yield* whatsappToolFailure(OFFLINE_FOR_AGENT);
-      yield* whatsappAccountCall(() => client.fetchOlder(chat, next, OLDER_COUNT, OLDER_WAIT_MS)).pipe(
-        Effect.orElseSucceed(() => false),
-      );
+      yield* this.#fetchOlder(session, client, next);
       const recovered = session.history.message(chat, message.id)?.attachment ?? null;
       if (!recovered)
         return yield* whatsappToolFailure(
@@ -821,6 +826,29 @@ export class WhatsAppAccountConnectorService {
         );
       logger.info("The phone sent an older WhatsApp file again.");
       return recovered;
+    });
+  }
+
+  #fetchOlder(
+    session: Session,
+    client: WhatsAppClientLike,
+    anchor: WhatsAppStoredMessage,
+  ): Effect.Effect<boolean, WhatsAppAccountOperationError> {
+    return Effect.suspend(() => {
+      // WhatsApp wakes every history waiter for this chat after one reply. Keep each reply and its
+      // collector inside the same permit, so another request cannot mistake it for its own page.
+      const lock = session.historyRequests.get(anchor.chat) ?? Semaphore.makeUnsafe(1);
+      session.historyRequests.set(anchor.chat, lock);
+      return lock.withPermit(
+        Effect.acquireUseRelease(
+          Effect.sync(() => session.history.collectOlderPage(anchor)),
+          () =>
+            whatsappAccountCall(() => client.fetchOlder(anchor.chat, anchor, OLDER_COUNT, OLDER_WAIT_MS)).pipe(
+              Effect.orElseSucceed(() => false),
+            ),
+          (finish) => Effect.sync(finish),
+        ),
+      );
     });
   }
 
@@ -840,13 +868,13 @@ export class WhatsAppAccountConnectorService {
           const chat = yield* this.#resolve(session, options.chat, false);
           let page = session.history.read(chat.id, options);
           // The phone can send messages older than the ones here, while it is online.
-          const oldest = session.history.messages(chat.id)[0];
+          const oldest =
+            session.history.message(chat.id, page.messages[0]?.id ?? options.beforeId ?? "") ??
+            session.history.messages(chat.id)[0];
           const short = page.messages.length < options.limit && !page.has_more && page.before_found;
           if (short && oldest && !options.since && session.client?.isOpen()) {
             const client = session.client;
-            const arrived = yield* whatsappAccountCall(() =>
-              client.fetchOlder(chat.id, oldest, OLDER_COUNT, OLDER_WAIT_MS),
-            ).pipe(Effect.orElseSucceed(() => false));
+            const arrived = yield* this.#fetchOlder(session, client, oldest);
             if (arrived) page = session.history.read(chat.id, options);
           }
           return {
@@ -891,12 +919,16 @@ export class WhatsAppAccountConnectorService {
         Effect.gen({ self: this }, function* () {
           const session = yield* this.#requireSession();
           const chat = yield* this.#resolve(session, options.chat, false);
-          const message = session.history.message(chat.id, options.messageId);
+          let message = session.history.message(chat.id, options.messageId);
           if (!message)
             return yield* whatsappToolFailure(
               `No message with id ${options.messageId} is in ${session.history.chatName(chat)} on this computer.`,
             );
-          const attachment = message.attachment ?? (yield* this.#recoverAttachment(session, chat.id, message));
+          if (!message.attachment) {
+            yield* this.#recoverAttachment(session, chat.id, message);
+            message = session.history.message(chat.id, options.messageId) ?? message;
+          }
+          const attachment = message.attachment;
           if (!attachment || message.deleted)
             return yield* whatsappToolFailure(
               message.media

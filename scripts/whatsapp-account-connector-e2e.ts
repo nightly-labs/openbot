@@ -47,6 +47,7 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/whatsapp-account-con
 const OWN_ID = "48600100200@s.whatsapp.net";
 const FRIEND = "48600999888@s.whatsapp.net";
 const GROUP = "120363000000000001@g.us";
+const ARCHIVE = "120363000000000002@g.us";
 // A 1×1 PNG, as the downloaded photo.
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
@@ -91,6 +92,10 @@ class FakeClient implements WhatsAppClientLike {
   readonly pairingRequests: string[] = [];
   readonly downloads: string[] = [];
   readonly older: Array<{ chat: string; anchor: string }> = [];
+  readonly phoneHistory: WhatsAppStoredMessage[] = [];
+  activeHistoryFetches = 0;
+  maxHistoryFetches = 0;
+  historyGate: Promise<void> | null = null;
   readonly files: Array<{ chat: string; file: WhatsAppOutgoingFile; replyTo: string | null }> = [];
 
   constructor(options: { auth: WhatsAppStoredAuth; history: WhatsAppHistory; events: WhatsAppAccountClientEvents }) {
@@ -156,6 +161,7 @@ class FakeClient implements WhatsAppClientLike {
     return message;
   }
   async downloadMedia(message: WhatsAppStoredMessage, path: string): Promise<void> {
+    assert.ok(message.attachment, "The download must receive the recovered media part.");
     this.downloads.push(message.id);
     await writeFile(path, PNG);
   }
@@ -166,6 +172,18 @@ class FakeClient implements WhatsAppClientLike {
   /** The phone sends the messages before `anchor` again, in full: a file that came before OpenBot kept files gets its media part. */
   async fetchOlder(chat: string, anchor: WhatsAppStoredMessage): Promise<boolean> {
     this.older.push({ chat, anchor: anchor.id });
+    if (chat === ARCHIVE) {
+      this.activeHistoryFetches += 1;
+      this.maxHistoryFetches = Math.max(this.maxHistoryFetches, this.activeHistoryFetches);
+      try {
+        await this.historyGate;
+        const messages = this.phoneHistory.filter((message) => message.at < anchor.at).slice(-50);
+        for (const message of messages) this.history.upsertMessage(message);
+        return messages.length > 0;
+      } finally {
+        this.activeHistoryFetches -= 1;
+      }
+    }
     const legacy = this.history.message(chat, "L1");
     if (anchor.id !== "P1" || !legacy) return false;
     this.history.upsertMessage({ ...legacy, attachment: PHOTO });
@@ -656,6 +674,93 @@ try {
   assert.deepEqual(linkClient.read, [{ chat: GROUP, ids: ["G1"] }]);
   const markRead = { ok: true, receipts: linkClient.read.length };
 
+  // Pages requested from the phone stay readable even when the persisted history is full.
+  // Continue beyond the transient cache size, then check that a restart keeps the newest 200.
+  for (let index = 1; index <= 700; index += 1) {
+    const message: WhatsAppStoredMessage = {
+      id: `H${index}`,
+      chat: ARCHIVE,
+      sender: FRIEND,
+      fromMe: false,
+      pushName: null,
+      at: 1_800_001_000 + index,
+      text: `Archive message ${index}`,
+      media: null,
+      replyTo: null,
+      edited: false,
+      deleted: false,
+      attachment: null,
+    };
+    linkClient.phoneHistory.push(message);
+    if (index > 500) linkClient.history.upsertMessage(message);
+  }
+  let cursor = "H501";
+  for (let pageIndex = 0; pageIndex < 6; pageIndex += 1) {
+    const response = await mcp(first.service, "whatsapp_read_messages", {
+      chat: ARCHIVE,
+      before_id: cursor,
+      limit: 50,
+    });
+    assert.equal(response.isError, false, response.text);
+    const page = messagePage.parse(JSON.parse(response.text));
+    const firstId = 451 - pageIndex * 50;
+    assert.deepEqual(
+      page.messages.map((message) => message.id),
+      Array.from({ length: 50 }, (_, index) => `H${firstId + index}`),
+    );
+    cursor = `H${firstId}`;
+    assert.ok(linkClient.history.messages(ARCHIVE).length <= 400, "The in-memory history stays bounded.");
+  }
+  const revisited = await mcp(first.service, "whatsapp_read_messages", {
+    chat: ARCHIVE,
+    before_id: "H501",
+    limit: 50,
+  });
+  assert.equal(revisited.isError, false, revisited.text);
+  assert.deepEqual(
+    messagePage.parse(JSON.parse(revisited.text)).messages.map((message) => message.id),
+    Array.from({ length: 50 }, (_, index) => `H${451 + index}`),
+  );
+  assert.deepEqual(linkClient.older.at(-1), { chat: ARCHIVE, anchor: "H501" });
+  let releaseHistory: () => void = () => {};
+  linkClient.historyGate = new Promise<void>((resolve) => {
+    releaseHistory = resolve;
+  });
+  const parallelPages = Promise.all(
+    ["H451", "H201"].map((before_id) =>
+      mcp(first.service, "whatsapp_read_messages", { chat: ARCHIVE, before_id, limit: 50 }),
+    ),
+  );
+  await until(() => linkClient.activeHistoryFetches > 0, "a pending history request");
+  // A separate HTTP round trip lets the other read reach the server while the first fetch waits.
+  await mcp(first.service, "whatsapp_list_chats", {});
+  const activeHistoryFetches = linkClient.activeHistoryFetches;
+  releaseHistory();
+  const parallelResults = await parallelPages;
+  assert.equal(activeHistoryFetches, 1, "Only one phone request per chat may collect history.");
+  assert.equal(linkClient.maxHistoryFetches, 1);
+  for (const [index, response] of parallelResults.entries()) {
+    assert.equal(response.isError, false, response.text);
+    const firstId = index === 0 ? 401 : 151;
+    assert.deepEqual(
+      messagePage.parse(JSON.parse(response.text)).messages.map((message) => message.id),
+      Array.from({ length: 50 }, (_, offset) => `H${firstId + offset}`),
+    );
+  }
+  linkClient.historyGate = null;
+  const persistedArchive = linkClient.history.toJSON().messages.filter((message) => message.chat === ARCHIVE);
+  assert.equal(persistedArchive.length, 200);
+  assert.equal(persistedArchive[0]?.id, "H501");
+  assert.equal(persistedArchive.at(-1)?.id, "H700");
+  const pagination = {
+    ok: true,
+    pages: 6,
+    revisited: true,
+    parallel: true,
+    fetched: 450,
+    persisted: persistedArchive.length,
+  };
+
   // 6. A restart keeps the device, the chats, the switch and the MCP port and bearer.
   const port = new URL(first.service.mcpServer()?.url ?? "").port;
   const bearer = await Effect.runPromise(first.service.mcpAuthorization());
@@ -664,7 +769,9 @@ try {
   const restored = second.service.status();
   assert.equal(restored.state, "connected");
   assert.equal(restored.sendingEnabled, true);
-  assert.equal(restored.history?.chats, 3);
+  assert.equal(restored.history?.chats, 4);
+  assert.equal(second.clients[0]?.history.messages(ARCHIVE).length, 200);
+  assert.equal(second.clients[0]?.history.messages(ARCHIVE)[0]?.id, "H501");
   assert.equal(new URL(second.service.mcpServer()?.url ?? "").port, port);
   assert.equal(await Effect.runPromise(second.service.mcpAuthorization()), bearer);
   const afterRestart = messagePage.parse(
@@ -751,6 +858,7 @@ try {
     sending,
     sendingFiles,
     markRead,
+    pagination,
     restart,
     removed,
     phoneLink,
