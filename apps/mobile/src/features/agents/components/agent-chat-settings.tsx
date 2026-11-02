@@ -7,8 +7,7 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { effectiveServerLevel, useSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { serverNotificationSetting, usePushNotificationPreference } from "@/features/settings/model/push-notifications";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
-import { haptics } from "@/shared/lib/haptics";
-import { currentText, useText } from "@/shared/lib/text";
+import { useText } from "@/shared/lib/text";
 
 /**
  * The user's own notification level of the agent, on a host that serves `agent-notification-levels-v1`.
