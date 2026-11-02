@@ -48,9 +48,10 @@ export const messages = {
     "Diese Nummer antwortet nur Personen, die ihr Besitzer zugelassen hat. Gib dem Besitzer diesen Code: {code}",
   "status.messaging.whatsappPairingApproved": "Du kannst jetzt Anfragen an diese Nummer senden.",
   "status.messaging.whatsappOwnChat": "Nachricht an dich selbst",
-  "status.messaging.whatsappWelcomeOwn": "👋 OpenBot ist verbunden. Schreib hier, um deine Agenten zu fragen.",
+  "status.messaging.whatsappWelcomeOwn":
+    "👋 *OpenBot ist verbunden*\n\nSchreib hier, um deine Agenten zu fragen. Der WhatsApp Orchestrator antwortet oder gibt die Arbeit an den passenden Agenten.\n\n*Was die Reaktionen bedeuten*\n👀 OpenBot hat die Nachricht\n✅ Die Anfrage ist erledigt\n❌ Die Anfrage ist fehlgeschlagen\n🫡 Die Anfrage wurde gestoppt\n\n*Genehmigungen*\nAntworte *1* zum Genehmigen oder *2* zum Ablehnen.\nSende *stop*, um eine Anfrage zu stoppen.",
   "status.messaging.whatsappWelcomeDedicated":
-    "👋 OpenBot ist verbunden. Die Personen, die du erlaubst, können dieser Nummer jetzt schreiben.",
+    "👋 *OpenBot ist verbunden*\n\nDie Personen, die du in OpenBot erlaubst, können dieser Nummer jetzt schreiben. Eine neue Person bekommt einen Code: Genehmige ihn in OpenBot unter Anfragen.\n\n*Was die Reaktionen bedeuten*\n👀 OpenBot hat die Nachricht\n✅ Die Anfrage ist erledigt\n❌ Die Anfrage ist fehlgeschlagen\n🫡 Die Anfrage wurde gestoppt\n\n*Genehmigungen*\nAntworte *1* zum Genehmigen oder *2* zum Ablehnen.\nSende *stop*, um eine Anfrage zu stoppen.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp-Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Antwortet in WhatsApp und fragt das Team",
 } as const satisfies PartialTranslation<typeof source>;

@@ -48,9 +48,10 @@ export const messages = {
     "이 번호는 소유자가 허용한 사람에게만 답해요. 소유자에게 이 코드를 알려 주세요: {code}",
   "status.messaging.whatsappPairingApproved": "이제 이 번호로 요청을 보낼 수 있어요.",
   "status.messaging.whatsappOwnChat": "나에게 메시지 보내기",
-  "status.messaging.whatsappWelcomeOwn": "👋 OpenBot이 연결되었습니다. 여기에 써서 에이전트에게 요청하세요.",
+  "status.messaging.whatsappWelcomeOwn":
+    "👋 *OpenBot이 연결되었습니다*\n\n여기에 써서 에이전트에게 요청하세요. WhatsApp Orchestrator가 답하거나 알맞은 에이전트에게 작업을 넘깁니다.\n\n*반응의 의미*\n👀 OpenBot이 메시지를 받았습니다\n✅ 요청이 완료되었습니다\n❌ 요청이 실패했습니다\n🫡 요청이 중지되었습니다\n\n*승인*\n승인하려면 *1*, 거부하려면 *2*로 답장하세요.\n요청을 중지하려면 *stop*을 보내세요.",
   "status.messaging.whatsappWelcomeDedicated":
-    "👋 OpenBot이 연결되었습니다. 허용한 사람은 이제 이 번호로 쓸 수 있습니다.",
+    "👋 *OpenBot이 연결되었습니다*\n\nOpenBot에서 허용한 사람은 이제 이 번호로 쓸 수 있습니다. 새로운 사람은 코드를 받습니다. OpenBot의 요청에서 승인하세요.\n\n*반응의 의미*\n👀 OpenBot이 메시지를 받았습니다\n✅ 요청이 완료되었습니다\n❌ 요청이 실패했습니다\n🫡 요청이 중지되었습니다\n\n*승인*\n승인하려면 *1*, 거부하려면 *2*로 답장하세요.\n요청을 중지하려면 *stop*을 보내세요.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "WhatsApp에서 답변하고 팀에 요청해요",
 } as const satisfies PartialTranslation<typeof source>;

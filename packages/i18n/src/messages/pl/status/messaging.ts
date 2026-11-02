@@ -47,9 +47,10 @@ export const messages = {
     "Ten numer odpowiada tylko osobom, którym pozwolił właściciel. Przekaż właścicielowi ten kod: {code}",
   "status.messaging.whatsappPairingApproved": "Możesz teraz wysyłać prośby na ten numer.",
   "status.messaging.whatsappOwnChat": "Wiadomość do siebie",
-  "status.messaging.whatsappWelcomeOwn": "👋 OpenBot jest połączony. Napisz tutaj, aby poprosić swoich agentów.",
+  "status.messaging.whatsappWelcomeOwn":
+    "👋 *OpenBot jest połączony*\n\nNapisz tutaj, aby poprosić swoich agentów. WhatsApp Orchestrator odpowiada albo przekazuje pracę właściwemu agentowi.\n\n*Co znaczą reakcje*\n👀 OpenBot ma wiadomość\n✅ Prośba jest wykonana\n❌ Prośba się nie udała\n🫡 Prośba została zatrzymana\n\n*Zatwierdzenia*\nOdpowiedz *1*, aby zatwierdzić, lub *2*, aby odrzucić.\nWyślij *stop*, aby zatrzymać prośbę.",
   "status.messaging.whatsappWelcomeDedicated":
-    "👋 OpenBot jest połączony. Osoby, na które pozwolisz, mogą już pisać na ten numer.",
+    "👋 *OpenBot jest połączony*\n\nOsoby, na które pozwolisz w OpenBot, mogą już pisać na ten numer. Nowa osoba dostaje kod: zatwierdź go w OpenBot w sekcji Prośby.\n\n*Co znaczą reakcje*\n👀 OpenBot ma wiadomość\n✅ Prośba jest wykonana\n❌ Prośba się nie udała\n🫡 Prośba została zatrzymana\n\n*Zatwierdzenia*\nOdpowiedz *1*, aby zatwierdzić, lub *2*, aby odrzucić.\nWyślij *stop*, aby zatrzymać prośbę.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Odpowiada w WhatsApp i pyta zespół",
 } as const satisfies PartialTranslation<typeof source>;

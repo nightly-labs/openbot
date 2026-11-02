@@ -48,9 +48,10 @@ export const messages = {
     "Questo numero risponde solo alle persone autorizzate dal proprietario. Dai questo codice al proprietario: {code}",
   "status.messaging.whatsappPairingApproved": "Ora puoi inviare richieste a questo numero.",
   "status.messaging.whatsappOwnChat": "Messaggio a te stesso",
-  "status.messaging.whatsappWelcomeOwn": "👋 OpenBot è collegato. Scrivi qui per chiedere ai tuoi agenti.",
+  "status.messaging.whatsappWelcomeOwn":
+    "👋 *OpenBot è collegato*\n\nScrivi qui per chiedere ai tuoi agenti. Il WhatsApp Orchestrator risponde o passa il lavoro all'agente giusto.\n\n*Cosa significano le reazioni*\n👀 OpenBot ha ricevuto il messaggio\n✅ La richiesta è completata\n❌ La richiesta non è riuscita\n🫡 La richiesta è stata fermata\n\n*Approvazioni*\nRispondi *1* per approvare o *2* per rifiutare.\nInvia *stop* per fermare una richiesta.",
   "status.messaging.whatsappWelcomeDedicated":
-    "👋 OpenBot è collegato. Le persone che autorizzi ora possono scrivere a questo numero.",
+    "👋 *OpenBot è collegato*\n\nLe persone che autorizzi in OpenBot ora possono scrivere a questo numero. Una persona nuova riceve un codice: approvalo in OpenBot, in Richieste.\n\n*Cosa significano le reazioni*\n👀 OpenBot ha ricevuto il messaggio\n✅ La richiesta è completata\n❌ La richiesta non è riuscita\n🫡 La richiesta è stata fermata\n\n*Approvazioni*\nRispondi *1* per approvare o *2* per rifiutare.\nInvia *stop* per fermare una richiesta.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Risponde su WhatsApp e consulta il team",
 } as const satisfies PartialTranslation<typeof source>;

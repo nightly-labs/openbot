@@ -534,10 +534,7 @@ try {
       );
       assert.equal(phone.sockets.length, sockets, "The connection opened a second socket after the link.");
       await until(
-        () =>
-          phone
-            .textsTo(OWNER_JID)
-            .some((text) => text.includes("OpenBot is connected. Write here to ask your agents.")),
+        () => phone.textsTo(OWNER_JID).some((text) => text.includes("Write here to ask your agents.")),
         "the welcome message in the owner's own chat",
       );
       // No orchestrator exists yet, so the service answers that no agent can answer: it read the message.
