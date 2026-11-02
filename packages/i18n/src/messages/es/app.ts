@@ -67,9 +67,8 @@ export const messages = {
   "app.help.guides": "Guías",
   "app.help.discord": "Únete a Discord",
   "app.githubStar.title": "¿Te gusta OpenBot hasta ahora?",
-  "app.githubStar.description":
-    "OpenBot es gratis y de código abierto. Una estrella en GitHub ayuda a que más personas lo encuentren.",
-  "app.githubStar.star": "Estrella en GitHub",
+  "app.githubStar.description": "Una estrella en GitHub ayuda a que más personas encuentren OpenBot.",
+  "app.githubStar.star": "Dar una estrella en GitHub",
   "app.githubStar.notNow": "Ahora no",
   "app.githubStar.thanksTitle": "¡Gracias!",
   "app.githubStar.thanksBody": "Nos has alegrado el día.",

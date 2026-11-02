@@ -66,8 +66,7 @@ export const messages = {
   "app.help.guides": "가이드",
   "app.help.discord": "Discord 참여",
   "app.githubStar.title": "OpenBot이 마음에 드시나요?",
-  "app.githubStar.description":
-    "OpenBot은 무료 오픈 소스입니다. GitHub 별은 더 많은 사람이 OpenBot을 찾는 데 도움이 됩니다.",
+  "app.githubStar.description": "GitHub에서 별을 주시면 더 많은 사람이 OpenBot을 찾을 수 있습니다.",
   "app.githubStar.star": "GitHub에서 별 주기",
   "app.githubStar.notNow": "나중에",
   "app.githubStar.thanksTitle": "감사합니다!",

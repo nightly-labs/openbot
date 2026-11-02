@@ -69,7 +69,7 @@ export const messages = {
   "app.help.guides": "指南",
   "app.help.discord": "加入 Discord",
   "app.githubStar.title": "喜欢 OpenBot 吗？",
-  "app.githubStar.description": "OpenBot 免费且开源。在 GitHub 上加星能帮助更多人发现它。",
+  "app.githubStar.description": "在 GitHub 上加星，能帮助更多人发现 OpenBot。",
   "app.githubStar.star": "在 GitHub 上加星",
   "app.githubStar.notNow": "以后再说",
   "app.githubStar.thanksTitle": "谢谢！",

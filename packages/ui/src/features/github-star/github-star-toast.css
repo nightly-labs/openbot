@@ -57,8 +57,10 @@
   text-wrap: pretty;
 }
 
+/* A long label in a translation moves the buttons to a new line, not past the edge. */
 .github-star-toast-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--openbot-space-1-5);
   margin-top: var(--openbot-space-1);
