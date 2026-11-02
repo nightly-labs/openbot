@@ -95,9 +95,12 @@ export function detectedLocation(provider: DetectedProvider): string {
  */
 export function detectedModelsDraft(provider: Extract<DetectedProvider, { kind: "models" }>): CustomProviderDraft {
   const source = provider.added && provider.savedModels ? provider.savedModels : provider.models;
-  const models = source
-    .slice(0, CUSTOM_PROVIDER_LIMITS.models)
-    .map((model) => ({ id: model.id, name: model.name ?? "", contextWindow: model.contextWindow?.toString() ?? "" }));
+  const models = source.slice(0, CUSTOM_PROVIDER_LIMITS.models).map((model) => ({
+    id: model.id,
+    name: model.name ?? "",
+    contextWindow: model.contextWindow?.toString() ?? "",
+    maxOutput: model.maxOutput?.toString() ?? "",
+  }));
   return {
     providerId: provider.id,
     displayName: provider.name,

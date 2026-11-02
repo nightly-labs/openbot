@@ -244,10 +244,30 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
         if (model) model.contextWindow = value;
       }),
   };
+  const maxOutputColumn: RepeatableColumn<ModelRow> = {
+    label: (number) => t("customProvider.model.maxOutput", { number }),
+    placeholder: () => t("customProvider.model.maxOutputPlaceholder"),
+    maxlength: 16,
+    identifier: true,
+    numeric: true,
+    read: (row) => row.maxOutput ?? "",
+    write: (index, value) =>
+      setDraft((state) => {
+        const model = state.models[index];
+        if (model) model.maxOutput = value;
+      }),
+  };
   const modelColumns = ():
     | typeof modelNameColumns
-    | readonly [RepeatableColumn<ModelRow>, RepeatableColumn<ModelRow>, RepeatableColumn<ModelRow>] =>
-    props.contextWindows ? [modelNameColumns[0], modelNameColumns[1], contextWindowColumn] : modelNameColumns;
+    | readonly [
+        RepeatableColumn<ModelRow>,
+        RepeatableColumn<ModelRow>,
+        RepeatableColumn<ModelRow>,
+        RepeatableColumn<ModelRow>,
+      ] =>
+    props.contextWindows
+      ? [modelNameColumns[0], modelNameColumns[1], contextWindowColumn, maxOutputColumn]
+      : modelNameColumns;
 
   const headerColumns: readonly [RepeatableColumn<HeaderRow>, RepeatableColumn<HeaderRow>] = [
     {

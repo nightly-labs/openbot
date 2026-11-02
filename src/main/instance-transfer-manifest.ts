@@ -96,6 +96,8 @@ const Settings = Schema.Struct({
            * drops a value out of range, so that a newer limit cannot refuse the whole Settings section.
            */
           contextWindow: Schema.optionalKey(Schema.Number),
+          /** Added after `contextWindow`, with the same rules. */
+          maxOutput: Schema.optionalKey(Schema.Number),
         }),
       ).check(Schema.isMaxLength(256)),
       /** The provider had a saved key. The key itself is never in the file. */
