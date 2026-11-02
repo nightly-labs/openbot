@@ -88,6 +88,12 @@ and hashes the archive; OpenBot never extracts it. Remote support is additive th
 MP4 attachments use the MP3 and MOV contract with `video/mp4`. Remote support is additive through
 the `mp4-attachments` capability, because a host with only `media-attachments` refuses MP4.
 
+SVG attachments are stored as `image/svg+xml` with `kind: "file"` and `previewKind: "image"`. The
+type comes from the file extension. Providers take only raster image blocks, so delivery sends the
+path as a mention and the agent reads the SVG text. The attachment schemes serve SVG with a `sandbox`
+policy, and the browser client gives it no object URL. Remote support is additive through the
+`svg-attachments` capability, which only protocol 9 peers get.
+
 ## Browser tool execution
 
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.

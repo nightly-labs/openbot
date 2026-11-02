@@ -15,5 +15,7 @@ export const messages = {
     "Deze server ondersteunt geen ZIP-bijlagen. Werk OpenBot bij op de host en probeer het opnieuw.",
   "error.attachment.mp4Unsupported":
     "Deze server ondersteunt geen MP4-bijlagen. Werk OpenBot bij op de host en probeer het opnieuw.",
+  "error.attachment.svgUnsupported":
+    "Deze server ondersteunt geen SVG-bijlagen. Werk OpenBot bij op de host en probeer het opnieuw.",
   "error.attachment.previewTooLarge": "Het bestand is groter dan de limiet van 100 MB.",
 } as const satisfies PartialTranslation<typeof source>;
