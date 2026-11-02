@@ -7,7 +7,7 @@ import { decodeConversationPage } from "./conversation";
 import { decodeAgentSummaries, decodeSidebarLayout, type RemoteAgent } from "./workspace-records";
 
 /** What the phone shows for one server before its connection is back. The host stays the source of truth. */
-export interface CachedServer {
+interface CachedServer {
   agents: RemoteAgent[];
   /** The host's hidden agents, or null for a host without `agent-hidden-v1`. */
   hidden: string[] | null;
