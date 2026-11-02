@@ -1512,16 +1512,8 @@ export class MessagingService {
       platformChannelId: send.channelId,
       replyThreadId: send.action === "reply" ? send.messageId : null,
     };
-    // The server is outside this computer, so a secret in the text must not reach it.
-    return yield* live.adapter.postAnswer(target, redactText(send.text), null).pipe(
-      Effect.as({ posted: true as const }),
-      Effect.catch((failure) =>
-        Effect.sync(() => {
-          this.#warn(failure.cause);
-          return { failure: "unknown" as const };
-        }),
-      ),
-    );
+    const result = yield* this.#outboundPost(connectionId, target, send.text);
+    return "posted" in result ? { posted: true as const } : { failure: result.failure };
   });
 
   readonly #activity = Effect.fn("MessagingService.activity")(function* (

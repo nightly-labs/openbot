@@ -558,9 +558,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           }
         };
 
-        /** The reply, post or reaction of a Discord output in the run that `run` is. */
+        /**
+         * The reply, post or reaction of a Discord output in the run that `run` is. Only a run that a
+         * mention started has a trigger message: a webhook payload has the same frame, with the type and
+         * data that its sender chooses.
+         */
         const discordPlan = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
-          discordOutputPlan(node, step.input, discordTriggerMessage(run?.payload ?? null));
+          discordOutputPlan(node, step.input, run?.source === "discord" ? discordTriggerMessage(run.payload) : null);
 
         const discordPost = (plan: Extract<DiscordOutputPlan, { send: unknown }>) =>
           dependencies.discordSend
@@ -1241,8 +1245,19 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               if (triggers.length === 0) return "none";
               let started = false;
               for (const { workflowId, node } of triggers) {
+                const open = runs.openRuns().filter((run) => run.workflowId === workflowId);
+                // A mention that Signal gives again, after a restart, has its run already.
+                if (
+                  open.some(
+                    (run) =>
+                      run.source === "discord" && discordTriggerMessage(run.payload)?.messageId === mention.messageId,
+                  )
+                ) {
+                  started = true;
+                  continue;
+                }
                 // A busy workflow skips the mention, as a schedule skips an occurrence.
-                if (runs.openRuns().some((run) => run.workflowId === workflowId)) continue;
+                if (open.length > 0) continue;
                 const detail = yield* attempt(() => store.detail(workflowId));
                 if (!detail) continue;
                 const result = yield* begin(detail, node, {
@@ -1252,7 +1267,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                   payload: workflowDiscordPayload(node.id, mention),
                 }).pipe(Effect.result);
                 if (Result.isFailure(result)) {
-                  if (!(result.failure.cause instanceof WorkflowStoreError)) return yield* result.failure;
+                  // After a run started, the mention stays with the workflows: no agent answers it too.
+                  if (!started && !(result.failure.cause instanceof WorkflowStoreError)) return yield* result.failure;
                   logger.warn("A Discord mention did not start a workflow run.", {
                     workflowId,
                     nodeId: node.id,

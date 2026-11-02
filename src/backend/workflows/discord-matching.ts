@@ -10,6 +10,7 @@ import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-v
 import { sourceText } from "@openbot/i18n/source";
 import type { MessagingDiscordMention, MessagingDiscordSend } from "../messaging/messaging-threads";
 import { EXTERNAL_EVENT_END, EXTERNAL_EVENT_START } from "../webhook-trigger";
+import { withoutEvents } from "./github-output";
 
 /** The message of a Discord trigger, as the run payload keeps it. */
 interface DiscordTriggerMessage {
@@ -108,15 +109,23 @@ export function discordOutputPlan(
   const chosen = text(node, "connectionId") || WORKFLOW_DISCORD_TRIGGER_SERVER;
   const connectionId = chosen === WORKFLOW_DISCORD_TRIGGER_SERVER ? (trigger?.connectionId ?? "") : chosen;
   if (!connectionId) return { error: sourceText("error.workflow.discordNoMessage") };
+  // The event of a trigger is data for an agent: the server does not see it as a post. The GitHub
+  // text names no service, so a Discord output uses it too. Empty text posts nothing.
+  const body = withoutEvents(input).trim();
+  const onlyEvent = !body && Boolean(input.trim());
+  const eventOnly = { error: sourceText("error.workflow.githubEventText") };
   if (action === "post") {
     const channelId = text(node, "placeId");
     if (!channelId) return { error: sourceText("error.workflow.outputPlaceMissing") };
-    return { connectionId, send: { action, channelId, text: input } };
+    if (onlyEvent) return eventOnly;
+    return { connectionId, send: { action, channelId, text: body } };
   }
   if (!trigger || trigger.connectionId !== connectionId)
     return { error: sourceText("error.workflow.discordNoMessage") };
-  if (action === "reply")
-    return { connectionId, send: { action, channelId: trigger.channelId, messageId: trigger.messageId, text: input } };
+  if (action === "reply") {
+    if (onlyEvent) return eventOnly;
+    return { connectionId, send: { action, channelId: trigger.channelId, messageId: trigger.messageId, text: body } };
+  }
   const emoji = isOneOf(WORKFLOW_DISCORD_EMOJI, node.fields.emoji) ? node.fields.emoji : WORKFLOW_DISCORD_EMOJI[0];
   return { connectionId, send: { action, channelId: trigger.channelId, messageId: trigger.messageId, emoji } };
 }

@@ -157,8 +157,10 @@ item starts. The event, marked as data, is the trigger's output.
 ### Workflow Discord triggers
 
 A Discord trigger uses the Discord connection of the host's messaging. It has no route, secret or
-table of its own, and Signal does not change: Signal already passes on the messages that mention
-OpenBot. `MessagingService` gives each mention in a server channel (not a direct message, not a
+table of its own. Signal passes on the messages that mention OpenBot or OpenBot's own role in the
+server (the role match needs a Signal deploy). A trigger limited to a channel does not start for a
+mention in a thread of that channel: the Signal message names the thread, not its parent.
+`MessagingService` gives each mention in a server channel (not a direct message, not a
 reply in an existing conversation) to `Workflows.receiveDiscord` before it goes to an agent. The
 trigger matches the connection, the channel (empty: any), the author's roles (empty: any) and a
 text filter (`discord-matching.ts`). A matched mention starts one run for each trigger, with source
