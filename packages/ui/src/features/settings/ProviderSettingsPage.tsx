@@ -7,6 +7,7 @@
 import { ProviderLogo } from "@openbot/brand";
 import {
   type AgentProviderId,
+  type AgentProviderStatus,
   agentProviderName,
   type CustomProviderSummary,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
@@ -19,7 +20,7 @@ import {
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
 } from "@openbot/contracts/ipc";
-import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
+import type { AppFormat, AppMessages, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Badge,
   Button,
@@ -797,6 +798,12 @@ const ACCOUNT_STATE_TEXT = {
   error: "provider.account.failed",
 } as const satisfies Record<ProviderAccountState, AppTextKey>;
 
+/** The Version line names the CLI that runs: the one the user installed, or OpenBot's download. */
+const VERSION_SOURCE = {
+  system: "provider.settings.versionInstalledByUser",
+  managed: "provider.settings.versionDownloaded",
+} as const satisfies Record<NonNullable<AgentProviderStatus["cliSource"]>, keyof AppMessages>;
+
 /** One account. Its text says what is wrong; the right edge has at most one button, then the ⋯ menu. */
 function AccountRow(
   props: SectionProps & {
@@ -1283,7 +1290,9 @@ function RuntimeSection(props: SectionProps) {
     if (row().updatable() && installed) {
       return t("provider.settings.versionAvailable", { installed, available: props.option.availableVersion ?? "" });
     }
-    return installed;
+    // Names the CLI that runs, so a failure of the user's own install does not read as OpenBot's (#4375).
+    const source = props.option.cliSource;
+    return installed && source ? t(VERSION_SOURCE[source], { version: installed }) : installed;
   };
   /** The sign-in card already shows a check error, so the same text does not show twice. */
   const lastError = () =>

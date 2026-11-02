@@ -3145,11 +3145,14 @@ export class ProviderRuntime implements ProviderPort {
         this.#startFailures.delete(provider);
         this.#slowStarts.delete(provider);
       });
-      // Other providers can have live turns. Replacement must not run start recovery.
+      // Other providers can have live turns. Replacement must not run start recovery. The start checks
+      // the copy just installed: a CLI the user installed that is as new ran in its place, and its
+      // version or its failure read as the copy's (#4375).
       yield* this.#connect("starting", [provider], {
         preserveCheckErrors: true,
         notifyReady: false,
         startTimeoutMs: learnedWaitMs ?? this.#longStartTimeoutMs,
+        preferInstalled: false,
       });
       const timedOut = this.#slowStarts.has(provider);
       if (!timedOut && learnedWaitMs !== undefined) this.#slowStarts.set(provider, learnedWaitMs);
@@ -3163,7 +3166,7 @@ export class ProviderRuntime implements ProviderPort {
           cause:
             message && matchingSourceKeys(message).length > 0
               ? new Error(message)
-              : new Error(sourceText("error.provider.cliActivateFailed"), { cause: message }),
+              : new Error(sourceText("error.provider.cliNewVersionNotStarted"), { cause: message }),
         });
       }
       return;
@@ -3277,6 +3280,7 @@ export class ProviderRuntime implements ProviderPort {
       refreshRuntimeInBackground?: boolean;
       notifyReady?: boolean;
       startTimeoutMs?: number;
+      preferInstalled?: boolean;
     } = {},
   ) {
     requestedProviders = requestedProviders.filter((provider) => !this.#off.has(provider));
@@ -3336,7 +3340,9 @@ export class ProviderRuntime implements ProviderPort {
         return Effect.gen({ self: this }, function* () {
           if (this.#clients.has(provider)) return null;
           const driver = requireProviderDriver(provider);
-          const resolvedCli = yield* this.#resolveProviderCli(provider);
+          const resolvedCli = yield* this.#resolveProviderCli(provider, {
+            preferInstalled: options.preferInstalled ?? true,
+          });
           cli = resolvedCli;
           logger.info("Resolved a provider CLI.", {
             provider,

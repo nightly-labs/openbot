@@ -248,6 +248,8 @@ export const messages = {
   "provider.settings.runtime": "런타임",
   "provider.settings.version": "버전",
   "provider.settings.versionAvailable": "{installed} · {available} 사용 가능",
+  "provider.settings.versionInstalledByUser": "{version} · 직접 설치함",
+  "provider.settings.versionDownloaded": "{version} · OpenBot이 다운로드함",
   "provider.settings.update": "업데이트",
   "provider.settings.downloadLabel": "{name} 다운로드",
   "provider.settings.diagnostics": "진단",
