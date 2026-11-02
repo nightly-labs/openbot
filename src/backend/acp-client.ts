@@ -2866,7 +2866,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // The user stopped this Antigravity session, and its harness can still run until the resume.
     // A tool that it asks for now must not run.
     if (thread?.needsResume && !thread.activeTurn) return { outcome: { outcome: "cancelled" } };
-    const turnId = thread?.activeTurn?.id ?? randomUUID();
+    const turn = thread?.activeTurn;
+    const turnId = turn?.id ?? randomUUID();
     const kind =
       params.toolCall.kind === "execute"
         ? "command"
@@ -2875,7 +2876,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           : "permissions";
     const requestedPermissions = kind === "permissions" ? { [params.toolCall.kind ?? "file-system"]: true } : null;
     const result = yield* this.#waitForUser(
-      thread?.activeTurn,
+      turn,
       this.#serverRequests.call(
         `item/${kind === "command" ? "commandExecution" : kind === "file-change" ? "fileChange" : "permissions"}/requestApproval`,
         {
@@ -2887,6 +2888,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         },
       ),
     ).pipe(toProviderClientOperationError);
+    // After `session/cancel` the protocol requires the `cancelled` outcome, and the answer that a
+    // turn's end gives is not the user's choice (#4165).
+    if (turn?.stopped || turn?.completing) return { outcome: { outcome: "cancelled" } };
     const accepted =
       isRecord(result) &&
       (result.decision === "accept" ||
