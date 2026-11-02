@@ -1121,23 +1121,19 @@ export class DrainScheduler {
   }
 
   /**
-   * The providers a delivery to this agent can reach. One for an agent that exists; an agent
-   * startDelivery has still to create can land on any of them, so all of them are claimed.
-   */
-  /**
-   * Whether this delivery waits while its agent's provider waits for a sign-in. A teammate's message,
-   * channel work and an external conversation still start and fail, so that the sender or the channel
-   * hears of it and is not held for a sign-in that can take any time.
+   * Whether this delivery waits while its agent's provider waits for a sign-in. Channel work and an
+   * external conversation still start and fail, so that their channel or their sender hears of it and
+   * the work does not hold a channel assignment.
    */
   #waitsForSignIn(delivery: DeliveryContext["delivery"] | undefined): boolean {
     if (!delivery) return true;
-    return !(
-      delivery.sender.kind === "agent" ||
-      this.#channels?.store.assignmentForDelivery(delivery.id) ||
-      this.#messaging?.ownsDelivery(delivery.id)
-    );
+    return !(this.#channels?.store.assignmentForDelivery(delivery.id) || this.#messaging?.ownsDelivery(delivery.id));
   }
 
+  /**
+   * The providers a delivery to this agent can reach. One for an agent that exists; an agent
+   * startDelivery has still to create can land on any of them, so all of them are claimed.
+   */
   #deliveryProviders(agentId: string): AgentProvider[] {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     return agent ? [providerForAgent(agent)] : [...AGENT_PROVIDERS];
