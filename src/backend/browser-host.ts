@@ -2784,7 +2784,9 @@ export class BrowserHost {
         });
     });
     contents.on("before-input-event", (event, input) => {
-      if (this.#quitShortcut(input)) {
+      // Only a tab in the main window: a Picture in Picture tab leaves Cmd+Q to the menu item, which asks
+      // first, because the hint shows in the main window and that window can be hidden.
+      if (this.#mountedViews.get(tab.view) === this.#window && this.#quitShortcut(input)) {
         event.preventDefault();
         return;
       }
