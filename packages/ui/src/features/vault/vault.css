@@ -185,3 +185,23 @@
   overflow-y: auto;
   padding: var(--openbot-space-4) var(--openbot-space-6) var(--openbot-space-6);
 }
+
+/* The Payment accounts group above the saved cards. */
+.vault-link-accounts {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin-bottom: var(--openbot-space-3);
+}
+
+.vault-group-label {
+  padding: 0 var(--openbot-space-3);
+}
+
+.vault-link-logo > svg {
+  width: 92%;
+  height: 92%;
+}
+
+.ui-item-content > .vault-link-error {
+  color: var(--openbot-danger-text);
+}

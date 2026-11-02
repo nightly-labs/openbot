@@ -314,6 +314,7 @@ import type {
   InstanceTransferResult,
   InstanceTransferSummary,
 } from "./ipc-instance-transfer";
+import type { LinkAccountStatus } from "./ipc-link-account";
 import type { MachineAlertSettings, MachineMetrics } from "./ipc-machine-resources";
 import type {
   AgentPublicationPreview,
@@ -1193,6 +1194,15 @@ export const IPC_ENDPOINTS = {
     ),
     hostDisconnect: scopedQuery<BitwardenConnectorStatus, "required">()("bitwarden-connector:host-disconnect"),
   },
+  // The Link account of this computer, for agent payments. The tokens stay in main; every answer is the
+  // status only. A joined server has no Link account: the Team API does not carry one.
+  linkAccount: {
+    status: request<undefined, LinkAccountStatus>()("link-account:status"),
+    connect: request<undefined, LinkAccountStatus>()("link-account:connect"),
+    cancel: request<undefined, LinkAccountStatus>()("link-account:cancel"),
+    disconnect: request<undefined, LinkAccountStatus>()("link-account:disconnect"),
+    changed: event<LinkAccountStatus>()("link-account:changed"),
+  },
   // The Vault of this computer. Lists carry no password, card number or security code: `reveal`
   // returns one when the user asks, and `copy` writes one to the clipboard in main. The `host*`
   // endpoints do the same for one server: a joined server answers through `vault-v1`, to an owner
@@ -1922,6 +1932,7 @@ export const IPC_GROUP_PATHS = {
   githubConnector: "githubConnector",
   onePasswordConnector: "onePasswordConnector",
   bitwardenConnector: "bitwardenConnector",
+  linkAccount: "linkAccount",
   vault: "vault",
   hostedSites: "hostedSites",
   routineFeed: "routineFeed",

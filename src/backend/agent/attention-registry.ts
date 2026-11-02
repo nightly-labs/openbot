@@ -36,6 +36,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Result, Schema } from "effect";
+import { getDomain } from "tldts";
 import type { AgentApiKeys } from "../agent-api-keys";
 import type { AgentClient } from "../agent-client";
 import { type BrowserOperationError, browserFailure } from "../browser-effects";
@@ -43,6 +44,7 @@ import type { PreparedBrowserSecret } from "../browser-host";
 import type { BrowserCardVault } from "../browser-tool-actions";
 import { type BrowserToolArguments, parseBrowserToolCall } from "../browser-tools";
 import { causeHelpers } from "../effect-boundary";
+import { LINK_CARD_ID_PREFIX, type LinkWallet } from "../link-wallet";
 import type { PasswordVault, PasswordVaultError } from "../password-vault";
 import {
   type AppServerRequest,
@@ -172,6 +174,30 @@ const VAULT_FIELDS: Record<BrowserToolArguments<"save_vault_item">["kind"], read
   login: ["username"],
   card: ["label", "nameOnCard", "expMonth", "expYear", "billingContactId"],
 };
+
+const LINK_UNAVAILABLE =
+  "Link is not connected. Ask the user to connect Link in Server settings > Vault > Cards, or use a saved card.";
+
+/** The host name of an https address, or null. */
+function httpsHost(address: string): string | null {
+  try {
+    const url = new URL(address);
+    return url.protocol === "https:" ? url.hostname.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The merchant's own site: the same registrable domain, such as shop.example.com for example.com. A
+ * public suffix, such as `myshopify.com` or `co.uk`, is never a site.
+ */
+function sameSite(address: string, merchant: string): boolean {
+  const host = httpsHost(address);
+  if (!host) return false;
+  const domain = getDomain(host, { allowPrivateDomains: true });
+  return domain !== null && domain === getDomain(merchant, { allowPrivateDomains: true });
+}
 
 /** The change that `save_vault_item` asks for, or the text that tells the agent what is wrong. */
 function vaultChange(args: BrowserToolArguments<"save_vault_item">): VaultAgentChange | string {
@@ -313,6 +339,8 @@ export interface AttentionRegistryOptions {
   passwordVault?: PasswordVault | null | undefined;
   /** The cards and contact info of the Vault, or null. `fill_card` types a card without the agent reading it. */
   vaultItems?: VaultItems | null | undefined;
+  /** The Link account of this computer, or null. Agents ask it for one-time cards that the user approves in Link. */
+  linkWallet?: LinkWallet | null | undefined;
   /** The name of an agent now. An item that an agent adds to the Vault keeps it. */
   agentName?(agentId: string): string | undefined;
   /** Adds a note to the chat that an agent changed the Vault. `text` is source text. */
@@ -355,6 +383,7 @@ export class AttentionRegistry {
   readonly #emitRuntimeSnapshot: () => void;
   readonly #passwordVault: PasswordVault | null;
   readonly #vaultItems: VaultItems | null;
+  readonly #linkWallet: LinkWallet | null;
   readonly #agentName: (agentId: string) => string | undefined;
   readonly #noteVaultChange: (agentId: string, threadId: string, turnId: string, text: string) => void;
   readonly #apiKeys: AgentApiKeys | null;
@@ -375,6 +404,7 @@ export class AttentionRegistry {
     this.#emitRuntimeSnapshot = options.emitRuntimeSnapshot;
     this.#passwordVault = options.passwordVault ?? null;
     this.#vaultItems = options.vaultItems ?? null;
+    this.#linkWallet = options.linkWallet ?? null;
     this.#agentName = options.agentName ?? (() => undefined);
     this.#noteVaultChange = options.noteVaultChange ?? (() => undefined);
     this.#apiKeys = options.apiKeys ?? null;
@@ -1053,6 +1083,103 @@ export class AttentionRegistry {
         }),
     };
   }
+
+  /**
+   * Answers `request_link_payment`: asks Link for a one-time card, and waits while the user approves or
+   * declines the payment in Link. The answer names the card for `fill_card`, never its number or code.
+   * Link's approval is the user's consent, so OpenBot asks nothing more here.
+   */
+  readonly requestLinkPayment = Effect.fn("AttentionRegistry.requestLinkPayment")(function* (
+    this: AttentionRegistry,
+    params: DynamicToolCallParams,
+  ) {
+    const call = yield* attentionStep(() => parseBrowserToolCall("request_link_payment", params.arguments));
+    if (call.tool !== "request_link_payment")
+      return yield* new AttentionOperationFailed({ cause: new Error("Invalid Link payment request.") });
+    const wallet = this.#linkWallet;
+    if (!wallet?.connected()) return browserTakeoverError(LINK_UNAVAILABLE);
+    const answer = yield* Effect.result(wallet.requestPayment(call.args));
+    if (Result.isFailure(answer)) return browserTakeoverError(`Link payment failed: ${answer.failure.message}`);
+    const result = answer.success;
+    const next =
+      result.status === "approved"
+        ? "Take a fresh snapshot of the checkout and call fill_card with this cardId."
+        : "Do not ask Link again for this purchase. Tell the user.";
+    return {
+      success: result.status === "approved",
+      contentItems: [{ type: "inputText", text: JSON.stringify({ ...result, next }) }],
+    } satisfies DynamicToolResult;
+  }).bind(this);
+
+  /**
+   * The one-time Link card for a `fill_card` call with a Link `cardId`, or null for a saved card. A
+   * fill on the merchant site that the user approved in Link runs at once; a fill on another site
+   * waits for the owner, because a page can tell an agent to type the card into a form that sends it
+   * away. That approval is not kept.
+   */
+  readonly linkCardVault = Effect.fn("AttentionRegistry.linkCardVault")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+  ): Effect.fn.Return<BrowserCardVault | DynamicToolResult | null> {
+    if (params.tool !== "fill_card") return null;
+    const call = yield* Effect.result(attentionStep(() => parseBrowserToolCall("fill_card", params.arguments)));
+    if (Result.isFailure(call) || call.success.tool !== "fill_card") return null;
+    const cardId = call.success.args.cardId;
+    if (!cardId.startsWith(LINK_CARD_ID_PREFIX)) return null;
+    const wallet = this.#linkWallet;
+    const agentId = params.ownerAgentId;
+    if (!wallet?.connected() || !agentId) return browserTakeoverError(LINK_UNAVAILABLE);
+    const read = yield* Effect.result(wallet.card(cardId));
+    if (Result.isFailure(read)) return browserTakeoverError(`Link card failed: ${read.failure.message}`);
+    const card = read.success;
+    if (!card) return browserTakeoverError("Link has no approved card with this id. Call request_link_payment first.");
+    const merchant = httpsHost(card.merchantUrl);
+    const onMerchant = (address: string) => merchant !== null && sameSite(address, merchant);
+    // The pages and frames that the owner let this one fill use. The approval is not kept.
+    const approvedFrames = new Map<string, Set<string>>();
+    return {
+      secret: (id) => (id === cardId ? card.secret : null),
+      approved: (id, page, frames) =>
+        id === cardId &&
+        [page, ...frames].every((frame) => onMerchant(frame) || approvedFrames.get(page)?.has(frame) === true),
+      approve: (id, page, frames) =>
+        Effect.gen({ self: this }, function* () {
+          if (id !== cardId) return false;
+          const others = frames.filter((frame) => frame !== page && !onMerchant(frame));
+          const decision = yield* this.awaitToolApproval(
+            client,
+            request,
+            {
+              requestId: request.id,
+              agentId,
+              threadId: params.threadId,
+              turnId: params.turnId,
+              kind: "permissions",
+              command: null,
+              cwd: null,
+              reason: [
+                sourceText("status.agent.linkCardFill", {
+                  card: `•••• ${card.secret.number.slice(-4)}`,
+                  site: page,
+                  merchant: card.merchantUrl || "?",
+                }),
+                ...(others.length > 0
+                  ? [sourceText("status.agent.vaultCardFillFrames", { origins: others.join(", ") })]
+                  : []),
+              ].join(" "),
+              grantRoot: null,
+              permissions: null,
+            },
+            { ownerOnly: true },
+          );
+          if (decision !== "accept") return false;
+          approvedFrames.set(page, new Set([...(approvedFrames.get(page) ?? []), page, ...frames]));
+          return true;
+        }),
+    } satisfies BrowserCardVault;
+  }).bind(this);
 
   /**
    * Answers `save_vault_item`: adds or changes contact info, or changes the fields of a login or a card
