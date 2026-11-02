@@ -93,7 +93,7 @@ export const messages = {
   "conversation.threads.error.start": "Impossibile avviare il thread.",
   "conversation.threads.error.branch": "Impossibile ramificare la chat.",
   "conversation.threads.error.send": "Impossibile inviare il messaggio al thread.",
-  "conversation.threads.error.files": "Puoi inviare file solo ai thread degli agenti su questo computer.",
+  "conversation.threads.error.files": "Questo server non accetta file nei thread. Aggiorna OpenBot su di esso.",
   "conversation.threads.error.stop": "Impossibile interrompere il thread.",
   "conversation.threads.error.archive": "Impossibile archiviare il thread.",
   "conversation.threads.error.restore": "Impossibile ripristinare il thread.",

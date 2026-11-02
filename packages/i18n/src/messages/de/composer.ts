@@ -65,6 +65,7 @@ export const messages = {
   "composer.reply.attachment": "Anhang",
   "composer.reply.cancel": "Antwort abbrechen",
   "composer.attachment.remove": "{name} entfernen",
+  "composer.attachment.adding": "{name} wird hinzugefügt",
   "composer.placeholder.hostSetup": "Schließe die Einrichtung des Anbieters auf deinem Host ab, um zu beginnen",
   "composer.placeholder.connectHost": "Verbinde dich mit deinem Host, um zu beginnen",
   "composer.placeholder.hostSleeping": "Dieser Server ruht. Drücke eine Taste oder klicke, um ihn aufzuwecken",

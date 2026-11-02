@@ -2,15 +2,14 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Effect } from "effect";
-import type { CustomProviderConfig } from "./opencode-config";
+import { type CustomProviderConfig, customModelOutputLimit } from "./opencode-config";
 import type { PiMcpExtension } from "./pi-mcp";
 import { providerCall } from "./provider-client-effects";
 
 const VARIABLE = "OPENBOT_PI_CUSTOM_ENDPOINTS";
 
-/** Pi's defaults for a model with no limits (Pi 1.4.0 `models-configuration.md`). */
+/** Pi's default for a model with no context window (Pi 1.4.0 `models-configuration.md`). */
 const DEFAULT_CONTEXT_WINDOW = 128_000;
-const DEFAULT_MAX_TOKENS = 16_384;
 
 /** What the extension reads from the environment: the endpoints with their keys and header values. */
 interface EndpointPayload {
@@ -66,14 +65,10 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
     headers: Object.fromEntries(endpoint.headers.map((header) => [header.name, header.value])),
     models: endpoint.models.map((model) => {
       const contextWindow = model.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
-      // A small context leaves room for the prompt: a server refuses a request whose prompt and
-      // output budget together pass the model's length.
-      return {
-        id: model.id,
-        name: model.name,
-        contextWindow,
-        maxTokens: Math.min(DEFAULT_MAX_TOKENS, Math.floor(contextWindow / 2)),
-      };
+      // Pi cuts `maxTokens` to the room that the prompt leaves in the window, so a saved max output
+      // above the window does not overflow (`clampMaxTokensToContext`, Pi 1.1.0:
+      // https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/simple-options.ts#L18-L22).
+      return { id: model.id, name: model.name, contextWindow, maxTokens: customModelOutputLimit(model, contextWindow) };
     }),
   };
 }

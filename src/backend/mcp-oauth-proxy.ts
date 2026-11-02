@@ -45,6 +45,7 @@ export interface McpOAuthProxySettingsStore {
 
 /** Where one route goes right now. */
 export interface McpOAuthProxyTarget {
+  /** The row address. Its fragment, when it has one, names the account of the sign-in. */
   url: string;
   /** The headers the user wrote on the row. They are added here, not given to the provider. */
   headers: ReadonlyArray<{ key: string; value: string }>;
@@ -402,6 +403,8 @@ const send = Effect.fn("McpOAuthProxy.send")(function* (
   const headers = yield* mcpSync(() => upstreamHeaders(target, token, request, userAgent));
   const origin = new URL(target.url).origin;
   let url = new URL(target.url);
+  // The fragment names the account on this machine. It does not go upstream.
+  url.hash = "";
   for (let hop = 0; ; hop += 1) {
     const answer = yield* upstreamFetch(
       url,

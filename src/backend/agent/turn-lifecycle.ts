@@ -55,7 +55,7 @@ import { markIncompleteImageGeneration } from "./image-generation";
 import { type InstructionsChanges, instructionsChangeMessage } from "./instructions-changes";
 import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
-import type { PlanContinuation } from "./plan-continuation";
+import { type PlanContinuation, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
@@ -89,9 +89,11 @@ const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
 /**
  * The provider errors that move an agent set to switch without asking to its next backup model. Each
  * one can pass on another provider, account or model; a request the model refuses fails on each.
+ * A usage limit that the usage-limit gate does not hold comes here too, such as a spent Gemini quota (#4368).
  */
 const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "billing",
+  "usage_limit",
   "provider_unavailable",
   "rate_limit",
   "authentication",
@@ -460,7 +462,7 @@ export class TurnLifecycle {
 
   /**
    * Whether a completed turn may continue its plan: it served only the user's or the agent's own
-   * messages, the user did not stop it, it asked nothing, opened no wait and holds no question,
+   * messages, the user did not stop it, its last line asks nothing but whether to continue and does not say it waits, opened no wait and holds no question,
    * approval or takeover, and no other message waits in its lane.
    */
   #planContinues(
@@ -480,8 +482,7 @@ export class TurnLifecycle {
       )
     )
       return false;
-    // A question anywhere in the last line, so Markdown or a closing remark after it does not hide it.
-    if (/[?？]/.test(answer?.trimEnd().split("\n").at(-1) ?? "")) return false;
+    if (waitsForUser(answer)) return false;
     return (
       !this.#hooks.turnStopped(agentId, taskId, turnId) &&
       !this.#hooks.hasOpenWait(
@@ -1138,6 +1139,7 @@ export class TurnLifecycle {
               snapshot.messages.findLast(
                 (message) => message.itemType === CONVERSATION_PLAN_ITEM_TYPE && message.turnId !== turnId,
               )?.plan ?? null,
+            answer: latestAssistant?.text,
           })
         : null;
       if (!continuation) this.#planContinuation.cancel(agentId, laneTaskId);
@@ -1212,10 +1214,13 @@ export class TurnLifecycle {
           status: "completed",
           createdAt: new Date().toISOString(),
           itemType: PLAN_CONTINUATION_ITEM_TYPE,
-          text: sourceText("status.agent.planContinues", {
-            current: continuation.count,
-            limit: this.#planContinuation.limit,
-          }),
+          text: sourceText(
+            continuation.kind === "plan" ? "status.agent.planContinues" : "status.agent.nextStepContinues",
+            {
+              current: continuation.current,
+              limit: continuation.limit,
+            },
+          ),
         });
       }
       this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: outcome });

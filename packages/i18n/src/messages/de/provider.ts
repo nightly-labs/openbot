@@ -124,6 +124,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, Standard",
   "provider.picker.effort": "Aufwand",
   "provider.picker.effortLabel": "Denkaufwand des Agenten",
+  "provider.picker.effortFixed": "{effort}, festgelegt von {provider}",
   "provider.picker.fast": "Schnell",
   "provider.picker.fastLabel": "Schnellmodus",
   "provider.picker.selectEffort": "Aufwand auswählen",
@@ -210,6 +211,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot meldet {provider} auf diesem Computer ab. Die {provider}-CLI in deinem Terminal wird auch abgemeldet.",
   "provider.settings.disconnectHost": "OpenBot meldet {provider} auf dem Server ab.",
+  "provider.settings.versionInstalledByUser": "{version} · von dir installiert",
+  "provider.settings.versionDownloaded": "{version} · von OpenBot geladen",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Prompt-Cache",
   "provider.settings.promptCacheDescription":

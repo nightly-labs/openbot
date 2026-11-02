@@ -12,6 +12,7 @@ import {
   isOpenableAttachmentName,
   MEDIA_ATTACHMENT_EXTENSIONS,
   MP4_ATTACHMENT_EXTENSIONS,
+  SVG_ATTACHMENT_EXTENSIONS,
   supportedAttachmentExtensions,
 } from "@openbot/contracts/attachment-files";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -28,6 +29,7 @@ import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
   TEAM_MP4_ATTACHMENTS_CAPABILITY,
+  TEAM_SVG_ATTACHMENTS_CAPABILITY,
   TEAM_ZIP_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import {
@@ -158,6 +160,8 @@ export function attachmentIpcHandlers({
           serverId === LOCAL_SERVER_ID || remoteServers.supportsCapability(serverId, TEAM_ZIP_ATTACHMENTS_CAPABILITY);
         const supportsMp4 =
           serverId === LOCAL_SERVER_ID || remoteServers.supportsCapability(serverId, TEAM_MP4_ATTACHMENTS_CAPABILITY);
+        const supportsSvg =
+          serverId === LOCAL_SERVER_ID || remoteServers.supportsCapability(serverId, TEAM_SVG_ATTACHMENTS_CAPABILITY);
         const options: OpenDialogOptions = {
           properties: ["openFile", "multiSelections"],
           filters:
@@ -171,6 +175,7 @@ export function attachmentIpcHandlers({
                       media: supportsMedia,
                       zip: supportsZip,
                       mp4: supportsMp4,
+                      svg: supportsSvg,
                     }),
                   },
                 ],
@@ -530,6 +535,12 @@ function assertRemoteAttachmentSupport(
     !remoteServers.supportsCapability(serverId, TEAM_MP4_ATTACHMENTS_CAPABILITY)
   ) {
     throw new Error(sourceText("error.attachment.mp4Unsupported"));
+  }
+  if (
+    names.some((name) => SVG_ATTACHMENT_EXTENSIONS.some((extension) => extension === attachmentFileExtension(name))) &&
+    !remoteServers.supportsCapability(serverId, TEAM_SVG_ATTACHMENTS_CAPABILITY)
+  ) {
+    throw new Error(sourceText("error.attachment.svgUnsupported"));
   }
   if (!names.some((name) => attachmentFileExtension(name) === "eml")) return;
   if (remoteServers.supportsCapability(serverId, TEAM_EML_ATTACHMENTS_CAPABILITY)) return;

@@ -345,26 +345,39 @@ export function ChatView({
   const sendingUpload = sendingMessage ? outboxSnapshot.uploads.get(sendingMessage.clientMessageId) : undefined;
   // While the agent works, the host queues a sent message: the queue sheet shows it, not the chat.
   const sendsToQueue = Boolean(queue && (activeTurnId || queue.queued.length || queue.replies.length));
-  const queuePending = useMemo(
-    () =>
-      sendsToQueue && sendingMessage
-        ? {
-            message: outboxRow(outbox, sendingMessage),
-            progress: sendingUpload?.completed ?? 0,
-            total: sendingMessage.files.length,
-            cancel: () => outbox.cancelUpload(sendingMessage.clientMessageId),
-          }
-        : null,
-    [sendsToQueue, sendingMessage, sendingUpload?.completed, outbox],
-  );
+  // A message sent while the agent works stays in the queue sheet until the chat draws the host row.
+  const queueSends = useRef(new Set<string>());
+  if (sendingMessage && sendsToQueue) queueSends.current.add(sendingMessage.clientMessageId);
+  // The host accepts a sent message before its queue row arrives. The queue keeps it until then, so
+  // the message does not leave the queue for a moment.
+  const queueDeliveries = queue?.deliveries;
+  const sentToQueue =
+    outboxMessages.find(
+      (message) =>
+        message.state === "sent" &&
+        queueSends.current.has(message.clientMessageId) &&
+        !queueDeliveries?.some((delivery) => delivery.id === message.messageId),
+    ) ?? null;
+  // A message that sends comes first, so its upload progress and cancel stay reachable.
+  const queuePending = useMemo(() => {
+    if (sendsToQueue && sendingMessage)
+      return {
+        message: outboxRow(outbox, sendingMessage),
+        progress: sendingUpload?.completed ?? 0,
+        total: sendingMessage.files.length,
+        cancel: () => outbox.cancelUpload(sendingMessage.clientMessageId),
+      };
+    return sentToQueue ? { message: outboxRow(outbox, sentToQueue), progress: 0, total: 0, cancel: () => {} } : null;
+  }, [sentToQueue, sendsToQueue, sendingMessage, sendingUpload?.completed, outbox]);
   // The sheet keeps a held edit in its rows when the host hides it. Count it here as
   // well, so a saved edit with a lost response stays reachable after a restart.
   const queued = queue?.queued;
   const heldQueueEdit = queue?.edit?.delivery ?? null;
-  const queueCount = useMemo(
-    () => (queued ? queueRowsWithHeldEdit(queued, heldQueueEdit).length : 0) + (queuePending ? 1 : 0),
-    [queued, heldQueueEdit, queuePending],
+  const queueRows = useMemo(
+    () => (queued ? queueRowsWithHeldEdit(queued, heldQueueEdit) : []),
+    [queued, heldQueueEdit],
   );
+  const queueCount = queueRows.length + (queuePending ? 1 : 0);
   usePublishedQueuedChat(queue?.chatId ?? `${target.serverId}:${target.id}`, queue ?? null, queuePending);
   // The thinking sheet reads the agent's conversation, so a channel does not open it. A thread opens it with its task.
   const turnLines = useTurnStepLines(target.serverId);
@@ -404,9 +417,6 @@ export function ChatView({
     !sendBaselines.current.has(sendingMessage.clientMessageId)
   )
     sendBaselines.current.set(sendingMessage.clientMessageId, new Set(projectedMessages.map((message) => message.id)));
-  // A message sent while the agent works stays in the queue sheet until the chat draws the host row.
-  const queueSends = useRef(new Set<string>());
-  if (sendingMessage && sendsToQueue) queueSends.current.add(sendingMessage.clientMessageId);
   const pendingMessages = useMemo(
     () =>
       outboxMessages.flatMap((message): PendingChatMessage[] =>
@@ -1136,10 +1146,10 @@ export function ChatView({
               ) : null}
               {queue && !notice ? (
                 <ChatQueueButton
-                  chatId={queue.chatId}
+                  queue={queue}
                   count={queueCount}
-                  error={Boolean(queue.error)}
-                  waiting={queue.waiting.length > 0}
+                  rows={queueRows}
+                  pending={queuePending}
                   liquidGlassAvailable={liquidGlassAvailable}
                   fallbackBackground={fieldBackground}
                 />

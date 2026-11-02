@@ -54,6 +54,7 @@
     "EMAIL_SMTP_PORT": "465",
     "EMAIL_SMTP_USERNAME": "hello@openbot.run",
     "EMAIL_FROM": "hello@openbot.run",
+    "EMAIL_LICENSE_FROM": "licenses@openbot.run",
     "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
     "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
     // Two active Signal machines (docs/remote-session-deployment.md): a is sui-alexandria, b is signal2.
@@ -75,7 +76,7 @@
     // The public Client ID of the OpenBotGit GitHub App. Its private key is the optional secret
     // GITHUB_APP_PRIVATE_KEY (PKCS #8). Without the key, agents act on GitHub as the signed-in user.
     "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
-    "APNS_TEAM_ID": "ZTRDTUL87R",
+    "APNS_TEAM_ID": "8A47NKRZSJ",
     "APNS_TOPIC": "run.openbot.mobile"
   },
   "d1_databases": [
@@ -153,6 +154,7 @@
         "EMAIL_SMTP_PORT": "465",
         "EMAIL_SMTP_USERNAME": "hello@openbot.run",
         "EMAIL_FROM": "hello@openbot.run",
+        "EMAIL_LICENSE_FROM": "licenses@openbot.run",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
@@ -247,6 +249,7 @@
         "EMAIL_SMTP_PORT": "465",
         "EMAIL_SMTP_USERNAME": "hello@openbot.run",
         "EMAIL_FROM": "hello@openbot.run",
+        "EMAIL_LICENSE_FROM": "licenses@openbot.run",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
@@ -258,7 +261,7 @@
         "SIGNAL_ENTRY_ZONE_ID": "",
         "HOSTED_SERVERS_ENABLED": "true",
         "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
-        "APNS_TEAM_ID": "ZTRDTUL87R",
+        "APNS_TEAM_ID": "8A47NKRZSJ",
         "APNS_TOPIC": "run.openbot.mobile"
       },
       "d1_databases": [

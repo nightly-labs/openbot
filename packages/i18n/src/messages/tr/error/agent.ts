@@ -40,6 +40,8 @@ export const messages = {
     'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} hiç model listelemedi.',
   "error.agent.modelNotInProviderList":
     'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} bu modeli listelemiyor.',
+  "error.agent.modelVariantNotListed":
+    'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} bu modeli listelemiyor. {provider} bu model için şu değerleri listeliyor: {models}.',
   "error.agent.modelProviderMismatch": "Seçilen model o sağlayıcıya ait değil.",
   "error.agent.modelNotListed": '"{model}" modeli mevcut değil. Kullanılabilir modeller: {models}.',
   "error.agent.providerNotListed":

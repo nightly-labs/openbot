@@ -117,6 +117,7 @@ import {
   createMainWindowController,
   createMainWindowHolder,
   hideWindowsForQuit,
+  keepWindowsHidden,
   showMainWindow,
 } from "./main-window";
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
@@ -209,6 +210,7 @@ const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, proces
 const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
 if (serverMode || hostedServer || localServerChild) hideExceptionErrorBox();
+if (serverMode || hostedServer) keepWindowsHidden();
 // A local server has no window, so it has no Dock tile either.
 if (localServerChild && process.platform === "darwin") app.dock?.hide();
 const inviteLinkOptions = {
@@ -578,6 +580,7 @@ function registerIpcHandlers({
   updater,
   setupFile,
   analyticsPreferences,
+  analyticsInstallId,
   updatePreferenceFile,
   requestedUpdate,
   idleRestart,
@@ -687,6 +690,7 @@ function registerIpcHandlers({
       initializeAgent: () => runCauseEffect(agentInitialization.start()),
       appVariant,
       analyticsCaptureUrl,
+      analyticsInstallId,
       getMainWindow: getDialogParent,
       openChatWindow: windows.openChatWindow,
       chatWindowTargets: windows.chatWindowTargets,
@@ -1364,12 +1368,18 @@ if (!hasSingleInstanceLock) {
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
       // be in place before the first request can arrive.
       registerIpcHandlers(built);
+      // A Signal socket of the host can be dead after sleep without knowing it; devices then cannot connect.
+      const renewHostSignal = () =>
+        void runCauseEffect(built.teamWebRtcBridge.renewHostSignal()).catch((error) =>
+          logger.warn("Unable to renew the host Signal connection after sleep:", toLogValue(error)),
+        );
       if (localServerChild) {
         // No window, menu, tray, Dynamic Island or renderer: the desktop app is the interface.
         const childRoutineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
         powerMonitor.on("suspend", () => childRoutineWake.suspend());
         powerMonitor.on("resume", () => childRoutineWake.resume());
         powerMonitor.on("resume", () => built.messaging.resume());
+        powerMonitor.on("resume", renewHostSignal);
         teardown.push(0, "routine wake", () => childRoutineWake.dispose());
         void runCauseEffect(built.agentInitialization.start()).catch((error) => {
           logger.error("Unable to initialize the local agent backend:", toLogValue(error));
@@ -1449,6 +1459,7 @@ if (!hasSingleInstanceLock) {
       powerMonitor.on("resume", () => void Effect.runPromise(remoteServers.wake()));
       // A Slack socket can be dead after sleep without knowing it; reconnect instead of waiting for a ping.
       powerMonitor.on("resume", () => built.messaging.resume());
+      powerMonitor.on("resume", renewHostSignal);
       const routineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
       powerMonitor.on("suspend", () => routineWake.suspend());
       powerMonitor.on("resume", () => routineWake.resume());

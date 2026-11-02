@@ -72,6 +72,7 @@ export function createDevelopmentDefaults(): Record<string, string> {
     EMAIL_SMTP_PORT: "",
     EMAIL_SMTP_USERNAME: "",
     EMAIL_FROM: "",
+    EMAIL_LICENSE_FROM: "",
     EMAIL_SMTP_PASSWORD: "",
     SKILLS_ADMIN_TOKEN: developmentSecret(),
     SITE_REPORT_HASH_SECRET: developmentSecret(),

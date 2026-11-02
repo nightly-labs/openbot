@@ -95,7 +95,7 @@ export const messages = {
   "conversation.threads.error.start": "Nie udało się rozpocząć wątku.",
   "conversation.threads.error.branch": "Nie udało się utworzyć odgałęzienia czatu.",
   "conversation.threads.error.send": "Nie udało się wysłać wiadomości do wątku.",
-  "conversation.threads.error.files": "Pliki można wysłać tylko do wątków agentów na tym komputerze.",
+  "conversation.threads.error.files": "Ten serwer nie przyjmuje plików w wątkach. Zaktualizuj na nim OpenBot.",
   "conversation.threads.error.stop": "Nie udało się zatrzymać wątku.",
   "conversation.threads.error.archive": "Nie udało się zarchiwizować wątku.",
   "conversation.threads.error.restore": "Nie udało się przywrócić wątku.",

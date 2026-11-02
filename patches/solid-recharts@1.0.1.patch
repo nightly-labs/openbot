@@ -4186,7 +4186,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..89948a25bc993728c9608060640f1ffcbbfccc62
 --- /dev/null
 +++ b/dist/solid2.js
-@@ -0,0 +1,62 @@
+@@ -0,0 +1,65 @@
 +// Solid 2 adapter for the published Solid 1 chart sources. Uses the host runtime only.
 +export * from "solid-js";
 +import * as solid from "solid-js";
@@ -4234,18 +4234,21 @@ index 0000000000000000000000000000000000000000..89948a25bc993728c9608060640f1ffc
 +}
 +
 +// Solid 1 props use the last defined value; Solid 2 merge preserves explicit undefined.
++// Symbol keys other than $PROXY are internal to one source. Solid's spread reads $RECORD to
++// find a merge or omit view; a forwarded $RECORD of an omit() source hides every other source.
 +export function mergeProps(...sources) {
 +  const resolve = source => typeof source === "function" ? source() : source;
 +  return new Proxy({}, {
 +    get(_target, key) {
 +      if (key === solid.$PROXY) return true;
++      if (typeof key === "symbol") return undefined;
 +      for (let index = sources.length - 1; index >= 0; index--) {
 +        const value = resolve(sources[index])?.[key];
 +        if (value !== undefined) return value;
 +      }
 +    },
-+    has(_target, key) { return key === solid.$PROXY || sources.some(source => key in (resolve(source) ?? {})); },
-+    ownKeys() { return [...new Set(sources.flatMap(source => Reflect.ownKeys(resolve(source) ?? {})))]; },
++    has(_target, key) { return key === solid.$PROXY || typeof key !== "symbol" && sources.some(source => key in (resolve(source) ?? {})); },
++    ownKeys() { return [...new Set(sources.flatMap(source => Object.keys(resolve(source) ?? {})))]; },
 +    getOwnPropertyDescriptor() { return { enumerable: true, configurable: true }; }
 +  });
 +}

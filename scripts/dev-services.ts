@@ -656,6 +656,10 @@ export function configureMobileConnectDevelopmentNetwork(
     environment.REMOTE_CONTROL_PLANE_URL ??= `http://127.0.0.1:${apiPort}`;
     environment.REMOTE_AUTH_WEBHOOK_URL ??= `http://127.0.0.1:${signalPort}/internal/auth-events`;
     environment.REMOTE_SIGNAL_URL ??= `ws://${address ?? "127.0.0.1"}:${signalPort}/v1/signal`;
+    // The top-level `vars` in wrangler.jsonc, which local `vite dev` reads, name the production Signal
+    // machines. Without these, a local ticket sends the host to a production Signal, which rejects it.
+    environment.REMOTE_SIGNAL_HOMES ??= "";
+    environment.REMOTE_AUTH_WEBHOOK_URLS ??= "";
     environment.TURN_HOST ??= address ?? "127.0.0.1";
   }
 

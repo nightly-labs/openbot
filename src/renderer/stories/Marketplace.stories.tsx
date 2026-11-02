@@ -57,6 +57,20 @@ export const PluginKey = at(plugin("resend"), { held: { resend: "connected" } })
 /** The server refused the saved sign-in, so the page asks the user to sign in again. */
 export const PluginSignInNeeded = at(plugin("notion"), { held: { notion: "signInNeeded" } });
 
+/**
+ * Three Notion accounts on a host that keeps a sign-in for each. A message tags an account by its
+ * row name, such as `@Notion Work`. One account needs a new sign-in.
+ */
+export const PluginAccounts = at(plugin("notion"), {
+  accounts: {
+    notion: [
+      { id: "notion-work", name: "Notion Work", signInNeeded: false, signedIn: true, renamable: true },
+      { id: "notion-personal", name: "Notion Personal", signInNeeded: false, signedIn: true, renamable: true },
+      { id: "notion-client", name: "Notion Acme", signInNeeded: true, signedIn: true, renamable: true },
+    ],
+  },
+});
+
 /** A desktop app: the server runs in an app on this computer, at a local address. */
 export const PluginDesktop = at(plugin("figma"), { held: { figma: "connected" } });
 

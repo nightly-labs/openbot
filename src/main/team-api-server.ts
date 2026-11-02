@@ -77,6 +77,7 @@ import {
   isTeamCurrentCapability,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   legacyTeamCapabilities,
+  MCP_ACCOUNTS_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
@@ -2045,6 +2046,9 @@ export class TeamApiServer {
               this.#options.remoteScreen?.checkSetup !== undefined && this.#options.remoteScreen?.test !== undefined
             );
           if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
+          // Each account signs in with the browser, so it needs the sign-in routes too.
+          if (capability === MCP_ACCOUNTS_CAPABILITY)
+            return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
           if (capability === MCP_SIGN_IN_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
           if (capability === MCP_SIGN_IN_APP_CAPABILITY)

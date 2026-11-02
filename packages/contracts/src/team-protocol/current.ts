@@ -126,6 +126,13 @@ export const TEAM_MEDIA_ATTACHMENTS_CAPABILITY = "media-attachments";
 export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
 export const TEAM_ZIP_ATTACHMENTS_CAPABILITY = "zip-attachments";
 export const TEAM_MP4_ATTACHMENTS_CAPABILITY = "mp4-attachments";
+export const TEAM_SVG_ATTACHMENTS_CAPABILITY = "svg-attachments";
+/**
+ * A host that keeps a separate MCP sign-in for each row whose URL ends in an `#account-…` fragment.
+ * An older host files every row on one URL under one sign-in, so the client offers "Add account"
+ * for a listing only when the host advertises this.
+ */
+export const MCP_ACCOUNTS_CAPABILITY = "mcp-accounts-v1";
 /**
  * Frozen optional member-leave-v1 contract: a bodyless `POST /v1/team/leave` answered with 204. The
  * caller, a member or an admin, removes their own membership with the same effects as an admin's
@@ -383,6 +390,8 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WORKFLOWS_GITHUB_CAPABILITY,
   TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY,
   WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY,
+  TEAM_SVG_ATTACHMENTS_CAPABILITY,
+  MCP_ACCOUNTS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -528,7 +537,9 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CHANNEL_TASK_CANCEL_CAPABILITY &&
     capability !== WORKFLOWS_GITHUB_CAPABILITY &&
     capability !== TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY &&
-    capability !== WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY,
+    capability !== WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY &&
+    capability !== TEAM_SVG_ATTACHMENTS_CAPABILITY &&
+    capability !== MCP_ACCOUNTS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -550,6 +561,8 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WORKFLOWS_GITHUB_CAPABILITY,
   TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY,
   WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY,
+  TEAM_SVG_ATTACHMENTS_CAPABILITY,
+  MCP_ACCOUNTS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -654,6 +667,8 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CHANNEL_TASK_CANCEL_CAPABILITY &&
       capability !== WORKFLOWS_GITHUB_CAPABILITY &&
       capability !== TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY &&
-      capability !== WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY,
+      capability !== WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY &&
+      capability !== TEAM_SVG_ATTACHMENTS_CAPABILITY &&
+      capability !== MCP_ACCOUNTS_CAPABILITY,
   );
 }

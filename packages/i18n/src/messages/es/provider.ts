@@ -123,6 +123,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, predeterminado",
   "provider.picker.effort": "Esfuerzo",
   "provider.picker.effortLabel": "Esfuerzo de razonamiento del agente",
+  "provider.picker.effortFixed": "{effort}, fijado por {provider}",
   "provider.picker.fast": "Rápido",
   "provider.picker.fastLabel": "Modo rápido",
   "provider.picker.selectEffort": "Seleccionar esfuerzo",
@@ -208,6 +209,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot cierra la sesión de {provider} en este ordenador. La CLI de {provider} de tu terminal también cierra la sesión.",
   "provider.settings.disconnectHost": "OpenBot cierra la sesión de {provider} en el servidor.",
+  "provider.settings.versionInstalledByUser": "{version} · instalada por ti",
+  "provider.settings.versionDownloaded": "{version} · descargada por OpenBot",
   "provider.settings.cache": "Caché",
   "provider.settings.promptCache": "Caché de prompts",
   "provider.settings.promptCacheDescription":

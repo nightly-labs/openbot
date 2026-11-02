@@ -33,6 +33,8 @@ export const messages = {
   "customProvider.error.modelIdInvalid":
     "Такой ID модели использовать нельзя. Уберите пробелы, кавычки и другие знаки препинания.",
   "customProvider.error.contextWindowInvalid": "Введите целое число токенов от {min} до {max}.",
+  "customProvider.error.maxOutputInvalid": "Введите целое число токенов от {min} до {max}.",
+  "customProvider.error.maxOutputNeedsWindow": "Для максимального вывода нужно контекстное окно.",
   "customProvider.error.headerNameRequired": "Введите имя заголовка.",
   "customProvider.error.headerNameInvalid": "Используйте допустимое имя HTTP-заголовка.",
   "customProvider.error.headerDuplicate": "Этот провайдер уже задаёт заголовок {name}.",
@@ -76,6 +78,8 @@ export const messages = {
   "customProvider.model.namePlaceholder": "Отображаемое имя",
   "customProvider.model.contextWindow": "Контекстное окно модели {number}",
   "customProvider.model.contextWindowPlaceholder": "Токены",
+  "customProvider.model.maxOutput": "Максимальный вывод модели {number}",
+  "customProvider.model.maxOutputPlaceholder": "Токены",
   "customProvider.model.remove": "Удалить модель {number}",
   "customProvider.model.add": "Добавить модель",
   "customProvider.headers": "Заголовки",

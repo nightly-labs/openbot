@@ -157,6 +157,14 @@ export function pickerModels(options: ClientAgentModelOption[]): PickerModel[] {
         service = labNames.get(lab) ?? providerLabel(lab);
         if (name.startsWith(`${service}: `)) name = name.slice(service.length + 2);
       }
+      // Hermes lists the models of each provider it is signed in to, as `<provider> · <model>`.
+      if (model.provider === "hermes") {
+        const provider = name.indexOf(" · ");
+        if (provider > 0) {
+          service = name.slice(0, provider);
+          name = name.slice(provider + 3);
+        }
+      }
       name = name.replace(/^[\s:–—-]+/, "") || model.id;
       return {
         id: model.id,

@@ -35,6 +35,8 @@ export const messages = {
   "customProvider.error.modelIdInvalid":
     "Bu model kimliği kullanılamaz. Boşlukları, tırnak işaretlerini ve diğer noktalama işaretlerini kaldırın.",
   "customProvider.error.contextWindowInvalid": "{min} ile {max} arasında tam sayı bir token sayısı girin.",
+  "customProvider.error.maxOutputInvalid": "{min} ile {max} arasında tam sayı bir token sayısı girin.",
+  "customProvider.error.maxOutputNeedsWindow": "En fazla çıktı için bir bağlam penceresi gerekir.",
   "customProvider.error.headerNameRequired": "Bir başlık adı girin.",
   "customProvider.error.headerNameInvalid": "Geçerli bir HTTP başlık adı kullanın.",
   "customProvider.error.headerDuplicate": "Bu sağlayıcıda zaten {name} ayarlanmış.",
@@ -80,6 +82,8 @@ export const messages = {
   "customProvider.model.namePlaceholder": "Görünen Ad",
   "customProvider.model.contextWindow": "Model {number} bağlam penceresi",
   "customProvider.model.contextWindowPlaceholder": "Token'lar",
+  "customProvider.model.maxOutput": "Model {number} en fazla çıktı",
+  "customProvider.model.maxOutputPlaceholder": "Token'lar",
   "customProvider.model.remove": "{number}. modeli kaldır",
   "customProvider.model.add": "Model ekle",
   "customProvider.headers": "Başlıklar",
