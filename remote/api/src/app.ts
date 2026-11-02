@@ -259,6 +259,7 @@ export function createRemoteApiApp(
               retryReason: retryReason && SLACK_RETRY_REASON_PATTERN.test(retryReason) ? retryReason : null,
               body,
               wakes: slack.wakes,
+              chatter: slack.chatter,
             }),
             { signal: request.signal },
           ),
@@ -529,12 +530,13 @@ function slackDeliveryKind(contentType: string | null): SlackDeliveryKind | null
  * The only parts of a signed Slack request that Signal reads: the `url_verification` challenge, which
  * Signal answers itself, or the workspace ID that picks the host. Events carry it as `team_id`, and
  * button presses as `payload.team.id`. `wakes`: a button press, a mention, a direct message or a
- * thread reply from a person, which can start a hosted server that sleeps.
+ * thread reply from a person, which can start a hosted server that sleeps. `chatter`: any other
+ * message, which a host that is not connected does not need again.
  */
 function slackRequest(
   kind: SlackDeliveryKind,
   body: Uint8Array,
-): { challenge: string } | { appId: string; teamId: string; wakes: boolean } | null {
+): { challenge: string } | { appId: string; teamId: string; wakes: boolean; chatter: boolean } | null {
   let value: unknown;
   try {
     const text = new TextDecoder().decode(body);
@@ -559,7 +561,7 @@ function slackRequest(
       event.subtype !== "message_deleted" &&
       (event.channel_type === "im" || event.thread_ts !== undefined));
   return teamId && appId && SLACK_ID_PATTERN.test(teamId) && SLACK_ID_PATTERN.test(appId)
-    ? { appId, teamId, wakes }
+    ? { appId, teamId, wakes, chatter: kind === "events" && event?.type === "message" && !wakes }
     : null;
 }
 
