@@ -8,9 +8,10 @@ import {
 import { type Accessor, createMemo, createSignal, flush, onSettled } from "solid-js";
 
 // Plan limits of providers OpenBot does not read itself (a z.ai GLM Coding Plan, a MiniMax coding
-// plan). A local feed script polls their usage endpoints and serves the readings on a loopback
-// WebSocket (`ws://127.0.0.1:47831`); the renderer CSP allows `ws://127.0.0.1:*`, not plain http.
-// With no feed running there are simply no extra rings. Payload, one JSON text per message:
+// plan). `scripts/usage-feed.cjs` of this checkout polls their usage endpoints and serves the
+// readings on a loopback WebSocket (`ws://127.0.0.1:47831`); the renderer CSP allows
+// `ws://127.0.0.1:*`, not plain http. With no feed running there are simply no extra rings.
+// Payload, one JSON text per message:
 // { rows: [{ id, name, ok: true, windows: [{ durationMins, usedPercent, resetsAt }] }] }.
 
 const FEED_URL = "ws://127.0.0.1:47831";
