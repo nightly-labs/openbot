@@ -745,7 +745,14 @@ const MessageRow = memo(function MessageRow({
           {rendered}
         </OutboxMessageMenu>
       ) : (
-        rendered
+        // The text of a user message selects natively, so the bubble has no touch and hold.
+        <ChatMessageGesture
+          align="end"
+          selecting={selecting}
+          onReply={shared.canReply ? () => actions.reply(message) : undefined}
+        >
+          {rendered}
+        </ChatMessageGesture>
       )}
       {message.author === "user" && message.status === "failed" ? <TurnFailure reason={message.failureReason} /> : null}
       {outbox ? <ChatOutboxStatus status={outbox} /> : null}

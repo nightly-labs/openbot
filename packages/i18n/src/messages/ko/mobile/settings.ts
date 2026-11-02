@@ -69,9 +69,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "애니메이션을 끄면 앱 전체의 움직임이 줄어들어요. 휴대전화 설정에서 동작 줄이기가 켜져 있으면 앱도 움직임을 줄여요. 그러면 아래 애니메이션은 꺼진 상태로 유지돼요.",
   "mobile.settings.animations.all": "애니메이션",
-  "mobile.settings.animations.chatZoom": "채팅 확대 전환",
-  "mobile.settings.animations.chatZoomFooter":
-    "채팅이 목록의 아바타에서 펼쳐지고 다시 그 안으로 닫혀요. 끄면 채팅이 옆에서 밀려 들어와요.",
   "mobile.settings.animations.agentFaces": "에이전트 얼굴 애니메이션",
   "mobile.settings.animations.agentFacesFooter":
     "에이전트가 작업하거나 쉬는 동안 아바타의 얼굴이 움직여요. 끄면 얼굴이 가만히 있어요.",

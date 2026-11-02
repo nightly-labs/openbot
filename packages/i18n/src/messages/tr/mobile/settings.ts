@@ -69,9 +69,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Uygulamanın tamamında hareketi azaltmak için “Animasyonlar” ayarını kapatın. Telefon ayarlarında “Hareketi Azalt” açıkken uygulama da hareketi azaltır. Bu durumda aşağıdaki animasyonlar kapalı kalır.",
   "mobile.settings.animations.all": "Animasyonlar",
-  "mobile.settings.animations.chatZoom": "Sohbetlere yakınlaştır",
-  "mobile.settings.animations.chatZoomFooter":
-    "Sohbet, listedeki avatarından açılır ve kapanınca ona geri döner. Kapalıyken sohbet yandan kayarak açılır.",
   "mobile.settings.animations.agentFaces": "Hareketli ajan yüzleri",
   "mobile.settings.animations.agentFacesFooter":
     "Ajanlar çalışırken ve dinlenirken avatarlarının yüzleri hareket eder. Kapalıyken yüzler sabit kalır.",

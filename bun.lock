@@ -383,8 +383,8 @@
   "patchedDependencies": {
     "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch",
     "expo-splash-screen@58.0.11": "patches/expo-splash-screen@58.0.11.patch",
+    "react-native-screens@4.30.0": "patches/react-native-screens@4.30.0.patch",
     "expo@58.0.17": "patches/expo@58.0.17.patch",
-    "expo-router@58.0.25": "patches/expo-router@58.0.25.patch",
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "dmg-builder@26.18.0": "patches/dmg-builder@26.18.0.patch",
     "lucide-solid@1.33.0": "patches/lucide-solid@1.33.0.patch",

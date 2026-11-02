@@ -22,10 +22,9 @@ import Trash2 from "lucide-react-native/icons/trash";
 import UserRound from "lucide-react-native/icons/user-round";
 import UsersRound from "lucide-react-native/icons/users-round";
 import Vibrate from "lucide-react-native/icons/vibrate";
-import { type ReactNode, useContext, useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import { Pressable, View } from "react-native";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
-import { ChatNavigationGateContext } from "@/features/agents/components/chat-link-pressable";
 import { openChatFromPane, useChatListPane } from "@/features/agents/components/chat-list-pane-context";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
 import {
@@ -216,18 +215,15 @@ export function MobileSearchResultRow({
   onLeave: () => void;
 }) {
   const { t, format } = useText();
-  const gate = useContext(ChatNavigationGateContext);
   const pane = useChatListPane();
-  // A chat opened through its home row zooms back into the row when it closes. A chat opened at a
-  // message slides in. In the chat list pane, the chat takes the place of the open one.
+  // In the chat list pane, the chat takes the place of the open one.
   const openChat = (agentId: string, messageId?: string) => {
     onLeave();
     if (pane)
       openChatFromPane(pane, messageId ? undefined : agentId, () =>
         router.push({ pathname: "/chat/[agentId]", params: messageId ? { agentId, messageId } : { agentId } }),
       );
-    else if (messageId) router.push({ pathname: "/chat/[agentId]", params: { agentId, messageId } });
-    else if (!gate?.openFromHome(agentId)) router.push({ pathname: "/chat/[agentId]", params: { agentId } });
+    else router.push({ pathname: "/chat/[agentId]", params: messageId ? { agentId, messageId } : { agentId } });
   };
   const snippet = useMemo(
     () => (result.kind === "message" ? mobileSearchSnippet(result.text, query) : ""),
@@ -263,7 +259,7 @@ export function MobileSearchResultRow({
             const open = () =>
               router.push({ pathname: "/channel/[channelId]", params: { channelId: channel.id, serverId } });
             if (pane) openChatFromPane(pane, channel.id, open);
-            else if (!gate?.openFromHome(channel.id)) open();
+            else open();
           }}
         />
       );

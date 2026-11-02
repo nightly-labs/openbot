@@ -69,9 +69,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Zet Animaties uit om beweging in de hele app te beperken. Als Beperk beweging aanstaat in de instellingen van je telefoon, beperkt de app ook beweging. De animaties hieronder blijven dan uit.",
   "mobile.settings.animations.all": "Animaties",
-  "mobile.settings.animations.chatZoom": "Inzoomen op chats",
-  "mobile.settings.animations.chatZoomFooter":
-    "Een chat opent vanuit zijn avatar in de lijst en sluit daar weer in. Als dit uitstaat, schuift een chat van opzij in beeld.",
   "mobile.settings.animations.agentFaces": "Geanimeerde agentgezichten",
   "mobile.settings.animations.agentFacesFooter":
     "Agentavatars bewegen hun gezicht terwijl de agents werken en rusten. Als dit uitstaat, blijven de gezichten stil.",

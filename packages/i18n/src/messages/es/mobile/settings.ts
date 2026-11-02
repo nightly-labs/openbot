@@ -73,9 +73,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Desactiva «Animaciones» para reducir el movimiento en toda la aplicación. Cuando «Reducir movimiento» está activado en los ajustes de tu teléfono, la aplicación también reduce el movimiento. En ese caso, las animaciones de abajo se mantienen desactivadas.",
   "mobile.settings.animations.all": "Animaciones",
-  "mobile.settings.animations.chatZoom": "Ampliar los chats",
-  "mobile.settings.animations.chatZoomFooter":
-    "Un chat se abre desde su avatar en la lista y se cierra de vuelta en él. Si esta opción está desactivada, el chat se desliza desde el lado.",
   "mobile.settings.animations.agentFaces": "Caras de agentes animadas",
   "mobile.settings.animations.agentFacesFooter":
     "Los avatares de los agentes mueven la cara mientras los agentes trabajan y descansan. Si esta opción está desactivada, las caras se quedan quietas.",
