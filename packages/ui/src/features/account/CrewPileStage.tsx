@@ -11,12 +11,17 @@ import { CREW_PIT, type CrewFace, type CrewMember, type CrewPile } from "./crew-
  */
 const PIT_FIT = { maxScale: 1.2, minScale: 0.45, sideRoom: 32, edgeRoom: 152 } as const;
 
+/** The face of a crew plush at rest: its character's own face, as PlushBot shows without an expression. */
+function restFace(member: CrewMember): BotExpression | undefined {
+  return member.character ? PLUSH_CHARACTER_BY_ID.get(member.character)?.face : undefined;
+}
+
 /**
  * The neutral face of a crew plush, turned to look at a point `dx`, `dy` pixels away (y down). The
  * gaze is absolute: bloub's rest gaze already looks up and to the right, so an offset hardly shows.
  */
 function faceToward(member: CrewMember, dx: number, dy: number): BotExpression | ExpressionId {
-  const neutral = member.character ? PLUSH_CHARACTER_BY_ID.get(member.character)?.face : undefined;
+  const neutral = restFace(member);
   if (!neutral) return "neutre";
   const distance = Math.hypot(dx, dy) || 1;
   return {
@@ -29,9 +34,10 @@ function faceToward(member: CrewMember, dx: number, dy: number): BotExpression |
   };
 }
 
-function crewExpression(member: CrewMember, face: CrewFace): BotExpression | ExpressionId | undefined {
+function crewExpression(member: CrewMember, face: CrewFace): BotExpression | ExpressionId {
   if (face.happy) return "heureux";
-  return face.look ? faceToward(member, face.look.dx, face.look.dy) : undefined;
+  if (face.look) return faceToward(member, face.look.dx, face.look.dy);
+  return restFace(member) ?? "neutre";
 }
 
 function leadFace(face: CrewFace): PlushMascotFace {
@@ -151,7 +157,7 @@ export function CrewPileStage(props: CrewPileStageProps) {
             const crewState = () => face()?.state ?? "idle";
             const expression = () => {
               const current = face();
-              return current ? crewExpression(member, current) : undefined;
+              return current ? crewExpression(member, current) : (restFace(member) ?? "neutre");
             };
             const mascotFace = () => {
               const current = face();
