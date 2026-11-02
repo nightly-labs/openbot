@@ -48,8 +48,9 @@ export function measureSidebarDragSlots(
   const pinned: DragSlot[] = [];
   const pinnedGroup = list.querySelector<HTMLElement>(SIDEBAR_DRAG_SELECTORS.pinnedGroup);
   const pinnedTarget = pinnedGroup?.querySelector<HTMLElement>(SIDEBAR_DRAG_SELECTORS.pinnedEmptyDrop) ?? pinnedGroup;
+  const listBounds = list.getBoundingClientRect();
   const geometry: SidebarDragGeometry = {
-    list: list.getBoundingClientRect(),
+    list: listBounds,
     pinned: pinnedTarget?.getBoundingClientRect() ?? null,
   };
   for (const section of list.querySelectorAll<HTMLElement>(SIDEBAR_DRAG_SELECTORS.sectionRegion)) {
@@ -57,12 +58,20 @@ export function measureSidebarDragSlots(
     if (!sectionId || isInClosedSection(section)) continue;
     const bounds = section.getBoundingClientRect();
     const header = section.querySelector<HTMLElement>(":scope > header");
+    // A stuck header is not at the top of its section, so its line comes from its style, not its box.
+    const headerStyle = header ? getComputedStyle(header) : null;
+    const stickOffset = headerStyle?.position === "sticky" ? Number.parseFloat(headerStyle.top) : Number.NaN;
     sections.set(sectionId, {
       bottom: bounds.bottom,
       sectionId,
       top: bounds.top,
       centerY: bounds.top + bounds.height / 2,
-      headerBottom: header?.getBoundingClientRect().bottom ?? bounds.top,
+      header: header
+        ? {
+            height: header.offsetHeight,
+            stickTop: Number.isFinite(stickOffset) ? listBounds.top + list.clientTop + stickOffset : null,
+          }
+        : null,
     });
   }
   for (const row of list.querySelectorAll<HTMLElement>(SIDEBAR_DRAG_SELECTORS.chatRow)) {

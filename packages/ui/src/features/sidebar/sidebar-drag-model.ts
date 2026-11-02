@@ -60,10 +60,27 @@ export interface ChatDragSlot {
 export interface SectionDragSlot {
   bottom: number;
   centerY: number;
-  /** The bottom of the section's header row. A section with no header has it at `top`. */
-  headerBottom: number;
+  /**
+   * The section's header row, which starts at `top`. `stickTop` is the viewport line that a sticky
+   * header stays on while its section scrolls under it, or null when the header scrolls away.
+   */
+  header: { height: number; stickTop: number | null } | null;
   sectionId: string;
   top: number;
+}
+
+/**
+ * Where the header of a section shows at this scroll. A sticky header stays on its line until the end
+ * of its section pushes it up. The slots are measured once, so this follows the scroll from there.
+ */
+function sectionHeaderBand(slot: SectionDragSlot, scrollDelta: number): { top: number; bottom: number } | null {
+  if (!slot.header || slot.header.height <= 0) return null;
+  const natural = slot.top - scrollDelta;
+  const top =
+    slot.header.stickTop === null
+      ? natural
+      : Math.max(natural, Math.min(slot.header.stickTop, slot.bottom - scrollDelta - slot.header.height));
+  return { top, bottom: top + slot.header.height };
 }
 
 export interface PersonDragSlot {
@@ -363,13 +380,15 @@ function folderTargetAtPoint(
   const y = point.clientY + scrollDelta;
   const sourceSlot = world.sectionSlots.get(sourceId);
   if (sourceSlot && y >= sourceSlot.top && y <= sourceSlot.bottom) return null;
+  const accepts = (candidate: SectionDragSlot) => !folders.isInside(candidate.sectionId, sourceId);
+  // A header that shows under the point wins, also when it is stuck over a folder that it holds.
+  let header: { slot: SectionDragSlot; top: number; bottom: number } | null = null;
+  for (const candidate of world.sectionSlots.values()) {
+    const band = accepts(candidate) ? sectionHeaderBand(candidate, scrollDelta) : null;
+    if (band && point.clientY >= band.top && point.clientY <= band.bottom) header = { slot: candidate, ...band };
+  }
   // Slots come in document order, so of the sections that hold the point, the deepest one wins.
-  const slot = closestVerticalSlot(
-    world.sectionSlots.values(),
-    point.clientY,
-    scrollDelta,
-    (candidate) => !folders.isInside(candidate.sectionId, sourceId),
-  );
+  const slot = header?.slot ?? closestVerticalSlot(world.sectionSlots.values(), point.clientY, scrollDelta, accepts);
   if (!slot) return null;
   const parentId = folders.parent(slot.sectionId);
   const beside = (placement: "before" | "after"): SidebarDropTarget | null =>
@@ -379,9 +398,8 @@ function folderTargetAtPoint(
   const into: SidebarDropTarget | null = folders.canNest(sourceId, slot.sectionId)
     ? { kind: "section-into", sectionId: slot.sectionId }
     : null;
-  const headerHeight = slot.headerBottom - slot.top;
-  if (y >= slot.top && y <= slot.headerBottom && headerHeight > 0) {
-    const ratio = (y - slot.top) / headerHeight;
+  if (header) {
+    const ratio = (point.clientY - header.top) / (header.bottom - header.top);
     if (ratio < 0.25) return beside("before") ?? into;
     if (ratio > 0.75) return beside("after") ?? into;
     return into ?? beside(ratio < 0.5 ? "before" : "after");
