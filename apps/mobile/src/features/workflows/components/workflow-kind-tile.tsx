@@ -1,5 +1,6 @@
 import type { WorkflowNodeKind, WorkflowTriggerType } from "@openbot/contracts/ipc";
 import type { LucideIcon } from "lucide-react-native";
+import AtSign from "lucide-react-native/icons/at-sign";
 import Bot from "lucide-react-native/icons/bot";
 import Clock from "lucide-react-native/icons/clock";
 import File from "lucide-react-native/icons/file";
@@ -54,6 +55,7 @@ const TRIGGER_ICON: Record<WorkflowTriggerType, LucideIcon> = {
   webhook: Webhook,
   message: MessageSquare,
   github: GitPullRequest,
+  discord: AtSign,
 };
 
 /** The icon of a step on its colour, as the desktop canvas marks each kind. */

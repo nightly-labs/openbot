@@ -18,7 +18,7 @@ export interface BloubAvatarProfile {
 
 const AUTOMATIC_COLORS = ["rouge", "orange", "ambre", "vert", "turquoise", "bleu", "violet", "rose"] as const;
 const UNSUPPORTED_AVATAR_SILHOUETTE = "goutte" as const satisfies ShapeId;
-const SUPPORTED_AVATAR_SILHOUETTES = SHAPES.map((option) => option.id).filter(
+export const SUPPORTED_AVATAR_SILHOUETTES = SHAPES.map((option) => option.id).filter(
   (silhouette): silhouette is SupportedAvatarSilhouetteId => silhouette !== UNSUPPORTED_AVATAR_SILHOUETTE,
 );
 
@@ -34,6 +34,9 @@ const HUE_COLORS: Readonly<Record<AvatarHue, ColorId>> = {
   280: "violet",
   320: "rose",
 };
+
+/** The eyes a person can pick, in the order Bloub lists them. */
+export const AVATAR_EXPRESSIONS: readonly ExpressionId[] = EXPRESSIONS.map((option) => option.id);
 
 export const AVATAR_HUE_OPTIONS: ReadonlyArray<{
   hue: AvatarHue;
@@ -112,6 +115,32 @@ export function avatarCandidateSeeds(agentId: string, currentSeed: string, batch
   }
 
   return candidates;
+}
+
+/** About 50 times the tries that one shape and eyes pair needs on average. */
+const FACE_SEED_TRIES = 10_000;
+
+/**
+ * A seed that draws the given shape and eyes. Only the seed is saved, so a face that a person
+ * builds must come from a seed: every app then draws it, with no new saved field. The same agent
+ * and choice always give the same seed. The automatic colour also comes from the seed, and the
+ * hash ties it to the eyes, so new eyes can change it: keep the colour with `avatarHueForColor`.
+ */
+export function avatarSeedForFace(
+  agentId: string,
+  face: { shape: SupportedAvatarSilhouetteId; expression: ExpressionId },
+): string {
+  for (let index = 0; index < FACE_SEED_TRIES; index += 1) {
+    const candidate = `${agentId}:face:${index}`;
+    const profile = bloubAvatarProfile(candidate, null);
+    if (profile.shape === face.shape && profile.expression === face.expression) return candidate;
+  }
+  throw new Error("No avatar seed draws this face.");
+}
+
+/** The hue that draws an automatic colour, so the colour can stay when the seed changes. */
+export function avatarHueForColor(color: ColorId): AvatarHue | null {
+  return AVATAR_HUE_CHOICES.find((option) => HUE_COLORS[option.hue] === color)?.hue ?? null;
 }
 
 function stableIndex(value: string, length: number): number {

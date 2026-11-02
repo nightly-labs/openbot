@@ -154,6 +154,25 @@ reason:
 `workflow_github_runs` links a run to its item. When a run ends, the oldest waiting delivery of its
 item starts. The event, marked as data, is the trigger's output.
 
+### Workflow Discord triggers
+
+A Discord trigger uses the Discord connection of the host's messaging. It has no route, secret or
+table of its own. Signal passes on the messages that mention OpenBot or OpenBot's own role in the
+server (the role match needs a Signal deploy). A trigger limited to a channel does not start for a
+mention in a thread of that channel: the Signal message names the thread, not its parent.
+`MessagingService` gives each mention in a server channel (not a direct message, not a
+reply in an existing conversation) to `Workflows.receiveDiscord` before it goes to an agent. The
+trigger matches the connection, the channel (empty: any), the author's roles (empty: any) and a
+text filter (`discord-matching.ts`). A matched mention starts one run for each trigger, with source
+`discord` (schema v50) and the idempotency key `discord:<node>:<message>`, and does not start an
+agent conversation. A workflow with an open run skips the mention; when all matched triggers skip
+it, OpenBot adds the failed reaction to the message.
+
+The run payload is the mention, marked as data. A Discord output reads the channel and message ID
+from it: a reply and a reaction act on that message; a post goes to a chosen channel. Each post or
+reaction is a row of `workflow_output_deliveries`. Only the local computer lists Discord servers,
+and only an owner or admin changes a Discord node (`route-workflows.ts`).
+
 ## Management surfaces
 
 - Local desktop: the `events` IPC group (`packages/contracts/src/ipc-endpoints.ts`).
@@ -179,6 +198,8 @@ item starts. The event, marked as data, is the trigger's output.
 - Workflow GitHub triggers and outputs: the `workflows` IPC group and the `workflows-github-v1` Team
   API capability (`WORKFLOWS_GITHUB_ROUTES`: catalog, options, history, run with last event). All
   routes need a host administrator. A client without the capability does not offer GitHub.
+- Workflow Discord triggers and outputs: no route of their own. Only the desktop that hosts the
+  workflows offers them, and the `workflows-v1` graph save refuses a change from a member.
 - Desktop and web use the shared routine editor components in
   `packages/ui/src/features/conversation`. Mobile uses native components in
   `apps/mobile/src/features/agents/components`.

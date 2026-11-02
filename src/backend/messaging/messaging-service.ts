@@ -43,6 +43,7 @@ import type { MessagingConnectionRecord, MessagingLink } from "./messaging-store
 import {
   MESSAGING_NOT_RUNNING,
   type MessagingActivity,
+  type MessagingDiscordSend,
   type MessagingHistory,
   type MessagingHistoryScope,
   type MessagingThreads,
@@ -279,6 +280,7 @@ export class MessagingService {
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
       post: (connectionId, target, markdown) => this.#outboundPost(connectionId, target, markdown),
+      discord: (connectionId, send) => this.#outboundDiscord(connectionId, send),
     });
     this.#ingress?.handle((workspaceId, delivery) => this.deliver(workspaceId, delivery));
     const records = this.#threads.store.connections();
@@ -1219,6 +1221,27 @@ export class MessagingService {
     const replyTo = quote
       ? { authorName: quote.authorName, text: withMentionNames(quote.text, mentioned), sentAt: quote.sentAt }
       : null;
+    // A new mention in a Discord server goes to the workflows first: a Discord trigger that takes it
+    // starts a run, and no agent answers it. A conversation that has an agent keeps it.
+    if (live.record.platform === "discord" && !message.isDirect && !existing) {
+      const workflows = yield* this.#threads.workflowMention({
+        connectionId: live.record.connectionId,
+        serverName: live.record.workspaceName,
+        channelId: message.platformChannelId,
+        channelName: place ?? message.platformChannelId,
+        messageId: message.platformMessageId,
+        authorId: message.authorId,
+        authorName,
+        authorRoleIds: message.authorRoleIds ?? [],
+        text: named,
+        receivedAt: new Date().toISOString(),
+      });
+      if (workflows === "skipped")
+        yield* adapter
+          .react(message.target, message.platformMessageId, "failed", true)
+          .pipe(Effect.catch(() => Effect.void));
+      if (workflows !== "none") return;
+    }
     // A conversation keeps its agent. A new one goes to the workspace's orchestrator, which asks its
     // teammates; without one, nothing answers.
     const agentId = existing?.agentId ?? this.#orchestrator(live.record);
@@ -1461,6 +1484,36 @@ export class MessagingService {
         }),
       ),
     );
+  });
+
+  /** A reply, post or reaction of a workflow's Discord output. */
+  readonly #outboundDiscord = Effect.fn("MessagingService.outboundDiscord")(function* (
+    this: MessagingService,
+    connectionId: string,
+    send: MessagingDiscordSend,
+  ) {
+    const live = this.#live.get(connectionId);
+    if (!live?.identity || live.record.platform !== "discord" || !live.adapter.addEmoji)
+      return { failure: "not-running" as const };
+    if (send.action === "react")
+      return yield* live.adapter
+        .addEmoji({ platformChannelId: send.channelId, replyThreadId: null }, send.messageId, send.emoji)
+        .pipe(
+          Effect.as({ posted: true as const }),
+          // A reaction is all or nothing, so a failed one is not in the server.
+          Effect.catch((failure) =>
+            Effect.sync(() => {
+              this.#warn(failure.cause);
+              return { failure: "refused" as const };
+            }),
+          ),
+        );
+    const target = {
+      platformChannelId: send.channelId,
+      replyThreadId: send.action === "reply" ? send.messageId : null,
+    };
+    const result = yield* this.#outboundPost(connectionId, target, send.text);
+    return "posted" in result ? { posted: true as const } : { failure: result.failure };
   });
 
   readonly #activity = Effect.fn("MessagingService.activity")(function* (

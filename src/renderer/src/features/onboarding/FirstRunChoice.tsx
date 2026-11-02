@@ -48,7 +48,6 @@ export function FirstRunChoice(props: FirstRunChoiceProps) {
               seed={member.seed}
               hue={member.hue}
               motion="idle"
-              cycleOffset={member.cycleOffset}
               animationOffset={member.animationOffset}
               followPointer
               class="first-run-choice-avatar"

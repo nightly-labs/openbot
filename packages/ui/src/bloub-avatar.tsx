@@ -11,13 +11,16 @@ import { flush } from "solid-js";
  */
 export type AvatarMotion = "hover" | "always" | "idle";
 export {
+  AVATAR_EXPRESSIONS,
   AVATAR_HUE_CHOICES,
-  AVATAR_HUE_OPTIONS,
   avatarCandidateSeeds,
   avatarHeadColor,
+  avatarHueForColor,
   avatarHueSwatch,
+  avatarSeedForFace,
   type BloubAvatarProfile,
   bloubAvatarProfile,
+  SUPPORTED_AVATAR_SILHOUETTES,
   type SupportedAvatarSilhouetteId,
 } from "@openbot/brand/bloub-avatar";
 export {

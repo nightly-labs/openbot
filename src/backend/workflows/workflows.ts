@@ -68,9 +68,21 @@ import { Cause, Context, Effect, Exit, Fiber, Layer, ManagedRuntime, Result, Sch
 import { isNoUpdateAnswer } from "../agent/routine-quiet-runs";
 import type { AgentProvider } from "../agent-client";
 import { coalescedPasses } from "../coalesced-passes";
-import type { MessagingPostFailure } from "../messaging/messaging-threads";
+import type {
+  MessagingDiscordMention,
+  MessagingDiscordSend,
+  MessagingMentionResult,
+  MessagingPostFailure,
+} from "../messaging/messaging-threads";
 import { resultText } from "../routine-results/routine-results";
 import type { ReceivedWebhookEvent } from "../routine-store";
+import {
+  type DiscordOutputPlan,
+  discordOutputPlan,
+  discordTriggerMatches,
+  discordTriggerMessage,
+  workflowDiscordPayload,
+} from "./discord-matching";
 import {
   githubEventFacts,
   githubFilterRefuses,
@@ -193,6 +205,11 @@ export interface WorkflowsDependencies {
     placeId: string,
     markdown: string,
   ): Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
+  /** Replies, posts or reacts in a Discord server; absent where this host has no messaging. */
+  discordSend?: (
+    connectionId: string,
+    send: MessagingDiscordSend,
+  ) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
   /** The workflow whose graph, title, versions or runs changed. */
   changed(workflowId: string): void;
   /**
@@ -276,6 +293,11 @@ interface WorkflowsShape {
    * same delivery once.
    */
   receiveGitHub(event: WorkflowGitHubEventInput): Effect.Effect<WorkflowGitHubResult, WorkflowFailed>;
+  /**
+   * Starts the run of each workflow whose Discord trigger takes a mention of OpenBot. Answers `none`
+   * when no trigger takes it, and `skipped` when each workflow that takes it is busy or cannot start.
+   */
+  receiveDiscord(mention: MessagingDiscordMention): Effect.Effect<MessagingMentionResult, WorkflowFailed>;
   /** Records in each GitHub trigger's history that the host got no GitHub events from `from` to `to`. */
   githubOffline(from: Date, to: Date): Effect.Effect<void, WorkflowFailed>;
   githubHistory(workflowId: string): Effect.Effect<WorkflowGitHubHistory, WorkflowFailed>;
@@ -443,10 +465,14 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         };
 
         /** Posts an output step's text to its place in a fiber of its own; the pass does not wait for it. */
-        const startPost = (step: StoredWorkflowStep, output: WorkflowOutputDelivery): Effect.Effect<void> => {
+        const startPost = (
+          step: StoredWorkflowStep,
+          output: WorkflowOutputDelivery,
+          send = dependencies.post(output.connectionId, output.placeId, output.text),
+        ): Effect.Effect<void> => {
           const post = Effect.gen(function* () {
             if (!runs.claimOutput(step.id, now())) return;
-            const result = yield* dependencies.post(output.connectionId, output.placeId, output.text).pipe(
+            const result = yield* send.pipe(
               // A stop or a defect during the post can leave it in part: the row says so, and does not stay `sending`.
               Effect.onExit((exit) =>
                 Exit.isSuccess(exit)
@@ -509,14 +535,17 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
          * Ends an output step whose post has no fiber, after a restart: a post that did not start is
          * sent now, and one that was on its way may be in the place in part. Answers whether it ended.
          */
-        const resumeOutput = (step: StoredWorkflowStep): Effect.Effect<boolean> => {
+        const resumeOutput = (
+          step: StoredWorkflowStep,
+          send?: Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>,
+        ): Effect.Effect<boolean> => {
           const output = runs.output(step.id);
           // The restart came between the step and its post: nothing was sent.
           if (!output)
             return Effect.succeed(settle(step, { status: "failed", error: sourceText("error.workflow.interrupted") }));
           switch (output.status) {
             case "pending":
-              return startPost(step, output).pipe(Effect.as(false));
+              return startPost(step, output, send).pipe(Effect.as(false));
             case "sent":
               return Effect.succeed(settle(step, { status: "done", output: step.input }));
             case "failed":
@@ -527,6 +556,49 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             case "uncertain":
               return Effect.succeed(settle(step, { status: "failed", error: outputError("uncertain") }));
           }
+        };
+
+        /**
+         * The reply, post or reaction of a Discord output in the run that `run` is. Only a run that a
+         * mention started has a trigger message: a webhook payload has the same frame, with the type and
+         * data that its sender chooses.
+         */
+        const discordPlan = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          discordOutputPlan(node, step.input, run?.source === "discord" ? discordTriggerMessage(run.payload) : null);
+
+        const discordPost = (plan: Extract<DiscordOutputPlan, { send: unknown }>) =>
+          dependencies.discordSend
+            ? dependencies.discordSend(plan.connectionId, plan.send)
+            : Effect.succeed({ failure: "not-running" as const });
+
+        /** Keeps a Discord output's reply, post or reaction, then sends it. */
+        const sendDiscord = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) => {
+          const plan = discordPlan(step, node, run);
+          if ("error" in plan) {
+            settle(step, { status: "failed", error: plan.error });
+            return Effect.void;
+          }
+          const { send } = plan;
+          // Nothing to say: the server gets no post. A reaction needs no text.
+          if (send.action !== "react" && !send.text.trim()) {
+            settle(step, { status: "done", output: "" });
+            return Effect.void;
+          }
+          if (!dependencies.connectionOn(plan.connectionId)) {
+            settle(step, { status: "failed", error: outputError("gone") });
+            return Effect.void;
+          }
+          runs.addOutput(
+            {
+              stepId: step.id,
+              connectionId: plan.connectionId,
+              placeId: send.channelId,
+              text: send.action === "react" ? send.emoji : send.text,
+            },
+            now(),
+          );
+          const output = runs.output(step.id);
+          return output ? startPost(step, output, discordPost(plan)) : Effect.void;
         };
 
         /**
@@ -690,6 +762,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const run = step.runId ? runs.run(step.runId) : null;
           const graph = run?.graph ?? store.detail(step.workflowId)?.graph;
           const node = graph?.nodes.find((candidate) => candidate.id === step.nodeId);
+          if (node && fieldText(node, "target") === "discord") {
+            const plan = discordPlan(step, node, run);
+            if ("error" in plan) return settle(step, { status: "failed", error: plan.error });
+            return yield* resumeOutput(step, discordPost(plan));
+          }
           if (!node || fieldText(node, "target") !== "github") return yield* resumeOutput(step);
           yield* sendGitHub(step, node, run);
           return runs.step(step.id)?.status !== "running";
@@ -737,6 +814,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               }
               if (fieldText(node, "target") === "github") {
                 yield* sendGitHub(step, node, run);
+                return;
+              }
+              if (fieldText(node, "target") === "discord") {
+                yield* sendDiscord(step, node, run);
                 return;
               }
               dependencies.notify({
@@ -1149,6 +1230,55 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               }
               if (!started.success.created) return { kind: "duplicate" };
               return { kind: "started", run: publicRun(started.success.run) };
+            }),
+          );
+        });
+
+        const receiveDiscord = Effect.fn("Workflows.receiveDiscord")(function* (mention: MessagingDiscordMention) {
+          return yield* locked(
+            Effect.gen(function* (): Effect.fn.Return<MessagingMentionResult, WorkflowFailed> {
+              const triggers = (yield* attempt(() => store.listWithGraphs())).flatMap(({ summary, graph }) =>
+                graph.nodes
+                  .filter((node) => discordTriggerMatches(node, mention))
+                  .map((node) => ({ workflowId: summary.id, node })),
+              );
+              if (triggers.length === 0) return "none";
+              let started = false;
+              for (const { workflowId, node } of triggers) {
+                const open = runs.openRuns().filter((run) => run.workflowId === workflowId);
+                // A mention that Signal gives again, after a restart, has its run already.
+                if (
+                  open.some(
+                    (run) =>
+                      run.source === "discord" && discordTriggerMessage(run.payload)?.messageId === mention.messageId,
+                  )
+                ) {
+                  started = true;
+                  continue;
+                }
+                // A busy workflow skips the mention, as a schedule skips an occurrence.
+                if (open.length > 0) continue;
+                const detail = yield* attempt(() => store.detail(workflowId));
+                if (!detail) continue;
+                const result = yield* begin(detail, node, {
+                  source: "discord",
+                  scheduledFor: null,
+                  idempotencyKey: `discord:${node.id}:${mention.messageId}`,
+                  payload: workflowDiscordPayload(node.id, mention),
+                }).pipe(Effect.result);
+                if (Result.isFailure(result)) {
+                  // After a run started, the mention stays with the workflows: no agent answers it too.
+                  if (!started && !(result.failure.cause instanceof WorkflowStoreError)) return yield* result.failure;
+                  logger.warn("A Discord mention did not start a workflow run.", {
+                    workflowId,
+                    nodeId: node.id,
+                    cause: String(result.failure.cause),
+                  });
+                  continue;
+                }
+                started = true;
+              }
+              return started ? "started" : "skipped";
             }),
           );
         });
@@ -1579,6 +1709,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           startScheduled,
           receiveWebhook,
           receiveGitHub,
+          receiveDiscord,
           githubOffline,
           githubHistory,
           githubLastEvent,
