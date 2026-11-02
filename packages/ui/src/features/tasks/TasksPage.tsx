@@ -198,7 +198,10 @@ function TasksComposer(props: TasksPageProps) {
   const phase = (): VoicePhase => props.voice?.phase ?? "idle";
   const busy = () => phase() === "requesting" || phase() === "preparing" || phase() === "transcribing";
   const hasRow = () => (props.rowFiles?.length ?? 0) > 0 || (props.pendingImages?.length ?? 0) > 0;
-  const canStart = () => phase() === "recording" || (phase() === "idle" && plainTaskTitle(props.draft) !== "");
+  // A start of files only names them, so it has a title too.
+  const canStart = () =>
+    phase() === "recording" ||
+    (phase() === "idle" && (plainTaskTitle(props.draft) !== "" || (props.files?.length ?? 0) > 0));
   const start = () => {
     if (canStart()) props.onStart();
   };

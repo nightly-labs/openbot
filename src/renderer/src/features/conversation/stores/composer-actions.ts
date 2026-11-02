@@ -26,7 +26,13 @@ import { playActionSound } from "../../../action-sounds";
 import { claimDictatedSend, forgetDictatedMessage } from "../../speech/speech-replies";
 import { rememberAttachmentKinds } from "../attachment-analytics";
 import { type PastedComposerCopy, rememberComposerFile } from "../composer-clipboard";
-import { copyComposerDraft, EMPTY_DRAFT, QUEUE_EDIT_STORAGE_KEY, type StoredQueueEdit } from "../composer-draft";
+import {
+  copyComposerDraft,
+  EMPTY_DRAFT,
+  insertAtSelection,
+  QUEUE_EDIT_STORAGE_KEY,
+  type StoredQueueEdit,
+} from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
@@ -316,14 +322,10 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     // Puts `text` at the selection. A view can unmount during import, so newer edits stay and the
     // text goes at the end. Returns undefined when the message would be too long.
     const insert = (text: string): ComposerPasteResult | undefined => {
-      const current = deps.drafts()[key] ?? EMPTY_DRAFT;
-      const next =
-        current.text === before
-          ? `${before.slice(0, selection.start)}${text}${before.slice(selection.end)}`
-          : [current.text, text].filter(Boolean).join(" ");
-      if (next.length > INPUT_LIMITS.messageText) return;
-      deps.setDrafts((drafts) => ({ ...drafts, [key]: { ...(drafts[key] ?? EMPTY_DRAFT), text: next } }));
-      return { value: next, caret: current.text === before ? selection.start + text.length : next.length };
+      const result = insertAtSelection((deps.drafts()[key] ?? EMPTY_DRAFT).text, text, { before, selection });
+      if (result.value.length > INPUT_LIMITS.messageText) return;
+      deps.setDrafts((drafts) => ({ ...drafts, [key]: { ...(drafts[key] ?? EMPTY_DRAFT), text: result.value } }));
+      return result;
     };
     const requestId = crypto.randomUUID();
     const runtime = conversationRuntime(deps.props);

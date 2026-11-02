@@ -1,5 +1,4 @@
 import {
-  attachmentReferenceIds,
   expandAttachmentReferences,
   removeAttachmentReferences,
   serializeAttachmentReference,
@@ -41,6 +40,7 @@ import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
 import { usePlatform } from "../../platform";
 import { readAgentSelection, writeAgentSelection } from "../agents/agent-selection";
+import { insertAtSelection, rowAttachments } from "../conversation/composer-draft";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { importPastedFiles, type PastePreview, pastePreviewTracker } from "../conversation/stores/composer-actions";
 import { createTurnSteps } from "../conversation/turn-steps";
@@ -182,11 +182,7 @@ export function TasksView(props: TasksViewProps) {
       else draft.drafts[key] = text;
     });
   }
-  /** The thumbnail row: each image, also one that the text names, and each other file that the text does not name. */
-  const rowFilesOf = (key: string) => {
-    const referenced = attachmentReferenceIds(textOf(key));
-    return filesOf(key).filter((file) => file.kind === "image" || !referenced.has(file.id));
-  };
+  const rowFilesOf = (key: string) => rowAttachments(textOf(key), filesOf(key));
 
   /**
    * Imports pasted files into a message box, and puts their references at the selection, or at the end
@@ -224,15 +220,11 @@ export function TasksView(props: TasksViewProps) {
         draft.files[key] = [...(draft.files[key] ?? []), ...accepted];
       });
       const references = accepted.map((file) => serializeAttachmentReference(file.name, file.id)).join(" ");
-      const latest = textOf(key);
-      const atSelection = latest === before ? selection : undefined;
-      const text = atSelection
-        ? `${latest.slice(0, atSelection.start)}${references}${latest.slice(atSelection.end)}`
-        : [latest, references].filter(Boolean).join(" ");
+      const result = insertAtSelection(textOf(key), references, { before, selection });
       // A message that would be too long keeps the files in the row only.
-      if (!references || text.length > INPUT_LIMITS.messageText) return;
-      setText(key, text);
-      return { value: text, caret: atSelection ? atSelection.start + references.length : text.length };
+      if (result.value.length > INPUT_LIMITS.messageText) return;
+      setText(key, result.value);
+      return result;
     } catch (error) {
       if (current === generation) toastError(error, "composer.error.keepAttachments");
     } finally {
@@ -450,7 +442,11 @@ export function TasksView(props: TasksViewProps) {
   }
 
   function start(text: string): boolean {
-    // A file in the text gives its name, as in the title that the host makes.
+    // A start of images only names them, as a side thread does. A file gives its name to the title.
+    if (!plainTaskTitle(expandAttachmentReferences(text)))
+      text = filesOf(START_FILES)
+        .map((file) => serializeAttachmentReference(file.name, file.id))
+        .join(" ");
     const title = plainTaskTitle(expandAttachmentReferences(text));
     const owner = agentId();
     if (!title || !owner) return false;
@@ -554,6 +550,9 @@ export function TasksView(props: TasksViewProps) {
         draft.snapshots = {};
         draft.conversations = {};
         draft.drafts = {};
+        // The old server discarded the files, so the start text no longer names them.
+        for (const file of draft.files[START_FILES] ?? [])
+          draft.draft = removeAttachmentReferences(draft.draft, file.id);
         draft.files = {};
         draft.pending = null;
         draft.selectedId = null;

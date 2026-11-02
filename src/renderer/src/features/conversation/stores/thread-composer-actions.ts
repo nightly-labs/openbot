@@ -9,7 +9,7 @@ import type { ComposerPasteResult, ComposerSelection } from "@openbot/ui/feature
 import { DRAFT_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
 import { actionToast } from "../../../action-toast";
-import { EMPTY_DRAFT } from "../composer-draft";
+import { EMPTY_DRAFT, insertAtSelection } from "../composer-draft";
 import { threadDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationThreads } from "../conversation-types";
@@ -168,18 +168,18 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     const references = accepted
       .map((attachment) => serializeAttachmentReference(attachment.name, attachment.id))
       .join(" ");
-    const current = draft(key).text;
-    const atSelection = at && current === at.before ? at.selection : undefined;
-    const text = atSelection
-      ? `${current.slice(0, atSelection.start)}${references}${current.slice(atSelection.end)}`
-      : [current, references].filter(Boolean).join(" ");
-    if (text.length > INPUT_LIMITS.messageText) {
+    const result = insertAtSelection(draft(key).text, references, at);
+    if (result.value.length > INPUT_LIMITS.messageText) {
       discard(accepted, serverId);
       actionToast.error(t("error.agent.messageTooLong"));
       return;
     }
-    updateDraft(key, (current) => ({ ...current, text, attachments: [...current.attachments, ...accepted] }));
-    return { value: text, caret: atSelection ? atSelection.start + references.length : text.length };
+    updateDraft(key, (current) => ({
+      ...current,
+      text: result.value,
+      attachments: [...current.attachments, ...accepted],
+    }));
+    return result;
   }
 
   async function pasteFiles(
