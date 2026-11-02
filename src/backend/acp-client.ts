@@ -528,6 +528,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       requestTimeoutMs,
       discoveryCwd: options.discoveryCwd,
       processWideModel: options.flavor.processWideModel === true,
+      modelSetUnsaved: options.flavor.modelSetUnsaved,
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
     });
   }

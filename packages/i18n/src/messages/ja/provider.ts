@@ -123,6 +123,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}、デフォルト",
   "provider.picker.effort": "推論の強さ",
   "provider.picker.effortLabel": "エージェントの推論の強さ",
+  "provider.picker.effortFixed": "{effort}（{provider} が固定）",
   "provider.picker.fast": "高速",
   "provider.picker.fastLabel": "高速モード",
   "provider.picker.selectEffort": "推論の強さを選択",

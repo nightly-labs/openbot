@@ -22,6 +22,10 @@ const GEMINI_PATH =
 const CLINE_PATH =
   "m23.365 13.556-1.442-2.895V8.994c0-2.764-2.218-5.002-4.954-5.002h-2.464c.178-.367.276-.779.276-1.213A2.77 2.77 0 0 0 12.018 0a2.77 2.77 0 0 0-2.763 2.779c0 .434.098.846.276 1.213H7.067c-2.736 0-4.954 2.238-4.954 5.002v1.667L.64 13.549c-.149.29-.149.636 0 .927l1.472 2.855v1.667C2.113 21.762 4.33 24 7.067 24h9.902c2.736 0 4.954-2.238 4.954-5.002V17.33l1.44-2.865c.143-.286.143-.622.002-.91m-12.854 2.36a2.27 2.27 0 0 1-2.261 2.273 2.27 2.27 0 0 1-2.261-2.273v-4.042A2.27 2.27 0 0 1 8.249 9.6a2.267 2.267 0 0 1 2.262 2.274zm7.285 0a2.27 2.27 0 0 1-2.26 2.273 2.27 2.27 0 0 1-2.262-2.273v-4.042A2.267 2.267 0 0 1 15.535 9.6a2.267 2.267 0 0 1 2.261 2.274z";
 
+// The Kimi mark in one colour, from Simple Icons (CC0): https://simpleicons.org/?q=kimi
+const KIMI_PATH =
+  "M21.765.351C22.998.351 24 1.353 24 2.586S22.998 4.82 21.765 4.82h-1.974c-.15 0-.26-.12-.26-.26V2.586A2.237 2.237 0 0 1 21.765.35M9.41 13.388l8.447-8.377c.16-.16.07-.471-.14-.471h-4.55s-.1.02-.14.06l-9.099 9.029c-.14.14-.35.02-.35-.21V4.81c0-.15-.1-.27-.221-.27H.22c-.12 0-.22.12-.22.27v18.57c0 .15.1.27.22.27h3.137c.12 0 .22-.12.22-.27v-3.79c0-.08.03-.16.08-.21l2.826-2.796c.07-.07.16-.08.241-.03l7.546 5.551a8.9 8.9 0 0 0 4.018 1.493c.12.01.23-.11.23-.27V19.76c0-.14-.08-.25-.19-.26a5.8 5.8 0 0 1-2.355-.942l-6.533-4.73c-.14-.09-.15-.32-.03-.441";
+
 // The DeepSeek whale in one colour, on a 24 by 24 grid, from LobeHub Icons (MIT):
 // https://github.com/lobehub/lobe-icons
 const DEEPSEEK_PATH =
@@ -64,6 +68,7 @@ export type ProviderLogoVariant =
   | "antigravity"
   | "cursor"
   | "cline"
+  | "kimi"
   | "acp"
   | "pi"
   | "muse"
@@ -107,6 +112,8 @@ export function providerLogoShape(provider: ProviderLogoVariant): ProviderLogoSh
       return { viewBox: GRID_24, paths: [{ d: CURSOR_PATH }] };
     case "cline":
       return { viewBox: GRID_24, paths: [{ d: CLINE_PATH }] };
+    case "kimi":
+      return { viewBox: GRID_24, paths: [{ d: KIMI_PATH }] };
     case "deepseek":
       return { viewBox: GRID_24, paths: [{ d: DEEPSEEK_PATH, evenOdd: true }] };
     case "openrouter":

@@ -41,6 +41,7 @@ export const messages = {
   "onboarding.provider.googlePlan": "Google AI Pro- of Ultra-abonnement",
   "onboarding.provider.cursorPlan": "Cursor-abonnement of API-sleutel",
   "onboarding.provider.clineAccount": "Gratis modellen met een Cline-account",
+  "onboarding.provider.kimiAccount": "Kimi-modellen met een Kimi Code-account",
   "onboarding.provider.hermesNous": "Nous Portal-abonnement of je Hermes-configuratie",
   "onboarding.provider.inceptionKey": "Mercury-modellen met een Inception-API-sleutel",
   "onboarding.provider.deepseekKey": "DeepSeek-modellen met een DeepSeek-API-sleutel",

@@ -204,6 +204,11 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
         providers.cline === undefined
           ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
           : decodeProviderRuntimeStatus(providers.cline),
+      // A host before Kimi sends no Kimi row; this client cannot download Kimi there.
+      kimi:
+        providers.kimi === undefined
+          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
+          : decodeProviderRuntimeStatus(providers.kimi),
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };

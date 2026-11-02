@@ -38,6 +38,8 @@ export const messages = {
   "error.agent.modelListEmptyNoError":
     "Выбранная модель агента «{model}» недоступна: {provider} не вернул ни одной модели.",
   "error.agent.modelNotInProviderList": "Выбранная модель агента «{model}» недоступна: {provider} её не перечисляет.",
+  "error.agent.modelVariantNotListed":
+    "Выбранная модель агента «{model}» недоступна: {provider} её не перечисляет. Используйте одно из значений, которые {provider} перечисляет для этой модели: {models}.",
   "error.agent.modelProviderMismatch": "Выбранная модель не принадлежит этому провайдеру.",
   "error.agent.modelNotListed": "Модель «{model}» недоступна. Доступные модели: {models}.",
   "error.agent.providerNotListed":

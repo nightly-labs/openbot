@@ -183,6 +183,7 @@ const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = [
   "antigravity",
   "cursor",
   "cline",
+  "kimi",
   "hermes",
   "acp",
 ];
@@ -1881,7 +1882,14 @@ export class ProviderRuntime implements ProviderPort {
     harness: CustomProviderHarness,
   ): Effect.fn.Return<CustomProviderRestart> {
     this.#environmentReloadPending.delete(harness);
-    if (!this.#clients.has(harness)) return "not-running";
+    if (!this.#clients.has(harness)) {
+      // A process stopped for idle keeps its old catalogue, and only an agent's turn starts it again.
+      // A new endpoint would then list no model, so no agent could be set to it (#4443). The start is
+      // not awaited, as a save does not wait for model discovery; a failure shows on the status.
+      if (this.#released.has(harness))
+        yield* this.ensureProvider(harness).pipe(Effect.ignore, Effect.forkIn(this.#scope));
+      return "not-running";
+    }
     if (this.#hooks.isProviderBusy(harness)) {
       this.#environmentReloadPending.add(harness);
       return "skipped-busy";

@@ -7,6 +7,8 @@
 //   It lists its provider as an auth method only when it is signed in, and its stderr is a Python log.
 // - `FAKE_SIGNED_OUT=1` refuses each new session, as an agent does before its sign-in. Hermes refuses
 //   it with "Internal error", and writes the cause only to stderr.
+// - `FAKE_MODEL_SET=kimi` gives no configuration options. `session/set_model` changes the model and
+//   then fails, as Kimi CLI 1.52.0 does when its config.toml is protected.
 // A prompt with the text `wait` runs until the client cancels it. Each other prompt answers at once.
 import {
   type AcpError,
@@ -33,6 +35,8 @@ const MISSING_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => Acp
   }),
   // Antigravity 1.3.0, on a load or a resume.
   antigravity: (sessionId) => ({ code: -32002, message: "Resource not found", data: { sessionId } }),
+  // Kimi CLI 1.52.0.
+  kimi: () => ({ code: -32602, message: "Invalid params", data: { session_id: "Session not found" } }),
   // Cursor.
   cursor: (sessionId) => ({
     code: -32602,
@@ -49,6 +53,7 @@ const HERMES_AUTH_METHODS = [
 ];
 const missingError = MISSING_ERRORS[process.env.FAKE_MISSING ?? "protocol"];
 const signedOut = process.env.FAKE_SIGNED_OUT === "1";
+const kimiModelSet = process.env.FAKE_MODEL_SET === "kimi";
 const models = new Map<string, string>();
 /** The `wait` prompt of each session that waits for its cancel. */
 const waiting = new Map<string, () => void>();
@@ -57,6 +62,8 @@ let count = 0;
 function setup(sessionId: string) {
   const current = models.get(sessionId) ?? MODELS[0]?.modelId ?? "";
   models.set(sessionId, current);
+  const state = { availableModels: MODELS, currentModelId: current };
+  if (kimiModelSet) return { sessionId, models: state };
   return {
     sessionId,
     configOptions: [
@@ -69,8 +76,8 @@ function setup(sessionId: string) {
         options: MODELS.map((model) => ({ value: model.modelId, name: model.name })),
       },
     ],
-    models: { availableModels: MODELS, currentModelId: current },
-    ...(hermes ? { modes: { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }] } } : {}),
+    models: state,
+    modes: hermes ? { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }] } : undefined,
   };
 }
 
@@ -123,6 +130,18 @@ serveFakeAcpAgent(
       logEntry({ event: "set", sessionId, configId, value });
       if (configId === "model") models.set(sessionId, value);
       peer.reply(request, { configOptions: setup(sessionId).configOptions });
+    },
+    "session/set_model": (request, peer) => {
+      const { sessionId = "", modelId = "" } = request.params;
+      logEntry({ event: "set_model", sessionId, value: modelId });
+      models.set(sessionId, modelId);
+      if (!kimiModelSet) peer.reply(request, {});
+      else
+        peer.fail(request, {
+          code: -32603,
+          message: "Internal error",
+          data: { details: "[Errno 1] Operation not permitted: '/home/user/.kimi/config.toml'" },
+        });
     },
     "session/prompt": (request, peer) => {
       const sessionId = request.params.sessionId ?? "";

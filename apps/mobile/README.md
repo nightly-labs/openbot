@@ -191,6 +191,13 @@ When no agents have loaded and the selected server is connecting or offline, the
 `Waiting for connection`. The empty-server prompt appears only once the server is online; agents
 already loaded remain visible during reconnection.
 
+The phone keeps an encrypted copy of the agents, hidden agents, sections and latest chat pages of
+each server (`workspace-cache.ts`), and writes it when a server load ends and when the app goes to
+the background. After a start, a server shows its copy at once, and its first connection attempt is
+quiet for 5 seconds, as a return to the app is. The UI does not mark the copy: a server that takes
+longer shows the usual reconnect status and faded avatars. Its own reads then replace the copy.
+Sign-out, an expired session and the removal of a server delete it.
+
 While a server is disconnected, its agent avatars and colored chat bubbles fade locally with the same
 280 ms transition. Voice controls and suggested prompts are disabled until the server is online. The
 chat input and attachments stay usable: a sent message goes to the phone's outbox and is drawn

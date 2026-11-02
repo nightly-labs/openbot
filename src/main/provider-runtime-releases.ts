@@ -6,6 +6,7 @@ import type { AgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import {
   codexTag,
   cursorPackageUrl,
+  kimiAssetName,
   OPENCODE_CLI_PACKAGE,
   providerRuntimeDescriptor,
   type RuntimeSpec,
@@ -20,7 +21,7 @@ import { ProviderRuntimeFailure, runtimeIO, runtimeSync } from "./provider-runti
  * users with the next OpenBot release. Providers ship faster than that, so the update offer now
  * follows upstream. The lock still names the version a first install uses when no source answers.
  *
- * Every download keeps a hash from its source: GitHub's asset `digest` for Codex and npm's
+ * Every download keeps a hash from its source: GitHub's asset `digest` for Codex, Pi and Kimi, and npm's
  * `dist.integrity` for Claude, OpenCode and Cline. x.ai publishes no hash for Grok, so a Grok release is
  * trusted on TLS alone, and so are Antigravity and Cursor from the ACP registry. Bun is a tool
  * runtime rather than a provider, and stays on the lock.
@@ -334,6 +335,37 @@ const LATEST_RELEASES: Record<
       "latest",
     );
     return { ...pinned, ...artifact, version: artifact.packageVersion, source: "latest" };
+  }),
+  // Kimi tags a release with the bare version.
+  kimi: Effect.fn("ProviderRelease.kimi")(function* ({ target, lock, fetch }: LatestReleaseContext) {
+    const pinned = providerRuntimeDescriptor("kimi").spec(target, lock);
+    const release = yield* fetchJsonEffect(fetch, "https://api.github.com/repos/MoonshotAI/kimi-cli/releases/latest", {
+      Accept: "application/vnd.github+json",
+    });
+    const version = isString(release.tag_name) && VERSION.test(release.tag_name) ? release.tag_name : null;
+    const assetName = version ? kimiAssetName(version, target) : null;
+    const asset = Array.isArray(release.assets)
+      ? release.assets.find((entry: unknown) => isDynamicRecord(entry) && entry.name === assetName)
+      : null;
+    if (
+      !version ||
+      !assetName ||
+      !isDynamicRecord(asset) ||
+      !isString(asset.digest) ||
+      !/^sha256:[a-f0-9]{64}$/u.test(asset.digest) ||
+      !isNumber(asset.size) ||
+      asset.size <= 0
+    )
+      return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.nativeArchiveInvalid")) });
+    return {
+      ...pinned,
+      source: "latest" as const,
+      version,
+      packageVersion: version,
+      url: `${lock.kimi.repository}/releases/download/${encodeURIComponent(version)}/${assetName}`,
+      archiveDigest: { algorithm: "sha256" as const, hex: asset.digest.slice(7) },
+      downloadBytes: asset.size,
+    };
   }),
 };
 

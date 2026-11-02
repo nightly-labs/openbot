@@ -114,6 +114,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, standaard",
   "provider.picker.effort": "Denkniveau",
   "provider.picker.effortLabel": "Redeneerniveau van de agent",
+  "provider.picker.effortFixed": "{effort}, vastgezet door {provider}",
   "provider.picker.fast": "Snel",
   "provider.picker.fastLabel": "Snelle modus",
   "provider.picker.selectEffort": "Kies niveau",

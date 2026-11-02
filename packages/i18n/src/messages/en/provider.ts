@@ -132,6 +132,7 @@ export const messages = defineMessages("provider", {
   "provider.picker.defaultModelLabel": "{name}, default",
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Agent reasoning effort",
+  "provider.picker.effortFixed": "{effort}, set by {provider}",
   "provider.picker.fast": "Fast",
   "provider.picker.fastLabel": "Fast mode",
   "provider.picker.selectEffort": "Select effort",

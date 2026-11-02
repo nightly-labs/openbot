@@ -35,6 +35,7 @@ export const AGENT_PROVIDERS = [
   "openrouter",
   "hermes",
   "acp",
+  "kimi",
 ] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
@@ -126,7 +127,8 @@ export interface AgentProviderDescriptor {
    * The workspace skill folders the CLI reads by itself, in its own order. OpenBot writes only
    * `.agents/skills` and `.claude/skills`, so each list names at least one of them.
    * Sources: the Codex "build skills" guide, the Claude Code skills guide, the opencode skills guide
-   * and the skill paths in Google's Antigravity ACP server, in the Cursor CLI and in the Cline CLI.
+   * and the skill paths in Google's Antigravity ACP server, in the Cursor CLI, in the Cline CLI and in
+   * the Kimi Code CLI.
    */
   readonly skillFolders: readonly [string, ...string[]];
   /**
@@ -134,7 +136,7 @@ export interface AgentProviderDescriptor {
    * itself. `plugin`: OpenBot gives the folder to Claude as a session plugin
    * (`claudeHomeSkillPlugin`). `instructions`: the CLI does not read it, so the developer instructions
    * name each skill and its `SKILL.md`. Sources: the strings and docs of the installed Codex, Grok,
-   * OpenCode, Cursor, Cline and Pi CLIs; the Antigravity ACP server reads only `$GEMINI_HOME`; Muse
+   * OpenCode, Cursor, Cline, Kimi and Pi CLIs; the Antigravity ACP server reads only `$GEMINI_HOME`; Muse
    * and a custom ACP agent are not known to read it.
    */
   readonly homeSkills: "native" | "plugin" | "instructions";
@@ -360,6 +362,31 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     approvalsInFullAccess: true,
     foldersInFullAccess: false,
   },
+  // The Kimi Code CLI (`kimi acp`). Sign-in is `kimi login`, a device code that the user confirms on
+  // Kimi's page. The sign-in writes the account's models into the CLI's own config.
+  kimi: {
+    id: "kimi",
+    displayName: "Kimi",
+    cliName: "Kimi Code CLI",
+    onboardingDescription: "Kimi models with a Kimi Code account",
+    signInMessage: "Sign in with Kimi to use Kimi.",
+    installGuideLink: null,
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "kimi",
+    pickerOrder: 7,
+    localCodeSignIn: "device",
+    signInPageEnd: "page",
+    skillFolders: [".kimi/skills", ".claude/skills", ".codex/skills", ".agents/skills"],
+    homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
+    workspaceEnforcement: "confined-process",
+    steer: "deferred",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
   pi: {
     id: "pi",
     displayName: "Pi",
@@ -370,7 +397,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "pi",
-    pickerOrder: 7,
+    pickerOrder: 8,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
@@ -393,7 +420,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "muse",
-    pickerOrder: 8,
+    pickerOrder: 9,
     localCodeSignIn: "device",
     signInPageEnd: "page",
     skillFolders: [".agents/skills"],
@@ -418,7 +445,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "mercury-3",
     legacyModelPrefix: null,
     authKind: "inception",
-    pickerOrder: 9,
+    pickerOrder: 10,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
@@ -443,7 +470,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "deepseek-v4-pro",
     legacyModelPrefix: null,
     authKind: "deepseek",
-    pickerOrder: 10,
+    pickerOrder: 11,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
@@ -468,7 +495,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "anthropic/claude-sonnet-5.5",
     legacyModelPrefix: null,
     authKind: "openrouter",
-    pickerOrder: 11,
+    pickerOrder: 12,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
@@ -496,7 +523,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "hermes",
-    pickerOrder: 12,
+    pickerOrder: 13,
     localCodeSignIn: "device",
     signInPageEnd: "page",
     skillFolders: [".agents/skills"],
@@ -587,6 +614,7 @@ export const MANAGED_RUNTIME_PROVIDERS = [
   "antigravity",
   "cursor",
   "cline",
+  "kimi",
   "pi",
   "muse",
 ] as const satisfies readonly AgentProviderId[];
@@ -599,13 +627,14 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
 /**
  * The providers that only newer Team API protocols carry: Gemini and custom ACP agents from protocol
  * 5, Cursor and Cline from protocol 6, Pi and Muse from protocol 7, Inception, DeepSeek and OpenRouter
- * from protocol 8. Hermes is not in a protocol list; protocol 8 carries any provider id.
+ * from protocol 8, and Kimi and Hermes, which no frozen protocol names.
  * A joined server's settings list one only when the host's status names it.
  */
 export const LOCAL_ONLY_PROVIDERS = [
   "antigravity",
   "cursor",
   "cline",
+  "kimi",
   "pi",
   "muse",
   "inception",

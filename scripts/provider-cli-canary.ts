@@ -47,6 +47,7 @@ const NOT_COVERED: Readonly<Record<string, string>> = {
   antigravity: "Needs a Google account.",
   cursor: "Needs a Cursor account.",
   cline: "Not checked yet: no run confirms that a free model turn works without a Cline sign-in.",
+  kimi: "Needs a Kimi Code account.",
   pi: "Needs a provider API key.",
   muse: "Needs a Muse account.",
 };

@@ -19,6 +19,9 @@ const MINIMUM_GROK_VERSION = [1, 0, 5] as const;
 // The first Cline CLI that OpenBot was checked with: its sessions run in-process and it answers a lost
 // session with the ACP resource-not-found error.
 const MINIMUM_CLINE_VERSION = [3, 0, 68] as const;
+// The first Kimi Code CLI that OpenBot was checked with: `kimi acp`, `kimi login --json` and
+// `kimi logout`.
+const MINIMUM_KIMI_VERSION = [1, 52, 0] as const;
 
 /** What every resolved provider CLI carries. */
 interface ResolvedCli {
@@ -59,6 +62,10 @@ export interface ClineCliInfo extends ResolvedCli {
   source?: "system" | "managed";
 }
 
+export interface KimiCliInfo extends ResolvedCli {
+  source?: "system" | "managed";
+}
+
 /**
  * OpenBot never installs Hermes: the user's own `hermes` runs, with the user's own `~/.hermes`, and
  * `resolveHermesCli` gives only `system`. The type keeps `managed`, as each other CLI does, so a
@@ -76,6 +83,7 @@ export type AgentCliInfo =
   | AntigravityCliInfo
   | CursorCliInfo
   | ClineCliInfo
+  | KimiCliInfo
   | HermesCliInfo;
 
 export class CodexCliError extends Error {
@@ -473,7 +481,7 @@ export const resolveHermesCli: (input?: {
  * Hermes prints its release and its build on the first line, such as
  * `Hermes Agent v0.21.5+5805.g54bc5e5 (2026.9.24) · upstream 54bc5e50`. A line about an update can follow.
  */
-export function parseHermesVersion(output: string): string {
+function parseHermesVersion(output: string): string {
   const version = output.match(/^Hermes Agent v(\d+\.\d+\.\d+)\b/mu)?.[1];
   if (!version) throw new CodexCliError(sourceText("error.provider.hermesVersionUnreadable"), "invalid");
   return version;
@@ -551,6 +559,51 @@ export const resolveClineCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
+/**
+ * The Kimi Code CLI is `kimi` on `PATH`, which `uv tool install kimi-cli` and Kimi's install script
+ * install. A CLI older than `MINIMUM_KIMI_VERSION` is skipped, so a managed one after it is still
+ * used. With no newer CLI, the outdated one is the error the user sees.
+ */
+export const resolveKimiCli: (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null | undefined;
+}) => Effect.Effect<KimiCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveKimiCli")(
+  function* (
+    input: { systemCandidates?: string[]; bundledExecutable?: string | null | undefined } = {},
+  ): Effect.fn.Return<KimiCliInfo, ProviderClientOperationError> {
+    const candidates = yield* cliCandidates("kimi", input.systemCandidates, input.bundledExecutable ?? null);
+    const failures: CodexCliError[] = [];
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const { stdout, launch } = yield* readCliVersion(candidate, "kimi");
+          const version = parseKimiVersion(stdout);
+          if (!isMinimumVersion(version, MINIMUM_KIMI_VERSION)) {
+            throw new CodexCliError(sourceText("error.provider.kimiOutdated", { version }), "outdated");
+          }
+          return { executable: candidate.executable, version, source: candidate.source, ...launch };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+      const error = attempt.failure.cause;
+
+      if (isCliTimeout(error)) throw error;
+      failures.push(
+        error instanceof CodexCliError
+          ? error
+          : new CodexCliError(sourceText("error.provider.kimiNotStarted"), "invalid"),
+      );
+    }
+    throw (
+      failures.find((failure) => failure.code === "outdated") ??
+      failures[0] ??
+      new CodexCliError(sourceText("error.provider.kimiMissing"), "missing")
+    );
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
+
 function bundledOpencodeExecutable(
   platform = process.platform,
   architecture = process.arch,
@@ -621,6 +674,13 @@ export function parseOpencodeVersion(output: string): string {
 export function parseClineVersion(output: string): string {
   const match = output.trim().match(/^(?:cline\s+)?v?(\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?$/i);
   if (!match) throw new CodexCliError(sourceText("error.provider.clineVersionUnreadable"), "invalid");
+  return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
+}
+
+/** Kimi prints `kimi, version 1.52.0`. */
+export function parseKimiVersion(output: string): string {
+  const match = output.trim().match(/^(?:kimi,?\s+version\s+)?v?(\d+)\.(\d+)\.(\d+)(?:[-+.][\w.-]+)?$/i);
+  if (!match) throw new CodexCliError(sourceText("error.provider.kimiVersionUnreadable"), "invalid");
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 

@@ -262,6 +262,14 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline を起動できませんでした。ターミナルで `cline --version` を実行してください。",
   "error.provider.clineVersionUnreadable": "Cline CLI のバージョンを読み取れません。",
   "error.provider.clineSignIn": "Cline を使うには Cline でサインインするか、CLINE_API_KEY を設定してください。",
+  "error.provider.kimiArchivePath": "Kimi のアーカイブに予期しないパスがあります。",
+  "error.provider.kimiChecksum": "Kimi ランタイムのチェックサムが一致しません。",
+  "error.provider.kimiLicenseChecksum": "Kimi のライセンスのチェックサムが一致しません。",
+  "error.provider.kimiMissing": "Kimi はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
+  "error.provider.kimiOutdated": "Kimi CLI {version} は古すぎます。OpenBot には 1.52.0 以降が必要です。",
+  "error.provider.kimiNotStarted": "Kimi を起動できませんでした。ターミナルで `kimi --version` を実行してください。",
+  "error.provider.kimiVersionUnreadable": "Kimi CLI のバージョンを読み取れません。",
+  "error.provider.kimiSignIn": "Kimi を使うには Kimi Code でサインインしてください。",
   "error.provider.hermesMissing":
     "Hermes Agent がインストールされていません。インストールしてから、もう一度お試しください。",
   "error.provider.hermesNotStarted":
