@@ -10,7 +10,6 @@ import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import * as Linking from "expo-linking";
-import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Blocks from "lucide-react-native/icons/blocks";
 import FileText from "lucide-react-native/icons/file-text";
@@ -48,6 +47,7 @@ import { createReplyReveal, finishedReplyReveal } from "../model/reply-reveal";
 import { ChatCodeBlock } from "./chat-code-block";
 import { ChatCodePreview } from "./chat-code-preview";
 import { ChatMath } from "./chat-math";
+import { CHAT_CODE_STYLES, CHAT_HEADING_RAMP, CHAT_TEXT_STYLES, type ChatTextType } from "./chat-text-styles";
 import { type ReplyPlayback, useReplyPlayback } from "./use-reply-playback";
 
 interface MarkdownTokenByType {
@@ -98,7 +98,7 @@ interface NativeSelectionTarget {
 interface TextPresentation {
   selectable: boolean;
   nativeSelection?: NativeSelectionTarget;
-  type: "body" | "body-sm" | "h4" | "h5";
+  type: ChatTextType;
   style: TextStyle;
   codeColor: ColorValue;
   animateTail: boolean;
@@ -113,11 +113,9 @@ interface TextPresentation {
   linkFavicons: boolean;
 }
 
-/** The HeroUI font size of each text type, in points, which inline math is sized against. */
-const TEXT_SIZES: Record<TextPresentation["type"], number> = { body: 16, "body-sm": 14, h4: 20, h5: 18 };
-
+/** The font size of a text type, in points, which inline math is sized against. */
 function textSize(presentation: TextPresentation): number {
-  return TEXT_SIZES[presentation.type] * presentation.fontScale;
+  return CHAT_TEXT_STYLES[presentation.type].fontSize * presentation.fontScale;
 }
 
 // The inline badge is shifted to align its label with native text. Reserve the
@@ -129,19 +127,30 @@ function textContainerStyle(source: string, presentation: TextPresentation): Tex
     ) || plainMentionParts(source, presentation.agents).some((part) => part.agent);
   // Inline math is moved down to the math axis in the same way.
   const hasMath = chatMathStart(source) !== undefined;
-  // Android moves code chips down as well; see `inlineChipStyle`.
-  const hasAndroidChip = Platform.OS === "android" && source.includes("`");
-  return hasMention || hasMath || hasAndroidChip
+  // Code chips move down as well; see `inlineChipStyle`.
+  const hasChip = source.includes("`");
+  return hasMention || hasMath || hasChip
     ? { ...presentation.style, paddingBottom: presentation.mentionOffset, overflow: "visible" }
     : presentation.style;
 }
 
+/** The height of an inline code chip: its line and one point above and below. */
+function codeChipHeight(presentation: TextPresentation): number {
+  return CHAT_CODE_STYLES[presentation.type === "body-sm" ? "small" : "body"].lineHeight + 2;
+}
+
 /**
- * Android puts the bottom of a view inside text on the text baseline, so a chip sits too high. It
- * moves down by the descender, as a mention does.
+ * A view inside text sits with its bottom edge on the text baseline, so a chip sits too high. It
+ * moves down until its middle is on the middle of the letters around it, as a mention does. A chip
+ * in a wrapping row is centred by the row and does not move.
  */
-function inlineChipStyle(presentation: TextPresentation): ViewStyle | undefined {
-  return Platform.OS === "android" ? { transform: [{ translateY: presentation.mentionOffset }] } : undefined;
+function inlineChipStyle(presentation: TextPresentation, height: number, inRow: boolean): ViewStyle | undefined {
+  if (inRow) return undefined;
+  return {
+    transform: [
+      { translateY: (height / 2 - CHAT_TEXT_STYLES[presentation.type].fontSize * 0.45) * presentation.fontScale },
+    ],
+  };
 }
 
 /** Joins the type badge of a file to the first characters of its name, so a line never ends between them. */
@@ -182,7 +191,15 @@ const FILE_TONE_COLORS: Record<FileReferenceTone, [string, string]> = {
  * Inline code that names a file, drawn as the desktop file reference: a type badge and the name
  * in the colour of its file family. Mobile cannot open workspace files, so it is not a control.
  */
-function FileReference({ text, presentation }: { text: string; presentation: TextPresentation }) {
+function FileReference({
+  text,
+  presentation,
+  inRow,
+}: {
+  text: string;
+  presentation: TextPresentation;
+  inRow: boolean;
+}) {
   const name = fileReferenceName(text.trim());
   const [color, soft] = useCSSVariable(FILE_TONE_COLORS[fileReferenceTone(name)]);
   const small = presentation.type === "body-sm";
@@ -192,7 +209,11 @@ function FileReference({ text, presentation }: { text: string; presentation: Tex
     // paragraph and wraps as text does.
     return (
       <>
-        <View collapsable={false} className="pl-0.5 pr-1" style={inlineChipStyle(presentation)}>
+        <View
+          collapsable={false}
+          className="pl-0.5 pr-1"
+          style={{ transform: [{ translateY: presentation.mentionOffset }] }}
+        >
           <FileBadge name={name} color={String(color)} soft={String(soft)} />
         </View>
         <Text style={{ color: String(color), fontWeight: "600", ...(small ? { fontSize: 12 } : null) }}>
@@ -202,17 +223,24 @@ function FileReference({ text, presentation }: { text: string; presentation: Tex
     );
   }
   return (
-    <View collapsable={false} className="max-w-full shrink flex-row items-center gap-1 self-start px-0.5">
+    <View
+      collapsable={false}
+      className="max-w-full shrink flex-row items-center gap-1 self-start px-0.5"
+      style={inlineChipStyle(presentation, small ? 16 : CHAT_TEXT_STYLES[presentation.type].lineHeight, inRow)}
+    >
       <FileBadge name={name} color={String(color)} soft={String(soft)} />
-      <Typography
+      <Text
         selectable={presentation.selectable}
         numberOfLines={1}
-        type={small ? "body-xs" : presentation.type}
-        className="shrink"
-        style={{ ...presentation.style, color: String(color), fontWeight: "600" }}
+        style={[
+          CHAT_TEXT_STYLES[presentation.type],
+          small ? { fontSize: 12, lineHeight: 16 } : null,
+          presentation.style,
+          { flexShrink: 1, color: String(color), fontWeight: "600" },
+        ]}
       >
         {text.trim()}
-      </Typography>
+      </Text>
     </View>
   );
 }
@@ -223,7 +251,9 @@ function FileBadge({ name, color, soft }: { name: string; color: string; soft: s
   return (
     <View className="h-4 min-w-4 items-center justify-center rounded px-0.5" style={{ backgroundColor: soft }}>
       {badge ? (
-        <Typography style={{ color, fontSize: 8, lineHeight: 10, fontWeight: "800" }}>{badge}</Typography>
+        <Text style={[CHAT_TEXT_STYLES["body-sm"], { color, fontSize: 8, lineHeight: 10, fontWeight: "800" }]}>
+          {badge}
+        </Text>
       ) : (
         <FileText size={11} color={color} strokeWidth={2} />
       )}
@@ -247,26 +277,38 @@ function codePieces(text: string): string[] {
   });
 }
 
-function CodeSpan({ text, presentation }: { text: string; presentation: TextPresentation }) {
-  if (isFileReference(text.trim())) return <FileReference text={text} presentation={presentation} />;
+function CodeSpan({
+  text,
+  presentation,
+  inRow = false,
+}: {
+  text: string;
+  presentation: TextPresentation;
+  /** The chip is an item of a wrapping row, not a view inside text. */
+  inRow?: boolean;
+}) {
+  if (isFileReference(text.trim())) return <FileReference text={text} presentation={presentation} inRow={inRow} />;
   const pieces = codePieces(text);
-  const chipStyle = inlineChipStyle(presentation);
+  const chipStyle = inlineChipStyle(presentation, codeChipHeight(presentation), inRow);
   return sourceEntries(pieces, (piece) => piece).map(({ value: piece, offset }, index) => (
     // Only the ends of the span are rounded, so touching pieces read as one chip.
     <View
       key={offset}
       collapsable={false}
-      className={`max-w-full self-start bg-control ${index === 0 ? "rounded-l-xl pl-1" : ""} ${index === pieces.length - 1 ? "rounded-r-xl pr-1" : ""} ${presentation.type === "body-sm" ? "py-px" : "py-0.5"}`}
+      className={`max-w-full self-start bg-control py-px ${index === 0 ? "rounded-l-xl pl-1" : ""} ${index === pieces.length - 1 ? "rounded-r-xl pr-1" : ""}`}
       style={chipStyle}
     >
-      <Typography.Code
+      <Text
         selectable={presentation.selectable}
         numberOfLines={1}
-        className={presentation.type === "body-sm" ? "bg-transparent p-0 text-xs leading-4" : "bg-transparent p-0"}
-        style={{ ...presentation.style, color: presentation.codeColor }}
+        style={[
+          presentation.style,
+          CHAT_CODE_STYLES[presentation.type === "body-sm" ? "small" : "body"],
+          { color: presentation.codeColor },
+        ]}
       >
         {piece}
-      </Typography.Code>
+      </Text>
     </View>
   ));
 }
@@ -277,14 +319,14 @@ function CodeSpan({ text, presentation }: { text: string; presentation: TextPres
  * their bottom edge, so the chip moves down until it is centred on the letters around it.
  */
 function mentionChip(presentation: TextPresentation) {
-  const size = TEXT_SIZES[presentation.type] - 1;
+  const size = CHAT_TEXT_STYLES[presentation.type].fontSize - 1;
   const lineHeight = Math.round(size * 1.25);
   const padding = 1;
   // The chip's middle goes on the middle of the letters around it, a little under half the text size
   // above their baseline (set on a device); the chip's bottom edge starts on that baseline.
-  const below = (lineHeight + padding * 2) / 2 - TEXT_SIZES[presentation.type] * 0.45;
+  const below = (lineHeight + padding * 2) / 2 - CHAT_TEXT_STYLES[presentation.type].fontSize * 0.45;
   return {
-    label: { ...presentation.style, fontSize: size, lineHeight },
+    label: [CHAT_TEXT_STYLES[presentation.type], presentation.style, { fontSize: size, lineHeight, flexShrink: 1 }],
     mark: (size + 1) * presentation.fontScale,
     style: {
       paddingVertical: padding * presentation.fontScale,
@@ -309,9 +351,7 @@ function AgentMention({ agent, presentation }: { agent: MobileAgent; presentatio
         seed={agent.avatarSeed}
         size={chip.mark}
       />
-      <Typography type={presentation.type} style={chip.label} className="shrink">
-        {agent.name}
-      </Typography>
+      <Text style={chip.label}>{agent.name}</Text>
     </View>
   );
 }
@@ -334,9 +374,7 @@ function SkillMention({ name, app, presentation }: { name: string; app: boolean;
         size={chip.mark - 2 * presentation.fontScale}
         strokeWidth={2}
       />
-      <Typography type={presentation.type} style={chip.label} className="shrink">
-        {name}
-      </Typography>
+      <Text style={chip.label}>{name}</Text>
     </View>
   );
 }
@@ -470,14 +508,6 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
     return token.raw;
   });
 }
-
-/** The HeroUI text types as plain styles: a native text view takes no class names. */
-const NATIVE_TEXT_STYLES: Record<TextPresentation["type"], TextStyle> = {
-  body: { fontSize: 16, lineHeight: 28 },
-  "body-sm": { fontSize: 14, lineHeight: 24 },
-  h4: { fontSize: 20, lineHeight: 28, letterSpacing: -0.5 },
-  h5: { fontSize: 18, lineHeight: 28, letterSpacing: -0.45 },
-};
 
 /**
  * A part of a native paragraph, in the order the text view draws it. An inline view, such as a
@@ -670,7 +700,7 @@ function SelectableParagraph({
       uiTextView
       selectable
       accessibilityRole={heading ? "header" : undefined}
-      style={[NATIVE_TEXT_STYLES[presentation.type], style]}
+      style={[CHAT_TEXT_STYLES[presentation.type], style]}
       onSelectionChange={({ nativeEvent }) =>
         report(
           paragraph,
@@ -724,21 +754,23 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
             const [token] = run;
             if (!token) return null;
             if (tokenIs(token, "codespan")) {
-              return <CodeSpan key={offset} text={token.text} presentation={presentation} />;
+              return <CodeSpan key={offset} text={token.text} presentation={presentation} inRow />;
             }
             return (
-              <Typography
+              <Text
                 key={offset}
                 selectable={presentation.selectable}
-                className="max-w-full"
-                type={presentation.type}
-                style={textContainerStyle(source(run), presentation)}
+                style={[
+                  CHAT_TEXT_STYLES[presentation.type],
+                  textContainerStyle(source(run), presentation),
+                  { maxWidth: "100%" },
+                ]}
               >
                 {inline(run, {
                   ...presentation,
                   animateTail: presentation.animateTail,
                 })}
-              </Typography>
+              </Text>
             );
           })}
         </View>
@@ -757,7 +789,7 @@ function MarkdownBlocks({
   inList?: boolean;
 }) {
   return (
-    <View className="min-w-0 gap-3">
+    <View className={inList ? "min-w-0 gap-1.5" : "min-w-0 gap-2.5"}>
       {sourceEntries(tokens, (token) => token.raw).map(({ value: token, offset }) => (
         <MarkdownBlock key={offset} token={token} presentation={presentation} inList={inList} />
       ))}
@@ -793,13 +825,12 @@ const MarkdownBlock = memo(function MarkdownBlock({
       );
     }
     return (
-      <Typography
+      <Text
         selectable={presentation.selectable}
-        type={presentation.type}
-        style={textContainerStyle(token.raw, presentation)}
+        style={[CHAT_TEXT_STYLES[presentation.type], textContainerStyle(token.raw, presentation)]}
       >
         {token.tokens ? inline(token.tokens, presentation) : token.text}
-      </Typography>
+      </Text>
     );
   }
   if (tokenIs(token, "heading")) {
@@ -815,14 +846,16 @@ const MarkdownBlock = memo(function MarkdownBlock({
         />
       );
     }
+    const level = heading.type === "h4" ? "h4" : "h5";
     return (
-      <Typography.Heading
+      <Text
         selectable={presentation.selectable}
-        type={heading.type === "h4" ? "h4" : "h5"}
-        style={textContainerStyle(token.raw, presentation)}
+        accessibilityRole="header"
+        dynamicTypeRamp={CHAT_HEADING_RAMP[level]}
+        style={[CHAT_TEXT_STYLES[level], textContainerStyle(token.raw, presentation)]}
       >
         {inline(token.tokens, heading)}
-      </Typography.Heading>
+      </Text>
     );
   }
   if (tokenIs(token, "blockMath") || (tokenIs(token, "code") && token.lang?.trim().toLowerCase() === "math")) {
@@ -872,12 +905,12 @@ const MarkdownBlock = memo(function MarkdownBlock({
   }
   if (tokenIs(token, "list")) {
     return (
-      <View className="gap-2">
+      <View className="gap-1.5">
         {sourceEntries(token.items, (item) => item.raw).map(({ value: item, offset: itemOffset }, itemIndex) => (
           <View key={itemOffset} className="flex-row items-start gap-2">
-            <Typography type={presentation.type} style={presentation.style}>
+            <Text style={[CHAT_TEXT_STYLES[presentation.type], presentation.style]}>
               {item.task ? (item.checked ? "☑" : "☐") : token.ordered ? `${Number(token.start) + itemIndex}.` : "•"}
-            </Typography>
+            </Text>
             <View className="min-w-0 shrink">
               <MarkdownBlocks tokens={item.tokens} inList presentation={presentation} />
             </View>
@@ -895,17 +928,16 @@ const MarkdownBlock = memo(function MarkdownBlock({
               <View key={rowOffset} className="flex-row border-b border-separator">
                 {sourceEntries(row, (cell) => cell.text).map(({ value: cell, offset: cellOffset }) => (
                   <View key={cellOffset} className="w-44 px-2 py-2">
-                    <Typography
+                    <Text
                       selectable={presentation.selectable}
-                      type={presentation.type}
-                      style={{
-                        ...textContainerStyle(cell.text, presentation),
-                        textAlign: cell.align ?? "left",
-                        fontWeight: cell.header ? "600" : "400",
-                      }}
+                      style={[
+                        CHAT_TEXT_STYLES[presentation.type],
+                        textContainerStyle(cell.text, presentation),
+                        { textAlign: cell.align ?? "left", fontWeight: cell.header ? "600" : "400" },
+                      ]}
                     >
                       {inline(cell.tokens, presentation)}
-                    </Typography>
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -917,9 +949,9 @@ const MarkdownBlock = memo(function MarkdownBlock({
   }
   if (token.type === "hr") return <View className="h-px bg-separator" />;
   return (
-    <Typography selectable={presentation.selectable} type={presentation.type} style={presentation.style}>
+    <Text selectable={presentation.selectable} style={[CHAT_TEXT_STYLES[presentation.type], presentation.style]}>
       {token.raw}
-    </Typography>
+    </Text>
   );
 });
 

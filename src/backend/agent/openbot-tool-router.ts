@@ -405,6 +405,16 @@ export class OpenBotToolRouter {
               if (client.running) client.respond(toolRequest.id, result);
               return;
             }
+            // It needs no tab: the card waits in the chat, and the registry answers it.
+            if (toolRequest.params.tool === "request_vault_item") {
+              const result = yield* this.#attention.requestVaultItem(client, toolRequest, {
+                ...toolRequest.params,
+                threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
+                ownerAgentId: agentId,
+              });
+              if (result && client.running) client.respond(toolRequest.id, result);
+              return;
+            }
             if (this.#attention.hasBrowserTakeoverForAgent(agentId)) {
               client.respond(toolRequest.id, {
                 success: false,

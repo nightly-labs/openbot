@@ -162,13 +162,19 @@ function hideExceptionErrorBox(): void {
   });
 }
 
-type ExitReason = "main_window_closed" | "signal" | "session_end" | "quit";
+/**
+ * `menu` and `shortcut` are the macOS Quit item by click and by `Cmd + Q`, `tray` is the tray item on
+ * Windows and Linux, and `update` is an update install. `quit` is any other request: the Dock, another
+ * app, or a system logout on macOS.
+ */
+type ExitReason = "main_window_closed" | "signal" | "session_end" | "menu" | "shortcut" | "tray" | "update" | "quit";
 let exitRecorded = false;
 
 /**
  * Records once why OpenBot quits, in the main log and in the trace, before the teardown closes the
  * trace. The first reason wins: closing the window then also quits. A process that ends with no such
- * line and no crash dump stopped from outside, such as Task Manager.
+ * line and no crash dump stopped from outside with a signal that cannot be caught, such as SIGKILL or
+ * Task Manager.
  */
 function recordExit(reason: ExitReason): void {
   if (exitRecorded) return;
@@ -177,6 +183,11 @@ function recordExit(reason: ExitReason): void {
   if (!crashTrace) return;
   crashTrace.record({ kind: "exit", name: reason, durationMs: 0, outcome: "requested" });
   Effect.runFork(crashTrace.flush());
+}
+
+function quitFor(reason: ExitReason): void {
+  recordExit(reason);
+  app.quit();
 }
 
 function reportMainProcessFailure(origin: "uncaughtException" | "unhandledRejection", error: unknown): void {
@@ -360,13 +371,13 @@ const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
 
 // A server is stopped with SIGTERM (systemd, Docker). Without a handler, Electron ends at once and its
 // services do not stop. A hosted server's boat pre-stop hook stops it this way before the disk save
-// (`scripts/hosting/openbot-boat-pre-stop`).
-if (!app.isPackaged || hostedServer || serverMode || localServerChild) {
+// (`scripts/hosting/openbot-boat-pre-stop`). The desktop app quits the same way, so a `kill` from a
+// terminal or another app also stops its services and leaves a "Quitting: signal." line (#4149).
+{
   const quitAfterSignal = () => {
-    recordExit("signal");
     // Before `app.quit()`: the same signal can stop the Computer Use driver first.
     quitStarted = true;
-    app.quit();
+    quitFor("signal");
   };
   process.once("SIGINT", quitAfterSignal);
   process.once("SIGTERM", quitAfterSignal);
@@ -460,6 +471,7 @@ const windows = createMainWindowController({
     attachQuitOnMainWindowClose(window);
   },
   reportError: (message, error) => logger.error(message, toLogValue(error)),
+  quitFromShortcut: () => quitFor("shortcut"),
 });
 
 let appIconColorImage: NativeImage | undefined;
@@ -1401,13 +1413,20 @@ if (!hasSingleInstanceLock) {
       void requestDesktopNotificationPermission(built.notificationPreference, language.translate).catch((error) =>
         logger.warn("Unable to ask for notification permission:", toLogValue(error)),
       );
-      configureApplicationMenu(service, updater, interfaceSize, language.translate, () => windowHolder.current);
+      configureApplicationMenu(
+        service,
+        updater,
+        interfaceSize,
+        language.translate,
+        () => windowHolder.current,
+        quitFor,
+      );
       // The way back to a window hidden in the background on Windows and Linux.
       backgroundTray = createBackgroundTray({
         icon: appIconColorImage ?? nativeImage.createFromPath(appIconPath),
         translate: language.translate,
         open: reopenMainWindow,
-        quit: () => app.quit(),
+        quit: () => quitFor("tray"),
       });
       const tray = backgroundTray;
       tray.sync(appBehavior.keepRunningInBackground);
@@ -1420,7 +1439,14 @@ if (!hasSingleInstanceLock) {
       // because a native label cannot be changed in place, and every window is told, including the
       // Dynamic Island, which has no Settings of its own to read the new value from.
       language.subscribe((preference) => {
-        configureApplicationMenu(service, updater, interfaceSize, language.translate, () => windowHolder.current);
+        configureApplicationMenu(
+          service,
+          updater,
+          interfaceSize,
+          language.translate,
+          () => windowHolder.current,
+          quitFor,
+        );
         tray.relabel();
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appLanguagePreference, preference);
@@ -1651,6 +1677,7 @@ function forceExitAfterShutdownDeadline(deadlineMs: number): void {
  * so Squirrel gets that time less the teardown.
  */
 async function prepareForUpdateInstall(deadlineMs = UPDATE_INSTALL_TIMEOUT_MS): Promise<void> {
+  recordExit("update");
   if (services) await runCauseEffect(services.browser.flushPersistentStorage());
   await prepareForShutdown(deadlineMs);
 }

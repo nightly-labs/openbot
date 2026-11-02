@@ -141,6 +141,7 @@ import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/te
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import { SIDEBAR_FOLDERS_CAPABILITY, sidebarFoldersEvent } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
@@ -272,6 +273,7 @@ import { routeRoutineResults } from "./team-api/route-routine-results";
 import { routeServerAudit } from "./team-api/route-server-audit";
 import { routeSharedTables } from "./team-api/route-shared-tables";
 import { routeSideQuestion } from "./team-api/route-side-question";
+import { routeSidebarFolders } from "./team-api/route-sidebar-folders";
 import { routeSidebarPins } from "./team-api/route-sidebar-pins";
 import { routeSignInRelay } from "./team-api/route-sign-in-relay";
 import { routeSkillsAdmin } from "./team-api/route-skills-admin";
@@ -1009,6 +1011,8 @@ export class TeamApiServer {
       if ((await routeAgentSessionSettings(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFolders(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentHidden(context, this.#options.hiddenAgents, hidden)) === "handled") return;
+      if ((await routeSidebarFolders(context, this.#options.sidebarLayout, this.#options.agents, hidden)) === "handled")
+        return;
       if (
         (await routeAgentNotificationLevels(
           context,
@@ -1217,6 +1221,14 @@ export class TeamApiServer {
     this.#nextRateLimitSweepAt = now + RATE_LIMIT_SWEEP_MS;
   }
 
+  /** The value without the agents that this peer cannot see, as its event protocol describes them. */
+  #peerView(value: unknown, capabilities: ReadonlySet<string>, blocked: ReadonlySet<string>): unknown {
+    const protocol = eventProtocol(capabilities);
+    const hidden = hiddenProviderAgentIds(this.#options.agents.listAgents(), protocol);
+    for (const id of blocked) hidden.add(id);
+    return protocol === 1 ? legacyProviderView(value, hidden) : hiddenAgentView(value, hidden, protocol);
+  }
+
   #encodeProviderEvent(
     event: AgentEvent | TeamRealtimeEvent,
     capabilities: ReadonlySet<string>,
@@ -1224,9 +1236,7 @@ export class TeamApiServer {
     blocked: ReadonlySet<string> = new Set(),
   ): string | null {
     const protocol = eventProtocol(capabilities);
-    const hidden = hiddenProviderAgentIds(this.#options.agents.listAgents(), protocol);
-    for (const id of blocked) hidden.add(id);
-    const visible = protocol === 1 ? legacyProviderView(event, hidden) : hiddenAgentView(event, hidden, protocol);
+    const visible = this.#peerView(event, capabilities, blocked);
     if (!isAgentEvent(visible) && !isTeamRealtimeEvent(visible)) return null;
     if (protocol !== 1) {
       const encoded = (
@@ -1411,12 +1421,22 @@ export class TeamApiServer {
                 status: event.status,
                 ...(event.origin === undefined ? {} : { origin: event.origin }),
               }
-            : optionalTeamEvent(
-                event.type === "agent-task-conversation"
-                  ? { ...event, snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities) }
-                  : event,
-                { agentTaskUiBlocks: connection.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY) },
-              );
+            : event.type === "sidebar-layout-changed" && connection.capabilities.has(SIDEBAR_FOLDERS_CAPABILITY)
+              ? // The layout with the parents. `sidebar-layout-changed` goes through the frozen adapter, which drops them.
+                // The layout leaves out the agents that this peer cannot see, as the read route does.
+                sidebarFoldersEvent({
+                  type: "sidebar-folders-changed",
+                  layout: this.#peerView(event.layout, connection.capabilities, blocked),
+                })
+              : optionalTeamEvent(
+                  event.type === "agent-task-conversation"
+                    ? {
+                        ...event,
+                        snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities),
+                      }
+                    : event,
+                  { agentTaskUiBlocks: connection.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY) },
+                );
       } catch (error) {
         // As for `encodeEvent`: a malformed optional event is skipped for this client only.
         (this.#options.logger ?? logger).warn("Team API event could not be encoded:", toLogValue(error));

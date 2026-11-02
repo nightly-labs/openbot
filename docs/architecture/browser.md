@@ -388,6 +388,14 @@ A password can also go to the Vault of the server that runs the agent. The local
 only an owner or admin can use; the released route keeps its fields. The card shows the save box on
 every password request, and for a member or an older host it shows the box off with the reason.
 
+`openbot_browser.request_vault_item` asks the user to add a login, a card or contact info that the
+Vault does not have. The attention registry surfaces a `form` UI block with `uiBlock.vault.kind`.
+The agent can fill in the fields that are not secret; the password, card number and security code
+are secret form fields, so the stored block never holds them. The desktop card opens the Vault
+dialog with the agent's values. The host saves the answer through `VaultItems.addEntered` (owner or
+admin only) and answers the tool with only the item's id, kind and name. The `ui-blocks-v1` wire
+leaves out `vault`, so a remote client shows the ordinary form. Messaging threads refuse the tool.
+
 The browser host owns the protection state and serializes entry behind existing browser work. CDP
 resolves fields before consent and checks the document and origin again before entry. The host
 stops recording, suppresses page diagnostics, blocks inspection and capture, rejects remote input,

@@ -2066,6 +2066,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     layoutMutable={
                       workspace.state.status === "online" && workspace.state.capabilities.includes("sidebar-layout")
                     }
+                    foldersSupported={
+                      workspace.state.status === "online" && workspace.state.capabilities.includes("sidebar-folders-v1")
+                    }
                     collapsedSectionIds={workspace.preferences.collapsedSidebarSectionIds()}
                     onMutateLayout={workspace.mutateSidebarLayout}
                     sectionDuplicateSupported={

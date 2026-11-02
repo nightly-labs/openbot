@@ -14,17 +14,21 @@ import type {
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_RUNTIME_ATTENTION_LIMIT, BROWSER_TAKEOVER_REASONS } from "@openbot/contracts/ipc";
+import { AGENT_RUNTIME_ATTENTION_LIMIT, BROWSER_TAKEOVER_REASONS, cardBrand } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import {
   type ConversationUiBlock,
   normalizeConversationUiBlock,
+  UI_BLOCK_LIMITS,
   UI_BLOCK_TEXT_ACTION_ID,
   UI_BLOCK_VERSION,
   type UiBlockAutoAnswer,
   type UiBlockResponse,
   type UiBlockSpec,
   type UiBlockState,
+  type UiBlockValue,
+  type UiVaultRequestKind,
+  type UiVaultSavedItem,
   uiBlockActionIsPrivileged,
   uiBlockAnswersFromResponse,
   uiBlockFallbackQuestions,
@@ -54,7 +58,7 @@ import {
   getString,
   type RequestId,
 } from "../protocol";
-import type { VaultAgentChange, VaultAgentResult, VaultItems } from "../vault-items";
+import type { VaultAgentChange, VaultAgentResult, VaultEnteredItem, VaultItems } from "../vault-items";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION, shouldAutoApprove } from "./approval-automation";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { HostedSiteOperationFailed } from "./hosted-site-coordinator";
@@ -83,6 +87,8 @@ import {
   questionPromptText,
   uiBlockPromptResult,
   validPromptQuestions,
+  vaultPromptResult,
+  vaultRequestFormSpec,
 } from "./prompts";
 import { compactRuntimeApproval, compactRuntimeQuestion } from "./runtime-snapshot";
 import { isDynamicToolCall } from "./thread-items";
@@ -102,20 +108,22 @@ interface PendingPrompt {
   questions: AgentPromptQuestion[];
   /** Set exactly when `responseKind` is `ui-block`. */
   uiBlock?: SurfacedUiBlock;
-  /** True while the answer of a `request_api_key` block is written to its file. */
-  savingApiKey?: boolean;
+  /** True while the answer of a `request_api_key` or `request_vault_item` block is saved. */
+  saving?: boolean;
   /** The block's own answer, and the timer that gives it. Removing the prompt clears the timer. */
   autoAnswer?: { state: UiBlockAutoAnswer; timer: ReturnType<typeof setTimeout> };
 }
 
 /**
- * An `ask_ui` block, or the form of `request_api_key`. With `apiKey`, the value of its secret field
- * `API_KEY_FIELD_ID` is saved for the agent under that name, and the agent gets the file path only.
+ * An `ask_ui` block, or the form of `request_api_key` or `request_vault_item`. With `apiKey`, the value
+ * of its secret field `API_KEY_FIELD_ID` is saved for the agent under that name, and the agent gets the
+ * file path only. With `vault`, the answer is saved as a new Vault item, and the agent gets its name only.
  */
 export interface SurfacedUiBlock {
   blockId: string;
   spec: UiBlockSpec;
   apiKey?: { name: string };
+  vault?: { kind: UiVaultRequestKind };
 }
 
 /**
@@ -166,9 +174,9 @@ const MESSAGING_QUESTION_REFUSED =
 /** The agent reads these, not the user. */
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
 const VAULT_LOGIN_ADD_REFUSED =
-  "You cannot add a login: a password comes only from the user. Sign in with submit_secret, and the user can save the password from the card. Or ask the user to add the login in Server settings > Vault.";
+  "You cannot add a login: a password comes only from the user. Call request_vault_item kind=login, or sign in with submit_secret, and the user can save the password from the card. In a Slack, Discord or Telegram chat, ask the user to add it in Server settings > Vault.";
 const VAULT_CARD_ADD_REFUSED =
-  "You cannot add a card: its number comes only from the user. Ask the user to add it in Server settings > Vault.";
+  "You cannot add a card: its number comes only from the user. Call request_vault_item kind=card. In a Slack, Discord or Telegram chat, ask the user to add it in Server settings > Vault.";
 const VAULT_FIELDS: Record<BrowserToolArguments<"save_vault_item">["kind"], readonly string[]> = {
   contact: ["label", "fullName", "address", "address2", "city", "region", "postalCode", "country", "phone", "email"],
   login: ["username"],
@@ -250,6 +258,66 @@ function vaultFailure(action: "save" | "delete", failure: PasswordVaultError): D
 
 function vaultResult(value: { status: string } & VaultAgentResult): DynamicToolResult {
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
+/** MM/YY or MM/YYYY. A wrong expiry gives NaN, which the Vault refuses with text for the user. */
+function enteredExpiry(text: string): { expMonth: number; expYear: number } {
+  const match = /^(\d{1,2})\s*\/\s*(\d{2}|\d{4})$/u.exec(text.trim());
+  if (!match?.[1] || !match[2]) return { expMonth: Number.NaN, expYear: Number.NaN };
+  const year = Number(match[2]);
+  return { expMonth: Number(match[1]), expYear: year < 100 ? 2000 + year : year };
+}
+
+/** The Vault item in the answer of a `request_vault_item` form. Null when the user typed nothing. */
+function enteredVaultItem(
+  kind: UiVaultRequestKind,
+  values: Readonly<Record<string, UiBlockValue>>,
+): VaultEnteredItem | null {
+  const text = (id: string) => {
+    const value = values[id];
+    return typeof value === "string" ? value.trim() : "";
+  };
+  switch (kind) {
+    case "login":
+      if (!text("website") && !values.password) return null;
+      return {
+        kind,
+        id: null,
+        website: text("website"),
+        username: text("username"),
+        notes: "",
+        // A password keeps its spaces, as the Vault page keeps them.
+        password: typeof values.password === "string" ? values.password : "",
+      };
+    case "card":
+      if (!text("number")) return null;
+      return {
+        kind,
+        id: null,
+        label: text("label"),
+        nameOnCard: text("nameOnCard"),
+        ...enteredExpiry(text("expiry")),
+        billingContactId: null,
+        number: text("number"),
+        securityCode: text("securityCode") || null,
+      };
+    case "contact": {
+      const fields = {
+        label: text("label"),
+        fullName: text("fullName"),
+        address: text("address"),
+        address2: text("address2"),
+        city: text("city"),
+        region: text("region"),
+        postalCode: text("postalCode"),
+        country: text("country"),
+        phone: text("phone"),
+        email: text("email"),
+      };
+      if (!Object.values(fields).some(Boolean)) return null;
+      return { kind, id: null, ...fields };
+    }
+  }
 }
 
 interface PendingBrowserTakeover {
@@ -511,10 +579,12 @@ export class AttentionRegistry {
     responder?: PromptResponder,
   ) {
     const saved = yield* this.#saveApiKeyAnswer(input, responder);
+    const savedItem = yield* this.#saveVaultAnswer(input, responder);
     yield* attentionStep(() => {
       const pending = this.#prompts.get(input.requestId);
-      // The turn ended while the key was written. The key stays saved, and the agent can list it.
+      // The turn ended while the key or the item was saved. It stays saved, and the agent can list it.
       if (saved && pending !== saved.pending) return;
+      if (savedItem && pending !== savedItem.pending) return;
       if (!pending) throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
       const questionIds = new Set(pending.questions.map((question) => question.id));
       if (Object.keys(input.answers).some((id) => !questionIds.has(id))) {
@@ -524,34 +594,50 @@ export class AttentionRegistry {
       const uiBlockResponse = pending.uiBlock ? uiBlockAnswer(pending.uiBlock.spec, input.answers, responder) : null;
       this.#routines.markRunningForTurn(getString(pending.params, "turnId"));
 
-      // The form of `request_api_key` never gives the agent its values, whatever the answer was.
+      // The forms of `request_api_key` and `request_vault_item` never give the agent their values.
       const result = pending.uiBlock?.apiKey
         ? apiKeyPromptResult(pending.uiBlock.blockId, saved?.key ?? null)
-        : pending.uiBlock
-          ? uiBlockPromptResult(
-              uiBlockResponse
-                ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse }
-                : { status: "skipped", blockId: pending.uiBlock.blockId },
-            )
-          : pending.responseKind === "dynamic-tool"
-            ? dynamicPromptResult(input.answers)
-            : pending.responseKind === "mcp-elicitation"
-              ? mcpElicitationResult(pending.params, input.answers)
-              : {
-                  answers: Object.fromEntries(
-                    Object.entries(input.answers).map(([id, values]) => [id, { answers: values }]),
-                  ),
-                };
+        : pending.uiBlock?.vault
+          ? vaultPromptResult(pending.uiBlock.blockId, savedItem?.item ?? null)
+          : pending.uiBlock
+            ? uiBlockPromptResult(
+                uiBlockResponse
+                  ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse }
+                  : { status: "skipped", blockId: pending.uiBlock.blockId },
+              )
+            : pending.responseKind === "dynamic-tool"
+              ? dynamicPromptResult(input.answers)
+              : pending.responseKind === "mcp-elicitation"
+                ? mcpElicitationResult(pending.params, input.answers)
+                : {
+                    answers: Object.fromEntries(
+                      Object.entries(input.answers).map(([id, values]) => [id, { answers: values }]),
+                    ),
+                  };
       pending.client.respond(pending.id, result);
       this.#prompts.delete(input.requestId);
       clearTimeout(pending.autoAnswer?.timer);
       this.#emitInputResolved("prompt", input.requestId, pending.agentId);
       try {
         if (pending.uiBlock) {
+          // A Vault request that saved nothing, such as an empty form from an older client, is closed.
+          const frozenResponse = pending.uiBlock.vault && !savedItem ? null : uiBlockResponse;
+          const state = answeredUiBlockState(
+            pending.uiBlock.spec,
+            frozenResponse,
+            responder,
+            pending.autoAnswer?.state,
+          );
+          // Notifications and the history read the outcome line. It names the item, and must fit the limit.
+          if (savedItem)
+            state.outcome = sourceText("status.agent.vaultAdded", {
+              name: savedItem.item.name || (pending.uiBlock.spec.title ?? ""),
+            }).slice(0, UI_BLOCK_LIMITS.outcome);
           this.#resolvePersistedPrompt(
             pending,
-            uiBlockResponse ? promptResolution(pending.questions, input.answers) : { status: "cancelled" },
-            answeredUiBlockState(pending.uiBlock.spec, uiBlockResponse, responder, pending.autoAnswer?.state),
+            frozenResponse ? promptResolution(pending.questions, input.answers) : { status: "cancelled" },
+            state,
+            savedItem?.saved,
           );
         } else {
           this.#resolvePersistedPrompt(pending, promptResolution(pending.questions, input.answers));
@@ -576,7 +662,7 @@ export class AttentionRegistry {
       const pending = this.#prompts.get(input.requestId);
       const apiKey = pending?.uiBlock?.apiKey;
       if (!pending?.uiBlock || !apiKey) return null;
-      if (pending.savingApiKey) throw new Error(sourceText("error.backend.apiKeySaving"));
+      if (pending.saving) throw new Error(sourceText("error.backend.apiKeySaving"));
       const answered = uiBlockAnswer(pending.uiBlock.spec, input.answers, responder)?.values?.[API_KEY_FIELD_ID];
       // A pasted key often brings a space or a line break, which the service would refuse.
       const value = typeof answered === "string" ? answered.trim() : "";
@@ -586,7 +672,7 @@ export class AttentionRegistry {
       if (responder && !responder.privileged)
         throw new ForbiddenAttentionAnswer(sourceText("error.backend.apiKeyNotAllowed"));
       if (!this.#apiKeys) throw new Error(sourceText("error.backend.apiKeySaveFailed"));
-      pending.savingApiKey = true;
+      pending.saving = true;
       return { pending, apiKeys: this.#apiKeys, name: apiKey.name, value };
     });
     if (!answer) return null;
@@ -594,11 +680,57 @@ export class AttentionRegistry {
       toAttentionOperationFailed,
       Effect.ensuring(
         Effect.sync(() => {
-          answer.pending.savingApiKey = false;
+          answer.pending.saving = false;
         }),
       ),
     );
     return { pending: answer.pending, key };
+  });
+
+  /**
+   * Saves the item of a submitted `request_vault_item` form before its prompt resolves, so a refused
+   * value, such as a card number that fails the check, leaves the form open for a correction. Null for
+   * every other prompt and answer.
+   */
+  readonly #saveVaultAnswer = Effect.fn("AttentionRegistry.saveVaultAnswer")(function* (
+    this: AttentionRegistry,
+    input: RespondToPromptInput,
+    responder: PromptResponder | undefined,
+  ) {
+    const answer = yield* attentionStep(() => {
+      const pending = this.#prompts.get(input.requestId);
+      const vault = pending?.uiBlock?.vault;
+      if (!pending?.uiBlock || !vault) return null;
+      if (pending.saving) throw new Error(sourceText("error.backend.vaultItemSaving"));
+      const response = uiBlockAnswer(pending.uiBlock.spec, input.answers, responder);
+      const item = response?.values ? enteredVaultItem(vault.kind, response.values) : null;
+      // A skip saves nothing, so a member may give it: the turn must not wait for an owner.
+      if (!item) return null;
+      // Every member may run the agents of this server, and they use what the Vault holds.
+      if (responder && !responder.privileged)
+        throw new ForbiddenAttentionAnswer(sourceText("error.backend.vaultItemNotAllowed"));
+      if (!this.#vaultItems) throw new Error(sourceText("error.vault.unavailable"));
+      pending.saving = true;
+      return { pending, vaultItems: this.#vaultItems, item };
+    });
+    if (!answer) return null;
+    const item = yield* answer.vaultItems.addEntered(answer.item, this.#agentName(answer.pending.agentId)).pipe(
+      toAttentionOperationFailed,
+      Effect.ensuring(
+        Effect.sync(() => {
+          answer.pending.saving = false;
+        }),
+      ),
+    );
+    const digits = answer.item.kind === "card" ? (answer.item.number ?? "").replace(/\D/gu, "") : "";
+    const brand = digits ? cardBrand(digits) : null;
+    const saved: UiVaultSavedItem = {
+      id: item.id,
+      name: item.name,
+      ...(brand ? { brand } : {}),
+      ...(digits ? { last4: digits.slice(-4) } : {}),
+    };
+    return { pending: answer.pending, item, saved };
   });
 
   readonly respondToApproval = Effect.fn("AttentionRegistry.respondToApproval")(function* (
@@ -1210,6 +1342,31 @@ export class AttentionRegistry {
     return vaultResult({ status: created ? "added" : "updated", ...item });
   }).bind(this);
 
+  /**
+   * Shows the card of `request_vault_item`. The user types the item into the Vault form, and
+   * `respondToPrompt` saves it; the agent gets its id and name, never a value. Gives the refusal, or
+   * null while the card waits for the answer.
+   */
+  readonly requestVaultItem = Effect.fn("AttentionRegistry.requestVaultItem")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+  ) {
+    const call = yield* attentionStep(() => parseBrowserToolCall("request_vault_item", params.arguments));
+    if (call.tool !== "request_vault_item")
+      return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault request.") });
+    if (!this.#vaultItems?.ready()) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (this.#messagingThread(params.threadId))
+      return browserTakeoverError(
+        "request_vault_item does not work in a Slack, Discord or Telegram chat. Ask the user to add the item in Server settings > Vault.",
+      );
+    const spec = vaultRequestFormSpec(call.args);
+    if (typeof spec === "string") return browserTakeoverError(spec);
+    this.surfaceUiBlock(client, request, { blockId: randomUUID(), spec, vault: { kind: call.args.kind } });
+    return null;
+  }).bind(this);
+
   /** Answers `delete_vault_item`. The chat shows a note, as for a save. */
   readonly deleteVaultItem = Effect.fn("AttentionRegistry.deleteVaultItem")(function* (
     this: AttentionRegistry,
@@ -1379,6 +1536,7 @@ export class AttentionRegistry {
       blockId: block.blockId,
       spec: block.spec,
       state: auto ? { status: "pending", autoAnswer: auto } : { status: "pending" },
+      ...(block.vault ? { vault: { kind: block.vault.kind } } : {}),
     });
     if (!threadId || !turnId || !agentId || !publicThreadId || !uiBlock || !validPromptQuestions(questions)) {
       client.respond(request.id, {
@@ -1851,11 +2009,15 @@ export class AttentionRegistry {
     return messageId;
   }
 
-  /** `uiBlockState` freezes the message's UI block, when it has one, in the same write. */
+  /**
+   * `uiBlockState` freezes the message's UI block, when it has one, in the same write. `vaultSaved`
+   * names the item that the user saved from a Vault request.
+   */
   #resolvePersistedPrompt(
     pending: PendingPrompt,
     resolution: AgentPromptResolution,
     uiBlockState?: UiBlockState,
+    vaultSaved?: UiVaultSavedItem,
   ): void {
     const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
     const message = snapshot.messages.find((candidate) => candidate.id === pending.messageId);
@@ -1864,10 +2026,16 @@ export class AttentionRegistry {
     message.text = questionPromptText(message.questionPrompt.questions, resolution);
     if (message.uiBlock && uiBlockState) {
       // The read drops a secret form value; storing the read result keeps it out of the database.
-      const frozen = normalizeConversationUiBlock({ ...message.uiBlock, state: uiBlockState });
+      const vault = message.uiBlock.vault && vaultSaved ? { ...message.uiBlock.vault, saved: vaultSaved } : undefined;
+      const frozen = normalizeConversationUiBlock({
+        ...message.uiBlock,
+        state: uiBlockState,
+        ...(vault ? { vault } : {}),
+      });
       message.uiBlock.state = frozen?.state ?? {
         status: uiBlockState.status === "answered" ? "closed" : uiBlockState.status,
       };
+      if (frozen?.vault) message.uiBlock.vault = frozen.vault;
     }
     this.#conversation.emitConversation(snapshot, "prompt.resolved", {
       turnId: pending.turnId,

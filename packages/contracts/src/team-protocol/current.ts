@@ -94,6 +94,7 @@ import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
 import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
+import { SIDEBAR_FOLDERS_CAPABILITY } from "./sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "./sign-in-relay-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
@@ -232,6 +233,7 @@ export {
   SERVER_AUDIT_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
+  SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
@@ -391,6 +393,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_SVG_ATTACHMENTS_CAPABILITY,
   MCP_ACCOUNTS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
+  SIDEBAR_FOLDERS_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
 ] as const;
 
@@ -539,6 +542,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== TEAM_SVG_ATTACHMENTS_CAPABILITY &&
     capability !== MCP_ACCOUNTS_CAPABILITY &&
     capability !== SIDEBAR_PINS_CAPABILITY &&
+    capability !== SIDEBAR_FOLDERS_CAPABILITY &&
     capability !== SERVER_AUDIT_CAPABILITY,
 );
 /**
@@ -562,6 +566,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   TEAM_SVG_ATTACHMENTS_CAPABILITY,
   MCP_ACCOUNTS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
+  SIDEBAR_FOLDERS_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -669,6 +674,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== TEAM_SVG_ATTACHMENTS_CAPABILITY &&
       capability !== MCP_ACCOUNTS_CAPABILITY &&
       capability !== SIDEBAR_PINS_CAPABILITY &&
+      capability !== SIDEBAR_FOLDERS_CAPABILITY &&
       capability !== SERVER_AUDIT_CAPABILITY,
   );
 }

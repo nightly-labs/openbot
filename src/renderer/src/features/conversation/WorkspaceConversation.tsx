@@ -26,6 +26,7 @@ import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
+import { quitShortcutHintShown } from "../../quit-shortcut-hint";
 import { createScopeGuard } from "../../scope-lifetime";
 import { useTurns } from "../../turns";
 import { turnsPort } from "../../turns-port";
@@ -585,7 +586,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           serverSettingsOpen() ||
           appSettingsOpen() ||
           skillsMarketplaceOpen() ||
-          hasVisibleToasts()
+          hasVisibleToasts() ||
+          quitShortcutHintShown()
         }
         settingsRequest={settingsRequest()}
         messageFocusRequest={messageFocusRequest()}

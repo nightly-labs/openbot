@@ -47,6 +47,10 @@ import { PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
+import {
+  SIDEBAR_FOLDERS_CAPABILITY,
+  SIDEBAR_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
@@ -247,9 +251,12 @@ const EMPTY_SERVER: MobileServer = {
  * the last list and does not stop the connection.
  */
 function startWorkspaceReads(client: RemoteTeamTransportRef, capabilities: readonly string[]) {
-  const sections = capabilities.includes(SIDEBAR_LAYOUT_CAPABILITY)
-    ? client.request("GET", TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayout)
-    : null;
+  // With `sidebar-folders-v1`, the layout has the parent of each folder; the phone shows its path.
+  const sections = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
+    ? client.request("POST", SIDEBAR_FOLDERS_ROUTES.read, decodeSidebarLayout, {})
+    : capabilities.includes(SIDEBAR_LAYOUT_CAPABILITY)
+      ? client.request("GET", TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayout)
+      : null;
   const agents = client.request("GET", TEAM_API_ROUTES.agents.all, decodeAgentSummaries);
   // The hidden list loads with the agents, so a hidden agent does not show for a moment.
   const hidden = readHostHiddenAgents(
@@ -1482,9 +1489,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           SIDEBAR_LAYOUT_CAPABILITY,
           "mobile.workspace.error.sectionsUnsupported",
         );
+        // The released route answers without the parents, and the list would show the folders flat.
         const layout = await request(
           "POST",
-          TEAM_API_ROUTES.sidebarLayout.actions,
+          hasCapability(serverCapabilities.current, serverId, SIDEBAR_FOLDERS_CAPABILITY)
+            ? SIDEBAR_FOLDERS_ROUTES.actions
+            : TEAM_API_ROUTES.sidebarLayout.actions,
           decodeSidebarLayout,
           action,
           serverId,

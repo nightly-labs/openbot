@@ -117,4 +117,12 @@ export const messages = defineMessages("vault", {
   "vault.reset": "Reset Vault",
   "vault.resetTitle": "Reset the Vault?",
   "vault.resetDescription": "OpenBot deletes the Vault file and all items in it. You cannot undo this.",
+  // Chat card: an agent asks the user to add a Vault item. The agent never sees its secrets.
+  "vault.request.private": "Goes to your Vault. {agent} never sees it.",
+  "vault.request.privateUnnamed": "Goes to your Vault. The agent never sees it.",
+  "vault.request.addLogin": "Add login",
+  "vault.request.addCard": "Add card",
+  "vault.request.addContact": "Add address",
+  "vault.request.notNow": "Not now",
+  "vault.request.saved": "Saved to Vault",
 });

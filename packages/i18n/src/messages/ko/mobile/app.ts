@@ -7,7 +7,7 @@ export const messages = {
   "mobile.app.route.newChannel": "새 채널",
   "mobile.app.route.createAgent": "에이전트 만들기",
   "mobile.app.route.addSharedAgent": "공유 에이전트 추가",
-  "mobile.app.route.newSection": "새 섹션",
+  "mobile.app.route.newSection": "새 폴더",
   "mobile.app.route.settings": "설정",
   "mobile.app.route.profile": "프로필",
   "mobile.app.route.accountSessions": "계정 세션",

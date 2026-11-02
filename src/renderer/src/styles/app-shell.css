@@ -1763,6 +1763,137 @@ textarea {
   min-height: 36px;
 }
 
+/* ---------------------------------------------------------------- folders */
+
+/* A custom section is a folder. Folders do not indent: a folder in a folder names its parent before
+   its own name. Folder headers stay at the top of the list while the chats under them scroll. */
+
+/* The header needs a solid fill so the rows do not show through it. It sticks 4px higher, over the
+   list's top padding, so no row shows above it. It keeps the 32px height of a section header. */
+.sidebar:not(.sidebar-compact) .sidebar-folder > header {
+  position: sticky;
+  top: -4px;
+  z-index: 2;
+  background: var(--openbot-bg-sidebar);
+}
+
+/* Each header sticks below the 32px headers of its parents. */
+.sidebar:not(.sidebar-compact) .sidebar-folder[data-depth="1"] > header {
+  top: calc(-4px + 32px);
+  z-index: 3;
+}
+
+.sidebar:not(.sidebar-compact) .sidebar-folder[data-depth="2"] > header {
+  top: calc(-4px + 64px);
+  z-index: 4;
+}
+
+/* The sticky header covers the top of the list, so the list keeps only its bottom fade. The top
+   fade would make the header partly transparent. */
+.agent-list.scroll-fade-top:has(.sidebar-folder):not(.scroll-fade-bottom) {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.agent-list.scroll-fade-top.scroll-fade-bottom:has(.sidebar-folder) {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) 0,
+    var(--openbot-text-primary) calc(100% - 18px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) 0,
+    var(--openbot-text-primary) calc(100% - 18px),
+    transparent 100%
+  );
+}
+
+/* The folder name starts in line with the avatars and the folder icon ends in line with the dates
+   (7px padding and the 1px button border). On hover, the header gets the fill of a row. */
+.sidebar-folder > header .sidebar-section-toggle {
+  padding-inline: calc(var(--openbot-space-2) - 1px);
+  color: var(--openbot-text-primary);
+}
+
+.sidebar-folder > header .sidebar-section-toggle:hover,
+.sidebar-folder > header .sidebar-section-toggle:focus-visible {
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-primary);
+}
+
+.sidebar-folder > header .sidebar-section-name {
+  font-weight: 600;
+}
+
+/* A folder in a folder has a lighter name, so the top folder stays the strongest line. */
+.sidebar-folder:not([data-depth="0"]) > header .sidebar-section-name {
+  font-weight: 500;
+}
+
+.sidebar-folder-parent {
+  color: var(--openbot-text-muted);
+  font-weight: 500;
+}
+
+.sidebar-folder-end {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.sidebar-folder-icon {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+}
+
+.sidebar-folder > header .sidebar-section-toggle:hover .sidebar-folder-icon {
+  color: var(--openbot-text-secondary);
+}
+
+.sidebar-folder-unread {
+  min-width: 18px;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The collapse grid has one column. Without a zero minimum, long names in a folder in a folder make
+   the column wider than the list. */
+.sidebar-folder > .sidebar-section-collapse {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* A folder body holds the chats of the folder first, then its folders. It clips instead of hiding
+   the overflow, so the headers of the folders in it can still stick. The spaces are those of a
+   section: 4px between rows, and 6px above a folder, as between sections. */
+.sidebar-folder > .sidebar-section-collapse > .sidebar-section-body {
+  min-width: 0;
+  overflow: clip;
+}
+
+.sidebar:not(.sidebar-compact) .sidebar-folder > .sidebar-section-collapse > .sidebar-section-body > .sidebar-folder {
+  margin-top: var(--openbot-space-1-5);
+}
+
+/* A folder that a drop goes into keeps the tint of a section drop target on its headers too: the
+   tint lies over their solid fill, so the rows under them still do not show. The outline lies over
+   the sticky headers. */
+.sidebar-folder.sidebar-section-agent-drop-target header {
+  background: linear-gradient(var(--openbot-accent-soft), var(--openbot-accent-soft)), var(--openbot-bg-sidebar);
+}
+
+.sidebar-folder.sidebar-section-agent-drop-target:not(.sidebar-section-drop-after)::after {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--openbot-accent-strong);
+  content: "";
+  pointer-events: none;
+}
+
 .sidebar-agent-drag-preview,
 .sidebar-person-drag-preview,
 .sidebar-section-drag-preview {

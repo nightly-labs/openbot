@@ -371,6 +371,7 @@ export class BrowserHost {
   readonly #tabSessions = new Map<string, Session>();
   readonly #browserProfile: (agentId: string) => AgentBrowserProfile;
   readonly #profileExists: (profileId: string) => boolean;
+  readonly #quitShortcut: (input: Input) => boolean;
   readonly #downloadsRoot: string;
   readonly #statePath: string;
   readonly #tabs = new Map<string, BrowserHostTab>();
@@ -422,12 +423,15 @@ export class BrowserHost {
       browserProfile?: (agentId: string) => AgentBrowserProfile;
       /** Whether a named profile still exists. A tab never opens in a deleted profile. */
       profileExists?: (profileId: string) => boolean;
+      /** True when the key is part of the Mac quit shortcut, which a focused tab must not give to the menu. */
+      quitShortcut?: (input: Input) => boolean;
     } = {},
   ) {
     this.#window = window;
     this.#memoryLow = options.memoryLow ?? (() => false);
     this.#browserProfile = options.browserProfile ?? (() => ({ kind: "shared" }));
     this.#profileExists = options.profileExists ?? (() => false);
+    this.#quitShortcut = options.quitShortcut ?? (() => false);
     this.#downloadsRoot = downloadsRoot;
     this.#statePath = statePath;
     this.#session = session.fromPartition("persist:openbot-browser", { cache: true });
@@ -2061,6 +2065,7 @@ export class BrowserHost {
     list_logins: rejectTakeoverTool,
     list_vault_items: rejectTakeoverTool,
     save_vault_item: rejectTakeoverTool,
+    request_vault_item: rejectTakeoverTool,
     delete_vault_item: rejectTakeoverTool,
     request_link_payment: rejectTakeoverTool,
   };
@@ -2781,6 +2786,12 @@ export class BrowserHost {
         });
     });
     contents.on("before-input-event", (event, input) => {
+      // Only a tab in the main window: a Picture in Picture tab leaves Cmd+Q to the menu item, which asks
+      // first, because the hint shows in the main window and that window can be hidden.
+      if (this.#mountedViews.get(tab.view) === this.#window && this.#quitShortcut(input)) {
+        event.preventDefault();
+        return;
+      }
       if (isToggleDevToolsShortcut(input)) {
         event.preventDefault();
         this.#window.webContents.toggleDevTools();
