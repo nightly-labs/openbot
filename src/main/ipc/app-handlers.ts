@@ -80,6 +80,7 @@ const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
   guides: "https://openbot.run/guides",
   // A Redirect Rule in the openbot.run Cloudflare zone sends this to the current Discord invite.
   discord: "https://discord.openbot.run",
+  github: "https://github.com/nightly-labs/openbot",
   x: "https://x.com/OpenBot_",
   "grok-bot-export": GROK_BOT_EXPORT_URL,
   "hosted-server-contact": HOSTED_SERVER_CONTACT_URL,

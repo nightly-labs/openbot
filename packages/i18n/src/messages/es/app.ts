@@ -66,6 +66,13 @@ export const messages = {
   "app.help.changelog": "Registro de cambios completo",
   "app.help.guides": "Guías",
   "app.help.discord": "Únete a Discord",
+  "app.githubStar.title": "¿Te gusta OpenBot hasta ahora?",
+  "app.githubStar.description":
+    "OpenBot es gratis y de código abierto. Una estrella en GitHub ayuda a que más personas lo encuentren.",
+  "app.githubStar.star": "Estrella en GitHub",
+  "app.githubStar.notNow": "Ahora no",
+  "app.githubStar.thanksTitle": "¡Gracias!",
+  "app.githubStar.thanksBody": "Nos has alegrado el día.",
   "app.rail.usageRings": "Uso de {name}: {windows}. Abrir uso",
   "app.rail.customAgentUsage": "Uso de {name}. Abrir uso",
   "app.settingsPage.title": "Ajustes",
