@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, realpathSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
@@ -248,6 +248,7 @@ export function clineStatePaths(env: NodeJS.ProcessEnv = process.env, home = hom
 /**
  * The folder where Hermes Agent keeps its sign-ins, settings, sessions and memories: `HERMES_HOME`,
  * else `~/.hermes`, or `%LOCALAPPDATA%\hermes` on Windows. OpenBot shares it with the user's own Hermes.
+ * When the user selected a profile with `hermes profile use <name>`, it is `<root>/profiles/<name>`.
  */
 export function hermesHome(
   env: NodeJS.ProcessEnv = process.env,
@@ -255,10 +256,30 @@ export function hermesHome(
   platform: NodeJS.Platform = process.platform,
 ): string {
   const configured = env.HERMES_HOME?.trim();
-  if (configured)
-    return configured === "~" || configured.startsWith("~/") ? join(home, configured.slice(1)) : configured;
-  if (platform === "win32") return join(env.LOCALAPPDATA?.trim() || join(home, "AppData", "Local"), "hermes");
-  return join(home, ".hermes");
+  const root = configured
+    ? configured === "~" || configured.startsWith("~/")
+      ? join(home, configured.slice(1))
+      : configured
+    : platform === "win32"
+      ? join(env.LOCALAPPDATA?.trim() || join(home, "AppData", "Local"), "hermes")
+      : join(home, ".hermes");
+  return basename(dirname(root)) === "profiles" ? root : hermesActiveProfile(root);
+}
+
+/** Hermes 0.21.5 reads `<root>/active_profile` at each start and then uses that profile's folder. */
+function hermesActiveProfile(root: string): string {
+  let name: string;
+  try {
+    name = readFileSync(join(root, "active_profile"), "utf8")
+      .replace(/^\uFEFF/, "")
+      .trim()
+      .toLowerCase();
+  } catch {
+    return root;
+  }
+  if (name === "" || name === "default" || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) return root;
+  const profile = join(root, "profiles", name);
+  return existsSync(profile) ? profile : root;
 }
 
 /**

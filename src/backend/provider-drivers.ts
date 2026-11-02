@@ -319,9 +319,13 @@ function requireHermesProvider(_connection: ClientSideConnection, initialization
 }
 
 /** The sandbox lets a Hermes process write in its folder, not create it, so OpenBot makes it. */
-function confineHermesTarget(target: SpawnTarget, confinement: ProcessConfinement): SpawnTarget {
-  mkdirSync(hermesHome(), { recursive: true, mode: 0o700 });
-  return confineSpawnTarget(target, confinement, hermesStatePaths());
+function confineHermesTarget(
+  target: SpawnTarget,
+  confinement: ProcessConfinement,
+  env: NodeJS.ProcessEnv,
+): SpawnTarget {
+  mkdirSync(hermesHome(env), { recursive: true, mode: 0o700 });
+  return confineSpawnTarget(target, confinement, hermesStatePaths(env));
 }
 
 /**
@@ -503,11 +507,11 @@ export interface BuiltInProviderDriver {
   id: AgentProviderId;
   signIn: ProviderSignIn;
   /**
-   * The file the provider's CLI writes when the user signs in with it. The host checks the account
-   * again when this file changes, so a sign-in done outside OpenBot, such as over SSH, needs no
+   * The files the provider's CLI writes when the user signs in with it. The host checks the account
+   * again when one of them changes, so a sign-in done outside OpenBot, such as over SSH, needs no
    * restart. Absent for a provider that OpenBot always signs in itself.
    */
-  signInFile?(): string;
+  signInFiles?(): readonly string[];
   /** Absent for a provider that has no sign-in on another device. */
   codeSignIn?: ProviderCodeSignIn;
   /** Absent for a provider that holds one account only. */
@@ -607,7 +611,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   {
     id: "pi",
     signIn: { kind: "terminal", timeoutMs: CLI_LOGIN_TIMEOUT_MS },
-    signInFile: () => join(piAgentDirectory(), "auth.json"),
+    signInFiles: () => [join(piAgentDirectory(), "auth.json")],
     resolveCli: resolvePiCli,
     createClient: (cli, timeout, context, confinement) => piClient("pi", cli, timeout, context, confinement),
     createProfileClient: (cli, timeout, context) => piProfileClient("pi", cli, timeout, context),
@@ -1051,8 +1055,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         closeInput: true,
       },
     },
-    // `hermes setup`, `hermes model` and `hermes auth` in a terminal write this file, for any provider.
-    signInFile: () => join(hermesHome(), "auth.json"),
+    // `hermes auth` and an OAuth provider of `hermes setup` or `hermes model` write `auth.json`. An
+    // API key goes in `.env`, and the provider choice in `config.yaml`.
+    signInFiles: () => ["auth.json", ".env", "config.yaml"].map((name) => join(hermesHome(), name)),
     resolveCli: () => resolveHermesCli(),
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
@@ -1060,7 +1065,13 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         flavor: HERMES_ACP_FLAVOR,
         argv: HERMES_ARGV,
         env: {},
-        ...(confinement ? { confine: (target) => confineHermesTarget(target, confinement) } : {}),
+        // The agent environment can name another `HERMES_HOME`, and the process gets it.
+        ...(confinement
+          ? {
+              confine: (target) =>
+                confineHermesTarget(target, confinement, { ...process.env, ...context.agentEnvironment?.() }),
+            }
+          : {}),
         extraEnv: () => ({ ...context.agentEnvironment?.() }),
         signInMessage: sourceText("error.provider.hermesSignIn"),
         authenticate: requireHermesProvider,

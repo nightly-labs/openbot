@@ -25,8 +25,12 @@ export interface CliCodeLogin {
   child: ChildProcess;
   /** Settles when the CLI exits: resolves on success, rejects on failure or after `timeoutMs`. */
   done: Effect.Effect<void, CliCodeLoginFailed>;
-  /** Resolves when the CLI has printed what the user needs. Rejects when it exits or goes quiet first. */
-  prompt: Effect.Effect<CliCodePrompt, CliCodeLoginFailed>;
+  /**
+   * Resolves when the CLI has printed what the user needs, or with null when it signed in and exited
+   * with success before it printed anything: Hermes imports the Nous sign-in of another Hermes
+   * profile. Rejects when it fails or goes quiet first.
+   */
+  prompt: Effect.Effect<CliCodePrompt | null, CliCodeLoginFailed>;
   /** Types the code into the CLI's prompt. Only a `paste` sign-in reads it. */
   submit(code: string): void;
 }
@@ -125,22 +129,23 @@ export class CliCodeLoginFailed extends Schema.TaggedError<CliCodeLoginFailed>()
 
 // Output contains credentials and must not become a trace payload.
 const readCodePrompt = Effect.fnUntraced(function* (child: ChildProcess, flow: CliCodePrompt["flow"]) {
-  return yield* Effect.callback<CliCodePrompt, CliCodeLoginFailed>((resume) => {
+  return yield* Effect.callback<CliCodePrompt | null, CliCodeLoginFailed>((resume) => {
     let output = "";
     let settled = false;
     const cleanup = () => {
       child.stdout?.off("data", read);
       child.stderr?.off("data", read);
       child.off("error", unavailable);
-      child.off("exit", unavailable);
+      child.off("exit", exited);
     };
-    const settle = (result: CliCodePrompt | Error) => {
+    const settle = (result: CliCodePrompt | Error | null) => {
       if (settled) return;
       settled = true;
       cleanup();
       resume(result instanceof Error ? Effect.fail(new CliCodeLoginFailed({ cause: result })) : Effect.succeed(result));
     };
     const unavailable = () => settle(new Error(sourceText("error.provider.codeLoginNoLink")));
+    const exited = (code: number | null) => (code === 0 ? settle(null) : unavailable());
     const read = (chunk: Buffer) => {
       if (output.length >= MAX_OUTPUT_CHARS) return;
       output += chunk.toString("utf8").slice(0, MAX_OUTPUT_CHARS - output.length);
@@ -150,7 +155,7 @@ const readCodePrompt = Effect.fnUntraced(function* (child: ChildProcess, flow: C
     child.stdout?.on("data", read);
     child.stderr?.on("data", read);
     child.once("error", unavailable);
-    child.once("exit", unavailable);
+    child.once("exit", exited);
     return Effect.sync(cleanup);
   }).pipe(
     Effect.timeoutOrElse({

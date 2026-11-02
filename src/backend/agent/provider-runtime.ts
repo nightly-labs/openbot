@@ -149,13 +149,17 @@ const SIGN_IN_FILE_POLL_MS = 2_000;
  * Identifies one write of a sign-in file. The time alone is not enough: a file system with 1 s
  * times shows two writes in the same second as one, such as an empty file and then the credentials.
  */
-function signInFileVersion(path: string): string {
-  try {
-    const stats = statSync(path, { throwIfNoEntry: false });
-    return stats ? `${stats.ino}:${stats.size}:${stats.mtimeMs}` : "missing";
-  } catch {
-    return "unreadable";
-  }
+function signInFileVersion(paths: readonly string[]): string {
+  return paths
+    .map((path) => {
+      try {
+        const stats = statSync(path, { throwIfNoEntry: false });
+        return stats ? `${stats.ino}:${stats.size}:${stats.mtimeMs}` : "missing";
+      } catch {
+        return "unreadable";
+      }
+    })
+    .join("|");
 }
 /**
  * Starts that fail in a row before OpenBot stops starting a provider by itself. A start that fails,
@@ -447,7 +451,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #customAgentUsageLock = Semaphore.makeUnsafe(1);
   #idleCheck: NodeJS.Timeout | null = null;
   /** Each provider's sign-in file, and the version of it that the last account check saw. */
-  readonly #signInFiles = new Map<AgentProvider, { path: string; seen: string }>();
+  readonly #signInFiles = new Map<AgentProvider, { paths: readonly string[]; seen: string }>();
   #signInCheck: NodeJS.Timeout | null = null;
   #status: AgentStatus = structuredClone(INITIAL_STATUS);
   #providerRefresh: Deferred.Deferred<AgentStatus, ProviderOperationFailed> | null = null;
@@ -1288,9 +1292,9 @@ export class ProviderRuntime implements ProviderPort {
    */
   #watchSignInFiles(): void {
     for (const driver of BUILT_IN_PROVIDER_DRIVERS) {
-      const path = driver.signInFile?.();
-      if (path && !this.#signInFiles.has(driver.id))
-        this.#signInFiles.set(driver.id, { path, seen: signInFileVersion(path) });
+      const paths = driver.signInFiles?.() ?? [];
+      if (paths.length > 0 && !this.#signInFiles.has(driver.id))
+        this.#signInFiles.set(driver.id, { paths, seen: signInFileVersion(paths) });
     }
     if (this.#signInFiles.size === 0) return;
     this.#signInCheck ??= setInterval(() => this.#checkSignInFiles(), SIGN_IN_FILE_POLL_MS);
@@ -1309,7 +1313,7 @@ export class ProviderRuntime implements ProviderPort {
       const row = this.#status.providers?.find((candidate) => candidate.id === provider);
       if (row?.state !== "sign-in-required") continue;
       if (this.#cliLogin.has(provider) || this.#providerConnectionCommands.has(provider)) continue;
-      const version = signInFileVersion(file.path);
+      const version = signInFileVersion(file.paths);
       if (version === file.seen) continue;
       file.seen = version;
       Effect.runFork(
