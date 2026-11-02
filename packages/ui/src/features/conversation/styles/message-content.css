@@ -60,7 +60,14 @@
 }
 
 .message-markdown :is(ul, ol) {
-  padding-left: var(--openbot-space-6);
+  padding-inline-start: var(--openbot-space-6);
+}
+
+/* Code, math and chips keep their own order inside a right-to-left block. */
+:is(.message-markdown, .message-data-table)
+:is(code, pre, .katex, .message-code-block, .message-preview-resize, .message-file-reference, .message-reference-chip) {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .message-markdown ul {
@@ -93,8 +100,8 @@
 }
 
 .message-markdown blockquote {
-  border-left: var(--openbot-space-0-5) solid var(--openbot-border-strong);
-  padding-left: var(--openbot-space-3);
+  border-inline-start: var(--openbot-space-0-5) solid var(--openbot-border-strong);
+  padding-inline-start: var(--openbot-space-3);
   color: var(--openbot-text-secondary);
 }
 
@@ -172,11 +179,11 @@
 }
 
 .message-markdown-table :is(th, td) {
-  border-right: 1px solid var(--openbot-data-table-border);
+  border-inline-end: 1px solid var(--openbot-data-table-border);
   border-bottom: 1px solid var(--openbot-data-table-border);
   padding: var(--openbot-space-2) var(--openbot-space-3);
   overflow-wrap: break-word;
-  text-align: left;
+  text-align: start;
   vertical-align: top;
 }
 
@@ -187,7 +194,7 @@
 }
 
 .message-markdown-table :is(th, td):last-child {
-  border-right: 0;
+  border-inline-end: 0;
 }
 
 .message-markdown-table tbody tr:last-child td {
@@ -623,6 +630,17 @@
   width: 100%;
 }
 
+/* A right-to-left reply takes the full width of the column, so its text starts at the right edge. */
+.message-entry-agent .ui-bubble:has(:is(.message-copy [dir="rtl"], .message-data-table-scroll[dir="rtl"])) {
+  width: min(720px, 100%);
+}
+
+.message-entry-agent
+  .ui-bubble:has(:is(.message-copy [dir="rtl"], .message-data-table-scroll[dir="rtl"]))
+  > .ui-bubble-content {
+  width: 100%;
+}
+
 .message-entry-agent .message-shell:has(.message-data-table-scroll) {
   align-items: flex-end;
 }
@@ -910,7 +928,7 @@
   color: var(--openbot-data-table-text);
   font-weight: inherit;
   overflow-wrap: break-word;
-  text-align: left;
+  text-align: start;
   vertical-align: top;
 }
 
@@ -923,7 +941,7 @@
 
 .message-data-table th:not(:last-child),
 .message-data-table td:not(:last-child) {
-  border-right: 1px solid var(--openbot-data-table-border);
+  border-inline-end: 1px solid var(--openbot-data-table-border);
 }
 
 /* Links and code can be one long token. Break them inside the column, so they do not make the
@@ -969,7 +987,7 @@
   height: 14px;
   align-items: center;
   justify-content: center;
-  margin-right: 4px;
+  margin-inline-end: 4px;
   color: currentColor;
   vertical-align: -2px;
 }

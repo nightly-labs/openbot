@@ -2,6 +2,7 @@ import type { JSX } from "@solidjs/web";
 import { For } from "solid-js";
 import { useText } from "../../text";
 import type { ComparisonTableBlock } from "./DataTable";
+import { textDirection } from "./textDirection";
 
 export function ComparisonTable(props: { table: ComparisonTableBlock; renderCell?: (text: string) => JSX.Element }) {
   const { t } = useText();
@@ -10,6 +11,7 @@ export function ComparisonTable(props: { table: ComparisonTableBlock; renderCell
       class="message-data-table-scroll message-comparison-table-scroll"
       aria-label={t("chat.table.comparison")}
       tabindex="0"
+      dir={textDirection([props.table.headers, ...props.table.rows].flat().join(" "))}
     >
       <table
         class="message-data-table message-comparison-table"

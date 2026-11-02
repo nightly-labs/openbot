@@ -2,6 +2,7 @@ import { Button, Check, Copy } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, onCleanup } from "solid-js";
 import { useText } from "../../text";
+import { textDirection } from "./textDirection";
 
 export type DataTableAlignment = "left" | "center" | "right";
 
@@ -75,7 +76,12 @@ export function DataTable(props: { table: DataTableBlock; renderCell?: (text: st
 
   return (
     <div class="message-data-table-frame">
-      <section class="message-data-table-scroll" aria-label={t("chat.table.data")} tabindex="0">
+      <section
+        class="message-data-table-scroll"
+        aria-label={t("chat.table.data")}
+        tabindex="0"
+        dir={textDirection([props.table.headers, ...props.table.rows].flat().join(" "))}
+      >
         <table
           ref={(element) => (table = element)}
           class="message-data-table"
