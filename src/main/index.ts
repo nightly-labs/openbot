@@ -1437,7 +1437,15 @@ if (!hasSingleInstanceLock) {
         tray.sync(appBehavior.keepRunningInBackground);
         syncMacDock(appBehavior.keepRunningInBackground);
       });
+      // The main window hides the Dock icon when it closes, unless another window still shows. When
+      // that last window, such as a chat window, closes later, the Dock icon hides then.
+      const hideDockAfterWindow = (_event: Electron.Event, window: BrowserWindow) =>
+        window.once("closed", () => {
+          if (!isQuitting && appBehavior.keepRunningInBackground) syncMacDock(true);
+        });
+      app.on("browser-window-created", hideDockAfterWindow);
       teardown.push(0, "background tray", () => {
+        app.off("browser-window-created", hideDockAfterWindow);
         unsubscribeBackgroundTray();
         tray.destroy();
       });
