@@ -115,6 +115,8 @@ export const messages = {
   "error.provider.modelIdDuplicate": "Deux modèles ont le même ID.",
   "error.provider.contextWindowInvalid":
     "La fenêtre de contexte d’un modèle doit être un nombre entier de jetons entre {min} et {max}.",
+  "error.provider.maxOutputInvalid":
+    "La sortie maximale d’un modèle doit être un nombre entier de jetons entre {min} et {max}.",
   "error.provider.headersTooMany": "Il y a trop d’en-têtes.",
   "error.provider.headerNameCharacter": "Un nom d’en-tête contient un caractère que HTTP n’autorise pas.",
   "error.provider.headerNameTooLong": "Un nom d’en-tête est trop long.",

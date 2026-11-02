@@ -97,6 +97,7 @@ export const messages = {
   "error.provider.modelIdCharacter": "某个模型 ID 含有不可用的字符。",
   "error.provider.modelIdDuplicate": "有两个模型的 ID 相同。",
   "error.provider.contextWindowInvalid": "模型的上下文窗口必须是 {min} 到 {max} 之间的整数个 token。",
+  "error.provider.maxOutputInvalid": "模型的最大输出必须是 {min} 到 {max} 之间的整数个 token。",
   "error.provider.headersTooMany": "请求头数量过多。",
   "error.provider.headerNameCharacter": "某个请求头名称含有 HTTP 不允许的字符。",
   "error.provider.headerNameTooLong": "某个请求头名称过长。",
