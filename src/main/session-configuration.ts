@@ -267,6 +267,7 @@ function applicationContentType(
   | "text/css; charset=utf-8"
   | "image/svg+xml"
   | "image/png"
+  | "image/webp"
   | "font/woff2"
   | "application/octet-stream" {
   switch (extname(path).toLowerCase()) {
@@ -280,6 +281,8 @@ function applicationContentType(
       return "image/svg+xml";
     case ".png":
       return "image/png";
+    case ".webp":
+      return "image/webp";
     case ".woff2":
       return "font/woff2";
     default:

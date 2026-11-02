@@ -2425,6 +2425,18 @@ textarea {
   vector-effect: non-scaling-stroke;
 }
 
+/* The plush body is a picture, not a path, so the same ring follows its edge as four offset shadows
+   in the surface colour. They sit on the whole drawing, in pixels, so the width matches the stroke. */
+.bloub-avatar-svg:has(> g > image) {
+  --agent-avatar-ring-color: var(--agent-avatar-outline, transparent);
+  --agent-avatar-ring-width: var(--agent-avatar-outline-width, 1.5px);
+
+  filter: drop-shadow(var(--agent-avatar-ring-width) 0 0 var(--agent-avatar-ring-color))
+    drop-shadow(calc(-1 * var(--agent-avatar-ring-width)) 0 0 var(--agent-avatar-ring-color))
+    drop-shadow(0 var(--agent-avatar-ring-width) 0 var(--agent-avatar-ring-color))
+    drop-shadow(0 calc(-1 * var(--agent-avatar-ring-width)) 0 var(--agent-avatar-ring-color));
+}
+
 /* A photo has no silhouette to stroke, so the same ring is an outline on its circle. */
 .agent-avatar-custom {
   overflow: hidden;
@@ -2441,10 +2453,14 @@ textarea {
   object-fit: cover;
 }
 
-/* A mood that flies rings. They sit outside the circle, so the parent stops
-   clipping and the image rounds itself instead. */
-.agent-avatar[data-avatar="image"]:is([data-mood="working"], [data-mood="connecting"]) {
+/* A mood that flies rings. The ring layer is placed on the avatar box, so the box
+   positions it; without that, a mood with no breathe (`connecting`) sized it to the page.
+   The rings sit outside the circle, so a photo stops clipping and rounds itself instead. */
+.agent-avatar:is([data-mood="working"], [data-mood="connecting"]) {
   position: relative;
+}
+
+.agent-avatar[data-avatar="image"]:is([data-mood="working"], [data-mood="connecting"]) {
   overflow: visible;
 }
 

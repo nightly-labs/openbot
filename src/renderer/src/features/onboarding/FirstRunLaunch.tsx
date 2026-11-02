@@ -42,7 +42,6 @@ export function FirstRunLaunch(props: FirstRunLaunchProps) {
                   seed={member.seed}
                   hue={member.hue}
                   motion="idle"
-                  cycleOffset={member.cycleOffset}
                   animationOffset={member.animationOffset}
                   followPointer
                   class="first-run-launch-avatar"

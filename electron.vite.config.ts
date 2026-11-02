@@ -54,7 +54,7 @@ export default defineConfig({
   renderer: {
     plugins: [solidPlugin(), tailwindcss({ optimize: false })],
     optimizeDeps: {
-      include: ["@norbert_bodziony/bloub"],
+      include: ["@norbert_bodziony/bloub", "@norbert_bodziony/bloub/plush"],
     },
     resolve: {
       dedupe: ["solid-js", "@solidjs/web"],

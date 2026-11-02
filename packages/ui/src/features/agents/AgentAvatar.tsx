@@ -1,13 +1,5 @@
-import {
-  type Block,
-  BloubBot,
-  BotEngine,
-  type BotFrame,
-  DEMI_VIEWBOX,
-  makeBlock,
-  POSES,
-  RAYON,
-} from "@norbert_bodziony/bloub";
+import { BotEngine, type BotFrame, DEMI_VIEWBOX, POSES, RAYON } from "@norbert_bodziony/bloub";
+import { PlushBot, type PlushState } from "@norbert_bodziony/bloub/plush";
 import {
   type AvatarMood,
   avatarMoodIsBusy,
@@ -20,22 +12,28 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { type AvatarMotion, bloubAvatarProfile, type SupportedAvatarSilhouetteId } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
-import { createPointerGaze } from "./avatar-pointer-gaze";
 
 // Cap avatar animation at 30fps: uncapped bloub clocks measured 30% renderer / 24% GPU
 // for two visible avatars. The shape is 24-40px, so the eye cannot see the difference.
 const AVATAR_FPS = 30;
-const SIDEBAR_MOTION_HOLD_FACTOR = 1.25;
 
-// Resting montage shown on hover: shape-safe blocks only, so the seeded silhouette stays
-// on screen while the face carries the personality (blink, wink, wide eyes).
-const DEFAULT_CYCLE: Block[] = [
-  slowerBlock("idle"),
-  makeBlock("wink"),
-  slowerBlock("idle"),
-  makeBlock("wide"),
-  slowerBlock("idle"),
-];
+/*
+ * The generated avatar is the felt plush: the agent's seeded shape as a still felt body, tinted in its
+ * colour, and only the eyes move. A photo cannot change its outline, so `swirl`, which turns the body,
+ * becomes the plush `thinking`: the body rests, the eyes look up, and three felt dots pulse beside it.
+ */
+const PLUSH_STATES: Readonly<Record<ShapeSafeStateId, PlushState>> = {
+  idle: "idle",
+  wink: "wink",
+  wide: "wide",
+  notify: "notify",
+  swirl: "thinking",
+};
+
+/** The pose that a still plush shows. The plush plays `thinking` on the engine's `idle`. */
+function frozenPose(state: PlushState): number {
+  return POSES[state === "thinking" ? "idle" : state];
+}
 
 // Decor rings are sampled from the `orbit` pose, not played as a state: `orbit`
 // replaces the body, while sampling only `frame.arcs` keeps the silhouette.
@@ -50,11 +48,6 @@ const STATIC_MOTIONS: ReadonlySet<AvatarMotion> = new Set(["hover", "idle"]);
 // scroll regions with `[tabindex]` are too wide to count as one.
 const HOVER_GROUP = "[data-avatar-hover], button, a, [role='button'], [role='link'], [role='menuitem']";
 
-function slowerBlock(state: ShapeSafeStateId): Block {
-  const block = makeBlock(state);
-  return { ...block, duration: block.duration * SIDEBAR_MOTION_HOLD_FACTOR };
-}
-
 interface AgentAvatarProps {
   agent?: Pick<AgentProfile, "avatarSeed" | "avatarHue" | "avatarUrl"> | undefined;
   seed?: string | undefined;
@@ -63,12 +56,11 @@ interface AgentAvatarProps {
   motion?: AvatarMotion;
   /** What the agent is doing. It chooses the face, never the silhouette. */
   mood?: AvatarMood;
-  cycleOffset?: number;
   animationOffset?: number;
   shape?: SupportedAvatarSilhouetteId;
   /**
-   * The eyes follow the pointer, and a press makes the agent nod. The avatar then moves without hover,
-   * so use it only where few avatars show. A photo avatar and reduced motion ignore it.
+   * The eyes follow the pointer. The avatar then moves without hover, so use it only where few
+   * avatars show. A photo avatar and reduced motion ignore it.
    */
   followPointer?: boolean;
   class?: string;
@@ -107,7 +99,6 @@ export function AgentAvatar(props: AgentAvatarProps) {
           hue={hue()}
           motion={motion()}
           mood={mood()}
-          cycleOffset={props.cycleOffset}
           animationOffset={props.animationOffset}
           shape={props.shape}
           followPointer={props.followPointer === true}
@@ -271,7 +262,6 @@ function GeneratedAvatar(props: {
   hue: AvatarHue | null;
   motion: AvatarMotion;
   mood: AvatarMood;
-  cycleOffset?: number | undefined;
   animationOffset?: number | undefined;
   shape?: SupportedAvatarSilhouetteId | undefined;
   followPointer: boolean;
@@ -280,7 +270,6 @@ function GeneratedAvatar(props: {
   style?: Record<string, string>;
 }) {
   let element: HTMLSpanElement | undefined;
-  const gaze = createPointerGaze();
   const [interacting, setInteracting] = createSignal(false);
   const [reducedMotion, setReducedMotion] = createSignal(prefersReducedMotion());
   const presentation = createMemo(() => avatarMoodPresentation(props.mood));
@@ -293,17 +282,12 @@ function GeneratedAvatar(props: {
     expression: presentation().expression ?? profile().expression,
     state: presentation().state,
   }));
-  const cycle = createMemo(() => offsetCycle(DEFAULT_CYCLE, props.cycleOffset ?? 0));
   // A mood that carries its own motion has to be seen without being pointed at, and so do eyes that
   // follow the pointer; the resting moods keep the hover gating that the perf note above is about.
   const animated = () =>
     !reducedMotion() &&
     (props.followPointer || avatarMoodIsBusy(props.mood) || !STATIC_MOTIONS.has(props.motion) || interacting());
-  const gazeScript = createMemo(() => (props.followPointer ? gaze.script : null));
-  const motionCycle = () => {
-    if (props.mood !== "idle") return [slowerBlock(presentation().state)];
-    return cycle();
-  };
+  const plushState = () => PLUSH_STATES[appearance().state];
 
   onSettled(() => {
     const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
@@ -343,24 +327,18 @@ function GeneratedAvatar(props: {
     };
   });
 
-  createEffect(
-    () => props.followPointer,
-    (follow) => {
-      if (follow && element) return gaze.attach(element);
-    },
-  );
-
+  // The plush plays one state and keeps its body still. On hover only the eyes move: drift, blinks,
+  // and the face of the mood. A new shape or colour turns the body like a coin (`flip`).
   const avatar = () => (
-    <BloubBot
+    <PlushBot
       size={100}
       shape={appearance().shape}
       color={appearance().color}
       expression={appearance().expression}
-      cycle={motionCycle()}
-      playing={true}
+      state={plushState()}
       fps={AVATAR_FPS}
       initialPhase={props.animationOffset ?? avatarAnimationPhase(props.seed)}
-      gaze={gazeScript()}
+      follow={props.followPointer}
       ariaLabel=""
       class="bloub-avatar-svg"
     />
@@ -382,16 +360,17 @@ function GeneratedAvatar(props: {
           fallback={
             /* A frozen Bloub frame cannot finish a morph, and the engine reads `state` only when it
                is built, so a mood change has to rebuild the bot. Keying on the appearance, state
-               included, does both: `frozenAt` alone would sample the seeded idle face. */
+               included, does both: `frozenAt` alone would sample the seeded idle face. A frozen
+               plush shows a new body at once, with no transition. */
             <Show when={appearance()} keyed>
               {(frozen) => (
-                <BloubBot
+                <PlushBot
                   size={100}
                   shape={frozen.shape}
                   color={frozen.color}
                   expression={frozen.expression}
-                  state={frozen.state}
-                  frozenAt={POSES[frozen.state]}
+                  state={PLUSH_STATES[frozen.state]}
+                  frozenAt={frozenPose(PLUSH_STATES[frozen.state])}
                   ariaLabel=""
                   class="bloub-avatar-svg"
                 />
@@ -413,11 +392,4 @@ function avatarAnimationPhase(seed: string): number {
     hash = Math.imul(hash, 0x01000193);
   }
   return ((hash >>> 0) / 0x100000000) * 1.4;
-}
-
-function offsetCycle(blocks: Block[], offset: number): Block[] {
-  if (blocks.length === 0) return blocks;
-  const start = ((Math.trunc(offset) % blocks.length) + blocks.length) % blocks.length;
-  if (start === 0) return blocks;
-  return [...blocks.slice(start), ...blocks.slice(0, start)];
 }
