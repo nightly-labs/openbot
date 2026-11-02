@@ -158,6 +158,9 @@ class FakeSocket implements WhatsAppSocket {
     if (me?.id) {
       this.user = { id: me.id };
       this.emit("connection.update", { connection: "open" });
+      const first = this.#phone.onOpen;
+      this.#phone.onOpen = null;
+      if (first) this.receive([first]);
     } else this.emit("connection.update", { qr: `2@fake-qr-${this.#phone.sockets.length}` });
   }
 
@@ -222,6 +225,8 @@ class FakePhone {
   logouts = 0;
   /** WhatsApp cannot be reached: each socket closes before it shows a code. */
   offline = false;
+  /** A message that the next linked socket receives at once, before any transport listens. */
+  onOpen: WAMessage | null = null;
 
   readonly create = (config: UserFacingSocketConfig): WhatsAppSocket => {
     const socket = new FakeSocket(this, config);
@@ -516,12 +521,26 @@ try {
       assert.equal(started.status, "waiting");
       const waiting = await linkState(messaging, (state) => state.qr !== null, "a QR code");
       assert.match(waiting.qr ?? "", /^2@fake-qr-/u);
+      // The phone's first message comes the moment the device opens, before the transport listens.
+      const early = message({ chat: OWNER_JID, fromMe: true, text: "first message after the link" });
+      phone.onOpen = early;
       phone.current().scan();
       const linked = await linkState(messaging, (state) => state.status === "linked", "the link");
       assert.equal(linked.workspaceId, OWNER);
+      const sockets = phone.sockets.length;
       const live = await until(
         () => connection(messaging)?.state === "connected" && connection(messaging),
         "connected",
+      );
+      assert.equal(phone.sockets.length, sockets, "The connection opened a second socket after the link.");
+      await until(
+        () => phone.textsTo(OWNER_JID).some((text) => text.includes("OpenBot is connected to this number")),
+        "the welcome message in the owner's own chat",
+      );
+      // No orchestrator exists yet, so the service answers that no agent can answer: it read the message.
+      await until(
+        () => phone.textsTo(OWNER_JID).some((text) => text.includes("No agent can answer here yet")),
+        "the answer to the message that came before the transport listened",
       );
       assert.equal(live.platform, "whatsapp");
       assert.ok(existsSync(storeFile(agents)), "The connection has no store file.");
@@ -886,6 +905,10 @@ try {
         phone.current().scan();
         await linkState(messaging, (state) => state.status === "linked", "the second link");
         await until(() => connection(messaging)?.state === "connected", "connected after the second link");
+        await until(
+          () => phone.textsTo(OWNER_JID).some((text) => text.includes("can now write to it")),
+          "the welcome message of a number only for OpenBot",
+        );
         const account = messaging.whatsappOverview().accounts[0];
         assert.ok(
           account?.allowedSenders.some((sender) => sender.id === GROUP),

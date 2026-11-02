@@ -53,6 +53,10 @@ export const messages = {
     "Bu numara yalnızca sahibinin izin verdiği kişileri yanıtlar. Sahibine şu kodu verin: {code}",
   "status.messaging.whatsappPairingApproved": "Artık bu numaraya istek gönderebilirsiniz.",
   "status.messaging.whatsappOwnChat": "Kendine mesaj gönder",
+  "status.messaging.whatsappWelcomeOwn":
+    "👋 OpenBot bu numaraya bağlandı. Ajanlarına sormak için buraya yaz. Bir isteği onaylamak veya reddetmek için 1 ya da 2, durdurmak için stop yanıtını ver.",
+  "status.messaging.whatsappWelcomeDedicated":
+    "👋 OpenBot bu numaraya bağlandı. OpenBot'ta izin verdiğin kişiler artık bu numaraya yazabilir; yeni bir kişi sana vermesi için bir kod alır.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Düzenleyicisi",
   "status.messaging.whatsappOrchestratorTitle": "WhatsApp'ta yanıt verir ve ekibe sorar",
 } as const satisfies PartialTranslation<typeof source>;

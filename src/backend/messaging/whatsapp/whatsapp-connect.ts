@@ -260,17 +260,42 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     const name = link.handle.store.creds.me?.name?.trim();
     const workspaceName = name ? `${name} (${maskedNumber(identity.number)})` : maskedNumber(identity.number);
     yield* this.#end(link, false);
-    const connectionId = yield* this.#hooks.prepare(identity.number, workspaceName);
-    // The number's earlier device was replaced by this link, so its keys go.
-    const previous = this.#credentials.get(connectionId)?.storeId;
-    if (previous && previous !== link.storeId) this.#runtime.delete(previous);
-    this.#runtime.promote(link.storeId);
-    yield* this.#hooks.finish(connectionId, {
-      whatsappStoreKey: Buffer.from(key).toString("base64"),
-      storeId: link.storeId,
-      ownNumber: ownNumber ? "1" : "0",
-    });
+    yield* Effect.gen({ self: this }, function* () {
+      const connectionId = yield* this.#hooks.prepare(identity.number, workspaceName);
+      // The number's earlier device was replaced by this link, so its keys go.
+      const previous = this.#credentials.get(connectionId)?.storeId;
+      if (previous && previous !== link.storeId) this.#runtime.delete(previous);
+      this.#runtime.promote(link.storeId);
+      yield* this.#hooks.finish(connectionId, {
+        whatsappStoreKey: Buffer.from(key).toString("base64"),
+        storeId: link.storeId,
+        ownNumber: ownNumber ? "1" : "0",
+      });
+    }).pipe(
+      // A link that cannot become a connection leaves no socket and no store.
+      Effect.onError(() =>
+        Effect.gen({ self: this }, function* () {
+          yield* link.handle.session.stop();
+          this.#runtime.delete(link.storeId);
+          this.#state = { ...IDLE, status: "failed", error: "unavailable" };
+        }),
+      ),
+    );
     this.#state = { ...IDLE, status: "linked", workspaceId: identity.number };
+    // A first message in the owner's own chat, so the chat shows at the top of WhatsApp. It is an own
+    // post, so the transport does not read it as a request.
+    this.#hooks.dispatch(
+      link.handle.session
+        .send(userJid(identity.number), {
+          text: sourceText(
+            ownNumber ? "status.messaging.whatsappWelcomeOwn" : "status.messaging.whatsappWelcomeDedicated",
+          ),
+        })
+        .pipe(
+          Effect.asVoid,
+          Effect.catch(() => Effect.void),
+        ),
+    );
   });
 
   #fail(error: NonNullable<WhatsAppLinkState["error"]>): Effect.Effect<void> {
@@ -282,14 +307,18 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     });
   }
 
-  /** Stops the link's socket; a failed link also deletes its store. A finished one keeps it open. */
+  /**
+   * Ends the link. A failed link stops its socket and deletes its store; a finished one keeps both, and
+   * the connection goes on with the same socket.
+   */
   #end(link: RunningLink, discard: boolean): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
       if (this.#link === link) this.#link = null;
       clearTimeout(link.timer);
       for (const unsubscribe of link.unsubscribe.splice(0)) unsubscribe();
+      if (!discard) return;
       yield* link.handle.session.stop();
-      if (discard) this.#runtime.delete(link.storeId);
+      this.#runtime.delete(link.storeId);
     });
   }
 

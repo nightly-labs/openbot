@@ -94,7 +94,8 @@ export class WhatsAppTransport implements MessagingTransport {
     store.prune();
     this.#prune = setInterval(() => this.#handle.store.prune(), PRUNE_INTERVAL_MS);
     this.#prune.unref?.();
-    sink.state("connecting");
+    // A connection that starts right after its link finds the socket open already.
+    sink.state(session.state === "open" ? "connected" : "connecting");
     for (const entry of store.unhandled()) {
       const message = decodeJournal(entry.payload);
       if (message) this.#enqueue(message, false);

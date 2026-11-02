@@ -53,6 +53,11 @@ export const messages = defineMessages("status.messaging", {
     "This number answers only people that its owner allowed. Give the owner this code: {code}",
   "status.messaging.whatsappPairingApproved": "You can now send requests to this number.",
   "status.messaging.whatsappOwnChat": "Message yourself",
+  // The first message after a link, in the linked number's own "Message yourself" chat.
+  "status.messaging.whatsappWelcomeOwn":
+    "👋 OpenBot is connected to this number. Write here to ask your agents. Reply 1 or 2 to approve or deny a request, and stop to stop one.",
+  "status.messaging.whatsappWelcomeDedicated":
+    "👋 OpenBot is connected to this number. The people you allow in OpenBot can now write to it, and a new person gets a code to give you.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Answers in WhatsApp and asks the team",
 });

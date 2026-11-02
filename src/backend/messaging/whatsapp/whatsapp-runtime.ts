@@ -17,7 +17,6 @@ export interface WhatsAppPolicy {
 export interface WhatsAppConnectionHandle {
   storeId: string;
   store: WhatsAppAuthStore;
-  /** Replaced once, when a link finishes (`promote`). */
   session: WhatsAppSession;
   chats: WhatsAppChatState;
 }
@@ -80,10 +79,9 @@ export class WhatsAppRuntime {
     return handle;
   }
 
-  /** A finished link: the store stays open, and a session for messages replaces the pairing one. */
+  /** A finished link: the store and its open socket go on as the connection's. */
   promote(storeId: string): void {
-    const handle = this.#open.get(storeId);
-    if (handle) handle.session = this.#session(handle.store, false);
+    this.#open.get(storeId)?.session.finishPairing();
   }
 
   /** Closes every store, when the messaging service stops. Their sessions are already stopped. */

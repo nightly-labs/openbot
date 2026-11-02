@@ -48,6 +48,10 @@ export const messages = {
     "Questo numero risponde solo alle persone autorizzate dal proprietario. Dai questo codice al proprietario: {code}",
   "status.messaging.whatsappPairingApproved": "Ora puoi inviare richieste a questo numero.",
   "status.messaging.whatsappOwnChat": "Messaggio a te stesso",
+  "status.messaging.whatsappWelcomeOwn":
+    "👋 OpenBot è collegato a questo numero. Scrivi qui per chiedere ai tuoi agenti. Rispondi 1 o 2 per approvare o rifiutare una richiesta, e stop per fermarla.",
+  "status.messaging.whatsappWelcomeDedicated":
+    "👋 OpenBot è collegato a questo numero. Le persone che autorizzi in OpenBot ora possono scrivergli, e una persona nuova riceve un codice da darti.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Risponde su WhatsApp e consulta il team",
 } as const satisfies PartialTranslation<typeof source>;

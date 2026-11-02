@@ -79,6 +79,8 @@ const ECHO_TTL_MS = 20 * 60_000;
 const ECHO_LIMIT = 5_000;
 const GROUP_CACHE_MS = 5 * 60_000;
 const VERSION_META = "wa-version";
+/** Message batches kept while nothing listens. */
+const UNREAD_LIMIT = 200;
 const HISTORY_KEPT: ReadonlySet<proto.Message.HistorySyncType> = new Set([
   proto.Message.HistorySyncType.INITIAL_BOOTSTRAP,
   proto.Message.HistorySyncType.PUSH_NAME,
@@ -141,11 +143,16 @@ export class WhatsAppSession {
   readonly #store: WhatsAppAuthStore;
   readonly #createSocket: WhatsAppSocketFactory;
   readonly #makeSignalRepository: SocketConfig["makeSignalRepository"];
-  readonly #pairing: boolean;
+  #pairing: boolean;
   readonly #fetchVersion: () => Promise<WAVersion | null>;
   readonly #now: () => number;
   readonly #stateListeners = new Set<(state: WhatsAppSessionState) => void>();
   readonly #upsertListeners = new Set<UpsertListener>();
+  /**
+   * Messages that arrived while nothing listened, such as between the end of a link and the start of
+   * the connection's transport. Baileys acknowledges a message when it emits it, so it would be lost.
+   */
+  readonly #unread: Array<{ messages: WAMessage[]; type: string }> = [];
   readonly #qrListeners = new Set<(qr: string) => void>();
   readonly #openWaiters = new Set<() => void>();
   readonly #echoes = new Map<string, number>();
@@ -199,7 +206,16 @@ export class WhatsAppSession {
 
   onUpsert(listener: UpsertListener): () => void {
     this.#upsertListeners.add(listener);
+    for (const event of this.#unread.splice(0)) listener(event);
     return () => this.#upsertListeners.delete(listener);
+  }
+
+  /**
+   * The link finished: the same socket goes on as the connection's. Closing it and opening a new one
+   * would lose the first messages of the phone, which the old socket decrypted but could not confirm.
+   */
+  finishPairing(): void {
+    this.#pairing = false;
   }
 
   onQr(listener: (qr: string) => void): () => void {
@@ -345,7 +361,11 @@ export class WhatsAppSession {
     });
     socket.ev.on("connection.update", (update) => this.#update(socket, update));
     socket.ev.on("messages.upsert", (event) => {
-      if (this.#socket !== socket || this.#pairing) return;
+      if (this.#socket !== socket || (this.#pairing && !this.#store.linked)) return;
+      if (this.#upsertListeners.size === 0) {
+        if (this.#unread.length < UNREAD_LIMIT) this.#unread.push(event);
+        return;
+      }
       for (const listener of this.#upsertListeners) listener(event);
     });
     socket.ws.on("frame", () => {
@@ -540,16 +560,40 @@ function parseVersion(text: string | undefined): WAVersion | null {
 /**
  * Baileys logs through this. It keeps only warnings and errors, and only their message text without
  * long numbers: the objects that Baileys passes can hold message content, phone numbers and keys.
+ *
+ * `OPENBOT_WHATSAPP_DEBUG=1` is for development only: it forwards every level with the error details
+ * and the stanzas that Baileys logs, which can hold phone numbers and message text. Never set it for
+ * a user.
  */
-const baileysLogger: SocketConfig["logger"] = {
-  level: "warn",
-  child: () => baileysLogger,
-  trace: () => undefined,
-  debug: () => undefined,
-  info: () => undefined,
-  warn: (object, message) => logger.warn(`WhatsApp: ${fixedText(object, message)}`),
-  error: (object, message) => logger.error(`WhatsApp: ${fixedText(object, message)}`),
-};
+const DEBUG = process.env.OPENBOT_WHATSAPP_DEBUG === "1";
+
+const baileysLogger: SocketConfig["logger"] = DEBUG
+  ? {
+      level: "trace",
+      child: () => baileysLogger,
+      trace: (object, message) => logger.info(`WhatsApp trace: ${debugText(object, message)}`),
+      debug: (object, message) => logger.info(`WhatsApp debug: ${debugText(object, message)}`),
+      info: (object, message) => logger.info(`WhatsApp info: ${debugText(object, message)}`),
+      warn: (object, message) => logger.warn(`WhatsApp warn: ${debugText(object, message)}`),
+      error: (object, message) => logger.error(`WhatsApp error: ${debugText(object, message)}`),
+    }
+  : {
+      level: "warn",
+      child: () => baileysLogger,
+      trace: () => undefined,
+      debug: () => undefined,
+      info: () => undefined,
+      warn: (object, message) => logger.warn(`WhatsApp: ${fixedText(object, message)}`),
+      error: (object, message) => logger.error(`WhatsApp: ${fixedText(object, message)}`),
+    };
+
+/** The message and the object, with each error as its name, message and stack. Development only. */
+function debugText(object: unknown, message?: string): string {
+  const details = JSON.stringify(object, (_key, value) =>
+    value instanceof Error ? { name: value.name, message: value.message, stack: value.stack } : value,
+  );
+  return `${message ?? ""} ${details ?? ""}`.slice(0, 4_000);
+}
 
 function fixedText(object: unknown, message?: string): string {
   const text = typeof message === "string" ? message : typeof object === "string" ? object : "event";

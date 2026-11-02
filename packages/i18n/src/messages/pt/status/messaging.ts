@@ -50,6 +50,10 @@ export const messages = {
     "Este número só responde a pessoas que o dono permitiu. Passe este código ao dono: {code}",
   "status.messaging.whatsappPairingApproved": "Agora você pode enviar solicitações para este número.",
   "status.messaging.whatsappOwnChat": "Mensagem para você mesmo",
+  "status.messaging.whatsappWelcomeOwn":
+    "👋 O OpenBot está conectado a este número. Escreva aqui para pedir aos seus agentes. Responda 1 ou 2 para aprovar ou recusar um pedido, e stop para pará-lo.",
+  "status.messaging.whatsappWelcomeDedicated":
+    "👋 O OpenBot está conectado a este número. As pessoas que você permitir no OpenBot já podem escrever para ele, e uma pessoa nova recebe um código para passar a você.",
   "status.messaging.whatsappOrchestratorName": "Orquestrador do WhatsApp",
   "status.messaging.whatsappOrchestratorTitle": "Responde no WhatsApp e consulta a equipe",
 } as const satisfies PartialTranslation<typeof source>;
