@@ -46,6 +46,8 @@ export const messages = {
   "status.agent.memoryChanges": "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate.",
   "status.agent.memoryChangesWithConflicts":
     "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate, {notChanged} non modificate perché un altro thread le ha modificate prima.",
+  "status.agent.nextStepContinues":
+    "L'agente si è fermato prima del passaggio successivo. Continua ({current} di {limit}).",
   "status.agent.planContinues": "Il piano ha passaggi aperti. L'agente continua ({current} di {limit}).",
   "status.agent.branchTitle": "Chat ramificata",
 } as const satisfies PartialTranslation<typeof source>;

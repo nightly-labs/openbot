@@ -2729,7 +2729,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
                   id: `${turnId}:plan-continuation`,
                   author: "system",
                   source: "system",
-                  text: sourceText("status.agent.planContinues", { current: 1, limit: 3 }),
+                  text: sourceText("status.agent.planContinues", { current: 1, limit: 8 }),
                   createdAt: new Date().toISOString(),
                   status: "completed",
                   itemType: PLAN_CONTINUATION_ITEM_TYPE,
