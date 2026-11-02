@@ -395,6 +395,15 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.trello.prompt.myCards": "Which Trello cards are assigned to me?",
   "marketplace.plugin.trello.prompt.board": "Summarize what is in progress on my Trello board.",
   "marketplace.plugin.trello.prompt.newCards": "Add these action items as cards to my Trello board.",
+  "marketplace.plugin.clickup.tagline": "Tasks, docs and team updates",
+  "marketplace.plugin.clickup.description":
+    "ClickUp lets agents search tasks, docs, comments and chat, create and update tasks, lists and docs, post comments, send chat messages and track time. Each user signs in to their own ClickUp account through the browser. Agents get the same permissions as the user. They can move tasks to the trash and delete comments.",
+  "marketplace.plugin.clickup.app":
+    "Tasks, docs, comments, chat and time tracking, over ClickUp's MCP server with browser sign-in.",
+  "marketplace.plugin.clickup.prompt.findTasks": "Find my open ClickUp tasks due this week.",
+  "marketplace.plugin.clickup.prompt.createTask": "Create a ClickUp task for these action items and assign it to me.",
+  "marketplace.plugin.clickup.prompt.summarizeDoc":
+    "Find the latest project update in ClickUp and summarize the open questions.",
   "marketplace.plugin.huggingface.tagline": "Models, datasets and papers on the Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face lets agents search models, datasets, Spaces, collections and papers on the Hugging Face Hub, read model cards and repository files, preview datasets, and search the Hugging Face documentation. It uses public Hub data and needs no account and no key. The tools only read: agents cannot create repositories or run jobs.",

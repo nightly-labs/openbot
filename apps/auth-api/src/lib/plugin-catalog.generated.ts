@@ -202,7 +202,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "clickup",
       version: "1.0.0",
       featured: false,
-      detailSha256: "b2aeef38331559856b56996d4c523d2ddca3517c3faf549eccd91ce61d589744",
+      detailSha256: "57940ce2f105ae6430a6b12fd398b0acaca589a44ae86ffae34a65704dccff3d",
     },
   ],
 };
@@ -1415,7 +1415,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "ClickUp",
     tagline: "Tasks, docs and team updates",
     description:
-      "ClickUp lets agents search tasks, docs and comments, and manage tasks and team updates in the signed-in workspace. Sign in to a ClickUp account through the browser. The connection can read and write within that account's workspace permissions.",
+      "ClickUp lets agents search tasks, docs, comments and chat, create and update tasks, lists and docs, post comments, send chat messages and track time. Each user signs in to their own ClickUp account through the browser. Agents get the same permissions as the user. They can move tasks to the trash and delete comments.",
     category: "productivity",
     creatorName: "ClickUp",
     iconUrl: "https://clickup.com/favicon.ico",
@@ -1432,8 +1432,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
       {
         id: "app-clickup-mcp",
         name: "ClickUp",
-        description:
-          "Task and document search, task updates, and team comments, over ClickUp's MCP server with browser sign-in.",
+        description: "Tasks, docs, comments, chat and time tracking, over ClickUp's MCP server with browser sign-in.",
         iconUrl: "https://clickup.com/favicon.ico",
         server: {
           name: "clickup",
