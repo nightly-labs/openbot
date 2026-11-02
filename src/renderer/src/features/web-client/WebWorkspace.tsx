@@ -124,6 +124,8 @@ import {
 } from "solid-js";
 // Copying a selection with a formula in it gives its LaTeX source, as on desktop.
 import "katex/contrib/copy-tex";
+// Copying a selection gives clean HTML, as on desktop.
+import "../../selection-copy";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { toAgentMessage } from "../../app-message-projection";
