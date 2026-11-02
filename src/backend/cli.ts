@@ -19,8 +19,7 @@ const MINIMUM_GROK_VERSION = [1, 0, 5] as const;
 // The first Cline CLI that OpenBot was checked with: its sessions run in-process and it answers a lost
 // session with the ACP resource-not-found error.
 const MINIMUM_CLINE_VERSION = [3, 0, 68] as const;
-// The first Kimi Code CLI that OpenBot was checked with: `kimi acp`, `kimi login --json` and
-// `kimi logout`.
+// The first checked Python Kimi CLI. Login capabilities are probed before code sign-in.
 const MINIMUM_KIMI_VERSION = [1, 52, 0] as const;
 
 /** What every resolved provider CLI carries. */
@@ -605,10 +604,10 @@ export const resolveKimiCli: (input?: {
 );
 
 /** The Python CLI supports JSON; Kimi Code 2.x prints a device code as text. */
-export const kimiCodeLoginArgs = Effect.fn("Cli.kimiCodeLoginArgs")(function* (cli: {
-  executable: string;
-  launchPath?: string;
-}): Effect.fn.Return<readonly string[], ProviderClientOperationError> {
+export const kimiCodeLoginArgs = Effect.fn("Cli.kimiCodeLoginArgs")(function* (
+  cli: { executable: string; launchPath?: string },
+  env: Readonly<Record<string, string>>,
+): Effect.fn.Return<readonly string[], ProviderClientOperationError> {
   const target = cliSpawnTarget(cli.executable, ["login", "--help"]);
   const output = yield* Effect.tryPromise({
     try: (signal) =>
@@ -618,7 +617,7 @@ export const kimiCodeLoginArgs = Effect.fn("Cli.kimiCodeLoginArgs")(function* (c
         maxBuffer: 64 * 1024,
         windowsHide: process.platform === "win32",
         windowsVerbatimArguments: target.windowsVerbatimArguments,
-        env: { ...process.env, ...cliPathEnvironment(cli) },
+        env: { ...process.env, ...cliPathEnvironment(cli), ...env },
       }),
     catch: (cause) => {
       const timedOut = isDynamicRecord(cause) && cause.killed === true;

@@ -39,6 +39,7 @@ import {
   antigravityAnswersUsageCommand,
   antigravityReadsGeminiHome,
   cliPathEnvironment,
+  kimiCodeLoginArgs,
   resolveAntigravityCli,
   resolveClaudeCli,
   resolveClineCli,
@@ -189,7 +190,15 @@ interface AcpAuthenticateSignIn {
 type ProviderCodeSignIn =
   | { kind: "codex-device" }
   | { kind: "muse-device"; timeoutMs: number }
-  | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderCliCommand };
+  | {
+      kind: "cli";
+      flow: "device" | "paste" | "link";
+      command: Omit<ProviderCliCommand, "argv"> & {
+        readonly argv:
+          | readonly string[]
+          | ((cli: AgentCliInfo) => Effect.Effect<readonly string[], ProviderClientOperationError>);
+      };
+    };
 
 /**
  * The Gemini API key sign-in, the other way in when Google's browser sign-in cannot reach this
@@ -1077,11 +1086,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       kind: "cli-command",
       command: { argv: ["login"], env: () => ({ ...KIMI_ENV }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
     },
-    // `login --json` prints the same device code as one JSON line.
+    // Probe the chosen CLI: Python emits JSON; Kimi Code 2.x emits text.
     codeSignIn: {
       kind: "cli",
       flow: "device",
-      command: { argv: ["login", "--json"], env: () => ({ ...KIMI_CODE_LOGIN_ENV }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+      command: {
+        argv: (cli) => kimiCodeLoginArgs(cli, KIMI_CODE_LOGIN_ENV),
+        env: () => ({ ...KIMI_CODE_LOGIN_ENV }),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+      },
     },
     signOut: { argv: ["logout"], env: () => ({ ...KIMI_ENV }), timeoutMs: 30_000 },
     resolveCli: resolveKimiCli,
