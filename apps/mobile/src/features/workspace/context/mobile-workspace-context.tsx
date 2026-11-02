@@ -6,6 +6,7 @@ import {
   MCP_SERVERS_CAPABILITY,
   type RespondToApprovalInput,
   type SidebarLayoutSnapshot,
+  type SidebarPin,
   type TeamRealtimeEvent,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -46,6 +47,7 @@ import { PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
+import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -73,7 +75,13 @@ import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import { rotateHostKey, updateHostIdentity } from "@openbot/team-client/team-admin-requests";
+import {
+  readSidebarPins,
+  rotateHostKey,
+  seedSidebarPins,
+  setSidebarPins,
+  updateHostIdentity,
+} from "@openbot/team-client/team-admin-requests";
 import {
   deleteAgent,
   discardAttachmentDraft,
@@ -134,9 +142,12 @@ import {
 } from "@/features/workspace/model/agent-avatar-cache";
 import {
   canToggleAgentPin,
+  phoneSidebarPins,
   reconcileAgentPins,
   reconcileChannelPins,
   setChannelHidden,
+  sidebarPinsChanged,
+  withHostSidebarPins,
 } from "@/features/workspace/model/agent-pins";
 import { ConnectionWaits } from "@/features/workspace/model/connection-waits";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
@@ -672,6 +683,72 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [preferenceStore],
   );
 
+  /** The count of pin changes of this phone for each server, so a slow host answer cannot undo a newer one. */
+  const pinChanges = useRef(new Map<string, number>());
+  /**
+   * Shows the pins that the host keeps for all devices of the user (`sidebar-pins-v1`). `change` is the
+   * pin change of this phone that the list answers; a newer change keeps its own list.
+   */
+  const applyHostSidebarPins = useCallback(
+    (serverId: string, items: readonly SidebarPin[], change = pinChanges.current.get(serverId) ?? 0) => {
+      if ((pinChanges.current.get(serverId) ?? 0) !== change) return;
+      try {
+        const next = withHostSidebarPins(preferenceStore.read(serverId), items);
+        preferenceStore.write(serverId, next);
+        setPreferences((current) => ({ ...current, [serverId]: next }));
+      } catch {
+        // The pins of this phone stay until the next list from the host.
+      }
+    },
+    [preferenceStore],
+  );
+  /**
+   * Sends the pins of this phone to a host that keeps them. The change stays pending until the host
+   * takes it, also after a restart of the app. Before the first read from the host, the pins stay on
+   * this phone; that read saves them on the host when the user has no list there.
+   */
+  const pushSidebarPins = useCallback(
+    (serverId: string) => {
+      if (!hasCapability(serverCapabilities.current, serverId, SIDEBAR_PINS_CAPABILITY)) return;
+      const current = preferenceStore.read(serverId);
+      if (!current.pinOrder) return;
+      const change = (pinChanges.current.get(serverId) ?? 0) + 1;
+      pinChanges.current.set(serverId, change);
+      if (!current.pinsPending) {
+        // In the state too: an event of another device does not replace the change while it is sent.
+        const pending = { ...current, pinsPending: true };
+        preferenceStore.write(serverId, pending);
+        setPreferences((saved) => ({ ...saved, [serverId]: pending }));
+      }
+      void runTeamEffect(setSidebarPins(teamApi(serverId), phoneSidebarPins(current)))
+        .then((snapshot) => applyHostSidebarPins(serverId, snapshot.items, change))
+        .catch(() => undefined);
+    },
+    [preferenceStore, teamApi, applyHostSidebarPins],
+  );
+  /**
+   * Brings the pins of a server in line with its host after each connect. A pending change of this
+   * phone goes first. With no list on the host, the pins of this phone become the list.
+   */
+  const syncSidebarPins = useCallback(
+    async (serverId: string, request: TeamApiRequest) => {
+      const current = preferenceStore.read(serverId);
+      if (current.pinsPending && current.pinOrder) {
+        pushSidebarPins(serverId);
+        return;
+      }
+      const change = pinChanges.current.get(serverId) ?? 0;
+      const snapshot = await runTeamEffect(readSidebarPins(request));
+      const local = phoneSidebarPins(current);
+      const kept =
+        snapshot.updatedAt === null && local.length > 0
+          ? await runTeamEffect(seedSidebarPins(request, local))
+          : snapshot;
+      applyHostSidebarPins(serverId, kept.items, change);
+    },
+    [preferenceStore, pushSidebarPins, applyHostSidebarPins],
+  );
+
   /** Saves what the phone shows for a server, so the next start shows it before the connection. */
   const persistServer = useCallback(
     (serverId: string) => {
@@ -841,6 +918,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);
+      // The pins do not hold the connection. Until the host answers, and when it cannot, the pins of
+      // this phone stay.
+      if (compatibility.capabilities.includes(SIDEBAR_PINS_CAPABILITY))
+        void syncSidebarPins(serverId, (method, path, decode, body) =>
+          client.request(method, path, decode, body),
+        ).catch(() => undefined);
       void channelStore.refresh(serverId);
       if (supportsBrowserView(compatibility.capabilities)) {
         // The tabs only add the browser button. A host that cannot list them still loads.
@@ -943,6 +1026,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       applySidebarLayout,
       applyConversationReads,
       liveState,
+      syncSidebarPins,
     ],
   );
 
@@ -1140,6 +1224,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         applyHostHidden(serverId, event.agents);
         return;
       }
+      // The user changed their pins on another device. A pending change of this phone goes first.
+      if (event.type === "sidebar-pins-changed") {
+        if (!preferencesRef.current[serverId]?.pinsPending) applyHostSidebarPins(serverId, event.items);
+        return;
+      }
       // The user changed their levels on another device. A read that started before it is older.
       if (event.type === "agent-notification-levels-changed") {
         setSyncedNotificationLevels(serverId, { server: event.server, agents: event.agents });
@@ -1261,6 +1350,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       queryClient,
       queryScope,
       applyConversationReads,
+      applyHostSidebarPins,
     ],
   );
 
@@ -1270,6 +1360,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const next = change(preferenceStore.read(serverId));
         preferenceStore.write(serverId, next);
         setPreferences((current) => ({ ...current, [serverId]: next }));
+        if (sidebarPinsChanged(next)) pushSidebarPins(serverId);
         return next;
       } catch (error) {
         showFailureAlert(
@@ -1281,7 +1372,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return null;
       }
     },
-    [preferenceStore],
+    [preferenceStore, pushSidebarPins],
   );
   /**
    * Hides or restores an agent on a host that serves `agent-hidden-v1`. The list changes at once; the
@@ -1646,7 +1737,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const server = currentActiveServer();
         const serverId = server.id;
         if (hostOwnsHide(serverCapabilities.current.get(serverId), server.role)) {
-          // The host owns the hide. The pin stays a preference of this phone.
+          // The host owns the hide. The phone removes the pin, as for a local hide.
           if (preferencesRef.current[serverId]?.pinned.includes(agentId))
             updatePreferences(serverId, (current) => ({
               ...current,

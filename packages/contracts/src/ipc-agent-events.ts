@@ -28,6 +28,7 @@ import {
 import { type HiddenAgent, isHiddenAgentsSnapshot } from "./ipc-hidden-agents";
 import { isQueueSnapshot, type QueueSnapshot } from "./ipc-queue";
 import { isSidebarLayoutSnapshot, type SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
+import { isSidebarPinsSnapshot, type SidebarPin } from "./ipc-sidebar-pins";
 import type { ServerNotificationLevel } from "./ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
@@ -68,6 +69,11 @@ export type AgentEvent =
       server: ServerNotificationLevel | null;
       agents: AgentNotificationLevelEntry[];
     }
+  /**
+   * The user's own pinned chats on this server changed on one of their devices. Only the connections
+   * of that member get it (`sidebar-pins-v1`), with the whole list.
+   */
+  | { type: "sidebar-pins-changed"; items: SidebarPin[]; updatedAt: string | null }
   /** The roles changed. A client reads `/v1/agent-access` again for its own levels. */
   | { type: "agent-access-changed"; revision: number }
   | { type: "conversation"; snapshot: ConversationSnapshot }
@@ -210,6 +216,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isHiddenAgentsSnapshot({ agents: value.agents });
     case "agent-notification-levels-changed":
       return isAgentNotificationLevelsSnapshot({ server: value.server, agents: value.agents });
+    case "sidebar-pins-changed":
+      return isSidebarPinsSnapshot({ items: value.items, updatedAt: value.updatedAt });
     case "agent-access-changed":
       return isNumber(value.revision) && Number.isSafeInteger(value.revision) && value.revision >= 0;
     case "conversation":

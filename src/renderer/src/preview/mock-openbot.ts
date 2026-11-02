@@ -141,6 +141,7 @@ import {
   SIDEBAR_PEOPLE_SECTION_ID,
   SIDEBAR_UNASSIGNED_SECTION_ID,
   type SidebarLayoutSnapshot,
+  type SidebarPinsSnapshot,
   type SteerQueuedMessageInput,
   sameCustomProviderOrigin,
   type TeamPresenceSnapshot,
@@ -592,6 +593,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     redirectUrl: "http://127.0.0.1:28417/mcp-auth",
     app: mcpSignInApps[mcpServerId] ?? null,
   });
+  let sidebarPins: SidebarPinsSnapshot = { items: [], updatedAt: null };
   let sidebarLayout: SidebarLayoutSnapshot = clone(
     options.sidebarLayout ?? {
       revision: 0,
@@ -2174,6 +2176,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         mcpSignInApps = rest;
         forgetMcpSignIn(mcpServerId);
         return mcpSignInAppState(mcpServerId);
+      },
+      getSidebarPins: async () => clone(sidebarPins),
+      setSidebarPins: async ({ items }) => {
+        sidebarPins = { items: clone(items), updatedAt: new Date().toISOString() };
+        emitAgentEvent({ type: "sidebar-pins-changed", ...clone(sidebarPins) });
+        return clone(sidebarPins);
+      },
+      seedSidebarPins: async ({ items }) => {
+        if (sidebarPins.updatedAt === null) sidebarPins = { items: clone(items), updatedAt: new Date().toISOString() };
+        return clone(sidebarPins);
       },
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {

@@ -67,8 +67,9 @@ commands, and release checks.
 
 Browser chat pages, drafts, file bytes, and chat visibility preferences stay in memory. A protected
 cookie holds the account credential. Local storage holds account-scoped trusted host public keys,
-the shared file panel's width, and for each account and host the pinned item ids, collapsed section
-ids and selected channel id, not chat content. The channel UI takes a `ChannelsPort` runtime; its
+the shared file panel's width, and for each account and host the pinned item ids (a copy of the list
+that a host with `sidebar-pins-v1` keeps), collapsed section ids and selected channel id, not chat
+content. The channel UI takes a `ChannelsPort` runtime; its
 desktop default is the preload API. A Web Lock permits one live tab per account
 and host because the existing control plane reuses that credential's logical host session.
 Host switches discard the prior host's chat state. Temporary connection loss keeps drafts; a
