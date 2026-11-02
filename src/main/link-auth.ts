@@ -11,7 +11,7 @@ import { Effect, Result, Schema } from "effect";
 import { z } from "zod";
 import { LinkOperationError, linkCall, linkDecode } from "./link-effects";
 
-export const LINK_AUTH_URL = "https://login.link.com";
+const LINK_AUTH_URL = "https://login.link.com";
 export const LINK_API_URL = "https://api.link.com";
 /** Link's public client. It needs no secret. */
 const LINK_CLIENT_ID = "lwlpk_U7Qy7ThG69STZk";
@@ -248,7 +248,7 @@ export function unexpected(detail: string): LinkAuthError {
   return new LinkAuthError("unexpected", sourceText("error.connector.linkUnexpected", { detail }));
 }
 
-export const waitForEffect = (ms: number, signal?: AbortSignal): Effect.Effect<void, LinkOperationError> =>
+const waitForEffect = (ms: number, signal?: AbortSignal): Effect.Effect<void, LinkOperationError> =>
   Effect.callback<void, LinkOperationError>((resume) => {
     if (signal?.aborted) {
       resume(Effect.fail(new LinkOperationError({ cause: signal.reason })));
