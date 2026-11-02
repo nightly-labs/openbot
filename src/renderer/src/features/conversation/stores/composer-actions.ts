@@ -509,7 +509,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const serverId = target?.serverId ?? deps.editingServerId() ?? deps.props.server?.id ?? "local";
     const deliveryId = target?.deliveryId ?? deps.editingDeliveryId();
     const draft = draftOverride ?? deps.currentDraft();
-    if (!agentId || !deliveryId || deps.submitting() || deps.attachmentBusy()) return false;
+    if (!agentId || !deliveryId || deps.submitting() || deps.attachmentBusy({ agentId, serverId })) return false;
     const editId = deps.editingEditId();
     if (
       !editId &&
