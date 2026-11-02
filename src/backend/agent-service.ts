@@ -1286,6 +1286,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
         isStopping: () => this.#stopping,
+        isDeleting: (agentId) => this.#removal.deleting().has(agentId),
         servesModel: (model, provider) => this.#endpoints.serves(model, provider),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         mayFailOver: (agentId) => this.#usageLimitBackup(agentId) !== undefined,
@@ -1467,6 +1468,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#providers
             .stopAgentProcess(agentId)
             .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause }))),
+        usageLimitHolds: (agentId) => !this.#usageLimits.mayDrain(agentId),
+        // Both moves run under this lock and check the deletion there.
+        settleModelMoves: () => this.#endpoints.runExclusive(() => Effect.void),
       },
     });
     this.#tools = new OpenBotToolRouter({
@@ -3099,7 +3103,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         Effect.gen({ self: this }, function* () {
           const agent = this.#store.list().find((candidate) => candidate.id === agentId);
           const pending = agent?.pendingRuntime;
-          if (!pending || this.#runtimeHandoverBusy(agentId)) return false;
+          if (!pending || this.#runtimeHandoverBusy(agentId) || this.#removal.deleting().has(agentId)) return false;
           yield* this.#applyAgentUpdate(
             {
               agentId,
@@ -3137,7 +3141,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return yield* this.#endpoints
       .runExclusive(() =>
         Effect.gen({ self: this }, function* () {
-          const move = this.#usageLimitMove(agentId);
+          const move = this.#removal.deleting().has(agentId) ? null : this.#usageLimitMove(agentId);
           if (!move) return false;
           yield* this.#applyAgentUpdate(move.input, undefined, move.move);
           return true;
