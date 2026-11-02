@@ -269,6 +269,8 @@ export const messages = defineMessages("provider", {
   "provider.settings.runtime": "Runtime",
   "provider.settings.version": "Version",
   "provider.settings.versionAvailable": "{installed} · {available} is available",
+  "provider.settings.versionInstalledByUser": "{version} · installed by you",
+  "provider.settings.versionDownloaded": "{version} · downloaded by OpenBot",
   "provider.settings.update": "Update",
   "provider.settings.downloadLabel": "Download of {name}",
   "provider.settings.diagnostics": "Diagnostics",

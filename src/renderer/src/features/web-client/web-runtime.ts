@@ -1,6 +1,7 @@
 import {
   assertSupportedAttachmentName,
   attachmentFileExtension,
+  rasterImageMimeType,
   supportedAttachmentExtensions,
 } from "@openbot/contracts/attachment-files";
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
@@ -114,6 +115,7 @@ import {
   createRemoteTeamPeer,
   MOBILE_ATTACHMENT_BYTES,
   type RemoteFileUpload,
+  type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
   type RemoteTeamPeerActions,
 } from "@openbot/team-client/remote-peer";
@@ -543,6 +545,25 @@ export function createWebWorkspaceRuntime(
   const duplicateOperationIds = new Map<string, string>();
   const completedDraftIdsByHost = new Map<string, Set<string>>();
   const draftCleanupRetryHosts = new Set<string>();
+  // The host names a draft's preview with the desktop `openbot-attachment:` scheme, so a draft image
+  // shows from its local bytes. A discard revokes the URL. A sent draft keeps it until the runtime ends:
+  // the pending row of the message shows it until the host's row comes.
+  const localDraftPreviews = new Map<string, string>();
+  function localDraftPreview(id: string, file: File): string | null {
+    const type = rasterImageMimeType(file.name);
+    if (!type) return null;
+    const url = URL.createObjectURL(new Blob([file], { type }));
+    localDraftPreviews.set(id, url);
+    return url;
+  }
+  function revokeLocalDraftPreviews(ids: Iterable<string>): void {
+    for (const id of ids) {
+      const url = localDraftPreviews.get(id);
+      if (!url) continue;
+      URL.revokeObjectURL(url);
+      localDraftPreviews.delete(id);
+    }
+  }
   function trackCompletedDraft(id: string, hostId = lockedHostId): void {
     if (!hostId) return;
     // The released API has no draft listing. A request that commits before returning cannot be
@@ -620,7 +641,7 @@ export function createWebWorkspaceRuntime(
     }
     if (!result.ok || (result.status ?? 500) >= 400)
       throw new WebHostRequestError(
-        hostRefusal(result.status, result.body) ?? currentText().t("webClient.error.requestIncomplete"),
+        hostRefusal(result) ?? currentText().t("webClient.error.requestIncomplete"),
         result.status === undefined ? (result.reference ?? null) : referenceFrom("http", result.status),
       );
     return result.body;
@@ -1160,8 +1181,7 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("webClient.error.uploadCancelled"));
       }
       trackCompletedDraft(value.id, uploadHostGeneration === generation ? lockedHostId : null);
-      // The host names the draft's preview with the desktop `openbot-attachment:` scheme.
-      return { ...value, previewUrl: null };
+      return { ...value, previewUrl: value.kind === "image" ? localDraftPreview(value.id, file) : null };
     },
     setTyping(agentId, typing) {
       peer.setTyping(agentId, typing);
@@ -1173,6 +1193,7 @@ export function createWebWorkspaceRuntime(
     async discard(id) {
       await Effect.runPromise(discardAttachmentDraft(teamApi, id).pipe(Effect.mapError((error) => error.cause)));
       removeCompletedDrafts([id]);
+      revokeLocalDraftPreviews([id]);
     },
     async download(id) {
       return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id)));
@@ -1330,6 +1351,7 @@ export function createWebWorkspaceRuntime(
       generation += 1;
       connectedHost = null;
       duplicateOperationIds.clear();
+      revokeLocalDraftPreviews([...localDraftPreviews.keys()]);
       try {
         await Promise.all([peer.dispose(), hosts?.dispose(), ...retiring]);
       } finally {
@@ -1355,11 +1377,17 @@ function decodeWebFile(value: unknown): WebFile {
   };
 }
 
-/** The host's own reason for a refusal. It redacts it; a server failure keeps the generic text. */
-function hostRefusal(status: number | undefined, body: unknown): string | null {
-  if (status === undefined || status < 400 || status >= 500) return null;
-  if (!isDynamicRecord(body) || !isString(body.error) || !body.error.trim()) return null;
-  const text = body.error.trim();
+/**
+ * The host's own reason for a refusal. It redacts it; a server failure keeps the generic text. Over
+ * WebRTC the host sends a refusal as an error frame, so it arrives as a failed command whose
+ * reference is `host/<4xx status>/<code>`.
+ */
+function hostRefusal(result: RemoteTeamCommandResult): string | null {
+  const status = result.ok ? result.status : Number(/^host\/(\d{3})(?:\/|$)/u.exec(result.reference ?? "")?.[1]);
+  if (status === undefined || !(status >= 400 && status < 500)) return null;
+  const reason = result.ok ? (isDynamicRecord(result.body) ? result.body.error : undefined) : result.error;
+  if (!isString(reason) || !reason.trim()) return null;
+  const text = reason.trim();
   return text.length > 300 ? `${text.slice(0, 299)}…` : text;
 }
 

@@ -1,5 +1,5 @@
 import { GlassView } from "expo-glass-effect";
-import { Link, router, Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
@@ -7,7 +7,7 @@ import ChevronDown from "lucide-react-native/icons/chevron-down";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
 import Globe from "lucide-react-native/icons/globe";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUniwind } from "uniwind";
@@ -25,7 +25,8 @@ import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { ToolbarMenuItems } from "@/shared/components/toolbar-menu-items";
 import { haptics } from "@/shared/lib/haptics";
-import { BAR_BUTTON_SIZE, NATIVE_BAR_BUTTON_TOP, useBarTop } from "@/shared/lib/native-bar";
+import { BAR_BUTTON_SIZE, NATIVE_BAR_BUTTON_TOP, NATIVE_BAR_HEIGHT, useBarTop } from "@/shared/lib/native-bar";
+import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 import { useVerticalBarShown } from "@/shared/lib/vertical-bar";
@@ -83,10 +84,6 @@ export function ChatHeader({
   const splitDetailRoot = useSplitDetailRoot();
   const verticalBar = useVerticalBarShown();
   const barTop = useBarTop();
-  // The vertical bar turns the native header on, and an option stays set after its `Stack.Screen`
-  // unmounts. Once the bar has shown in this chat, the drawn header turns the native one off again.
-  const [nativeHeaderUsed, setNativeHeaderUsed] = useState(false);
-  if (verticalBar && !nativeHeaderUsed) setNativeHeaderUsed(true);
   const splitShown = useSplitLayout() !== null;
   const warning = useThemeColor("warning");
   const disconnected = useMobileWorkspaceSelector(
@@ -106,28 +103,24 @@ export function ChatHeader({
   const iconColor = String(foreground);
   const identity = (
     <>
-      <Link.AppleZoomTarget>
-        {target.kind === "channel" ? (
-          <View collapsable={false}>
-            <ChannelAvatar
-              channel={{ members: target.members.map((member) => ({ agentId: member.id })) }}
-              agents={members}
-              size={28}
-              disconnected={disconnected}
-            />
-          </View>
-        ) : (
-          <AgentPinAvatar agentId={target.id} location="chat" size={28}>
-            <BloubAvatar
-              agentId={target.id}
-              serverId={target.serverId}
-              hue={target.avatarHue}
-              seed={target.avatarSeed}
-              size={28}
-            />
-          </AgentPinAvatar>
-        )}
-      </Link.AppleZoomTarget>
+      {target.kind === "channel" ? (
+        <ChannelAvatar
+          channel={{ members: target.members.map((member) => ({ agentId: member.id })) }}
+          agents={members}
+          size={28}
+          disconnected={disconnected}
+        />
+      ) : (
+        <AgentPinAvatar agentId={target.id} location="chat" size={28}>
+          <BloubAvatar
+            agentId={target.id}
+            serverId={target.serverId}
+            hue={target.avatarHue}
+            seed={target.avatarSeed}
+            size={28}
+          />
+        </AgentPinAvatar>
+      )}
       {kicker ? (
         <>
           <Typography.Paragraph className="font-semibold" numberOfLines={1} style={typeScale.rowTitle}>
@@ -170,6 +163,8 @@ export function ChatHeader({
   // The row's side padding, and on the drawn header the gap after the pill and a 48 pt button with its
   // 8 pt gap for Back and for the trailing button. The vertical bar has these buttons in the native bar.
   const titleReserve = verticalBar ? 32 : 40 + (splitDetailRoot ? 0 : 56) + (actionsMenu === null ? 0 : 56);
+  // In the native bar, the pill is as tall as the bar, as the bar buttons beside it are.
+  const pillHeight = isIOS && !verticalBar ? NATIVE_BAR_HEIGHT : BAR_BUTTON_SIZE;
   const titlePill = (
     <GlassView
       glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
@@ -178,7 +173,7 @@ export function ChatHeader({
         alignSelf: "stretch",
         backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
         borderCurve: "continuous",
-        borderRadius: 24,
+        borderRadius: pillHeight / 2,
         flexDirection: "row",
         // A kicker and a title need the width up to the trailing button.
         maxWidth: kicker ? undefined : 220,
@@ -203,8 +198,8 @@ export function ChatHeader({
                 ? t("mobile.chat.threads.menuAttention", { name: target.name, count: threadMenu.attention })
                 : t("mobile.chat.threads.menu", { name: target.name })
             }
-            className="h-12 min-w-0 flex-row items-center gap-2 pr-3 pl-2.5"
-            style={{ maxWidth: kicker ? width - insets.left - insets.right - titleReserve : 220 }}
+            className="min-w-0 flex-row items-center gap-2 pr-3 pl-2.5"
+            style={{ height: pillHeight, maxWidth: kicker ? width - insets.left - insets.right - titleReserve : 220 }}
           >
             {identity}
             <ChevronDown color={iconColor} size={16} strokeWidth={2.5} />
@@ -296,22 +291,13 @@ export function ChatHeader({
       </View>
     );
 
-  if (verticalBar) {
-    // iOS moves native bar buttons into the vertical bar of iPhone Duo, beside the status bar, as on
-    // home. The header becomes the native bar for that: Back and the buttons go to the vertical bar.
-    // iOS hides a custom view of the top bar while the content scrolls, so the title is not one: it
-    // stays drawn at the top, where the empty top bar closed.
+  if (isIOS) {
+    // The chat routes show the native bar on iOS, so its items morph into and out of the bar items of
+    // the screen under the chat, as on the other screens. iOS moves native bar buttons into the
+    // vertical bar of iPhone Duo, beside the status bar. iOS hides a custom view of the top bar there
+    // while the content scrolls, so the title is not one then: it stays drawn at the top.
     return (
       <>
-        <Stack.Screen
-          options={{
-            headerShown: true,
-            headerTransparent: true,
-            headerBackVisible: false,
-            scrollEdgeEffects: { top: "hidden" },
-            title: "",
-          }}
-        />
         <Stack.Toolbar placement="left">
           <Stack.Toolbar.Button
             icon="chevron.left"
@@ -319,6 +305,13 @@ export function ChatHeader({
             hidden={splitDetailRoot || accessibilityHidden}
             onPress={goBack}
           />
+          {verticalBar ? null : (
+            <Stack.Toolbar.View hidesSharedBackground hidden={accessibilityHidden}>
+              <View className="flex-row" style={{ height: NATIVE_BAR_HEIGHT }}>
+                {titlePill}
+              </View>
+            </Stack.Toolbar.View>
+          )}
         </Stack.Toolbar>
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Button
@@ -343,22 +336,23 @@ export function ChatHeader({
         <SheetScrollEdgeEffect
           style={{ height: topInset + 82, left: 0, position: "absolute", right: 0, top: 0, zIndex: 10 }}
         />
-        <View
-          className="absolute z-20 flex-row"
-          pointerEvents="box-none"
-          accessibilityElementsHidden={accessibilityHidden}
-          importantForAccessibility={accessibilityHidden ? "no-hide-descendants" : "auto"}
-          style={{ top: barTop, left: insets.left + 16, right: insets.right + 16, height: BAR_BUTTON_SIZE }}
-        >
-          {titlePill}
-        </View>
+        {verticalBar ? (
+          <View
+            className="absolute z-20 flex-row"
+            pointerEvents="box-none"
+            accessibilityElementsHidden={accessibilityHidden}
+            importantForAccessibility={accessibilityHidden ? "no-hide-descendants" : "auto"}
+            style={{ top: barTop, left: insets.left + 16, right: insets.right + 16, height: BAR_BUTTON_SIZE }}
+          >
+            {titlePill}
+          </View>
+        ) : null}
       </>
     );
   }
 
   return (
     <>
-      {nativeHeaderUsed ? <Stack.Screen options={{ headerShown: false }} /> : null}
       <View
         className="absolute inset-x-0 z-20 flex-row items-center gap-2"
         pointerEvents="box-none"

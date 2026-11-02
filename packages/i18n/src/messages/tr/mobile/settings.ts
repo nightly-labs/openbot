@@ -69,9 +69,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Uygulamanın tamamında hareketi azaltmak için “Animasyonlar” ayarını kapatın. Telefon ayarlarında “Hareketi Azalt” açıkken uygulama da hareketi azaltır. Bu durumda aşağıdaki animasyonlar kapalı kalır.",
   "mobile.settings.animations.all": "Animasyonlar",
-  "mobile.settings.animations.chatZoom": "Sohbetlere yakınlaştır",
-  "mobile.settings.animations.chatZoomFooter":
-    "Sohbet, listedeki avatarından açılır ve kapanınca ona geri döner. Kapalıyken sohbet yandan kayarak açılır.",
   "mobile.settings.animations.agentFaces": "Hareketli ajan yüzleri",
   "mobile.settings.animations.agentFacesFooter":
     "Ajanlar çalışırken ve dinlenirken avatarlarının yüzleri hareket eder. Kapalıyken yüzler sabit kalır.",
@@ -157,8 +154,8 @@ export const messages = {
   "mobile.settings.notifications.channelSilent": "Ajan bildirimleri (sessiz)",
   "mobile.settings.privacy.title": "Gizlilik",
   "mobile.settings.privacy.footer":
-    "Bu telefondan özellik kullanımını ve bağlantı sonuçlarını paylaşın. Mesaj içerikleri ve dosyalar gönderilmez.",
-  "mobile.settings.privacy.analytics": "Ürün analizlerini paylaş",
+    "Bu telefondaki özellik kullanımı ve bağlantı sonuçları her zaman OpenBot analizlerine gönderilir. Açık: hesap kimliğiniz ve e-postanızla birlikte. Kapalı: yalnızca rastgele bir kurulum kimliğiyle. Mesaj içerikleri ve dosyalar gönderilmez.",
+  "mobile.settings.privacy.analytics": "Analizleri hesabıma bağla",
   "mobile.settings.privacy.retry": "Gizlilik ayarını kaydetmeyi tekrar dene",
   "mobile.settings.conversations.title": "Konuşmalar",
   "mobile.settings.conversations.hiddenChats": "Gizli sohbetler",

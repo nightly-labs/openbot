@@ -26,7 +26,6 @@ import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { AgentDragPreview, useChatDrag, useHoldMenu } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
-import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
 import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
 import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
@@ -139,12 +138,10 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   );
   const waitBadge = waitReason ? <AgentWaitBadge reason={waitReason} /> : null;
   const avatar = (
-    <ChatZoomSource>
-      <AgentPinAvatar agentId={agent.id} location="row" size={54}>
-        {bloub}
-        {waitBadge}
-      </AgentPinAvatar>
-    </ChatZoomSource>
+    <AgentPinAvatar agentId={agent.id} location="row" size={54}>
+      {bloub}
+      {waitBadge}
+    </AgentPinAvatar>
   );
   const openLabel = agent.title.trim()
     ? t("mobile.agent.list.openWithTitle", { name: agent.name, title: agent.title.trim() })

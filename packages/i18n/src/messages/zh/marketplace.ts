@@ -123,6 +123,7 @@ export const messages = {
   "marketplace.app.setup.account": "在浏览器中使用你的 {name} 账号登录。",
   "marketplace.app.setup.key": "需要你的 {name} 账号中的 API 密钥。",
   "marketplace.app.setup.keySaved": "{field} 已保存在 {host} 上。",
+  "marketplace.app.account.removeDescription": "OpenBot 会删除 {host} 上该账号的登录凭据。",
   "marketplace.app.setup.desktop": "在 {name} 桌面应用中运行，地址为 {address}。",
   "marketplace.app.setup.desktopConnected": "已连接到 {address}。",
   "marketplace.app.setup.open": "无需登录或密钥。",
@@ -360,6 +361,13 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "哪些 Trello 卡片分配给了我？",
   "marketplace.plugin.trello.prompt.board": "总结我的 Trello 看板上正在进行的工作。",
   "marketplace.plugin.trello.prompt.newCards": "把这些待办事项作为卡片添加到我的 Trello 看板。",
+  "marketplace.plugin.clickup.tagline": "任务、文档和团队动态",
+  "marketplace.plugin.clickup.description":
+    "ClickUp 让智能体搜索任务、文档、评论和聊天，创建和更新任务、列表和文档，发表评论，发送聊天消息并记录时间。每个用户在浏览器中登录自己的 ClickUp 账户。智能体拥有与用户相同的权限。它们可以把任务移到回收站，也可以删除评论。",
+  "marketplace.plugin.clickup.app": "任务、文档、评论、聊天和时间记录，通过 ClickUp 的 MCP 服务器并在浏览器中登录。",
+  "marketplace.plugin.clickup.prompt.findTasks": "找出我本周到期且未完成的 ClickUp 任务。",
+  "marketplace.plugin.clickup.prompt.createTask": "用这些待办事项创建一个 ClickUp 任务，并分配给我。",
+  "marketplace.plugin.clickup.prompt.summarizeDoc": "在 ClickUp 中找到最新的项目进展，并总结未解决的问题。",
   "marketplace.plugin.huggingface.tagline": "Hub 上的模型、数据集和论文",
   "marketplace.plugin.huggingface.description":
     "Hugging Face 让助手在 Hugging Face Hub 上搜索模型、数据集、Spaces、合集和论文，读取模型卡片和仓库文件，预览数据集，并搜索 Hugging Face 文档。它使用 Hub 的公开数据，无需账号和密钥。这些工具只读取数据：助手不能创建仓库，也不能运行任务。",

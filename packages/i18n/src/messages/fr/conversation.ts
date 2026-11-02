@@ -93,7 +93,8 @@ export const messages = {
   "conversation.threads.error.start": "Impossible de démarrer le fil.",
   "conversation.threads.error.branch": "Impossible de dériver le chat.",
   "conversation.threads.error.send": "Impossible d’envoyer le message au fil.",
-  "conversation.threads.error.files": "Les fichiers ne vont que dans les fils des agents de cet ordinateur.",
+  "conversation.threads.error.files":
+    "Ce serveur n’accepte pas de fichiers dans les fils. Mettez OpenBot à jour dessus.",
   "conversation.threads.error.stop": "Impossible d’arrêter le fil.",
   "conversation.threads.error.archive": "Impossible d’archiver le fil.",
   "conversation.threads.error.restore": "Impossible de restaurer le fil.",

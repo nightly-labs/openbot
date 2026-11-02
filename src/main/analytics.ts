@@ -114,6 +114,11 @@ const ROUTINE_TRIGGER_TYPES = [
 ] as const;
 
 type AnalyticsIdentity = Pick<CentralAuthUser, "id" | "email">;
+/**
+ * Who an event is about: the signed-in account (with its email) when the user shares analytics,
+ * else the install ID (with no email).
+ */
+type AnalyticsSubject = { id: string; email: string | null };
 type AnalyticsOperationKind = "clear" | "identify" | "track";
 type AnalyticsOperation = { kind: AnalyticsOperationKind; run: () => unknown };
 type AnalyticsOperationQueue = { active: boolean; operations: AnalyticsOperation[] };
@@ -130,6 +135,15 @@ type HostEventName =
   | "system_inventory"
   | "system_resources"
   | "hosted_site_action";
+/**
+ * Events that go only when the user links analytics to their account: the sites they visit, the
+ * tools their agents use and their setup. Other events go also when it is off, with the install ID.
+ */
+const LINKED_ONLY_EVENTS: ReadonlySet<HostEventName> = new Set([
+  "system_site_visited",
+  "system_tool_used",
+  "system_inventory",
+]);
 export type HostOpenPanelClient = Pick<OpenPanelBase, "setGlobalProperties" | "track" | "identify" | "clear">;
 type ClientFactory = (options: OpenPanelOptions) => HostOpenPanelClient;
 
@@ -144,7 +158,10 @@ export interface HostAnalyticsOptions {
   enabled: boolean;
   /** The OpenPanel API. Production when omitted; a dev capture server in `analytics-redaction-e2e`. */
   apiUrl?: string;
+  /** True when the user shares analytics with their account. Off: events go with `installId`. */
   trackingEnabled?: boolean;
+  /** The random install ID. Null: no saved ID, and events that have no account are not sent. */
+  installId?: string | null;
   appVersion: string;
   platform: "darwin" | "win32" | "linux";
   resolveOwner: () => AnalyticsIdentity | null;
@@ -289,7 +306,7 @@ type ActiveTurn = {
   startedAt: number;
   startedAtTime: number;
   origin: string;
-  owner: AnalyticsIdentity | null;
+  owner: AnalyticsSubject | null;
   ownerResolutionPending: boolean;
   tools: Map<string, ToolUseRow>;
 };
@@ -308,13 +325,14 @@ export class HostAnalytics {
   readonly #client: HostOpenPanelClient | null;
   #identifiedOwner: AnalyticsIdentity | null = null;
   #trackingEnabled: boolean;
+  readonly #install: AnalyticsSubject | null;
   #bufferOwnerlessEvents = true;
   #pending: HostPendingEvent[] = [];
   readonly #activeTurns = new Map<string, ActiveTurn>();
-  readonly #hostedSiteOwners = new Map<string, AnalyticsIdentity | null>();
+  readonly #hostedSiteOwners = new Map<string, AnalyticsSubject | null>();
   readonly #hostedSiteTerminalOperations = new Set<string>();
   readonly #siteDomains = new Map<string, string>();
-  readonly #routineRunOwners = new Map<string, AnalyticsIdentity | null>();
+  readonly #routineRunOwners = new Map<string, AnalyticsSubject | null>();
   readonly #routineRunReports = new Set<string>();
   readonly #workflowRunReports = new Set<string>();
   /** A workflow run that began before this process is a replay after a restart, and is not sent. */
@@ -338,6 +356,7 @@ export class HostAnalytics {
     this.#inventoryDayStore = options.inventoryDay;
     this.#resources = options.resources;
     this.#trackingEnabled = options.trackingEnabled ?? true;
+    this.#install = options.installId ? { id: options.installId, email: null } : null;
     if (!options.enabled) {
       this.#client = null;
       return;
@@ -358,11 +377,11 @@ export class HostAnalytics {
   }
 
   handleAgentEvent(event: AgentEvent): void {
-    if (event.type === "conversation" && this.#client && this.#trackingEnabled) {
+    if (event.type === "conversation" && this.#client) {
       this.#handleHostedSiteConversation(event.snapshot.messages);
       this.#handleRoutineRunConversation(event.snapshot.agentId, event.snapshot.messages);
     }
-    if ((!this.#client && !this.#reports) || !this.#trackingEnabled) return;
+    if (!this.#client && !this.#reports) return;
     switch (event.type) {
       case "conversation":
         return;
@@ -372,7 +391,7 @@ export class HostAnalytics {
         this.#pruneActiveTurns(now);
         if (this.#activeTurns.has(event.turnId)) return;
         this.#makeTurnCapacity();
-        const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
+        const owner = this.#currentSubject();
         this.#activeTurns.set(event.turnId, {
           ...(this.#reports ? { failureScope: this.#reports.scope() } : {}),
           agentId: event.agentId,
@@ -495,13 +514,16 @@ export class HostAnalytics {
     }
   }
 
+  /** Reports go with the account when the user shares analytics, else with the install ID. */
   #configureReports(): void {
-    if (this.#reports) Effect.runFork(this.#reports.configure(this.#trackingEnabled, this.#resolveOwner()?.id ?? null));
+    if (!this.#reports) return;
+    const subject = this.#trackingEnabled ? normalizeAnalyticsIdentity(this.#resolveOwner()) : this.#install;
+    Effect.runFork(this.#reports.configure(this.#trackingEnabled || subject !== null, subject?.id ?? null));
   }
 
   /** Only the local service emits this signal. Remote clients never send host reports. */
   handleFailure(failure: FailureSignal): void {
-    if (!this.#reports || !this.#trackingEnabled) return;
+    if (!this.#reports) return;
     this.#configureReports();
     const candidates = [...this.#activeTurns.values()].filter((turn) => turn.agentId === failure.agentId);
     const turn = failure.turnId
@@ -509,7 +531,7 @@ export class HostAnalytics {
       : candidates.length === 1
         ? candidates[0]
         : undefined;
-    if (turn?.owner && turn.owner.id !== this.#resolveOwner()?.id) return;
+    if (turn?.owner && turn.owner.id !== this.#currentSubject()?.id) return;
     const properties = turn?.properties ?? (failure.agentId ? this.#agentProperties(failure.agentId) : {});
     const provider =
       failure.provider ?? properties.provider ?? AGENT_PROVIDERS.find((id) => failure.code.startsWith(`${id}_`));
@@ -548,7 +570,7 @@ export class HostAnalytics {
    * A retry can end the same run again; each outcome of a run is sent once.
    */
   handleWorkflowRun(end: WorkflowRunEnd): void {
-    if (!this.#client || !this.#trackingEnabled) return;
+    if (!this.#client) return;
     const startedAt = Date.parse(end.startedAt);
     if (!(startedAt >= this.#createdAt)) return;
     const reportKey = `${end.runId}:${end.status}`;
@@ -591,22 +613,23 @@ export class HostAnalytics {
 
   flushPending(): void {
     this.#configureReports();
-    if (!this.#client || !this.#trackingEnabled) return;
-    const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
-    if (!owner) return;
-    this.#bufferOwnerlessEvents = true;
-    for (const activeTurn of this.#activeTurns.values()) {
-      if (!activeTurn.ownerResolutionPending) continue;
-      activeTurn.owner = owner;
-      activeTurn.ownerResolutionPending = false;
+    if (!this.#client) return;
+    const owner = this.#trackingEnabled ? normalizeAnalyticsIdentity(this.#resolveOwner()) : null;
+    if (owner) {
+      this.#bufferOwnerlessEvents = true;
+      for (const activeTurn of this.#activeTurns.values()) {
+        if (!activeTurn.ownerResolutionPending) continue;
+        activeTurn.owner = owner;
+        activeTurn.ownerResolutionPending = false;
+      }
+      this.#flushPendingForOwner(owner);
     }
-    this.#flushPendingForOwner(owner);
     this.#checkInventory();
     this.checkResources();
   }
 
+  /** The account signed out. Later events go with the install ID only when the user does not share analytics. */
   clear(): void {
-    if (this.#reports) Effect.runFork(this.#reports.configure(this.#trackingEnabled, null));
     this.#pending = [];
     this.#bufferOwnerlessEvents = false;
     for (const activeTurn of this.#activeTurns.values()) {
@@ -614,6 +637,9 @@ export class HostAnalytics {
     }
     this.#identifiedOwner = null;
     if (this.#trackingEnabled) this.#enqueue("clear", () => this.#client?.clear());
+    if (!this.#reports) return;
+    const subject = this.#trackingEnabled ? null : this.#install;
+    Effect.runFork(this.#reports.configure(this.#trackingEnabled || subject !== null, subject?.id ?? null));
   }
 
   setTrackingEnabled(enabled: boolean): void {
@@ -646,7 +672,7 @@ export class HostAnalytics {
     for (const event of events) {
       if (event.status === "running") {
         if (terminalOperations.has(event.operationId)) continue;
-        const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
+        const owner = this.#currentSubject();
         if (!this.#hostedSiteOwners.has(event.operationId)) this.#hostedSiteOwners.set(event.operationId, owner);
         continue;
       }
@@ -655,7 +681,7 @@ export class HostAnalytics {
       this.#hostedSiteTerminalOperations.add(event.operationId);
       const owner = this.#hostedSiteOwners.get(event.operationId) ?? null;
       this.#hostedSiteOwners.delete(event.operationId);
-      if (!owner || !this.#trackingEnabled) continue;
+      if (!owner) continue;
       this.#trackForOwner(
         "hosted_site_action",
         {
@@ -700,7 +726,7 @@ export class HostAnalytics {
     for (const event of events) {
       if (event.status === "running") {
         if (laterStatuses.has(event.runId) || this.#routineRunOwners.has(event.runId)) continue;
-        this.#routineRunOwners.set(event.runId, normalizeAnalyticsIdentity(this.#resolveOwner()));
+        this.#routineRunOwners.set(event.runId, this.#currentSubject());
         continue;
       }
       if (!observedRunning.has(event.runId)) continue;
@@ -751,14 +777,17 @@ export class HostAnalytics {
     return { kind: builtinKind ?? "mcp", plugin, ...(tool ? { tool } : {}), calls: 0, failed: 0 };
   }
 
-  /** Sends the inventory at most once per local day. It needs an owner, so it waits for sign-in. */
+  /**
+   * Sends the inventory at most once per local day. A user who shares analytics waits for sign-in,
+   * so the inventory goes with their account.
+   */
   #checkInventory(): void {
     const today = localDay(new Date());
     if (this.#closed || this.#inventoryDay === today || this.#inventoryCheck) return;
     const resolveInventory = this.#resolveInventory;
     const store = this.#inventoryDayStore;
     if (!this.#client || !this.#trackingEnabled || !resolveInventory || !store) return;
-    if (!normalizeAnalyticsIdentity(this.#resolveOwner())) return;
+    if (!this.#currentSubject()) return;
     this.#inventoryCheck = true;
     Effect.runFork(
       Effect.gen({ self: this }, function* () {
@@ -774,12 +803,12 @@ export class HostAnalytics {
           return;
         }
         const inventory = yield* resolveInventory();
-        if (this.#closed || !this.#trackingEnabled || !normalizeAnalyticsIdentity(this.#resolveOwner())) return;
+        if (this.#closed || !this.#trackingEnabled || !this.#currentSubject()) return;
         // The day is stored before the send, so a failed write sends nothing and a crash cannot send twice.
         yield* store.write(today);
         this.#inventoryDay = today;
-        const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
-        if (!owner || !this.#trackingEnabled) return;
+        const owner = this.#currentSubject();
+        if (!owner) return;
         this.#trackForOwner(
           "system_inventory",
           {
@@ -811,23 +840,24 @@ export class HostAnalytics {
   }
 
   /**
-   * Sends the resource summary of the last closed day, once. It needs an owner, so it waits for
-   * sign-in. A day that closes while the user has analytics off is dropped, never sent later.
+   * Sends the resource summary of the last closed day, once. A user who shares analytics waits for
+   * sign-in, so the summary goes with their account.
    */
   checkResources(): void {
     const source = this.#resources;
     if (this.#closed || this.#resourceCheck || !source || !this.#client) return;
     const due = source.previousDay();
     if (!due) return;
-    const sending = this.#trackingEnabled;
-    if (sending && !normalizeAnalyticsIdentity(this.#resolveOwner())) return;
+    // A user who shares analytics waits for sign-in. Without an install ID, a day of a user who
+    // does not share analytics is cleared with no send, so it never goes later with the account.
+    if (!this.#currentSubject() && this.#trackingEnabled) return;
     this.#resourceCheck = true;
     Effect.runFork(
       Effect.gen({ self: this }, function* () {
         // Cleared before the send, so a failed write sends nothing and a crash cannot send twice.
         yield* source.clearPreviousDay(due.day);
-        const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
-        if (!sending || this.#closed || !this.#trackingEnabled || !owner) return;
+        const owner = this.#currentSubject();
+        if (this.#closed || !owner) return;
         this.#trackForOwner("system_resources", due.properties, owner);
       }).pipe(
         Effect.ignore,
@@ -842,31 +872,48 @@ export class HostAnalytics {
     );
   }
 
-  #trackForOwner(name: HostEventName, properties: HostProperties, owner: AnalyticsIdentity, flushPending = true): void {
+  /**
+   * The subject of a new event: the account when the user shares analytics, else the install ID.
+   * Null while a user who shares analytics is signed out, so the install ID never shows next to an
+   * account, and when there is no install ID.
+   */
+  #currentSubject(): AnalyticsSubject | null {
+    if (!this.#trackingEnabled) return this.#install;
+    return normalizeAnalyticsIdentity(this.#resolveOwner());
+  }
+
+  #trackForOwner(name: HostEventName, properties: HostProperties, owner: AnalyticsSubject, flushPending = true): void {
+    // An account taken before the user stopped sharing analytics is never sent after it.
+    if (!this.#trackingEnabled && LINKED_ONLY_EVENTS.has(name)) return;
+    // An install ID taken before the user started sharing analytics is never sent after it.
+    if (this.#trackingEnabled && owner.email === null) return;
+    const subject = owner.email !== null && !this.#trackingEnabled ? this.#install : owner;
+    if (!subject) return;
     const sanitized = sanitizeHostEvent(name, properties);
-    if (flushPending) this.#flushPendingForOwner(owner);
-    else this.#identify(owner);
-    this.#send(name, sanitized, owner.id);
-    const currentOwner = normalizeAnalyticsIdentity(this.#resolveOwner());
-    if (currentOwner?.id !== owner.id || currentOwner.email !== owner.email) {
+    if (flushPending) this.#flushPendingForOwner(subject);
+    else this.#identify(subject);
+    this.#send(name, sanitized, subject.id);
+    const current = this.#currentSubject();
+    if (current?.id !== subject.id || current.email !== subject.email) {
       this.#identifiedOwner = null;
       this.#enqueue("clear", () => this.#client?.clear());
     }
   }
 
-  #flushPendingForOwner(owner: AnalyticsIdentity): void {
+  /** Events that waited for the account go with the account only. */
+  #flushPendingForOwner(owner: AnalyticsSubject): void {
     this.#identify(owner);
+    if (owner.email === null) return;
     const pending = this.#pending;
     this.#pending = [];
     for (const event of pending) this.#send(event.name, event.properties, owner.id, event.timestamp);
   }
 
-  #track(name: HostEventName, properties: HostProperties, ownerOverride?: AnalyticsIdentity | null): void {
-    if (!this.#trackingEnabled) return;
+  #track(name: HostEventName, properties: HostProperties, ownerOverride?: AnalyticsSubject | null): void {
     const sanitized = sanitizeHostEvent(name, properties);
-    const owner = ownerOverride === undefined ? normalizeAnalyticsIdentity(this.#resolveOwner()) : ownerOverride;
+    const owner = ownerOverride === undefined ? this.#currentSubject() : ownerOverride;
     if (!owner) {
-      if (!this.#bufferOwnerlessEvents) return;
+      if (!this.#trackingEnabled || !this.#bufferOwnerlessEvents) return;
       this.#pending.push({ name, properties: sanitized, timestamp: new Date().toISOString() });
       if (this.#pending.length > MAX_PENDING_EVENTS) this.#pending.shift();
       return;
@@ -874,13 +921,20 @@ export class HostAnalytics {
     this.#trackForOwner(name, sanitized, owner, ownerOverride === undefined);
   }
 
-  #identify(owner: AnalyticsIdentity): void {
+  /** Puts the email on the account's profile. The install ID has no profile data. */
+  #identify(owner: AnalyticsSubject): void {
     if (!this.#client) return;
+    if (owner.email === null) {
+      if (this.#identifiedOwner) this.#enqueue("clear", () => this.#client?.clear());
+      this.#identifiedOwner = null;
+      return;
+    }
     const previous = this.#identifiedOwner;
     if (previous?.id === owner.id && previous.email === owner.email) return;
     if (previous && previous.id !== owner.id) this.#enqueue("clear", () => this.#client?.clear());
-    this.#identifiedOwner = { ...owner };
-    this.#enqueue("identify", () => this.#client?.identify({ profileId: owner.id, email: owner.email }));
+    const identity = { id: owner.id, email: owner.email };
+    this.#identifiedOwner = identity;
+    this.#enqueue("identify", () => this.#client?.identify({ profileId: identity.id, email: identity.email }));
   }
 
   #send(name: HostEventName, properties: HostProperties, profileId: string, timestamp?: string): void {
@@ -1198,6 +1252,8 @@ function isRoutineRunFinished(status: RoutineRunConversationEventStatus): boolea
  * That costs the model breakdown for OpenCode, which is the cheaper of the two mistakes.
  */
 function reportedModel(value: string): string {
+  // Hermes names a model of the user's own endpoint `custom:<endpoint name>:<model>`.
+  if (value.startsWith("custom:")) return "custom";
   const separator = value.indexOf("/");
   if (separator < 0) return value;
   // A key-only provider never puts its own id before a model id, so that prefix comes from OpenCode.

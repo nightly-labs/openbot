@@ -132,10 +132,20 @@ interface AgentRoutinesSettingsProps {
   onOpenRun?: ((messageId: string) => void) | undefined;
 }
 
+function codeUnitOrder(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
 export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const text = useText();
   const { t, errorMessage } = text;
   const [routines, setRoutines] = createSignal<RoutineEditorRecord[]>([]);
+  // The host lists the last changed routine first. Newest-created first keeps a row in place
+  // when it is paused or edited. Ties use code-unit order, as SQLite does.
+  const listedRoutines = createMemo(() =>
+    [...routines()].sort((a, b) => codeUnitOrder(b.createdAt, a.createdAt) || codeUnitOrder(a.id, b.id)),
+  );
   const [draft, setDraft] = createSignal<RoutineDraft | null>(null);
   const [runs, setRuns] = createSignal<RoutineRunFields[]>([]);
   // Where the open routine sends its answers. Only an agent routine on this computer has a place.
@@ -507,7 +517,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       });
       const saved = result.routine;
       setRoutines((items) => {
-        const next = [saved, ...items.filter((routine) => routine.id !== saved.id)];
+        const next = items.some((routine) => routine.id === saved.id)
+          ? items.map((routine) => (routine.id === saved.id ? saved : routine))
+          : [saved, ...items];
         props.onCountChange(next.length);
         return next;
       });
@@ -785,7 +797,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                   fallback={<p class="agent-routines-empty">{t("routine.settings.empty")}</p>}
                 >
                   <div class="agent-routines-list">
-                    <For each={routines()}>
+                    <For each={listedRoutines()} keyed={(routine) => routine.id}>
                       {(routine) => (
                         <ItemGroup class="agent-routine-card">
                           <div class="agent-routine-list-item">
@@ -793,18 +805,18 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                               variant="ghost"
                               type="button"
                               class="agent-routine-row"
-                              onClick={() => openRoutine(routine)}
+                              onClick={() => openRoutine(routine())}
                             >
                               <span
                                 class={
-                                  routine.active
+                                  routine().active
                                     ? "agent-routine-status-icon-active"
                                     : "agent-routine-status-icon-paused"
                                 }
                               >
-                                <Show when={!routineCompleted(routine)} fallback={<CircleCheck aria-hidden="true" />}>
+                                <Show when={!routineCompleted(routine())} fallback={<CircleCheck aria-hidden="true" />}>
                                   <Show
-                                    when={routineTriggerKind(routine) === "webhook"}
+                                    when={routineTriggerKind(routine()) === "webhook"}
                                     fallback={<Clock3 aria-hidden="true" />}
                                   >
                                     <Link aria-hidden="true" />
@@ -812,21 +824,20 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                                 </Show>
                               </span>
                               <span>
-                                <strong>{routine.name}</strong>
+                                <strong>{routine().name}</strong>
                                 <small>
-                                  {routineCompleted(routine)
-                                    ? t("routine.settings.completed", { schedule: routineListSummary(routine, text) })
-                                    : routineListSummary(routine, text)}
+                                  {routineCompleted(routine())
+                                    ? t("routine.settings.completed", { schedule: routineListSummary(routine(), text) })
+                                    : routineListSummary(routine(), text)}
                                 </small>
                               </span>
                             </Button>
                             {/* A done one-time routine needs a new time to run again, so only the editor resumes it. */}
                             <Switch
-                              size="sm"
-                              aria-label={routine.name}
-                              checked={routine.active}
-                              disabled={routineCompleted(routine) || togglingIds().has(routine.id)}
-                              onChange={(active) => void setRoutineActive(routine, active)}
+                              aria-label={routine().name}
+                              checked={routine().active}
+                              disabled={routineCompleted(routine()) || togglingIds().has(routine().id)}
+                              onChange={(active) => void setRoutineActive(routine(), active)}
                             />
                           </div>
                         </ItemGroup>

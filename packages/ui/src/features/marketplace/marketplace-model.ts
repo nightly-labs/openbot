@@ -51,12 +51,36 @@ interface AppBase {
   status: MarketplaceAppStatus;
 }
 
+/** One account of a catalog app: one row that the host holds for it. */
+export interface MarketplaceAppAccount {
+  /** The id of the MCP row. */
+  id: string;
+  /** The row name: the account's label, and its `@` tag in a message. */
+  name: string;
+  /** The server refused the stored sign-in of this account. */
+  signInNeeded: boolean;
+  /** The host holds a sign-in for this account. True when the host did not say. */
+  signedIn: boolean;
+  /**
+   * The row has its own account address, so a new name keeps it with the app. A row from before
+   * accounts is found by its catalog name, and its sign-in by its plain address.
+   */
+  renamable: boolean;
+}
+
 /** What the host holds for one app of a catalog plugin. */
 export interface MarketplaceAppConnection {
   /** The host holds a row for the app. */
   held: boolean;
-  /** The server refused the row's stored sign-in, so the user must sign in again. */
+  /** The server refused the stored sign-in of a row, so the user must sign in again. */
   signInNeeded: boolean;
+  /** The rows of the app, the first one first. Empty when the host holds none. */
+  accounts: readonly MarketplaceAppAccount[];
+  /**
+   * The user can add another account: the app signs in with a browser, and the host keeps a
+   * separate sign-in for each account (`mcp-accounts-v1`).
+   */
+  multipleAccounts: boolean;
 }
 
 /**
@@ -200,7 +224,21 @@ export interface MarketplaceModel {
    * Runs the connect step of one app that the host holds, and saves the answer over the held row:
    * a new key, a new sign-in, or a desktop app that is on again. False when the user closed it.
    */
-  reconnectApp: (app: Extract<MarketplaceApp, { kind: "plugin" }>, appId: string) => Promise<boolean>;
+  reconnectApp: (
+    app: Extract<MarketplaceApp, { kind: "plugin" }>,
+    appId: string,
+    accountId?: string | undefined,
+  ) => Promise<boolean>;
+  /** Signs in to one more account of a held app, as a new row. False when the user closed the step. */
+  addAccount: (app: Extract<MarketplaceApp, { kind: "plugin" }>, appId: string) => Promise<boolean>;
+  /** Gives an account another name. The name is also its `@` tag in a message. */
+  renameAccount: (
+    app: Extract<MarketplaceApp, { kind: "plugin" }>,
+    accountId: string,
+    name: string,
+  ) => Promise<boolean>;
+  /** Removes one account of an app that has more than one, with its sign-in. */
+  removeAccount: (app: Extract<MarketplaceApp, { kind: "plugin" }>, accountId: string) => Promise<boolean>;
   /** The joined server that keeps an app's credential. Absent when this computer keeps it. */
   appHostName?: string | undefined;
   /** Absent when this client cannot ask macOS, or when a joined server runs the apps. */

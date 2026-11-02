@@ -49,6 +49,11 @@ interface PersistenceSnapshot {
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
+  if (url.pathname === "/focus-navigation") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<input aria-label="Search" autofocus><a href="/focus-navigation?next">Next page</a>`);
+    return;
+  }
   if (url.pathname === "/popup-parent") {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<style>
@@ -521,7 +526,7 @@ async function main(): Promise<void> {
         if (scenario === "background") {
           // The scenario runs before the browser panel is first shown.
         } else if (scenario === "focus") {
-          await runFocusScenario(browser, origin);
+          await runFocusScenario(browser, origin, window);
         } else if (scenario === "identity") {
           await runIdentityScenario(browser, origin);
           if (googleLive) await runGoogleLiveProbe(browser);
@@ -1857,7 +1862,7 @@ async function main(): Promise<void> {
     await boundedContents.executeJavaScript("window.releaseHeldEvaluation(true); true");
     if (!(await heldEvaluation).success) throw new Error("The held evaluation failed.");
     await runCauseEffect(browser.close(boundedTab.id));
-    await runFocusScenario(browser, origin);
+    await runFocusScenario(browser, origin, window);
     process.stdout.write("BrowserHost: V2 semantics, adaptive image, iframe, upload, waits, and emulation passed.\n");
 
     await runIdentityScenario(browser, origin);
@@ -2323,7 +2328,87 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
   }
 }
 
-async function runFocusScenario(browser: BrowserHost, origin: string): Promise<void> {
+async function runFocusScenario(browser: BrowserHost, origin: string, window: BrowserWindow): Promise<void> {
+  // The page shares the app window. Chromium gives a page the focus when a new document commits,
+  // so each navigation must give it back to the app renderer that had it (#4405).
+  // A window without a document has no view to hold the focus.
+  if (!window.webContents.getURL()) await window.webContents.loadURL("about:blank");
+  window.focus();
+  window.webContents.focus();
+  await waitFor(async () => webContents.getFocusedWebContents() === window.webContents, "app window focus");
+  const { tab: sameWindowTab, contents: sameWindowContents } = await openTabWithContents(
+    browser,
+    origin,
+    "smoke-thread",
+    "smoke-bot",
+  );
+  const sameWindowSteps = {
+    navigate: { tool: "navigate", args: { tabId: sameWindowTab.id, url: `${origin}/focus-navigation` } },
+    reload: { tool: "navigate", args: { tabId: sameWindowTab.id, direction: "reload" } },
+    linkClick: {
+      tool: "click",
+      args: { tabId: sameWindowTab.id, target: { kind: "role", role: "link", name: "Next page", exact: true } },
+    },
+    back: { tool: "navigate", args: { tabId: sameWindowTab.id, direction: "back" } },
+    // A refused connection commits an error page.
+    errorPage: { tool: "navigate", args: { tabId: sameWindowTab.id, url: "http://127.0.0.1:1/" } },
+  };
+  const sameWindowFocus: Record<string, boolean> = {};
+  for (const [name, step] of Object.entries(sameWindowSteps)) {
+    const result = await callBrowserTool(browser, step.tool, step.args);
+    if (!result.success && name !== "errorPage")
+      throw new Error(`The same-window focus ${name} failed: ${toolError(result)}`);
+    sameWindowFocus[name] = webContents.getFocusedWebContents() === window.webContents;
+  }
+  // A person who enters an address moves to the page when its document commits, not only after the load.
+  window.webContents.focus();
+  await waitFor(async () => webContents.getFocusedWebContents() === window.webContents, "app window focus again");
+  // The address suggestions hide the page while the person types.
+  await runCauseEffect(browser.setVisible({ visible: false, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
+  let addressFocusedTab = false;
+  sameWindowContents.once("did-navigate", () => {
+    addressFocusedTab = webContents.getFocusedWebContents() === sameWindowContents;
+  });
+  await runCauseEffect(browser.loadUrl(sameWindowTab.id, `${origin}/`));
+  await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
+  // An address that changes only the fragment has no commit. The next agent navigation still gives the focus back.
+  await runCauseEffect(browser.loadUrl(sameWindowTab.id, `${origin}/#fragment`));
+  window.webContents.focus();
+  await waitFor(
+    async () => webContents.getFocusedWebContents() === window.webContents,
+    "app window focus after fragment",
+  );
+  const afterFragment = await callBrowserTool(browser, "navigate", {
+    tabId: sameWindowTab.id,
+    url: `${origin}/focus-navigation`,
+  });
+  if (!afterFragment.success) throw new Error(`The navigation after a fragment failed: ${toolError(afterFragment)}`);
+  sameWindowFocus.afterFragment = webContents.getFocusedWebContents() === window.webContents;
+  await runCauseEffect(browser.close(sameWindowTab.id));
+  // A tab that a person opens with focus has it when its document commits.
+  window.webContents.focus();
+  await waitFor(async () => webContents.getFocusedWebContents() === window.webContents, "app window focus for open");
+  let openedFocusedTab = false;
+  const createdContents = new Promise<WebContents>((resolve) =>
+    app.once("web-contents-created", (_event, created) => resolve(created)),
+  );
+  const focusedOpen = runCauseEffect(browser.open(`${origin}/focus-navigation`, "smoke-thread", "smoke-bot", true));
+  const openedContents = await createdContents;
+  openedContents.once("did-navigate", () => {
+    openedFocusedTab = webContents.getFocusedWebContents() === openedContents;
+  });
+  await runCauseEffect(browser.close((await focusedOpen).id));
+  await mkdir(".openbot-build", { recursive: true });
+  await writeFile(
+    ".openbot-build/browser-focus-same-window.json",
+    JSON.stringify({ sameWindowFocus, addressFocusedTab, openedFocusedTab }, null, 2),
+  );
+  const lost = Object.entries(sameWindowFocus).filter(([, kept]) => !kept);
+  if (lost.length > 0)
+    throw new Error(`Agent navigation took focus from the app window: ${lost.map(([name]) => name).join(", ")}.`);
+  if (!addressFocusedTab) throw new Error("An address that the person entered did not focus the page.");
+  if (!openedFocusedTab) throw new Error("A tab that the person opened did not have focus when its page committed.");
+
   const focusSentinel = new BrowserWindow({
     show: false,
     opacity: 0,

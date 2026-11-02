@@ -14,7 +14,6 @@ import { useAgentPinTransition } from "@/features/agents/components/agent-pin-tr
 import { ChatDragArea, DRAG_AVATAR_SIZE, useChatDrag, useHoldMenu } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
-import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
 import { PinnedChatItem } from "@/features/agents/components/pinned-agents-grid";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -281,17 +280,15 @@ export const ChannelListRow = memo(function ChannelListRow({
     : t("mobile.channel.list.open", { name: channel.name });
   const size = pinned ? 64 : 54;
   const avatar = (
-    <ChatZoomSource>
-      <AgentPinAvatar agentId={channel.id} location={pinned ? "pinned" : "row"} size={size}>
-        <ChannelAvatar channel={channel} agents={agents} size={size} disconnected={disconnected} />
-        {pinned && unread ? (
-          <View
-            className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
-            style={{ borderColor: background, backgroundColor: accent }}
-          />
-        ) : null}
-      </AgentPinAvatar>
-    </ChatZoomSource>
+    <AgentPinAvatar agentId={channel.id} location={pinned ? "pinned" : "row"} size={size}>
+      <ChannelAvatar channel={channel} agents={agents} size={size} disconnected={disconnected} />
+      {pinned && unread ? (
+        <View
+          className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
+          style={{ borderColor: background, backgroundColor: accent }}
+        />
+      ) : null}
+    </AgentPinAvatar>
   );
 
   const trigger = (

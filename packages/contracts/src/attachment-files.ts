@@ -169,6 +169,15 @@ export function isOpenableAttachmentName(name: string): boolean {
 }
 
 /**
+ * The raster image type for a local preview of a file, or null. The type comes from the name, not
+ * from the file, so a preview is never a type that a browser runs as a page (HTML, SVG).
+ */
+export function rasterImageMimeType(name: string): string | null {
+  const extension = attachmentFileExtension(name);
+  return IMAGE_ATTACHMENT_EXTENSIONS.some((image) => image === extension) ? attachmentMimeTypeForName(name) : null;
+}
+
+/**
  * The name check for a surface that picks files for one host, such as mobile. It accepts the same
  * files as the desktop picker filter that `supportedAttachmentExtensions` builds for that host.
  */

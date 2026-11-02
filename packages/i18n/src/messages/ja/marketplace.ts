@@ -117,6 +117,7 @@ export const messages = {
   "marketplace.app.setup.account": "ブラウザーで {name} アカウントにサインインします。",
   "marketplace.app.setup.key": "{name} アカウントの API キーが必要です。",
   "marketplace.app.setup.keySaved": "{field} は {host} に保存されています。",
+  "marketplace.app.account.removeDescription": "OpenBot は {host} にあるこのアカウントのサインイン情報を削除します。",
   "marketplace.app.setup.desktop": "{name} デスクトップアプリの {address} で動作します。",
   "marketplace.app.setup.desktopConnected": "{address} に接続済みです。",
   "marketplace.app.setup.open": "サインインもキーも不要です。",
@@ -402,6 +403,16 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "自分に割り当てられた Trello カードはどれですか？",
   "marketplace.plugin.trello.prompt.board": "Trello ボードで進行中の作業をまとめてください。",
   "marketplace.plugin.trello.prompt.newCards": "これらのアクション項目をカードとして Trello ボードに追加してください。",
+  "marketplace.plugin.clickup.tagline": "タスク、ドキュメント、チームの更新",
+  "marketplace.plugin.clickup.description":
+    "ClickUp を使うと、エージェントはタスク、ドキュメント、コメント、チャットを検索し、タスク、リスト、ドキュメントを作成・更新し、コメントの投稿、チャットメッセージの送信、時間の記録ができます。各ユーザーはブラウザーで自分の ClickUp アカウントにサインインします。エージェントにはユーザーと同じ権限があります。タスクをゴミ箱に移動したり、コメントを削除したりできます。",
+  "marketplace.plugin.clickup.app":
+    "タスク、ドキュメント、コメント、チャット、時間記録。ClickUp の MCP サーバーをブラウザーでのサインインで使います。",
+  "marketplace.plugin.clickup.prompt.findTasks": "今週が期限の未完了の ClickUp タスクを探してください。",
+  "marketplace.plugin.clickup.prompt.createTask":
+    "これらのアクション項目で ClickUp タスクを作成し、私に割り当ててください。",
+  "marketplace.plugin.clickup.prompt.summarizeDoc":
+    "ClickUp で最新のプロジェクト更新を探し、未解決の質問を要約してください。",
   "marketplace.plugin.huggingface.tagline": "Hub のモデル、データセット、論文",
   "marketplace.plugin.huggingface.description":
     "Hugging Face を使うと、エージェントは Hugging Face Hub のモデル、データセット、Spaces、コレクション、論文を検索し、モデルカードやリポジトリのファイルを読み、データセットをプレビューし、Hugging Face のドキュメントを検索できます。公開されている Hub のデータを使うので、アカウントもキーも不要です。ツールは読み取り専用で、エージェントはリポジトリの作成やジョブの実行はできません。",

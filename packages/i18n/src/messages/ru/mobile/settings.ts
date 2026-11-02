@@ -74,9 +74,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Выключите «Анимации», чтобы убрать движение во всём приложении. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение, и анимации ниже остаются выключенными.",
   "mobile.settings.animations.all": "Анимации",
-  "mobile.settings.animations.chatZoom": "Увеличение чатов",
-  "mobile.settings.animations.chatZoomFooter":
-    "Чат открывается из своего аватара в списке и сворачивается обратно в него. Если выключить, чат выезжает сбоку.",
   "mobile.settings.animations.agentFaces": "Живые лица агентов",
   "mobile.settings.animations.agentFacesFooter":
     "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными.",
@@ -162,8 +159,8 @@ export const messages = {
   "mobile.settings.notifications.channelSilent": "Уведомления агентов (без звука)",
   "mobile.settings.privacy.title": "Конфиденциальность",
   "mobile.settings.privacy.footer":
-    "Передавать данные об использовании функций и результатах подключения с этого телефона. Содержимое сообщений и файлы не отправляются.",
-  "mobile.settings.privacy.analytics": "Делиться аналитикой продукта",
+    "Данные об использовании функций и результатах подключения с этого телефона всегда отправляются в аналитику OpenBot. Вкл.: вместе с ID аккаунта и почтой. Выкл.: только со случайным ID установки. Содержимое сообщений и файлы не отправляются.",
+  "mobile.settings.privacy.analytics": "Связывать аналитику с моим аккаунтом",
   "mobile.settings.privacy.retry": "Повторить сохранение настройки конфиденциальности",
   "mobile.settings.conversations.title": "Диалоги",
   "mobile.settings.conversations.hiddenChats": "Скрытые чаты",

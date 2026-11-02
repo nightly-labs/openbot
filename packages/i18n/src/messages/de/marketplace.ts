@@ -124,6 +124,7 @@ export const messages = {
   "marketplace.app.setup.account": "Melde dich im Browser mit deinem {name}-Konto an.",
   "marketplace.app.setup.key": "Benötigt einen API-Schlüssel aus deinem {name}-Konto.",
   "marketplace.app.setup.keySaved": "{field} auf {host} gespeichert.",
+  "marketplace.app.account.removeDescription": "OpenBot löscht die Anmeldung dieses Kontos auf {host}.",
   "marketplace.app.setup.desktop": "Läuft in der Desktop-App von {name} unter {address}.",
   "marketplace.app.setup.desktopConnected": "Verbunden mit {address}.",
   "marketplace.app.setup.open": "Keine Anmeldung und kein Schlüssel nötig.",
@@ -413,6 +414,16 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Welche Trello-Karten sind mir zugewiesen?",
   "marketplace.plugin.trello.prompt.board": "Fasse zusammen, was auf meinem Trello-Board gerade in Arbeit ist.",
   "marketplace.plugin.trello.prompt.newCards": "Füge diese To-dos als Karten zu meinem Trello-Board hinzu.",
+  "marketplace.plugin.clickup.tagline": "Aufgaben, Docs und Team-Updates",
+  "marketplace.plugin.clickup.description":
+    "ClickUp lässt Agenten Aufgaben, Docs, Kommentare und Chats durchsuchen, Aufgaben, Listen und Docs erstellen und ändern, Kommentare schreiben, Chat-Nachrichten senden und Zeit erfassen. Jeder Nutzer meldet sich im Browser bei seinem eigenen ClickUp-Konto an. Agenten haben dieselben Berechtigungen wie der Nutzer. Sie können Aufgaben in den Papierkorb verschieben und Kommentare löschen.",
+  "marketplace.plugin.clickup.app":
+    "Aufgaben, Docs, Kommentare, Chat und Zeiterfassung über den MCP-Server von ClickUp mit Anmeldung im Browser.",
+  "marketplace.plugin.clickup.prompt.findTasks": "Finde meine offenen ClickUp-Aufgaben, die diese Woche fällig sind.",
+  "marketplace.plugin.clickup.prompt.createTask":
+    "Erstelle aus diesen To-dos eine ClickUp-Aufgabe und weise sie mir zu.",
+  "marketplace.plugin.clickup.prompt.summarizeDoc":
+    "Finde das neueste Projekt-Update in ClickUp und fasse die offenen Fragen zusammen.",
   "marketplace.plugin.huggingface.tagline": "Modelle, Datensätze und Paper auf dem Hub",
   "marketplace.plugin.huggingface.description":
     "Mit Hugging Face durchsuchen Agenten Modelle, Datensätze, Spaces, Collections und Paper auf dem Hugging Face Hub, lesen Model Cards und Repository-Dateien, zeigen eine Vorschau von Datensätzen und durchsuchen die Hugging-Face-Dokumentation. Es verwendet öffentliche Hub-Daten und braucht kein Konto und keinen Schlüssel. Die Tools lesen nur: Agenten können keine Repositorys anlegen und keine Jobs ausführen.",

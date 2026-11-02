@@ -241,6 +241,8 @@ export const messages = {
   "provider.settings.runtime": "Runtime",
   "provider.settings.version": "Versie",
   "provider.settings.versionAvailable": "{installed} · {available} is beschikbaar",
+  "provider.settings.versionInstalledByUser": "{version} · door jou geïnstalleerd",
+  "provider.settings.versionDownloaded": "{version} · gedownload door OpenBot",
   "provider.settings.update": "Updaten",
   "provider.settings.downloadLabel": "Download van {name}",
   "provider.settings.diagnostics": "Diagnose",

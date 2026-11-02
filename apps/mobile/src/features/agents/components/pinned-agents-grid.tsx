@@ -25,7 +25,6 @@ import {
   useHoldMenu,
 } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
 import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
@@ -144,26 +143,24 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
       onPressOut={holdMenu.onPressOut}
       style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
     >
-      <ChatZoomSource>
-        <AgentPinAvatar agentId={agent.id} location="pinned" size={64}>
-          <BloubAvatar
-            agentId={agent.id}
-            serverId={agent.serverId}
-            hue={agent.avatarHue}
-            seed={agent.avatarSeed}
-            size={64}
-            animateIdle={false}
-            rings
+      <AgentPinAvatar agentId={agent.id} location="pinned" size={64}>
+        <BloubAvatar
+          agentId={agent.id}
+          serverId={agent.serverId}
+          hue={agent.avatarHue}
+          seed={agent.avatarSeed}
+          size={64}
+          animateIdle={false}
+          rings
+        />
+        {isUnread ? (
+          <View
+            className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
+            style={{ borderColor: background, backgroundColor: accent }}
           />
-          {isUnread ? (
-            <View
-              className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
-              style={{ borderColor: background, backgroundColor: accent }}
-            />
-          ) : null}
-          {waitReason ? <AgentWaitBadge reason={waitReason} size={22} /> : null}
-        </AgentPinAvatar>
-      </ChatZoomSource>
+        ) : null}
+        {waitReason ? <AgentWaitBadge reason={waitReason} size={22} /> : null}
+      </AgentPinAvatar>
       <View className="w-full gap-0.5">
         <Typography.Paragraph
           align="center"

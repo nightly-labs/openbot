@@ -1828,5 +1828,74 @@
         }
       }
     }
+  },
+  "kimi": {
+    "repository": "https://github.com/MoonshotAI/kimi-cli",
+    "version": "1.52.0",
+    "tag": "1.52.0",
+    "license": "Apache-2.0",
+    "licenseSha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+    "artifacts": {
+      "darwin-arm64": {
+        "asset": "kimi-1.52.0-aarch64-apple-darwin-onedir.tar.gz",
+        "assetSha256": "1d87d0c6d39e30593e44571ce6f78b20345735e6e836c1b175283ddabf5b9028",
+        "downloadBytes": 67577902,
+        "installedBytes": 150000000,
+        "executable": "kimi",
+        "files": {
+          "kimi": "52fe62da5118ccadbbc26fe195751f7050e8c65fc42dc9486d743bc6473f2be2",
+          "_internal/base_library.zip": "c9565951309b343eac33428623548a1611e875d7a5bd54a3c6a7a8ce8ca79cc2",
+          "_internal/Python.framework/Versions/3.14/Python": "9c4bb24d772ea86352166776dae56223042f1a89c04a256d9a7d9744f92ff7e4"
+        }
+      },
+      "darwin-x64": {
+        "asset": "kimi-1.52.0-x86_64-apple-darwin-onedir.tar.gz",
+        "assetSha256": "5b0977d6823cc36c0011707521d7b5f111d488b4680e697e94c801ca9d9778c7",
+        "downloadBytes": 69427316,
+        "installedBytes": 155000000,
+        "executable": "kimi",
+        "files": {
+          "kimi": "9b308f6c3376f4ce930709ac1498f06edda578fb25ce878b68fcf5123793168e",
+          "_internal/base_library.zip": "86ecffe17abeca77ecb8bb0e19e0f22ae7b9c84523507629f5fa9f8ce03c3f02",
+          "_internal/Python.framework/Versions/3.14/Python": "f0361be4d20d3b473e3a00a6b0f569fe5a10884b1b5dc4f15e576c756fda8af7"
+        }
+      },
+      "linux-x64": {
+        "asset": "kimi-1.52.0-x86_64-unknown-linux-gnu-onedir.tar.gz",
+        "assetSha256": "23d11d2cbe5211beb7d7cc7552e92fa2268021eaca58a7482852e60b16fc148f",
+        "downloadBytes": 95685385,
+        "installedBytes": 230000000,
+        "executable": "kimi",
+        "files": {
+          "kimi": "aa0d3f28e5a92775b2b3e9c85910debd2b3d6daa4b2bf5184f86f5abac037756",
+          "_internal/base_library.zip": "b0e68e532df7eb30c61d6950291c79e7354fa4123be1be65f987f17edc6cb539",
+          "_internal/libpython3.14.so.1.0": "4131f23ceebb53864abe82c8da4cd512f98e4d939e40e51de8f5536a944decad"
+        }
+      },
+      "linux-arm64": {
+        "asset": "kimi-1.52.0-aarch64-unknown-linux-gnu-onedir.tar.gz",
+        "assetSha256": "61c49cd8d3aa92d91939f2b72b8fc448d59565ed769e6a9ff8afc64a899f2bf0",
+        "downloadBytes": 92945609,
+        "installedBytes": 230000000,
+        "executable": "kimi",
+        "files": {
+          "kimi": "ee420d7fbb295843bac0de36fe6f794f4aecbf606aa5ec9f2a7686593a42859b",
+          "_internal/base_library.zip": "8e38fbea715db949ebf5e0ada7ee81e468390dca60c027f48d880680642b09bc",
+          "_internal/libpython3.14.so.1.0": "0c9a7e987d3c7607cf0b3d2371796df60eb64bd6a316751b2c6943db55a3e50c"
+        }
+      },
+      "win32-x64": {
+        "asset": "kimi-1.52.0-x86_64-pc-windows-msvc-onedir.zip",
+        "assetSha256": "7c424b7ce9a2918091c1d37738c90b410d766107de7e46039922e7ffd5c3d09a",
+        "downloadBytes": 73776124,
+        "installedBytes": 150000000,
+        "executable": "kimi.exe",
+        "files": {
+          "kimi.exe": "4a2aff3980d941ce90ac6d7a8062a255059929d011418c63952bfb2680699e99",
+          "_internal/base_library.zip": "308de2cc818eeb94415a4534a2bcfb3391c8b231197935405a1baa9405dcfd01",
+          "_internal/python314.dll": "0f9857ffdfe010fe6b99328d58c2e3c7472ce75f336bf9c2ad9bd5bca3bce700"
+        }
+      }
+    }
   }
 }

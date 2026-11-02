@@ -1,7 +1,7 @@
 import type { BrowserViewContextMenu, BrowserViewInput } from "@openbot/contracts/team-protocol/browser-view-v1";
 import * as Clipboard from "expo-clipboard";
 import { GlassView } from "expo-glass-effect";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
@@ -37,8 +37,10 @@ import {
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgent, MobileBrowserViewSupport } from "@/features/workspace/model/workspace-types";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import { ToolbarMenuItems } from "@/shared/components/toolbar-menu-items";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
+import { NATIVE_BAR_HEIGHT } from "@/shared/lib/native-bar";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
@@ -53,6 +55,10 @@ import type { LiveViewMode } from "../model/live-view-gestures";
 
 /** The floating controls are 48 points, 8 points from the safe area, as in the chat. */
 const CONTROL_SIZE = 48;
+/** The agent title. In the iOS native bar it is as tall as the bar, as the bar buttons beside it are. */
+const TITLE_HEIGHT = isIOS ? NATIVE_BAR_HEIGHT : CONTROL_SIZE;
+/** The widest agent title in the iOS native bar, so a long name leaves room for the bar buttons. */
+const TITLE_MAX_WIDTH = 220;
 const CONTROL_OFFSET = 8;
 /** A paste on a host without the clipboard capability goes as keystrokes, so it is kept short. */
 const TYPED_PASTE_MAX_LENGTH = 2_000;
@@ -465,6 +471,82 @@ function BrowserView({
     chooseTab: onChooseTab,
   });
 
+  const runOption = (id: string) => {
+    if (id === "trackpad") {
+      void haptics.selection();
+      const next = mode === "trackpad" ? "direct" : "trackpad";
+      rememberedMode = next;
+      setMode(next);
+    } else if (id === "recenter") {
+      void haptics.impact("soft");
+      stage.current?.recenterPointer();
+    } else if (id === "reload") {
+      reload();
+    } else if (id === "hand-back") {
+      void handBack();
+    }
+  };
+  const goBack = () => {
+    void haptics.impact("soft");
+    router.back();
+  };
+  const openHelp = () => {
+    void haptics.impact("soft");
+    router.push("/browser-help");
+  };
+  const titleView =
+    choices.length > 0 ? (
+      // In a channel where several agents work, the name switches to the browser of another one.
+      <MenuView
+        actions={choices.map((choice) => ({
+          id: choice.id,
+          title: choice.name,
+          state: choice.id === agent.id ? "on" : "off",
+        }))}
+        onPressAction={({ nativeEvent }) => {
+          if (nativeEvent.event === agent.id || !choices.some((choice) => choice.id === nativeEvent.event)) return;
+          void haptics.selection();
+          onChooseAgent(nativeEvent.event);
+        }}
+        style={{ minWidth: 0, flexShrink: 1 }}
+      >
+        <GlassCapsule liquidGlass={liquidGlass} fallbackBackground={fieldBackground} height={TITLE_HEIGHT}>
+          <View
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.browser.switchAgent", { name: agent.name })}
+            className="min-w-0 shrink flex-row items-center gap-2 pr-3.5 pl-2.5"
+            style={{ height: TITLE_HEIGHT }}
+          >
+            <BloubAvatar
+              agentId={agent.id}
+              serverId={agent.serverId}
+              hue={agent.avatarHue}
+              seed={agent.avatarSeed}
+              size={28}
+            />
+            <Typography.Paragraph className="min-w-0 shrink" weight="semibold" numberOfLines={1}>
+              {agent.name}
+            </Typography.Paragraph>
+            <ChevronsUpDown color={iconColor} size={16} strokeWidth={2} />
+          </View>
+        </GlassCapsule>
+      </MenuView>
+    ) : (
+      <View className="min-w-0 shrink flex-row items-center gap-2" accessibilityRole="header">
+        <BloubAvatar
+          agentId={agent.id}
+          serverId={agent.serverId}
+          hue={agent.avatarHue}
+          seed={agent.avatarSeed}
+          size={28}
+        />
+        <Typography.Paragraph className="min-w-0 shrink" weight="semibold" numberOfLines={1}>
+          {agent.name}
+        </Typography.Paragraph>
+      </View>
+    );
+
   const openSheet = () => {
     void haptics.impact("soft");
     keyboardField.current?.blur();
@@ -648,116 +730,70 @@ function BrowserView({
         </View>
       </KeyboardAvoidingView>
 
-      <View
-        className="absolute inset-x-0 z-20 flex-row items-center gap-3"
-        pointerEvents="box-none"
-        style={{ top: insets.top + CONTROL_OFFSET, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
-      >
-        <ChatGlassIconButton
-          accessibilityLabel={t("common.back")}
-          fallbackBackground={fieldBackground}
-          liquidGlassAvailable={liquidGlass}
-          onPress={() => {
-            void haptics.impact("soft");
-            router.back();
-          }}
+      {isIOS ? (
+        // The native bar, so its items morph with the items of the chat under the browser.
+        <>
+          <Stack.Toolbar placement="left">
+            <Stack.Toolbar.Button icon="chevron.left" accessibilityLabel={t("common.back")} onPress={goBack} />
+            <Stack.Toolbar.View hidesSharedBackground>
+              <View className="flex-row items-center" style={{ height: NATIVE_BAR_HEIGHT, maxWidth: TITLE_MAX_WIDTH }}>
+                {titleView}
+              </View>
+            </Stack.Toolbar.View>
+          </Stack.Toolbar>
+          <Stack.Toolbar placement="right">
+            <Stack.Toolbar.Button
+              icon="questionmark.circle"
+              accessibilityLabel={t("mobile.browser.help")}
+              onPress={openHelp}
+            />
+            <Stack.Toolbar.Menu icon="ellipsis" accessibilityLabel={t("mobile.browser.options")}>
+              <ToolbarMenuItems actions={options} onPressAction={runOption} />
+            </Stack.Toolbar.Menu>
+          </Stack.Toolbar>
+        </>
+      ) : (
+        <View
+          className="absolute inset-x-0 z-20 flex-row items-center gap-3"
+          pointerEvents="box-none"
+          style={{ top: insets.top + CONTROL_OFFSET, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
         >
-          <ArrowLeft color={iconColor} size={24} strokeWidth={2} />
-        </ChatGlassIconButton>
-        {choices.length > 0 ? (
-          // In a channel where several agents work, the name switches to the browser of another one.
-          <MenuView
-            actions={choices.map((choice) => ({
-              id: choice.id,
-              title: choice.name,
-              state: choice.id === agent.id ? "on" : "off",
-            }))}
-            onPressAction={({ nativeEvent }) => {
-              if (nativeEvent.event === agent.id || !choices.some((choice) => choice.id === nativeEvent.event)) return;
-              void haptics.selection();
-              onChooseAgent(nativeEvent.event);
-            }}
-            style={{ minWidth: 0, flexShrink: 1 }}
+          <ChatGlassIconButton
+            accessibilityLabel={t("common.back")}
+            fallbackBackground={fieldBackground}
+            liquidGlassAvailable={liquidGlass}
+            onPress={goBack}
           >
-            <GlassCapsule liquidGlass={liquidGlass} fallbackBackground={fieldBackground}>
+            <ArrowLeft color={iconColor} size={24} strokeWidth={2} />
+          </ChatGlassIconButton>
+          {titleView}
+          <View className="flex-1" />
+          <ChatGlassIconButton
+            accessibilityLabel={t("mobile.browser.help")}
+            fallbackBackground={fieldBackground}
+            liquidGlassAvailable={liquidGlass}
+            onPress={openHelp}
+          >
+            <CircleQuestionMark color={iconColor} size={24} strokeWidth={2} />
+          </ChatGlassIconButton>
+          <MenuView
+            actions={options}
+            onPressAction={({ nativeEvent }) => runOption(nativeEvent.event)}
+            style={{ height: CONTROL_SIZE, width: CONTROL_SIZE }}
+          >
+            <GlassCircle liquidGlass={liquidGlass} fallbackBackground={fieldBackground}>
               <View
                 accessible
                 accessibilityRole="button"
-                accessibilityLabel={t("mobile.browser.switchAgent", { name: agent.name })}
-                className="min-w-0 shrink flex-row items-center gap-2 pr-3.5 pl-2.5"
-                style={{ height: CONTROL_SIZE }}
+                accessibilityLabel={t("mobile.browser.options")}
+                className="flex-1 items-center justify-center"
               >
-                <BloubAvatar
-                  agentId={agent.id}
-                  serverId={agent.serverId}
-                  hue={agent.avatarHue}
-                  seed={agent.avatarSeed}
-                  size={28}
-                />
-                <Typography.Paragraph className="min-w-0 shrink" weight="semibold" numberOfLines={1}>
-                  {agent.name}
-                </Typography.Paragraph>
-                <ChevronsUpDown color={iconColor} size={16} strokeWidth={2} />
+                <Ellipsis color={iconColor} size={24} strokeWidth={2} />
               </View>
-            </GlassCapsule>
+            </GlassCircle>
           </MenuView>
-        ) : (
-          <View className="min-w-0 shrink flex-row items-center gap-2" accessibilityRole="header">
-            <BloubAvatar
-              agentId={agent.id}
-              serverId={agent.serverId}
-              hue={agent.avatarHue}
-              seed={agent.avatarSeed}
-              size={28}
-            />
-            <Typography.Paragraph className="min-w-0 shrink" weight="semibold" numberOfLines={1}>
-              {agent.name}
-            </Typography.Paragraph>
-          </View>
-        )}
-        <View className="flex-1" />
-        <ChatGlassIconButton
-          accessibilityLabel={t("mobile.browser.help")}
-          fallbackBackground={fieldBackground}
-          liquidGlassAvailable={liquidGlass}
-          onPress={() => {
-            void haptics.impact("soft");
-            router.push("/browser-help");
-          }}
-        >
-          <CircleQuestionMark color={iconColor} size={24} strokeWidth={2} />
-        </ChatGlassIconButton>
-        <MenuView
-          actions={options}
-          onPressAction={({ nativeEvent }) => {
-            if (nativeEvent.event === "trackpad") {
-              void haptics.selection();
-              const next = mode === "trackpad" ? "direct" : "trackpad";
-              rememberedMode = next;
-              setMode(next);
-            } else if (nativeEvent.event === "recenter") {
-              void haptics.impact("soft");
-              stage.current?.recenterPointer();
-            } else if (nativeEvent.event === "reload") {
-              reload();
-            } else if (nativeEvent.event === "hand-back") {
-              void handBack();
-            }
-          }}
-          style={{ height: CONTROL_SIZE, width: CONTROL_SIZE }}
-        >
-          <GlassCircle liquidGlass={liquidGlass} fallbackBackground={fieldBackground}>
-            <View
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel={t("mobile.browser.options")}
-              className="flex-1 items-center justify-center"
-            >
-              <Ellipsis color={iconColor} size={24} strokeWidth={2} />
-            </View>
-          </GlassCircle>
-        </MenuView>
-      </View>
+        </View>
+      )}
 
       {/* The phone keyboard types into this field. What changes in it goes to the page. */}
       <TextInput
@@ -845,18 +881,20 @@ function GlassCircle({
 function GlassCapsule({
   liquidGlass,
   fallbackBackground,
+  height,
   children,
 }: {
   liquidGlass: boolean;
   fallbackBackground: ViewStyle["backgroundColor"];
+  height: number;
   children: ReactNode;
 }) {
   return (
     <GlassView
       glassEffectStyle={liquidGlass ? "regular" : "none"}
       style={{
-        height: CONTROL_SIZE,
-        borderRadius: CONTROL_SIZE / 2,
+        height,
+        borderRadius: height / 2,
         borderCurve: "continuous",
         overflow: "hidden",
         flexShrink: 1,

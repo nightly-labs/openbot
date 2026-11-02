@@ -104,6 +104,8 @@ export const messages = {
   "error.provider.modelIdDuplicate": "İki model aynı kimliğe sahip.",
   "error.provider.contextWindowInvalid":
     "Bir modelin bağlam penceresi {min} ile {max} arasında tam sayı bir token sayısı olmalıdır.",
+  "error.provider.maxOutputInvalid":
+    "Bir modelin en fazla çıktısı {min} ile {max} arasında tam sayı bir token sayısı olmalıdır.",
   "error.provider.headersTooMany": "Çok fazla üstbilgi var.",
   "error.provider.headerNameCharacter": "Bir üstbilgi adı HTTP'nin izin vermediği bir karaktere sahip.",
   "error.provider.headerNameTooLong": "Bir üstbilgi adı çok uzun.",
@@ -177,6 +179,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} kimliği doğrulanmış bir hesap döndürmedi.",
   "error.provider.signInExpired": "{provider} oturumunuzun süresi doldu. Devam etmek için yeniden oturum açın.",
   "error.provider.cliActivateFailed": "OpenBot yönetilen CLI'yi etkinleştiremedi.",
+  "error.provider.cliNewVersionNotStarted": "Yeni sürüm başlamadı.",
   "error.provider.cliBusyReconnect":
     "{provider} CLI bir tur üzerinde çalışıyor. Bitmesini bekleyin, ardından tekrar bağlanın.",
   "error.provider.cliBusySignOut":
@@ -256,6 +259,20 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline başlatılamadı. Bir terminalde `cline --version` komutunu çalıştırın.",
   "error.provider.clineVersionUnreadable": "Cline CLI sürümü okunamıyor.",
   "error.provider.clineSignIn": "Cline'ı kullanmak için Cline ile oturum açın veya CLINE_API_KEY ayarlayın.",
+  "error.provider.kimiArchivePath": "Kimi arşivi beklenmeyen bir yola sahip.",
+  "error.provider.kimiChecksum": "Kimi çalışma zamanı sağlama toplamı (checksum) eşleşmiyor.",
+  "error.provider.kimiLicenseChecksum": "Kimi lisansı sağlama toplamı (checksum) eşleşmiyor.",
+  "error.provider.kimiMissing": "Kimi indirilmedi. Devam etmek için OpenBot içinde indirin.",
+  "error.provider.kimiOutdated": "Kimi CLI {version} çok eski. OpenBot 1.52.0 veya daha yenisini gerektirir.",
+  "error.provider.kimiNotStarted": "Kimi başlatılamadı. Bir terminalde `kimi --version` komutunu çalıştırın.",
+  "error.provider.kimiVersionUnreadable": "Kimi CLI sürümü okunamıyor.",
+  "error.provider.kimiSignIn": "Kimi'yi kullanmak için Kimi Code ile oturum açın.",
+  "error.provider.hermesMissing": "Hermes Agent yüklü değil. Yükleyin ve yeniden deneyin.",
+  "error.provider.hermesNotStarted":
+    "Hermes Agent başlatılamadı. Bir terminalde `hermes --version` komutunu çalıştırın.",
+  "error.provider.hermesVersionUnreadable": "Hermes Agent sürümü okunamıyor.",
+  "error.provider.hermesSignIn":
+    "Hermes'i kullanmak için Nous Portal ile oturum açın veya bir terminalde `hermes setup` komutunu çalıştırın.",
   "error.provider.usageLimitReached": "Hesap kullanım sınırına ulaştı.",
   "error.provider.foreignReasoning":
     "Farklı bir hesap veya API anahtarı aldığı için {provider} bu sohbetteki önceki akıl yürütmeyi kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
@@ -308,6 +325,8 @@ export const messages = {
   "error.provider.customAgentNoSecureStorage":
     "Bu bilgisayarda güvenli depolama alanı yok, bu nedenle ortam değerleri kaydedilemez. Bunları kaldırıp tekrar deneyin.",
   "error.provider.customAgentNotSaved": "Bu özel ajan kayıtlı değil. Listeyi yenileyip tekrar deneyin.",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}. “Yalnızca çalışma alanı” bunu engelliyor. “Tam erişim”i deneyin.",
   "error.provider.customAgentTooMany": "En fazla {count} özel ajan kaydedebilirsiniz.",
   "error.provider.customAgentEnvValueMissing": "{name} için bir değer girin.",
   "error.provider.off": "{provider}, OpenBot'ta kapalı. Önce sağlayıcı ayarlarından açın.",

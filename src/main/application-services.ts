@@ -144,6 +144,7 @@ import {
 import { AgentNotificationLevelStore, OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { AgentTemplateService } from "./agent-template-service";
 import { HostAnalytics } from "./analytics";
+import { readAnalyticsInstallId } from "./analytics-install-id";
 import { analyticsInventoryDayStore, collectAnalyticsInventory } from "./analytics-inventory";
 import { catalogPluginSlug, isReportedMcpServerName, loadCatalogPluginServers } from "./analytics-plugin-catalog";
 import { AnalyticsPreferenceService } from "./analytics-preference-service";
@@ -347,6 +348,7 @@ const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
 const ANALYTICS_INVENTORY_FILE = "openbot-analytics-inventory-v1.json";
+const ANALYTICS_INSTALL_ID_FILE = "openbot-analytics-install-id-v1.json";
 const APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v3.json";
 const V2_APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v2.json";
 const ROUTINE_FEED_FILE = "openbot-routine-feed-v1.json";
@@ -569,6 +571,8 @@ export interface ApplicationServices {
   setupFile: string;
   /** The analytics answer of this computer, kept the same as the account's latest answer. */
   analyticsPreferences: AnalyticsPreferenceService;
+  /** The random analytics ID of this install. Null when analytics is not built in or it cannot be saved. */
+  analyticsInstallId: string | null;
   updatePreferenceFile: string;
   approvalAutomation: ApprovalAutomation;
   agentAdminSettings: AgentAdminSettingsService;
@@ -2671,6 +2675,11 @@ export async function createApplicationServices({
   }
   performance.mark("openbot:services.remote-desktop");
   const analyticsEnabled = (app.isPackaged && appVariant === "production") || analyticsCaptureUrl !== null;
+  const analyticsInstallId = analyticsEnabled
+    ? await Effect.runPromise(
+        readAnalyticsInstallId(join(app.getPath("userData"), ANALYTICS_INSTALL_ID_FILE), Date.now()),
+      )
+    : null;
   const failureReports = analyticsEnabled
     ? new ReportQueue(
         fileReportStorage(join(app.getPath("userData"), "openbot-error-reports-v1.json")),
@@ -2705,6 +2714,7 @@ export async function createApplicationServices({
     enabled: analyticsEnabled,
     ...(analyticsCaptureUrl ? { apiUrl: analyticsCaptureUrl } : {}),
     trackingEnabled: analyticsPreference.enabled,
+    installId: analyticsInstallId,
     appVersion: app.getVersion(),
     platform: analyticsPlatform,
     // A function for a lifetime reason, not an ordering one: the signed-in account changes
@@ -3303,6 +3313,7 @@ export async function createApplicationServices({
     updater,
     setupFile,
     analyticsPreferences,
+    analyticsInstallId,
     updatePreferenceFile,
     approvalAutomation,
     agentAdminSettings,

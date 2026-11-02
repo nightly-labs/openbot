@@ -206,6 +206,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot disconnette {provider} su questo computer. Anche la CLI {provider} nel terminale viene disconnessa.",
   "provider.settings.disconnectHost": "OpenBot disconnette {provider} sul server.",
+  "provider.settings.versionInstalledByUser": "{version} · installata da te",
+  "provider.settings.versionDownloaded": "{version} · scaricata da OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache dei prompt",
   "provider.settings.promptCacheDescription":

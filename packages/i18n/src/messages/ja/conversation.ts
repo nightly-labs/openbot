@@ -90,7 +90,8 @@ export const messages = {
   "conversation.threads.error.start": "スレッドを開始できませんでした。",
   "conversation.threads.error.branch": "チャットを分岐できませんでした。",
   "conversation.threads.error.send": "スレッドにメッセージを送信できませんでした。",
-  "conversation.threads.error.files": "ファイルを送れるのは、このコンピューター上のエージェントのスレッドだけです。",
+  "conversation.threads.error.files":
+    "このサーバーはスレッドでファイルを受け付けません。サーバーの OpenBot を更新してください。",
   "conversation.threads.error.stop": "スレッドを停止できませんでした。",
   "conversation.threads.error.archive": "スレッドをアーカイブできませんでした。",
   "conversation.threads.error.restore": "スレッドを復元できませんでした。",

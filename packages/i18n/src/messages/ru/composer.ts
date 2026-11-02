@@ -64,6 +64,7 @@ export const messages = {
   "composer.reply.attachment": "Вложение",
   "composer.reply.cancel": "Отменить ответ",
   "composer.attachment.remove": "Убрать {name}",
+  "composer.attachment.adding": "Добавление {name}",
   "composer.placeholder.hostSetup": "Завершите настройку провайдера на хосте, чтобы начать",
   "composer.placeholder.connectHost": "Подключитесь к хосту, чтобы начать",
   "composer.placeholder.hostSleeping": "Сервер спит. Нажмите клавишу или щёлкните, чтобы разбудить его",

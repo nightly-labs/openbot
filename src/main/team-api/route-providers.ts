@@ -317,7 +317,7 @@ function releasedSaveBody({ harness: _harness, ...body }: DynamicRecord): Dynami
     ...body,
     models: body.models.map((model: unknown) => {
       if (!isObject(model)) return model;
-      const { contextWindow: _contextWindow, ...released } = model;
+      const { contextWindow: _contextWindow, maxOutput: _maxOutput, ...released } = model;
       return released;
     }),
   };
@@ -492,7 +492,11 @@ function managedProviderV5(body: DynamicRecord): ManagedProviderId {
   if (!isOneOf(PROVIDERS_V5_RUNTIME_PROVIDERS, id)) throw new Error("Unknown provider.");
   return id;
 }
-function wireSnapshotV5(snapshot: ProviderRuntimeSnapshot): ProviderRuntimeSnapshot {
+/** The `providers-v5` runtime snapshot: the v4 runtimes, Pi and Muse. Later runtimes go only to `providers-v8`. */
+interface WireProviderRuntimeSnapshotV5 extends Omit<ProviderRuntimeSnapshot, "providers"> {
+  providers: Record<(typeof PROVIDERS_V5_RUNTIME_PROVIDERS)[number], ProviderRuntimeStatus>;
+}
+function wireSnapshotV5(snapshot: ProviderRuntimeSnapshot): WireProviderRuntimeSnapshotV5 {
   const wire = wireSnapshotV4(snapshot);
   return {
     ...wire,

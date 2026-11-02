@@ -159,11 +159,11 @@ export const messages = {
   "settings.notch.size.height": "Hoogte",
   "settings.notch.size.previewNotch": "Ingebouwd scherm",
   "settings.notch.size.previewIsland": "Extern scherm",
-  "settings.analytics.title": "Deel productanalyse",
+  "settings.analytics.title": "Analyse aan mijn account koppelen",
   "settings.analytics.description":
-    "Stuur metadata over gebruik en betrouwbaarheid met je account-ID en e-mailadres naar de zelfgehoste analyse van OpenBot.",
+    "Aan: metadata over gebruik en betrouwbaarheid gaat met je account-ID en e-mailadres naar de zelfgehoste analyse van OpenBot, met de websites die jij en je agents bezoeken, het gebruik van tools en een dagelijks overzicht van je installatie. Uit: alleen basisgebruik, zoals beurten en aantallen tokens, gaat met een willekeurige installatie-ID. Chats, bestanden en prompts worden nooit verstuurd.",
   "settings.analytics.webDescription":
-    "Stuur metadata over gebruik en betrouwbaarheid met je account-ID en e-mailadres naar de zelfgehoste analyse van OpenBot. Deze instelling geldt voor deze browser.",
+    "Aan: metadata over gebruik en betrouwbaarheid gaat met je account-ID en e-mailadres naar de zelfgehoste analyse van OpenBot. Uit: dezelfde metadata gaat alleen met een willekeurige installatie-ID. Chats, bestanden en prompts worden nooit verstuurd. Deze instelling geldt voor deze browser.",
   "settings.tab.general.title": "Algemeen",
   "settings.tab.general.description": "Bepaal hoe OpenBot zich op deze computer gedraagt.",
   "settings.tab.agents.title": "Agents",

@@ -41,6 +41,8 @@ export const messages = {
   "onboarding.provider.googlePlan": "Google AI Pro- of Ultra-abonnement",
   "onboarding.provider.cursorPlan": "Cursor-abonnement of API-sleutel",
   "onboarding.provider.clineAccount": "Gratis modellen met een Cline-account",
+  "onboarding.provider.kimiAccount": "Kimi-modellen met een Kimi Code-account",
+  "onboarding.provider.hermesNous": "Nous Portal-abonnement of je Hermes-configuratie",
   "onboarding.provider.inceptionKey": "Mercury-modellen met een Inception-API-sleutel",
   "onboarding.provider.deepseekKey": "DeepSeek-modellen met een DeepSeek-API-sleutel",
   "onboarding.provider.openrouterKey": "Veel modellen met een OpenRouter-API-sleutel",
@@ -81,7 +83,8 @@ export const messages = {
   "onboarding.choice.startFreeInstead": "Toch gratis beginnen",
   "onboarding.consent.notice": "Door verder te gaan, accepteer je de {terms} en neem je kennis van het {privacy}.",
   "onboarding.consent.analyticsTitle": "Help OpenBot beter te maken",
-  "onboarding.consent.analyticsDetail": "Deel welke functies je gebruikt. Nooit je chats, bestanden of prompts.",
+  "onboarding.consent.analyticsDetail":
+    "Koppel functiegebruik aan je account en e-mailadres, en deel bezochte websites, gebruik van tools en een dagelijks overzicht van je installatie. Anders gaat alleen basisgebruik, met een willekeurige installatie-ID. Nooit je chats, bestanden of prompts.",
   "onboarding.consent.thanksTitle": "Bedankt! Het team staat bij je in het krijt.",
   "onboarding.consent.thanksToast": "Bedankt dat je helpt OpenBot beter te maken 💜",
   "onboarding.consent.thanksToastDetail": "Je kunt dit altijd wijzigen in Instellingen.",

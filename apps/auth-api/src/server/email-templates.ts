@@ -1,5 +1,6 @@
-import type { BillingPlanId } from "@openbot/contracts/billing";
-import { OPENBOT_LINKS } from "../lib/landing-links";
+import type { BillingCurrency, BillingPlanId } from "@openbot/contracts/billing";
+import { LICENSE_DEVICES_PER_USER, type LicensePlan, type LicenseTier } from "@openbot/contracts/license";
+import { OPENBOT_DOWNLOAD_PAGE_LINKS, OPENBOT_LINKS } from "../lib/landing-links";
 
 // HTML and plain-text bodies for account email. Mail clients render HTML very differently, so the
 // markup keeps to what all of them share:
@@ -46,9 +47,49 @@ export interface WelcomeEmailInput {
   serverName: string;
 }
 
+/** The first payment of a license. */
+interface LicenseWelcomeEmailInput {
+  plan: LicensePlan;
+  users: number;
+  currency: BillingCurrency;
+  /** The list price of one period, in minor units of `currency`. Null when a discount changes it. */
+  amount: number | null;
+  /** The next payment, in milliseconds since the epoch. Null when no payment follows. */
+  nextPaymentAt: number | null;
+}
+
+/** A renewal payment of a license that failed. */
+interface LicensePaymentFailedEmailInput {
+  plan: LicensePlan;
+  users: number;
+  currency: BillingCurrency;
+  /** The unpaid amount, in minor units of `currency`. */
+  amount: number;
+  /** Stripe's next try, in milliseconds since the epoch. Null when Stripe does not try again. */
+  nextAttemptAt: number | null;
+  /** Stripe's page for the unpaid invoice. Null sends the user to the web app. */
+  invoiceUrl: string | null;
+}
+
+/** A license that ended. */
+interface LicenseEndedEmailInput {
+  plan: LicensePlan;
+  users: number;
+  /** `unpaid` after the last failed try; `canceled` for a cancel, a refund, or a dispute. */
+  reason: "unpaid" | "canceled";
+}
+
+export type LicenseEmailInput =
+  | ({ kind: "welcome" } & LicenseWelcomeEmailInput)
+  | ({ kind: "payment_failed" } & LicensePaymentFailedEmailInput)
+  | ({ kind: "ended" } & LicenseEndedEmailInput);
+
 const SITE_URL = "https://openbot.run";
 const WEB_APP_URL = `${SITE_URL}/app`;
+const DOWNLOAD_URL = `${SITE_URL}${OPENBOT_DOWNLOAD_PAGE_LINKS.hub}`;
+const PRICING_URL = `${SITE_URL}/pricing`;
 const PLAN_NAMES: Record<BillingPlanId, string> = { starter: "Starter", standard: "Standard", pro: "Pro" };
+const LICENSE_TIER_NAMES: Record<LicenseTier, string> = { starter: "Starter", team: "Team" };
 const LOGO_URL = `${SITE_URL}/icon-192x192.png`;
 const FOOTER_LINKS = [
   { label: "openbot.run", href: SITE_URL },
@@ -229,6 +270,207 @@ export function renderWelcomeEmail(input: WelcomeEmailInput): RenderedEmail {
       footer,
     }),
   };
+}
+
+/** Each license email goes from the license sender, and a reply goes to that mailbox. */
+export function renderLicenseEmail(input: LicenseEmailInput): RenderedEmail {
+  switch (input.kind) {
+    case "welcome":
+      return renderLicenseWelcome(input);
+    case "payment_failed":
+      return renderLicensePaymentFailed(input);
+    case "ended":
+      return renderLicenseEnded(input);
+  }
+}
+
+// Sent once for a license, at its first payment: at once for a paid Checkout, at the end of a free
+// trial for a trial. Kamil signs it.
+function renderLicenseWelcome(input: LicenseWelcomeEmailInput): RenderedEmail {
+  const tierName = LICENSE_TIER_NAMES[input.plan.tier];
+  const seats = `${input.users} seat${input.users === 1 ? "" : "s"}`;
+  const subject = `Your OpenBot ${tierName} license is active`;
+  const preheader = `Thank you for buying OpenBot. Your license covers ${seats}.`;
+  const active = "Your license is active. You can use OpenBot for work now.";
+  const team =
+    input.plan.tier === "team"
+      ? "Invite your teammates from your server’s Members settings. The license counts each person once."
+      : "Your license covers you. Change to the Team license when you invite teammates.";
+  const devices = `Each user can use OpenBot on up to ${LICENSE_DEVICES_PER_USER} devices.`;
+  const reply = "If something does not work, or you have an idea, reply to this email. I read every reply.";
+  const footer = "You receive this email because you bought an OpenBot license.";
+  const rows = licenseRows(input.plan, input.users);
+  if (input.amount !== null)
+    rows.push(["Price", `${formatAmount(input.amount, input.currency)} / ${input.plan.interval}`]);
+  if (input.nextPaymentAt !== null) rows.push(["Next payment", formatDate(input.nextPaymentAt)]);
+  return {
+    subject,
+    preheader,
+    text: textBody(
+      [
+        "Hi,",
+        "",
+        "Thank you for buying OpenBot.",
+        active,
+        "",
+        ...rows.map(([label, value]) => `${label}: ${value}`),
+        "",
+        team,
+        devices,
+        `Download OpenBot: ${DOWNLOAD_URL}`,
+        "",
+        reply,
+        ...SIGNATURE_TEXT,
+      ],
+      footer,
+    ),
+    html: renderLayout({
+      title: subject,
+      preheader,
+      body: [
+        heading("Thank you for buying OpenBot", { gap: 16 }),
+        paragraph("Hi,", { gap: 16 }),
+        paragraph(active, { gap: 16 }),
+        detailRows(rows),
+        paragraph(`${escapeHtml(team)} ${devices}`, { gap: 16 }),
+        button("Download OpenBot", DOWNLOAD_URL),
+        paragraph(reply, { gap: 24 }),
+        SIGNATURE_HTML,
+      ].join(""),
+      footer,
+    }),
+  };
+}
+
+// Sent once for each unpaid renewal invoice, at its first failed try. Stripe tries again by itself, so
+// the license stays active until the last try fails.
+function renderLicensePaymentFailed(input: LicensePaymentFailedEmailInput): RenderedEmail {
+  const tierName = LICENSE_TIER_NAMES[input.plan.tier];
+  const subject = `Payment failed for your OpenBot ${tierName} license`;
+  const preheader = "Pay the invoice to keep your license active.";
+  const failed = "The payment for your OpenBot license did not go through.";
+  const retry =
+    input.nextAttemptAt === null
+      ? "This was the last try. If the invoice stays unpaid, your license ends."
+      : `Your license stays active while we try again on ${formatDate(input.nextAttemptAt)}. If no payment goes through, your license ends.`;
+  const action = input.invoiceUrl
+    ? "Pay the invoice now. You can use a different card."
+    : "Open Billing in the OpenBot settings to pay the invoice.";
+  const buttonLabel = input.invoiceUrl ? "Pay the invoice" : "Open OpenBot";
+  const url = input.invoiceUrl ?? WEB_APP_URL;
+  const reply = "If you have a question, reply to this email.";
+  const footer = "You receive this email because you have an OpenBot license.";
+  const rows = licenseRows(input.plan, input.users);
+  rows.push(["Amount due", formatAmount(input.amount, input.currency)]);
+  if (input.nextAttemptAt !== null) rows.push(["Next try", formatDate(input.nextAttemptAt)]);
+  return {
+    subject,
+    preheader,
+    text: textBody(
+      [
+        "Hi,",
+        "",
+        failed,
+        "",
+        ...rows.map(([label, value]) => `${label}: ${value}`),
+        "",
+        retry,
+        action,
+        `${buttonLabel}: ${url}`,
+        "",
+        reply,
+        ...SIGNATURE_TEXT,
+      ],
+      footer,
+    ),
+    html: renderLayout({
+      title: subject,
+      preheader,
+      body: [
+        heading("We could not take your payment", { gap: 16 }),
+        paragraph("Hi,", { gap: 16 }),
+        paragraph(failed, { gap: 16 }),
+        detailRows(rows),
+        paragraph(`${escapeHtml(retry)} ${escapeHtml(action)}`, { gap: 16 }),
+        button(buttonLabel, url),
+        paragraph(reply, { gap: 24 }),
+        SIGNATURE_HTML,
+      ].join(""),
+      footer,
+    }),
+  };
+}
+
+// Sent once when a license that had a payment ends. A trial that ends before its first payment gets none.
+function renderLicenseEnded(input: LicenseEndedEmailInput): RenderedEmail {
+  const tierName = LICENSE_TIER_NAMES[input.plan.tier];
+  const subject = `Your OpenBot ${tierName} license has ended`;
+  const ended =
+    input.reason === "unpaid"
+      ? "We could not take the payment for your OpenBot license, so it has ended."
+      : "Your OpenBot license was canceled, and it has ended.";
+  const preheader = ended;
+  const data = "Your workspaces, chats, and files stay on your computer.";
+  const again = "To use OpenBot for work again, buy a new license at any time.";
+  const reply = "If this is a mistake, or you have a question, reply to this email.";
+  const footer = "You receive this email because you had an OpenBot license.";
+  const rows = licenseRows(input.plan, input.users);
+  return {
+    subject,
+    preheader,
+    text: textBody(
+      [
+        "Hi,",
+        "",
+        ended,
+        "",
+        ...rows.map(([label, value]) => `${label}: ${value}`),
+        "",
+        data,
+        again,
+        `See prices: ${PRICING_URL}`,
+        "",
+        reply,
+        ...SIGNATURE_TEXT,
+      ],
+      footer,
+    ),
+    html: renderLayout({
+      title: subject,
+      preheader,
+      body: [
+        heading("Your license has ended", { gap: 16 }),
+        paragraph("Hi,", { gap: 16 }),
+        paragraph(escapeHtml(ended), { gap: 16 }),
+        detailRows(rows),
+        paragraph(`${escapeHtml(data)} ${escapeHtml(again)}`, { gap: 16 }),
+        button("See prices", PRICING_URL),
+        paragraph(reply, { gap: 24 }),
+        SIGNATURE_HTML,
+      ].join(""),
+      footer,
+    }),
+  };
+}
+
+const SIGNATURE_TEXT = ["", "Best,", "Kamil"];
+const SIGNATURE_HTML = paragraph("Best,<br>Kamil", { last: true });
+
+function licenseRows(plan: LicensePlan, users: number): [label: string, value: string][] {
+  return [
+    ["License", `${LICENSE_TIER_NAMES[plan.tier]} license${plan.bundle ? " (bundle)" : ""}`],
+    ["Seats", String(users)],
+  ];
+}
+
+/** An amount in minor units, for example `€80.00`. */
+function formatAmount(amount: number, currency: BillingCurrency): string {
+  return new Intl.NumberFormat("en", { style: "currency", currency: currency.toUpperCase() }).format(amount / 100);
+}
+
+/** A day in UTC, for example `2 Nov 2026`. */
+function formatDate(time: number): string {
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" }).format(time);
 }
 
 function textBody(lines: string[], footer: string): string {

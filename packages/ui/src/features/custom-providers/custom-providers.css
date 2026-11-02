@@ -125,6 +125,11 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.6fr) auto;
 }
 
+/* Two token counts next to the ID and the name. Each count keeps room for a value such as 131,072. */
+.custom-provider-row-inputs.custom-provider-row-quad {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(9ch, 0.8fr) minmax(9ch, 0.8fr) auto;
+}
+
 .custom-provider-rows-error,
 .custom-provider-row-error,
 .custom-provider-submit-error {

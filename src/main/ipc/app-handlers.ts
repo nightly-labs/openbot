@@ -74,6 +74,7 @@ const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
   "opencode-install": "https://opencode.ai/docs/",
   "opencode-auth": "https://opencode.ai/auth",
   "claude-install": "https://code.claude.com/docs",
+  "hermes-install": "https://hermes-agent.nousresearch.com/docs/getting-started/installation",
   feedback: "https://x.com/intent/post?text=Feedback%20for%20OpenBot%20%40norbertbodziony%3A%20",
   message: "https://x.com/norbertbodziony",
   changelog: "https://openbot.run/changelog",
@@ -121,6 +122,7 @@ export interface AppIpcDependencies {
   initializeAgent: () => Promise<void>;
   appVariant: AppVariant;
   analyticsCaptureUrl: string | null;
+  analyticsInstallId: string | null;
   getMainWindow: () => BrowserWindow | null;
   openChatWindow: (target: ChatWindowTarget) => void;
   chatWindowTargets: () => ChatWindowTarget[];
@@ -154,6 +156,7 @@ export function appIpcHandlers({
   initializeAgent,
   appVariant,
   analyticsCaptureUrl,
+  analyticsInstallId,
   getMainWindow,
   openChatWindow,
   chatWindowTargets,
@@ -175,6 +178,7 @@ export function appIpcHandlers({
           platform,
           variant: appVariant,
           ...(analyticsCaptureUrl ? { analyticsCaptureUrl } : {}),
+          ...(analyticsInstallId ? { analyticsInstallId } : {}),
         };
       }),
       getSetupState: handler(() => runCauseEffect(readSetupState(setupFile))),

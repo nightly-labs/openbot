@@ -10,6 +10,7 @@
  */
 
 import type { MacAutomationTarget, McpServerConfig, McpTransport, SkillCategory } from "@openbot/contracts/ipc";
+import { mcpAccountFragment, withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { isListingUrl, type McpAuth, mcpFlowFields } from "@openbot/contracts/mcp-connect-flows";
 
 /** One of the example questions a plugin listing opens with. */
@@ -64,12 +65,17 @@ interface MarketplacePluginServerBase {
  */
 export function isPluginAppConfig(config: McpServerConfig, app: MarketplacePluginApp): boolean {
   const server = app.server;
-  if (config.name !== server.name || config.transport !== server.transport) return false;
+  if (config.transport !== server.transport) return false;
   if (server.transport === "http") {
+    // An account the user added has its own label for a name, and the fragment that only "Add
+    // account" writes. Any other row must have the catalog name.
+    if (mcpAccountFragment(config.url) === null && config.name !== server.name) return false;
+    const url = withoutMcpAccountFragment(config.url);
     // A listing that asks for the user's own link cannot know the address, only its host.
     const userLink = (server.auth ?? []).some((flow) => mcpFlowFields(flow).some((field) => field.url));
-    return userLink ? isListingUrl(config.url, server.url) : config.url === server.url;
+    return userLink ? isListingUrl(url, server.url) : url === server.url;
   }
+  if (config.name !== server.name) return false;
   return (
     config.command === server.command &&
     config.args.length === server.args.length &&

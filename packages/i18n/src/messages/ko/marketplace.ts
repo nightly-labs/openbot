@@ -109,6 +109,7 @@ export const messages = {
   "marketplace.app.setup.account": "브라우저에서 {name} 계정으로 로그인해요.",
   "marketplace.app.setup.key": "{name} 계정의 API 키가 필요해요.",
   "marketplace.app.setup.keySaved": "{field}: {host}에 저장돼 있어요.",
+  "marketplace.app.account.removeDescription": "OpenBot이 {host}에 있는 이 계정의 로그인 정보를 삭제해요.",
   "marketplace.app.setup.desktop": "{name} 데스크톱 앱의 {address}에서 실행돼요.",
   "marketplace.app.setup.desktopConnected": "{address}에 연결됐어요.",
   "marketplace.app.setup.open": "로그인이나 키가 필요 없어요.",
@@ -361,6 +362,15 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "나에게 배정된 Trello 카드는 뭐야?",
   "marketplace.plugin.trello.prompt.board": "내 Trello 보드에서 진행 중인 작업을 요약해 줘.",
   "marketplace.plugin.trello.prompt.newCards": "이 실행 항목들을 내 Trello 보드에 카드로 추가해 줘.",
+  "marketplace.plugin.clickup.tagline": "작업, 문서, 팀 업데이트",
+  "marketplace.plugin.clickup.description":
+    "ClickUp을 사용하면 에이전트가 작업, 문서, 댓글, 채팅을 검색하고, 작업, 목록, 문서를 만들고 수정하며, 댓글을 달고, 채팅 메시지를 보내고, 시간을 기록할 수 있습니다. 각 사용자는 브라우저에서 자신의 ClickUp 계정에 로그인합니다. 에이전트는 사용자와 같은 권한을 가집니다. 작업을 휴지통으로 옮기고 댓글을 삭제할 수 있습니다.",
+  "marketplace.plugin.clickup.app":
+    "작업, 문서, 댓글, 채팅, 시간 기록을 ClickUp MCP 서버와 브라우저 로그인으로 사용합니다.",
+  "marketplace.plugin.clickup.prompt.findTasks": "이번 주 마감인 내 미완료 ClickUp 작업을 찾아 줘.",
+  "marketplace.plugin.clickup.prompt.createTask": "이 실행 항목들로 ClickUp 작업을 만들고 나에게 할당해 줘.",
+  "marketplace.plugin.clickup.prompt.summarizeDoc":
+    "ClickUp에서 최신 프로젝트 업데이트를 찾아 미해결 질문을 요약해 줘.",
   "marketplace.plugin.huggingface.tagline": "Hub의 모델, 데이터셋, 논문",
   "marketplace.plugin.huggingface.description":
     "Hugging Face를 사용하면 에이전트가 Hugging Face Hub에서 모델, 데이터셋, Spaces, 컬렉션, 논문을 검색하고, 모델 카드와 저장소 파일을 읽고, 데이터셋을 미리 보고, Hugging Face 문서를 검색할 수 있어요. 공개 Hub 데이터를 사용하므로 계정도 키도 필요 없어요. 도구는 읽기만 해요. 에이전트는 저장소를 만들거나 작업(Jobs)을 실행할 수 없어요.",
