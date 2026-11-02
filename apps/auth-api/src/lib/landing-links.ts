@@ -43,6 +43,8 @@ export const OPENBOT_LINKS = {
   /** GitHub Pages hosts the status page, so it stays up when Cloudflare does not. */
   status: "https://status.openbot.run",
   selfHostedServer: "https://github.com/nightly-labs/openbot/blob/main/docs/self-hosted-server.md",
+  dockerDocumentation: "https://github.com/nightly-labs/openbot/blob/main/docs/docker.md",
+  dockerInstallUbuntu: "https://docs.docker.com/engine/install/ubuntu/",
   architecture: "https://github.com/nightly-labs/openbot#architecture",
   contributing: "https://github.com/nightly-labs/openbot/blob/main/CONTRIBUTING.md",
   codex: "https://learn.chatgpt.com/docs/app-server",

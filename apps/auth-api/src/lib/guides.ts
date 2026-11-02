@@ -21,6 +21,14 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
   imageEyebrow: "OPENBOT · GUIDES",
   articles: publishedFirst([
     {
+      slug: "install-openbot-vps",
+      title: "How to Install OpenBot on a VPS: Ubuntu and Docker Guide",
+      description:
+        "Install OpenBot on a VPS with Ubuntu or Docker. Connect the server to your account, set up an AI provider, and manage updates, logs and backups.",
+      publishedAt: "2026-10-30",
+      author: NEWS_AUTHOR,
+    },
+    {
       slug: "import-hermes-agents",
       title: "How to Import Hermes Agents into OpenBot",
       description:
