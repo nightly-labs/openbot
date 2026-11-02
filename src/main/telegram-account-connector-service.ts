@@ -627,9 +627,7 @@ export class TelegramAccountConnectorService {
       searchMessages: (options) => this.#withClient((client) => client.searchMessages(options)),
       sendMessage: (options) =>
         this.#requireSending().pipe(
-          Effect.andThen(
-            this.#withClient((client) => this.#requireSending().pipe(Effect.andThen(client.sendMessage(options)))),
-          ),
+          Effect.andThen(this.#withClient((client) => client.sendMessage(options, this.#requireSending()))),
           Effect.tap((sent) =>
             Effect.sync(() => {
               logger.info("An agent sent a Telegram message.", { chat: sent.chat.id, message: sent.message.id });
@@ -642,9 +640,7 @@ export class TelegramAccountConnectorService {
         this.#requireSending().pipe(
           Effect.andThen(telegramFileToSend(options.path, { protected: this.#protectedDirectory, home: homedir() })),
           Effect.flatMap((path) =>
-            this.#withClient((client) =>
-              this.#requireSending().pipe(Effect.andThen(client.sendFile({ ...options, path }))),
-            ),
+            this.#withClient((client) => client.sendFile({ ...options, path }, this.#requireSending())),
           ),
           Effect.tap((sent) =>
             Effect.sync(() => {
@@ -654,9 +650,7 @@ export class TelegramAccountConnectorService {
         ),
       markRead: (chat) =>
         this.#requireSending().pipe(
-          Effect.andThen(
-            this.#withClient((client) => this.#requireSending().pipe(Effect.andThen(client.markRead(chat)))),
-          ),
+          Effect.andThen(this.#withClient((client) => client.markRead(chat, this.#requireSending()))),
         ),
     };
   }

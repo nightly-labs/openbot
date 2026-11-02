@@ -237,16 +237,25 @@ export function messageAttachment(message: Api.Message): TelegramAttachment | nu
  */
 export function attachmentFileName(message: Api.Message, attachment: TelegramAttachment): string {
   const base = (attachment.file_name ?? attachment.kind).normalize("NFC");
-  const clean = base
-    .replace(/[^\p{L}\p{N} ._-]/gu, "_")
-    .replace(/^[.\s]+/u, "")
-    .slice(0, 120);
+  const clean = base.replace(/[^\p{L}\p{N} ._-]/gu, "_").replace(/^[.\s]+/u, "");
   // GramJS answers ".jpg" for a photo and "ogg", without the dot, for a document.
-  const found = attachment.file_name ? "" : utils.getExtension(message.media);
+  const found = attachment.file_name
+    ? (/\.[\p{L}\p{N}]{1,10}$/u.exec(clean)?.[0] ?? "")
+    : utils.getExtension(message.media);
   const dotted = found && !found.startsWith(".") ? `.${found}` : found;
   // Voice messages are OGG with Opus; ".oga" is a name that few players and transcribers know.
-  const extension = dotted === ".oga" ? ".ogg" : dotted;
-  return `${message.id}-${clean || attachment.kind}${extension}`;
+  const extension = !attachment.file_name && dotted === ".oga" ? ".ogg" : dotted;
+  const stem = attachment.file_name && found ? clean.slice(0, -found.length) : clean;
+  // Keep whole Unicode code points. 120 bytes leaves space for the message id, extension and
+  // the temporary download suffix within the 255-byte file-system component limit.
+  let name = "";
+  let bytes = Buffer.byteLength(extension);
+  for (const character of stem) {
+    bytes += Buffer.byteLength(character);
+    if (bytes > 120) break;
+    name += character;
+  }
+  return `${message.id}-${name || attachment.kind}${extension}`;
 }
 
 export function messageRecord(message: Api.Message): TelegramMessageRecord {

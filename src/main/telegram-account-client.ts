@@ -375,7 +375,9 @@ export class TelegramAccountClient {
       const read: TelegramMessageRecord[] = [];
       let more = false;
       const iterator = this.#client.iterMessages(chat.input, {
-        limit: options.limit + 1,
+        // A forward read can skip old messages before it reaches the date filter. Count the
+        // matching messages below, not the messages that GramJS has visited.
+        limit: forward && since !== null ? Number.MAX_SAFE_INTEGER : options.limit + 1,
         reverse: forward,
         ...(options.beforeId ? { offsetId: options.beforeId } : {}),
         ...(options.afterId ? { minId: options.afterId } : {}),
@@ -424,8 +426,10 @@ export class TelegramAccountClient {
   readonly sendMessage = Effect.fn("TelegramAccountClient.sendMessage")(function* (
     this: TelegramAccountClient,
     options: { chat: string; text: string; replyToId: number | null },
+    requireSending: Effect.Effect<void, TelegramAccountOperationError>,
   ): Effect.fn.Return<{ chat: TelegramChatSummary; message: TelegramMessageRecord }, TelegramAccountOperationError> {
     const chat = yield* this.resolveChat(options.chat, { exact: true });
+    yield* requireSending;
     const sent = yield* telegramAccountCall(() =>
       this.#client.sendMessage(chat.input, {
         message: options.text,
@@ -501,8 +505,10 @@ export class TelegramAccountClient {
       kind: "auto" | "photo" | "document" | "voice" | "audio" | "video" | "video_note";
       replyToId: number | null;
     },
+    requireSending: Effect.Effect<void, TelegramAccountOperationError>,
   ): Effect.fn.Return<{ chat: TelegramChatSummary; message: TelegramMessageRecord }, TelegramAccountOperationError> {
     const chat = yield* this.resolveChat(options.chat, { exact: true });
+    yield* requireSending;
     const sent = yield* telegramAccountCall(() =>
       this.#client.sendFile(chat.input, {
         file: options.path,
@@ -522,8 +528,10 @@ export class TelegramAccountClient {
   readonly markRead = Effect.fn("TelegramAccountClient.markRead")(function* (
     this: TelegramAccountClient,
     reference: string,
+    requireSending: Effect.Effect<void, TelegramAccountOperationError>,
   ): Effect.fn.Return<{ chat: TelegramChatSummary }, TelegramAccountOperationError> {
     const chat = yield* this.resolveChat(reference, { exact: true });
+    yield* requireSending;
     yield* telegramAccountCall(() => this.#client.markAsRead(chat.input));
     return { chat: summary(chat) };
   });
