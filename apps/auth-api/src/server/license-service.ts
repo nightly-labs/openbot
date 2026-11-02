@@ -85,6 +85,13 @@ const LICENSE_EMAIL_CLAIM_PREFIXES = {
 } as const satisfies Record<LicenseEmailInput["kind"], string>;
 /** A license that changes from one of these statuses had no payment yet. */
 const BEFORE_FIRST_PAYMENT_STATUSES: ReadonlySet<string> = new Set(["trialing", "incomplete"]);
+/** A license with one of these statuses waits for a payment that failed or is missing. */
+const UNPAID_STATUSES: ReadonlySet<string> = new Set(["past_due", "unpaid", "paused"]);
+/** The longest first period after a trial, with one day more for the calendar. */
+const FIRST_PERIOD_AFTER_TRIAL_MS: Readonly<Record<BillingInterval, number>> = {
+  month: 32 * 86_400_000,
+  year: 367 * 86_400_000,
+};
 
 /** The unpaid renewal invoice of a license, read from an `invoice.payment_failed` event. */
 export interface FailedLicenseInvoice {
@@ -106,6 +113,7 @@ export interface LicenseSync {
   users: number;
   interval: BillingInterval;
   currency: BillingCurrency;
+  status: BillingSubscriptionStatus;
 }
 
 /** The stored state of a license before a sync writes it. */
@@ -856,22 +864,25 @@ export class LicenseService {
         written?.meta.changes === 1
           ? licenseChange(previous, { users, status: subscription.status, cancelAtPeriodEnd, plan, currency })
           : null;
-      if (
-        written?.meta.changes === 1 &&
-        subscription.status === "active" &&
-        (previous === null || BEFORE_FIRST_PAYMENT_STATUSES.has(previous.status))
-      ) {
+      // A trial whose first payment failed is unpaid until a later try or the customer pays.
+      const unpaidTrial =
+        previous !== null &&
+        UNPAID_STATUSES.has(previous.status) &&
+        inFirstPeriodAfterTrial(subscription, plan.interval, periodEnd);
+      const neverPaid = previous === null || BEFORE_FIRST_PAYMENT_STATUSES.has(previous.status) || unpaidTrial;
+      if (written?.meta.changes === 1 && subscription.status === "active" && neverPaid) {
         yield* this.#sendEmail(ownerId, subscription.id, {
           kind: "welcome",
           plan,
           users,
           currency,
-          amount: licensePeriodAmount(plan, users, currency),
+          // Stripe gives a discount only as an ID, so a discounted license shows no price.
+          amount: subscriptionHasDiscount(subscription) ? null : licensePeriodAmount(plan, users, currency),
           nextPaymentAt: cancelAtPeriodEnd ? null : periodEnd,
         });
       }
       // A trial or an incomplete Checkout that ends had no payment, so it gets no email.
-      if (change?.endReason && previous && !BEFORE_FIRST_PAYMENT_STATUSES.has(previous.status)) {
+      if (change?.endReason && !neverPaid) {
         yield* this.#sendEmail(ownerId, subscription.id, { kind: "ended", plan, users, reason: change.endReason });
       }
       // Checkout lets one account open one license. A second one comes only from the Dashboard or a payment
@@ -947,6 +958,7 @@ export class LicenseService {
         users,
         interval: plan.interval,
         currency,
+        status: subscription.status,
       };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -954,7 +966,8 @@ export class LicenseService {
 
   /**
    * Sends the email for a failed renewal payment of a stored license, once for each invoice. The first
-   * payment fails on the Checkout page, which shows the error, so it sends none.
+   * payment fails on the Checkout page, which shows the error, so it sends none. A license that ended
+   * with the failed payment gets the ended email only.
    */
   readonly paymentFailed = Effect.fn("LicenseService.paymentFailed")(
     function* (
@@ -962,6 +975,7 @@ export class LicenseService {
       synced: LicenseSync,
       invoice: FailedLicenseInvoice,
     ): Effect.fn.Return<void, BillingError | BillingOperationError, LicenseDependencies> {
+      if (!isOpenBillingStatus(synced.status)) return;
       yield* this.#sendEmail(synced.userId, invoice.invoiceId, {
         kind: "payment_failed",
         plan: synced.plan,
@@ -1372,4 +1386,25 @@ function licensePlanChange(): BillingError {
 
 function noLicense(): BillingError {
   return new BillingError(404, "no_license", sourceText("error.billing.noLicense"));
+}
+
+/**
+ * True in the first period after a trial. Stripe keeps `trial_end` after the trial, and each later period
+ * moves the period end past this limit.
+ */
+function inFirstPeriodAfterTrial(
+  subscription: StripeSubscription,
+  interval: BillingInterval,
+  periodEnd: number | null,
+): boolean {
+  const trialEnd = subscription.trial_end;
+  if (typeof trialEnd !== "number" || periodEnd === null) return false;
+  return periodEnd <= trialEnd * 1_000 + FIRST_PERIOD_AFTER_TRIAL_MS[interval];
+}
+
+function subscriptionHasDiscount(subscription: StripeSubscription): boolean {
+  return (
+    (subscription.discounts?.length ?? 0) > 0 ||
+    subscription.items.data.some((item) => (item.discounts?.length ?? 0) > 0)
+  );
 }

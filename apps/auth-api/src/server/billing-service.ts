@@ -1300,10 +1300,10 @@ function isLicenseCheckout(event: StripeEvent): boolean {
   return isDynamicRecord(metadata) && metadata[LICENSE_METADATA.kind] === LICENSE_METADATA_KIND;
 }
 
-/** The subscription that an event is about, or null for an event that does not change one. */
 /**
- * The unpaid invoice of a failed renewal or trial end (`subscription_cycle`). Null for another event, for
- * the first payment, for a plan change, or for an amount in another currency.
+ * The unpaid invoice of a failed renewal or trial end (`subscription_cycle`), at Stripe's first try. Null for
+ * another event, for a later try, for the first payment, for a plan change, or for an amount in another
+ * currency. The claim of an email stays only 7 days, and Stripe tries again for longer.
  */
 function failedRenewalInvoice(event: StripeEvent, currency: BillingCurrency): FailedLicenseInvoice | null {
   if (event.type !== "invoice.payment_failed") return null;
@@ -1311,6 +1311,7 @@ function failedRenewalInvoice(event: StripeEvent, currency: BillingCurrency): Fa
   const amountDue = object.amount_due;
   if (
     object.billing_reason !== "subscription_cycle" ||
+    object.attempt_count !== 1 ||
     !isString(object.id) ||
     !isBillingAmount(amountDue) ||
     !isString(object.currency) ||
@@ -1334,6 +1335,7 @@ function stripeInvoiceUrl(value: unknown): string | null {
   return url.protocol === "https:" && url.hostname === "invoice.stripe.com" ? url.href : null;
 }
 
+/** The subscription that an event is about, or null for an event that does not change one. */
 function eventSubscriptionId(event: StripeEvent): string | null {
   const object = event.data.object;
   switch (event.type) {

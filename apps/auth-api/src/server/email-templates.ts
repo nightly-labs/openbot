@@ -52,8 +52,8 @@ export interface LicenseWelcomeEmailInput {
   plan: LicensePlan;
   users: number;
   currency: BillingCurrency;
-  /** The price of one period, in minor units of `currency`. */
-  amount: number;
+  /** The list price of one period, in minor units of `currency`. Null when a discount changes it. */
+  amount: number | null;
   /** The next payment, in milliseconds since the epoch. Null when no payment follows. */
   nextPaymentAt: number | null;
 }
@@ -300,7 +300,8 @@ function renderLicenseWelcome(input: LicenseWelcomeEmailInput): RenderedEmail {
   const reply = "If something does not work, or you have an idea, reply to this email. I read every reply.";
   const footer = "You receive this email because you bought an OpenBot license.";
   const rows = licenseRows(input.plan, input.users);
-  rows.push(["Price", `${formatAmount(input.amount, input.currency)} / ${input.plan.interval}`]);
+  if (input.amount !== null)
+    rows.push(["Price", `${formatAmount(input.amount, input.currency)} / ${input.plan.interval}`]);
   if (input.nextPaymentAt !== null) rows.push(["Next payment", formatDate(input.nextPaymentAt)]);
   return {
     subject,

@@ -545,8 +545,8 @@ one-time code and its expiration time. A team invitation can contain the inviter
 role, and invite URL. When the first cloud server plan of an account starts, a welcome message goes
 to the account address. It contains the plan name and the server name. License messages go to the
 account address from `licenses@openbot.run` through the same provider. When a license has its first
-payment, the message contains the license tier, the number of users, the price, the currency, the
-billing period, and the date of the next payment. When a renewal payment fails, the message contains
+payment, the message contains the license tier, the number of users, the list price when no discount
+applies, the currency, the billing period, and the date of the next payment. When a renewal payment fails, the message contains
 the license tier, the number of users, the amount due, the currency, the date of the next payment
 try, and the link to the Stripe page of the invoice. When a paid license ends, the message contains
 the license tier, the number of users, and whether it ended after a failed payment. The HTML version of a message loads the OpenBot logo from `openbot.run` when

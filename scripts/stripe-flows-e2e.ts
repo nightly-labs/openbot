@@ -120,6 +120,7 @@ const SCENARIOS = [
   "license-count",
   "license-renewal",
   "license-failed-renewal",
+  "license-trial-failed",
   "license-currency",
   "license-isolation",
   "license-limit",
@@ -2432,13 +2433,45 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       print("SKIP [license-failed-renewal] send count: the remote Worker log is not available");
       return;
     }
-    const failed = await billingEmailSends(account.api, since, "license email payment_failed");
+    const failed = await waitFor("license payment failed send", async () => {
+      const lines = await billingEmailSends(account.api, since, "license email payment_failed");
+      return lines.length > 0 ? lines : null;
+    });
     const sends = await billingEmailSends(account.api, since, "license email");
     record(
       "license-failed-renewal",
       "one payment failed email for the invoice; the payment after it sends no welcome or ended email",
       failed.length === 1 && sends.length === 2 && licenseEmailClaims("ended", sub).length === 0,
       { sends },
+    );
+  },
+
+  async "license-trial-failed"(account) {
+    const sub = await account.buyLicense(1, "eur", STARTER_MONTH, Date.now() + 3 * 86_400_000);
+    await licenseWhere(account, "license trialing", (state) => state.license?.status === "trialing");
+    await account.useCard("pm_card_chargeCustomerFail");
+    await account.advance(4);
+    const due = await licenseWhere(account, "past_due", (state) => state.license?.status === "past_due", 120_000);
+    const unpaid = (await subscription(sub)).latest_invoice ?? "";
+    const failedClaim = await waitFor(
+      "payment failed claim",
+      async () => licenseEmailClaims("payment_failed", unpaid)[0],
+    );
+    record(
+      "license-trial-failed",
+      "a failed first payment at the trial end claims one payment failed email and no welcome email",
+      failedClaim.type === "license_email_payment_failed" && licenseEmailClaims("welcome", sub).length === 0,
+      { license: due.license, claim: failedClaim },
+    );
+    const good = await account.useCard("pm_card_visa");
+    await stripe("POST", `/v1/invoices/${unpaid}/pay`, idSchema, { payment_method: good });
+    await licenseWhere(account, "active", (state) => state.license?.status === "active");
+    const welcome = await waitFor("license welcome claim", async () => licenseEmailClaims("welcome", sub)[0]);
+    record(
+      "license-trial-failed",
+      "the first payment after a failed trial end claims the welcome email, and no ended email",
+      welcome.type === "license_email_welcome" && licenseEmailClaims("ended", sub).length === 0,
+      { welcome, ended: licenseEmailClaims("ended", sub) },
     );
   },
 
