@@ -3,7 +3,13 @@
 
 import type { LinkAccountState, LinkAccountStatus } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
+import {
+  createOpenBotLogger,
+  redactText,
+  registerSecretValue,
+  registerSecretValues,
+  toLogValue,
+} from "@openbot/logging";
 import { Duration, Effect, Exit, Result, Scope, Semaphore } from "effect";
 import { z } from "zod";
 import {
@@ -205,8 +211,8 @@ export class LinkAccountService implements LinkWallet {
 
   /** Stops the sign-in, the waits for approvals, and the revokes. The encrypted sign-in stays. */
   readonly dispose = Effect.fn("LinkAccount.dispose")(function* (this: LinkAccountService) {
+    // The generation stays: a refresh that runs now must still write Link's rotated token.
     this.#disposed = true;
-    this.#generation += 1;
     this.#pending?.controller.abort();
     this.#pending = null;
     this.#listeners.clear();
@@ -245,8 +251,14 @@ export class LinkAccountService implements LinkWallet {
         if (this.#now() >= deadline)
           return { status: "expired", detail: "The user did not answer in Link within 5 minutes." };
         yield* Effect.sleep(Duration.millis(APPROVAL_POLL_MS));
-        const read = yield* this.#api("GET", `/spend_requests/${encodeURIComponent(spend.id)}`);
-        spend = yield* parseAnswer(spendRequestSchema, read, "spend request");
+        const read = yield* this.#api("GET", `/spend_requests/${encodeURIComponent(spend.id)}`).pipe(Effect.result);
+        // Link or the network failed for a moment: the request can still be approved, so ask again.
+        if (Result.isFailure(read)) {
+          if (isUnreachable(read.failure)) continue;
+          return yield* read.failure;
+        }
+        if (read.success.status >= 500) continue;
+        spend = yield* parseAnswer(spendRequestSchema, read.success, "spend request");
       }
       if (spend.status !== "approved") {
         const status =
@@ -286,8 +298,13 @@ export class LinkAccountService implements LinkWallet {
     const spend = yield* parseAnswer(spendRequestWithCardSchema, read, "card");
     const card = spend.card;
     if (spend.status !== "approved" || !card) return null;
-    registerSecretValue(card.number);
-    if (card.cvc) registerSecretValue(card.cvc, { allowShort: true });
+    // The number also as the page may show it, in groups of four. The security code is not
+    // registered: a three-digit pattern would remove numbers from every log line. It reaches only the page.
+    registerSecretValues([
+      card.number,
+      card.number.replace(/(\d{4})(?=\d)/gu, "$1 "),
+      card.number.replace(/(\d{4})(?=\d)/gu, "$1-"),
+    ]);
     return {
       secret: {
         number: card.number,
@@ -312,12 +329,27 @@ export class LinkAccountService implements LinkWallet {
     let record = this.#store.read();
     if (!record || this.#expired)
       return yield* new LinkOperationError({ cause: new Error(sourceText("error.connector.linkNotConnected")) });
+    if (!record.refreshToken && this.#accessTokenExpired(record)) return yield* this.#markExpired();
     if (this.#accessTokenExpired(record, REFRESH_MARGIN_MS) && record.refreshToken)
       record = yield* this.#refresh(record);
     const first = yield* this.#send(method, path, body, record.accessToken);
+    if (first.status === 401 && !record.refreshToken) return yield* this.#markExpired();
     if (first.status !== 401 || !record.refreshToken) return first;
     record = yield* this.#refresh(record);
     return yield* this.#send(method, path, body, record.accessToken);
+  });
+
+  /** Link stopped the sign-in, and no refresh token can renew it. The user connects again. */
+  readonly #markExpired = Effect.fn("LinkAccount.markExpired")(function* (
+    this: LinkAccountService,
+  ): Effect.fn.Return<never, LinkOperationError> {
+    const message = sourceText("error.connector.linkExpired");
+    if (!this.#expired) {
+      this.#expired = true;
+      this.#error = message;
+      this.#emitStatus();
+    }
+    return yield* new LinkOperationError({ cause: new Error(message) });
   });
 
   readonly #send = Effect.fn("LinkAccount.send")(function* (
@@ -503,6 +535,10 @@ function parseAnswer<T>(
     if (!parsed.success) throw unexpected(what);
     return parsed.data;
   });
+}
+
+function isUnreachable(error: LinkOperationError): boolean {
+  return error.cause instanceof LinkAuthError && error.cause.failure === "unreachable";
 }
 
 /** Throws for a failed call: an error with Link's message, never the body. */

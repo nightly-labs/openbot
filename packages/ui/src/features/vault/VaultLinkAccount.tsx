@@ -42,7 +42,7 @@ const LINK_MARK = "link";
  * user to approve each payment in Link and gets a one-time card.
  */
 export function VaultLinkAccount(props: VaultLinkAccountProps) {
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, sourceText } = useText();
   const [ui, setUi] = createStore<LinkUi>({ busy: false, failure: null, disconnecting: false });
 
   async function run(action: () => Promise<void>): Promise<boolean> {
@@ -68,7 +68,9 @@ export function VaultLinkAccount(props: VaultLinkAccountProps) {
   const detail = () => {
     if (props.status.state === "pending") return t("vault.link.waiting");
     if (props.status.state === "connected") return props.status.email ?? "";
-    return props.status.error ?? (props.status.state === "expired" ? t("error.connector.linkExpired") : "");
+    // Main sends its error as source text, so it shows in the user's language.
+    if (props.status.error) return sourceText(props.status.error);
+    return props.status.state === "expired" ? t("error.connector.linkExpired") : "";
   };
   const failed = () => props.status.state !== "pending" && props.status.state !== "connected" && detail() !== "";
   // A failed or expired sign-in shows its reason in the danger colour.

@@ -36,6 +36,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Result, Schema } from "effect";
+import { getDomain } from "tldts";
 import type { AgentApiKeys } from "../agent-api-keys";
 import type { AgentClient } from "../agent-client";
 import { type BrowserOperationError, browserFailure } from "../browser-effects";
@@ -187,10 +188,15 @@ function httpsHost(address: string): string | null {
   }
 }
 
-/** The merchant's own site: the same host, or one of them under the other, such as shop.example.com. */
-function sameSite(host: string | null, merchant: string): boolean {
+/**
+ * The merchant's own site: the same registrable domain, such as shop.example.com for example.com. A
+ * public suffix, such as `myshopify.com` or `co.uk`, is never a site.
+ */
+function sameSite(address: string, merchant: string): boolean {
+  const host = httpsHost(address);
   if (!host) return false;
-  return host === merchant || host.endsWith(`.${merchant}`) || merchant.endsWith(`.${host}`);
+  const domain = getDomain(host, { allowPrivateDomains: true });
+  return domain !== null && domain === getDomain(merchant, { allowPrivateDomains: true });
 }
 
 /** The change that `save_vault_item` asks for, or the text that tells the agent what is wrong. */
@@ -1128,14 +1134,18 @@ export class AttentionRegistry {
     const card = read.success;
     if (!card) return browserTakeoverError("Link has no approved card with this id. Call request_link_payment first.");
     const merchant = httpsHost(card.merchantUrl);
-    const approvedPages = new Set<string>();
+    const onMerchant = (address: string) => merchant !== null && sameSite(address, merchant);
+    // The pages and frames that the owner let this one fill use. The approval is not kept.
+    const approvedFrames = new Map<string, Set<string>>();
     return {
       secret: (id) => (id === cardId ? card.secret : null),
-      approved: (id, page) =>
-        id === cardId && (approvedPages.has(page) || (merchant !== null && sameSite(httpsHost(page), merchant))),
-      approve: (id, page) =>
+      approved: (id, page, frames) =>
+        id === cardId &&
+        [page, ...frames].every((frame) => onMerchant(frame) || approvedFrames.get(page)?.has(frame) === true),
+      approve: (id, page, frames) =>
         Effect.gen({ self: this }, function* () {
           if (id !== cardId) return false;
+          const others = frames.filter((frame) => frame !== page && !onMerchant(frame));
           const decision = yield* this.awaitToolApproval(
             client,
             request,
@@ -1147,18 +1157,23 @@ export class AttentionRegistry {
               kind: "permissions",
               command: null,
               cwd: null,
-              reason: sourceText("status.agent.linkCardFill", {
-                card: `•••• ${card.secret.number.slice(-4)}`,
-                site: page,
-                merchant: card.merchantUrl || "?",
-              }),
+              reason: [
+                sourceText("status.agent.linkCardFill", {
+                  card: `•••• ${card.secret.number.slice(-4)}`,
+                  site: page,
+                  merchant: card.merchantUrl || "?",
+                }),
+                ...(others.length > 0
+                  ? [sourceText("status.agent.vaultCardFillFrames", { origins: others.join(", ") })]
+                  : []),
+              ].join(" "),
               grantRoot: null,
               permissions: null,
             },
             { ownerOnly: true },
           );
           if (decision !== "accept") return false;
-          approvedPages.add(page);
+          approvedFrames.set(page, new Set([...(approvedFrames.get(page) ?? []), page, ...frames]));
           return true;
         }),
     } satisfies BrowserCardVault;
