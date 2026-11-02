@@ -202,7 +202,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "keenable",
       version: "1.0.0",
       featured: false,
-      detailSha256: "41427819f9e748c37215ea1197fb2a08494765f46bd2238f31604f6131eb3f48",
+      detailSha256: "51ce40eab16cfe578bb237108638cc746fe7a02e1aefca669c106025be3df672",
     },
   ],
 };
@@ -1441,7 +1441,11 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         description:
           "Search the web and fetch page content using Keenable's hosted MCP server. To raise the limits, add your API key as an X-API-Key header in server settings.",
         iconUrl: "https://keenable.ai/favicon.ico",
-        server: { name: "keenable", transport: "http", url: "https://api.keenable.ai/mcp-public" },
+        server: {
+          name: "keenable",
+          transport: "http",
+          url: "https://api.keenable.ai/mcp-public?keenable_title=openbot",
+        },
       },
     ],
     websiteUrl: "https://keenable.ai",

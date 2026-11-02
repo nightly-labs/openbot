@@ -1406,7 +1406,7 @@ const KEENABLE: MarketplacePluginDetail = {
       description:
         "Search the web and fetch page content using Keenable's hosted MCP server. To raise the limits, add your API key as an X-API-Key header in server settings.",
       iconUrl: "https://keenable.ai/favicon.ico",
-      server: { name: "keenable", transport: "http", url: "https://api.keenable.ai/mcp-public" },
+      server: { name: "keenable", transport: "http", url: "https://api.keenable.ai/mcp-public?keenable_title=openbot" },
     },
   ],
   websiteUrl: "https://keenable.ai",

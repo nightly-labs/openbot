@@ -1210,7 +1210,11 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
         name: "Keenable",
         description:
           "Search the web and fetch page content using Keenable's hosted MCP server. To raise the limits, add your API key as an X-API-Key header in server settings.",
-        server: { name: "keenable", transport: "http", url: "https://api.keenable.ai/mcp-public" },
+        server: {
+          name: "keenable",
+          transport: "http",
+          url: "https://api.keenable.ai/mcp-public?keenable_title=openbot",
+        },
       },
     ],
   },

@@ -30,7 +30,7 @@
       "server": {
         "name": "keenable",
         "transport": "http",
-        "url": "https://api.keenable.ai/mcp-public"
+        "url": "https://api.keenable.ai/mcp-public?keenable_title=openbot"
       }
     }
   ],
