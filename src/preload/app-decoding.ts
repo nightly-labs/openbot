@@ -552,6 +552,12 @@ export function decodeAgentImportSkill(value: unknown): string {
 
 export const decodeVoid = emptyDecoder("IPC returned unexpected data.");
 
+/** True shows the hint that `Cmd + Q` must be held or pressed twice, and false removes it. */
+export function decodeQuitShortcutHint(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  throw new Error("Invalid quit shortcut hint.");
+}
+
 export function decodeHostedSite(value: unknown): HostedSiteSummary {
   const site = parseHostedSiteSummary(value);
   if (!site) throw new Error("Invalid hosted site response.");

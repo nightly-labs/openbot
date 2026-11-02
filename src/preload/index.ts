@@ -168,6 +168,7 @@ import {
   decodePendingListing,
   decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
+  decodeQuitShortcutHint,
   decodeRemoteDesktopSetupFromMain,
   decodeRemoteDesktopTestFromMain,
   decodeRemoteNetworkRouteState,
@@ -673,6 +674,7 @@ const openbotApi: OpenBotDesktopApi = {
     openChatWindow: decodeVoid,
     getChatWindows: decodeChatWindowTargets,
     chatWindows: decodeChatWindowTargets,
+    quitShortcutHint: decodeQuitShortcutHint,
   }),
   ...bridgeGroup(IPC_ENDPOINTS.providers, {
     connectProvider: decodeAgentStatusFromMain,

@@ -25,7 +25,9 @@ import {
   BrowserWindow,
   clipboard,
   type Display,
+  dialog,
   Menu,
+  type MenuItemConstructorOptions,
   type Point,
   type Rectangle,
   screen,
@@ -53,6 +55,7 @@ import {
   resolveMainWindowBounds,
   writeMainWindowBounds,
 } from "./main-window-state";
+import { createQuitShortcut, type QuitShortcut } from "./quit-shortcut";
 import type { RemoteServerManager } from "./remote-server-manager";
 import type { RemoteWorkflowError } from "./remote-service-effects";
 import { sendToRenderer } from "./renderer-ipc";
@@ -133,6 +136,8 @@ export interface MainWindowContext {
   /** Where the entry point attaches the Windows session-end handlers, which read its own flags. */
   onMainWindowCreated: (window: BrowserWindow) => void;
   reportError: (message: string, error: unknown) => void;
+  /** Quits after `Cmd + Q` was held or pressed twice in a window. See `createQuitShortcut`. */
+  quitFromShortcut: () => void;
 }
 
 export interface MainWindowController {
@@ -164,7 +169,16 @@ export function createMainWindowController({
   onRendererGone,
   onMainWindowCreated,
   reportError,
+  quitFromShortcut,
 }: MainWindowContext): MainWindowController {
+  const quitShortcut =
+    process.platform === "darwin"
+      ? createQuitShortcut({
+          quit: quitFromShortcut,
+          isQuitting,
+          showHint: (window, visible) => sendToRenderer(window, IPC_ENDPOINTS.app.quitShortcutHint, visible),
+        })
+      : null;
   const { restoreMainWindowBounds, currentMainWindowBounds, rememberMainWindowBounds, flushMainWindowBounds } =
     createMainWindowBoundsRecorder({
       getMainWindow: () => holder.current,
@@ -256,7 +270,7 @@ export function createMainWindowController({
     });
     window.webContents.on("render-process-gone", onRendererGone);
     window.webContents.once("destroyed", onRendererGone);
-    attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: true });
+    attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: true, quitShortcut });
     window.webContents.on("will-navigate", (event, targetUrl) => {
       if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
     });
@@ -334,7 +348,7 @@ export function createMainWindowController({
       const interfaceSize = getServices()?.interfaceSize;
       if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
     });
-    attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: false });
+    attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: false, quitShortcut });
     announceChatWindows();
     const url = appRendererUrl(process.env.ELECTRON_RENDERER_URL);
     url.searchParams.set("window", "chat");
@@ -391,16 +405,23 @@ export function createMainWindowController({
 
 /**
  * The keys and the right-click menu of a window that loads the app. Only the main window has the
- * browser, so only it closes a browser tab on the close shortcut.
+ * browser, so only it closes a browser tab on the close shortcut. `quitShortcut` is null where the
+ * Quit item keeps its default key.
  */
 function attachAppInput(
   window: BrowserWindow,
   getServices: () => MainWindowApplicationServices | null,
   getTranslate: () => AppTranslate,
-  { closesBrowserTabs }: { closesBrowserTabs: boolean },
+  { closesBrowserTabs, quitShortcut }: { closesBrowserTabs: boolean; quitShortcut: QuitShortcut | null },
 ): void {
   let inspectElementModifierPressed = false;
+  if (quitShortcut) window.on("blur", () => quitShortcut.handleBlur(window));
   window.webContents.on("before-input-event", (event, input) => {
+    if (quitShortcut?.handleInput(window, input)) {
+      // This also stops the Quit item, which has the same key.
+      event.preventDefault();
+      return;
+    }
     if (input.key.toLowerCase() === "shift") {
       inspectElementModifierPressed = input.type === "keyDown";
     }
@@ -834,6 +855,46 @@ function hideMenuBar(window: BrowserWindow): void {
   if (process.platform !== "darwin") window.setMenuBarVisibility(false);
 }
 
+export type MenuQuitSource = "menu" | "shortcut";
+
+let quitConfirmationOpen = false;
+
+/**
+ * `Cmd + Q` is next to `Cmd + W` and `Cmd + A`, and one press stopped OpenBot with its agents and
+ * routines (#4149). In a focused OpenBot page the keys never get here: `createQuitShortcut` quits
+ * when they are held or pressed twice. The item gets the keys only with no OpenBot page focused, such
+ * as with the browser dock focused, and there no page can show the hint, so OpenBot asks. A click on
+ * the item, the Dock, a system logout and an update still quit at once.
+ */
+function macQuitItem(translate: AppTranslate, quit: (source: MenuQuitSource) => void): MenuItemConstructorOptions {
+  return {
+    label: translate("menu.quit"),
+    accelerator: "Command+Q",
+    click: (_item, _window, event) => {
+      if (!event.triggeredByAccelerator) return quit("menu");
+      // A second press while the question is open does not open another one, and a quit that has
+      // started hid every window and needs no question.
+      if (quitConfirmationOpen || windowsKeptHidden) return;
+      quitConfirmationOpen = true;
+      void dialog
+        .showMessageBox({
+          type: "question",
+          message: translate("menu.quitConfirmTitle"),
+          detail: translate("menu.quitConfirmBody"),
+          buttons: [translate("menu.quitConfirm"), translate("common.cancel")],
+          defaultId: 0,
+          cancelId: 1,
+        })
+        .then(({ response }) => {
+          if (response === 0) quit("shortcut");
+        })
+        .finally(() => {
+          quitConfirmationOpen = false;
+        });
+    },
+  };
+}
+
 /**
  * The native application menu.
  *
@@ -845,6 +906,8 @@ function hideMenuBar(window: BrowserWindow): void {
  * must be declared here: without it macOS has no Settings shortcut. The View menu is the default
  * `viewMenu`, but its zoom items change the saved interface size, so Settings and the next start
  * keep the size the user chose. A website in the browser keeps the zoom of the default roles.
+ *
+ * On macOS the Quit item is custom too, so `quit` learns how it was chosen. See `macQuitItem`.
  */
 export function configureApplicationMenu(
   service: AgentService,
@@ -852,6 +915,7 @@ export function configureApplicationMenu(
   interfaceSize: InterfaceSizeService,
   translate: AppTranslate,
   getMainWindow: () => BrowserWindow | null,
+  quit: (source: MenuQuitSource) => void,
 ): void {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
@@ -895,7 +959,7 @@ export function configureApplicationMenu(
           { role: "hideOthers" },
           { role: "unhide" },
           { type: "separator" },
-          { role: "quit" },
+          process.platform === "darwin" ? macQuitItem(translate, quit) : { role: "quit" },
         ],
       },
       { role: "editMenu" },
