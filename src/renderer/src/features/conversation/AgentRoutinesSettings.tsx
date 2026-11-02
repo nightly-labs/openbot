@@ -132,13 +132,19 @@ interface AgentRoutinesSettingsProps {
   onOpenRun?: ((messageId: string) => void) | undefined;
 }
 
+function codeUnitOrder(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
 export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const text = useText();
   const { t, errorMessage } = text;
   const [routines, setRoutines] = createSignal<RoutineEditorRecord[]>([]);
-  // The host lists the last changed routine first. Newest-created first keeps a row in place when it is paused or edited.
+  // The host lists the last changed routine first. Newest-created first keeps a row in place
+  // when it is paused or edited. Ties use code-unit order, as SQLite does.
   const listedRoutines = createMemo(() =>
-    [...routines()].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id)),
+    [...routines()].sort((a, b) => codeUnitOrder(b.createdAt, a.createdAt) || codeUnitOrder(a.id, b.id)),
   );
   const [draft, setDraft] = createSignal<RoutineDraft | null>(null);
   const [runs, setRuns] = createSignal<RoutineRunFields[]>([]);
@@ -511,7 +517,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       });
       const saved = result.routine;
       setRoutines((items) => {
-        const next = [saved, ...items.filter((routine) => routine.id !== saved.id)];
+        const next = items.some((routine) => routine.id === saved.id)
+          ? items.map((routine) => (routine.id === saved.id ? saved : routine))
+          : [saved, ...items];
         props.onCountChange(next.length);
         return next;
       });
