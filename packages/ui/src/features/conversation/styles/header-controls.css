@@ -829,6 +829,14 @@
   line-height: 15px;
 }
 
+/* The settings that a Cursor model value fixes, such as "256k · High · Fast". */
+.provider-model-option-name > .provider-model-option-settings {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
+}
+
 /* The tick sits in the filled circle, cut out of it in the panel color. */
 .provider-model-check {
   position: absolute;

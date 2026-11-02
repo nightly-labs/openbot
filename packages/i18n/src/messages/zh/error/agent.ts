@@ -33,6 +33,8 @@ export const messages = {
   "error.agent.modelListEmpty": "所选的助手模型“{model}”不可用：{provider} 没有列出任何模型。上次错误：{detail}",
   "error.agent.modelListEmptyNoError": "所选的助手模型“{model}”不可用：{provider} 没有列出任何模型。",
   "error.agent.modelNotInProviderList": "所选的助手模型“{model}”不可用：{provider} 未列出该模型。",
+  "error.agent.modelVariantNotListed":
+    "所选的助手模型“{model}”不可用：{provider} 未列出该模型。请使用 {provider} 为该模型列出的以下值之一：{models}。",
   "error.agent.modelProviderMismatch": "所选模型不属于该服务商。",
   "error.agent.modelNotListed": "模型“{model}”不可用。可用模型：{models}。",
   "error.agent.providerNotListed": "当前没有可用的 {provider} 模型，请调用 list_models 查看可用模型。",

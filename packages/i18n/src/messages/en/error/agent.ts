@@ -39,6 +39,8 @@ export const messages = defineMessages("error.agent", {
     'The selected agent model "{model}" is unavailable: {provider} listed no models.',
   "error.agent.modelNotInProviderList":
     'The selected agent model "{model}" is unavailable: {provider} does not list it.',
+  "error.agent.modelVariantNotListed":
+    'The selected agent model "{model}" is unavailable: {provider} does not list it. Use one of these values that {provider} lists for this model: {models}.',
   "error.agent.modelProviderMismatch": "The selected model does not belong to that provider.",
   "error.agent.modelNotListed": 'Model "{model}" is not available. Available models: {models}.',
   "error.agent.providerNotListed":
