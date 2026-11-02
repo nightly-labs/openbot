@@ -377,11 +377,11 @@ export function createStableConversationState(
  * shared owner would carry "the computer panel is open for chief" from one
  * server to the next and open the wrong panel on arrival.
  *
- * `attachmentBusy` and `submitting` are
- * here for the same reason by a different route: they carry no key at all. Each
- * describes the composer on screen right now - "a send is in flight" - so a
- * shared owner would disable the arriving server's composer for the length of
- * the server it was left on. What has to outlive the conversation goes in
+ * `submitting` is here for the same reason by a different route: it carries no
+ * key at all. It describes the composer on screen right now - "a send is in
+ * flight" - so a shared owner would disable the arriving server's composer for
+ * the length of the server it was left on. `importingDrafts` is keyed by chat,
+ * but it stays with `submitting`, as the busy flag that it replaces did. What has to outlive the conversation goes in
  * `conversationErrors` and `composerErrors` instead, which are keyed by
  * chat/conversation and sit in the stable half so one chat's banner never
  * leaks into another chat on the same server.
@@ -391,7 +391,8 @@ export function createStableConversationState(
  */
 export function createServerConversationState() {
   const [showComposerActions, setShowComposerActions] = createSignal(false);
-  const [attachmentBusy, setAttachmentBusy] = createSignal(false);
+  // The draft keys of the chats that wait for a file import. Other chats send as normal.
+  const [importingDrafts, setImportingDrafts] = createSignal<ReadonlySet<string>>(new Set());
   const [submitting, setSubmitting] = createSignal(false);
   const [markingRead, setMarkingRead] = createSignal(false);
   const [dropActive, setDropActive] = createSignal(false);
@@ -429,8 +430,8 @@ export function createServerConversationState() {
   return {
     showComposerActions,
     setShowComposerActions,
-    attachmentBusy,
-    setAttachmentBusy,
+    importingDrafts,
+    setImportingDrafts,
     submitting,
     setSubmitting,
     markingRead,
