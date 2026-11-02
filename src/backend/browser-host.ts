@@ -371,6 +371,7 @@ export class BrowserHost {
   readonly #tabSessions = new Map<string, Session>();
   readonly #browserProfile: (agentId: string) => AgentBrowserProfile;
   readonly #profileExists: (profileId: string) => boolean;
+  readonly #quitShortcut: (input: Input) => boolean;
   readonly #downloadsRoot: string;
   readonly #statePath: string;
   readonly #tabs = new Map<string, BrowserHostTab>();
@@ -422,12 +423,15 @@ export class BrowserHost {
       browserProfile?: (agentId: string) => AgentBrowserProfile;
       /** Whether a named profile still exists. A tab never opens in a deleted profile. */
       profileExists?: (profileId: string) => boolean;
+      /** True when the key is part of the Mac quit shortcut, which a focused tab must not give to the menu. */
+      quitShortcut?: (input: Input) => boolean;
     } = {},
   ) {
     this.#window = window;
     this.#memoryLow = options.memoryLow ?? (() => false);
     this.#browserProfile = options.browserProfile ?? (() => ({ kind: "shared" }));
     this.#profileExists = options.profileExists ?? (() => false);
+    this.#quitShortcut = options.quitShortcut ?? (() => false);
     this.#downloadsRoot = downloadsRoot;
     this.#statePath = statePath;
     this.#session = session.fromPartition("persist:openbot-browser", { cache: true });
@@ -2780,6 +2784,10 @@ export class BrowserHost {
         });
     });
     contents.on("before-input-event", (event, input) => {
+      if (this.#quitShortcut(input)) {
+        event.preventDefault();
+        return;
+      }
       if (isToggleDevToolsShortcut(input)) {
         event.preventDefault();
         this.#window.webContents.toggleDevTools();
