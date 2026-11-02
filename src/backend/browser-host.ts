@@ -36,7 +36,7 @@ import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
 import {
   app,
-  type BrowserWindow,
+  BrowserWindow,
   type BrowserWindowConstructorOptions,
   clipboard,
   type Input,
@@ -868,6 +868,8 @@ export class BrowserHost {
       (tab) =>
         Effect.gen({ self: this }, function* () {
           tab.loadGeneration += 1;
+          // The person entered this address, so the page keeps the focus when its document commits.
+          this.#focusTab(tab);
           yield* untilStopped(
             tab,
             navigateAndWait(tab.contents, () => tab.contents.loadURL(normalizedUrl, browserLoadOptions())),
@@ -2844,12 +2846,21 @@ export class BrowserHost {
     // Chromium gives a visible page the focus when a new document commits. A navigation that an
     // agent or the page starts must not take the keys from a person who types in the app.
     let focusedBeforeCommit: WebContents | null = null;
+    const restoreFocusAfterCommit = () => {
+      const previous = focusedBeforeCommit;
+      focusedBeforeCommit = null;
+      // With no focused window the app is in the background, and a restore would raise it.
+      if (previous && contents.isFocused() && BrowserWindow.getFocusedWindow())
+        restoreWebContentsFocus(previous, contents);
+    };
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame && !details.isSameDocument) focusedBeforeCommit = this.#focusedContentsOutsideTabs();
     });
-    contents.on("did-navigate", () => {
-      if (focusedBeforeCommit && contents.isFocused()) restoreWebContentsFocus(focusedBeforeCommit, contents);
-      focusedBeforeCommit = null;
+    contents.on("did-navigate", restoreFocusAfterCommit);
+    // An error page also commits, but Electron reports it as a failed load. A load that a newer
+    // navigation cancels has no commit, so the tab has no focus and the newer start stays recorded.
+    contents.on("did-fail-load", (_event, _code, _description, _url, isMainFrame) => {
+      if (isMainFrame && contents.isFocused()) restoreFocusAfterCommit();
     });
     contents.on("did-navigate", (_event, url) => {
       tab.documents += 1;

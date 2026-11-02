@@ -2336,7 +2336,12 @@ async function runFocusScenario(browser: BrowserHost, origin: string, window: Br
   window.focus();
   window.webContents.focus();
   await waitFor(async () => webContents.getFocusedWebContents() === window.webContents, "app window focus");
-  const sameWindowTab = await runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot"));
+  const { tab: sameWindowTab, contents: sameWindowContents } = await openTabWithContents(
+    browser,
+    origin,
+    "smoke-thread",
+    "smoke-bot",
+  );
   const sameWindowSteps = {
     navigate: { tool: "navigate", args: { tabId: sameWindowTab.id, url: `${origin}/focus-navigation` } },
     reload: { tool: "navigate", args: { tabId: sameWindowTab.id, direction: "reload" } },
@@ -2345,16 +2350,24 @@ async function runFocusScenario(browser: BrowserHost, origin: string, window: Br
       args: { tabId: sameWindowTab.id, target: { kind: "role", role: "link", name: "Next page", exact: true } },
     },
     back: { tool: "navigate", args: { tabId: sameWindowTab.id, direction: "back" } },
+    // A refused connection commits an error page.
+    errorPage: { tool: "navigate", args: { tabId: sameWindowTab.id, url: "http://127.0.0.1:1/" } },
   };
   const sameWindowFocus: Record<string, boolean> = {};
   for (const [name, step] of Object.entries(sameWindowSteps)) {
     const result = await callBrowserTool(browser, step.tool, step.args);
-    if (!result.success) throw new Error(`The same-window focus ${name} failed: ${toolError(result)}`);
+    if (!result.success && name !== "errorPage")
+      throw new Error(`The same-window focus ${name} failed: ${toolError(result)}`);
     sameWindowFocus[name] = webContents.getFocusedWebContents() === window.webContents;
   }
-  // A person who enters an address still moves to the page.
+  // A person who enters an address moves to the page when its document commits, not only after the load.
+  window.webContents.focus();
+  await waitFor(async () => webContents.getFocusedWebContents() === window.webContents, "app window focus again");
+  let addressFocusedTab = false;
+  sameWindowContents.once("did-navigate", () => {
+    addressFocusedTab = webContents.getFocusedWebContents() === sameWindowContents;
+  });
   await runCauseEffect(browser.loadUrl(sameWindowTab.id, `${origin}/`));
-  const addressFocusedTab = webContents.getFocusedWebContents()?.getURL() === `${origin}/`;
   await runCauseEffect(browser.close(sameWindowTab.id));
   await mkdir(".openbot-build", { recursive: true });
   await writeFile(
