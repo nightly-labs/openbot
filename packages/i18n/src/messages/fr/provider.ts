@@ -138,11 +138,14 @@ export const messages = {
   "provider.status.signInRequired": "Connexion requise",
   "provider.model.free": "Gratuit",
   "provider.model.default": "par défaut",
+  "provider.effort.none": "Aucun",
+  "provider.effort.minimal": "Minimal",
   "provider.effort.low": "Faible",
   "provider.effort.medium": "Moyen",
   "provider.effort.high": "Élevé",
   "provider.effort.xhigh": "Très élevé",
   "provider.effort.max": "Max",
+  "provider.effort.ultra": "Ultra",
 
   "provider.museKey.title": "Clé d’API Meta pour Muse",
   "provider.museKey.description":
