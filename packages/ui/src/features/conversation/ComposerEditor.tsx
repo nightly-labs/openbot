@@ -886,7 +886,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const ids = attachmentReferenceIds(text);
     const all = selection.start === 0 && selection.end === value.length;
     const attachments = (props.attachments ?? []).filter((attachment) => all || ids.has(attachment.id));
-    // Without an attachment, the native copy keeps its rich text.
+    // Without an attachment, the copy goes to the next listeners, as any page text does.
     if (!attachments.length) return;
     event.preventDefault();
     let remaining: string | undefined;

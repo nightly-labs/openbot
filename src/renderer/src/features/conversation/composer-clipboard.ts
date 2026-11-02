@@ -96,11 +96,15 @@ export function copiedFileRead(id: string): Promise<void> {
 }
 
 // The async clipboard API writes no custom MIME type, so the copy ID is in the HTML for both copy paths.
+// A `div` with line breaks, not a `pre`, so that another app pastes normal text, not code.
 function fragmentHtml(copy: ComposerCopy, plainText: string): string {
-  const pre = document.createElement("pre");
-  pre.setAttribute(HTML_ATTRIBUTE, encodeURIComponent(JSON.stringify({ version: 1, copyId: copy.id })));
-  pre.textContent = plainText;
-  return pre.outerHTML;
+  const element = document.createElement("div");
+  element.setAttribute(HTML_ATTRIBUTE, encodeURIComponent(JSON.stringify({ version: 1, copyId: copy.id })));
+  plainText.split("\n").forEach((line, index) => {
+    if (index > 0) element.append(document.createElement("br"));
+    element.append(line);
+  });
+  return element.outerHTML;
 }
 
 /**

@@ -2,24 +2,31 @@
  * Copying selected page text writes clean HTML. Chromium's own HTML gives each element its computed
  * style, so a paste into a mail or a document got the theme colors (white text on a dark background)
  * and the markup of the app buttons. Here the HTML keeps only the structure: headings, lists, tables,
- * links, code and line breaks. The plain text is the selection text, as before. A field keeps the
- * native copy, and a copy that an earlier listener handled stays as it is, such as a formula from
- * `katex/contrib/copy-tex` or the nodes of the workflow canvas.
+ * links, code and line breaks. The plain text is the selection text, as before. The message box gets
+ * the same copy; its own paste reads only the plain text. A text field copies only plain text, so it
+ * keeps the native copy.
  *
- * Import this module for its effect, as `katex/contrib/copy-tex` is. The listener is on the window,
+ * A copy that an earlier listener handled stays as it is, such as a draft with attachments or the
+ * nodes of the workflow canvas. A formula is the exception: `katex/contrib/copy-tex` writes its TeX
+ * plain text, and its HTML has the KaTeX classes, inline styles and each formula two times. Here the
+ * HTML is replaced, with the TeX source of each formula.
+ *
+ * Import this module for its effect, after `katex/contrib/copy-tex`. The listener is on the window,
  * so that the listeners on the document and on the elements run first.
  */
 window.addEventListener("copy", (event) => {
-  if (event.defaultPrevented || !event.clipboardData || isEditable(event.target)) return;
+  if (!event.clipboardData || isTextField(event.target)) return;
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
+  const handled = event.defaultPrevented;
+  if (handled && !selection.getRangeAt(0).cloneContents().querySelector(".katex")) return;
   const text = selection.toString();
   if (!text) return;
   const container = document.createElement("div");
   for (let index = 0; index < selection.rangeCount; index += 1) {
     container.append(rangeFragment(selection.getRangeAt(index)));
   }
-  event.clipboardData.setData("text/plain", text);
+  if (!handled) event.clipboardData.setData("text/plain", text);
   event.clipboardData.setData("text/html", container.innerHTML);
   event.preventDefault();
 });
@@ -81,11 +88,9 @@ const BLOCK_DISPLAY = /^(block|flex|grid|flow-root|list-item|table)$/u;
 const PRESERVED_LINES = /^(pre|pre-wrap|pre-line|break-spaces)$/u;
 const SAFE_LINK = /^(https?|mailto):/iu;
 
-function isEditable(target: EventTarget | null): boolean {
+function isTextField(target: EventTarget | null): boolean {
   const element = target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
-  return Boolean(
-    element?.closest("input, textarea, select") || (element instanceof HTMLElement && element.isContentEditable),
-  );
+  return Boolean(element?.closest("input, textarea, select"));
 }
 
 /** The selected part of a range, inside its kept ancestors, so text selected in a code block or a cell keeps its block. */
@@ -125,6 +130,13 @@ function copyElement(element: Element, parent: Node, range: Range): void {
   if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse") return;
   if (tag === "br") {
     parent.appendChild(document.createElement("br"));
+    return;
+  }
+  if (element.classList.contains("katex")) {
+    // The delimiters of the plain text from `katex/contrib/copy-tex`.
+    const tex = element.querySelector(".katex-mathml annotation")?.textContent;
+    const display = element.parentElement?.classList.contains("katex-display") === true;
+    if (tex) parent.appendChild(document.createTextNode(display ? `$$${tex}$$` : `$${tex}$`));
     return;
   }
   if (!KEPT_TAGS.has(tag) && element.parentElement?.closest("pre")) {
