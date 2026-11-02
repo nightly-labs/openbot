@@ -146,6 +146,10 @@ export const messages = {
   "provider.claudeKey.description":
     "호스트에 Anthropic API 키를 저장하세요. Anthropic이 각 요청을 키로 청구해요. 에이전트에서 사용하려면 에이전트의 모델 메뉴에서 'API 키' 계정을 선택하세요. Claude에 로그인하지 않은 경우 모든 에이전트가 키를 사용해요.",
   "provider.claudeKey.label": "Anthropic API 키",
+  "provider.codexKey.title": "OpenAI API 키로 로그인",
+  "provider.codexKey.description":
+    "Codex가 키를 이 컴퓨터에 저장해요. OpenAI는 요청마다 ChatGPT 요금제가 아니라 이 키로 요금을 청구해요. 요금제를 다시 사용하려면 계정 연결을 해제하고 ChatGPT를 연결하세요.",
+  "provider.codexKey.label": "OpenAI API 키",
   "provider.inceptionKey.title": "Inception API 키",
   "provider.inceptionKey.description":
     "Mercury 모델을 사용하려면 이 컴퓨터에 Inception API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
@@ -242,6 +246,10 @@ export const messages = {
     "Gemini가 Google AI 요금제가 아닌 이 키를 사용해요. 요금제의 사용량은 표시되지 않아요.",
   "provider.settings.claudeKeyInUse":
     "에이전트의 모델 메뉴에서 'API 키' 계정을 선택하세요. Claude에 로그인하지 않은 경우 모든 에이전트가 키를 사용해요.",
+  "provider.settings.codexKeyInUse":
+    "ChatGPT가 요금제가 아니라 이 키를 사용해요. OpenAI는 요청마다 이 키로 요금을 청구해요. 요금제 사용량은 표시되지 않아요.",
+  "provider.settings.codexKeyAlternative":
+    "또는 OpenAI API 키로 로그인하세요. OpenAI는 요청마다 이 키로 요금을 청구해요.",
   "provider.settings.addKey": "키 추가",
   "provider.settings.changeKey": "키 변경",
   "provider.settings.runtime": "런타임",
@@ -250,6 +258,12 @@ export const messages = {
   "provider.settings.update": "업데이트",
   "provider.settings.downloadLabel": "{name} 다운로드",
   "provider.settings.diagnostics": "진단",
+  "provider.settings.cache": "캐시",
+  "provider.settings.promptCache": "프롬프트 캐시",
+  "provider.settings.promptCacheDescription": "턴 사이에 Claude가 에이전트의 컨텍스트를 캐시에 보관하는 시간이에요.",
+  "provider.settings.promptCacheHour": "1시간",
+  "provider.settings.promptCacheDefault": "Claude Code 기본값",
+  "provider.settings.promptCacheLoadFailed": "이 서버의 프롬프트 캐시 시간을 불러올 수 없었어요.",
   "provider.settings.use": "사용",
   "provider.settings.defaultForNew": "새 에이전트 기본값",
   "provider.settings.startsWith": "새 에이전트는 {name}(으)로 시작해요.",

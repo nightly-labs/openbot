@@ -7,6 +7,8 @@ export const messages = {
   "notification.needsBrowserStep": "브라우저에서 직접 마무리할 단계가 있어요.",
   "notification.needsApprovalFor": "승인이 필요해요: {action}",
   "notification.finished": "작업을 마쳤어요.",
+  "notification.workflowApproval": "단계 하나가 승인을 기다리고 있어요.",
+  "notification.workflowOutput": "워크플로에 새 결과가 있어요.",
   "notification.failed": "오류로 중단됐어요.",
   "notification.channelTitle": "{channel}의 {agent}",
   "notification.channelMessage": "메시지를 보냈어요.",

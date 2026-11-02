@@ -26,4 +26,10 @@ export const messages = {
   "error.voice.speech.timedOut": "답변을 소리 내어 읽는 시간이 초과되었어요.",
   "error.voice.speech.failed": "OpenBot이 답변을 소리 내어 읽지 못했어요.",
   "error.voice.recordingNotKept": "OpenBot이 음성 녹음을 보관하지 못했어요.",
+  "error.voice.server.routeOff": "음성 서버가 이 용도로 설정되어 있지 않아요. 설정 → 음성을 확인하세요.",
+  "error.voice.server.keyRefused": "{host}이(가) API 키를 거부했어요.",
+  "error.voice.server.invalidAnswer": "{host}이(가) OpenAI 호환 응답을 보내지 않았어요.",
+  "error.voice.server.invalidAudio":
+    "{host}이(가) OpenBot에서 재생할 수 없는 오디오를 보냈어요. WAV를 보내는 서버를 사용하세요.",
+  "error.voice.server.tooLarge": "{host}의 응답이 너무 커요.",
 } as const satisfies PartialTranslation<typeof source>;

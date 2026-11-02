@@ -282,6 +282,7 @@ export const messages = {
     "에이전트 ID는 소문자, 숫자, `-`만 사용할 수 있고 기본 제공 제공자의 ID와 같을 수 없어요.",
   "error.provider.customAgentEnvInvalid":
     "변수 이름은 문자, 숫자, `_`만 사용할 수 있고 숫자로 시작할 수 없어요. 이름은 한 번씩만, 최대 16개까지 사용하세요.",
+  "error.provider.customAgentUsagePromptInvalid": "사용량 명령어는 256자 이내의 한 줄이어야 해요.",
   "error.provider.customAgentCommandInvalid":
     "명령은 전체 경로, ~/로 시작하는 경로, 또는 공백이 없는 명령 이름이어야 해요.",
   "error.provider.customAgentArgsInvalid": "인수에는 줄바꿈을 넣을 수 없어요. 인수는 최대 32개까지 사용하세요.",
@@ -296,6 +297,8 @@ export const messages = {
   "error.provider.customAgentRemoveBusy":
     "이 사용자 지정 에이전트를 제거하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
   "error.provider.customAgentNone": "저장된 사용자 지정 에이전트가 없어요.",
+  "error.provider.customAgentsUnavailable":
+    "이 서버는 사용자 지정 에이전트를 변경할 수 없어요. 서버의 OpenBot을 업데이트하세요.",
   "error.provider.customAgentMissing": "이 사용자 지정 에이전트는 지금 저장되어 있지 않아요. 다른 모델을 선택하세요.",
   "error.provider.customAgentSignIn": "에이전트 자체 명령으로 로그인한 후 다시 시도해 주세요.",
   "error.provider.customAgentsReadOnly":

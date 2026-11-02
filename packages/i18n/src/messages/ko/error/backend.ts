@@ -133,6 +133,8 @@ export const messages = {
   "error.backend.recipientHidden": "이 에이전트는 숨겨져 있어요. 메시지를 보내려면 복원하세요.",
   "error.backend.attachBetween": "파일을 1개에서 {limit}개 사이로 첨부하세요.",
   "error.backend.attachmentNotFile": "첨부 파일이 파일이 아니에요: {path}",
+  "error.backend.attachSvg":
+    "{name}은(는) SVG 파일이라 첨부할 수 없어요. 답변에 절대 경로를 쓰면 채팅에 이미지가 표시돼요.",
   "error.backend.generatedImageTooLarge": "생성된 이미지가 100MB 한도를 넘었어요.",
   "error.backend.attachmentNotRegularFile": "일반 파일만 첨부할 수 있어요: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot이 {name}을(를) 복사할 수 없었어요.",
@@ -267,6 +269,7 @@ export const messages = {
   "error.backend.uiBlockAnswerInvalid": "이 답변은 에이전트의 블록과 맞지 않아요.",
   "error.backend.uiBlockActionNotAllowed": "서버 소유자 또는 관리자만 이 작업을 선택할 수 있어요.",
   "error.backend.approvalInactive": "이 승인은 더 이상 활성 상태가 아니에요.",
+  "error.backend.approvalOwnerOnly": "서버 소유자만 이 작업을 승인할 수 있어요.",
   "error.backend.takeoverInactive": "이 브라우저 제어권 가져오기는 더 이상 활성 상태가 아니에요.",
   "error.backend.authSubmitting": "인증을 이미 제출하는 중이에요.",
   "error.backend.apiKeySaveFailed": "OpenBot이 API 키를 저장할 수 없었어요. 다시 시도해 주세요.",
@@ -303,6 +306,10 @@ export const messages = {
   "error.backend.browserViewProtected": "인증 중에는 브라우저 보기가 보호돼요.",
   "error.backend.browserPreviewPageChanged": "미리보기 중에 브라우저 페이지가 바뀌었어요. 다시 시도해 주세요.",
   "error.backend.browserInputProtected": "인증 중에는 브라우저 입력이 보호돼요.",
+  "error.backend.browserTypingFocusMoved":
+    "입력하기 전에 페이지가 대상에서 포커스를 옮겼어요. 아무것도 입력되지 않았어요. 스냅샷을 새로 찍어 주세요.",
+  "error.backend.browserTypingSubmitSkipped":
+    "입력란에 텍스트는 들어갔지만 페이지가 포커스를 옮겨서 Enter를 보내지 않았어요. 텍스트를 다시 입력하지 말고 스냅샷을 새로 찍어 주세요.",
   "error.backend.mcpServerHttpCredentials": "서버가 {status}(으)로 응답했어요. API 키나 다른 자격 증명을 확인하세요.",
   "error.backend.mcpServerHttpUrl":
     "서버가 {status}(으)로 응답했어요. URL을 확인하세요. 링크가 잘못되었거나 만료되었거나 삭제되었을 수 있어요.",

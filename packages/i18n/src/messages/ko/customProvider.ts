@@ -167,6 +167,9 @@ export const messages = {
   "customProvider.acp.commandHint": "시작할 프로그램이에요. OpenBot이 PATH에서 찾아요.",
   "customProvider.acp.args": "인수",
   "customProvider.acp.argsHint": "인수는 공백으로 구분하세요. 공백이 있는 인수는 따옴표로 묶으세요.",
+  "customProvider.acp.usagePrompt": "사용량 명령어",
+  "customProvider.acp.usagePromptHint":
+    "OpenBot이 최대 5분마다 한 번 보내고 마지막 답변을 보여줘요. /usage처럼 에이전트가 직접 답하는 명령어를 사용하세요.",
   "customProvider.acp.env": "환경 변수",
   "customProvider.acp.env.name": "변수 {number} 이름",
   "customProvider.acp.env.value": "변수 {number} 값",
@@ -197,6 +200,7 @@ export const messages = {
   "customProvider.acp.error.envDuplicate": "이 에이전트에 {name}이(가) 이미 설정되어 있어요.",
   "customProvider.acp.error.envValueRequired": "이 변수의 값을 입력해 주세요.",
   "customProvider.acp.error.envValueLength": "값은 {max}자 미만으로 입력해 주세요.",
+  "customProvider.acp.error.usagePromptInvalid": "{max}자 이내의 한 줄로 입력해 주세요.",
   "customProvider.acp.error.agentIdPattern":
     "영문 소문자, 숫자, 하이픈을 사용하고 영문자 또는 숫자로 시작해야 해요. 최대 40자예요.",
 

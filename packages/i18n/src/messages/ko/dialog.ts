@@ -16,6 +16,8 @@ export const messages = {
   "dialog.chooseAgentExport": "에이전트 내보내기 파일 선택",
   "dialog.chooseHermesFolder": "Hermes 폴더 선택",
   "dialog.filter.agentExports": "에이전트 내보내기 파일",
+  "dialog.chooseVaultCsv": "내보낸 비밀번호 파일 선택",
+  "dialog.filter.csv": "CSV 파일",
   "dialog.saveExportSkill": "내보내기 스킬 저장",
   "dialog.saveTransfer": "전송 파일 저장",
   "dialog.chooseTransfer": "전송 파일 선택",

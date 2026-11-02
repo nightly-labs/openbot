@@ -193,4 +193,10 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "채널을 삭제하려면 이 데스크톱 서버를 업데이트해 주세요.",
   "error.remote.historyRefreshFailed": "메시지를 보냈지만 채팅 기록을 새로 고칠 수 없었어요.",
   "error.remote.taskHistoryRefreshFailed": "작업을 변경했지만 채팅 기록을 새로 고칠 수 없었어요.",
+  "error.remote.localServerStartFailed": "이 컴퓨터의 서버가 시작되지 않았어요.",
+  "error.remote.localServerNotFound": "이 서버는 이 컴퓨터에 없어요.",
+  "error.remote.localServerLimit":
+    "이 컴퓨터에는 서버를 최대 {limit}개까지 둘 수 있어요. 새로 만들려면 하나를 삭제하세요.",
+  "error.remote.localServersReadOnly":
+    "이 버전의 OpenBot은 이 컴퓨터의 서버 목록을 읽을 수 없어요. OpenBot을 업데이트하세요.",
 } as const satisfies PartialTranslation<typeof source>;
