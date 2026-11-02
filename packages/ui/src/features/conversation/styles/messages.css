@@ -448,7 +448,7 @@
 }
 
 .agent-activity-avatar {
-  --agent-avatar-optical-offset: -2px;
+  --agent-avatar-optical-offset: calc(32px * -0.14);
 
   width: 32px;
   height: 32px;

@@ -31,7 +31,8 @@
   height: 128%;
 }
 
-.agent-settings-avatar:hover {
+/* A photo keeps its own colours, as on mobile, so only a generated face lights up. */
+.agent-settings-avatar:hover:not(:has(.agent-avatar-custom)) {
   filter: brightness(1.08);
 }
 

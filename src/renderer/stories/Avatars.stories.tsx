@@ -108,8 +108,8 @@ const PLUSH_AND_FLAT_SEEDS = ["agent-alpha", "agent-beta", "agent-gamma", "agent
  * One seed across every mood and every size, as the app draws a resting avatar.
  *
  * This is the story that proves the point of the mood table: reading down a column, the silhouette
- * is the same in all seven rows and only the face changes. A row that draws a different body is a
- * state that should not be in `SHAPE_SAFE_STATES`.
+ * is the same in all seven rows and only the face and the plush's felt pieces change. A row that
+ * draws a different body is a mood that should map to another plush state.
  */
 export const SizesAndMoods: AgentStory = {
   render: () => (
@@ -186,7 +186,7 @@ export const PlushAndFlat: AgentStory = {
   ),
 };
 
-/** The live moods, with their rings and breathing, as the app actually renders them. */
+/** The live moods as the app renders them: each one plays on the plush face, with no ring or glow. */
 export const Moods: AgentStory = {
   render: () => (
     <div class="flex items-center gap-8 p-8">
