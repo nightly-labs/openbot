@@ -97,6 +97,8 @@ class BrowserViewPort extends Context.Service<
   }
 }
 
+type ViewInput = Parameters<BrowserHost["dispatchViewInput"]>[1];
+
 interface ManagedViewSession {
   id: string;
   tabId: string;
@@ -119,6 +121,15 @@ interface ManagedViewSession {
    * key typed after it must not land first.
    */
   input: Semaphore.Semaphore;
+  /** Input messages received and not yet handled. */
+  waiting: number;
+  /**
+   * A pointer move with more input behind it. A busy page takes as long to handle a move as the
+   * member takes to send the next one, so sending every move puts the page seconds behind the
+   * pointer, and a click after them waits for all of them. A newer move replaces this one, and any
+   * other input sends it first, so the page still sees the pointer where it was at each click or key.
+   */
+  heldMove: ViewInput | null;
   /** One socket at a time starts or replaces the view. A view that stops ends the page's screencast. */
   views: Semaphore.Semaphore;
   /** The client draws the pointer itself and asked for the page's cursor. */
@@ -159,6 +170,8 @@ export class BrowserViewGateway {
       frameSizes: new Map(),
       rememberFrames: false,
       input: Semaphore.makeUnsafe(1),
+      waiting: 0,
+      heldMove: null,
       views: Semaphore.makeUnsafe(1),
       reportCursor: false,
       reportContextMenu: false,
@@ -274,7 +287,15 @@ export class BrowserViewGateway {
     recordRestartActivity();
     client.on("message", (data, binary) => {
       if (binary || session.socket !== client) return;
-      this.#dispatch(session.input.withPermits(1)(this.#handleInput(session, data)));
+      session.waiting += 1;
+      this.#dispatch(
+        session.input.withPermits(1)(
+          Effect.suspend(() => {
+            session.waiting -= 1;
+            return this.#handleInput(session, data);
+          }).pipe(Effect.ensuring(this.#sendHeldMove(session, false))),
+        ),
+      );
     });
     client.once("close", () => this.#dispatch(this.#detach(session, client)));
     client.once("error", () => this.#dispatch(this.#detach(session, client)));
@@ -385,6 +406,12 @@ export class BrowserViewGateway {
       input.type === "pointer"
         ? { ...input, sequence: undefined, x: input.x * frame.width, y: input.y * frame.height }
         : input;
+    if (dispatched.type === "pointer" && dispatched.action === "move") {
+      // Sent when nothing is behind it, or by the input that is.
+      session.heldMove = dispatched;
+      return;
+    }
+    yield* this.#sendHeldMove(session, true);
     const browser = yield* BrowserViewPort;
     const client = session.socket;
     const onContextMenu =
@@ -392,6 +419,20 @@ export class BrowserViewGateway {
         ? (menu: BrowserViewContextMenu) => this.#send(session, client, { type: "context-menu", ...menu })
         : undefined;
     yield* browser.input(session.tabId, dispatched, onContextMenu).pipe(Effect.catch(() => Effect.void));
+  });
+
+  /** Sends the held move. Unless another input is about to, only when no input waits behind it. */
+  readonly #sendHeldMove = Effect.fn("BrowserViewGateway.sendHeldMove")(function* (
+    this: BrowserViewGateway,
+    session: ManagedViewSession,
+    beforeInput: boolean,
+  ): Effect.fn.Return<void, never, BrowserViewPort> {
+    const move = session.heldMove;
+    if (!move || (!beforeInput && session.waiting > 0)) return;
+    session.heldMove = null;
+    if (!session.socket) return;
+    const browser = yield* BrowserViewPort;
+    yield* browser.input(session.tabId, move).pipe(Effect.catch(() => Effect.void));
   });
 
   #send(session: ManagedViewSession, client: Ws.WebSocket, message: BrowserViewHostMessage): void {
