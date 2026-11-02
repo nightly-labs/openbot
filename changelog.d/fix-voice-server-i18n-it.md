@@ -1,1 +1,3 @@
-- Italian settings include the voice server section (OpenAI-compatible server setup).
+### Fixed
+
+- Italian settings name the voice server section, including the setup dialog. Before, that section stayed in English.
