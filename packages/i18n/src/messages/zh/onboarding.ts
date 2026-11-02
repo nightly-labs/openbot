@@ -83,7 +83,7 @@ export const messages = {
   "onboarding.consent.notice": "继续即表示你接受{terms}并已阅读{privacy}。",
   "onboarding.consent.analyticsTitle": "帮助改进 OpenBot",
   "onboarding.consent.analyticsDetail":
-    "将功能使用情况关联到你的账号和邮箱，并分享访问过的网站、工具使用情况和设置详情。否则仅随一个随机安装 ID 发送基本使用情况。绝不发送你的聊天、文件或提示词。",
+    "将功能使用情况关联到你的账号和邮箱，并分享访问过的网站、工具使用情况和每日设置摘要。否则仅随一个随机安装 ID 发送基本使用情况。绝不发送你的聊天、文件或提示词。",
   "onboarding.consent.thanksTitle": "谢谢你！团队欠你一个人情。",
   "onboarding.consent.thanksToast": "感谢你帮助改进 OpenBot 💜",
   "onboarding.consent.thanksToastDetail": "你可以随时在设置中更改。",

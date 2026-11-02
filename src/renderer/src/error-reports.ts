@@ -25,6 +25,8 @@ const startup: { properties: FailureProperties; timestamp: number }[] = [];
 let profileId: string | null = null;
 /** The random install ID. Reports go with it when the user does not share analytics. */
 let installId: string | null = null;
+/** The install ID of this page. Each read gives the same ID, so analytics and reports agree. */
+let webInstallId: string | null | undefined;
 /** The web analytics preference. The key keeps its first name, so stored choices stay. */
 export const WEB_PREFERENCE = "openbot:web:error-reports-enabled";
 /** A choice of this browser that the account has not saved yet, "true" or "false". */
@@ -59,8 +61,8 @@ export function configureDesktopReports(
 }
 
 /**
- * `tracking` is the user's choice. On: reports go with the account, or with the install ID while
- * signed out. Off: they go with the install ID only, and not at all without one.
+ * `tracking` is the user's choice. On: reports go with the account, or with no ID while signed out.
+ * Off: they go with the install ID only, and not at all without one.
  */
 export function configureErrorReports(tracking: boolean, accountId: string | null = profileId): void {
   enabled = tracking;
@@ -69,7 +71,7 @@ export function configureErrorReports(tracking: boolean, accountId: string | nul
     const initial = !configured;
     configured = true;
     const account = tracking ? accountId : null;
-    const subject = account ?? installId;
+    const subject = tracking ? accountId : installId;
     const sending = tracking || subject !== null;
     Effect.runFork(
       queue.configure(sending, subject).pipe(
@@ -140,22 +142,27 @@ export function configureWebReports(user: Pick<CentralAuthUser, "id" | "email"> 
 /**
  * The install ID of this browser. A missing, damaged or 13-month-old ID is made again. Null when
  * storage cannot keep it: an ID that changes at each page load would count one browser as many.
+ * After a write, the stored value is read again, so the page uses the ID that storage keeps.
  */
 export function webAnalyticsInstallId(): string | null {
+  if (webInstallId !== undefined) return webInstallId;
   const now = Date.now();
+  const stored = (): string | null => {
+    try {
+      return currentAnalyticsInstallId(JSON.parse(localStorage.getItem(WEB_INSTALL_ID) ?? "null"), now)?.id ?? null;
+    } catch {
+      return null;
+    }
+  };
+  webInstallId = stored();
+  if (webInstallId) return webInstallId;
   try {
-    const current = currentAnalyticsInstallId(JSON.parse(localStorage.getItem(WEB_INSTALL_ID) ?? "null"), now);
-    if (current) return current.id;
+    localStorage.setItem(WEB_INSTALL_ID, JSON.stringify(newAnalyticsInstallId(crypto.randomUUID(), now)));
+    webInstallId = stored();
   } catch {
-    // A damaged value is made again below.
+    webInstallId = null;
   }
-  try {
-    const created = newAnalyticsInstallId(crypto.randomUUID(), now);
-    localStorage.setItem(WEB_INSTALL_ID, JSON.stringify(created));
-    return created.id;
-  } catch {
-    return null;
-  }
+  return webInstallId;
 }
 
 /**

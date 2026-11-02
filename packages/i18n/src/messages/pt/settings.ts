@@ -144,7 +144,7 @@ export const messages = {
   "settings.notch.size.previewIsland": "Tela externa",
   "settings.analytics.title": "Vincular a análise à minha conta",
   "settings.analytics.description":
-    "Ativado: os metadados de uso e confiabilidade vão para o serviço de análise hospedado pelo próprio OpenBot com o ID e o e-mail da sua conta, junto com os sites que você e seus agentes visitam, o uso de ferramentas e os detalhes da sua configuração. Desativado: só o uso básico, como turnos e contagens de tokens, vai com um ID de instalação aleatório. Chats, arquivos e prompts nunca são enviados.",
+    "Ativado: os metadados de uso e confiabilidade vão para o serviço de análise hospedado pelo próprio OpenBot com o ID e o e-mail da sua conta, junto com os sites que você e seus agentes visitam, o uso de ferramentas e um resumo diário da sua configuração. Desativado: só o uso básico, como turnos e contagens de tokens, vai com um ID de instalação aleatório. Chats, arquivos e prompts nunca são enviados.",
   "settings.analytics.webDescription":
     "Ativado: os metadados de uso e confiabilidade vão para o serviço de análise hospedado pelo próprio OpenBot com o ID e o e-mail da sua conta. Desativado: os mesmos metadados vão só com um ID de instalação aleatório. Chats, arquivos e prompts nunca são enviados. Esta configuração se aplica a este navegador.",
   "settings.tab.general.title": "Geral",

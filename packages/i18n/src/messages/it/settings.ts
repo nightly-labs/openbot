@@ -146,7 +146,7 @@ export const messages = {
   "settings.notch.size.previewIsland": "Schermo esterno",
   "settings.analytics.title": "Collega le analisi al mio account",
   "settings.analytics.description":
-    "Attivo: i metadati di utilizzo e affidabilità vanno alle analisi self-hosted di OpenBot con l'ID del tuo account e l'email, insieme ai siti web che visitate tu e i tuoi agenti, all'uso degli strumenti e ai dettagli della tua configurazione. Disattivo: va solo l'uso di base, come turni e conteggi dei token, con un ID di installazione casuale. Chat, file e prompt non vengono mai inviati.",
+    "Attivo: i metadati di utilizzo e affidabilità vanno alle analisi self-hosted di OpenBot con l'ID del tuo account e l'email, insieme ai siti web che visitate tu e i tuoi agenti, all'uso degli strumenti e a un riepilogo giornaliero della tua configurazione. Disattivo: va solo l'uso di base, come turni e conteggi dei token, con un ID di installazione casuale. Chat, file e prompt non vengono mai inviati.",
   "settings.analytics.webDescription":
     "Attivo: i metadati di utilizzo e affidabilità vanno alle analisi self-hosted di OpenBot con l'ID del tuo account e l'email. Disattivo: gli stessi metadati vanno solo con un ID di installazione casuale. Chat, file e prompt non vengono mai inviati. Questa impostazione vale per questo browser.",
   "settings.tab.general.title": "Generali",

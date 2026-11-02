@@ -147,7 +147,7 @@ export const messages = {
   "settings.notch.size.previewIsland": "Externes Display",
   "settings.analytics.title": "Analysedaten mit meinem Konto verknüpfen",
   "settings.analytics.description":
-    "An: Nutzungs- und Zuverlässigkeitsmetadaten gehen mit deiner Konto-ID und E-Mail-Adresse an das von OpenBot selbst betriebene Analysesystem, mit den Websites, die du und deine Agenten besuchen, der Tool-Nutzung und Details deiner Einrichtung. Aus: Nur die grundlegende Nutzung, etwa Durchläufe und Token-Zahlen, geht mit einer zufälligen Installations-ID. Chats, Dateien und Prompts werden nie gesendet.",
+    "An: Nutzungs- und Zuverlässigkeitsmetadaten gehen mit deiner Konto-ID und E-Mail-Adresse an das von OpenBot selbst betriebene Analysesystem, mit den Websites, die du und deine Agenten besuchen, der Tool-Nutzung und einer täglichen Übersicht deiner Einrichtung. Aus: Nur die grundlegende Nutzung, etwa Durchläufe und Token-Zahlen, geht mit einer zufälligen Installations-ID. Chats, Dateien und Prompts werden nie gesendet.",
   "settings.analytics.webDescription":
     "An: Nutzungs- und Zuverlässigkeitsmetadaten gehen mit deiner Konto-ID und E-Mail-Adresse an das von OpenBot selbst betriebene Analysesystem. Aus: Dieselben Metadaten gehen nur mit einer zufälligen Installations-ID. Chats, Dateien und Prompts werden nie gesendet. Diese Einstellung gilt für diesen Browser.",
   "settings.tab.general.title": "Allgemein",

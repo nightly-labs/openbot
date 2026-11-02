@@ -143,7 +143,7 @@ export const messages = {
   "settings.notch.size.previewIsland": "Harici ekran",
   "settings.analytics.title": "Analizleri hesabıma bağla",
   "settings.analytics.description":
-    "Açık: kullanım ve güvenilirlik meta verileri, sizin ve ajanlarınızın ziyaret ettiği web siteleri, araç kullanımı ve kurulum ayrıntılarıyla birlikte hesap kimliğiniz ve e-postanızla OpenBot'un kendi barındırdığı analizlerine gönderilir. Kapalı: yalnızca turlar ve token sayıları gibi temel kullanım, rastgele bir kurulum kimliğiyle gönderilir. Sohbetler, dosyalar ve istemler asla gönderilmez.",
+    "Açık: kullanım ve güvenilirlik meta verileri, sizin ve ajanlarınızın ziyaret ettiği web siteleri, araç kullanımı ve günlük kurulum özetiyle birlikte hesap kimliğiniz ve e-postanızla OpenBot'un kendi barındırdığı analizlerine gönderilir. Kapalı: yalnızca turlar ve token sayıları gibi temel kullanım, rastgele bir kurulum kimliğiyle gönderilir. Sohbetler, dosyalar ve istemler asla gönderilmez.",
   "settings.analytics.webDescription":
     "Açık: kullanım ve güvenilirlik meta verileri hesap kimliğiniz ve e-postanızla birlikte OpenBot'un kendi barındırdığı analizlerine gönderilir. Kapalı: aynı meta veriler yalnızca rastgele bir kurulum kimliğiyle gönderilir. Sohbetler, dosyalar ve istemler asla gönderilmez. Bu ayar bu tarayıcı için geçerlidir.",
   "settings.tab.general.title": "Genel",

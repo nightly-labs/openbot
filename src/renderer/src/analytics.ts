@@ -1017,8 +1017,9 @@ class DesktopAnalytics {
   }
 
   /**
-   * `profileId` is the account ID. Without one, the event goes with the install ID. A user who does
-   * not share analytics sends nothing when there is no install ID.
+   * `profileId` is the account ID. A user who does not share analytics sends with the install ID,
+   * and nothing when there is no install ID. A signed-out user who shares analytics sends with no
+   * ID, so the install ID never shows next to an account.
    */
   #send(
     name: AnalyticsEventName,
@@ -1026,7 +1027,7 @@ class DesktopAnalytics {
     profileId: string | null,
     timestamp?: string,
   ): void {
-    const subject = profileId ?? this.#installId;
+    const subject = profileId ?? (this.#trackingEnabled ? null : this.#installId);
     if (!subject && !this.#trackingEnabled) return;
     const client = profileId ? this.#client : this.#anonymousClient;
     this.#enqueue(profileId ? this.#clientQueue : this.#anonymousQueue, "track", () =>

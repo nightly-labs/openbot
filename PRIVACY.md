@@ -299,7 +299,8 @@ The local host also records how the agents are used:
   responsiveness; agent database statement times and counts; counts of processes that stopped
   unexpectedly, by reason; and the computer's memory and processor class, architecture, and whether
   it is a server. Memory is rounded to 50 MB. Process IDs, program names, command lines and paths
-  are not sent. A day that ends while analytics is off is sent with the install ID.
+  are not sent. A day that ends while analytics is off is sent with the install ID, and is not sent
+when there is no install ID.
 - **Token counts.** When a turn completes, the host sends the token counts that the provider
   reported for that turn: uncached input, cached input, cache write, output, and their total. These
   come from the same records as the Usage view. When the provider reported no usage, the host sends
@@ -328,7 +329,7 @@ agent workspaces, conversations, attachments, browser data, and team data are st
 When analytics is off or not answered, the desktop app, the local host, the browser app and the
 mobile app still send basic product events and error reports. These are anonymous: they carry a
 random install ID (`install-` and a random UUID) and no name, email or account. The ID has no part
-of the account, the email, the device name or the hardware, and OpenPanel does not join these
+of the account, the email, the device name or the hardware, and OpenBot does not join these
 events to an account. The events and their limits are the same as above, with one exception: the
 local host sends the **Websites**, **Tools** and **Setup** records only when analytics is on.
 The desktop app and the local host keep the ID in a file in the app data folder, the browser app in
@@ -336,8 +337,10 @@ the `localStorage` of openbot.run, and the mobile app in the phone's keychain. A
 after 13 months, a new ID replaces it. Deleting the desktop app data or the site data of
 openbot.run also makes a new ID. When the device cannot save the ID, it sends no events without an
 account. OpenPanel still derives session, device, browser, operating-system, network, and approximate
-geographic metadata from each request, as for other events. With analytics on, desktop and browser
-events of a signed-out user also carry the install ID.
+geographic metadata from each request, as for other events. Because the session comes from the
+network and the browser, on the day that you turn analytics off, OpenPanel can show the last events
+with your account and the first events with the install ID in one session. The install ID is used
+only while analytics is off: with analytics on, events of a signed-out user carry no ID.
 
 ## Data stored by the central account service
 

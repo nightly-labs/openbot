@@ -88,7 +88,7 @@ export const messages = {
   "onboarding.consent.notice": "Wenn du fortfährst, akzeptierst du die {terms} und nimmst die {privacy} zur Kenntnis.",
   "onboarding.consent.analyticsTitle": "Hilf mit, OpenBot besser zu machen",
   "onboarding.consent.analyticsDetail":
-    "Verknüpfe die Nutzung von Funktionen mit deinem Konto und deiner E-Mail-Adresse und teile besuchte Websites, Tool-Nutzung und Details deiner Einrichtung. Sonst wird nur die grundlegende Nutzung mit einer zufälligen Installations-ID gesendet. Nie deine Chats, Dateien oder Prompts.",
+    "Verknüpfe die Nutzung von Funktionen mit deinem Konto und deiner E-Mail-Adresse und teile besuchte Websites, Tool-Nutzung und eine tägliche Übersicht deiner Einrichtung. Sonst wird nur die grundlegende Nutzung mit einer zufälligen Installations-ID gesendet. Nie deine Chats, Dateien oder Prompts.",
   "onboarding.consent.thanksTitle": "Danke! Das Team schuldet dir was.",
   "onboarding.consent.thanksToast": "Danke, dass du OpenBot besser machst 💜",
   "onboarding.consent.thanksToastDetail": "Du kannst das jederzeit in den Einstellungen ändern.",

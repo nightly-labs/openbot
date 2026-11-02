@@ -517,8 +517,8 @@ export class HostAnalytics {
   /** Reports go with the account when the user shares analytics, else with the install ID. */
   #configureReports(): void {
     if (!this.#reports) return;
-    const subject = (this.#trackingEnabled ? normalizeAnalyticsIdentity(this.#resolveOwner()) : null) ?? this.#install;
-    Effect.runFork(this.#reports.configure(subject !== null, subject?.id ?? null));
+    const subject = this.#trackingEnabled ? normalizeAnalyticsIdentity(this.#resolveOwner()) : this.#install;
+    Effect.runFork(this.#reports.configure(this.#trackingEnabled || subject !== null, subject?.id ?? null));
   }
 
   /** Only the local service emits this signal. Remote clients never send host reports. */
@@ -628,7 +628,7 @@ export class HostAnalytics {
     this.checkResources();
   }
 
-  /** The account signed out: later events go with the install ID. */
+  /** The account signed out. Later events go with the install ID only when the user does not share analytics. */
   clear(): void {
     this.#pending = [];
     this.#bufferOwnerlessEvents = false;
@@ -637,7 +637,9 @@ export class HostAnalytics {
     }
     this.#identifiedOwner = null;
     if (this.#trackingEnabled) this.#enqueue("clear", () => this.#client?.clear());
-    if (this.#reports) Effect.runFork(this.#reports.configure(this.#install !== null, this.#install?.id ?? null));
+    if (!this.#reports) return;
+    const subject = this.#trackingEnabled ? null : this.#install;
+    Effect.runFork(this.#reports.configure(this.#trackingEnabled || subject !== null, subject?.id ?? null));
   }
 
   setTrackingEnabled(enabled: boolean): void {
@@ -846,7 +848,9 @@ export class HostAnalytics {
     if (this.#closed || this.#resourceCheck || !source || !this.#client) return;
     const due = source.previousDay();
     if (!due) return;
-    if (!this.#currentSubject()) return;
+    // A user who shares analytics waits for sign-in. Without an install ID, a day of a user who
+    // does not share analytics is cleared with no send, so it never goes later with the account.
+    if (!this.#currentSubject() && this.#trackingEnabled) return;
     this.#resourceCheck = true;
     Effect.runFork(
       Effect.gen({ self: this }, function* () {
@@ -869,18 +873,20 @@ export class HostAnalytics {
   }
 
   /**
-   * The subject of a new event: the account when the user shares analytics and it is signed in,
-   * else the install ID. Null while an event of a user who shares analytics waits for the account,
-   * or when there is no install ID.
+   * The subject of a new event: the account when the user shares analytics, else the install ID.
+   * Null while a user who shares analytics is signed out, so the install ID never shows next to an
+   * account, and when there is no install ID.
    */
   #currentSubject(): AnalyticsSubject | null {
     if (!this.#trackingEnabled) return this.#install;
-    return normalizeAnalyticsIdentity(this.#resolveOwner()) ?? (this.#bufferOwnerlessEvents ? null : this.#install);
+    return normalizeAnalyticsIdentity(this.#resolveOwner());
   }
 
   #trackForOwner(name: HostEventName, properties: HostProperties, owner: AnalyticsSubject, flushPending = true): void {
     // An account taken before the user stopped sharing analytics is never sent after it.
     if (!this.#trackingEnabled && LINKED_ONLY_EVENTS.has(name)) return;
+    // An install ID taken before the user started sharing analytics is never sent after it.
+    if (this.#trackingEnabled && owner.email === null) return;
     const subject = owner.email !== null && !this.#trackingEnabled ? this.#install : owner;
     if (!subject) return;
     const sanitized = sanitizeHostEvent(name, properties);
