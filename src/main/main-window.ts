@@ -251,7 +251,8 @@ export function createMainWindowController({
       // Nobody can use a tab without the window, so the agents waiting on it continue.
       getServices()?.browser.releaseUserControlHeldBy({ kind: "local" });
       // The hidden renderer owns the cross-host Dynamic Island coordinator and must outlive its visible
-      // window. On Windows and Linux the user chooses it, and the tray icon is the way back.
+      // window. On Windows and Linux the user chooses it, and the tray icon is the way back. On macOS
+      // the Dock icon is the way back, or the menu bar icon when the user chooses it.
       if ((process.platform === "darwin" || keepRunningInBackground()) && !isQuitting()) {
         event.preventDefault();
         window.hide();

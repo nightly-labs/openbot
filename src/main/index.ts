@@ -29,7 +29,7 @@ import {
 } from "electron";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
-import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath } from "./app-icon";
+import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { type BackgroundTray, createBackgroundTray } from "./background-tray";
 import { removeClaudeCodeSessionEnvironment } from "./claude-session-environment";
@@ -468,6 +468,10 @@ const windows = createMainWindowController({
   onMainWindowCreated: (window) => {
     attachWindowsSessionEndHandlers(window);
     attachQuitOnMainWindowClose(window);
+    if (process.platform === "darwin") {
+      window.on("hide", syncMacDock);
+      window.on("show", syncMacDock);
+    }
   },
   reportError: (message, error) => logger.error(message, toLogValue(error)),
   quitFromShortcut: () => quitFor("shortcut"),
@@ -505,6 +509,23 @@ function applyAppIconColor(color: AppLogoColor): void {
   appIconColorImage = icon;
   for (const window of BrowserWindow.getAllWindows()) window.setIcon(icon);
   backgroundTray?.setIcon(icon);
+}
+
+/**
+ * On macOS, a user who keeps OpenBot in the menu bar sees no Dock icon while the main window is
+ * hidden. The Dock icon comes back when the window shows. A window hidden with the app (Cmd + H) keeps
+ * the Dock icon: it is the way back to that window.
+ */
+function syncMacDock(): void {
+  if (process.platform !== "darwin" || !app.dock || localServerChild) return;
+  const window = windowHolder.current;
+  const windowShown = window !== null && !window.isDestroyed() && window.isVisible();
+  if (services?.appBehavior.keepRunningInBackground && !windowShown && !app.isHidden()) {
+    app.dock.hide();
+    return;
+  }
+  if (!app.dock.isVisible())
+    void app.dock.show().catch((error) => logger.warn("Unable to show the Dock icon:", toLogValue(error)));
 }
 
 /**
@@ -1412,16 +1433,29 @@ if (!hasSingleInstanceLock) {
         () => windowHolder.current,
         quitFor,
       );
-      // The way back to a window hidden in the background on Windows and Linux.
+      // The way back to a window hidden in the background.
       backgroundTray = createBackgroundTray({
         icon: appIconColorImage ?? nativeImage.createFromPath(appIconPath),
+        menuBarIcon:
+          process.platform === "darwin"
+            ? nativeImage.createFromPath(
+                resolveMenuBarIconPath({
+                  isPackaged: app.isPackaged,
+                  resourcesPath: process.resourcesPath,
+                  sourceRoot: resolve(__dirname, "../.."),
+                }),
+              )
+            : null,
         translate: language.translate,
         open: reopenMainWindow,
         quit: () => quitFor("tray"),
       });
       const tray = backgroundTray;
       tray.sync(appBehavior.keepRunningInBackground);
-      const unsubscribeBackgroundTray = appBehavior.subscribe(() => tray.sync(appBehavior.keepRunningInBackground));
+      const unsubscribeBackgroundTray = appBehavior.subscribe(() => {
+        tray.sync(appBehavior.keepRunningInBackground);
+        syncMacDock();
+      });
       teardown.push(0, "background tray", () => {
         unsubscribeBackgroundTray();
         tray.destroy();

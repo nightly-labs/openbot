@@ -36,6 +36,9 @@ export const messages = {
   "settings.launchAtLogin.description": "Die App öffnen, wenn du dich an diesem Computer anmeldest.",
   "settings.keepRunning.title": "OpenBot im Hintergrund weiter ausführen",
   "settings.keepRunning.description": "Aktive Aufgaben nach dem Schließen des Fensters weiter ausführen.",
+  "settings.menuBar.title": "OpenBot in der Menüleiste zeigen",
+  "settings.menuBar.description":
+    "Das Dock-Symbol nach dem Schließen des Fensters ausblenden. Aktive Aufgaben laufen weiter.",
   "settings.keepAwake.title": "Computer wach halten",
   "settings.keepAwake.description":
     "Routinen laufen pünktlich, solange der Computer am Strom hängt. Der Bildschirm kann sich trotzdem ausschalten.",

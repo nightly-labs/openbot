@@ -36,6 +36,9 @@ export const messages = {
   "settings.launchAtLogin.description": "Apri l'app quando accedi a questo computer.",
   "settings.keepRunning.title": "Mantieni OpenBot attivo in background",
   "settings.keepRunning.description": "Le attività in corso continuano anche dopo aver chiuso la finestra.",
+  "settings.menuBar.title": "Mostra OpenBot nella barra dei menu",
+  "settings.menuBar.description":
+    "Nasconde l’icona nel Dock dopo la chiusura della finestra. Le attività in corso continuano.",
   "settings.keepAwake.title": "Mantieni attivo il computer",
   "settings.keepAwake.description":
     "Le routine partono in orario finché il computer è collegato alla corrente. Lo schermo può comunque spegnersi.",

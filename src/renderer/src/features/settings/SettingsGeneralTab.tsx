@@ -179,13 +179,27 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             description={i18n.t("settings.keepRemoteSessions.description")}
           />
           <Show when={props.value.keepRunningInBackground !== null}>
-            <SwitchField
-              data-settings-row="settings.keepRunning.title"
-              checked={props.value.keepRunningInBackground === true}
-              onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
-              label={i18n.t("settings.keepRunning.title")}
-              description={i18n.t("settings.keepRunning.description")}
-            />
+            {/* macOS always keeps running after the window closes. There the switch moves OpenBot from the Dock to the menu bar. */}
+            <Show
+              when={props.platform === "darwin"}
+              fallback={
+                <SwitchField
+                  data-settings-row="settings.keepRunning.title"
+                  checked={props.value.keepRunningInBackground === true}
+                  onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
+                  label={i18n.t("settings.keepRunning.title")}
+                  description={i18n.t("settings.keepRunning.description")}
+                />
+              }
+            >
+              <SwitchField
+                data-settings-row="settings.menuBar.title"
+                checked={props.value.keepRunningInBackground === true}
+                onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
+                label={i18n.t("settings.menuBar.title")}
+                description={i18n.t("settings.menuBar.description")}
+              />
+            </Show>
           </Show>
           <Show when={props.value.keepAwake !== null}>
             <SwitchField
