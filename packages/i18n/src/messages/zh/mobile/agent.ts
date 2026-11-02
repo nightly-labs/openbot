@@ -471,6 +471,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "助手",
   "mobile.agent.section.moveFailed": "无法移动对话",
   "mobile.agent.section.moveTo": "移动到分区",
+  "mobile.agent.noMessages": "还没有消息",
   "mobile.agent.list.open": "打开与 {name} 的对话",
   "mobile.agent.list.openWithTitle": "打开与 {name} 的对话，{title}",
   "mobile.agent.list.openPinned": "打开与 {name} 的置顶对话",

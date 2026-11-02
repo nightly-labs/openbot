@@ -498,6 +498,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "エージェント",
   "mobile.agent.section.moveFailed": "チャットを移動できませんでした",
   "mobile.agent.section.moveTo": "セクションへ移動",
+  "mobile.agent.noMessages": "まだメッセージはありません",
   "mobile.agent.list.open": "{name} とのチャットを開く",
   "mobile.agent.list.openWithTitle": "{name} とのチャットを開く、{title}",
   "mobile.agent.list.openPinned": "ピン留めした {name} とのチャットを開く",

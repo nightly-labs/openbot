@@ -11,6 +11,7 @@
 import { AppWindow, Badge, buttonVariants, Clock3, ContextMenu, Lock } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, Show } from "solid-js";
+import { isAgentStoredEmptyPreview } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -59,7 +60,14 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
     return rowProps.waiting && current?.kind === "waiting" ? current : undefined;
   };
   // A waiting row previews the question: the stored preview is the message before it.
-  const detail = () => hiddenDetail() || wait()?.detail || rowProps.agent.preview;
+  const detail = () => {
+    const hidden = hiddenDetail();
+    if (hidden) return hidden;
+    const waiting = wait()?.detail;
+    if (waiting) return waiting;
+    const preview = rowProps.agent.preview;
+    return isAgentStoredEmptyPreview(preview) ? t("app.agent.noMessages") : preview;
+  };
   // The state label already reads the question, so the label does not say it twice.
   const labelDetail = () => (wait()?.detail ? "" : `. ${hiddenLabel()}${detail()}`);
   const [menuOpen, setMenuOpen] = createSignal(false);

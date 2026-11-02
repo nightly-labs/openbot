@@ -497,6 +497,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Agents",
   "mobile.agent.section.moveFailed": "Kan chat niet verplaatsen",
   "mobile.agent.section.moveTo": "Naar sectie verplaatsen",
+  "mobile.agent.noMessages": "Nog geen berichten",
   "mobile.agent.list.open": "Open chat met {name}",
   "mobile.agent.list.openWithTitle": "Open chat met {name}, {title}",
   "mobile.agent.list.openPinned": "Open vastgezette chat met {name}",

@@ -485,6 +485,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.section.unassigned": "Agents",
   "mobile.agent.section.moveFailed": "Could not move chat",
   "mobile.agent.section.moveTo": "Move to section",
+  "mobile.agent.noMessages": "No messages yet",
   "mobile.agent.list.open": "Open chat with {name}",
   "mobile.agent.list.openWithTitle": "Open chat with {name}, {title}",
   "mobile.agent.list.openPinned": "Open pinned chat with {name}",
