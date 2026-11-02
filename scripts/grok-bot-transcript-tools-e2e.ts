@@ -27,6 +27,10 @@ const TOOL_REPLY = "Done with the tool";
 const WAIT_REPLY = "Finished after the tool";
 const FAIL_REPLY = "The tool failed";
 const PERMISSION_REPLY = "Allowed";
+const WINDOW_REPLY = "Reply after a full tail";
+const WINDOW_PROMPT = "windowed tail";
+/** Same cap as `readGrokBotTranscript` (`limit: 200`). */
+const TAIL_LIMIT = 200;
 const INTERIM_REPLY = "Checking your computer's date now.";
 const FINAL_REPLY = "It is Friday, Oct 30.";
 const cipher = {
@@ -47,6 +51,7 @@ const report: {
   retryingHeld: boolean;
   subagentHeld: boolean;
   rosterEnded: boolean;
+  windowedTail: boolean;
   quietFallback: boolean;
   writingShown: boolean;
   usageInputTokens: number;
@@ -66,6 +71,7 @@ const report: {
   retryingHeld: false,
   subagentHeld: false,
   rosterEnded: false,
+  windowedTail: false,
   quietFallback: false,
   writingShown: false,
   usageInputTokens: 0,
@@ -175,6 +181,7 @@ type Mode =
   | "retrying"
   | "subagent"
   | "roster"
+  | "window"
   | "quiet";
 
 const TEXT_USAGE = { inputTokens: 11, outputTokens: 5, cacheReadTokens: 3, cacheWriteTokens: 1 };
@@ -272,7 +279,7 @@ function armTurn(): void {
     if (mode === "roster") running = true;
     return;
   }
-  if (mode === "text") {
+  if (mode === "text" || mode === "window") {
     running = true;
     publishAgent();
     publishEnded(TEXT_USAGE);
@@ -325,7 +332,21 @@ function armTurn(): void {
   );
 }
 
+/** A full tail. The new prompt replaces the two oldest rows, so both windows have `TAIL_LIMIT` rows. */
+function windowTail(armed: boolean): unknown[] {
+  const keep = armed ? TAIL_LIMIT - 2 : TAIL_LIMIT;
+  const entries: unknown[] = [];
+  for (let index = 0; index < keep; index += 1) {
+    entries.push({ id: `old${index}`, kind: "message", role: "user", content: `older ${index}` });
+  }
+  if (!armed) return entries;
+  entries.push({ id: "tWu", kind: "message", role: "user", content: WINDOW_PROMPT });
+  entries.push({ id: "tWs", kind: "send-message", message: { type: "text", content: WINDOW_REPLY } });
+  return entries;
+}
+
 function liveEntries(): unknown[] {
+  if (mode === "window") return windowTail(true);
   if (mode === "text") return textTail.entries;
   if (mode === "tool") return toolTail.entries;
   if (mode === "fail") {
@@ -471,7 +492,7 @@ const server = createServer((request, response: ServerResponse) => {
     if (url.pathname === "/api/getAgentTranscriptTail") {
       response.writeHead(200, { "content-type": "application/json" });
       if (!arm) {
-        response.end(JSON.stringify({ entries: [] }));
+        response.end(JSON.stringify({ entries: mode === "window" ? windowTail(false) : [] }));
         return;
       }
       polls += 1;
@@ -690,6 +711,15 @@ try {
   const subNotes = await runTurn(client, started.thread.id, "subagent holds", "subagent", 4_000);
   report.subagentHeld = Date.now() - subStart >= 400 && assistantText(subNotes) === "Parent still running";
   assert.equal(report.subagentHeld, true);
+
+  const windowNotes = await runTurn(client, started.thread.id, WINDOW_PROMPT, "window", 4_000);
+  report.windowedTail = assistantText(windowNotes) === WINDOW_REPLY;
+  assert.equal(report.windowedTail, true);
+  const windowTurn = windowNotes.find((note) => note.method === "turn/completed");
+  assert.equal(
+    isDynamicRecord(windowTurn?.params) && isDynamicRecord(windowTurn.params.turn) && windowTurn.params.turn.status,
+    "completed",
+  );
 
   const rosterNotes = await runTurn(client, started.thread.id, "roster signal", "roster", 4_000);
   report.rosterEnded = assistantText(rosterNotes) === "Roster reply";

@@ -514,10 +514,6 @@ export class GrokBotAgentClient extends EventEmitter<ClientEvents> implements Ag
     turn.controller.signal.addEventListener("abort", abortStream);
     try {
       const prompt = promptText(params);
-      const none: GrokBotInferenceMessage[] = [];
-      const before = await readTail()
-        .then((body) => transcriptToMessages(body))
-        .catch(() => none);
       const queue = createGatewayEventQueue();
       const watch = createTurnWatch();
       const session = (await Effect.runPromise(store.load()))?.gateway ?? null;
@@ -587,7 +583,7 @@ export class GrokBotAgentClient extends EventEmitter<ClientEvents> implements Ag
           watch,
           activity.steps.some((step) => step.name === "SendMessage" && step.status === "inProgress"),
         );
-        const reply = replyAfter(before, messages, prompt);
+        const reply = replyAfter(messages, prompt);
         if (reply.length > turn.text.length && reply.startsWith(turn.text)) {
           const delta = reply.slice(turn.text.length);
           turn.text = reply;
@@ -973,16 +969,17 @@ function promptText(params: unknown): string {
   return text;
 }
 
-/** Assistant text written after our prompt in the transcript tail. */
-function replyAfter(
-  before: readonly GrokBotInferenceMessage[],
-  after: readonly GrokBotInferenceMessage[],
-  prompt: string,
-): string {
+/**
+ * Assistant text after this prompt in the transcript tail.
+ * `getAgentTranscriptTail` returns a fixed window. A full window drops the oldest rows, so this
+ * prompt is not at the previous window's length. The last user row with this text is this turn.
+ */
+function replyAfter(after: readonly GrokBotInferenceMessage[], prompt: string): string {
   let start = -1;
-  for (let index = after.length - 1; index >= Math.min(before.length, after.length) - 1 && index >= 0; index -= 1) {
+  const wanted = prompt.trim();
+  for (let index = after.length - 1; index >= 0; index -= 1) {
     const message = after[index];
-    if (message && message.role === "USER" && "text" in message && message.text.trim() === prompt.trim()) {
+    if (message && message.role === "USER" && "text" in message && message.text.trim() === wanted) {
       start = index;
       break;
     }
