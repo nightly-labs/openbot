@@ -7,6 +7,7 @@ import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { useAgentWaits } from "@/features/workspace/components/use-agent-activity";
 import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
@@ -59,6 +60,8 @@ export function useChatQueue(
     queryKey,
     queryFn: () => workspace().loadQueue(agentId, serverId),
     enabled: online,
+    // The chat reads the queue once when it opens, also when the cache holds a recent copy.
+    refetchOnMount: "always",
     retry: false,
   });
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +100,7 @@ export function useChatQueue(
       query.data?.deliveries.some((item) => item.id === edit.delivery.id && item.status !== "queued"),
   );
   // A teammate's answer waits in the queue until the agent reads it, but it is not the user's
-  // message: it has no edit, steer or reorder actions. The waiting block shows it instead.
+  // message: it has no edit or reorder actions, only steer. The waiting block shows it instead.
   const queued = useMemo(
     () => orderedQueue((query.data?.deliveries ?? []).filter((item) => !isQueuedAgentReply(item))),
     [query.data],
@@ -108,12 +111,14 @@ export function useChatQueue(
   // The person can close the rows when every teammate is done, as on desktop. A closed row that
   // works again shows.
   const { hiddenReplyIds, hideReplies } = useHiddenReplies();
+  // A teammate that waits for the person in its own chat says so in its row.
+  const waits = useAgentWaits(serverId, online);
   const waiting = useMemo(
     () =>
-      awaitingReplies(messages, replies).filter(
+      awaitingReplies(messages, replies, waits).filter(
         (row) => !(hiddenReplyIds.has(row.id) && (row.state === "replied" || row.state === "failed")),
       ),
-    [messages, replies, hiddenReplyIds],
+    [messages, replies, waits, hiddenReplyIds],
   );
   // Persist typing after a pause, without blocking each key event. The edit identity is
   // persisted synchronously BEFORE requesting the host hold, so a restart can recover it.
@@ -146,9 +151,13 @@ export function useChatQueue(
   const refresh = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey });
   }, [queryClient, queryKey]);
+  // A connection that comes back reads the queue again. The chat that opens online has its read
+  // from the query: a second request here would replace it.
+  const wasOnline = useRef(online);
   useEffect(() => {
-    if (online) refresh();
-  }, [online, refresh]);
+    if (online && !wasOnline.current) void queryClient.invalidateQueries({ queryKey }, { cancelRefetch: false });
+    wasOnline.current = online;
+  }, [online, queryClient, queryKey]);
 
   const run = useCallback(
     async (action: () => Promise<void>) => {

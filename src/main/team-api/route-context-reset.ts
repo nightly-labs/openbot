@@ -8,7 +8,7 @@ import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiAgents } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, stringField } from "./request-helpers";
+import { readJson, requireAgentLevel, stringField } from "./request-helpers";
 
 /**
  * A new chat with one agent, started from a joined server. Any member can start one, as any member
@@ -28,6 +28,7 @@ export async function routeContextReset(
   const agentId = stringField(await readJson(request), "agentId");
   if (hiddenAgentIds.has(agentId) || !agents.listAgents().some((agent) => agent.id === agentId))
     throw new HttpError(404, sourceText("error.team.agentNotFound"));
+  requireAgentLevel(context, agentId, "chat");
   try {
     await runCauseEffect(agents.clearAgentContext(agentId));
   } catch (error) {

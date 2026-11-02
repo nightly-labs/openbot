@@ -1,0 +1,35 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/uiBlock";
+
+export const messages = {
+  "uiBlock.status.pending": "Wacht op je antwoord",
+  "uiBlock.status.answered": "Beantwoord",
+  "uiBlock.status.expired": "Verlopen",
+  "uiBlock.status.closed": "Gesloten",
+  "uiBlock.outcome.expired": "Er is niet op tijd geantwoord",
+  "uiBlock.outcome.closed": "Gesloten zonder antwoord",
+  "uiBlock.outcome.autoAnswered": "{outcome} (niemand antwoordde op tijd)",
+  "uiBlock.confirm.holdHint":
+    "Houd de knop ingedrukt om te bevestigen, of druk erop om in een tweede stap te bevestigen",
+  "uiBlock.confirm.prompt": "Bevestigen: {action}?",
+  "uiBlock.confirm.accept": "Bevestigen",
+  "uiBlock.confirm.autoActionLabel": "{action} · {seconds} s",
+  "uiBlock.confirm.previewLabel": "Voorvertoning",
+  "uiBlock.confirm.showFullPreview": "Alles tonen",
+  "uiBlock.confirm.hideFullPreview": "Minder tonen",
+  "uiBlock.choice.submit": "Sturen",
+  "uiBlock.choice.shortcutHint": "Druk op {first} t/m {last} om te kiezen",
+  "uiBlock.choice.selectedCount": { one: "{count} geselecteerd", other: "{count} geselecteerd" },
+  "uiBlock.choice.noneSelected": "Niets geselecteerd",
+  "uiBlock.quick.label": "Snelle antwoorden",
+  "uiBlock.quick.textLabel": "Je eigen antwoord",
+  "uiBlock.quick.textPlaceholder": "Of typ je eigen antwoord",
+  "uiBlock.quick.send": "Sturen",
+  "uiBlock.form.submit": "Versturen",
+  "uiBlock.form.required": "Dit veld is verplicht",
+  "uiBlock.form.choose": "Kies een optie",
+  "uiBlock.form.notSet": "Niet ingesteld",
+  "uiBlock.form.invalid": "Sommige antwoorden kloppen niet. Controleer ze en probeer het opnieuw.",
+  "uiBlock.skip": "Overslaan",
+  "uiBlock.error.answerFailed": "Kan je antwoord niet versturen. Probeer het opnieuw.",
+} as const satisfies PartialTranslation<typeof source>;

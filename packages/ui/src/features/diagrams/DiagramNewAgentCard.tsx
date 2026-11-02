@@ -8,9 +8,9 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentModelId,
-  AgentModelOption,
   AgentProviderId,
   AgentStatus,
+  ClientAgentModelOption,
   CustomAgentSummary,
   CustomProviderSummary,
 } from "@openbot/contracts/ipc";
@@ -20,13 +20,14 @@ import { ProviderModelPicker } from "../../components/ProviderModelPicker";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { createFirstAgentDraft, type FirstAgentDraft } from "../agents/FirstAgentSetup";
+import { InstructionsLimit, instructionsTooLong } from "../agents/InstructionsLimit";
 
 export type DiagramNewAgentDraft = Pick<FirstAgentDraft, "name" | "purpose" | "avatarSeed" | "avatarHue"> &
   Partial<Pick<FirstAgentDraft, "provider" | "model">>;
 
 /** What the model picker of a new agent offers, and the model it starts on. */
 export interface DiagramModelChoice {
-  options: AgentModelOption[];
+  options: ClientAgentModelOption[];
   status: AgentStatus;
   initial: { provider: AgentProviderId; model: AgentModelId };
   customProviders?: readonly CustomProviderSummary[] | undefined;
@@ -46,6 +47,7 @@ export function DiagramNewAgentCard(props: {
   const [purpose, setPurpose] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const [choice, setChoice] = createSignal(props.models?.initial ?? null);
+  const [height, setHeight] = createSignal<number | null>(null);
   let nameInput: HTMLInputElement | undefined;
   let form: HTMLFormElement | undefined;
   onSettled(() => {
@@ -59,10 +61,17 @@ export function DiagramNewAgentCard(props: {
       props.onCancel();
     };
     document.addEventListener("pointerdown", dismiss);
-    return () => document.removeEventListener("pointerdown", dismiss);
+    // The card stays inside the canvas at the height it has now. The count and the error under the
+    // purpose field make it taller.
+    const resize = new ResizeObserver(() => setHeight(form?.offsetHeight ?? null));
+    if (form) resize.observe(form);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      resize.disconnect();
+    };
   });
   const create = () => {
-    if (!name().trim() || busy()) return;
+    if (!name().trim() || instructionsTooLong(purpose()) || busy()) return;
     setBusy(true);
     props
       .onCreate({
@@ -78,7 +87,11 @@ export function DiagramNewAgentCard(props: {
     <form
       ref={(element) => (form = element)}
       class="diagram-new-agent"
-      style={{ "--diagram-new-agent-x": `${props.at.x}px`, "--diagram-new-agent-y": `${props.at.y}px` }}
+      style={{
+        "--diagram-new-agent-x": `${props.at.x}px`,
+        "--diagram-new-agent-y": `${props.at.y}px`,
+        "--diagram-new-agent-height": height() === null ? undefined : `${height()}px`,
+      }}
       aria-label={t("diagram.newAgent.label")}
       data-diagram-overlay=""
       onSubmit={(event: SubmitEvent) => {
@@ -111,9 +124,10 @@ export function DiagramNewAgentCard(props: {
         placeholder={t("diagram.newAgent.purposePlaceholder")}
         aria-label={t("diagram.newAgent.purpose")}
         disabled={busy()}
-        maxlength={INPUT_LIMITS.agentDescription}
+        invalid={instructionsTooLong(purpose())}
         onValueChange={setPurpose}
       />
+      <InstructionsLimit text={purpose()} />
       <Show when={props.models}>
         {(models) => (
           <Show when={choice()}>
@@ -138,7 +152,7 @@ export function DiagramNewAgentCard(props: {
         <Button type="button" variant="ghost" size="xs" disabled={busy()} onClick={() => props.onCancel()}>
           {t("diagram.newAgent.cancel")}
         </Button>
-        <Button type="submit" size="xs" disabled={!name().trim() || busy()}>
+        <Button type="submit" size="xs" disabled={!name().trim() || instructionsTooLong(purpose()) || busy()}>
           {busy() ? t("diagram.newAgent.creating") : t("diagram.newAgent.create")}
         </Button>
       </div>

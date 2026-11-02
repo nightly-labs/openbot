@@ -31,7 +31,14 @@ export const Route = createFileRoute("/v2/hosting/servers/")({
             return json(
               yield* requestHostedServerService(request).create(
                 user,
-                { name: body.name, plan: body.plan, interval: body.interval, currency: body.currency },
+                {
+                  name: body.name,
+                  plan: body.plan,
+                  interval: body.interval,
+                  currency: body.currency,
+                  entryPoint: body.entryPoint,
+                  license: body.license,
+                },
                 request.headers.get("Idempotency-Key"),
                 // Stripe sends the desktop user to the return page, which tells them to go back to the app.
                 { target: "desktop", origin: new URL(request.url).origin },

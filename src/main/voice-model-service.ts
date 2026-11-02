@@ -3,7 +3,8 @@ import { EventEmitter } from "node:events";
 import { createReadStream, existsSync } from "node:fs";
 import { mkdir, open, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { LocalVoiceModelId, VoiceModelStatus } from "@openbot/contracts/ipc";
+import type { LocalVoiceModelId, SpeechModelId, VoiceModelStatus } from "@openbot/contracts/ipc";
+import { PARAKEET_MODEL_FILES, SUPERTONIC_MODEL_FILES } from "@openbot/contracts/speech-models";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Fiber, Result, Schema, Scope, Stream } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
@@ -18,35 +19,38 @@ export interface VoiceModelFile {
   sha256: string;
 }
 
-const PARAKEET_MODEL_REVISION = "2bda32ec70b097a55adaa07d9a7173915b43cc78";
-const PARAKEET_MODEL_BASE_URL = `https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/${PARAKEET_MODEL_REVISION}`;
+const BARK_PLUS_MODEL_REVISION = "5f95a80a9da9d392a38df8e9a6609e25be643d07";
+const BARK_PLUS_MODEL_BASE_URL = `https://huggingface.co/velddev/Underdog-Bark-3.0-Plus-sherpa-onnx/resolve/${BARK_PLUS_MODEL_REVISION}`;
 
-/** The directory name of the model in `<userData>/runtimes`. A new pin needs a new name. */
-export const PARAKEET_MODEL_DIRECTORY = "parakeet-tdt-0.6b-v3-int8";
+/** The directory name of Bark 3.0 Plus in `<userData>/runtimes`. A new pin needs a new name. */
+export const BARK_PLUS_MODEL_DIRECTORY = "bark-3.0-plus-int8";
 
-/** NVIDIA Parakeet TDT 0.6B v3 (CC-BY-4.0), int8 ONNX export for sherpa-onnx. */
-export const PARAKEET_MODEL_FILES: readonly VoiceModelFile[] = [
+/**
+ * Conway Research Underdog Bark 3.0 Plus (CC-BY-4.0), a post-trained Parakeet TDT 0.6B v3. The
+ * int8 ONNX export for sherpa-onnx is unofficial; it has the file names of the Parakeet export.
+ */
+const BARK_PLUS_MODEL_FILES: readonly VoiceModelFile[] = [
   {
     name: "encoder.int8.onnx",
-    url: `${PARAKEET_MODEL_BASE_URL}/encoder.int8.onnx`,
-    bytes: 652_184_281,
-    sha256: "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+    url: `${BARK_PLUS_MODEL_BASE_URL}/encoder.int8.onnx`,
+    bytes: 630_748_318,
+    sha256: "c32c6964e13877500701f1699d2fa92a7f6bc3cd700370ba884c09901c183a16",
   },
   {
     name: "decoder.int8.onnx",
-    url: `${PARAKEET_MODEL_BASE_URL}/decoder.int8.onnx`,
-    bytes: 11_845_275,
-    sha256: "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+    url: `${BARK_PLUS_MODEL_BASE_URL}/decoder.int8.onnx`,
+    bytes: 47_658_545,
+    sha256: "89a081f0cf1500ec64e8a45f24f0bc10d1224aa334191e7f7e6f3226365b06b8",
   },
   {
     name: "joiner.int8.onnx",
-    url: `${PARAKEET_MODEL_BASE_URL}/joiner.int8.onnx`,
-    bytes: 6_355_277,
-    sha256: "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+    url: `${BARK_PLUS_MODEL_BASE_URL}/joiner.int8.onnx`,
+    bytes: 6_123_465,
+    sha256: "b8fe34824c5d2ec077489e4b4f66907cb47a971e1d34fe96915e9e5427df3c89",
   },
   {
     name: "tokens.txt",
-    url: `${PARAKEET_MODEL_BASE_URL}/tokens.txt`,
+    url: `${BARK_PLUS_MODEL_BASE_URL}/tokens.txt`,
     bytes: 93_939,
     sha256: "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
   },
@@ -83,21 +87,36 @@ const WHISPER_TURBO_MODEL_FILES: readonly VoiceModelFile[] = [
   },
 ];
 
+/** A model that OpenBot downloads: a dictation model or the speech model. */
+type DownloadedModelId = LocalVoiceModelId | SpeechModelId;
+
+/** The directory name of Supertonic 3 in `<userData>/runtimes`. The phone uses the same name. */
+export {
+  PARAKEET_MODEL_DIRECTORY,
+  PARAKEET_MODEL_FILES,
+  SUPERTONIC_MODEL_DIRECTORY,
+} from "@openbot/contracts/speech-models";
+
 /** The files of each model. */
-const VOICE_MODEL_FILES: Record<LocalVoiceModelId, readonly VoiceModelFile[]> = {
+const VOICE_MODEL_FILES: Record<DownloadedModelId, readonly VoiceModelFile[]> = {
   "parakeet-tdt-0.6b-v3": PARAKEET_MODEL_FILES,
+  "bark-3.0-plus": BARK_PLUS_MODEL_FILES,
   "whisper-turbo": WHISPER_TURBO_MODEL_FILES,
+  "supertonic-3": SUPERTONIC_MODEL_FILES,
 };
 
-interface VoiceModelEvents {
-  status: [status: VoiceModelStatus];
+/** The status of one downloaded model. */
+export type DownloadedModelStatus<Id extends DownloadedModelId> = Omit<VoiceModelStatus, "modelId"> & { modelId: Id };
+
+interface VoiceModelEvents<Id extends DownloadedModelId> {
+  status: [status: DownloadedModelStatus<Id>];
 }
 
-interface VoiceModelServiceOptions {
-  modelId?: LocalVoiceModelId;
+interface VoiceModelServiceOptions<Id extends DownloadedModelId> {
+  modelId: Id;
   directory: string;
   files?: readonly VoiceModelFile[];
-  fetch?: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+  fetch?: ((input: string | URL | Request, init?: RequestInit) => Promise<Response>) | undefined;
 }
 
 /** What a verified file looked like, so a later check can skip the hash while nothing changed. */
@@ -106,8 +125,8 @@ interface VerifiedFile {
   mtimeMs: number;
 }
 
-export class VoiceModelService extends EventEmitter<VoiceModelEvents> {
-  readonly modelId: LocalVoiceModelId;
+export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitter<VoiceModelEvents<Id>> {
+  readonly modelId: Id;
   readonly #directory: string;
   readonly #files: readonly VoiceModelFile[];
   readonly #totalBytes: number;
@@ -119,16 +138,17 @@ export class VoiceModelService extends EventEmitter<VoiceModelEvents> {
    */
   readonly #verified = new Map<string, VerifiedFile>();
   #status: Omit<VoiceModelStatus, "modelId"> = { phase: "missing", progress: null, message: null };
-  #preparation: Fiber.Fiber<VoiceModelStatus, VoiceOperationError> | null = null;
+  #preparation: Fiber.Fiber<DownloadedModelStatus<Id>, VoiceOperationError> | null = null;
+  #removal: Fiber.Fiber<DownloadedModelStatus<Id>, VoiceOperationError> | null = null;
   readonly #scope = Scope.makeUnsafe();
   #abortController: AbortController | null = null;
   #stopping = false;
   /** The user stopped the download in progress, so it ends as missing rather than failed. */
   #cancelled = false;
 
-  constructor(options: VoiceModelServiceOptions) {
+  constructor(options: VoiceModelServiceOptions<Id>) {
     super();
-    this.modelId = options.modelId ?? "parakeet-tdt-0.6b-v3";
+    this.modelId = options.modelId;
     this.#directory = options.directory;
     this.#files = options.files ?? VOICE_MODEL_FILES[this.modelId];
     this.#totalBytes = this.#files.reduce((total, file) => total + file.bytes, 0);
@@ -139,14 +159,14 @@ export class VoiceModelService extends EventEmitter<VoiceModelEvents> {
     return this.#directory;
   }
 
-  readonly getStatus = Effect.fn("VoiceModel.getStatus")(function* (this: VoiceModelService) {
-    if (this.#status.phase === "downloading") return this.#copyStatus();
-    const ready = yield* this.#isComplete();
-    this.#setStatus({ phase: ready ? "ready" : "missing", progress: ready ? 100 : null, message: null });
-    return this.#copyStatus();
+  readonly getStatus = Effect.fn("VoiceModel.getStatus")(function* (this: VoiceModelService<Id>) {
+    if (this.#status.phase === "downloading" || this.#removal) return this.#copyStatus();
+    return yield* this.#readStatus();
   }).bind(this);
 
-  readonly prepare = Effect.fn("VoiceModel.prepare")(function* (this: VoiceModelService) {
+  readonly prepare = Effect.fn("VoiceModel.prepare")(function* (this: VoiceModelService<Id>) {
+    // A download that starts while the files are deleted would write into the directory being removed.
+    if (this.#removal) yield* Fiber.await(this.#removal);
     if (this.#preparation) return yield* Fiber.join(this.#preparation);
     this.#cancelled = false;
     const fiber = yield* Effect.forkIn(
@@ -210,7 +230,7 @@ export class VoiceModelService extends EventEmitter<VoiceModelEvents> {
   }).bind(this);
 
   /** Stops the download in progress, if any, and answers the status after it ends. */
-  readonly cancel = Effect.fn("VoiceModel.cancel")(function* (this: VoiceModelService) {
+  readonly cancel = Effect.fn("VoiceModel.cancel")(function* (this: VoiceModelService<Id>) {
     const preparation = this.#preparation;
     if (!preparation) return yield* this.getStatus();
     this.#cancelled = true;
@@ -219,10 +239,45 @@ export class VoiceModelService extends EventEmitter<VoiceModelEvents> {
     return this.#copyStatus();
   }).bind(this);
 
-  readonly shutdown = Effect.fn("VoiceModel.shutdown")(function* (this: VoiceModelService) {
+  /**
+   * Deletes the model directory, and stops the download in progress first. `endHost` ends any host
+   * that has the model loaded; a `prepare` during it waits, so no new host loads the files that go.
+   * The directory is the one main gave this service, never a renderer path.
+   */
+  readonly remove = Effect.fn("VoiceModel.remove")(function* (
+    this: VoiceModelService<Id>,
+    endHost: Effect.Effect<void>,
+  ) {
+    if (this.#removal) return yield* Fiber.join(this.#removal);
+    const fiber = yield* Effect.forkIn(
+      Effect.gen({ self: this }, function* () {
+        if (this.#preparation) yield* this.cancel();
+        yield* endHost;
+        const removed = yield* Effect.result(voiceIO(() => rm(this.#directory, { recursive: true, force: true })));
+        if (Result.isFailure(removed)) {
+          // Some files can be gone. A file that is still there and unchanged needs only a `stat`.
+          yield* this.#readStatus();
+          return yield* new VoiceOperationError({ cause: new Error(sourceText("error.voice.removeFailed")) });
+        }
+        this.#verified.clear();
+        this.#setStatus({ phase: "missing", progress: null, message: null });
+        return this.#copyStatus();
+      }).pipe(Effect.uninterruptible),
+      this.#scope,
+      { startImmediately: true },
+    );
+    this.#removal = fiber;
+    fiber.addObserver(() => {
+      if (this.#removal === fiber) this.#removal = null;
+    });
+    return yield* Fiber.join(fiber);
+  }).bind(this);
+
+  readonly shutdown = Effect.fn("VoiceModel.shutdown")(function* (this: VoiceModelService<Id>) {
     this.#stopping = true;
     this.#abortController?.abort();
     if (this.#preparation) yield* Fiber.await(this.#preparation);
+    if (this.#removal) yield* Fiber.await(this.#removal);
     yield* Scope.close(this.#scope, Exit.void);
   }, Effect.uninterruptible).bind(this);
 
@@ -298,6 +353,14 @@ export class VoiceModelService extends EventEmitter<VoiceModelEvents> {
     );
   }
 
+  #readStatus(): Effect.Effect<DownloadedModelStatus<Id>, VoiceOperationError> {
+    return Effect.gen({ self: this }, function* () {
+      const ready = yield* this.#isComplete();
+      this.#setStatus({ phase: ready ? "ready" : "missing", progress: ready ? 100 : null, message: null });
+      return this.#copyStatus();
+    });
+  }
+
   #isComplete(): Effect.Effect<boolean, VoiceOperationError> {
     return Effect.gen({ self: this }, function* () {
       for (const file of this.#files) if (!(yield* this.#isVerified(file))) return false;
@@ -328,7 +391,7 @@ export class VoiceModelService extends EventEmitter<VoiceModelEvents> {
     this.emit("status", this.#copyStatus());
   }
 
-  #copyStatus(): VoiceModelStatus {
+  #copyStatus(): DownloadedModelStatus<Id> {
     return { modelId: this.modelId, ...this.#status };
   }
 }

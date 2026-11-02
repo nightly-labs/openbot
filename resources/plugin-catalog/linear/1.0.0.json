@@ -4,7 +4,7 @@
   "tagline": "Issues and project triage",
   "description": "Linear lets agents list assigned issues, triage the backlog, update statuses, and draft new issues in the workspace the signed-in account belongs to. Each user signs in to their own Linear account through the browser.",
   "category": "coding",
-  "creatorName": "linear.app",
+  "creatorName": "Linear",
   "iconUrl": "https://linear.app/favicon.ico",
   "version": "1.0.0",
   "prompts": [

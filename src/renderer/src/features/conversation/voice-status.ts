@@ -1,25 +1,4 @@
-import type { AppInfo } from "@openbot/contracts/ipc";
-import type { AppTextKey } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
-export type VoicePhase = "idle" | "preparing" | "requesting" | "recording" | "transcribing";
-
-/** The catalog key of the voice button's accessible name. */
-export function voiceButtonLabel(phase: VoicePhase): AppTextKey {
-  if (phase === "recording") return "composer.voice.stop";
-  if (phase === "preparing") return "composer.voice.preparing";
-  if (phase === "requesting") return "composer.voice.requesting";
-  if (phase === "transcribing") return "composer.voice.transcribing";
-  return "composer.voice.start";
-}
-
-/**
- * Whether this build can transcribe at all. The voice runtime is prepared for macOS and Windows
- * only, so the Linux package ships without one and the composer offers no microphone rather than a
- * control that always fails.
- */
-export function voiceSupported(platform: AppInfo["platform"] | undefined): boolean {
-  return platform !== "linux";
-}
 
 export function voiceCaptureError(error: unknown) {
   const { t } = currentText();

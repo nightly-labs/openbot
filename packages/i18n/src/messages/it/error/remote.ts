@@ -123,8 +123,6 @@ export const messages = {
   "error.remote.serverDisconnected": "Il server si è disconnesso.",
   "error.remote.preferencesUnreadable": "Non è stato possibile leggere le preferenze della chat salvate.",
   "error.remote.accountAuthRequired": "Serve l'autenticazione dell'account.",
-  "error.remote.serverIdentityChanged":
-    "L'identità del server è cambiata. La chiave host attendibile non viene sostituita.",
   "error.remote.pairedIdentityChanged":
     "L'identità del desktop associato manca o è cambiata. Scansiona un nuovo codice da quel desktop.",
   "error.remote.permanentInviteNoEmail": "Gli inviti permanenti non si possono inviare per email.",
@@ -182,6 +180,8 @@ export const messages = {
   "error.remote.directoryTimeout": "Il servizio OpenBot non ha risposto in tempo. Riprova.",
   "error.remote.inviteAlreadyUsed": "Questo invito è già stato usato. Chiedi un nuovo invito.",
   "error.remote.inviteNotFound": "Questo invito non esiste o è scaduto. Chiedi un nuovo invito.",
+  "error.remote.licenseUsersFull":
+    "La licenza del proprietario del server non ha utenti liberi. Chiedi al proprietario di aggiungere un utente alla licenza.",
   "error.remote.memberLimitReached":
     "Questo host ha raggiunto il limite di membri. Chiedi al proprietario di fare spazio.",
   "error.remote.hostNotRegistered": "Questo host non è più registrato presso il servizio OpenBot.",
@@ -190,5 +190,12 @@ export const messages = {
   "error.remote.hostOtherAccount": "Questo host appartiene a un altro account.",
   "error.remote.remoteNotConfigured": "Le connessioni remote non sono configurate su questo servizio OpenBot.",
   "error.remote.hostRefused": "L'host ha rifiutato la richiesta ({status}).",
+  "error.remote.formUnavailable": "Questo modulo non è più disponibile.",
   "error.remote.hostedServerRemoval": "Usa Fatturazione per eliminare un server ospitato.",
+  "error.remote.channelsUnsupported": "Aggiorna questo server desktop per usare i canali.",
+  "error.remote.channelDeleteUnsupported": "Aggiorna questo server desktop per eliminare i canali.",
+  "error.remote.historyRefreshFailed":
+    "Il messaggio è stato inviato, ma non è stato possibile aggiornare la cronologia della chat.",
+  "error.remote.taskHistoryRefreshFailed":
+    "L'attività è stata modificata, ma non è stato possibile aggiornare la cronologia della chat.",
 } as const satisfies PartialTranslation<typeof source>;

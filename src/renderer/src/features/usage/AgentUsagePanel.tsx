@@ -1,4 +1,10 @@
-import { type AgentSummary, analyticsRange, type HostAnalytics, type HostAnalyticsInput } from "@openbot/contracts/ipc";
+import {
+  analyticsRange,
+  type ClientAgentSummary,
+  type HostAnalytics,
+  type HostAnalyticsInput,
+  WORKFLOWS_USAGE_ID,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   ArrowLeft,
@@ -26,6 +32,7 @@ import {
 import { useText } from "@openbot/ui/text";
 import { errorReference } from "@openbot/user-errors";
 import { createEffect, createStore, onSettled, Show } from "solid-js";
+import { desktopAnalytics } from "../../analytics";
 import { type UsagePort, usagePort } from "./usage-port";
 
 interface AgentUsagePanelProps {
@@ -43,17 +50,24 @@ interface UsageState {
   result: HostAnalytics | null;
   phase: "loading" | "ready" | "unsupported" | "error";
   errorReference: string | null;
-  agents: AgentSummary[];
+  agents: ClientAgentSummary[];
   metric: UsageMetric;
   period: UsagePeriod;
   serverId: string;
+}
+
+/** The report range for a period. With no agent, the report is for all agents. */
+function usageRange(days: number, agentId: string | undefined): HostAnalyticsInput {
+  // `analyticsRange` needs an agent id; the panel keeps only the dates it computes.
+  const { startDate, endDate, timeZone } = analyticsRange("", days);
+  return agentId === undefined ? { startDate, endDate, timeZone } : { startDate, endDate, timeZone, agentId };
 }
 
 export function AgentUsagePanel(props: AgentUsagePanelProps) {
   const { t } = useText();
   const port = () => props.port ?? usagePort();
   const [state, setState] = createStore<UsageState>({
-    range: { ...analyticsRange("range"), agentId: props.agentId },
+    range: usageRange(usagePeriodDays["30d"], props.agentId),
     agents: [],
     result: null,
     phase: "loading",
@@ -111,8 +125,20 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     () => [props.agentId, props.serverId],
     () => {
       setState((draft) => {
-        draft.range.agentId = props.agentId;
+        if (props.agentId === undefined) delete draft.range.agentId;
+        else draft.range.agentId = props.agentId;
         draft.agents = [];
+      });
+    },
+  );
+  // One view for each report the user asks for: the first one, and each filter or period change.
+  createEffect(
+    () => [state.range.agentId, props.serverId, state.period] as const,
+    ([agentId, , range]) => {
+      desktopAnalytics.track("usage_viewed", {
+        scope: agentId ? "agent" : "server",
+        range,
+        filtered: agentId !== props.agentId,
       });
     },
   );
@@ -144,6 +170,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
   // The filter and the per-agent table both name an agent by id, and props.agentName only
   // names the panel's own agent, so it must not label another agent's row.
   const agentLabel = (id: string): UsageAgentLabel => {
+    if (id === WORKFLOWS_USAGE_ID) return { name: t("usage.panel.workflows"), provider: "" };
     const agent = state.agents.find((candidate) => candidate.id === id);
     return {
       name: agent?.name ?? (id === props.agentId ? props.agentName : undefined) ?? id,
@@ -171,6 +198,9 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
               ...[
                 ...new Set([
                   ...state.agents.map((agent) => agent.id),
+                  ...(state.result?.agents.some((agent) => agent.agentId === WORKFLOWS_USAGE_ID)
+                    ? [WORKFLOWS_USAGE_ID]
+                    : []),
                   ...(state.range.agentId ? [state.range.agentId] : []),
                 ]),
               ].map((id) => `agent:${id}`),
@@ -179,7 +209,8 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
             onChange={(value) => {
               if (value)
                 setState((draft) => {
-                  draft.range.agentId = value === "all" ? undefined : value.slice(6);
+                  if (value === "all") delete draft.range.agentId;
+                  else draft.range.agentId = value.slice(6);
                 });
             }}
             itemComponent={(itemProps) => (
@@ -220,10 +251,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
             onChange={(value) => {
               setState((draft) => {
                 draft.period = value;
-                draft.range = {
-                  ...analyticsRange("range", usagePeriodDays[value]),
-                  agentId: draft.range.agentId,
-                };
+                draft.range = usageRange(usagePeriodDays[value], draft.range.agentId);
               });
             }}
           />

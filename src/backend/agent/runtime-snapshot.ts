@@ -10,6 +10,7 @@ import {
   type AgentRuntimeSnapshot,
   type AgentSummary,
   CONVERSATION_PLAN_ITEM_TYPE,
+  CONVERSATION_SUBAGENTS_ITEM_TYPE,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
 import type { MailboxStore } from "../mailbox-store";
@@ -32,6 +33,7 @@ export function compactRuntimeQuestion(
         label: option.label,
         description: option.description.slice(0, AGENT_RUNTIME_QUESTION_DESCRIPTION_LIMIT),
       })) ?? null,
+    ...(question.multiSelect ? { multiSelect: true } : {}),
   };
 }
 
@@ -73,7 +75,12 @@ export function compactRuntimeApproval(approval: AgentApproval): AgentRuntimeSna
 function fitRuntimeSnapshot(snapshot: AgentRuntimeSnapshot): AgentRuntimeSnapshot {
   if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
 
-  // Local-only context goes first, so it never costs Team clients a field they had before.
+  // The context goes first: only context-usage-v1 carries it, so it never costs a Team client a field
+  // that it had before. The side threads go before the agents' own chats.
+  if (snapshot.threadContextStates?.length) {
+    snapshot.threadContextStates = [];
+    if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
+  }
   if (snapshot.contextStates?.length) {
     snapshot.contextStates = [];
     if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
@@ -137,6 +144,7 @@ function runtimeSnapshotBytes(snapshot: AgentRuntimeSnapshot): number {
 
 export interface RuntimeSnapshotSources {
   contextStates?: AgentRuntimeSnapshot["contextStates"];
+  threadContextStates?: AgentRuntimeSnapshot["threadContextStates"];
   agents: AgentSummary[];
   conversation: Pick<ConversationRuntime, "loadedSnapshot">;
   database: Pick<OpenBotDatabase, "readConversationRuntime">;
@@ -149,6 +157,7 @@ export interface RuntimeSnapshotSources {
 /** The runtime view of every agent: active turns, queued work, latest messages and attention. */
 export function buildRuntimeSnapshot({
   contextStates,
+  threadContextStates,
   agents,
   conversation,
   database,
@@ -181,6 +190,7 @@ export function buildRuntimeSnapshot({
         message.itemType !== "agent_attachment" &&
         !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
         message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
+        message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
         message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE,
     );
     const persisted =
@@ -214,5 +224,6 @@ export function buildRuntimeSnapshot({
     usageLimits: usageLimits.limitedAgents(),
     usageLimitedModels: usageLimits.limitedModels(),
     ...(contextStates ? { contextStates } : {}),
+    ...(threadContextStates ? { threadContextStates } : {}),
   });
 }

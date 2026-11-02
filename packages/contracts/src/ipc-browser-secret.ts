@@ -40,3 +40,27 @@ export function parseBrowserSecretResponse(value: unknown): RespondToBrowserSecr
     throw new Error("Invalid secure authentication response.");
   return { ...identity, decision: "submit", secret: value.secret };
 }
+
+/**
+ * The response of the desktop app or the web client. `saveToVault` keeps a submitted password in the
+ * Vault of the server that runs the agent. The released Team API route carries only the released
+ * fields; a joined server gets the save on the `browser-secret-vault-v1` route.
+ */
+export type LocalBrowserSecretResponse = RespondToBrowserSecretInput & { saveToVault?: true };
+
+/** Never include the rejected payload in validation errors. */
+export function parseLocalBrowserSecretResponse(value: unknown): LocalBrowserSecretResponse {
+  const parsed = parseBrowserSecretResponse(value);
+  if (!isDynamicRecord(value) || value.saveToVault === undefined) return parsed;
+  if (value.saveToVault !== true || parsed.decision !== "submit")
+    throw new Error("Invalid secure authentication response.");
+  return { ...parsed, saveToVault: true };
+}
+
+/** The released fields of a response, for a remote server. */
+export function remoteBrowserSecretResponse(input: LocalBrowserSecretResponse): RespondToBrowserSecretInput {
+  const identity = { requestId: input.requestId, agentId: input.agentId };
+  return input.decision === "submit"
+    ? { ...identity, decision: "submit", secret: input.secret }
+    : { ...identity, decision: input.decision };
+}

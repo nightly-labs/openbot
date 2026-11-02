@@ -19,6 +19,7 @@ export const messages = {
   "common.create": "Utwórz",
   "common.open": "Otwórz",
   "common.search": "Szukaj",
+  "common.noMatches": "Brak wyników",
   "common.loading": "Wczytywanie…",
   "common.saving": "Zapisywanie…",
   "common.tryAgain": "Ponów",

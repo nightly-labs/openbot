@@ -55,6 +55,18 @@ export function groupAgentMessageMarkers(
   return rows;
 }
 
+/**
+ * Sets on the marker of each agent message that has text whether the text shows under the marker.
+ * `open` holds the exchange ids of the open messages. A message with no text gets no toggle.
+ */
+export function markOpenAgentMessages(messages: readonly AgentMessage[], open: ReadonlySet<string>): AgentMessage[] {
+  return messages.map((message) => {
+    const marker = message.actionMarker;
+    if (marker?.kind !== "agent-message" || message.body.trim() === "") return message;
+    return { ...message, actionMarker: { ...marker, expanded: open.has(marker.messageId) } };
+  });
+}
+
 /** A message with attachments draws them under its marker, so it keeps a row of its own. */
 function groupableMarker(message: AgentMessage): AgentMessageMarkerModel | null {
   if (message.actionMarker?.kind !== "agent-message") return null;

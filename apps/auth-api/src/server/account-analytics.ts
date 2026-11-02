@@ -9,21 +9,27 @@ import {
 } from "@openbot/contracts/billing";
 import { FIRST_TOUCH_CAMPAIGN_FIELDS, type FirstTouch, parseFirstTouch } from "@openbot/contracts/first-touch";
 import {
+  HOSTED_SERVER_ENTRY_POINTS,
   HOSTED_SERVER_ERRORS,
   HOSTED_SERVER_SIZE_NAMES,
+  type HostedServerEntryPoint,
   type HostedServerError,
   type HostedServerSize,
 } from "@openbot/contracts/hosted-servers";
 import { isOneOf } from "@openbot/contracts/runtime-values";
+import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { Effect, Schema } from "effect";
 
 /** The same OpenPanel project as the desktop app and the website. ANALYTICS.md is the contract. */
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 /**
  * The current generation. Generation 10 adds the account events, first-touch properties, and
- * `reactivated` and `end_reason` on plan events; it changes no generation 9 property.
+ * `reactivated` and `end_reason` on plan events. Generation 11 adds the license to the billing events
+ * (`product`, `users`, `direction`), `entry_point` on `checkout_started`, and the license totals of
+ * `billing_snapshot`. A billing event without `product` is from a server plan. No generation 10
+ * property changes. Generation 12 adds `email_sent`. Generation 13 adds the `license` kind of `email_sent`.
  */
-export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 10;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 13;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
@@ -40,6 +46,18 @@ const BILLING_ACTIONS = [
   "portal_opened",
 ] as const;
 export type BillingAction = (typeof BILLING_ACTIONS)[number];
+/**
+ * The billing actions of an account that pays for a plan or a license. Each one also sets the
+ * account email on the OpenPanel profile, so that a paying account is never anonymous, also when
+ * its apps have product analytics off.
+ */
+const PAID_BILLING_ACTIONS = [
+  "plan_started",
+  "payment_succeeded",
+  "plan_changed",
+  "cancel_scheduled",
+  "cancel_withdrawn",
+] as const satisfies readonly BillingAction[];
 
 const HOSTED_SERVER_ACTIONS = [
   "provisioned",
@@ -54,7 +72,23 @@ const HOSTED_SERVER_ACTIONS = [
 type HostedServerAction = (typeof HOSTED_SERVER_ACTIONS)[number];
 
 const PORTAL_FLOWS = ["manage", "update", "cancel"] as const;
-const WAKE_REASONS = ["message", "restart", "schedule"] as const;
+/** What a billing event is for: a hosted server plan or the commercial license. */
+export const BILLING_PRODUCTS = ["server", "license"] as const;
+export type BillingProduct = (typeof BILLING_PRODUCTS)[number];
+/** On `plan_changed`: the new plan or user count costs more (`up`) or less (`down`). */
+export const PLAN_CHANGE_DIRECTIONS = ["up", "down"] as const;
+export type PlanChangeDirection = (typeof PLAN_CHANGE_DIRECTIONS)[number];
+/**
+ * The largest license user count that analytics accepts. The app sells up to 10 users; a license
+ * from the Stripe Dashboard can have more, so the bound only stops a value that is not a count.
+ */
+const ANALYTICS_MAX_LICENSE_USERS = 10_000;
+
+/** True for a license user count that analytics can send. */
+export function isAnalyticsLicenseUsers(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= ANALYTICS_MAX_LICENSE_USERS;
+}
+const WAKE_REASONS = ["message", "restart", "schedule", "retention"] as const;
 /** Why a plan ended: the account cancelled it, or Stripe ended it after unpaid invoices. */
 const PLAN_END_REASONS = ["canceled", "unpaid"] as const;
 export type PlanEndReason = (typeof PLAN_END_REASONS)[number];
@@ -65,13 +99,28 @@ export type AccountSurface = (typeof ACCOUNT_SURFACES)[number];
 const ATTRIBUTION_SOURCES = ["sign_in", "checkout"] as const;
 export type AttributionSource = (typeof ATTRIBUTION_SOURCES)[number];
 
+/** The kinds of email that the Worker sends through the shared SMTP mailbox. */
+const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome", "license"] as const;
+export type EmailKind = (typeof EMAIL_KINDS)[number];
+/** `unknown`: the server got the message but did not confirm it, so it can count against the quota. */
+const EMAIL_RESULTS = ["accepted", "rate_limited", "unknown", "failed"] as const;
+export type EmailResult = (typeof EMAIL_RESULTS)[number];
+
 type AnalyticsProperties = Record<string, string | number | boolean>;
 
 export type AccountAnalyticsEvent =
   | {
       name: "billing_action";
       action: BillingAction;
+      /** Absent means `server`, as in generation 10. */
+      product?: BillingProduct;
       plan?: BillingPlanId;
+      /** For a license: the number of users that it pays for. */
+      users?: number;
+      /** On `plan_changed`. */
+      direction?: PlanChangeDirection;
+      /** On `checkout_started`: where the journey started in the app. */
+      entryPoint?: HostedServerEntryPoint;
       interval?: BillingInterval;
       currency?: BillingCurrency;
       /** Minor units of `currency`, from Stripe. */
@@ -91,12 +140,16 @@ export type AccountAnalyticsEvent =
       size?: HostedServerSize;
       reason?: (typeof WAKE_REASONS)[number];
       error?: HostedServerError | null;
-    };
+    }
+  | { name: "email_sent"; kind: EmailKind; result: EmailResult };
 
-/** Account events that only the Worker sees: new accounts, payments and hosted servers. */
+/** Account events that only the Worker sees: new accounts, payments, hosted servers and email sends. */
 export interface AccountAnalytics {
-  /** Never throws and never waits: a failed send loses the event, not the request. */
-  track(accountId: string, event: AccountAnalyticsEvent): void;
+  /**
+   * Never throws and never waits: a failed send loses the event, not the request. `null` is for an
+   * event with no account, such as `email_sent`: it has no `profileId`, as `billing_snapshot`.
+   */
+  track(accountId: string | null, event: AccountAnalyticsEvent): void;
 }
 
 export const NO_ACCOUNT_ANALYTICS: AccountAnalytics = { track: () => undefined };
@@ -111,19 +164,34 @@ export interface AccountAnalyticsOptions {
   fetch: (input: string, init: RequestInit) => Promise<Response>;
   /** Keeps the Worker alive until the send ends (`waitUntil`). */
   schedule: (send: Effect.Effect<void>) => void;
+  /** Reads the account email for the profile of a paying account. */
+  database: D1Database;
 }
 
 class AnalyticsDeliveryError extends Schema.TaggedError<AnalyticsDeliveryError>()("AnalyticsDeliveryError", {}) {}
+
+/** The two OpenPanel requests of the account service. An event body never has an email. */
+type OpenPanelBody =
+  | { type: "track"; payload: { name: string; profileId?: string; properties: AnalyticsProperties } }
+  | { type: "identify"; payload: { profileId: string; email: string } };
+
+/**
+ * The normalized email of an account, for the OpenPanel profile of a paying account. `null` when the
+ * account is gone or its email is not valid.
+ */
+export async function readAccountEmail(database: D1Database, accountId: string): Promise<string | null> {
+  const row = await database
+    .prepare("SELECT email FROM users WHERE id = ?")
+    .bind(accountId)
+    .first<{ email: unknown }>();
+  return typeof row?.email === "string" ? normalizeEmailAddress(row.email) : null;
+}
 
 export function createAccountAnalytics(options: AccountAnalyticsOptions): AccountAnalytics {
   const clientId = options.clientId?.trim();
   const clientSecret = options.clientSecret?.trim();
   if (!clientId || !clientSecret) return NO_ACCOUNT_ANALYTICS;
-  const send = Effect.fn("AccountAnalytics.send")(function* (
-    accountId: string,
-    event: AccountAnalyticsEvent,
-    properties: AnalyticsProperties,
-  ) {
+  const post = Effect.fn("AccountAnalytics.post")(function* (body: OpenPanelBody) {
     const response = yield* Effect.tryPromise({
       try: (signal) =>
         options.fetch(`${OPENPANEL_API_URL}/track`, {
@@ -133,21 +201,46 @@ export function createAccountAnalytics(options: AccountAnalyticsOptions): Accoun
             "openpanel-client-id": clientId,
             "openpanel-client-secret": clientSecret,
           },
-          body: JSON.stringify({ type: "track", payload: { name: event.name, profileId: accountId, properties } }),
+          body: JSON.stringify(body),
           signal: AbortSignal.any([signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]),
         }),
       catch: () => new AnalyticsDeliveryError({}),
     });
-    if (!response.ok) console.warn("Account analytics send failed.", { status: response.status });
+    if (!response.ok) {
+      console.warn(body.type === "track" ? "Account analytics send failed." : "Account analytics identify failed.", {
+        status: response.status,
+      });
+    }
+  });
+  /** Sets the account email on the profile, as the apps do at sign-in. */
+  const identify = Effect.fn("AccountAnalytics.identify")(function* (accountId: string) {
+    const email = yield* Effect.tryPromise({
+      try: () => readAccountEmail(options.database, accountId),
+      catch: () => new AnalyticsDeliveryError({}),
+    });
+    if (email) yield* post({ type: "identify", payload: { profileId: accountId, email } });
   });
   return {
     track(accountId, event) {
       const properties = accountEventProperties(event);
-      if (!properties || !ACCOUNT_ID_PATTERN.test(accountId)) return;
+      if (!properties || (accountId !== null && !ACCOUNT_ID_PATTERN.test(accountId))) return;
+      const send = post({
+        type: "track",
+        payload: { name: event.name, ...(accountId === null ? {} : { profileId: accountId }), properties },
+      }).pipe(Effect.catch(() => Effect.sync(() => console.warn("Account analytics send failed."))));
+      const paid = accountId !== null && event.name === "billing_action" && isOneOf(PAID_BILLING_ACTIONS, event.action);
       options.schedule(
-        send(accountId, event, properties).pipe(
-          Effect.catch(() => Effect.sync(() => console.warn("Account analytics send failed."))),
-        ),
+        paid
+          ? Effect.all(
+              [
+                send,
+                identify(accountId).pipe(
+                  Effect.catch(() => Effect.sync(() => console.warn("Account analytics identify failed."))),
+                ),
+              ],
+              { concurrency: 2, discard: true },
+            )
+          : send,
       );
     },
   };
@@ -166,7 +259,14 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
   if (event.name === "billing_action") {
     if (!isOneOf(BILLING_ACTIONS, event.action)) return null;
     properties.action = event.action;
-    if (isOneOf(BILLING_PLAN_IDS, event.plan)) properties.plan = event.plan;
+    const product = isOneOf(BILLING_PRODUCTS, event.product) ? event.product : "server";
+    properties.product = product;
+    if (product === "server" && isOneOf(BILLING_PLAN_IDS, event.plan)) properties.plan = event.plan;
+    if (product === "license" && isAnalyticsLicenseUsers(event.users)) properties.users = event.users;
+    if (event.action === "plan_changed" && isOneOf(PLAN_CHANGE_DIRECTIONS, event.direction))
+      properties.direction = event.direction;
+    if (event.action === "checkout_started" && isOneOf(HOSTED_SERVER_ENTRY_POINTS, event.entryPoint))
+      properties.entry_point = event.entryPoint;
     if (isOneOf(BILLING_INTERVALS, event.interval)) properties.interval = event.interval;
     if (isOneOf(BILLING_CURRENCIES, event.currency)) {
       properties.currency = event.currency;
@@ -187,6 +287,10 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
     const touch = firstTouchProperties(event.firstTouch);
     if (!isOneOf(ATTRIBUTION_SOURCES, event.via) || !touch.first_touch_source) return null;
     return { ...properties, recorded_via: event.via, ...touch };
+  }
+  if (event.name === "email_sent") {
+    if (!isOneOf(EMAIL_KINDS, event.kind) || !isOneOf(EMAIL_RESULTS, event.result)) return null;
+    return { ...properties, kind: event.kind, result: event.result };
   }
   if (event.name !== "hosted_server_action" || !isOneOf(HOSTED_SERVER_ACTIONS, event.action)) return null;
   properties.action = event.action;

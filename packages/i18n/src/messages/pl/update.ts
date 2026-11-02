@@ -16,6 +16,7 @@ export const messages = {
   "update.provider.checking": "Sprawdzanie aktualizacji: {name}",
   "update.provider.available": "Dostępna aktualizacja: {name}",
   "update.provider.updating": "Aktualizowanie: {name}",
+  "update.provider.waiting": "Aktualizacja {name} czeka",
   "update.provider.failed": "Aktualizacja nie powiodła się: {name}",
   "update.provider.settingUp": "Konfigurowanie",
   "update.provider.failedRetry": "Aktualizacja nie powiodła się. Spróbuj ponownie.",
@@ -63,5 +64,6 @@ export const messages = {
   "update.whatsNew.empty.body":
     "Ta wersja nie ma tu informacji do pokazania. Pełna lista zmian pokazuje wszystkie zmiany.",
   "update.whatsNew.changelog": "Pełna lista zmian",
+  "update.whatsNew.changelogFailed": "Nie udało się otworzyć listy zmian.",
   "update.whatsNew.done": "Rozumiem",
 } as const satisfies PartialTranslation<typeof source>;

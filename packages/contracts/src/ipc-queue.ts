@@ -77,7 +77,7 @@ export interface QueueDelivery {
 
 /**
  * A queued answer from another agent to a question this agent asked. A client shows it in the
- * waiting block, with the question it answers, and does not offer queue actions on it.
+ * waiting block, with the question it answers. Its only queue action is steer, while a turn runs.
  *
  * A host too old to send `expectsReply` reports every delivery as a question, so each one stays an
  * ordinary queue row there.
@@ -91,7 +91,7 @@ export function isQueuedAgentReply(delivery: QueueDelivery): boolean {
   );
 }
 
-function isQueueDelivery(value: unknown): value is QueueDelivery {
+export function isQueueDelivery(value: unknown): value is QueueDelivery {
   return (
     isDynamicRecord(value) &&
     isIdentifier(value.id) &&
@@ -134,9 +134,9 @@ export type QueueHoldReason = (typeof QUEUE_HOLD_REASONS)[number];
 /**
  * Why a queue is waiting for something other than its own running turn.
  *
- * A channel assignment reserves the whole host, so an agent with nothing running of its own can
- * still be unable to start the message the user just sent it. Without this the wait has no visible
- * cause: the channel turn's events are not the agent's own, so the agent reads as idle.
+ * A channel assignment holds the member agent that does it, so an agent with nothing running in its
+ * own chat can still be unable to start the message the user just sent it. Without this the wait has
+ * no visible cause: the channel turn's events are not the agent's own, so the agent reads as idle.
  */
 export interface QueueHold {
   reason: QueueHoldReason;

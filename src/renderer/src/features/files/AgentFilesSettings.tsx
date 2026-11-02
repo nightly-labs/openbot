@@ -7,7 +7,7 @@ export interface AgentFilesOptions {
   /** Owners and admins delete files. A member only reads. */
   canManage: boolean;
   /** Only on this computer: a remote agent's workspace is a folder on the host. */
-  onOpenWorkspace?: () => void;
+  onOpenWorkspace?: (() => void) | undefined;
   onPreviewFile: (file: StoredFileRow) => void;
   onShowMessage: (messageId: string) => void;
   onOpenConversation: (conversationId: string) => void;

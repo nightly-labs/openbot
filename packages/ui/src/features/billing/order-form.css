@@ -1,0 +1,766 @@
+/*
+ * The order form of the pricing page and of Billing. The public site does not load the app's primitives or
+ * transitions, so this file styles its own digits, buttons and hidden text. Every rule is scoped under `.order-form`.
+ */
+
+.order-form {
+  /* The colour of the order. The pricing page sets it from the size of the order. */
+  --order-accent: var(--openbot-accent);
+  --order-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --order-move: 300ms;
+  --order-glow: 600ms;
+  --order-pad: clamp(24px, 3vw, 36px);
+  --order-radius-frame: 24px;
+  --order-text-price: clamp(34px, 3.2vw, 44px);
+  --order-text-choice-price: 26px;
+  --order-text-line: 22px;
+  --order-text-title: 20px;
+  --order-text-label: 15px;
+  --order-text-saving: 11px;
+  --order-text-badge: 10px;
+  /* The rolling digits of the app (`transitions.css`). */
+  --order-digit-dur: 500ms;
+  --order-digit-distance: 12px;
+  --order-digit-stagger: 70ms;
+  --order-digit-blur: 2px;
+  --order-digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
+  container: order-form / inline-size;
+}
+
+.order-form .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The heading slot on the left and the switches on the right. */
+.order-form-top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px 48px;
+}
+
+.order-form-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* Month or year, and the currency: the same pill switch as the app's billing switch. */
+.order-form-segment {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(var(--order-count, 2), minmax(0, 1fr));
+  min-width: 0;
+  padding: 3px;
+  /* Frosted glass: the glow behind it shows through, blurred. */
+  border: 1px solid var(--openbot-glass-border);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-glass-surface);
+  box-shadow:
+    inset 0 1px 0 var(--openbot-glass-highlight),
+    0 8px 24px -12px var(--openbot-glass-shadow);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* The light pill under the chosen option. It slides with a spring. */
+.order-form-segment::before {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--order-count, 2));
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-surface-light);
+  content: "";
+  transform: translateX(calc(var(--order-index, 0) * 100%));
+  transition: transform var(--order-move) var(--order-spring);
+}
+
+.order-form-segment[data-disabled] {
+  opacity: 0.6;
+}
+
+.order-form-segment-option {
+  position: relative;
+  z-index: 1;
+  display: grid;
+}
+
+.order-form-segment-label {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border-radius: var(--openbot-radius-pill);
+  /* Primary text: the glow behind the glass can be bright. */
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--openbot-duration-slow) ease;
+}
+
+.order-form-segment-option[data-checked] .order-form-segment-label {
+  color: var(--openbot-text-on-light);
+}
+
+.order-form-segment[data-disabled] .order-form-segment-label {
+  cursor: not-allowed;
+}
+
+.order-form-segment-option:has(input:focus-visible) .order-form-segment-label {
+  outline: 2px solid var(--openbot-accent-strong);
+  outline-offset: 2px;
+}
+
+@keyframes order-form-pop {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.order-form-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 9px;
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--order-accent) 18%, var(--openbot-transparent));
+  /* The text mixes in the text colour, so a dark accent stays readable. */
+  color: color-mix(in srgb, var(--order-accent) 65%, var(--openbot-text-primary));
+  font-family: var(--openbot-font-mono);
+  font-size: var(--order-text-badge);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition:
+    background-color var(--order-move) ease,
+    color var(--order-move) ease;
+}
+
+.order-form-price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0;
+}
+
+.order-form-price-amount {
+  color: var(--openbot-text-primary);
+  font-size: var(--order-text-price);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.order-form-price-unit {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-lg);
+}
+
+/* Rolling digits, as the app's `t-digit` transition. A rise comes up from below; a fall comes down from above. */
+@keyframes order-form-digit-in {
+  0% {
+    transform: translateY(calc(var(--order-digit-distance) * var(--digit-dir-y, 1)));
+    opacity: 0;
+    filter: blur(var(--order-digit-blur));
+  }
+
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.order-form .t-digit-group {
+  display: inline-flex;
+}
+
+.order-form .t-digit {
+  display: inline-block;
+}
+
+/* `backwards`, not `both`: the group keeps `is-animating`, and a kept end frame (a transform and a blur filter)
+   puts the digits on their own layer. Firefox then snaps them to another pixel row than the "€" beside them. */
+.order-form .t-digit-group.is-animating .t-digit {
+  animation: order-form-digit-in var(--order-digit-dur) var(--order-digit-ease) backwards;
+}
+
+.order-form .t-digit-group.is-animating .t-digit[data-stagger="1"] {
+  animation-delay: var(--order-digit-stagger);
+}
+
+.order-form .t-digit-group.is-animating .t-digit[data-stagger="2"] {
+  animation-delay: calc(var(--order-digit-stagger) * 2);
+}
+
+/* The colour of the order lights the edge of the form and spills under it as a glow. */
+.order-form-frame {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: clamp(32px, 4vw, 48px);
+  border: 1px solid color-mix(in srgb, var(--order-accent) 40%, var(--openbot-transparent));
+  border-radius: var(--order-radius-frame);
+  background: var(--openbot-bg-surface);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--order-accent) 12%, var(--openbot-transparent)),
+    0 -1px 0 color-mix(in srgb, var(--order-accent) 60%, var(--openbot-transparent)),
+    0 30px 120px -40px color-mix(in srgb, var(--order-accent) 55%, var(--openbot-transparent));
+  overflow: hidden;
+  transition:
+    border-color var(--order-glow) var(--openbot-ease-out),
+    box-shadow var(--order-glow) var(--openbot-ease-out);
+}
+
+/* A hairline of the accent colour along the top edge. */
+.order-form-frame::after {
+  position: absolute;
+  top: 0;
+  right: 20%;
+  left: 20%;
+  height: 1px;
+  background: linear-gradient(90deg, var(--openbot-transparent), var(--order-accent), var(--openbot-transparent));
+  content: "";
+}
+
+.order-form-half {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: var(--order-pad);
+}
+
+.order-form-half + .order-form-half {
+  border-left: 1px solid var(--openbot-border);
+}
+
+/* The yearly discount: a success-toned pill by the heading, lit when yearly billing is on. */
+.order-form-half-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.order-form-half h2 {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--order-text-title);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.order-form-half-summary {
+  margin: 8px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-lg);
+  line-height: 1.45;
+}
+
+.order-form-yearly,
+.order-form-trial {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: var(--openbot-radius-pill);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--openbot-success) 30%, var(--openbot-transparent));
+  color: var(--openbot-success-text);
+  font-size: var(--openbot-text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color var(--openbot-duration-slow) ease;
+}
+
+.order-form-trial {
+  background: color-mix(in srgb, var(--openbot-success) 14%, var(--openbot-transparent));
+}
+
+.order-form-yearly[data-active] {
+  background: color-mix(in srgb, var(--openbot-success) 14%, var(--openbot-transparent));
+  animation: order-form-pop var(--order-move) var(--order-spring) 80ms both;
+}
+
+.order-form-saving {
+  min-height: 20px;
+  padding: 0 8px;
+  font-size: var(--order-text-saving);
+}
+
+.order-form-choices {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.order-form-choice {
+  position: relative;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-surface);
+  transition:
+    border-color var(--openbot-duration-slow) ease,
+    background-color var(--openbot-duration-slow) ease;
+}
+
+.order-form-choice:hover {
+  border-color: var(--openbot-border-strong);
+}
+
+/* The chosen row: four corner marks in the accent colour close in around it, like a selection in a game. */
+.order-form-choice[data-checked] {
+  border-color: color-mix(in srgb, var(--order-accent) 25%, var(--openbot-transparent));
+  background-color: color-mix(in srgb, var(--order-accent) 5%, var(--openbot-bg-surface));
+}
+
+.order-form-choice::before {
+  --order-mark: linear-gradient(var(--order-accent) 0 0);
+  position: absolute;
+  inset: -5px;
+  background:
+    var(--order-mark) top left / 14px 2px,
+    var(--order-mark) top left / 2px 14px,
+    var(--order-mark) top right / 14px 2px,
+    var(--order-mark) top right / 2px 14px,
+    var(--order-mark) bottom left / 14px 2px,
+    var(--order-mark) bottom left / 2px 14px,
+    var(--order-mark) bottom right / 14px 2px,
+    var(--order-mark) bottom right / 2px 14px;
+  background-repeat: no-repeat;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.04);
+  transition:
+    opacity var(--openbot-duration-slow) ease,
+    transform var(--order-move) var(--order-spring);
+}
+
+.order-form-choice[data-checked]::before {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.order-form-choice:has(> input:focus-visible) {
+  outline: 2px solid var(--openbot-accent-strong);
+  outline-offset: 2px;
+}
+
+.order-form-choice-label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  cursor: pointer;
+}
+
+.order-form-choice[data-disabled] {
+  opacity: 0.5;
+}
+
+.order-form-choice[data-disabled] .order-form-choice-label {
+  cursor: not-allowed;
+}
+
+.order-form-choice-dot {
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  transition: border-color var(--openbot-duration-slow) ease;
+}
+
+.order-form-choice-dot::after {
+  position: absolute;
+  inset: 3px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--order-accent);
+  content: "";
+  transform: scale(0);
+  transition: transform var(--order-move) var(--order-spring);
+}
+
+.order-form-choice[data-checked] .order-form-choice-dot {
+  border-color: var(--order-accent);
+}
+
+.order-form-choice[data-checked] .order-form-choice-dot::after {
+  transform: scale(1);
+}
+
+.order-form-row-name {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.order-form-row-name strong {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-xl);
+}
+
+.order-form-row-name span:last-child {
+  flex-basis: 100%;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  line-height: 1.4;
+}
+
+.order-form-choice-price {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+
+.order-form-choice-amount {
+  display: inline-flex;
+  align-items: center;
+  color: var(--openbot-text-primary);
+  font-size: var(--order-text-choice-price);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.order-form-choice-price .order-form-price-unit {
+  font-size: var(--openbot-text-sm);
+}
+
+/* The monthly price, struck through in yearly billing. It opens to its own width, so the price beside it moves smoothly. */
+.order-form-was {
+  display: inline-grid;
+  grid-template-columns: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-columns var(--order-move) ease,
+    opacity var(--openbot-duration-slow) ease;
+}
+
+.order-form-was[data-shown] {
+  grid-template-columns: 1fr;
+  opacity: 1;
+}
+
+.order-form-was > span {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.order-form-was s {
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-xl);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.order-form-stepper {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px 16px 50px;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.order-form-stepper > span {
+  min-width: 84px;
+  text-align: center;
+}
+
+.order-form-stepper .order-form-step {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+  font: inherit;
+  font-size: var(--openbot-text-xl);
+  cursor: pointer;
+  transition:
+    background-color var(--openbot-duration-fast) ease,
+    opacity var(--openbot-duration-fast) ease,
+    transform var(--openbot-duration-fast) ease;
+}
+
+.order-form-stepper .order-form-step:hover:not(:disabled) {
+  background: var(--openbot-bg-surface-raised);
+}
+
+.order-form-stepper .order-form-step:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.order-form-stepper .order-form-step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.order-form-stepper .order-form-step:focus-visible {
+  outline: 2px solid var(--openbot-accent-strong);
+  outline-offset: 2px;
+}
+
+/* The summary: each part under its own half, then the total and the buttons in one row under both. */
+.order-form-summary {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--openbot-border);
+}
+
+/* Without server plans the license fills the form. */
+.order-form:not([data-servers]) .order-form-frame,
+.order-form:not([data-servers]) .order-form-summary {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.order-form-summary-lines {
+  display: grid;
+  grid-row: 1;
+  align-content: start;
+  margin: 0;
+  padding: 14px var(--order-pad);
+  list-style: none;
+  transition: padding var(--order-move) ease;
+}
+
+/* A half with nothing chosen takes no room. */
+.order-form-summary-lines:not(:has([data-open])) {
+  padding-block: 0;
+}
+
+.order-form-summary-server {
+  grid-column: 1;
+}
+
+.order-form-summary-license {
+  grid-column: 2;
+}
+
+.order-form-summary-license:has([data-open]) {
+  border-left: 1px solid var(--openbot-border);
+}
+
+.order-form:not([data-servers]) .order-form-summary-license {
+  grid-column: 1;
+  border-left: 0;
+}
+
+.order-form-summary-personal {
+  grid-column: 1 / -1;
+}
+
+/* A line opens to its own height and closes to none, so the total moves smoothly. */
+.order-form-summary-line {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--order-move) ease,
+    opacity var(--openbot-duration-slow) ease;
+}
+
+.order-form-summary-line[data-open] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.order-form-summary-line > div {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.order-form-summary-line > div > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 24px;
+  padding: 6px 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--order-text-label);
+}
+
+.order-form-summary-line > div > div > span:last-child {
+  color: var(--openbot-text-primary);
+  font-size: var(--order-text-line);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Discounts are smaller, success-toned lines under the part that they come off. */
+.order-form-summary-line[data-minus] > div > div {
+  padding: 2px 0;
+  font-size: var(--openbot-text-lg);
+}
+
+.order-form-summary-line[data-minus] > div > div > span:last-child {
+  color: var(--openbot-success);
+  font-size: var(--openbot-text-lg);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* A gap after the minus sign, so its bar does not run into the bars of "€". */
+.order-form-summary-line[data-minus] .t-digit-group {
+  margin-left: 0.12em;
+}
+
+.order-form-total {
+  display: flex;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 24px;
+  padding: 20px var(--order-pad);
+  border-top: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-surface-raised);
+}
+
+.order-form-total-label {
+  color: var(--openbot-text-secondary);
+  font-size: var(--order-text-label);
+  font-weight: 500;
+}
+
+.order-form-total .order-form-price {
+  margin-right: auto;
+}
+
+.order-form-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@container order-form (max-width: 760px) {
+  .order-form-controls {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  .order-form-frame,
+  .order-form-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .order-form-half + .order-form-half {
+    border-top: 1px solid var(--openbot-border);
+    border-left: 0;
+  }
+
+  .order-form-summary-lines {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .order-form-summary-license:has([data-open]) {
+    border-top: 1px solid var(--openbot-border);
+    border-left: 0;
+  }
+
+  .order-form-total {
+    grid-row: auto;
+  }
+
+  .order-form-action {
+    width: 100%;
+  }
+
+  .order-form-choice-label {
+    padding: 14px;
+  }
+
+  .order-form-choice-amount {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .order-form-was s {
+    margin-right: 0;
+    font-size: var(--openbot-text-md);
+  }
+
+  .order-form-choice-price .order-form-price-unit {
+    max-width: 84px;
+  }
+
+  .order-form-stepper {
+    padding: 0 14px 14px 46px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .order-form-segment::before,
+  .order-form-segment-label,
+  .order-form-frame,
+  .order-form-choice,
+  .order-form-choice::before,
+  .order-form-choice-dot::after,
+  .order-form-summary-lines,
+  .order-form-summary-line,
+  .order-form-yearly,
+  .order-form-was,
+  .order-form-stepper .order-form-step {
+    transition: none;
+  }
+
+  .order-form-yearly[data-active],
+  .order-form .t-digit-group.is-animating .t-digit {
+    animation: none;
+  }
+}

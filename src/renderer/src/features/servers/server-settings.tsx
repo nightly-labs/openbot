@@ -1,9 +1,13 @@
+import { parseHostedServerName } from "@openbot/contracts/hosted-servers";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AvatarImageInput,
+  CentralAuthUser,
   InviteSummary,
   McpServerConfig,
   McpSignInAppState,
   McpSignInRelayPage,
+  McpSignInState,
   McpTestResult,
   SaveMcpSignInAppInput,
   ServerSummary,
@@ -15,6 +19,7 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
+import { useAuth } from "../account/account-context";
 import { mcpSignInRecord } from "./mcp-servers";
 import type { ServerSettingsSection } from "./ServerSettingsModal";
 import { serverCanAdminister, serverRoleCanAdminister, serverSupportsCapability } from "./server-capabilities";
@@ -48,10 +53,31 @@ function withMcpSignInPage(pages: Record<string, string>, url: string, tabId: st
   return tabId ? { ...rest, [url]: tabId } : rest;
 }
 
+/** The generated name when the account gives no usable one. Its slug is long enough for a host address. */
+const FALLBACK_SERVER_NAME = "OpenBot";
+
+/**
+ * A name for a server that the user publishes before naming it, such as "Ann’s server". The first
+ * word of the account name or email goes in, shortened by whole characters to fit the length limit.
+ * When the name has too few Latin letters or digits for a host address, the fallback is used. This
+ * depends on the language: "Анна’s server" is long enough, but "Анна のサーバー" is not.
+ */
+function generatedServerName(user: CentralAuthUser | null): string {
+  const person = (user?.name?.trim() || user?.email.split("@")[0] || "").split(/\s+/u)[0] ?? "";
+  if (!person) return FALLBACK_SERVER_NAME;
+  const { t } = currentText();
+  const characters = Array.from(person);
+  let name = t("server.settings.generatedName", { name: person });
+  for (let length = characters.length - 1; name.length > INPUT_LIMITS.serverName && length > 0; length--)
+    name = t("server.settings.generatedName", { name: characters.slice(0, length).join("") });
+  return parseHostedServerName(name) ?? FALLBACK_SERVER_NAME;
+}
+
 const ServerSettings = createSimpleContext({
   name: "Server settings",
   init: () => {
     const { servers, setServers, hostStatus, setHostStatus, setHostUpdateOpener } = useServers();
+    const { signedInAccount } = useAuth();
     const [serverSettingsTargetId, setServerSettingsTargetId] = createSignal<string | null>(null);
     /** The section an opener asked for, such as Updates from the host version notice. */
     const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
@@ -65,13 +91,17 @@ const ServerSettings = createSimpleContext({
     const [serverSettingsMcp, setServerSettingsMcp] = createSignal<McpServerConfig[]>([]);
     const [serverSettingsMcpError, setServerSettingsMcpError] = createSignal<string | null>(null);
     /** Which http rows the server holds a sign-in for, by id. Empty for a host without `mcp-sign-in-v1`. */
-    const [serverSettingsMcpSignIns, setServerSettingsMcpSignIns] = createSignal<Record<string, boolean>>({});
+    const [serverSettingsMcpSignIns, setServerSettingsMcpSignIns] = createSignal<Record<string, McpSignInState>>({});
     /** The host tab of each remote sign-in page, by the address it signs in to, while the sign-in waits. */
     const [serverSettingsMcpSignInPages, setServerSettingsMcpSignInPages] = createSignal<Record<string, string>>({});
     /** The relayed sign-in page of each remote sign-in that waits in this computer's browser (`sign-in-relay-v1`). */
     const [serverSettingsMcpSignInRelays, setServerSettingsMcpSignInRelays] = createSignal<
       Record<string, McpSignInRelayPage>
     >({});
+    /** The MCP row whose sign-in an agent's card asked for, until the MCP section starts it. */
+    const [serverSettingsMcpSignInRequest, setServerSettingsMcpSignInRequest] = createSignal<string | null>(null);
+    /** Set when the Marketplace asked for the form that adds a server, until the MCP section opens it. */
+    const [serverSettingsMcpAddRequest, setServerSettingsMcpAddRequest] = createSignal(false);
     /** Bumped by every open and refresh, so a slower earlier load cannot paint over a newer one. */
     let serverSettingsRequest = 0;
     /**
@@ -195,8 +225,22 @@ const ServerSettings = createSimpleContext({
       setServerSettingsMcp([]);
       setServerSettingsMcpError(null);
       setServerSettingsMcpSignIns({});
+      setServerSettingsMcpSignInRequest(null);
+      setServerSettingsMcpAddRequest(false);
       setServerSettingsError(null);
       void refreshServerSettings(serverId);
+    }
+
+    /** Opens the MCP section of a server and signs in to one of its rows, as its Sign in button does. */
+    function openMcpSignIn(serverId: string, mcpServerId: string, trigger: HTMLElement | null): void {
+      openServerSettings(serverId, trigger, "mcp");
+      setServerSettingsMcpSignInRequest(mcpServerId);
+    }
+
+    /** Opens the MCP section of a server on the form that adds a server, as its Add button does. */
+    function openMcpAdd(serverId: string, trigger: HTMLElement | null): void {
+      openServerSettings(serverId, trigger, "mcp");
+      setServerSettingsMcpAddRequest(true);
     }
 
     async function saveServerIdentity(input: { serverName: string; logo?: AvatarImageInput | null }): Promise<void> {
@@ -246,20 +290,38 @@ const ServerSettings = createSimpleContext({
       setHostStatus(await serversPort().host.recheckScreenRecording());
     }
 
+    /** Changes the key of the server on this computer. Paired devices follow the signed handover. */
+    async function rotateHostKey(): Promise<void> {
+      if (serverSettingsTarget()?.kind !== "local")
+        throw new Error(currentText().t("server.settings.hostKeyLocalOnly"));
+      setHostStatus(await serversPort().host.rotateIdentityKey());
+    }
+
     async function setServerPublished(published: boolean): Promise<void> {
-      const server = serverSettingsTarget();
-      if (server?.kind !== "local") throw new Error(currentText().t("server.settings.publicationLocalOnly"));
+      if (serverSettingsTarget()?.kind !== "local")
+        throw new Error(currentText().t("server.settings.publicationLocalOnly"));
+      await setLocalServerPublished(published);
+    }
+
+    /** Publishes or unpublishes this computer's server, whichever server the settings show. */
+    async function setLocalServerPublished(published: boolean): Promise<void> {
+      const server = servers().find((candidate) => candidate.kind === "local");
+      if (!server) throw new Error(currentText().t("server.settings.publicationLocalOnly"));
       const analytics = desktopAnalytics.scope();
       const action = published ? ("published" as const) : ("unpublished" as const);
       let operationSucceeded = false;
       try {
+        // The host needs a name to publish. One that the user did not set is generated, so the
+        // switch works on its own; the user can change it in General later.
+        if (published && !hostStatus().configured)
+          setHostStatus(await serversPort().host.configure({ serverName: generatedServerName(signedInAccount()) }));
         const status = published ? await serversPort().host.start() : await serversPort().host.stop();
         if (published && status.phase !== "online") throw new Error("publish_failed");
         analytics.track("team_action", { action, result: "succeeded", server_kind: "local" });
         operationSucceeded = true;
         setHostStatus(status);
         setServers(await serversPort().servers.list());
-        await refreshServerSettings(server.id);
+        if (serverSettingsTargetId() === server.id) await refreshServerSettings(server.id);
       } catch (error) {
         if (!operationSucceeded) {
           analytics.track("team_action", {
@@ -394,15 +456,17 @@ const ServerSettings = createSimpleContext({
     async function leaveConfirmedServer(): Promise<void> {
       const server = leaveConfirmServer();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
-      await removeMembership(server);
+      if (server.thisComputer) await serversPort().localServers.delete(server.id);
+      else await removeMembership(server);
       if (serverSettingsTarget()?.id === server.id) setServerSettingsOpen(false);
     }
 
-    /** Restarts the hosted server that the confirmation from the server menu asks about. */
+    /** Restarts the hosted server, or the server on this computer, that the confirmation from the server menu asks about. */
     async function restartConfirmedServer(): Promise<void> {
       const server = restartConfirmServer();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
-      await serversPort().hostedServers.restart(server.id);
+      if (server.thisComputer) await serversPort().localServers.restart(server.id);
+      else await serversPort().hostedServers.restart(server.id);
     }
 
     async function removeMembership(server: ServerSummary): Promise<void> {
@@ -474,7 +538,7 @@ const ServerSettings = createSimpleContext({
     }
 
     /** Which http rows the server holds a sign-in for. A host without `mcp-sign-in-v1` answers none. */
-    async function listMcpSignIns(server: ServerSummary): Promise<Record<string, boolean>> {
+    async function listMcpSignIns(server: ServerSummary): Promise<Record<string, McpSignInState>> {
       // A badge beside the list, not the list: a failed read shows no badge rather than failing the
       // list read, or reporting a save that already landed as failed.
       return serversPort()
@@ -672,7 +736,9 @@ const ServerSettings = createSimpleContext({
       refreshServerSettings,
       saveServerIdentity,
       recheckScreenRecording,
+      rotateHostKey,
       setServerPublished,
+      publishLocalServer: () => setLocalServerPublished(true),
       createServerInvite,
       updateServerMember,
       removeServerMember,
@@ -691,6 +757,13 @@ const ServerSettings = createSimpleContext({
       serverSettingsMcp,
       serverSettingsMcpError,
       serverSettingsMcpSignIns,
+      serverSettingsTargetId,
+      serverSettingsMcpSignInRequest,
+      clearMcpSignInRequest: () => setServerSettingsMcpSignInRequest(null),
+      openMcpSignIn,
+      serverSettingsMcpAddRequest,
+      clearMcpAddRequest: () => setServerSettingsMcpAddRequest(false),
+      openMcpAdd,
       serverSettingsMcpSignInPages,
       serverSettingsMcpSignInRelays,
       openMcpSignInRelay,

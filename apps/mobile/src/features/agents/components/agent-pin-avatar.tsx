@@ -1,5 +1,5 @@
 import { type PropsWithChildren, useEffect, useRef } from "react";
-import { View } from "react-native";
+import { View, type ViewInstance } from "react-native";
 
 import { type AgentAvatarLocation, useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 
@@ -10,7 +10,7 @@ interface AgentPinAvatarProps extends PropsWithChildren {
 }
 
 export function AgentPinAvatar({ agentId, children, location, size }: AgentPinAvatarProps) {
-  const ref = useRef<View>(null);
+  const ref = useRef<ViewInstance>(null);
   const { notifyAvatarLayout, registerAvatar, transition } = useAgentPinTransition();
 
   useEffect(() => {

@@ -589,7 +589,8 @@ function toDynamicIslandMessage(
     message.itemType === "question_prompt" ||
     message.itemType === "agent_attachment" ||
     message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) ||
-    message.itemType === "plan"
+    message.itemType === "plan" ||
+    message.itemType === "subagents"
   ) {
     return [];
   }

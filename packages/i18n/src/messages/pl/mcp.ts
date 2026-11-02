@@ -45,7 +45,8 @@ export const messages = {
   "mcp.status.noAnswer": "Brak odpowiedzi",
   "mcp.status.didNotStart": "Nie uruchomił się",
   "mcp.status.unreachable": "Nieosiągalny",
-  "mcp.server.providerLimitNote": "Tylko Claude: serwer z katalogiem roboczym nie jest przekazywany innym dostawcom.",
+  "mcp.server.providerLimitNote":
+    "Tylko Claude i Codex: serwer z katalogiem roboczym nie jest przekazywany innym dostawcom.",
   "mcp.server.runtimeDownloading":
     "Pobieranie środowiska uruchomieniowego dla serwerów STDIO. Serwer może się nie uruchomić, dopóki pobieranie się nie zakończy.",
   "mcp.server.runtimeDownloadingProgress":
@@ -87,7 +88,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Usuń przekazywaną zmienną {position}",
   "mcp.panel.workingDirectory": "Katalog roboczy",
   "mcp.panel.workingDirectoryDescription":
-    "Agenci Claude i test połączenia uruchamiają serwer tutaj. Zostaw puste, aby przekazać ten serwer każdemu dostawcy: żaden inny dostawca nie może ustawić katalogu, więc pomija serwer, który go wskazuje.",
+    "Agenci Claude i Codex oraz test połączenia uruchamiają serwer tutaj. Zostaw puste, aby przekazać ten serwer każdemu dostawcy: inni dostawcy nie mogą ustawić katalogu, więc pomijają serwer, który go wskazuje.",
   "mcp.panel.endpointTitle": "Endpoint",
   "mcp.panel.endpointDescription": "Każdy dostawca może używać serwera MCP przez HTTP.",
   "mcp.panel.serverUrl": "URL serwera",

@@ -1,0 +1,30 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/common";
+
+export const messages = {
+  "common.cancel": "취소",
+  "common.save": "저장",
+  "common.close": "닫기",
+  "common.delete": "삭제",
+  "common.remove": "제거",
+  "common.edit": "편집",
+  "common.rename": "이름 변경",
+  "common.retry": "다시 시도",
+  "common.copy": "복사",
+  "common.copied": "복사됨",
+  "common.done": "완료",
+  "common.back": "뒤로",
+  "common.continue": "계속",
+  "common.add": "추가",
+  "common.create": "만들기",
+  "common.open": "열기",
+  "common.search": "검색",
+  "common.noMatches": "일치하는 항목 없음",
+  "common.loading": "불러오는 중…",
+  "common.saving": "저장 중…",
+  "common.tryAgain": "다시 시도",
+  "common.connecting": "연결 중…",
+  "common.download": "다운로드",
+  "common.removing": "제거 중…",
+  "common.sending": "보내는 중…",
+} as const satisfies PartialTranslation<typeof source>;

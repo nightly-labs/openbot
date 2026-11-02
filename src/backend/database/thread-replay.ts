@@ -3,6 +3,7 @@ import type { ConversationMessage, ConversationSnapshot } from "@openbot/contrac
 import { isAgentProvider } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { ConversationQueries } from "./conversation-queries";
+import { activityTurnId } from "./conversation-writer";
 import { type DatabaseCore, deleteThreadAttachments } from "./database-core";
 import { databaseRows, decodeThreadAgentRow, objectValue, requiredEventRow } from "./database-rows";
 import { currentConversationMessage } from "./legacy-conversation-message";
@@ -235,10 +236,13 @@ export class ThreadReplay {
         messages.push(message);
         messagesByTurn.set(message.turnId, messages);
       }
+      // A branch keeps the turn ids of the rows it copied, and the turn row stays with the source
+      // thread: a turn id is unique across threads. The replay of a branch writes no row for them.
       const turnInsert = db.prepare(`
         INSERT INTO projection_turns (
           turn_id, thread_id, provider_session_id, status, started_at, completed_at, last_event_sequence
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(turn_id) DO NOTHING
       `);
       for (const [turnId, messages] of messagesByTurn) {
         const running = latest.activeTurnId === turnId;
@@ -280,22 +284,32 @@ export class ThreadReplay {
         INSERT INTO projection_thread_activities (
           activity_id, thread_id, turn_id, activity_type,
           payload_json, created_at, last_event_sequence
-        ) VALUES (?, ?, NULL, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `);
       for (const event of events) {
         const eventPayload = JSON.parse(event.payload_json);
         const eventRecord = objectValue(eventPayload);
+        const eventSnapshot = conversationSnapshotValue(objectValue(eventRecord?.snapshot));
+        const eventMessage =
+          currentConversationMessage(eventRecord?.appendedMessage) ??
+          currentConversationMessage(eventRecord?.importedMessage);
         const activityPayload =
-          conversationSnapshotValue(objectValue(eventRecord?.snapshot)) ||
-          currentConversationMessage(eventRecord?.appendedMessage) ||
-          currentConversationMessage(eventRecord?.importedMessage) ||
+          eventSnapshot ||
+          eventMessage ||
           Array.isArray(eventRecord?.changedMessages) ||
           Array.isArray(eventRecord?.removedMessageIds)
             ? (eventRecord?.detail ?? {})
             : eventPayload;
+        const eventActiveTurnId = eventSnapshot?.activeTurnId ?? eventRecord?.activeTurnId;
         activityInsert.run(
           randomUUID(),
           threadId,
+          (eventMessage ?? currentConversationMessage(eventRecord?.streamedMessage))?.turnId ??
+            activityTurnId(
+              event.event_type,
+              eventRecord?.detail,
+              isString(eventActiveTurnId) ? eventActiveTurnId : null,
+            ),
           event.event_type,
           JSON.stringify(activityPayload),
           event.occurred_at,

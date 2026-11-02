@@ -18,10 +18,12 @@ import { pathIdentifier, publicHttpBaseUrl, readJson, stringField } from "./requ
 
 export interface RemoteScreenRouteDependencies {
   store: Pick<TeamStore, "getIdentity">;
-  remoteScreen?: Pick<
-    TeamApiRemoteScreen,
-    "capabilities" | "createSession" | "selectDisplay" | "closeMemberSession" | "checkSetup" | "test"
-  >;
+  remoteScreen?:
+    | Pick<
+        TeamApiRemoteScreen,
+        "capabilities" | "createSession" | "selectDisplay" | "closeMemberSession" | "checkSetup" | "test"
+      >
+    | undefined;
 }
 
 export async function routeRemoteScreen(

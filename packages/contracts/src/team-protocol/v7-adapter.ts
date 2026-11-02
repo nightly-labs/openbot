@@ -15,6 +15,7 @@ import {
   isBrowserViewSessionRoute,
   isBrowserViewSessionsRoute,
 } from "./browser-view-v1";
+import { withExchangeExpectsReply } from "./conversation-exchange-v7";
 import { withConversationPlans } from "./conversation-plan-v4";
 import { withConversationSenders } from "./conversation-sender-v5";
 import {
@@ -40,12 +41,15 @@ import { isHistoryExtentRoute, withPageHistoryExtent } from "./history-extent-v1
 import { decodeHostAnalyticsV1Response } from "./host-analytics-v1";
 import { decodeMessageClientId } from "./message-client-id-v1";
 import { decodeProfileV7Request, decodeProfileV7Response } from "./profile-v7";
+import { withConversationPromptMultiSelect } from "./prompt-multi-select-v1";
 import { decodeQueueEditRequest, isQueueEditRoute } from "./queue-edit-v1";
 import {
   decodeRemoteDesktopSetupRequest,
   decodeRemoteDesktopSetupResponse,
   isRemoteDesktopSetupRoute,
 } from "./remote-desktop-setup-v1";
+import { withConversationSubagents } from "./subagents-v1";
+import { withConversationUiBlocks } from "./ui-blocks-v1";
 import { decodeTeamProtocolV7HttpRequest, decodeTeamProtocolV7HttpResponse } from "./v7";
 import type { TeamProtocolV7BaseJsonObject, TeamProtocolV7BaseJsonValue } from "./v7-base";
 import {
@@ -93,49 +97,6 @@ function withQueueMarks(projected: TeamProtocolV7BaseJsonValue, source: unknown)
         : delivery,
     ),
   };
-}
-
-/**
- * `expectsReply` rides beside the frozen conversation projection, in the way `editing` rides beside
- * the queue: the shipped key lists drop it, so a client on protocol 1-3 reads every exchange as a
- * request, and only the current protocol learns that the sender asked for no answer.
- *
- * A present mark must be a boolean. The projection removes the key, so an unchecked value would
- * reach the client as an exchange that needs no answer, and hide that a teammate is waiting for a
- * result. Fail closed instead; an absent mark still means an older host, and a request.
- */
-function withExchangeExpectsReply(
-  projected: TeamProtocolV7BaseJsonValue,
-  source: unknown,
-): TeamProtocolV7BaseJsonValue {
-  if (!isDynamicRecord(projected) || !isDynamicRecord(source)) return projected;
-  const marks = new Map<string, boolean>();
-  for (const message of [
-    ...(Array.isArray(source.messages) ? source.messages : []),
-    // A page names the messages its replies point at separately, and a reply to an exchange is
-    // exactly where the mark is read.
-    ...(isDynamicRecord(source.references) ? Object.values(source.references) : []),
-  ]) {
-    if (!isDynamicRecord(message) || !isDynamicRecord(message.exchange)) continue;
-    const mark = message.exchange.expectsReply;
-    if (mark === undefined) continue;
-    if (!isBoolean(mark)) throw new Error("Invalid exchange reply mark.");
-    if (isString(message.id)) marks.set(message.id, mark);
-  }
-  if (marks.size === 0) return projected;
-  const withMark = (message: TeamProtocolV7BaseJsonValue): TeamProtocolV7BaseJsonValue => {
-    if (!isDynamicRecord(message) || !isString(message.id) || !isDynamicRecord(message.exchange)) return message;
-    const value = marks.get(message.id);
-    return value === undefined ? message : { ...message, exchange: { ...message.exchange, expectsReply: value } };
-  };
-  const result: TeamProtocolV7BaseJsonObject = { ...projected };
-  if (Array.isArray(result.messages)) result.messages = result.messages.map(withMark);
-  if (isDynamicRecord(result.references)) {
-    result.references = Object.fromEntries(
-      Object.entries(result.references).map(([id, value]) => [id, withMark(value)]),
-    );
-  }
-  return result;
 }
 
 /**
@@ -247,19 +208,39 @@ export function decodeTeamProtocolV7CurrentHttpRequest(
 
 /**
  * `historyExtent` is the negotiated history-extent-v1 capability: only then does a page carry its
- * unloaded length beside the frozen keys. Without it the output is the released projection.
+ * unloaded length beside the frozen keys. `uiBlocks` is the negotiated ui-blocks-v1 capability: only
+ * then does a conversation message carry its `uiBlock`. `subagents` is the negotiated subagents-v1
+ * capability: only then does a conversation message carry its `subagents`. `promptMultiSelect` is the
+ * negotiated prompt-multi-select-v1 capability: only then does a prompt question carry `multiSelect`.
+ * Without them the output is the released projection.
  */
 export function encodeTeamProtocolV7CurrentHttpResponse(
   method: string,
   path: string,
   status: number,
   value: unknown,
-  options: { preserveSemanticTags?: boolean; historyExtent?: boolean } = {},
+  options: {
+    preserveSemanticTags?: boolean;
+    historyExtent?: boolean;
+    uiBlocks?: boolean;
+    subagents?: boolean;
+    promptMultiSelect?: boolean;
+  } = {},
 ): string {
-  const { historyExtent, ...frozen } = options;
+  const { historyExtent, uiBlocks, subagents, promptMultiSelect, ...frozen } = options;
   const encoded = encodeFrozenResponse(method, path, status, value, frozen);
-  if (!historyExtent || status >= 400 || !isHistoryExtentRoute(method, path)) return encoded;
-  return JSON.stringify(withPageHistoryExtent(JSON.parse(encoded), value));
+  if (status >= 400) return encoded;
+  const withExtent = historyExtent && isHistoryExtentRoute(method, path);
+  const withBlocks = uiBlocks && isConversationRoute(method, path);
+  const withSubagents = subagents && isConversationRoute(method, path);
+  const withMultiSelect = promptMultiSelect && isConversationRoute(method, path);
+  if (!withExtent && !withBlocks && !withSubagents && !withMultiSelect) return encoded;
+  let output: TeamProtocolV7BaseJsonValue = JSON.parse(encoded);
+  if (withExtent) output = withPageHistoryExtent(output, value);
+  if (withBlocks) output = withConversationUiBlocks(output, value);
+  if (withSubagents) output = withConversationSubagents(output, value);
+  if (withMultiSelect) output = withConversationPromptMultiSelect(output, value);
+  return JSON.stringify(output);
 }
 
 function encodeFrozenResponse(
@@ -322,7 +303,11 @@ function encodeFrozenResponse(
   return JSON.stringify(decodeTeamProtocolV7HttpResponse(method, path, status, toWireAgentKeys(currentValue)));
 }
 
-/** A host sends the history extent only under history-extent-v1, so a present one is always kept. */
+/**
+ * A host sends the history extent only under history-extent-v1, a UI block only under ui-blocks-v1,
+ * the subagents only under subagents-v1, and a multi-select flag only under prompt-multi-select-v1,
+ * so a present one is always kept.
+ */
 export function decodeTeamProtocolV7CurrentHttpResponse(
   method: string,
   path: string,
@@ -330,8 +315,14 @@ export function decodeTeamProtocolV7CurrentHttpResponse(
   value: unknown,
 ): TeamProtocolV7BaseJsonValue {
   const decoded = decodeFrozenResponse(method, path, status, value);
-  if (status >= 400 || !isHistoryExtentRoute(method, path)) return decoded;
-  return withPageHistoryExtent(decoded, value);
+  if (status >= 400) return decoded;
+  // The conversation page route carries all three.
+  const withExtent = isHistoryExtentRoute(method, path) ? withPageHistoryExtent(decoded, value) : decoded;
+  if (!isConversationRoute(method, path)) return withExtent;
+  return withConversationPromptMultiSelect(
+    withConversationSubagents(withConversationUiBlocks(withExtent, value), value),
+    value,
+  );
 }
 
 function decodeFrozenResponse(

@@ -4,10 +4,10 @@ import { useText } from "@openbot/ui/text";
 /** Explains the Full access level that "Always allow" on an approval card gives. */
 export function StandingApprovalConfirmation(props: {
   open: boolean;
-  agentName?: string;
+  agentName?: string | undefined;
   onCancel: () => void;
   onConfirm: () => void;
-  restoreFocusTarget?: HTMLElement;
+  restoreFocusTarget?: HTMLElement | undefined;
 }) {
   const { t } = useText();
   return (

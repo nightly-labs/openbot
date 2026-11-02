@@ -248,7 +248,7 @@ export interface ConnectOptions {
   pageSelector?: string | null;
   // The pid of the live registry record that owns the port, if any. See
   // OpenDevBrowserOptions: without it a browser with no app window is refused.
-  ownerPid?: number | null;
+  ownerPid?: number | null | undefined;
 }
 
 export interface PageChoice {
@@ -320,7 +320,7 @@ export interface OpenDevBrowserOptions {
   // A browser without the Electron token must prove its process descends from
   // this pid, because liveness alone cannot tell a restarted instance from a
   // squatter.
-  ownerPid?: number | null;
+  ownerPid?: number | null | undefined;
 }
 
 export async function openDevBrowser(
@@ -402,6 +402,9 @@ export async function connectToDevApp(
     );
   }
   logger.info(`driving ${describeTarget(page.url())}`);
+  // Playwright emulates a light `prefers-color-scheme` on each page it attaches to. The app takes its
+  // theme from that media query, so without this a window that follows the system shows light.
+  await Promise.all(pages.map((attached) => attached.emulateMedia({ colorScheme: null })));
   // The full text, not a slice of it: the logger redacts first and truncates
   // after, so cutting here can hand it half of a token - a prefix short enough
   // that no redaction rule recognizes the shape, and long enough to be the

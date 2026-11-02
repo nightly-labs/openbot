@@ -1,34 +1,59 @@
 import { Effect, Schema } from "effect";
-// Computer Use, local scripts and the busy-message mode of one agent, as this computer holds them.
-// The `agent-host-settings-v1` host routes use this, and they write through `AgentService.updateAgent`,
-// the writer of the local window, so a remote admin changes the same state.
+// Computer Use, local scripts, the busy-message mode, the backup models, the task limit, the agent's
+// own new chats and the plan card of one agent, as this computer holds them. The
+// `agent-host-settings-v1`, `agent-backup-models-v1`, `agent-task-limit-v1`, `agent-new-chat-v1` and
+// `agent-plan-card-v1` host routes use this, and they write through `AgentService.updateAgent`, the
+// writer of the local window, so a remote admin changes the same state.
 
 import {
+  type AgentBackupModelSettings,
   type AgentHostSettings,
+  type AgentNewChatSettings,
+  type AgentPlanCardSettings,
   type AgentSummary,
+  type AgentTaskLimitSettings,
   agentAutomationAllowed,
   agentComputerUseEnabled,
+  agentNewChatAllowed,
+  agentQuickAcknowledgementEnabled,
+  type UpdateAgentBackupModelsInput,
   type UpdateAgentHostSettingsInput,
+  type UpdateAgentNewChatInput,
+  type UpdateAgentPlanCardInput,
+  type UpdateAgentTaskLimitInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../backend/agent-service";
 import { causeHelpers } from "../backend/effect-boundary";
 import { AgentNotFoundError } from "./agent-admin-settings";
+import type { AgentDefaultsPreferenceStore } from "./agent-defaults-preference-store";
 import type { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
 
 export interface AgentHostSettingsDependencies {
   agents: Pick<AgentService, "listAgents" | "updateAgent">;
   busyMessageMode: Pick<BusyMessageModePreferenceStore, "get">;
+  agentDefaults: Pick<AgentDefaultsPreferenceStore, "get">;
 }
 
 export interface AgentHostSettingsService {
   read(agentId: string): AgentHostSettings;
   update(input: UpdateAgentHostSettingsInput): Effect.Effect<AgentHostSettings, AgentHostSettingsFailure>;
+  readBackupModels(agentId: string): AgentBackupModelSettings;
+  updateBackupModels(
+    input: UpdateAgentBackupModelsInput,
+  ): Effect.Effect<AgentBackupModelSettings, AgentHostSettingsFailure>;
+  readTaskLimit(agentId: string): AgentTaskLimitSettings;
+  updateTaskLimit(input: UpdateAgentTaskLimitInput): Effect.Effect<AgentTaskLimitSettings, AgentHostSettingsFailure>;
+  readNewChat(agentId: string): AgentNewChatSettings;
+  updateNewChat(input: UpdateAgentNewChatInput): Effect.Effect<AgentNewChatSettings, AgentHostSettingsFailure>;
+  readPlanCard(agentId: string): AgentPlanCardSettings;
+  updatePlanCard(input: UpdateAgentPlanCardInput): Effect.Effect<AgentPlanCardSettings, AgentHostSettingsFailure>;
 }
 
 export function createAgentHostSettings({
   agents,
   busyMessageMode,
+  agentDefaults,
 }: AgentHostSettingsDependencies): AgentHostSettingsService {
   function requireAgent(agentId: string): AgentSummary {
     const agent = agents.listAgents().find((candidate) => candidate.id === agentId);
@@ -38,7 +63,7 @@ export function createAgentHostSettings({
   function settings(agent: AgentSummary): AgentHostSettings {
     return {
       computerUse: agentComputerUseEnabled(agent),
-      allowAutomation: agentAutomationAllowed(agent),
+      allowAutomation: agentAutomationAllowed(agent, agentDefaults.get()),
       busyMessageMode: agent.busyMessageMode ?? null,
       defaultBusyMessageMode: busyMessageMode.get().mode,
     };
@@ -54,9 +79,72 @@ export function createAgentHostSettings({
     const agent = yield* agents.updateAgent({ agentId, ...changes }).pipe(toAgentHostSettingsFailure);
     return settings(agent);
   });
+  const backupModels = (agent: AgentSummary): AgentBackupModelSettings => ({
+    backupModels: agent.backupModels ?? null,
+    usageLimitReturn: agent.usageLimitReturn ?? null,
+  });
+  const updateBackupModels = Effect.fn("AgentHostSettings.updateBackupModels")(function* ({
+    agentId,
+    backupModels: next,
+  }: UpdateAgentBackupModelsInput) {
+    yield* Effect.try({
+      try: () => requireAgent(agentId),
+      catch: (cause) => new AgentHostSettingsFailure({ cause }),
+    });
+    const agent = yield* agents.updateAgent({ agentId, backupModels: next }).pipe(toAgentHostSettingsFailure);
+    return backupModels(agent);
+  });
+  const taskLimit = (agent: AgentSummary): AgentTaskLimitSettings => ({ taskLimit: agent.taskLimit ?? null });
+  const updateTaskLimit = Effect.fn("AgentHostSettings.updateTaskLimit")(function* ({
+    agentId,
+    taskLimit: next,
+  }: UpdateAgentTaskLimitInput) {
+    yield* Effect.try({
+      try: () => requireAgent(agentId),
+      catch: (cause) => new AgentHostSettingsFailure({ cause }),
+    });
+    const agent = yield* agents.updateAgent({ agentId, taskLimit: next }).pipe(toAgentHostSettingsFailure);
+    return taskLimit(agent);
+  });
+  const newChat = (agent: AgentSummary): AgentNewChatSettings => ({
+    allowNewChat: agentNewChatAllowed(agent, agentDefaults.get()),
+  });
+  const updateNewChat = Effect.fn("AgentHostSettings.updateNewChat")(function* ({
+    agentId,
+    allowNewChat,
+  }: UpdateAgentNewChatInput) {
+    yield* Effect.try({
+      try: () => requireAgent(agentId),
+      catch: (cause) => new AgentHostSettingsFailure({ cause }),
+    });
+    const agent = yield* agents.updateAgent({ agentId, allowNewChat }).pipe(toAgentHostSettingsFailure);
+    return newChat(agent);
+  });
+  const planCard = (agent: AgentSummary): AgentPlanCardSettings => ({
+    quickAcknowledgement: agentQuickAcknowledgementEnabled(agent, agentDefaults.get()),
+  });
+  const updatePlanCard = Effect.fn("AgentHostSettings.updatePlanCard")(function* ({
+    agentId,
+    quickAcknowledgement,
+  }: UpdateAgentPlanCardInput) {
+    yield* Effect.try({
+      try: () => requireAgent(agentId),
+      catch: (cause) => new AgentHostSettingsFailure({ cause }),
+    });
+    const agent = yield* agents.updateAgent({ agentId, quickAcknowledgement }).pipe(toAgentHostSettingsFailure);
+    return planCard(agent);
+  });
   return {
     read: (agentId) => settings(requireAgent(agentId)),
     update: (input) => update(input).pipe(Effect.uninterruptible),
+    readBackupModels: (agentId) => backupModels(requireAgent(agentId)),
+    updateBackupModels: (input) => updateBackupModels(input).pipe(Effect.uninterruptible),
+    readTaskLimit: (agentId) => taskLimit(requireAgent(agentId)),
+    updateTaskLimit: (input) => updateTaskLimit(input).pipe(Effect.uninterruptible),
+    readNewChat: (agentId) => newChat(requireAgent(agentId)),
+    updateNewChat: (input) => updateNewChat(input).pipe(Effect.uninterruptible),
+    readPlanCard: (agentId) => planCard(requireAgent(agentId)),
+    updatePlanCard: (input) => updatePlanCard(input).pipe(Effect.uninterruptible),
   };
 }
 

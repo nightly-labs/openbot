@@ -16,7 +16,6 @@ export const messages = {
   "skill.emptyAssigned": "このエージェントにはまだスキルが割り当てられていません。",
   "skill.folderSkill":
     "このスキルは OpenBot がインストールしたものではありません。{location} で編集または削除してください。",
-  "skill.localOnHost": "このローカルスキルはホストに保存されています。詳細はそのコンピューターで開いてください。",
   "skill.moreFor": "{name} のその他の操作",
   "skill.update": "更新",
   "skill.updateName": "{name} を更新",
@@ -71,4 +70,11 @@ export const messages = {
   "skill.preview.examplePrompt": "このスキルの使い方を手伝ってください。",
   "skill.preview.try": "スキルを試す",
   "skill.preview.linkFailed": "リンクを開けませんでした。",
+
+  "skill.marketplace.changed": { other: "エージェント {count} 件で {name} を変更しました。" },
+  "skill.marketplace.updated": { other: "エージェント {count} 件で {name} を更新しました。" },
+  "skill.marketplace.undone": "{name} の変更を元に戻しました。",
+  "skill.marketplace.confirmAgents": "エージェント: {agents}。",
+  "skill.marketplace.limitReason": "エージェントに追加できるスキルは {limit} 個までです。",
+  "skill.marketplace.cannotRemove": "組み込みのスキルと、OpenBot がインストールしていないスキルは削除できません。",
 } as const satisfies PartialTranslation<typeof source>;

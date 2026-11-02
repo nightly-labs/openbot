@@ -1,0 +1,33 @@
+{
+  "slug": "railway",
+  "name": "Railway",
+  "tagline": "Projects, services and deployments",
+  "description": "Railway lets agents list projects and services, create projects, redeploy services, and manage feature flags. Agents can also give multi-step work to the Railway Agent, which reads logs, finds why a deploy failed, creates services and sets variables. Each user signs in to their own Railway account through the browser and chooses the workspaces and projects that agents can use. Agents get full access in those projects: they can deploy staged changes, delete feature flags, and change services, variables, databases and networking through the Railway Agent.",
+  "category": "coding",
+  "creatorName": "Railway",
+  "iconUrl": "https://railway.com/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-projects", "text": "Which projects and services are in my Railway workspace?" },
+    { "id": "prompt-crash", "text": "Why does my backend service on Railway crash on deploy?" },
+    { "id": "prompt-redeploy", "text": "Redeploy the API service in my Railway project." }
+  ],
+  "apps": [
+    {
+      "id": "app-railway-mcp",
+      "name": "Railway",
+      "description": "Projects, services, and deployments, over Railway's MCP server with browser sign-in.",
+      "iconUrl": "https://railway.com/apple-touch-icon.png",
+      "server": {
+        "name": "railway",
+        "transport": "http",
+        "url": "https://mcp.railway.com",
+        "auth": [{ "id": "railway-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://railway.com",
+  "privacyPolicyUrl": "https://railway.com/legal/privacy",
+  "termsUrl": "https://railway.com/legal/terms"
+}

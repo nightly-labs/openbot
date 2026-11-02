@@ -1,5 +1,5 @@
 import { AGENT_PROVIDERS } from "@openbot/contracts/agent-providers";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Option, Schema } from "effect";
 
 export const CauseCode = Schema.Literals([
@@ -77,6 +77,17 @@ export const Report = Schema.Struct({
 export type Report = typeof Report.Type;
 export type ReportContext = Pick<Report, "surface" | "app_version" | "platform" | "event_schema_version">;
 
+/**
+ * The current analytics generation of each surface. Product events and failure reports send the same value.
+ * Change a value only together with ANALYTICS.md.
+ */
+export const ANALYTICS_GENERATIONS = {
+  desktop_host: 11,
+  desktop: 12,
+  web: 2,
+  mobile: 4,
+} as const satisfies Record<Report["surface"], number>;
+
 const FAILURE_CODES = new Set([
   "unknown",
   "agent_event_failed",
@@ -143,7 +154,10 @@ export function safeReport(input: unknown): Report | null {
     !Number.isFinite(Date.parse(value.timestamp)) ||
     !/^(?:\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?|web|unknown)$/u.test(value.app_version) ||
     !isReportProfileId(value.profileId) ||
-    value.event_schema_version !== (value.surface === "web" ? 1 : value.surface === "mobile" ? 2 : 7)
+    // A stored report from an older generation can still be sent: its properties pass the current filter.
+    !Number.isInteger(value.event_schema_version) ||
+    value.event_schema_version < 1 ||
+    value.event_schema_version > ANALYTICS_GENERATIONS[value.surface]
   )
     return null;
   return {
@@ -167,6 +181,10 @@ const STRUCTURED_CAUSES: Readonly<Record<string, CauseCode>> = {
   authentication_error: "authentication",
   rate_limit_exceeded: "rate_limit",
   rate_limit_error: "rate_limit",
+  rateLimitExceeded: "rate_limit",
+  serverOverloaded: "provider_unavailable",
+  internalServerError: "provider_unavailable",
+  flexUnavailable: "provider_unavailable",
   insufficient_quota: "billing",
   ECONNREFUSED: "network",
   ECONNRESET: "network",
@@ -183,7 +201,10 @@ export function classifyFailure(error: unknown): CauseCode {
   for (const key of [record?.codexErrorInfo, record?.code]) {
     if (isCauseCode(key)) return key;
     if (typeof key === "string" && Object.hasOwn(STRUCTURED_CAUSES, key)) return STRUCTURED_CAUSES[key] ?? "unknown";
-    if (isDynamicRecord(key) && Object.hasOwn(key, "httpConnectionFailed")) return "network";
+    if (isDynamicRecord(key)) {
+      const cause = codexFailureCause(key);
+      if (cause) return cause;
+    }
   }
   if (isDynamicRecord(record?.error)) {
     const nested = classifyFailure(record.error);
@@ -192,19 +213,60 @@ export function classifyFailure(error: unknown): CauseCode {
   const message = error instanceof Error ? error.message : typeof error === "string" ? error : record?.message;
   if (typeof message !== "string") return "unknown";
   if (/\binvalid upload request\b/iu.test(message)) return "invalid_upload_request";
-  if (/\b(?:401 unauthorized|invalid_api_key|not authenticated|authentication failed)\b/iu.test(message))
+  if (
+    /\b(?:401 unauthorized|invalid_api_key|not authenticated|authentication failed|authentication_error)\b/iu.test(
+      message,
+    )
+  )
     return "authentication";
-  if (/\b(?:rate[ _-]?limit|too many requests)\b/iu.test(message)) return "rate_limit";
+  if (/\b(?:rate[ _-]?limit(?:_error|_exceeded)?|too many requests)\b/iu.test(message)) return "rate_limit";
   if (/\b(?:insufficient (?:funds|balance|quota)|payment required|credits? exhausted)\b/iu.test(message))
     return "billing";
   if (/\b(?:usage limit|hit your (?:weekly |session )?limit)\b/iu.test(message)) return "usage_limit";
-  if (/\b(?:timed? out|ETIMEDOUT)\b/iu.test(message)) return "timeout";
-  if (/\b(?:fetch failed|failed to fetch|network request failed|ECONNRESET|ECONNREFUSED|ENOTFOUND)\b/iu.test(message))
+  if (/\b(?:timed? out|ETIMEDOUT|gateway time-?out|deadline exceeded|DEADLINE_EXCEEDED)\b/iu.test(message))
+    return "timeout";
+  if (
+    /\b(?:fetch failed|failed to fetch|network request failed|connection error|socket hang up|stream disconnected|error sending request|ECONNRESET|ECONNREFUSED|ECONNABORTED|ENOTFOUND|EAI_AGAIN)\b/iu.test(
+      message,
+    )
+  )
     return "network";
   if (/\b(?:ENOSPC|SQLITE_FULL|disk full)\b/iu.test(message)) return "storage";
   if (/\b(?:EACCES|permission denied|403 forbidden)\b/iu.test(message)) return "permission";
-  if (/\b(?:service unavailable|bad gateway|internal server error)\b/iu.test(message)) return "provider_unavailable";
+  // An outage: Claude's "API Error: 529 … overloaded_error", OpenAI's "server_error", Google's
+  // UNAVAILABLE status in capitals, or a 5xx status that the text names as a status.
+  if (
+    /\b(?:service unavailable|bad gateway|internal server error|overloaded(?:_error)?|server_error|api_error|server had an error|high demand|temporarily unavailable|upstream connect error)\b/iu.test(
+      message,
+    ) ||
+    /\bUNAVAILABLE\b/u.test(message) ||
+    /\b(?:API Error|status(?: code)?|HTTP(?:\/[\d.]+)?)\W{0,4}5\d\d\b/iu.test(message)
+  )
+    return "provider_unavailable";
   return "unknown";
+}
+
+/**
+ * Codex names a failed connection, a broken stream or a spent retry budget as an object, with the last
+ * HTTP status when the provider answered. No status means that the provider did not answer. Any other
+ * 4xx is a request that each model can refuse, so the message decides.
+ */
+function codexFailureCause(info: DynamicRecord): CauseCode | null {
+  const failure = [
+    "httpConnectionFailed",
+    "responseStreamConnectionFailed",
+    "responseStreamDisconnected",
+    "responseTooManyFailedAttempts",
+  ]
+    .map((key) => info[key])
+    .find(isDynamicRecord);
+  if (!failure) return null;
+  const status = failure.httpStatusCode;
+  if (typeof status !== "number") return "network";
+  if (status === 429) return "rate_limit";
+  if (status === 401) return "authentication";
+  if (status === 408) return "timeout";
+  return status >= 500 ? "provider_unavailable" : null;
 }
 
 export function operationForCode(code: string): Operation {

@@ -32,7 +32,7 @@ export function SidebarNav() {
     startCreateSection,
     updateSidebarNativeDrag,
     userHiddenAgentList,
-    waitingAgents,
+    waitingChats,
   } = useSidebarScope();
   const { t } = useText();
   return (
@@ -50,7 +50,7 @@ export function SidebarNav() {
         <Show
           when={
             resolvedPinnedItems().length === 0 &&
-            waitingAgents().length === 0 &&
+            waitingChats().length === 0 &&
             filteredChats().length === 0 &&
             userHiddenAgentList().length === 0 &&
             (props.showPeople === false || orderedPeople().length === 0) &&

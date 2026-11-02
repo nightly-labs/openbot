@@ -1,23 +1,39 @@
-import type { AccountSession, CentralAuthUser } from "@openbot/contracts/ipc";
+import type { AccountSession, CentralAuthUser, ClientAgentSummary, HostAnalytics } from "@openbot/contracts/ipc";
 import {
   Badge,
   Button,
+  ConfirmDialog,
   ErrorReference,
-  ImageRemoveButton,
-  Input,
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemGroup,
   ItemTitle,
+  Pencil,
   SettingsSection,
   Text,
+  Upload,
   UserAvatar,
 } from "@openbot/ui";
-import { createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
+import { ProfileActivity, type ProfileActivityPhase } from "./ProfileActivity";
+import { ProfileEditDialog } from "./ProfileEditDialog";
+import { ProfileShareDialog } from "./ProfileShareDialog";
+import { type ProfileStats, profileStats } from "./profile-stats";
 import type { SettingsProfileStore } from "./stores/profile-store";
+
+/** The host's report of the past year, and the agents it names. */
+export interface ProfileActivityState {
+  phase: ProfileActivityPhase;
+  report: HostAnalytics | null;
+  agents: readonly ClientAgentSummary[];
+  errorReference: string | null;
+  onRetry: () => void;
+  /** Draws the image that the Share dialog shows. The Share button is hidden without it. */
+  onCreateShareImage?: ((stats: ProfileStats) => Promise<Blob>) | undefined;
+}
 
 interface SettingsProfileTabProps {
   store: SettingsProfileStore;
@@ -26,6 +42,8 @@ interface SettingsProfileTabProps {
   canRevokeSession: boolean;
   /** Signs this computer out of the account. The button is hidden without it. */
   onSignOut?: (() => Promise<void>) | undefined;
+  /** The activity of this computer. Nothing shows without it. */
+  activity?: ProfileActivityState | undefined;
 }
 
 /** `Date.prototype.toLocaleString()` with no options: the date and the time, each field numeric. */
@@ -43,6 +61,20 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
   const { t, format, errorMessage } = useText();
   const [signingOut, setSigningOut] = createSignal(false);
   const [signOutError, setSignOutError] = createSignal<string | null>(null);
+  /** The session that the Disconnect confirmation is open for. */
+  const [disconnectTarget, setDisconnectTarget] = createSignal<string | null>(null);
+  const [editing, setEditing] = createSignal(false);
+  const [sharing, setSharing] = createSignal(false);
+  const accountName = () => props.account.name?.trim() || props.account.email.split("@")[0] || props.account.email;
+  const stats = createMemo(() => {
+    const activity = props.activity;
+    return activity?.report ? profileStats(activity.report, activity.agents) : null;
+  });
+  const shareImage = () => {
+    const current = stats();
+    const create = props.activity?.onCreateShareImage;
+    return current && current.tokens > 0 && create ? () => create(current) : undefined;
+  };
   const sessionTime = (timestamp: number) => format.date(timestamp, SESSION_TIME_FORMAT);
   const sessionKind = (session: AccountSession) => {
     if (session.hostedServer) return t("settings.profile.sessions.kind.hostedServer");
@@ -50,6 +82,12 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
       ? t("settings.profile.sessions.kind.desktop")
       : t("settings.profile.sessions.kind.mobile");
   };
+  // The reset runs in the click, not in the dialog's render: Solid refuses a store write there.
+  function editProfile() {
+    props.store.resetName();
+    props.store.clearAvatarError();
+    setEditing(true);
+  }
   async function signOut(onSignOut: () => Promise<void>) {
     if (signingOut()) return;
     setSigningOut(true);
@@ -63,93 +101,42 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
   }
   return (
     <>
-      <SettingsSection title={t("settings.profile.identity.title")}>
-        <Input
-          ref={(element) => props.store.registerAvatarInput(element)}
-          class="sr-only"
-          type="file"
-          aria-label={t("settings.profile.photo.upload")}
-          accept="image/png,image/jpeg,image/webp"
-          onChange={(event) => void props.store.uploadAvatar(event.currentTarget.files?.[0])}
-        />
-        <ItemGroup class="settings-modal-card">
-          <Item class="settings-identity-name-row">
-            <ItemContent>
-              <ItemTitle id="settings-profile-name-label">{t("settings.profile.name.title")}</ItemTitle>
-              <ItemDescription id="settings-profile-name-description">
-                {t("settings.profile.name.description")}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions
-              class="settings-identity-name-control"
-              data-invalid={props.store.visibleNameError() ? "" : undefined}
-            >
-              <Input
-                ref={(element) => props.store.registerNameInput(element)}
-                class="settings-identity-name-input"
-                id="settings-profile-name"
-                size="md"
-                value={props.store.state.profile.name}
-                aria-labelledby="settings-profile-name-label"
-                aria-describedby={
-                  props.store.visibleNameError() ? "settings-profile-name-error" : "settings-profile-name-description"
-                }
-                aria-invalid={props.store.visibleNameError() ? "true" : undefined}
-                onValueChange={props.store.updateName}
-                onBlur={props.store.markTouchedIfDirty}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" || event.isComposing) return;
-                  event.preventDefault();
-                  void props.store.saveName();
-                }}
-              />
-              <span
-                id="settings-profile-name-error"
-                class="ui-field-error settings-identity-name-error"
-                role="alert"
-                aria-hidden={props.store.visibleNameError() ? undefined : "true"}
-              >
-                {props.store.visibleNameError() ?? ""}
-              </span>
-            </ItemActions>
-          </Item>
-          <Item class="settings-identity-image-row">
-            <ItemContent>
-              <ItemTitle>{t("settings.profile.photo.title")}</ItemTitle>
-              <ItemDescription class={props.store.state.avatar.error ? "settings-modal-error" : undefined}>
-                {props.store.state.avatar.error ?? t("settings.profile.photo.description")}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions class="settings-identity-image-control">
-              <div class="settings-identity-image-picker ui-removable-image">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-lg"
-                  class="settings-identity-image-trigger settings-modal-profile-photo-trigger"
-                  aria-label={
-                    props.account.avatarUrl ? t("settings.profile.photo.edit") : t("settings.profile.photo.add")
-                  }
-                  disabled={props.store.state.avatar.busy}
-                  onClick={props.store.openAvatarPicker}
-                >
-                  <UserAvatar user={props.account} class="settings-modal-avatar" decorative />
-                </Button>
-                <Show when={props.account.avatarUrl && !props.store.state.avatar.busy}>
-                  <ImageRemoveButton
-                    label={t("settings.profile.photo.remove")}
-                    onClick={() => void props.store.updateAvatar(null)}
-                  />
-                </Show>
-              </div>
-            </ItemActions>
-          </Item>
-        </ItemGroup>
-      </SettingsSection>
+      <section class="profile-hero" aria-label={t("settings.profile.header.label")}>
+        <UserAvatar user={props.account} class="profile-hero-avatar" decorative />
+        <div class="profile-hero-text">
+          <h3>{accountName()}</h3>
+        </div>
+        <div class="profile-hero-actions">
+          <Show when={shareImage()}>
+            <Button variant="outline" size="sm" onClick={() => setSharing(true)}>
+              <Upload size={14} class="profile-icon-share" aria-hidden="true" />
+              {t("settings.profile.share.action")}
+            </Button>
+          </Show>
+          <Button variant="outline" size="sm" onClick={editProfile}>
+            <Pencil size={14} class="profile-icon-edit" aria-hidden="true" />
+            {t("settings.profile.edit.action")}
+          </Button>
+        </div>
+      </section>
+      <ProfileEditDialog open={editing()} onOpenChange={setEditing} store={props.store} account={props.account} />
+      <Show when={shareImage()}>
+        {(createImage) => <ProfileShareDialog open={sharing()} onOpenChange={setSharing} createImage={createImage()} />}
+      </Show>
+      <Show when={props.activity && props.activity.phase !== "unsupported" ? props.activity : null}>
+        {(activity) => (
+          <ProfileActivity
+            phase={activity().phase}
+            stats={stats()}
+            errorReference={activity().errorReference}
+            onRetry={activity().onRetry}
+          />
+        )}
+      </Show>
 
       <SettingsSection title={t("settings.profile.account.title")}>
         <ItemGroup class="settings-modal-card">
-          <Item class="settings-modal-account-email-row">
+          <Item data-settings-row="settings.profile.email.title" class="settings-modal-account-email-row">
             <ItemContent>
               <ItemTitle>{t("settings.profile.email.title")}</ItemTitle>
               <ItemDescription>{t("settings.profile.email.description")}</ItemDescription>
@@ -174,6 +161,7 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
       </SettingsSection>
       <Show when={props.canListSessions}>
         <SettingsSection
+          data-settings-row="settings.profile.sessions.title"
           title={t("settings.profile.sessions.title")}
           description={t("settings.profile.sessions.description")}
         >
@@ -223,7 +211,7 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
                           signedIn: sessionTime(session.connectedAt),
                         })}
                         disabled={Boolean(props.store.state.sessions.revokingId) || !props.canRevokeSession}
-                        onClick={() => void props.store.revokeSession(session.sessionId)}
+                        onClick={() => setDisconnectTarget(session.sessionId)}
                       >
                         {props.store.state.sessions.revokingId === session.sessionId
                           ? t("settings.disconnect.pending")
@@ -235,6 +223,21 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
               )}
             </For>
           </ItemGroup>
+          <ConfirmDialog
+            open={disconnectTarget() !== null}
+            onCancel={() => setDisconnectTarget(null)}
+            onConfirm={async () => {
+              const sessionId = disconnectTarget();
+              if (sessionId === null) return;
+              // The store shows a failure under the section heading, so the dialog closes either way.
+              await props.store.revokeSession(sessionId);
+              setDisconnectTarget(null);
+            }}
+            title={t("settings.profile.sessions.disconnectConfirm.title")}
+            description={t("settings.profile.sessions.disconnectConfirm.description")}
+            confirmLabel={t("settings.disconnect.action")}
+            pendingLabel={t("settings.disconnect.pending")}
+          />
         </SettingsSection>
       </Show>
     </>

@@ -3,13 +3,17 @@
 // 1. Runs `update.ts --dry-run` against a local fake of the 5 probes: a bootstrap run, two failed
 //    Marketplace runs, then healthy runs. It checks the planned issue writes, the state and the
 //    daily minutes, and that only maintainer issues and comments reach the page.
-// 2. Runs one `--dry-run` against the live services and GitHub. It writes nothing remote.
-// 3. Builds the page, serves it with the files of step 1, and checks it in Chrome: the banner, the
+// 2. Runs `notify.ts` against a local receiver: bootstrap, signed deliveries in the 3 formats, event
+//    filters, a paused and a removed subscription, retries to their end, the test event, and no URL
+//    token or secret in the output.
+// 3. Runs one `--dry-run` against the live services and GitHub. It writes nothing remote.
+// 4. Builds the page, serves it with the files of step 1, and checks it in Chrome: the banner, the
 //    5 rows, the 30 and 90 day views, an incident that opens, plain-text updates, no console errors,
 //    and no axe-core violations, at 1440 and 390 px.
 // Writes .openbot-build/status-page/report.json and the screenshots beside it.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { extname, resolve } from "node:path";
@@ -55,6 +59,7 @@ const probeServer = createServer((request, response) => {
   };
   if (path === "/api/health/ready") return reply("accounts", '{"status":"ready"}');
   if (path === "/signal/health/ready") return reply("connections", '{"status":"ready"}');
+  if (path === "/signal/health/turn") return reply("connections", '{"status":"ready"}');
   if (path === "/api/health/hosting") return reply("hosted", '{"status":"ok"}');
   if (path === "/api/v1/skills?limit=1") return reply("marketplace", '{"skills":[]}');
   if (/^\/github\/nightly-labs\/openbot\/releases\/latest\/download\/latest(-mac|-linux)?\.yml$/.test(path)) {
@@ -334,7 +339,534 @@ assert.match(feed, /&lt;b&gt;Installed&lt;\/b&gt;/, "The feed escapes update tex
 assert.equal(feed.match(/<entry>/g)?.length, 5);
 logger.info("Update runs: passed.");
 
-// 2. One read-only run against the live services ----------------------------------------
+// 2. Status webhooks against a local receiver ------------------------------------------
+
+/** What each subscription answers. `flaky` fails its first 2 tries. */
+const RECEIVER_TOKEN = randomBytes(16).toString("hex");
+const flakyFailures = { left: 2 };
+interface Received {
+  subscription: string;
+  headers: Record<string, string | undefined>;
+  body: string;
+}
+let received: Received[] = [];
+const receiver = createServer((request, response) => {
+  const match = /^\/hook\/([0-9a-f]+)\/([a-z-]+)$/.exec(request.url ?? "");
+  if (request.method !== "POST" || match?.[1] !== RECEIVER_TOKEN || !match[2]) {
+    response.writeHead(404).end();
+    return;
+  }
+  const subscription = match[2];
+  const chunks: Buffer[] = [];
+  request.on("data", (chunk: Buffer) => chunks.push(chunk));
+  request.on("end", () => {
+    const headers = Object.fromEntries(
+      ["content-type", "x-openbot-event", "x-openbot-delivery-id", "x-openbot-timestamp", "x-openbot-signature"].map(
+        (name) => [name, request.headers[name]?.toString()],
+      ),
+    );
+    received.push({ subscription, headers, body: Buffer.concat(chunks).toString("utf8") });
+    if (subscription === "dead" || (subscription === "flaky" && flakyFailures.left-- > 0)) {
+      response.writeHead(500).end();
+    } else if (subscription === "redirect") {
+      response.writeHead(301, { Location: `/hook/${RECEIVER_TOKEN}/team` }).end();
+    } else {
+      response.writeHead(subscription === "discord" ? 204 : 200).end();
+    }
+  });
+});
+const receiverPort = await listen(receiver);
+const hookUrl = (subscription: string) => `http://127.0.0.1:${receiverPort}/hook/${RECEIVER_TOKEN}/${subscription}`;
+const SECRETS = {
+  team: randomBytes(32).toString("hex"),
+  ops: randomBytes(32).toString("hex"),
+  flaky: randomBytes(32).toString("hex"),
+  dead: randomBytes(32).toString("hex"),
+  redirect: randomBytes(32).toString("hex"),
+};
+const HOOKS = [
+  { id: "team", url: hookUrl("team"), secret: SECRETS.team },
+  { id: "ops", url: hookUrl("ops"), secret: SECRETS.ops, events: ["service.changed", "incident.resolved"] },
+  { id: "slack", url: hookUrl("slack"), format: "slack", events: ["incident.created"] },
+  { id: "discord", url: hookUrl("discord"), format: "discord" },
+  { id: "paused", url: hookUrl("paused"), secret: SECRETS.team, paused: true },
+  { id: "flaky", url: hookUrl("flaky"), secret: SECRETS.flaky, events: ["incident.created"] },
+  { id: "dead", url: hookUrl("dead"), secret: SECRETS.dead, events: ["incident.created"] },
+  { id: "redirect", url: hookUrl("redirect"), secret: SECRETS.redirect, events: ["incident.created"] },
+];
+const leakValues = [RECEIVER_TOKEN, ...Object.values(SECRETS)];
+
+interface NotifyReport {
+  found: string[];
+  queued: { delivery: string; subscription: string; type: string }[];
+  sent: { delivery: string; subscription: string; type: string; attempt: number; ok: boolean; reason: string | null }[];
+  dropped: { subscription: string; type: string; reason: string }[];
+  waiting: number;
+}
+interface NotifyStateJson {
+  checkedAt: string | null;
+  seen: Record<string, string>;
+  open: Record<string, { missing: number }>;
+  outbox: { id: string; subscription: string; attempts: number; nextAt: string; event: { type: string } }[];
+}
+
+const NOTIFY_STATE = resolve(WORK, "notify.json");
+const NOTIFY_SUMMARY = resolve(WORK, "notify-summary.md");
+/** The stdout and stderr of each run, scanned for secrets at the end. */
+const notifyOutput: string[] = [];
+
+const SERVICE_LIST = ["accounts", "connections", "hosted", "updates", "marketplace"];
+const statusFile = (checkedAt: string, down: string[], incidents: readonly ReturnType<typeof incident>[]) => ({
+  version: 1,
+  checkedAt,
+  services: SERVICE_LIST.map((id) => ({ id, result: down.includes(id) ? "down" : "ok", days: [] })),
+  incidents,
+});
+interface UpdateFixture {
+  at: string;
+  stage: string;
+  body: string;
+}
+interface IncidentFixture {
+  id: number;
+  title: string;
+  components: string[];
+  startedAt: string;
+  updates: UpdateFixture[];
+  kind?: string;
+  impact?: string;
+  resolvedAt?: string | null;
+}
+const incident = (fields: IncidentFixture) => ({
+  url: `https://github.com/nightly-labs/openbot/issues/${fields.id}`,
+  kind: "incident",
+  impact: "partial",
+  resolvedAt: null,
+  ...fields,
+});
+const investigating = { at: "2026-10-16T10:30:00Z", stage: "investigating", body: "Some links fail." };
+const identified = { at: "2026-10-16T11:00:00Z", stage: "identified", body: "A bad cache rule." };
+const scheduled = { at: "2026-10-15T08:00:00Z", stage: "scheduled", body: "Phones can disconnect for a minute." };
+const links = (updates: UpdateFixture[], resolvedAt: string | null = null) =>
+  incident({
+    id: 201,
+    title: "Invitation links fail",
+    components: ["accounts"],
+    startedAt: investigating.at,
+    resolvedAt,
+    updates,
+  });
+const maintenance = (updates: UpdateFixture[] = [scheduled]) =>
+  incident({
+    id: 202,
+    title: "Connections server upgrade",
+    kind: "maintenance",
+    impact: "maintenance",
+    components: ["connections"],
+    startedAt: "2026-10-16T12:00:00Z",
+    resolvedAt: "2026-10-16T12:30:00Z",
+    updates,
+  });
+const signIn = incident({
+  id: 203,
+  title: "Sign-in fails",
+  impact: "major",
+  components: ["accounts", "hosted"],
+  startedAt: "2026-10-16T12:01:00Z",
+  updates: [
+    { at: "2026-10-16T12:01:00Z", stage: "investigating", body: "Sign-in fails for <some> users & @everyone." },
+  ],
+});
+
+/** The stdout and stderr of a child that failed. */
+const childOutput = (error: unknown) =>
+  error instanceof Error
+    ? ["stdout" in error ? error.stdout : "", "stderr" in error ? error.stderr : ""]
+        .map((value) => (typeof value === "string" ? value : ""))
+        .join("")
+    : "";
+
+async function notify(
+  name: string,
+  status: unknown,
+  now: string,
+  options: { extra?: string[]; hooks?: unknown; actions?: boolean } = {},
+): Promise<NotifyReport> {
+  const statusPath = resolve(WORK, `notify-${name}-status.json`);
+  const reportPath = resolve(WORK, `notify-${name}.json`);
+  writeFileSync(statusPath, JSON.stringify(status));
+  const env = childEnv();
+  delete env.GITHUB_ACTIONS;
+  env.STATUS_WEBHOOKS = JSON.stringify(options.hooks ?? HOOKS);
+  if (options.actions) env.GITHUB_ACTIONS = "true";
+  try {
+    const result = await run(
+      "bun",
+      [
+        resolve(APP, "scripts/notify.ts"),
+        "--status",
+        statusPath,
+        "--state",
+        NOTIFY_STATE,
+        "--report",
+        reportPath,
+        "--summary",
+        NOTIFY_SUMMARY,
+        "--now",
+        now,
+        ...(options.extra ?? []),
+      ],
+      { cwd: ROOT, env },
+    );
+    notifyOutput.push(`${result.stdout}${result.stderr}`);
+  } catch (error) {
+    notifyOutput.push(childOutput(error));
+    throw error;
+  }
+  return readJson<NotifyReport>(reportPath);
+}
+const notifyState = () => readJson<NotifyStateJson>(NOTIFY_STATE);
+const take = () => {
+  const list = received;
+  received = [];
+  return list;
+};
+const bySubscription = (list: Received[]) => {
+  const groups: Record<string, string[]> = {};
+  for (const item of list) {
+    groups[item.subscription] = [...(groups[item.subscription] ?? []), item.headers["x-openbot-event"] ?? ""];
+  }
+  return groups;
+};
+
+/** Checks the signature as a receiver must: HMAC-SHA256 of `<timestamp>.<delivery>.<body>`, in constant time. */
+function verify(item: Received, secret: string) {
+  const timestamp = item.headers["x-openbot-timestamp"] ?? "";
+  assert.ok(Math.abs(Date.now() / 1000 - Number(timestamp)) < 300, "The timestamp is not the send time.");
+  const expected = Buffer.from(
+    `sha256=${createHmac("sha256", secret)
+      .update(`${timestamp}.${item.headers["x-openbot-delivery-id"] ?? ""}.${item.body}`)
+      .digest("hex")}`,
+  );
+  const actual = Buffer.from(item.headers["x-openbot-signature"] ?? "");
+  assert.ok(
+    actual.length === expected.length && timingSafeEqual(actual, expected),
+    `Bad signature for ${item.subscription}.`,
+  );
+}
+
+const STATUS_A = statusFile("2026-10-16T10:40:00Z", [], [maintenance(), links([investigating])]);
+const STATUS_B = statusFile(
+  "2026-10-16T12:05:00Z",
+  ["marketplace"],
+  [signIn, maintenance(), links([identified, investigating])],
+);
+
+// No state and no --bootstrap must stop: it would send every current event again.
+await assert.rejects(notify("no-state", STATUS_A, "2026-10-16T10:41:00Z"), "A run without state must fail.");
+assert.equal(existsSync(NOTIFY_STATE), false, "A failed run wrote a state file.");
+
+// A bad secret stops the run and names the field, not the value.
+const badUrl = `http://example.com/hook/${RECEIVER_TOKEN}`;
+for (const [label, hooks] of [
+  ["http", [{ id: "team", url: badUrl, secret: SECRETS.team }]],
+  ["short secret", [{ id: "team", url: hookUrl("team"), secret: RECEIVER_TOKEN.slice(0, 20) }]],
+  ["unknown field", [{ id: "team", url: hookUrl("team"), secret: SECRETS.team, pause: true }]],
+  ["duplicate", [HOOKS[0], HOOKS[0]]],
+] as const) {
+  await assert.rejects(
+    notify(`bad-${label.replace(" ", "-")}`, STATUS_A, "2026-10-16T10:41:00Z", { hooks, extra: ["--bootstrap"] }),
+    `STATUS_WEBHOOKS with ${label} must fail.`,
+  );
+}
+assert.equal(existsSync(NOTIFY_STATE), false);
+
+let notified = await notify("bootstrap", STATUS_A, "2026-10-16T10:41:00Z", { extra: ["--bootstrap"] });
+assert.deepEqual(take(), [], "The bootstrap run sent an event.");
+assert.deepEqual(notified.queued, []);
+assert.deepEqual(Object.keys(notifyState().seen).sort(), [
+  "incident.created:201",
+  "incident.updated:201:2026-10-16T10:30:00Z:investigating",
+  "maintenance.scheduled:202",
+  "maintenance.updated:202:2026-10-15T08:00:00Z:scheduled",
+]);
+await assert.rejects(
+  notify("bootstrap-again", STATUS_A, "2026-10-16T10:42:00Z", { extra: ["--bootstrap"] }),
+  "--bootstrap with a state file must fail.",
+);
+
+// New update on 201, new incident 203, maintenance 202 starts, Marketplace goes down.
+notified = await notify("events", STATUS_B, "2026-10-16T12:05:30Z");
+assert.deepEqual(
+  notified.found.filter((id) => !id.startsWith("incident.created:201") && !id.startsWith("maintenance.scheduled")),
+  [
+    `incident.updated:201:${investigating.at}:investigating`,
+    `incident.updated:201:${identified.at}:identified`,
+    `maintenance.updated:202:${scheduled.at}:scheduled`,
+    "maintenance.started:202",
+    "incident.created:203",
+    // Its first update is in incident.created, so it is not sent alone.
+    "incident.updated:203:2026-10-16T12:01:00Z:investigating",
+    "service.changed:marketplace:2026-10-16T12:05:00Z",
+  ],
+);
+let got = take();
+assert.deepEqual(bySubscription(got), {
+  team: ["incident.updated", "maintenance.started", "incident.created"],
+  ops: ["service.changed"],
+  slack: ["incident.created"],
+  discord: ["incident.updated", "maintenance.started", "incident.created"],
+  flaky: ["incident.created"],
+  dead: ["incident.created"],
+  redirect: ["incident.created"],
+});
+for (const item of got.filter((entry) => entry.subscription === "team" || entry.subscription === "ops")) {
+  verify(item, item.subscription === "team" ? SECRETS.team : SECRETS.ops);
+  const body = JSON.parse(item.body);
+  assert.equal(body.version, 1);
+  assert.equal(body.type, item.headers["x-openbot-event"]);
+  assert.equal(body.page, "https://status.openbot.run");
+  assert.match(item.headers["x-openbot-delivery-id"] ?? "", /^[0-9a-f]{32}$/);
+}
+const created = JSON.parse(
+  got.find((item) => item.subscription === "team" && item.headers["x-openbot-event"] === "incident.created")?.body ??
+    "{}",
+);
+assert.deepEqual(
+  { id: created.incident.id, services: created.incident.services, update: created.incident.update.stage },
+  {
+    id: 203,
+    services: [
+      { id: "accounts", name: "Accounts and sign-in" },
+      { id: "hosted", name: "Hosted servers" },
+    ],
+    update: "investigating",
+  },
+);
+const changed = JSON.parse(got.find((item) => item.subscription === "ops")?.body ?? "{}");
+assert.deepEqual(changed.service, {
+  id: "marketplace",
+  name: "Marketplace",
+  previous: "ok",
+  current: "down",
+  checkedAt: "2026-10-16T12:05:00Z",
+});
+const slack = got.find((item) => item.subscription === "slack");
+assert.equal(slack?.headers["x-openbot-signature"], undefined, "A chat subscription without a secret got a signature.");
+const slackText = JSON.parse(slack?.body ?? "{}").text;
+assert.match(slackText, /^\*New incident: Sign-in fails\*/);
+assert.match(slackText, /&lt;some&gt; users &amp; @everyone/, "Slack text is not escaped.");
+assert.match(slackText, /<https:\/\/github\.com\/nightly-labs\/openbot\/issues\/203\|Open>$/);
+const discord = JSON.parse(got.filter((item) => item.subscription === "discord").at(-1)?.body ?? "{}");
+assert.deepEqual(discord.allowed_mentions, { parse: [] }, "A Discord message can notify @everyone.");
+assert.match(
+  discord.content,
+  /^\*\*New incident: Sign-in fails\*\*\nMajor outage: Accounts and sign-in, Hosted servers\n/,
+);
+const deliveryIds = got.map((item) => item.headers["x-openbot-delivery-id"]);
+assert.equal(new Set(deliveryIds).size, deliveryIds.length, "Two deliveries have the same ID.");
+assert.deepEqual(
+  notifyState().outbox.map((item) => [item.subscription, item.attempts, item.nextAt]),
+  [
+    ["flaky", 1, "2026-10-16T12:10:30.000Z"],
+    ["dead", 1, "2026-10-16T12:10:30.000Z"],
+    ["redirect", 1, "2026-10-16T12:10:30.000Z"],
+  ],
+  "A failed delivery waits 5 minutes. A redirect is a failure.",
+);
+
+// The same status again, and an older one from an issue event: no new event, no early retry.
+notified = await notify("repeat", STATUS_B, "2026-10-16T12:06:00Z");
+assert.deepEqual(take(), []);
+assert.deepEqual(notified.queued, []);
+notified = await notify("older", statusFile("2026-10-16T11:00:00Z", [], STATUS_B.incidents), "2026-10-16T12:07:00Z");
+assert.deepEqual(take(), [], "An older status.json sent a service change.");
+assert.equal(notifyState().checkedAt, "2026-10-16T12:05:00Z");
+
+// A removed subscription loses its waiting deliveries. Then the retries run to their end.
+const hooksLeft = HOOKS.filter((hook) => hook.id !== "redirect");
+notified = await notify("removed", STATUS_B, "2026-10-16T12:08:00Z", { hooks: hooksLeft });
+assert.deepEqual(
+  notified.dropped.map((item) => [item.subscription, item.reason]),
+  [["redirect", "The subscription is paused or removed."]],
+);
+const tries: { now: string; sent: string[] }[] = [];
+for (let round = 0; notifyState().outbox.length > 0; round++) {
+  assert.ok(round < 10, "The retries do not end.");
+  const now = notifyState()
+    .outbox.map((item) => item.nextAt)
+    .sort()[0];
+  assert.ok(now);
+  notified = await notify(`retry-${round}`, STATUS_B, now, { hooks: hooksLeft });
+  tries.push({
+    now,
+    sent: notified.sent.map((item) => `${item.subscription} ${item.attempt} ${item.ok ? "ok" : item.reason}`),
+  });
+}
+const retried = bySubscription(take());
+assert.equal(retried.flaky?.length, 2, "flaky is delivered on its third try.");
+assert.equal(retried.dead?.length, 7, "dead is tried 8 times in total.");
+// The retry clock passes the end of the maintenance window (12:30), so it completes here. A redirect
+// to team would add incident.created.
+assert.deepEqual(retried.team, ["maintenance.completed"], "A redirect reached another subscription.");
+assert.deepEqual(retried.discord, ["maintenance.completed"]);
+assert.deepEqual(
+  tries.map((item) => item.now),
+  [
+    "2026-10-16T12:10:30.000Z",
+    "2026-10-16T12:20:30.000Z",
+    "2026-10-16T12:40:30.000Z",
+    "2026-10-16T13:20:30.000Z",
+    "2026-10-16T14:40:30.000Z",
+    "2026-10-16T17:20:30.000Z",
+    "2026-10-16T22:40:30.000Z",
+  ],
+  "The waits are 5, 10, 20, 40, 80, 160 and 320 minutes.",
+);
+assert.deepEqual(
+  notified.dropped.map((item) => [item.subscription, item.reason]),
+  [["dead", "Failed after 8 tries: HTTP 500"]],
+);
+assert.match(readFileSync(NOTIFY_SUMMARY, "utf8"), /\| dead \| incident\.created \| 8 \| HTTP 500\. No more tries \|/);
+
+// 201 is resolved, 202 is complete and Marketplace is back.
+const STATUS_C = statusFile(
+  "2026-10-17T00:00:00Z",
+  [],
+  [
+    signIn,
+    maintenance(),
+    links(
+      [
+        { at: "2026-10-16T13:00:00Z", stage: "resolved", body: "This incident is resolved." },
+        identified,
+        investigating,
+      ],
+      "2026-10-16T13:00:00Z",
+    ),
+  ],
+);
+notified = await notify("end", STATUS_C, "2026-10-17T00:00:30Z", { hooks: hooksLeft });
+got = take();
+assert.deepEqual(bySubscription(got), {
+  team: ["incident.resolved"],
+  ops: ["incident.resolved", "service.changed"],
+  discord: ["incident.resolved"],
+});
+const resolved = JSON.parse(
+  got.find((item) => item.subscription === "team" && item.headers["x-openbot-event"] === "incident.resolved")?.body ??
+    "{}",
+);
+assert.equal(resolved.incident.update.stage, "resolved", "The resolved event does not carry the final update.");
+
+// The test event goes to each active subscription, with or without a filter.
+notified = await notify("test", STATUS_C, "2026-10-17T00:01:00Z", { hooks: hooksLeft, extra: ["--test"] });
+got = take();
+assert.deepEqual(Object.keys(bySubscription(got)).sort(), ["dead", "discord", "flaky", "ops", "slack", "team"]);
+assert.ok(got.every((item) => item.headers["x-openbot-event"] === "test"));
+const teamTest = got.find((item) => item.subscription === "team");
+assert.ok(teamTest);
+verify(teamTest, SECRETS.team);
+assert.ok(!Object.keys(notifyState().seen).some((id) => id.startsWith("test:")), "A test event is in the seen list.");
+
+// In GitHub Actions the script masks each URL and secret before anything else.
+await notify("actions", STATUS_C, "2026-10-17T00:02:00Z", { hooks: hooksLeft, actions: true });
+const actionsOutput = notifyOutput.pop() ?? "";
+const masks = actionsOutput.split("\n").filter((line) => line.startsWith("::add-mask::"));
+for (const value of [...Object.values(SECRETS).filter((value) => value !== SECRETS.redirect), RECEIVER_TOKEN]) {
+  assert.ok(
+    masks.some((line) => line.includes(value)),
+    "A secret is not masked in GitHub Actions.",
+  );
+}
+assert.ok(
+  actionsOutput
+    .split("\n")
+    .every((line) => line.startsWith("::add-mask::") || !leakValues.some((value) => line.includes(value))),
+  "A secret is in the GitHub Actions log outside an add-mask command.",
+);
+// An incident that opens again sends no old "Resolved" update. An open incident that leaves the page
+// (closed as not planned) and a maintenance that is closed before its start send one event, after 2
+// runs without them. The first update of an incident that opened with none is sent when it comes.
+const resolvedUpdate = { at: "2026-10-16T13:00:00Z", stage: "resolved", body: "This incident is resolved." };
+const reopened = links([resolvedUpdate, identified, investigating]);
+const later = incident({
+  id: 204,
+  title: "Accounts database upgrade",
+  kind: "maintenance",
+  impact: "maintenance",
+  components: ["accounts"],
+  startedAt: "2026-10-20T12:00:00Z",
+  resolvedAt: "2026-10-20T13:00:00Z",
+  updates: [],
+});
+const empty = (updates: UpdateFixture[]) =>
+  incident({ id: 205, title: "Slow downloads", components: ["updates"], startedAt: "2026-10-17T00:02:30Z", updates });
+const slowNote = { at: "2026-10-17T00:03:30Z", stage: "identified", body: "A slow mirror." };
+const sortedEvents = (list: Received[]) => {
+  const groups = bySubscription(list);
+  return { team: [...(groups.team ?? [])].sort(), discord: [...(groups.discord ?? [])].sort(), ops: groups.ops };
+};
+
+notified = await notify(
+  "reopen",
+  statusFile("2026-10-17T00:03:00Z", [], [empty([]), later, reopened, maintenance()]),
+  "2026-10-17T00:03:00Z",
+  {
+    hooks: hooksLeft,
+  },
+);
+assert.deepEqual(sortedEvents(take()), {
+  team: ["incident.created", "maintenance.scheduled"],
+  discord: ["incident.created", "maintenance.scheduled"],
+  ops: undefined,
+});
+const withNote = [empty([slowNote]), later, reopened, maintenance()];
+notified = await notify("removed-incident", statusFile("2026-10-17T00:04:00Z", [], withNote), "2026-10-17T00:04:00Z", {
+  hooks: hooksLeft,
+});
+got = take();
+assert.deepEqual(sortedEvents(got), {
+  team: ["incident.removed", "incident.updated"],
+  discord: ["incident.removed", "incident.updated"],
+  ops: undefined,
+});
+const removed = JSON.parse(
+  got.find((item) => item.subscription === "team" && item.headers["x-openbot-event"] === "incident.removed")?.body ??
+    "{}",
+);
+assert.equal(removed.incident.id, 203);
+assert.equal(removed.incident.title, "Sign-in fails");
+const withoutLater = [empty([slowNote]), reopened, maintenance()];
+await notify("cancel-1", statusFile("2026-10-17T00:05:00Z", [], withoutLater), "2026-10-17T00:05:00Z", {
+  hooks: hooksLeft,
+});
+assert.deepEqual(take(), [], "A maintenance that is missing for one run is cancelled.");
+await notify("cancel-2", statusFile("2026-10-17T00:05:30Z", [], withoutLater), "2026-10-17T00:05:30Z", {
+  hooks: hooksLeft,
+});
+assert.deepEqual(sortedEvents(take()), {
+  team: ["maintenance.cancelled"],
+  discord: ["maintenance.cancelled"],
+  ops: undefined,
+});
+assert.deepEqual(Object.keys(notifyState().open).sort(), ["201", "205"]);
+receiver.close();
+
+const scanned = [
+  ...notifyOutput,
+  readFileSync(NOTIFY_STATE, "utf8"),
+  readFileSync(NOTIFY_SUMMARY, "utf8"),
+  ...tries.map((item) => JSON.stringify(item)),
+];
+for (const text of scanned) {
+  for (const value of leakValues) assert.equal(text.includes(value), false, "A URL token or secret is in the output.");
+}
+const webhooks = { tries, summary: readFileSync(NOTIFY_SUMMARY, "utf8") };
+writeFileSync(resolve(OUT, "webhook-summary.md"), webhooks.summary);
+logger.info("Status webhooks: passed.");
+
+// 3. One read-only run against the live services ----------------------------------------
 
 let live: RunReport["outcomes"] | null = null;
 if (!skipLive) {
@@ -362,7 +894,7 @@ if (!skipLive) {
   }
 }
 
-// 3. The built page in Chrome ---------------------------------------------------------
+// 4. The built page in Chrome ---------------------------------------------------------
 
 await run("bun", ["run", "build"], { cwd: APP });
 const PAGES = resolve(WORK, "pages");
@@ -479,5 +1011,8 @@ try {
   pageServer.close();
 }
 
-writeFileSync(resolve(OUT, "report.json"), `${JSON.stringify({ passed: true, steps, live, views }, null, 2)}\n`);
+writeFileSync(
+  resolve(OUT, "report.json"),
+  `${JSON.stringify({ passed: true, steps, webhooks, live, views }, null, 2)}\n`,
+);
 logger.info(`Passed. Report: ${resolve(OUT, "report.json")}`);

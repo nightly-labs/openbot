@@ -103,12 +103,14 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
       <SettingsSection title={i18n.t("settings.notch.title")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
+            data-settings-row="settings.notch.show.title"
             checked={props.value.macBookNotch}
             onChange={(checked) => props.onUpdateSetting("macBookNotch", checked)}
             label={i18n.t("settings.notch.show.title")}
             description={i18n.t("settings.notch.show.description")}
           />
           <SwitchField
+            data-settings-row="settings.notch.idle.title"
             checked={props.value.macBookNotchIdle}
             disabled={!props.value.macBookNotch}
             onChange={(checked) => props.onUpdateSetting("macBookNotchIdle", checked)}
@@ -116,6 +118,7 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
             description={i18n.t("settings.notch.idle.description")}
           />
           <SwitchField
+            data-settings-row="settings.notch.displays.title"
             checked={props.value.macBookNotchAdditionalDisplays}
             disabled={!props.value.macBookNotch}
             onChange={(checked) => props.onUpdateSetting("macBookNotchAdditionalDisplays", checked)}
@@ -123,6 +126,7 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
             description={i18n.t("settings.notch.displays.description")}
           />
           <SwitchField
+            data-settings-row="settings.notch.haptics.title"
             checked={props.value.macBookNotchHaptics}
             disabled={!props.value.macBookNotch}
             onChange={(checked) => props.onUpdateSetting("macBookNotchHaptics", checked)}
@@ -133,6 +137,7 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
       </SettingsSection>
 
       <SettingsSection
+        data-settings-row="settings.notch.servers.title"
         title={i18n.t("settings.notch.servers.title")}
         description={i18n.t("settings.notch.servers.description")}
       >
@@ -157,6 +162,7 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
       </SettingsSection>
 
       <SettingsSection
+        data-settings-row="settings.notch.size.title"
         title={i18n.t("settings.notch.size.title")}
         description={i18n.t("settings.notch.size.description")}
         actions={

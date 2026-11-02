@@ -10,10 +10,9 @@ import {
   requestHostedServerService,
   requestHostedSiteService,
   requestRemoteControlPlane,
-  requestRemoteSignalUrl,
-  requestSourceIp,
   requestTeamInviteEmailDelivery,
 } from "../../../server/request-auth";
+import { requestSourceIp } from "../../../server/source-ip";
 
 function handle({ request }: { request: Request }) {
   return handleBrowserApi(request, {
@@ -26,7 +25,6 @@ function handle({ request }: { request: Request }) {
     billing: requestBillingService,
     avatarBucket: requestAvatarBucket,
     hostedSites: requestHostedSiteService,
-    signalUrl: requestRemoteSignalUrl,
     sourceIp: requestSourceIp,
     errorResponse: hostedServerErrorResponse,
   });

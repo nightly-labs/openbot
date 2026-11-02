@@ -306,35 +306,6 @@
   gap: var(--openbot-space-3);
 }
 
-.chat-primitives-stage-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--openbot-space-3);
-  border-bottom: 1px solid var(--openbot-border);
-  padding-bottom: var(--openbot-space-4);
-}
-
-.chat-primitives-stage-header > div {
-  display: grid;
-  gap: 2px;
-}
-
-.chat-primitives-live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-success);
-  box-shadow: 0 0 0 4px var(--openbot-success-soft);
-}
-
-.chat-primitives-thread {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-
 .chat-prototype-message.message-entry {
   margin: 0;
 }
@@ -350,10 +321,6 @@
   color: inherit;
   cursor: pointer;
   font: inherit;
-}
-
-.chat-prototype-rich-message .ui-message-content {
-  max-width: 100%;
 }
 
 .chat-primitives-gallery {
@@ -379,18 +346,6 @@
   color: var(--openbot-text-secondary);
 }
 
-.routine-event-context-grid {
-  width: min(1200px, 100%);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
-  align-items: start;
-  gap: var(--openbot-space-6);
-}
-
-.routine-event-context-grid .chat-primitives-stage {
-  width: 100%;
-}
-
 .question-prompt-story-stage {
   min-height: 100vh;
   display: grid;
@@ -405,91 +360,11 @@
   max-width: 100%;
 }
 
-.question-prompt-story-stage:has(.question-prompt-chat-preview) {
-  display: block;
-  padding: 0;
-}
-
-.question-prompt-chat-preview {
-  width: 100%;
-  height: 100vh;
-  min-height: 560px;
-  color: var(--openbot-text-primary);
-}
-
-.question-prompt-chat-preview .conversation-title .bot-avatar {
-  width: 22px;
-  height: 22px;
-}
-
-.question-prompt-chat-model.provider-model-trigger {
-  height: 26px;
-  padding-inline: var(--openbot-space-2);
-}
-
-.question-prompt-chat-model svg {
-  width: var(--openbot-icon-xs);
-  height: var(--openbot-icon-xs);
-}
-
-.question-prompt-chat-thread {
-  width: min(760px, 100%);
-  margin: 0 auto;
-}
-
-.question-prompt-chat-question > .ui-message-content {
-  gap: var(--openbot-space-1);
-}
-
-.question-prompt-chat-composer-wrap {
-  width: min(784px, 100%);
-  align-self: center;
-}
-
-.question-prompt-chat-composer-wrap .ui-textarea {
-  width: 100%;
-  min-height: 28px;
-  resize: none;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  padding: 4px 0;
-  box-shadow: none;
-  color: var(--openbot-text-primary);
-  font: inherit;
-  font-size: var(--openbot-text-md);
-  line-height: 20px;
-}
-
-.question-prompt-chat-composer-wrap .ui-textarea::placeholder {
-  color: var(--openbot-text-muted);
-}
-
-.question-prompt-chat-composer-wrap .ui-textarea:focus {
-  border: 0;
-  outline: 0;
-  box-shadow: none;
-}
-
-.question-prompt-chat-composer-wrap .composer-button svg,
-.question-prompt-chat-composer-wrap .voice-button svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-}
-
 @media (max-width: 720px) {
   .chat-primitives-stage,
   .chat-primitives-gallery,
   .question-prompt-story-stage {
     padding: var(--openbot-space-4);
-  }
-
-  .routine-event-context-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .question-prompt-story-stage:has(.question-prompt-chat-preview) {
-    padding: 0;
   }
 }
 

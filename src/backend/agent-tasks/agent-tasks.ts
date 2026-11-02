@@ -1,26 +1,37 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
+import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_TASK_QUEUED_PREVIEW,
   type AgentEvent,
   type AgentSummary,
   type AgentTask,
+  type AgentTaskBranch,
   type AgentTaskHold,
   type AgentTasksSnapshot,
+  type AttachmentSummary,
   agentTaskLimit,
+  type BranchAgentTaskInput,
+  type ConversationMessage,
   type ConversationSnapshot,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect } from "effect";
+import { Deferred, Effect, Schema, Semaphore } from "effect";
 import { z } from "zod";
 import type { ConversationRuntime } from "../agent/conversation-runtime";
 import type { TaskLanes } from "../agent/drain-scheduler";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
+import {
+  type AgentThreadOrigin,
+  type AgentThreadRecord,
+  type AgentThreadStore,
+  copyBranchMessages,
+} from "../agent-threads/agent-thread-store";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
-import type { AgentTaskOrigin, AgentTaskRecord, AgentTaskStore } from "./agent-task-store";
+import { storedSync } from "../stored-state-effects";
 
 const logger = createOpenBotLogger("agent-tasks");
 
@@ -51,8 +62,20 @@ export interface AgentTaskCaller {
   inExecutionThread: boolean;
 }
 
+/** Why a branch was not made. The cause holds the localized message for the person. */
+export class AgentTaskBranchFailed extends Schema.TaggedError<AgentTaskBranchFailed>()("AgentTaskBranchFailed", {
+  reason: Schema.Literals(["source-not-found", "source-busy", "message-not-found", "thread-limit", "storage"]),
+  cause: Schema.Defect(),
+}) {}
+
+type BranchFailure = AgentTaskBranchFailed["reason"];
+
+function branchStep<A>(reason: BranchFailure, run: () => A): Effect.Effect<A, AgentTaskBranchFailed> {
+  return Effect.try({ try: run, catch: (cause) => new AgentTaskBranchFailed({ reason, cause }) });
+}
+
 export interface AgentTasksOptions {
-  store: AgentTaskStore;
+  store: AgentThreadStore;
   mailbox: MailboxStore;
   conversation: ConversationRuntime;
   hooks: AgentTasksHooks;
@@ -66,7 +89,7 @@ export interface AgentTasksOptions {
  * It never imports the agent service facade.
  */
 export class AgentTasks implements TaskLanes {
-  readonly #store: AgentTaskStore;
+  readonly #store: AgentThreadStore;
   readonly #mailbox: MailboxStore;
   readonly #conversation: ConversationRuntime;
   readonly #hooks: AgentTasksHooks;
@@ -74,6 +97,10 @@ export class AgentTasks implements TaskLanes {
   readonly #progress = new Map<string, string>();
   /** The last turn of each task that the user stopped, by task id. */
   readonly #stoppedTurns = new Map<string, string>();
+  /** Who waits for the running turn of a task to end, by task id. */
+  readonly #turnEndWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
+  /** One branch is made at a time, so a retry that arrives during the first call finds its branch. */
+  readonly #branches = Semaphore.makeUnsafe(1);
 
   constructor(options: AgentTasksOptions) {
     this.#store = options.store;
@@ -121,66 +148,207 @@ export class AgentTasks implements TaskLanes {
   /** The task's conversation. Its thread loads here, also for a task that no turn has used since boot. */
   read(agentId: string, taskId: string): ConversationSnapshot {
     const task = this.#store.task(taskId);
-    if (!task || task.agentId !== agentId) throw new Error(sourceText("error.backend.taskNotFound"));
+    if (!task || task.agentId !== agentId) throw new Error(sourceText("error.backend.threadNotFound"));
     this.#conversation.registerTaskThread(agentId, task.threadId);
     return this.#conversation.ensureSnapshot(agentId, task.threadId);
   }
 
   /** The open task of this agent, ready for a message. */
-  requireOpen(agentId: string, taskId: string): AgentTaskRecord {
+  requireOpen(agentId: string, taskId: string): AgentThreadRecord {
     const task = this.#store.task(taskId);
-    if (!task || task.agentId !== agentId) throw new Error(sourceText("error.backend.taskNotFound"));
-    if (task.closedAt !== null) throw new Error(sourceText("error.backend.taskClosed"));
+    if (!task || task.agentId !== agentId) throw new Error(sourceText("error.backend.threadNotFound"));
+    if (task.closedAt !== null) throw new Error(sourceText("error.backend.threadArchived"));
     this.#conversation.registerTaskThread(agentId, task.threadId);
     return task;
   }
 
   /** A task of this agent, open or closed. */
-  require(agentId: string, taskId: string): AgentTaskRecord {
+  require(agentId: string, taskId: string): AgentThreadRecord {
     const task = this.#store.task(taskId);
-    if (!task || task.agentId !== agentId) throw new Error(sourceText("error.backend.taskNotFound"));
+    if (!task || task.agentId !== agentId) throw new Error(sourceText("error.backend.threadNotFound"));
     return task;
   }
 
   /** The title is the first line of the message that starts the task. */
-  create(agentId: string, text: string, origin: AgentTaskOrigin): AgentTaskRecord {
+  create(agentId: string, text: string, origin: AgentThreadOrigin): AgentThreadRecord {
     const title = taskTitle(text);
-    if (!title) throw new Error(sourceText("error.backend.taskTitleRequired"));
+    if (!title) throw new Error(sourceText("error.backend.threadTitleRequired"));
     this.#requireRoom(agentId);
-    const task = this.#store.create({ agentId, origin, title });
+    const task = this.#store.create({ agentId, origin, title, titleSource: origin === "agent" ? "agent" : "auto" });
     this.#conversation.registerTaskThread(agentId, task.threadId);
     return task;
+  }
+
+  /**
+   * Makes a branch: a new side thread with a copy of a conversation of the agent, through the turn of
+   * the chosen message. The files of the copied messages are copied as files of the branch, so they
+   * stay when the source is deleted. No turn starts. A retry with the same request id returns the
+   * branch that the first call made, also with no new copies of the files.
+   */
+  branch(input: BranchAgentTaskInput): Effect.Effect<AgentThreadRecord, AgentTaskBranchFailed> {
+    return this.#branches.withPermit(this.#branch(input));
+  }
+
+  readonly #branch = Effect.fn("AgentTasks.branch")(function* (
+    this: AgentTasks,
+    input: BranchAgentTaskInput,
+  ): Effect.fn.Return<AgentThreadRecord, AgentTaskBranchFailed> {
+    const earlier = this.#store.branchFor(input.agentId, input.requestId);
+    if (earlier) {
+      this.#conversation.registerTaskThread(earlier.agentId, earlier.threadId);
+      return earlier;
+    }
+    const source = yield* branchStep("source-not-found", () => this.#branchSource(input));
+    yield* branchStep("source-busy", () => {
+      if (source.running) throw new Error(sourceText("error.backend.branchSourceBusy"));
+    });
+    yield* branchStep("thread-limit", () => this.#requireRoom(input.agentId));
+    const messages = yield* branchStep("message-not-found", () => {
+      const rows = this.#store.branchSource(source.threadId, input.messageId);
+      if (!rows) throw new Error(sourceText("error.backend.branchMessageNotFound"));
+      return rows;
+    });
+    const title =
+      source.title === null
+        ? taskTitle(messages.findLast((message) => message.author === "user")?.text ?? "") ||
+          sourceText("status.agent.branchTitle")
+        : branchTitle(source.title, this.#store.titles(input.agentId));
+    const threadId = `openbot-thread-${randomUUID()}`;
+    const staged: string[] = [];
+    const record = yield* Effect.gen({ self: this }, function* () {
+      const files = new Map<string, AttachmentSummary>();
+      for (const attachment of branchFiles(messages)) {
+        if (files.has(attachment.id)) continue;
+        // A file that is gone keeps its card as it is in the source.
+        const file = yield* this.#mailbox.resolveAttachment(attachment.id);
+        if (!file) continue;
+        const copy = yield* this.#mailbox.stageGeneratedCopy({
+          sourcePath: file.path,
+          name: file.name,
+          mimeType: file.mimeType,
+          ownerAgentId: input.agentId,
+          ownerThreadId: threadId,
+        });
+        staged.push(copy.id);
+        files.set(attachment.id, copy);
+      }
+      return yield* branchStep("storage", () =>
+        this.#mailbox.persistGeneratedAttachmentsWith(staged, "attachment.branch-copied", () =>
+          this.#store.branch({
+            agentId: input.agentId,
+            requestId: input.requestId,
+            threadId,
+            title,
+            sourceThreadId: source.threadId,
+            sourceMessageId: input.messageId,
+            messages: copyBranchMessages(messages, files),
+          }),
+        ),
+      );
+    }).pipe(
+      Effect.mapError((failure) =>
+        failure instanceof AgentTaskBranchFailed
+          ? failure
+          : new AgentTaskBranchFailed({ reason: "storage", cause: failure.cause }),
+      ),
+      // Copies that no committed branch names are removed.
+      Effect.onError(() => this.#mailbox.discardStagedGeneratedAttachments(staged).pipe(Effect.ignore)),
+    );
+    this.#conversation.registerTaskThread(record.agentId, record.threadId);
+    return record;
+  });
+
+  /** The thread that a branch copies, its title for a side thread, and whether a turn runs in it. */
+  #branchSource(input: BranchAgentTaskInput): { threadId: string; title: string | null; running: boolean } {
+    if (input.taskId === null) {
+      const threadId = this.#hooks.agent(input.agentId)?.threadId;
+      if (!threadId) throw new Error(sourceText("error.backend.threadNotFound"));
+      const chat = this.#conversation.loadedSnapshot(input.agentId);
+      return {
+        threadId,
+        title: null,
+        running: chat?.threadId === threadId && chat.activeTurnId !== null,
+      };
+    }
+    const task = this.require(input.agentId, input.taskId);
+    return {
+      threadId: task.threadId,
+      // The " #N" of a branch title came from a branch. A title that a person wrote keeps its number.
+      title: task.branch && task.titleSource === "auto" ? task.title.replace(/ #\d+$/, "") : task.title,
+      running:
+        Boolean(this.#conversation.loadedExecutionSnapshot(task.threadId)?.activeTurnId) ||
+        this.#mailbox.laneActive(task.agentId, task.taskId),
+    };
   }
 
   /** The task list holds `INPUT_LIMITS.agentTasks` tasks, open ones first, so more open tasks could not be seen or stopped. */
   #requireRoom(agentId: string): void {
     if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks)
-      throw new Error(sourceText("error.backend.taskOpenLimitReached", { count: INPUT_LIMITS.agentTasks }));
+      throw new Error(sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks }));
   }
 
   /** Removes a new task that took no message, because the move into it was refused. */
-  discard(task: AgentTaskRecord): void {
+  discard(task: AgentThreadRecord): void {
     this.#conversation.forgetExecutionThread(task.threadId);
-    this.#store.discard(task.taskId);
+    this.#store.delete(task.taskId);
+  }
+
+  /** A rename by a person: trimmed, and kept when later messages arrive. */
+  rename(task: AgentThreadRecord, title: string): void {
+    const trimmed = title.trim();
+    if (!trimmed || trimmed.length > INPUT_LIMITS.agentTaskTitle)
+      throw new Error(sourceText("error.backend.threadTitleRequired"));
+    this.#store.rename(task.threadId, trimmed);
+    this.changed(task.agentId);
+  }
+
+  /**
+   * Removes the thread with its conversation. The caller stops its turn, cancels its queued messages
+   * and releases its provider sessions first.
+   */
+  delete(task: AgentThreadRecord): void {
+    this.#progress.delete(task.taskId);
+    this.#stoppedTurns.delete(task.taskId);
+    this.#turnEndWaiters.delete(task.taskId);
+    this.#store.delete(task.taskId);
+    this.changed(task.agentId);
   }
 
   /** The task as the task list shows it. */
-  publicTask(task: AgentTaskRecord): AgentTask {
+  publicTask(task: AgentThreadRecord): AgentTask {
     return this.#publicTask(task);
   }
 
-  close(task: AgentTaskRecord): void {
+  close(task: AgentThreadRecord): void {
     this.#store.close(task.taskId);
     this.#progress.delete(task.taskId);
     this.#stoppedTurns.delete(task.taskId);
     this.changed(task.agentId);
   }
 
-  reopen(task: AgentTaskRecord): void {
+  reopen(task: AgentThreadRecord): void {
     if (task.closedAt !== null) this.#requireRoom(task.agentId);
     this.#store.reopen(task.taskId);
     this.#conversation.registerTaskThread(task.agentId, task.threadId);
     this.changed(task.agentId);
+  }
+
+  /**
+   * Ends when the next turn of this task ends. The wait starts at this call, not when the Effect runs,
+   * so a caller that sends a Stop after this call cannot miss the end.
+   */
+  turnEnd(taskId: string): Effect.Effect<void> {
+    const ended = Deferred.makeUnsafe<void>();
+    const waiters = this.#turnEndWaiters.get(taskId) ?? new Set<Deferred.Deferred<void>>();
+    this.#turnEndWaiters.set(taskId, waiters.add(ended));
+    return Deferred.await(ended).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          waiters.delete(ended);
+          if (waiters.size === 0 && this.#turnEndWaiters.get(taskId) === waiters) this.#turnEndWaiters.delete(taskId);
+        }),
+      ),
+    );
   }
 
   /** The turn that a Stop asked to end: a message sent to the task does not steer into it. */
@@ -197,10 +365,47 @@ export class AgentTasks implements TaskLanes {
     return this.#store.executionThreads();
   }
 
-  /** The thread of the task that a delivery runs in, or null for the agent's own chat. */
+  /** The agent id and thread id of every open task, the newest first. */
+  openExecutionThreads(): Array<{ id: string; threadId: string }> {
+    return this.#store.openExecutionThreads();
+  }
+
+  /**
+   * The thread of the task that a delivery runs in, also when the task is archived, or null for the
+   * agent's own chat. Work of an archived task must never settle in the agent's own chat. The work of
+   * a deleted task ends at boot (`endWorkOfGoneTasks`), and a delete waits until its task is idle.
+   */
   threadForDelivery(deliveryId: string): string | null {
     const taskId = this.#mailbox.taskIdForDelivery(deliveryId);
-    return taskId ? this.threadId(taskId) : null;
+    return taskId ? (this.#store.task(taskId)?.threadId ?? null) : null;
+  }
+
+  /** Whether a delivery names a task that no longer exists. */
+  deliveryTaskGone(deliveryId: string): boolean {
+    const taskId = this.#mailbox.taskIdForDelivery(deliveryId);
+    return taskId !== null && this.#store.task(taskId) === null;
+  }
+
+  /**
+   * Ends the work of each task whose thread is gone: a queued message is cancelled, and a started one
+   * is interrupted. The rows stay. Migration 47 did not copy a task whose agent was gone, so its
+   * queued message would otherwise wait forever and keep the agent busy. Runs at boot, before the
+   * recovery reads the provider history. Returns the agents whose queue changed.
+   */
+  readonly endWorkOfGoneTasks = Effect.fn("AgentTasks.endWorkOfGoneTasks")(function* (this: AgentTasks) {
+    const agentIds = new Set<string>();
+    for (const work of this.#mailbox.unfinishedTaskDeliveries()) {
+      if (this.#store.task(work.taskId)) continue;
+      if (work.queued) yield* storedSync(() => this.#mailbox.cancelNow(work.agentId, work.deliveryId));
+      else
+        yield* this.#mailbox.markTerminal(work.deliveryId, "interrupted", sourceText("error.backend.threadNotFound"));
+      agentIds.add(work.agentId);
+    }
+    return [...agentIds];
+  });
+
+  isBranchThread(threadId: string): boolean {
+    return Boolean(this.#store.taskForThread(threadId)?.branch);
   }
 
   taskForThread(threadId: string): string | null {
@@ -278,8 +483,8 @@ export class AgentTasks implements TaskLanes {
 
   /**
    * Takes the events of task threads: they reach the task's panel, never the agent's own chat.
-   * True when the event was taken. A prompt or an approval of a task turn passes, so the user can
-   * answer it in the agent's chat.
+   * True when the event was taken. A prompt or an approval of a task turn passes. Its `threadId` is the
+   * task's thread, so the task's panel shows it and the agent's chat leaves it out.
    */
   event(event: AgentEvent): boolean {
     switch (event.type) {
@@ -320,6 +525,10 @@ export class AgentTasks implements TaskLanes {
           event.status === "completed" ? "completed" : event.status === "failed" ? "failed" : "interrupted",
         );
         this.changed(task.agentId);
+        // The waiters leave the map here, so a wait that a failed Stop never runs does not stay.
+        const waiters = this.#turnEndWaiters.get(task.taskId);
+        this.#turnEndWaiters.delete(task.taskId);
+        for (const ended of waiters ?? []) Deferred.doneUnsafe(ended, Effect.void);
         return true;
       }
       case "queue-changed":
@@ -331,19 +540,19 @@ export class AgentTasks implements TaskLanes {
     }
   }
 
-  #taskOf(threadId: string | null): AgentTaskRecord | null {
+  #taskOf(threadId: string | null): AgentThreadRecord | null {
     if (!threadId || !this.#conversation.isTaskThread(threadId)) return null;
     return this.#store.taskForThread(threadId);
   }
 
-  #publicTask(task: AgentTaskRecord): AgentTask {
+  #publicTask(task: AgentThreadRecord): AgentTask {
     const snapshot = this.#conversation.loadedExecutionSnapshot(task.threadId);
     const activeTurnId = task.closedAt === null ? (snapshot?.activeTurnId ?? null) : null;
     const queuedMessages =
       task.closedAt === null
         ? this.#mailbox.queuedTaskMessages(task.agentId, task.taskId).map((message) => ({
             deliveryId: message.deliveryId,
-            text: message.text.slice(0, AGENT_TASK_QUEUED_PREVIEW),
+            text: expandAttachmentReferences(message.text).slice(0, AGENT_TASK_QUEUED_PREVIEW),
             createdAt: message.createdAt,
           }))
         : [];
@@ -367,11 +576,54 @@ export class AgentTasks implements TaskLanes {
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
       closedAt: task.closedAt,
+      branch: this.#publicBranch(task),
+    };
+  }
+
+  /** The source is a task id, or null for the agent's own chat. A deleted source keeps its thread id. */
+  #publicBranch(task: AgentThreadRecord): AgentTaskBranch | null {
+    if (!task.branch) return null;
+    const { sourceThreadId, sourceMessageId, throughMessageId } = task.branch;
+    if (this.#hooks.agent(task.agentId)?.threadId === sourceThreadId)
+      return { sourceTaskId: null, sourceTitle: null, sourceMessageId, throughMessageId };
+    const source = this.#store.taskForThread(sourceThreadId);
+    return {
+      sourceTaskId: source?.taskId ?? sourceThreadId,
+      sourceTitle: source?.title ?? null,
+      sourceMessageId,
+      throughMessageId,
     };
   }
 }
 
-function startedTaskResult(task: AgentTaskRecord): OpenBotToolResponse {
+/** The files of the copied messages: attachments and voice recordings. */
+function branchFiles(messages: readonly ConversationMessage[]): AttachmentSummary[] {
+  return messages.flatMap((message) => [
+    ...(message.attachments ?? []),
+    ...(message.voiceRecording ? [message.voiceRecording] : []),
+  ]);
+}
+
+/** Room for " #9999" after the source title. */
+const BRANCH_NUMBER_ROOM = 6;
+
+/**
+ * The title of a branch of a side thread: the source title, then the next number after those that the
+ * agent's threads already use, from #2.
+ */
+function branchTitle(sourceTitle: string, titles: readonly string[]): string {
+  const room = INPUT_LIMITS.agentTaskTitle - BRANCH_NUMBER_ROOM;
+  const root = sourceTitle.length > room ? `${sourceTitle.slice(0, room - 1)}…` : sourceTitle;
+  const prefix = `${root} #`;
+  let last = 1;
+  for (const title of titles) {
+    const number = title.startsWith(prefix) ? title.slice(prefix.length) : "";
+    if (/^\d{1,4}$/.test(number)) last = Math.max(last, Number(number));
+  }
+  return `${prefix}${last + 1}`;
+}
+
+function startedTaskResult(task: AgentThreadRecord): OpenBotToolResponse {
   return openBotToolResult({
     taskId: task.taskId,
     title: task.title,
@@ -379,10 +631,10 @@ function startedTaskResult(task: AgentTaskRecord): OpenBotToolResponse {
   });
 }
 
-/** The first line of the text, cut to the title limit. */
+/** The first line of the text, cut to the title limit. An attachment reference shows as its file name. */
 function taskTitle(text: string): string {
   const line =
-    text
+    expandAttachmentReferences(text)
       .split("\n")
       .map((part) => part.trim())
       .find((part) => part.length > 0) ?? "";

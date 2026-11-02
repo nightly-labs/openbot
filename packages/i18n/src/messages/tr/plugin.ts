@@ -8,7 +8,6 @@ export const messages = {
   "plugin.link.terms": "Hizmet Şartları",
   "plugin.copyLink": "Bağlantıyı kopyala",
   "plugin.askPrompt": "{name} eklentisine sor: {prompt}",
-  "plugin.section.apps": "Uygulamalar",
   "plugin.section.skills": "Beceriler",
   "plugin.section.information": "Bilgiler",
   "plugin.info.developer": "Geliştirici",

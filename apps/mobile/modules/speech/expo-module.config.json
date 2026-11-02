@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["SpeechModule"]
+  },
+  "android": {
+    "modules": ["run.openbot.speech.SpeechModule"]
+  }
+}

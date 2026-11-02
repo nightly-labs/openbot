@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { BrowserBounds, BrowserEnvironment } from "@openbot/contracts/ipc";
+import { type BrowserBounds, type BrowserEnvironment, isBrowserProfileId } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { legacyAgentId } from "@openbot/contracts/validation";
 import { Effect } from "effect";
@@ -16,6 +17,55 @@ export interface StoredBrowserTab {
   ownerAgentId: string | null;
   /** Absent in a v1 file, and in a v2 file whose environment did not survive validation. */
   environment?: BrowserEnvironment;
+  /** The key of the agent session the tab opened in. Absent: the shared session. See `agentBrowserSessionKey`. */
+  agentSession?: string;
+  /**
+   * The id of the named profile the tab opened in. It comes before `agentSession`, which a profile tab
+   * also stores, so an older build opens it in a session of its own and never in the shared one.
+   */
+  profile?: string;
+}
+
+/** The persistent session of a tab other than the shared one. Fixed for the life of the tab. */
+export type BrowserTabSession = { kind: "agent"; key: string } | { kind: "profile"; profileId: string };
+
+/** The directory name of a session under `Partitions`. Its partition is `persist:` and this name. */
+export function browserTabPartition(tabSession: BrowserTabSession): string {
+  return tabSession.kind === "agent"
+    ? `openbot-browser-agent-${tabSession.key}`
+    : `openbot-browser-profile-${tabSession.profileId}`;
+}
+
+/** The session of a saved tab. Undefined: the shared session. */
+export function storedTabSession(
+  tab: Pick<StoredBrowserTab, "agentSession" | "profile">,
+): BrowserTabSession | undefined {
+  if (tab.profile !== undefined) return { kind: "profile", profileId: tab.profile };
+  return tab.agentSession === undefined ? undefined : { kind: "agent", key: tab.agentSession };
+}
+
+/** The saved fields of a tab session. A profile tab also names a session that an older build reads. */
+export function storedSessionFields(
+  tabSession: BrowserTabSession | undefined,
+): Pick<StoredBrowserTab, "agentSession" | "profile"> {
+  if (!tabSession) return {};
+  if (tabSession.kind === "agent") return { agentSession: tabSession.key };
+  return {
+    agentSession: agentBrowserSessionKey(`browser-profile:${tabSession.profileId}`),
+    profile: tabSession.profileId,
+  };
+}
+
+/**
+ * The partition key of an agent's own browser session. A hash, so an agent id never becomes part of
+ * a directory name, and the same agent always gets the same cookies back.
+ */
+export function agentBrowserSessionKey(agentId: string): string {
+  return createHash("sha256").update(agentId).digest("hex").slice(0, 32);
+}
+
+function isAgentBrowserSessionKey(value: unknown): value is string {
+  return isString(value) && /^[0-9a-f]{32}$/.test(value);
 }
 
 /**
@@ -148,6 +198,10 @@ function storedBrowserTab(value: unknown): StoredBrowserTab | null {
     return null;
   }
   if (!isPersistableBrowserUrl(value.url)) return null;
+  // A tab whose session cannot be read is dropped: loading it in the shared session would show it
+  // signed in to another account.
+  if (value.agentSession !== undefined && !isAgentBrowserSessionKey(value.agentSession)) return null;
+  if (value.profile !== undefined && !isBrowserProfileId(value.profile)) return null;
   const environment = browserEnvironment(value.environment);
   return {
     id: value.id,
@@ -155,6 +209,8 @@ function storedBrowserTab(value: unknown): StoredBrowserTab | null {
     ownerThreadId,
     ownerAgentId,
     ...(environment === null ? {} : { environment }),
+    ...(value.agentSession === undefined ? {} : { agentSession: value.agentSession }),
+    ...(value.profile === undefined ? {} : { profile: value.profile }),
   };
 }
 

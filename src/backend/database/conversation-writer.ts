@@ -141,12 +141,13 @@ export class ConversationWriter {
         `).run(
           randomUUID(),
           snapshot.threadId,
-          snapshot.activeTurnId,
+          activityTurnId(eventType, payload, snapshot.activeTurnId),
           eventType,
           JSON.stringify(payload),
           new Date().toISOString(),
           sequence,
         );
+        // A late write for a turn that already ended must not open it again (#2214).
         if (snapshot.activeTurnId) {
           db.prepare(`
             INSERT INTO projection_turns
@@ -156,6 +157,7 @@ export class ConversationWriter {
               WHERE thread_id = ? AND state = 'active' ORDER BY created_at DESC LIMIT 1
             ), 'running', ?, NULL, ?)
             ON CONFLICT(turn_id) DO UPDATE SET status = 'running', last_event_sequence = excluded.last_event_sequence
+            WHERE projection_turns.completed_at IS NULL
           `).run(snapshot.activeTurnId, snapshot.threadId, snapshot.threadId, new Date().toISOString(), sequence);
         }
         if (
@@ -536,6 +538,7 @@ export class ConversationWriter {
           `UPDATE projection_threads
            SET active_turn_id = ?, updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`,
         ).run(input.activeTurnId, new Date().toISOString(), sequence, input.threadId);
+        // A late write for a turn that already ended must not open it again (#2214).
         if (input.activeTurnId) {
           db.prepare(`
             INSERT INTO projection_turns
@@ -545,6 +548,7 @@ export class ConversationWriter {
               WHERE thread_id = ? AND state = 'active' ORDER BY created_at DESC LIMIT 1
             ), 'running', ?, NULL, ?)
             ON CONFLICT(turn_id) DO UPDATE SET status = 'running', last_event_sequence = excluded.last_event_sequence
+            WHERE projection_turns.completed_at IS NULL
           `).run(input.activeTurnId, input.threadId, input.threadId, new Date().toISOString(), sequence);
         }
         if (
@@ -567,6 +571,15 @@ export class ConversationWriter {
              WHERE thread_id = ? AND turn_id = ?`,
           ).run(status, new Date().toISOString(), sequence, input.threadId, input.detail.turnId);
         }
+        if (input.eventType === "turn.interrupted-by-restart") {
+          // Restart recovery runs before any provider starts, so no turn of this thread runs.
+          // A running row that is not the thread's active turn has no other writer (#2214).
+          db.prepare(
+            `UPDATE projection_turns
+             SET status = 'interrupted', completed_at = COALESCE(completed_at, ?), last_event_sequence = ?
+             WHERE thread_id = ? AND status = 'running'`,
+          ).run(new Date().toISOString(), sequence, input.threadId);
+        }
         db.prepare(`
           INSERT INTO projection_thread_activities
             (activity_id, thread_id, turn_id, activity_type, payload_json, created_at, last_event_sequence)
@@ -574,7 +587,7 @@ export class ConversationWriter {
         `).run(
           randomUUID(),
           input.threadId,
-          input.activeTurnId,
+          activityTurnId(input.eventType, input.detail, input.activeTurnId),
           input.eventType,
           JSON.stringify(input.detail ?? {}),
           new Date().toISOString(),
@@ -759,6 +772,15 @@ export class ConversationWriter {
     );
     return result.revision;
   }
+}
+
+/** A turn-end event clears the active turn, so the turn it ends is only in its detail (#3722). */
+export function activityTurnId(eventType: string, detail: unknown, activeTurnId: string | null): string | null {
+  return ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(eventType) &&
+    isDynamicRecord(detail) &&
+    isString(detail.turnId)
+    ? detail.turnId
+    : activeTurnId;
 }
 
 function mergeImportedMessage(existing: ConversationMessage, imported: ConversationMessage): ConversationMessage {

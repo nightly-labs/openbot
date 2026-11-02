@@ -7,10 +7,10 @@ import {
   agentProviderDescriptor,
 } from "@openbot/contracts/agent-providers";
 import { type AgentSummary, type InstalledSkill, SKILL_DESCRIPTION_MAX_LENGTH } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
-import { parse as parseYaml } from "yaml";
+import { HOME_SKILL_FOLDER, homeSkillTagId, listHomeSkills } from "../backend/home-skills";
+import { readSkillFrontmatter } from "../backend/skill-frontmatter";
 import { type ArchiveOperationError, archiveCall, archiveResult } from "./archive-effects";
 import { OWNERSHIP_MARKER } from "./managed-skill-service";
 
@@ -54,6 +54,32 @@ export const listFolderSkills = Effect.fn("SkillFolder.listFolderSkills")(functi
     );
   }
   return skills.sort((left, right) => left.name.localeCompare(right.name));
+});
+
+/**
+ * The user's skills in `~/.agents/skills` for the `$` list, with the `home:<slug>` id that the
+ * provider text resolves to the skill's `SKILL.md`. Every provider can use them: see `homeSkills` of
+ * the provider descriptor. `exclude` holds the slugs that the list already has.
+ */
+export const listHomeFolderSkills = Effect.fn("SkillFolder.listHomeFolderSkills")(function* (
+  exclude: ReadonlySet<string>,
+) {
+  return (yield* listHomeSkills())
+    .filter((skill) => !exclude.has(skill.slug))
+    .map(
+      (skill): InstalledSkill => ({
+        skillId: homeSkillTagId(skill.slug),
+        slug: skill.slug,
+        name: skill.slug,
+        installedVersion: 1,
+        availableVersion: 1,
+        state: "installed",
+        enabled: true,
+        origin: "workspace",
+        description: skill.description,
+        location: `~/${HOME_SKILL_FOLDER}/${skill.slug}`,
+      }),
+    );
 });
 
 /** Maps each skill folder name to the skill folders that hold it, in the order given. */
@@ -120,24 +146,20 @@ const readFolderSkillEffect = Effect.fn("SkillFolder.readFolderSkill")(function*
   } catch {
     return { ...skill, problem: sourceText("error.skill.markdownUnreadable") };
   }
-  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u.exec(text)?.[1];
-  if (frontmatter === undefined) return { ...skill, problem: sourceText("error.skill.frontmatterMissing") };
-  let metadata: unknown;
-  try {
-    metadata = parseYaml(frontmatter);
-  } catch {
-    return { ...skill, problem: sourceText("error.skill.frontmatterInvalid") };
-  }
-  if (!isDynamicRecord(metadata)) return { ...skill, problem: sourceText("error.skill.frontmatterInvalid") };
-  const description = isString(metadata.description) ? metadata.description.trim() : "";
-  if (!description || description.length > SKILL_DESCRIPTION_MAX_LENGTH)
-    return {
-      ...skill,
-      problem: sourceText("error.skill.descriptionLength", { limit: SKILL_DESCRIPTION_MAX_LENGTH }),
-    };
-  if (metadata.name !== slug)
-    return { ...skill, description, problem: sourceText("error.skill.nameMismatch", { slug }) };
-  return { ...skill, description };
+  const checked = readSkillFrontmatter(text, slug);
+  if (checked.problem === undefined) return { ...skill, description: checked.description };
+  return {
+    ...skill,
+    ...(checked.description === undefined ? {} : { description: checked.description }),
+    problem:
+      checked.problem === "descriptionLength"
+        ? sourceText("error.skill.descriptionLength", { limit: SKILL_DESCRIPTION_MAX_LENGTH })
+        : checked.problem === "nameMismatch"
+          ? sourceText("error.skill.nameMismatch", { slug })
+          : checked.problem === "frontmatterMissing"
+            ? sourceText("error.skill.frontmatterMissing")
+            : sourceText("error.skill.frontmatterInvalid"),
+  };
 });
 
 const pathExistsEffect = Effect.fn("SkillFolder.pathExists")(function* (

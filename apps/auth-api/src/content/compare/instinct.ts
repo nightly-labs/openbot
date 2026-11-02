@@ -1,5 +1,5 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
-import type { Comparison } from "./comparison";
+import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
 // Every statement about Instinct here is taken from instinct.com, its terms of service and
 // its privacy policy, or from the TechCrunch report on its private access; each page used
@@ -14,7 +14,7 @@ export const INSTINCT_COMPARISON: Comparison = {
   chooseOpenBot: [
     "Your mail, files and chats must stay on your own computer, not on a service's servers in the US.",
     "You want to approve a message or a payment before an agent makes it.",
-    "You want ChatGPT, Claude, Gemini, Grok, Cursor and Cline agents in one team, or your own model.",
+    "You want ChatGPT, Claude, Gemini, Grok, Cursor, Cline, Muse Code and Pi agents in one team, or your own model.",
     "You want a free app that you can download today, with source code that you can read.",
   ],
   rivalPlans:
@@ -28,8 +28,7 @@ export const INSTINCT_COMPARISON: Comparison = {
     {
       icon: "cpu",
       topic: "Models and plans",
-      openbot:
-        "Use the plans you already have: ChatGPT, Claude, Gemini, Grok, Cursor or Cline. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
+      openbot: OPENBOT_TEXT.models,
       rival:
         "Instinct names no model. Its privacy policy says that it shares data with third-party AI model providers.",
       better: "openbot",
@@ -45,8 +44,7 @@ export const INSTINCT_COMPARISON: Comparison = {
     {
       icon: "cloud",
       topic: "When your computer is off",
-      openbot:
-        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
+      openbot: OPENBOT_TEXT.offline,
       rival: "Instinct works on its own service, so no computer of yours must stay on.",
     },
     {
@@ -55,6 +53,21 @@ export const INSTINCT_COMPARISON: Comparison = {
       openbot:
         "Apps for iPhone and Android connect from anywhere, over an encrypted connection between your devices, and no cloud stores your chats or files. Agents can also answer in Slack, Discord and Telegram.",
       rival: "By text message, WhatsApp or a phone call. Instinct has no app of its own to talk to it.",
+    },
+    {
+      icon: "refresh",
+      topic: "Backup models",
+      openbot: OPENBOT_TEXT.backupModels,
+      rival: "Instinct names no model and states no backup model. You cannot choose a model.",
+      better: "openbot",
+    },
+    {
+      icon: "key",
+      topic: "Logins and payments",
+      openbot: OPENBOT_TEXT.logins,
+      rival:
+        "You can give Instinct your passwords for other accounts and your payment details, so that it signs in and books for you. Its privacy policy names no encryption and says that it cannot guarantee perfect security.",
+      better: "openbot",
     },
     {
       icon: "lock",
@@ -77,8 +90,7 @@ export const INSTINCT_COMPARISON: Comparison = {
     {
       icon: "users",
       topic: "Teams",
-      openbot:
-        "Each agent is a full coding agent with its own job. They give work to each other in shared channels, and coworkers can join one team host.",
+      openbot: OPENBOT_TEXT.teams,
       rival: "One personal assistant for each person.",
       better: "openbot",
     },
@@ -94,8 +106,7 @@ export const INSTINCT_COMPARISON: Comparison = {
     {
       icon: "globe",
       topic: "Where you can use it",
-      openbot:
-        "In any country: OpenBot has no region lock. The desktop app is in 10 languages, from English, German and Spanish to Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+      openbot: OPENBOT_TEXT.regions,
       rival:
         "By invite only, in private access. Instinct operates its service in the United States and names no countries. Only for people 18 and over.",
       better: "openbot",
@@ -103,7 +114,7 @@ export const INSTINCT_COMPARISON: Comparison = {
     {
       icon: "devices",
       topic: "Apps",
-      openbot: "macOS, Windows and Linux, and mobile apps for iPhone and Android.",
+      openbot: OPENBOT_TEXT.apps,
       rival: "No app to install: you text or call Instinct, and you manage your account on the web.",
     },
     {
@@ -119,16 +130,14 @@ export const INSTINCT_COMPARISON: Comparison = {
   sections: [
     {
       title: "Models and the plans you pay for",
-      openbot:
-        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, Grok CLI with your Grok account or an xAI API key, Cursor CLI with your Cursor plan or a Cursor API key, and Cline with your Cline account. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
+      openbot: OPENBOT_TEXT.plansSection,
       rival:
         "Instinct does not say which models it uses, and you cannot choose one. Its privacy policy names third-party AI model providers among the parties that get your data. Instinct publishes no price: it is in private access, and its terms say that you pay the fees that apply and that it can change its prices at any time.",
       better: "openbot",
     },
     {
       title: "Where the work happens",
-      openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+      openbot: OPENBOT_TEXT.workSection,
       rival:
         "Instinct works on its own service, which its terms say it operates in the United States, so no computer of yours must stay on. It connects to your email, messaging apps and calendar, and to the screen, audio and location of your devices. Instinct says that it can use a phone and a computer in the same way that people do.",
       better: "openbot",
@@ -143,15 +152,13 @@ export const INSTINCT_COMPARISON: Comparison = {
     },
     {
       title: "Phones and remote access",
-      openbot:
-        "The OpenBot apps for iPhone and Android connect to the computer that runs your agents. From anywhere, you chat with them, follow their progress, approve their actions and send files. The connection goes directly between your devices when it can, it is encrypted, and no cloud stores your chats or files. You set up no VPN or tunnel. Agents can also answer in Slack, Discord and Telegram. Remote access needs an OpenBot account.",
+      openbot: OPENBOT_TEXT.phonesSection,
       rival:
         "You talk to Instinct by text message or WhatsApp, or you call it; there is no Instinct app to install. You sign in on the web with your phone number and a code, and you manage connected apps and your data there.",
     },
     {
       title: "How agents work as a team",
-      openbot:
-        "In OpenBot, each agent is a full coding agent: Codex, Claude Code, Gemini, Grok CLI, Cursor CLI, Cline or OpenCode, each with its own job and workspace. A lead agent can give parts of a task to other agents in a shared channel. You follow their work and step in when a decision needs you. For a team of people, one computer runs the host and the others join it; the chats and files stay on the host.",
+      openbot: OPENBOT_TEXT.teamSection,
       rival:
         "Instinct is one personal assistant for each person. It describes no teams of agents and no shared workspace.",
       better: "openbot",

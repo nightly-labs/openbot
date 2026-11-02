@@ -16,7 +16,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { requireProviderDriver } from "../src/backend/provider-drivers";
 import { createCustomAgentChanges } from "../src/main/custom-agent-changes";
 import { CustomAgentStore } from "../src/main/custom-agent-store";
-import type { CustomProviderCipher } from "../src/main/custom-provider-store";
+import { stopClients, xorCipher } from "./provider-fakes/host";
 
 // The interpreter has a name no system folder holds, so the result does not depend on whether this
 // machine also has a `node` in /usr/bin.
@@ -51,12 +51,6 @@ function handle(message) {
 setInterval(() => {}, 1000);
 `;
 
-const cipher: CustomProviderCipher = {
-  canPersist: () => true,
-  encrypt: (value) => Buffer.from(Buffer.from(value, "utf8").map((byte) => byte ^ 0x5a)),
-  decrypt: (value) => Buffer.from(value.map((byte) => byte ^ 0x5a)).toString("utf8"),
-};
-
 const OUT = resolve(import.meta.dirname, "../.openbot-build/custom-acp-agent-login-path-e2e");
 const report: { passed: boolean; check?: unknown; models?: unknown; error?: string } = { passed: false };
 
@@ -87,14 +81,21 @@ try {
   const executable = join(root, "fake-acp-agent");
   await writeFile(executable, FAKE_AGENT);
   await chmod(executable, 0o755);
-  const store = new CustomAgentStore({ path: join(root, "custom-agents.json"), cipher });
+  const store = new CustomAgentStore({ path: join(root, "custom-agents.json"), cipher: xorCipher });
   await runCauseEffect(store.load());
-  await runCauseEffect(store.save({ id: "alpha", name: "Alpha", command: executable, args: [], env: [] }));
+  await runCauseEffect(
+    store.save({ id: "alpha", name: "Alpha", command: executable, args: [], env: [], usagePrompt: null }),
+  );
 
   // Check agent, before the user saves an agent. Only the store's environment check is used.
   const unused = () => Effect.die(new Error("Check agent changes no agent."));
   const changes = createCustomAgentChanges({
-    service: { saveCustomAgent: unused, removeCustomAgent: unused, reloadCustomAgents: unused },
+    service: {
+      saveCustomAgent: unused,
+      removeCustomAgent: unused,
+      reloadCustomAgents: unused,
+      customAgentUsage: unused,
+    },
     customAgents: store,
   });
   const check = await runCauseEffect(changes.check({ command: executable, args: [], env: [] }));
@@ -120,7 +121,7 @@ try {
 } catch (error) {
   report.error = error instanceof Error ? error.message : String(error);
 } finally {
-  await Promise.all(clients.map((client) => runCauseEffect(client.stop()).catch(() => undefined)));
+  await stopClients(clients);
   await rm(root, { recursive: true, force: true });
 }
 

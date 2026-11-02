@@ -68,6 +68,19 @@ export function ReplyIcon() {
   );
 }
 
+/** A new thread that goes out from a message. */
+export function BranchIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 fill-none stroke-current">
+      <path
+        d="M13.33 2.5h4.17v4.17M6.67 2.5H2.5v4.17M10 17.5v-6.08a3.33 3.33 0 0 0-.98-2.36L2.5 2.5m10 5 5-5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function QueueIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20">
@@ -160,6 +173,14 @@ export function BrowserForwardIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current">
       <path d="m8 4 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  );
+}
+
+export function BrowserStopIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current">
+      <path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke-linecap="round" />
     </svg>
   );
 }

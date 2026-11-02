@@ -113,10 +113,13 @@ export function useMermaidJobs(): readonly MermaidJob[] {
   return useSyncExternalStore(subscribe, () => jobs);
 }
 
-/** The diagram of a source, drawn on first use. Pass `enabled: false` while the source still streams. */
+/**
+ * The diagram of a source, drawn on first use. With `enabled: false` nothing is drawn: a diagram
+ * that is drawn already still shows, and any other is undefined.
+ */
 export function useMermaidDiagram(source: string, dark: boolean, enabled = true): MermaidDiagram | undefined {
   const key = diagramKey(source, dark);
   const diagram = useSyncExternalStore(subscribe, () => diagrams.get(key));
   useEffect(() => (enabled ? retainMermaidDiagram(source, dark) : undefined), [enabled, source, dark]);
-  return enabled ? (diagram ?? DRAWING) : undefined;
+  return enabled ? (diagram ?? DRAWING) : diagram;
 }

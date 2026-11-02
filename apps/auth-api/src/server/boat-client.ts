@@ -28,6 +28,7 @@ const BoatSandboxState = Schema.Literals([
 ]);
 export type BoatSandboxState = typeof BoatSandboxState.Type;
 const BoatSandbox = Schema.Struct({ id: Schema.String, state: BoatSandboxState });
+const BoatCommandResult = Schema.Struct({ exitCode: Schema.NullOr(Schema.Number), stdout: Schema.String });
 
 /** Provider messages and raw causes can contain credentials and are not retained. */
 export class BoatApiError extends Schema.TaggedError<BoatApiError>()("BoatApiError", {
@@ -141,12 +142,30 @@ export class BoatClient {
       .pipe(Effect.provide(this.#transport));
   }
 
-  /** Restore the saved disk; boat refuses a smaller machine that cannot hold it. */
+  /**
+   * Restore the saved disk; boat refuses a smaller machine that cannot hold it. True when boat
+   * answers `running`: it kept the stopped machine in memory and continued it with no boot.
+   */
   resumeSandbox(sandboxId: string, ttlSeconds: number, type?: BoatSandboxType) {
     return boatRequest("POST", `/sandboxes/${encodeURIComponent(sandboxId)}/resume`, {
       body: type === undefined ? { ttlSeconds } : { ttlSeconds, type },
     })
-      .pipe(Effect.asVoid)
+      .pipe(Effect.map((payload) => isDynamicRecord(payload) && payload.status === "running"))
+      .pipe(Effect.provide(this.#transport));
+  }
+
+  /** Runs a shell command as the sandbox user and gives its exit code and output. */
+  runCommand(sandboxId: string, command: string, timeoutSeconds: number) {
+    return boatRequest("POST", `/sandboxes/${encodeURIComponent(sandboxId)}/commands`, {
+      body: { command, timeoutSeconds },
+    })
+      .pipe(
+        Effect.flatMap((payload) =>
+          Schema.decodeUnknownEffect(BoatCommandResult)(payload).pipe(
+            Effect.mapError(() => new BoatApiError(502, "invalid_response")),
+          ),
+        ),
+      )
       .pipe(Effect.provide(this.#transport));
   }
 

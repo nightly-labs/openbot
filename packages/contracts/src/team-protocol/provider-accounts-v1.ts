@@ -58,6 +58,8 @@ const accountId: AdminDecoder = (value) => {
   if (typeof value !== "string" || !ACCOUNT_ID.test(value)) throw new Error("Invalid provider account.");
   return value;
 };
+/** The account id decoder, for the routes of a later capability that name an account. */
+export const PROVIDER_ACCOUNT_ID: AdminDecoder = accountId;
 const provider = string(PROVIDER_LIMIT);
 const finite: AdminDecoder = (value) => {
   if (typeof value !== "number" || !Number.isFinite(value)) throw new Error("Invalid admin number.");

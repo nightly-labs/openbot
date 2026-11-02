@@ -18,6 +18,8 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { runTeamEffect } from "@openbot/team-client";
 import {
+  discordAccess,
+  discordRoles,
   type MessagingConnectorPage,
   messagingConnectorAddOrchestrator,
   messagingConnectorComplete,
@@ -26,6 +28,7 @@ import {
   messagingConnectorOverview,
   messagingConnectorReconnect,
   messagingConnectorSetEnabled,
+  setDiscordAccess,
   type TeamAdminRequestError,
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
@@ -45,8 +48,14 @@ function withStorage(action: (storage: Storage) => void): boolean {
   }
 }
 
-/** `request` throws for a server that is not connected. Call `dispose` when the client closes. */
-export function webHostMessaging(request: (serverId: string) => TeamApiRequest): {
+/**
+ * `request` throws for a server that is not connected. `discordAccessSupported` says whether the host has
+ * `discord-access-v1`. Call `dispose` when the client closes.
+ */
+export function webHostMessaging(
+  request: (serverId: string) => TeamApiRequest,
+  discordAccessSupported: () => boolean,
+): {
   api: HostMessagingApi;
   dispose: () => void;
 } {
@@ -57,6 +66,12 @@ export function webHostMessaging(request: (serverId: string) => TeamApiRequest):
   /** `request` can throw, so it runs inside the Effect and a failure rejects the promise. */
   const run = <T>(serverId: string, call: (target: TeamApiRequest) => Effect.Effect<T, TeamAdminRequestError>) =>
     runTeamEffect(Effect.suspend(() => call(request(serverId))).pipe(Effect.mapError((error) => error.cause)));
+
+  /** An older host does not offer `discord-access-v1`: the page then asks to update it. */
+  const access = <T>(serverId: string, call: (target: TeamApiRequest) => Effect.Effect<T, TeamAdminRequestError>) =>
+    discordAccessSupported()
+      ? run(serverId, call)
+      : Promise.reject(new Error(sourceText("error.team.discordAccessUnsupported")));
 
   const forget = (nonce: string) => {
     pending.delete(nonce);
@@ -152,6 +167,9 @@ export function webHostMessaging(request: (serverId: string) => TeamApiRequest):
       hostSetEnabled: (input, serverId) => run(serverId, (target) => messagingConnectorSetEnabled(target, input)),
       hostAddOrchestrator: (input, serverId) =>
         run(serverId, (target) => messagingConnectorAddOrchestrator(target, input)),
+      hostGetDiscordAccess: (input, serverId) => access(serverId, (target) => discordAccess(target, input)),
+      hostListDiscordRoles: (input, serverId) => access(serverId, (target) => discordRoles(target, input)),
+      hostSetDiscordAccess: (input, serverId) => access(serverId, (target) => setDiscordAccess(target, input)),
     },
     dispose: () => {
       for (const nonce of [...pending.keys()]) forget(nonce);

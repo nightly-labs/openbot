@@ -1,6 +1,7 @@
 import { Typography } from "heroui-native";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { ScrollView, TextInput, type TextStyle, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { type CodeToken, highlightCode } from "../model/code-highlight";
@@ -30,6 +31,7 @@ export function CodeDocument({
   wrap,
   topInset,
   bottomInset,
+  note,
 }: {
   text: string;
   language?: string;
@@ -37,8 +39,13 @@ export function CodeDocument({
   wrap: boolean;
   topInset: number;
   bottomInset: number;
+  /** A line under the code, such as that the file goes on past what it shows. */
+  note?: string | null;
 }) {
   const { foreground, muted, colors } = useCodeTokenColors();
+  // The code keeps clear of the side insets: the rail of iPhone Duo and the edges in landscape.
+  const insets = useSafeAreaInsets();
+  const sides = { paddingLeft: insets.left + SIDE_PADDING, paddingRight: insets.right + SIDE_PADDING };
   const [tokens, setTokens] = useState<CodeToken[] | null>(null);
   useEffect(() => {
     let active = true;
@@ -78,9 +85,9 @@ export function CodeDocument({
       contentContainerStyle={{ paddingTop: topInset, paddingBottom: bottomInset + SIDE_PADDING }}
     >
       {wrap ? (
-        <View style={{ paddingHorizontal: SIDE_PADDING }}>{code}</View>
+        <View style={sides}>{code}</View>
       ) : (
-        <View className="flex-row" style={{ paddingLeft: SIDE_PADDING }}>
+        <View className="flex-row" style={{ paddingLeft: sides.paddingLeft }}>
           <Typography.Code
             selectable={false}
             accessibilityElementsHidden
@@ -99,12 +106,17 @@ export function CodeDocument({
           <ScrollView
             horizontal
             alwaysBounceHorizontal={false}
-            contentContainerStyle={{ paddingLeft: GUTTER_GAP, paddingRight: SIDE_PADDING }}
+            contentContainerStyle={{ paddingLeft: GUTTER_GAP, paddingRight: sides.paddingRight }}
           >
             {code}
           </ScrollView>
         </View>
       )}
+      {note ? (
+        <Typography.Paragraph type="body-sm" className="text-muted" style={{ ...sides, paddingTop: 12 }}>
+          {note}
+        </Typography.Paragraph>
+      ) : null}
     </ScrollView>
   );
 }

@@ -56,3 +56,14 @@ jobs:
           find changelog.d apps/mobile/changelog.d -name '*.md' \
             ! -path changelog.d/README.md ! -path apps/mobile/changelog.d/README.md -print0 |
             xargs -0 -r bun scripts/check-release-notes.ts --fragments
+
+      # A merge that gives a mobile version its second store date posts on Discord
+      # (mobile-release-announcement.yml), so its highlights must be ready before the merge.
+      - name: Check the mobile Discord announcement
+        shell: bash
+        run: |
+          git show HEAD^1:apps/mobile/CHANGELOG.md > "$RUNNER_TEMP/CHANGELOG.before.md"
+          version="$(bun scripts/discord-mobile-release-announcement.ts available "$RUNNER_TEMP/CHANGELOG.before.md")"
+          if [[ -n "$version" ]]; then
+            bun scripts/discord-mobile-release-announcement.ts check "$version"
+          fi

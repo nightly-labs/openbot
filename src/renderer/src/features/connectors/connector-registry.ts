@@ -42,7 +42,7 @@ export function createConnectorSet(transports: ConnectorTransports, options: Mes
   }
   if (transports.github) set.github = createGitHubConnector(transports.github, options.hostName);
   if (transports.onePassword) set.onepassword = createOnePasswordConnector(transports.onePassword, options.hostName);
-  if (transports.bitwarden) set.bitwarden = createBitwardenConnector(transports.bitwarden);
+  if (transports.bitwarden) set.bitwarden = createBitwardenConnector(transports.bitwarden, options.hostName);
   return set;
 }
 
@@ -50,7 +50,7 @@ export function createConnectorSet(transports: ConnectorTransports, options: Mes
  * One connector on one server. `unsupported`: the server could run it, but this build or its host
  * cannot, such as GitHub with no GitHub App. `loading`: that is not known before the first read.
  */
-export type ConnectorEntry =
+type ConnectorEntry =
   | { id: ConnectorId; access: "available"; controller: ConnectorController }
   | { id: ConnectorId; access: "local-only" | "hidden" | "unsupported" | "loading" };
 
@@ -106,11 +106,13 @@ export function createConnectorRegistry(
   );
   // GitHub tells its availability only after a read, so a new server is read before it can show. A
   // joined server's capabilities come after its id, so the connectors it can reach are part of the key.
+  // The key is a memo because the server summary changes while a workspace loads, and an effect runs
+  // again each time its key is computed.
   createEffect(
-    () => {
+    createMemo(() => {
       const id = server()?.id;
       return id ? `${id}:${reachable().map((controller) => controller.id)}` : undefined;
-    },
+    }),
     (key) => {
       if (key) reload();
     },

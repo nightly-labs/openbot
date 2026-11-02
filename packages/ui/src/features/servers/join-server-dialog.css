@@ -1,10 +1,4 @@
 .join-server-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--openbot-layer-dialog);
-  display: grid;
-  place-items: center;
-  padding: var(--openbot-space-6);
   animation: join-server-backdrop-in var(--modal-open-dur) var(--modal-ease) both;
   will-change: opacity;
 }
@@ -22,9 +16,7 @@
   border-radius: var(--openbot-radius-xl);
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
-  box-shadow:
-    0 0 0 1px var(--openbot-border-strong),
-    0 24px 64px var(--openbot-shadow-dialog);
+  box-shadow: 0 0 0 1px var(--openbot-border-strong);
 }
 
 .join-server-close {

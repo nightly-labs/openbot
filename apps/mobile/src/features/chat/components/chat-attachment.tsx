@@ -1,71 +1,163 @@
+import { playableMediaKind } from "@openbot/contracts/attachment-files";
+import { CHAT_VISUAL_PAGE_LIMIT, chatVisualFrameHeight, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
+import { requireOptionalNativeModule } from "expo";
+import { File } from "expo-file-system";
 import { Image } from "expo-image";
+import { router } from "expo-router";
 import { Button, Skeleton, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
 import ExternalLink from "lucide-react-native/icons/external-link";
 import ImageOff from "lucide-react-native/icons/image-off";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-import type { ImageDimensions } from "../model/image-dimensions";
+import { attachmentFrame, FILL, FRAME_RADIUS, MAX_FRAME_WIDTH } from "../model/attachment-frame";
+import { storeCodePreview } from "../model/code-preview-store";
+import { type ImageDimensions, sameShape } from "../model/image-dimensions";
 import { attachmentTypeLabel, rememberImageDimensions, useAttachmentFile } from "./attachment-preview";
-import { ImageViewer } from "./image-viewer";
+import { ChatCodePreview } from "./chat-code-preview";
+import { isViewableImage, useChatImageSource } from "./chat-image-viewer";
+import { HtmlPage } from "./html-page";
 import { UPLOAD_BLUR_RADIUS, UPLOAD_SETTLE_MS, UploadProgressCircle, useUploadRevealStyle } from "./upload-progress";
+import { useAttachmentPreview } from "./use-attachment-preview";
+import { useHistoryShown } from "./use-history-shown";
+import { useListSettled } from "./use-list-settled";
+import { useMediaFile } from "./use-media-file";
 
-// An image is this tall unless it is too wide for the column. The host sends no image size, so a
-// height taken from the image changes once it downloads and moves every message below it; a
-// fixed height keeps that change to the image's own width. Portrait photos and screenshots,
-// the usual case, never move the chat.
-const IMAGE_HEIGHT = 240;
-const MAX_IMAGE_WIDTH = 280;
-// An extremely narrow image keeps a frame wide enough to tap, and shows whole inside it.
-const MIN_IMAGE_WIDTH = 72;
 // The width reserved while the shape is still unknown: a portrait phone photo.
 const UNKNOWN_RATIO = 3 / 4;
-// Every layer of an image fills its frame exactly, with no padding or percentage in between.
-const FILL = { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 } as const;
 
 /**
- * The frame an image draws in, always showing the whole image. It is 240 pt tall with the
- * image's own width; an image too wide for the column scales down to the column's width
- * instead, so nothing is cropped.
+ * The video player, loaded only when this app build has its native module. An older development
+ * build has none, and `expo-video` requires the module when it loads, so a video there stays a file.
  */
-function imageFrame(dimensions: ImageDimensions | null, maxWidth: number) {
-  const ratio = dimensions ? dimensions.width / dimensions.height : UNKNOWN_RATIO;
-  const width = IMAGE_HEIGHT * ratio;
-  if (width > maxWidth) return { width: maxWidth, height: Math.round(maxWidth / ratio) };
-  return { width: Math.max(MIN_IMAGE_WIDTH, Math.round(width)), height: IMAGE_HEIGHT };
-}
+const chatVideo: typeof import("./chat-video.native") | null = requireOptionalNativeModule("ExpoVideo")
+  ? require("./chat-video.native")
+  : null;
+/** The audio player uses the same native module, so an older build shows audio as a file too. */
+const chatAudio: typeof import("./chat-audio.native") | null = chatVideo ? require("./chat-audio.native") : null;
 
-/** Two sizes with the same shape, allowing for rounding in a scaled copy. */
-function sameShape(left: ImageDimensions, right: ImageDimensions) {
-  return Math.abs(left.width / left.height - right.width / right.height) < 0.01;
-}
-
-export function ChatAttachmentView({
-  attachment,
-  serverId,
-  alignment = "left",
-  upload,
-}: {
+interface ChatAttachmentProps {
   attachment: AttachmentSummary;
   serverId: string;
   alignment?: "left" | "right";
   /** The sent fraction of this file, from 0 to 1, while the message that carries it is sending. */
   upload?: number;
-}) {
+  /** The agent's color for the controls of a player, unless the user turned off agent colors. */
+  tint?: AttachmentTint;
+  /** The page of a visual reply, which shows in the chat as desktop shows it, at the agent's height. */
+  visual?: { height?: number } | undefined;
+}
+
+export interface AttachmentTint {
+  color: string;
+  /** Text and icons on the color. */
+  foreground: string;
+}
+
+export function ChatAttachmentView(props: ChatAttachmentProps) {
+  const { attachment } = props;
+  // Media plays once it is on the host. While it uploads, the file card shows the progress.
+  const playable =
+    props.upload === undefined &&
+    attachment.size <= MOBILE_ATTACHMENT_BYTES &&
+    !attachment.id.startsWith("mobile-draft-attachment-");
+  const media = playable ? playableMediaKind(attachment.mimeType) : null;
+  if (chatVideo && media === "video") return <chatVideo.ChatVideoAttachment {...props} />;
+  if (chatAudio && media === "audio") return <chatAudio.ChatAudioAttachment {...props} />;
+  if (
+    props.visual &&
+    playable &&
+    isChatVisualMimeType(attachment.mimeType) &&
+    attachment.size <= CHAT_VISUAL_PAGE_LIMIT
+  )
+    return <ChatVisualAttachment {...props} />;
+  return <ChatFileAttachment {...props} />;
+}
+
+/**
+ * A visual reply. The live page shows in the chat with no card, as on desktop; in a build without
+ * the web view module it is a card, as a ```html block in a reply shows. The page downloads with
+ * the chat. Until it is read, its space waits; a page that cannot be read is a file card.
+ */
+function ChatVisualAttachment(props: ChatAttachmentProps) {
+  const { attachment, serverId } = props;
+  const { t } = useText();
+  const { width } = useWindowDimensions();
+  const settled = useListSettled();
+  // A web view starts only once the chat shows its history, so it does not slow the chat that opens.
+  const historyShown = useHistoryShown();
+  const pageHeight = chatVisualFrameHeight(undefined, props.visual?.height);
+  const file = useMediaFile(serverId, attachment, true);
+  const [page, setPage] = useState<{ uri: string; source: string } | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const uri = file.data;
+    if (!uri) return;
+    let active = true;
+    new File(uri)
+      .text()
+      .then((source) => {
+        if (active) setPage({ uri, source });
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [file.data]);
+  if (failed || file.error) return <ChatFileAttachment {...props} />;
+  if (!page)
+    return (
+      <Skeleton
+        isLoading
+        accessible
+        accessibilityLabel={t("mobile.chat.attachment.downloading")}
+        // The size of the page, or of the card: the bubble width, its header row and a picture half as high as wide.
+        style={{ width: width - 80, height: HtmlPage ? pageHeight : (width - 80) / 2 + 42, borderRadius: 18 }}
+      />
+    );
+  if (HtmlPage)
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("mobile.chat.attachment.preview", { name: attachment.name })}
+        style={{ width: width - 80, maxWidth: "100%", height: pageHeight }}
+        onPress={() => {
+          void haptics.impact("soft");
+          const local = { uri: page.uri, name: attachment.name, mimeType: attachment.mimeType };
+          const previewId = storeCodePreview({ kind: "html", source: page.source, language: "html", file: local });
+          router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
+        }}
+      >
+        {/* The page takes no touches, so the chat scrolls over it and a tap opens it. */}
+        <View pointerEvents="none" style={FILL}>
+          {settled && historyShown ? <HtmlPage source={page.source} title={attachment.name} mode="chat" /> : null}
+        </View>
+      </Pressable>
+    );
+  return (
+    <ChatCodePreview
+      kind="html"
+      text={page.source}
+      language="html"
+      file={{ uri: page.uri, name: attachment.name, mimeType: attachment.mimeType }}
+    />
+  );
+}
+
+function ChatFileAttachment({ attachment, serverId, alignment = "left", upload }: ChatAttachmentProps) {
   const { t, format, sourceText } = useText();
   const [fileColor, muted] = useThemeColor(["success", "muted"]);
   const [decoded, setDecoded] = useState<ImageDimensions | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
-  // Where the image was when the viewer opened. The chat's copy hides while the viewer holds it.
-  const [viewing, setViewing] = useState(false);
-  const [sourceHidden, setSourceHidden] = useState(false);
-  const frameRef = useRef<View>(null);
   // The send can finish before the upload view has settled. Hold it as complete for that long,
   // so the photo finishes coming into focus instead of jumping to sharp in one frame.
   const [lingering, setLingering] = useState(false);
@@ -83,16 +175,17 @@ export function ChatAttachmentView({
   const tooLarge = attachment.size > MOBILE_ATTACHMENT_BYTES;
   // An image above the transfer limit cannot be shown here, so it is a file the user opens on desktop.
   const image = attachment.kind === "image" && !tooLarge;
-  const { pending, localUri, uri, dimensions, query, sharing, share, saveToPhotos } = useAttachmentFile(
-    serverId,
-    attachment,
-    image,
-  );
-  const maxWidth = Math.min(MAX_IMAGE_WIDTH, width - 80);
+  const { pending, localUri, uri, dimensions, query, sharing, share } = useAttachmentFile(serverId, attachment, image);
+  // The conversation's viewer measures this copy and hides it on the UI thread while it holds the picture.
+  const source = useChatImageSource(image && isViewableImage(attachment) ? attachment.id : null, FRAME_RADIUS);
+  const maxWidth = Math.min(MAX_FRAME_WIDTH, width - 80);
   const shape = decoded ?? dimensions;
-  const frame = imageFrame(shape, maxWidth);
+  const frame = attachmentFrame(shape, maxWidth, UNKNOWN_RATIO);
   const failed = Boolean(query.error) || imageFailed;
-  const busy = sharing || query.isFetching;
+  // A file that the preview screen shows opens there, as in the desktop file panel; another opens in the share sheet.
+  const preview = useAttachmentPreview(serverId, attachment);
+  const previewable = preview.kind !== null;
+  const busy = sharing || query.isFetching || preview.opening;
 
   if (image)
     return (
@@ -102,12 +195,12 @@ export function ChatAttachmentView({
             width: frame.width,
             height: frame.height,
             maxWidth: "100%",
-            borderRadius: 18,
+            borderRadius: FRAME_RADIUS,
             borderCurve: "continuous",
             overflow: "hidden",
           }}
         >
-          <View ref={frameRef} collapsable={false} style={{ ...FILL, opacity: sourceHidden ? 0 : 1 }}>
+          <Animated.View ref={source.origin} collapsable={false} style={[FILL, source.hiddenStyle]}>
             {/* A plain pressable: a HeroUI button keeps its own side padding and row gap, which
                 pushed the image off the frame's right edge. Every layer here fills the frame. */}
             <Pressable
@@ -115,10 +208,7 @@ export function ChatAttachmentView({
               accessibilityLabel={t("mobile.chat.attachment.preview", { name: attachment.name })}
               accessibilityState={{ disabled: pending || !uri || failed }}
               disabled={pending || !uri || failed}
-              onPress={() => {
-                void haptics.impact("soft");
-                setViewing(true);
-              }}
+              onPress={() => source.open?.(attachment)}
               style={FILL}
             >
               {failed ? (
@@ -176,7 +266,7 @@ export function ChatAttachmentView({
                 </>
               )}
             </Pressable>
-          </View>
+          </Animated.View>
           {upload !== undefined ? (
             // The focus says it visually; this says it to a screen reader.
             <View
@@ -201,27 +291,6 @@ export function ChatAttachmentView({
             <Button.Label>{t("mobile.chat.attachment.retryImage")}</Button.Label>
           </Button>
         ) : null}
-        {viewing && uri ? (
-          <ImageViewer
-            uri={uri}
-            name={attachment.name}
-            dimensions={shape ?? frame}
-            measureOrigin={(report) =>
-              frameRef.current
-                ? frameRef.current.measureInWindow((x, y, width, height) => report({ x, y, width, height }))
-                : report(null)
-            }
-            originRadius={18}
-            busy={busy}
-            onShare={share}
-            onSave={saveToPhotos}
-            onShown={() => setSourceHidden(true)}
-            onDismissed={() => {
-              setViewing(false);
-              setSourceHidden(false);
-            }}
-          />
-        ) : null}
       </View>
     );
 
@@ -240,13 +309,18 @@ export function ChatAttachmentView({
         className="h-auto flex-row justify-start gap-3 rounded-2xl border border-border bg-control p-3"
         style={{ width: maxWidth, maxWidth: "100%" }}
         isDisabled={pending || busy || tooLarge}
-        accessibilityLabel={t("mobile.chat.attachment.openOrSave", { name: attachment.name })}
+        accessibilityLabel={
+          previewable
+            ? t("mobile.chat.attachment.preview", { name: attachment.name })
+            : t("mobile.chat.attachment.openOrSave", { name: attachment.name })
+        }
         accessibilityHint={tooLarge ? t("mobile.chat.attachment.tooLargeHint") : undefined}
         // The card is one element to a screen reader, so the progress inside it is read from here.
         accessibilityValue={upload !== undefined ? { min: 0, max: 100, now: Math.round(upload * 100) } : undefined}
         onPress={() => {
           void haptics.impact("soft");
-          share();
+          if (previewable) preview.open();
+          else share();
         }}
       >
         <View className="size-11 items-center justify-center rounded-xl bg-success/15">
@@ -265,6 +339,8 @@ export function ChatAttachmentView({
         {/* Where the share icon will be: the file's progress, then a check, then the icon. */}
         {shownUpload !== undefined ? (
           <UploadProgressCircle progress={shownUpload} />
+        ) : previewable ? (
+          <ChevronRight size={18} color={muted} />
         ) : (
           <ExternalLink size={18} color={muted} />
         )}

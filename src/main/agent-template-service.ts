@@ -44,6 +44,7 @@ import { Effect, Result, Schema } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
 import { imageMimeType, localSchedule, toArrayBuffer, validTimezone } from "./agent-marketplace-service";
 import type { LocalSkillLibrary } from "./local-skill-library";
+import { MANAGED_SKILL_SLUGS } from "./managed-skill-service";
 import { inspectSkillMarkdown, normalizedFiles } from "./skill-package";
 
 /** The words for a snapshot problem. The English is the text the contract sent before. */
@@ -232,7 +233,13 @@ export class AgentTemplateService {
           decodeAgentTemplateDetail,
         )
         .pipe(toAgentTemplateFailure);
-      return { ...detail, avatarUrl: detail.avatarUrl ? this.auth.resolveApiUrl(detail.avatarUrl) : null };
+      return {
+        ...detail,
+        // A template published before its owner's copy of a managed skill was recognized carries that
+        // copy. The new agent gets OpenBot's own, and installing the copy would fail on its folder.
+        skills: detail.skills.filter((skill) => skill.kind !== "embedded" || !MANAGED_SKILL_SLUGS.has(skill.slug)),
+        avatarUrl: detail.avatarUrl ? this.auth.resolveApiUrl(detail.avatarUrl) : null,
+      };
     });
   }
 

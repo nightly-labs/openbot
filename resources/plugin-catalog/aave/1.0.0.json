@@ -4,7 +4,7 @@
   "tagline": "Aave data and transactions",
   "description": "Aave helps users explore live Aave V3 and V4 markets, review wallet positions and DAO governance, simulate lending actions, and prepare non-custodial transactions. Every transaction is returned unsigned: the plugin reads the markets and writes the call, and the wallet stays with the user.",
   "category": "data-analytics",
-  "creatorName": "avara.xyz",
+  "creatorName": "Avara",
   "iconUrl": "https://aave.com/images/icon-aave.png",
   "version": "1.0.0",
   "prompts": [

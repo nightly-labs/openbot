@@ -147,6 +147,7 @@ export function createStoryDetection(initial: ProviderDetection, options: StoryD
         version: "1.9.0",
         protocolVersion: 1,
         capabilities: ["loadSession", "image"],
+        models: ["Claude Sonnet 5.5", "GPT-5.5"],
       })),
   };
 

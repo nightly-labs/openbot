@@ -4,6 +4,7 @@ import { AgentTemplateInstallDialog } from "@openbot/ui/features/agents/AgentTem
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { actionToast } from "../../action-toast";
+import { desktopAnalytics } from "../../analytics";
 import { type AgentTemplateInstallCalls, agentTemplatesPort } from "./agent-templates-port";
 
 interface InstallState {
@@ -21,6 +22,8 @@ export function AgentTemplateInstall(props: {
   server?: ServerSummary | undefined;
   /** Defaults to the desktop port. */
   calls?: AgentTemplateInstallCalls | undefined;
+  /** Opens a link from the instructions. */
+  onOpenLink: (url: string) => void;
   onClose: () => void;
   onInstalled: (agent: AddedAgent, serverId?: string) => Promise<void>;
 }) {
@@ -74,9 +77,22 @@ export function AgentTemplateInstall(props: {
       expectedUpdatedAt: reviewed.updatedAt,
     };
     const port = calls();
-    const agent = server
-      ? await port.agent.addTemplateAgent(input, server.id)
-      : (await port.agentTemplates.install(input)).agent;
+    const agent = await (server
+      ? port.agent.addTemplateAgent(input, server.id)
+      : port.agentTemplates.install(input).then((installed) => installed.agent)
+    ).catch((error: unknown) => {
+      desktopAnalytics.track("agent_template_action", {
+        action: "installed",
+        result: "failed",
+        entry_point: "deep_link",
+      });
+      throw error;
+    });
+    desktopAnalytics.track("agent_template_action", {
+      action: "installed",
+      result: "succeeded",
+      entry_point: "deep_link",
+    });
     props.onClose();
     actionToast.success(
       server
@@ -97,6 +113,7 @@ export function AgentTemplateInstall(props: {
       detail={state.detail}
       loading={state.loading}
       onInstall={install}
+      onOpenLink={props.onOpenLink}
     />
   );
 }

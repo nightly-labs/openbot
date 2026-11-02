@@ -4,7 +4,8 @@ import { sendContactMessage } from "../../server/contact-message";
 import { runApiResponse } from "../../server/effect-runtime";
 import { isSameOriginReportRequest } from "../../server/hosted-site-report-request";
 import { readJsonObject } from "../../server/json-body";
-import { apiError, authErrorResponse, requestContactMessageServices, requestSourceIp } from "../../server/request-auth";
+import { apiError, authErrorResponse, requestContactMessageServices } from "../../server/request-auth";
+import { requestSourceIp } from "../../server/source-ip";
 
 // The contact form on `/contact`. Only that page can send: the route needs no sign-in, so it checks
 // the origin as the site report form does.

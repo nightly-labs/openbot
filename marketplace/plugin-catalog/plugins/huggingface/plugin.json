@@ -1,0 +1,28 @@
+{
+  "slug": "huggingface",
+  "name": "Hugging Face",
+  "tagline": "Models, datasets and papers on the Hub",
+  "description": "Hugging Face lets agents search models, datasets, Spaces, collections and papers on the Hugging Face Hub, read model cards and repository files, preview datasets, and search the Hugging Face documentation. It uses public Hub data and needs no account and no key. The tools only read: agents cannot create repositories or run jobs.",
+  "category": "research",
+  "creatorName": "Hugging Face",
+  "iconUrl": "https://huggingface.co/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-models", "text": "Find small open models for speech recognition on Hugging Face." },
+    { "id": "prompt-papers", "text": "Which papers are trending on Hugging Face today?" },
+    { "id": "prompt-dataset", "text": "Find a dataset of weather time series and show its columns." }
+  ],
+  "apps": [
+    {
+      "id": "app-huggingface-mcp",
+      "name": "Hugging Face",
+      "description": "Model, dataset, Space, paper, and docs search, over Hugging Face's MCP server with no sign-in.",
+      "iconUrl": "https://huggingface.co/favicon.ico",
+      "server": { "name": "huggingface", "transport": "http", "url": "https://huggingface.co/mcp" }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://huggingface.co",
+  "privacyPolicyUrl": "https://huggingface.co/privacy",
+  "termsUrl": "https://huggingface.co/terms-of-service"
+}

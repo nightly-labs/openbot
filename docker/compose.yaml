@@ -20,6 +20,9 @@ services:
     volumes:
       - openbot-data:/data
     # OpenBot only connects out. It needs no published port.
+    # On a local network or a Tailscale tailnet, host networking can let devices connect directly.
+    # It removes the network isolation of the container. See "Network" in docs/docker.md.
+    # network_mode: host
     # environment:
     #   XAI_API_KEY: ${XAI_API_KEY}
 

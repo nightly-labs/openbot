@@ -4,7 +4,7 @@
 
 .remote-desktop-workspace {
   position: fixed;
-  z-index: 120;
+  z-index: var(--openbot-layer-toast);
   inset: 0;
   display: flex;
   min-width: 0;
@@ -74,8 +74,8 @@
   color: var(--openbot-text-muted);
 }
 
-.remote-desktop-disconnect-button:hover:not(:disabled),
-.remote-desktop-disconnect-button:focus-visible:not(:disabled) {
+.remote-desktop-disconnect-button:hover:not(:disabled, [aria-disabled="true"]),
+.remote-desktop-disconnect-button:focus-visible:not(:disabled, [aria-disabled="true"]) {
   background: var(--openbot-danger-soft);
   color: var(--openbot-danger);
 }

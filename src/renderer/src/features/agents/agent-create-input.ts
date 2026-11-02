@@ -4,13 +4,14 @@ import { createAgentInitialMessage } from "./agent-initial-message";
 
 /** A new agent asked for from a short draft, such as the routine canvas's card. */
 export type NewAgentDraft = Pick<FirstAgentDraft, "name" | "purpose" | "avatarSeed" | "avatarHue"> &
-  Partial<Pick<FirstAgentDraft, "provider" | "model">>;
+  Partial<Pick<FirstAgentDraft, "provider" | "model" | "reasoningEffort">>;
 
 /**
  * The creation request for a draft. A draft without a provider leaves the backend to pick its
  * starting default. The provider and model travel with the request: the backend applies them before
  * the initial message is queued, while a later provider change would be rejected as active work. A
- * remote host without `agent-create-model` drops the pair and starts its own default.
+ * remote host without `agent-create-model` drops the pair and starts its own default. The reasoning
+ * level travels only with the pair; without one, the backend starts the model's default level.
  */
 export function newAgentInput(draft: NewAgentDraft, createModelSupported: boolean): CreateAgentInput {
   return {
@@ -18,7 +19,13 @@ export function newAgentInput(draft: NewAgentDraft, createModelSupported: boolea
     description: draft.purpose.trim() || "General-purpose assistant",
     avatarSeed: draft.avatarSeed,
     avatarHue: draft.avatarHue,
-    ...(createModelSupported && draft.provider && draft.model ? { provider: draft.provider, model: draft.model } : {}),
+    ...(createModelSupported && draft.provider && draft.model
+      ? {
+          provider: draft.provider,
+          model: draft.model,
+          ...(draft.reasoningEffort ? { reasoningEffort: draft.reasoningEffort } : {}),
+        }
+      : {}),
     initialMessage: createAgentInitialMessage(draft),
   };
 }

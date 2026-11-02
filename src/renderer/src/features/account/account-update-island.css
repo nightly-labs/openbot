@@ -128,8 +128,14 @@
 .account-update-island__action-shell {
   position: relative;
   display: grid;
-  width: calc(var(--openbot-control-xl) + var(--openbot-control-xl) + var(--openbot-space-6) + var(--openbot-space-1));
-  min-width: calc(var(--openbot-control-xl) + var(--openbot-control-xl) + var(--openbot-space-3));
+  /* A floor, not a fixed width: translated labels such as "Uruchom ponownie" are wider than the
+     English ones, and the button grows to hold them while the status text gives way. */
+  min-width: calc(
+    var(--openbot-control-xl) +
+    var(--openbot-control-xl) +
+    var(--openbot-space-6) +
+    var(--openbot-space-1)
+  );
   flex-shrink: 0;
 }
 

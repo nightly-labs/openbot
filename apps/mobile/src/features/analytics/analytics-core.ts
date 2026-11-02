@@ -1,11 +1,12 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
-import { classifyFailure, type ReportQueue, safeProperties } from "@openbot/telemetry";
+import { classifyFailure, type Operation, type ReportQueue, safeProperties } from "@openbot/telemetry";
 import { Effect } from "effect";
 import { type MobileEventName, type MobileEventProperties, type SafeProperties, sanitizeMobileEvent } from "./events";
 
 export interface MobileAnalyticsClient {
-  track(name: string, properties: SafeProperties, timestamp?: string): Promise<unknown> | undefined;
+  /** `profileId` is the install ID when tracking is off; otherwise the client's identified profile. */
+  track(name: string, properties: SafeProperties, timestamp?: string, profileId?: string): Promise<unknown> | undefined;
   identify(user: { profileId: string; email: string }): Promise<unknown> | undefined;
   clear(): undefined;
 }
@@ -13,21 +14,63 @@ export interface MobileAnalyticsScope {
   track<N extends MobileEventName>(name: N, properties: MobileEventProperties<N>): void;
 }
 
+/**
+ * The operation of a failed event in its failure report. Each event has one, so a new event cannot
+ * report the wrong operation. Pairing, connection, input, conversation and server events keep
+ * `team`, as in earlier versions.
+ */
+const FAILURE_OPERATIONS: Record<MobileEventName, Operation> = {
+  mobile_app_opened: "other",
+  usage_viewed: "other",
+  mobile_pairing_action: "team",
+  mobile_connection_action: "team",
+  agent_input_action: "team",
+  conversation_action: "team",
+  team_action: "team",
+  hosted_server_plans_action: "team",
+  attachment_action: "attachment",
+  message_send: "turn",
+  conversation_opened: "turn",
+  routine_action: "routine",
+  agent_action: "agent",
+  agent_template_action: "agent",
+  marketplace_action: "marketplace",
+  memory_action: "memory",
+  search_action: "search",
+  account_sign_out: "auth",
+  account_sign_in_started: "auth",
+  account_sign_in_completed: "auth",
+  notification_settings_action: "settings",
+  live_activity_action: "settings",
+  analytics_preference_changed: "settings",
+  voice_conversation_action: "voice",
+  voice_turn: "voice",
+  onboarding_step: "other",
+  onboarding_completed: "other",
+};
+
 const ANONYMOUS_TTL_MS = 30 * 60 * 1_000;
 const MAX_PENDING_EVENTS = 100;
 type PendingEvent = { name: MobileEventName; properties: SafeProperties; timestamp: string };
 
-/** A scope belongs to the account and consent state that started an operation. */
+/**
+ * A scope belongs to the account and consent state that started an operation. With tracking on,
+ * events go with the account ID and email. With tracking off, they go with the random install ID
+ * only: no account ID, no email, no identify.
+ */
 export class MobileAnalytics {
   private anonymous: PendingEvent[] = [];
   private anonymousStartedAt: number | null = null;
   private expiry: ReturnType<typeof setTimeout> | undefined;
   private enabled = false;
+  /** Set while the last event before an opt-out goes out. No other event starts. */
+  private closing = false;
   private consentReady = false;
   private userReady = false;
   private generation = 0;
   private consentGeneration = 0;
   private user: Pick<CentralAuthUser, "id" | "email"> | null = null;
+  private installId: string | null = null;
   private tail = Promise.resolve();
   private pending = 0;
   private client: MobileAnalyticsClient | null = null;
@@ -41,18 +84,50 @@ export class MobileAnalytics {
     if (this.consentReady && this.enabled === enabled) return;
     this.consentReady = true;
     this.enabled = enabled;
-    const reports = this.createReports?.();
-    if (reports && this.userReady) Effect.runFork(reports.configure(enabled, this.user?.id ?? null));
+    this.closing = false;
+    if (this.userReady || !enabled) this.configureReports();
     this.consentGeneration += 1;
     this.generation += 1;
     if (!enabled) {
       this.clearAnonymous();
       this.client?.clear();
+      this.startClient();
     } else this.identify();
   }
 
-  isEnabled(): boolean {
-    return this.enabled;
+  /** Set once, before the preference loads. Null when the phone cannot keep an install ID. */
+  setInstallId(installId: string | null): void {
+    this.installId = installId;
+    if (this.consentReady && !this.enabled) {
+      this.configureReports();
+      this.startClient();
+    }
+  }
+
+  /** True when events go out: with the account when tracking is on, with the install ID when it is off. */
+  isSending(): boolean {
+    return this.enabled || this.installId !== null;
+  }
+
+  /** The install ID while tracking is off. The payload filter puts it on each event. */
+  anonymousProfileId(): string | null {
+    return this.enabled ? null : this.installId;
+  }
+
+  private configureReports(): void {
+    const reports = this.createReports?.();
+    if (!reports) return;
+    const subject = this.enabled ? (this.user?.id ?? null) : this.installId;
+    Effect.runFork(reports.configure(this.enabled || subject !== null, subject));
+  }
+
+  private startClient(): void {
+    if (!this.isSending()) return;
+    try {
+      this.client ??= this.createClient();
+    } catch {
+      this.client = null;
+    }
   }
 
   setUser(user: Pick<CentralAuthUser, "id" | "email"> | null): void {
@@ -66,8 +141,7 @@ export class MobileAnalytics {
       this.clearAnonymous();
     }
     this.user = next;
-    const reports = this.createReports?.();
-    if (reports && this.consentReady) Effect.runFork(reports.configure(this.enabled, next?.id ?? null));
+    if (this.consentReady) this.configureReports();
     this.enqueue(() => this.client?.clear());
     this.identify();
     if (next) {
@@ -94,22 +168,18 @@ export class MobileAnalytics {
 
   private identify(): void {
     if (!this.enabled) return;
-    try {
-      this.client ??= this.createClient();
-    } catch {
-      return;
-    }
+    this.startClient();
     const user = this.user;
     if (user) this.enqueue(() => this.client?.identify({ profileId: user.id, email: user.email }));
   }
 
   private enqueue(send: () => Promise<unknown> | undefined): void {
-    if (!this.enabled || !this.client) return;
+    if (!this.isSending() || !this.client) return;
     const generation = this.consentGeneration;
     this.pending += 1;
     this.tail = this.tail
       .then(async () => {
-        if (this.enabled && generation === this.consentGeneration) await send();
+        if (this.isSending() && generation === this.consentGeneration) await send();
       })
       .catch(() => undefined)
       .finally(() => {
@@ -120,12 +190,11 @@ export class MobileAnalytics {
   scope(): MobileAnalyticsScope {
     this.expireAnonymous();
     const generation = this.generation;
-    const enabled = this.enabled;
     const failureScope = this.createReports?.()?.scope() ?? null;
     return {
       track: (name, properties) => {
         this.expireAnonymous();
-        if (!enabled || generation !== this.generation) return;
+        if (generation !== this.generation) return;
         this.track(name, properties, failureScope);
       },
     };
@@ -136,27 +205,12 @@ export class MobileAnalytics {
     properties: MobileEventProperties<N>,
     failureScope?: ReturnType<ReportQueue["scope"]> | null,
   ): void {
-    if (!this.enabled) return;
+    if (!this.isSending() || this.closing) return;
     this.expireAnonymous();
     const safe = sanitizeMobileEvent(name, properties);
     if (safe.result === "failed") {
       const reports = failureScope === undefined ? this.createReports?.() : failureScope;
-      const operation =
-        name === "attachment_action"
-          ? "attachment"
-          : name === "message_send" || name === "conversation_opened"
-            ? "turn"
-            : name === "routine_action"
-              ? "routine"
-              : name === "agent_action"
-                ? "agent"
-                : name === "memory_action"
-                  ? "memory"
-                  : name === "search_action"
-                    ? "search"
-                    : name === "account_sign_out"
-                      ? "auth"
-                      : "team";
+      const operation = FAILURE_OPERATIONS[name];
       const failure = safeProperties({
         ...safe,
         operation,
@@ -168,6 +222,11 @@ export class MobileAnalytics {
       if (reports && failure) Effect.runFork(reports.record("client_operation_failed", failure));
     }
     if (!this.client || this.pending >= MAX_PENDING_EVENTS) return;
+    const installId = this.anonymousProfileId();
+    if (installId) {
+      this.enqueue(() => this.client?.track(name, safe, undefined, installId));
+      return;
+    }
     if (!this.user) {
       if (this.anonymousStartedAt === null) {
         this.anonymousStartedAt = Date.now();
@@ -201,6 +260,22 @@ export class MobileAnalytics {
       });
       throw error;
     }
+  }
+
+  /**
+   * Sends one last event and waits until it and the events before it are sent, for at most `limitMs`.
+   * The caller then turns tracking off. Until then, no other event starts.
+   */
+  async sendLast<N extends MobileEventName>(
+    name: N,
+    properties: MobileEventProperties<N>,
+    limitMs: number,
+  ): Promise<void> {
+    this.track(name, properties);
+    this.closing = true;
+    let limit: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([this.tail, new Promise((resolve) => (limit = setTimeout(resolve, limitMs)))]);
+    clearTimeout(limit);
   }
 
   retryReports(): void {

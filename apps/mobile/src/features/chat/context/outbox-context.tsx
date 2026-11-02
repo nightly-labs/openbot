@@ -11,6 +11,8 @@ import {
 } from "react";
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { ChannelHistoryRefreshError } from "@/features/channels/model/channel-store";
+import { donateShareTarget } from "@/features/share/model/share-extension";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 import { currentText } from "@/shared/lib/text";
@@ -107,24 +109,60 @@ async function deliverOutboxMessage(
   delivery: OutboxDelivery,
 ): Promise<OutboxDeliveryResult> {
   const { target } = message;
-  const repeatSafe = workspace.canRetryMessage(target.serverId);
-  const messageId = await uploadChatAttachments(delivery.files, {
-    cancelled: delivery.cancelled,
-    progress: delivery.progress,
-    fileProgress: delivery.fileProgress,
-    upload: (file, onProgress) => workspace.uploadAttachment(target.agentId, file, target.serverId, onProgress),
-    discard: (id) => workspace.discardAttachment(target.agentId, id, target.serverId),
+  const control = { cancelled: delivery.cancelled, progress: delivery.progress, fileProgress: delivery.fileProgress };
+  if (target.kind === "agent") {
+    const repeatSafe = workspace.canRetryMessage(target.serverId);
+    const messageId = await uploadChatAttachments(delivery.files, {
+      ...control,
+      upload: (file, onProgress) => workspace.uploadAttachment(target.agentId, file, target.serverId, onProgress),
+      discard: (id) => workspace.discardAttachment(target.agentId, id, target.serverId),
+      send: async (ids) => {
+        await delivery.beforeStore(repeatSafe);
+        return workspace.sendMessage(
+          target.agentId,
+          message.text,
+          ids,
+          message.replyToMessageId,
+          target.serverId,
+          repeatSafe ? message.clientMessageId : undefined,
+        );
+      },
+    });
+    const agent = workspace.agents.find((item) => item.serverId === target.serverId && item.id === target.agentId);
+    if (agent) donateShareTarget(agent.serverId, agent.id, agent.name);
+    return { messageId };
+  }
+  const { channelStore } = workspace;
+  await uploadChatAttachments(delivery.files, {
+    ...control,
+    upload: (file, onProgress) => channelStore.upload(target.serverId, file, onProgress),
+    discard: (id) => channelStore.discard(target.serverId, id),
     send: async (ids) => {
-      await delivery.beforeStore(repeatSafe);
-      return workspace.sendMessage(
-        target.agentId,
-        message.text,
-        ids,
-        message.replyToMessageId,
-        target.serverId,
-        repeatSafe ? message.clientMessageId : undefined,
-      );
+      // The host keeps the receipt of a channel operation with the channel, so a repeat is always safe.
+      await delivery.beforeStore(true);
+      try {
+        await channelStore.command(
+          target.serverId,
+          {
+            type: "send",
+            // The outbox id, so a repeat after a lost answer stores the message once.
+            operationId: message.clientMessageId,
+            channelId: target.channelId,
+            text: message.text,
+            // The member that the message names at its start, as the person saw the channel.
+            recipientAgentId: target.recipientAgentId,
+            replyToMessageId: message.replyToMessageId,
+            attachmentDraftIds: ids,
+          },
+          { waitForRefresh: true },
+        );
+      } catch (error) {
+        // The host stored the message. The next channel read shows it, so a failed read is not a
+        // failed send, and its drafts must not be discarded.
+        if (!(error instanceof ChannelHistoryRefreshError)) throw error;
+      }
+      return "";
     },
   });
-  return { messageId };
+  return { messageId: null };
 }

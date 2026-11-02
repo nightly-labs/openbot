@@ -17,6 +17,7 @@ export const messages = {
     "Güncelleme hizmeti yanıt vermedi. OpenBot birkaç dakika içinde kendiliğinden tekrar dener.",
   "error.update.checkNoRelease":
     "Bu platform için yayımlanmış bir güncelleme bulunamadı. OpenBot birkaç dakika içinde kendiliğinden tekrar dener.",
+  "error.update.managedByNix": "Bu OpenBot kopyasının güncellemelerini Nix yükler. Nix ile güncelleyin.",
   "error.update.managedByHost":
     "Bu Mac üzerindeki güncellemeler ana makine tarafından yüklenir. Güncelleme, ana makinenin bakımı çalışana kadar hazır kalır.",
   "error.update.siblingSession":

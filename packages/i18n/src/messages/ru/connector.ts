@@ -38,7 +38,6 @@ export const messages = {
   "connector.github.statusConnected": "Подключено",
   "connector.github.statusConnecting": "Подключение",
   "connector.github.statusExpired": "Истекло",
-  "connector.github.statusNotSetUp": "Не настроено",
   "connector.github.accountTitle": "Аккаунт",
   "connector.github.filterPlaceholder": {
     one: "Фильтр: {count} репозиторий",
@@ -81,20 +80,12 @@ export const messages = {
   "connector.github.keepConnected": "Оставить подключённым",
   "connector.github.close": "Закрыть",
   "connector.dangerZone": "Опасная зона",
-
-  "connector.hub.onThisComputer": "На этом компьютере",
-  "connector.hub.onHost": "На {host}",
-  "connector.hub.notSetUp": "Не настроено",
-  "connector.hub.available": "Доступно",
-  "connector.hub.localOnly": "Только ваш компьютер",
-  "connector.hub.open": "Открыть {name}",
-  "connector.hub.setUp": "Настроить",
-  "connector.hub.usedBy": "Используют: {names}",
+  "connector.statusUnknown": "Неизвестно",
+  "connector.readFailed": "OpenBot не смог прочитать состояние этого подключения.",
 
   "connector.slack.title": "Slack",
   "connector.slack.description":
     "Люди упоминают @OpenBot в Slack или пишут ему личным сообщением. Оркестратор Slack спрашивает нужного агента и отвечает.",
-  "connector.slack.statusNotSetUp": "Не настроено",
   "connector.slack.statusConnected": "Подключено",
   "connector.slack.statusAttention": "Требует внимания",
   "connector.slack.summaryConnected": "{workspace} · отвечает Оркестратор Slack",
@@ -109,13 +100,19 @@ export const messages = {
   "connector.slack.connect": "Подключить Slack",
   "connector.slack.addAgent": "Добавить агента",
   "connector.slack.actionFailed": "Slack не принял изменение",
-  "connector.slack.workspaceTitle": "Рабочее пространство",
+  "connector.slack.workspaceTitle": "Рабочие пространства",
   "connector.slack.workspaceDescription": "Люди упоминают @OpenBot или пишут ему личным сообщением.",
   "connector.slack.disconnectWorkspace": "Отключить",
+  "connector.slack.disconnectAllTitle": "Отключить Slack",
+  "connector.slack.disconnectAllSummary":
+    "Все рабочие пространства будут отключены. Связаться с вашими агентами через @OpenBot будет нельзя.",
+  "connector.slack.disconnectAllSummaryOrchestrator":
+    "Все рабочие пространства будут отключены. Оркестратор Slack и его разговоры будут удалены из OpenBot.",
   "connector.slack.missingScopes":
     "У OpenBot нет этих разрешений в Slack: {scopes}. Отключите рабочее пространство и подключите его снова.",
   "connector.slack.retryAt": "Slack попросил OpenBot подождать. Следующая попытка в {time}.",
   "connector.slack.reconnect": "Переподключить",
+  "connector.slack.pause": "Приостановить",
   "connector.slack.resume": "Возобновить",
   "connector.slack.rowAction": "{action}: {name}",
   "connector.slack.orchestratorTitle": "Оркестратор Slack",
@@ -157,11 +154,23 @@ export const messages = {
   "connector.slack.removeEffectDeleted": "Оркестратор Slack и его диалоги будут удалены из OpenBot.",
   "connector.slack.keep": "Оставить подключённым",
   "connector.slack.close": "Закрыть",
+  "connector.slack.addWorkspace": "Добавить пространство",
+  "connector.slack.limitReached": {
+    one: "Можно подключить не более {count} рабочего пространства.",
+    few: "Можно подключить не более {count} рабочих пространств.",
+    many: "Можно подключить не более {count} рабочих пространств.",
+    other: "Можно подключить не более {count} рабочего пространства.",
+  },
+  "connector.slack.summaryMany": {
+    one: "{count} рабочее пространство · отвечает Оркестратор Slack",
+    few: "{count} рабочих пространства · отвечает Оркестратор Slack",
+    many: "{count} рабочих пространств · отвечает Оркестратор Slack",
+    other: "{count} рабочего пространства · отвечает Оркестратор Slack",
+  },
 
   "connector.discord.title": "Discord",
   "connector.discord.description":
     "Люди упоминают @OpenBot в канале сервера Discord. Оркестратор Discord спрашивает нужного агента и отвечает.",
-  "connector.discord.statusNotSetUp": "Не настроено",
   "connector.discord.statusConnected": "Подключено",
   "connector.discord.statusAttention": "Требует внимания",
   "connector.discord.summaryConnected": "{workspace} · отвечает Оркестратор Discord",
@@ -176,13 +185,19 @@ export const messages = {
   "connector.discord.connect": "Подключить Discord",
   "connector.discord.addAgent": "Добавить агента",
   "connector.discord.actionFailed": "Discord не принял изменение",
-  "connector.discord.workspaceTitle": "Сервер Discord",
+  "connector.discord.workspaceTitle": "Серверы Discord",
   "connector.discord.workspaceDescription": "Упомяните @OpenBot в канале. Ответьте OpenBot, чтобы продолжить.",
   "connector.discord.disconnectWorkspace": "Отключить",
+  "connector.discord.disconnectAllTitle": "Отключить Discord",
+  "connector.discord.disconnectAllSummary":
+    "Все серверы будут отключены. Связаться с вашими агентами через @OpenBot будет нельзя.",
+  "connector.discord.disconnectAllSummaryOrchestrator":
+    "Все серверы будут отключены. Оркестратор Discord и его разговоры будут удалены из OpenBot.",
   "connector.discord.missingScopes":
     "У OpenBot нет этих разрешений в Discord: {scopes}. Отключите сервер Discord и подключите его снова.",
   "connector.discord.retryAt": "Discord попросил OpenBot подождать. Следующая попытка в {time}.",
   "connector.discord.reconnect": "Переподключить",
+  "connector.discord.pause": "Приостановить",
   "connector.discord.resume": "Возобновить",
   "connector.discord.rowAction": "{action}: {name}",
   "connector.discord.orchestratorTitle": "Оркестратор Discord",
@@ -223,10 +238,37 @@ export const messages = {
   "connector.discord.removeEffectDeleted": "Оркестратор Discord и его диалоги будут удалены из OpenBot.",
   "connector.discord.keep": "Оставить подключённым",
   "connector.discord.close": "Закрыть",
+  "connector.discord.addWorkspace": "Добавить сервер Discord",
+  "connector.discord.limitReached": {
+    one: "Можно подключить не более {count} сервера Discord.",
+    few: "Можно подключить не более {count} серверов Discord.",
+    many: "Можно подключить не более {count} серверов Discord.",
+    other: "Можно подключить не более {count} сервера Discord.",
+  },
+  "connector.discord.summaryMany": {
+    one: "{count} сервер Discord · отвечает Оркестратор Discord",
+    few: "{count} сервера Discord · отвечает Оркестратор Discord",
+    many: "{count} серверов Discord · отвечает Оркестратор Discord",
+    other: "{count} сервера Discord · отвечает Оркестратор Discord",
+  },
+  "connector.discord.accessTitle": "Кто может использовать OpenBot",
+  "connector.discord.accessDescription": "OpenBot отвечает только этим людям. Упоминания от других он игнорирует.",
+  "connector.discord.accessEveryone": "Все на сервере",
+  "connector.discord.accessEveryoneDescription":
+    "Упомянуть OpenBot может любой, кто может писать в канале, который видит OpenBot.",
+  "connector.discord.accessRoles": "Участники с ролями: {roles}",
+  "connector.discord.accessChoose": "Выбрать роли",
+  "connector.discord.accessDialogTitle": "Кто может использовать OpenBot в {workspace}?",
+  "connector.discord.accessDialogDescription": "Если роль не выбрана, упомянуть OpenBot могут все.",
+  "connector.discord.accessLoading": "Загрузка ролей…",
+  "connector.discord.accessLoadFailed": "Роли Discord не загрузились",
+  "connector.discord.accessNoRoles": "На этом сервере нет ролей для выбора.",
+  "connector.discord.accessRoleDeleted": "{role} (удалена)",
+  "connector.discord.accessSave": "Сохранить",
+  "connector.discord.accessHostUpdate": "Обновите OpenBot на {host}, чтобы выбрать роли.",
   "connector.telegram.title": "Telegram",
   "connector.telegram.description":
     "Добавьте бота OpenBot в группу Telegram или откройте с ним личный чат. Оркестратор Telegram спрашивает нужного агента и отвечает.",
-  "connector.telegram.statusNotSetUp": "Не настроено",
   "connector.telegram.statusConnected": "Подключено",
   "connector.telegram.statusAttention": "Требует внимания",
   "connector.telegram.summaryConnected": {
@@ -265,10 +307,13 @@ export const messages = {
   "connector.telegram.resume": "Возобновить",
   "connector.telegram.reconnect": "Переподключить",
   "connector.telegram.disconnectChat": "Отключить",
+  "connector.telegram.disconnectAllTitle": "Отключить Telegram",
+  "connector.telegram.disconnectAllSummary":
+    "Все чаты будут отключены. Связаться с вашими агентами через бота OpenBot будет нельзя.",
+  "connector.telegram.disconnectAllSummaryOrchestrator":
+    "Все чаты будут отключены. Оркестратор Telegram и его разговоры будут удалены из OpenBot.",
   "connector.telegram.rowAction": "{action}: {name}",
-  "connector.telegram.linkTitle": "Привязать ещё один чат",
-  "connector.telegram.linkDescription": "Telegram откроется в браузере. Чат появится здесь, когда будет привязан.",
-  "connector.telegram.linkWaiting": "Ожидание Telegram. Выберите чат в Telegram.",
+  "connector.telegram.linkChat": "Привязать чат",
   "connector.telegram.addToGroup": "Добавить в группу",
   "connector.telegram.openDirectChat": "Открыть личный чат",
   "connector.telegram.orchestratorTitle": "Оркестратор Telegram",
@@ -328,11 +373,13 @@ export const messages = {
     "В приложении 1Password откройте «Настройки» > «Разработчик» и включите «Integrate with 1Password CLI».",
   "connector.onePassword.stepAppReady": "Приложение 1Password позволяет CLI создать общее хранилище.",
   "connector.onePassword.openApp": "Открыть 1Password",
+  "connector.onePassword.openAppFailed": "OpenBot не смог открыть 1Password.",
   "connector.onePassword.checkAgain": "Проверить снова",
   "connector.onePassword.stepVaultTitle": "Создайте общее хранилище",
   "connector.onePassword.stepVaultDescription":
     "OpenBot создаёт хранилище «Shared with OpenBot» и сервисный аккаунт, который может только читать его. 1Password попросит вас подтвердить.",
-  "connector.onePassword.useToken": "Использовать вместо этого токен сервисного аккаунта",
+  "connector.onePassword.useTokenDescription": "Вместо этих шагов вставьте токен сервисного аккаунта с 1Password.com.",
+  "connector.onePassword.useTokenAction": "Использовать токен",
   "connector.onePassword.tokenLabel": "Токен сервисного аккаунта",
   "connector.onePassword.tokenPlaceholder": "ops_…",
   "connector.onePassword.connectWithToken": "Подключить",
@@ -358,7 +405,6 @@ export const messages = {
   "connector.onePassword.actionFailed": "OpenBot не удалось изменить подключение к 1Password.",
   "connector.onePassword.statusConnected": "Подключено",
   "connector.onePassword.statusConnecting": "Подключение",
-  "connector.onePassword.statusNotSetUp": "Не настроено",
   "connector.onePassword.descriptionHost":
     "Предоставьте OpenBot на {host} доступ к отдельному хранилищу 1Password через сервисный аккаунт, чтобы агенты на {host} могли входить на сайты в его браузере.",
   "connector.onePassword.howItWorksHost":
@@ -376,7 +422,28 @@ export const messages = {
   "connector.bitwarden.sessionKey": "Ключ сессии Bitwarden",
   "connector.bitwarden.connect": "Подключить Bitwarden",
   "connector.bitwarden.disconnect": "Отключить Bitwarden",
+  "connector.bitwarden.disconnectAction": "Отключить",
+  "connector.bitwarden.disconnectSummary":
+    "OpenBot забудет ключ сеанса. Агенты больше не смогут подставлять логины из Bitwarden. Другие клиенты Bitwarden останутся разблокированными.",
+  "connector.bitwarden.disconnectSummaryHost":
+    "{host} удалит ключ API и мастер-пароль. Агенты на {host} больше не смогут подставлять логины из Bitwarden.",
   "connector.bitwarden.connected": "Подключено",
-  "connector.bitwarden.disconnected": "Не подключено",
   "connector.bitwarden.actionFailed": "OpenBot не удалось изменить подключение к Bitwarden.",
+  "connector.bitwarden.descriptionHost": "Заполнять логины в браузере на {host} из Bitwarden или Vaultwarden.",
+  "connector.bitwarden.setupHost":
+    "{host} входит через свой Bitwarden CLI. В хранилище создайте папку с именем Shared with OpenBot и положите в неё только логины, которые могут использовать агенты. В веб-хранилище откройте Настройки › Безопасность › Ключи и посмотрите ключ API. Ниже введите адрес сервера, client_id, client_secret и мастер-пароль.",
+  "connector.bitwarden.scopeHost":
+    "Все агенты на {host} могут использовать подходящие логины из Shared with OpenBot. OpenBot использует точные HTTPS-источники. Он не использует элементы, которые запрашивают мастер-пароль, и элементы с собственным правилом сопоставления URI.",
+  "connector.bitwarden.sessionHost":
+    "{host} хранит ключ API и мастер-пароль в зашифрованном виде, чтобы снова разблокировать хранилище после перезапуска. Этот компьютер их не хранит. Отключение удаляет их с {host}. {host} должен подключаться к адресу сервера по HTTPS.",
+  "connector.bitwarden.serverUrl": "Адрес сервера",
+  "connector.bitwarden.folderTitle": "Общая папка",
+  "connector.bitwarden.folderDescription":
+    "Переместите логин в эту папку в Bitwarden, чтобы агенты могли входить с его помощью. Уберите его оттуда, чтобы прекратить доступ.",
+  "connector.bitwarden.folderName": "Shared with OpenBot",
+  "connector.bitwarden.folderKind": "Папка в Bitwarden",
+  "connector.bitwarden.clientId": "client_id ключа API",
+  "connector.bitwarden.clientSecret": "client_secret ключа API",
+  "connector.bitwarden.masterPassword": "Мастер-пароль",
+  "connector.bitwarden.connecting": "Подключение",
 } as const satisfies PartialTranslation<typeof source>;

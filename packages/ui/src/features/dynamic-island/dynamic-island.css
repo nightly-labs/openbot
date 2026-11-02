@@ -473,6 +473,15 @@
   border-radius: var(--dynamic-island-external-expanded-radius);
 }
 
+/* Keyboard focus on the toggle draws the shared focus ring on the island outline. The shell clips
+   its content, so the ring is inset: a ring outside the outline would be cut off. */
+.dynamic-island-shell:has(.dynamic-island-toggle:focus-visible) .dynamic-island-silhouette-body,
+.dynamic-island-external .dynamic-island-shell:has(.dynamic-island-toggle:focus-visible) .dynamic-island-silhouette {
+  box-shadow:
+    inset var(--openbot-focus-ring),
+    inset 0 -1px 0 var(--openbot-shadow-ring);
+}
+
 .dynamic-island-external > .dynamic-island-hover-zone {
   top: 0;
 }

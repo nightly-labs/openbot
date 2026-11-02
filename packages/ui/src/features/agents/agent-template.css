@@ -1,15 +1,6 @@
 /* The publish dialog and the install dialog of an agent template. Both are one centred card: the
  * agent's identity on top, its content below, and the actions in a footer on the right. */
 
-.agent-template-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--openbot-layer-dialog);
-  display: grid;
-  place-items: center;
-  padding: var(--openbot-space-6);
-}
-
 .agent-template-dialog {
   position: relative;
   display: flex;
@@ -157,9 +148,23 @@
   gap: var(--openbot-space-1);
 }
 
+/* The instructions as Markdown, at the body size of the dialog. Headings stay below the agent's name. */
 .agent-template-prose {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
   overflow-wrap: anywhere;
-  white-space: pre-wrap;
+}
+
+.agent-template-prose .message-markdown-heading[data-level] {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
+.agent-template-prose .message-markdown-heading:not([data-level="1"], [data-level="2"]) {
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
 }
 
 .agent-template-list {

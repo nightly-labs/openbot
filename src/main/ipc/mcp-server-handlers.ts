@@ -28,7 +28,7 @@ import { SIGN_IN_RELAY_CAPABILITY, SIGN_IN_RELAY_ROUTES } from "@openbot/contrac
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
-import { MCP_PROBE_TIMEOUT_MS } from "../../backend/mcp-probe";
+import { MCP_STDIO_PROBE_TIMEOUT_MS } from "../../backend/mcp-probe";
 import { type McpToolRuntimes, needsManagedRuntime } from "../../backend/mcp-provider-shapes";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { ResponseDecoder } from "../remote-host-decoding";
@@ -134,7 +134,7 @@ const TOOL_RUNTIME_TEST_WAIT_MS = 60_000;
  * deadline even starts, so the caller's request must cover both. Without this the 15-second
  * request limit reports a timeout for a download that is still running, before the host probes.
  */
-const REMOTE_TEST_TIMEOUT_MS = TOOL_RUNTIME_TEST_WAIT_MS + MCP_PROBE_TIMEOUT_MS + 20_000;
+const REMOTE_TEST_TIMEOUT_MS = TOOL_RUNTIME_TEST_WAIT_MS + MCP_STDIO_PROBE_TIMEOUT_MS + 20_000;
 
 export function mcpServerIpcHandlers({
   service,

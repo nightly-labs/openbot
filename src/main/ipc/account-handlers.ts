@@ -35,7 +35,9 @@ export function accountIpcHandlers({ centralAuth, host }: AccountIpcDependencies
       revokeMobileConnectLink: handler(() =>
         runCauseEffect(centralAuth.revokeMobileConnectLink(host.getMobileConnectHost())),
       ),
-      listMobileConnectedDevices: handler(() => runCauseEffect(centralAuth.listMobileConnectedDevices())),
+      listMobileConnectedDevices: handler(() =>
+        runCauseEffect(centralAuth.listMobileConnectedDevices(host.getMobileConnectHost())),
+      ),
       listAccountSessions: handler(() => runCauseEffect(centralAuth.listAccountSessions())),
       revokeAccountSession: payloadHandler(stringPayload("sessionId", INPUT_LIMITS.identifier), (sessionId) =>
         runCauseEffect(centralAuth.revokeAccountSession(sessionId)),

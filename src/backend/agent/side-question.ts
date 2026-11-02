@@ -1,8 +1,10 @@
 import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentSummary,
   type AskSideQuestionInput,
   CONVERSATION_PLAN_ITEM_TYPE,
+  CONVERSATION_SUBAGENTS_ITEM_TYPE,
   type ConversationMessage,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
@@ -10,12 +12,12 @@ import { tagSafe } from "./developer-instructions";
 
 /** The chat messages a side question reads, newest last. */
 export const SIDE_QUESTION_CHAT_MESSAGES = 60;
-const MESSAGE_CHARACTERS = 4_000;
+const MESSAGE_CHARACTERS = INPUT_LIMITS.sideQuestionEarlierText;
 const CHAT_CHARACTERS = 60_000;
 const EARLIER_CHARACTERS = 60_000;
 
 /** Indented JSON for a prompt block, with `<` escaped as `tagSafe` does. */
-function promptJson(value: unknown): string {
+export function promptJson(value: unknown): string {
   return tagSafe(JSON.stringify(value, null, 2));
 }
 
@@ -29,11 +31,13 @@ function chatMessage(message: ConversationMessage): boolean {
     message.itemType !== "agent_attachment" &&
     !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
     message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
+    message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
     message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE
   );
 }
 
-function chatTranscript(agent: AgentSummary, messages: readonly ConversationMessage[]) {
+/** The chat messages that fit the budget, newest last, each with the name of its writer. */
+export function chatTranscript(agent: AgentSummary, messages: readonly ConversationMessage[]) {
   const entries: { from: string; text: string }[] = [];
   let characters = 0;
   for (const message of [...messages].filter(chatMessage).reverse()) {

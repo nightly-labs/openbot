@@ -4,7 +4,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, type Scope } from "effect";
 import type { CliLoginProcess } from "./agent/cli-login-flow";
 import { waitForSuccessfulProcess } from "./agent/provider-status";
-import type { AgentCliInfo } from "./cli";
+import { type AgentCliInfo, cliPathEnvironment } from "./cli";
 import { type ProviderClientOperationError, providerCall, providerSync } from "./provider-client-effects";
 import { stopProcessTree } from "./windows-process-tree";
 
@@ -92,7 +92,10 @@ export const startProviderTerminalLogin = Effect.fn("ProviderTerminalLogin.start
             ],
             { stdio: "ignore", windowsHide: true, env: { ...process.env, OPENBOT_LOGIN_EXECUTABLE: cli.executable } },
           )
-        : spawn("xterm", ["-e", cli.executable], { stdio: "ignore" }),
+        : spawn("xterm", ["-e", cli.executable], {
+            stdio: "ignore",
+            env: { ...process.env, ...cliPathEnvironment(cli) },
+          }),
     ),
     (child) => stopProcessTree(child).pipe(Effect.ignore),
   );

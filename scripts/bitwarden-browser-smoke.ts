@@ -52,10 +52,13 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
       return JSON.stringify(args[1] === "items" ? [item] : item);
     },
   });
-  const vault = passwordVaultRouter(
-    { connected: () => false, loginsFor: () => Effect.succeed(null), secretFor: () => Effect.succeed(null) },
-    connector,
-  );
+  const vault = passwordVaultRouter([
+    {
+      prefix: "",
+      vault: { connected: () => false, loginsFor: () => Effect.succeed(null), secretFor: () => Effect.succeed(null) },
+    },
+    { prefix: "bitwarden:", vault: connector },
+  ]);
   const checks: string[] = [];
   try {
     await runCauseEffect(connector.connect("fixture-session-key"));
@@ -93,7 +96,7 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
         const value = await runCauseEffect(
           vault.secretFor(login.id, prepared.request.origin, method === "password" ? "password" : "totp"),
         );
-        if (!value || (await runCauseEffect(prepared.submit(value))) !== "submitted")
+        if (!value || (await runCauseEffect(prepared.submit(value, true))) !== "submitted")
           throw new Error("Bitwarden fixture did not submit.");
         const snapshot = await runCauseEffect(browser.snapshot(tab.id));
         if (!snapshot.url.endsWith("/complete") || JSON.stringify(snapshot).includes(value))

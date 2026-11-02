@@ -4,6 +4,7 @@ import {
   parseGetStorageUsageInput,
   STORAGE_CAPABILITY,
 } from "@openbot/contracts/ipc";
+import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -26,6 +27,13 @@ export async function routeStorage(
   storage: TeamApiStorage | undefined,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
+  if (method === "POST" && url.pathname === STORAGE_DISK_ROUTES.disk) {
+    if (!storage || !capabilities.has(STORAGE_DISK_CAPABILITY))
+      throw new HttpError(400, sourceText("error.team.storageUnsupported"));
+    // `readJson` checks that the body is empty. Every member can read it, as `storage-disk-v1` says.
+    await readJson(request);
+    return json(200, await runCauseEffect(storage.disk()));
+  }
   const usage = method === "POST" && url.pathname === STORAGE_ROUTES.usage;
   const deleteFile = method === "POST" && url.pathname === STORAGE_ROUTES.deleteFile;
   const clear = method === "POST" && url.pathname === STORAGE_ROUTES.clear;

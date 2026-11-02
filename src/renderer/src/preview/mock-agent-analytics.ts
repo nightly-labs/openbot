@@ -2,7 +2,7 @@ import type { AnalyticsProviderDay, AnalyticsTotals, HostAnalytics, HostAnalytic
 import {
   type AgentAnalytics,
   type AgentAnalyticsInput,
-  type AgentSummary,
+  type ClientAgentSummary,
   emptyAnalyticsTotals,
 } from "@openbot/contracts/ipc";
 
@@ -10,7 +10,7 @@ import {
 // same curve, and the per-agent table previews as identical rows with equal shares.
 export function mockAgentAnalytics(
   input: AgentAnalyticsInput,
-  agent: Pick<AgentSummary, "id" | "model" | "provider">,
+  agent: Pick<ClientAgentSummary, "id" | "model" | "provider">,
   weight = 1,
 ): AgentAnalytics {
   const daily = [];
@@ -61,7 +61,7 @@ export function mockAgentAnalytics(
 
 export function mockHostAnalytics(
   input: HostAnalyticsInput,
-  agents: Pick<AgentSummary, "id" | "model" | "provider">[],
+  agents: Pick<ClientAgentSummary, "id" | "model" | "provider">[],
 ): HostAnalytics {
   const selected = agents.filter((agent) => !input.agentId || agent.id === input.agentId);
   const reports = selected.map((agent, index) =>
@@ -95,8 +95,15 @@ export function mockHostAnalytics(
     const provider = selected[index]?.provider ?? "";
     for (const day of report.daily) {
       const key = JSON.stringify([day.date, provider]);
-      const cell = providerDays.get(key) ?? { date: day.date, provider, processedTokens: 0, estimatedCostUsd: null };
+      const cell = providerDays.get(key) ?? {
+        date: day.date,
+        provider,
+        processedTokens: 0,
+        cachedInput: null,
+        estimatedCostUsd: null,
+      };
       cell.processedTokens += day.processedTokens;
+      if (day.cachedInput !== null) cell.cachedInput = (cell.cachedInput ?? 0) + day.cachedInput;
       if (day.estimatedCostUsd !== null) cell.estimatedCostUsd = (cell.estimatedCostUsd ?? 0) + day.estimatedCostUsd;
       providerDays.set(key, cell);
     }

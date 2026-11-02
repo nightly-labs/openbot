@@ -32,6 +32,8 @@ export const messages = defineMessages("mobile.auth", {
   "mobile.auth.signIn.helpStep2": "2. Go to Settings → Mobile Connect.",
   "mobile.auth.signIn.helpStep3": "3. Choose Generate QR code, then scan it here.",
   "mobile.auth.signIn.emailButton": "Continue with email",
+  "mobile.auth.done.title": "Connected",
+  "mobile.auth.done.body": "You are signed in.",
   "mobile.auth.email.title": "Sign in with email",
   "mobile.auth.email.description": "Enter your email address. We will send you a one-time code.",
   "mobile.auth.email.label": "Email",

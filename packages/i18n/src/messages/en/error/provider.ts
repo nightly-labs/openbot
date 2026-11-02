@@ -6,6 +6,10 @@ export const messages = defineMessages("error.provider", {
     "OpenBot could not register MCP servers in the Codex configuration. Check that your Codex config.toml is valid and writable, then restart OpenBot.",
   "error.provider.computerUseConfig":
     "OpenBot could not register Computer Use in the Codex configuration. Check that your Codex config.toml is valid and writable, then restart OpenBot. You can turn off Computer Use in the teammate settings to continue without it.",
+  "error.provider.codexUnresponsive": "Codex stopped answering, so OpenBot ended its process.",
+  "error.provider.acpUnresponsive": "{provider} did not answer in time, so OpenBot ended its process.",
+  "error.provider.acpMcpNotLoaded":
+    "{provider} did not load OpenBot's tools, so this agent cannot use them or reach its teammates. A {provider} team policy can block local MCP servers. Ask your team admin to allow them, then try again.",
   "error.provider.endpointsReadOnly":
     "The saved endpoints were written by a newer version of OpenBot, or the file cannot be read. Update OpenBot to change them.",
   "error.provider.endpointNoSecureStorage":
@@ -56,6 +60,10 @@ export const messages = defineMessages("error.provider", {
     "OpenBot could not reach the provider release sources. Check the connection and try again.",
   "error.provider.runtimesUnsupported": "Provider runtimes are not available on this platform.",
   "error.provider.closing": "OpenBot is closing.",
+  "error.provider.removeWhileOn": "Turn the provider off before you remove its download.",
+  "error.provider.removeWhileDownloading": "Wait for the download to end, then remove it.",
+  "error.provider.removeIncomplete": "A program uses some files of this CLI. Close it, then try again.",
+  "error.provider.removeDownloadsFailed": "Could not remove the CLI downloads of {providers}.",
   "error.provider.cliOverride": "Remove the explicit CLI path override before updating in OpenBot.",
   "error.provider.runtimeUpdateIncomplete": "The runtime update did not complete.",
   "error.provider.downloadHttp": "Runtime download failed with HTTP {status}.",
@@ -93,11 +101,15 @@ export const messages = defineMessages("error.provider", {
   "error.provider.modelsTooMany": "There are too many models.",
   "error.provider.modelIdCharacter": "A model ID has an unusable character.",
   "error.provider.modelIdDuplicate": "Two models have the same ID.",
+  "error.provider.contextWindowInvalid":
+    "A model's context window must be a whole number of tokens from {min} to {max}.",
+  "error.provider.maxOutputInvalid": "A model's max output must be a whole number of tokens from {min} to {max}.",
   "error.provider.headersTooMany": "There are too many headers.",
   "error.provider.headerNameCharacter": "A header name has a character HTTP does not allow.",
   "error.provider.headerNameTooLong": "A header name is too long.",
   "error.provider.headerNameDuplicate": "Two headers have the same name.",
   "error.provider.headerValueInvalid": "A header value is missing or too long.",
+  "error.provider.headerValueMissing": "The header {name} needs a value.",
   "error.provider.apiKeyTooLong": "The API key is too long.",
   "error.provider.localOnly": "Providers can only be changed on the computer that runs the agents.",
   "error.provider.keyRequired": "A provider key is required.",
@@ -111,19 +123,15 @@ export const messages = defineMessages("error.provider", {
   "error.provider.codexNotStarted": "Codex CLI was found but could not be started.",
   "error.provider.codexNotStartedHint":
     "Codex CLI was found but could not be started. Run `codex --version` in a new terminal.",
+  "error.provider.codexManagedNotStarted":
+    "ChatGPT was downloaded but could not be started. Download it again in OpenBot.",
   "error.provider.codexMissing": "ChatGPT is not downloaded. Download it in OpenBot to continue.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex ignored {count} setting in its configuration: {settings}. Correct or remove it, or update Codex.",
-    other: "Codex ignored {count} settings in its configuration: {settings}. Correct or remove them, or update Codex.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex ignored {count} setting in its configuration. Correct or remove it, or update Codex.",
-    other: "Codex ignored {count} settings in its configuration. Correct or remove them, or update Codex.",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} is too old. OpenBot requires 2.1.232 or newer.",
   "error.provider.claudeNotStarted": "Claude CLI was found but could not be started.",
   "error.provider.claudeNotStartedHint":
     "Claude CLI was found but could not be started. Run `claude --version` in a new terminal.",
+  "error.provider.claudeManagedNotStarted":
+    "Claude was downloaded but could not be started. Download it again in OpenBot.",
   "error.provider.claudeMissing": "Claude is not downloaded. Download it in OpenBot to continue.",
   "error.provider.grokOutdated": "Grok CLI {version} is too old. OpenBot requires 1.0.5 or newer.",
   "error.provider.grokNotStarted": "Grok CLI was found but could not be started.",
@@ -164,9 +172,21 @@ export const messages = defineMessages("error.provider", {
   "error.provider.noAuthenticatedAccount": "{provider} did not return an authenticated account.",
   "error.provider.signInExpired": "Your {provider} sign-in expired. Sign in again to continue.",
   "error.provider.cliActivateFailed": "OpenBot could not activate the managed CLI.",
+  "error.provider.cliNewVersionNotStarted": "The new version did not start.",
   "error.provider.cliBusyReconnect": "The {provider} CLI is working on a turn. Wait for it to finish, then reconnect.",
+  "error.provider.cliBusySignOut": "The {provider} CLI is working on a turn. Wait for it to finish, then disconnect.",
   "error.provider.opencodeCredentialsRejected":
     "The model provider rejected the API key. Fix the OpenCode key in Settings, or the provider's key with `opencode auth login`. Then try again or choose another model.\n{detail}",
+  "error.provider.opencodeAuthRequired":
+    'OpenCode has no sign-in for the model provider "{provider}". Choose a model with the Free label, or connect the provider: paste an OpenCode Go key in the OpenCode settings, or run `opencode auth login` in a terminal. Then try again.',
+  "error.provider.opencodeAuthRequiredUnknown":
+    "OpenCode has no sign-in for the provider of this model. Choose a model with the Free label, or connect the provider: paste an OpenCode Go key in the OpenCode settings, or run `opencode auth login` in a terminal. Then try again.",
+  "error.provider.customEndpointKeyRefused":
+    'The endpoint "{provider}" refused its API key or headers. Enter them again in Server settings → Providers, then try again.',
+  "error.provider.customEndpointKeyMissing":
+    'The endpoint "{provider}" needs an API key. Add the key in Server settings → Providers, then try again.',
+  "error.provider.opencodeKeyExpired":
+    "Your OpenCode API key expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
   "error.provider.opencodeServiceFailure":
     "OpenCode could not complete this turn because its local service failed. Try again. If the error continues, reconnect OpenCode in Settings.",
   "error.provider.opencodeRateLimited":
@@ -175,10 +195,16 @@ export const messages = defineMessages("error.provider", {
     "The model provider refused the request because of the account's billing. Waiting does not fix this. Add a payment method or funds in the provider account, or choose another model.\n{detail}",
   "error.provider.opencodeInvalidUpload":
     "OpenCode's model provider reported an invalid upload request. Choose another model and continue. Check saved routines before you create them again.\n{detail}",
+  "error.provider.opencodeUnreadableContent":
+    "This model cannot read a file or image in this chat. Choose a model that can read files, then send your message again.",
+  "error.provider.opencodeFreeLimit":
+    "The free OpenCode models reached their usage limit. All free models share this limit. To continue, paste an OpenCode Go key in the OpenCode settings, or choose a model from another provider.",
   "error.provider.opencodeProviderFailed":
     "The model provider failed on its side. Your connection is not the cause. Try again later or choose another model.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode could not connect to the model provider. Check the network connection of the computer that runs OpenBot, then try again.\n{detail}",
+  "error.provider.opencodeDatabaseNewer":
+    "OpenCode could not open its database because a newer OpenCode version changed it. Update OpenCode to version 2 or later, then try again.",
   "error.provider.opencodeNoAnswer":
     "The OpenCode model ended the turn with no answer. Try again, or choose another model.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -201,6 +227,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.antigravitySignIn": "Sign in with Google to use Gemini.",
   "error.provider.antigravityRateLimited":
     "Gemini refused the request because a rate limit or the plan's quota is reached. Wait a few minutes or choose another model, then try again.\n{detail}",
+  "error.provider.antigravityQuotaReached":
+    "Google says a Gemini usage limit is reached. The limit can be for one model, so the usage page of your plan can show more left. Choose another Gemini model, or wait for the reset.\n{detail}",
   "error.provider.antigravityModelUnavailable":
     "Gemini cannot use this model now. Choose another model, then try again.\n{detail}",
   "error.provider.antigravityServiceFailure":
@@ -221,6 +249,18 @@ export const messages = defineMessages("error.provider", {
   "error.provider.clineNotStarted": "Cline could not start. Run `cline --version` in a terminal.",
   "error.provider.clineVersionUnreadable": "Unable to read the Cline CLI version.",
   "error.provider.clineSignIn": "Sign in with Cline or set CLINE_API_KEY to use Cline.",
+  "error.provider.kimiArchivePath": "The Kimi archive has an unexpected path.",
+  "error.provider.kimiChecksum": "Kimi runtime checksum mismatch.",
+  "error.provider.kimiLicenseChecksum": "Kimi license checksum mismatch.",
+  "error.provider.kimiMissing": "Kimi is not downloaded. Download it in OpenBot to continue.",
+  "error.provider.kimiOutdated": "Kimi CLI {version} is too old. OpenBot requires 1.52.0 or newer.",
+  "error.provider.kimiNotStarted": "Kimi could not start. Run `kimi --version` in a terminal.",
+  "error.provider.kimiVersionUnreadable": "Unable to read the Kimi CLI version.",
+  "error.provider.kimiSignIn": "Sign in with Kimi Code to use Kimi.",
+  "error.provider.hermesMissing": "Hermes Agent is not installed. Install it, then try again.",
+  "error.provider.hermesNotStarted": "Hermes Agent could not start. Run `hermes --version` in a terminal.",
+  "error.provider.hermesVersionUnreadable": "Unable to read the Hermes Agent version.",
+  "error.provider.hermesSignIn": "Sign in with Nous Portal, or run `hermes setup` in a terminal, to use Hermes.",
   "error.provider.usageLimitReached": "The account reached its usage limit.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
@@ -233,6 +273,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.acpSignInStopped": "The sign-in stopped before it was complete.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini could not open the sign-in page. Install a browser and xdg-utils, then connect from a desktop session on this host. A server with no desktop cannot complete this sign-in.",
+  "error.provider.geminiBrowserOpenFailed":
+    "Gemini could not open the sign-in page in your browser. Check your default browser, then connect again.",
   "error.provider.acpSignInFailed": "The sign-in did not complete.",
   "error.provider.acpSignInFailedReason": "The sign-in did not complete: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -240,11 +282,16 @@ export const messages = defineMessages("error.provider", {
   "error.provider.httpsSignInLinkOnly": "Only HTTPS sign-in links can open in the browser.",
   "error.provider.geminiKeyRefused":
     "Gemini refused the saved API key. Replace or remove the key in Settings, then connect again.",
+  "error.provider.keyProviderRefused":
+    "{provider} refused the saved API key. Replace or remove the key in Settings, then try again.",
+  "error.provider.keyProviderNoBalance":
+    "The {provider} account of the saved API key has no balance. Add credit to the account, then try again.",
   "error.provider.messageTooLarge": "OpenBot stopped {provider} because it sent a message larger than {limit} MB.",
   "error.provider.customAgentIdInvalid":
     "An agent ID must be lowercase letters, digits or `-`, and cannot be the ID of a built-in provider.",
   "error.provider.customAgentEnvInvalid":
     "A variable name must be letters, digits or `_`, and not start with a digit. Use each name once, at most 16 names.",
+  "error.provider.customAgentUsagePromptInvalid": "A usage command must be one line of at most 256 characters.",
   "error.provider.customAgentCommandInvalid":
     "The command must be a full path, a path that starts with ~/, or a command name with no spaces.",
   "error.provider.customAgentArgsInvalid": "An argument cannot contain a line break. Use at most 32 arguments.",
@@ -258,6 +305,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.customAgentRemoveBusy":
     "Wait for the active turn and queue to finish before you remove this custom agent.",
   "error.provider.customAgentNone": "No custom agent is saved.",
+  "error.provider.customAgentsUnavailable": "This server cannot change its custom agents. Update OpenBot on it.",
   "error.provider.customAgentMissing": "This custom agent is not saved now. Choose another model.",
   "error.provider.customAgentSignIn": "Sign in with the agent's own command, then try again.",
   "error.provider.customAgentsReadOnly":
@@ -265,6 +313,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.customAgentNoSecureStorage":
     "This computer has no secure storage, so environment values cannot be saved. Remove them and try again.",
   "error.provider.customAgentNotSaved": "This custom agent is not saved. Refresh the list and try again.",
+  "error.provider.customAgentWorkspaceOnly": "{reason}. Workspace only blocks this. Try Full access.",
   "error.provider.customAgentTooMany": "You can save at most {count} custom agents.",
   "error.provider.customAgentEnvValueMissing": "Enter a value for {name}.",
   "error.provider.off": "{provider} is off in OpenBot. Turn it on in provider settings first.",
@@ -275,10 +324,15 @@ export const messages = defineMessages("error.provider", {
   "error.provider.useChangeFailed": "OpenBot could not change the provider setting.",
   "error.provider.accountsUnsupported": "{provider} can hold one account only.",
   "error.provider.accountNeedsConnection": "Connect {provider} before you add another account.",
+  "error.provider.usageResetUnsupported": "{provider} cannot reset usage limits.",
+  "error.provider.signOutUnsupported": "OpenBot cannot disconnect the {provider} sign-in.",
+  "error.provider.usageResetNotConnected": "Sign in to this {provider} account again before you reset its usage.",
   "error.provider.accountLimit": "{provider} can hold at most {limit} accounts.",
   "error.provider.accountNotFound": "This {provider} account is not on this computer. Refresh and try again.",
   "error.provider.accountAlreadyAdded": "This {provider} account is already connected.",
   "error.provider.accountDefault": "The first {provider} account cannot be removed.",
+  "error.provider.accountUsesKey":
+    "This {provider} account uses the saved API key and has no sign-in. Change the key in Server settings → Providers.",
   "error.provider.accountInUse": "An agent on this account is working. Try again when the agent stops.",
   "error.provider.accountsReadOnly":
     "The saved provider accounts cannot be read. Update OpenBot before you change them.",
@@ -332,6 +386,9 @@ export const messages = defineMessages("error.provider", {
   "error.provider.museAuthUnverified":
     "Muse authentication is not verified. Connect on the host computer, or set a Meta API key.",
   "error.provider.museSignIn": "Sign in to Muse on the host computer to continue.",
+  "error.provider.inceptionSignIn": "Add an Inception API key to continue.",
+  "error.provider.deepseekSignIn": "Add a DeepSeek API key to continue.",
+  "error.provider.openrouterSignIn": "Add an OpenRouter API key to continue.",
   "error.provider.terminalLoginFailed":
     "The sign-in terminal could not open. Open the provider CLI on this host and sign in there, then refresh providers.",
   "error.provider.nativeArchiveInvalid": "The provider download does not contain a valid installation.",

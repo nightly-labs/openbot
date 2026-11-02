@@ -14,13 +14,13 @@ export const messages = {
   "remoteDesktop.viewerTitle": "Zdalny pulpit Sunshine",
   "remoteDesktop.viewerLoadFailed": "Nie udało się wczytać podglądu Moonlight.",
   "remoteDesktop.streamNotReady":
-    "Host nie uruchomił strumienia. Sunshine mógł się zatrzymać na hoście. Spróbuj ponownie.",
-  "remoteDesktop.hostOfflineTitle": "Host jest offline",
-  "remoteDesktop.hostOfflineMessage": "Połącz się ponownie z hostem, zanim otworzysz jego pulpit.",
+    "Serwer nie uruchomił strumienia. Sunshine mógł się zatrzymać na serwerze. Spróbuj ponownie.",
+  "remoteDesktop.hostOfflineTitle": "Serwer jest offline",
+  "remoteDesktop.hostOfflineMessage": "Połącz się ponownie z serwerem, zanim otworzysz jego pulpit.",
   "remoteDesktop.openFailed": "Nie udało się otworzyć pulpitu",
   "remoteDesktop.notSharingTitle": "{name} nie udostępnia ekranu",
   "remoteDesktop.notSharingDescription":
-    "Host blokuje OpenBot przed nagrywaniem ekranu. Na tamtym komputerze otwórz Ustawienia systemowe → Prywatność i ochrona → Nagrywanie ekranu, włącz OpenBot, a potem spróbuj ponownie tutaj.",
+    "Serwer blokuje OpenBot przed nagrywaniem ekranu. Na tamtym serwerze otwórz Ustawienia systemowe → Prywatność i ochrona → Nagrywanie ekranu, włącz OpenBot, a potem spróbuj ponownie tutaj.",
   "remoteDesktop.setup.check.screenRecording": "Nagrywanie ekranu",
   "remoteDesktop.setup.check.accessibility": "Dostępność",
   "remoteDesktop.setup.check.service": "Usługa Sunshine",
@@ -40,7 +40,7 @@ export const messages = {
   "remoteDesktop.setup.startFailed": "Nie udało się uruchomić testu zdalnego pulpitu.",
   "remoteDesktop.setup.connectionLost": "Utracono połączenie testowe.",
   "remoteDesktop.setup.hostUpdateRequired":
-    "Zaktualizuj OpenBot na hoście, aby sprawdzić uprawnienia i przetestować zdalny pulpit.",
+    "Zaktualizuj OpenBot na serwerze, aby sprawdzić uprawnienia i przetestować zdalny pulpit.",
   "remoteDesktop.setup.permissions": "Uprawnienia",
   "remoteDesktop.setup.checked": "Sprawdzono",
   "remoteDesktop.setup.checkAgain": "Sprawdź ponownie",
@@ -54,7 +54,7 @@ export const messages = {
   "remoteDesktop.setup.liveTest": "Test połączenia na żywo",
   "remoteDesktop.setup.liveTestLocal": "Przetestuj obraz, mysz i klawiaturę na tym Macu.",
   "remoteDesktop.setup.liveTestRemote":
-    "Test otwiera tymczasowy panel na hoście. Inne sesje zdalne muszą się najpierw zakończyć. Dane wejściowe pozostają w panelu.",
+    "Test otwiera tymczasowy panel na serwerze. Inne sesje zdalne muszą się najpierw zakończyć. Dane wejściowe pozostają w panelu.",
   "remoteDesktop.setup.testSummary": "Wideo: {video} · Obraz: {picture} · Mysz: {mouse} · Klawiatura: {keyboard}",
   "remoteDesktop.setup.received": "odebrano",
   "remoteDesktop.setup.notReceived": "nie odebrano",
@@ -66,7 +66,7 @@ export const messages = {
   "remoteDesktop.setup.testRemote": "Testuj zdalny pulpit",
   "remoteDesktop.setup.videoFailed": "Testowe połączenie wideo nie powiodło się.",
   "remoteDesktop.setup.inputInstructions":
-    "Kliknij cel na hoście, a potem wpisz {code}. Mysz: {mouse}. Klawiatura: {keyboard}.",
+    "Kliknij cel w panelu testowym, a potem wpisz {code}. Mysz: {mouse}. Klawiatura: {keyboard}.",
   "remoteDesktop.setup.videoOnly":
     "Tylko test wideo. Test myszy i klawiatury wymaga zaktualizowanego środowiska Sunshine.",
   "remoteDesktop.setup.pictureConfirmed": "Obraz potwierdzony",

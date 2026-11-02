@@ -6,7 +6,11 @@ import { createDiagnosticStream } from "./stderr-diagnostics";
 
 function collect(limit?: number) {
   const messages: string[] = [];
-  const stream = createDiagnosticStream({ redact: redactText, emit: (message) => messages.push(message), limit });
+  const stream = createDiagnosticStream({
+    redact: redactText,
+    emit: (message) => messages.push(message),
+    ...(limit === undefined ? {} : { limit }),
+  });
   return { messages, stream };
 }
 

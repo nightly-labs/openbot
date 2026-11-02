@@ -2,10 +2,11 @@ import { writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import type { AgentProviderId } from "@openbot/contracts/ipc";
+import { type AgentProviderId, type QueueDelivery, ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { AgentStore } from "../src/backend/agent-store";
 import { runCauseEffect } from "../src/backend/effect-boundary";
+import type { DeliveryContext } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { isRecord } from "../src/backend/protocol";
 import type { ProviderHistoryFragment, ReadProviderHistory } from "../src/backend/provider-history";
@@ -13,6 +14,45 @@ import { importProviderHistory, type ProviderHistoryImportResult } from "../src/
 
 const REPORT_NAME = "provider-history-reimport-report.json";
 const SENTINEL_TIME = "1970-01-01T00:00:00.000Z";
+const QUIET_DELIVERY_ID = "quiet-routine-delivery";
+const QUIET_ANSWER = "Nothing new since the last run.";
+const quietRoutineDelivery: DeliveryContext = {
+  delivery: {
+    id: QUIET_DELIVERY_ID,
+    messageId: "quiet-routine-message",
+    recipientAgentId: "provider-history-reimport-agent",
+    sender: {
+      kind: "routine",
+      routineId: "quiet-routine",
+      runId: "quiet-routine-run",
+      routineName: "Quiet routine",
+      scheduledFor: new Date(9_000).toISOString(),
+    },
+    text: "Check for news.",
+    attachments: [],
+    replyToMessageId: null,
+    status: "completed",
+    position: null,
+    turnId: "claude-quiet-turn",
+    error: null,
+    createdAt: new Date(9_000).toISOString(),
+  } satisfies QueueDelivery,
+  managedAttachments: [],
+};
+
+const FAILED_DELIVERY_ID = "failed-routine-delivery";
+const FAILED_ANSWER = "The server is not reachable.";
+/** A scheduled run whose agent called `routine_report_failure`: its delivery completed with the reason. */
+const failedRoutineDelivery: DeliveryContext = {
+  ...quietRoutineDelivery,
+  delivery: {
+    ...quietRoutineDelivery.delivery,
+    id: FAILED_DELIVERY_ID,
+    messageId: "failed-routine-message",
+    turnId: "claude-failed-turn",
+    error: "ssh: connect to host 10.0.0.5 port 22: Connection refused",
+  },
+};
 
 interface Report {
   schemaVersion: 1;
@@ -53,9 +93,14 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
           externalSessionId: `${sessionId}-external`,
           agentId,
           publicThreadId: threadId,
-          findDelivery: () => null,
+          findDelivery: (deliveryId) =>
+            deliveryId === QUIET_DELIVERY_ID
+              ? quietRoutineDelivery
+              : deliveryId === FAILED_DELIVERY_ID
+                ? failedRoutineDelivery
+                : null,
           findMessageDelivery: () => null,
-          quietRoutineDelivery: () => false,
+          quietRoutineDelivery: (deliveryId) => deliveryId === QUIET_DELIVERY_ID || deliveryId === FAILED_DELIVERY_ID,
         }),
       );
     };
@@ -115,6 +160,39 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
     const splitEdited = await runImport("split-session", "codex", splitTurn("split-turn", 8, "edited"));
     const messagesAfterSplitEdit = messageTexts();
 
+    // A quiet routine run that a Claude agent answered live, and that the next start imports.
+    const quietTurnId = "claude-quiet-turn";
+    database.persistConversationChanges({
+      agentId,
+      threadId,
+      activeTurnId: null,
+      changedMessages: [
+        {
+          id: `${quietTurnId}:assistant`,
+          turnId: quietTurnId,
+          author: "assistant",
+          text: QUIET_ANSWER,
+          createdAt: new Date(9_000).toISOString(),
+          status: "completed",
+          itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+        },
+      ],
+      eventType: "turn.completed",
+    });
+    const claudeQuiet = await runImport("claude-quiet-session", "claude", [quietRoutineTurn(quietTurnId, 9)]);
+    const quietAnswers = database
+      .readConversation(agentId, threadId)
+      .messages.filter((message) => message.turnId === quietTurnId && message.author === "assistant");
+
+    // A run that reported a failure is never quiet, also after a no-update call.
+    const failedTurnId = "claude-failed-turn";
+    const claudeFailed = await runImport("claude-failed-session", "claude", [
+      quietRoutineTurn(failedTurnId, 10, FAILED_DELIVERY_ID, FAILED_ANSWER),
+    ]);
+    const failedAnswers = database
+      .readConversation(agentId, threadId)
+      .messages.filter((message) => message.turnId === failedTurnId && message.author === "assistant");
+
     // A turn that an import did not finish keeps `imported = 0` and is imported at the next start.
     database.connection
       .prepare("UPDATE provider_history_turns SET imported = 0 WHERE session_id = ? AND turn_id = ?")
@@ -135,6 +213,8 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
         splitFirst,
         splitRepeat,
         splitEdited,
+        claudeQuiet,
+        claudeFailed,
         unfinished,
       },
       acceptance: {
@@ -151,6 +231,16 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
         splitRepeatImportsNoTurn: splitFirst.turns === 1 && splitRepeat.turns === 0,
         splitEditInFirstFragmentImportsTurn:
           splitEdited.turns === 1 && messagesAfterSplitEdit.includes("Part A 8 edited"),
+        claudeQuietAnswerStoredOnce:
+          claudeQuiet.turns === 1 &&
+          quietAnswers.length === 1 &&
+          quietAnswers[0]?.id === `${quietTurnId}:assistant` &&
+          quietAnswers[0]?.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+        claudeFailedRunAnswerIsNotQuiet:
+          claudeFailed.turns === 1 &&
+          failedAnswers.length === 1 &&
+          failedAnswers[0]?.text === FAILED_ANSWER &&
+          failedAnswers[0]?.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE,
         unfinishedTurnImportsAgain: unfinished.turns === 1,
         importCompleted: database.providerHistoryImport("codex-session")?.state === "complete",
       },
@@ -176,6 +266,27 @@ function turn(turnId: string, startedAt: number, suffix?: string): ProviderHisto
     items: [
       { type: "agentMessage", id: `${turnId}-commentary`, text: text("Commentary"), phase: "commentary" },
       { type: "agentMessage", id: `${turnId}-answer`, text: text("Answer"), status: "completed" },
+    ],
+  };
+}
+
+/** A scheduled run that called the no-update tool and wrote a short answer, as Claude stores it. */
+function quietRoutineTurn(
+  turnId: string,
+  startedAt: number,
+  deliveryId = QUIET_DELIVERY_ID,
+  answer = QUIET_ANSWER,
+): ProviderHistoryFragment {
+  return {
+    turnId,
+    status: "completed",
+    startedAt,
+    itemOffset: 0,
+    complete: true,
+    items: [
+      { type: "userMessage", id: `${turnId}-prompt`, clientId: deliveryId, content: [] },
+      { type: "toolCall", id: `${turnId}-tool`, name: "mcp__openbot__routine_no_update", status: "completed" },
+      { type: "agentMessage", id: `${turnId}-answer`, text: answer, status: "completed" },
     ],
   };
 }

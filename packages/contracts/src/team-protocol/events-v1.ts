@@ -50,7 +50,8 @@ const integerInRange =
     }
     return value;
   };
-const routineTime: AdminDecoder = (value) => {
+/** A time of day as "HH:MM". `workflows-v1` reads it too. */
+export const routineTime: AdminDecoder = (value) => {
   if (typeof value !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/u.test(value)) {
     throw new Error("Invalid routine schedule.");
   }
@@ -76,7 +77,8 @@ const nonEmptyString =
     if (!isString(decoded) || decoded.length === 0) throw new Error("Invalid routine schedule.");
     return decoded;
   };
-const routineSchedule = variant({
+/** A released routine schedule. `workflows-v1` reads it too. */
+export const routineSchedule = variant({
   hourly: fields({ kind: oneOf("hourly"), minute: integerInRange(0, 59) }),
   daily: fields({ kind: oneOf("daily"), time: routineTime }),
   weekdays: fields({ kind: oneOf("weekdays"), time: routineTime }),

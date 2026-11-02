@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { useDerivedValue, useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { useAppDrawerShownOnUI } from "@/features/servers/components/app-drawer-activity";
 import { useMotionPreference } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
 import { useScreenFocusedWhile } from "@/shared/lib/use-screen-focused-while";
@@ -56,6 +57,10 @@ export function useBloubActivityFrame(seed: string, mood: AvatarMood, animateIdl
   const playback = useSharedValue<Playback>({ frames: [rest], index: 0, loopStart: null });
   const elapsed = useSharedValue(0);
   const idleFrames = useRef<BloubActivityFrame[] | null>(null);
+  // Android: the drawer and its scrim cover the avatars of home, and each frame redraws the SVG in
+  // software. The face holds its frame until the drawer has closed. The gate is on the UI thread, so
+  // the drawer does not render every avatar again. iOS keeps the motion under its blur.
+  const drawerShown = useAppDrawerShownOnUI();
   const startIdle = useCallback(() => {
     const frames = idleFrames.current;
     if (!frames) return false;
@@ -72,6 +77,7 @@ export function useBloubActivityFrame(seed: string, mood: AvatarMood, animateIdl
     }
   }, [playback, startIdle]);
   const clock = useFrameCallback(({ timeSincePreviousFrame }) => {
+    if (isAndroid && drawerShown.get()) return;
     const current = playback.get();
     if (current.loopStart === null && current.index >= current.frames.length - 1) return;
     const fps = current.idle ? IDLE_FPS : FPS;

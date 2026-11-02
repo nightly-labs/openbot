@@ -12,6 +12,8 @@ import type {
   BrowserDisplayState,
   BrowserEnvironment,
   BrowserLiveViewEvent,
+  BrowserLocalSignInEnd,
+  BrowserLocalSignInResult,
   BrowserPictureInPictureEvent,
   BrowserPreview,
   BrowserTab,
@@ -89,6 +91,18 @@ export function decodeBrowserBounds(value: unknown): BrowserBounds {
   };
 }
 
+export function decodeBrowserLocalSignInEnd(value: unknown): BrowserLocalSignInEnd {
+  const end = decodeRecord(value, "browser sign-in end");
+  return { signedIn: requiredBoolean(end, "signedIn") };
+}
+
+/** Null when the person cancelled the sign-in. */
+export function decodeBrowserLocalSignInResult(value: unknown): BrowserLocalSignInResult | null {
+  if (value === null) return null;
+  const result = decodeRecord(value, "browser sign-in result");
+  return { cookies: requiredNumber(result, "cookies"), signedIn: requiredBoolean(result, "signedIn") };
+}
+
 export function decodeBrowserLiveViewEvent(value: unknown): BrowserLiveViewEvent {
   const event = decodeRecord(value, "browser live view event");
   const tabId = requiredString(event, "tabId");
@@ -128,8 +142,19 @@ export function decodeBrowserPictureInPictureEvent(value: unknown): BrowserPictu
 }
 
 function browserTab(tab: DynamicRecord): BrowserTab {
-  const { environment, recording, diagnosticErrorCount, openerTabId, popupFailure } = tab;
+  const {
+    environment,
+    recording,
+    diagnosticErrorCount,
+    openerTabId,
+    popupFailure,
+    userControl,
+    canGoBack,
+    canGoForward,
+  } = tab;
   if (recording !== undefined && !isBoolean(recording)) throw new Error("Invalid recording.");
+  if (canGoBack !== undefined && !isBoolean(canGoBack)) throw new Error("Invalid canGoBack.");
+  if (canGoForward !== undefined && !isBoolean(canGoForward)) throw new Error("Invalid canGoForward.");
   if (diagnosticErrorCount !== undefined && !isNumber(diagnosticErrorCount)) {
     throw new Error("Invalid diagnosticErrorCount.");
   }
@@ -146,6 +171,10 @@ function browserTab(tab: DynamicRecord): BrowserTab {
     ...(diagnosticErrorCount === undefined ? {} : { diagnosticErrorCount }),
     ...(openerTabId === undefined ? {} : { openerTabId }),
     ...(popupFailure === undefined ? {} : { popupFailure: popupFailureOf(popupFailure) }),
+    // Only an exact `true` marks the tab: any other value does not make an agent wait.
+    ...(userControl === true ? { userControl } : {}),
+    ...(canGoBack === undefined ? {} : { canGoBack }),
+    ...(canGoForward === undefined ? {} : { canGoForward }),
   };
 }
 

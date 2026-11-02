@@ -2,6 +2,10 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/onboarding";
 
 export const messages = {
+  "onboarding.readFailed.title": "OpenBot no pudo leer tu configuración.",
+  "onboarding.readFailed.description":
+    "Tus datos locales no cambiaron. Inténtalo de nuevo. Si el problema continúa, vuelve a configurar OpenBot.",
+  "onboarding.readFailed.setUpAgain": "Configurar de nuevo",
   "onboarding.setup.saveFailed": "OpenBot no pudo guardar la configuración local.",
   "onboarding.setup.verifyFailed": "OpenBot no pudo verificar esta invitación.",
   "onboarding.setup.connectFailed": "OpenBot no pudo conectarse a este host.",
@@ -38,6 +42,11 @@ export const messages = {
   "onboarding.provider.googlePlan": "Plan Google AI Pro o Ultra",
   "onboarding.provider.cursorPlan": "Plan de Cursor o clave de API",
   "onboarding.provider.clineAccount": "Modelos gratuitos con una cuenta de Cline",
+  "onboarding.provider.kimiAccount": "Modelos de Kimi con una cuenta de Kimi Code",
+  "onboarding.provider.hermesNous": "Plan de Nous Portal o tu configuración de Hermes",
+  "onboarding.provider.inceptionKey": "Modelos Mercury con una clave de API de Inception",
+  "onboarding.provider.deepseekKey": "Modelos de DeepSeek con una clave de API de DeepSeek",
+  "onboarding.provider.openrouterKey": "Muchos modelos con una clave de API de OpenRouter",
   "onboarding.provider.tryFree": "Pruébalo gratis",
   "onboarding.provider.noSignIn": "No es necesario iniciar sesión",
   "onboarding.provider.more": "Más proveedores",
@@ -74,6 +83,15 @@ export const messages = {
   "onboarding.choice.subscription": "Tengo una suscripción",
   "onboarding.choice.subscriptionDetail": "ChatGPT, Claude o Grok",
   "onboarding.choice.startFreeInstead": "Prefiero empezar gratis",
+  "onboarding.consent.notice": "Al continuar, aceptas las {terms} y confirmas que has leído la {privacy}.",
+  "onboarding.consent.analyticsTitle": "Ayuda a mejorar OpenBot",
+  "onboarding.consent.analyticsDetail":
+    "Vincula el uso de funciones a tu cuenta y correo electrónico, y comparte los sitios web visitados, el uso de herramientas y un resumen diario de tu configuración. Si no, solo se envía el uso básico, con un ID de instalación aleatorio. Nunca tus chats, archivos ni prompts.",
+  "onboarding.consent.thanksTitle": "¡Gracias! El equipo te debe una.",
+  "onboarding.consent.thanksToast": "Gracias por ayudar a mejorar OpenBot 💜",
+  "onboarding.consent.thanksToastDetail": "Puedes cambiarlo en cualquier momento en Ajustes.",
+  "onboarding.consent.termsLink": "Condiciones del servicio",
+  "onboarding.consent.privacyLink": "Política de privacidad",
   "onboarding.plan.title": "Conecta tu plan",
   "onboarding.plan.description": "Inicia sesión una vez. Tus agentes usan tu plan.",
   "onboarding.computer.title": "OpenBot podría controlar tu equipo",

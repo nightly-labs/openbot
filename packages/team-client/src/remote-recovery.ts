@@ -1,5 +1,6 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { SIDEBAR_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { errorReference } from "@openbot/user-errors/reference";
 import { Effect, Result, Schema } from "effect";
@@ -23,7 +24,11 @@ const recoveryCall = <A>(operation: () => Promise<A>) =>
 /** The wait after the first failed attempt. Each next failed attempt doubles it: 2, 4, 8 and 16 seconds. */
 export const REMOTE_RETRY_INTERVAL_MS = 2_000;
 export const REMOTE_RETRY_LIMIT = 5;
-export const REMOTE_RETRY_COOLDOWN_MS = 120_000;
+/**
+ * The wait after `REMOTE_RETRY_LIMIT` failed attempts. Then the attempts start again from the first wait.
+ * A server that comes back is found within this time, without a manual reconnect (issue #4087).
+ */
+export const REMOTE_RETRY_COOLDOWN_MS = 30_000;
 /** Up to this fraction of a wait is added at random, so phones that lost the same service do not retry together. */
 const REMOTE_RETRY_JITTER = 0.2;
 
@@ -96,6 +101,7 @@ const SAFE_CONNECTION_ERRORS = new Set(
       "error.remote.inviteAlreadyUsed",
       "error.remote.inviteNotFound",
       "error.remote.memberLimitReached",
+      "error.remote.licenseUsersFull",
       "error.remote.hostNotRegistered",
       "error.remote.membershipEnded",
       "error.remote.accountSessionInactive",
@@ -358,7 +364,7 @@ export function createRemoteConnectionRecovery(
     /**
      * A failure no retry can fix: the two ends disagree about the wire, so the next attempt is told
      * the same thing. Stops the loop rather than joining it -- `offline` would schedule five
-     * attempts and then one every two minutes, for as long as the app is open.
+     * attempts, a wait of 30 seconds and five attempts again, for as long as the app is open.
      * Reversible: `refresh`, returning to the foreground, and switching servers each clear it.
      */
     suspend(error?: unknown) {
@@ -448,8 +454,10 @@ export const resyncRemoteConversations = Effect.fn("RemoteRecovery.resyncConvers
 
 /** Bound the reads that make a workspace usable; file transfers and writes retain their own limits. */
 export function remoteWorkspaceReadTimeout(method: string, path: string): number | undefined {
-  if (method !== "GET") return undefined;
   const route = path.split("?")[0];
+  // `sidebar-folders-v1` reads the layout with a POST.
+  if (method === "POST" && route === SIDEBAR_FOLDERS_ROUTES.read) return 15_000;
+  if (method !== "GET") return undefined;
   return route === TEAM_API_ROUTES.compatibility ||
     route === TEAM_API_ROUTES.agents.all ||
     route === TEAM_API_ROUTES.agents.status ||

@@ -5,7 +5,7 @@ import { BrowserWindow, type Session, type WebContents, type WebContentsView, we
 import type { BrowserCdpEngine } from "./browser-cdp";
 import type { BrowserDiagnostics } from "./browser-diagnostics";
 import type { BrowserOperationError } from "./browser-effects";
-import { isPersistableBrowserUrl } from "./browser-state";
+import { type BrowserTabSession, isPersistableBrowserUrl } from "./browser-state";
 
 /**
  * One tab as `BrowserHost` holds it. The host owns every tab and its lifecycle; the tab operations in
@@ -35,16 +35,31 @@ export interface BrowserHostTab {
    */
   secretDocument?: boolean;
   /**
+   * `fill_card` typed a saved card into the current document. Its fields show the number and the
+   * security code, and page code can read them, so screenshots, previews, evaluation and recording
+   * stay blocked until a main-frame navigation replaces the document.
+   */
+  filledCard?: boolean;
+  /**
    * A session of this tab and its popups only, kept in memory: a sign-in page that the host opened
    * for someone else. Such a tab is not saved, and its cookies go when it closes.
    */
   privateSession?: Session;
+  /**
+   * The persistent session this tab and its popups use: the agent's own session or a named profile.
+   * Absent: the shared session. Fixed for the life of the tab.
+   */
+  tabSession?: BrowserTabSession;
   popup: boolean;
   popupFailure?: BrowserTab["popupFailure"];
   closing?: boolean;
   ownerThreadId: string | null;
   ownerAgentId: string | null;
   revision: number;
+  /** The number of the queued operation that runs now or ran last. */
+  operations?: number;
+  /** The last full-page image that the agent got, and the operation that last passed it on. */
+  image?: { operation: number; url: string; taken: number };
   queue: Deferred.Deferred<void>;
   scope: Scope.Closeable;
   /** Operations queued or running on `queue`, so a preview can tell the agent is working on the tab. */
@@ -66,13 +81,15 @@ export interface BrowserHostTab {
    */
   pendingRestore?: (() => Effect.Effect<void, BrowserOperationError>) | undefined;
   /**
-   * An idle agent tab whose page was unloaded to free its renderer's memory. The title and the last
+   * An idle agent tab whose page and renderer process were closed to free memory. The title and the last
    * preview frame stand in for the page until `pendingRestore` loads it again.
    */
   sleeping?: { title: string; preview: BrowserPreview | null } | undefined;
   /** When a person or an agent last used the tab. A preview request does not count as use. */
   lastUsedAt: number;
   focusOnVisible: boolean;
+  /** The next document keeps the focus that it takes when it commits: a person opened the tab or entered its address. */
+  focusOnCommit?: boolean | undefined;
   /** Whether the tab had focus when its page closed itself, so its opener can take focus over. */
   focusedAtPageClose?: boolean | undefined;
   environment: BrowserEnvironment;
@@ -80,6 +97,8 @@ export interface BrowserHostTab {
   diagnostics: BrowserDiagnostics;
   recording: boolean;
   captureGeneration: number;
+  /** Counts the addresses loaded after the tab opened. A later load that aborts the first load does not close the tab. */
+  loadGeneration: number;
   viewInvalidations: Set<() => void>;
   /**
    * The live view that made the last right-click, until the menu of that click opens. The menu then
@@ -104,6 +123,12 @@ export function restoreWebContentsFocus(previous: WebContents | null, controlled
   }
 }
 
+/** Whether history has a page with an address at `offset` from the current one, as back and forward need. */
+export function hasHistoryEntry(contents: WebContents, offset: -1 | 1): boolean {
+  const history = contents.navigationHistory;
+  return history.canGoToOffset(offset) && Boolean(history.getEntryAtIndex(history.getActiveIndex() + offset)?.url);
+}
+
 export function toPublicTab(tab: BrowserHostTab): BrowserTab {
   const environment =
     tab.environment.viewport.mode === "fill"
@@ -126,6 +151,8 @@ export function toPublicTab(tab: BrowserHostTab): BrowserTab {
     environment,
     recording: tab.recording,
     diagnosticErrorCount: tab.diagnostics.errorCount,
+    canGoBack: hasHistoryEntry(tab.contents, -1),
+    canGoForward: hasHistoryEntry(tab.contents, 1),
     ...(tab.openerTabId ? { openerTabId: tab.openerTabId } : {}),
     ...(tab.popupFailure ? { popupFailure: tab.popupFailure } : {}),
   };

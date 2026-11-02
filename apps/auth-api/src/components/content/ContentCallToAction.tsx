@@ -39,7 +39,7 @@ export function ContentCallToAction() {
           workspace and context. Your work stays on your computer.
         </p>
         <div class="post-cta-actions">
-          <ButtonLink to="/" hash="download" variant="primary" size="lg" icon="download">
+          <ButtonLink to="/download" variant="primary" size="lg" icon="download">
             Download OpenBot
           </ButtonLink>
           <ButtonLink to="/contact" variant="secondary" size="lg" icon="contact" class="landing-button-glass">

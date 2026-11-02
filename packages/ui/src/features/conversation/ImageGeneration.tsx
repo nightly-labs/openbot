@@ -9,14 +9,14 @@ export type ImageGenerationStatus = "generating" | "completed" | "failed" | "int
 export interface ImageGenerationProps {
   status: ImageGenerationStatus;
   presentation?: "generated" | "attachment";
-  prompt?: string;
+  prompt?: string | undefined;
   resolution?: string;
   aspectRatio: ImageGenerationAspectRatio;
-  attachment?: AttachmentSummary;
-  error?: string;
+  attachment?: AttachmentSummary | undefined;
+  error?: string | undefined;
   /** `origin` is the clicked image, for a viewer that zooms out of it. */
   onPreview?: (attachment: AttachmentSummary, origin: HTMLElement) => void;
-  onDownload?: (attachment: AttachmentSummary) => void;
+  onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
 }
 
 export function ImageGeneration(props: ImageGenerationProps) {

@@ -1,12 +1,12 @@
 .conversation-panel:has(.settings-panel) .conversation-header,
 .conversation-panel:has(.settings-panel) .conversation-scroll,
 .conversation-panel:has(.settings-panel) .composer-wrap {
-  width: calc(100% - var(--settings-panel-width, 296px));
+  width: calc(100% - var(--settings-panel-width, 360px));
 }
 
 .conversation-panel:has(.settings-panel) .chat-search {
-  right: calc(var(--settings-panel-width, 296px) + 16px);
-  max-width: calc(100% - var(--settings-panel-width, 296px) - 32px);
+  right: calc(var(--settings-panel-width, 360px) + 16px);
+  max-width: calc(100% - var(--settings-panel-width, 360px) - 32px);
 }
 
 .conversation-panel:has(#browser-side-panel) .chat-search,
@@ -82,20 +82,6 @@
   }
 }
 
-@keyframes browser-tab-control-glow {
-  0%,
-  100% {
-    background: var(--openbot-accent-soft);
-    box-shadow: 0 0 0 var(--openbot-data-table-outer-border);
-    transform: scale(0.94);
-  }
-  50% {
-    background: var(--openbot-accent-soft);
-    box-shadow: 0 0 10px var(--openbot-accent);
-    transform: scale(1);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .browser-panel,
   .remote-desktop-workspace,
@@ -137,7 +123,6 @@
     will-change: auto;
   }
 
-  .browser-tab-control-acting,
   .computer-control-dot {
     animation: none;
   }

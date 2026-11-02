@@ -1,13 +1,15 @@
 import type { MarketplaceSkillSummary } from "@openbot/contracts/ipc";
+import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import {
   ArrowRight,
   Button,
   Check,
   ErrorReference,
-  Heading,
   IconButton,
+  Link2,
   Plug,
   Puzzle,
+  Skeleton,
   Sparkles,
   Text,
 } from "@openbot/ui";
@@ -18,25 +20,8 @@ import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { CONNECTOR_LISTINGS } from "../connectors/connector-catalog";
 import { LogoTile } from "../settings/IntegrationLayout";
-import type { MarketplaceApp } from "./marketplace-model";
-
-/** The top of an agent or skill page. The window moves the focus to the title when the page opens. */
-export function PageHead(props: { media: JSX.Element; title: string; description: string; actions?: JSX.Element }) {
-  return (
-    <div class="marketplace-head">
-      {props.media}
-      <div class="marketplace-head-copy">
-        <Heading as="h3" size="lg" class="marketplace-page-title">
-          {props.title}
-        </Heading>
-        <Text as="p" variant="body-sm" tone="muted">
-          {props.description}
-        </Text>
-      </div>
-      {props.actions}
-    </div>
-  );
-}
+import type { MarketplaceListing } from "./marketplace-listing";
+import type { MarketplaceApp, MarketplaceModel } from "./marketplace-model";
 
 /** The part of a page that waits for the full listing: a status line, or the failure with Retry. */
 export function DetailState(props: {
@@ -71,61 +56,25 @@ export function DetailState(props: {
   );
 }
 
-/** A titled part of a page. */
-export function Block(props: {
-  id: string;
-  level: "h3" | "h4";
-  title: string;
-  description?: string;
-  aside?: JSX.Element;
-  children: JSX.Element;
-}) {
+/** Copies the public page of a listing, as an app page copies its plugin's. */
+export function CopyListingLink(props: { model: MarketplaceModel; link: MarketplaceListingLink }) {
+  const { t } = useText();
   return (
-    <section class="marketplace-block" aria-labelledby={props.id}>
-      <div class="marketplace-block-head">
-        <div class="marketplace-block-copy">
-          <Heading as={props.level} size="sm" id={props.id}>
-            {props.title}
-          </Heading>
-          <Show when={props.description}>
-            <Text variant="caption" tone="muted">
-              {props.description}
-            </Text>
-          </Show>
-        </div>
-        {props.aside}
-      </div>
-      {props.children}
-    </section>
+    <Button type="button" variant="outline" size="sm" onClick={() => props.model.copyListingLink(props.link)}>
+      <Link2 aria-hidden="true" />
+      {t("plugin.copyLink")}
+    </Button>
   );
 }
 
-/**
- * The facts column of a page. `dt` and `dd` stay direct children of the list: axe rejects a wrapper
- * per row.
- */
-export function Properties(props: { label: string; items: readonly { label: string; value: JSX.Element }[] }) {
+/** A link named a listing that the Marketplace does not have. The list opens with this notice on top. */
+export function MissingNotice(props: { children: string }) {
   return (
-    <aside class="marketplace-side" aria-label={props.label}>
-      <dl class="marketplace-props">
-        <For each={props.items}>
-          {(entry) => (
-            <>
-              <dt>
-                <Text as="span" variant="caption" tone="muted">
-                  {entry.label}
-                </Text>
-              </dt>
-              <dd>
-                <Text as="span" variant="body-sm">
-                  {entry.value}
-                </Text>
-              </dd>
-            </>
-          )}
-        </For>
-      </dl>
-    </aside>
+    <div class="marketplace-empty" role="alert">
+      <Text as="p" variant="body-sm" tone="muted">
+        {props.children}
+      </Text>
+    </div>
   );
 }
 
@@ -261,5 +210,70 @@ export function TryCard(props: {
         )}
       </Show>
     </div>
+  );
+}
+
+/** A listing's first load, its failure, its rows, and "Load more" while the server has more. */
+export function ListingPanel(props: {
+  listing: MarketplaceListing<unknown>;
+  loadingLabel: string;
+  count: number;
+  /** False: no "Load more", as on the Skills tab, where each group has its own page. */
+  paged?: boolean;
+  empty: JSX.Element;
+  children: JSX.Element;
+}) {
+  const { t } = useText();
+  const failure = () => (
+    <div class="marketplace-empty" role="alert">
+      <Text as="p" variant="body-sm" tone="muted">
+        {props.listing.error()}
+      </Text>
+      <Button type="button" variant="outline" size="sm" onClick={props.listing.retry}>
+        {t("common.retry")}
+      </Button>
+    </div>
+  );
+  return (
+    <Show
+      when={!props.listing.loading()}
+      fallback={
+        <div class="marketplace-grid" role="status" aria-label={props.loadingLabel}>
+          <For each={Array.from({ length: 6 }, (_, index) => index)}>
+            {() => (
+              <div class="marketplace-card marketplace-card-skeleton" aria-hidden="true">
+                <Skeleton class="marketplace-skeleton-mark" />
+                <Skeleton class="marketplace-skeleton-line" />
+                <Skeleton class="marketplace-skeleton-line" />
+              </div>
+            )}
+          </For>
+        </div>
+      }
+    >
+      {/* A failed "Load more" keeps the rows that loaded. */}
+      <Show when={!props.listing.error() || props.count > 0} fallback={failure()}>
+        <div class="marketplace-stack">
+          <Show when={props.count > 0 || props.listing.pending()} fallback={props.empty}>
+            {props.children}
+          </Show>
+          <Show when={!props.listing.error()} fallback={failure()}>
+            {/* A filter can hide each loaded row while a later page still holds a match. */}
+            <Show when={props.paged !== false && props.listing.hasMore()}>
+              <Button
+                type="button"
+                variant="outline"
+                class="marketplace-load-more"
+                data-cuelume-tap="navigate"
+                loading={props.listing.loadingMore()}
+                onClick={props.listing.loadMore}
+              >
+                {t("marketplace.loadMore")}
+              </Button>
+            </Show>
+          </Show>
+        </div>
+      </Show>
+    </Show>
   );
 }

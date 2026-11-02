@@ -1,0 +1,248 @@
+/* Spoken replies: the speaking bar above the composer, and the voice pane in the side panel. */
+
+.speaking-bar {
+  display: flex;
+  width: min(560px, 100%);
+  align-items: center;
+  gap: var(--openbot-space-3);
+  margin: 0 auto var(--openbot-space-2);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: var(--openbot-shadow-raised);
+  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-2);
+  animation: speaking-bar-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+@keyframes speaking-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* The face is drawn low in its own box; the app lifts it by the same share. */
+.speaking-bar-avatar {
+  --agent-avatar-optical-offset: calc(28px * -0.14);
+
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+}
+
+.speaking-bar-waveform {
+  max-width: 120px;
+  flex: 0 0 auto;
+  color: var(--openbot-accent);
+}
+
+.speaking-bar-caption {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: var(--openbot-space-4);
+}
+
+.voice-panel-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-0-5);
+}
+
+.voice-panel-name {
+  margin: 0;
+  font-size: var(--openbot-text-md);
+  font-weight: 600;
+}
+
+.voice-panel-phase {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.voice-panel-stage {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-8);
+}
+
+.voice-panel-presence {
+  position: relative;
+  display: grid;
+  width: 140px;
+  height: 140px;
+  place-items: center;
+  transform: scale(var(--voice-presence-scale, 1));
+  transition:
+    transform var(--openbot-duration-fast) linear,
+    opacity var(--openbot-duration-normal) ease;
+}
+
+/* A soft glow of the accent colour behind the face, brighter while the agent speaks. */
+.voice-panel-presence::before {
+  position: absolute;
+  inset: -24px;
+  border-radius: var(--openbot-radius-pill);
+  background: radial-gradient(closest-side, var(--openbot-accent-soft), transparent);
+  content: "";
+  opacity: 0.5;
+  transition: opacity var(--openbot-duration-normal) ease;
+}
+
+.voice-panel-presence[data-phase="speaking"]::before {
+  opacity: 1;
+}
+
+.voice-panel-presence[data-phase="thinking"]::before {
+  animation: voice-panel-think 1.6s var(--openbot-ease-in-out) infinite alternate;
+}
+
+@keyframes voice-panel-think {
+  to {
+    opacity: 0.15;
+  }
+}
+
+.voice-panel-avatar {
+  --agent-avatar-optical-offset: calc(112px * -0.14);
+
+  position: relative;
+  width: 112px;
+  height: 112px;
+}
+
+/* The waveform keeps its place when it is hidden, so the captions do not move. */
+/* A muted microphone: the agent's face dims until the user speaks again. */
+.voice-panel-presence[data-muted] {
+  opacity: 0.5;
+}
+
+.voice-panel-waveform {
+  display: flex;
+  width: 141px;
+  color: var(--openbot-text-secondary);
+  opacity: 0;
+  transition: opacity var(--openbot-duration-normal) ease;
+}
+
+.voice-panel-waveform[data-phase] {
+  opacity: 1;
+}
+
+.voice-panel-waveform[data-phase="speaking"] {
+  color: var(--openbot-accent);
+}
+
+.voice-panel-captions {
+  width: 100%;
+  min-height: calc(var(--openbot-leading-xl) * 4);
+  overflow-y: auto;
+  text-align: center;
+}
+
+.voice-panel-caption {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-xl);
+  line-height: var(--openbot-leading-xl);
+}
+
+.voice-panel-caption[data-empty] {
+  color: var(--openbot-text-muted);
+}
+
+.voice-panel-error {
+  color: var(--openbot-danger);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.voice-panel-controls {
+  display: flex;
+  justify-content: center;
+  gap: var(--openbot-space-4);
+}
+
+.voice-panel-control {
+  border-radius: var(--openbot-radius-pill);
+  transition:
+    background-color var(--openbot-duration-fast) ease,
+    color var(--openbot-duration-fast) ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speaking-bar,
+  .voice-panel-presence[data-phase="thinking"]::before {
+    animation: none;
+  }
+
+  .voice-panel-presence {
+    transform: none;
+  }
+}
+
+/* Under a message of a spoken turn: plays the user's recording, or reads the reply aloud again. */
+.voice-player {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+}
+
+.voice-player-toggle {
+  flex: none;
+  border-radius: var(--openbot-radius-pill);
+}
+
+.voice-player-toggle svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.voice-player-track {
+  flex: none;
+}
+
+.voice-player-bars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+}
+
+.voice-player-bar {
+  width: 2px;
+  height: calc(3px + var(--voice-peak, 0) * 17px);
+  border-radius: var(--openbot-radius-pill);
+  background: currentColor;
+  opacity: 0.45;
+}
+
+.voice-player-bar[data-played] {
+  background: var(--openbot-accent);
+  opacity: 1;
+}
+
+.voice-player-time {
+  min-width: 3ch;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}

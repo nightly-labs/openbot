@@ -19,8 +19,10 @@ type WorkspaceFrameProps = ParentProps<
     onRetryServer: (serverId: string) => Promise<void>;
     /** The rails and the sidebar, in paint order. */
     left: JSX.Element;
-    /** The page of the rail. A page other than the agents covers the middle panes, and makes them inert. */
+    /** The page of the rail. A page of another kind than the agents covers the middle panes, and makes them inert. */
     windowPage: WindowPage;
+    /** Hides the sidebar below the top row. The middle panes then span it; the server menu stays. */
+    sidebarHidden?: boolean;
     page?: JSX.Element;
     connection?: JSX.Element;
     initialLoading?: boolean;
@@ -39,7 +41,7 @@ type WorkspaceFrameProps = ParentProps<
 export function WorkspaceFrame(props: WorkspaceFrameProps) {
   const platform = usePlatform();
   const layout = useLayout();
-  const pageOpen = () => props.windowPage !== "agents";
+  const pageOpen = () => windowPageKind(props.windowPage) !== "agents";
   const rest = omit(
     props,
     "compact",
@@ -48,6 +50,7 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
     "onRetryServer",
     "left",
     "windowPage",
+    "sidebarHidden",
     "page",
     "after",
     "children",
@@ -70,6 +73,7 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
           "app-frame-edge": platform.appInfo() !== null,
           "app-frame-with-server-rail": layout.serverRailVisible(),
           "app-frame-page-open": pageOpen(),
+          "app-frame-sidebar-hidden": props.sidebarHidden === true,
           "app-frame-platform-darwin": platform.appInfo()?.platform === "darwin",
         },
       ]}

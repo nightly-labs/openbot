@@ -10,8 +10,8 @@ import {
   remoteControlPlaneErrorResponse,
   requestAuthService,
   requestRemoteControlPlane,
-  requestSourceIp,
 } from "../../../server/request-auth";
+import { requestSourceIp } from "../../../server/source-ip";
 
 export const Route = createFileRoute("/v1/mobile-auth/link")({
   server: {

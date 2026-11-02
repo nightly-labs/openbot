@@ -1,7 +1,7 @@
 import type { AppLogoVariant } from "@openbot/brand";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { StartupSplash } from "../src/features/startup/StartupSplash";
-import { SplashPlayground } from "./splash-concept";
+import { SplashPlayground } from "./splash-story-support";
 
 interface SplashStoryArgs {
   variant: AppLogoVariant;

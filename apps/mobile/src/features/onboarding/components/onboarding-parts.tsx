@@ -1,7 +1,7 @@
 import { Typography } from "heroui-native";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import type { ReactNode, RefObject } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView, View, type ViewInstance } from "react-native";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -108,7 +108,7 @@ export function OnboardingFooter({
   /** Absent on a step whose own content holds its actions. */
   primary: FooterAction | null;
   /** The place of the main action, which the empty home takes over when the user skips. */
-  primaryRef?: RefObject<View | null>;
+  primaryRef?: RefObject<ViewInstance | null>;
   onBack: (() => void) | null;
   onSkip: (() => void) | null;
   busy: boolean;

@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { DiscordDelivery } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_ROUTE_TTL_SECONDS, type DiscordRouteGuild } from "@openbot/contracts/signal-protocol/discord-route";
+import type { GitHubRouteRepository } from "@openbot/contracts/signal-protocol/github-route";
 import {
   INGRESS_QUEUE_CAPABILITY,
   type IngressRoute,
@@ -16,7 +17,7 @@ import {
   telegramRouteChatKey,
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import { WEBHOOK_ROUTE_TTL_SECONDS, type WebhookRoute } from "@openbot/contracts/signal-protocol/webhook-route";
-import { Context, Effect, Fiber, Layer, Result } from "effect";
+import { Context, Effect, Fiber, Layer, Result, Schema } from "effect";
 import { IngressQueue, queueRouteKey, type RouteWaker } from "./ingress-queue";
 import {
   type DecodedSignalClientMessage,
@@ -34,7 +35,7 @@ import {
   type WebhookDeliveryStatus,
 } from "./protocol";
 import { runTelegramCall, type SignalTelegram, type TelegramAnswer, telegramFailure } from "./telegram";
-import { RemoteTokenError, type TelegramChatLink } from "./tokens";
+import { RemoteTokenError, type RemoteTokenUnavailableError, type TelegramChatLink } from "./tokens";
 
 /** The workspaces a verified route ticket names, each with the time it was linked to the host. */
 interface SlackRoute {
@@ -50,6 +51,11 @@ interface WebhookRouteTicket {
   routes: WebhookRoute[];
 }
 
+/** The repositories a verified GitHub route ticket names. */
+interface GitHubRoute {
+  repositories: GitHubRouteRepository[];
+}
+
 /** The chats a verified Telegram route ticket names, each with the time it was linked to the host. */
 interface TelegramRoute {
   chats: TelegramRouteChat[];
@@ -57,8 +63,8 @@ interface TelegramRoute {
 
 export interface RemoteTokenProvider {
   verifyTicket(token: string): Effect.Effect<RemoteTicketClaims, RemoteTokenError>;
-  verifyResumeToken(token: string): Effect.Effect<RemoteTicketClaims, RemoteTokenError>;
-  validateClaims(claims: RemoteTicketClaims): Effect.Effect<boolean, RemoteTokenError>;
+  verifyResumeToken(token: string): Effect.Effect<RemoteTicketClaims, RemoteTokenError | RemoteTokenUnavailableError>;
+  validateClaims(claims: RemoteTicketClaims): Effect.Effect<boolean, RemoteTokenUnavailableError>;
   issueResumeToken(claims: RemoteTicketClaims): Effect.Effect<string, RemoteTokenError>;
   iceServers(claims: RemoteTicketClaims): IceServer[];
   /** Without a route verifier, no ingress socket connects. */
@@ -82,6 +88,8 @@ export interface RemoteTokenProvider {
   /** Without a route verifier, an ingress socket cannot name generic webhook routes. */
   verifyWebhookRoute?(token: string, hostId: string): Effect.Effect<WebhookRouteTicket, RemoteTokenError>;
   validateWebhookRoute?(hostId: string, routes: WebhookRoute[]): Effect.Effect<string[], RemoteTokenError>;
+  /** Without a GitHub route verifier, an ingress socket receives no GitHub event. */
+  verifyGitHubRoute?(token: string, hostId: string): Effect.Effect<GitHubRoute, RemoteTokenError>;
   revokeHost?(hostId: string, authEpoch: number): void;
   revokeSession?(sessionId: string): void;
 }
@@ -122,6 +130,8 @@ interface AuthenticatedPeer {
   discordSession: string | null;
   // `ingress` only: opaque generic webhook route IDs whose requests this socket receives.
   webhookRoutes: string[];
+  // `ingress` only: the GitHub repositories whose events this socket receives (`githubRepositoryKey`).
+  githubRepositories: string[];
   // The TURN credentials of the last `turn-refresh`, and when Signal made them.
   turnCredentials: { iceServers: IceServer[]; issuedAt: number } | null;
 }
@@ -137,6 +147,7 @@ interface ActiveConnection {
 export interface SignalMetrics {
   acceptedConnections: number;
   authenticationFailures: number;
+  authenticationUnavailable: number;
   protocolFailures: number;
   relayedMessages: number;
   activeSockets: number;
@@ -154,6 +165,8 @@ export interface SignalMetrics {
   discordApiFailures: number;
   webhookDeliveries: number;
   webhookDeliveriesUnavailable: number;
+  githubDeliveries: number;
+  githubDeliveriesUnavailable: number;
   // Slack, Discord and Telegram events kept for a hosted server that starts, and sent to it later.
   queuedDeliveries: number;
   queuedDeliveriesFlushed: number;
@@ -171,7 +184,17 @@ export interface SignalServiceOptions {
   routeWaker?: RouteWaker | null;
   /** Runs the work that an event for an offline route starts, in the process's runtime. */
   fork?: (work: Effect.Effect<unknown>) => void;
+  /**
+   * Whether this Signal is the entry (`SignalEntry`). A machine that is not the entry refuses the
+   * tickets without a `signal` claim. Without it, this Signal is always the entry.
+   */
+  isEntry?: () => boolean;
 }
+
+// A ticket without a `signal` claim reached a Signal that is not the entry. The peer must connect
+// again through the entry name, so Signal closes with 1013 and sends no error frame.
+class NotEntryError extends Schema.TaggedError<NotEntryError>()("NotEntryError", {}) {}
+const NOT_ENTRY_REASON = "This Signal is not the entry.";
 
 /** What the Discord Gateway knows of the bot's guilds. */
 export interface DiscordMembership {
@@ -192,6 +215,8 @@ export interface SlackDelivery {
   body: Uint8Array;
   /** The request addresses OpenBot: a mention, a direct message, a thread reply or a button press. */
   wakes: boolean;
+  /** A message that does not address OpenBot. */
+  chatter: boolean;
 }
 
 export interface SlackDeliveryResponse {
@@ -211,13 +236,30 @@ export interface WebhookDeliveryResponse {
   status: WebhookDeliveryStatus;
 }
 
-type IngressDeliveryKind = "slack" | "webhook";
+/** One GitHub event with a valid App signature. Signal read only its installation and repository. */
+export interface GitHubDelivery {
+  installationId: number;
+  repositoryId: number;
+  event: string;
+  deliveryId: string;
+  body: Uint8Array;
+}
+
+/**
+ * 202 when at least one host saved the event, 204 when no host watches the repository, 503 when
+ * hosts watch it and none saved it. GitHub does not send an event again by itself.
+ */
+export interface GitHubDeliveryResponse {
+  status: 202 | 204 | 503;
+}
+
+type IngressDeliveryKind = "slack" | "webhook" | "github";
 
 type IngressDeliveryResult = Extract<SignalClientMessage, { type: `${IngressDeliveryKind}-delivery-result` }>;
 
 type TelegramDeliveryMessage = Extract<QueuedSignalMessage, { type: "telegram-delivery" }>;
 
-/** One Slack or webhook request that waits for the answer of an `ingress` socket. */
+/** One Slack, webhook or GitHub request that waits for the answer of an `ingress` socket. */
 interface PendingDelivery {
   kind: IngressDeliveryKind;
   socketId: string;
@@ -237,14 +279,15 @@ export interface IngressDeliveryLimits {
 }
 
 /**
- * Slack and webhook deliveries share these limits, so the bytes in flight to one host stay under the
- * socket's 256 KB backpressure limit, which closes the socket when it is reached. A body travels as
- * base64, a third larger than the body. The remainder leaves room for frame fields and Discord events.
+ * Slack, webhook and GitHub deliveries share these limits, so the bytes in flight to one host stay under the
+ * socket's 1 MiB backpressure limit, which closes the socket when it is reached. A body travels as
+ * base64, a third larger than the body: the largest GitHub event is about 683 KiB. The remainder leaves
+ * room for frame fields and Discord events.
  */
 const DEFAULT_INGRESS_DELIVERY_LIMITS: IngressDeliveryLimits = {
   timeoutMilliseconds: 2_500,
   maximumPendingPerHost: 16,
-  maximumPendingBytesPerHost: 128 * 1024,
+  maximumPendingBytesPerHost: 768 * 1024,
   maximumPending: 1_000,
 };
 
@@ -313,6 +356,9 @@ export class SignalService {
   // Generic webhook route ID to the `ingress` socket that said hello last with a route ticket.
   readonly #webhookRoutes = new Map<string, string>();
   readonly #webhookRouteFloor = new Map<string, number>();
+  // GitHub repository (`githubRepositoryKey`) to each host that watches it, and that host's newest
+  // `ingress` socket with a GitHub route for it. Every host gets the event.
+  readonly #githubRepositories = new Map<string, Map<string, string>>();
   // The SHA-256 of each `discord-session` token to its socket. The token itself is not kept.
   readonly #discordSessions = new Map<string, string>();
   readonly #discordEnabled: boolean;
@@ -320,6 +366,7 @@ export class SignalService {
   readonly #pendingDeliveries = new Map<string, PendingDelivery>();
   readonly #queue: IngressQueue;
   readonly #fork: (work: Effect.Effect<unknown>) => void;
+  readonly #isEntry: () => boolean;
   readonly #deliveryLimits: IngressDeliveryLimits;
   readonly #connections = new Map<string, ActiveConnection>();
   readonly #connectionDropTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -340,6 +387,7 @@ export class SignalService {
   readonly #metrics: SignalMetrics = {
     acceptedConnections: 0,
     authenticationFailures: 0,
+    authenticationUnavailable: 0,
     protocolFailures: 0,
     relayedMessages: 0,
     activeSockets: 0,
@@ -356,6 +404,8 @@ export class SignalService {
     discordApiFailures: 0,
     webhookDeliveries: 0,
     webhookDeliveriesUnavailable: 0,
+    githubDeliveries: 0,
+    githubDeliveriesUnavailable: 0,
     queuedDeliveries: 0,
     queuedDeliveriesFlushed: 0,
   };
@@ -379,12 +429,23 @@ export class SignalService {
     this.#discordEnabled = options.discord === true;
     this.#telegram = options.telegram ?? null;
     this.#fork = options.fork ?? ((work) => void Effect.runFork(work));
+    this.#isEntry = options.isEntry ?? (() => true);
     this.#queue = new IngressQueue(options.routeWaker ?? null, { fork: this.#fork });
   }
 
   /** The Bot API and the file tokens, or `null` when Telegram is off. */
   get telegram(): SignalTelegram | null {
     return this.#telegram;
+  }
+
+  /**
+   * Closes the sockets that this Signal has only as the entry: each peer whose ticket has no `signal`
+   * claim. `disconnect` removes them. The peers connect again through the entry name.
+   */
+  closeEntrySockets(): void {
+    for (const peer of [...this.#peers.values()]) {
+      if (!peer.claims.signal) peer.socket.close(1013, NOT_ENTRY_REASON);
+    }
   }
 
   close(): void {
@@ -480,7 +541,11 @@ export class SignalService {
         if (peer.peer === "ingress") this.#queue.acknowledge(peer.claims.hostId, message.id);
         return;
       }
-      if (message.type === "slack-delivery-result" || message.type === "webhook-delivery-result") {
+      if (
+        message.type === "slack-delivery-result" ||
+        message.type === "webhook-delivery-result" ||
+        message.type === "github-delivery-result"
+      ) {
         const pending = this.#pendingDeliveries.get(message.requestId);
         if (!pending || pending.socketId !== socket.id || `${pending.kind}-delivery-result` !== message.type) {
           this.#fail(socket, "permission_denied", "The delivery does not belong to this peer.");
@@ -539,6 +604,12 @@ export class SignalService {
         }
         for (const route of peer.webhookRoutes) {
           if (this.#webhookRoutes.get(route) === socket.id) this.#webhookRoutes.delete(route);
+        }
+        for (const route of peer.githubRepositories) {
+          const hosts = this.#githubRepositories.get(route);
+          if (hosts?.get(peer.claims.hostId) !== socket.id) continue;
+          hosts.delete(peer.claims.hostId);
+          if (hosts.size === 0) this.#githubRepositories.delete(route);
         }
         for (const guildId of peer.discordGuilds) {
           if (this.#discordGuilds.get(guildId) === socket.id) this.#discordGuilds.delete(guildId);
@@ -719,7 +790,8 @@ export class SignalService {
    * Passes one signed Slack request to the `ingress` socket of the workspace's host and waits for
    * its answer. It resolves 503 when no host holds the workspace, the host is too busy, or it does
    * not answer in time: Slack then sends the request again. For a hosted server that sleeps it
-   * resolves 200, and keeps the request when it addresses OpenBot (`IngressQueue`).
+   * resolves 200, and keeps the request when it addresses OpenBot (`IngressQueue`). Chatter for a
+   * host with no socket resolves 200 and is lost.
    */
   readonly deliverSlack = Effect.fn("Signal.deliverSlack")((appId: string, teamId: string, delivery: SlackDelivery) => {
     const route = slackRouteKey(appId, teamId);
@@ -735,7 +807,9 @@ export class SignalService {
         retryReason: delivery.retryReason,
         bodyBase64,
       }) as const;
-    // A hosted server that sleeps: Slack gets 200, so it does not count a failure or send again.
+    // A hosted server that sleeps, or chatter: Slack gets 200, so it does not count a failure or send
+    // again. Slack turns off events for the whole app when more than 95% of deliveries fail for 60
+    // minutes, and a computer that is off gets every channel message.
     if (!socketId || !this.#peers.has(socketId)) {
       this.#undelivered("slack");
       return this.#keep(
@@ -744,7 +818,10 @@ export class SignalService {
         delivery.wakes,
         frame(randomIdentifier(), Buffer.from(delivery.body).toString("base64")),
       ).pipe(
-        Effect.map((outcome): SlackDeliveryResponse => (outcome === "unavailable" ? UNAVAILABLE : { status: 200 })),
+        Effect.map(
+          (outcome): SlackDeliveryResponse =>
+            outcome === "unavailable" && !delivery.chatter ? UNAVAILABLE : { status: 200 },
+        ),
       );
     }
     return this.#deliver("slack", socketId, delivery.body, frame).pipe(
@@ -791,7 +868,43 @@ export class SignalService {
   );
 
   /**
-   * Sends one Slack or webhook delivery to an `ingress` socket and waits for its answer. It resolves
+   * The rate limit of the GitHub route: by installation for a signed event, by address for a refused
+   * one. GitHub sends every App's events from shared addresses.
+   */
+  acceptGitHubRequest(key: `installation:${number}` | `address:${string}`): boolean {
+    return this.#acceptRateKey(`github-${key}`, Date.now(), key.startsWith("installation:") ? INGRESS_RATE_FACTOR : 1);
+  }
+
+  /**
+   * Passes one GitHub event to every host whose GitHub route names its repository, at the same time,
+   * and waits for their answers.
+   */
+  readonly deliverGitHub = Effect.fn("Signal.deliverGitHub")(function* (
+    this: SignalService,
+    delivery: GitHubDelivery,
+  ): Effect.fn.Return<GitHubDeliveryResponse> {
+    const hosts = this.#githubRepositories.get(githubRepositoryKey(delivery.installationId, delivery.repositoryId));
+    if (!hosts || hosts.size === 0) return { status: 204 };
+    const results = yield* Effect.forEach(
+      [...hosts.values()],
+      (socketId) =>
+        this.#deliver("github", socketId, delivery.body, (requestId, bodyBase64) => ({
+          type: "github-delivery",
+          version: 1,
+          requestId,
+          event: delivery.event,
+          deliveryId: delivery.deliveryId,
+          bodyBase64,
+        })),
+      { concurrency: "unbounded" },
+    );
+    const statuses = results.map((result) => (result?.type === "github-delivery-result" ? result.status : null));
+    if (statuses.includes(202)) return { status: 202 };
+    return statuses.every((status) => status === 404) ? { status: 204 } : UNAVAILABLE;
+  });
+
+  /**
+   * Sends one Slack, webhook or GitHub delivery to an `ingress` socket and waits for its answer. It resolves
    * null when no socket holds the route, the host is too busy, or it does not answer in time: the
    * sender then tries again, so nothing needs to be kept here. Both kinds share one budget per host.
    */
@@ -1142,9 +1255,11 @@ export class SignalService {
           }).pipe(Effect.result);
           let claims: RemoteTicketClaims;
           if (Result.isFailure(initial)) {
+            if (initial.failure._tag === "RemoteTokenUnavailableError") return yield* initial.failure;
             usedInitialTicket = false;
             claims = yield* tokens.verifyResumeToken(message.token);
           } else claims = initial.success;
+          if (!claims.signal && !this.#isEntry()) return yield* new NotEntryError();
           if (message.peer !== "client" && claims.role !== "host")
             return yield* new RemoteTokenError({ message: "Host role required." });
           if (message.peer === "client" && claims.role === "host")
@@ -1153,10 +1268,17 @@ export class SignalService {
           let telegramRoute: TelegramRoute = { chats: [] };
           let discordRoute: DiscordRoute = { guilds: [] };
           let webhookRoute: WebhookRouteTicket = { routes: [] };
+          let githubRoute: GitHubRoute = { repositories: [] };
           if (message.peer === "ingress") {
-            if (!message.slackRoute && !message.discordRoute && !message.webhookRoute && !message.telegramRoute)
+            if (
+              !message.slackRoute &&
+              !message.discordRoute &&
+              !message.webhookRoute &&
+              !message.telegramRoute &&
+              !message.githubRoute
+            )
               return yield* new RemoteTokenError({
-                message: "A Slack, Discord, Telegram or webhook route is required.",
+                message: "A Slack, Discord, Telegram, webhook or GitHub route is required.",
               });
             if (message.slackRoute) {
               if (!tokens.verifySlackRoute) return yield* new RemoteTokenError({ message: "Slack route required." });
@@ -1190,6 +1312,11 @@ export class SignalService {
                 webhookRoute = { routes: webhookRoute.routes.filter((route) => linked.has(route.id)) };
               }
             }
+            if (message.githubRoute) {
+              if (!tokens.verifyGitHubRoute)
+                return yield* new RemoteTokenError({ message: "GitHub route verification required." });
+              githubRoute = yield* tokens.verifyGitHubRoute(message.githubRoute, claims.hostId);
+            }
             // A Signal without Telegram ignores the ticket: the host sends it before `ready` names
             // the capability.
             const telegram = this.#telegram;
@@ -1212,17 +1339,27 @@ export class SignalService {
           }
           // Finish signing before admission. No quota slot is held while signing waits or fails.
           const resumeToken = yield* tokens.issueResumeToken(claims);
-          if ((this.#revokedEpochs.get(claims.hostId) ?? 0) > claims.authEpoch) {
-            return yield* new RemoteTokenError({ message: "Revoked ticket." });
-          }
-          if (claims.role !== "host" && this.#revokedSessions.has(claims.sessionId))
-            return yield* new RemoteTokenError({ message: "Ended session." });
+          if (this.#isRevoked(claims))
+            return yield* new RemoteTokenError({ message: "Revoked ticket or ended session." });
           this.#pruneReplayCache();
           if (usedInitialTicket && this.#usedTicketIds.has(claims.jti))
             return yield* new RemoteTokenError({ message: "Ticket was already used." });
-          return { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, resumeToken };
+          return { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, githubRoute, resumeToken };
         }).pipe(Effect.result);
         if (Result.isFailure(authentication)) {
+          // After a restart every resume asks the account service. When it does not answer, the
+          // session can still be active: close without an error frame, so that the peer keeps its
+          // data channels and connects again after its backoff.
+          const failure = authentication.failure;
+          if (failure._tag === "RemoteTokenUnavailableError" && !this.#isRevoked(failure)) {
+            this.#metrics.authenticationUnavailable += 1;
+            socket.close(1013, "The account service is unavailable.");
+            return;
+          }
+          if (failure._tag === "NotEntryError") {
+            socket.close(1013, NOT_ENTRY_REASON);
+            return;
+          }
           this.#metrics.authenticationFailures += 1;
           this.#fail(socket, "authentication_required", "Remote ticket is invalid or expired.", 1008);
           return;
@@ -1233,7 +1370,13 @@ export class SignalService {
           this.#fail(socket, "protocol_error", "This socket is already authenticated.", 1008);
           return;
         }
-        const { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, resumeToken } = authentication.success;
+        // This machine can stop being the entry while verification waits: check again.
+        if (!authentication.success.claims.signal && !this.#isEntry()) {
+          socket.close(1013, NOT_ENTRY_REASON);
+          return;
+        }
+        const { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, githubRoute, resumeToken } =
+          authentication.success;
         // A reconnect replaces the old client even when its host has disconnected and the peer has
         // no connection record. Admission and replacement must have no asynchronous gap.
         const replaced = message.peer === "client" ? this.#clientForSession(claims) : null;
@@ -1260,6 +1403,9 @@ export class SignalService {
           discordGuilds: discordRoute.guilds.map((guild) => guild.id),
           discordSession: null,
           webhookRoutes: webhookRoute.routes.map((route) => route.id),
+          githubRepositories: githubRoute.repositories.map((repository) =>
+            githubRepositoryKey(repository.installationId, repository.id),
+          ),
           turnCredentials: null,
         };
         this.#peers.set(socket.id, peer);
@@ -1313,6 +1459,11 @@ export class SignalService {
             this.#webhookRouteFloor.set(route.id, route.linkedAt);
             this.#webhookRoutes.set(route.id, socket.id);
           }
+          for (const route of peer.githubRepositories) {
+            const hosts = this.#githubRepositories.get(route) ?? new Map<string, string>();
+            hosts.set(claims.hostId, socket.id);
+            this.#githubRepositories.set(route, hosts);
+          }
           this.#send(socket, {
             type: "ready",
             version: 1,
@@ -1324,6 +1475,7 @@ export class SignalService {
           if (webhookRoute.routes.length > 0) {
             this.#send(socket, { type: "webhook-ready", version: 1 });
           }
+          if (message.githubRoute) this.#send(socket, { type: "github-ready", version: 1 });
           // Without the bot token, Signal cannot make a Discord call: the socket gets no session. The
           // session names the guilds routed here, so the host learns of a guild it lost while off.
           if (this.#discordEnabled && message.discordRoute) {
@@ -1671,6 +1823,11 @@ export class SignalService {
     socket.send(encodeSignalServerMessage(message));
   }
 
+  #isRevoked(claims: { hostId: string; sessionId: string; role: string; authEpoch: number }): boolean {
+    if ((this.#revokedEpochs.get(claims.hostId) ?? 0) > claims.authEpoch) return true;
+    return claims.role !== "host" && this.#revokedSessions.has(claims.sessionId);
+  }
+
   #fail(socket: SignalSocket, code: SignalErrorCode, message: string, closeCode?: number): void {
     this.#send(socket, { type: "error", version: 1, code, message });
     if (closeCode) socket.close(closeCode, message);
@@ -1699,4 +1856,12 @@ function slackRouteKey(appId: string, teamId: string): string {
 /** One OpenBot bot in one chat. The production and development bots can share a chat. */
 function telegramRouteKey(botId: string, chatId: string): string {
   return `${botId}:${chatId}`;
+}
+
+/**
+ * One repository in one installation of the OpenBot GitHub App. A repository that moves to another
+ * account gets another installation, so a route for the old one stops.
+ */
+function githubRepositoryKey(installationId: number, repositoryId: number): string {
+  return `${installationId}:${repositoryId}`;
 }

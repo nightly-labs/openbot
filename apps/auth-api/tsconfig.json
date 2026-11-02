@@ -5,7 +5,8 @@
     "jsxImportSource": "@solidjs/web",
     "paths": {
       "@openbot/renderer-preview": ["./src/types/renderer-preview.d.ts"],
-      "@openbot/renderer-web": ["./src/types/renderer-web.d.ts"]
+      "@openbot/renderer-web": ["./src/types/renderer-web.d.ts"],
+      "@openbot/ui/features/conversation/MarkdownMessageText": ["./src/types/markdown-message-text.d.ts"]
     },
     "types": ["@cloudflare/workers-types", "vite/client", "@testing-library/jest-dom"]
   },

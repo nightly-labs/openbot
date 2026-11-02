@@ -3,11 +3,18 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
 import { AcpAgentClient } from "../src/backend/acp-client";
+import { OPENCODE_ACP_FLAVOR } from "../src/backend/acp-flavor-opencode";
 import { codexSandboxConfig, codexSandboxMode, codexSandboxPolicy } from "../src/backend/agent/workspace-sandbox";
 import type { AgentClient, AgentProvider } from "../src/backend/agent-client";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { ClaudeAgentClient } from "../src/backend/claude-client";
-import { resolveClaudeCli, resolveCodexCli, resolveGrokCli, resolveOpencodeCli } from "../src/backend/cli";
+import {
+  resolveClaudeCli,
+  resolveCodexCli,
+  resolveCursorCli,
+  resolveGrokCli,
+  resolveOpencodeCli,
+} from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { GrokAgentClient } from "../src/backend/grok-client";
 import {
@@ -25,6 +32,7 @@ import {
   isRecord,
   type RequestId,
 } from "../src/backend/protocol";
+import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/provider-drivers";
 
 const temporaryRoot = await mkdtemp(join(tmpdir(), "openbot-filesystem-smoke-"));
 const sharedRoot = join(temporaryRoot, "shared");
@@ -245,7 +253,17 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
     { writableRoots: [workspaceRoot, sharedRoot] },
     join(temporaryRoot, "provider-state"),
   );
-  const approvals: { method: string; reason: string | null; itemId: string | null; mentions: string[] }[] = [];
+  const approvals: {
+    method: string;
+    reason: string | null;
+    itemId: string | null;
+    mentions: string[];
+    declined: boolean;
+  }[] = [];
+  // Cursor asks before each command and each edit, and the user allows them in the app. Its process
+  // sandbox, not the approval, keeps it in the workspace, so the smoke allows them too, with the
+  // `accept` that the ACP client reads.
+  const allowApprovals = provider === "cursor";
   const items = new Map<string, { type: string | null; status: string | null; mentions: string[] }>();
   client.on("request", (request) => {
     if (!isApprovalRequest(request.method)) {
@@ -257,8 +275,10 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
       reason: getString(request.params, "reason"),
       itemId: getString(request.params, "itemId"),
       mentions: mentions(request.params),
+      declined: !allowApprovals,
     });
-    declineServerRequest(client, request);
+    if (allowApprovals) client.respond(request.id, { decision: "accept" });
+    else declineServerRequest(client, request);
   });
   // The agent's own account of each step, and each item that names a file outside.
   let finalMessage: string | null = null;
@@ -339,8 +359,9 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
     await completion;
 
     const named = (name: string) => (id: string | null) => !!id && !!items.get(id)?.mentions.includes(name);
-    const declined = (name: string) =>
+    const asked = (name: string) =>
       approvals.filter((approval) => approval.mentions.includes(name) || named(name)(approval.itemId));
+    const declined = (name: string) => asked(name).filter((approval) => approval.declined);
     const failedItems = (name: string) =>
       [...items.entries()].filter(
         ([, item]) =>
@@ -355,6 +376,10 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
     };
     const editAttempt = {
       declinedApprovals: declined(basename(paths.editOutside)).length,
+      // Only the file tool's own approvals: an allowed command that reads the path is no edit.
+      allowedEdits: asked(basename(paths.editOutside)).filter(
+        (approval) => !approval.declined && approval.method === "item/fileChange/requestApproval",
+      ).length,
       failedItems: failedItems(basename(paths.editOutside)).map(([id, item]) => ({ id, ...item })),
     };
     const report = {
@@ -381,7 +406,10 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
       (commandStatus !== null && commandStatus !== "0") || commandAttempt.declinedApprovals > 0
         ? null
         : "No evidence that the command tried to write outside and was blocked.",
-      editAttempt.declinedApprovals > 0 || editAttempt.failedItems.length > 0
+      // An edit that the smoke allowed and that left no file was blocked by the process sandbox.
+      editAttempt.declinedApprovals > 0 ||
+      editAttempt.failedItems.length > 0 ||
+      (editAttempt.allowedEdits > 0 && !report.editOutsideWritten)
         ? null
         : "No evidence that the file tool tried to write outside and was blocked or declined.",
     ].filter(isString);
@@ -486,7 +514,7 @@ async function runImagegenSmoke(): Promise<void> {
 
 /**
  * The smoke's client. `confinement` is for the Workspace only smoke: Codex and Claude take the sandbox
- * with each session, and Grok and OpenCode start in the process sandbox that OpenBot gives them. A
+ * with each session, and Grok, OpenCode and Cursor start in the process sandbox that OpenBot gives them. A
  * null model means the first one the provider lists, or `--model`. `stateDirectory` is where a
  * Workspace only Claude query keeps its skill plugin.
  */
@@ -495,9 +523,15 @@ async function createClient(
   confinement?: ProcessConfinement,
   stateDirectory?: string,
 ): Promise<{ client: AgentClient; model: string | null; version: string }> {
-  if (provider === "grok" || provider === "opencode") {
+  if (provider === "grok" || provider === "opencode" || provider === "cursor") {
     if (!confinement) throw new Error(`The filesystem smoke runs ${provider} only with --workspace-only.`);
     const model = modelArgument();
+    if (provider === "cursor") {
+      // The provider row's own client, so the smoke starts Cursor in the sandbox that the app gives it.
+      const cli = await runCauseEffect(resolveCursorCli());
+      const client = requireProviderDriver("cursor").createClient(cli, 60_000, NO_PROVIDER_CREDENTIALS, confinement);
+      return { client, model, version: cli.version };
+    }
     if (provider === "grok") {
       const cli = await runCauseEffect(resolveGrokCli());
       const client = new GrokAgentClient(cli, 60_000, false, undefined, undefined, undefined, undefined, confinement);
@@ -506,6 +540,7 @@ async function createClient(
     const cli = await runCauseEffect(resolveOpencodeCli());
     const client = new AcpAgentClient(cli, 60_000, {
       provider: "opencode",
+      flavor: OPENCODE_ACP_FLAVOR,
       argv: ["acp"],
       env: { ...OPENCODE_CONFINED_ENV },
       signInMessage: "OpenCode is not signed in.",
@@ -553,11 +588,11 @@ async function initialize(client: AgentClient): Promise<void> {
 function requestedProviders(): AgentProvider[] {
   const index = process.argv.indexOf("--provider");
   const requested = index >= 0 ? process.argv[index + 1] : "all";
-  const confined = ["grok", "opencode"] as const;
+  const confined = ["grok", "opencode", "cursor"] as const;
   if (requested === "all") return workspaceOnly ? ["codex", "claude", ...confined] : ["codex", "claude"];
   if (requested === "codex" || requested === "claude") return [requested];
-  if (workspaceOnly && (requested === "grok" || requested === "opencode")) return [requested];
-  throw new Error("--provider must be codex, claude, or all; grok and opencode need --workspace-only.");
+  if (workspaceOnly && (requested === "grok" || requested === "opencode" || requested === "cursor")) return [requested];
+  throw new Error("--provider must be codex, claude, or all; grok, opencode and cursor need --workspace-only.");
 }
 
 function modelArgument(): string | null {

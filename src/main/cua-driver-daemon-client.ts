@@ -71,7 +71,13 @@ export class CuaDriverDaemonClient {
   }
 
   /**
-   * Every window on the desktop, in front-to-back order.
+   * Every window on screen, in front-to-back order.
+   *
+   * Only on-screen windows, because only that list has an order. On macOS the driver numbers
+   * `z_index` from the order WindowServer lists windows in, and WindowServer promises front to back
+   * only for the on-screen list. The full list, off-screen windows included, came back in another
+   * order on macOS 27, and the rim was drawn over the conversation in front of it. The rim reads no
+   * off-screen window in any case.
    *
    * The result is the tool's own structured payload, which is what the driver's command line
    * prints, so the readers above it see exactly what they saw before.
@@ -80,7 +86,7 @@ export class CuaDriverDaemonClient {
     return this.#request({
       method: "call",
       name: "list_windows",
-      args: {},
+      args: { on_screen_only: true },
       session_id: SESSION_ID,
       client_kind: "cli",
     }).pipe(Effect.map((result) => (isDynamicRecord(result) ? result.structuredContent : null)));

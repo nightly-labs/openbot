@@ -16,10 +16,17 @@ export const DISCORD_BOT_PERMISSIONS = (
 ).toString();
 
 /**
- * The Gateway intents Signal asks for: guilds, guild messages and direct messages. No privileged
- * intent: Discord gives a bot the text of a message that mentions it, and of a direct message.
+ * The Gateway intents Signal always asks for: guilds, guild messages and direct messages. Without a
+ * privileged intent, Discord gives a bot the text of a message that mentions it, and of a direct message.
  */
 export const DISCORD_GATEWAY_INTENTS = (1 << 0) | (1 << 9) | (1 << 12);
+
+/**
+ * The privileged Message Content intent. Signal adds it unless `DISCORD_MESSAGE_CONTENT` is `false`, so
+ * that the message a person replies to, and the conversation history, have their text. When the
+ * Developer Portal has it off, Discord refuses it and Signal connects without it.
+ */
+export const DISCORD_MESSAGE_CONTENT_INTENT = 1 << 15;
 
 /** The avatar of the Discord Orchestrator agent that OpenBot adds. */
 export const DISCORD_ORCHESTRATOR_AVATAR = { avatarSeed: "discord-orchestrator", avatarHue: 245 } as const;

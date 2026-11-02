@@ -29,7 +29,7 @@ export const MEMORY_RECALL_TOOL_DEFINITIONS = [
   {
     name: "search_memories",
     description:
-      "Search your saved memories when a past preference, decision, or fact can help with the current task. Returns committed entries and their selection revisions. Search terms are literal words, not query operators. No match means the fact was not found; do not invent it.",
+      "Search your saved memories when a past preference, decision, or fact can help with the current task. Returns committed entries and their selection revisions. Search terms are words, not query operators. No match means the fact was not found; do not invent it.",
     shape: searchMemoriesInput.shape,
   },
   {

@@ -1,17 +1,20 @@
-// The provider-aware base schema that protocols 4, 5 and 6 share. Each version file passes its own
+// The provider-aware base schema that protocols 4 to 8 share. Each version file passes its own
 // profile to `createProviderAwareCodec`; the profile is the only part of the schema that differs between
 // these versions. Versions 1-3 retain their own codec.
+import { PROVIDER_ID_PATTERN } from "../agent-providers";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
 
 /**
  * What a released provider-aware protocol accepts. Each list is frozen with its protocol version: a value
- * added to a list is a new protocol version, never an edit to a released profile.
+ * added to a list is a new protocol version, never an edit to a released profile. `"open"` accepts every
+ * id that `OPEN_PROVIDER_ID` matches, so a new provider needs no new protocol version; only an open
+ * profile carries the `displayName` of a provider status row, for a peer that does not know the id.
  */
 export interface ProviderAwareProfile {
   /** Agent `provider`, provider status `id`, and model option `provider` values. */
-  readonly providers: readonly string[];
+  readonly providers: readonly string[] | "open";
   /** Agent auth `kind` values for a signed-in account, next to `unknown`, `signed-out` and `unsupported`. */
-  readonly authKinds: readonly string[];
+  readonly authKinds: readonly string[] | "open";
   /** The charset and length of an agent summary `model`. It must not have the `g` or `y` flag. */
   readonly agentModel: RegExp;
   readonly maximumCapabilities?: number;
@@ -35,6 +38,9 @@ export function createProviderAwareCodec(profile: ProviderAwareProfile) {
       decodeTeamProtocolProviderAwareHttpResponse(profile, method, path, status, value),
   };
 }
+
+/** A provider id or auth kind of an open profile: lower case, as `provider-accounts-v1` bounds it. */
+export const OPEN_PROVIDER_ID = PROVIDER_ID_PATTERN;
 
 export const TEAM_PROTOCOL_VERSION_HEADER = "OpenBot-Protocol-Version";
 export const TEAM_APP_VERSION_HEADER = "OpenBot-App-Version";
@@ -191,7 +197,7 @@ function decodeTeamProtocolProviderAwareEvent(
   if (!TEAM_PROTOCOL_ProviderAware_EVENT_TYPE_SET.has(value.type)) {
     return { kind: "unknown", type: value.type };
   }
-  const projected = projectTeamProtocolProviderAwareEvent(value);
+  const projected = projectTeamProtocolProviderAwareEvent(profile, value);
   if (isTeamProtocolProviderAwareKnownEvent(profile, projected)) return { kind: "known", event: projected };
   return { kind: "invalid", type: value.type };
 }
@@ -234,19 +240,19 @@ const TEAM_PROTOCOL_ProviderAware_EVENT_KEYS = {
   "team-direct-typing": ["type", "senderMemberId", "recipientMemberId", "typing"],
 } as const satisfies Record<(typeof TEAM_PROTOCOL_ProviderAware_EVENT_TYPES)[number], readonly string[]>;
 
-function projectTeamProtocolProviderAwareEvent(value: DynamicRecord): DynamicRecord {
+function projectTeamProtocolProviderAwareEvent(profile: ProviderAwareProfile, value: DynamicRecord): DynamicRecord {
   if (!isString(value.type) || !isTeamProtocolProviderAwareEventType(value.type)) return value;
   const eventType = value.type;
   const projected = projectProviderAwareObject(value, TEAM_PROTOCOL_ProviderAware_EVENT_KEYS[eventType]);
   switch (eventType) {
     case "status":
       if (isDynamicRecord(projected.status)) {
-        projected.status = projectTeamProtocolProviderAwareHttpResponse("GET agent-status", projected.status);
+        projected.status = projectTeamProtocolProviderAwareHttpResponse(profile, "GET agent-status", projected.status);
       }
       break;
     case "usage-changed":
       if (isDynamicRecord(projected.usage)) {
-        projected.usage = projectTeamProtocolProviderAwareHttpResponse("GET agent-usage", projected.usage);
+        projected.usage = projectTeamProtocolProviderAwareHttpResponse(profile, "GET agent-usage", projected.usage);
       }
       break;
     case "bots-changed":
@@ -264,7 +270,7 @@ function projectTeamProtocolProviderAwareEvent(value: DynamicRecord): DynamicRec
       break;
     case "conversation-page":
       if (isDynamicRecord(projected.page)) {
-        projected.page = projectTeamProtocolProviderAwareHttpResponse("GET conversation-page", projected.page);
+        projected.page = projectTeamProtocolProviderAwareHttpResponse(profile, "GET conversation-page", projected.page);
       }
       break;
     case "queue-changed":
@@ -301,7 +307,11 @@ function projectTeamProtocolProviderAwareEvent(value: DynamicRecord): DynamicRec
       break;
     case "team-presence":
       if (isDynamicRecord(projected.snapshot)) {
-        projected.snapshot = projectTeamProtocolProviderAwareHttpResponse("GET team-presence", projected.snapshot);
+        projected.snapshot = projectTeamProtocolProviderAwareHttpResponse(
+          profile,
+          "GET team-presence",
+          projected.snapshot,
+        );
       }
       break;
     case "team-direct-message":
@@ -457,7 +467,7 @@ function isProviderAwareBotSummary(
     isProviderAwareBoundedString(value.title, 120) &&
     isProviderAwareBoundedString(value.description, 2_000) &&
     isBoolean(value.notifications) &&
-    isProviderAwareOneOf(profile.providers, value.provider) &&
+    isProfileProvider(profile.providers, value.provider) &&
     isString(value.model) &&
     profile.agentModel.test(value.model) &&
     isProviderAwareOneOf(["low", "medium", "high", "xhigh", "max"], value.reasoningEffort) &&
@@ -515,7 +525,8 @@ function isProviderAwareSidebarLayout(value: unknown): value is TeamProtocolProv
   );
 }
 
-function isProviderAwareConversationSnapshot(value: unknown): value is TeamProtocolProviderAwareJsonObject {
+/** Also checks the task conversations of `agent-tasks-v1`, after their keys are put in the wire spelling. */
+export function isProviderAwareConversationSnapshot(value: unknown): value is TeamProtocolProviderAwareJsonObject {
   return (
     isTeamProtocolProviderAwareJsonObject(value) &&
     isProviderAwareIdentifier(value.botId) &&
@@ -939,6 +950,10 @@ function isProviderAwareBoundedString(value: unknown, limit: number): value is s
 
 function isProviderAwareOneOf<T extends string | number>(values: readonly T[], value: unknown): value is T {
   return values.some((candidate) => candidate === value);
+}
+
+function isProfileProvider(values: readonly string[] | "open", value: unknown): value is string {
+  return values === "open" ? isString(value) && OPEN_PROVIDER_ID.test(value) : isProviderAwareOneOf(values, value);
 }
 
 function isTeamProtocolProviderAwarePresenceSnapshot(
@@ -1438,7 +1453,7 @@ function decodeTeamProtocolProviderAwareHttpResponse(
   if (!matchesTeamProtocolProviderAwareHttpShape(contract.response, value)) {
     throw new Error("Invalid Team protocol v1 HTTP response.");
   }
-  const projected = projectTeamProtocolProviderAwareHttpResponse(route, value);
+  const projected = projectTeamProtocolProviderAwareHttpResponse(profile, route, value);
   validateTeamProtocolProviderAwareHttpResponse(profile, route, projected);
   return projected;
 }
@@ -1462,6 +1477,7 @@ function projectTeamProtocolProviderAwareHttpRequest(
 }
 
 function projectTeamProtocolProviderAwareHttpResponse(
+  profile: ProviderAwareProfile,
   route: TeamProtocolProviderAwareHttpRoute,
   value: TeamProtocolProviderAwareJsonValue,
 ): TeamProtocolProviderAwareJsonValue {
@@ -1522,7 +1538,7 @@ function projectTeamProtocolProviderAwareHttpResponse(
       projected.auth = projectProviderAwareObject(projected.auth, ["kind", "accountType", "email"]);
     }
     if (Array.isArray(projected.providers)) {
-      projected.providers = projected.providers.map(projectProviderAwareProviderStatus);
+      projected.providers = projected.providers.map((status) => projectProviderAwareProviderStatus(profile, status));
     }
     if (isDynamicRecord(projected.capabilities)) {
       projected.capabilities = projectProviderAwareObject(projected.capabilities, ["chat", "browser", "computerUse"]);
@@ -1643,7 +1659,8 @@ function projectProviderAwareSidebarLayout(value: unknown): TeamProtocolProvider
   return projected;
 }
 
-function projectProviderAwareConversation(
+/** Also projects the task conversations of `agent-tasks-v1`, with no read state. */
+export function projectProviderAwareConversation(
   value: unknown,
   page: boolean,
   includeReadState = true,
@@ -1962,16 +1979,16 @@ function projectProviderAwareQueuedMessageReceipt(value: unknown): TeamProtocolP
   return projected;
 }
 
-function projectProviderAwareProviderStatus(value: unknown): TeamProtocolProviderAwareJsonObject {
-  return projectProviderAwareObject(value, [
-    "id",
-    "state",
-    "version",
-    "message",
-    "email",
-    "connectionState",
-    "checkError",
-  ]);
+const PROVIDER_STATUS_KEYS = ["id", "state", "version", "message", "email", "connectionState", "checkError"] as const;
+
+function projectProviderAwareProviderStatus(
+  profile: ProviderAwareProfile,
+  value: unknown,
+): TeamProtocolProviderAwareJsonObject {
+  return projectProviderAwareObject(
+    value,
+    profile.providers === "open" ? [...PROVIDER_STATUS_KEYS, "displayName"] : PROVIDER_STATUS_KEYS,
+  );
 }
 
 function projectProviderAwareUsageLimit(value: unknown): TeamProtocolProviderAwareJsonObject {
@@ -2675,7 +2692,7 @@ function isProviderAwareAgentAuth(profile: ProviderAwareProfile, value: unknown)
   if (value.kind === "unknown" || value.kind === "signed-out") return true;
   if (value.kind === "unsupported") return isProviderAwareBoundedString(value.accountType, 160);
   return (
-    isProviderAwareOneOf(profile.authKinds, value.kind) &&
+    isProfileProvider(profile.authKinds, value.kind) &&
     (value.email === null || isProviderAwareBoundedString(value.email, 254))
   );
 }
@@ -2683,7 +2700,7 @@ function isProviderAwareAgentAuth(profile: ProviderAwareProfile, value: unknown)
 function isProviderAwareProviderStatus(profile: ProviderAwareProfile, value: unknown): boolean {
   return (
     isDynamicRecord(value) &&
-    isProviderAwareOneOf(profile.providers, value.id) &&
+    isProfileProvider(profile.providers, value.id) &&
     isProviderAwareOneOf(
       ["not-started", "checking", "available", "sign-in-required", "not-installed", "outdated", "error"],
       value.state,
@@ -2694,7 +2711,9 @@ function isProviderAwareProviderStatus(profile: ProviderAwareProfile, value: unk
     (value.connectionState === undefined || value.connectionState === "connecting") &&
     (value.checkError === undefined ||
       value.checkError === null ||
-      isProviderAwareBoundedString(value.checkError, 2_000))
+      isProviderAwareBoundedString(value.checkError, 2_000)) &&
+    (value.displayName === undefined ||
+      (profile.providers === "open" && isProviderAwareLimitedString(value.displayName, 80)))
   );
 }
 
@@ -2729,7 +2748,7 @@ function isProviderAwareUsageWindow(value: unknown): boolean {
 function isProviderAwareAgentModelOption(profile: ProviderAwareProfile, value: unknown): boolean {
   return (
     isDynamicRecord(value) &&
-    isProviderAwareOneOf(profile.providers, value.provider) &&
+    isProfileProvider(profile.providers, value.provider) &&
     isProviderAwareBoundedString(value.id, 160) &&
     isProviderAwareLimitedString(value.name, 160) &&
     isProviderAwareBoundedString(value.description, 2_000) &&
@@ -2880,7 +2899,7 @@ function isProviderAwareBotUpdate(profile: ProviderAwareProfile, value: TeamProt
     (value.title === undefined || isProviderAwareBoundedString(value.title, 120)) &&
     (value.description === undefined || isProviderAwareBoundedString(value.description, 2_000)) &&
     (value.notifications === undefined || isBoolean(value.notifications)) &&
-    (value.provider === undefined || isProviderAwareOneOf(profile.providers, value.provider)) &&
+    (value.provider === undefined || isProfileProvider(profile.providers, value.provider)) &&
     (value.model === undefined || isProviderAwareBoundedString(value.model, 160)) &&
     (value.reasoningEffort === undefined ||
       isProviderAwareOneOf(["low", "medium", "high", "xhigh", "max"], value.reasoningEffort)) &&

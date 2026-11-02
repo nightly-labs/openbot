@@ -6,8 +6,8 @@
  * server accepts; anything else is refused, so a refusal is a state the dialog reached.
  */
 
+import type { McpKeyFlow } from "@openbot/contracts/mcp-connect-flows";
 import { McpKeyDialog } from "@openbot/ui/features/settings/McpKeyDialog";
-import type { McpKeyFlow } from "@openbot/ui/features/settings/mcp-connect-auth";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { MARKETPLACE_PLUGINS } from "../src/features/settings/marketplace-plugin-catalog";
@@ -20,11 +20,12 @@ import {
   ConnectStage,
   connectAs,
   createConnectStage,
-  FIGMA,
   keyFlowFor,
   LINEAR,
+  RESEND,
   subjectFor,
 } from "./mcp-connect-stage";
+import { SettledArgs } from "./settled-args";
 
 /** A local command instead of an address: the same flow, written to the environment. */
 const POSTGRES = {
@@ -69,9 +70,9 @@ const NOTHING_ASKED: McpKeyFlow = { id: "none", kind: "key", label: "Connect", f
 const COMPOSIO = MARKETPLACE_PLUGINS.find((plugin) => plugin.slug === "composio")?.apps[0];
 if (!COMPOSIO) throw new Error("The catalog must carry the Composio plugin with an app.");
 
-/** One token, the key a server issues beside its sign-in, two values over a command, a link, and none. */
+/** One key for the environment, the key a server issues beside its sign-in, two values, a link, and none. */
 const SERVERS = {
-  figma: () => ({ subject: subjectFor(FIGMA), flow: keyFlowFor(FIGMA) }),
+  resend: () => ({ subject: subjectFor(RESEND), flow: keyFlowFor(RESEND) }),
   linear: () => ({ subject: subjectFor(LINEAR), flow: keyFlowFor(LINEAR) }),
   postgres: () => POSTGRES,
   composio: () => ({ subject: subjectFor(COMPOSIO), flow: keyFlowFor(COMPOSIO) }),
@@ -107,7 +108,7 @@ function KeyPlayground(props: KeyPlaygroundProps) {
 const meta = {
   title: "Settings/McpKeyDialog",
   component: KeyPlayground,
-  args: { server: "figma", outcome: "connects", showsTheKeyPage: true },
+  args: { server: "resend", outcome: "connects", showsTheKeyPage: true },
   argTypes: {
     server: { control: "select", options: Object.keys(SERVERS) },
     outcome: { control: "select", options: CONNECT_OUTCOMES },
@@ -115,6 +116,7 @@ const meta = {
   },
   parameters: CONNECT_PARAMETERS,
   globals: CONNECT_GLOBALS,
+  render: (args) => <SettledArgs>{() => <KeyPlayground {...args} />}</SettledArgs>,
 } satisfies Meta<typeof KeyPlayground>;
 
 export default meta;

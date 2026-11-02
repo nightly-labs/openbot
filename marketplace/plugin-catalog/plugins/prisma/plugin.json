@@ -1,0 +1,33 @@
+{
+  "slug": "prisma",
+  "name": "Prisma",
+  "tagline": "Postgres databases, backups and Compute apps",
+  "description": "Prisma lets agents list and create Prisma Postgres databases, read schemas, run SQL, list backups and restore them to a new database, manage Object Storage buckets, read Compute builds and logs, and search the Prisma docs. Each user signs in to their own Prisma account through the browser and selects a workspace. Agents get full access: they can run SQL that changes or deletes data, update schemas, delete databases and buckets, and stop, roll back or delete Compute deployments.",
+  "category": "coding",
+  "creatorName": "Prisma",
+  "iconUrl": "https://www.prisma.io/apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-databases", "text": "Which databases are in my Prisma workspace?" },
+    { "id": "prompt-backups", "text": "Show me all available backups of my database." },
+    { "id": "prompt-logs", "text": "Show the runtime logs of my latest Compute deployment." }
+  ],
+  "apps": [
+    {
+      "id": "app-prisma-mcp",
+      "name": "Prisma",
+      "description": "Databases, SQL, backups, and Compute apps, over Prisma's MCP server with browser sign-in.",
+      "iconUrl": "https://www.prisma.io/apple-icon.png",
+      "server": {
+        "name": "prisma",
+        "transport": "http",
+        "url": "https://mcp.prisma.io/mcp",
+        "auth": [{ "id": "prisma-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.prisma.io",
+  "privacyPolicyUrl": "https://www.prisma.io/legal/privacy",
+  "termsUrl": "https://www.prisma.io/legal/terms"
+}

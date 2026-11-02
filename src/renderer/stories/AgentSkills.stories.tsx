@@ -3,7 +3,13 @@ import { onCleanup } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
-import { STORY_AGENT, STORY_AGENT_STATUS, STORY_INSTALLED_SKILLS, STORY_MODELS } from "./fixtures";
+import {
+  STORY_AGENT,
+  STORY_AGENT_STATUS,
+  STORY_INSTALLED_SKILLS,
+  STORY_MODELS,
+  storyRuntimeSettings,
+} from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
 const storyAgent = STORY_AGENT;
@@ -29,11 +35,7 @@ function AgentSkillsStory(props: {
         onTrySkill={fn()}
         onOpenUsage={fn()}
         agent={storyAgent}
-        runtimeSettings={{
-          provider: storyAgent.provider,
-          model: storyAgent.model,
-          reasoningEffort: storyAgent.reasoningEffort,
-        }}
+        runtimeSettings={storyRuntimeSettings(storyAgent)}
         agentStatus={STORY_AGENT_STATUS}
         modelOptions={STORY_MODELS}
         working={false}
@@ -62,11 +64,7 @@ const meta = {
   component: AgentSettingsPanel,
   args: {
     agent: storyAgent,
-    runtimeSettings: {
-      provider: storyAgent.provider,
-      model: storyAgent.model,
-      reasoningEffort: storyAgent.reasoningEffort,
-    },
+    runtimeSettings: storyRuntimeSettings(storyAgent),
     agentStatus: STORY_AGENT_STATUS,
     modelOptions: STORY_MODELS,
     working: false,

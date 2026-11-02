@@ -340,7 +340,7 @@ interface SunshineMoonlightRuntimeOptions {
   getDisplays: () => RemoteDesktopDisplay[];
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteDesktopOperationError>;
   spawnProcess?: RemoteRuntimeSpawn;
-  onDiagnostic?: (source: "sunshine" | "moonlight", message: string) => void;
+  onDiagnostic?: ((source: "sunshine" | "moonlight", message: string) => void) | undefined;
   /** Called when Sunshine or Moonlight Web exits after the runtime started. */
   onExit?: (source: "sunshine" | "moonlight") => void;
   allocateSunshineBasePort?: () => Effect.Effect<number, RemoteDesktopOperationError>;
@@ -662,6 +662,10 @@ export class SunshineMoonlightRuntime {
       // The Linux runtime is built with X11 capture and no hardware encoder, so Sunshine does not
       // probe the others.
       ...(this.#options.platform === "linux" ? ["capture = x11", "encoder = software"] : []),
+      // The macOS tray changes its status item from the pairing and stream threads, and macOS 27 stops
+      // a process that changes AppKit off the main thread. OpenBot runs its own main loop and pairing
+      // UI, so the tray has no use.
+      ...(this.#options.platform === "darwin" ? ["system_tray = disabled"] : []),
     ];
     yield* desktopCall(() =>
       Promise.all([

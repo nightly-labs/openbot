@@ -1,13 +1,16 @@
-import type {
-  AgentProviderId,
-  AgentStatus,
-  AppSetupState,
-  CustomProviderRestart,
-  CustomProviderSummary,
-  ProviderRuntimeSnapshot,
-  ServerSummary,
+import {
+  type AgentProviderId,
+  type AgentStatus,
+  type AppSetupState,
+  type CustomProviderRestart,
+  type CustomProviderSummary,
+  isManagedRuntimeProvider,
+  type ProviderRuntimeSnapshot,
+  type ServerSummary,
+  type UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { Toaster, toast } from "@openbot/ui";
+import type { ProviderAccountActions } from "@openbot/ui/components/provider-accounts";
 import type { ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
 import type { ProviderDetectionSettingsValue } from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
 import { createSignal, onCleanup } from "solid-js";
@@ -45,6 +48,7 @@ const providerRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   antigravity: { phase: "downloading", progress: 12, message: null, version: null },
   cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
   cline: { phase: "not-downloaded", progress: null, message: null, version: null },
+  kimi: { phase: "not-downloaded", progress: null, message: null, version: null },
   pi: { phase: "not-downloaded", progress: null, message: null, version: null },
   muse: { phase: "not-downloaded", progress: null, message: null, version: null },
 };
@@ -68,6 +72,44 @@ const openCodeInstalledAgentStatus: AgentStatus = {
     { id: "opencode", state: "sign-in-required", version: "1.18.27", message: null },
   ],
 };
+/** Codex with two connected accounts. Codex gave the own sign-in two usage resets, and the other none. */
+const usageResetAgentStatus: AgentStatus = {
+  ...providerUpdateAgentStatus,
+  providers: (providerUpdateAgentStatus.providers ?? []).map((provider) =>
+    provider.id === "codex"
+      ? {
+          ...provider,
+          accounts: [
+            { id: "default", label: null, email: "ada@example.com", state: "connected", message: null },
+            { id: "a0123456789abcdef", label: "Work", email: "ada@work.example", state: "connected", message: null },
+          ],
+        }
+      : provider,
+  ),
+};
+/** A reset spends one credit after a short wait, so the dialog shows its pending state. */
+function createUsageResetAccounts(): ProviderAccountActions {
+  let available = 2;
+  return {
+    connect: fn(async () => undefined),
+    cancel: fn(async () => undefined),
+    rename: fn(async () => undefined),
+    remove: fn(async () => undefined),
+    usageResets: async (provider) =>
+      provider === "codex"
+        ? [
+            { provider, accountId: "default", available },
+            { provider, accountId: "a0123456789abcdef", available: 0 },
+          ]
+        : [],
+    resetUsage: fn(async () => {
+      await new Promise((done) => setTimeout(done, 600));
+      available -= 1;
+      return "reset" as const;
+    }),
+  };
+}
+
 /** ChatGPT installed and signed out, so its row offers both ways in. The rest are connected. */
 const codeSignInAgentStatus: AgentStatus = {
   ...providerUpdateAgentStatus,
@@ -102,6 +144,7 @@ const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   antigravity: { phase: "ready", progress: 100, message: null, version: "1.2.1" },
   cursor: { phase: "ready", progress: 100, message: null, version: "2026.09.28-64d2043" },
   cline: { phase: "ready", progress: 100, message: null, version: "3.0.68" },
+  kimi: { phase: "ready", progress: 100, message: null, version: "1.52.0" },
   pi: { phase: "ready", progress: 100, message: null, version: "3.0.68" },
   muse: { phase: "ready", progress: 100, message: null, version: "3.0.68" },
 };
@@ -125,7 +168,10 @@ function ServerProvidersStory(props: {
   /** Providers the user turned off. With it every provider row has the switch that turns one on or off. */
   offProviders?: readonly AgentProviderId[];
   providerUsers?: Partial<Record<AgentProviderId, readonly string[]>>;
+  /** Codex accounts with usage reset credits: the account ⋯ menu offers Reset usage. */
+  usageReset?: boolean;
 }) {
+  const usageResetAccounts = props.usageReset ? createUsageResetAccounts() : undefined;
   const previousApi = window.openbot;
   const mock = createMockOpenBot({
     ...(props.providerUpdate
@@ -184,6 +230,24 @@ function ServerProvidersStory(props: {
     return "restarted";
   }
 
+  /** A key that is not sent stays saved, as in main. */
+  async function updateCustomProvider(input: UpdateCustomProviderInput): Promise<CustomProviderRestart> {
+    setCustomProviders((current) =>
+      current.map((provider) =>
+        provider.id === input.id
+          ? {
+              ...provider,
+              name: input.name,
+              baseUrl: input.baseUrl,
+              models: input.models,
+              hasApiKey: provider.hasApiKey || Boolean(input.apiKey),
+            }
+          : provider,
+      ),
+    );
+    return "restarted";
+  }
+
   return (
     <>
       <SettingsPageStory title="Server settings" onEscape={() => setOpen(false)}>
@@ -208,6 +272,7 @@ function ServerProvidersStory(props: {
             onOpenScreenRecordingSettings={fn(async () => undefined)}
             onRecheckScreenRecording={fn(async () => undefined)}
             initialSection="providers"
+            hostPromptCacheTtl={{}}
             onSwitchToManageProviders={props.inactive ? fn() : undefined}
             providers={
               props.inactive
@@ -229,13 +294,15 @@ function ServerProvidersStory(props: {
                       };
                     },
                     get agentStatus() {
-                      return props.codeSignIn
-                        ? codeSignInAgentStatus
-                        : props.providerUpdate
-                          ? providerUpdateAgentStatus
-                          : props.openCodeInstalled
-                            ? openCodeInstalledAgentStatus
-                            : providerAgentStatus;
+                      return props.usageReset
+                        ? usageResetAgentStatus
+                        : props.codeSignIn
+                          ? codeSignInAgentStatus
+                          : props.providerUpdate
+                            ? providerUpdateAgentStatus
+                            : props.openCodeInstalled
+                              ? openCodeInstalledAgentStatus
+                              : providerAgentStatus;
                     },
                     connection: props.codeSignIn
                       ? codeConnection
@@ -263,8 +330,10 @@ function ServerProvidersStory(props: {
                       : props.providerDownloads
                         ? fn()
                         : undefined,
+                    accountActions: usageResetAccounts,
                     onAddCustomProvider: addCustomProvider,
                     onDeleteCustomProvider: deleteCustomProvider,
+                    onUpdateCustomProvider: updateCustomProvider,
                     get customProviders() {
                       return customProviders();
                     },
@@ -287,6 +356,22 @@ function ServerProvidersStory(props: {
                           );
                         }
                       : undefined,
+                    onMeasureProviderDownload:
+                      props.offProviders && props.providerUpdate
+                        ? async (provider: AgentProviderId) =>
+                            isManagedRuntimeProvider(provider)
+                              ? await mock.api.providerRuntimes.measureDownload(provider)
+                              : { bytes: 0, versions: 0 }
+                        : undefined,
+                    onRemoveProviderDownload:
+                      props.offProviders && props.providerUpdate
+                        ? async (provider: AgentProviderId) => {
+                            if (!isManagedRuntimeProvider(provider)) return;
+                            runtimes.applyProviderRuntimeSnapshot(
+                              await mock.api.providerRuntimes.removeDownload(provider),
+                            );
+                          }
+                        : undefined,
                   }
             }
           />
@@ -417,7 +502,8 @@ export const ProviderUpdateRetry: Story = {
 
 /**
  * Cursor, Antigravity and Cline are installed for other work, so the user turned them off. Agents use
- * Codex and Claude, so those switches stay on.
+ * Codex and Claude, so those switches stay on. Open Cursor: its Download section offers Remove download,
+ * and after it the list reads "Off · Not downloaded".
  */
 export const ProvidersOff: Story = {
   render: () => (
@@ -427,6 +513,14 @@ export const ProvidersOff: Story = {
       providerUsers={{ codex: ["Ada"], claude: ["Rex", "Mila"] }}
     />
   ),
+};
+
+/**
+ * Open Codex: the ⋯ menu of the own sign-in offers Reset usage, as Codex gave it two usage resets. The
+ * Work account has none, so its menu does not. The confirmation names the credits left.
+ */
+export const CodexUsageReset: Story = {
+  render: () => <ServerProvidersStory usageReset />,
 };
 
 /** A server that the window has not selected. Its providers are managed after a switch to it. */

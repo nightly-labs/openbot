@@ -6,7 +6,8 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json",
+    "notify": "bun scripts/notify.ts",
     "update": "bun scripts/update.ts"
   },
   "dependencies": {
@@ -16,7 +17,7 @@
     "@solidjs/web": "catalog:",
     "effect": "catalog:",
     "lucide-solid": "catalog:",
-    "solid-js": "2.0.0-rc.0"
+    "solid-js": "2.0.0-rc.18"
   },
   "devDependencies": {
     "@solidjs/vite-plugin": "catalog:",

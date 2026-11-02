@@ -7,15 +7,17 @@ import { type ParamListBase, useNavigation } from "expo-router/react-navigation"
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { Alert, BackHandler, StyleSheet, View } from "react-native";
+import { Alert, BackHandler, StyleSheet, View, type ViewInstance } from "react-native";
 import { KeyboardAvoidingView, KeyboardController } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable } from "uniwind";
 
 import type { WelcomeHandOff } from "@/features/agents/components/empty-agents-scene";
+import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
 import { agentInitialMessage } from "@/features/agents/model/agent-initial-message";
 import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { AgentStep } from "@/features/onboarding/components/agent-step";
 import { ConversationStep } from "@/features/onboarding/components/conversation-step";
@@ -189,6 +191,7 @@ export function OnboardingFlow({
   onFinish: (welcome?: WelcomeHandOff) => void;
 }) {
   const { t, errorMessage } = useText();
+  const insets = useSafeAreaInsets();
   const motion = useOnboardingMotion();
   const { session, signOut } = useMobileSession();
   const { servers, createAgent } = useMobileWorkspace();
@@ -208,11 +211,17 @@ export function OnboardingFlow({
   const [created, setCreated] = useState<{ agentId: string; withTask: boolean } | null>(null);
   const [openingChat, setOpeningChat] = useState(false);
   const creating = useRef(false);
+  // Read by the step changes, which run after a delay and must report the step that the user left.
+  const stepRef = useRef<Step>("hello");
+  useEffect(() => {
+    stepRef.current = step;
+    mobileAnalytics.track("onboarding_step", { step, action: "viewed" });
+  }, [step]);
 
   // The hero: where each step wants it, where its layer is, and the swipe of the look step.
   const [slots, setSlots] = useState<Partial<Record<Step, HeroSlotRect>>>({});
   const [heroOrigin, setHeroOrigin] = useState({ x: 0, y: 0 });
-  const heroLayer = useRef<View>(null);
+  const heroLayer = useRef<ViewInstance>(null);
   // The height of the step area with no keyboard. A step without a text field keeps it while the
   // keyboard closes over it, so its characters stand where they will stay and the hero lands on
   // them, not above them.
@@ -287,6 +296,10 @@ export function OnboardingFlow({
     (next: Step, nextDirection: 1 | -1) => {
       void KeyboardController.dismiss();
       heroDrag.set(0);
+      mobileAnalytics.track("onboarding_step", {
+        step: stepRef.current,
+        action: nextDirection === 1 ? "next" : "back",
+      });
       setDirection(nextDirection);
       setStep(next);
     },
@@ -362,11 +375,13 @@ export function OnboardingFlow({
 
   // The empty home has the layout of the welcome. Skipped on the welcome, the flow fades off the
   // same group and text, and the home's action starts where the welcome's main action stands.
-  const primaryPlace = useRef<View>(null);
+  const primaryPlace = useRef<ViewInstance>(null);
   const finishing = useRef(false);
   const skip = () => {
     if (finishing.current) return;
     finishing.current = true;
+    mobileAnalytics.track("onboarding_step", { step, action: "skipped" });
+    mobileAnalytics.track("onboarding_completed", { skipped: true });
     void haptics.selection();
     void KeyboardController.dismiss();
     const place = step === "hello" ? primaryPlace.current : null;
@@ -422,6 +437,8 @@ export function OnboardingFlow({
   const openChat = () => {
     if (!created || openingChat) return;
     setOpeningChat(true);
+    mobileAnalytics.track("onboarding_step", { step: "ready", action: "next" });
+    mobileAnalytics.track("onboarding_completed", { skipped: false });
     router.push({ pathname: "/chat/[agentId]", params: { agentId: created.agentId } });
   };
 
@@ -454,7 +471,11 @@ export function OnboardingFlow({
           onPress: () => go(custom ? "role" : "task", 1),
         };
       case "role":
-        return { label: t("mobile.onboarding.name.continue"), onPress: () => go("task", 1) };
+        return {
+          label: t("mobile.onboarding.name.continue"),
+          disabled: instructionsTooLong(customDescription),
+          onPress: () => go("task", 1),
+        };
       case "task":
         return {
           label: pending
@@ -478,8 +499,12 @@ export function OnboardingFlow({
         motion={motion}
         connecting={connecting}
         onComputer={connectComputer}
-        onCloud={showsPlans ? () => router.push("/hosted-server") : null}
+        onCloud={
+          showsPlans ? () => router.push({ pathname: "/hosted-server", params: { entryPoint: "onboarding" } }) : null
+        }
         onInvitation={() => router.push("/add-server")}
+        onBack={previous !== null ? back : null}
+        onSkip={skip}
       />
     ) : step === "agent" ? (
       <AgentStep
@@ -519,10 +544,11 @@ export function OnboardingFlow({
         onChange={setCustomDescription}
         label={t("mobile.onboarding.custom.roleLabel")}
         placeholder={t("mobile.onboarding.custom.rolePlaceholder")}
-        maxLength={INPUT_LIMITS.agentDescription}
         color={draftColor}
         disabled={false}
-      />
+      >
+        <InstructionsLimit text={customDescription} />
+      </ConversationStep>
     ) : step === "task" ? (
       <ConversationStep
         motion={motion}
@@ -602,7 +628,12 @@ export function OnboardingFlow({
           ]}
         />
       </FadeLayer>
-      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+      {/* The steps keep clear of the side insets (the iPhone Duo rail, the landscape cutout). The tints
+          above stay edge to edge. */}
+      <KeyboardAvoidingView
+        behavior="padding"
+        style={{ flex: 1, paddingLeft: insets.left, paddingRight: insets.right }}
+      >
         {/* Steps overlap while one leaves and the next arrives, so neither pushes the other. The
             inner view takes the keyboard padding. A step with a text field fills it; the others
             keep their height with no keyboard. The last step only fades in: its hero lands with

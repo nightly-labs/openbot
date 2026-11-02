@@ -1,5 +1,4 @@
 // Frozen optional channel-chats-v1 wire contract. Keep IPC types and limits out of this file.
-// Deprecated: hosts no longer advertise channel-chats-v1. Clients without the capability hide channels.
 import { isDynamicRecord, isString } from "../runtime-values";
 import { decodeTeamProtocolV1HttpRequest, decodeTeamProtocolV1HttpResponse } from "./v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./v2";
@@ -269,8 +268,10 @@ export function channelRequest(path: string, value: unknown): TeamProtocolV2Json
     };
   }
   if (pathname !== CHANNEL_ROUTES.command || !isDynamicRecord(value)) throw new Error("Invalid channel command.");
+  // `cancel` belongs to `channel-task-cancel-v1`: a host takes it only from a peer that advertises
+  // that capability, and it has the task fields of `stop`.
   const common = record(value, {
-    type: oneOf("save", "archive", "restore", "read", "send", "stop", "resume", "reassign"),
+    type: oneOf("save", "archive", "restore", "read", "send", "stop", "resume", "reassign", "cancel"),
     operationId: identifier,
     channelId: identifier,
   });

@@ -9,6 +9,7 @@ import {
   type DeleteCustomAgentInput,
   isCustomAgentEnvName,
   isCustomAgentId,
+  isCustomAgentUsagePrompt,
   type SaveCustomAgentInput,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
@@ -61,6 +62,13 @@ function parseEnv(value: unknown): CustomAgentEnvInput[] {
   return env;
 }
 
+/** Absent or empty is no usage prompt. */
+function parseUsagePrompt(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (!isCustomAgentUsagePrompt(value)) throw new Error(sourceText("error.provider.customAgentUsagePromptInvalid"));
+  return value.trim();
+}
+
 export function parseSaveCustomAgent(input: unknown): SaveCustomAgentInput {
   if (!isObject(input)) throw new Error(sourceText("error.provider.customAgentCommandInvalid"));
   return {
@@ -69,6 +77,7 @@ export function parseSaveCustomAgent(input: unknown): SaveCustomAgentInput {
     command: parseCommand(input.command),
     args: parseArgs(input.args),
     env: parseEnv(input.env),
+    usagePrompt: parseUsagePrompt(input.usagePrompt),
   };
 }
 

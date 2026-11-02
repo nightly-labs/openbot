@@ -4,7 +4,7 @@
   "tagline": "Designs, assets and exports",
   "description": "Canva lets users create and edit designs in words, search their own design library, upload and organize assets, export in the format a channel needs, and leave comments where the work is. Each user signs in to their own Canva account, and the agent can do what that account can do.",
   "category": "design",
-  "creatorName": "canva.com",
+  "creatorName": "Canva",
   "iconUrl": "https://static.canva.com/static/images/apple-touch-icon-180x180.png",
   "version": "1.0.0",
   "prompts": [

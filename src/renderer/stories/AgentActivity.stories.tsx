@@ -36,6 +36,16 @@ export const LongStep: IndicatorStory = {
   },
 };
 
+/** Nothing has come from the provider for a minute, so the line waits and does not shine. */
+export const WaitingForProvider: IndicatorStory = {
+  args: {
+    agent: STORY_AGENTS[0],
+    label: "Connecting the dots…",
+    since: Date.now() - 377_000,
+    waitingFor: "Grok",
+  },
+};
+
 // The desktop app icon, scaled down and inlined so the story needs no network.
 // It stands in for an agent’s uploaded avatar: the circular crop and the rings
 // flying around it are what this story is for.

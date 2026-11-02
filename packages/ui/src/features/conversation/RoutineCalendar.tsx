@@ -19,7 +19,6 @@ import {
   AlertDescription,
   ArrowLeft,
   Button,
-  CalendarClock,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -33,6 +32,7 @@ import { createMemo, createStore, For, Match, onSettled, Show, Switch, untrack }
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { RoutineCalendarEmpty } from "./RoutineCalendarEmpty";
 import { routineScheduleSummary } from "./routine-schedule-ui";
 
 /**
@@ -75,7 +75,8 @@ export interface RoutineCalendarProps {
   onOpenRoutine: (routineId: string) => void;
   onOpenAgent: (agentId: string) => void;
   onRetry?: () => void;
-  onCreateRoutine?: () => void;
+  /** Starts a new routine for the agent. Without it, the empty calendar has no action. */
+  onCreateRoutine?: (agentId: string) => void;
   /** A full-pane calendar has a way back. With it, the heading takes focus when the calendar opens. */
   onBack?: () => void;
   /** The host whose routines show, after the title. */
@@ -248,6 +249,10 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
     if (untrack(() => props.onBack)) heading?.focus();
   });
 
+  /** With no routine, there is nothing to move through: the calendar shows its pitch on a faint month. */
+  const empty = () => (props.state ?? "ready") === "ready" && props.routines.length === 0;
+  const emptyMonth = createMemo(() => daysFor(today(), "month"));
+
   return (
     <section class="routine-planner" aria-labelledby="routine-planner-heading" data-view={state.view}>
       <header class="routine-planner-header">
@@ -279,49 +284,51 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
           </div>
           <p>{t("routine.calendar.timeZone", { zone: props.timeZone.replaceAll("_", " ") })}</p>
         </div>
-        <div class="routine-planner-toolbar">
-          <div class="routine-planner-nav">
-            <IconButton
-              variant="ghost"
-              label={t(PREVIOUS_LABEL[state.view])}
-              data-cuelume-tap="navigate"
-              onClick={() => step(-1)}
+        <Show when={!empty()}>
+          <div class="routine-planner-toolbar">
+            <div class="routine-planner-nav">
+              <IconButton
+                variant="ghost"
+                label={t(PREVIOUS_LABEL[state.view])}
+                data-cuelume-tap="navigate"
+                onClick={() => step(-1)}
+              >
+                <ChevronLeft aria-hidden="true" />
+              </IconButton>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={showsToday()}
+                data-cuelume-tap="navigate"
+                onClick={() => moveFrom(today())}
+              >
+                {t("routine.calendar.today")}
+              </Button>
+              <IconButton
+                variant="ghost"
+                label={t(NEXT_LABEL[state.view])}
+                data-cuelume-tap="navigate"
+                onClick={() => step(1)}
+              >
+                <ChevronRight aria-hidden="true" />
+              </IconButton>
+              <p class="routine-planner-range" aria-live="polite">
+                {rangeLabel()}
+              </p>
+            </div>
+            <SlidingTabs.Root
+              value={state.view}
+              onChange={(value) => moveTo(state.anchor, value === "day" || value === "month" ? value : "week")}
             >
-              <ChevronLeft aria-hidden="true" />
-            </IconButton>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={showsToday()}
-              data-cuelume-tap="navigate"
-              onClick={() => moveFrom(today())}
-            >
-              {t("routine.calendar.today")}
-            </Button>
-            <IconButton
-              variant="ghost"
-              label={t(NEXT_LABEL[state.view])}
-              data-cuelume-tap="navigate"
-              onClick={() => step(1)}
-            >
-              <ChevronRight aria-hidden="true" />
-            </IconButton>
-            <p class="routine-planner-range" aria-live="polite">
-              {rangeLabel()}
-            </p>
+              <SlidingTabs.List aria-label={t("routine.calendar.view")}>
+                <SlidingTabs.Trigger value="day">{t("routine.calendar.viewDay")}</SlidingTabs.Trigger>
+                <SlidingTabs.Trigger value="week">{t("routine.calendar.viewWeek")}</SlidingTabs.Trigger>
+                <SlidingTabs.Trigger value="month">{t("routine.calendar.viewMonth")}</SlidingTabs.Trigger>
+              </SlidingTabs.List>
+            </SlidingTabs.Root>
           </div>
-          <SlidingTabs.Root
-            value={state.view}
-            onChange={(value) => moveTo(state.anchor, value === "day" || value === "month" ? value : "week")}
-          >
-            <SlidingTabs.List aria-label={t("routine.calendar.view")}>
-              <SlidingTabs.Trigger value="day">{t("routine.calendar.viewDay")}</SlidingTabs.Trigger>
-              <SlidingTabs.Trigger value="week">{t("routine.calendar.viewWeek")}</SlidingTabs.Trigger>
-              <SlidingTabs.Trigger value="month">{t("routine.calendar.viewMonth")}</SlidingTabs.Trigger>
-            </SlidingTabs.List>
-          </SlidingTabs.Root>
-        </div>
-        <Show when={clockChange()}>
+        </Show>
+        <Show when={!empty() && clockChange()}>
           {(day) => (
             <p class="routine-planner-clock-change">{t("routine.calendar.clockChange", { day: longDay(day()) })}</p>
           )}
@@ -364,16 +371,13 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
             </Show>
           </Alert>
         </Match>
-        <Match when={props.routines.length === 0}>
-          <div class="routine-planner-empty">
-            <CalendarClock aria-hidden="true" />
-            <p>{t("routine.calendar.empty")}</p>
-            <Show when={props.onCreateRoutine}>
-              <Button size="sm" onClick={() => props.onCreateRoutine?.()}>
-                {t("routine.settings.create")}
-              </Button>
-            </Show>
-          </div>
+        <Match when={empty()}>
+          <RoutineCalendarEmpty
+            days={emptyMonth()}
+            today={today()}
+            agents={props.agents}
+            onCreateRoutine={props.onCreateRoutine}
+          />
         </Match>
         <Match when={true}>
           <div class="routine-planner-body">

@@ -1,44 +1,26 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
+import { ReportSitePage } from "../components/report-site/ReportSitePage";
+import { reportSiteText } from "../components/transactional/page-text";
+import { loadPageText } from "../lib/page-text";
 
 // Reached from any hosted site with that site's name in the query, so it is kept out of search.
 export const Route = createFileRoute("/report-site")({
-  head: () => ({
-    meta: [{ title: "Report a hosted site — OpenBot" }, { name: "robots", content: "noindex, nofollow" }],
-  }),
   validateSearch: (value) => ({
     hostname: isDynamicRecord(value) && isString(value.hostname) ? value.hostname : "",
+  }),
+  loader: ({ context }) => loadPageText(context.locale, reportSiteText),
+  head: ({ loaderData }) => ({
+    meta: [
+      ...(loaderData ? [{ title: loaderData.text.pageTitle }] : []),
+      { name: "robots", content: "noindex, nofollow" },
+    ],
   }),
   component: ReportSite,
 });
 
 function ReportSite() {
   const search = Route.useSearch();
-  return (
-    <main class="report-site-page">
-      <h1>Report a hosted site</h1>
-      <p>Send a report about harmful or unlawful content hosted on openbot.site.</p>
-      <form method="post" action="/v1/sites/reports">
-        <label>
-          Site address
-          <input name="hostname" value={search().hostname} readonly required />
-        </label>
-        <label>
-          Reason
-          <select name="reason" required>
-            <option value="phishing">Phishing</option>
-            <option value="malware">Malware</option>
-            <option value="abuse">Abuse</option>
-            <option value="copyright">Copyright</option>
-            <option value="other">Other</option>
-          </select>
-        </label>
-        <label>
-          Details
-          <textarea name="details" maxlength="1000" />
-        </label>
-        <button type="submit">Send report</button>
-      </form>
-    </main>
-  );
+  const page = Route.useLoaderData();
+  return <ReportSitePage hostname={search().hostname} lang={page().lang} text={page().text} />;
 }

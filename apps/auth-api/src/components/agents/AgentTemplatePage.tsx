@@ -1,9 +1,11 @@
 import { createOpenBotAgentTemplateUrl, createWebAppAgentTemplatePath } from "@openbot/contracts/agent-template-links";
 import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
-import { createSignal, For, lazy, onSettled, Show } from "solid-js";
+import { markdownPlainText, markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
+import { Link } from "@tanstack/solid-router";
+import { createMemo, createSignal, For, Loading, lazy, onSettled, Show } from "solid-js";
 import { agentTemplatePath } from "../../lib/agent-template-path";
 import { landingAnalytics } from "../../lib/analytics";
-import { OPENBOT_LINKS } from "../../lib/landing-links";
+import { LandingFooter } from "../landing/LandingFooter";
 import { SiteHeader } from "../landing/SiteHeader";
 import { PluginOpenButtons } from "../plugins/PluginOpenButtons";
 
@@ -12,6 +14,13 @@ import { PluginOpenButtons } from "../plugins/PluginOpenButtons";
 // after hydration.
 const AgentAvatar = lazy(() =>
   import("@openbot/ui/features/agents/AgentAvatar").then((module) => ({ default: module.AgentAvatar })),
+);
+// The instructions are Markdown. The renderer is the app's own, which builds elements from the parsed
+// text and never inserts HTML. It loads only when the reader opens the instructions.
+const MarkdownMessageText = lazy(() =>
+  import("@openbot/ui/features/conversation/MarkdownMessageText").then((module) => ({
+    default: module.MarkdownMessageText,
+  })),
 );
 
 export interface AgentTemplatePageProps {
@@ -44,6 +53,10 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
     return landingAnalytics.start(document, window.location.hostname, agentTemplatePath(props.template.id));
   });
 
+  // Closed, the instructions are one paragraph of plain text. Opened, they show their Markdown, so
+  // "Read more" is there also when the text fits but has headings, lists or other formatting.
+  const preview = createMemo(() => markdownPreviewText(props.template.description));
+  const hasMore = () => clamped() || preview() !== props.template.description.replace(/\s+/gu, " ").trim();
   const openUrl = () => createOpenBotAgentTemplateUrl(props.template.id);
   const counts = () =>
     [countLabel(props.template.skills.length, "skill"), countLabel(props.template.routines.length, "routine")].filter(
@@ -82,12 +95,39 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
               </ul>
             </Show>
 
-            <p ref={description} class="agent-share-description" data-expanded={expanded() ? "" : undefined}>
-              {props.template.description}
-            </p>
-            <Show when={clamped()}>
-              <button class="agent-share-more" type="button" onClick={() => setExpanded(!expanded())}>
-                {expanded() ? "Show less" : "Read all instructions"}
+            <Show
+              when={expanded()}
+              fallback={
+                <p ref={description} class="agent-share-description">
+                  {preview()}
+                </p>
+              }
+            >
+              <div class="agent-share-instructions message-markdown">
+                <Loading
+                  fallback={
+                    <p class="agent-share-instructions-text">{markdownPlainText(props.template.description)}</p>
+                  }
+                >
+                  <MarkdownMessageText
+                    imagesAsLinks
+                    linkFavicons={false}
+                    body={props.template.description}
+                    agents={[]}
+                    onSelectAgent={() => undefined}
+                    onOpenLink={(url) => window.open(url, "_blank", "noopener,noreferrer")}
+                  />
+                </Loading>
+              </div>
+            </Show>
+            <Show when={hasMore()}>
+              <button
+                class="agent-share-more"
+                type="button"
+                aria-expanded={expanded() ? "true" : "false"}
+                onClick={() => setExpanded(!expanded())}
+              >
+                {expanded() ? "Show less" : "Read more"}
               </button>
             </Show>
 
@@ -104,11 +144,12 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
         </article>
 
         <p class="agent-share-fallback">
-          OpenBot didn't open? <a href={OPENBOT_LINKS.downloadFromOtherPage}>Download it</a>,{" "}
-          <a href={openUrl()}>open the app</a>, or{" "}
+          OpenBot didn't open? <Link to="/download">Download it</Link>, <a href={openUrl()}>open the app</a>, or{" "}
           <a href={createWebAppAgentTemplatePath(props.template.id)}>open in browser</a>.
         </p>
       </main>
+
+      <LandingFooter />
     </div>
   );
 }

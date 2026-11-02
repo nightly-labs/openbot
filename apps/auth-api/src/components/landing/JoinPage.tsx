@@ -1,18 +1,21 @@
 import { AppLogo } from "@openbot/brand";
 import { createWebAppInvitePath, OPENBOT_INVITE_ORIGIN, toOpenBotInviteUrl } from "@openbot/contracts/invite-links";
-import { createSignal, onSettled, Show } from "solid-js";
+import { createSignal, For, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { detectDownloadPlatform } from "../../lib/download-platforms";
 import { OPENBOT_DOWNLOAD_LINKS } from "../../lib/landing-links";
+import { createOpenAppFallback, OpenAppFallbackDialog } from "../transactional/OpenAppFallback";
+import type { JoinLink, JoinPageText } from "../transactional/page-text";
+import { TransactionalPage } from "../transactional/TransactionalPage";
 import { Button } from "../ui/button";
 
-export function JoinPage() {
+export function JoinPage(props: { lang: string; text: JoinPageText }) {
   const [openUrl, setOpenUrl] = createSignal("");
   const [browserUrl, setBrowserUrl] = createSignal("");
   const [downloadUrl, setDownloadUrl] = createSignal<string>(OPENBOT_DOWNLOAD_LINKS.macos);
   const [mobile, setMobile] = createSignal(false);
   const [invalid, setInvalid] = createSignal(false);
-  const [openAttempted, setOpenAttempted] = createSignal(false);
+  const fallback = createOpenAppFallback();
 
   onSettled(() => {
     setMobile(
@@ -35,83 +38,57 @@ export function JoinPage() {
     return cleanup;
   });
 
+  const noApp = () => (mobile() ? props.text.noAppMobile : props.text.noApp);
+  const linkHref = (link: JoinLink) => (link === "browser" ? browserUrl() : downloadUrl());
+  // The dialog offers the desktop download, which a phone cannot install. Phones get the note below.
+  const armFallback = () => {
+    if (!mobile()) fallback.arm();
+  };
+
   return (
-    <main class="join-page">
-      <a class="landing-brand join-page-brand" href="/" aria-label="OpenBot home">
-        <AppLogo variant="production" class="landing-brand-logo" />
-        <span>OpenBot</span>
-      </a>
+    <TransactionalPage titleId="join-title" lang={props.lang}>
+      <AppLogo variant="production" animation="blink" class="join-card-logo" />
+      <p class="join-card-eyebrow">{props.text.eyebrow}</p>
+      <h1 id="join-title">{props.text.title}</h1>
+      <p class="join-card-copy">{props.text.intro}</p>
 
-      <section class="join-card" aria-labelledby="join-title">
-        <div class="join-card-signal" aria-hidden="true">
-          <span />
-          <i />
-          <span />
-        </div>
-        <AppLogo variant="production" animation="blink" class="join-card-logo" />
-        <p class="join-card-eyebrow">Private invitation</p>
-        <h1 id="join-title">Connect to an OpenBot host</h1>
-        <p class="join-card-copy">
-          Open this invitation in OpenBot. The app will verify the host and ask for confirmation before it connects.
-        </p>
-
-        <Show
-          when={!invalid()}
-          fallback={
-            <p class="join-card-error">
-              This invitation link is invalid or incomplete. Ask the host for a new invitation.
-            </p>
-          }
-        >
-          <div class="join-card-actions">
-            <Show
-              when={openUrl()}
-              fallback={
-                <span class="landing-button landing-button-primary landing-button-lg join-card-disabled">
-                  Open OpenBot
-                </span>
-              }
-            >
-              {(href) => (
-                <Button href={href()} variant="primary" size="lg" icon="open" onClick={() => setOpenAttempted(true)}>
-                  Open OpenBot
-                </Button>
-              )}
-            </Show>
-            <Show when={browserUrl()}>
-              {(href) => (
-                <Button href={href()} variant="secondary" size="lg" icon="arrow-right">
-                  Open in browser
-                </Button>
-              )}
-            </Show>
-            <Show when={!mobile()}>
-              <Button href={downloadUrl()} variant="secondary" size="lg" icon="download">
-                Download OpenBot
+      <Show when={!invalid()} fallback={<p class="join-card-error">{props.text.invalid}</p>}>
+        <div class="join-card-actions join-card-actions-full">
+          {/* Until the page reads the link, the app cannot open it. The button is then a real
+              disabled button, so it is not a link that goes nowhere. */}
+          <Show
+            when={openUrl()}
+            fallback={
+              <Button as="button" type="button" disabled variant="primary" size="lg" icon="open">
+                {props.text.open}
               </Button>
-            </Show>
-          </div>
+            }
+          >
+            {(href) => (
+              <Button href={href()} variant="primary" size="lg" icon="open" onClick={armFallback}>
+                {props.text.open}
+              </Button>
+            )}
+          </Show>
+        </div>
+        <Show when={browserUrl()}>
+          <p class="join-card-alternatives">
+            <For each={noApp()}>
+              {(part) => (
+                <Show when={part.link} fallback={part.text}>
+                  {(link) => <a href={linkHref(link())}>{part.text}</a>}
+                </Show>
+              )}
+            </For>
+          </p>
         </Show>
+      </Show>
 
-        <Show when={!mobile()}>
-          {/* The live region exists before the click, so screen readers announce the text when it appears. */}
-          <p class={openAttempted() ? "join-card-note" : "join-card-status-empty"} role="status">
-            <Show when={openAttempted()}>
-              If OpenBot did not open, install it with Download OpenBot, or start OpenBot once so that it can open
-              invitation links. You can also use Open in browser.
-            </Show>
-          </p>
-        </Show>
-        <Show when={mobile()}>
-          <p class="join-card-note">
-            If OpenBot is installed, tap Open OpenBot. You can also paste this link into Add server in the app.
-          </p>
-        </Show>
-        <p class="join-card-note">
-          This link grants access to a host. Share it only with people you want to invite. OpenBot shows its expiry
-          before you join.
-        </p>
-      </section>
-    </main>
+      <Show when={mobile()}>
+        <p class="join-card-note">{props.text.mobile}</p>
+      </Show>
+      <p class="join-card-note">{props.text.email}</p>
+      <OpenAppFallbackDialog fallback={fallback} text={props.text.openAppFallback} />
+    </TransactionalPage>
   );
 }

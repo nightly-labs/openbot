@@ -1,5 +1,5 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
-import type { Comparison } from "./comparison";
+import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
 // Every statement about Hermes Agent here is taken from the Hermes Agent documentation,
 // its repository or Nous Research's own pages, and each page used is in `sources`.
@@ -12,10 +12,10 @@ const HERMES_DOCS = "https://hermes-agent.nousresearch.com/docs";
 export const HERMES_AGENT_COMPARISON: Comparison = {
   rival: { name: "Hermes Agent", mark: "hermes-agent" },
   answer:
-    "Both apps run AI agents on your own computer, and neither needs an account. Choose OpenBot if you want Codex, Claude Code, Gemini and Grok CLI to work as a team with the plans you already pay for, including Claude Pro or Max and Google AI Pro, and to reach them from iPhone and Android apps. Choose Hermes Agent if you want an open-source agent under the MIT license that learns skills over time and talks to you in messaging apps such as Telegram or WhatsApp.",
+    "Both apps run AI agents on your own computer. Choose OpenBot if you want Codex, Claude Code, Gemini and Grok CLI to work as a team with the plans you already pay for, including Claude Pro or Max and Google AI Pro, and to reach them from iPhone and Android apps. Choose Hermes Agent if you want an open-source agent under the MIT license that learns skills over time and talks to you in messaging apps such as WhatsApp or Signal.",
   chooseOpenBot: [
     "You pay for Claude Pro or Max, or Google AI Pro or Ultra, and want your agents to use that plan.",
-    "You want Codex, Claude Code, Gemini, Grok CLI and Cursor CLI as agents in one team, each with its own job.",
+    "You want Codex, Claude Code, Gemini, Grok CLI, Cursor CLI, Cline, Pi and Muse Code as agents in one team, each with its own job.",
     "You want iPhone and Android apps that connect to your own computer.",
     "Coworkers must join your agents on one team host, with shared channels and files.",
   ],
@@ -23,7 +23,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     "Hermes Agent uses API keys from many providers, and signs in with ChatGPT, SuperGrok or GitHub Copilot. As its model, a Claude plan works only on Max with extra usage credits, and a consumer Gemini plan does not work.",
   chooseRival: [
     "You want an agent that makes its own skills and searches its past conversations.",
-    "You want to talk to it in Telegram, WhatsApp, Signal, Slack or email.",
+    "You want to talk to it in WhatsApp, Signal or email.",
     "You need the MIT license, for example for commercial use.",
     "You want Nous Research to host it for you in Hermes Cloud.",
   ],
@@ -31,8 +31,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     {
       icon: "cpu",
       topic: "Models and plans",
-      openbot:
-        "Use the plans you already have: ChatGPT, Claude, Gemini, Grok or Cursor. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
+      openbot: OPENBOT_TEXT.models,
       rival:
         "API keys from many providers, OpenRouter, and local models. Sign in with ChatGPT, SuperGrok or GitHub Copilot. As its model, a Claude plan works only on Max with extra usage credits; a consumer Gemini plan does not work.",
       better: "openbot",
@@ -47,25 +46,50 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     {
       icon: "cloud",
       topic: "When your computer is off",
-      openbot:
-        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
+      openbot: OPENBOT_TEXT.offline,
       rival:
         "Scheduled tasks run on the server or cloud computer that runs Hermes. On a laptop, they stop while Hermes is stopped.",
     },
     {
       icon: "phone",
       topic: "Remote access",
-      openbot:
-        "Apps for iPhone and Android. Chats and files go over an encrypted connection between your devices, and no cloud stores them.",
+      openbot: OPENBOT_TEXT.remote,
       rival:
         "Messaging apps such as Telegram, WhatsApp, Signal and Slack, which carry your messages. No native iPhone or Android app is stated.",
       better: "openbot",
     },
     {
+      icon: "refresh",
+      topic: "Backup models",
+      openbot: OPENBOT_TEXT.backupModels,
+      rival:
+        "When a provider has rate limits or server errors, Hermes Agent moves to backup models from other providers by itself, in the order that you set.",
+    },
+    {
+      icon: "key",
+      topic: "Logins and payments",
+      openbot: OPENBOT_TEXT.logins,
+      rival:
+        "An encrypted vault on your computer keeps logins, payment cards and addresses. Passwords and card numbers go only into the page, and Hermes asks you before each card fill. It also uses 1Password or Bitwarden.",
+    },
+    {
+      icon: "mic",
+      topic: "Voice",
+      openbot: OPENBOT_TEXT.voice,
+      rival:
+        "Push-to-talk in the terminal, and spoken replies in Telegram and Discord. Speech recognition can run on your computer with no API key.",
+    },
+    {
+      icon: "contact",
+      topic: "Chat apps",
+      openbot: OPENBOT_TEXT.chatApps,
+      rival: "Telegram, Discord, Slack, WhatsApp, Signal, SMS, email, Matrix and about 20 more.",
+      better: "rival",
+    },
+    {
       icon: "users",
       topic: "Teams",
-      openbot:
-        "Each agent is a full coding agent with its own job. They give work to each other in shared channels, and coworkers can join one team host.",
+      openbot: OPENBOT_TEXT.teams,
       rival:
         "10 subagents at once by default, and you can set more. Bots with their own roles talk in group chats of up to six. Several people can use one Hermes instance through messaging apps, with an allowlist.",
       better: "openbot",
@@ -90,15 +114,14 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     {
       icon: "globe",
       topic: "Where you can use it",
-      openbot:
-        "In any country: OpenBot has no region lock. The desktop app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+      openbot: OPENBOT_TEXT.regions,
       rival:
         "Anywhere: you run it yourself. Hermes Cloud uses the nearest of 14 locations in Europe, North America, Asia and Australia. The interface is in 17 languages.",
     },
     {
       icon: "devices",
       topic: "Apps",
-      openbot: "macOS, Windows and Linux, and mobile apps for iPhone and Android.",
+      openbot: OPENBOT_TEXT.apps,
       rival:
         "A command line, a terminal UI, a web dashboard, and Hermes Desktop for macOS, Windows and Linux. The command line also runs on Android in Termux. No iPhone or Android app is stated.",
     },
@@ -114,31 +137,27 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
   sections: [
     {
       title: "Models and the plans you pay for",
-      openbot:
-        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, Grok CLI with your Grok account or an xAI API key, and Cursor CLI with your Cursor plan or a Cursor API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
+      openbot: OPENBOT_TEXT.plansSection,
       rival:
         "Hermes Agent calls a model through an API. It works with many providers, OpenRouter and Nous Portal, and with local models on any OpenAI-compatible server, such as Ollama or vLLM. It can sign in with a ChatGPT account, a SuperGrok or X Premium+ subscription, or GitHub Copilot. As its own model, a Claude plan works only on Max, and then it uses only the extra usage credits that you buy; with Claude Pro, you need an API key. There is no way to use a consumer Gemini plan: Gemini needs a Google API key.",
       better: "openbot",
     },
     {
       title: "Where the work happens",
-      openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+      openbot: OPENBOT_TEXT.workSection,
       rival:
         "Hermes Agent runs on your computer, on a server, or in Docker. Its commands can run on that computer, in Docker, over SSH, or in cloud sandboxes such as Modal and Daytona. Hermes Cloud runs it on a computer that Nous Research hosts, for a daily price, and the models and tools it uses cost extra. On a laptop, tasks stop while Hermes is stopped.",
     },
     {
       title: "Phones and remote access",
-      openbot:
-        "The OpenBot apps for iPhone and Android connect to the computer that runs your agents. From anywhere, you chat with them, follow their progress and send files. The connection goes directly between your devices when it can, it is encrypted, and no cloud stores your chats or files. Remote access needs an OpenBot account.",
+      openbot: OPENBOT_TEXT.phonesSection,
       rival:
         "Hermes Agent reaches your phone through messaging apps: Telegram, WhatsApp, Signal, Slack, SMS, email, iMessage through BlueBubbles, and many more. Your messages then go through the messaging service that you choose. Hermes Desktop can also connect to a Hermes backend on another computer. The documentation states no native iPhone or Android app.",
       better: "openbot",
     },
     {
       title: "How agents work as a team",
-      openbot:
-        "In OpenBot, each agent is a full coding agent: Codex, Claude Code, Gemini, Grok CLI, Cursor CLI or OpenCode, each with its own job and workspace. A lead agent can give parts of a task to other agents in a shared channel. You follow their work and step in when a decision needs you. For a team of people, one computer runs the host and the others join it; the chats and files stay on the host.",
+      openbot: OPENBOT_TEXT.teamSection,
       rival:
         "Hermes Agent starts up to 10 subagents at once by default, and you can set a higher limit. In Bot Mode, each Bot has its own role, model, memory and skills; Bots talk in group chats of up to six and send messages to each other. Bundled skills can give coding work to Claude Code, Codex or OpenCode. Several people can use one Hermes instance through messaging apps such as Slack or Telegram, and an allowlist controls who can talk to it.",
       better: "openbot",
@@ -169,8 +188,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     },
     {
       question: "Can I use my ChatGPT, Claude or Gemini subscription with OpenBot?",
-      answer:
-        "Yes. OpenBot signs in to each provider tool with your own account: your ChatGPT plan for Codex, your Claude plan for Claude Code, and a Google AI Pro or Ultra plan for Gemini. Grok CLI uses your Grok account or an xAI API key, and Cursor CLI your Cursor plan. OpenBot adds no charge of its own.",
+      answer: OPENBOT_TEXT.plansFaq,
     },
     {
       question: "Can I use local models?",
@@ -220,6 +238,18 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     {
       label: "Hermes Agent language packs",
       url: "https://hermes-agent.nousresearch.com/docs/user-guide/features/language-packs",
+    },
+    {
+      label: "Hermes Agent fallback providers",
+      url: "https://hermes-agent.nousresearch.com/docs/user-guide/features/fallback-providers",
+    },
+    {
+      label: "Hermes Agent credential vault",
+      url: "https://hermes-agent.nousresearch.com/docs/user-guide/features/credential-vault",
+    },
+    {
+      label: "Hermes Agent voice mode",
+      url: "https://hermes-agent.nousresearch.com/docs/user-guide/features/voice-mode",
     },
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },

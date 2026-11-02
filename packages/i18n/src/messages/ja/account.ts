@@ -36,6 +36,9 @@ export const messages = {
   "account.usage.window.fiveHour": "5 時間",
   "account.usage.window.hours": { other: "{count} 時間" },
   "account.usage.window.minutes": "{minutes} 分",
+  "account.usage.window.cursorModels": "Cursor モデル",
+  "account.usage.window.otherModels": "その他のモデル",
+  "account.usage.window.group": "{group} · {window}",
   "account.update.failedRetry": "アップデートに失敗しました。もう一度お試しください。",
   "account.update.managedByHost": "ホストが管理しています",
   "account.update.restart": "再起動",
@@ -98,4 +101,5 @@ export const messages = {
   "account.language.previous": "前の言語",
   "account.language.next": "次の言語",
   "account.language.continue": "続ける",
+  "account.language.change": "言語を変更",
 } as const satisfies PartialTranslation<typeof source>;

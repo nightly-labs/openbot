@@ -7,7 +7,6 @@ export const messages = {
   "plugin.link.terms": "Условия использования",
   "plugin.copyLink": "Копировать ссылку",
   "plugin.askPrompt": "Спросить {name}: {prompt}",
-  "plugin.section.apps": "Приложения",
   "plugin.section.skills": "Навыки",
   "plugin.section.information": "Информация",
   "plugin.info.developer": "Разработчик",

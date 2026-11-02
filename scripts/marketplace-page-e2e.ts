@@ -42,28 +42,44 @@ try {
   await railButton("Agents").click();
   await waitForPage("agents");
 
-  // The rail opens the Marketplace as a page of the window, with the focus on its title.
+  // The rail opens the Marketplace as a page of the window, with the focus on the title of its side panel.
   await railButton("Marketplace").click();
   await marketplace.waitFor();
   await waitForPage("marketplace");
   assert.equal(await railButton("Marketplace").getAttribute("aria-current"), "page");
   assert.equal(await page.getByRole("dialog").count(), 0, "The Marketplace opened as a dialog.");
-  await page.waitForFunction(() => document.activeElement?.classList.contains("marketplace-title") === true);
+  await page.waitForFunction(() => document.activeElement?.classList.contains("marketplace-nav-title") === true);
   mkdirSync(OUT, { recursive: true });
   await page.screenshot({ path: resolve(OUT, "marketplace.png") });
   steps.push("rail opens the page");
 
-  // A listing opens a view in the page. The crumb in the top row, and Escape, go back to the catalog.
-  const crumbs = marketplace.getByRole("navigation", { name: "Location", exact: true });
-  await marketplace.getByRole("tab", { name: "Apps" }).click();
-  await marketplace.locator(".marketplace-hitarea").first().click();
-  await crumbs.getByRole("button", { name: "Marketplace", exact: true }).click();
-  await crumbs.getByRole("button", { name: "Marketplace", exact: true }).waitFor({ state: "detached" });
-  steps.push("crumb goes back one view");
-  await marketplace.locator(".marketplace-hitarea").first().click();
-  await crumbs.getByRole("button", { name: "Marketplace", exact: true }).waitFor();
+  // A listing opens a view in the page. The kind in the path of the top row and Escape go back to the catalog.
+  const back = marketplace
+    .getByRole("navigation", { name: "Location" })
+    .getByRole("button", { name: "Apps", exact: true });
+  // Apps is the first kind in the side panel, and the page opens on it.
+  const kinds = marketplace.getByRole("navigation", { name: "Marketplace content types" }).getByRole("button");
+  assert.equal((await kinds.first().innerText()).trim(), "Apps");
+  assert.equal(await kinds.first().getAttribute("aria-current"), "page");
+  steps.push("page opens on Apps");
+  await marketplace.locator(".marketplace-app-row-hit").first().click();
+  await back.waitFor();
+  // On an app page one row stays selected: Apps, or the app in "Your apps".
+  const selected = await marketplace
+    .locator(".marketplace-nav [aria-current]")
+    .evaluateAll((rows) => rows.map((row) => row.getAttribute("aria-current")));
+  assert.ok(
+    selected.length === 1 && (selected[0] === "location" || selected[0] === "page"),
+    `The side panel did not keep one selected row on an app page: ${selected.join(", ")}`,
+  );
+  steps.push("the side panel keeps a selected row on an app page");
+  await back.click();
+  await back.waitFor({ state: "detached" });
+  steps.push("the path goes back to the list");
+  await marketplace.locator(".marketplace-app-row-hit").first().click();
+  await back.waitFor();
   await page.keyboard.press("Escape");
-  await crumbs.getByRole("button", { name: "Marketplace", exact: true }).waitFor({ state: "detached" });
+  await back.waitFor({ state: "detached" });
   assert.equal(await windowPage(), "marketplace", "Escape in a view closed the page.");
   steps.push("escape goes back one view");
 
@@ -71,10 +87,10 @@ try {
   // Escape clears the search.
   const search = marketplace.getByRole("searchbox");
   await search.fill("git");
-  await marketplace.locator(".marketplace-hitarea").first().click();
-  await crumbs.getByRole("button", { name: "Marketplace", exact: true }).waitFor();
+  await marketplace.locator(".marketplace-app-row-hit").first().click();
+  await back.waitFor();
   await page.keyboard.press("Escape");
-  await crumbs.getByRole("button", { name: "Marketplace", exact: true }).waitFor({ state: "detached" });
+  await back.waitFor({ state: "detached" });
   assert.equal(await search.inputValue(), "git", "Escape in a view cleared the search.");
   await marketplace.getByRole("heading", { level: 2 }).focus();
   await page.keyboard.press("Escape");

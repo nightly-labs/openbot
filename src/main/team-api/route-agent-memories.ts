@@ -17,7 +17,7 @@ import { parseSetAgentMemoryInclusion } from "../ipc/agent-inputs";
 import type { TeamApiAgents } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { AgentRouteTarget, RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { pathIdentifier, readJson, stringField } from "./request-helpers";
+import { pathIdentifier, readJson, requireAgentLevel, stringField } from "./request-helpers";
 
 export interface AgentMemoryRouteDependencies {
   agents: Pick<TeamApiAgents, "listMemories" | "createMemory" | "updateMemory" | "deleteMemory" | "clearMemories">;
@@ -93,6 +93,7 @@ export async function routeAgentMemoryPage(
   if (hiddenAgentIds.has(agentId) || !agents.listAgents().some((agent) => agent.id === agentId))
     throw new HttpError(404, sourceText("error.team.agentNotFound"));
   if (url.pathname === AGENT_MEMORY_INCLUSION_ROUTE) {
+    requireAgentLevel(context, agentId, "manage");
     let input: ReturnType<typeof parseSetAgentMemoryInclusion>;
     try {
       input = parseSetAgentMemoryInclusion(body);

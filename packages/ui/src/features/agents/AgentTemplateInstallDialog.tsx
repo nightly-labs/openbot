@@ -13,6 +13,8 @@ export interface AgentTemplateInstallDialogProps {
   detail: AgentTemplateDetail | null;
   loading: boolean;
   onInstall: () => Promise<void>;
+  /** Opens a link from the instructions. */
+  onOpenLink: (url: string) => void;
 }
 
 /**
@@ -86,7 +88,11 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
                       </Text>
                     </header>
                     <div class="agent-template-detail">
-                      <TemplateInstructions title={detail().title} description={detail().description} />
+                      <TemplateInstructions
+                        title={detail().title}
+                        description={detail().description}
+                        onOpenLink={props.onOpenLink}
+                      />
                       <TemplateSkills skills={detail().skills} expandable />
                       <TemplateRoutines routines={detail().routines} labelled />
                     </div>

@@ -2,9 +2,10 @@
  * Where the reader is in a long chat, on the right edge of the transcript. The public site's reading
  * progress draws the same rail for its articles.
  *
- * One segment per day, as long as the day. The part the reader has passed fills in a muted neutral,
- * and the segment they are in glows at the point they have reached. Pointing at the rail brings in the
- * day titles through a blur, over a scrim with no edge.
+ * One segment per message the reader wrote, as long as the message and the replies under it. The
+ * part the reader has passed fills in a muted neutral, and the segment they are in glows at the point
+ * they have reached. Pointing at the rail brings in the messages as titles through a blur, over a
+ * scrim with no edge.
  *
  * The anchor sticks to the top of the scroll container with the viewport's height, and its negative
  * margin gives that height back, so the transcript under it does not move.
@@ -36,17 +37,7 @@
   display: flex;
   flex-direction: column;
   padding: var(--openbot-space-3) 0;
-  opacity: 0;
-  transform: translate(var(--openbot-space-2), -50%);
-  transition:
-    opacity var(--chat-scroll-rail-quick) ease,
-    transform var(--chat-scroll-rail-duration) var(--chat-scroll-rail-ease);
-}
-
-.chat-scroll-rail[data-visible="true"] .chat-scroll-rail-nav,
-.chat-scroll-rail-nav:has(:focus-visible) {
-  opacity: 1;
-  transform: translate(0, -50%);
+  transform: translateY(-50%);
 }
 
 .chat-scroll-rail-nav:hover,
@@ -54,24 +45,24 @@
   pointer-events: auto;
 }
 
-/* A scrim in the transcript colour, with no edge of its own. It darkens only where the titles are,
-   so they stay legible over a wide message, and over empty space it does not show at all. */
+/* A scrim in the transcript colour that blurs the messages under the titles, with no edge of its own.
+   It darkens and blurs only where the titles are, so they stay legible over a wide message. Both
+   masks fade it out: at the top and bottom, and on the left before the titles start. The blur is set
+   only while the rail is open, so a scroll does not filter the transcript under a hidden scrim. */
 .chat-scroll-rail-surface {
   position: absolute;
-  inset: calc(-1 * var(--openbot-space-8)) 0 calc(-1 * var(--openbot-space-8)) calc(-1 * var(--openbot-space-8));
-  background: linear-gradient(
-    to left,
-    var(--openbot-bg-canvas) 0%,
-    color-mix(in srgb, var(--openbot-bg-canvas) 92%, transparent) 55%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    var(--openbot-text-primary) var(--openbot-space-8),
-    var(--openbot-text-primary) calc(100% - var(--openbot-space-8)),
-    transparent
-  );
+  inset: calc(-1 * var(--openbot-space-8)) 0 calc(-1 * var(--openbot-space-8)) calc(-2 * var(--openbot-space-8));
+  background: color-mix(in srgb, var(--openbot-bg-canvas) 80%, transparent);
+  mask-image:
+    linear-gradient(
+      to bottom,
+      transparent,
+      var(--openbot-text-primary) var(--openbot-space-8),
+      var(--openbot-text-primary) calc(100% - var(--openbot-space-8)),
+      transparent
+    ),
+    linear-gradient(to right, transparent, var(--openbot-text-primary) calc(2 * var(--openbot-space-8)));
+  mask-composite: intersect;
   opacity: 0;
   transition: opacity var(--openbot-duration-slow) ease;
 }
@@ -102,9 +93,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Each day keeps room for its title. A chat with more days than the rail holds scrolls the track
-   inside the rail, so every day stays in reach; the track keeps the current day in view. The reading
-   head scrolls with the list. */
+/* Each section keeps room for its title. A chat with more sections than the rail holds scrolls the
+   track inside the rail, so every section stays in reach; the track keeps the current one in view.
+   The reading head scrolls with the list. */
 .chat-scroll-rail-track {
   position: relative;
   flex: 1;
@@ -138,6 +129,8 @@
   justify-content: flex-end;
   gap: var(--openbot-space-3);
   padding: 0 0 0 var(--openbot-space-4);
+  /* The button's border would move the bars out of the side padding. */
+  border: 0;
   border-radius: 0;
   color: var(--openbot-text-muted);
   font-weight: inherit;
@@ -182,16 +175,17 @@
   text-underline-offset: 4px;
 }
 
-/* A hit area wider than the 2px bar it holds. The bar is 5-7px from the edge, inside the 12px
-   padding the narrowest transcript keeps, so it does not cover a message. */
+/* A hit area wider than the 2px bar it holds. The bars always take the pointer, so the hit area stays
+   inside the container's side padding and does not cover the edge of a message. The bar is 3-9px
+   from the edge, inside the 12px padding the narrowest transcript keeps. */
 .chat-scroll-rail-bar {
   position: relative;
-  width: 20px;
+  width: clamp(12px, var(--chat-scroll-rail-inset, 20px), 20px);
   flex: none;
   padding-bottom: var(--openbot-space-1);
 }
 
-.chat-scroll-rail[data-visible="true"] .chat-scroll-rail-bar {
+.chat-scroll-rail .chat-scroll-rail-bar {
   pointer-events: auto;
 }
 
@@ -230,8 +224,8 @@
   box-shadow: 0 0 10px var(--chat-scroll-rail-glow);
 }
 
-/* The reading head: where the reader is inside the current day. One head for the whole list, so it
-   runs from day to day with the place. */
+/* The reading head: where the reader is inside the current section. One head for the whole list, so
+   it runs from section to section with the place. */
 .chat-scroll-rail-head {
   position: absolute;
   top: 0;
@@ -256,6 +250,7 @@
 
 .chat-scroll-rail-nav:hover .chat-scroll-rail-surface,
 .chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-surface {
+  backdrop-filter: blur(var(--openbot-space-4));
   opacity: 1;
   transition: opacity var(--openbot-duration-overlay) ease;
 }
@@ -265,26 +260,32 @@
   opacity: 1;
 }
 
+/* The titles come in one after another, but a long list does not make the reader wait: the delay
+   stops growing after the first twelve. */
 .chat-scroll-rail-nav:hover .chat-scroll-rail-label,
 .chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-label {
+  --chat-scroll-rail-delay: calc(min(var(--chat-scroll-rail-index, 0), 12) * 18ms);
+
   opacity: 1;
   filter: blur(0);
   transform: none;
   transition:
     color var(--openbot-duration-slow) ease,
-    opacity var(--chat-scroll-rail-quick) ease calc(var(--chat-scroll-rail-index, 0) * 18ms),
-    filter var(--chat-scroll-rail-quick) ease calc(var(--chat-scroll-rail-index, 0) * 18ms),
-    transform var(--chat-scroll-rail-duration) var(--chat-scroll-rail-ease)
-    calc(var(--chat-scroll-rail-index, 0) * 18ms);
+    opacity var(--chat-scroll-rail-quick) ease var(--chat-scroll-rail-delay),
+    filter var(--chat-scroll-rail-quick) ease var(--chat-scroll-rail-delay),
+    transform var(--chat-scroll-rail-duration) var(--chat-scroll-rail-ease) var(--chat-scroll-rail-delay);
 }
 
 /* The rules above name their own transitions, which outrank the global reduced-motion rule, so the
    titles would still slide and blur in. */
 @media (prefers-reduced-motion: reduce) {
-  .chat-scroll-rail[data-visible] .chat-scroll-rail-nav,
-  .chat-scroll-rail[data-visible] .chat-scroll-rail-nav *,
-  .chat-scroll-rail[data-visible] .chat-scroll-rail-nav *::before,
-  .chat-scroll-rail[data-visible] .chat-scroll-rail-nav *::after {
+  .chat-scroll-rail .chat-scroll-rail-nav *,
+  .chat-scroll-rail .chat-scroll-rail-nav *::before,
+  .chat-scroll-rail .chat-scroll-rail-nav *::after,
+  .chat-scroll-rail-nav:hover .chat-scroll-rail-surface,
+  .chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-surface,
+  .chat-scroll-rail-nav:hover .chat-scroll-rail-label,
+  .chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-label {
     transition: none;
   }
 }

@@ -1,11 +1,13 @@
 import { Stack } from "expo-router/stack";
 import { useCSSVariable } from "uniwind";
+import { androidBackOptions } from "@/shared/components/android-header-button";
+import { headerFontOptions } from "@/shared/lib/app-font";
 import { isIOS } from "@/shared/lib/platform";
 import { sheetBackHaptics } from "@/shared/lib/sheet-back-haptics";
 import { sheetHeaderInsetOptions } from "@/shared/lib/sheet-header";
 import { useText } from "@/shared/lib/text";
 
-export const unstable_settings = { initialRouteName: "index" };
+export const unstable_settings = { anchor: "index" };
 
 export default function AgentInfoLayout() {
   const { t } = useText();
@@ -13,17 +15,19 @@ export default function AgentInfoLayout() {
   return (
     <Stack
       screenListeners={sheetBackHaptics}
-      screenOptions={{
+      screenOptions={(props) => ({
+        ...androidBackOptions(props),
         ...sheetHeaderInsetOptions,
         presentation: "card",
         headerBackButtonDisplayMode: "minimal",
+        ...headerFontOptions,
         headerShadowVisible: false,
         headerTransparent: isIOS,
         headerStyle: { backgroundColor: isIOS ? "transparent" : background },
         headerBlurEffect: "none",
         scrollEdgeEffects: { top: "hidden", bottom: "soft" },
         contentStyle: { backgroundColor: background },
-      }}
+      })}
     >
       <Stack.Screen name="index" options={{ title: t("mobile.agent.menu.info") }} />
       <Stack.Screen name="appearance" options={{ title: t("mobile.agent.route.appearance") }} />
@@ -37,8 +41,18 @@ export default function AgentInfoLayout() {
       <Stack.Screen name="memory" options={{ title: t("mobile.agent.record.memory") }} />
       <Stack.Screen name="routine" options={{ title: t("mobile.agent.record.routine") }} />
       <Stack.Screen name="runtime" options={{ title: t("mobile.agent.runtime.model") }} />
+      <Stack.Screen name="backup-models" options={{ title: t("mobile.agent.backupModels.title") }} />
+      <Stack.Screen name="backup-model-picker" options={{ title: t("mobile.agent.backupModels.add") }} />
       <Stack.Screen name="permissions" options={{ title: t("mobile.agent.permissions.title") }} />
+      <Stack.Screen name="folders" options={{ title: t("mobile.agent.folders.title") }} />
+      <Stack.Screen name="folder-browser" options={{ title: t("mobile.agent.folders.browseTitle") }} />
       <Stack.Screen name="advanced" options={{ title: t("mobile.agent.advanced.title") }} />
+      <Stack.Screen name="browser-profile" options={{ title: t("mobile.agent.browserProfile.label") }} />
+      <Stack.Screen name="browser-profiles" options={{ title: t("mobile.server.route.browserProfiles") }} />
+      {/* The page names its profile. */}
+      <Stack.Screen name="browser-profile-edit" options={{ title: t("mobile.server.route.browserProfiles") }} />
+      <Stack.Screen name="browser-profile-agents" options={{ title: t("mobile.server.browserProfiles.agentsTitle") }} />
+      <Stack.Screen name="notifications" options={{ title: t("mobile.settings.notifications.title") }} />
       <Stack.Screen name="crop-photo" options={{ title: t("mobile.agent.route.cropPhoto") }} />
     </Stack>
   );

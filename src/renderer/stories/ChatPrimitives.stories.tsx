@@ -1,4 +1,4 @@
-import type { AttachmentSummary, MessageReaction } from "@openbot/contracts/ipc";
+import type { MessageReaction } from "@openbot/contracts/ipc";
 import {
   Bubble,
   BubbleContent,
@@ -16,123 +16,12 @@ import {
   Text,
 } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
-import { ChoiceCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { MessageActions, MessageBody } from "@openbot/ui/features/conversation/MessageRendering";
-import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, Show } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { toAgentMessage } from "../src/app-message-projection";
-import { STORY_AGENTS, STORY_ATTACHMENTS } from "./fixtures";
-
-const [firstStoryAttachment] = STORY_ATTACHMENTS;
-if (!firstStoryAttachment) throw new Error("Story attachment fixtures are empty.");
-
-const previewImage = new URL("../src/assets/openbot-logo-production.png", import.meta.url).href;
-const generatedImage: AttachmentSummary = {
-  id: "chat-primitives-generated-image",
-  name: "observatory.png",
-  size: 184_320,
-  kind: "image",
-  mimeType: "image/png",
-  previewKind: "image",
-  previewUrl: previewImage,
-};
-
-const assistantMessage: AgentMessage = {
-  id: "chat-primitives-assistant",
-  author: "agent",
-  body: "The launch brief is ready. I tightened the milestones, assigned owners, and kept the rollout reversible.",
-  time: "10:02",
-  kind: "text",
-};
-
-const userMessage: AgentMessage = {
-  id: "chat-primitives-user",
-  author: "you",
-  body: "Great — turn that into a checklist for the team.",
-  time: "10:03",
-  kind: "text",
-};
-
-const markdownMessage: AgentMessage = {
-  id: "chat-primitives-markdown",
-  author: "agent",
-  body: [
-    "## Launch checklist",
-    "",
-    "- Confirm the release owner",
-    "- Run the focused regression suite",
-    "- Keep the rollback command nearby",
-    "",
-    "> Ship deliberately, not nervously.",
-  ].join("\n"),
-  time: "10:04",
-  kind: "text",
-};
-
-const codeMessage: AgentMessage = {
-  id: "chat-primitives-code",
-  author: "agent",
-  body: [
-    "Run the release checks from the workspace root:",
-    "",
-    "```bash",
-    "bun run test",
-    "bun run typecheck",
-    "```",
-  ].join("\n"),
-  time: "10:05",
-  kind: "text",
-};
-
-const tableMessage: AgentMessage = {
-  id: "chat-primitives-table",
-  author: "agent",
-  body: [
-    "| Surface | Owner | State |",
-    "| --- | --- | --- |",
-    "| Renderer | Ada | Ready |",
-    "| API | Lin | Reviewing |",
-    "| Release | Sam | Queued |",
-  ].join("\n"),
-  time: "10:06",
-  kind: "text",
-};
-
-const imageMessage: AgentMessage = {
-  id: "chat-primitives-image",
-  author: "agent",
-  body: "",
-  time: "10:07",
-  kind: "text",
-  status: "completed",
-  attachments: [generatedImage],
-  imageGeneration: {
-    prompt: "A quiet observatory above the clouds at blue hour",
-    resolution: "1024 × 1024",
-    aspectRatio: "square",
-  },
-};
-
-const attachmentMessage: AgentMessage = {
-  id: "chat-primitives-attachment",
-  author: "agent",
-  body: "",
-  time: "10:08",
-  kind: "text",
-  attachments: [firstStoryAttachment],
-};
-
-const streamingMessage: AgentMessage = {
-  id: "chat-primitives-streaming",
-  author: "agent",
-  body: "I’m checking the final dependency graph and preparing the rollout notes…",
-  time: "10:09",
-  kind: "text",
-  status: "streaming",
-  streaming: true,
-};
+import { STORY_AGENTS } from "./fixtures";
 
 const messageBodyCallbacks = {
   onSelectAgent: fn(),
@@ -141,7 +30,6 @@ const messageBodyCallbacks = {
   onAttachmentAction: fn(),
   onDownload: fn(),
 };
-const onPrototypeReply = fn();
 
 function PrototypeMessage(props: {
   message: AgentMessage;
@@ -220,70 +108,6 @@ function PrototypeMessage(props: {
         <MessageFooter>{props.message.streaming ? "Writing…" : props.message.time}</MessageFooter>
       </MessageContent>
     </Message>
-  );
-}
-
-function RichSurface(props: { label: string; children: JSX.Element }) {
-  return (
-    <Message class="chat-prototype-message chat-prototype-rich-message" aria-label={props.label}>
-      <MessageContent>
-        <MessageHeader>{props.label}</MessageHeader>
-        <Bubble variant="ghost">
-          <BubbleContent>{props.children}</BubbleContent>
-        </Bubble>
-      </MessageContent>
-    </Message>
-  );
-}
-
-function PrototypeThread(props: { narrow?: boolean }) {
-  return (
-    <section
-      class={props.narrow ? "chat-primitives-stage chat-primitives-stage-narrow" : "chat-primitives-stage"}
-      aria-label="Integrated chat example"
-    >
-      <header class="chat-primitives-stage-header">
-        <div>
-          <Text variant="label">Chief</Text>
-          <Text variant="caption" tone="muted">
-            Product workspace · online
-          </Text>
-        </div>
-        <span class="chat-primitives-live-dot" aria-hidden="true" />
-      </header>
-      <div class="chat-primitives-thread">
-        <PrototypeMessage message={assistantMessage} actions reaction="👍" onReply={onPrototypeReply} />
-        <PrototypeMessage message={userMessage} actions referencedMessage={assistantMessage} />
-        <PrototypeMessage message={markdownMessage} actions />
-        <PrototypeMessage
-          message={codeMessage}
-          referencedMessage={userMessage}
-          variant="ghost"
-          actions
-          reaction="👀"
-          onReply={onPrototypeReply}
-        />
-        <PrototypeMessage message={tableMessage} variant="ghost" actions reaction="✅" onReply={onPrototypeReply} />
-        <PrototypeMessage message={imageMessage} variant="ghost" actions reaction="🎉" onReply={onPrototypeReply} />
-        <PrototypeMessage
-          message={attachmentMessage}
-          variant="ghost"
-          actions
-          reaction="👍"
-          onReply={onPrototypeReply}
-        />
-        <RichSurface label="Decision required">
-          <ChoiceCard
-            title="How should we release this?"
-            hint="Choose the rollout strategy."
-            choices={["Gradual rollout", "Internal preview", "Full release"]}
-            customChoice="Different approach"
-            onSubmit={async () => true}
-          />
-        </RichSurface>
-        <PrototypeMessage message={streamingMessage} actions onReply={onPrototypeReply} />
-      </div>
-    </section>
   );
 }
 
@@ -382,16 +206,6 @@ export const MessageComposition: Story = {
       </section>
     </main>
   ),
-};
-
-export const IntegratedMessages: Story = {
-  name: "Integrated messages",
-  render: () => <PrototypeThread />,
-};
-
-export const NarrowConversation: Story = {
-  name: "Integrated messages narrow",
-  render: () => <PrototypeThread narrow />,
 };
 
 export const MessageDates: Story = {

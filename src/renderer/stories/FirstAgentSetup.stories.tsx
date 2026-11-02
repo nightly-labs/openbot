@@ -1,20 +1,26 @@
 import {
-  DEFAULT_FIRST_AGENT_DRAFT,
+  createFirstAgentDraft,
   FIRST_AGENT_SUGGESTIONS,
   type FirstAgentDraft,
   FirstAgentSetup,
   type FirstAgentSetupProps,
   type FirstAgentSuggestion,
 } from "@openbot/ui/features/agents/FirstAgentSetup";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENT_STATUS, STORY_MODELS } from "./fixtures";
 
+// The first face, as the app picks one at random. Story args are made before a provider renders, so
+// the default name is English.
+const DEFAULT_FIRST_AGENT_DRAFT = createFirstAgentDraft(() => 0);
+
 function draftFromSuggestion(suggestion: FirstAgentSuggestion): FirstAgentDraft {
+  const { t } = currentText();
   return {
-    name: suggestion.name,
-    purpose: suggestion.purpose,
+    name: t(suggestion.nameKey),
+    purpose: t(suggestion.purposeKey),
     avatarSeed: suggestion.avatarSeed,
     avatarHue: suggestion.avatarHue,
     suggestionId: suggestion.id,
@@ -95,6 +101,11 @@ export const Submitting: Story = {
 
 export const SmallWindow: Story = {
   parameters: { viewport: { defaultViewport: "firstAgentSmall" } },
+};
+
+/** The model picker lists only the providers that can run, and its plus opens the provider settings. */
+export const ModelPicker: Story = {
+  args: { modelOptions: STORY_MODELS, agentStatus: STORY_AGENT_STATUS, onManageProviders: fn() },
 };
 
 export const LongPrompt: Story = {

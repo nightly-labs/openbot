@@ -1,6 +1,6 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentProviderId, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
-import { isImageGenerationAspectRatio } from "@openbot/contracts/ipc";
+import { isImageGenerationAspectRatio, ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { displayMessageReferences, type TeammatePrompt, teammatePrompts } from "./agent/delivery-content";
 import { imageGenerationFailure, isImageGenerationItem } from "./agent/image-generation";
@@ -288,7 +288,7 @@ function reconcileClaudeHistoryMessages(
     importedNarration.set(message.turnId, parts);
   }
   for (const message of imported) {
-    if (message.author !== "assistant" || message.itemType !== "agentMessage" || !message.turnId) continue;
+    if (!isClaudeAnswer(message) || !message.turnId) continue;
     const parts = turns.get(message.turnId) ?? [];
     parts.push(message);
     turns.set(message.turnId, parts);
@@ -315,7 +315,7 @@ function reconcileClaudeHistoryMessages(
   for (const [turnId, parts] of turns) {
     // Live Claude output combines SDK replies under one ID. Keep that ID and its metadata.
     const answer = storedMessages.get(`${turnId}:assistant`);
-    if (answer?.author !== "assistant" || answer.itemType !== "agentMessage" || answer.turnId !== turnId) continue;
+    if (!answer || !isClaudeAnswer(answer) || answer.turnId !== turnId) continue;
     const text = parts.map((part) => part.text).join("");
     const narration = importedNarration.get(turnId) ?? [];
     /* A turn released before narration rode the thinking disclosure stored the narration and the
@@ -392,6 +392,17 @@ function isClaudeNarration(message: ConversationMessage): boolean {
     message.itemType === "commentary" &&
     Boolean(message.turnId) &&
     !isClaudeReasoning(message)
+  );
+}
+
+/**
+ * An answer of a Claude turn. A quiet routine run keeps its answers as quiet answers, live and on
+ * import, so the import must match them too or it stores each one a second time.
+ */
+function isClaudeAnswer(message: ConversationMessage): boolean {
+  return (
+    message.author === "assistant" &&
+    (message.itemType === "agentMessage" || message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE)
   );
 }
 

@@ -17,6 +17,7 @@ export const messages = {
     "アップデートサービスから応答がありませんでした。数分後に OpenBot が自動でもう一度試します。",
   "error.update.checkNoRelease":
     "このプラットフォーム向けに公開されたアップデートは見つかりませんでした。数分後に OpenBot が自動でもう一度試します。",
+  "error.update.managedByNix": "この OpenBot のアップデートは Nix がインストールします。Nix で更新してください。",
   "error.update.managedByHost":
     "この Mac のアップデートはホストがインストールします。ホストのメンテナンスが実行されるまで、アップデートは準備済みのままです。",
   "error.update.siblingSession":

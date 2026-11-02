@@ -5,7 +5,9 @@
   display: block;
   border: 0;
   background: transparent;
-  /* The page also uses the dark scheme, so its canvas stays transparent. */
+  /* The page also uses the dark scheme, so its canvas stays transparent. Both stay dark in the light
+     theme: a frame and a page with different schemes get an opaque canvas. The colors come from
+     the theme variables, which follow the palette. */
   color-scheme: dark;
 }
 
@@ -32,4 +34,106 @@
   min-width: 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-xs);
+}
+
+/*
+ * The box that holds a page in the chat. It is a manual popover, so full screen can put it in the top
+ * layer without a move in the document. Until then it has none of the browser's popover styles.
+ */
+.chat-visual-box {
+  position: relative;
+  min-width: 0;
+}
+
+.chat-visual-box[popover]:not(:popover-open) {
+  position: relative;
+  inset: auto;
+  display: block;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.chat-visual-box-fill {
+  height: 100%;
+}
+
+/* In the chat the surface adds no box, so the frame keeps its place and size. */
+.chat-visual-box:not(:popover-open) > .chat-visual-surface {
+  display: contents;
+}
+
+/* Full screen: the page fills a dialog card on the dim layer that app dialogs use. */
+.chat-visual-box:popover-open {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  border: 0;
+  padding: var(--openbot-space-6);
+  background: var(--openbot-dialog-overlay);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: var(--openbot-text-primary);
+  -webkit-app-region: no-drag;
+}
+
+.chat-visual-box:popover-open::backdrop {
+  background: transparent;
+}
+
+.chat-visual-box:popover-open > .chat-visual-surface {
+  width: min(1100px, 100%);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-xl);
+  background: var(--openbot-bg-control);
+  box-shadow: 0 0 0 1px var(--openbot-dialog-ring);
+}
+
+.chat-visual-box:popover-open .chat-visual-frame {
+  min-height: 0;
+  flex: 1;
+  background: var(--openbot-bg-sidebar);
+}
+
+/* The expand button shows when the pointer or the focus is on the page. */
+:where(.ui-button).chat-visual-expand {
+  position: absolute;
+  top: var(--openbot-space-2);
+  right: var(--openbot-space-2);
+  opacity: 0;
+  transition: opacity var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+
+.chat-visual-expand svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+.chat-visual-box:popover-open > .chat-visual-expand {
+  display: none;
+}
+
+.chat-visual-box:hover > .chat-visual-expand,
+.chat-visual-box:focus-within > .chat-visual-expand {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  :where(.ui-button).chat-visual-expand {
+    opacity: 1;
+  }
 }

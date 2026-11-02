@@ -1,4 +1,4 @@
-import type { AnalyticsDay, AnalyticsProviderDay } from "@openbot/contracts/ipc";
+import { type AnalyticsDay, type AnalyticsProviderDay, analyticsTokens } from "@openbot/contracts/ipc";
 
 // The one series a report without a provider split still draws. It cannot collide with a
 // provider column: the fallback returns it as the whole series list.
@@ -19,9 +19,11 @@ export function usageSeries(
   daily: AnalyticsDay[],
   metric: "cost" | "tokens",
 ): { series: string[]; rows: UsageSeriesRow[] } {
-  const measure = (value: { processedTokens: number; estimatedCostUsd: number | null }) =>
-    metric === "cost" ? value.estimatedCostUsd : value.processedTokens;
-  if (cells.length === 0)
+  const measure = (value: AnalyticsDay | AnalyticsProviderDay) =>
+    metric === "cost" ? value.estimatedCostUsd : analyticsTokens(value);
+  // A remote host sends cells without `cachedInput` (frozen host-analytics v1), so their tokens
+  // would still count cache reads. The days carry `cachedInput`, so the token chart draws their total.
+  if (cells.length === 0 || (metric === "tokens" && cells.some((cell) => cell.cachedInput === undefined)))
     return {
       series: [usageTotalSeries],
       rows: daily.map((day) => ({ date: day.date, [usageTotalSeries]: measure(day) })),
@@ -29,7 +31,7 @@ export function usageSeries(
   const totals = new Map<string, number>();
   const byDate = new Map<string, Map<string, number | null>>();
   for (const cell of cells) {
-    totals.set(cell.provider, (totals.get(cell.provider) ?? 0) + cell.processedTokens);
+    totals.set(cell.provider, (totals.get(cell.provider) ?? 0) + analyticsTokens(cell));
     const row = byDate.get(cell.date) ?? new Map<string, number | null>();
     row.set(cell.provider, measure(cell));
     byDate.set(cell.date, row);

@@ -1,14 +1,16 @@
-import { existsSync, realpathSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
 import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
+import { isPathInside } from "./path-containment";
 
 /**
  * The folders one Workspace only agent may write: its workspace and the shared folder. The temporary
  * folders and the provider's state are added to them.
  *
- * Grok, OpenCode, Antigravity, Cursor and Cline take no sandbox per session, so a Workspace only
+ * Grok, OpenCode, Antigravity, Cursor, Cline and Kimi take no sandbox per session, so a Workspace only
  * agent on them gets a provider process of its own, and OpenBot starts that process inside an
  * operating system sandbox. The whole process is confined: the file edit tools, the shell, and every
  * command and MCP server it starts. Nothing inside the process can take the sandbox away. Only macOS
@@ -17,6 +19,8 @@ import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
  */
 export interface ProcessConfinement {
   readonly writableRoots: readonly string[];
+  /** Folders in the writable roots that the user excluded. They are denied like the protected paths. */
+  readonly excludedFolders?: readonly string[];
 }
 
 /** What a provider must write to run, and what in there it must not write. */
@@ -32,6 +36,18 @@ export interface ProviderStatePaths {
    * depth, that trust a project or approve its MCP servers for the processes that are not confined.
    */
   readonly protectedInProjects?: { readonly folders: readonly string[]; readonly names: readonly string[] };
+  /**
+   * Files outside `writable` that the provider writes in, and that processes that are not confined
+   * open too. Only their contents are writable: a confined agent that replaced one with a link would
+   * send those processes' writes outside.
+   */
+  readonly writableContents?: readonly string[];
+  /**
+   * Lock folders outside `writable` that the provider makes beside a file each time it reads that
+   * file. The confined process can make, touch and remove each folder, but not write in it or put a
+   * file or a link in its place. The file beside it stays read-only.
+   */
+  readonly lockFolders?: readonly string[];
 }
 
 export interface SpawnTarget {
@@ -78,14 +94,22 @@ export function grokStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
  * OpenCode process runs, so a confined process gets a cache of its own: `OPENCODE_CONFINED_ENV`.
  */
 export function openCodeStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const xdg = (name: string, fallback: string) => join(env[name]?.trim() || join(home, fallback), "opencode");
   return {
-    writable: [xdg("XDG_DATA_HOME", ".local/share"), xdg("XDG_STATE_HOME", ".local/state"), OPENCODE_CONFINED_CACHE],
+    writable: [
+      openCodeDataDirectory(env, home),
+      join(env.XDG_STATE_HOME?.trim() || join(home, ".local/state"), "opencode"),
+      OPENCODE_CONFINED_CACHE,
+    ],
     protected: [],
   };
 }
 
 const OPENCODE_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cache");
+
+/** OpenCode's data folder: its sessions, its database (`opencode.db`) and its `auth.json`. */
+export function openCodeDataDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return join(env.XDG_DATA_HOME?.trim() || join(home, ".local/share"), "opencode");
+}
 
 /**
  * The Antigravity server keeps its sign-in, sessions and harness files in `antigravity-acp` under
@@ -112,12 +136,13 @@ export function antigravityStatePaths(env: NodeJS.ProcessEnv = process.env, home
  * skills, agents, commands and rules, load code or settings in the editor and in every other CLI
  * process, so they stay read-only. So do the trust and MCP approval files of each project in
  * `projects`. The sessions stay in the shared data folder, so a thread continues when the agent
- * changes between Workspace only and Full access.
+ * changes between Workspace only and Full access. On macOS the CLI reads its sign-in from the login
+ * Keychain with `security`, which must write a lock file first: `keychainLockFiles`.
  */
 export function cursorStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
   const xdgConfig = env.XDG_CONFIG_HOME?.trim();
   const userConfig = env.CURSOR_CONFIG_DIR?.trim() || (xdgConfig ? join(xdgConfig, "cursor") : join(home, ".cursor"));
-  const dataHome = env.CURSOR_DATA_DIR?.trim() || join(home, ".cursor");
+  const dataHome = cursorDataHome(env, home);
   // `auth.json` and the `sandbox.json` and `hooks.json` files are always in `~/.cursor` on macOS.
   const fixedHome = join(home, ".cursor");
   const settings = [
@@ -138,6 +163,7 @@ export function cursorStatePaths(env: NodeJS.ProcessEnv = process.env, home = ho
   ];
   return {
     writable: unique([cursorConfinedConfig(home), dataHome, fixedHome, CURSOR_CONFINED_CACHE]),
+    writableContents: keychainLockFiles(),
     protected: unique([userConfig, dataHome, fixedHome].flatMap((root) => settings.map((name) => join(root, name)))),
     protectedInProjects: {
       folders: unique([dataHome, fixedHome].map((root) => join(root, "projects"))),
@@ -146,7 +172,34 @@ export function cursorStatePaths(env: NodeJS.ProcessEnv = process.env, home = ho
   };
 }
 
+/** The Cursor CLI's data folder, which holds its sessions and the project data in `projects`. */
+export function cursorDataHome(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.CURSOR_DATA_DIR?.trim() || join(home, ".cursor");
+}
+
 const CURSOR_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cursor-cache");
+
+let keychainLockFile: string | undefined;
+
+/**
+ * `security` takes `mds/mds.lock` in the user's cache folder (`DARWIN_USER_CACHE_DIR`, not
+ * `TMPDIR`) before it reads the login Keychain. When the sandbox denies that write, the read fails,
+ * and Cursor 2026.10.22 answers each session with "Authentication required" although it is signed
+ * in. Only the contents of the lock file are writable: the module directory beside it lists the
+ * security modules that the user's other processes load. The confined process cannot create the
+ * file, so OpenBot makes it when it is missing, as `security` would.
+ */
+function keychainLockFiles(): string[] {
+  if (process.platform !== "darwin") return [];
+  keychainLockFile ??= join(
+    execFileSync("/usr/bin/getconf", ["DARWIN_USER_CACHE_DIR"], { encoding: "utf8" }).trim(),
+    "mds",
+    "mds.lock",
+  );
+  mkdirSync(dirname(keychainLockFile), { recursive: true, mode: 0o700 });
+  closeSync(openSync(keychainLockFile, "a"));
+  return [keychainLockFile];
+}
 
 /** The config folder of every confined Cursor process. Only confined processes read it. */
 function cursorConfinedConfig(home: string): string {
@@ -193,6 +246,94 @@ export function clineStatePaths(env: NodeJS.ProcessEnv = process.env, home = hom
 }
 
 /**
+ * The folder where Hermes Agent keeps its sign-ins, settings, sessions and memories: `HERMES_HOME`,
+ * else `~/.hermes`, or `%LOCALAPPDATA%\hermes` on Windows. OpenBot shares it with the user's own Hermes.
+ * When the user selected a profile with `hermes profile use <name>`, it is `<root>/profiles/<name>`.
+ */
+export function hermesHome(
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir(),
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const configured = env.HERMES_HOME?.trim();
+  const root = configured
+    ? configured === "~" || configured.startsWith("~/")
+      ? join(home, configured.slice(1))
+      : configured
+    : platform === "win32"
+      ? join(env.LOCALAPPDATA?.trim() || join(home, "AppData", "Local"), "hermes")
+      : join(home, ".hermes");
+  return basename(dirname(root)) === "profiles" ? root : hermesActiveProfile(root);
+}
+
+/** Hermes 0.21.5 reads `<root>/active_profile` at each start and then uses that profile's folder. */
+function hermesActiveProfile(root: string): string {
+  let name: string;
+  try {
+    name = readFileSync(join(root, "active_profile"), "utf8")
+      .replace(/^\uFEFF/, "")
+      .trim()
+      .toLowerCase();
+  } catch {
+    return root;
+  }
+  if (name === "" || name === "default" || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) return root;
+  const profile = join(root, "profiles", name);
+  return existsSync(profile) ? profile : root;
+}
+
+/**
+ * Hermes writes its sessions, memories, sign-in refreshes, caches and logs across its whole folder.
+ * Its install, settings, `.env`, identity, skills, hooks, schedules, plugins, profiles and the tools
+ * it downloads load code, commands or instructions for every other Hermes process, so they stay
+ * read-only.
+ */
+export function hermesStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const root = hermesHome(env, home);
+  return {
+    writable: [root],
+    protected: [
+      "hermes-agent",
+      "hermes-setup",
+      "config.yaml",
+      ".env",
+      "SOUL.md",
+      "skills",
+      "skill-bundles",
+      "hooks",
+      "cron",
+      "scripts",
+      "plugins",
+      "desktop-plugins",
+      "relay-plugins.toml",
+      "profiles",
+      "active_profile",
+      "pairing",
+      "platforms",
+      "installs",
+      "bootstrap-cache",
+      "tools",
+    ].map((name) => join(root, name)),
+  };
+}
+
+/**
+ * The Kimi Code CLI keeps its sign-in, sessions, logs and caches in `KIMI_SHARE_DIR`, `~/.kimi` by
+ * default, and writes its plans in `~/.kimi/plans`. Its settings and hooks (`config.toml`), MCP
+ * servers, plugins, skills and downloaded tools are in that folder too, and every other Kimi process
+ * loads them, so they stay read-only.
+ */
+export function kimiStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const kimiHome = env.KIMI_SHARE_DIR?.trim() || join(home, ".kimi");
+  return {
+    writable: unique([kimiHome, join(home, ".kimi", "plans")]),
+    protected: ["config.toml", "config.json", "mcp.json", "plugins", "skills", "bin"].map((name) =>
+      join(kimiHome, name),
+    ),
+  };
+}
+
+/**
  * A custom agent keeps its state where it wants, and OpenBot cannot know where. A Workspace only
  * custom agent gets no state folder: an agent that must write in its home folder to run needs Full
  * access.
@@ -201,10 +342,23 @@ export function customAgentStatePaths(): ProviderStatePaths {
   return { writable: [], protected: [] };
 }
 
-/** Pi can write sessions, but cannot change the settings or extensions a later full-access run loads. */
+/** The folder where Pi keeps its sign-in, settings and sessions. */
+export function piAgentDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.PI_CODING_AGENT_DIR?.trim() || join(home, ".pi", "agent");
+}
+
+/**
+ * Pi can write sessions, but cannot change the sign-in, settings or extensions a later full-access
+ * run loads. Pi 1.4.0 takes a lock folder beside `auth.json`, `settings.json` and `trust.json` each
+ * time it reads one, and a read stops with EPERM when it cannot make that folder.
+ */
 export function piStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const root = env.PI_CODING_AGENT_DIR?.trim() || join(home, ".pi", "agent");
-  return { writable: [join(root, "sessions")], protected: [] };
+  const agentDirectory = piAgentDirectory(env, home);
+  return {
+    writable: [join(agentDirectory, "sessions")],
+    protected: [],
+    lockFolders: ["auth.json", "settings.json", "trust.json"].map((name) => join(agentDirectory, `${name}.lock`)),
+  };
 }
 
 /** Only session data is writable. Muse settings, credentials, hooks, and plugins stay read-only. */
@@ -243,6 +397,8 @@ const PROJECT_SETTINGS = [
   // Cline reads its project rules, workflows, hooks, skills and agents from these two.
   ".cline",
   ".clinerules",
+  // Kimi reads its project skills and instructions from `.kimi`.
+  ".kimi",
   ".pi",
   ".muse",
   // Antigravity reads project skills from `.gemini` and its customizations from these four.
@@ -264,8 +420,10 @@ export function confineSpawnTarget(
   platform: NodeJS.Platform = process.platform,
 ): SpawnTarget {
   const writable = [...confinement.writableRoots, ...state.writable, ...workspaceTemporaryPaths(platform)];
+  const excluded = confinement.excludedFolders ?? [];
   const protectedPaths = [
     ...state.protected,
+    ...excluded,
     ...confinement.writableRoots.flatMap((root) => PROJECT_SETTINGS.map((name) => join(root, name))),
   ];
   if (platform === "darwin") {
@@ -274,7 +432,14 @@ export function confineSpawnTarget(
       command: SANDBOX_EXEC,
       args: [
         "-p",
-        seatbeltProfile(writable, protectedPaths, state.protectedInProjects),
+        seatbeltProfile(
+          writable,
+          protectedPaths,
+          state.protectedInProjects,
+          state.writableContents ?? [],
+          state.lockFolders ?? [],
+          excluded,
+        ),
         target.command,
         ...target.args,
       ],
@@ -292,15 +457,29 @@ function unavailable(tool: string): string {
 
 /**
  * Writes are denied, then allowed in the writable folders, then denied again in the protected paths:
- * in a Seatbelt profile the last rule that matches wins. Everything else stays open, as the Access
- * setting says: reads, the network and process starts.
+ * in a Seatbelt profile the last rule that matches wins. `file-write-data` allows writes in an
+ * existing file, not its removal, a rename or a link in its place. A lock folder allows every write
+ * on the folder itself, but a create there only of a folder. A folder that holds an excluded folder
+ * cannot be removed or renamed, because the excluded folder would move with it out of its rule.
+ * Everything else stays open, as the Access setting says: reads, the network and process starts.
  */
 function seatbeltProfile(
   writable: readonly string[],
   protectedPaths: readonly string[],
   inProjects: ProviderStatePaths["protectedInProjects"],
+  contents: readonly string[],
+  lockFolders: readonly string[],
+  excluded: readonly string[],
 ): string {
-  const allowed = unique(writable.flatMap(realPaths)).map((path) => `(subpath ${sbplString(path)})`);
+  const writableReal = unique(writable.flatMap(realPaths));
+  const allowed = writableReal.map((path) => `(subpath ${sbplString(path)})`);
+  const holders = unique(
+    excluded.flatMap(realPaths).flatMap((folder) => writableReal.flatMap((root) => holderFolders(root, folder))),
+  ).map((path) => `(literal ${sbplString(path)})`);
+  const files = unique(contents.flatMap(realPaths)).map((path) => `(literal ${sbplString(path)})`);
+  // `utimes`, which refreshes a lock, has no file-write operation of its own, so the folder gets
+  // `file-write*`.
+  const locks = unique(lockFolders.flatMap(realPaths)).map((path) => `(literal ${sbplString(path)})`);
   const names = inProjects?.names.map(regexText).join("|");
   const denied = [
     ...unique(protectedPaths.flatMap(realPaths)).map(
@@ -317,10 +496,30 @@ function seatbeltProfile(
     "(allow default)",
     "(deny file-write*)",
     `(allow file-write* ${allowed.join(" ")})`,
+    ...(files.length > 0 ? [`(allow file-write-data ${files.join(" ")})`] : []),
+    ...(locks.length > 0
+      ? [
+          `(allow file-write* ${locks.join(" ")})`,
+          `(deny file-write-create (require-all (require-any ${locks.join(" ")}) (require-not (vnode-type DIRECTORY))))`,
+        ]
+      : []),
     '(allow file-write* (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty") (literal "/dev/ptmx") (literal "/dev/dtracehelper") (regex #"^/dev/ttys[0-9]+$") (regex #"^/dev/fd/"))',
     ...(denied.length > 0 ? [`(deny file-write* ${denied.join(" ")})`] : []),
+    ...(holders.length > 0 ? [`(deny file-write-unlink ${holders.join(" ")})`] : []),
     "",
   ].join("\n");
+}
+
+/** `root` and each folder below it that holds `folder`, or none when `folder` is not inside `root`. */
+function holderFolders(root: string, folder: string): string[] {
+  const holders: string[] = [];
+  let parent = dirname(folder);
+  while (parent !== folder && isPathInside(root, parent)) {
+    holders.push(parent);
+    folder = parent;
+    parent = dirname(parent);
+  }
+  return holders;
 }
 
 /**

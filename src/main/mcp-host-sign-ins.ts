@@ -12,10 +12,10 @@ import type {
   TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { Cause, Exit, Option } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
 import type { AgentService } from "../backend/agent-service";
 import type { BrowserHost } from "../backend/browser-host";
-import { normalizeResource } from "../backend/mcp-oauth-provider";
+import { mcpOAuthAccountKey } from "../backend/mcp-oauth-provider";
 import { HostSignInPages } from "./host-sign-in-pages";
 
 /** The bound of an error on the wire, as `mcp-sign-in-v1` reads it. */
@@ -93,11 +93,11 @@ export class McpHostSignIns {
   }
 
   signOut(input: SignOutMcpServerInput) {
-    return this.#dependencies.service.signOutMcpServer(input);
+    return this.#dependencies.service.signOutMcpServer(input).pipe(Effect.map(onWire));
   }
 
   list(): McpSignInState[] {
-    return this.#dependencies.service.listMcpSignIns();
+    return onWire(this.#dependencies.service.listMcpSignIns());
   }
 
   /** The sign-in app of one row (`mcp-sign-in-app-v1`). The next `start` uses it. */
@@ -118,8 +118,13 @@ export class McpHostSignIns {
   }
 }
 
+/** The states as `mcp-sign-in-v1` states them: `signedIn` and nothing more. */
+function onWire(states: readonly McpSignInState[]): McpSignInState[] {
+  return states.map(({ mcpServerId, signedIn }) => ({ mcpServerId, signedIn }));
+}
+
 function signInKey(url: string): string {
-  return normalizeResource(url) ?? url;
+  return mcpOAuthAccountKey(url) ?? url;
 }
 
 function resultOf(exit: Exit.Exit<McpTestResult, { cause: unknown }>): McpTestResult {

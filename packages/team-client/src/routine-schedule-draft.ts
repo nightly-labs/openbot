@@ -144,17 +144,38 @@ function routineDraftCron(draft: RoutineScheduleDraft): string {
   }
 }
 
-/** `M H1-H2/N * * DAYS`: the window start gives M and H1, and H2 is the last hour not after its end. */
+/**
+ * `M H1-H2/N * * DAYS`: the window start gives M and H1, and H2 is the last hour not after its end.
+ * A window that ends after midnight is `M H1-23/N,H3-H2/N`, where H3 continues the steps after 23.
+ * Cron checks the days of each run on its own date, so a run after midnight uses the next day.
+ */
 export function routineHourlyCron(draft: Extract<RoutineScheduleDraft, { kind: "hourly" }>): string {
   const minute = routineHourlyMinute(draft);
   const step = draft.everyHours > 1 ? `/${draft.everyHours}` : "";
   let hours = `*${step}`;
   if (draft.window) {
     const first = Math.floor(routineTimeMinutes(draft.window.start) / 60);
-    const last = Math.max(first, Math.floor((routineTimeMinutes(draft.window.end) - minute) / 60));
-    hours = `${first}-${last}${step}`;
+    const last = Math.max(first, Math.floor((windowEndMinutes(draft.window) - minute) / 60));
+    const morning = nextDayFirstHour(first, draft.everyHours);
+    if (last < 24) hours = `${first}-${last}${step}`;
+    else if (morning > last - 24) hours = `${first}-23${step}`;
+    else hours = `${first}-23${step},${morning}-${last - 24}${step}`;
   }
   return `${minute} ${hours} * * ${cronDayList(draft.days)}`;
+}
+
+/** The window end in minutes after the start day begins. An end before the start is on the next day. */
+function windowEndMinutes(window: NonNullable<RoutineHoursWindow>): number {
+  const end = routineTimeMinutes(window.end);
+  return end < routineTimeMinutes(window.start) ? end + 24 * 60 : end;
+}
+
+/**
+ * The first hour after midnight of runs that start at `first` and repeat every `everyHours`.
+ * Each step in `ROUTINE_EVERY_HOURS` divides 24, so the steps continue at `first % everyHours`.
+ */
+function nextDayFirstHour(first: number, everyHours: number): number {
+  return first % everyHours;
 }
 
 /** The minute past the hour of each run. */
@@ -183,12 +204,14 @@ export function sameRoutineDays(days: number[], expected: number[]): boolean {
   return sameDays(days, expected);
 }
 
-/** How many runs one day gets. The window is inclusive at both ends, so 9:00 to 18:00 hourly is 10. */
+/**
+ * How many runs one day gets. The window is inclusive at both ends, so 9:00 to 18:00 hourly is 10,
+ * and 20:00 to 10:00 hourly is 15.
+ */
 export function routineRunsPerDay(window: RoutineHoursWindow, everyHours: number): number {
   const step = Math.max(1, everyHours) * 60;
   const start = window ? routineTimeMinutes(window.start) : 0;
-  const end = window ? routineTimeMinutes(window.end) : 24 * 60 - 1;
-  if (end < start) return 0;
+  const end = window ? windowEndMinutes(window) : 24 * 60 - 1;
   return Math.floor((end - start) / step) + 1;
 }
 
@@ -214,14 +237,12 @@ export function routineYearlyDaysInMonth(month: number): number {
 }
 
 /** Why the draft cannot be saved, or `null`. A save of such a draft would change when it runs. */
-export type RoutineDraftProblem = "endBeforeStart" | "invalidDate" | "cronRequired" | "cronTooLong";
+export type RoutineDraftProblem = "invalidDate" | "cronRequired" | "cronTooLong";
 
 export function routineDraftProblemCode(draft: RoutineScheduleDraft): RoutineDraftProblem | null {
   switch (draft.kind) {
     case "once":
       return isRoutineDate(draft.date) ? null : "invalidDate";
-    case "hourly":
-      return routineRunsPerDay(draft.window, draft.everyHours) === 0 ? "endBeforeStart" : null;
     case "yearly":
       return draft.day > routineYearlyDaysInMonth(draft.month) ? "invalidDate" : null;
     case "custom": {
@@ -366,25 +387,45 @@ function intervalCron(schedule: Extract<RoutineSchedule, { kind: "interval" }>):
   return `0 0 */${Math.min(31, Math.round(hours / 24))} * *`;
 }
 
-/** Reads back the cron that `hourlySchedule` writes: `M H1-H2/N * * DAYS`. */
+/** Reads back the cron that `hourlySchedule` writes: `M H1-H2/N * * DAYS` or `M H1-23/N,H3-H2/N * * DAYS`. */
 function hourlyCronDraft(expression: string): RoutineScheduleDraft | null {
   const fields = expression.trim().split(/\s+/);
   if (fields.length !== 5) return null;
   const [minuteField = "", hourField = "", monthDay, month, weekDayField = ""] = fields;
   if (monthDay !== "*" || month !== "*" || !/^\d{1,2}$/.test(minuteField)) return null;
   const minute = Number(minuteField);
-  const hours = /^(\*|(\d{1,2})-(\d{1,2}))(?:\/(\d{1,2}))?$/.exec(hourField);
+  const [evening = "", morning, ...extra] = hourField.split(",");
+  const hours = /^(\*|(\d{1,2})-(\d{1,2}))(?:\/(\d{1,2}))?$/.exec(evening);
   const days = cronWeekDays(weekDayField);
-  if (minute > 59 || !hours || !days) return null;
+  if (minute > 59 || !hours || !days || extra.length > 0) return null;
   const everyHours = hours[4] === undefined ? 1 : Number(hours[4]);
   if (!EVERY_HOURS.has(everyHours)) return null;
   if (hours[1] === "*") {
+    if (morning !== undefined) return null;
     return { kind: "hourly", everyHours, days, window: null, ...(minute === 0 ? {} : { minute }) };
   }
   const first = Number(hours[2]);
-  const last = Number(hours[3]);
+  let last = Number(hours[3]);
   if (first > last || last > 23) return null;
+  if (morning !== undefined) {
+    const next = last === 23 ? morningLastHour(morning, first, everyHours) : null;
+    if (next === null) return null;
+    last = next;
+  }
   return { kind: "hourly", everyHours, days, window: { start: clock(first, minute), end: clock(last, minute) } };
+}
+
+/** The last hour of the `H3-H2/N` part after midnight, or `null` when it does not continue the steps from `first`. */
+function morningLastHour(source: string, first: number, everyHours: number): number | null {
+  const range = /^(\d{1,2})-(\d{1,2})(?:\/(\d{1,2}))?$/.exec(source);
+  if (!range) return null;
+  const start = Number(range[1]);
+  const last = Number(range[2]);
+  const step = range[3] === undefined ? 1 : Number(range[3]);
+  if (step !== everyHours || start !== nextDayFirstHour(first, everyHours) || last < start || last >= first) {
+    return null;
+  }
+  return last;
 }
 
 /** `*`, or days and day ranges from 0 to 7, where 7 is Sunday. */

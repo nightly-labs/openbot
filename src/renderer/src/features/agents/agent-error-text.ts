@@ -1,3 +1,4 @@
+import { agentProviderName, isAgentProvider } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 
 /** A provider quotes what it was given, so an error can carry a whole request body back. */
@@ -13,6 +14,19 @@ export function readableAgentError(message: string): string {
   const readable = errorMessage(message, t("agent.error.continueFailed"));
   if (readable.length <= ERROR_DESCRIPTION_LIMIT) return readable;
   return `${readable.slice(0, ERROR_DESCRIPTION_LIMIT - 1).trimEnd()}…`;
+}
+
+/**
+ * The toast title of an error with no agent. A provider's own failure has the code
+ * `<provider>_<kind>`, such as `opencode_start_failed`, and its text often does not name the
+ * provider (#2850). The message stays as it is, so its kind is still read from its start.
+ */
+export function providerErrorTitle(code: string): string {
+  const { t } = currentText();
+  const provider = code.split("_", 1)[0];
+  return isAgentProvider(provider)
+    ? t("agent.error.providerNamed", { provider: agentProviderName(provider) })
+    : t("agent.error.provider");
 }
 
 /** True when this error text has had no toast in the last 30 seconds. The caller then shows one. */

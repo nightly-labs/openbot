@@ -1,5 +1,6 @@
 import type { AgentApproval, AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
+import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage } from "@openbot/ui/data";
 import { createStoredMessage } from "../../app-stored-values";
 import { promptRequestKey } from "../conversation/conversation-keys";
@@ -7,7 +8,76 @@ import { promptRequestKey } from "../conversation/conversation-keys";
 type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
 type BrowserTakeoverEvent = Extract<AgentEvent, { type: "browser-takeover-requested" }>;
 
-export type PendingAttentionPrompts = Record<string, PromptEvent | BrowserTakeoverEvent | undefined>;
+type AttentionEvent = PromptEvent | BrowserTakeoverEvent;
+
+/**
+ * The waiting prompts and browser takeovers, by `attentionKey`. Each thread of an agent has its own
+ * entry, so a wait in a side thread or a channel never hides the one in the agent's own chat.
+ */
+export type PendingAttentionPrompts = Record<string, AttentionEvent | undefined>;
+
+/** An agent with no thread yet has a key that no wait has. */
+export function attentionKey(agentId: string, threadId: string | null): string {
+  return `${agentId}\u0000${threadId ?? ""}`;
+}
+
+/**
+ * Whether the answer to this prompt is on its way to main. The agent's own chat marks it by agent id,
+ * and a side thread by its `attentionKey`, so an answer in one does not replace the mark of the other.
+ */
+function promptAnswerInFlight(
+  prompt: { agentId: string; threadId: string; turnId: string; requestId: string | number },
+  submittedRequests: Record<string, string | undefined>,
+): boolean {
+  const key = promptRequestKey(prompt.turnId, prompt.requestId);
+  return (
+    key === submittedRequests[prompt.agentId] ||
+    key === submittedRequests[attentionKey(prompt.agentId, prompt.threadId)]
+  );
+}
+
+export function attentionEventKey(event: AttentionEvent): string {
+  return event.type === "prompt"
+    ? attentionKey(event.agentId, event.threadId)
+    : attentionKey(event.request.agentId, event.request.threadId);
+}
+
+export function attentionAgentId(event: AttentionEvent): string {
+  return event.type === "prompt" ? event.agentId : event.request.agentId;
+}
+
+/** The waits of an agent, in any thread. */
+export function attentionOfAgent(prompts: PendingAttentionPrompts, agentId: string): AttentionEvent[] {
+  return Object.values(prompts).filter(
+    (event): event is AttentionEvent => event !== undefined && attentionAgentId(event) === agentId,
+  );
+}
+
+/** Removes the waits that `matches` selects. The same object when none matches. */
+export function withoutAttention(
+  prompts: PendingAttentionPrompts,
+  matches: (event: AttentionEvent) => boolean,
+): PendingAttentionPrompts {
+  const kept = Object.entries(prompts).filter(([, event]) => event !== undefined && !matches(event));
+  return kept.length === Object.keys(prompts).length ? prompts : Object.fromEntries(kept);
+}
+
+/**
+ * One wait per agent, for a view that shows one: the wait of the agent's own chat first, else the
+ * newest of another thread.
+ */
+export function attentionByAgent(
+  prompts: PendingAttentionPrompts,
+  agents: readonly { id: string; threadId: string | null }[],
+): PendingAttentionPrompts {
+  const byAgent: PendingAttentionPrompts = {};
+  for (const event of Object.values(prompts)) if (event) byAgent[attentionAgentId(event)] = event;
+  for (const agent of agents) {
+    const own = prompts[attentionKey(agent.id, agent.threadId)];
+    if (own) byAgent[agent.id] = own;
+  }
+  return byAgent;
+}
 
 /**
  * Folding a runtime snapshot into what the renderer already holds.
@@ -33,12 +103,12 @@ export function reconcileAttentionPrompts(
   for (const prompt of snapshot.pendingPrompts) {
     // A prompt whose answer is already on its way to main would otherwise come
     // back the moment a snapshot crosses the answer in flight.
-    if (promptRequestKey(prompt.turnId, prompt.requestId) !== submittedRequests[prompt.agentId]) {
-      next[prompt.agentId] = { type: "prompt", ...prompt };
+    if (!promptAnswerInFlight(prompt, submittedRequests)) {
+      next[attentionKey(prompt.agentId, prompt.threadId)] = { type: "prompt", ...prompt };
     }
   }
   for (const request of snapshot.pendingBrowserTakeovers) {
-    next[request.agentId] = { type: "browser-takeover-requested", request };
+    next[attentionKey(request.agentId, request.threadId)] = { type: "browser-takeover-requested", request };
   }
   return next;
 }
@@ -58,7 +128,8 @@ export function reconcileAttentionPrompts(
  *
  * Only prompts are filtered. A browser takeover leaves `pendingPrompts` the
  * moment main accepts the response, so the projection above this has already
- * dropped it.
+ * dropped it. The coordinator keeps one wait per agent; the scope keys each by
+ * its thread.
  */
 export function seededAttentionPrompts(
   seed: PendingAttentionPrompts | undefined,
@@ -67,25 +138,23 @@ export function seededAttentionPrompts(
 ): PendingAttentionPrompts {
   if (!seed) return {};
   const next: PendingAttentionPrompts = {};
-  for (const [agentId, entry] of Object.entries(seed)) {
+  for (const entry of Object.values(seed)) {
     if (!entry) continue;
+    const agentId = attentionAgentId(entry);
     if (entry.type === "prompt") {
       const key = promptRequestKey(entry.turnId, entry.requestId);
-      if (key === presentedResolutions[agentId] || key === submittedRequests[agentId]) continue;
+      if (key === presentedResolutions[agentId] || promptAnswerInFlight(entry, submittedRequests)) continue;
     }
-    next[agentId] = entry;
+    next[attentionEventKey(entry)] = entry;
   }
   return next;
 }
 
 export function reconcileAttentionApprovals(
-  current: Record<string, AgentApproval | undefined>,
+  current: readonly AgentApproval[],
   snapshot: Pick<AgentRuntimeSnapshot, "attentionComplete" | "pendingApprovals">,
-): Record<string, AgentApproval | undefined> {
-  return {
-    ...(snapshot.attentionComplete ? {} : current),
-    ...Object.fromEntries(snapshot.pendingApprovals.map((approval) => [approval.agentId, approval])),
-  };
+): AgentApproval[] {
+  return reconcilePendingRequests(current, snapshot.pendingApprovals, snapshot.attentionComplete);
 }
 
 /**

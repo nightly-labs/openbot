@@ -142,8 +142,11 @@ export const CONVERSATION_STORY_ARGS: Parameters<typeof Conversation>[0] = {
   onStop: fn(),
 };
 
-/** The agent chat as the app shows it, on a mocked bridge, for a story that composes screens. */
-export function StoryAgentConversation(props: { agent: Parameters<typeof Conversation>[0]["agent"] }) {
+/**
+ * The conversation view as the app shows it, on a mocked bridge, for a story that composes screens
+ * or shows a channel. The props replace the story defaults.
+ */
+export function StoryConversation(props: Partial<Parameters<typeof ConversationView>[0]>) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
   const controller = createConversationController({ onTypingChange: CONVERSATION_STORY_ARGS.onTypingChange });
@@ -156,7 +159,7 @@ export function StoryAgentConversation(props: { agent: Parameters<typeof Convers
     <div class="conversation-story-frame">
       <StoryAppProviders>
         <ConversationControllerProvider controller={controller}>
-          <ConversationView {...CONVERSATION_STORY_ARGS} agent={props.agent} />
+          <ConversationView {...CONVERSATION_STORY_ARGS} {...props} />
         </ConversationControllerProvider>
       </StoryAppProviders>
     </div>

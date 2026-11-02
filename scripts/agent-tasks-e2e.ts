@@ -4,8 +4,8 @@
 // turns at the same time (not a custom ACP agent):
 // `bun scripts/agent-tasks-e2e.ts --allow-mutations --agent=<agent id>`.
 //
-// It checks the task limit and its hold, a raised limit that starts the waiting task, Stop, the
-// refused provider switch while a task runs, and that the task list reports the `error` field. Each
+// It checks the task limit and its hold, a raised limit that starts the waiting task, Stop, a
+// provider switch queued while a task runs, and that the task list reports the `error` field. Each
 // task turn is a real provider turn, so keep the prompts short. At the end it stops and closes the
 // tasks it started and gives the agent its task limit back.
 // Writes .openbot-build/agent-tasks-e2e/report.json.
@@ -13,8 +13,15 @@ import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
-import type { AgentSummary, AgentTask, AgentTasksSnapshot, OpenBotDesktopApi } from "@openbot/contracts/ipc";
-import { sourceText } from "@openbot/i18n/source";
+import {
+  type AgentSummary,
+  type AgentTask,
+  type AgentTasksSnapshot,
+  type ClientAgentSummary,
+  isAgentModelOption,
+  isAgentSummary,
+  type OpenBotDesktopApi,
+} from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
@@ -43,7 +50,13 @@ interface Report {
   limitOne?: { first: string; second: string; secondHold: string | null; limit: number };
   raisedLimit?: { second: string; limit: number };
   stop?: { states: string[]; outcomes: Array<string | null> };
-  providerSwitch?: { refused: boolean; message: string | null; target: string | null };
+  providerSwitch?: {
+    refused: boolean;
+    target: string | null;
+    provider?: string;
+    pendingProvider?: string | null;
+    pendingModel?: string | null;
+  };
   errorField?: { present: boolean };
   restored?: { taskLimit: number | null };
   passed: boolean;
@@ -74,15 +87,17 @@ function listTasks(): Promise<AgentTasksSnapshot> {
   return page.evaluate((id) => window.openbot.agent.listTasks(id), agentId);
 }
 
-function readAgent(): Promise<AgentSummary> {
-  return page.evaluate(async (id) => {
+async function readAgent(): Promise<AgentSummary> {
+  const agent = await page.evaluate(async (id) => {
     const agent = (await window.openbot.agent.listAgents()).find((candidate) => candidate.id === id);
     if (!agent) throw new Error(`Unknown agent: ${id}`);
     return agent;
   }, agentId);
+  if (!isAgentSummary(agent)) throw new Error(`The agent ${agentId} has a provider that this build does not know.`);
+  return agent;
 }
 
-function setTaskLimit(taskLimit: number | null): Promise<AgentSummary> {
+function setTaskLimit(taskLimit: number | null): Promise<ClientAgentSummary> {
   return page.evaluate(({ id, limit }) => window.openbot.agent.updateAgent({ agentId: id, taskLimit: limit }), {
     id: agentId,
     limit: taskLimit,
@@ -155,40 +170,34 @@ try {
   report.raisedLimit = { second: taskIn(raised, second.id).state, limit: raised.limit };
   assert.equal(raised.limit, 2);
 
-  // 3. A provider switch waits for the running tasks, and the error says so.
-  const target = await page.evaluate(
-    async ({ provider }) =>
-      (await window.openbot.agent.listModels()).find((model) => model.provider !== provider) ?? null,
-    { provider: before.provider },
-  );
+  // 3. A provider switch while a task runs is queued for the next turn.
+  const models = await page.evaluate(() => window.openbot.agent.listModels());
+  const target = models.filter(isAgentModelOption).find((model) => model.provider !== before.provider) ?? null;
   const running = await listTasks();
   if (target && taskIn(running, first.id).state === "running") {
     const outcome = await page.evaluate(
       async ({ id, provider, model }) => {
-        try {
-          await window.openbot.agent.updateAgent({ agentId: id, provider, model });
-          return { refused: false, message: null };
-        } catch (error) {
-          return { refused: true, message: error instanceof Error ? error.message : String(error) };
-        }
+        const agent = await window.openbot.agent.updateAgent({ agentId: id, provider, model });
+        return {
+          refused: false,
+          provider: agent.provider,
+          pendingProvider: agent.pendingRuntime?.provider ?? null,
+          pendingModel: agent.pendingRuntime?.model ?? null,
+        };
       },
       { id: agentId, provider: target.provider, model: target.id },
     );
     report.providerSwitch = { ...outcome, target: `${target.provider}/${target.id}` };
-    if (!outcome.refused) {
-      // Put the agent back before the assertion fails.
-      await page.evaluate(
-        ({ id, provider, model }) => window.openbot.agent.updateAgent({ agentId: id, provider, model }),
-        { id: agentId, provider: before.provider, model: before.model },
-      );
-    }
-    assert.ok(outcome.refused, "The provider switch was not refused while a task ran.");
-    assert.ok(
-      outcome.message?.includes(sourceText("error.agent.waitForTasksBeforeProviderChange")),
-      `Unexpected switch error: ${outcome.message}`,
+    assert.equal(outcome.refused, false, "The provider switch is queued while a task runs.");
+    assert.equal(outcome.provider, before.provider, "The running provider stays until the task ends.");
+    assert.equal(outcome.pendingProvider, target.provider);
+    assert.equal(outcome.pendingModel, target.id);
+    await page.evaluate(
+      ({ id, provider, model }) => window.openbot.agent.updateAgent({ agentId: id, provider, model }),
+      { id: agentId, provider: before.provider, model: before.model },
     );
   } else {
-    report.providerSwitch = { refused: false, message: null, target: null };
+    report.providerSwitch = { refused: false, target: null };
   }
 
   // 4. Stop ends each task's turn as interrupted.

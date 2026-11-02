@@ -1,5 +1,5 @@
 import { ANDROID_PLAY_STORE_URL } from "@openbot/ui/features/mobile-app/android-play-store";
-import { IOS_TESTFLIGHT_URL } from "@openbot/ui/features/mobile-app/ios-testflight";
+import { IOS_APP_STORE_URL } from "@openbot/ui/features/mobile-app/ios-app-store";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
@@ -250,21 +250,21 @@ function LatestRelease(props: { platform: ChangelogPlatform }) {
           <Show
             when={props.platform === "mobile"}
             fallback={
-              <ButtonLink to="/" hash="download" variant="secondary" size="sm" icon="download">
+              <ButtonLink to="/download" variant="secondary" size="sm" icon="download">
                 Download
               </ButtonLink>
             }
           >
             <div class="changelog-latest-actions">
               <Button
-                href={IOS_TESTFLIGHT_URL}
+                href={IOS_APP_STORE_URL}
                 target="_blank"
                 rel={EXTERNAL_LINK_REL}
                 variant="secondary"
                 size="sm"
-                icon="open"
+                icon="download"
               >
-                Join the TestFlight beta
+                Download for iPhone
               </Button>
               <Button
                 href={ANDROID_PLAY_STORE_URL}

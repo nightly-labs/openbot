@@ -2,12 +2,16 @@ import {
   type AgentProviderId,
   type AgentReasoningEffort,
   agentProviderName,
+  type ForeignProviderId,
   type ProviderAccountStatus,
+  providerDisplayName,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Typography } from "heroui-native";
+import { Platform } from "react-native";
 import { useUniwind } from "uniwind";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -32,10 +36,14 @@ const EFFORT_LABELS = {
  * A menu picker is as wide as the label it shows, and the row puts that label beside its title on
  * one line. A model name has no length the host promises to respect -- OpenCode states the vendor,
  * the model and the price tier in one string -- so an untruncated name pushed "Model" until it
- * wrapped mid-word. The cap is on the visible label only; the id that gets saved is untouched.
+ * wrapped mid-word. The cap is on the selected label only, which the row shows. The menu shows the
+ * other names in full, so the user can tell them apart. The id that gets saved is untouched.
+ * Android keeps the full name: its picker cuts the row label to one line, and its menu wraps long
+ * names, so a cap only removes the part of a name that tells two models apart.
  */
 const MAX_PICKER_LABEL = 28;
-function pickerLabel(text: string): string {
+function pickerLabel(text: string, selected: boolean): string {
+  if (Platform.OS === "android" || !selected) return text;
   const characters = Array.from(text);
   return characters.length > MAX_PICKER_LABEL ? `${characters.slice(0, MAX_PICKER_LABEL).join("").trimEnd()}…` : text;
 }
@@ -61,11 +69,23 @@ export function useProviderAccounts(agent: MobileAgent, enabled: boolean) {
   return { queryKey, accounts: canManage ? (accounts.data ?? null) : null };
 }
 
+/** The name of an account, as on desktop: the user's name for it, its email, "API key", or its place in the list. */
+export function useProviderAccountName() {
+  const { t } = useText();
+  return (account: ProviderAccountStatus, index: number) =>
+    account.label ||
+    account.email ||
+    (account.id === CLAUDE_API_KEY_ACCOUNT_ID
+      ? t("mobile.agent.runtime.accountApiKey")
+      : t("mobile.agent.runtime.accountNumbered", { number: index + 1 }));
+}
+
 export function AgentRuntimeFields({
   serverId,
   available,
   saving,
   provider,
+  foreignProvider,
   model,
   reasoningEffort,
   hostDefault = false,
@@ -79,6 +99,8 @@ export function AgentRuntimeFields({
   available: boolean;
   saving: boolean;
   provider?: AgentProviderId;
+  /** The provider when this build does not know it. The choice shows it and stays disabled. */
+  foreignProvider?: ForeignProviderId | undefined;
   model?: string;
   reasoningEffort?: AgentReasoningEffort;
   /**
@@ -94,9 +116,7 @@ export function AgentRuntimeFields({
   onAccountChange?: (accountId: string) => void;
 }) {
   const { t } = useText();
-  // The name of an account, as on desktop: the user's name for it, its email, or its place in the list.
-  const accountName = (account: ProviderAccountStatus, index: number) =>
-    account.label || account.email || t("mobile.agent.runtime.accountNumbered", { number: index + 1 });
+  const accountName = useProviderAccountName();
   const workspace = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const { theme } = useUniwind();
@@ -109,7 +129,7 @@ export function AgentRuntimeFields({
   const options = models.data?.filter((option) => option.provider === provider) ?? [];
   const selected = options.find((option) => option.id === model);
   const enabled = available && !saving && options.length > 0;
-  const showsModel = !hostDefault || provider !== undefined;
+  const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
   return (
     <>
       <SettingsSection title={title}>
@@ -117,22 +137,31 @@ export function AgentRuntimeFields({
           trailing={
             <SettingsPicker<string>
               value={provider ?? ""}
-              options={[
-                ...(hostDefault ? [{ value: "", label: t("mobile.agent.runtime.hostDefault") }] : []),
-                ...(!models.data?.some((option) => option.provider === provider) && showsModel
+              options={
+                foreignProvider !== undefined
                   ? [
                       {
-                        value: provider ?? "",
-                        label: provider ? agentProviderName(provider) : t("mobile.agent.runtime.unavailable"),
+                        value: "",
+                        label: t("mobile.agent.runtime.updateToUse", { name: providerDisplayName(foreignProvider) }),
                       },
                     ]
-                  : []),
-                ...Array.from(new Set(models.data?.map((option) => option.provider))).map((value) => ({
-                  value,
-                  label: agentProviderName(value),
-                })),
-              ]}
-              enabled={available && !saving && Boolean(models.data?.length)}
+                  : [
+                      ...(hostDefault ? [{ value: "", label: t("mobile.agent.runtime.hostDefault") }] : []),
+                      ...(!models.data?.some((option) => option.provider === provider) && showsModel
+                        ? [
+                            {
+                              value: provider ?? "",
+                              label: provider ? agentProviderName(provider) : t("mobile.agent.runtime.unavailable"),
+                            },
+                          ]
+                        : []),
+                      ...Array.from(new Set(models.data?.map((option) => option.provider))).map((value) => ({
+                        value,
+                        label: agentProviderName(value),
+                      })),
+                    ]
+              }
+              enabled={foreignProvider === undefined && available && !saving && Boolean(models.data?.length)}
               dark={theme === "dark"}
               label={t("mobile.agent.runtime.provider")}
               onChange={(value) => {
@@ -160,7 +189,7 @@ export function AgentRuntimeFields({
                     : []),
                   ...accounts.map((account, index) => ({
                     value: account.id,
-                    label: pickerLabel(accountName(account, index)),
+                    label: pickerLabel(accountName(account, index), account.id === accountId),
                   })),
                 ]}
                 enabled={available && !saving}
@@ -183,11 +212,14 @@ export function AgentRuntimeFields({
                     ? [
                         {
                           value: model ?? "",
-                          label: model ? pickerLabel(model) : t("mobile.agent.runtime.unavailable"),
+                          label: model ? pickerLabel(model, true) : t("mobile.agent.runtime.unavailable"),
                         },
                       ]
                     : []),
-                  ...options.map((option) => ({ value: option.id, label: pickerLabel(option.name) })),
+                  ...options.map((option) => ({
+                    value: option.id,
+                    label: pickerLabel(option.name, option.id === model),
+                  })),
                 ]}
                 enabled={enabled}
                 dark={theme === "dark"}

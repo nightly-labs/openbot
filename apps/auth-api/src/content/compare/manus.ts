@@ -1,5 +1,5 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
-import type { Comparison } from "./comparison";
+import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
 // Every statement about Manus here is taken from manus.im, its documentation, help
 // center, Trust Center, terms and privacy policy, and each page used is in `sources`.
@@ -14,7 +14,7 @@ export const MANUS_COMPARISON: Comparison = {
   answer:
     "Choose OpenBot if you want your agents on your own computer, with the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok: the app is free. Choose Manus if you want a general agent that works in its own cloud computer, keeps working with no computer of yours on, and chooses the model for you.",
   chooseOpenBot: [
-    "You already pay for ChatGPT, Claude, Gemini, Grok or Cursor, or you run your own model.",
+    "You already pay for ChatGPT, Claude, Gemini, Grok, Cursor, Cline or Muse Code, or you run your own model.",
     "Your files and chats must stay on your own computer, not in a cloud in the US or Singapore.",
     "You want a team of coding agents that give work to each other, each with its own job.",
     "You want a desktop app for Linux, or a free app.",
@@ -24,14 +24,13 @@ export const MANUS_COMPARISON: Comparison = {
   chooseRival: [
     "You want an agent that works in a cloud computer, with no computer of yours to keep on.",
     "You want research, websites and slides from one prompt, with many agents in parallel.",
-    "You want to give it tasks in Telegram, WhatsApp Business, LINE, Slack or email.",
+    "You want to give it tasks in LINE or by email.",
   ],
   rows: [
     {
       icon: "cpu",
       topic: "Models and plans",
-      openbot:
-        "Use the plans you already have: ChatGPT, Claude, Gemini, Grok or Cursor. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
+      openbot: OPENBOT_TEXT.models,
       rival:
         "Manus chooses the model for each task. You choose Manus 2.0 Lite, Manus 2.0 or Manus 2.0 Max. Manus states no way to use your own AI plan, API key or model.",
       better: "openbot",
@@ -47,24 +46,51 @@ export const MANUS_COMPARISON: Comparison = {
     {
       icon: "cloud",
       topic: "When your computer is off",
-      openbot:
-        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
+      openbot: OPENBOT_TEXT.offline,
       rival:
         "Cloud tasks keep working after you close the app, and scheduled tasks run while you are offline. Tasks on your own computer need it on.",
     },
     {
       icon: "phone",
       topic: "Remote access",
-      openbot:
-        "Apps for iPhone and Android connect from anywhere. Chats and files go over an encrypted connection between your devices, with no VPN, and no cloud stores them.",
+      openbot: OPENBOT_TEXT.remote,
       rival:
         "Apps for iPhone and Android and a web app. You can also give tasks in Telegram, WhatsApp Business, LINE, Slack or email. The tasks and their files stay in Manus's cloud.",
     },
     {
+      icon: "refresh",
+      topic: "Backup models",
+      openbot: OPENBOT_TEXT.backupModels,
+      rival:
+        "Manus chooses the model for each task. With Manus Flex, you can use your own API key. Manus states no move to a backup model.",
+      better: "openbot",
+    },
+    {
+      icon: "key",
+      topic: "Logins and payments",
+      openbot: OPENBOT_TEXT.logins,
+      rival:
+        "You sign in to sites yourself in Manus's cloud browser, and Manus keeps the session but not your password. You take over the browser for codes and CAPTCHAs. Manus states no password manager or saved cards.",
+      better: "openbot",
+    },
+    {
+      icon: "mic",
+      topic: "Voice",
+      openbot: OPENBOT_TEXT.voice,
+      rival:
+        "You can give a voice command in the phone app, and Manus writes out the voice messages that you send in chat apps. Manus states no reading of replies aloud.",
+      better: "openbot",
+    },
+    {
+      icon: "contact",
+      topic: "Chat apps",
+      openbot: OPENBOT_TEXT.chatApps,
+      rival: "Slack, Telegram, LINE and email. Cue, its app for personal agents, also connects to iMessage.",
+    },
+    {
       icon: "users",
       topic: "Teams",
-      openbot:
-        "Each agent is a full coding agent with its own job. They give work to each other in shared channels, and coworkers can join one team host.",
+      openbot: OPENBOT_TEXT.teams,
       rival:
         "Wide Research runs many agents in parallel on one task. Up to 50 people can work in one task, and the Team plan pools credits across seats.",
     },
@@ -89,15 +115,14 @@ export const MANUS_COMPARISON: Comparison = {
     {
       icon: "globe",
       topic: "Where you can use it",
-      openbot:
-        "In any country: OpenBot has no region lock. The desktop app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+      openbot: OPENBOT_TEXT.regions,
       rival:
         "Worldwide, except countries under a US embargo, for people 18 and over. Its data is stored in the US and Singapore. The website is in 17 languages.",
     },
     {
       icon: "devices",
       topic: "Apps",
-      openbot: "macOS, Windows and Linux, and mobile apps for iPhone and Android.",
+      openbot: OPENBOT_TEXT.apps,
       rival: "macOS and Windows, apps for iPhone and Android, and the web. A Linux desktop app: not stated by Manus.",
     },
     {
@@ -113,31 +138,27 @@ export const MANUS_COMPARISON: Comparison = {
   sections: [
     {
       title: "Models and the plans you pay for",
-      openbot:
-        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, Grok CLI with your Grok account or an xAI API key, and Cursor CLI with your Cursor plan or a Cursor API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
+      openbot: OPENBOT_TEXT.plansSection,
       rival:
         "Manus says it is LLM-agnostic: it chooses the right model for each task, so you do not have to. It does not name the models. You choose only between its own tiers: the free plan gets Manus 2.0 Lite in Agent mode, and paid plans also get Manus 2.0 and Manus 2.0 Max. You pay Manus in credits, and a plan that you already pay for at another AI company does not apply.",
       better: "openbot",
     },
     {
       title: "Where the work happens",
-      openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+      openbot: OPENBOT_TEXT.workSection,
       rival:
         "By default, each Manus task works in a temporary sandbox: a virtual computer with internet access in Manus's cloud. A Cloud Computer that stays on costs $30 or $50 a month more. Cloud tasks and scheduled tasks keep running while you are offline. Since March 2026, the desktop app for macOS and Windows can also let Manus run commands in the folders that you allow on your own computer; those tasks need that computer on.",
       better: "openbot",
     },
     {
       title: "Phones and remote access",
-      openbot:
-        "The OpenBot apps for iPhone and Android connect to the computer that runs your agents. From anywhere, you chat with them, follow their progress and send files. The connection goes directly between your devices when it can, it is encrypted, and no cloud stores your chats or files. You set up no VPN or tunnel. Remote access needs an OpenBot account.",
+      openbot: OPENBOT_TEXT.phonesSection,
       rival:
         "Manus has apps for iPhone and Android and a web app. You can also give it tasks in Telegram, WhatsApp Business, LINE or Slack, or by email; one messaging app at a time for each workspace. The work itself happens in Manus's cloud, or on your computer when you use the desktop app.",
     },
     {
       title: "How agents work as a team",
-      openbot:
-        "In OpenBot, each agent is a full coding agent: Codex, Claude Code, Gemini, Grok CLI, Cursor CLI or OpenCode, each with its own job and workspace. A lead agent can give parts of a task to other agents in a shared channel. You follow their work and step in when a decision needs you. For a team of people, one computer runs the host and the others join it; the chats and files stay on the host.",
+      openbot: OPENBOT_TEXT.teamSection,
       rival:
         "Manus is one agent that can split a large task: Wide Research starts hundreds of independent agents that work in parallel. Paid plans run up to 20 tasks at the same time. Up to 50 people can work in one task, and only the owner of the task pays the credits. The Team plan pools credits and adds single sign-on; the owner of a team can see all the session data of its members.",
     },
@@ -163,8 +184,7 @@ export const MANUS_COMPARISON: Comparison = {
     },
     {
       question: "Can I use my ChatGPT, Claude or Gemini subscription with OpenBot?",
-      answer:
-        "Yes. OpenBot signs in to each provider tool with your own account: your ChatGPT plan for Codex, your Claude plan for Claude Code, and a Google AI Pro or Ultra plan for Gemini. Grok CLI uses your Grok account or an xAI API key, and Cursor CLI your Cursor plan. OpenBot adds no charge of its own.",
+      answer: OPENBOT_TEXT.plansFaq,
     },
     {
       question: "Can I use my own AI plan or model with Manus?",
@@ -235,6 +255,21 @@ export const MANUS_COMPARISON: Comparison = {
     { label: "Manus terms of use", url: "https://manus.im/terms" },
     { label: "Manus download", url: "https://manus.im/download" },
     { label: "OpenManus on GitHub", url: "https://github.com/FoundationAgents/OpenManus" },
+    { label: "Introducing Manus Flex", url: "https://manus.im/blog/introducing-manus-flex" },
+    { label: "Manus Cloud Browser", url: "https://manus.im/docs/features/cloud-browser" },
+    { label: "What is new in Manus 2.0", url: "https://help.manus.im/en/articles/17190150-what-is-new-in-manus-2-0" },
+    {
+      label: "Manus on LINE",
+      url: "https://help.manus.im/en/articles/14495248-sending-and-receiving-messages-on-line",
+    },
+    {
+      label: "Manus in Slack",
+      url: "https://help.manus.im/en/articles/14432468-how-do-i-set-up-connect-and-use-manus-agents-in-slack",
+    },
+    {
+      label: "Cue messaging apps",
+      url: "https://help.manus.im/en/articles/14178640-can-i-connect-multiple-messaging-agents-at-once-in-cue",
+    },
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },
   ],

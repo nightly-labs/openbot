@@ -14,9 +14,9 @@ export const messages = {
   "usage.chart.costDescription":
     "Ежедневная примерная стоимость в USD по провайдерам. Точные значения доступны по ссылке «Данные по дням».",
   "usage.chart.tokensDescription":
-    "Ежедневно обработанные токены по провайдерам. Точные значения доступны по ссылке «Данные по дням».",
+    "Ежедневные токены без чтения из кэша по провайдерам. Точные значения доступны по ссылке «Данные по дням».",
   "usage.chart.costLabel": "Ежедневная примерная стоимость в USD по провайдерам",
-  "usage.chart.tokensLabel": "Ежедневно обработанные токены по провайдерам",
+  "usage.chart.tokensLabel": "Ежедневные токены без чтения из кэша по провайдерам",
   "usage.column.cost": "Стоимость",
   "usage.column.share": "Доля",
   "usage.column.tokens": "Токены",
@@ -33,7 +33,7 @@ export const messages = {
     other: "{sessions} сессии",
   },
   "usage.costEstimate": "Оценка по API · USD",
-  "usage.knownTokens": "Известные обработанные токены",
+  "usage.knownTokens": "Известные токены без чтения из кэша",
   "usage.provider.shareOfCost": "{share} известной стоимости",
   "usage.provider.shareOfTokens": "{share} известных токенов",
   "usage.dailyTrend": "Динамика по дням",
@@ -41,7 +41,8 @@ export const messages = {
   "usage.dailyTokens": "Токены по дням",
   "usage.viewDailyData": "Данные по дням",
   "usage.totals.title": "Итого",
-  "usage.totals.processedTokens": "Обработанные токены",
+  "usage.totals.tokens": "Токены без чтения из кэша",
+  "usage.totals.processedTokens": "Обработанные токены с чтением из кэша",
   "usage.totals.cachedInput": "Входные из кэша",
   "usage.totals.uncachedInput": "Входные без кэша",
   "usage.totals.cacheCreation": "Создание кэша",
@@ -62,9 +63,12 @@ export const messages = {
   "usage.about.title": "Об этих оценках",
   "usage.about.body":
     "Стоимость токенов в USD по ценам API. Это оценка, а не списание по подписке. Отдельная плата за инструменты и медиа не учитывается. Неизвестные цены и неполные данные об использовании остаются недоступными. Доли считаются только по известным значениям; неполные данные могут занижать итоги.",
+  "usage.about.tokens":
+    "Счётчики токенов не включают чтение из кэша. Каждый запрос к модели в рамках одного ответа заново читает кэшированный разговор, поэтому чтение из кэша может во много раз превышать остальные токены. В итогах оно показано как «Входные из кэша».",
   "usage.panel.label": "Использование агентов",
   "usage.panel.title": "Использование",
   "usage.panel.allAgents": "Все агенты",
+  "usage.panel.workflows": "Рабочие процессы",
   "usage.panel.agents": "Агенты использования",
   "usage.panel.metric": "Показатель использования",
   "usage.panel.period": "Период использования",

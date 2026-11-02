@@ -1,5 +1,6 @@
+import type { InstalledSkill } from "@openbot/contracts/ipc";
 import { ArrowUp, Button, MessageCircleQuestionMark, X } from "@openbot/ui";
-import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
+import type { AgentMessage, AgentProfile, ComposerMcpServer } from "@openbot/ui/data";
 import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -22,6 +23,12 @@ export interface SideQuestionPanelProps {
   agent: AgentProfile;
   agents: AgentProfile[];
   exchanges: readonly SideQuestionExchange[];
+  /** The agent's skills, for the `$` picker and the skill tags in messages. */
+  skills?: InstalledSkill[] | undefined;
+  /** The last skill list request failed, so an empty picker says so instead of "no skills". */
+  skillsLoadFailed?: boolean | undefined;
+  /** The host's MCP servers, offered by the same `$` the skills answer. */
+  mcpServers?: ComposerMcpServer[] | undefined;
   /** Why the last question got no answer. The question is back in the draft. */
   error: string | null;
   draft: string;
@@ -31,6 +38,8 @@ export interface SideQuestionPanelProps {
   onAsk: (question: string) => void;
   onClosePanel: () => void;
   onOpenLink: (url: string) => void;
+  /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
+  macWindowControls?: boolean | undefined;
 }
 
 function exchangeMessages(exchange: SideQuestionExchange): AgentMessage[] {
@@ -88,7 +97,7 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
           type="button"
           variant="ghost"
           class="browser-toolbar-button side-panel-pane-close"
-          aria-label={t("conversation.tasks.panel.closePanel")}
+          aria-label={t("conversation.sidePanel.closePanel")}
           onClick={() => props.onClosePanel()}
         >
           <X class="browser-toolbar-icon" />
@@ -118,10 +127,12 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
                     message={message()}
                     author={author(message())}
                     agents={props.agents}
+                    skills={props.skills}
                     onSelectAgent={() => undefined}
                     onOpenLink={props.onOpenLink}
                     onPreview={() => undefined}
                     onAttachmentAction={() => undefined}
+                    macWindowControls={props.macWindowControls}
                   />
                 </div>
               )}
@@ -136,7 +147,21 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
       </Show>
       <div class="composer-wrap">
         <Show when={props.error}>
-          {(error) => <ComposerNotice tone="danger" title={t("conversation.sideQuestion.failed")} body={error()} />}
+          {(error) => (
+            <ComposerNotice
+              tone="danger"
+              title={t("conversation.sideQuestion.failed")}
+              body={error()}
+              action={
+                // The failed question is back in the draft, so Retry asks the draft again.
+                <Show when={props.draft.trim()}>
+                  <Button variant="outline" size="sm" type="button" disabled={asking()} onClick={ask}>
+                    {t("common.retry")}
+                  </Button>
+                </Show>
+              }
+            />
+          )}
         </Show>
         <form
           class="composer side-question-composer"
@@ -150,6 +175,9 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
             <ComposerEditor
               agentId={props.agent.id}
               agents={props.agents}
+              skills={props.skills}
+              skillsLoadFailed={props.skillsLoadFailed}
+              mcpServers={props.mcpServers}
               value={props.draft}
               placeholder={t("conversation.sideQuestion.placeholder")}
               ariaLabel={t("conversation.sideQuestion.placeholder")}

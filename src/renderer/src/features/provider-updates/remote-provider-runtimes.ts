@@ -1,9 +1,5 @@
-import type {
-  ProviderAdminDesktopApi,
-  ProviderRuntimeSnapshot,
-  ProviderRuntimeStatus,
-  ProviderRuntimesDesktopApi,
-} from "@openbot/contracts/ipc";
+import type { ProviderAdminDesktopApi, ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import type { ProviderRuntimeSource } from "./provider-runtime-store";
 
 /** How often a download on the host is read again while it runs. */
 const POLL_MS = 1000;
@@ -16,10 +12,7 @@ const RETRY_MS = 5000;
  * reads the status again and hands it to the store's listener. The reads stop when no download runs
  * and when the store unsubscribes.
  */
-export function remoteProviderRuntimes(
-  admin: () => ProviderAdminDesktopApi,
-  serverId: string,
-): ProviderRuntimesDesktopApi {
+export function remoteProviderRuntimes(admin: () => ProviderAdminDesktopApi, serverId: string): ProviderRuntimeSource {
   const listeners = new Set<(snapshot: ProviderRuntimeSnapshot) => void>();
   let timer: ReturnType<typeof setTimeout> | undefined;
 

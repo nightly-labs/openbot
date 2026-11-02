@@ -69,6 +69,24 @@ export function createMockEvents(
       if (routine?.trigger.kind !== "webhook") throw new Error("This routine has no webhook trigger.");
       return { secret: mockSecret() };
     },
+    // The preview host starts no run: it answers as a host whose routine matched the test event.
+    sendTestEvent: async ({ id, owner }) => {
+      const routine = findRoutine(id, owner);
+      if (routine?.trigger.kind !== "webhook") throw new Error("This routine has no webhook trigger.");
+      if (!routine.active)
+        return {
+          eventType: routine.trigger.eventType ?? "openbot.test",
+          status: "ignored",
+          reason: "inactive",
+          runId: null,
+        };
+      return {
+        eventType: routine.trigger.eventType ?? "openbot.test",
+        status: "started",
+        reason: null,
+        runId: nextId("run"),
+      };
+    },
     // The preview host receives no webhook requests.
     listActivity: async () => [],
     listRoutineRuns: async (input) => {

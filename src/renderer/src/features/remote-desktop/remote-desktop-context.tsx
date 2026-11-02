@@ -31,6 +31,9 @@ import { remoteDesktopPort } from "./remote-desktop-port";
  * - `remoteDesktopConnectPromise` is the in-flight connect, so a second open of
  *   the same server awaits it instead of racing a second connect, and a
  *   disconnect arriving mid-connect has something to wait on.
+ * - `remoteDesktopViewerFailed` is the viewer's last word on the stream. A
+ *   session whose stream failed has nothing to resume, so hiding the workspace
+ *   ends it instead of keeping it, and the header no longer shows it as active.
  */
 const RemoteDesktop = createSimpleContext({
   name: "Remote desktop",
@@ -45,6 +48,7 @@ const RemoteDesktop = createSimpleContext({
     const [remoteDesktopConnectionErrorCode, setRemoteDesktopConnectionErrorCode] =
       createSignal<RemoteDesktopErrorCode | null>(null);
     const [remoteDesktopSessionEstablished, setRemoteDesktopSessionEstablished] = createSignal(false);
+    const [remoteDesktopViewerFailed, setRemoteDesktopViewerFailed] = createSignal(false);
     let remoteDesktopRestoreTarget: HTMLElement | null = null;
     let remoteDesktopConnectPromise: Promise<RemoteDesktopSession | undefined> | null = null;
     /** Bumped by every open, retry and disconnect, so a late connect cannot revive a closed workspace. */
@@ -136,6 +140,15 @@ const RemoteDesktop = createSimpleContext({
     function hideRemoteDesktopWorkspace(): void {
       setRemoteDesktopWorkspaceVisible(false);
       restoreRemoteDesktopFocus();
+      if (remoteDesktopViewerFailed()) void disconnectRemoteDesktopWorkspace(false).catch(() => undefined);
+    }
+
+    function reportRemoteDesktopViewerFailed(failed: boolean): void {
+      setRemoteDesktopViewerFailed(failed);
+      // The stream can also fail while the workspace is hidden, when Sunshine stops on the host.
+      if (failed && !remoteDesktopWorkspaceVisible()) {
+        void disconnectRemoteDesktopWorkspace(false).catch(() => undefined);
+      }
     }
 
     async function startRemoteDesktopConnection(
@@ -185,6 +198,7 @@ const RemoteDesktop = createSimpleContext({
       }
 
       remoteDesktopRestoreTarget = trigger;
+      if (remoteDesktopWorkspaceServerId() !== serverId) setRemoteDesktopViewerFailed(false);
       setRemoteDesktopWorkspaceServerId(serverId);
       setRemoteDesktopWorkspaceVisible(true);
       clearRemoteDesktopConnectionError();
@@ -213,6 +227,7 @@ const RemoteDesktop = createSimpleContext({
       const request = ++remoteDesktopConnectionRequest;
       clearRemoteDesktopConnectionError();
       setRemoteDesktopSessionEstablished(false);
+      setRemoteDesktopViewerFailed(false);
       setRemoteDesktopConnectingServerId(serverId);
       if (existingSession) await disconnectRemoteDesktop(existingSession.id);
       const connection = startRemoteDesktopConnection(serverId, request);
@@ -224,12 +239,15 @@ const RemoteDesktop = createSimpleContext({
     async function disconnectRemoteDesktopWorkspace(restoreFocus = true): Promise<void> {
       const serverId = remoteDesktopWorkspaceServerId();
       if (!serverId) return;
-      ++remoteDesktopConnectionRequest;
+      const request = ++remoteDesktopConnectionRequest;
       clearRemoteDesktopConnectionError();
       setRemoteDesktopSessionEstablished(false);
+      setRemoteDesktopViewerFailed(false);
       const session = latestRemoteDesktopSession(serverId);
       if (session) await disconnectRemoteDesktop(session.id);
       else await remoteDesktopConnectPromise;
+      // A disconnect that runs after the workspace is hidden can end after the user opens it again.
+      if (request !== remoteDesktopConnectionRequest) return;
       remoteDesktopConnectPromise = null;
       setRemoteDesktopConnectingServerId(null);
       setRemoteDesktopWorkspaceVisible(false);
@@ -300,6 +318,7 @@ const RemoteDesktop = createSimpleContext({
       remoteDesktopConnectionErrorCode,
       openRemoteDesktopWorkspace,
       hideRemoteDesktopWorkspace,
+      reportRemoteDesktopViewerFailed,
       retryRemoteDesktopWorkspace,
       disconnectRemoteDesktopWorkspace,
       selectRemoteDesktopDisplay,

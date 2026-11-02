@@ -91,6 +91,7 @@ export function checkResult(result: CustomAgentCheckResult): AcpAgentCheck {
     ...(result.version === null ? {} : { version: result.version }),
     protocolVersion: result.protocolVersion,
     capabilities: result.capabilities,
+    models: result.models,
   };
 }
 

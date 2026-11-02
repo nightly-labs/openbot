@@ -13,13 +13,14 @@ export const messages = {
   "remoteDesktop.disconnect": "Отключить",
   "remoteDesktop.viewerTitle": "Удалённый рабочий стол Sunshine",
   "remoteDesktop.viewerLoadFailed": "Не удалось загрузить просмотр Moonlight.",
-  "remoteDesktop.streamNotReady": "Хост не запустил поток. Возможно, Sunshine остановился на хосте. Повторите попытку.",
-  "remoteDesktop.hostOfflineTitle": "Хост не в сети",
-  "remoteDesktop.hostOfflineMessage": "Подключитесь к хосту, прежде чем открывать его рабочий стол.",
+  "remoteDesktop.streamNotReady":
+    "Сервер не запустил поток. Возможно, Sunshine остановился на сервере. Повторите попытку.",
+  "remoteDesktop.hostOfflineTitle": "Сервер не в сети",
+  "remoteDesktop.hostOfflineMessage": "Подключитесь к серверу, прежде чем открывать его рабочий стол.",
   "remoteDesktop.openFailed": "Не удалось открыть рабочий стол",
   "remoteDesktop.notSharingTitle": "{name} не показывает свой экран",
   "remoteDesktop.notSharingDescription":
-    "Хост не разрешает OpenBot записывать экран. На компьютере-хосте откройте «Системные настройки» → «Конфиденциальность и безопасность» → «Запись экрана», включите OpenBot и повторите попытку здесь.",
+    "Сервер не разрешает OpenBot записывать экран. На этом сервере откройте «Системные настройки» → «Конфиденциальность и безопасность» → «Запись экрана», включите OpenBot и повторите попытку здесь.",
   "remoteDesktop.setup.check.screenRecording": "Запись экрана",
   "remoteDesktop.setup.check.accessibility": "Универсальный доступ",
   "remoteDesktop.setup.check.service": "Служба Sunshine",
@@ -40,7 +41,7 @@ export const messages = {
   "remoteDesktop.setup.startFailed": "Не удалось запустить проверку удалённого рабочего стола.",
   "remoteDesktop.setup.connectionLost": "Тестовое подключение потеряно.",
   "remoteDesktop.setup.hostUpdateRequired":
-    "Обновите OpenBot на хосте, чтобы проверить разрешения и удалённый рабочий стол.",
+    "Обновите OpenBot на сервере, чтобы проверить разрешения и удалённый рабочий стол.",
   "remoteDesktop.setup.permissions": "Разрешения",
   "remoteDesktop.setup.checked": "Проверено",
   "remoteDesktop.setup.checkAgain": "Проверить снова",
@@ -54,7 +55,7 @@ export const messages = {
   "remoteDesktop.setup.liveTest": "Проверка живого подключения",
   "remoteDesktop.setup.liveTestLocal": "Проверьте изображение, мышь и клавиатуру на этом Mac.",
   "remoteDesktop.setup.liveTestRemote":
-    "Проверка открывает временную панель на хосте. Сначала нужно завершить другие удалённые сессии. Ввод остаётся внутри панели.",
+    "Проверка открывает временную панель на сервере. Сначала нужно завершить другие удалённые сессии. Ввод остаётся внутри панели.",
   "remoteDesktop.setup.testSummary": "Видео: {video} · Изображение: {picture} · Мышь: {mouse} · Клавиатура: {keyboard}",
   "remoteDesktop.setup.received": "получено",
   "remoteDesktop.setup.notReceived": "не получено",
@@ -66,7 +67,7 @@ export const messages = {
   "remoteDesktop.setup.testRemote": "Проверить удалённый рабочий стол",
   "remoteDesktop.setup.videoFailed": "Видеоподключение для проверки не удалось.",
   "remoteDesktop.setup.inputInstructions":
-    "Нажмите на цель на хосте, затем введите {code}. Мышь: {mouse}. Клавиатура: {keyboard}.",
+    "Нажмите на цель в тестовой панели, затем введите {code}. Мышь: {mouse}. Клавиатура: {keyboard}.",
   "remoteDesktop.setup.videoOnly":
     "Проверка только видео. Для проверки мыши и клавиатуры нужна обновлённая среда Sunshine.",
   "remoteDesktop.setup.pictureConfirmed": "Изображение подтверждено",

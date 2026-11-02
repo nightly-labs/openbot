@@ -11,11 +11,11 @@ import {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
-  freeModelsReady,
   type ProviderConnection,
   ProviderPicker,
   type ProviderPickerOption,
 } from "@openbot/ui/components/ProviderPicker";
+import { freeModelsReady } from "@openbot/ui/components/provider-row";
 import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
 import { DetectedProviders } from "@openbot/ui/features/custom-providers/DetectedProviders";
@@ -123,6 +123,11 @@ const PROVIDER_DESCRIPTION_KEYS: Readonly<Record<string, AppTextKey>> = {
   "Google AI Pro or Ultra plan": "onboarding.provider.googlePlan",
   "Cursor plan or API key": "onboarding.provider.cursorPlan",
   "Free models with a Cline account": "onboarding.provider.clineAccount",
+  "Kimi models with a Kimi Code account": "onboarding.provider.kimiAccount",
+  "Mercury models with an Inception API key": "onboarding.provider.inceptionKey",
+  "DeepSeek models with a DeepSeek API key": "onboarding.provider.deepseekKey",
+  "Many models with an OpenRouter API key": "onboarding.provider.openrouterKey",
+  "Nous Portal plan or your Hermes setup": "onboarding.provider.hermesNous",
 };
 
 /**
@@ -213,6 +218,7 @@ export function createSetupProviders(
         message: status?.message,
         email: status?.email,
         connectionState: status?.connectionState,
+        signInPending: status?.signInPending,
         checkError: status?.checkError,
         availableVersion: props.providerAvailableVersions?.[provider.id] ?? null,
         freeModels: provider.id === "opencode",
@@ -471,9 +477,13 @@ export function createSetupProviders(
     }
   }
 
-  /** OpenCode, Muse and Gemini sign in with a pasted key, so their rows open the key dialog; the rest open a guide. */
+  /**
+   * OpenCode, Muse and Gemini sign in with a pasted key, so their rows open the key dialog; the rest
+   * open a guide. Claude's and Codex's keys are an option on their Providers page, so their Sign in
+   * stays the guide.
+   */
   function signInProvider(provider: AgentProviderId): void {
-    if (isKeyDialogProvider(provider) && props.providerKeys) {
+    if (isKeyDialogProvider(provider) && provider !== "claude" && provider !== "codex" && props.providerKeys) {
       setKeyProvider(provider);
       return;
     }
@@ -714,6 +724,7 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
       <Show when={source().onAddCustomProvider}>
         <CustomProviderDialog
           open={props.providers.host.state.open}
+          contextWindows={!source().hostProviders}
           busy={props.providers.host.state.saving}
           submitError={props.providers.host.state.submitError}
           takenProviderIds={(source().customProviders ?? []).map((provider) => provider.id)}

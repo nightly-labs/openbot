@@ -1,0 +1,246 @@
+/* The Folders row sits in the Rules group after Permissions. The + opens the folder picker; the rest
+   of the row opens the Folders page. */
+.agent-folders-entry {
+  position: relative;
+}
+
+/* The + sits over an empty slot in the row, between the count and the chevron; a button cannot hold a button. */
+.agent-folders-entry-add-slot {
+  flex: none;
+  width: 24px;
+}
+
+.agent-folders-entry-add {
+  position: absolute;
+  top: 50%;
+  right: calc(var(--openbot-space-3) + 14px + var(--openbot-space-2));
+  color: var(--openbot-text-muted);
+  transform: translateY(-50%);
+}
+
+/* The + is 24px; the row is 40px tall, so it takes a 40px target. */
+.agent-folders-entry-add::before {
+  position: absolute;
+  inset: -8px;
+  content: "";
+}
+
+/* The count changes as folders come and go; its digits keep one width. */
+.agent-folders-count,
+.agent-folders-lost {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A folder that is no longer on the disk shows on the row, so the user does not have to open the page. */
+.agent-folders-lost {
+  color: var(--openbot-warning-text);
+}
+
+/* The value holds the count, a dot, then the warning; the row's 8px gap is too wide around a dot. */
+.agent-folders-dot {
+  margin-inline: calc(var(--openbot-space-1) * -1);
+}
+
+/* While a folder is dragged over the side panel, the Folders row and the Added group show where it goes. */
+.agent-folders-entry,
+.agent-folders-drop-target {
+  outline: 1px dashed transparent;
+  outline-offset: -1px;
+  transition:
+    outline-color var(--openbot-duration-fast) var(--openbot-ease-out),
+    background-color var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.agent-folders-entry[data-dragging],
+.agent-folders-drop-target[data-dragging] {
+  outline-color: var(--openbot-text-muted);
+  background-color: var(--openbot-hover);
+}
+
+.agent-folders-page {
+  display: grid;
+  gap: var(--openbot-space-4);
+}
+
+/* Icon, text, then the actions the row has: Locate… for a missing folder, then X. */
+.agent-folders-row {
+  display: grid;
+  grid-auto-columns: auto;
+  grid-auto-flow: column;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--openbot-space-2);
+  min-height: 48px;
+  padding: var(--openbot-space-1-5) var(--openbot-space-1-5) var(--openbot-space-1-5) var(--openbot-space-3);
+}
+
+.agent-folders-text {
+  display: grid;
+  min-width: 0;
+}
+
+.agent-folders-name {
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-folders-path {
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-folders-row[data-missing] .settings-link-icon,
+.agent-folders-row[data-missing] .agent-folders-path {
+  color: var(--openbot-warning-text);
+}
+
+/* The note on the Folders page when the agent can change all files. */
+.agent-folders-access {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.agent-folders-access-text {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  text-wrap: pretty;
+}
+
+.agent-folders-remove {
+  position: relative;
+  color: var(--openbot-text-muted);
+}
+
+/* The button is 32px; the row is 48px tall, so it can take a 44px target. */
+.agent-folders-remove::before {
+  position: absolute;
+  inset: -6px;
+  content: "";
+}
+
+.agent-folders-add {
+  color: var(--openbot-text-secondary);
+}
+
+.agent-folders-drop-target[data-dragging] .agent-folders-add {
+  color: var(--openbot-text-primary);
+}
+
+/* A folder the user just added comes in under the others. */
+@media (prefers-reduced-motion: no-preference) {
+  .agent-folders-row[data-fresh] {
+    animation: agent-folders-row-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
+  }
+
+  .agent-folders-chat-drop {
+    animation: agent-folders-fade-in var(--openbot-duration-fast) var(--openbot-ease-out) both;
+  }
+
+  /* The user tried to add a folder that this row already gives: the row shows itself once. */
+  .agent-folders-row[data-flash],
+  .agent-folders-entry[data-flash] {
+    animation: agent-folders-row-flash 900ms var(--openbot-ease-out);
+  }
+}
+
+/* Without motion the row stays marked a moment and the mark goes at once. */
+@media (prefers-reduced-motion: reduce) {
+  .agent-folders-row[data-flash],
+  .agent-folders-entry[data-flash] {
+    animation: agent-folders-row-flash 900ms steps(1, end);
+  }
+}
+
+@keyframes agent-folders-row-flash {
+  from,
+  40% {
+    background-color: var(--openbot-hover);
+  }
+}
+
+@keyframes agent-folders-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes agent-folders-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The chat's drop overlay in two halves. It takes the place of the chat's own overlay for a local
+   agent in Workspace only mode; with wider access a folder gives nothing new, so files only attach. */
+.agent-folders-chat-drop {
+  position: absolute;
+  z-index: 60;
+  inset: var(--openbot-space-3);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--openbot-space-3);
+  border-radius: var(--openbot-radius-lg);
+  background: color-mix(in srgb, var(--background) 70%, transparent);
+  pointer-events: none;
+  backdrop-filter: blur(3px);
+}
+
+/* The settings panel takes its own drops, so the overlay stops at its edge. */
+.conversation-panel:has(.settings-panel) .agent-folders-chat-drop {
+  right: calc(var(--settings-panel-width, 360px) + var(--openbot-space-3));
+}
+
+.agent-folders-chat-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-6);
+  border: 1px dashed var(--openbot-text-muted);
+  border-radius: var(--openbot-radius-lg);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+  text-align: center;
+  text-wrap: balance;
+  transition:
+    border-color var(--openbot-duration-fast) var(--openbot-ease-out),
+    background-color var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.agent-folders-chat-zone > span {
+  max-width: 28ch;
+}
+
+.agent-folders-chat-zone-folder {
+  pointer-events: auto;
+}
+
+.agent-folders-chat-zone[data-dragging] {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--openbot-text-primary));
+  background: var(--openbot-hover);
+}
+
+.agent-folders-chat-zone svg {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  color: var(--openbot-text-secondary);
+  transition: color var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.agent-folders-chat-zone[data-dragging] svg {
+  color: var(--openbot-text-primary);
+}

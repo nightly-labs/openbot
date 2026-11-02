@@ -89,6 +89,15 @@ export interface OpenWorkspaceFileInput {
   action?: FileAction;
 }
 
+/** A preview reads no file over `maxBytes`: it answers with no bytes, as for a file over the preview limit. */
+export interface PreviewSharedFileInput extends OpenSharedFileInput {
+  maxBytes?: number;
+}
+
+export interface PreviewWorkspaceFileInput extends OpenWorkspaceFileInput {
+  maxBytes?: number;
+}
+
 /** The most entries one folder view shows. The rest are counted by `truncated`. */
 export const WORKSPACE_DIRECTORY_LIMIT = 500;
 

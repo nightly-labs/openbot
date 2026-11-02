@@ -13,11 +13,14 @@ type Drafts = Record<string, ComposerDraft>;
 export interface StoredComposerDrafts {
   agents: Drafts;
   channels: Drafts;
+  /** The message box of each side thread, keyed by `threadDraftKey`. */
+  threads: Drafts;
 }
 
 interface ComposerDraftOwner {
   drafts: () => Drafts;
   channelDrafts: () => Drafts;
+  threadDrafts: () => Drafts;
   editingAgentId: () => string | null;
   editingServerId: () => string | null;
   editingDraftBackup: () => ComposerDraft | null;
@@ -37,14 +40,18 @@ export function readStoredComposerDrafts(): StoredComposerDrafts {
   try {
     return decodeStoredDrafts(JSON.parse(window.localStorage.getItem(COMPOSER_DRAFTS_STORAGE_KEY) ?? "null"));
   } catch {
-    return { agents: {}, channels: {} };
+    return { agents: {}, channels: {}, threads: {} };
   }
 }
 
 function decodeStoredDrafts(value: unknown): StoredComposerDrafts {
   return isDynamicRecord(value)
-    ? { agents: decodeDrafts(value.agents), channels: decodeDrafts(value.channels) }
-    : { agents: {}, channels: {} };
+    ? {
+        agents: decodeDrafts(value.agents),
+        channels: decodeDrafts(value.channels),
+        threads: decodeThreadDrafts(value.threads),
+      }
+    : { agents: {}, channels: {}, threads: {} };
 }
 
 /**
@@ -73,7 +80,11 @@ export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
     try {
       window.localStorage.setItem(
         COMPOSER_DRAFTS_STORAGE_KEY,
-        JSON.stringify({ agents: storableDrafts(agents), channels: storableDrafts(owner.channelDrafts()) }),
+        JSON.stringify({
+          agents: storableDrafts(agents),
+          channels: storableDrafts(owner.channelDrafts()),
+          threads: storableThreadDrafts(owner.threadDrafts()),
+        }),
       );
     } catch {
       // Storage is full or unavailable. The drafts stay in memory for this session.
@@ -84,6 +95,7 @@ export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
       [
         owner.drafts(),
         owner.channelDrafts(),
+        owner.threadDrafts(),
         owner.editingAgentId(),
         owner.editingDraftBackup(),
         owner.unsentTexts(),
@@ -113,6 +125,11 @@ function storableDrafts(drafts: Drafts): Record<string, { text: string }> {
   );
 }
 
+/** A side thread's draft is stored as its text only, as `storableDrafts` keeps it. */
+function storableThreadDrafts(drafts: Drafts): Record<string, string> {
+  return Object.fromEntries(Object.entries(storableDrafts(drafts)).map(([key, draft]) => [key, draft.text]));
+}
+
 function decodeDrafts(value: unknown): Drafts {
   if (!isDynamicRecord(value)) return {};
   return Object.fromEntries(
@@ -120,6 +137,15 @@ function decodeDrafts(value: unknown): Drafts {
       isDynamicRecord(draft) && isString(draft.text)
         ? [[key, { text: draft.text, attachments: [], replyToMessageId: null }]]
         : [],
+    ),
+  );
+}
+
+function decodeThreadDrafts(value: unknown): Drafts {
+  if (!isDynamicRecord(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, text]) =>
+      isString(text) ? [[key, { text, attachments: [], replyToMessageId: null }]] : [],
     ),
   );
 }

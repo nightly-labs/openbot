@@ -1,195 +1,19 @@
-import type {
-  InstalledSkill,
-  MarketplaceAgentSummary,
-  MarketplaceSkillQuery,
-  MarketplaceSkillSummary,
-} from "@openbot/contracts/ipc";
-import { CONNECTOR_LISTINGS } from "@openbot/ui/features/connectors/connector-catalog";
-import { Marketplace } from "@openbot/ui/features/marketplace/Marketplace";
-import type { MarketplaceApp, MarketplaceModel } from "@openbot/ui/features/marketplace/marketplace-model";
-import {
-  createMarketplaceNavigation,
-  type MarketplaceNavigation,
-} from "@openbot/ui/features/marketplace/marketplace-view";
-import { currentText } from "@openbot/ui/text";
-import { createSignal, createStore, onSettled, untrack } from "solid-js";
-import { fn } from "storybook/test";
+import type { MarketplaceNavigation } from "@openbot/ui/features/marketplace/marketplace-view";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import {
-  STORY_AGENT_SUMMARIES,
-  STORY_MARKETPLACE_AGENT_DETAILS,
   STORY_MARKETPLACE_AGENTS,
   STORY_MARKETPLACE_PLUGINS,
-  STORY_MARKETPLACE_SKILL_DETAILS,
   STORY_MARKETPLACE_SKILLS,
   STORY_MCP_SERVERS,
 } from "../src/preview/fixtures";
-import { STORY_CONNECTOR_DETAILS, storyConnectorSet } from "./connector-fixtures";
-
-function page<T extends { name: string; description: string; category?: string | undefined }>(
-  items: readonly T[],
-  query: MarketplaceSkillQuery,
-) {
-  const text = query.query?.toLowerCase() ?? "";
-  return {
-    items: items.filter(
-      (item) =>
-        (!query.category || (item.category ?? "other") === query.category) &&
-        (!text || item.name.toLowerCase().includes(text) || item.description.toLowerCase().includes(text)),
-    ),
-    nextCursor: null,
-  };
-}
-
-function installed(skill: MarketplaceSkillSummary): InstalledSkill {
-  return {
-    skillId: skill.id,
-    slug: skill.slug,
-    name: skill.name,
-    installedVersion: skill.version,
-    availableVersion: skill.version,
-    state: "installed",
-    enabled: true,
-  };
-}
-
-interface StoryProps {
-  /** A member of a joined server browses and adds nothing. */
-  member?: boolean;
-  empty?: boolean;
-  /** Opens the window on this page, as a link or a click would. */
-  start?: (nav: MarketplaceNavigation) => void;
-}
-
-/** The real window on fixtures. Each action changes the fixture state, so the states can be tried. */
-function MarketplaceStory(props: StoryProps) {
-  const { member, empty, start } = untrack(() => ({ ...props }));
-  const agents = empty ? [] : STORY_MARKETPLACE_AGENTS;
-  const skills = empty ? [] : STORY_MARKETPLACE_SKILLS;
-  const firstSkill = STORY_MARKETPLACE_SKILLS[0];
-  const connectors = storyConnectorSet();
-  // The story fixes the names once, in the language it opens with.
-  const connectorApps = untrack(() =>
-    STORY_CONNECTOR_DETAILS.map(({ id }): MarketplaceApp => {
-      const listing = CONNECTOR_LISTINGS[id];
-      return {
-        kind: "connector",
-        id,
-        connector: id,
-        name: currentText().t(listing.title),
-        tagline: currentText().t(listing.tagline),
-        status: id === "github" ? "connected" : "idle",
-        category: listing.category,
-      };
-    }),
-  );
-  const [state, setState] = createStore<{
-    added: Record<string, true>;
-    installed: Record<string, InstalledSkill[]>;
-    apps: MarketplaceApp[];
-    busy: Record<string, true>;
-    notice: string;
-  }>({
-    added: { [STORY_MARKETPLACE_AGENTS[1]?.id ?? ""]: true },
-    installed: { chief: firstSkill ? [installed(firstSkill)] : [] },
-    apps: [
-      ...connectorApps,
-      ...STORY_MARKETPLACE_PLUGINS.map(
-        (plugin, index): MarketplaceApp => ({
-          kind: "plugin",
-          id: plugin.slug,
-          name: plugin.name,
-          tagline: plugin.tagline,
-          status: index === 0 ? "connected" : "idle",
-          category: plugin.category,
-          plugin,
-        }),
-      ),
-      ...STORY_MCP_SERVERS.slice(0, 1).map(
-        (server): MarketplaceApp => ({
-          kind: "custom",
-          id: `custom:${server.id}`,
-          name: server.name,
-          tagline: server.command,
-          status: "connected",
-          server,
-        }),
-      ),
-    ],
-    busy: {},
-    notice: "",
-  });
-  const [error, setError] = createSignal<string | null>(null);
-  const [open, setOpen] = createSignal(true);
-  const setApp = (id: string, status: MarketplaceApp["status"]) =>
-    setState((draft) => {
-      const app = draft.apps.find((entry) => entry.id === id);
-      if (app) app.status = status;
-    });
-
-  const model: MarketplaceModel = {
-    listAgents: async (query) => page<MarketplaceAgentSummary>(agents, query),
-    loadAgent: async (id) => STORY_MARKETPLACE_AGENT_DETAILS[id],
-    agentState: (listing) => (member ? null : state.added[listing.id] ? "added" : "add"),
-    agentBusy: (id) => Boolean(state.busy[id]),
-    addAgent: async (listing) => {
-      setState((draft) => {
-        draft.added[listing.id] = true;
-        draft.notice = `${listing.name} added.`;
-      });
-      return true;
-    },
-    openChat: () => setOpen(false),
-
-    listSkills: async (query) => page<MarketplaceSkillSummary>(skills, query),
-    loadSkill: async (id) => STORY_MARKETPLACE_SKILL_DETAILS[id],
-    agents: () => (member ? [] : STORY_AGENT_SUMMARIES),
-    activeAgentId: () => STORY_AGENT_SUMMARIES[0]?.id ?? "",
-    readSkills: () => undefined,
-    skillRead: () => "loaded",
-    installedSkill: (agentId, skillId) => state.installed[agentId]?.find((skill) => skill.skillId === skillId),
-    skillBusy: () => false,
-    setSkill: async (skill, agentIds, on) =>
-      setState((draft) => {
-        for (const agentId of agentIds) {
-          const list = (draft.installed[agentId] ?? []).filter((entry) => entry.skillId !== skill.id);
-          draft.installed[agentId] = on ? [...list, installed(skill)] : list;
-        }
-      }),
-    trySkill: fn(),
-
-    apps: () => state.apps,
-    canConnectApps: () => !member,
-    appBusy: () => false,
-    connectApp: async (app) => {
-      setApp(app.id, "connected");
-      return true;
-    },
-    disconnectApp: (app) => setApp(app.id, "idle"),
-    removeServer: async (id) => {
-      setState((draft) => {
-        draft.apps = draft.apps.filter((app) => app.id !== id && !(app.kind === "custom" && app.server.id === id));
-      });
-      return true;
-    },
-    runPrompt: fn(),
-    copyLink: fn(),
-    openUrl: fn(),
-    connector: (id) => connectors[id],
-
-    error,
-    clearError: () => setError(null),
-    notice: () => state.notice,
-  };
-  const nav = createMarketplaceNavigation();
-  // A write in the component body is refused, so the start page opens once the window is up.
-  onSettled(() => start?.(nav));
-  return <Marketplace model={model} nav={nav} open={open()} onOpenChange={setOpen} />;
-}
+import { LOCAL_SKILL, MarketplaceStory, type StoryProps } from "./marketplace-story-support";
+import { CONNECT_OUTCOMES } from "./mcp-connect-stage";
 
 const meta = {
   title: "Settings/Marketplace",
   component: MarketplaceStory,
+  args: { outcome: "connects" },
+  argTypes: { outcome: { control: "select", options: CONNECT_OUTCOMES } },
   parameters: {
     layout: "fullscreen",
     a11y: { test: "error" },
@@ -205,47 +29,108 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const tab = (value: "apps" | "skills") => (nav: MarketplaceNavigation) =>
+const tab = (value: "agents" | "skills") => (nav: MarketplaceNavigation) =>
   nav.set((draft) => {
     draft.tab = value;
   });
 
 /** A story that opens the window on the page `start` goes to. */
 const at = (start: (nav: MarketplaceNavigation) => void, props: Omit<StoryProps, "start"> = {}): Story => ({
-  render: () => <MarketplaceStory {...props} start={start} />,
+  render: (args) => <MarketplaceStory {...props} outcome={args.outcome} start={start} />,
 });
 
-export const Agents: Story = {};
+export const Apps: Story = {};
 
 export const Narrow: Story = { parameters: { viewport: { defaultViewport: "marketplaceNarrow" } } };
 
-export const Apps = at(tab("apps"));
+export const Agents = at(tab("agents"));
 
 export const PluginApp = at((nav) => {
-  tab("apps")(nav);
   nav.go({ kind: "app", id: STORY_MARKETPLACE_PLUGINS[0]?.slug ?? "" });
 });
 
+const plugin = (slug: string) => (nav: MarketplaceNavigation) => nav.go({ kind: "app", id: slug });
+
+/** A key app: the page says which key the host saved, and never shows the key. */
+export const PluginKey = at(plugin("resend"), { held: { resend: "connected" } });
+
+/** The server refused the saved sign-in, so the page asks the user to sign in again. */
+export const PluginSignInNeeded = at(plugin("notion"), { held: { notion: "signInNeeded" } });
+
+/**
+ * Three Notion accounts on a host that keeps a sign-in for each. A message tags an account by its
+ * row name, such as `@Notion Work`. One account needs a new sign-in.
+ */
+export const PluginAccounts = at(plugin("notion"), {
+  accounts: {
+    notion: [
+      { id: "notion-work", name: "Notion Work", signInNeeded: false, signedIn: true, renamable: true },
+      { id: "notion-personal", name: "Notion Personal", signInNeeded: false, signedIn: true, renamable: true },
+      { id: "notion-client", name: "Notion Acme", signInNeeded: true, signedIn: true, renamable: true },
+    ],
+  },
+});
+
+/** A desktop app: the server runs in an app on this computer, at a local address. */
+export const PluginDesktop = at(plugin("figma"), { held: { figma: "connected" } });
+
+/** Before the install on a Mac: the switch says whether the install asks macOS for each Apple app. */
+export const PluginAppleApps = at(plugin("apple-apps"), { macOS: true });
+
+/** After the install on a Mac: the button asks macOS again. */
+export const PluginAppleAppsConnected = at(plugin("apple-apps"), {
+  macOS: true,
+  held: { "apple-apps": "connected" },
+});
+
+export const OnePassword = at((nav) => {
+  nav.go({ kind: "app", id: "onepassword" });
+});
+
 export const GitHub = at((nav) => {
-  tab("apps")(nav);
   nav.go({ kind: "app", id: "github" });
 });
 
 export const CustomServer = at((nav) => {
-  tab("apps")(nav);
   nav.go({ kind: "app", id: `custom:${STORY_MCP_SERVERS[0]?.id ?? ""}` });
 });
 
+/** The Skills tab: "Your skills" on top, then 6 rows of each catalog group. */
 export const Skills = at(tab("skills"));
 
-export const SkillPage = at((nav) => {
+/** No agent has a skill yet: "Your skills" says what a skill is and how to get one. */
+export const SkillsFirstUse = at(tab("skills"), { noSkills: true });
+
+/** A group page: three featured skills, then the group in two columns, with a sort and Load more. */
+export const SkillGroup = at((nav) => {
+  tab("skills")(nav);
+  nav.go({ kind: "skillGroup", group: "coding" });
+});
+
+const firstSkillPage = (nav: MarketplaceNavigation) => {
   const listing = STORY_MARKETPLACE_SKILLS[0];
   tab("skills")(nav);
   if (listing) nav.go({ kind: "skill", listing });
+};
+
+/** A skill on 12 of 50 agents: the agents section has a search, a switch, Update and Remove for each agent. */
+export const SkillPage = at(firstSkillPage, { manyAgents: true });
+
+/** A skill made on this computer: no listing, but the same agents section and dialog. */
+export const LocalSkillPage = at((nav) => {
+  tab("skills")(nav);
+  nav.go({ kind: "localSkill", skillId: LOCAL_SKILL.skillId });
+});
+
+/** The agents dialog with 50 agents: a search, "All 50 agents", and one row for each agent. */
+export const SkillAgentsDialog = at(firstSkillPage, {
+  manyAgents: true,
+  dialogSkill: STORY_MARKETPLACE_SKILLS[0]?.id ?? "",
 });
 
 export const AgentPage = at((nav) => {
   const listing = STORY_MARKETPLACE_AGENTS[0];
+  tab("agents")(nav);
   if (listing) nav.go({ kind: "agent", listing });
 });
 
@@ -255,7 +140,20 @@ export const NoMatch = at((nav) =>
   }),
 );
 
-export const EmptyCatalog: Story = { args: { empty: true } };
+export const EmptyCatalog = at(tab("agents"), { empty: true });
 
-/** A member of a joined server: no Add, no install menu and no Connect. */
+/** A member of a joined server: no Add, no Add custom, no install menu and no Connect. */
 export const Member: Story = { args: { member: true } };
+
+const connector = (id: string) => at((nav) => nav.go({ kind: "app", id }), { connected: true });
+
+/** A chat channel: one connected Slack workspace. */
+export const SlackConnected = connector("slack");
+
+/** A chat channel: a group and a direct chat. */
+export const TelegramConnected = connector("telegram");
+
+/** A password vault, connected. */
+export const OnePasswordConnected = connector("onepassword");
+
+export const BitwardenConnected = connector("bitwarden");

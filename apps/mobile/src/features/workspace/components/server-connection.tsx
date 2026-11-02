@@ -8,8 +8,8 @@ import {
   type RemoteTeamDirectoryClient,
   remoteConnectionFailureDetails,
 } from "@openbot/team-client";
-import { REMOTE_PEER_LOST_AFTER_MS } from "@openbot/team-client/remote-peer";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { REMOTE_PEER_LOST_AFTER_MS, type RemoteTeamConnectionUpdate } from "@openbot/team-client/remote-peer";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectionAnalytics } from "@/features/analytics/connection";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
@@ -36,6 +36,11 @@ function endsQuietResume(status: RemoteRecoveryStatus): boolean {
 export interface ServerConnectionHandle {
   client: RemoteTeamTransportRef;
   refresh(): void;
+  /**
+   * The phone shows this server from its cache, so the first attempt after the start runs in a quiet
+   * time, as a return to the app does. Only once, and only before that attempt ends.
+   */
+  quietStart(): void;
 }
 
 export interface ServerLoadContext {
@@ -61,8 +66,11 @@ interface Props {
   onTeamEvent(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
 }
 
-/** Each mounted membership owns its transport; selection does not change its lifetime. */
-export function ServerConnection({
+/**
+ * Each mounted membership owns its transport; selection does not change its lifetime. Memoized: a
+ * render of the transport sends its props to its hidden page, so a workspace render must not reach it.
+ */
+export const ServerConnection = memo(function ServerConnection({
   hostId,
   publicKey,
   active,
@@ -99,7 +107,45 @@ export function ServerConnection({
     if (last && last.status.phase !== "online") onStatusRef.current(hostId, last.status, last.failure, false);
   }, [hostId]);
   useEffect(() => () => clearTimeout(resumeTimer.current), []);
+  const quietStartUsed = useRef(false);
+  const quietStart = useCallback(() => {
+    const last = lastStatus.current;
+    if (quietStartUsed.current || !activeRef.current || resuming.current || inactiveSince.current !== null) return;
+    quietStartUsed.current = true;
+    if (last && (last.status.phase !== "connecting" || last.status.attempt > 1)) return;
+    resuming.current = true;
+    resumeTimer.current = setTimeout(endResume, QUIET_RESUME_MS);
+    if (last) onStatusRef.current(hostId, last.status, last.failure, true);
+  }, [hostId, endResume]);
   const attach = useCallback((value: RemoteTeamTransportRef | null) => setClient(value), []);
+  const onMembershipChangedRef = useRef(onMembershipChanged);
+  onMembershipChangedRef.current = onMembershipChanged;
+  const handleNetworkRestored = useCallback(() => {
+    supportLog.add("info", "connection", `${hostId} network restored`);
+    controller.current?.networkRestored();
+  }, [hostId]);
+  const handleConnectionUpdate = useCallback(
+    (update: RemoteTeamConnectionUpdate) => {
+      if (update.hostId !== hostId) return;
+      supportLog.add(
+        update.state === "offline" ? "warn" : "info",
+        "connection",
+        `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.resync ? ", resync" : ""}`,
+      );
+      if (update.state === "offline") {
+        if (activeRef.current) analytics.lost();
+        if (update.code === "session_revoked") {
+          if (activeRef.current) void onMembershipChangedRef.current?.().catch(() => undefined);
+          else membershipRefreshPending.current = true;
+        }
+        const error = referencedError(update.message ?? sourceText("error.remote.desktopOffline"), update.reference);
+        if (update.code === "protocol_error") controller.current?.suspend(error);
+        else controller.current?.offline(error);
+      }
+      if (update.resync) controller.current?.refresh();
+    },
+    [hostId, analytics],
+  );
 
   useEffect(() => {
     if (!client) return;
@@ -160,7 +206,7 @@ export function ServerConnection({
       },
     );
     controller.current = recovery;
-    register(hostId, { client, refresh: () => recovery.refresh() });
+    register(hostId, { client, refresh: () => recovery.refresh(), quietStart });
     recovery.setActive(activeRef.current);
     return () => {
       disposed = true;
@@ -169,9 +215,10 @@ export function ServerConnection({
       controller.current = null;
       register(hostId, null);
     };
-  }, [client, hostId, publicKey, register, load, onStatus, analytics]);
+  }, [client, hostId, publicKey, register, load, onStatus, analytics, quietStart]);
 
   useEffect(() => {
+    const returned = active && inactiveSince.current !== null;
     if (!active) {
       generation.current += 1;
       analytics.background();
@@ -198,6 +245,10 @@ export function ServerConnection({
       inactiveSince.current = null;
     }
     controller.current?.setActive(active);
+    // The user opened the app to use this server. A wait from before, such as the cooldown after five
+    // failed attempts, does not continue: one attempt starts now, and a failure starts the backoff again.
+    const phase = lastStatus.current?.status.phase;
+    if (returned && (phase === "waiting" || phase === "cooldown")) controller.current?.refresh();
     if (active && membershipRefreshPending.current) {
       membershipRefreshPending.current = false;
       void onMembershipChanged?.().catch(() => undefined);
@@ -210,30 +261,9 @@ export function ServerConnection({
       active={active}
       directory={directory}
       onMembershipChanged={onMembershipChanged}
-      onNetworkRestored={() => {
-        supportLog.add("info", "connection", `${hostId} network restored`);
-        controller.current?.networkRestored();
-      }}
+      onNetworkRestored={handleNetworkRestored}
       onTeamEvent={onTeamEvent}
-      onConnectionUpdate={(update) => {
-        if (update.hostId !== hostId) return;
-        supportLog.add(
-          update.state === "offline" ? "warn" : "info",
-          "connection",
-          `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.resync ? ", resync" : ""}`,
-        );
-        if (update.state === "offline") {
-          if (activeRef.current) analytics.lost();
-          if (update.code === "session_revoked") {
-            if (activeRef.current) void onMembershipChanged?.().catch(() => undefined);
-            else membershipRefreshPending.current = true;
-          }
-          const error = referencedError(update.message ?? sourceText("error.remote.desktopOffline"), update.reference);
-          if (update.code === "protocol_error") controller.current?.suspend(error);
-          else controller.current?.offline(error);
-        }
-        if (update.resync) controller.current?.refresh();
-      }}
+      onConnectionUpdate={handleConnectionUpdate}
     />
   );
-}
+});

@@ -68,3 +68,18 @@ export const MESSAGING_MEMORY_SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS messaging_memories_connection
     ON projection_messaging_memories(connection_id, updated_at DESC, memory_id);
 `;
+
+// Shared by migration v44 and the separate new-database schema. IF NOT EXISTS throughout.
+//
+// The Discord roles whose members can use OpenBot in one connection. A connection with no row lets
+// everyone. The name is the one the user chose from, kept so the setting reads the same when a role
+// is gone. Configuration, written directly. No CASCADE, as for memories: disconnect keeps the rows.
+export const MESSAGING_ALLOWED_ROLES_SCHEMA_SQL = `
+  CREATE TABLE IF NOT EXISTS projection_messaging_allowed_roles (
+    connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id),
+    role_id TEXT NOT NULL,
+    role_name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (connection_id, role_id)
+  );
+`;

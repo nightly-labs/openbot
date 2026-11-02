@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["ComposerPasteModule"]
+  },
+  "android": {
+    "modules": ["run.openbot.composerpaste.ComposerPasteModule"]
+  }
+}

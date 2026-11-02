@@ -1,5 +1,5 @@
 import type { AnalyticsModel } from "@openbot/contracts/ipc";
-import { agentProviderCliName, isAgentProvider } from "@openbot/contracts/ipc";
+import { agentProviderCliName, analyticsTokens, isAgentProvider } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { currentText, type TextValue } from "../../text";
 
@@ -70,7 +70,7 @@ export function usageProviders(models: AnalyticsModel[]) {
   const providers = new Map<string, { provider: string; tokens: number; cost: number | null }>();
   for (const model of models) {
     const row = providers.get(model.provider) ?? { provider: model.provider, tokens: 0, cost: null };
-    row.tokens += model.processedTokens;
+    row.tokens += analyticsTokens(model);
     if (model.estimatedCostUsd !== null) row.cost = (row.cost ?? 0) + model.estimatedCostUsd;
     providers.set(model.provider, row);
   }

@@ -53,8 +53,8 @@ export function SliderField(props: SliderFieldProps): JSX.Element {
       value={[props.value]}
       minValue={props.minValue}
       maxValue={props.maxValue}
-      step={props.step}
-      disabled={props.disabled}
+      step={props.step ?? 1}
+      disabled={props.disabled ?? false}
       getValueLabel={(params) => props.formatValue(params.values[0] ?? props.value)}
       onChange={(values) => reportChange(values[0] ?? props.value)}
       onChangeEnd={(values) => props.onChangeEnd?.(values[0] ?? props.value)}
@@ -85,6 +85,92 @@ export function SliderField(props: SliderFieldProps): JSX.Element {
           aria-disabled={props.disabled ? "true" : undefined}
           onKeyUp={(event) => {
             if (SLIDER_STEP_KEYS.has(event.key)) props.onChangeEnd?.(props.value);
+          }}
+        />
+      </SliderPrimitive.Track>
+    </SliderPrimitive.Root>
+  );
+}
+
+export interface SeekSliderProps {
+  /** The name screen readers announce for the position, such as "Playback position". */
+  label: string;
+  value: number;
+  maxValue: number;
+  step?: number;
+  disabled?: boolean;
+  formatValue: (value: number) => string;
+  /** Runs while the user drags or presses a key, before the position is final. */
+  onChange?: (value: number) => void;
+  /** Runs once when the user releases the pointer or the key. */
+  onChangeEnd: (value: number) => void;
+  class?: string;
+  /** Drawn on the track under the playhead, such as the waveform of a recording. */
+  children?: JSX.Element;
+}
+
+/** A playback position over a picture of the media: click, drag or use the keys to move it. */
+export function SeekSlider(props: SeekSliderProps): JSX.Element {
+  const percent = () => (props.maxValue > 0 ? (props.value / props.maxValue) * 100 : 0);
+  // Kobalte also reports a change when the value prop moves on its own, as it does while media
+  // plays. Only a change the user started is passed on, until the user releases it.
+  let userChange = false;
+  let lastValue = props.value;
+  const startUserChange = () => {
+    userChange = true;
+    lastValue = props.value;
+  };
+  // Kobalte ends a change only for a thumb drag, so a press on the picture ends where it is released.
+  const startPointerChange = () => {
+    startUserChange();
+    document.addEventListener("pointerup", () => endChange(lastValue), { once: true });
+  };
+  // The same double report as in SliderField: the first report of a task is the real one.
+  let reportedThisTask = false;
+  function reportChange(value: number): void {
+    if (!userChange || reportedThisTask) return;
+    lastValue = value;
+    reportedThisTask = true;
+    queueMicrotask(() => {
+      reportedThisTask = false;
+    });
+    props.onChange?.(value);
+  }
+  function endChange(value: number): void {
+    if (!userChange) return;
+    userChange = false;
+    props.onChangeEnd(value);
+  }
+  return (
+    <SliderPrimitive.Root
+      data-slot="seek-slider"
+      class={cx("ui-seek-slider", props.class)}
+      value={[props.value]}
+      minValue={0}
+      maxValue={Math.max(props.maxValue, 0)}
+      step={props.step ?? 1}
+      disabled={props.disabled ?? false}
+      getValueLabel={(params) => props.formatValue(params.values[0] ?? props.value)}
+      onChange={(values) => reportChange(values[0] ?? props.value)}
+      onChangeEnd={(values) => endChange(values[0] ?? props.value)}
+    >
+      <SliderPrimitive.Track class="ui-seek-slider-track">
+        {/* A press on the picture or the thumb reaches these before the track moves the value. */}
+        <span class="ui-seek-slider-picture" onPointerDown={startPointerChange}>
+          {props.children}
+        </span>
+        <SliderPrimitive.Thumb
+          class="ui-seek-slider-thumb"
+          style={{ left: `${percent()}%` }}
+          aria-label={props.label}
+          aria-valuetext={props.formatValue(props.value)}
+          aria-disabled={props.disabled ? "true" : undefined}
+          onPointerDown={startPointerChange}
+          onKeyDown={(event) => {
+            if (SLIDER_STEP_KEYS.has(event.key)) startUserChange();
+          }}
+          onKeyUp={(event) => {
+            if (SLIDER_STEP_KEYS.has(event.key)) endChange(props.value);
           }}
         />
       </SliderPrimitive.Track>

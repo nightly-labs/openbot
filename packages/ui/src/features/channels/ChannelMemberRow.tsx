@@ -6,7 +6,7 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 
 interface ChannelMemberRowProps {
   /** Missing when the channel holds a member the agent list no longer has. */
-  agent?: AgentProfile;
+  agent?: AgentProfile | undefined;
   /** What to call a member the agent list cannot name. */
   fallbackName: string;
   description?: string;

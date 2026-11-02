@@ -75,7 +75,7 @@ interface RemoteScreenGatewayOptions {
   runtimePaths: RemoteDesktopRuntimePaths | null;
   runtimeStateDirectory: string;
   getRuntimeCredentials: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
-  getDisplays?: () => RemoteDesktopDisplay[];
+  getDisplays?: (() => RemoteDesktopDisplay[]) | undefined;
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   createRuntime?: RemoteScreenGatewayCreateRuntime;
   audit?: (event: RemoteScreenAuditEvent) => void;
@@ -1037,6 +1037,7 @@ export class RemoteScreenGateway {
       return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.runtimeUnavailable")) });
     const dependencies = yield* ScreenDependencies;
     if (!this.#runtime) {
+      const onDiagnostic = this.#options.onDiagnostic;
       const runtime: RemoteScreenRuntime = this.#options.createRuntime({
         paths,
         stateDirectory: this.#options.runtimeStateDirectory,
@@ -1051,7 +1052,7 @@ export class RemoteScreenGateway {
               return [];
             return yield* dependencies.iceServers();
           }).pipe(Effect.mapError(({ cause }) => new RemoteDesktopOperationError({ cause }))),
-        onDiagnostic: this.#options.onDiagnostic,
+        ...(onDiagnostic === undefined ? {} : { onDiagnostic }),
         onExit: () => {
           if (this.#runtime === runtime) Effect.runFork(this.#provide(this.#runtimeExited()));
         },

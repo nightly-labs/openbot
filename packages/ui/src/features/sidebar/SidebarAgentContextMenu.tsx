@@ -3,7 +3,7 @@
  * away is `SidebarMoveToSubmenu`, which the channel menu shows too; everything here is agent-only.
  */
 
-import { ContextMenu, Copy, Moon, Pin, PinOff, RotateCcw } from "@openbot/ui";
+import { AppWindow, ContextMenu, Copy, MessageCirclePlus, Moon, Pin, PinOff, RotateCcw } from "@openbot/ui";
 import { Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
@@ -34,6 +34,22 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
           </Show>
           <span>{menuProps.pinned ? t("sidebar.unpin") : t("sidebar.pin")}</span>
         </ContextMenu.Item>
+        <Show when={!menuProps.userHidden && props.onNewAgentThread}>
+          {(start) => (
+            <ContextMenu.Item onSelectAfterClose={() => start()(menuProps.agent.id)}>
+              <MessageCirclePlus class="agent-context-icon size-4" aria-hidden="true" />
+              <span>{t("sidebar.agentMenu.newThread")}</span>
+            </ContextMenu.Item>
+          )}
+        </Show>
+        <Show when={!menuProps.userHidden && props.onOpenAgentWindow}>
+          {(open) => (
+            <ContextMenu.Item onSelect={() => open()(menuProps.agent.id)}>
+              <AppWindow class="agent-context-icon size-4" aria-hidden="true" />
+              <span>{t("sidebar.agentMenu.openWindow")}</span>
+            </ContextMenu.Item>
+          )}
+        </Show>
         <SidebarMoveToSubmenu chatId={menuProps.agent.id} />
         <ContextMenu.Item onSelect={() => props.onEditAgent(menuProps.agent.id)}>
           <EditIcon />
@@ -41,7 +57,7 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
         </ContextMenu.Item>
         <Show when={props.duplicateSupported !== false && props.onDuplicateAgent}>
           <ContextMenu.Item
-            disabled={props.duplicatingAgentIds?.has(menuProps.agent.id)}
+            disabled={props.duplicatingAgentIds?.has(menuProps.agent.id) ?? false}
             onSelect={() => void props.onDuplicateAgent?.(menuProps.agent.id).catch(() => undefined)}
           >
             <Copy class="agent-context-icon size-4" aria-hidden="true" />

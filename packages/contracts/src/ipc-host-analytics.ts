@@ -13,13 +13,13 @@ import {
 import { isDynamicRecord, isString } from "./runtime-values";
 
 export interface HostAnalyticsInput extends Omit<AgentAnalyticsInput, "agentId"> {
-  agentId?: string;
+  agentId?: string | undefined;
 }
 // Only the host report carries the per-agent split and the daily-by-provider grid: on an
 // agent-scoped report the agent array would be one row restating the totals, and adding
 // either to AgentAnalytics would drag the agent codec and the mobile screen along.
 export interface HostAnalytics extends Omit<AgentAnalytics, "agentId"> {
-  agentId?: string;
+  agentId?: string | undefined;
   agents: AnalyticsAgent[];
   providerDaily: AnalyticsProviderDay[];
 }

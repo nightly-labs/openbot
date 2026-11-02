@@ -1,9 +1,10 @@
 import { Typography } from "heroui-native";
 import { useEffect, useState } from "react";
-import { type StyleProp, useWindowDimensions, View, type ViewStyle } from "react-native";
+import { type StyleProp, View, type ViewStyle } from "react-native";
 import Animated, { cubicBezier, Easing, FadeOut, ReduceMotion } from "react-native-reanimated";
 import { AgentCrowd, CROWD_SHARE, TEXT_SHARE } from "@/features/agents/components/agent-crowd";
 import { OnboardingPrimaryButton } from "@/features/onboarding/components/onboarding-buttons";
+import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 
@@ -51,7 +52,7 @@ export function EmptyAgentsScene({
 }) {
   const { t } = useText();
   const reducedMotion = useReducedMotion();
-  const { width: windowWidth } = useWindowDimensions();
+  const windowWidth = useColumnWidth();
   // Only the first render counts: the scene can show again later, with its usual entrance.
   const [welcome] = useState(afterWelcome);
   const [settled, setSettled] = useState(welcome === null);

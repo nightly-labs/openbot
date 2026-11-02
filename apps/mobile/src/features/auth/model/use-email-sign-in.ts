@@ -1,8 +1,9 @@
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
+import { classifyFailure } from "@openbot/telemetry";
 import * as Crypto from "expo-crypto";
 import { useEffect, useRef, useState } from "react";
 import { Keyboard } from "react-native";
-
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import {
   type MobileEmailChallenge,
   MobileEmailSignInError,
@@ -134,8 +135,15 @@ export function useEmailSignIn({
     setPending(kind);
     setEmailIssue(null);
     setNotice(null);
+    const scope = mobileAnalytics.scope();
+    const started = performance.now();
     try {
       const next = await startMobileEmailSignIn(address, requestId.current);
+      scope.track("account_sign_in_started", {
+        method: "email",
+        result: "code_sent",
+        duration_ms: performance.now() - started,
+      });
       requestId.current = null;
       setChallenge(next);
       setNeedsNewCode(false);
@@ -148,6 +156,13 @@ export function useEmailSignIn({
         void haptics.notification("success");
       }
     } catch (error) {
+      scope.track("account_sign_in_started", {
+        method: "email",
+        result: "failed",
+        failure_code: "operation_failed",
+        cause_code: classifyFailure(error),
+        duration_ms: performance.now() - started,
+      });
       const issue = issueFrom(error, t("mobile.auth.email.error.sendFailed"));
       if (!UNCONFIRMED_DELIVERY.has(issue.code)) requestId.current = null;
       if (issue.retryAfterSeconds) setBlockedUntil(Date.now() + issue.retryAfterSeconds * 1_000);
@@ -165,7 +180,9 @@ export function useEmailSignIn({
     setCodeIssue(null);
     setNotice(null);
     try {
-      const session = await verifyMobileEmailCode(challenge.challengeId, value);
+      const session = await mobileAnalytics.operation("account_sign_in_completed", { method: "email" }, () =>
+        verifyMobileEmailCode(challenge.challengeId, value),
+      );
       setVerified(true);
       void haptics.notification("success");
       // The keyboard closes while the verified state shows, so the screen is still when it leaves.

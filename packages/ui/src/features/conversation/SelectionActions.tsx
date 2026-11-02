@@ -1,13 +1,23 @@
+import { fileQuoteId, fileQuoteTarget } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { SELECTION_ACTION_INSTRUCTIONS, serializeSelectionInstruction } from "@openbot/contracts/selection-instruction";
-import { Button, Input, Kbd, TextQuote } from "@openbot/ui";
+import {
+  SELECTION_ACTION_INSTRUCTIONS,
+  serializeFileSelectionInstruction,
+  serializeSelectionInstruction,
+} from "@openbot/contracts/selection-instruction";
+import { Button, Input, TextQuote } from "@openbot/ui";
 import { clamp } from "@openbot/ui/utils";
 import { Portal } from "@solidjs/web";
 import type { Element as SolidElement } from "solid-js";
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 
-const MESSAGE_TEXT_SELECTOR = ".message-copy[data-selection-message-id]";
+const MESSAGE_TEXT_SELECTOR = "[data-selection-message-id]";
+/**
+ * The text of a file in the side panel. `data-selection-file-quote` is its quote id without lines;
+ * `data-selection-file-lines` marks text that is the file source, so a selection gives its lines.
+ */
+const FILE_TEXT_SELECTOR = "[data-selection-file-quote]";
 const INTERACTIVE_SELECTOR =
   'a, button, input, textarea, select, [contenteditable="true"], [role="button"], .message-citation';
 const HIGHLIGHT_NAME = "openbot-message-selection";
@@ -15,6 +25,7 @@ const VIEWPORT_MARGIN = 12;
 const TOOLBAR_GAP = 8;
 
 export interface MessageTextSelection {
+  /** The id of the selected message, or the quote id of the selected file passage. */
   messageId: string;
   text: string;
   range: Range;
@@ -45,7 +56,7 @@ export function messageTextSelection(selection: Selection | null): MessageTextSe
   const startBlock = messageTextBlock(range.startContainer);
   const endBlock = messageTextBlock(range.endContainer);
   if (!startBlock || startBlock !== endBlock) return null;
-  const messageId = startBlock.dataset.selectionMessageId;
+  const messageId = startBlock.dataset.selectionMessageId ?? fileSelectionQuoteId(startBlock, range);
   const text = selection
     .toString()
     .replace(/\u00a0/gu, " ")
@@ -227,8 +238,12 @@ export function SelectionActionsBar(props: {
   let previousSelectionKey = "";
 
   const hasPrompt = createMemo(() => prompt().trim().length > 0);
+  const selectionBody = (instruction: string) =>
+    fileQuoteTarget(props.selection.messageId)
+      ? serializeFileSelectionInstruction(instruction, props.selection.text, props.selection.messageId)
+      : serializeSelectionInstruction(instruction, props.selection.text);
   const maximumInstructionLength = createMemo(() => {
-    const quoteOnly = serializeSelectionInstruction("", props.selection.text).length;
+    const quoteOnly = selectionBody("").length;
     return Math.max(1, INPUT_LIMITS.messageText - quoteOnly);
   });
 
@@ -334,7 +349,7 @@ export function SelectionActionsBar(props: {
   const submit = async (instruction: string) => {
     const normalized = instruction.trim();
     if (!normalized || mode() === "sending") return;
-    const body = serializeSelectionInstruction(normalized, props.selection.text);
+    const body = selectionBody(normalized);
     if (body.length > INPUT_LIMITS.messageText) {
       setLastInstruction(normalized);
       setMode("error");
@@ -484,18 +499,16 @@ export function SelectionActionsBar(props: {
                       class="selection-actions-control"
                       aria-label={t("chat.selection.quote")}
                       aria-keyshortcuts={props.quoteShortcut === "meta" ? "Meta+Shift+Period" : "Control+Shift+Period"}
+                      title={t(
+                        props.quoteShortcut === "meta"
+                          ? "chat.selection.quoteShortcutMac"
+                          : "chat.selection.quoteShortcutOther",
+                      )}
                       onPointerDown={(event) => event.preventDefault()}
                       onClick={() => onQuote()()}
                     >
                       <TextQuote class="selection-actions-icon" aria-hidden="true" />
                       <span class="selection-actions-label">{t("chat.selection.quote")}</span>
-                      <Kbd class="selection-actions-kbd" aria-hidden="true">
-                        {t(
-                          props.quoteShortcut === "meta"
-                            ? "chat.selection.quoteShortcutMac"
-                            : "chat.selection.quoteShortcutOther",
-                        )}
-                      </Kbd>
                     </Button>
                   )}
                 </Show>
@@ -583,8 +596,8 @@ function PresetButton(props: { label: string; icon: SolidElement; onSelect: () =
   );
 }
 
-/* The Quote button with its shortcut label, so the presets do not clip it. */
-const QUOTE_ACTION_WIDTH = 116;
+/* The Quote button, so the presets do not clip it. */
+const QUOTE_ACTION_WIDTH = 84;
 
 function isQuoteShortcut(event: KeyboardEvent, modifier: QuoteShortcutModifier): boolean {
   const modifierDown = modifier === "meta" ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
@@ -593,7 +606,25 @@ function isQuoteShortcut(event: KeyboardEvent, modifier: QuoteShortcutModifier):
 
 function messageTextBlock(node: Node): HTMLElement | null {
   const element = node instanceof HTMLElement ? node : node.parentElement;
-  return element?.closest<HTMLElement>(MESSAGE_TEXT_SELECTOR) ?? null;
+  return element?.closest<HTMLElement>(`${MESSAGE_TEXT_SELECTOR}, ${FILE_TEXT_SELECTOR}`) ?? null;
+}
+
+/** The quote id of a file passage. Source text gives the lines; rendered Markdown names only the file. */
+function fileSelectionQuoteId(block: HTMLElement, range: Range): string | undefined {
+  const id = block.dataset.selectionFileQuote;
+  const target = id ? fileQuoteTarget(id) : null;
+  if (!id || !target || block.dataset.selectionFileLines !== "true") return id;
+  const before = block.ownerDocument.createRange();
+  before.setStart(block, 0);
+  before.setEnd(range.startContainer, range.startOffset);
+  const selected = range.toString();
+  const leading = selected.slice(0, selected.length - selected.trimStart().length);
+  const start = lineBreaks(before.toString()) + lineBreaks(leading) + 1;
+  return fileQuoteId({ ...target, lines: { start, end: start + lineBreaks(selected.trim()) } });
+}
+
+function lineBreaks(value: string): number {
+  return value.split("\n").length - 1;
 }
 
 function rangeIntersectsInteractiveContent(range: Range, root: HTMLElement): boolean {

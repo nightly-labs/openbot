@@ -45,7 +45,7 @@ export function providerFailureStatus(
 ): Omit<AgentProviderStatus, "id"> {
   // Redacted, because this message reaches the renderer and every log with it, and a provider CLI
   // quotes what it was given: an OpenCode failure can carry the API key or a header value of a
-  // custom endpoint. The fixed strings below need no redaction, but the CLI's own text does.
+  // custom endpoint.
   const message = redactText(error instanceof Error ? error.message : String(error));
   // The CLI runs, but the account or the saved key does not: the user must sign in again.
   if (error instanceof ProviderSignInError) return { state: "sign-in-required", version: version ?? null, message };
@@ -57,15 +57,9 @@ export function providerFailureStatus(
     if (error.code === "outdated") {
       return { state: "outdated", version: version ?? null, message };
     }
-    if (provider === "codex" || provider === "claude") {
-      const label = provider === "codex" ? "ChatGPT" : "Claude";
-      const bundledMessage =
-        error.code === "missing"
-          ? `OpenBot's included ${label} runtime is missing. Reinstall OpenBot.`
-          : `OpenBot could not start its included ${label} runtime. Update or reinstall OpenBot.`;
-      return { state: "error", version: version ?? null, message: bundledMessage };
-    }
-    if (error.code === "missing") {
+    // A missing Codex or Claude keeps the state "error" that it always had. The message from the
+    // resolver says which copy failed, the user's own or OpenBot's download, and how to repair it.
+    if (error.code === "missing" && provider !== "codex" && provider !== "claude") {
       return { state: "not-installed", version: null, message };
     }
   }

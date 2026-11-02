@@ -36,6 +36,9 @@ const moonlightPatch = basename(lock.remoteDesktop.moonlightWeb.patch.path);
 await Promise.all([
   ...names.map((name) => access(join(root, name))),
   access(join(root, "static/stream.html")),
+  ...(platform === "win32"
+    ? [access(join(root, "assets/shaders/directx/convert_yuv420_packed_uv_type0_ps.hlsl"))]
+    : []),
   access(resolve("build/remote-desktop-runtime/licenses/Sunshine-GPL-3.0.txt")),
   access(resolve("build/remote-desktop-runtime/licenses/moonlight-web-stream-GPL-3.0.txt")),
   access(resolve(`build/remote-desktop-runtime/sources/Sunshine-${lock.remoteDesktop.sunshine.version}-source.tar.gz`)),
@@ -74,9 +77,15 @@ for (const name of [
 }
 
 if (platform === "darwin") {
-  const libraries = await machOLibraries(root);
+  const libraries = await bundledLibraries(root, (name) => name.endsWith(".dylib"));
   await verifyMachOLoadPaths(libraries);
   verifyBundledLibraryLicenses(libraries, distributionChecksumEntries);
+}
+if (platform === "linux") {
+  verifyBundledLibraryLicenses(
+    await bundledLibraries(root, (name) => /\.so(\.\d+)*$/.test(name)),
+    distributionChecksumEntries,
+  );
 }
 
 logger.info(`Verified the Sunshine and Moonlight Web runtime in ${root}`);
@@ -120,12 +129,16 @@ function verifyBundledLibraryLicenses(libraries: string[], distributionChecksums
   }
 }
 
-async function machOLibraries(directory: string, prefix = ""): Promise<string[]> {
+async function bundledLibraries(
+  directory: string,
+  isLibrary: (name: string) => boolean,
+  prefix = "",
+): Promise<string[]> {
   const libraries: string[] = [];
   for (const entry of await readdir(join(directory, ...prefix.split("/").filter(Boolean)), { withFileTypes: true })) {
     const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) libraries.push(...(await machOLibraries(directory, relativePath)));
-    else if (entry.name.endsWith(".dylib")) libraries.push(relativePath);
+    if (entry.isDirectory()) libraries.push(...(await bundledLibraries(directory, isLibrary, relativePath)));
+    else if (isLibrary(entry.name)) libraries.push(relativePath);
   }
   return libraries;
 }

@@ -1,8 +1,10 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect, Fiber } from "effect";
-import { type AgentProvider, RequestTimeoutError } from "./agent-client";
+import { LOG_TIMESTAMP_PREFIX } from "./agent/provider-diagnostics";
+import { AgentProcessExitError, type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { cliSpawnTarget } from "./cli";
 import { JsonLineDecoder, LineTooLongError } from "./jsonl";
 import {
@@ -39,6 +41,16 @@ interface ClientEvents {
   diagnostic: [message: string];
 }
 
+/**
+ * A stderr record that says why a process stopped: a Rust panic, a `FATAL` record, or what a `main`
+ * that returned an error prints (`Error: …`, `fatal: …`). Codex's `ERROR` level does not count. Codex
+ * also writes it at each start for things that do not stop it, such as a folder that is not trusted
+ * (#4265), and such a record is not the reason for a later exit.
+ */
+const CRASH_RECORD = /\bpanicked at\b|^(?:\S+\s+)?FATAL\s|^(?:[A-Za-z]*Error|error|fatal)(?: ?\[[^\]]+\])?:\s*\S/u;
+/** How long an exit waits for the rest of stderr. A child of Codex can keep the pipe open. */
+const STDERR_END_WAIT_MS = 250;
+
 export class AppServerError extends Error {
   constructor(
     message: string,
@@ -64,6 +76,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #ending: Fiber.Fiber<void> | null = null;
   #nextId = 1;
   #stopping = false;
+  #probing = false;
 
   /** Added to the inherited environment, such as the `CODEX_HOME` of an account after the first. */
   readonly #extraEnv: Readonly<Record<string, string>> | undefined;
@@ -109,17 +122,39 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
 
     // Whole records only. A chunk ends wherever the pipe filled up, and half a record is neither
     // readable nor reliably redactable.
+    // The runtime only logs these records. An exit names the last crash record, or the last record.
+    let lastRecord: string | null = null;
+    let lastCrash: string | null = null;
     const diagnostics = createDiagnosticStream({
       redact: redactDiagnostic,
-      emit: (message) => this.emit("diagnostic", message),
+      emit: (message) => {
+        lastRecord = message;
+        if (CRASH_RECORD.test(message)) lastCrash = message;
+        this.emit("diagnostic", message);
+      },
     });
     child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk.toString("utf8")));
+    child.stderr.once("end", () => diagnostics.flush());
     child.once("close", () => diagnostics.flush());
 
     child.once("error", (error) => this.#fail(error, child));
     child.once("exit", (code, signal) => {
-      const suffix = signal ? `signal ${signal}` : `code ${code ?? "unknown"}`;
-      this.#fail(new Error(`Codex App Server exited with ${suffix}.`), child);
+      // A signal, or code 0 after Codex handled one, is a stop from outside. The last record is
+      // then an unrelated line.
+      if (signal) return this.#fail(new Error(`Codex App Server exited with signal ${signal}.`), child);
+      if (code === 0) return this.#fail(new Error("Codex App Server exited with code 0."), child);
+      const fail = () => {
+        const detail = (lastCrash ?? lastRecord)?.replace(LOG_TIMESTAMP_PREFIX, "") ?? null;
+        this.#fail(new AgentProcessExitError(`Codex App Server exited with code ${code ?? "unknown"}.`, detail), child);
+      };
+      // Node can send `exit` before stderr is read to its end, and a CLI that fails writes the
+      // reason last. The `end` listener above flushes the held record before this one runs.
+      if (child.stderr.readableEnded) return fail();
+      const wait = setTimeout(fail, STDERR_END_WAIT_MS);
+      child.stderr.once("end", () => {
+        clearTimeout(wait);
+        fail();
+      });
     });
   }
 
@@ -156,6 +191,24 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   ) {
     if (!this.running) return;
     yield* this.request("thread/unsubscribe", { threadId }, decodeRecordResponse);
+  });
+
+  /**
+   * Moves a replaced thread out of the list that the Codex app and ChatGPT show. Without this, each
+   * replacement session adds a row that starts with the OpenBot handoff to the user's own Codex
+   * history.
+   *
+   * `thread/archive` moves the rollout to `archived_sessions` and unloads the thread when it is
+   * loaded. `thread/turns/list` and `thread/items/list` still read it, so a history import works,
+   * and a resume unarchives it first (`ThreadLifecycle.resumeThread`). A thread that is already
+   * archived, or that has no rollout, answers `no rollout found`.
+   */
+  readonly archiveThread = Effect.fn("CodexAppServer.archiveThread")(function* (
+    this: CodexAppServerClient,
+    threadId: string,
+  ) {
+    if (!this.running) return;
+    yield* this.request("thread/archive", { threadId }, decodeRecordResponse);
   });
 
   /**
@@ -248,6 +301,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     timeoutMs = this.#requestTimeoutMs,
   ) {
     const id = this.#nextId++;
+    const child = this.#process;
     return yield* Effect.callback<T, ProviderClientOperationError>((resume) => {
       this.#pending.set(id, {
         resolve: (value) =>
@@ -273,7 +327,11 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       Effect.timeoutOrElse({
         duration: timeoutMs,
         orElse: () =>
-          Effect.fail(new ProviderClientOperationError({ cause: new RequestTimeoutError("Codex", method) })),
+          Effect.sync(() => this.#checkAnswering(child, timeoutMs)).pipe(
+            Effect.andThen(
+              Effect.fail(new ProviderClientOperationError({ cause: new RequestTimeoutError("Codex", method) })),
+            ),
+          ),
       }),
       Effect.ensuring(Effect.sync(() => this.#pending.delete(id))),
     );
@@ -366,6 +424,37 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       this.#toolRequests.delete(id);
       request.controller.abort();
     }
+  }
+
+  /**
+   * Ends a process that stopped answering, so the runtime starts a new one as it does after an exit.
+   * Without this a hung app server stays the shared client, and the requests of every agent time out
+   * until the user kills it.
+   *
+   * One request that timed out is not enough: `account/rateLimits/read` waits on the network. So one
+   * `config/read` probes the process. That request is local, and every thread start needs it. A
+   * process that does not answer it in the request timeout is ended, also when it still sends events:
+   * it takes no new work. A request with a shorter timeout, such as a `model/list` that may be slow,
+   * starts no probe.
+   */
+  #checkAnswering(child: ChildProcessWithoutNullStreams | null, timeoutMs: number): void {
+    if (this.#probing || !child || this.#process !== child || timeoutMs < this.#requestTimeoutMs) return;
+    this.#probing = true;
+    Effect.runFork(
+      this.request("config/read", { includeLayers: false }, decodeRecordResponse).pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            if (this.#process !== child || !(failure.cause instanceof RequestTimeoutError)) return;
+            this.#fail(new Error(sourceText("error.provider.codexUnresponsive")), child);
+          }),
+        ),
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.#probing = false;
+          }),
+        ),
+      ),
+    );
   }
 
   #fail(error: Error, child: ChildProcessWithoutNullStreams): void {

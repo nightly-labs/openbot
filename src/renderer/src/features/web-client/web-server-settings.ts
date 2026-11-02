@@ -4,6 +4,7 @@ import type {
   McpServerConfig,
   McpSignInAppState,
   McpSignInRelayPage,
+  McpSignInState,
   McpTestResult,
   SaveMcpSignInAppInput,
   ServerSummary,
@@ -46,7 +47,7 @@ interface WebServerSettingsState {
   mcp: McpServerConfig[];
   mcpError: string | null;
   /** Which http rows the host holds a sign-in for, by id. Empty for a host without `mcp-sign-in-v1`. */
-  mcpSignIns: Record<string, boolean>;
+  mcpSignIns: Record<string, McpSignInState>;
   /** The host tab of each sign-in page, by the address it signs in to, while the sign-in waits. */
   mcpSignInPages: Record<string, string>;
   /** The relayed sign-in page of each sign-in that waits in this browser (`sign-in-relay-v1`). */

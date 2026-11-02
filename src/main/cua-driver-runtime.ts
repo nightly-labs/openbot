@@ -163,7 +163,7 @@ export interface CuaDriverEndpointInput {
   userDataPath: string;
   temporaryDirectory: string;
   /** `XDG_RUNTIME_DIR`, read on Linux alone. */
-  runtimeDirectory?: string | null;
+  runtimeDirectory?: string | null | undefined;
 }
 
 /**
@@ -224,7 +224,7 @@ export interface CuaDriverCommandAliasInput {
   platform: NodeJS.Platform;
   isPackaged: boolean;
   /** `APPIMAGE`, which only an AppImage run sets. */
-  appImagePath?: string | null;
+  appImagePath?: string | null | undefined;
   userDataPath: string;
 }
 
@@ -280,6 +280,16 @@ export interface CuaDriverRuntimeOptions {
   waitForSocket?: (path: string) => Promise<void>;
   /** Injected by the test, which listens on no address of its own. */
   actionTap?: CuaDriverActionTap;
+  /**
+   * True once OpenBot starts to quit. The providers are told nothing more from then on.
+   *
+   * A signal to the process group, which a terminal, `systemd` and Docker send, reaches the daemon
+   * too, and the daemon can stop before the teardown stops it. Its exit then looks like a death
+   * under OpenBot, and announcing it would deactivate every agent's stored session, which the next
+   * run would otherwise resume. A function rather than a method to call, so a quit during startup,
+   * before anything holds this runtime, counts too.
+   */
+  quitting?: () => boolean;
 }
 
 export class CuaDriverRuntime {
@@ -359,8 +369,8 @@ export class CuaDriverRuntime {
    * is given.
    *
    * The command is absolute, so `resolveMcpCommand` accepts it without a login shell. The working
-   * directory stays empty on purpose: ACP has no field for one and Codex accepts none, so both
-   * would drop this entry with no error if it carried one.
+   * directory stays empty on purpose: ACP has no field for one, so ACP providers would drop this
+   * entry with no error if it carried one.
    */
   mcpServerConfig(): McpServerConfig | null {
     const command = this.#command ?? this.#executable;
@@ -412,9 +422,10 @@ export class CuaDriverRuntime {
    * privately. So this reports only the two moments that leave a live session holding a tool set
    * that is not the one it would be given now.
    *
-   * Two things it is quiet for. The warm-up at startup settles the entry the stored sessions were
+   * Three things it is quiet for. The warm-up at startup settles the entry the stored sessions were
    * already using. A stop this process asked for happens at teardown, where the sessions are being
-   * left for the next run. A state that moves below `ready` and back while the daemon keeps serving
+   * left for the next run. A daemon that dies once OpenBot quits dies with it: see the `quitting`
+   * option. A state that moves below `ready` and back while the daemon keeps serving
    * is not quiet, because the entry goes with it.
    */
   onMcpServerChanged(listener: () => void): () => void {
@@ -692,7 +703,7 @@ export class CuaDriverRuntime {
     const announced = config ? [config.command, ...config.args].join(" ") : "";
     if (announced === this.#announcedMcpServer) return;
     this.#announcedMcpServer = announced;
-    if (this.#quiet) return;
+    if (this.#quiet || this.#options.quitting?.()) return;
     for (const listener of this.#mcpListeners) listener();
   }
 

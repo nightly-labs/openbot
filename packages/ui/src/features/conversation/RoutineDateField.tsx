@@ -19,7 +19,7 @@ interface RoutineDateFieldProps {
   /** The first date that can be picked. Earlier days are disabled. */
   today: Date;
   onChange: (value: string) => void;
-  disabled?: boolean;
+  disabled?: boolean | undefined;
   /** A month and a day that repeat each year: no year, no weekdays, and no past dates. */
   yearly?: boolean;
   /** The popover closed, so the edit is complete. */
@@ -82,7 +82,12 @@ export function RoutineDateField(props: RoutineDateFieldProps) {
 
 const NAVIGATION_STEPS: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
 
-function RoutineCalendar(props: { value: string; today: Date; yearly?: boolean; onSelect: (value: string) => void }) {
+function RoutineCalendar(props: {
+  value: string;
+  today: Date;
+  yearly?: boolean | undefined;
+  onSelect: (value: string) => void;
+}) {
   const text = useText();
   const todayKey = () => routineDateKey(props.today);
   const [month, setMonth] = createSignal(() => monthStart(parseRoutineDateKey(props.value)));

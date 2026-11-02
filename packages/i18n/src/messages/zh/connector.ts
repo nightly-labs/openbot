@@ -1,0 +1,418 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/connector";
+
+export const messages = {
+  // Marketplace > Apps > GitHub: the built-in GitHub connection.
+  "connector.github.title": "GitHub",
+  "connector.github.description": "这台电脑上的每个助手都可以使用你的 GitHub 仓库、Issue 和拉取请求，以及 gh 和 git。",
+  "connector.github.connect": "连接 GitHub",
+  "connector.github.pendingTitle": "在 GitHub 上输入该验证码",
+  "connector.github.pendingDescription": "GitHub 已在浏览器中打开，在那里输入验证码即可完成连接。",
+  "connector.github.waiting": "正在等待 GitHub",
+  "connector.github.copyCode": "复制验证码",
+  "connector.github.codeCopied": "已复制",
+  "connector.github.openGitHub": "打开 GitHub",
+  "connector.github.cancel": "取消",
+  "connector.github.connectedAs": "已连接为 @{login}",
+  "connector.github.repositoriesTitle": "仓库",
+  "connector.github.repositoriesDescription": "助手只能使用已安装 OpenBot GitHub App 的仓库。",
+  "connector.github.chooseRepositories": "选择仓库",
+  "connector.github.repositoriesLoading": "正在从 GitHub 读取仓库",
+  "connector.github.repositoriesFailed": "OpenBot 无法从 GitHub 读取仓库。",
+  "connector.github.noRepositories": "尚未在任何仓库上安装 OpenBot GitHub App。",
+  // {count} is a number, such as 12.
+  "connector.github.moreRepositories": { one: "还有 {count} 个仓库", other: "还有 {count} 个仓库" },
+  // A badge next to a repository that only its members can see.
+  "connector.github.private": "私有",
+  "connector.github.disconnect": "断开连接",
+  "connector.github.disconnectTitle": "断开 GitHub？",
+  "connector.github.disconnectSummary": "所有助手都将失去 GitHub，聊天和文件仍会保留。",
+  "connector.github.expiredTitle": "GitHub 连接已过期",
+  "connector.github.expiredDescription": "以 @{login} 重新连接，即可让助手继续使用 GitHub。",
+  "connector.github.reconnect": "重新连接",
+  "connector.github.actionFailed": "OpenBot 无法更改 GitHub 连接。",
+  // The status next to the name at the top of the GitHub page.
+  "connector.github.statusConnected": "已连接",
+  "connector.github.statusConnecting": "连接中",
+  "connector.github.statusExpired": "已过期",
+  "connector.github.accountTitle": "账号",
+  // {count} is the number of repositories in the list, such as 12.
+  "connector.github.filterPlaceholder": { one: "筛选 {count} 个仓库", other: "筛选 {count} 个仓库" },
+  "connector.github.filterLabel": "筛选仓库",
+  // {query} is the text the user typed in the filter.
+  "connector.github.noMatch": "没有匹配“{query}”的仓库。",
+  // The connect dialog. The steps show as numbers; screen readers read the names.
+  "connector.github.stepSignIn": "登录",
+  "connector.github.stepConnected": "已连接",
+  "connector.github.requestingCode": "OpenBot 正在向 GitHub 请求验证码。",
+  // {code} is the code to type on GitHub, such as WDJB-MJHT.
+  "connector.github.codeLabel": "验证码 {code}",
+  "connector.github.failedTitle": "GitHub 未连接成功",
+  "connector.github.cancelConnecting": "取消连接 GitHub",
+  // {count} is the number of repositories that agents can use.
+  "connector.github.connectedSummary": {
+    one: "{count} 个仓库 · 这台电脑上的所有助手",
+    other: "{count} 个仓库 · 这台电脑上的所有助手",
+  },
+  "connector.github.done": "完成",
+  "connector.github.later": "稍后",
+  // The confirmation before Disconnect. {login} is the GitHub account name, such as octocat.
+  "connector.github.disconnectConfirmTitle": "断开 GitHub？",
+  "connector.github.disconnectConfirmDescription": "断开后会从这台电脑移除 @{login} 的登录信息。",
+  "connector.github.disconnectEffectTools": "所有助手都将失去 GitHub 工具、gh 和 git。",
+  "connector.github.disconnectEffectRevoke": "随后会打开 GitHub，你可以在那里撤销 OpenBot。",
+  "connector.github.disconnectEffectKept": "聊天、文件和助手记忆仍保留在这台电脑上。",
+  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
+  "connector.github.descriptionHost":
+    "{host} 上的每个助手都可以使用你的 GitHub 仓库、Issue 和拉取请求，以及 gh 和 git。",
+  "connector.github.connectedSummaryHost": {
+    one: "{count} 个仓库 · {host} 上的所有助手",
+    other: "{count} 个仓库 · {host} 上的所有助手",
+  },
+  "connector.github.disconnectConfirmDescriptionHost": "断开后会从 {host} 移除 @{login} 的登录信息。",
+  "connector.github.disconnectEffectKeptHost": "聊天、文件和助手记忆仍保留在 {host} 上。",
+  "connector.github.keepConnected": "保持连接",
+  "connector.github.close": "关闭",
+  // The last section of an integration page, with the action that removes it.
+  "connector.dangerZone": "危险操作",
+
+  "connector.statusUnknown": "未知",
+  "connector.readFailed": "OpenBot 无法读取该连接的状态。",
+  // Marketplace > Apps > Slack: a workspace installs the one OpenBot app, and the Slack
+  // Orchestrator agent receives each request, asks the team and answers.
+  "connector.slack.title": "Slack",
+  "connector.slack.description": "人们在 Slack 中提及 @OpenBot 或给它发私信，Slack 调度助手会找到合适的助手来回答。",
+  "connector.slack.statusConnected": "已连接",
+  "connector.slack.statusAttention": "需要关注",
+  // {workspace} is the Slack workspace name.
+  "connector.slack.summaryConnected": "{workspace} · 由 Slack 调度助手回答",
+  "connector.slack.summaryNoAgent": "{workspace} · 还没有助手回答",
+  "connector.slack.attentionTitle": {
+    one: "{count} 个工作区需要关注",
+    other: "{count} 个工作区需要关注",
+  },
+  "connector.slack.attentionDescription": "下方状态说明了该怎么做。",
+  "connector.slack.connect": "连接 Slack",
+  "connector.slack.addAgent": "添加助手",
+  "connector.slack.actionFailed": "Slack 没有接受该更改",
+  "connector.slack.workspaceTitle": "工作区",
+  "connector.slack.workspaceDescription": "人们提及 @OpenBot 或给它发私信。",
+  "connector.slack.disconnectWorkspace": "断开连接",
+  "connector.slack.disconnectAllTitle": "断开 Slack",
+  "connector.slack.disconnectAllSummary": "所有工作区都将断开，其他人无法再通过 @OpenBot 联系你的助手。",
+  "connector.slack.disconnectAllSummaryOrchestrator": "所有工作区都将断开，Slack 调度助手及其对话将从 OpenBot 中删除。",
+  "connector.slack.missingScopes": "OpenBot 在 Slack 中缺少这些权限：{scopes}。请断开该工作区后重新连接。",
+  "connector.slack.retryAt": "Slack 要求 OpenBot 等待，将于 {time} 重试。",
+  "connector.slack.reconnect": "重新连接",
+  "connector.slack.pause": "暂停",
+  "connector.slack.resume": "恢复",
+  // {action} is a button, such as Pause; {name} is the workspace name.
+  "connector.slack.rowAction": "{action}：{name}",
+  "connector.slack.orchestratorTitle": "Slack 调度助手",
+  "connector.slack.orchestratorDescription":
+    "该助手接收来自 Slack 的所有请求。简单的问题它自己回答，其余的交给合适的助手处理，并把答案发在话题中。",
+  "connector.slack.orchestratorNone": "还没有助手回答",
+  "connector.slack.orchestratorNoneDescription": "请添加 Slack 调度助手，否则 Slack 中不会有人回答。",
+  "connector.slack.inviteNote":
+    "OpenBot 会自动加入每个公开频道以及之后新建的公开频道。私有频道需要邀请：/invite @OpenBot。",
+  // The connect dialog. The steps show as numbers; screen readers read the names.
+  "connector.slack.stepWorkspace": "工作区",
+  "connector.slack.stepAgent": "助手",
+  "connector.slack.connectTitle": "连接 Slack 工作区",
+  "connector.slack.connectDescription": "OpenBot 会在该工作区安装一个名为 OpenBot 的应用，并加入所有公开频道。",
+  "connector.slack.connectStepBrowser": "Slack 会在浏览器中打开",
+  "connector.slack.connectStepAllow": "在右上角选择工作区，然后点“允许”",
+  "connector.slack.connectStepReturn": "Slack 完成后该对话框会继续",
+  "connector.slack.connectInSlack": "在 Slack 中连接",
+  "connector.slack.connectWaiting": "正在等待 Slack，请在浏览器中完成安装。",
+  "connector.slack.agentStepTitle": "添加 Slack 调度助手",
+  // {workspace} is the Slack workspace name.
+  "connector.slack.agentStepDescription": "这个新助手会回答人们在 {workspace} 中发给 @OpenBot 的所有内容。",
+  "connector.slack.orchestratorName": "Slack 调度助手",
+  "connector.slack.orchestratorRole": "在 Slack 中回答并调度团队",
+  "connector.slack.orchestratorDoesReceive": "优先接收所有 Slack 请求",
+  "connector.slack.orchestratorDoesDelegate": "把每项任务交给最合适的助手",
+  "connector.slack.orchestratorDoesAnswer": "把答案发到 Slack 话题中",
+  "connector.slack.orchestratorModel": "模型",
+  "connector.slack.doneTitle": "OpenBot 已加入 {workspace}",
+  "connector.slack.doneDescription": "在任意公开频道中提及 @OpenBot，或给它发私信。",
+  "connector.slack.done": "完成",
+  "connector.slack.disconnectTitle": "断开 {workspace}？",
+  "connector.slack.disconnectDescription": "OpenBot 将停止在 {workspace} 中回答，并从这台电脑删除其 Slack 令牌。",
+  "connector.slack.disconnectDescriptionHost": "OpenBot 将停止在 {workspace} 中回答，并从 {host} 删除其 Slack 令牌。",
+  "connector.slack.disconnectEffect": "{workspace} 中的人将无法再通过 @OpenBot 联系你的助手。",
+  "connector.slack.removeEffectKept": "对话和 Slack 调度助手会保留在 OpenBot 中。",
+  "connector.slack.removeEffectDeleted": "Slack 调度助手及其对话将从 OpenBot 中删除。",
+  "connector.slack.keep": "保持连接",
+  "connector.slack.close": "关闭",
+
+  "connector.slack.addWorkspace": "添加工作区",
+  // Shown when the page has the maximum number of workspaces.
+  "connector.slack.limitReached": { other: "最多可连接 {count} 个工作区。" },
+  // {count} is the number of Slack workspaces: two or more.
+  "connector.slack.summaryMany": { other: "{count} 个工作区 · 由 Slack 调度助手回答" },
+  // Marketplace > Apps > Discord: a Discord server (a guild) adds the one OpenBot bot, and
+  // the Discord Orchestrator agent receives each request, asks the team and answers. Always write
+  // "Discord server": "server" alone is an OpenBot server.
+  "connector.discord.title": "Discord",
+  "connector.discord.description":
+    "人们在 Discord 服务器的频道中提及 @OpenBot，Discord 调度助手会找到合适的助手来回答。",
+  "connector.discord.statusConnected": "已连接",
+  "connector.discord.statusAttention": "需要关注",
+  // {workspace} is the Discord server name.
+  "connector.discord.summaryConnected": "{workspace} · 由 Discord 调度助手回答",
+  "connector.discord.summaryNoAgent": "{workspace} · 还没有助手回答",
+  "connector.discord.attentionTitle": {
+    one: "{count} 个 Discord 服务器需要关注",
+    other: "{count} 个 Discord 服务器需要关注",
+  },
+  "connector.discord.attentionDescription": "下方状态说明了该怎么做。",
+  "connector.discord.connect": "连接 Discord",
+  "connector.discord.addAgent": "添加助手",
+  "connector.discord.actionFailed": "Discord 没有接受该更改",
+  "connector.discord.workspaceTitle": "Discord 服务器",
+  "connector.discord.workspaceDescription": "在频道中提及 @OpenBot，回复 OpenBot 可继续对话。",
+  "connector.discord.disconnectWorkspace": "断开连接",
+  "connector.discord.disconnectAllTitle": "断开 Discord",
+  "connector.discord.disconnectAllSummary": "所有服务器都将断开，其他人无法再通过 @OpenBot 联系你的助手。",
+  "connector.discord.disconnectAllSummaryOrchestrator":
+    "所有服务器都将断开，Discord 调度助手及其对话将从 OpenBot 中删除。",
+  "connector.discord.missingScopes": "OpenBot 在 Discord 中缺少这些权限：{scopes}。请断开该 Discord 服务器后重新连接。",
+  "connector.discord.retryAt": "Discord 要求 OpenBot 等待，将于 {time} 重试。",
+  "connector.discord.reconnect": "重新连接",
+  "connector.discord.pause": "暂停",
+  "connector.discord.resume": "恢复",
+  // {action} is a button, such as Pause; {name} is the Discord server name.
+  "connector.discord.rowAction": "{action}：{name}",
+  "connector.discord.orchestratorTitle": "Discord 调度助手",
+  "connector.discord.orchestratorDescription":
+    "该助手接收来自 Discord 的所有请求。简单的问题它自己回答，其余的交给合适的助手处理，并在频道中回复答案。",
+  "connector.discord.orchestratorNone": "还没有助手回答",
+  "connector.discord.orchestratorNoneDescription": "请添加 Discord 调度助手，否则 Discord 中不会有人回答。",
+  "connector.discord.channelsNote": "OpenBot 能看到其角色可见的频道。",
+  // The connect dialog. The steps show as numbers; screen readers read the names.
+  "connector.discord.stepWorkspace": "Discord 服务器",
+  "connector.discord.stepAgent": "助手",
+  "connector.discord.connectTitle": "连接 Discord 服务器",
+  "connector.discord.connectDescription": "OpenBot 会向该 Discord 服务器添加一个名为 OpenBot 的机器人。",
+  "connector.discord.connectStepBrowser": "Discord 会在浏览器中打开",
+  "connector.discord.connectStepAllow": "选择服务器，然后点“授权”",
+  "connector.discord.connectStepReturn": "Discord 完成后该对话框会继续",
+  "connector.discord.connectInDiscord": "在 Discord 中连接",
+  "connector.discord.connectWaiting": "正在等待 Discord，请在浏览器中完成授权。",
+  "connector.discord.agentStepTitle": "添加 Discord 调度助手",
+  // {workspace} is the Discord server name.
+  "connector.discord.agentStepDescription": "这个新助手会回答人们在 {workspace} 中发给 @OpenBot 的所有内容。",
+  "connector.discord.orchestratorName": "Discord 调度助手",
+  "connector.discord.orchestratorRole": "在 Discord 中回答并调度团队",
+  "connector.discord.orchestratorDoesReceive": "优先接收所有 Discord 请求",
+  "connector.discord.orchestratorDoesDelegate": "把每项任务交给最合适的助手",
+  "connector.discord.orchestratorDoesAnswer": "在 Discord 频道中回复答案",
+  "connector.discord.orchestratorModel": "模型",
+  "connector.discord.doneTitle": "OpenBot 已加入 {workspace}",
+  "connector.discord.doneDescription": "在频道中提及 @OpenBot，回复 OpenBot 可继续对话。",
+  "connector.discord.done": "完成",
+  "connector.discord.disconnectTitle": "断开 {workspace}？",
+  "connector.discord.disconnectDescription": "OpenBot 将停止在 {workspace} 中回答，并从这台电脑移除 Discord 连接。",
+  "connector.discord.disconnectDescriptionHost": "OpenBot 将停止在 {workspace} 中回答，并从 {host} 移除 Discord 连接。",
+  "connector.discord.disconnectEffect": "{workspace} 中的人将无法再通过 @OpenBot 联系你的助手。",
+  "connector.discord.removeEffectKept": "对话和 Discord 调度助手会保留在 OpenBot 中。",
+  "connector.discord.removeEffectDeleted": "Discord 调度助手及其对话将从 OpenBot 中删除。",
+  "connector.discord.keep": "保持连接",
+  "connector.discord.close": "关闭",
+
+  "connector.discord.addWorkspace": "添加 Discord 服务器",
+  "connector.discord.limitReached": { other: "最多可连接 {count} 个 Discord 服务器。" },
+  // {count} is the number of Discord servers: two or more.
+  "connector.discord.summaryMany": { other: "{count} 个 Discord 服务器 · 由 Discord 调度助手回答" },
+  // Who can use OpenBot in one Discord server: the members with one of the chosen Discord roles.
+  "connector.discord.accessTitle": "谁可以使用 OpenBot",
+  "connector.discord.accessDescription": "OpenBot 只回答这些人。其他人的提及会被忽略。",
+  "connector.discord.accessEveryone": "服务器中的所有人",
+  "connector.discord.accessEveryoneDescription": "凡是能在 OpenBot 可见的频道中发消息的人，都可以提及它。",
+  // {roles} is a list of Discord role names, such as "Admin and Moderator".
+  "connector.discord.accessRoles": "拥有 {roles} 的成员",
+  "connector.discord.accessChoose": "选择角色",
+  // {workspace} is the Discord server name.
+  "connector.discord.accessDialogTitle": "谁可以在 {workspace} 中使用 OpenBot？",
+  "connector.discord.accessDialogDescription": "不选择任何角色时，所有人都可以提及 OpenBot。",
+  "connector.discord.accessLoading": "正在加载角色…",
+  "connector.discord.accessLoadFailed": "Discord 角色未能加载",
+  "connector.discord.accessNoRoles": "该服务器没有可选的角色。",
+  // {role} is the name of a Discord role that the server no longer has.
+  "connector.discord.accessRoleDeleted": "{role}（已删除）",
+  "connector.discord.accessSave": "保存",
+  // {host} is the joined server's name.
+  "connector.discord.accessHostUpdate": "请更新 {host} 上的 OpenBot，以选择角色。",
+  // Marketplace > Apps > Telegram: each chat adds the one OpenBot bot, and the Telegram
+  // Orchestrator agent receives the messages of all chats, asks the team and answers.
+  "connector.telegram.title": "Telegram",
+  "connector.telegram.description":
+    "把 OpenBot 机器人加入 Telegram 群组，或与它开启私聊。Telegram 调度助手会找到合适的助手来回答。",
+  "connector.telegram.statusConnected": "已连接",
+  "connector.telegram.statusAttention": "需要关注",
+  // {count} is the number of linked Telegram chats.
+  "connector.telegram.summaryConnected": {
+    one: "{count} 个聊天 · 由 Telegram 调度助手回答",
+    other: "{count} 个聊天 · 由 Telegram 调度助手回答",
+  },
+  "connector.telegram.summaryNoAgent": {
+    one: "{count} 个聊天 · 还没有助手回答",
+    other: "{count} 个聊天 · 还没有助手回答",
+  },
+  "connector.telegram.attentionTitle": {
+    one: "{count} 个聊天需要关注",
+    other: "{count} 个聊天需要关注",
+  },
+  "connector.telegram.attentionDescription": "下方状态说明了该怎么做。",
+  "connector.telegram.connect": "连接 Telegram",
+  "connector.telegram.addAgent": "添加助手",
+  "connector.telegram.actionFailed": "Telegram 没有接受该更改",
+  "connector.telegram.chatsTitle": "聊天",
+  "connector.telegram.groupDescription": "人们提及机器人或回复它的消息。",
+  "connector.telegram.directDescription": "该聊天中的所有消息都会交给 Telegram 调度助手。",
+  "connector.telegram.helpRemoved": "OpenBot 机器人已不在该聊天中。请断开该聊天，然后重新添加机器人。",
+  "connector.telegram.helpRelayUnavailable":
+    "OpenBot 无法在这台电脑上接收 Telegram 消息。请先登录，在服务器设置中为这台电脑命名，并保持 OpenBot 开着。",
+  "connector.telegram.helpRelayUnavailableHost":
+    "{host} 上的 OpenBot 无法接收 Telegram 消息。请在 {host} 上登录，在服务器设置中为该服务器命名，并保持 OpenBot 开着。",
+  "connector.telegram.helpError": "OpenBot 无法连接到该聊天。请重新连接，或断开该聊天。",
+  "connector.telegram.retryAt": "Telegram 要求 OpenBot 等待，将于 {time} 重试。",
+  "connector.telegram.pause": "暂停",
+  "connector.telegram.resume": "恢复",
+  "connector.telegram.reconnect": "重新连接",
+  "connector.telegram.disconnectChat": "断开连接",
+  "connector.telegram.disconnectAllTitle": "断开 Telegram",
+  "connector.telegram.disconnectAllSummary": "所有聊天都将断开，其他人无法再通过 OpenBot 机器人联系你的助手。",
+  "connector.telegram.disconnectAllSummaryOrchestrator":
+    "所有聊天都将断开，Telegram 调度助手及其对话将从 OpenBot 中删除。",
+  // {action} is a button, such as Pause; {name} is the chat name.
+  "connector.telegram.rowAction": "{action}：{name}",
+  "connector.telegram.linkChat": "关联聊天",
+  "connector.telegram.addToGroup": "加入群组",
+  "connector.telegram.openDirectChat": "开启私聊",
+  "connector.telegram.orchestratorTitle": "Telegram 调度助手",
+  "connector.telegram.orchestratorDescription":
+    "该助手接收来自你所有 Telegram 聊天中发给 OpenBot 的消息。简单的问题它自己回答，其余的交给合适的助手处理，并把答案发在聊天中。",
+  "connector.telegram.orchestratorNone": "还没有助手回答",
+  "connector.telegram.orchestratorNoneDescription": "请添加 Telegram 调度助手，否则 Telegram 中不会有人回答。",
+  "connector.telegram.mentionNote": "在群组中请提及机器人或回复它的消息；在私聊中所有消息都会发给机器人。",
+  // The connect dialog. The steps show as numbers; screen readers read the names.
+  "connector.telegram.stepChat": "聊天",
+  "connector.telegram.stepAgent": "助手",
+  "connector.telegram.connectTitle": "关联 Telegram 聊天",
+  "connector.telegram.connectDescription":
+    "把 OpenBot 机器人加入群组，或与它开启私聊。一个机器人即可服务你的所有聊天。",
+  "connector.telegram.connectStepBrowser": "Telegram 会在浏览器中打开",
+  "connector.telegram.connectStepPick": "选择群组，或在私聊中点击“开始”",
+  "connector.telegram.connectStepReturn": "聊天关联完成后该对话框会继续",
+  "connector.telegram.connectWaiting": "正在等待 Telegram，请在 Telegram 中选择聊天。",
+  "connector.telegram.agentStepTitle": "添加 Telegram 调度助手",
+  // {chat} is the Telegram chat name.
+  "connector.telegram.agentStepDescription":
+    "这个新助手会回答 {chat} 中以及你之后关联的每个聊天中发给 OpenBot 的消息。",
+  "connector.telegram.orchestratorName": "Telegram 调度助手",
+  "connector.telegram.orchestratorRole": "在 Telegram 中回答并调度团队",
+  "connector.telegram.orchestratorDoesReceive": "优先接收所有发给 OpenBot 的 Telegram 消息",
+  "connector.telegram.orchestratorDoesDelegate": "把每项任务交给最合适的助手",
+  "connector.telegram.orchestratorDoesAnswer": "把答案发到 Telegram 聊天中",
+  "connector.telegram.orchestratorModel": "模型",
+  "connector.telegram.doneTitle": "OpenBot 已加入 {chat}",
+  "connector.telegram.done": "完成",
+  "connector.telegram.disconnectTitle": "断开 {chat}？",
+  "connector.telegram.leaveDescription": "OpenBot 机器人会退出 {chat}，OpenBot 将停止在那里回答。",
+  "connector.telegram.disconnectEffect": "{chat} 中的人将无法再通过 OpenBot 机器人联系你的助手。",
+  "connector.telegram.removeEffectKept": "对话和 Telegram 调度助手会保留在 OpenBot 中。",
+  "connector.telegram.removeEffectDeleted": "这是最后一个聊天，因此 Telegram 调度助手及其对话将从 OpenBot 中删除。",
+  "connector.telegram.keep": "保持连接",
+  "connector.telegram.close": "关闭",
+  // Marketplace > 1Password: a vault that the user shares with OpenBot through a service account.
+  "connector.onePassword.title": "1Password",
+  "connector.onePassword.description":
+    "通过服务账号把一个专用的 1Password 保险库共享给 OpenBot，让助手可以在 OpenBot 浏览器中登录网站。",
+  "connector.onePassword.howItWorks":
+    "连接时会在你的 1Password 账号中创建“Shared with OpenBot”保险库，以及一个只能读取该保险库的服务账号。OpenBot 在这台电脑的浏览器中填充已保存的登录信息，因此只会共享你移入该保险库的条目。助手永远看不到密码。",
+  "connector.onePassword.connect": "连接 1Password",
+  // The three setup steps before a connection, each with the one button it needs.
+  "connector.onePassword.setupTitle": "设置",
+  "connector.onePassword.stepCliTitle": "安装 1Password CLI",
+  "connector.onePassword.stepCliChecking": "正在这台电脑上查找 1Password CLI",
+  "connector.onePassword.stepCliInstalling": "正在从 1Password 下载 1Password CLI",
+  // {version} is a version number, such as 2.39.0.
+  "connector.onePassword.stepCliReady": "已安装版本 {version}。",
+  "connector.onePassword.stepCliMissing": "OpenBot 会从 1Password 下载到自己的文件夹，不需要管理员密码。",
+  "connector.onePassword.stepCliManual": "OpenBot 无法在这台电脑上安装它。请从 1Password 安装后再回到该页面。",
+  "connector.onePassword.installCli": "安装",
+  "connector.onePassword.stepAppTitle": "开启 CLI 集成",
+  "connector.onePassword.stepAppDescription": "在 1Password 应用中打开“设置 > 开发者”，开启“与 1Password CLI 集成”。",
+  "connector.onePassword.stepAppReady": "1Password 应用已允许 CLI 创建共享保险库。",
+  "connector.onePassword.openApp": "打开 1Password",
+  "connector.onePassword.openAppFailed": "OpenBot 无法打开 1Password。",
+  "connector.onePassword.checkAgain": "重新检查",
+  "connector.onePassword.stepVaultTitle": "创建共享保险库",
+  "connector.onePassword.stepVaultDescription":
+    "OpenBot 会创建“Shared with OpenBot”保险库和一个只能读取它的服务账号。1Password 会请求你批准。",
+  "connector.onePassword.useTokenDescription": "不走这些步骤，改为粘贴 1Password.com 上的服务账号令牌。",
+  "connector.onePassword.useTokenAction": "使用令牌",
+  "connector.onePassword.tokenLabel": "服务账号令牌",
+  "connector.onePassword.tokenPlaceholder": "ops_…",
+  "connector.onePassword.connectWithToken": "连接",
+  "connector.onePassword.approveInApp": "请在 1Password 应用中批准该请求",
+  "connector.onePassword.cancel": "取消",
+  "connector.onePassword.chooseAccountTitle": "选择账号",
+  "connector.onePassword.chooseAccountDescription": "OpenBot 会在你选择的账号中创建共享保险库。",
+  "connector.onePassword.useAccount": "使用该账号",
+  "connector.onePassword.vaultTitle": "共享保险库",
+  "connector.onePassword.vaultDescription": "在 1Password 中把登录信息移入该保险库，助手即可用它登录。移出后即停止。",
+  "connector.onePassword.loginsLoading": "正在从 1Password 读取登录信息",
+  // {count} is a number, such as 3.
+  "connector.onePassword.loginCount": { one: "{count} 条登录信息", other: "{count} 条登录信息" },
+  "connector.onePassword.disconnect": "断开连接",
+  "connector.onePassword.disconnectTitle": "断开 1Password",
+  "connector.onePassword.disconnectSummary":
+    "OpenBot 会忘记该令牌。保险库和服务账号仍保留在 1Password 中，如不再需要请在那里删除。",
+  "connector.onePassword.actionFailed": "OpenBot 无法更改 1Password 连接。",
+  "connector.onePassword.statusConnected": "已连接",
+  "connector.onePassword.statusConnecting": "连接中",
+  // The same page for the connection of a joined server. {host} is the server name, such as Studio.
+  "connector.onePassword.descriptionHost":
+    "通过服务账号把一个专用的 1Password 保险库共享给 {host} 上的 OpenBot，让 {host} 上的助手可以在其浏览器中登录网站。",
+  "connector.onePassword.howItWorksHost":
+    "{host} 使用服务账号令牌连接。请在 1Password.com 上创建一个只能读取你共享给 OpenBot 的保险库的服务账号，然后把它的令牌粘贴到这里。{host} 会校验并保存该令牌，这台电脑不保存。助手永远看不到密码。",
+  "connector.onePassword.disconnectSummaryHost":
+    "{host} 会忘记该令牌。保险库和服务账号仍保留在 1Password 中，如不再需要请在那里删除。",
+  "connector.bitwarden.title": "Bitwarden",
+  "connector.bitwarden.description": "用 Bitwarden 填充浏览器登录信息。",
+  "connector.bitwarden.setup":
+    "请安装 Bitwarden CLI 并用 bw login 登录。创建一个名为 Shared with OpenBot 的文件夹，只把允许助手使用的登录信息放进去。运行 bw unlock --raw，把会话密钥粘贴到下方。请勿粘贴主密码。",
+  "connector.bitwarden.scope":
+    "这台电脑上的所有助手都可以使用 Shared with OpenBot 中匹配的登录信息。OpenBot 只按精确的 HTTPS 来源匹配，不会使用需要主密码提示或自定义 URI 匹配规则的条目。",
+  "connector.bitwarden.session":
+    "会话密钥只保存在内存中。连续 8 小时未使用保险库或 OpenBot 退出后，需要重新连接。断开只停止 OpenBot 的访问，不会锁定其他 Bitwarden 客户端。",
+  "connector.bitwarden.sessionKey": "Bitwarden 会话密钥",
+  "connector.bitwarden.connect": "连接 Bitwarden",
+  "connector.bitwarden.disconnect": "断开 Bitwarden",
+  "connector.bitwarden.disconnectAction": "断开",
+  "connector.bitwarden.disconnectSummary":
+    "OpenBot 会忘记会话密钥。代理将无法再从 Bitwarden 填写登录信息。其他 Bitwarden 客户端保持解锁状态。",
+  "connector.bitwarden.disconnectSummaryHost":
+    "{host} 会删除 API 密钥和主密码。{host} 上的代理将无法再从 Bitwarden 填写登录信息。",
+  "connector.bitwarden.connected": "已连接",
+  "connector.bitwarden.actionFailed": "OpenBot 无法更改 Bitwarden 连接。",
+  "connector.bitwarden.descriptionHost": "在 {host} 上用 Bitwarden 或 Vaultwarden 填充浏览器登录信息。",
+  "connector.bitwarden.setupHost":
+    "{host} 使用自己的 Bitwarden CLI 登录。请在你的保险库中创建一个名为 Shared with OpenBot 的文件夹，只把允许助手使用的登录信息放进去。在网页版保险库中打开“设置 › 安全 › 密钥”，查看你的 API 密钥。然后在下方填写服务器地址、client_id、client_secret 和你的主密码。",
+  "connector.bitwarden.scopeHost":
+    "{host} 上的所有助手都可以使用 Shared with OpenBot 中匹配的登录信息。OpenBot 只按精确的 HTTPS 来源匹配，不会使用需要主密码提示或自定义 URI 匹配规则的条目。",
+  "connector.bitwarden.sessionHost":
+    "{host} 会加密保存 API 密钥和主密码，因此重启后可以再次解锁。这台电脑不保存它们。断开连接会把它们从 {host} 上移除。{host} 必须能通过 HTTPS 访问该服务器地址。",
+  "connector.bitwarden.serverUrl": "服务器地址",
+  "connector.bitwarden.folderTitle": "共享文件夹",
+  "connector.bitwarden.folderDescription": "在 Bitwarden 中把登录信息移入该文件夹，助手即可用它登录。移出后即停止。",
+  "connector.bitwarden.folderName": "Shared with OpenBot",
+  "connector.bitwarden.folderKind": "Bitwarden 中的文件夹",
+  "connector.bitwarden.clientId": "API 密钥 client_id",
+  "connector.bitwarden.clientSecret": "API 密钥 client_secret",
+  "connector.bitwarden.masterPassword": "主密码",
+  "connector.bitwarden.connecting": "正在连接",
+} as const satisfies PartialTranslation<typeof source>;

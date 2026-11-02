@@ -1,7 +1,7 @@
 import { BookOpen, CircleQuestionMark, DropdownMenu, Gift, Megaphone, MotionTooltip } from "@openbot/ui";
 import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
-import { DiscordMark } from "../settings/IntegrationLayout";
+import { DiscordMark } from "../settings/brand-marks";
 
 /** One line of the What's new list: the headline of a release note and the date of its release. */
 export interface HelpMenuNews {

@@ -1,7 +1,9 @@
+import { CHANNEL_CHATS_CAPABILITY, CHANNEL_TASK_CANCEL_CAPABILITY } from "@openbot/contracts/ipc";
 import { createContext, type ParentProps, untrack, useContext } from "solid-js";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
+import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
 import { serverRoleCanAdminister } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 import { useWindowPage } from "../window/window-page-context";
@@ -26,7 +28,7 @@ export function ChannelsControllerProvider(props: ParentProps<{ controller: Chan
 
 /** The desktop channels domain: preload is the runtime, and the app's contexts are the environment. */
 export function ChannelsProvider(props: ParentProps) {
-  const { activeServer, activeServerId } = useServers();
+  const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
   const { agentList, setAgentSetupOpen } = useAgents();
   const { clearDirectSelection, setDirectTyping } = useDirectMessages();
   const windowPage = useWindowPage();
@@ -50,9 +52,9 @@ export function ChannelsProvider(props: ParentProps) {
         writeChannelSelection(accountKey(), selectionServerId, channelId);
       }
     },
-    // Channels are deprecated: the host archives them at start, and no server offers them.
-    supported: () => false,
+    supported: () => activeServerSupportsCapability(CHANNEL_CHATS_CAPABILITY),
     deletionSupported: () => activeServer()?.kind !== "remote" || serverRoleCanAdminister(activeServer()),
+    taskCancelSupported: () => activeServerSupportsCapability(CHANNEL_TASK_CANCEL_CAPABILITY),
     beforeOpen: () => {
       setAgentSetupOpen(false);
       // The channel covers the workspace, and a direct conversation left selected under it is read
@@ -66,6 +68,13 @@ export function ChannelsProvider(props: ParentProps) {
     // arrives behind it was never seen, however focused the window is. The channel stays
     // selected under the report, which is the state this read has to refuse.
     canMarkRead: () => document.hasFocus() && !windowPage.conversationCovered(),
+    // The rows of a joined server's channels go to its frame for the next start.
+    onList: (channels) => {
+      const server = activeServer();
+      const auth = centralAuth();
+      if (server?.kind === "remote" && auth.status === "signed_in")
+        saveRemoteFrameChannels(auth.user.id, server.id, channels);
+    },
   });
   return <ChannelsControllerProvider controller={controller}>{props.children}</ChannelsControllerProvider>;
 }

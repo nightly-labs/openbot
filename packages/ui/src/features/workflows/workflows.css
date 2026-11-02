@@ -1,0 +1,1364 @@
+/*
+ * The workflow canvas: the stage, the HUD, the tool bar, the search, the minimap, the zoom, the version
+ * bar, the Undo toast of a delete and the in-app frame. The nodes use workflow-nodes.css.
+ */
+
+:where(.wfn-stage) {
+  /* A control in the tool bar: the bar radius less the bar padding. */
+  --wfn-tool-radius: calc(var(--openbot-radius-grouped) - var(--openbot-space-1-5));
+  /* The canvas inside the window card: the card radius less its 1px border. */
+  --wfn-card-inner-radius: calc(var(--openbot-radius-card) - 1px);
+}
+
+.wfn-stage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 120px;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 120px var(--openbot-space-8);
+  background-color: var(--openbot-bg-frame);
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--openbot-text-primary) 9%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 20px 20px;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-sans);
+}
+
+/* ------------------------------------------------------ Menus, library */
+
+.wfn-menu-text {
+  font-size: var(--openbot-text-sm);
+}
+
+.wfn-menu-meta {
+  color: var(--openbot-text-muted);
+  font-size: var(--wfn-small);
+}
+
+.wfn-menu-check {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  margin-left: auto;
+  color: var(--openbot-text-primary);
+}
+
+/* ---------------------------------------------------------- Connections */
+
+.wfn-stage {
+  position: relative;
+}
+
+/* On a screen with one device pixel for each CSS pixel, a line of 1.5 in a 24px icon that shows at 14px or 16px is
+ * thinner than a pixel, so it shows faint and soft. A line of 2 fills whole pixels. */
+@media (max-resolution: 1.5dppx) {
+  .wfn-stage {
+    --openbot-icon-stroke: 2;
+  }
+}
+
+/* --------------------------------------------------------------- Canvas */
+
+.wfn-stage.wfn-canvas {
+  display: block;
+  height: 100vh;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  background-image: none;
+}
+
+.wfn-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: default;
+  touch-action: none;
+}
+
+/*
+ * The canvas fades out at the edges of the view, so a node that the view cuts does not end on a hard
+ * line. The fade is over the world and under the bars, the cursors and the selection box.
+ */
+.wfn-viewport::after {
+  --wfn-edge-fade: var(--openbot-space-8);
+
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  content: "";
+  background:
+    linear-gradient(to right, var(--openbot-bg-frame), transparent) left / var(--wfn-edge-fade) 100% no-repeat,
+    linear-gradient(to left, var(--openbot-bg-frame), transparent) right / var(--wfn-edge-fade) 100% no-repeat,
+    linear-gradient(to bottom, var(--openbot-bg-frame), transparent) top / 100% var(--wfn-edge-fade) no-repeat,
+    linear-gradient(to top, var(--openbot-bg-frame), transparent) bottom / 100% var(--wfn-edge-fade) no-repeat;
+  pointer-events: none;
+}
+
+/* The dot grid fades out toward the edges of the view, as on the Higgsfield canvas. A mask reads only
+ * the alpha, so any opaque colour serves. */
+.wfn-dots {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  mask-image: radial-gradient(ellipse 85% 75% at 50% 50%, var(--openbot-text-primary) 45%, transparent 100%);
+  pointer-events: none;
+}
+
+.wfn-dots circle {
+  fill: color-mix(in srgb, var(--openbot-text-primary) 15%, transparent);
+}
+
+/* A drag on the empty canvas draws a selection box; Space held turns it into a pan. */
+.wfn-viewport[data-space] {
+  cursor: grab;
+}
+
+.wfn-viewport:is([data-panning], [data-dragging]) {
+  cursor: grabbing;
+  user-select: none;
+}
+
+/* A size that goes back to its default eases there too. */
+.wfn-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  interpolate-size: allow-keywords;
+}
+
+/* While the camera glides, the nodes that pass under a still pointer show no hover. */
+.wfn-viewport[data-camera-moving] .wfn-world {
+  pointer-events: none;
+}
+
+/* The world has no width, so a slot sizes to its content and free text does not wrap. */
+.wfn-slot {
+  position: absolute;
+  width: max-content;
+  cursor: default;
+}
+
+.wfn-slot :is(.wfn-label, .wfn-card) {
+  cursor: grab;
+}
+
+.wfn-viewport[data-dragging] .wfn-slot :is(.wfn-label, .wfn-card) {
+  cursor: grabbing;
+}
+
+/*
+ * The HUD: every bar over the canvas is one glass bar, 40px high, with a 4px inset. Controls inside
+ * are 32px with an 8px radius, so the bar radius is 8 + 4 = 12. The bars come in one after another.
+ */
+.wfn-canvas {
+  /* The space between the bottom bars and the edges of the canvas. */
+  --wfn-hud-inset: var(--openbot-space-4);
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.wfn-hud {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  height: calc(var(--openbot-control-md) + var(--openbot-space-2));
+  padding: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--wfn-glass);
+  box-shadow: 0 0 0 1px var(--wfn-ring-strong);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  backdrop-filter: var(--wfn-glass-blur);
+}
+
+.wfn-hud-top {
+  position: absolute;
+  top: var(--openbot-space-4);
+  right: var(--openbot-space-4);
+  left: var(--openbot-space-4);
+  z-index: 3;
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: flex-start;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.wfn-hud-top .wfn-hud {
+  position: relative;
+  pointer-events: auto;
+}
+
+.wfn-hud-group {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+}
+
+/* The tool bar: tools, then Search, then Add node as the one primary action. */
+.wfn-hud-tools {
+  bottom: var(--wfn-hud-inset);
+  left: round(50%, 1px);
+  translate: round(-50%, 1px) 0;
+}
+
+.wfn-stage .wfn-hud-add-button {
+  margin-left: var(--openbot-space-1);
+}
+
+/* A pressed tool, such as Select or an open minimap: a quiet fill, not a colour. */
+.wfn-stage .wfn-hud .wfn-hud-tool[aria-pressed="true"] {
+  background: var(--wfn-hover);
+  color: var(--openbot-text-primary);
+}
+
+/* The icon of a pressed tool is full. Most icons have lines inside, which a full fill hides, so they take a part fill.
+ * The Select arrow is one closed shape, so it fills whole. */
+.wfn-stage .wfn-hud .wfn-hud-tool[aria-pressed="true"] svg.lucide {
+  fill: currentcolor;
+  fill-opacity: 0.35;
+}
+
+.wfn-stage .wfn-hud .wfn-hud-tool[aria-pressed="true"] svg.wfn-hud-arrow {
+  fill-opacity: 1;
+}
+
+.wfn-stage .wfn-hud .wfn-hud-tool svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+/* The workflow switcher: the name and a small chevron in one button. The name has the type of the other page titles. */
+.wfn-stage .wfn-hud-title .wfn-hud-switcher {
+  gap: var(--openbot-space-1-5);
+  min-width: 0;
+  padding-inline: var(--openbot-space-3) calc(var(--openbot-space-2) + var(--openbot-space-0-5));
+}
+
+.wfn-stage .wfn-hud-switcher-name {
+  overflow: hidden;
+  max-width: 40ch;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-stage .wfn-hud-switcher .wfn-hud-chevron {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  color: var(--openbot-text-muted);
+}
+
+/* In the desktop window, the page lets clicks through to the server menu in the top row. The parts of the canvas take
+ * them back; the top row of the canvas starts after the server menu. */
+.wfn-canvas[data-frame="window"] > * {
+  pointer-events: auto;
+}
+
+/* The Draw tool draws over the nodes, and Sticky note and Shapes place over them, so the nodes do not take a press. */
+.wfn-canvas:is([data-tool="draw"], [data-tool="note"], [data-tool="shape"]) .wfn-world * {
+  pointer-events: none;
+}
+
+/* The pan tool takes every press on the canvas, nodes too. */
+.wfn-canvas[data-tool="pan"] .wfn-viewport,
+.wfn-canvas[data-tool="pan"] .wfn-slot :is(.wfn-label, .wfn-card, .wfn-card *) {
+  cursor: grab;
+}
+
+.wfn-canvas[data-tool="pan"] .wfn-viewport[data-panning],
+.wfn-canvas[data-tool="pan"] .wfn-viewport[data-panning] * {
+  cursor: grabbing;
+}
+
+.wfn-canvas[data-tool="draw"] .wfn-viewport {
+  cursor: crosshair;
+}
+
+.wfn-canvas[data-draw="eraser"] .wfn-viewport {
+  cursor: none;
+}
+
+/* The options of the Draw, Sticky note and Shapes tools sit above the tool bar, at its centre. */
+.wfn-hud.wfn-hud-sub {
+  right: 0;
+  bottom: calc(var(--wfn-hud-inset) + var(--openbot-control-lg) + var(--openbot-space-3) + var(--openbot-space-2));
+  left: 0;
+  gap: var(--openbot-space-1);
+  width: fit-content;
+  margin-inline: auto;
+}
+
+.wfn-stage .wfn-hud-sub .wfn-hud-tool {
+  width: var(--openbot-control-md);
+}
+
+.wfn-stage .wfn-hud-sub .wfn-shape-icon {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+/* The shape colour: the picked colour and a chevron, as the colour button of Higgsfield. */
+.wfn-stage .wfn-hud .wfn-hud-fill {
+  gap: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-2) var(--openbot-space-1-5);
+}
+
+.wfn-stage .wfn-hud-fill .wfn-hud-chevron {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  color: var(--openbot-text-muted);
+}
+
+/*
+ * The item that Sticky note or Shapes puts down shows at half strength under the pointer, at its
+ * size on the canvas, with its centre on the pointer.
+ */
+.wfn-ghost {
+  position: absolute;
+  z-index: 3;
+  opacity: 0.5;
+  translate: -50% -50%;
+  pointer-events: none;
+  animation: wfn-fade-in var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+/* A shape that a drag draws grows from the corner where the drag started. */
+.wfn-ghost[data-drawn] {
+  translate: none;
+  animation: none;
+}
+
+.wfn-ghost[data-kind="note"] {
+  border-radius: var(--wfn-radius-card);
+  background: var(--wfn-note-paper);
+  box-shadow: 0 0 0 1px var(--wfn-note-edge);
+}
+
+.wfn-ghost span.wfn-shape-surface {
+  background: color-mix(in srgb, var(--wfn-shape) 16%, transparent);
+  box-shadow: none;
+  outline: 1px dashed var(--wfn-shape);
+  outline-offset: -1px;
+}
+
+.wfn-ghost svg.wfn-shape-surface {
+  stroke-dasharray: 4 3;
+  stroke-width: 1;
+}
+
+.wfn-ink-dot {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--wfn-ink);
+  box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
+  transition-property: box-shadow;
+  transition-duration: var(--openbot-duration-fast);
+  transition-timing-function: var(--openbot-ease-out);
+}
+
+/* The picked colour has a ring in the text colour, with a gap of the bar colour. */
+.wfn-stage .wfn-hud .wfn-ink-swatch[aria-pressed="true"] {
+  background: transparent;
+}
+
+.wfn-ink-swatch[aria-pressed="true"] .wfn-ink-dot {
+  box-shadow:
+    0 0 0 2px var(--wfn-glass),
+    0 0 0 3.5px var(--openbot-text-primary);
+}
+
+/* The lines: in canvas units, so a zoom scales them with the nodes. */
+.wfn-ink {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.wfn-ink-line {
+  fill: none;
+  stroke: var(--wfn-ink);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition-property: opacity;
+  transition-duration: var(--openbot-duration-fast);
+  transition-timing-function: var(--openbot-ease-out);
+}
+
+.wfn-ink-line[data-brush="marker"] {
+  stroke-opacity: 0.45;
+}
+
+/* A line that the eraser touched shows faint until the release removes it. */
+.wfn-ink-line[data-erasing] {
+  opacity: 0.25;
+}
+
+.wfn-eraser {
+  position: absolute;
+  z-index: 3;
+  width: var(--openbot-space-4);
+  height: var(--openbot-space-4);
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
+  box-shadow: inset 0 0 0 1px var(--openbot-text-primary);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+/* Hide interface keeps only the canvas and one way back. */
+.wfn-canvas[data-hud-hidden] :is(.wfn-hud, .wfn-hud-top) {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.wfn-stage .wfn-hud-show {
+  position: absolute;
+  right: var(--wfn-hud-inset);
+  bottom: var(--wfn-hud-inset);
+  z-index: 3;
+  gap: var(--openbot-space-1-5);
+  animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.wfn-hud-zoom {
+  bottom: var(--wfn-hud-inset);
+  left: var(--wfn-hud-inset);
+}
+
+.wfn-hud-separator {
+  width: 1px;
+  height: var(--openbot-space-4);
+  margin: 0 var(--openbot-space-1);
+  background: var(--wfn-ring-strong);
+}
+
+/* Every control in a bar, and in a node toolbar: 32px and a press scale. Bar controls have radius 8. */
+.wfn-stage .wfn-hud .ui-button {
+  border-radius: var(--openbot-radius-md);
+}
+
+.wfn-stage :is(.wfn-hud, .wfn-toolbar) .ui-button {
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  transition-property: background-color, color, opacity, scale;
+  transition-duration: var(--openbot-duration-fast);
+  transition-timing-function: var(--openbot-ease-out);
+}
+
+.wfn-stage :is(.wfn-hud, .wfn-toolbar) .ui-button:active:not(:disabled) {
+  scale: 0.96;
+}
+
+.wfn-stage .wfn-hud .ui-button-variant-ghost {
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-stage .wfn-hud .ui-button-variant-ghost:hover:not(:disabled),
+.wfn-stage .wfn-hud .ui-button-variant-ghost[data-expanded] {
+  background: var(--wfn-hover);
+  color: var(--openbot-text-primary);
+}
+
+.wfn-stage .wfn-hud-button {
+  gap: var(--openbot-space-1-5);
+  height: var(--openbot-control-md);
+  padding-inline: var(--openbot-space-3);
+}
+
+/* An icon has space of its own at its edge, so the side with the icon gets less padding. Then the two sides look equal. */
+.wfn-stage .wfn-hud-button:has(> svg:first-child) {
+  padding-inline-start: calc(var(--openbot-space-2) + var(--openbot-space-0-5));
+}
+
+.wfn-stage .wfn-hud-button svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/*
+ * The tool bar is one size up from the other bars, as on Higgsfield: 48px high, 36px controls with
+ * 20px icons. The control radius is 16 - 6 = 10, so the corners stay concentric.
+ */
+.wfn-stage .wfn-hud-tools {
+  gap: var(--openbot-space-1-5);
+  height: calc(var(--openbot-control-lg) + var(--openbot-space-3));
+  padding: var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-grouped);
+}
+
+.wfn-stage .wfn-hud-tools .ui-button {
+  height: var(--openbot-control-lg);
+  border-radius: var(--wfn-tool-radius);
+}
+
+.wfn-stage .wfn-hud-tools .wfn-hud-tool {
+  width: var(--openbot-control-lg);
+}
+
+.wfn-stage .wfn-hud-tools .wfn-hud-tool svg {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+}
+
+.wfn-stage .wfn-hud-tools .wfn-hud-add-button svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+/*
+ * The Draw, Sticky note and Shapes tools show a picture in the bar. The pen stands on the bar and
+ * the bar cuts its foot; the notes and the shapes sit in the centre of the button. On hover and when
+ * the tool is on, each layer moves on its own with a small spring, as on Higgsfield.
+ */
+.wfn-stage .wfn-hud-tools {
+  overflow: clip;
+}
+
+.wfn-stage .wfn-hud-tools .wfn-hud-tool[data-art] {
+  position: relative;
+  width: calc(var(--openbot-control-lg) + var(--openbot-space-2));
+  padding: 0;
+  overflow: visible;
+}
+
+.wfn-stage .wfn-hud-tools .wfn-hud-tool:is([data-art="note"], [data-art="shape"]) {
+  width: calc(var(--openbot-control-lg) + var(--openbot-space-4));
+}
+
+.wfn-stage .wfn-hud .wfn-hud-tool[data-art]:is(:hover, [aria-pressed="true"]) {
+  background: transparent;
+}
+
+/*
+ * The art colours. Each picture mixes its colour with paper for a lit face and with paper text for
+ * a face in shade, so a picture reads the same in the dark and the light theme. The front of a note
+ * or a shape goes from the lit face to the base colour.
+ */
+.wfn-stage .wfn-hud-tools .wfn-hud-tool[data-art] .wfn-tool-art {
+  --wfn-art-base: var(--wfn-art-color);
+  --wfn-art-light: color-mix(in srgb, var(--wfn-art-color) 58%, var(--openbot-paper));
+  --wfn-art-dark: color-mix(in srgb, var(--wfn-art-color) 72%, var(--openbot-paper-text));
+  --wfn-art-wood-color: color-mix(in srgb, var(--openbot-file-orange) 38%, var(--openbot-paper));
+  --wfn-art-metal-color: color-mix(in srgb, var(--openbot-paper) 78%, var(--openbot-paper-text));
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/*
+ * The light palette darkens each colour for text. A note or a shape keeps the hue at a fixed light
+ * tone there, as the note paper does, so it is bright and clean. The ink colour becomes a light neutral tone.
+ */
+:root[data-openbot-color-scheme="light"] .wfn-stage .wfn-hud-tools .wfn-hud-tool[data-art] .wfn-tool-art {
+  --wfn-art-base: oklch(from var(--wfn-art-color) 0.82 calc(c * 0.75) h);
+  --wfn-art-light: oklch(from var(--wfn-art-color) 0.93 calc(c * 0.35) h);
+}
+
+/* The pen comes up out of the bar. */
+.wfn-hud-tool[data-art="draw"]:is(:hover, [aria-pressed="true"]) .wfn-art-layer {
+  translate: 0 calc(var(--openbot-space-1-5) * -1);
+}
+
+/* The notes fan out: the back note goes to the left, the front note goes up and to the right. */
+.wfn-hud-tool[data-art="note"]:is(:hover, [aria-pressed="true"]) [data-layer="back"] {
+  rotate: -15deg;
+  translate: calc(var(--openbot-space-1) * -1) calc(var(--openbot-space-0-5) * -1);
+}
+
+.wfn-hud-tool[data-art="note"]:is(:hover, [aria-pressed="true"]) [data-layer="middle"] {
+  rotate: 4deg;
+  translate: 0 calc(var(--openbot-space-1) * -1);
+}
+
+.wfn-hud-tool[data-art="note"]:is(:hover, [aria-pressed="true"]) [data-layer="front"] {
+  rotate: 4deg;
+  translate: var(--openbot-space-1) calc(var(--openbot-space-1-5) * -1);
+}
+
+/* The square grows and turns to the left, the circle rolls to the right, the next shape lifts. */
+.wfn-hud-tool[data-art="shape"]:is(:hover, [aria-pressed="true"]) [data-layer="back"] {
+  rotate: -17deg;
+  translate: calc(var(--openbot-space-1) * -1) calc(var(--openbot-space-0-5) * -1);
+  scale: 1.06;
+}
+
+.wfn-hud-tool[data-art="shape"]:is(:hover, [aria-pressed="true"]) [data-layer="middle"] {
+  rotate: 12deg;
+  translate: var(--openbot-space-1) var(--openbot-space-0-5);
+}
+
+.wfn-hud-tool[data-art="shape"]:is(:hover, [aria-pressed="true"]) [data-layer="front"] {
+  rotate: 6deg;
+  translate: var(--openbot-space-0-5) calc(var(--openbot-space-1-5) * -1);
+}
+
+.wfn-hud-tools .wfn-hud-separator {
+  height: calc(var(--openbot-space-4) + var(--openbot-space-1));
+  margin: 0 var(--openbot-space-0-5);
+}
+
+/* The icon of a HUD bar, such as the version bar. */
+.wfn-hud-icon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--openbot-control-md);
+  height: var(--openbot-control-md);
+  border-radius: var(--openbot-radius-md);
+  background: var(--wfn-hover);
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-stage .wfn-hud-icon svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.wfn-stage .wfn-hud-name {
+  field-sizing: content;
+  min-width: 8ch;
+  max-width: 40ch;
+  height: var(--openbot-control-md);
+  padding: 0 var(--openbot-space-2);
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  background: transparent;
+  box-shadow: none;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  text-overflow: ellipsis;
+  transition-property: background-color, box-shadow;
+  transition-duration: var(--openbot-duration-fast);
+}
+
+.wfn-stage .wfn-hud-name:hover {
+  background: var(--wfn-hover);
+}
+
+.wfn-stage .wfn-hud-name:focus-visible {
+  outline: none;
+  background: var(--wfn-hover);
+  box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
+}
+
+/* A past run on view. */
+.wfn-hud-viewing {
+  gap: var(--openbot-space-1-5);
+  padding-left: var(--openbot-space-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.wfn-stage .wfn-hud-viewing > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
+}
+
+/* The tools bar gives its place to the version bar while a version shows. */
+.wfn-hud[hidden] {
+  display: none;
+}
+
+/* A version that shows, read-only, in place of the tools: its time, Back, and Make current. */
+.wfn-hud-version {
+  bottom: var(--wfn-hud-inset);
+  left: round(50%, 1px);
+  gap: var(--openbot-space-1-5);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  translate: round(-50%, 1px) 0;
+}
+
+.wfn-hud-lock {
+  display: inline-flex;
+  gap: var(--openbot-space-1);
+  align-items: center;
+  margin-right: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+}
+
+.wfn-hud-lock-icon {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+/* Any drag on a version pans. */
+.wfn-canvas[data-preview] .wfn-viewport {
+  cursor: grab;
+}
+
+.wfn-canvas[data-preview] .wfn-viewport[data-panning] {
+  cursor: grabbing;
+}
+
+.wfn-hud-label {
+  font-weight: var(--openbot-weight-medium);
+}
+
+.wfn-hud-meta {
+  margin-right: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+}
+
+.wfn-hud-count {
+  min-width: var(--openbot-space-4);
+  padding: 0 var(--openbot-space-1);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--wfn-hover);
+  color: var(--openbot-text-muted);
+  font-size: var(--wfn-small);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--openbot-leading-sm);
+  text-align: center;
+}
+
+/* The run: a primary button, or progress and Stop while it runs. */
+.wfn-hud-progress {
+  display: inline-flex;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+  padding: 0 var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-variant-numeric: tabular-nums;
+  animation: wfn-fade-in var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.wfn-hud-progress .wfn-hud-ring {
+  --ui-radial-progress-color: var(--openbot-text-primary);
+
+  width: var(--openbot-icon-md);
+}
+
+.wfn-stage .wfn-hud-stop {
+  animation: wfn-fade-in var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.wfn-stage .wfn-hud-stop svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  fill: currentColor;
+}
+
+@keyframes wfn-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Zoom: the value opens the zoom menu. */
+.wfn-stage .wfn-zoom-value {
+  justify-content: center;
+  min-width: 6ch;
+  padding-inline: var(--openbot-space-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.wfn-zoom-menu {
+  min-width: 200px;
+}
+
+.wfn-zoom-menu .wfn-menu-text {
+  margin-right: auto;
+}
+
+/* The zoom levels: a 3 by 2 grid above the zoom commands, as on the Higgsfield canvas. */
+.wfn-zoom-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+}
+
+.wfn-zoom-menu.ui-action-menu .wfn-zoom-presets .wfn-zoom-preset {
+  justify-content: center;
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.wfn-zoom-menu.ui-action-menu .wfn-zoom-presets .wfn-zoom-preset[data-current] {
+  background: var(--wfn-hover);
+  color: var(--openbot-text-primary);
+}
+
+/* Context menu icons sit in one column, so the labels align. */
+.wfn-menu-glyph {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-menu-glyph svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* The shared danger colour reaches only a direct icon, so the column icon takes it here. */
+.wfn-menu .ui-action-menu-danger .wfn-menu-glyph {
+  color: var(--openbot-danger);
+}
+
+/* ------------------------------------------------------------- Search */
+
+/*
+ * Search opens above the tool bar, as on the Higgsfield canvas. It is one glass panel: the field,
+ * then the empty line or the results. The panel radius is the field radius + its 4px inset.
+ */
+.wfn-hud.wfn-search {
+  bottom: calc(var(--wfn-hud-inset) + var(--openbot-control-md) + var(--openbot-space-2) + var(--openbot-space-2));
+  left: round(50%, 1px);
+  display: grid;
+  gap: var(--openbot-space-1);
+  align-items: stretch;
+  width: min(480px, calc(100% - var(--openbot-space-8)));
+  height: auto;
+  translate: round(-50%, 1px) 0;
+}
+
+.wfn-search-field {
+  display: flex;
+  gap: var(--openbot-space-1);
+  align-items: center;
+  padding-left: var(--openbot-space-2);
+  border-radius: var(--wfn-tool-radius);
+}
+
+/* The field has no border, so a 1px ring in the focus colour shows where typing goes. */
+.wfn-search-field:has(.wfn-search-input:focus-visible) {
+  box-shadow: inset 0 0 0 1px var(--openbot-border-focus);
+}
+
+.wfn-stage .wfn-search-icon {
+  flex: 0 0 auto;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
+}
+
+.wfn-stage .wfn-search-input {
+  flex: 1 1 auto;
+  height: var(--openbot-control-md);
+  padding: 0 var(--openbot-space-1);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--openbot-text-sm);
+}
+
+.wfn-stage .wfn-search-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.wfn-search-empty {
+  margin: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3);
+  border-top: 1px solid var(--wfn-ring);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-wrap: pretty;
+}
+
+.wfn-search-results {
+  display: grid;
+  gap: 2px;
+  max-height: 320px;
+  margin: 0;
+  padding: var(--openbot-space-1) 0 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--wfn-ring);
+  list-style: none;
+}
+
+.wfn-stage .wfn-hud .wfn-search-result {
+  justify-content: flex-start;
+  gap: var(--openbot-space-2);
+  width: 100%;
+  height: auto;
+  min-height: var(--openbot-control-md);
+  padding: var(--openbot-space-1) var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  text-align: left;
+}
+
+.wfn-search-result .wfn-menu-text {
+  flex: 0 0 auto;
+}
+
+/*
+ * A connection dropped on the empty canvas opens the same panel at the end of the line, with only the
+ * kinds that can take it. The first kind is what Enter adds, so it shows the hover fill while the
+ * field has focus.
+ */
+/* The popover places the menu, so it does not take the place of the search bar. */
+.wfn-hud.wfn-search.wfn-drop-menu {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  width: 240px;
+  translate: none;
+}
+
+/* Its groups and rows are those of the add menu: the icon of the kind and its name. */
+.wfn-hud.wfn-drop-menu .wfn-search-results {
+  display: block;
+  max-height: min(560px, calc(100vh - var(--openbot-space-8)));
+  padding: var(--openbot-space-1) 0 0;
+}
+
+.wfn-drop-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wfn-drop-menu:has(.wfn-search-input:focus) .wfn-search-result[data-first] {
+  background: var(--wfn-hover);
+}
+
+.wfn-search-snippet {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--wfn-small);
+  font-weight: var(--openbot-weight-regular);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ Minimap */
+
+/* The minimap sits over the zoom bar. Nodes are kind-tinted blocks; the view is a bright frame. */
+.wfn-hud.wfn-minimap {
+  bottom: calc(var(--wfn-hud-inset) + var(--openbot-control-md) + var(--openbot-space-2) + var(--openbot-space-2));
+  left: var(--wfn-hud-inset);
+  height: auto;
+  padding: 0;
+  overflow: hidden;
+}
+
+.wfn-minimap svg {
+  display: block;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.wfn-minimap-node {
+  fill: color-mix(in srgb, var(--wfn-kind, var(--openbot-text-primary)) 40%, transparent);
+}
+
+.wfn-minimap-node[data-selected] {
+  fill: var(--openbot-text-primary);
+}
+
+/* A drawn line, thin at every size, so it does not cover the nodes. */
+.wfn-minimap-line {
+  fill: none;
+  stroke: var(--wfn-ink);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.wfn-minimap-line[data-brush="marker"] {
+  stroke-opacity: 0.45;
+}
+
+.wfn-minimap-view {
+  fill: color-mix(in srgb, var(--openbot-text-primary) 4%, transparent);
+  stroke: color-mix(in srgb, var(--openbot-text-primary) 64%, transparent);
+  stroke-width: 1.5;
+}
+
+.wfn-results-menu {
+  min-width: 220px;
+}
+
+.wfn-results-menu .wfn-menu-text {
+  margin-right: auto;
+}
+
+.wfn-results-menu .wfn-menu-meta {
+  font-variant-numeric: tabular-nums;
+}
+
+.wfn-results-menu .wfn-menu-check {
+  margin-left: 0;
+}
+
+.wfn-menu-check[data-off] {
+  visibility: hidden;
+}
+
+/* Each node kind has one colour, for its menu tile and its results strip. The tile is a soft wash of
+ * that colour behind the icon. */
+.wfn-menu-icon {
+  --wfn-kind: var(--openbot-text-secondary);
+
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+  margin-left: calc(var(--openbot-space-1) * -1);
+  border-radius: var(--openbot-radius-sm);
+  background: color-mix(in srgb, var(--wfn-kind) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wfn-kind) 14%, transparent);
+  color: var(--wfn-kind);
+}
+
+:is(.wfn-menu, .wfn-search) .wfn-menu-icon svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: inherit;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wfn-edge-line,
+  .wfn-edge-comet,
+  .wfn-hud-progress,
+  .wfn-stage .wfn-hud-stop {
+    animation: none;
+  }
+
+  .wfn-stage :is(.wfn-hud, .wfn-toolbar) .ui-button:active:not(:disabled) {
+    scale: 1;
+  }
+}
+
+/* ------------------------------------------------------------ Selection */
+
+/* In a group, each node keeps its ring, and only one node at a time resizes. */
+.wfn-world[data-group] .wfn-grip {
+  display: none;
+}
+
+/* While a node moves or resizes, the nodes under the pointer show no handles. */
+.wfn-viewport:is([data-resizing], [data-dragging]) .wfn-node:not([data-resizing], [data-selected]) .wfn-grip {
+  --wfn-grip-color: transparent;
+}
+
+/* The cursor of the handle stays while the pointer moves over other nodes. */
+.wfn-viewport[data-resizing],
+.wfn-viewport[data-resizing] .wfn-slot :is(.wfn-label, .wfn-card, .wfn-grip) {
+  cursor: ew-resize;
+  user-select: none;
+}
+
+.wfn-viewport[data-resizing="ns"],
+.wfn-viewport[data-resizing="ns"] .wfn-slot :is(.wfn-label, .wfn-card, .wfn-grip) {
+  cursor: ns-resize;
+}
+
+.wfn-viewport[data-resizing="nwse"],
+.wfn-viewport[data-resizing="nwse"] .wfn-slot :is(.wfn-label, .wfn-card, .wfn-grip) {
+  cursor: nwse-resize;
+}
+
+.wfn-viewport[data-resizing="nesw"],
+.wfn-viewport[data-resizing="nesw"] .wfn-slot :is(.wfn-label, .wfn-card, .wfn-grip) {
+  cursor: nesw-resize;
+}
+
+/* A live resize follows the pointer with no delay. */
+.wfn-viewport[data-resizing] .wfn-slot :is(.wfn-node, .wfn-card) {
+  transition: none;
+}
+
+/* ------------------------------------------------------- Empty canvas */
+
+/* An empty workflow asks for its trigger in the middle of the canvas. The canvas stays usable. */
+.wfn-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: var(--openbot-space-3);
+  place-content: center;
+  justify-items: center;
+  pointer-events: none;
+  animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.wfn-empty > * {
+  pointer-events: auto;
+}
+
+.wfn-stage .wfn-empty-icon {
+  width: var(--openbot-control-lg);
+  height: var(--openbot-control-lg);
+  border-radius: var(--openbot-radius-lg);
+}
+
+.wfn-stage .wfn-empty-icon svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+.wfn-empty-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  text-wrap: balance;
+}
+
+/* ------------------------------------------------------------ Selection */
+
+/* The selection box: a quiet fill and a 1px ring, not a colour. */
+.wfn-marquee {
+  position: absolute;
+  z-index: 3;
+  border-radius: var(--openbot-radius-xs);
+  background: color-mix(in srgb, var(--openbot-text-primary) 4%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 32%, transparent);
+  pointer-events: none;
+}
+
+/* A selection of more than one node: one frame around all of it and one toolbar. */
+.wfn-group {
+  position: absolute;
+  z-index: 2;
+  border-radius: var(--wfn-radius-card);
+  outline: calc(1px / var(--wfn-scale, 1)) dashed color-mix(in srgb, var(--openbot-text-primary) 24%, transparent);
+  outline-offset: calc(12px / var(--wfn-scale, 1));
+  pointer-events: none;
+}
+
+.wfn-group .wfn-group-bar {
+  bottom: calc(100% + (12px + var(--openbot-space-3)) / var(--wfn-scale, 1));
+  pointer-events: auto;
+}
+
+.wfn-group-count {
+  padding: 0 var(--openbot-space-1) 0 var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.wfn-viewport[data-dragging] .wfn-group-bar {
+  opacity: 0;
+}
+
+/* Alignment guides: 1px at every zoom, a faint tint of the text colour that fades in. */
+.wfn-guide {
+  position: absolute;
+  z-index: 3;
+  background: color-mix(in srgb, var(--openbot-text-primary) 22%, transparent);
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+@starting-style {
+  .wfn-guide {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wfn-guide {
+    transition: none;
+  }
+}
+
+.wfn-guide[data-axis="x"] {
+  width: calc(1px / var(--wfn-scale, 1));
+  translate: calc(-0.5px / var(--wfn-scale, 1)) 0;
+}
+
+.wfn-guide[data-axis="y"] {
+  height: calc(1px / var(--wfn-scale, 1));
+  translate: 0 calc(-0.5px / var(--wfn-scale, 1));
+}
+
+/* ------------------------------------------------------------ Run status */
+
+.wfn-hud-live {
+  display: contents;
+}
+
+.wfn-stage .wfn-hud-step {
+  gap: var(--openbot-space-1-5);
+  max-width: 360px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wfn-stage .wfn-hud .wfn-hud-step > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: none;
+  color: var(--openbot-text-muted);
+}
+
+.wfn-stage .wfn-hud-status[data-status="failed"] .wfn-hud-step > svg {
+  color: var(--openbot-danger-text);
+}
+
+.wfn-hud-step .wfn-hud-meta {
+  margin-right: 0;
+}
+
+.wfn-hud-step-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wfn-ghost {
+    animation: none;
+  }
+}
+
+/* A deleted workflow hides until its Undo toast closes. */
+.wfn-stage[data-deleted] {
+  visibility: hidden;
+}
+
+/* The Undo toast of a workflow delete has the 1px ring and no shadow, as the other canvas surfaces. */
+.wfn-undo-toast-host .agent-delete-undo-toast {
+  box-shadow: 0 0 0 1px var(--openbot-border);
+}
+
+.wfn-undo-toast-tile {
+  display: grid;
+  place-items: center;
+  width: var(--openbot-control-md);
+  height: var(--openbot-control-md);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-control);
+  box-shadow: inset 0 0 0 1px var(--openbot-border);
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-undo-toast-icon {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* --------------------------------------------------------------- In app */
+
+/* The story has no root that sizes the window, so the window takes the screen. */
+.app-window.wfn-app {
+  height: 100vh;
+}
+
+/*
+ * In the desktop window, the canvas fills the pane. The window frame shows through the top row, which
+ * holds the canvas bar, and the canvas paints only the card below it, inside the card's border and corners.
+ */
+.wfn-stage.wfn-canvas[data-frame="window"] {
+  --wfn-hud-inset: var(--openbot-space-2);
+
+  height: 100%;
+  background: transparent;
+}
+
+.wfn-canvas[data-frame="window"] :is(.wfn-viewport, .wfn-empty) {
+  top: var(--left-header-height);
+}
+
+.wfn-canvas[data-frame="window"] .wfn-viewport {
+  border-radius: var(--wfn-card-inner-radius);
+  background: var(--openbot-bg-frame);
+}
+
+/* The workflow page does not need the Marketplace button that the sidebar keeps in the top row. */
+.wfn-app .sidebar-marketplace-button {
+  display: none;
+}
+
+/* The server menu keeps the start of the top row, so the bar starts after it. */
+.wfn-canvas[data-frame="window"] .wfn-hud-top {
+  top: 0;
+  right: var(--openbot-space-3);
+  left: calc(var(--left-panel-width) + var(--openbot-space-3));
+  height: var(--left-header-height);
+  align-items: center;
+}
+
+/* In the top row, the bars are plain groups of controls, as in the other pages' top rows. */
+.wfn-canvas[data-frame="window"] .wfn-hud-top .wfn-hud {
+  height: auto;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* The buttons of the top row have the size of the buttons in the other pages' top rows, such as Run now in Routines. */
+.wfn-canvas[data-frame="window"] .wfn-hud-top .wfn-hud-button {
+  height: var(--openbot-control-xs);
+  padding-inline: var(--openbot-space-2);
+  font-size: var(--openbot-text-lg);
+}
+
+.wfn-canvas[data-frame="window"] .wfn-hud-top .wfn-hud-button svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+/* The window's top row stays when the interface is hidden: only the bars on the canvas go. */
+.wfn-canvas[data-frame="window"][data-hud-hidden] .wfn-hud-top,
+.wfn-canvas[data-frame="window"][data-hud-hidden] .wfn-hud-top .wfn-hud {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------ Switcher */
+
+/*
+ * The workflow switcher in the menu of the app. The panel keeps the sheet colour, the edge and the top
+ * highlight of the shared menu, but not its drop shadow.
+ */
+
+.wfs-menu.ui-action-menu {
+  --ui-menu-panel-shadow: inset 0 1px 0 var(--ui-menu-highlight), 0 0 0 1px var(--ui-menu-edge);
+
+  min-width: 260px;
+  max-width: min(320px, calc(100vw - var(--openbot-space-4)));
+  max-height: min(520px, var(--kb-popper-content-available-height, 520px));
+  overflow-y: auto;
+}
+
+.wfs-menu .wfs-name {
+  flex: 1 1 auto;
+}
+
+/* The step count at the end of a row keeps its numbers in line from row to row. */
+.wfs-menu .ui-menu-trailing {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The history clock has no closed shape, so it stays an outline on the highlighted row. */
+.wfs-menu.ui-action-menu [class~="lucide-rotate-ccw-clock"] > * {
+  fill: none;
+}

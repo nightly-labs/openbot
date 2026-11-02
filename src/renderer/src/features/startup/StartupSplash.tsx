@@ -31,7 +31,7 @@ const RIGHT_EYE_LENGTH = strokeLength(APP_LOGO_EYE_POINTS.right);
  * eye, and the longer of the two for both eyes. The unit is px:
  * a unitless number in `calc()` does not interpolate. In SVG, px are the mark's user units.
  */
-export const SPLASH_EYE_LENGTH_STYLE = {
+const SPLASH_EYE_LENGTH_STYLE = {
   "--splash-eye-left-length": `${LEFT_EYE_LENGTH}px`,
   "--splash-eye-right-length": `${RIGHT_EYE_LENGTH}px`,
   "--splash-eye-length": `${Math.max(LEFT_EYE_LENGTH, RIGHT_EYE_LENGTH)}px`,

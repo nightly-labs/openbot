@@ -1,10 +1,15 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { accessSync } from "node:fs";
+import { accessSync, copyFileSync, mkdirSync, realpathSync } from "node:fs";
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { type BundledLibrary, bundledLibraryLicenses, bundleMacDynamicLibraries } from "./mac-runtime-dylibs";
+import {
+  type BundledLibrary,
+  bundledLibraryLicense,
+  bundledLibraryLicenses,
+  bundleMacDynamicLibraries,
+} from "./mac-runtime-dylibs";
 import { createRemoteDesktopSourceManifest, loadNativeRuntimeLock } from "./native-runtime-lock";
 
 const platform =
@@ -24,8 +29,15 @@ const tarExecutable =
  * in software. The other capture and encoder paths need a GPU, a Wayland compositor or elevated
  * capabilities, and each would add libraries that such a computer does not have. With no tray, the
  * binary also loads no GTK modules.
+ *
+ * Boost.Locale turns on its ICU backend when it finds ICU, and each Ubuntu release has another ICU
+ * version. Sunshine only converts UTF-8, which the iconv backend of glibc does. The RUNPATH makes
+ * Sunshine load the libraries in `lib/` (LINUX_BUNDLED_LIBRARIES) before those of the system.
  */
 const LINUX_SUNSHINE_OPTIONS = [
+  "-DBOOST_LOCALE_ENABLE_ICU=OFF",
+  "-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON",
+  "-DCMAKE_INSTALL_RPATH=$ORIGIN/lib",
   "-DSUNSHINE_ENABLE_CUDA=OFF",
   "-DSUNSHINE_ENABLE_DRM=OFF",
   "-DSUNSHINE_ENABLE_KWIN=OFF",
@@ -36,6 +48,14 @@ const LINUX_SUNSHINE_OPTIONS = [
   "-DSUNSHINE_ENABLE_WAYLAND=OFF",
   "-DSUNSHINE_ENABLE_X11=ON",
 ];
+
+/**
+ * The libraries that the Linux runtime carries, and the Ubuntu 24.04 package of each. Ubuntu 26.04
+ * has libminiupnpc21 only, and its ABI is not that of libminiupnpc17.
+ */
+const LINUX_BUNDLED_LIBRARIES: Readonly<Record<string, string>> = {
+  "libminiupnpc.so.17": "libminiupnpc17",
+};
 
 const lock = await loadNativeRuntimeLock();
 const outputRoot = resolve("build/remote-desktop-runtime", platform, architecture);
@@ -74,6 +94,13 @@ try {
   } else {
     await cp(sunshineBinary, join(outputRoot, `sunshine${executableSuffix}`));
   }
+  // Windows Sunshine reads its DirectX shaders from `assets/` in its working directory, the
+  // runtime directory. Without them it cannot convert a captured frame and does not start.
+  if (platform === "win32") {
+    await cp(join(sunshineSource, "src_assets/windows/assets/shaders"), join(outputRoot, "assets/shaders"), {
+      recursive: true,
+    });
+  }
   await cp(
     join(moonlightSource, "target/release", `web-server${executableSuffix}`),
     join(outputRoot, `web-server${executableSuffix}`),
@@ -90,6 +117,7 @@ try {
     // Before signing, not after: rewriting a load command invalidates the signature over it.
     signMacRuntime(outputRoot, bundled.signTargets);
   }
+  if (platform === "linux") bundledLibraries = bundleLinuxRuntimeDependencies(outputRoot);
 
   const licenses = resolve("build/remote-desktop-runtime/licenses");
   await mkdir(licenses, { recursive: true });
@@ -99,7 +127,9 @@ try {
     // The copies the runtime now carries are OpenBot's to redistribute, so their notices ship with
     // them. Taken from the tree that was linked against, so the notice is the one for the binary in
     // the archive rather than whatever the formula says today.
-    ...bundledLibraryLicenses(bundledLibraries).map(({ file, source }) => cp(source, join(licenses, file))),
+    ...(platform === "linux" ? linuxLibraryLicenses(bundledLibraries) : bundledLibraryLicenses(bundledLibraries)).map(
+      ({ file, source }) => cp(source, join(licenses, file)),
+    ),
     writeFile(
       resolve("build/remote-desktop-runtime/source-manifest.json"),
       `${JSON.stringify(createRemoteDesktopSourceManifest(lock), null, 2)}\n`,
@@ -372,6 +402,35 @@ function bundleMacRuntimeDependencies(root: string): { libraries: BundledLibrary
     libraries: [...inBundle, ...besideExecutables],
     signTargets: besideExecutables.map((library) => library.path),
   };
+}
+
+// Copies each library of LINUX_BUNDLED_LIBRARIES that Sunshine loads into `lib/`. `ldd` gives the
+// file that the build linked against.
+function bundleLinuxRuntimeDependencies(root: string): BundledLibrary[] {
+  const libraries: BundledLibrary[] = [];
+  for (const line of execFileSync("ldd", [join(root, "sunshine")], { encoding: "utf8" }).split("\n")) {
+    const [, name, load] = /^\s*(\S+) => (\/\S+)/.exec(line) ?? [];
+    if (!name || !load || !LINUX_BUNDLED_LIBRARIES[name]) continue;
+    const path = join(root, "lib", name);
+    const origin = realpathSync(load);
+    mkdirSync(dirname(path), { recursive: true });
+    copyFileSync(origin, path);
+    libraries.push({ name, path, origin });
+  }
+  const missing = Object.keys(LINUX_BUNDLED_LIBRARIES).filter(
+    (name) => !libraries.some((library) => library.name === name),
+  );
+  if (missing.length > 0) throw new Error(`Sunshine does not load ${missing.join(", ")}, so it cannot be bundled.`);
+  return libraries;
+}
+
+// Debian keeps the licence of a package in /usr/share/doc/<package>/copyright.
+function linuxLibraryLicenses(libraries: readonly BundledLibrary[]): { file: string; source: string }[] {
+  return libraries.map((library) => {
+    const entry = bundledLibraryLicense(library.name);
+    if (!entry) throw new Error(`${library.name} would ship in the runtime with no licence recorded for it.`);
+    return { file: entry.license, source: `/usr/share/doc/${LINUX_BUNDLED_LIBRARIES[library.name]}/copyright` };
+  });
 }
 
 function signMacRuntime(root: string, bundledLibraries: string[] = []): void {

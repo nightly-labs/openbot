@@ -52,6 +52,7 @@ function createContactForm() {
       return;
     }
     setStatus("sending");
+    const topic = fieldText(data, "topic");
     const response = await fetch("/v1/contact", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -59,16 +60,19 @@ function createContactForm() {
         name: fieldText(data, "name"),
         email,
         company: fieldText(data, "company"),
-        topic: fieldText(data, "topic"),
+        topic,
         message,
       }),
     }).catch(() => null);
     if (response?.ok) {
+      landingAnalytics.trackContactFormSubmitted(topic, "succeeded");
       setSentTo(email);
       setStatus("sent");
       return;
     }
-    setStatus(response?.status === 429 ? "limited" : "failed");
+    const limited = response?.status === 429;
+    landingAnalytics.trackContactFormSubmitted(topic, limited ? "rate_limited" : "failed");
+    setStatus(limited ? "limited" : "failed");
   };
 
   const reset = () => {

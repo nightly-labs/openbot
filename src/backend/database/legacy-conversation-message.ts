@@ -1,5 +1,5 @@
 import type { ConversationMessage } from "@openbot/contracts/ipc";
-import { isConversationMessage } from "@openbot/contracts/ipc";
+import { isConversationMessage, isConversationTurnTrace } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 
 /**
@@ -34,8 +34,18 @@ export function currentConversationMessage(value: unknown): ConversationMessage 
   // the one released key the guard accepts as it stands -- as an unknown extra -- so it is asked for by
   // name; every other one already fails the guard and takes the branch below.
   if (isDynamicRecord(value) && value.senderBotId === undefined && isConversationMessage(value)) return value;
-  const current = withoutEmptyReplyIds(toCurrentKeys(value));
+  const current = withoutInvalidTrace(withoutEmptyReplyIds(toCurrentKeys(value)));
   return isConversationMessage(current) ? current : null;
+}
+
+/**
+ * The trace is timing data that a later build can write in another shape. A trace that does not
+ * decode is dropped, so the message still reads as it did before traces were kept.
+ */
+function withoutInvalidTrace(value: JsonValue): JsonValue {
+  if (!isDynamicRecord(value) || value.trace === undefined || isConversationTurnTrace(value.trace)) return value;
+  const { trace: _dropped, ...message } = value;
+  return message;
 }
 
 function withoutEmptyReplyIds(value: JsonValue): JsonValue {

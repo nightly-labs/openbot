@@ -3,7 +3,15 @@ import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, parse, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type AvatarHue, isAvatarHue, isSkillCategory, type SkillCategory } from "@openbot/contracts/ipc";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import {
+  type AvatarHue,
+  isAgentTemplateRoutine,
+  isAvatarHue,
+  isSkillCategory,
+  type MarketplaceAgentRoutine,
+  type SkillCategory,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { unzipSync, zipSync } from "fflate";
@@ -62,6 +70,7 @@ interface AgentSpec {
   description: string;
   avatarHue: AvatarHue;
   skills: string[];
+  routines: MarketplaceAgentRoutine[];
 }
 
 interface CatalogSpec {
@@ -70,6 +79,8 @@ interface CatalogSpec {
   sources: Record<UpstreamProvider, UpstreamSource>;
   skills: SkillSpec[];
   agents: AgentSpec[];
+  /** Slugs of earlier agents that the publisher unlists. Installed copies keep their snapshot. */
+  retiredAgents: string[];
 }
 
 interface BuiltSkill {
@@ -169,6 +180,7 @@ export async function buildProductionCatalog(outputArgument?: string): Promise<s
       schemaVersion: spec.schemaVersion,
       catalogVersion: spec.catalogVersion,
       agents: spec.agents.map((agent) => buildAgent(agent, builtSkills, version)),
+      retired: { agents: spec.retiredAgents },
     };
     const notices = createUpstreamNotices(spec, builtSkills);
     await writeFile(join(staging, "catalog.json"), stableJson(catalog));
@@ -447,7 +459,7 @@ function buildAgent(agent: AgentSpec, skills: BuiltSkill[], version: number) {
     avatarHue: agent.avatarHue,
     version,
     skills: selected,
-    routines: [],
+    routines: agent.routines,
   };
   const snapshotHash = sha256(JSON.stringify(snapshot));
   return {
@@ -469,13 +481,33 @@ async function loadCatalogSpec(): Promise<CatalogSpec> {
   const skills = [...raw.skills.map(parseSkillSpec), ...packs];
   const duplicateSkill = skills.find((skill, index) => skills.findIndex((item) => item.slug === skill.slug) !== index);
   if (duplicateSkill) throw new Error(`Duplicate production skill slug: ${duplicateSkill.slug}.`);
+  const agents = raw.agents.map(parseAgentSpec);
+  const agentSlugs = new Set(agents.map((agent) => agent.slug));
+  if (agentSlugs.size !== agents.length) throw new Error("Production catalog contains a duplicate agent slug.");
+  const retiredAgents = parseRetiredAgents(raw.retired);
+  const listedRetired = retiredAgents.find((slug) => agentSlugs.has(slug));
+  if (listedRetired) throw new Error(`Retired agent ${listedRetired} is also in the agent list.`);
   return {
     schemaVersion: raw.schemaVersion,
     catalogVersion: raw.catalogVersion,
     sources,
     skills,
-    agents: raw.agents.map(parseAgentSpec),
+    agents,
+    retiredAgents,
   };
+}
+
+function parseRetiredAgents(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (
+    !isDynamicRecord(value) ||
+    !Array.isArray(value.agents) ||
+    !value.agents.every((slug) => isString(slug) && /^[a-z0-9][a-z0-9-]*$/u.test(slug)) ||
+    new Set(value.agents).size !== value.agents.length
+  ) {
+    throw new Error("Production catalog retired list is invalid.");
+  }
+  return value.agents;
 }
 
 function parsePackSpec(value: unknown): PackSpec {
@@ -579,6 +611,15 @@ function parseAgentSpec(value: unknown): AgentSpec {
   ) {
     throw new Error("Production catalog contains an invalid agent.");
   }
+  // The publisher writes routines straight to D1, so they get the checks that a submission gets.
+  const routines = value.routines ?? [];
+  if (
+    !Array.isArray(routines) ||
+    routines.length > INPUT_LIMITS.agentRoutines ||
+    !routines.every(isAgentTemplateRoutine)
+  ) {
+    throw new Error(`Production catalog agent ${value.slug} has an invalid routine.`);
+  }
   return {
     slug: value.slug,
     name: value.name,
@@ -588,6 +629,7 @@ function parseAgentSpec(value: unknown): AgentSpec {
     description: value.description,
     avatarHue: value.avatarHue,
     skills: value.skills,
+    routines,
   };
 }
 

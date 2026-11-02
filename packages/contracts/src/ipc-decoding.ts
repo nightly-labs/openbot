@@ -42,6 +42,12 @@ export function requiredBoolean(record: DynamicRecord, field: string): boolean {
   return value;
 }
 
+export function nullableBoolean(record: DynamicRecord, field: string): boolean | null {
+  const value = record[field];
+  if (value === null || isBoolean(value)) return value;
+  throw new Error(`Invalid ${field}.`);
+}
+
 export function nullableString(record: DynamicRecord, field: string): string | null {
   const value = record[field];
   if (value === null || isString(value)) return value;

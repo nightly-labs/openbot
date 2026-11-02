@@ -12,10 +12,16 @@ const outcome = {
   duration_ms: duration,
   failure_code: ["operation_failed", "connection_failed", "permission_denied", "pairing_failed", "load_failed"],
 };
+const seconds = (value: unknown) => isNumber(value) && Number.isFinite(value) && value >= 0 && value <= 86_400;
+const voice = { server_kind: ["remote"], transcription: ["local", "cloud"] } as const;
 
 export const MOBILE_EVENTS = {
   mobile_app_opened: { kind: ["cold_start", "foreground"], signed_in: isBoolean },
-  mobile_pairing_action: { action: ["scanner_opened", "camera_permission", "redeem", "cancel"], ...outcome },
+  mobile_pairing_action: {
+    action: ["scanner_opened", "camera_permission", "redeem", "cancel"],
+    ...outcome,
+    entry_point: ["qr", "link"],
+  },
   mobile_connection_action: {
     action: ["connect", "reconnect", "lost"],
     ...outcome,
@@ -51,8 +57,32 @@ export const MOBILE_EVENTS = {
     server_kind: ["remote"],
   },
   conversation_action: { ...outcome, action: ["pin", "unpin", "hide", "unhide"] },
-  usage_viewed: {},
+  usage_viewed: { scope: ["agent", "server"] },
   account_sign_out: outcome,
+  // The desktop sends the same two sign-in events. `code_sent` is the result of a sent code.
+  account_sign_in_started: { ...outcome, result: ["code_sent", "failed"], method: ["email"] },
+  account_sign_in_completed: { ...outcome, method: ["email"] },
+  hosted_server_plans_action: {
+    action: ["viewed", "setup_opened", "closed"],
+    entry_point: ["drawer", "onboarding"],
+  },
+  onboarding_step: {
+    step: ["hello", "server", "agent", "look", "name", "role", "task", "ready"],
+    action: ["viewed", "next", "back", "skipped"],
+  },
+  onboarding_completed: { skipped: isBoolean },
+  notification_settings_action: {
+    action: ["enabled", "disabled", "preview_toggled", "permission_prompted", "live_activities_toggled"],
+    permission: ["granted", "denied", "undetermined"],
+    enabled: isBoolean,
+  },
+  live_activity_action: { action: ["started", "ended"] },
+  voice_conversation_action: { ...outcome, ...voice, action: ["start", "end"], turn_count: count },
+  voice_turn: { ...outcome, ...voice, audio_duration_seconds: seconds },
+  agent_template_action: { ...outcome, action: ["installed"], entry_point: ["deep_link"] },
+  // The desktop event, without `listing_slug`: the phone sends no listing name.
+  marketplace_action: { ...outcome, entity: ["agent", "skill", "plugin"], action: ["install", "update"] },
+  analytics_preference_changed: { enabled: isBoolean },
 } as const;
 
 type Rule = readonly string[] | ((value: unknown) => boolean);

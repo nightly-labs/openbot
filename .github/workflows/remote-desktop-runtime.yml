@@ -218,7 +218,12 @@ jobs:
 
       - name: Install macOS build dependencies
         if: runner.os == 'macOS' && steps.runtime-cache.outputs.cache-hit != 'true'
-        run: brew install cmake ninja node pkgconf icu4c@78 miniupnpc openssl@3 opus
+        # Sunshine does not build with OpenSSL 4. Runner images since 2026-10-28 link openssl@4 into the
+        # Homebrew prefix, where CMake finds it before the keg-only openssl@3.
+        run: |
+          brew install cmake ninja node pkgconf icu4c@78 miniupnpc openssl@3 opus
+          if brew list openssl@4 >/dev/null 2>&1; then brew unlink openssl@4; fi
+          brew link --force --overwrite openssl@3
 
       - name: Set up Windows build dependencies
         if: runner.os == 'Windows' && steps.runtime-cache.outputs.cache-hit != 'true'
@@ -299,6 +304,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb libxtst6
           xvfb-run -a bun run test:remote-desktop-runtime
+
+      # The runner is Ubuntu 24.04. On Ubuntu 26.04 with only the runtime libraries of
+      # scripts/hosting/packages.txt, each executable must find every library that it loads.
+      - name: Check Linux runtime libraries on Ubuntu 26.04
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm \
+            -v "$PWD/build/remote-desktop-runtime/linux/x64:/runtime:ro" \
+            -v "$PWD/scripts/hosting/packages.txt:/packages.txt:ro" \
+            ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944 \
+            bash -euo pipefail -c '
+              apt-get update -qq
+              sed -n "/^# The remote desktop runtime\./,\$p" /packages.txt | grep -v "^#" |
+                xargs apt-get install -y -qq --no-install-recommends >/dev/null
+              missing=$(ldd /runtime/sunshine /runtime/web-server /runtime/streamer | grep "not found" || true)
+              if [ -n "$missing" ]; then echo "$missing" >&2; exit 1; fi'
 
       - name: Create deterministic archive
         run: bun scripts/package-remote-desktop-runtime.ts ${{ matrix.platform }} ${{ matrix.architecture }}
@@ -531,7 +552,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb \
-            libcap2 libcurl4t64 libevdev2 libglib2.0-0t64 libminiupnpc17 libpulse0 libssl3t64 libva2 \
+            libcap2 libcurl4t64 libevdev2 libglib2.0-0t64 libnuma1 libpulse0 libssl3t64 libva2 \
             libx11-6 libxcb-shm0 libxcb-xfixes0 libxcb1 libxfixes3 libxrandr2 libxtst6
           xvfb-run -a bun run test:remote-desktop-runtime
 

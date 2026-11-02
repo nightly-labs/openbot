@@ -2,7 +2,7 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/connector";
 
 export const messages = {
-  // Server settings > Connectors: the built-in GitHub connection of this computer.
+  // Marketplace > Apps > GitHub: the built-in GitHub connection.
   "connector.github.title": "GitHub",
   "connector.github.description":
     "このコンピューターのすべてのエージェントが、GitHub のリポジトリ、Issue、プルリクエスト、gh と git を使えます。",
@@ -37,7 +37,6 @@ export const messages = {
   "connector.github.statusConnected": "接続済み",
   "connector.github.statusConnecting": "接続中",
   "connector.github.statusExpired": "期限切れ",
-  "connector.github.statusNotSetUp": "未設定",
   "connector.github.accountTitle": "アカウント",
   "connector.github.filterPlaceholder": { other: "{count} 件のリポジトリを絞り込む" },
   "connector.github.filterLabel": "リポジトリを絞り込む",
@@ -71,22 +70,13 @@ export const messages = {
   "connector.github.keepConnected": "接続を維持",
   "connector.github.close": "閉じる",
   "connector.dangerZone": "危険な操作",
+  "connector.statusUnknown": "不明",
+  "connector.readFailed": "OpenBot はこの接続の状態を読み取れませんでした。",
 
-  // Server settings > Connectors: the list of integrations. Each row opens its page.
-  "connector.hub.onThisComputer": "このコンピューター上",
-  "connector.hub.onHost": "{host} 上",
-  "connector.hub.notSetUp": "未設定",
-  "connector.hub.available": "利用可能",
-  "connector.hub.localOnly": "自分のコンピューターのみ",
-  "connector.hub.open": "{name} を開く",
-  "connector.hub.setUp": "設定",
-  "connector.hub.usedBy": "{names} が使用中",
-
-  // Server settings > Connectors > Slack.
+  // Marketplace > Apps > Slack.
   "connector.slack.title": "Slack",
   "connector.slack.description":
     "Slack で @OpenBot をメンションするか、ダイレクトメッセージを送ります。Slack Orchestrator が適切なエージェントに依頼して回答します。",
-  "connector.slack.statusNotSetUp": "未設定",
   "connector.slack.statusConnected": "接続済み",
   "connector.slack.statusAttention": "対応が必要",
   "connector.slack.summaryConnected": "{workspace} · Slack Orchestrator が回答します",
@@ -101,10 +91,16 @@ export const messages = {
   "connector.slack.workspaceTitle": "ワークスペース",
   "connector.slack.workspaceDescription": "@OpenBot をメンションするか、ダイレクトメッセージを送ります。",
   "connector.slack.disconnectWorkspace": "切断",
+  "connector.slack.disconnectAllTitle": "Slack を切断",
+  "connector.slack.disconnectAllSummary":
+    "すべてのワークスペースが切断されます。@OpenBot からエージェントに連絡できなくなります。",
+  "connector.slack.disconnectAllSummaryOrchestrator":
+    "すべてのワークスペースが切断されます。Slack Orchestrator とその会話は OpenBot から削除されます。",
   "connector.slack.missingScopes":
     "OpenBot には Slack で次の権限がありません: {scopes}。ワークスペースを切断してから、もう一度接続してください。",
   "connector.slack.retryAt": "Slack から待機するよう求められました。{time} に再試行します。",
   "connector.slack.reconnect": "再接続",
+  "connector.slack.pause": "一時停止",
   "connector.slack.resume": "再開",
   "connector.slack.rowAction": "{action}: {name}",
   "connector.slack.orchestratorTitle": "Slack Orchestrator",
@@ -149,13 +145,19 @@ export const messages = {
   "connector.slack.removeEffectDeleted": "Slack Orchestrator とその会話は OpenBot から削除されます。",
   "connector.slack.keep": "接続を維持",
   "connector.slack.close": "閉じる",
+  "connector.slack.addWorkspace": "ワークスペースを追加",
+  "connector.slack.limitReached": {
+    other: "接続できるワークスペースは最大 {count} 件です。",
+  },
+  "connector.slack.summaryMany": {
+    other: "ワークスペース {count} 件 · Slack Orchestrator が回答します",
+  },
 
-  // Server settings > Connectors > Discord. Always write "Discord server": "server" alone is an
+  // Marketplace > Apps > Discord. Always write "Discord server": "server" alone is an
   // OpenBot server.
   "connector.discord.title": "Discord",
   "connector.discord.description":
     "Discord サーバーのチャンネルで @OpenBot をメンションします。Discord Orchestrator が適切なエージェントに依頼して回答します。",
-  "connector.discord.statusNotSetUp": "未設定",
   "connector.discord.statusConnected": "接続済み",
   "connector.discord.statusAttention": "対応が必要",
   "connector.discord.summaryConnected": "{workspace} · Discord Orchestrator が回答します",
@@ -171,10 +173,16 @@ export const messages = {
   "connector.discord.workspaceDescription":
     "チャンネルで @OpenBot をメンションします。続けるには OpenBot に返信します。",
   "connector.discord.disconnectWorkspace": "切断",
+  "connector.discord.disconnectAllTitle": "Discord を切断",
+  "connector.discord.disconnectAllSummary":
+    "すべてのサーバーが切断されます。@OpenBot からエージェントに連絡できなくなります。",
+  "connector.discord.disconnectAllSummaryOrchestrator":
+    "すべてのサーバーが切断されます。Discord Orchestrator とその会話は OpenBot から削除されます。",
   "connector.discord.missingScopes":
     "OpenBot には Discord で次の権限がありません: {scopes}。Discord サーバーを切断してから、もう一度接続してください。",
   "connector.discord.retryAt": "Discord から待機するよう求められました。{time} に再試行します。",
   "connector.discord.reconnect": "再接続",
+  "connector.discord.pause": "一時停止",
   "connector.discord.resume": "再開",
   "connector.discord.rowAction": "{action}: {name}",
   "connector.discord.orchestratorTitle": "Discord Orchestrator",
@@ -217,12 +225,33 @@ export const messages = {
   "connector.discord.removeEffectDeleted": "Discord Orchestrator とその会話は OpenBot から削除されます。",
   "connector.discord.keep": "接続を維持",
   "connector.discord.close": "閉じる",
+  "connector.discord.addWorkspace": "Discord サーバーを追加",
+  "connector.discord.limitReached": {
+    other: "接続できる Discord サーバーは最大 {count} 件です。",
+  },
+  "connector.discord.summaryMany": {
+    other: "Discord サーバー {count} 件 · Discord Orchestrator が回答します",
+  },
+  "connector.discord.accessTitle": "OpenBot を使える人",
+  "connector.discord.accessDescription": "OpenBot はこれらの人にだけ回答します。ほかの人からのメンションは無視します。",
+  "connector.discord.accessEveryone": "サーバーの全員",
+  "connector.discord.accessEveryoneDescription":
+    "OpenBot が見えるチャンネルに投稿できる人なら、誰でもメンションできます。",
+  "connector.discord.accessRoles": "{roles} を持つメンバー",
+  "connector.discord.accessChoose": "ロールを選択",
+  "connector.discord.accessDialogTitle": "{workspace} で OpenBot を使えるのは誰ですか？",
+  "connector.discord.accessDialogDescription": "ロールを選択しない場合は、全員が OpenBot をメンションできます。",
+  "connector.discord.accessLoading": "ロールを読み込んでいます…",
+  "connector.discord.accessLoadFailed": "Discord のロールを読み込めませんでした",
+  "connector.discord.accessNoRoles": "このサーバーには選択できるロールがありません。",
+  "connector.discord.accessRoleDeleted": "{role}（削除済み）",
+  "connector.discord.accessSave": "保存",
+  "connector.discord.accessHostUpdate": "ロールを選択するには、{host} の OpenBot を更新してください。",
 
-  // Server settings > Connectors > Telegram.
+  // Marketplace > Apps > Telegram.
   "connector.telegram.title": "Telegram",
   "connector.telegram.description":
     "OpenBot ボットを Telegram グループに追加するか、ボットとのダイレクトチャットを開きます。Telegram Orchestrator が適切なエージェントに依頼して回答します。",
-  "connector.telegram.statusNotSetUp": "未設定",
   "connector.telegram.statusConnected": "接続済み",
   "connector.telegram.statusAttention": "対応が必要",
   "connector.telegram.summaryConnected": {
@@ -253,11 +282,13 @@ export const messages = {
   "connector.telegram.resume": "再開",
   "connector.telegram.reconnect": "再接続",
   "connector.telegram.disconnectChat": "切断",
+  "connector.telegram.disconnectAllTitle": "Telegram を切断",
+  "connector.telegram.disconnectAllSummary":
+    "すべてのチャットが切断されます。OpenBot ボットからエージェントに連絡できなくなります。",
+  "connector.telegram.disconnectAllSummaryOrchestrator":
+    "すべてのチャットが切断されます。Telegram Orchestrator とその会話は OpenBot から削除されます。",
   "connector.telegram.rowAction": "{action}: {name}",
-  "connector.telegram.linkTitle": "別のチャットをリンク",
-  "connector.telegram.linkDescription":
-    "ブラウザーで Telegram が開きます。リンクされると、チャットがここに表示されます。",
-  "connector.telegram.linkWaiting": "Telegram を待っています。Telegram でチャットを選んでください。",
+  "connector.telegram.linkChat": "チャットをリンク",
   "connector.telegram.addToGroup": "グループに追加",
   "connector.telegram.openDirectChat": "ダイレクトチャットを開く",
   "connector.telegram.orchestratorTitle": "Telegram Orchestrator",
@@ -319,11 +350,14 @@ export const messages = {
     "1Password アプリで「設定」>「開発者」を開き、「1Password CLI と連携」をオンにしてください。",
   "connector.onePassword.stepAppReady": "1Password アプリで、CLI が共有保管庫を作成できるようになっています。",
   "connector.onePassword.openApp": "1Password を開く",
+  "connector.onePassword.openAppFailed": "OpenBot は 1Password を開けませんでした。",
   "connector.onePassword.checkAgain": "再確認",
   "connector.onePassword.stepVaultTitle": "共有保管庫を作成",
   "connector.onePassword.stepVaultDescription":
     "OpenBot は「Shared with OpenBot」保管庫と、それを読み取ることだけができるサービスアカウントを作成します。1Password から承認を求められます。",
-  "connector.onePassword.useToken": "代わりにサービスアカウントのトークンを使う",
+  "connector.onePassword.useTokenDescription":
+    "これらの手順の代わりに、1Password.com のサービスアカウントのトークンを貼り付けます。",
+  "connector.onePassword.useTokenAction": "トークンを使う",
   "connector.onePassword.tokenLabel": "サービスアカウントのトークン",
   "connector.onePassword.tokenPlaceholder": "ops_…",
   "connector.onePassword.connectWithToken": "接続",
@@ -344,7 +378,6 @@ export const messages = {
   "connector.onePassword.actionFailed": "OpenBot は 1Password の接続を変更できませんでした。",
   "connector.onePassword.statusConnected": "接続済み",
   "connector.onePassword.statusConnecting": "接続中",
-  "connector.onePassword.statusNotSetUp": "未設定",
   "connector.onePassword.descriptionHost":
     "サービスアカウントを通じて専用の 1Password 保管庫を {host} 上の OpenBot と共有すると、{host} のエージェントがそのブラウザーでサイトにサインインできます。",
   "connector.onePassword.howItWorksHost":
@@ -362,7 +395,29 @@ export const messages = {
   "connector.bitwarden.sessionKey": "Bitwarden のセッションキー",
   "connector.bitwarden.connect": "Bitwarden を接続",
   "connector.bitwarden.disconnect": "Bitwarden を切断",
+  "connector.bitwarden.disconnectAction": "切断",
+  "connector.bitwarden.disconnectSummary":
+    "OpenBot はセッションキーを破棄します。エージェントは Bitwarden からログインを入力できなくなります。他の Bitwarden クライアントはロック解除されたままです。",
+  "connector.bitwarden.disconnectSummaryHost":
+    "{host} は API キーとマスターパスワードを削除します。{host} のエージェントは Bitwarden からログインを入力できなくなります。",
   "connector.bitwarden.connected": "接続済み",
-  "connector.bitwarden.disconnected": "未接続",
   "connector.bitwarden.actionFailed": "OpenBot は Bitwarden の接続を変更できませんでした。",
+  "connector.bitwarden.descriptionHost":
+    "{host} のブラウザーのログインを Bitwarden または Vaultwarden から入力します。",
+  "connector.bitwarden.setupHost":
+    "{host} は自分の Bitwarden CLI でサインインします。保管庫に Shared with OpenBot という名前のフォルダーを作成し、エージェントが使ってよいログインだけを入れてください。ウェブ保管庫で 設定 › セキュリティ › キー を開き、API キーを表示します。下にサーバーのアドレス、client_id、client_secret、マスターパスワードを入力してください。",
+  "connector.bitwarden.scopeHost":
+    "{host} のすべてのエージェントが Shared with OpenBot の一致するログインを使えます。OpenBot は完全に一致する HTTPS オリジンを使います。マスターパスワードの再入力が必要なアイテムや、カスタムの URI 一致ルールを持つアイテムは使いません。",
+  "connector.bitwarden.sessionHost":
+    "{host} は API キーとマスターパスワードを暗号化して保存し、再起動の後にもう一度ロックを解除できます。このコンピューターには保存しません。切断すると {host} から削除されます。{host} は HTTPS でサーバーのアドレスに接続できる必要があります。",
+  "connector.bitwarden.serverUrl": "サーバーのアドレス",
+  "connector.bitwarden.folderTitle": "共有フォルダ",
+  "connector.bitwarden.folderDescription":
+    "エージェントにログイン情報でサインインさせるには、Bitwarden でそのログイン情報をこのフォルダに移動してください。やめるには削除してください。",
+  "connector.bitwarden.folderName": "Shared with OpenBot",
+  "connector.bitwarden.folderKind": "Bitwarden のフォルダー",
+  "connector.bitwarden.clientId": "API キーの client_id",
+  "connector.bitwarden.clientSecret": "API キーの client_secret",
+  "connector.bitwarden.masterPassword": "マスターパスワード",
+  "connector.bitwarden.connecting": "接続中",
 } as const satisfies PartialTranslation<typeof source>;

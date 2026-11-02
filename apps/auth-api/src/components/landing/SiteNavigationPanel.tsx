@@ -1,11 +1,15 @@
+import { AppLogo } from "@openbot/brand";
 import { Link } from "@tanstack/solid-router";
 import { For, Match, Show, Switch } from "solid-js";
 import { articleGradient, articleGradientCss } from "../../lib/article-gradient";
 import { formatArticleDate } from "../../lib/content-collection";
+import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
 import { PLUGIN_DETAIL_ROUTE } from "../../lib/plugins";
 import type {
   ArticleNavigationSection,
   PluginNavigationSection,
+  ResourceLink,
+  ResourceNavigationSection,
   SiteNavigationSection,
 } from "../../lib/site-navigation";
 import { ArticleGradient } from "../content/ArticleGradient";
@@ -41,13 +45,30 @@ export function SiteNavigationPanel(props: SiteNavigationPanelProps) {
         <Match when={props.section.kind === "plugins" && props.section}>
           {(section) => <PluginPanelBody section={section()} />}
         </Match>
+        <Match when={props.section.kind === "resources" && props.section}>
+          {(section) => <ResourcePanelBody section={section()} />}
+        </Match>
       </Switch>
       <div class="site-panel-footer">
         <span class="site-panel-summary">{props.section.summary}</span>
-        <Link class="site-panel-index" to={props.section.indexRoute}>
-          {props.section.indexLabel}
-          <LandingIcon name="arrow-right" />
-        </Link>
+        <Switch>
+          <Match when={props.section.kind !== "resources" && props.section}>
+            {(section) => (
+              <Link class="site-panel-index" to={section().indexRoute}>
+                {section().indexLabel}
+                <LandingIcon name="arrow-right" />
+              </Link>
+            )}
+          </Match>
+          <Match when={props.section.kind === "resources" && props.section}>
+            {(section) => (
+              <a class="site-panel-index" href={section().footer.href} target="_blank" rel={EXTERNAL_LINK_REL}>
+                {section().footer.label}
+                <LandingIcon name="arrow-up-right" />
+              </a>
+            )}
+          </Match>
+        </Switch>
       </div>
     </div>
   );
@@ -143,5 +164,68 @@ function PluginPanelBody(props: { section: PluginNavigationSection }) {
         )}
       </For>
     </ul>
+  );
+}
+
+function ResourcePanelBody(props: { section: ResourceNavigationSection }) {
+  return (
+    <ul class="site-panel-body site-panel-plugins">
+      <For each={props.section.links}>
+        {(link) => (
+          <li>
+            <ResourceRow link={link} />
+          </li>
+        )}
+      </For>
+    </ul>
+  );
+}
+
+// Named accessors, not conditionals in props: a conditional prop moves the SSR hydration keys.
+function ResourceRow(props: { link: ResourceLink }) {
+  const href = () => ("href" in props.link ? props.link.href : undefined);
+  const route = () => ("to" in props.link ? props.link.to : undefined);
+  return (
+    <Switch>
+      <Match when={href()}>
+        {(external) => (
+          <a class="site-panel-plugin" href={external()} target="_blank" rel={EXTERNAL_LINK_REL}>
+            <ResourceRowContents link={props.link} />
+          </a>
+        )}
+      </Match>
+      <Match when={route()}>
+        {(to) => (
+          <Link class="site-panel-plugin" to={to()}>
+            <ResourceRowContents link={props.link} />
+          </Link>
+        )}
+      </Match>
+    </Switch>
+  );
+}
+
+// An icon sits on the same gradient as a plugin's mark. The Brand row shows the app icon itself.
+function ResourceRowContents(props: { link: ResourceLink }) {
+  const icon = () => (props.link.icon === "logo" ? undefined : props.link.icon);
+  return (
+    <>
+      <Switch>
+        <Match when={icon()}>
+          {(name) => (
+            <span class="site-panel-plugin-mark" style={{ "--site-panel-art": artwork(props.link.label) }}>
+              <LandingIcon name={name()} class="site-panel-resource-icon" />
+            </span>
+          )}
+        </Match>
+        <Match when={props.link.icon === "logo"}>
+          <AppLogo variant="production" class="site-panel-plugin-mark site-panel-resource-logo" />
+        </Match>
+      </Switch>
+      <span class="site-panel-row-copy">
+        <span class="site-panel-row-title">{props.link.label}</span>
+        <span class="site-panel-meta">{props.link.description}</span>
+      </span>
+    </>
   );
 }

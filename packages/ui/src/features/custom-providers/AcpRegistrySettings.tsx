@@ -71,7 +71,7 @@ export function AcpRegistrySettings(props: { api: AcpRegistrySettingsApi }) {
         } catch (error) {
           if (!disposed)
             setState((s) => {
-              s.error = errorMessage(error, t("customProvider.registry.failed"));
+              s.error = errorMessage(error, t("customProvider.registry.statusFailed"));
             });
         } finally {
           reading = false;
@@ -98,7 +98,7 @@ export function AcpRegistrySettings(props: { api: AcpRegistrySettingsApi }) {
       });
     } catch (error) {
       setState((s) => {
-        s.error = errorMessage(error, t("customProvider.registry.failed"));
+        s.error = errorMessage(error, t("customProvider.registry.searchFailed"));
       });
     } finally {
       setState((s) => {
@@ -119,7 +119,10 @@ export function AcpRegistrySettings(props: { api: AcpRegistrySettingsApi }) {
       await search();
     } catch (error) {
       setState((s) => {
-        s.error = errorMessage(error, t("customProvider.registry.failed"));
+        s.error = errorMessage(
+          error,
+          t(entry.installedVersion ? "customProvider.registry.updateFailed" : "customProvider.registry.installFailed"),
+        );
       });
     } finally {
       setState((s) => {
@@ -137,7 +140,7 @@ export function AcpRegistrySettings(props: { api: AcpRegistrySettingsApi }) {
       await search();
     } catch (error) {
       setState((s) => {
-        s.error = errorMessage(error, t("customProvider.registry.failed"));
+        s.error = errorMessage(error, t("customProvider.registry.removeFailed"));
       });
     } finally {
       setState((s) => {
@@ -151,7 +154,7 @@ export function AcpRegistrySettings(props: { api: AcpRegistrySettingsApi }) {
       await search();
     } catch (error) {
       setState((s) => {
-        s.error = errorMessage(error, t("customProvider.registry.failed"));
+        s.error = errorMessage(error, t("customProvider.registry.cancelFailed"));
       });
     }
   }

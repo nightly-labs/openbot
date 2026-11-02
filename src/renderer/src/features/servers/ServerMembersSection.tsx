@@ -1,5 +1,13 @@
+import { isOpenBillingStatus } from "@openbot/contracts/billing";
 import { DEFAULT_TEAM_MEMBER_LIMIT, INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { InviteSummary, TeamPresenceMember, TeamRole } from "@openbot/contracts/ipc";
+import type { InviteSummary, TeamInviteSummary, TeamPresenceMember, TeamRole } from "@openbot/contracts/ipc";
+import {
+  LICENSE_INCLUDED_USERS,
+  LICENSE_MAX_USERS,
+  type License,
+  licenseMonthlyAmount,
+  licensePlanOf,
+} from "@openbot/contracts/license";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -35,17 +43,22 @@ import {
   SelectTrigger,
   SelectValue,
   SettingsSection,
-  ShieldCheck,
   SlidingTabs,
+  SwitchField,
   Text,
   Trash2,
   UserRound,
 } from "@openbot/ui";
+import { formatMinorMoney } from "@openbot/ui/features/billing/LicenseSection";
+import { MemberRoleMenu } from "@openbot/ui/features/servers/ServerRoles";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
+import { desktopAnalytics } from "../../analytics";
+import { ServerInvitesEmpty } from "./ServerInvitesEmpty";
+import type { ServerRolesSection } from "./ServerRolesSection";
 import { serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
@@ -59,6 +72,8 @@ const ROLE_LABELS = {
   member: "server.role.member",
 } as const satisfies Record<TeamRole, AppTextKey>;
 const EMAIL_PLACEHOLDER = "person@company.com";
+/** How long the account service keeps a single-use invite. Every server but a local development host uses it. */
+const INVITE_LIFETIME_MS = 7 * 24 * 60 * 60 * 1_000;
 
 /** The invite composer. `mode` picks which of `email` and `link` the panel is filling in. */
 interface InvitePanel {
@@ -87,6 +102,8 @@ interface MembersPanel {
 interface MembersPanels {
   invite: InvitePanel;
   members: MembersPanel;
+  /** Set after this Mac publishes, to offer the remote desktop setup once. */
+  offerRemoteDesktopSetup: boolean;
 }
 
 interface ServerMembersSection {
@@ -97,8 +114,12 @@ interface ServerMembersSection {
   resetForServer(): void;
 }
 
-/** The Members section: the invite composer, the member list, and the pending invites. */
-export function createServerMembersSection(host: ServerSettingsSectionHost): ServerMembersSection {
+/** The Members section: publication, the invite composer, the member list, and the pending invites. */
+export function createServerMembersSection(
+  host: ServerSettingsSectionHost,
+  options: { onSetUpDesktop: () => void; saveIdentityDraft: () => Promise<boolean> },
+  roles: Pick<ServerRolesSection, "roles" | "setMemberRole">,
+): ServerMembersSection {
   const { t, format } = useText();
   const { props, local, configured, published, actionsAvailable, busy, run } = host;
   const [panels, setPanels] = createStore<MembersPanels>({
@@ -112,10 +133,16 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
       role: "member",
     },
     members: { removeId: null, roleChange: null, revokeInviteId: null, search: "" },
+    offerRemoteDesktopSetup: false,
   });
   /** A clock, not panel state: it retires an invite row as its `expiresAt` passes. */
   const [now, setNow] = createSignal(Date.now());
+  /** The full license that the next invite would add a user to, while the owner confirms it. */
+  const [licenseStep, setLicenseStep] = createSignal<{ license: License; used: number; error: string | null } | null>(
+    null,
+  );
   let inviteLinkInput: HTMLInputElement | undefined;
+  let inviteEmailInput: HTMLInputElement | undefined;
   let expiryTimer: ReturnType<typeof setTimeout> | undefined;
   let inviteLinkSwapTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -131,6 +158,19 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
       (item) => (item.permanent || item.usedAt === null) && (item.permanent || Date.parse(item.expiresAt) > now()),
     ),
   );
+  /** The invites the empty pending list shows as a faint example: the kinds this server can make. */
+  const sampleInvites = createMemo((): TeamInviteSummary[] => {
+    const expiresAt = new Date(now() + INVITE_LIFETIME_MS).toISOString();
+    const sample = { expiresAt, usedAt: null, email: null, permanent: false, useCount: 0 } as const;
+    return [
+      { ...sample, id: "sample-email", role: "member", email: EMAIL_PLACEHOLDER },
+      { ...sample, id: "sample-link", role: "member" },
+      ...(permanentSupported()
+        ? [{ ...sample, id: "sample-permanent", role: "member" as const, permanent: true }]
+        : []),
+      { ...sample, id: "sample-admin", role: "admin" },
+    ];
+  });
   const inviteUsed = () =>
     Boolean(
       panels.invite.result &&
@@ -151,6 +191,19 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
     const limit = memberLimit();
     return limit !== null && activeMembers().length >= limit;
   };
+  createEffect(
+    () => membersFull() && canManage(),
+    (full) => {
+      if (full) desktopAnalytics.track("limit_reached", { kind: "members", action: "shown" });
+    },
+  );
+  const trackInvite = (action: "invite_link_copied" | "invite_qr_shown") =>
+    desktopAnalytics.track("team_action", {
+      action,
+      result: "succeeded",
+      server_kind: props.server.kind,
+      role: panels.invite.role,
+    });
   const membersCount = () => {
     const count = activeMembers().length;
     const limit = memberLimit();
@@ -242,13 +295,40 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
     }, duration);
   }
 
-  async function createInvite(): Promise<void> {
+  /**
+   * The owner's open license and the people that it counts, when it is full and the invite can add a
+   * person that it does not count yet. The account service refuses a join above the license, so the
+   * owner adds a user first. Admins get null: the license is the owner's, and the join tells the person
+   * that it is full. A failed read gets null, so it never blocks an invite.
+   */
+  async function fullLicense(email: string | null): Promise<{ license: License; used: number } | null> {
+    const calls = props.license;
+    if (!calls || props.server.role !== "owner") return null;
+    const state = await calls.getState().catch(() => null);
+    const license = state?.license;
+    if (!state || !license || !isOpenBillingStatus(license.status) || state.used < license.users) return null;
+    if (email && state.users.some((user) => normalizeEmailAddress(user.email) === email)) return null;
+    return { license, used: state.used };
+  }
+
+  async function createInvite(licenseChecked = false): Promise<void> {
     const email = panels.invite.mode === "email" ? normalizeEmailAddress(panels.invite.email) : null;
     if (panels.invite.mode === "email" && !email) {
       setPanels((state) => {
         state.invite.emailError = t("server.invite.invalidEmail");
       });
       return;
+    }
+    if (!licenseChecked) {
+      const check: { full: { license: License; used: number } | null } = { full: null };
+      await run("invite", async () => {
+        check.full = await fullLicense(email);
+      });
+      if (check.full) {
+        setLicenseStep({ ...check.full, error: null });
+        desktopAnalytics.track("limit_reached", { kind: "license_users", action: "shown", role: panels.invite.role });
+        return;
+      }
     }
     let result: InviteSummary | undefined;
     const role = panels.invite.role;
@@ -266,8 +346,33 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
     if (!created.email) swapInviteLink(created.inviteUrl);
   }
 
+  /** An unnamed server gets a generated name as it publishes, so the switch needs no setup first. */
+  async function setPublished(value: boolean): Promise<void> {
+    const serverId = props.server.id;
+    if (value && local() && !configured() && !(await options.saveIdentityDraft())) return;
+    if (props.server.id !== serverId) return;
+    const succeeded = await run("publish", () => props.onSetPublished(value));
+    if (!succeeded || props.server.id !== serverId) return;
+    setPanels((state) => {
+      state.offerRemoteDesktopSetup = value && local() && props.platform === "darwin";
+    });
+  }
+
+  function dismissRemoteDesktopSetup(): void {
+    setPanels((state) => {
+      state.offerRemoteDesktopSetup = false;
+    });
+  }
+
+  function accessDescription() {
+    if (!local()) return published() ? t("server.settings.remoteOnline") : t("server.settings.remoteOffline");
+    if (published()) return t("server.settings.reachable");
+    return configured() ? t("server.settings.notReachable") : t("server.settings.notPublished");
+  }
+
   function resetForServer(): void {
     setPanels((state) => {
+      state.offerRemoteDesktopSetup = false;
       state.invite.result = null;
       state.invite.showQr = false;
       state.members.search = "";
@@ -275,6 +380,16 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
       state.members.revokeInviteId = null;
     });
     resetInviteLink();
+  }
+
+  /** The empty pending list's action: the composer above, on its email field. */
+  function startEmailInvite(): void {
+    if (panels.invite.mode !== "email") inviteTabsProps.onChange("email");
+    // A hidden tab panel is inert, so the email field takes focus only after the tab change renders.
+    requestAnimationFrame(() => {
+      inviteEmailInput?.scrollIntoView({ block: "center", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+      inviteEmailInput?.focus({ preventScroll: true });
+    });
   }
 
   const inviteTabsProps = {
@@ -296,63 +411,52 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
   function Panel() {
     return (
       <>
-        <Show when={!configured() || !published()}>
-          <Alert class="server-settings-members-alert" tone="warning" role="status">
-            <AlertIcon>
-              <ShieldCheck />
-            </AlertIcon>
-            <AlertContent>
-              <AlertTitle>
-                {configured() ? t("server.members.invitationsPaused") : t("server.members.setupRequired")}
-              </AlertTitle>
-              <AlertDescription>
-                {configured() ? t("server.members.publishToInvite") : t("server.members.saveIdentityFirst")}
-              </AlertDescription>
-            </AlertContent>
-          </Alert>
-        </Show>
+        {accessSection()}
         <Show when={canManage()}>{inviteComposer()}</Show>
-        <SettingsSection
-          class="server-settings-members-section"
-          title={
-            <span class="server-settings-members-title">
-              {t("server.members.title")}
-              <Badge variant={membersFull() ? "warning-light" : "secondary"}>{membersCount()}</Badge>
-            </span>
-          }
-          actions={
-            <label class="server-settings-search">
-              <Search aria-hidden="true" />
-              <span class="sr-only">{t("server.members.search")}</span>
-              <Input
-                size="sm"
-                type="search"
-                placeholder={t("server.members.search")}
-                value={panels.members.search}
-                onValueChange={(value) =>
-                  setPanels((state) => {
-                    state.members.search = value;
-                  })
+        {/* An unnamed local server has no members yet: publishing it adds the owner. */}
+        <Show when={configured()}>
+          <SettingsSection
+            class="server-settings-members-section"
+            title={
+              <span class="server-settings-members-title">
+                {t("server.members.title")}
+                <Badge variant={membersFull() ? "warning-light" : "secondary"}>{membersCount()}</Badge>
+              </span>
+            }
+            actions={
+              <label class="server-settings-search">
+                <Search aria-hidden="true" />
+                <span class="sr-only">{t("server.members.search")}</span>
+                <Input
+                  size="sm"
+                  type="search"
+                  placeholder={t("server.members.search")}
+                  value={panels.members.search}
+                  onValueChange={(value) =>
+                    setPanels((state) => {
+                      state.members.search = value;
+                    })
+                  }
+                />
+              </label>
+            }
+          >
+            <ItemGroup class="settings-modal-card server-settings-members-list">
+              <Show
+                when={filteredMembers().length > 0}
+                fallback={
+                  <Item class="server-settings-empty-row">
+                    <ItemContent>
+                      <ItemDescription>{t("server.members.noMatch")}</ItemDescription>
+                    </ItemContent>
+                  </Item>
                 }
-              />
-            </label>
-          }
-        >
-          <ItemGroup class="settings-modal-card server-settings-members-list">
-            <Show
-              when={filteredMembers().length > 0}
-              fallback={
-                <Item class="server-settings-empty-row">
-                  <ItemContent>
-                    <ItemDescription>{t("server.members.noMatch")}</ItemDescription>
-                  </ItemContent>
-                </Item>
-              }
-            >
-              <For each={filteredMembers()}>{(member) => memberRow(member)}</For>
-            </Show>
-          </ItemGroup>
-        </SettingsSection>
+              >
+                <For each={filteredMembers()}>{(member) => memberRow(member)}</For>
+              </Show>
+            </ItemGroup>
+          </SettingsSection>
+        </Show>
         <Show when={canManage() && inactiveLegacyMembers().length > 0}>
           <SettingsSection
             title={t("server.members.inactiveTitle")}
@@ -364,6 +468,50 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
           </SettingsSection>
         </Show>
         <Show when={canManage()}>{pendingInvites()}</Show>
+      </>
+    );
+  }
+
+  function accessSection() {
+    return (
+      <>
+        <SettingsSection title={t("server.settings.access")}>
+          <ItemGroup class="settings-modal-card">
+            <SwitchField
+              class="server-settings-publish-setting"
+              size="default"
+              checked={published()}
+              disabled={!local() || Boolean(busy())}
+              onChange={(value) => void setPublished(value)}
+              label={local() ? t("server.settings.publish") : t("server.settings.published")}
+              description={accessDescription()}
+            />
+          </ItemGroup>
+        </SettingsSection>
+        <Show when={panels.offerRemoteDesktopSetup}>
+          <ItemGroup class="settings-modal-card">
+            <Item>
+              <ItemContent>
+                <ItemTitle>{t("server.settings.setUpDesktopTitle")}</ItemTitle>
+                <ItemDescription>{t("server.settings.setUpDesktopDescription")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Button size="sm" variant="ghost" onClick={dismissRemoteDesktopSetup}>
+                  {t("server.settings.later")}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    dismissRemoteDesktopSetup();
+                    options.onSetUpDesktop();
+                  }}
+                >
+                  {t("server.settings.setUp")}
+                </Button>
+              </ItemActions>
+            </Item>
+          </ItemGroup>
+        </Show>
       </>
     );
   }
@@ -395,6 +543,7 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
                     error={panels.invite.emailError}
                   >
                     <Input
+                      ref={(element) => (inviteEmailInput = element)}
                       size="md"
                       type="email"
                       autocomplete="email"
@@ -504,6 +653,7 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
                         copiedLabel={t("common.copied")}
                         size="sm"
                         variant="default"
+                        onCopy={() => trackInvite("invite_link_copied")}
                         onCopyError={host.showCopyError}
                       />
                       <Button
@@ -511,11 +661,12 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
                         variant="default"
                         aria-label={t("server.invite.showQr")}
                         aria-expanded={panels.invite.showQr ? "true" : "false"}
-                        onClick={() =>
+                        onClick={() => {
+                          if (!panels.invite.showQr) trackInvite("invite_qr_shown");
                           setPanels((state) => {
                             state.invite.showQr = !state.invite.showQr;
-                          })
-                        }
+                          });
+                        }}
                       >
                         <ScanLine />
                       </Button>
@@ -531,7 +682,7 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
             </Show>
             <Show when={membersFull()}>
               <Text variant="caption" tone="muted" class="server-settings-invite-hint">
-                {t("server.invite.full", { limit: memberLimit() ?? DEFAULT_TEAM_MEMBER_LIMIT })}
+                {t("server.invite.full", { count: memberLimit() ?? DEFAULT_TEAM_MEMBER_LIMIT })}
               </Text>
             </Show>
             <Show
@@ -594,19 +745,39 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
         </ItemContent>
         <ItemActions class="server-settings-member-actions">
           <Show when={member.role !== "owner"} fallback={<Badge variant="primary-light">{t(ROLE_LABELS.owner)}</Badge>}>
-            <Text variant="label-sm" tone="secondary">
-              {t(ROLE_LABELS[member.role])}
-            </Text>
+            <Show
+              when={
+                canManage() && actionsAvailable() && !member.disabled && member.role !== "owner" ? member.role : null
+              }
+              fallback={
+                <Text variant="label-sm" tone="secondary">
+                  {t(ROLE_LABELS[member.role])}
+                </Text>
+              }
+            >
+              {(serverRole) => (
+                <MemberRoleMenu
+                  memberId={member.id}
+                  memberName={teamMemberName(member)}
+                  serverRole={serverRole()}
+                  roles={roles.roles()}
+                  disabled={Boolean(busy())}
+                  mount={host.menuMount()}
+                  onServerRole={(role, trigger) => {
+                    // The confirmation returns focus to the element focused when it opens.
+                    trigger.focus({ preventScroll: true });
+                    setPanels((state) => {
+                      state.members.roleChange = { memberId: member.id, role };
+                    });
+                  }}
+                  onToggleRole={(roleId, on) => roles.setMemberRole(roleId, member.id, on)}
+                />
+              )}
+            </Show>
             <Show when={canManage() && actionsAvailable()}>
               <MemberActionsMenu
                 member={member}
                 mount={host.menuMount()}
-                onRoleChange={(role, trigger) => {
-                  trigger.focus({ preventScroll: true });
-                  setPanels((state) => {
-                    state.members.roleChange = { memberId: member.id, role };
-                  });
-                }}
                 onRemove={(trigger) => {
                   // The confirmation returns focus to the element focused when it opens.
                   trigger.focus({ preventScroll: true });
@@ -618,6 +789,32 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
             </Show>
           </Show>
         </ItemActions>
+      </Item>
+    );
+  }
+
+  function inviteRow(invite: TeamInviteSummary, action: JSX.Element) {
+    return (
+      <Item class="server-settings-invite-row">
+        <ItemContent>
+          <ItemTitle>
+            {invite.email ?? (invite.permanent ? t("server.invite.permanentLink") : t("server.invite.privateLink"))}
+          </ItemTitle>
+          <ItemDescription>
+            {t(ROLE_LABELS[invite.role])} ·{" "}
+            {invite.permanent
+              ? t("server.invite.neverExpires", { count: invite.useCount })
+              : t("server.invite.expires", {
+                  date: format.date(new Date(invite.expiresAt), {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }),
+                })}
+          </ItemDescription>
+        </ItemContent>
+        <ItemActions>{action}</ItemActions>
       </Item>
     );
   }
@@ -636,52 +833,40 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
           <Show
             when={activeInvites().length > 0}
             fallback={
-              <Item class="server-settings-empty-row">
-                <ItemContent>
-                  <ItemDescription>{t("server.invite.noPending")}</ItemDescription>
-                </ItemContent>
-              </Item>
+              <ServerInvitesEmpty
+                samples={sampleInvites()}
+                row={(invite) =>
+                  inviteRow(
+                    invite,
+                    <span class={buttonVariants({ size: "sm", variant: "destructive-ghost" })}>
+                      {t("server.invite.revoke")}
+                    </span>,
+                  )
+                }
+                disabled={!published() || membersFull()}
+                onInvite={startEmailInvite}
+              />
             }
           >
             <For each={activeInvites()}>
-              {(invite) => (
-                <Item class="server-settings-invite-row">
-                  <ItemContent>
-                    <ItemTitle>
-                      {invite.email ??
-                        (invite.permanent ? t("server.invite.permanentLink") : t("server.invite.privateLink"))}
-                    </ItemTitle>
-                    <ItemDescription>
-                      {t(ROLE_LABELS[invite.role])} ·{" "}
-                      {invite.permanent
-                        ? t("server.invite.neverExpires", { count: invite.useCount })
-                        : t("server.invite.expires", {
-                            date: format.date(new Date(invite.expiresAt), {
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }),
-                          })}
-                    </ItemDescription>
-                  </ItemContent>
-                  <ItemActions>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="destructive-ghost"
-                      disabled={!actionsAvailable() || Boolean(busy())}
-                      onClick={() =>
-                        setPanels((state) => {
-                          state.members.revokeInviteId = invite.id;
-                        })
-                      }
-                    >
-                      {t("server.invite.revoke")}
-                    </Button>
-                  </ItemActions>
-                </Item>
-              )}
+              {(invite) =>
+                inviteRow(
+                  invite,
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive-ghost"
+                    disabled={!actionsAvailable() || Boolean(busy())}
+                    onClick={() =>
+                      setPanels((state) => {
+                        state.members.revokeInviteId = invite.id;
+                      })
+                    }
+                  >
+                    {t("server.invite.revoke")}
+                  </Button>,
+                )
+              }
             </For>
           </Show>
         </ItemGroup>
@@ -695,6 +880,7 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
         <RemoveDialog />
         <RoleDialog />
         <RevokeInviteDialog />
+        <LicenseUserDialog />
       </>
     );
   }
@@ -796,13 +982,101 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
     );
   }
 
+  /**
+   * Asks the owner to add a user to the full license, then sends the invite. A Starter license is for
+   * 1 user, so the dialog changes it to Team with the same billing period. A license at the maximum cannot grow, so the
+   * dialog offers the contact page and sends no invite.
+   */
+  function LicenseUserDialog() {
+    const { errorMessage } = useText();
+    return (
+      <Show when={licenseStep()}>
+        {(step) => {
+          const plan = () => licensePlanOf(step().license);
+          const toTeam = () => plan().tier !== "team";
+          // A license can count more people than it pays for, when they joined before a lower limit.
+          const next = () => Math.max(step().license.users, step().used) + 1;
+          const users = () => (toTeam() ? Math.max(LICENSE_INCLUDED_USERS, next()) : next());
+          const price = () =>
+            users() > LICENSE_MAX_USERS
+              ? null
+              : licenseMonthlyAmount(
+                  toTeam() ? { ...plan(), tier: "team" } : plan(),
+                  users(),
+                  step().license.currency,
+                ) - step().license.amount;
+          return (
+            <ConfirmDialog
+              open
+              tone="default"
+              icon={<UserRound />}
+              pending={busy() === "invite"}
+              title={t("billing.license.invite.title")}
+              description={
+                <Show when={price()} fallback={t("billing.license.invite.max", { count: LICENSE_MAX_USERS })}>
+                  {(amount) => {
+                    const money = formatMinorMoney(format, amount(), step().license.currency);
+                    return toTeam()
+                      ? t("billing.license.invite.oneUser", { users: format.number(users()), price: money })
+                      : t("billing.license.invite.description", { price: money });
+                  }}
+                </Show>
+              }
+              confirmLabel={
+                price() === null
+                  ? t("billing.license.contact.action")
+                  : toTeam()
+                    ? t("billing.license.invite.confirmTeam")
+                    : t("billing.license.invite.confirm")
+              }
+              error={step().error ?? undefined}
+              onCancel={() => {
+                setLicenseStep(null);
+                desktopAnalytics.track("limit_reached", { kind: "license_users", action: "dismissed" });
+              }}
+              onConfirm={async () => {
+                const calls = props.license;
+                if (price() === null) {
+                  setLicenseStep(null);
+                  desktopAnalytics.track("limit_reached", { kind: "license_users", action: "contact_clicked" });
+                  desktopAnalytics.track("sales_contact_clicked", { entry_point: "members" });
+                  props.onContactUs?.();
+                  return;
+                }
+                desktopAnalytics.track("limit_reached", { kind: "license_users", action: "confirmed" });
+                if (calls) {
+                  const action = toTeam() ? "plan_change_requested" : "users_change_requested";
+                  try {
+                    if (toTeam()) await calls.changePlan({ interval: plan().interval, users: users() });
+                    else await calls.setUsers({ users: users() });
+                    desktopAnalytics.track("license_action", { action, result: "succeeded", direction: "up" });
+                  } catch (error) {
+                    desktopAnalytics.track("license_action", {
+                      action,
+                      result: "failed",
+                      direction: "up",
+                      failure_code: "update_failed",
+                    });
+                    setLicenseStep({ ...step(), error: errorMessage(error, t("billing.license.actionFailed")) });
+                    return;
+                  }
+                }
+                setLicenseStep(null);
+                await createInvite(true);
+              }}
+            />
+          );
+        }}
+      </Show>
+    );
+  }
+
   return { Panel, ConfirmDialogs, resetForServer };
 }
 
 function MemberActionsMenu(props: {
   member: TeamPresenceMember;
   mount: HTMLElement | undefined;
-  onRoleChange: (role: InviteRole, trigger: HTMLElement) => void;
   onRemove: (trigger: HTMLElement) => void;
 }) {
   const { t } = useText();
@@ -817,20 +1091,9 @@ function MemberActionsMenu(props: {
       >
         <Ellipsis aria-hidden="true" />
       </DropdownMenu.Trigger>
-      {/* A portal without a mount uses the document body. */}
+      {/* A portal without a mount uses the document body. The server role is in the role menu. */}
       <DropdownMenu.Portal mount={props.mount ?? document.body}>
         <DropdownMenu.Content class="server-settings-member-menu">
-          <Show when={!props.member.disabled}>
-            <DropdownMenu.Item
-              onSelect={() =>
-                triggerElement && props.onRoleChange(props.member.role === "admin" ? "member" : "admin", triggerElement)
-              }
-            >
-              {props.member.role === "admin" ? <UserRound aria-hidden="true" /> : <ShieldCheck aria-hidden="true" />}
-              {props.member.role === "admin" ? t("server.members.makeMember") : t("server.members.makeAdmin")}
-            </DropdownMenu.Item>
-            <DropdownMenu.Separator />
-          </Show>
           <DropdownMenu.Item
             class="ui-action-menu-danger"
             onSelect={() => triggerElement && props.onRemove(triggerElement)}

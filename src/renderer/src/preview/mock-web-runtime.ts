@@ -27,7 +27,10 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     openBrowserTab: (input) => mock.api.browser.open(input),
     navigateBrowserTab: (input) => mock.api.browser.navigate(input),
     reloadBrowserTab: (tabId) => mock.api.browser.reload(tabId),
+    stopBrowserTab: (tabId) => mock.api.browser.stop(tabId),
     closeBrowserTab: (tabId) => mock.api.browser.close(tabId),
+    takeBrowserControl: (tabId) => mock.api.browser.takeControl(tabId),
+    releaseBrowserControl: (tabId) => mock.api.browser.releaseControl(tabId),
     getSidebarLayout: () => agent.getSidebarLayout(),
     mutateSidebarLayout: (action) => agent.mutateSidebarLayout(action),
     channels: agent,
@@ -110,6 +113,7 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     setAvatar: async (agentId, image) => {
       await agent.setAvatar({ agentId, image });
     },
+    agentAvatar: async (_agentId, avatarUrl) => avatarUrl,
     models: () => agent.listModels(),
     status: () => agent.getStatus(),
     accountUsage: () => agent.getUsage(),
@@ -119,7 +123,13 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
       await agent.updateAgent(input);
     },
     deleteAgent: (agentId) => agent.deleteAgent(agentId),
-    search: (agentId, query, cursor) => agent.searchConversationMessages({ agentId, query, cursor, limit: 50 }),
+    search: (agentId, query, cursor) =>
+      agent.searchConversationMessages({
+        query,
+        ...(agentId === undefined ? {} : { agentId }),
+        ...(cursor === undefined ? {} : { cursor }),
+        limit: 50,
+      }),
     dispose: async () => {
       unsubscribe();
       mock.dispose();

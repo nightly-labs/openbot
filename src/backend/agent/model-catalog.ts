@@ -7,12 +7,9 @@ import { decodeModelListResponse, type ModelListResponse } from "./../protocol";
 import { providerFailure } from "../provider-client-effects";
 import { BUILT_IN_PROVIDER_DRIVERS, type ProviderClientContext } from "./../provider-drivers";
 import {
-  claudeModelName,
   compareModelVersions,
   FALLBACK_MODELS,
-  isOpencodeModelUnusableWithStoredKey,
   modelDisplayName,
-  modelsAfterOpenCodeDiscoveryFailure,
   OPENCODE_FREE_MODEL_FALLBACKS,
   PREFERRED_MODEL_ORDER,
 } from "./provider-models";
@@ -59,15 +56,15 @@ export class ModelCatalog {
   readonly refresh = Effect.fn("ModelCatalog.refresh")(function* (this: ModelCatalog) {
     const discovered = yield* Effect.forEach(
       BUILT_IN_PROVIDER_DRIVERS,
-      ({ id: provider }) =>
+      ({ id: provider, catalog = {} }) =>
         Effect.gen({ self: this }, function* () {
           const previous = this.#models.filter((model) => model.provider === provider);
           const client = this.#options.client(provider);
           const signedOut = this.#options.isSignedOut(provider);
-          // Do not expose fallback or stale models when OpenCode reports sign-in-required. A client
-          // in the map has an account: activation refreshes the catalog before it marks the
+          // Do not expose fallback or stale models when the provider reports sign-in-required. A
+          // client in the map has an account: activation refreshes the catalog before it marks the
           // provider available, so the old status alone does not mean signed out.
-          if (provider === "opencode" && signedOut && !client) return { provider, models: [], fresh: false };
+          if (catalog.hiddenWhenSignedOut && signedOut && !client) return { provider, models: [], fresh: false };
           if (!client) return { provider, models: previous, fresh: false };
           // Read once per pass, not per model: a stored key cannot change inside one refresh, and
           // a model is unusable only because OpenBot is what put that key in the environment.
@@ -82,11 +79,9 @@ export class ModelCatalog {
                 "model/list",
                 { limit: 100, includeHidden: true, ...(cursor ? { cursor } : {}) },
                 decodeModelListResponse,
-                // A custom agent can need more than 5 s to start and open a probe session in
-                // `initialize` and again in `model/list`: Claude Agent ACP with a few plugins and MCP
-                // servers does. It answers inside the normal timeout, and a list that timed out kept
-                // that agent out of the catalogue.
-                client.provider === "acp" ? this.#options.requestTimeoutMs : 5_000,
+                // A slow list answers inside the normal request timeout, and a list that timed out
+                // kept that agent out of the catalogue.
+                catalog.slowList ? this.#options.requestTimeoutMs : 5_000,
               );
               // Every model the CLI reports is offered, the ones it marks hidden included; only the
               // stored-key drop below keeps a model out. A CLI hides a model it still accepts -- a new release such
@@ -107,7 +102,7 @@ export class ModelCatalog {
                 }
                 serverModels.set(id, { ...item, model: id });
               }
-              cursor = client.provider === "codex" ? response.nextCursor : undefined;
+              cursor = catalog.paged ? response.nextCursor : undefined;
               if (cursor && cursors.has(cursor))
                 return yield* providerFailure(new Error("Model discovery repeated a pagination cursor."));
               if (cursor) cursors.add(cursor);
@@ -123,25 +118,19 @@ export class ModelCatalog {
                 .filter(isReasoningEffort);
               // The name the provider CLI gives, whole: a model is easier to recognise as
               // `GPT-5.6 Sol` than as `Sol`, and its own CLI names it that way.
-              // Claude Code is the exception, and `claudeModelName` says why.
+              // A provider can name its models itself, such as Claude Code.
               // Clamped, because a name over the limit is not a long name downstream: it fails
               // `isAgentModelOption`, and the IPC and Team API list decoders fail closed on the
               // whole array, so one over-long name empties the picker. OpenCode is the CLI that
               // reaches it - it names a custom model `"<provider name>/<model name>"`, and 80 plus
               // 160 characters passes 160 - but the clamp protects every CLI.
               const name = modelDisplayName(
-                (client.provider === "claude" ? claudeModelName(server.model) : null) ||
-                  server.displayName?.trim() ||
-                  fallback?.name ||
-                  server.model,
+                catalog.modelName?.(server.model) || server.displayName?.trim() || fallback?.name || server.model,
               );
-              // The stored key is an OpenCode Go key, so the Zen models the key also lists never
-              // reach the picker. With no key stored the same models can only come from the user's
-              // own OpenCode sign-in, which does buy them. Decided here, on the resolved name, so
-              // the catalog and the picker's Free badge cannot disagree about what costs money.
-              if (provider === "opencode" && hasStoredKey && isOpencodeModelUnusableWithStoredKey(server.model, name)) {
-                continue;
-              }
+              // Decided here, on the resolved name, so the catalog and the picker's Free badge cannot
+              // disagree about what costs money. With no key stored the same models can only come
+              // from the user's own sign-in, which does buy them.
+              if (hasStoredKey && catalog.usableWithStoredKey?.(server.model, name) === false) continue;
               models.push({
                 provider: client.provider,
                 id: server.model,
@@ -155,6 +144,7 @@ export class ModelCatalog {
                   ? efforts
                   : (fallback?.supportedReasoningEfforts ?? ["medium"]),
                 ...(server.reasoningEffortConfigurable === false ? { reasoningEffortConfigurable: false } : {}),
+                ...catalog.modelFields?.(server),
               });
             }
             const rank = PREFERRED_MODEL_ORDER.get(client.provider) ?? (() => 0);
@@ -163,10 +153,10 @@ export class ModelCatalog {
             const sorted = [...models].sort(
               (left, right) => rank(left) - rank(right) || compareModelVersions(left, right),
             );
-            // A successful but empty OpenCode response is no more useful to the picker than a
-            // timeout: it must not erase the built-in free tier on first discovery. Keep the last
-            // known catalog when available, otherwise seed the OpenCode safety net. It is not a
-            // fresh catalog, so callers must not treat it as proof that this process serves it.
+            // For a provider with a fallback, a successful but empty response is no more useful to
+            // the picker than a timeout: it must not erase the built-in free tier on first
+            // discovery. It is not a fresh catalog, so callers must not treat it as proof that
+            // this process serves it.
             // A response that the stored-key filter emptied is a real answer: restoring the last
             // catalog would bring back the models that the key cannot use.
             logger.info("A provider listed its models.", {
@@ -174,8 +164,8 @@ export class ModelCatalog {
               count: sorted.length,
               durationMs: Math.round(performance.now() - startedAt),
             });
-            if (client.provider === "opencode" && serverModels.size === 0) {
-              return { provider, models: modelsAfterOpenCodeDiscoveryFailure(previous), fresh: false };
+            if (catalog.fallback && serverModels.size === 0) {
+              return { provider, models: catalog.fallback(previous), fresh: false };
             }
             return { provider, models: sorted, fresh: true };
           }).pipe(
@@ -188,7 +178,7 @@ export class ModelCatalog {
               });
               return Effect.succeed({
                 provider,
-                models: provider === "opencode" ? modelsAfterOpenCodeDiscoveryFailure(previous) : previous,
+                models: catalog.fallback?.(previous) ?? previous,
                 fresh: false,
               });
             }),

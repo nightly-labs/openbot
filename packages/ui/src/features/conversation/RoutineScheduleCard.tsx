@@ -4,30 +4,26 @@ import { ChatActionCard, type ChatActionCardStatus } from "./ChatActionCard";
 import { RoutineSchedulePicker } from "./RoutineSchedulePicker";
 import type { RoutineDraftKindOption, RoutineScheduleDraft } from "./routine-schedule-draft";
 
-/** `superseded`: a later card in the chat changed this routine, so this one is only a record. */
-export type RoutineScheduleCardState = "idle" | "saving" | "saved" | "error" | "deleted" | "superseded";
+type RoutineScheduleCardState = "idle" | "saving" | "saved" | "error" | "deleted";
 
 export interface RoutineScheduleCardProps {
   routineName: string;
   action: "created" | "updated";
   schedule: RoutineScheduleDraft;
   /** Without it the card is read-only. */
-  onChange?: (schedule: RoutineScheduleDraft) => void;
+  onChange?: ((schedule: RoutineScheduleDraft) => void) | undefined;
   /** One edit on the row is complete. A card that saves each edit saves here. */
   onEditEnd?: () => void;
   state?: RoutineScheduleCardState;
-  errorText?: string;
+  errorText?: string | undefined;
   /** For example "Thu, Sep 25 at 8:20 AM". */
-  nextRunLabel?: string;
+  nextRunLabel?: string | undefined;
   /** For example "Warsaw time". Give it only when the routine zone is not the viewer's zone. */
-  timeZoneLabel?: string;
+  timeZoneLabel?: string | undefined;
   onOpenRoutine?: () => void;
-  /** Moves to the newest card of this routine. Shown while the state is `superseded`. */
-  onShowLatest?: () => void;
   today?: Date;
   /** The frequencies the menu offers. Defaults to all of them. */
   kinds?: RoutineDraftKindOption[];
-  elementRef?: (element: HTMLElement) => void;
 }
 
 /**
@@ -52,14 +48,6 @@ export function RoutineScheduleCard(props: RoutineScheduleCardProps) {
         return { kind: "error", text: props.errorText ?? t("routine.card.saveFailed") };
       case "deleted":
         return { kind: "note", text: t("routine.card.deleted") };
-      case "superseded": {
-        const showLatest = props.onShowLatest;
-        return {
-          kind: "note",
-          text: t("routine.card.changedLater"),
-          action: showLatest ? { label: t("routine.card.showLatest"), onClick: showLatest } : undefined,
-        };
-      }
       case "idle": {
         const text = nextRun();
         return text ? { kind: "note", text } : undefined;
@@ -76,14 +64,13 @@ export function RoutineScheduleCard(props: RoutineScheduleCardProps) {
       onOpen={props.onOpenRoutine}
       openLabel={t("routine.card.open", { name: props.routineName })}
       status={status()}
-      elementRef={(element) => props.elementRef?.(element)}
     >
       <RoutineSchedulePicker
         density="card"
         schedule={props.schedule}
         today={props.today}
         kinds={props.kinds}
-        disabled={deleted() || state() === "superseded" || !props.onChange}
+        disabled={deleted() || !props.onChange}
         onChange={(schedule) => props.onChange?.(schedule)}
         onEditEnd={() => props.onEditEnd?.()}
       />

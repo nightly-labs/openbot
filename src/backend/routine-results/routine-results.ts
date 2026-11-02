@@ -44,7 +44,7 @@ class RoutineResultFailed extends Schema.TaggedError<RoutineResultFailed>()("Rou
 }) {}
 
 /** A refusal the user reads: the text is already a sentence for them. */
-class RoutineResultError extends Error {}
+export class RoutineResultError extends Error {}
 
 export interface RoutineResultsDependencies {
   store: RoutineResultStore;
@@ -344,6 +344,6 @@ function retryDelay(attempts: number): number {
 }
 
 /** What the place gets: the routine's name over its answer. Both are the user's and the agent's own text. */
-function resultText(routineName: string, answer: string): string {
+export function resultText(routineName: string, answer: string): string {
   return `**${routineName}**\n\n${answer}`;
 }

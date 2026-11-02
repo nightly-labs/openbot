@@ -1,6 +1,6 @@
 import { BlurTargetView, BlurView } from "expo-blur";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { StyleSheet, type View } from "react-native";
+import { StyleSheet, type ViewInstance } from "react-native";
 import Animated, {
   Easing,
   ReduceMotion,
@@ -34,7 +34,7 @@ export function BlurReveal<T>({
   enterDelay?: number;
 }) {
   const [retained, setRetained] = useState(value);
-  const target = useRef<View | null>(null);
+  const target = useRef<ViewInstance | null>(null);
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
   const visible = value !== null;

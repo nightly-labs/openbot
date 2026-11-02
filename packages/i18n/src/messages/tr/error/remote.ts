@@ -124,8 +124,6 @@ export const messages = {
   "error.remote.serverDisconnected": "Sunucu bağlantısı kesildi.",
   "error.remote.preferencesUnreadable": "Kayıtlı sohbet tercihleri okunamadı.",
   "error.remote.accountAuthRequired": "Hesap kimlik doğrulaması gereklidir.",
-  "error.remote.serverIdentityChanged":
-    "Sunucu kimliği değişti. Güvenilen ana makine anahtarının değiştirilmesi reddedildi.",
   "error.remote.pairedIdentityChanged":
     "Eşleştirilen masaüstü kimliği eksik veya değişti. O masaüstünden yeni bir kod tarayın.",
   "error.remote.permanentInviteNoEmail": "Kalıcı davetler e-posta ile gönderilemez.",
@@ -181,6 +179,8 @@ export const messages = {
   "error.remote.directoryTimeout": "OpenBot hizmeti zamanında yanıt vermedi. Tekrar deneyin.",
   "error.remote.inviteAlreadyUsed": "Bu davet zaten kullanıldı. Yeni bir davet isteyin.",
   "error.remote.inviteNotFound": "Bu davet yok veya süresi doldu. Yeni bir davet isteyin.",
+  "error.remote.licenseUsersFull":
+    "Sunucu sahibinin lisansında boş kullanıcı yok. Sahibinden lisansa kullanıcı eklemesini isteyin.",
   "error.remote.memberLimitReached": "Bu ana makine üye sınırına ulaştı. Sahibinden yer açmasını isteyin.",
   "error.remote.hostNotRegistered": "Bu ana makine artık OpenBot hizmetine kayıtlı değil.",
   "error.remote.membershipEnded": "Artık bu ana makinenin üyesi değilsiniz. Sahibinden yeni bir davet isteyin.",
@@ -188,5 +188,11 @@ export const messages = {
   "error.remote.hostOtherAccount": "Bu ana makine başka bir hesaba ait.",
   "error.remote.remoteNotConfigured": "Bu OpenBot hizmetinde uzak bağlantılar ayarlanmamış.",
   "error.remote.hostRefused": "Ana makine isteği reddetti ({status}).",
+  // Channel actions on mobile.
+  "error.remote.formUnavailable": "Bu form artık kullanılamıyor.",
   "error.remote.hostedServerRemoval": "Barındırılan bir sunucuyu silmek için Faturalandırma'yı kullanın.",
+  "error.remote.channelsUnsupported": "Kanalları kullanmak için bu masaüstü sunucusunu güncelleyin.",
+  "error.remote.channelDeleteUnsupported": "Kanalları silmek için bu masaüstü sunucusunu güncelleyin.",
+  "error.remote.historyRefreshFailed": "Mesaj gönderildi, ancak sohbet geçmişi yenilenemedi.",
+  "error.remote.taskHistoryRefreshFailed": "Görev değiştirildi, ancak sohbet geçmişi yenilenemedi.",
 } as const satisfies PartialTranslation<typeof source>;

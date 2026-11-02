@@ -4,7 +4,7 @@
   "tagline": "Current library documentation",
   "description": "Context7 fetches current documentation and API references for libraries and frameworks, so answers use the version the project actually runs. It needs no account and no key.",
   "category": "research",
-  "creatorName": "context7.com",
+  "creatorName": "Upstash",
   "iconUrl": "https://context7.com/favicon.ico",
   "version": "1.0.0",
   "prompts": [

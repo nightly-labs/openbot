@@ -14,9 +14,9 @@ export const messages = {
   "usage.chart.costDescription":
     "Geschätzte tägliche Kosten in USD nach Anbieter. Genaue Werte findest du unter „Tagesdaten anzeigen“.",
   "usage.chart.tokensDescription":
-    "Täglich verarbeitete Tokens nach Anbieter. Genaue Werte findest du unter „Tagesdaten anzeigen“.",
+    "Tägliche Tokens ohne Cache-Lesevorgänge nach Anbieter. Genaue Werte findest du unter „Tagesdaten anzeigen“.",
   "usage.chart.costLabel": "Geschätzte tägliche Kosten in USD nach Anbieter",
-  "usage.chart.tokensLabel": "Täglich verarbeitete Tokens nach Anbieter",
+  "usage.chart.tokensLabel": "Tägliche Tokens ohne Cache-Lesevorgänge nach Anbieter",
   "usage.column.cost": "Kosten",
   "usage.column.share": "Anteil",
   "usage.column.tokens": "Tokens",
@@ -31,7 +31,7 @@ export const messages = {
     other: "{sessions} Sitzungen",
   },
   "usage.costEstimate": "API-Schätzung · USD",
-  "usage.knownTokens": "Bekannte verarbeitete Tokens",
+  "usage.knownTokens": "Bekannte Tokens ohne Cache-Lesevorgänge",
   "usage.provider.shareOfCost": "{share} der bekannten Kosten",
   "usage.provider.shareOfTokens": "{share} der bekannten Tokens",
   "usage.dailyTrend": "Täglicher Verlauf",
@@ -39,7 +39,8 @@ export const messages = {
   "usage.dailyTokens": "Tägliche Tokens",
   "usage.viewDailyData": "Tagesdaten anzeigen",
   "usage.totals.title": "Gesamtwerte",
-  "usage.totals.processedTokens": "Verarbeitete Tokens",
+  "usage.totals.tokens": "Tokens ohne Cache-Lesevorgänge",
+  "usage.totals.processedTokens": "Verarbeitete Tokens mit Cache-Lesevorgängen",
   "usage.totals.cachedInput": "Eingabe aus dem Cache",
   "usage.totals.uncachedInput": "Eingabe ohne Cache",
   "usage.totals.cacheCreation": "Cache-Erstellung",
@@ -60,9 +61,12 @@ export const messages = {
   "usage.about.title": "Über diese Schätzungen",
   "usage.about.body":
     "Token-Kosten zum entsprechenden API-Preis in USD. Dies ist eine Schätzung, keine Abonnementgebühr. Separate Werkzeug- und Mediengebühren werden nicht berechnet. Unbekannte Preise und unvollständige Nutzungsdaten bleiben nicht verfügbar. Anteile verwenden nur bekannte Beträge; unvollständige Daten können die Gesamtwerte unterschätzen.",
+  "usage.about.tokens":
+    "Token-Zahlen enthalten keine Cache-Lesevorgänge. Jede Modellanfrage in einem Durchlauf liest die zwischengespeicherte Unterhaltung erneut, daher können Cache-Lesevorgänge ein Vielfaches der übrigen Tokens sein. Die Gesamtwerte zeigen sie als „Eingabe aus dem Cache“.",
   "usage.panel.label": "Agentennutzung",
   "usage.panel.title": "Nutzung",
   "usage.panel.allAgents": "Alle Agenten",
+  "usage.panel.workflows": "Workflows",
   "usage.panel.agents": "Agenten für die Nutzungsansicht",
   "usage.panel.metric": "Nutzungskennzahl",
   "usage.panel.period": "Nutzungszeitraum",

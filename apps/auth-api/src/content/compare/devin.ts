@@ -1,5 +1,5 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
-import type { Comparison } from "./comparison";
+import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
 // Every statement about Devin here is taken from devin.ai, the Devin documentation,
 // cognition.com and Cognition's terms and Trust Center, and each page used is in
@@ -13,7 +13,7 @@ export const DEVIN_COMPARISON: Comparison = {
   answer:
     "Choose OpenBot if you want coding agents on your own computer that use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok: the app is free. Choose Devin if you want an autonomous software engineer that works in Cognition's cloud, with no computer of yours on, and starts from Slack, GitHub, Linear or Jira.",
   chooseOpenBot: [
-    "You already pay for ChatGPT, Claude, Gemini, Grok or Cursor, and want your agents to use that plan.",
+    "You already pay for ChatGPT, Claude, Gemini, Grok, Cursor, Cline or Muse Code, and want your agents to use that plan.",
     "Your code and chats must stay on your own computer, not in Cognition's cloud.",
     "You want no app vendor to keep your code or train models on it.",
     "You want native apps for iPhone and Android, or a free app.",
@@ -29,8 +29,7 @@ export const DEVIN_COMPARISON: Comparison = {
     {
       icon: "cpu",
       topic: "Models and plans",
-      openbot:
-        "Use the plans you already have: ChatGPT, Claude, Gemini, Grok or Cursor. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
+      openbot: OPENBOT_TEXT.models,
       rival:
         "Models from Anthropic, OpenAI, Google, Cognition and open-source labs, paid through your Devin plan. No own API keys. On paid plans, Devin Desktop can also run agents such as Codex CLI or Gemini CLI, billed by their provider.",
       better: "openbot",
@@ -45,24 +44,51 @@ export const DEVIN_COMPARISON: Comparison = {
     {
       icon: "cloud",
       topic: "When your computer is off",
-      openbot:
-        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
+      openbot: OPENBOT_TEXT.offline,
       rival:
         "Devin Cloud keeps working when you close your laptop. Automations start sessions on a schedule or from events.",
     },
     {
       icon: "phone",
       topic: "Remote access",
-      openbot:
-        "Apps for iPhone and Android connect from anywhere. Chats and files go over an encrypted connection between your devices, with no VPN, and no cloud stores them.",
+      openbot: OPENBOT_TEXT.remote,
       rival:
         "A web app that you can install on your phone from the browser. Start sessions from Slack, Microsoft Teams, Linear, Jira or a GitHub comment. No iPhone or Android app is listed.",
     },
     {
+      icon: "refresh",
+      topic: "Backup models",
+      openbot: OPENBOT_TEXT.backupModels,
+      rival:
+        "You choose from Anthropic, OpenAI, Google, Cognition and open models, and the Adaptive router picks one for each task. Cognition describes no move when a provider is down. When your ChatGPT plan reaches its limit, a cloud session pauses.",
+      better: "openbot",
+    },
+    {
+      icon: "key",
+      topic: "Logins and payments",
+      openbot: OPENBOT_TEXT.logins,
+      rival:
+        "You save a username and password, site cookies or 2FA codes as encrypted Secrets, and Devin types them in its browser. You can take over its browser for CAPTCHAs and 2FA. Cognition names no password manager and no payment cards.",
+      better: "openbot",
+    },
+    {
+      icon: "mic",
+      topic: "Voice",
+      openbot: OPENBOT_TEXT.voice,
+      rival:
+        "Voice calls in the web app, on a live speech model, and you can interrupt Devin while it talks. Cognition does not say where it processes speech.",
+    },
+    {
+      icon: "contact",
+      topic: "Chat apps",
+      openbot: OPENBOT_TEXT.chatApps,
+      rival:
+        "Slack and Microsoft Teams: you tag @Devin to start a session. Cognition names no Discord, Telegram or WhatsApp.",
+    },
+    {
       icon: "users",
       topic: "Teams",
-      openbot:
-        "Each agent is a full coding agent with its own job. They give work to each other in shared channels, and coworkers can join one team host.",
+      openbot: OPENBOT_TEXT.teams,
       rival:
         "Devin can hand parts of a task to managed Devins, each in its own virtual machine. The Teams plan takes up to 200 users, with no limit on parallel sessions.",
     },
@@ -87,15 +113,14 @@ export const DEVIN_COMPARISON: Comparison = {
     {
       icon: "globe",
       topic: "Where you can use it",
-      openbot:
-        "In any country: OpenBot has no region lock. The desktop app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+      openbot: OPENBOT_TEXT.regions,
       rival:
         "Cognition lists no countries; its terms exclude countries under a US embargo. Devin works in Cognition's cloud, and Cognition names no EU data region.",
     },
     {
       icon: "devices",
       topic: "Apps",
-      openbot: "macOS, Windows and Linux, and mobile apps for iPhone and Android.",
+      openbot: OPENBOT_TEXT.apps,
       rival:
         "Devin Desktop and the Devin CLI for macOS, Windows and Linux, a web app, and plugins for JetBrains IDEs. No native mobile app is listed.",
     },
@@ -112,30 +137,26 @@ export const DEVIN_COMPARISON: Comparison = {
   sections: [
     {
       title: "Models and the plans you pay for",
-      openbot:
-        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, Grok CLI with your Grok account or an xAI API key, and Cursor CLI with your Cursor plan or a Cursor API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
+      openbot: OPENBOT_TEXT.plansSection,
       rival:
         "Devin supports the latest models from Anthropic, OpenAI, Google and Cognition, and open-source models such as DeepSeek, Kimi and GLM. You choose a model in Devin Desktop and the CLI, and a mode in Devin Cloud. Cognition's own SWE-2 model is post-trained from Kimi K3. Devin does not take your own API keys: you pay through your Devin plan, and extra use is billed at API prices. On Pro, Max and Teams, Devin Desktop can also run third-party agents such as Codex CLI, Claude Agent, OpenCode and Gemini CLI; their provider bills you directly.",
       better: "openbot",
     },
     {
       title: "Where the work happens",
-      openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+      openbot: OPENBOT_TEXT.workSection,
       rival:
         "Devin Cloud works in virtual machines in Cognition's cloud, and it keeps working when you close your laptop. Automations start sessions from a schedule, Slack, GitHub, Linear or a webhook. Devin Desktop and the Devin CLI run on your own computer. With Outposts, commands can run on machines that you operate. In every case, the agent's planning and inference run in Cognition's cloud; Enterprise can have a dedicated deployment.",
     },
     {
       title: "Phones and remote access",
-      openbot:
-        "The OpenBot apps for iPhone and Android connect to the computer that runs your agents. From anywhere, you chat with them, follow their progress and send files. The connection goes directly between your devices when it can, it is encrypted, and no cloud stores your chats or files. You set up no VPN or tunnel. Remote access needs an OpenBot account.",
+      openbot: OPENBOT_TEXT.phonesSection,
       rival:
         "Devin's web app can be installed on a phone from the browser, as a Progressive Web App. You can also start sessions from Slack, Microsoft Teams, Linear or Jira, from a GitHub pull request with a /devin comment, or through the Devin API. The sessions themselves run in Cognition's cloud. We found no Devin app in the App Store or Google Play.",
     },
     {
       title: "How agents work as a team",
-      openbot:
-        "In OpenBot, each agent is a full coding agent: Codex, Claude Code, Gemini, Grok CLI, Cursor CLI or OpenCode, each with its own job and workspace. A lead agent can give parts of a task to other agents in a shared channel. You follow their work and step in when a decision needs you. For a team of people, one computer runs the host and the others join it; the chats and files stay on the host.",
+      openbot: OPENBOT_TEXT.teamSection,
       rival:
         "Devin can give parts of a large task to a team of managed Devins that work in parallel, each in its own virtual machine, and the Devin CLI has subagents. Pro and Max run up to 10 sessions at the same time; Teams and Enterprise have no limit. The Teams plan takes up to 200 users, with shared work and an admin dashboard; Enterprise adds single sign-on and a dedicated deployment.",
     },
@@ -161,8 +182,7 @@ export const DEVIN_COMPARISON: Comparison = {
     },
     {
       question: "Can I use my ChatGPT, Claude or Gemini subscription with OpenBot?",
-      answer:
-        "Yes. OpenBot signs in to each provider tool with your own account: your ChatGPT plan for Codex, your Claude plan for Claude Code, and a Google AI Pro or Ultra plan for Gemini. Grok CLI uses your Grok account or an xAI API key, and Cursor CLI your Cursor plan. OpenBot adds no charge of its own.",
+      answer: OPENBOT_TEXT.plansFaq,
     },
     {
       question: "Can I use my own API key or plan with Devin?",
@@ -219,6 +239,10 @@ export const DEVIN_COMPARISON: Comparison = {
     { label: "Devin self-serve plans", url: `${DEVIN_DOCS}/admin/billing/self-serve` },
     { label: "Cognition platform terms", url: "https://cognition.com/legal/platform-terms-of-service" },
     { label: "Cognition Trust Center", url: "https://trust.cognition.ai" },
+    { label: "Devin Adaptive", url: "https://docs.devin.ai/cli/adaptive" },
+    { label: "Devin with your ChatGPT plan", url: "https://docs.devin.ai/admin/billing/chatgpt" },
+    { label: "Devin secrets and site cookies", url: "https://docs.devin.ai/product-guides/secrets" },
+    { label: "Devin voice mode", url: "https://docs.devin.ai/work-with-devin/voice-mode" },
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },
   ],

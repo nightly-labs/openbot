@@ -12,6 +12,15 @@ export const messages = defineMessages("error.connector", {
   "error.connector.githubExpired": "The GitHub connection expired. Connect GitHub again.",
   "error.connector.githubFileUnreadable": "The GitHub connection file is unreadable.",
   "error.connector.githubFileTooLarge": "The GitHub connection file is too large.",
+  "error.connector.linkDenied": "The Link sign-in was refused.",
+  "error.connector.linkCodeExpired": "The Link sign-in expired. Connect Link again.",
+  "error.connector.linkUnexpected": "Link sent an unexpected answer: {detail}",
+  "error.connector.linkUnreachable": "OpenBot cannot reach Link: {detail}",
+  "error.connector.linkExpired": "The Link connection expired. Connect Link again.",
+  "error.connector.linkNotConnected": "Link is not connected. Connect it in Server settings > Vault > Cards.",
+  "error.connector.linkNoCard": "The Link account has no card. Add a card in Link.",
+  "error.connector.linkFileUnreadable": "The Link connection file is unreadable.",
+  "error.connector.linkFileTooLarge": "The Link connection file is too large.",
   // The 1Password connection: the CLI that creates the service account, the token and the stored file.
   "error.connector.onePasswordCliMissing":
     "OpenBot cannot find the 1Password CLI. Install it and turn on its integration in the 1Password app, or use a service account token.",
@@ -28,4 +37,11 @@ export const messages = defineMessages("error.connector", {
   "error.connector.onePasswordFileTooLarge": "The 1Password connection file is too large.",
   "error.connector.bitwardenFailed":
     "Could not read Bitwarden. Install the bw CLI, sign in, unlock it, and create one folder named Shared with OpenBot. Connect with a new session key.",
+  "error.connector.bitwardenHostInput":
+    "Enter an HTTPS server address, the API key client_id and client_secret, and the master password.",
+  "error.connector.bitwardenHostFailed":
+    "Could not open Bitwarden on this server. Check the server address, the API key and the master password, and make sure that one folder is named Shared with OpenBot. Then connect again.",
+  "error.connector.bitwardenCliInstallFailed":
+    "Could not install the Bitwarden CLI on this server. Check its network connection, then connect again.",
+  "error.connector.bitwardenFileUnreadable": "The Bitwarden connection file is unreadable.",
 });

@@ -33,7 +33,7 @@ internal data class OpenedNotification(
 
 /**
  * Opens a notification that an OpenBot host sealed, with the keys of each server that the app writes
- * into `push-notifications.json` in its files folder (`push-notifications-native.android.ts`).
+ * into `push-notifications.json` in its files folder (`android-push-notifications.android.ts`).
  *
  * The seal is the one of `live-activity-seal.ts` in `@openbot/team-client`: a keystream of
  * HMAC-SHA256 blocks over a 16-byte nonce and a 32-bit counter, then a 16-byte HMAC-SHA256 tag over

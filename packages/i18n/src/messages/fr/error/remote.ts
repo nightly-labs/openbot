@@ -128,8 +128,6 @@ export const messages = {
   "error.remote.serverDisconnected": "Le serveur s’est déconnecté.",
   "error.remote.preferencesUnreadable": "Impossible de lire les préférences de discussion enregistrées.",
   "error.remote.accountAuthRequired": "L’authentification du compte est requise.",
-  "error.remote.serverIdentityChanged":
-    "L’identité du serveur a changé. La clé d’hôte de confiance n’est pas remplacée.",
   "error.remote.pairedIdentityChanged":
     "L’identité de l’ordinateur associé est absente ou a changé. Scannez un nouveau code depuis cet ordinateur.",
   "error.remote.permanentInviteNoEmail": "Les invitations permanentes ne peuvent pas être envoyées par e-mail.",
@@ -185,6 +183,8 @@ export const messages = {
   "error.remote.directoryTimeout": "Le service OpenBot n’a pas répondu à temps. Réessayez.",
   "error.remote.inviteAlreadyUsed": "Cette invitation a déjà été utilisée. Demandez une nouvelle invitation.",
   "error.remote.inviteNotFound": "Cette invitation n’existe pas ou a expiré. Demandez une nouvelle invitation.",
+  "error.remote.licenseUsersFull":
+    "La licence du propriétaire du serveur n'a plus d'utilisateur libre. Demandez au propriétaire d'ajouter un utilisateur à la licence.",
   "error.remote.memberLimitReached":
     "Cet hôte a atteint sa limite de membres. Demandez au propriétaire de libérer de la place.",
   "error.remote.hostNotRegistered": "Cet hôte n’est plus enregistré auprès du service OpenBot.",
@@ -194,5 +194,12 @@ export const messages = {
   "error.remote.hostOtherAccount": "Cet hôte appartient à un autre compte.",
   "error.remote.remoteNotConfigured": "Les connexions à distance ne sont pas configurées sur ce service OpenBot.",
   "error.remote.hostRefused": "L’hôte a refusé la demande ({status}).",
+  "error.remote.formUnavailable": "Ce formulaire n’est plus disponible.",
   "error.remote.hostedServerRemoval": "Utilisez « Facturation » pour supprimer un serveur hébergé.",
+  "error.remote.channelsUnsupported": "Mettez à jour ce serveur de bureau pour utiliser les canaux.",
+  "error.remote.channelDeleteUnsupported": "Mettez à jour ce serveur de bureau pour supprimer des canaux.",
+  "error.remote.historyRefreshFailed":
+    "Le message a été envoyé, mais l’historique de la discussion n’a pas pu être actualisé.",
+  "error.remote.taskHistoryRefreshFailed":
+    "La tâche a été modifiée, mais l’historique de la discussion n’a pas pu être actualisé.",
 } as const satisfies PartialTranslation<typeof source>;

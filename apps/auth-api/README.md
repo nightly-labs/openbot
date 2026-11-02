@@ -33,8 +33,8 @@ commands continue to use that file.
 
 ### Stripe sandbox
 
-`bun run api:stripe:bootstrap` creates the six plan Prices (lookup keys `openbot_{plan}_{month|year}`)
-and the Customer Portal settings in the Stripe account of `STRIPE_SECRET_KEY`. It is safe to run
+`bun run api:stripe:bootstrap` creates the six plan Prices (lookup keys `openbot_{plan}_{month|year}`),
+the license Price (`openbot_license_month`) and the Customer Portal settings in the Stripe account of `STRIPE_SECRET_KEY`. It is safe to run
 again: a changed amount makes a new Price and moves the lookup key to it. In the Portal, an upgrade
 is charged at once, and a downgrade or a shorter interval starts at the next period.
 
@@ -53,10 +53,14 @@ also sets the allow list from `HOSTED_SERVERS_TEST_ALLOW_LIST` and the developer
 
 `scripts/stripe-flows-e2e.ts` checks the plan flows against the sandbox and a local Worker: renewal,
 failed renewal, cancel at the period end, plan change, renew, delete, another account's server, a
-deleted customer, a refund, a dispute, and the welcome email of a first plan. Each scenario uses a Stripe test clock and deletes it at the end. Start the Worker
+deleted customer, a refund, a dispute, and the welcome email of a first plan. The `license-*`
+scenarios check the license: buy, Checkout, one open Checkout page, change users, the user count,
+renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. Each scenario uses a Stripe
+test clock and deletes it at the end. Start the Worker
 with `HOSTED_SERVERS_ENABLED=true`, `HOSTED_SERVERS_ALLOWED_USER_IDS` set to the output of
-`bun scripts/stripe-flows-e2e.ts --print-user-ids`, and `BOAT_API_KEY=e2e-invalid-key`, and forward
-the webhooks to it. A value in the shell overrides `.env.dev`; without the fake key, each paid
+`bun scripts/stripe-flows-e2e.ts --print-user-ids`, `HOSTED_SERVER_TEMPLATE=e2e-template`, and
+`BOAT_API_KEY=e2e-invalid-key`, and forward the webhooks to it. Without a template, hosting is off and
+each server scenario fails with `hosting_unavailable`. A value in the shell overrides `.env.dev`; without the fake key, each paid
 scenario creates a real boat VM. Then, from the
 repository root:
 
@@ -117,6 +121,22 @@ article uses. `content-art/manifest.json` records a hash of the inputs of each
 image. The build compares those hashes with the articles and fails when an image
 is missing, out of date, or belongs to no article.
 
+## Home page beam
+
+The home page beam is a SolidJS port of
+[LaserFlow from React Bits](https://reactbits.dev/animations/laser-flow). Its license lets the
+website use it, but does not let this public repository contain it. The port is in the private
+`nightly-labs/openbot-laser-flow` repository. Git ignores its path here, and a checkout without it
+builds a home page with no beam. To see the beam locally, clone it into that path:
+
+```bash
+git clone git@github.com:nightly-labs/openbot-laser-flow.git apps/auth-api/src/vendor/laser-flow
+```
+
+CI checks it out with the read-only deploy key in the `LASER_FLOW_DEPLOY_KEY` secret. Pull request
+previews from forks have no beam. A production deploy, from CI or from `bun run deploy`, stops
+before any change when the port is missing. Never copy the file into this repository.
+
 ## Email delivery
 
 Private Email SMTP is the primary delivery method. Use a separate app password.
@@ -136,7 +156,12 @@ EMAIL_SMTP_PORT=465
 EMAIL_SMTP_USERNAME=hello@openbot.run
 EMAIL_SMTP_PASSWORD=<PRIVATE_EMAIL_APP_PASSWORD>
 EMAIL_FROM=hello@openbot.run
+EMAIL_LICENSE_FROM=licenses@openbot.run
 ```
+
+License emails (the first payment, a failed renewal payment, and the end of a license) go from
+`EMAIL_LICENSE_FROM`. The SMTP account must be allowed to send as that address: on Private Email,
+make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAIL_FROM`.
 
 `bun run env:set:smtp` encrypts the app password into `.env.production` only.
 
@@ -210,6 +235,13 @@ bun run api:deploy
 
 The service applies limits per email, per IP, per challenge, and per resend.
 
+A deploy replaces every file under `/assets/`. Before a production deploy, CI and `bun run api:deploy`
+run `scripts/keep-previous-assets.ts`. It copies the files of the builds that were live in the last
+24 hours from `https://openbot.run` into the new build, so a tab that is open during a deploy can
+still load code. The site keeps the list of these files in `/asset-history.json`. When the list or a
+file cannot be read, the deploy continues with fewer files, and such a tab reloads when it next loads
+code.
+
 ## Hosted sites
 
 `/v1/sites` takes two optional headers: `OpenBot-Host-Id` and `OpenBot-Host-Token`, the machine token
@@ -247,6 +279,26 @@ Set the private JWK, public JWKS, active key ID, Signal URL, and webhook secret 
 the encrypted environment. The private and public keys must use ES256. The Signal
 URL must point to a DNS-only host. Cloudflare carries only account and configuration
 requests. It does not carry Team API or Remote Desktop data.
+
+Two optional variables spread hosts over more than one Signal machine. When both are empty, each
+ticket names `REMOTE_SIGNAL_URL`, as before.
+
+- `REMOTE_SIGNAL_HOMES`: the Signal machines that a host can have as its home, as `id=url,id=url`,
+  for example `a=wss://signal-a.openbot.run/v1/signal,b=wss://signal-b.openbot.run/v1/signal`. An ID
+  has 1 to 32 characters from `a-z`, `0-9` and `-`. A URL must use `wss:`, or `ws:` when
+  `REMOTE_SIGNAL_URL` uses `ws:`. An invalid value makes each ticket request fail with
+  `503 remote_not_configured`. A host ticket request with `signalHome: true` gets a home, which
+  `remote_hosts.signal_home` keeps, and a ticket with the `signal` claim. The host keeps its home
+  until it sends that home's URL as `failedSignalUrl`. Session tickets of the host name the same
+  home. Other host tickets (ingress, the webhook relay, released hosts) and hosts with no home use
+  `REMOTE_SIGNAL_URL`, which stays the entry Signal.
+- `REMOTE_AUTH_WEBHOOK_URLS`: each Signal that gets the auth events, as `url,url`. Empty means
+  `REMOTE_AUTH_WEBHOOK_URL` only. The outbox deletes an event when each URL accepted it, and sends it
+  again only to the URLs that failed.
+- `SIGNAL_ENTRY_ZONE_ID` and the secret `SIGNAL_ENTRY_DNS_TOKEN`: with both and two homes, the cron
+  `*/1 * * * *` moves the `REMOTE_SIGNAL_URL` name to another home when its machine stops answering
+  `/health/ready` (`src/server/signal-entry-failover.ts`). The token needs only `Zone.DNS:Edit` on that
+  zone. The test and preview Workers keep the zone empty, so they never change production DNS.
 
 To deploy your own copy of this Worker with your own Signal, see
 [Self-hosted remote access](../../docs/self-hosting.md).

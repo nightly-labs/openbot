@@ -1,0 +1,97 @@
+name: Provider CLI canary
+
+# Users get each new provider CLI release within an hour of its publication, with no OpenBot release
+# between. This run reads the newest release of each provider for each target, installs the newest
+# OpenCode, and runs the conformance cases on it with a free model and no account
+# (scripts/provider-cli-canary.ts). When a release breaks OpenBot, add its version to
+# `provider-runtime-blocklist.json` on `main` to stop the offer. The `alert` job opens one issue on
+# the second failed run in a row and closes it after a run that passes. An issue that a person closes
+# stays closed until the canary passes and then fails two times again.
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  canary:
+    name: Newest provider CLIs
+    if: github.repository == 'nightly-labs/openbot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The canary runs released CLIs that this repository does not build.
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Run the provider CLI canary
+        run: bun run test:provider-cli-canary
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: provider-cli-canary
+          path: .openbot-build/provider-cli-canary/
+          if-no-files-found: ignore
+
+  alert:
+    name: Report a failed canary
+    needs: canary
+    if: always() && github.repository == 'nightly-labs/openbot'
+    concurrency:
+      group: provider-cli-canary-alert
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      issues: write
+    steps:
+      - name: Open or close the alert issue
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          FAILED: ${{ needs.canary.result == 'failure' }}
+          PASSED: ${{ needs.canary.result == 'success' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Provider CLI canary fails"
+          open=$(gh api -X GET "repos/$GH_REPO/issues" -f state=open -f creator='github-actions[bot]' -f per_page=100 \
+            --jq "[.[] | select(.title == \"$title\" and .user.login == \"github-actions[bot]\")][0].number // empty")
+          if [ "$FAILED" = "true" ]; then
+            if [ -n "$open" ]; then exit 0; fi
+            # A free model can be busy for one run, so open the issue only on the second failure. Only
+            # that run opens it: a person can close the issue while the canary still fails.
+            canary_failed() {
+              [ -n "$1" ] || return 1
+              count=$(gh api -X GET "repos/$GH_REPO/actions/runs/$1/jobs" \
+                --jq '[.jobs[] | select(.name == "Newest provider CLIs" and .conclusion == "failure")] | length') || exit 1
+              [ "$count" != "0" ]
+            }
+            runs=$(gh api -X GET "repos/$GH_REPO/actions/workflows/provider-cli-canary.yml/runs" -f status=completed -f per_page=20 \
+              --jq "[.workflow_runs[] | select(.id != $GITHUB_RUN_ID) | .id][0:2] | map(tostring) | join(\" \")")
+            read -r previous before <<< "$runs"
+            if ! canary_failed "$previous"; then exit 0; fi
+            if canary_failed "$before"; then exit 0; fi
+            gh issue create --title "$title" --body "The provider CLI canary failed 2 times in a row. A new provider CLI release can be broken for users, or its release cannot be read. The report artifact names the provider, the version and the case.
+
+          To stop the offer of a broken version, add it to \`provider-runtime-blocklist.json\` on \`main\`.
+
+          Last failed run: $RUN_URL
+
+          The next good run closes this issue."
+          elif [ "$PASSED" = "true" ] && [ -n "$open" ]; then
+            gh issue close "$open" --comment "The canary passes again: $RUN_URL"
+          fi

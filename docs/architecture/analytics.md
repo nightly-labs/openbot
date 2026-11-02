@@ -86,10 +86,17 @@ and ends between two samples, such as a short tool run, is not counted. The main
 `monitorEventLoopDelay`, less its 20 ms timer interval.
 Database time comes from `AgentDatabaseSupervisor`, from the send of a statement to its answer or to
 the end of the host; the host process is not changed. Renderer and child process exits other than a
-clean exit are counted and written to the trace as `crash` spans at the next sample. A utility
-process with the reason `killed` is not counted: OpenBot stops these processes itself. An exit in the
-last minute before a quit is not counted: a stop signal can end the child processes before the
-main process starts its teardown.
+clean exit are written to the trace as `crash` spans at once, and counted at the next sample. A
+utility process with the reason `killed` is neither: OpenBot stops these processes itself. An exit in
+the last minute before a quit is not counted: a stop signal can end the child processes before the
+main process starts its teardown. The trace still has it, after the `exit` span of that quit.
+
+`index.ts` writes one `exit` span and one line in `logs/main/main.log` when OpenBot starts to quit.
+The name is the first reason: `main_window_closed` (Windows and Linux, where closing the main
+window quits), `signal`, `session_end` or `quit` (the menu, the tray, an update or a restart). The
+main log holds every line of the `main` logger, redacted, in two files of 1 MB. `crashReporter`
+keeps local crash dumps in `app.getPath("crashDumps")` and never uploads them. A process that ends
+with no `exit` span and no dump was stopped from outside OpenBot (#2675).
 
 The pure part (`resource-summary.ts`) keeps each day as sparse histograms with two significant digits,
 peaks and counters, so p95 stays exact enough without a sample list. The summary file holds the
@@ -107,10 +114,18 @@ Migration 15 adds these tables on both database creation paths. They do not refe
 projections: clearing a conversation must retain usage. Agent deletion removes usage, checkpoints,
 activity, and related command receipts in its existing transaction.
 
-The turn lifecycle accepts usage only for a provider session belonging to the agent. Codex totals
-use durable session checkpoints; restored totals establish a baseline for pre-feature sessions.
+The turn lifecycle accepts usage only for a provider session belonging to the agent, in its own chat
+or in one of its tasks. It finds the session in the public thread of the provider thread. Codex
+totals use durable session checkpoints. The Codex counter `:codex:cache-writes` replaces `:codex`,
+which counted cache writes as uncached input. When the counter has no checkpoint, it starts from the
+session totals before the last request (`total` minus `last`). Thus the requests that `:codex`
+counted, task requests from before task metering, and requests from before migration 15 do not
+count. The last request counts, also in a session from before migration 15. An update with no
+`last` or no turn ID establishes a baseline.
 Claude uses per-model query totals and a separate counter identity for each query process. ACP usage
-is optional. Missing fields remain unknown. Completed assistant messages exclude commentary and tool
+is optional. Missing fields remain unknown. ACP usage is a session total, with one counter for each
+session, except from Antigravity: 1.4.3 sends the tokens of one prompt, so each prompt result has its
+own counter, and its `thoughtTokens` count as output. Completed assistant messages exclude commentary and tool
 output. Only post-install messages enter activity counts.
 
 `agent:get-analytics` and the capability-gated `GET /v1/agents/:agentId/analytics` return aggregates.
@@ -122,9 +137,14 @@ that host team can read totals. The public web and Signal service store no usage
 
 The Usage views show 7, 30, 90, or custom days, with 30 days as the default. Both expose exact daily
 values beside the SVG charts. Cost is a USD API-equivalent estimate, not a subscription charge.
-The bundled rates cite official sources and carry a verification date. Claude list-price estimates
+The bundled rates cite official sources and carry a verification date. A rate with a scheduled
+change uses the rate in force when the turn started. Claude list-price estimates
 come from SDK model usage; unknown or managed pricing is not treated as a list-price estimate.
-Unknown models, missing cache data, and unresolvable context or cache-write pricing stay unpriced.
+Codex cache writes use the 30-minute cache-write rate. An update under the provider's long-context
+threshold uses the short rates. An update over it uses the long rates only when it is one request
+(its input equals the `last` prompt); ACP reports no such prompt, so a Grok update over it stays
+unpriced. Unknown models, missing cache data, and unresolvable context or cache-write pricing stay
+unpriced.
 Tool and media fees are outside the estimate. Stored estimates retain their price basis.
 
 ### Host-wide Usage

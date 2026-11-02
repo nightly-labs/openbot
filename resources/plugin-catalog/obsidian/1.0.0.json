@@ -1,0 +1,50 @@
+{
+  "slug": "obsidian",
+  "name": "Obsidian",
+  "tagline": "Notes in your vault",
+  "description": "Obsidian lets agents search, read and write the notes in your vault, so the vault can be their memory. The local server connects to the Local REST API plugin in the Obsidian app on this computer. The plugin's API key is passed to the local server as one environment variable. Keep Obsidian open while agents use it.",
+  "category": "productivity",
+  "creatorName": "Obsidian",
+  "iconUrl": "https://obsidian.md/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-recall", "text": "What do my notes say about the decisions on this project?" },
+    { "id": "prompt-save", "text": "Save this decision as a new note in my vault." },
+    { "id": "prompt-log", "text": "Add a summary of today's work to my Work log note." }
+  ],
+  "apps": [
+    {
+      "id": "app-obsidian-mcp",
+      "name": "Obsidian",
+      "description": "Note search, reading and editing, over a local MCP server with the Local REST API plugin key.",
+      "iconUrl": "https://obsidian.md/favicon.ico",
+      "server": {
+        "name": "obsidian",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "obsidian-mcp-server@3.7.2"],
+        "auth": [
+          {
+            "id": "obsidian-key",
+            "kind": "key",
+            "label": "API key",
+            "fields": [
+              {
+                "id": "token",
+                "label": "API key",
+                "env": "OBSIDIAN_API_KEY",
+                "hint": "In Obsidian, open Settings > Local REST API. Copy the API key and turn on \"Enable non-encrypted (HTTP) server\"."
+              }
+            ],
+            "docsUrl": "https://github.com/coddingtonbear/obsidian-local-rest-api",
+            "docsLabel": "Get a key"
+          }
+        ]
+      }
+    }
+  ],
+  "websiteUrl": "https://obsidian.md",
+  "privacyPolicyUrl": "https://obsidian.md/privacy",
+  "termsUrl": "https://obsidian.md/terms",
+  "skills": []
+}

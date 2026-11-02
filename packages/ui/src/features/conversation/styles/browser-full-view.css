@@ -1,0 +1,492 @@
+/*
+ * The browser as a full view: the tabs in the top row on the window frame, then the card with the
+ * address row and the page. The view is portaled to `document.body`, outside `.app-window`, so it sets
+ * the frame values of that window again.
+ *
+ * The view appears and disappears in one frame, with no transition. The page inside it is a native
+ * view that the renderer cannot animate: it is attached once the view has stopped moving
+ * (`BrowserFullView.tsx`), so an opening transition is only time in front of an empty card.
+ */
+
+/* Keep app navigation below the portaled browser and its backdrop. */
+body:has(.browser-full-view) .app-frame {
+  isolation: isolate;
+}
+
+.browser-expanded-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--openbot-layer-dropdown) - 2);
+}
+
+.browser-full-view {
+  --browser-full-edge: var(--openbot-space-1);
+  --browser-full-top-height: 38px;
+  position: fixed;
+  z-index: calc(var(--openbot-layer-dropdown) - 1);
+  inset: 0;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  padding: 0 var(--browser-full-edge) var(--browser-full-edge);
+  background: var(--openbot-bg-frame);
+  color: var(--openbot-text-primary);
+}
+
+.browser-full-view[hidden],
+.browser-expanded-backdrop[hidden] {
+  display: none;
+}
+
+/* The top row on the frame. Its controls are the flat chips of the app top row. The empty parts of the
+ * row move the window. */
+.browser-full-top {
+  display: flex;
+  height: var(--browser-full-top-height);
+  min-width: 0;
+  flex: none;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-1) 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.browser-full-top svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.browser-full-top-spacer {
+  flex: 1;
+}
+
+/*
+ * On macOS the window is `titleBarStyle: "hidden"` and the traffic lights are drawn over the view.
+ * `trafficLightPosition: { x: 12, y: 13 }` (`src/main/main-window.ts`) puts the group at x 12..71, so
+ * the first control starts at x 82, where the top row of the app frame starts beside those dots.
+ */
+.browser-full-view-mac-controls .browser-full-top {
+  padding-inline-start: calc(82px - var(--browser-full-edge));
+}
+
+.browser-full-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-canvas);
+}
+
+.browser-full-browser {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.browser-full-alert {
+  margin: var(--openbot-space-2) var(--openbot-space-2) 0;
+}
+
+/* The dock is placed in the surface, so the surface is its containing block. */
+.browser-full-surface {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+/*
+ * A host's page is drawn on a canvas at the host's viewport shape, not the window's. The page keeps
+ * that shape and gets a margin at the sides or at the bottom. `BrowserFullView` sets the frame size
+ * once the first frame is drawn; until then the page takes a common desktop shape.
+ */
+.browser-full-surface[data-live] {
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.browser-full-surface[data-live] .browser-live-view {
+  position: relative;
+  inset: auto;
+  width: min(
+    calc(100cqw - 2 * var(--openbot-space-3)),
+    calc((100cqh - 2 * var(--openbot-space-3)) * var(--browser-frame-width, 16) / var(--browser-frame-height, 10))
+  );
+  height: auto;
+  aspect-ratio: var(--browser-frame-width, 16) / var(--browser-frame-height, 10);
+  overflow: hidden;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+}
+
+.browser-full-owner-avatar {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.browser-full-owner-acting {
+  border-radius: var(--openbot-radius-pill);
+  box-shadow: 0 0 0 1.5px var(--openbot-accent);
+}
+
+.browser-full-owner-globe {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: none;
+  color: var(--openbot-text-muted);
+}
+
+/* The chips share the row. Below their minimum width the row scrolls, as other browsers do. The row is
+ * the offset parent of the chips, so a drag can measure them in it. */
+.browser-full-chips {
+  --browser-full-fade: calc(var(--openbot-space-8) * 2);
+  position: relative;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow-x: auto;
+  padding: var(--openbot-space-0-5);
+  scrollbar-width: none;
+}
+
+/* A row that scrolls fades out at the edge where more chips are. */
+.browser-full-chips[data-fade-start] {
+  mask-image: linear-gradient(to right, transparent, var(--openbot-text-primary) var(--browser-full-fade));
+}
+
+.browser-full-chips[data-fade-end] {
+  mask-image: linear-gradient(to right, var(--openbot-text-primary) calc(100% - var(--browser-full-fade)), transparent);
+}
+
+.browser-full-chips[data-fade-start][data-fade-end] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--openbot-text-primary) var(--browser-full-fade),
+    var(--openbot-text-primary) calc(100% - var(--browser-full-fade)),
+    transparent
+  );
+}
+
+/* Chips shrink evenly to a width that still shows a few words of the title, then the row scrolls. */
+.browser-full-chip {
+  min-width: 120px;
+  max-width: 200px;
+  flex: 0 1 200px;
+  user-select: none;
+  transition: flex-basis var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* A tab of a named profile has a line in the profile's color under its title. */
+.browser-full-chip[data-profile-color]::after {
+  position: absolute;
+  right: var(--openbot-space-2);
+  bottom: 2px;
+  left: var(--openbot-space-2);
+  height: 2px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--browser-profile-color);
+  content: "";
+  pointer-events: none;
+}
+
+/* After a close with the pointer, the chips keep their width until the pointer leaves the row. */
+.browser-full-chips[data-frozen] .browser-full-chip {
+  flex: 0 0 var(--browser-full-chip-frozen);
+}
+
+.browser-full-chips[data-dragging] {
+  cursor: grabbing;
+}
+
+.browser-full-chips[data-dragging] .browser-full-chip {
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* The held chip is lifted above the others and follows the pointer without delay. */
+.browser-full-chips[data-dragging] .browser-full-chip[data-dragging] {
+  z-index: 1;
+  background: var(--openbot-bg-surface-raised);
+  box-shadow:
+    inset 0 0 0 1px var(--openbot-border-strong),
+    var(--openbot-shadow-raised);
+  transition: none;
+}
+
+.browser-full-chips[data-dragging] .browser-full-chip::before {
+  opacity: 0;
+}
+
+.browser-full-hidden-tabs {
+  max-width: 320px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .browser-full-chip,
+  .browser-full-chips[data-dragging] .browser-full-chip {
+    transition: none;
+  }
+}
+
+.browser-full-spin {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: none;
+  color: var(--openbot-text-muted);
+  animation: ui-spin 1s linear infinite;
+}
+
+.browser-full-chip .side-panel-tab-select {
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-start;
+}
+
+.browser-full-chip .side-panel-tab-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The address row: arrows and a filled capsule. */
+.browser-full-address-row {
+  display: flex;
+  height: 44px;
+  flex: none;
+  align-items: center;
+  gap: var(--openbot-space-0-5);
+  padding-inline: var(--openbot-space-2);
+  border-bottom: 1px solid var(--openbot-border);
+  color: var(--openbot-text-secondary);
+}
+
+.browser-full-address-row svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* Focus is quiet: the capsule lifts and gets a thin edge. The caret and the selected address show where
+ * typing goes. */
+.browser-full-capsule {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  height: var(--openbot-control-md);
+  flex: 1;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin-inline: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-2) var(--openbot-space-1);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  transition:
+    background-color var(--openbot-duration-normal) var(--openbot-ease-out),
+    box-shadow var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.browser-full-capsule:focus-within {
+  background: var(--openbot-bg-control-active);
+  box-shadow: inset 0 0 0 1px var(--openbot-border-grouped);
+}
+
+.browser-full-capsule .browser-full-capsule-input {
+  height: 100%;
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+}
+
+.browser-full-capsule .browser-full-capsule-input:focus-visible {
+  outline: none;
+}
+
+.browser-full-capsule .browser-full-capsule-input::selection {
+  background: var(--openbot-accent-strong);
+}
+
+.browser-full-capsule-agent {
+  display: grid;
+  flex: none;
+  place-items: center;
+}
+
+/* The suggestions under the address field. */
+.browser-full-suggest {
+  position: absolute;
+  z-index: var(--openbot-layer-dropdown);
+  top: calc(100% + var(--openbot-space-1));
+  right: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-lg);
+}
+
+.browser-full-suggest-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: var(--openbot-control-md);
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-md);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  text-align: start;
+  cursor: default;
+}
+
+.browser-full-suggest-row:hover {
+  background: var(--openbot-bg-control-hover);
+}
+
+.browser-full-suggest-row[aria-selected="true"] {
+  background: var(--openbot-bg-control-active);
+}
+
+.browser-full-suggest-icon {
+  display: grid;
+  width: var(--openbot-icon-sm);
+  flex: none;
+  place-items: center;
+  color: var(--openbot-text-muted);
+}
+
+.browser-full-suggest-title {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-full-suggest-detail {
+  min-width: 0;
+  flex: 0 100 auto;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-full-suggest-switch {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0 var(--openbot-space-2);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-muted);
+}
+
+/* Narrow: one button with the tab count opens the list of tabs. */
+.browser-full-switch {
+  min-width: 0;
+  max-width: 100%;
+  justify-content: flex-start;
+  gap: var(--openbot-space-2);
+}
+
+.browser-full-switch-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The tab count, in a square, as phone browsers show it. */
+.browser-full-switch-count {
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  flex: none;
+  place-items: center;
+  padding-inline: var(--openbot-space-1);
+  border: 1.5px solid currentcolor;
+  border-radius: var(--openbot-radius-sm);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.browser-full-switch-menu {
+  display: flex;
+  width: min(360px, calc(100vw - 2 * var(--openbot-space-3)));
+  max-height: min(480px, 70dvh);
+  flex-direction: column;
+  padding: var(--openbot-space-1);
+}
+
+.browser-full-switch-list {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.browser-full-switch-row {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-0-5);
+}
+
+.browser-full-switch-select {
+  min-width: 0;
+  height: auto;
+  flex: 1;
+  padding-block: var(--openbot-space-1-5);
+}
+
+.browser-full-switch-select[aria-current="true"] {
+  background: var(--openbot-bg-control-active);
+}
+
+.browser-full-switch-close svg,
+.browser-full-switch-actions svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.browser-full-switch-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.browser-full-switch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-1);
+  margin-top: var(--openbot-space-1);
+  padding-top: var(--openbot-space-1);
+  border-top: 1px solid var(--openbot-border);
+}
+
+@media (max-width: 720px) {
+  /* The page starts under the address row. */
+  .browser-full-surface[data-live] {
+    place-items: start center;
+    padding-top: var(--openbot-space-3);
+  }
+}

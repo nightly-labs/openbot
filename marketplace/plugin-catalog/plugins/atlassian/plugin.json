@@ -1,0 +1,33 @@
+{
+  "slug": "atlassian",
+  "name": "Atlassian",
+  "tagline": "Jira work items and Confluence pages",
+  "description": "Atlassian lets agents search and read Jira work items, Confluence pages and Bitbucket pull requests, and create or update work items, pages and comments. Each user signs in to their own Atlassian account through the browser and approves the access on a consent screen. Agents get the same permissions as the user: they can change work items and pages, change page permissions, and merge pull requests. Tools that delete Jira data stay off until an organization admin turns them on. Each tool call uses Rovo credits.",
+  "category": "productivity",
+  "creatorName": "Atlassian",
+  "iconUrl": "https://www.atlassian.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-assigned", "text": "Which open Jira work items are assigned to me?" },
+    { "id": "prompt-release-page", "text": "Find the Confluence page about our release process and summarize it." },
+    { "id": "prompt-new-item", "text": "Create a Jira work item for the login bug with steps to reproduce." }
+  ],
+  "apps": [
+    {
+      "id": "app-atlassian-mcp",
+      "name": "Atlassian",
+      "description": "Jira, Confluence, and Bitbucket, over Atlassian's MCP server with browser sign-in.",
+      "iconUrl": "https://www.atlassian.com/favicon.ico",
+      "server": {
+        "name": "atlassian",
+        "transport": "http",
+        "url": "https://mcp.atlassian.com/v2/mcp",
+        "auth": [{ "id": "atlassian-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.atlassian.com",
+  "privacyPolicyUrl": "https://www.atlassian.com/legal/privacy-policy",
+  "termsUrl": "https://www.atlassian.com/legal/atlassian-customer-agreement"
+}

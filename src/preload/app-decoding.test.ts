@@ -12,21 +12,28 @@ import { describe, expect, it } from "vitest";
 import {
   decodeAccountSessions,
   decodeAnalyticsPreference,
+  decodeAppAppearancePreference,
   decodeAppInfo,
   decodeAppLanguagePreference,
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
   decodeCentralAuthState,
+  decodeChatWindowTargets,
+  decodeCustomAgentResult,
   decodeCustomAgents,
+  decodeCustomAgentUsage,
   decodeDetectedModelServers,
   decodeDiscoverModelsResult,
   decodeMobileConnectedDevices,
   decodeMobileConnectTicket,
   decodeNotificationOpenedEvent,
   decodeNotificationPreference,
+  decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
   decodeUpdatePreference,
   decodeUpdateStatus,
+  decodeVoiceServerProbe,
+  decodeVoiceServerSettings,
 } from "./app-decoding";
 
 const updateStatus = {
@@ -52,6 +59,7 @@ const customAgent = {
   command: "goose",
   args: ["acp"],
   envNames: ["OPENAI_API_KEY"],
+  usagePrompt: null,
   resolvedCommand: "/opt/homebrew/bin/goose",
 };
 
@@ -64,11 +72,46 @@ const codeSent = {
 } satisfies CentralAuthState;
 
 // Each value is what main sends, typed as its contract, so it must come back unchanged.
+const voiceServer = {
+  address: "http://studio.local:8000/v1",
+  hasApiKey: true,
+  routes: {
+    dictation: true,
+    speech: false,
+    transcriptionModel: "Systran/faster-whisper-large-v3",
+    speechModel: null,
+    voice: null,
+  },
+};
+
 const valid: [string, (value: unknown) => unknown, unknown][] = [
+  ["a voice server", decodeVoiceServerSettings, voiceServer],
+  ["no voice server", decodeVoiceServerSettings, null],
+  [
+    "a voice server test that found models",
+    decodeVoiceServerProbe,
+    { ok: true, models: { transcription: ["whisper-1"], speech: ["kokoro"], voices: ["af_heart"] } },
+  ],
+  [
+    "a voice server test that failed",
+    decodeVoiceServerProbe,
+    { ok: false, field: "apiKey", message: "studio.local:8000 refused the API key." },
+  ],
   [
     "app info",
     decodeAppInfo,
     { name: "OpenBot", version: "1.0.0", platform: "darwin", variant: "dev" } satisfies AppInfo,
+  ],
+  [
+    "app info with an install ID",
+    decodeAppInfo,
+    {
+      name: "OpenBot",
+      version: "1.0.0",
+      platform: "darwin",
+      variant: "production",
+      analyticsInstallId: "install-0b5c7c9e-8d55-4a3f-9d0e-2f7c1a6b4e21",
+    } satisfies AppInfo,
   ],
   [
     "setup state",
@@ -85,6 +128,7 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     } satisfies ApprovalAutomationPreference,
   ],
   ["language preference", decodeAppLanguagePreference, { language: "fr" }],
+  ["appearance preference", decodeAppAppearancePreference, { appearance: "light", transparentWindow: true }],
   ["signed out", decodeCentralAuthState, { status: "signed_out" } satisfies CentralAuthState],
   ["code sent", decodeCentralAuthState, codeSent],
   [
@@ -102,6 +146,14 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     {
       status: "signed_in",
       user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null },
+    } satisfies CentralAuthState,
+  ],
+  [
+    "signed in with an analytics answer",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, analyticsEnabled: true },
     } satisfies CentralAuthState,
   ],
   [
@@ -133,8 +185,25 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     decodeNotificationOpenedEvent,
     { serverId: "local", agentId: "agent-1", threadId: null } satisfies NotificationOpenedEvent,
   ],
+  [
+    "opened channel notification",
+    decodeNotificationOpenedEvent,
+    { serverId: "local", agentId: "agent-1", threadId: null, channelId: "channel-1" } satisfies NotificationOpenedEvent,
+  ],
+  ["chat windows", decodeChatWindowTargets, [{ serverId: "local", agentId: "agent-1" }]],
   ["detected model servers", decodeDetectedModelServers, [detectedServer]],
   ["custom agents", decodeCustomAgents, [customAgent, { ...customAgent, id: "qwen", resolvedCommand: null }]],
+  ["a custom agent with a usage prompt", decodeCustomAgents, [{ ...customAgent, usagePrompt: "/usage" }]],
+  [
+    // The released acp-registry-v1 install codec keeps only the fields that it knew.
+    "a registry install result with no usage prompt",
+    decodeCustomAgentResult,
+    {
+      agents: [Object.fromEntries(Object.entries(customAgent).filter(([key]) => key !== "usagePrompt"))],
+      restart: "not-running",
+    },
+  ],
+  ["custom agent usage", decodeCustomAgentUsage, [{ id: "devin", text: "Plan: Pro\n42% left" }]],
   ["a model list", decodeDiscoverModelsResult, { models: [{ id: "qwen3" }] }],
   [
     "detection settings",
@@ -144,6 +213,29 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
 ];
 
 const malformed: [string, (value: unknown) => unknown, unknown][] = [
+  [
+    "app info with an install ID that is not text",
+    decodeAppInfo,
+    { name: "OpenBot", version: "1.0.0", platform: "darwin", variant: "production", analyticsInstallId: 1 },
+  ],
+  // The key never comes back to the renderer, so a record that carries one fails closed.
+  ["a voice server with its key", decodeVoiceServerSettings, { ...voiceServer, apiKey: "sk-secret" }],
+  [
+    "a voice server that dictates with no model",
+    decodeVoiceServerSettings,
+    { ...voiceServer, routes: { ...voiceServer.routes, transcriptionModel: null } },
+  ],
+  [
+    "a voice server that speaks with no voice",
+    decodeVoiceServerSettings,
+    { ...voiceServer, routes: { ...voiceServer.routes, speech: true, speechModel: "kokoro", voice: null } },
+  ],
+  ["a voice server test with an unknown field", decodeVoiceServerProbe, { ok: false, field: "model", message: "" }],
+  [
+    "a voice server test with an empty model",
+    decodeVoiceServerProbe,
+    { ok: true, models: { transcription: [""], speech: [], voices: [] } },
+  ],
   [
     "app info on an unknown platform",
     decodeAppInfo,
@@ -157,6 +249,12 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   ["analytics preference without a switch", decodeAnalyticsPreference, {}],
   ["approval automation without overrides", decodeApprovalAutomationPreference, { defaultAutoApprove: true }],
   ["language preference with an unknown tag", decodeAppLanguagePreference, { language: "xx" }],
+  ["appearance preference with no transparent window", decodeAppAppearancePreference, { appearance: "dark" }],
+  [
+    "appearance preference with a string transparent window",
+    decodeAppAppearancePreference,
+    { appearance: "dark", transparentWindow: "true" },
+  ],
   ["an unknown account status", decodeCentralAuthState, { status: "banned" }],
   ["signed in without a user", decodeCentralAuthState, { status: "signed_in" }],
   ["code sent with a text expiry", decodeCentralAuthState, { ...codeSent, expiresAt: "soon" }],
@@ -168,6 +266,13 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   ["update preference without a switch", decodeUpdatePreference, null],
   ["notification preference without a switch", decodeNotificationPreference, { desktopNotifications: "yes" }],
   ["opened notification without an agent", decodeNotificationOpenedEvent, { serverId: "local", threadId: null }],
+  [
+    "opened notification with a non-string channel",
+    decodeNotificationOpenedEvent,
+    { serverId: "local", agentId: "agent-1", threadId: null, channelId: 7 },
+  ],
+  ["a chat window without an agent", decodeChatWindowTargets, [{ serverId: "local" }]],
+  ["chat windows that are not a list", decodeChatWindowTargets, { serverId: "local", agentId: "agent-1" }],
   // A scan row never carries a credential, so one that does is refused with the whole list.
   ["a detected server with a key", decodeDetectedModelServers, [{ ...detectedServer, apiKey: "sk-x" }]],
   ["a detected server with headers", decodeDetectedModelServers, [{ ...detectedServer, headers: [] }]],
@@ -175,6 +280,17 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   ["a custom agent with its environment", decodeCustomAgents, [{ ...customAgent, env: [] }]],
   ["a custom agent with its ciphertext", decodeCustomAgents, [{ ...customAgent, secret: "c2VhbGVk" }]],
   ["a custom agent with a value", decodeCustomAgents, [{ ...customAgent, value: "sk-x" }]],
+  ["a custom agent with a two-line usage prompt", decodeCustomAgents, [{ ...customAgent, usagePrompt: "/usage\nrm" }]],
+  ["custom agent usage of an invalid id", decodeCustomAgentUsage, [{ id: "Not An Id", text: "42%" }]],
+  ["custom agent usage with no text", decodeCustomAgentUsage, [{ id: "devin", text: null }]],
+  [
+    "an account analytics answer that is not a yes or a no",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, analyticsEnabled: "yes" },
+    },
+  ],
   ["a model list with an empty id", decodeDiscoverModelsResult, { models: [{ id: "" }] }],
   [
     "detection settings without a switch",
@@ -190,5 +306,40 @@ describe("app decoding", () => {
 
   it.each(malformed)("rejects %s", (_name, decode, value) => {
     expect(() => decode(value)).toThrow(/^Invalid /);
+  });
+});
+
+const AGENT_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
+
+// A Marketplace link began in a URL a web page chose. Only an agent id or a skill slug of the right
+// form reaches the renderer, with no other field; anything else is no link at all.
+describe("pending Marketplace listing", () => {
+  it.each([
+    ["an agent", { kind: "agent", id: AGENT_ID }],
+    ["a skill", { kind: "skill", id: "release-notes" }],
+  ])("keeps %s", (_name, value) => {
+    expect(decodePendingMarketplaceListing(value)).toEqual(value);
+  });
+
+  it("drops a field main did not name", () => {
+    expect(decodePendingMarketplaceListing({ kind: "skill", id: "release-notes", install: true })).toEqual({
+      kind: "skill",
+      id: "release-notes",
+    });
+  });
+
+  it.each([
+    ["no link", null],
+    ["a bare slug", "release-notes"],
+    ["an unknown kind", { kind: "plugin", id: "release-notes" }],
+    ["an agent with a slug", { kind: "agent", id: "release-notes" }],
+    ["an agent id in upper case", { kind: "agent", id: AGENT_ID.toUpperCase() }],
+    ["a skill with a path", { kind: "skill", id: "../account" }],
+    ["a skill with a dot", { kind: "skill", id: "notes.md" }],
+    ["a skill slug over 64 characters", { kind: "skill", id: "a".repeat(65) }],
+    ["an empty id", { kind: "skill", id: "" }],
+    ["an id that is not text", { kind: "agent", id: 42 }],
+  ])("refuses %s", (_name, value) => {
+    expect(decodePendingMarketplaceListing(value)).toBeNull();
   });
 });

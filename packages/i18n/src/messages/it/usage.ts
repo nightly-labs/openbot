@@ -14,9 +14,9 @@ export const messages = {
   "usage.chart.costDescription":
     "Costo giornaliero stimato in USD per provider. I valori esatti sono disponibili con «Vedi dati giornalieri».",
   "usage.chart.tokensDescription":
-    "Token elaborati ogni giorno per provider. I valori esatti sono disponibili con «Vedi dati giornalieri».",
+    "Token senza letture dalla cache ogni giorno per provider. I valori esatti sono disponibili con «Vedi dati giornalieri».",
   "usage.chart.costLabel": "Costo giornaliero stimato in USD per provider",
-  "usage.chart.tokensLabel": "Token elaborati ogni giorno per provider",
+  "usage.chart.tokensLabel": "Token senza letture dalla cache ogni giorno per provider",
   "usage.column.cost": "Costo",
   "usage.column.share": "Quota",
   "usage.column.tokens": "Token",
@@ -28,7 +28,7 @@ export const messages = {
   "usage.summary": "Riepilogo dell'utilizzo",
   "usage.sessions": { one: "{sessions} sessione", other: "{sessions} sessioni" },
   "usage.costEstimate": "Stima API · USD",
-  "usage.knownTokens": "Token elaborati noti",
+  "usage.knownTokens": "Token noti senza letture dalla cache",
   "usage.provider.shareOfCost": "{share} del costo noto",
   "usage.provider.shareOfTokens": "{share} dei token noti",
   "usage.dailyTrend": "Andamento giornaliero",
@@ -36,7 +36,8 @@ export const messages = {
   "usage.dailyTokens": "Token giornalieri",
   "usage.viewDailyData": "Vedi dati giornalieri",
   "usage.totals.title": "Totali",
-  "usage.totals.processedTokens": "Token elaborati",
+  "usage.totals.tokens": "Token senza letture dalla cache",
+  "usage.totals.processedTokens": "Token elaborati con letture dalla cache",
   "usage.totals.cachedInput": "Input in cache",
   "usage.totals.uncachedInput": "Input non in cache",
   "usage.totals.cacheCreation": "Creazione della cache",
@@ -57,9 +58,12 @@ export const messages = {
   "usage.about.title": "Informazioni su queste stime",
   "usage.about.body":
     "Costo dei token equivalente all'API, in USD. È una stima, non un addebito dell'abbonamento. Le tariffe separate per tool e contenuti multimediali non sono calcolate. I prezzi sconosciuti e l'utilizzo incompleto restano non disponibili. Le quote usano solo gli importi noti; i dati parziali possono far sottostimare i totali.",
+  "usage.about.tokens":
+    "I conteggi dei token non includono le letture dalla cache. Ogni richiesta al modello in un turno rilegge la conversazione in cache, quindi le letture dalla cache possono essere molte volte superiori agli altri token. I totali le mostrano come «Input in cache».",
   "usage.panel.label": "Utilizzo dell'agente",
   "usage.panel.title": "Utilizzo",
   "usage.panel.allAgents": "Tutti gli agenti",
+  "usage.panel.workflows": "Flussi di lavoro",
   "usage.panel.agents": "Agenti dell'utilizzo",
   "usage.panel.metric": "Metrica dell'utilizzo",
   "usage.panel.period": "Periodo dell'utilizzo",

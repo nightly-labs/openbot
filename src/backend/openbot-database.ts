@@ -192,6 +192,10 @@ export class OpenBotDatabase {
     return this.#conversations.readActiveTurnId(agentId, threadId);
   }
 
+  readRunningTurnIds(): Map<string, string[]> {
+    return this.#conversations.readRunningTurnIds();
+  }
+
   readConversationRevision(agentId: string, threadId: string | null): number {
     return this.#conversations.readConversationRevision(agentId, threadId);
   }
@@ -246,8 +250,9 @@ export class OpenBotDatabase {
     agentId?: string,
     cursor?: string,
     requestedLimit = 100,
+    includeSideThreads = false,
   ): ConversationSearchPage {
-    return this.#conversations.searchConversationMessages(query, agentId, cursor, requestedLimit);
+    return this.#conversations.searchConversationMessages(query, agentId, cursor, requestedLimit, includeSideThreads);
   }
 
   searchConversationFiles(query: string, cursor?: string, requestedLimit = 50): ConversationFileSearchPage {
@@ -408,6 +413,34 @@ export class OpenBotDatabase {
       });
       db.exec("COMMIT");
       return { ...structuredClone(snapshot), revision };
+    } catch (error) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /**
+   * Writes the mailbox changes and runs `write` in one transaction, so the mailbox rows and the rows
+   * that name them commit together or not at all.
+   */
+  persistMailboxChangesWith<T>(
+    mailboxState: MailboxProjectionState,
+    mailboxChanges: MailboxProjectionChanges,
+    mailboxEventType: string,
+    write: () => T,
+  ): T {
+    const db = this.connection;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      this.applyMailboxChanges(
+        `mailbox:${mailboxEventType}:${randomUUID()}`,
+        mailboxState,
+        mailboxChanges,
+        mailboxEventType,
+      );
+      const result = write();
+      db.exec("COMMIT");
+      return result;
     } catch (error) {
       if (db.isTransaction) db.exec("ROLLBACK");
       throw error;

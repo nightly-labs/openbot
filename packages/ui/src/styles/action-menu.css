@@ -8,7 +8,7 @@
   --ui-menu-bg: var(--openbot-bg-sheet);
   --ui-menu-edge: color-mix(in srgb, var(--openbot-text-primary) 11%, transparent);
   --ui-menu-highlight: color-mix(in srgb, var(--openbot-text-primary) 5%, transparent);
-  --ui-menu-shadow: color-mix(in srgb, var(--openbot-bg-notch) 45%, transparent);
+  --ui-menu-shadow: var(--openbot-shadow-menu);
   --ui-menu-item-hover: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
   /* The highlighted row as one opaque color, for the parts of an icon that are cut out of its fill. */
   --ui-menu-row-highlight: color-mix(in srgb, var(--openbot-text-primary) 6%, var(--ui-menu-bg));
@@ -265,7 +265,7 @@
 }
 
 .ui-motion-tooltip {
-  z-index: var(--openbot-layer-popover);
+  z-index: var(--openbot-layer-tooltip);
   transform-origin: var(--kb-tooltip-content-transform-origin);
   animation: ui-menu-in var(--ui-submenu-duration) var(--ui-submenu-ease) both;
 }

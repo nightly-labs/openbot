@@ -52,7 +52,11 @@ export class BrowserRecorder {
   constructor(
     downloadsRoot: string,
     onStateChanged: (tabId: string, recording: boolean) => void,
-    options: { maxRecordingMs?: number; maxConcurrentRecordings?: number; maxAggregateBytes?: number } = {},
+    options: {
+      maxRecordingMs?: number | undefined;
+      maxConcurrentRecordings?: number | undefined;
+      maxAggregateBytes?: number | undefined;
+    } = {},
   ) {
     this.#downloadsRoot = downloadsRoot;
     this.#onStateChanged = onStateChanged;

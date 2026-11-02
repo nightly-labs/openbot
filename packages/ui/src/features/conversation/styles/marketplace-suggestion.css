@@ -89,6 +89,149 @@
   align-items: center;
 }
 
+/*
+ * Connect, its busy step and Connected are one button. Both labels share one grid cell; the stage
+ * takes the width of the label on screen, and the cell keeps that width, so the wider label
+ * overflows on both sides instead of pushing the other one off-centre.
+ */
+.marketplace-suggestion .marketplace-suggestion-button {
+  overflow: clip;
+}
+
+/* Connected is a status: the success fill holds under the pointer. On-light text keeps AA on the dark-theme fill. */
+.marketplace-suggestion .marketplace-suggestion-button.ui-button[data-state="connected"],
+.marketplace-suggestion .marketplace-suggestion-button.ui-button[data-state="connected"]:hover {
+  border-color: transparent;
+  background: var(--openbot-success);
+  color: var(--openbot-text-on-light);
+  cursor: default;
+}
+
+/* On-light text on the light-theme success fill is 3:1. The darker success-text fill keeps AA. */
+:root[data-openbot-color-scheme="light"]
+  .marketplace-suggestion
+  .marketplace-suggestion-button.ui-button[data-state="connected"] {
+  background: var(--openbot-success-text);
+}
+
+.marketplace-suggestion-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+}
+
+.marketplace-suggestion-layer {
+  display: inline-flex;
+  grid-area: 1 / 1;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  white-space: nowrap;
+}
+
+.marketplace-suggestion-button[data-state="connected"] [data-layer="start"],
+.marketplace-suggestion-button:not([data-state="connected"]) [data-layer="done"] {
+  opacity: 0;
+}
+
+.marketplace-suggestion-layer > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* The spinner takes no room until the step is busy. */
+.marketplace-suggestion-spinner {
+  display: inline-flex;
+  width: 0;
+  margin-inline-end: calc(-1 * var(--openbot-space-1-5));
+  opacity: 0;
+}
+
+.marketplace-suggestion-button[data-state="busy"] .marketplace-suggestion-spinner {
+  width: auto;
+  margin-inline-end: 0;
+  opacity: 1;
+}
+
+.marketplace-suggestion[data-state="connected"] .marketplace-suggestion-dismiss {
+  width: 0;
+  min-width: 0;
+  margin-inline-start: calc(-1 * var(--openbot-space-3));
+  overflow: hidden;
+  border-width: 0;
+  padding: 0;
+  opacity: 0;
+  visibility: hidden;
+}
+
+/*
+ * The motion of a change the user started. With reduced motion, only the fill and the labels fade.
+ * The busy step: the spinner grows in and the button widens. Connected: the success fill comes in, the
+ * old label lifts away as the new one rises, the check draws from its short stroke, and Dismiss
+ * folds so the button glides to the edge.
+ */
+.marketplace-suggestion[data-motion] .marketplace-suggestion-button.ui-button {
+  transition:
+    background-color var(--openbot-duration-slow) var(--openbot-ease-out),
+    color var(--openbot-duration-slow) var(--openbot-ease-out),
+    opacity var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.marketplace-suggestion[data-motion] .marketplace-suggestion-layer {
+  transition: opacity var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .marketplace-suggestion[data-motion] .marketplace-suggestion-stage {
+    transition: width var(--openbot-duration-slow) var(--openbot-ease-out);
+  }
+
+  .marketplace-suggestion[data-motion] .marketplace-suggestion-layer {
+    transition:
+      opacity var(--openbot-duration-normal) var(--openbot-ease-out),
+      transform var(--openbot-duration-slow) var(--openbot-ease-out);
+  }
+
+  .marketplace-suggestion-button[data-state="connected"] [data-layer="start"] {
+    transform: translateY(-40%);
+  }
+
+  .marketplace-suggestion-button:not([data-state="connected"]) [data-layer="done"] {
+    transform: translateY(40%);
+  }
+
+  .marketplace-suggestion[data-motion] .marketplace-suggestion-layer > svg path {
+    stroke-dasharray: 24 24;
+    stroke-dashoffset: -24;
+    transition: stroke-dashoffset var(--openbot-duration-overlay) var(--openbot-ease-out) var(--openbot-duration-fast);
+  }
+
+  .marketplace-suggestion[data-motion] .marketplace-suggestion-button[data-state="connected"] svg path {
+    stroke-dashoffset: 0;
+  }
+
+  .marketplace-suggestion[data-motion] .marketplace-suggestion-spinner {
+    transform: scale(0.6);
+    transition:
+      opacity var(--openbot-duration-normal) var(--openbot-ease-out),
+      transform var(--openbot-duration-normal) var(--openbot-ease-out);
+  }
+
+  .marketplace-suggestion[data-motion]
+    .marketplace-suggestion-button[data-state="busy"]
+    .marketplace-suggestion-spinner {
+    transform: none;
+  }
+
+  .marketplace-suggestion[data-motion] .marketplace-suggestion-dismiss {
+    transition:
+      opacity var(--openbot-duration-fast) var(--openbot-ease-out),
+      width var(--openbot-duration-slow) var(--openbot-ease-out),
+      margin var(--openbot-duration-slow) var(--openbot-ease-out),
+      visibility 0s linear var(--openbot-duration-slow);
+  }
+}
+
 .marketplace-suggestion-done[data-slot="badge"] {
   gap: var(--openbot-space-1-5);
   border-radius: var(--openbot-radius-pill);

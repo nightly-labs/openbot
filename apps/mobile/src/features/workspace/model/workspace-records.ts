@@ -1,8 +1,14 @@
 import {
   type AgentSummary,
+  type ClientAgentSummary,
+  type ForeignProviderId,
+  foreignProvider,
+  isAgentMarketplaceSource,
   isAgentModel,
   isAgentProvider,
+  isAgentProviderRef,
   isAvatarHue,
+  isKnownAgentProvider,
   isReasoningEffort,
   isSidebarLayoutSnapshot,
   type SidebarLayoutSnapshot,
@@ -18,8 +24,11 @@ export type RemoteAgent = Pick<
   "id" | "name" | "title" | "description" | "preview" | "updatedAt" | "avatarSeed" | "avatarHue"
 > &
   Partial<
-    Pick<AgentSummary, "provider" | "model" | "reasoningEffort" | "avatarUrl" | "notifications" | "workspacePath">
-  >;
+    Pick<
+      AgentSummary,
+      "provider" | "model" | "reasoningEffort" | "avatarUrl" | "notifications" | "workspacePath" | "marketplaceSource"
+    >
+  > & { foreignProvider?: ForeignProviderId | undefined };
 
 export function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent {
   return {
@@ -31,6 +40,7 @@ export function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent 
     preview: agent.preview,
     updatedLabel: formatUpdatedAt(agent.updatedAt),
     provider: agent.provider,
+    foreignProvider: agent.foreignProvider,
     model: agent.model,
     reasoningEffort: agent.reasoningEffort,
     notifications: agent.notifications,
@@ -38,7 +48,18 @@ export function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent 
     avatarUrl: agent.avatarUrl ?? null,
     avatarSeed: agent.avatarSeed,
     avatarHue: agent.avatarHue,
+    marketplaceSource: agent.marketplaceSource
+      ? { listingId: agent.marketplaceSource.listingId, version: agent.marketplaceSource.version }
+      : undefined,
   };
+}
+
+/** An agent of a host event. A provider that this build does not know moves to `foreignProvider`. */
+export function remoteAgentOf(agent: ClientAgentSummary): RemoteAgent {
+  const { provider, ...rest } = agent;
+  return isKnownAgentProvider(provider)
+    ? { ...rest, provider }
+    : { ...rest, provider: undefined, foreignProvider: foreignProvider(provider) };
 }
 
 export function decodeAgent(value: unknown): RemoteAgent {
@@ -63,6 +84,8 @@ export function decodeAgent(value: unknown): RemoteAgent {
     preview: value.preview,
     updatedAt: value.updatedAt,
     provider: isAgentProvider(value.provider) ? value.provider : undefined,
+    // A provider of a newer host stays on the agent: the host still runs it.
+    foreignProvider: isAgentProviderRef(value.provider) ? foreignProvider(value.provider) : undefined,
     model: isAgentModel(value.model) ? value.model : undefined,
     reasoningEffort: isReasoningEffort(value.reasoningEffort) ? value.reasoningEffort : undefined,
     notifications: isBoolean(value.notifications) ? value.notifications : undefined,
@@ -70,6 +93,8 @@ export function decodeAgent(value: unknown): RemoteAgent {
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
     avatarSeed: value.avatarSeed,
     avatarHue: value.avatarHue,
+    // An older host sends no listing; a malformed one is left out rather than failing the agent list.
+    marketplaceSource: isAgentMarketplaceSource(value.marketplaceSource) ? value.marketplaceSource : undefined,
   };
 }
 

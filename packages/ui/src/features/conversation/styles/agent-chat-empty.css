@@ -1,0 +1,117 @@
+/* A direct chat before its first message: the agent, its line, and a faint sample turn below.
+   It fills the scroll area and no more, so the chat cannot open scrolled past the title: on a
+   short window, the turn row gets only the height that is left. */
+.agent-chat-empty {
+  box-sizing: border-box;
+  height: 100%;
+  display: grid;
+  grid-auto-rows: auto minmax(0, 21rem);
+  align-content: center;
+  justify-items: center;
+  gap: var(--openbot-space-6);
+  padding: var(--openbot-space-6) 0;
+  container-type: inline-size;
+}
+
+.agent-chat-empty-pitch {
+  --agent-chat-empty-title-size: var(--openbot-text-display);
+  --agent-chat-empty-hand-size: calc(var(--agent-chat-empty-title-size) * 1.2);
+  display: grid;
+  justify-items: center;
+  gap: var(--openbot-space-2);
+  text-align: center;
+}
+
+.agent-chat-empty-avatar.agent-avatar {
+  width: calc(var(--openbot-control-xl) * 1.6);
+  height: calc(var(--openbot-control-xl) * 1.6);
+  margin-bottom: var(--openbot-space-2);
+}
+
+.agent-chat-empty-title {
+  margin: 0;
+  font-size: var(--agent-chat-empty-title-size);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.agent-chat-empty-title > span {
+  display: block;
+}
+
+.agent-chat-empty-ready,
+.agent-chat-empty-description {
+  color: var(--openbot-text-muted);
+}
+
+.agent-chat-empty-description {
+  max-width: 30rem;
+  margin: 0;
+  font-size: var(--openbot-text-xl);
+  line-height: 1.5;
+  text-wrap: balance;
+}
+
+/* The one handwritten word. It writes itself once, from left to right. The brand has no hand
+   font, so the system ones stand in. */
+.agent-chat-empty-hand {
+  display: inline-block;
+  color: var(--openbot-accent-text);
+  font-family: "Bradley Hand", "Noteworthy", "Segoe Print", cursive;
+  font-size: var(--agent-chat-empty-hand-size);
+  line-height: 1;
+  transform: rotate(-2deg);
+  clip-path: inset(-0.4em 100% -0.4em -0.2em);
+  animation: agent-chat-empty-write calc(var(--openbot-duration-slow) * 2.8) linear
+    calc(var(--openbot-duration-slow) * 2.5) forwards;
+}
+
+@keyframes agent-chat-empty-write {
+  to {
+    clip-path: inset(-0.4em -0.2em -0.4em -0.2em);
+  }
+}
+
+/* The faint turn, in a column of chat width. Its rows are the chat's own. */
+.agent-chat-empty-turn {
+  width: min(100%, 40rem);
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+  mask-image: radial-gradient(ellipse 70% 90% at 50% 20%, var(--openbot-text-primary) 45%, var(--openbot-transparent));
+}
+
+.agent-chat-empty-row {
+  padding-top: var(--openbot-chat-entry-gap);
+}
+
+.agent-chat-empty-showing {
+  transition:
+    opacity calc(var(--openbot-duration-slow) * 3.5) var(--openbot-ease-out),
+    filter calc(var(--openbot-duration-slow) * 3.5) var(--openbot-ease-out),
+    transform calc(var(--openbot-duration-slow) * 3.5) var(--openbot-ease-out);
+}
+
+.agent-chat-empty-showing[data-leaving] {
+  opacity: 0;
+  filter: blur(3px);
+  transform: translateY(-6px);
+}
+
+@container (max-width: 520px) {
+  .agent-chat-empty-pitch {
+    --agent-chat-empty-title-size: var(--openbot-text-3xl);
+  }
+
+  .agent-chat-empty-description {
+    font-size: var(--openbot-text-lg);
+  }
+}
+
+.agent-chat-empty[data-still] .agent-chat-empty-hand {
+  animation: none;
+  clip-path: none;
+}

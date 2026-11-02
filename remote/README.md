@@ -54,6 +54,23 @@ must be in the ticket JWKS that Signal loads (`REMOTE_TICKET_PUBLIC_JWKS` on the
 `REMOTE_TICKET_PUBLIC_KEYS` here). Signal does not store or log the body. Without
 `SLACK_SIGNING_SECRET`, the Slack route answers 503.
 
+## GitHub events
+
+The OpenBot GitHub App sends the events of every installation to one webhook URL,
+`https://signal.openbot.run/v1/github/events`. Signal checks GitHub's `X-Hub-Signature-256` with the
+App's webhook secret (`GITHUB_WEBHOOK_SECRET`, at least 32 bytes), and reads only the event name, the
+delivery ID, the installation ID and the repository ID. Then it passes the exact body to the `ingress`
+socket of every host whose GitHub route names the repository, at the same time. It answers 202 when a
+host saved the event, 204 when no host watches the repository or every host refused it, and 503 when a
+host did not answer. A body larger than 512 KiB gets 413. GitHub does not send an event again by itself:
+an event for a host that is offline is lost, and the host shows the gap in its event history.
+
+An `ingress` socket names its repositories with a GitHub route ticket: an ES256 JWT with the audience
+`openbot-github-route`, signed by the Worker with the remote ticket key, for 5 minutes. The Worker
+checks, with the host's GitHub sign-in, which of the repositories that the host's GitHub triggers watch
+the sign-in can see through an installation of the App. D1 keeps none of it. Signal does not store or
+log the body. Without `GITHUB_WEBHOOK_SECRET`, the GitHub route answers 503.
+
 ## Discord
 
 The OpenBot Discord bot is one bot for every guild that installs it. Signal holds its bot token
@@ -62,14 +79,22 @@ malformed value, Discord is off: Signal logs one line without the value, keeps n
 connection, and `POST /v1/discord/api` answers 503. The remote sessions and the Slack route keep
 running.
 
+Signal asks for the privileged Message Content intent, so that OpenBot gets the text of the message
+a person replies to and of the conversation history. Turn on **Message Content Intent** in the
+Developer Portal. When Discord refuses the intent (close code 4014), Signal logs one line and connects
+without it. `DISCORD_MESSAGE_CONTENT=false` stops Signal asking for it.
+
 Signal keeps the bot's Gateway connection with the intents `Guilds`, `GuildMessages` and
-`DirectMessages`, and no privileged intent. Discord then gives the bot the text of a message only
-when the message mentions the bot. From the Gateway, Signal reads:
+`DirectMessages`, plus `MessageContent` unless `DISCORD_MESSAGE_CONTENT` is `false`. Without the
+Message Content intent, Discord gives the bot the text of a message only when the message mentions
+the bot. With it, Discord sends the text of every message in the channels the bot can see; Signal
+still passes on only the messages that mention the bot. From the Gateway, Signal reads:
 
 - the names of the guilds, channels and threads, and which guild each channel is in;
 - each guild message that mentions the bot and that a person wrote. Signal passes the message ID,
-  channel, author, text without the bot's mention, the replied message, the Discord CDN addresses of
-  the attachments and the time to the `ingress` socket of the host that the guild is linked to;
+  channel, author, the author's role IDs, text without the bot's mention, the replied message (with
+  its author, text and time when a person wrote it and Discord gave its text), the Discord CDN
+  addresses of the attachments and the time to the `ingress` socket of the host that the guild is linked to;
 - each press of an OpenBot button. Signal acknowledges it to Discord at once and passes it on;
 - the removal of the bot from a guild, which ends that guild's connection on the host.
 
@@ -84,7 +109,7 @@ account service which links are current until every older ticket has expired.
 
 A socket with a Discord route gets a `discord-session` token and the list of the guilds routed to it. The host sends it as the
 bearer of its calls to `POST /v1/discord/api`: post, edit or delete a message, add or remove a
-reaction, read the messages after one message, read a member or channel name, answer a button press,
+reaction, read the messages after one message, read a member or channel name, list the guild's roles, answer a button press,
 and upload one file of at most 10 MB. Signal makes each call with the bot token, only in a guild that
 is routed to that socket, and only in a channel of that guild. No post can ping anyone. The token is
 valid while the socket is open.
@@ -186,9 +211,66 @@ bun run remote:check
 ```
 
 Updating Signal may close the WebSocket. An active WebRTC connection stays up. `remote:update` puts coturn
-into drain and waits for the allocations to finish. A single coturn instance is no protection against machine
-failure. Forcing a coturn restart ends active relay sessions. The client performs an ICE restart and resumes
-a file transfer from the last acknowledged offset once the service is back.
+into drain and waits for the allocations to finish. Forcing a coturn restart ends
+active relay sessions. The client performs an ICE restart and resumes a file transfer from the last
+acknowledged offset once the service is back.
+
+## Two Signal machines
+
+Two Signal machines can run at the same time. Each machine has its own name, and one more name, the
+entry (`signal.openbot.run`), goes to one of them. Set these on each machine:
+
+- `SIGNAL_ID`: the name of this machine in the `signal` ticket claim, `^[a-z0-9-]{1,32}$`.
+- `SIGNAL_ENTRY_HOST`: the entry name, for example `signal.openbot.run`.
+- `SIGNAL_PUBLIC_IPV4`: the public IPv4 address of this machine.
+
+Set `SIGNAL_ENTRY_HOST` and `SIGNAL_PUBLIC_IPV4` together, or Signal does not start. Without them, the
+machine is always the entry.
+
+The claim rule: the account service can put a `signal` claim in a ticket. A Signal with `SIGNAL_ID`
+refuses a ticket with another `signal` claim (`authentication_required`, close 1008). A resume token
+keeps the claim. A ticket with the claim of this machine works whether this machine is the entry or not.
+Without `SIGNAL_ID`, Signal does not check the claim.
+
+The entry rule (`src/entry.ts`): Signal resolves `SIGNAL_ENTRY_HOST` (IPv4, all addresses) once before
+it listens, then every 30 seconds. An answer with `SIGNAL_PUBLIC_IPV4` makes this machine the entry.
+Two answers in a row without it end the entry. A failed lookup keeps the state. So the entry name must
+be DNS-only (not proxied): a proxied name never shows the address of a machine. While a machine is not
+the entry:
+
+- A ticket or resume token without a `signal` claim gets close 1013 and no error frame. The peer
+  connects again through the entry name. When the machine stops being the entry, it closes these
+  sockets (host, client and `ingress`) with 1013.
+- The Slack, Telegram, GitHub and generic webhook routes answer 503.
+- The Discord Gateway is stopped, and `/v1/discord/api` answers 503 (`unavailable`). The Gateway starts
+  again when the machine becomes the entry again.
+
+Set `TELEGRAM_WEBHOOK_ORIGIN` and the Slack, GitHub and webhook URLs to the entry name.
+
+On failover, the entry name moves. With it move the bots (Slack, Telegram, Discord, GitHub, webhooks), the
+`ingress` sockets, and the hosts and clients whose tickets have no `signal` claim. A peer whose ticket
+names a machine stays on that machine, and needs a new ticket to move.
+
+`/metrics` shows `openbot_remote_signal_entry{signal="<SIGNAL_ID>"}`: 1 while this machine is the entry,
+0 when it is not. Without the entry rule the metric is absent. The health routes answer 200 on both machines.
+
+## TURN relays
+
+`TURN_EXTRA_HOSTS` names other coturn servers, comma-separated, that use the same `TURN_SHARED_SECRET`
+and the same TURN ports. Signal then gives each host one relay: `TURN_HOST` or one of these. The host
+and all its clients get the same relay, and the hosts spread over the relays. A peer gets only one
+relay, because a browser allocates on each TURN server that it gets.
+
+Signal makes one real allocation on each relay every minute (`src/turn-relays.ts`). A relay that does
+not allocate, because it is full or does not answer, gets no new peers until it allocates again. When
+no relay allocates, Signal gives all of them. When a relay stops under a connected client, the client
+loses its path, opens a new Signal socket (`recoverPath` in `team-webrtc.ts`), gets the relay that
+Signal picks then, and restarts ICE. `/metrics` shows the last probe of each
+relay as `openbot_remote_turn_relay_available{host="<relay>"}`. `/health/turn` still reports only the
+relay of `TURN_HOST`; the Signal on the machine of each other relay reports that relay.
+
+Production uses `turn2.openbot.run` on the standby host as the second relay; see
+[the deployment procedure](../docs/remote-session-deployment.md#standby-signal).
 
 Current hosts advertise `multiplex: true` and support independent device sessions at the same time.
 Reconnecting one session replaces only that session's Signal socket. Disconnecting or revoking one device

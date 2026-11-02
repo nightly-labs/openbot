@@ -1,14 +1,17 @@
 import { Effect } from "effect";
 import { createAccountAnalytics } from "./account-analytics";
 import { BillingSales } from "./billing-sales";
-import { BillingService, type FirstPlanStart } from "./billing-service";
-import { createWelcomeEmailDelivery, type EmailDeliveryBindings } from "./email-delivery";
+import { BillingService } from "./billing-service";
+import { createLicenseEmailDelivery, createWelcomeEmailDelivery, type EmailDeliveryBindings } from "./email-delivery";
+import type { LicenseEmailInput } from "./email-templates";
 import {
   type HostedServerBindings,
   HostedServerService,
   type HostedServerServiceOptions,
 } from "./hosted-server-service";
+import { parseLicenseTrialEnd } from "./license-service";
 import type { RemoteFailure } from "./remote-control-plane";
+import type { SmtpFailure } from "./smtp-email-delivery";
 import type { WorkerBindings } from "./types";
 
 export type HostedBillingBindings = HostedServerBindings &
@@ -16,7 +19,11 @@ export type HostedBillingBindings = HostedServerBindings &
   Partial<
     Pick<
       WorkerBindings,
-      "STRIPE_SECRET_KEY" | "STRIPE_WEBHOOK_SECRET" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET"
+      | "STRIPE_SECRET_KEY"
+      | "STRIPE_WEBHOOK_SECRET"
+      | "LICENSE_TRIAL_END"
+      | "OPENPANEL_CLIENT_ID"
+      | "OPENPANEL_CLIENT_SECRET"
     >
   >;
 
@@ -29,7 +36,9 @@ export function createHostedBilling(
   options: Pick<HostedServerServiceOptions, "removeHost" | "developerKey"> & {
     /** Tells the members of a host that its plan, and so its member limit, can be different. */
     planChanged: (hostId: string) => Effect.Effect<void, RemoteFailure>;
-    /** Keeps the Worker alive until an analytics send ends (`waitUntil`). */
+    /** Tells the members of an account's servers that its license, and so their member limit, can be different. */
+    licenseChanged: (userId: string) => Effect.Effect<void, RemoteFailure>;
+    /** Keeps the Worker alive until an analytics send or a server start command ends (`waitUntil`). */
     schedule: (work: Effect.Effect<void>) => void;
   },
 ): { billing: BillingService | null; hosting: HostedServerService } {
@@ -38,6 +47,7 @@ export function createHostedBilling(
     clientSecret: bindings.OPENPANEL_CLIENT_SECRET,
     fetch: (input, init) => fetch(input, init),
     schedule: options.schedule,
+    database: bindings.DB,
   });
   const secretKey = bindings.STRIPE_SECRET_KEY?.trim();
   const sales =
@@ -54,12 +64,25 @@ export function createHostedBilling(
         database: bindings.DB,
         secretKey,
         webhookSecret: bindings.STRIPE_WEBHOOK_SECRET?.trim() || null,
+        licenseTrialEnd: parseLicenseTrialEnd(bindings.LICENSE_TRIAL_END),
         fetch: (input, init) => fetch(input, init),
         analytics,
         ...(sales ? { sales } : {}),
-        onFirstPlanStarted: (start) => options.schedule(sendWelcomeEmail(bindings, start)),
+        onFirstPlanStarted: (start) =>
+          options.schedule(
+            sendBillingEmail("welcome email", () => createWelcomeEmailDelivery(bindings, analytics), start),
+          ),
+        onLicenseEmail: (message) =>
+          options.schedule(
+            sendBillingEmail(
+              `license email ${message.kind}`,
+              () => createLicenseEmailDelivery(bindings, analytics),
+              message,
+            ),
+          ),
         onSubscriptionSynced: (sync) =>
           hosting.onSubscriptionSynced(sync).pipe(Effect.andThen(() => options.planChanged(sync.serverId))),
+        onLicenseChanged: options.licenseChanged,
       })
     : null;
   const hosting = new HostedServerService(bindings, {
@@ -67,24 +90,29 @@ export function createHostedBilling(
     developerKey: options.developerKey ?? null,
     billing,
     analytics,
+    schedule: options.schedule,
   });
   return { billing, hosting };
 }
 
 /**
- * A deployment without SMTP sends no welcome email. A failed send is not sent again. Each result logs
+ * A deployment without SMTP sends no billing email. A failed send is not sent again. Each result logs
  * one line with no address.
  */
-function sendWelcomeEmail(bindings: EmailDeliveryBindings, start: FirstPlanStart): Effect.Effect<void> {
+function sendBillingEmail<Message>(
+  name: "welcome email" | `license email ${LicenseEmailInput["kind"]}`,
+  createDelivery: () => { send(message: Message): Effect.Effect<void, SmtpFailure> } | null,
+  message: Message,
+): Effect.Effect<void> {
   return Effect.try({
-    try: () => createWelcomeEmailDelivery(bindings),
+    try: createDelivery,
     catch: () => ({ message: "smtp_config_incomplete" }),
   }).pipe(
     Effect.flatMap((delivery) =>
       delivery
-        ? delivery.send(start).pipe(Effect.andThen(Effect.sync(() => console.log("billing: welcome email sent"))))
-        : Effect.sync(() => console.log("billing: welcome email not sent: SMTP is not set")),
+        ? delivery.send(message).pipe(Effect.andThen(Effect.sync(() => console.log(`billing: ${name} sent`))))
+        : Effect.sync(() => console.log(`billing: ${name} not sent: SMTP is not set`)),
     ),
-    Effect.catch((error) => Effect.sync(() => console.warn("billing: welcome email failed", error.message))),
+    Effect.catch((error) => Effect.sync(() => console.warn(`billing: ${name} failed`, error.message))),
   );
 }

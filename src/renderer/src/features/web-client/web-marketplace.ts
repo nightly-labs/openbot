@@ -1,3 +1,4 @@
+import { agentTemplateShareOrigin } from "@openbot/contracts/agent-template-links";
 import { sourceText } from "@openbot/i18n";
 import { runTeamEffect } from "@openbot/team-client";
 import { createMarketplaceCatalog } from "@openbot/team-client/marketplace-catalog";
@@ -8,6 +9,7 @@ import {
   installMarketplaceAgent,
   listAgentSkills,
   listMcpServers,
+  listMcpSignIns,
   removeMcpServer,
   saveMcpServer,
   setAgentSkillEnabled,
@@ -42,11 +44,14 @@ export function createWebMarketplaceCalls(
     skills: {
       list: (query) => runTeamEffect(catalog.skills.list(query)),
       get: (id) => runTeamEffect(catalog.skills.get(id)),
+      getBySlug: (slug) => runTeamEffect(catalog.skills.getBySlug(slug)),
     },
     agents: {
       list: (query) => runTeamEffect(catalog.agents.list(query)),
       get: (id) => runTeamEffect(catalog.agents.get(id)),
+      getListing: (id) => runTeamEffect(catalog.agents.getListing(id)),
     },
+    shareOrigin: agentTemplateShareOrigin(window.location.origin),
     agentSkills: (serverId) => ({
       listInstalled: async (agentId) =>
         runTeamEffect(listAgentSkills(request(serverId), agentId).pipe(Effect.mapError((error) => error.cause))),
@@ -60,6 +65,9 @@ export function createWebMarketplaceCalls(
     mcp: {
       listMcpServers: async (serverId) =>
         runTeamEffect(listMcpServers(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
+      // A host without `mcp-sign-in-v1` refuses the route; the marketplace then shows no sign-in state.
+      listMcpSignIns: async (serverId) =>
+        runTeamEffect(listMcpSignIns(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
       testMcpServer: async (input, serverId) =>
         runTeamEffect(testMcpServer(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
       saveMcpServer: async (input, serverId) =>
@@ -72,15 +80,15 @@ export function createWebMarketplaceCalls(
         if (!serverId) throw new Error(sourceText("error.mcp.signInOnHost"));
         return relay.signIn(request(serverId), config);
       },
+      cancelMcpSignIn: async (input, serverId) => {
+        await runTeamEffect(cancelMcpSignIn(request(serverId), input).pipe(Effect.mapError((error) => error.cause)));
+      },
     },
     signInRelay: {
       page: async (url) => relay.page(url),
       // No await comes before `window.open`: a browser blocks a page that the user's click did not open.
       open: async (url) => relay.open(url),
       paste: (url, address) => relay.paste(url, address),
-      cancel: async (url, serverId) => {
-        await runTeamEffect(cancelMcpSignIn(request(serverId), { url }).pipe(Effect.mapError((error) => error.cause)));
-      },
     },
     addAgent: async (input, serverId) => {
       if (!serverId) throw new Error(noAgentInstall());
@@ -90,7 +98,9 @@ export function createWebMarketplaceCalls(
     },
     openUrl: async (url) => {
       const protocol = URL.parse(url)?.protocol;
-      if (protocol !== "https:" && protocol !== "http:") throw new Error("This link cannot be opened.");
+      if (protocol !== "https:" && protocol !== "http:") {
+        throw new Error(currentText().t("webClient.error.linkBlocked"));
+      }
       window.open(url, "_blank", "noopener");
     },
   };

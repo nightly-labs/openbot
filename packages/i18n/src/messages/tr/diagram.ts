@@ -4,8 +4,36 @@ import type { messages as source } from "../en/diagram";
 export const messages = {
   "diagram.view.label": "{name} diyagramı",
   "diagram.board.label": "{name} için tuval",
-  "diagram.board.emptyTitle": "Bir rutinle başlayın",
-  "diagram.board.emptyBody": "İşi başlatan bir rutin ekleyin, ardından ajanları ona bağlayın.",
+  "diagram.board.emptyLead": "Bir kez çizin.",
+  "diagram.board.emptyTitle": "Sonra {run} izleyin.",
+  "diagram.board.emptyRun": "çalışmasını",
+  "diagram.board.emptyStart": "Bir rutin işi başlatır.",
+  "diagram.board.emptyHandoff": "Her ajan cevabını bir sonrakine aktarır.",
+  "diagram.board.sample.routine": "Sabah özeti",
+  "diagram.board.sample.instruction":
+    "Dünden beri pazarda ve satış hunisinde neyin değiştiğini toplayın, sonra bunu bugünün önceliklerine dönüştürün.",
+  "diagram.board.sample.researchName": "Araştırma",
+  "diagram.board.sample.researchTitle": "Araştırma ortağı",
+  "diagram.board.sample.researchTask":
+    "Dünden beri çıkan pazar ve ürün haberlerini, her madde için bir kaynakla toplayın.",
+  "diagram.board.sample.researchOutput":
+    "1. Northwind API fiyatlarını %20 düşürdü.\n2. Genel amaçlı modeller için AB rehberi kesinleşti.\n3. İki rakip bu hafta ajan tuvalleri yayınladı.",
+  "diagram.board.sample.salesName": "Satış",
+  "diagram.board.sample.salesTitle": "Dış satış uzmanı",
+  "diagram.board.sample.salesTask":
+    "Dünden beri aşaması değişen anlaşmaları ve her biri için sonraki adımı listeleyin.",
+  "diagram.board.sample.salesOutput":
+    "- Contoso müzakere aşamasına geçti. Sonraki adım: güvenlik incelemesini gönderin.\n- Fabrikam 9 gündür ilerlemiyor. Sonraki adım: destekçiyi arayın.",
+  "diagram.board.sample.writerName": "Yazar",
+  "diagram.board.sample.writerTitle": "Özet yazarı",
+  "diagram.board.sample.writerTask": "Araştırmadan ve huniden tek bir özet yazın. En fazla 200 kelime.",
+  "diagram.board.sample.writerOutput":
+    "Northwind API fiyatlarını düşürdü, AB rehberi kesinleşti ve Contoso anlaşmaya yakın. Fabrikam bugün aranmalı.",
+  "diagram.board.sample.chiefName": "Şef",
+  "diagram.board.sample.chiefTitle": "Kurmay başkanı",
+  "diagram.board.sample.chiefTask": "Özeti okuyun, bugünün üç önceliğine karar verin ve bunları ekibe paylaşın.",
+  "diagram.board.sample.chiefOutput":
+    "Bugünün öncelikleri:\n1. Contoso'ya güvenlik incelemesini gönderin.\n2. Northwind'in fiyat indirimine yanıt verin.\n3. Fabrikam'ı arayın.",
   "diagram.menu.label": "Tuval",
   "diagram.menu.addAgent": "Buraya ajan ekle",
   "diagram.menu.noAgents": "Tüm ajanlar tuvalde",

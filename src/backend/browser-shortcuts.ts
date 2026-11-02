@@ -38,6 +38,26 @@ export function isGlobalSearchShortcut(input: BrowserShortcutInput): boolean {
   );
 }
 
+/**
+ * A key of the full browser view, as other browsers have them: new, reopen, close and select tab,
+ * address, reload, back and forward. The page has the focus nearly all the time, so the host sends
+ * these keys on to the window, where the view acts on them. `browser-view-shortcuts.ts` in
+ * `@openbot/ui` reads the same keys.
+ */
+export function isBrowserViewShortcut(input: BrowserShortcutInput, mac: boolean): boolean {
+  if (input.type !== "keyDown") return false;
+  const key = input.key.toLowerCase();
+  if (input.control && !input.meta && !input.alt && key === "tab") return true;
+  if (input.control && input.shift && !input.meta && !input.alt && (key === "pageup" || key === "pagedown")) {
+    return true;
+  }
+  const mod = mac ? input.meta && !input.control : input.control && !input.meta;
+  if (!mod) return false;
+  if (input.alt) return mac && !input.shift && (key === "arrowleft" || key === "arrowright");
+  if (key === "t") return true;
+  return !input.shift && (["w", "l", "r", "[", "]"].includes(key) || /^[1-9]$/.test(key));
+}
+
 export function isSelectAllShortcut(input: BrowserShortcutInput): boolean {
   return (
     input.type === "keyDown" &&
@@ -55,27 +75,70 @@ export function isToggleDevToolsShortcut(input: BrowserShortcutInput): boolean {
   return key === "i" && (input.control || input.meta) && input.alt !== input.shift;
 }
 
-export type ChatContextMenuItem = "copy-link" | "separator" | "copy" | "select-all";
+/** The edit commands of the chat menu, each named after the `WebContents` method that runs it. */
+export type ChatEditAction = "undo" | "redo" | "cut" | "copy" | "paste" | "pasteAndMatchStyle" | "delete" | "selectAll";
+
+export type ChatContextMenuItem =
+  | { kind: "copy-link" }
+  | { kind: "separator" }
+  | { kind: "spelling"; suggestion: string }
+  | { kind: "edit"; action: ChatEditAction; enabled: boolean };
 
 export interface ChatContextMenuParams {
   selectionText: string;
   isEditable: boolean;
   linkURL: string;
+  misspelledWord: string;
+  dictionarySuggestions: string[];
+  editFlags: {
+    canUndo: boolean;
+    canRedo: boolean;
+    canCut: boolean;
+    canCopy: boolean;
+    canPaste: boolean;
+    canDelete: boolean;
+    canSelectAll: boolean;
+  };
+  /** macOS is the only platform with a Paste and Match Style command. */
+  pasteAndMatchStyle: boolean;
 }
 
 /**
- * The native items a right-click offers in chat. Selected text and editable fields get the edit
- * roles, a link gets a copy-link entry first; anywhere else keeps no menu, so the window does not
- * pop a menu with nothing useful in it.
+ * The native items a right-click offers in chat. An editable field gets spelling suggestions and
+ * the full edit menu, each entry enabled from the field's edit state. Selected text elsewhere gets
+ * copy and select-all, and a link gets a copy-link entry first. Anywhere else keeps no menu, so the
+ * window does not pop a menu with nothing useful in it.
  */
 export function chatContextMenuItems(params: ChatContextMenuParams): ChatContextMenuItem[] {
   const items: ChatContextMenuItem[] = [];
-  if (params.linkURL) items.push("copy-link");
-  const hasSelection = params.selectionText.trim().length > 0;
-  if (!hasSelection && !params.isEditable) return items;
-  if (items.length > 0) items.push("separator");
-  if (hasSelection) items.push("copy");
-  items.push("select-all");
+  const separate = () => {
+    if (items.length > 0) items.push({ kind: "separator" });
+  };
+  const edit = (action: ChatEditAction, enabled: boolean) => items.push({ kind: "edit", action, enabled });
+  if (params.linkURL) items.push({ kind: "copy-link" });
+  const flags = params.editFlags;
+  if (params.isEditable) {
+    if (params.misspelledWord && params.dictionarySuggestions.length > 0) {
+      separate();
+      for (const suggestion of params.dictionarySuggestions) items.push({ kind: "spelling", suggestion });
+    }
+    separate();
+    edit("undo", flags.canUndo);
+    edit("redo", flags.canRedo);
+    separate();
+    edit("cut", flags.canCut);
+    edit("copy", flags.canCopy);
+    edit("paste", flags.canPaste);
+    if (params.pasteAndMatchStyle) edit("pasteAndMatchStyle", flags.canPaste);
+    edit("delete", flags.canDelete);
+    separate();
+    edit("selectAll", flags.canSelectAll);
+    return items;
+  }
+  if (params.selectionText.trim().length === 0) return items;
+  separate();
+  edit("copy", true);
+  edit("selectAll", true);
   return items;
 }
 

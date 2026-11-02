@@ -70,6 +70,8 @@ export interface AgentRuntimePromptQuestion {
   question: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;
+  /** See `AgentPromptQuestion.multiSelect`. */
+  multiSelect?: boolean;
 }
 
 function isRuntimePromptQuestion(value: unknown): value is AgentRuntimePromptQuestion {
@@ -79,6 +81,7 @@ function isRuntimePromptQuestion(value: unknown): value is AgentRuntimePromptQue
     isBoundedString(value.header, AGENT_RUNTIME_QUESTION_HEADER_LIMIT) &&
     isBoundedString(value.question, AGENT_RUNTIME_TEXT_LIMIT) &&
     isBoolean(value.isSecret) &&
+    (value.multiSelect === undefined || isBoolean(value.multiSelect)) &&
     (value.options === null ||
       (Array.isArray(value.options) &&
         value.options.length <= INPUT_LIMITS.promptOptions &&
@@ -151,7 +154,11 @@ export interface AgentContextCategoryUsage {
   tokens: number;
 }
 
-/** Local desktop context state. Frozen Team adapters do not carry this field. */
+/**
+ * How full the context window of one chat is. The Team API carries it only under context-usage-v1, with
+ * the keys and values that `team-protocol/context-usage-v1.ts` freezes: a new key or value goes only to a
+ * later capability.
+ */
 export interface AgentContextState {
   agentId: string;
   threadId: string;
@@ -217,6 +224,8 @@ function isAgentContextState(value: unknown): value is AgentContextState {
 
 export interface AgentRuntimeSnapshot {
   contextStates?: AgentContextState[];
+  /** The context of each side thread that reported one, by its `threadId`. Team API: as `contextStates`. */
+  threadContextStates?: AgentContextState[];
   agents: AgentRuntimeRosterEntry[];
   activeTurns: Array<{ agentId: string; threadId: string; turnId: string }>;
   work: AgentRuntimeWorkItem[];
@@ -251,6 +260,10 @@ export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSna
       (Array.isArray(value.contextStates) &&
         value.contextStates.length <= INPUT_LIMITS.agents &&
         value.contextStates.every(isAgentContextState))) &&
+    (value.threadContextStates === undefined ||
+      (Array.isArray(value.threadContextStates) &&
+        value.threadContextStates.length <= INPUT_LIMITS.agents * INPUT_LIMITS.agentTasks &&
+        value.threadContextStates.every(isAgentContextState))) &&
     Array.isArray(value.agents) &&
     value.agents.length <= INPUT_LIMITS.agents &&
     value.agents.every(isAgentRuntimeRosterEntry) &&

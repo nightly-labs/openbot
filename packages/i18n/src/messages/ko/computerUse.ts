@@ -1,0 +1,43 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/computerUse";
+
+export const messages = {
+  // Computer Use settings, the permission help window, and the window highlight.
+  "computerUse.permission.screenRecording.title": "화면 기록",
+  "computerUse.permission.screenRecording.description": "OpenBot이 앱 창을 볼 수 있어요.",
+  "computerUse.permission.screenRecording.pane": "화면 및 시스템 오디오 기록",
+  "computerUse.permission.accessibility.title": "손쉬운 사용",
+  "computerUse.permission.accessibility.description": "OpenBot이 클릭하고 입력할 수 있어요.",
+  "computerUse.permission.accessibility.pane": "손쉬운 사용",
+  "computerUse.error.check": "OpenBot이 컴퓨터 제어를 확인하지 못했어요.",
+  "computerUse.error.openSettings": "OpenBot이 시스템 설정을 열지 못했어요.",
+  "computerUse.error.startDriver": "OpenBot이 컴퓨터 제어 드라이버를 시작하지 못했어요.",
+  "computerUse.checkAgain": "다시 확인",
+  "computerUse.checking": "컴퓨터 제어 확인 중",
+  "computerUse.unavailable.title": "컴퓨터 제어를 아직 사용할 수 없어요",
+  "computerUse.permissions.title": "시스템 권한",
+  "computerUse.permissions.description": "권한은 macOS에서 관리해요.",
+  "computerUse.ready.title": "컴퓨터 제어를 사용할 수 있어요",
+  "computerUse.ready.description":
+    "OpenBot이 이 컴퓨터의 앱을 보고 조작할 수 있어요. 이 시스템에서는 추가 권한이 필요하지 않아요.",
+  "computerUse.openSettingsFailed.title": "시스템 설정을 열 수 없어요",
+  "computerUse.compact.title": "컴퓨터 제어 켜기",
+  "computerUse.compact.description": "OpenBot이 이 컴퓨터의 앱을 보고 조작하도록 허용해요.",
+  "computerUse.granted": "허용됨",
+  "computerUse.opening": "여는 중…",
+  "computerUse.manage": "관리",
+  "computerUse.grant": "허용",
+  "computerUse.manageLabel": "{permission} 관리",
+  "computerUse.grantLabel": "{permission} 허용",
+  "computerUse.help.title": "{permission} 켜기",
+  "computerUse.help.paneOpen": "시스템 설정에서 {pane}이(가) 열려 있어요.",
+  "computerUse.help.dragLabel": "{name}을(를) 시스템 설정으로 끌어다 놓거나, 눌러서 Finder에서 보세요",
+  "computerUse.help.dragToAdd": "끌어서 추가",
+  "computerUse.help.findInList": "목록에서 {name}을(를) 찾으세요.",
+  "computerUse.help.dragIntoList": "{name}.app을 목록으로 끌어다 놓으세요.",
+  "computerUse.help.turnOn": "스위치를 켜세요.",
+  "computerUse.help.showInFinder": "Finder에서 보기",
+  "computerUse.help.revealFailed": "Finder에서 애플리케이션을 표시할 수 없었어요.",
+  "computerUse.help.dragFailed": "애플리케이션을 끌 수 없었어요.",
+  "computerUse.highlight.working": "OpenBot이 {title}에서 작업 중이에요",
+} as const satisfies PartialTranslation<typeof source>;

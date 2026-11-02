@@ -16,6 +16,7 @@ export const messages = {
   "error.update.checkUnavailable": "Служба обновлений не ответила. OpenBot сам повторит попытку через несколько минут.",
   "error.update.checkNoRelease":
     "Для этой платформы не найдено опубликованных обновлений. OpenBot сам повторит попытку через несколько минут.",
+  "error.update.managedByNix": "Обновления этой копии OpenBot устанавливает Nix. Обновите её через Nix.",
   "error.update.managedByHost":
     "Обновления на этом Mac устанавливает хост. Обновление остаётся готовым до начала обслуживания хоста.",
   "error.update.siblingSession":

@@ -10,7 +10,7 @@ interface DynamicIslandStoryPreviewContext {
 }
 
 interface DynamicIslandDisplayComparisonProps {
-  defaultState?: DynamicIslandViewState;
+  defaultState?: DynamicIslandViewState | undefined;
   state?: Accessor<DynamicIslandViewState>;
   onStateChange?: (state: DynamicIslandViewState) => void;
   controls?: JSX.Element;

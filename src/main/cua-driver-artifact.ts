@@ -32,9 +32,9 @@ export interface CuaDriverArtifactInput {
   /** `OPENBOT_CUA_DRIVER_PATH`, then the driver's own `CUA_DRIVER_PATH`. */
   overrides?: readonly (string | undefined)[];
   /** `CUA_DRIVER_RS_INSTALL_DIR` and its legacy alias `CUA_DRIVER_BIN_DIR`, the installer's own override. */
-  installDirectory?: string;
+  installDirectory?: string | undefined;
   /** `%LOCALAPPDATA%`. Read only on Windows, where the installer writes below it. */
-  localAppDataDirectory?: string;
+  localAppDataDirectory?: string | undefined;
   /** `/Applications`. Read only on macOS, where the driver's real binary is inside a bundle there. */
   applicationsDirectory?: string;
 }

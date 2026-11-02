@@ -110,7 +110,7 @@ export const installOnePasswordCli = Effect.fn("OnePasswordCli.install")(functio
 });
 
 /** Writes the archive to `archive` and returns its SHA-256. A larger or failed answer rejects with `failed`. */
-async function downloadArchive(options: {
+export async function downloadArchive(options: {
   url: string;
   archive: string;
   failed: string;

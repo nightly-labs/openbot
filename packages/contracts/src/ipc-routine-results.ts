@@ -5,8 +5,9 @@ import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runti
 /**
  * Routine results: the answer of an agent routine's run, sent on to a messaging place outside OpenBot.
  * Whether the answer reached the place is the delivery's status, not the run's: a run that succeeded
- * keeps that status when its delivery fails. Only this computer's host keeps a destination; these
- * types never cross the Team API.
+ * keeps that status when its delivery fails. Only this computer's host keeps a destination. An owner or
+ * admin of a joined server reads the connections and sets a destination through `routine-results-v1`;
+ * the deliveries never cross the Team API.
  */
 
 /**
@@ -161,4 +162,18 @@ export function isSetRoutineResultDestinationInput(value: unknown): value is Set
 
 export function isResendRoutineResultInput(value: unknown): value is ResendRoutineResultInput {
   return isDynamicRecord(value) && isIdentifier(value.agentId) && isIdentifier(value.runId);
+}
+
+/** The `routine-results-v1` options answer. The route codec has already checked its fields. */
+export function decodeRoutineResultConnectionOptions(value: unknown): RoutineResultConnectionOption[] {
+  if (!isDynamicRecord(value) || !isRoutineResultConnectionOptions(value.connections))
+    throw new Error("Invalid routine result connections.");
+  return value.connections;
+}
+
+/** The `routine-results-v1` destination answer. */
+export function decodeRoutineResultDestinationAnswer(value: unknown): RoutineResultDestination | null {
+  if (!isDynamicRecord(value) || !isNullableRoutineResultDestination(value.destination))
+    throw new Error("Invalid routine result destination.");
+  return value.destination;
 }

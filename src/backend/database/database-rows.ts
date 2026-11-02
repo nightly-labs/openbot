@@ -1,5 +1,5 @@
 import type { ConversationMessage } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { currentConversationMessage } from "./legacy-conversation-message";
 
 /**
@@ -46,6 +46,13 @@ export function optionalNumberColumn(row: DynamicRecord, key: string): number | 
   throw new Error(`Invalid SQLite column ${key}.`);
 }
 
+/** A column that a CHECK constraint holds to `values`. */
+export function checkedColumn<T extends string>(row: DynamicRecord, key: string, values: readonly T[]): T {
+  const value = row[key];
+  if (!isOneOf(values, value)) throw new Error(`Invalid SQLite column ${key}.`);
+  return value;
+}
+
 export function decodeConversationThreadRow(
   value: unknown,
 ): { active_turn_id: string | null; last_event_sequence: number } | null {
@@ -88,4 +95,9 @@ export function errorCode(value: unknown): string | null {
 
 export function objectValue(value: unknown): DynamicRecord | null {
   return isDynamicRecord(value) ? value : null;
+}
+
+/** One `?` for each value, for an `IN (...)` list. */
+export function placeholders(values: readonly unknown[]): string {
+  return values.map(() => "?").join(", ");
 }

@@ -6,6 +6,53 @@ export function serializeEditor(editor: HTMLDivElement): string {
   return Array.from(editor.childNodes).map(serializeNode).join("");
 }
 
+export interface ComposerSelection {
+  start: number;
+  end: number;
+}
+
+export interface ComposerPasteResult {
+  value: string;
+  caret: number;
+}
+
+export function placeSerializedCaret(editor: HTMLDivElement, position: number): void {
+  let remaining = position;
+  let visible = 0;
+  for (const segment of editorSegments(editor)) {
+    const serializedLength = serializeNode(segment).length;
+    const text = segment.nodeType === Node.TEXT_NODE;
+    if (remaining <= serializedLength) {
+      visible += text ? remaining : Number(remaining > 0);
+      break;
+    }
+    remaining -= serializedLength;
+    visible += text ? serializedLength : 1;
+  }
+  const range = rangeFromTextOffsets(editor, visible, visible);
+  if (!range) return;
+  const selection = editor.ownerDocument.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+}
+
+/** Offsets in the serialized draft, including the complete identity of each inline token. */
+export function serializedEditorSelection(editor: HTMLDivElement): ComposerSelection {
+  const selection = editor.ownerDocument.getSelection();
+  const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+  const end = serializeEditor(editor).length;
+  if (!range || !editor.contains(range.commonAncestorContainer)) return { start: end, end };
+  const prefix = editor.ownerDocument.createRange();
+  prefix.selectNodeContents(editor);
+  prefix.setEnd(range.startContainer, range.startOffset);
+  const fragment = editor.ownerDocument.createElement("div");
+  fragment.append(prefix.cloneContents());
+  const start = serializeEditor(fragment).length;
+  prefix.setEnd(range.endContainer, range.endOffset);
+  fragment.replaceChildren(prefix.cloneContents());
+  return { start, end: serializeEditor(fragment).length };
+}
+
 function serializeNode(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
   if (!(node instanceof HTMLElement)) return "";

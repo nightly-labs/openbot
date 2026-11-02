@@ -1,0 +1,12 @@
+#!/bin/sh
+# `bun mobile:ios` puts this directory first on PATH. Expo runs `xcodebuild` without
+# `-derivedDataPath`, so Xcode would write the build to ~/Library/Developer/Xcode/DerivedData in a
+# folder named after the worktree path, which stays there after the worktree is removed. Expo reads
+# the app path from CONFIGURATION_BUILD_DIR in the build output, so the build can be in the worktree.
+for arg in "$@"; do
+  if [ "$arg" = "-derivedDataPath" ]; then exec /usr/bin/xcodebuild "$@"; fi
+done
+if [ -n "$OPENBOT_XCODE_DERIVED_DATA" ]; then
+  exec /usr/bin/xcodebuild -derivedDataPath "$OPENBOT_XCODE_DERIVED_DATA" "$@"
+fi
+exec /usr/bin/xcodebuild "$@"

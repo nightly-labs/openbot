@@ -1,0 +1,61 @@
+import { defineMessages } from "../../../message";
+
+export const messages = defineMessages("mobile.appLock", {
+  "mobile.appLock.title": "App lock",
+  "mobile.appLock.method.pin": "PIN code",
+  "mobile.appLock.method.faceId": "Face ID",
+  "mobile.appLock.method.touchId": "Touch ID",
+  "mobile.appLock.method.phone": "Phone unlock",
+  "mobile.appLock.methods.title": "Unlock with",
+  "mobile.appLock.methods.footer":
+    "Turn on a PIN, {method}, or both. OpenBot then locks when you leave it and asks for one of them when you come back.",
+  "mobile.appLock.methods.footerPinOnly":
+    "Turn on a PIN. OpenBot then locks when you leave it and asks for the PIN when you come back.",
+  "mobile.appLock.changePin": "Change PIN",
+  "mobile.appLock.lockAfter.title": "Lock OpenBot",
+  "mobile.appLock.lockAfter.immediately": "Immediately",
+  "mobile.appLock.lockAfter.minutes": { one: "After {count} minute", other: "After {count} minutes" },
+  "mobile.appLock.lockAfter.hours": { one: "After {count} hour", other: "After {count} hours" },
+  "mobile.appLock.lockWithPhone": "When the phone locks",
+  "mobile.appLock.lockAfter.footer":
+    "The time starts when you leave OpenBot. OpenBot always locks when it starts again.",
+  "mobile.appLock.device.turnOnPrompt": "Turn on {method} for OpenBot",
+  "mobile.appLock.device.failed": "{method} did not confirm. Try again.",
+  "mobile.appLock.device.unavailable": "Set a passcode on your phone first.",
+  "mobile.appLock.pinSetup.title": "PIN code",
+  "mobile.appLock.pinSetup.enter": "Enter a new 4-digit PIN",
+  "mobile.appLock.pinSetup.confirm": "Enter the PIN again",
+  "mobile.appLock.pinSetup.mismatch": "The PINs are not the same. Try again.",
+  "mobile.appLock.pinSetup.saveFailed": "Could not save the PIN. Try again.",
+  "mobile.appLock.lock.title": "OpenBot is locked",
+  "mobile.appLock.lock.confirmTitle": "Confirm that it is you",
+  "mobile.appLock.lock.enterPin": "Enter your PIN",
+  "mobile.appLock.lock.unlockPrompt": "Unlock OpenBot",
+  "mobile.appLock.lock.useDevice": "Use {method}",
+  "mobile.appLock.lock.unlock": "Unlock",
+  "mobile.appLock.lock.wrongPin": "Incorrect PIN.",
+  "mobile.appLock.lock.attemptsLeft": {
+    one: "Incorrect PIN. {count} attempt left before sign-out.",
+    other: "Incorrect PIN. {count} attempts left before sign-out.",
+  },
+  "mobile.appLock.lock.waitSeconds": {
+    one: "Too many attempts. Try again in {count} second.",
+    other: "Too many attempts. Try again in {count} seconds.",
+  },
+  "mobile.appLock.lock.waitMinutes": {
+    one: "Too many attempts. Try again in {count} minute.",
+    other: "Too many attempts. Try again in {count} minutes.",
+  },
+  "mobile.appLock.lock.checkFailed": "Could not check the PIN. Try again.",
+  "mobile.appLock.lock.pinMissing": "This phone has no PIN for OpenBot. Sign out to reset the app lock.",
+  "mobile.appLock.lock.loadFailed": "Could not read the app lock settings.",
+  "mobile.appLock.lock.retry": "Try again",
+  "mobile.appLock.lock.forgotPin": "Forgot PIN?",
+  "mobile.appLock.lock.signOut": "Sign out",
+  "mobile.appLock.lock.signOutTitle": "Sign out of OpenBot?",
+  "mobile.appLock.lock.signOutBody":
+    "This removes the app lock and signs you out on this phone. Reconnect by scanning a new code from OpenBot on your desktop.",
+  "mobile.appLock.lock.signedOut": "Too many incorrect PINs. OpenBot signed you out on this phone.",
+  "mobile.appLock.lock.delete": "Delete digit",
+  "mobile.appLock.lock.progress": { one: "{count} of 4 digits entered", other: "{count} of 4 digits entered" },
+});

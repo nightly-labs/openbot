@@ -1,7 +1,7 @@
 import type { GitHubConnectorStatus, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 
-/** What the Connectors section reaches: one GitHub connection, of this computer or of a joined server. */
+/** What the GitHub app page reaches: one GitHub connection, of this computer or of a joined server. */
 export type GitHubConnectorPort = Pick<
   OpenBotDesktopApi["githubConnector"],
   "status" | "connect" | "cancel" | "disconnect" | "repositories" | "openVerification" | "openInstall" | "onChanged"

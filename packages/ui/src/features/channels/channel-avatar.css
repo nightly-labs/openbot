@@ -7,27 +7,30 @@
   color: var(--openbot-text-muted);
 }
 .channel-avatar .agent-avatar {
+  /* The optical lift paints a face's drawing like a positioned box. A photo has no drawing, so the
+     face itself is positioned, and each face paints over the one before it in order. */
+  position: relative;
   width: var(--openbot-space-8);
   height: var(--openbot-space-8);
   flex-shrink: 0;
   border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-surface);
-}
-.channel-avatar:not(.channel-avatar-cluster) .agent-avatar + .agent-avatar {
-  margin-left: calc(-1 * var(--openbot-space-4));
 }
 /*
  * The cluster holds the members in the square an agent avatar occupies, so a channel row keeps the
  * shape of the agent rows around it. Two measurements set the geometry: the cell pitch, which is
  * how far apart the face centres sit, and the face box. A bloub is drawn about 1.16 times its own
- * box wide, so a face box of 0.48 draws 0.56 of the square: the faces overlap by the difference
- * from the 0.44 pitch, and the pair still ends inside the square. The overflow count takes the
- * last cell.
+ * box wide, so a face box of 0.54 draws 0.63 of the square: the faces overlap by the
+ * difference from the 0.38 pitch, and the pair still ends inside the square. Each face is outlined
+ * in the colour of the surface, and a later face is painted over an earlier one, so the outline cuts
+ * the face below it. The overflow count takes the last cell and overlaps the face beside it; a
+ * count of two digits takes the bottom row.
  */
 .channel-avatar-cluster {
-  --channel-avatar-size: 36px;
-  --channel-avatar-pitch: calc(var(--channel-avatar-size) * 0.44);
-  --channel-avatar-face: calc(var(--channel-avatar-size) * 0.48);
+  /* A sidebar row sets the size it gives an agent avatar; a cluster outside a row keeps 36px. */
+  --channel-avatar-size: var(--agent-row-avatar-size, 36px);
+  --channel-avatar-pitch: calc(var(--channel-avatar-size) * 0.38);
+  --channel-avatar-face: calc(var(--channel-avatar-size) * 0.54);
+  --agent-avatar-outline-width: 2px;
 
   display: grid;
   grid-template: repeat(2, var(--channel-avatar-pitch)) / repeat(2, var(--channel-avatar-pitch));
@@ -45,7 +48,17 @@
   height: var(--channel-avatar-face);
   background: none;
 }
-/* One member is the channel's whole face. Two sit side by side, and three read as a triangle. */
+/* A photo fills its whole box, so it takes the size of the count disc, which matches the faces. */
+.channel-avatar-cluster .agent-avatar-custom {
+  --channel-avatar-face: calc(var(--channel-avatar-size) * 0.46);
+}
+/* The row layout overlaps its faces. `:where` keeps the cluster out at no weight, so a surface
+   that sets its own overlap wins. */
+.channel-avatar:where(:not(.channel-avatar-cluster)) .agent-avatar + .agent-avatar {
+  margin-left: calc(-1 * var(--openbot-space-4));
+}
+/* One member is the channel's whole face. Two sit side by side, and three read as a triangle; a
+   count of two digits takes the third place. */
 .channel-avatar-cluster > :only-child {
   --channel-avatar-face: var(--channel-avatar-size);
 
@@ -55,23 +68,40 @@
 .channel-avatar-cluster > :first-child:nth-last-child(2) ~ * {
   grid-row: 1 / span 2;
 }
-.channel-avatar-cluster > :first-child:nth-last-child(3) ~ .agent-avatar:last-child {
+.channel-avatar-cluster > :first-child:nth-last-child(3) ~ :last-child {
   grid-column: 1 / span 2;
 }
 /* The pinned rail draws the same cluster at the size it gives an agent avatar. */
 .agent-row.sidebar-pinned-row .channel-avatar-cluster {
-  --channel-avatar-size: 48px;
+  --channel-avatar-size: var(--sidebar-pinned-avatar-size, 56px);
+  --agent-avatar-outline-width: 2.5px;
 }
 .agent-row.sidebar-pinned-row .channel-avatar-cluster .agent-avatar {
   width: var(--channel-avatar-face);
   height: var(--channel-avatar-face);
 }
 .channel-avatar-count {
-  color: var(--openbot-text-primary);
+  /* The optical lift translates the face's drawing, which paints it like a positioned box. The
+     count is positioned too, so it paints over the face before it. */
+  position: relative;
+  display: grid;
+  /* A face's drawing fills about 0.42 of the square; a disc of the face box (0.54) is larger, so it
+     ends past the faces and pulls the cluster off centre. 0.46 matches the faces. Two digits do
+     not fit the disc, so the disc grows into a pill, centred on the bottom row. */
+  box-sizing: border-box;
+  min-width: calc(var(--channel-avatar-size) * 0.46);
+  height: calc(var(--channel-avatar-size) * 0.46);
+  padding-inline: 1px;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  outline: var(--agent-avatar-outline-width) solid var(--agent-avatar-outline, transparent);
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-secondary);
   /* The count is type, so it takes a step off the type scale rather than a share of the square:
-     the smallest step that stays legible beside a face at both cluster sizes. */
-  font-size: var(--openbot-text-md);
+     the smallest step that stays legible on the disc at both cluster sizes. */
+  font-size: var(--openbot-text-sm);
   line-height: 1;
   font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
 }

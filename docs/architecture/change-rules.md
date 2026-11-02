@@ -70,15 +70,15 @@ safe to replay. Keep domain retry and recovery rules at their existing owners.
    component that assembles another one's props is how the god controller grew back last time.
 9. Do not add temporary compatibility paths without a removal condition and a test for that condition. Released Team API protocol adapters are permanent by default and follow the policy below.
 10. Log through `@openbot/logging` (`ts-log` Logger), never bare `console.*` - Biome's `noConsole`
-    enforces this in `src`, `scripts` and `packages`. The remote-desktop build recipe files listed in
-    the `Require a recipe version bump` step of `.github/workflows/remote-desktop-runtime.yml` are
-    exempt: any edit to them, cosmetic or not, forces `remoteDesktop.recipeVersion` up and a full
+    enforces this in `src`, `scripts` and `packages`. The remote-desktop build recipe scripts that the
+    `noConsole` override in `biome.json` excludes are exempt. The `Require a recipe version bump` step
+    of `.github/workflows/remote-desktop-runtime.yml` lists them: any edit to them, cosmetic or not, forces `remoteDesktop.recipeVersion` up and a full
     native runtime rebuild, so their logging is frozen until the recipe changes for a real reason. Every line is timestamped, prefixed and
     secret-redacted, and redaction covers a serialized payload passed as one string, not only a
     structured param. Patterns cannot find a secret with no label, such as a token in an error
     text, so a store that loads a secret passes the value to `registerSecretValue`, and every later
     line masks that exact value. The provider credential store and the MCP store (for header and
-    environment names that look secret) do this. `info` and above is written by default; `OPENBOT_LOG_LEVEL` lowers the
+    environment names that look secret) do this. `info` and above is written by default; `OPENBOT_LOG_LEVEL` changes the
     threshold. Machine-readable stdout (piped JSON, tags, harness URLs) uses
     `process.stdout.write` with a `// Machine-readable:` comment instead. Dev automation
     (`scripts/dev-automation`, `bun run dev:automation`) drives the already-running dev app over its
@@ -129,8 +129,8 @@ the saved messages, and can be tried again when the provider connects or the app
 
 ## Required verification
 
-Run the narrowest relevant test and lint the changed files. The pre-commit hook runs `check:ui` and
-the typecheck of each project that a staged file affects, and CI runs the remaining checks. See [AGENTS.md, Checks](../../AGENTS.md#checks)
+Run the narrowest relevant test and lint the changed files. The pre-commit hook runs `check:staged`,
+`check:ui`, and the typecheck of each project that a staged file affects, and CI runs the remaining checks. See [AGENTS.md, Checks](../../AGENTS.md#checks)
 for the local rules, and [check design notes](../development-checks.md#check-coverage) for what each CI
 job covers.
 

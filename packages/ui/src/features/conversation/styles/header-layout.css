@@ -102,7 +102,7 @@
 
 ::highlight(openbot-chat-search-current) {
   background: var(--openbot-warning);
-  color: var(--openbot-text-on-light);
+  color: var(--openbot-paper-text);
 }
 
 .conversation-title[aria-label="View agent settings"]:hover {
@@ -124,11 +124,4 @@
   transition:
     border-color var(--openbot-duration-slow) ease,
     box-shadow var(--openbot-duration-slow) ease;
-}
-
-.browser-panel-controlled {
-  border-left-color: var(--openbot-accent);
-  box-shadow:
-    -1px 0 0 var(--openbot-accent-soft),
-    -10px 0 28px var(--openbot-accent-soft);
 }

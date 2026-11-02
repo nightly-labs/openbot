@@ -8,6 +8,8 @@ import Bot from "lucide-react-native/icons/bot";
 import UserPlus from "lucide-react-native/icons/user-plus";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { redeemMobileConnectUrl } from "@/features/auth/api/mobile-auth";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SignInScreen } from "@/features/auth/screens/sign-in-screen";
@@ -22,6 +24,7 @@ export function IncomingLinkScreen() {
 
 function IncomingLinkContent({ request }: { request?: string }) {
   const { t, errorMessage } = useText();
+  const insets = useSafeAreaInsets();
   const { session, connect } = useMobileSession();
   const [link] = useState(() => readIncomingLink(request));
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +70,12 @@ function IncomingLinkContent({ request }: { request?: string }) {
     setBusy(true);
     setError(null);
     try {
-      const next = await redeemMobileConnectUrl(link.url);
+      const url = link.url;
+      const next = await mobileAnalytics.operation(
+        "mobile_pairing_action",
+        { action: "redeem", entry_point: "link" },
+        () => redeemMobileConnectUrl(url),
+      );
       connect(next);
       forgetIncomingLink(request);
       void haptics.notification("success");
@@ -116,7 +124,10 @@ function IncomingLinkContent({ request }: { request?: string }) {
   const accountService = pairingService && pairingService !== OPENBOT_CONTROL_PLANE_ORIGIN ? pairingService : null;
 
   return (
-    <View className="flex-1 justify-center gap-5 bg-background px-6 py-safe-offset-6">
+    <View
+      className="flex-1 justify-center gap-5 bg-background py-safe-offset-6"
+      style={{ paddingLeft: insets.left + 24, paddingRight: insets.right + 24 }}
+    >
       <Stack.Screen options={{ gestureEnabled: !busy, headerShown: false }} />
       <Typography.Heading type="h3">
         {link.kind === "pairing"

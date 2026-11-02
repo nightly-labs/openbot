@@ -49,8 +49,8 @@ interface SettingsProfilePanels {
 /**
  * The Profile tab: the display-name draft, the avatar upload and the account session list.
  *
- * Created by `SettingsModal` rather than by the tab, because the dialog's footer save bar reads
- * `nameDirty()` and has to keep working while another tab is selected.
+ * Created by the settings dialog rather than by the tab, so the session list follows the dialog's
+ * open state and the selected tab.
  */
 export function createSettingsProfileStore(props: ProfileStoreProps, isActive: () => boolean) {
   const [panels, setPanels] = createStore<SettingsProfilePanels>({
@@ -58,7 +58,6 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
     profile: { busy: false, name: "", saveError: null, savedName: "", touched: false },
     sessions: { items: [], loading: false, error: null, revokingId: null },
   });
-  let avatarFileInput: HTMLInputElement | undefined;
   let nameInput: HTMLInputElement | undefined;
   let sessionsRevision = 0;
 
@@ -246,46 +245,27 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
     }
   }
 
-  async function uploadAvatar(file: File | undefined): Promise<void> {
-    if (!file || panels.avatar.busy) return;
-    setPanels((state) => {
-      state.avatar.busy = true;
-      state.avatar.error = null;
-    });
-    try {
-      const image = await (props.processAvatarFile ?? normalizeAvatarFile)(file);
-      await props.onUpdateAccountAvatar(image);
-    } catch (error) {
-      setPanels((state) => {
-        const text = currentText();
-        state.avatar.error = text.errorMessage(error, text.t("settings.profile.photo.processFailed"));
-      });
-    } finally {
-      setPanels((state) => {
-        state.avatar.busy = false;
-      });
-      if (avatarFileInput) avatarFileInput.value = "";
-    }
+  /** The photo as the account stores it. The edit dialog shows it before it saves it. */
+  function processAvatarFile(file: File): Promise<AvatarImageInput> {
+    return (props.processAvatarFile ?? normalizeAvatarFile)(file);
   }
 
-  function registerAvatarInput(element: HTMLInputElement): void {
-    avatarFileInput = element;
+  function clearAvatarError(): void {
+    setPanels((state) => {
+      state.avatar.error = null;
+    });
   }
 
   function registerNameInput(element: HTMLInputElement): void {
     nameInput = element;
   }
 
-  function openAvatarPicker(): void {
-    avatarFileInput?.click();
-  }
-
   return {
+    clearAvatarError,
     markTouchedIfDirty,
     nameDirty,
-    openAvatarPicker,
+    processAvatarFile,
     refreshSessions,
-    registerAvatarInput,
     registerNameInput,
     resetName,
     revokeSession,
@@ -293,7 +273,6 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
     state: panels,
     updateAvatar,
     updateName,
-    uploadAvatar,
     visibleNameError,
   };
 }

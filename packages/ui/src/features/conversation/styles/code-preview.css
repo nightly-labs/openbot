@@ -103,13 +103,9 @@
   white-space: pre;
 }
 
+/* The preview animates its backdrop from script, with the surface. */
 .message-preview-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--openbot-layer-dialog);
-  display: grid;
-  place-items: center;
-  padding: var(--openbot-space-6);
+  animation: none;
 }
 
 .message-preview-dialog {

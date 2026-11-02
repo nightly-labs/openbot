@@ -4,14 +4,19 @@
 
 import {
   type AddMessagingOrchestratorResult,
+  type DiscordAccess,
+  type DiscordRoleList,
   decodeHostMessagingOverview,
   isAddMessagingOrchestratorResult,
+  isDiscordAccess,
+  isDiscordRoleList,
   type MessagingPlatform,
   messagingPage,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, nullableString } from "@openbot/contracts/ipc-decoding";
 import { CONNECTORS_CAPABILITY, CONNECTORS_ROUTES } from "@openbot/contracts/team-protocol/connectors-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { DISCORD_ACCESS_CAPABILITY, DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -32,6 +37,7 @@ import {
   parseHostMessagingWorkspaceInput,
   parseHostSetMessagingEnabledInput,
   parseMessagingWorkspaceInput,
+  parseSetDiscordAccessInput,
   parseSetMessagingEnabledInput,
 } from "./messaging-inputs";
 import { scopedHandler } from "./scoped-handler";
@@ -52,6 +58,9 @@ interface MessagingIpcDependencies {
     | "connectTelegramChat"
     | "disconnectTelegramChat"
     | "addTelegramOrchestrator"
+    | "discordAccess"
+    | "listDiscordRoles"
+    | "setDiscordAccess"
   >;
   remoteServers: {
     supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
@@ -75,6 +84,16 @@ const decodePage = (value: unknown): { url: string | null; nonce: string | null 
 
 const decodeEmpty = (): null => null;
 
+const decodeDiscordAccess = (value: unknown): DiscordAccess => {
+  if (!isDiscordAccess(value)) throw new Error("Invalid Discord access response.");
+  return value;
+};
+
+const decodeDiscordRoles = (value: unknown): DiscordRoleList => {
+  if (!isDiscordRoleList(value)) throw new Error("Invalid Discord roles response.");
+  return value;
+};
+
 const decodeOrchestrator = (value: unknown): AddMessagingOrchestratorResult => {
   if (!isAddMessagingOrchestratorResult(value)) throw new Error("Invalid messaging orchestrator response.");
   return value;
@@ -89,6 +108,12 @@ export function messagingIpcHandlers({
   function post<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: TeamProtocolV2Json): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, CONNECTORS_CAPABILITY))
       throw new Error(sourceText("error.team.connectorsUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
+  }
+  /** A `discord-access-v1` request to a joined server. An older host does not offer it. */
+  function postAccess<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: TeamProtocolV2Json) {
+    if (!remoteServers.supportsCapability(serverId, DISCORD_ACCESS_CAPABILITY))
+      throw new Error(sourceText("error.team.discordAccessUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
   /**
@@ -142,6 +167,15 @@ export function messagingIpcHandlers({
       ),
       addDiscordOrchestrator: payloadHandler(parseAddMessagingOrchestratorInput, (input) =>
         runCauseEffect(messaging.addOrchestrator("discord", input)),
+      ),
+      getDiscordAccess: payloadHandler(parseMessagingWorkspaceInput, ({ workspaceId }) =>
+        runCauseEffect(messaging.discordAccess(workspaceId)),
+      ),
+      listDiscordRoles: payloadHandler(parseMessagingWorkspaceInput, ({ workspaceId }) =>
+        runCauseEffect(messaging.listDiscordRoles(workspaceId)),
+      ),
+      setDiscordAccess: payloadHandler(parseSetDiscordAccessInput, (input) =>
+        runCauseEffect(messaging.setDiscordAccess(input)),
       ),
       getTelegramOverview: handler(() => messaging.telegramOverview()),
       connectTelegramChat: payloadHandler(parseConnectTelegramChatInput, ({ place }) =>
@@ -223,6 +257,24 @@ export function messagingIpcHandlers({
           ),
         remote: ({ platform, workspaceId }, serverId) =>
           post(serverId, CONNECTORS_ROUTES.messagingOrchestrator, decodeOrchestrator, { platform, workspaceId }),
+      }),
+      hostGetDiscordAccess: scopedHandler(parseMessagingWorkspaceInput, {
+        local: ({ workspaceId }) => runCauseEffect(messaging.discordAccess(workspaceId)),
+        remote: ({ workspaceId }, serverId) =>
+          postAccess(serverId, DISCORD_ACCESS_ROUTES.access, decodeDiscordAccess, { workspaceId }),
+      }),
+      hostListDiscordRoles: scopedHandler(parseMessagingWorkspaceInput, {
+        local: ({ workspaceId }) => runCauseEffect(messaging.listDiscordRoles(workspaceId)),
+        remote: ({ workspaceId }, serverId) =>
+          postAccess(serverId, DISCORD_ACCESS_ROUTES.roles, decodeDiscordRoles, { workspaceId }),
+      }),
+      hostSetDiscordAccess: scopedHandler(parseSetDiscordAccessInput, {
+        local: (input) => runCauseEffect(messaging.setDiscordAccess(input)),
+        remote: ({ workspaceId, allowedRoles }, serverId) =>
+          postAccess(serverId, DISCORD_ACCESS_ROUTES.update, decodeDiscordAccess, {
+            workspaceId,
+            allowedRoles: allowedRoles.map((role) => ({ id: role.id, name: role.name })),
+          }),
       }),
     },
   };

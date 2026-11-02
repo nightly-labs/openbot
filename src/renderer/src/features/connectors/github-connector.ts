@@ -3,10 +3,21 @@ import {
   type GitHubConnectorRepositories,
   type GitHubConnectorStatus,
 } from "@openbot/contracts/ipc";
+import type { GitHubConnectorPanelProps } from "@openbot/ui/features/settings/GitHubConnectorPanel";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup, onSettled } from "solid-js";
-import { type ConnectorController, createConnectorActions, NO_WATCH } from "./connector-controller";
+import {
+  type ConnectorAnalyticsAction,
+  type ConnectorController,
+  createConnectorActions,
+  NO_WATCH,
+} from "./connector-controller";
 import { type GitHubConnectorPort, githubConnectorPort } from "./github-connector-port";
+
+/** A controller whose page is the GitHub page, for a view that shows a part of it. */
+export interface GitHubConnectorController extends ConnectorController {
+  readonly detail: { id: "github"; props: GitHubConnectorPanelProps };
+}
 
 /**
  * The GitHub connection of this computer or of a joined server. Reads the status once and then
@@ -23,13 +34,13 @@ export function createGitHubConnector(
   port: () => GitHubConnectorPort = githubConnectorPort,
   /** The joined server whose connection this is, or undefined for this computer's. */
   hostName: () => string | undefined = () => undefined,
-): ConnectorController {
+): GitHubConnectorController {
   const [status, setStatus] = createSignal<GitHubConnectorStatus>(DISCONNECTED_GITHUB_CONNECTOR);
   const [repositories, setRepositories] = createSignal<GitHubConnectorRepositories | null>(null);
   const [repositoriesError, setRepositoriesError] = createSignal<string | null>(null);
   /** False until the first status read ends. Until then, `available` is not known. */
   const [read, setRead] = createSignal(false);
-  const actions = createConnectorActions("connector.github.actionFailed");
+  const actions = createConnectorActions("connector.github.actionFailed", "github");
   /** Each read replaces the one before it, so a slow answer never overwrites a newer one. */
   let repositoriesRead = 0;
   /** Set when GitHub opened to change the repositories. The next window focus reads them again. */
@@ -91,14 +102,19 @@ export function createGitHubConnector(
     window.removeEventListener("focus", onFocus);
   });
 
-  const run = (action: () => Promise<GitHubConnectorStatus | undefined>, waits = true) =>
+  const run = (
+    action: () => Promise<GitHubConnectorStatus | undefined>,
+    waits = true,
+    track?: ConnectorAnalyticsAction,
+  ) =>
     actions.run(action, {
       waits,
+      ...(track ? { track } : {}),
       done: (next) => {
         if (next) setStatus(next);
       },
     });
-  const connect = () => run(() => port().connect());
+  const connect = () => run(() => port().connect(), true, "connect_started");
 
   return {
     id: "github",
@@ -128,7 +144,7 @@ export function createGitHubConnector(
         },
         onConnect: connect,
         onCancel: () => run(() => port().cancel(), false),
-        onDisconnect: () => run(() => port().disconnect()),
+        onDisconnect: () => run(() => port().disconnect(), true, "disconnected"),
         onOpenVerification: () => run(async () => void (await port().openVerification())),
         onOpenInstall: () =>
           run(async () => {

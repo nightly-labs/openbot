@@ -25,14 +25,17 @@ Make one application for production and one for development at
   - Turn off **Public Bot** until the launch. When it is off, only the owner of the application can
     add the bot to a server.
   - Turn off **Requires OAuth2 Code Grant**.
-  - Leave every **Privileged Gateway Intent** off. OpenBot asks for no privileged intent: Discord
-    gives a bot the text of each message that mentions it.
+  - Turn on **Message Content Intent**, and leave the other privileged intents off. With it,
+    OpenBot reads the message that a person replies to and the earlier messages of a conversation.
+    Signal asks for it by default. A bot that is verified, or in 100 or more servers, needs
+    Discord's approval for the intent first.
   - Select **Reset Token** and copy the bot token once.
 
 The install asks for the permissions in `DISCORD_BOT_PERMISSIONS`
 (`packages/contracts/src/discord-app.ts`): view channels, send messages, send messages in threads,
 embed links, attach files, read message history and add reactions. Signal asks for the intents in
-`DISCORD_GATEWAY_INTENTS`: guilds, guild messages and direct messages.
+`DISCORD_GATEWAY_INTENTS`: guilds, guild messages and direct messages, and adds
+`DISCORD_MESSAGE_CONTENT_INTENT` unless `DISCORD_MESSAGE_CONTENT` is `false`.
 
 ## Secrets
 
@@ -44,6 +47,7 @@ embed links, attach files, read message history and add reactions. Signal asks f
 | Worker | `DISCORD_ROUTE_PRIVATE_JWK`, `DISCORD_ROUTE_KEY_ID` | An ES256 key that signs route tickets. Put its public key in `REMOTE_TICKET_PUBLIC_JWKS`. |
 | Signal | `DISCORD_BOT_TOKEN` | The bot token. |
 | Signal | `DISCORD_APPLICATION_ID` | The application ID. |
+| Signal | `DISCORD_MESSAGE_CONTENT` | Optional. `false` stops Signal asking for the Message Content intent. Not a secret. |
 
 `scripts/deploy-auth-api.ts` (`bun run --cwd apps/auth-api deploy`) sets the Worker secrets when they are in the environment. Without them, the
 Discord routes answer 503 `discord_not_configured`. Without the Signal values, Signal keeps no Gateway
@@ -56,9 +60,12 @@ for the development application.
 
 - Discord has no thread of replies. A conversation is a chain of replies, and OpenBot replies to the
   first message of it, so that each reply to an OpenBot post names the conversation.
+- Only a message that mentions OpenBot reaches it. A reply keeps the mention when its **@ ON**
+  setting stays on (the default).
 - Without the Message Content intent, Discord gives OpenBot the text only of a message that
-  mentions it. A reply keeps the mention when its **@ ON** setting stays on (the default). A reply
-  without the mention does not reach OpenBot.
+  mentions it, so OpenBot does not see the message that a person replies to or the other messages
+  of the channel. When Discord refuses the intent, Signal logs one line and connects without it.
+- When a server has a list of roles, OpenBot ignores a mention from a member who has none of them.
 - A direct message to OpenBot gets one fixed answer: a direct message has no server, so Signal cannot
   find the OpenBot server that answers it.
 - Discord limits a bot's file to 10 MB unless the server has a higher boost level. OpenBot sends at

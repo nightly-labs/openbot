@@ -130,3 +130,8 @@ function exifOrientation(bytes: Uint8Array, start: number, length: number): numb
   }
   return null;
 }
+
+/** Two sizes with the same shape, allowing for rounding in a scaled copy. */
+export function sameShape(left: ImageDimensions, right: ImageDimensions) {
+  return Math.abs(left.width / left.height - right.width / right.height) < 0.01;
+}

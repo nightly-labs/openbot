@@ -31,11 +31,16 @@ export function createSidebarLayoutActions(deps: {
   chatName: (chatId: string) => string;
   draggedSidebarItem: () => SidebarPinnedItem | null;
   filteredChatsBySection: () => Map<string, SidebarChatItem[]>;
+  /** The host keeps folders in folders, so a folder moves among its siblings with `nest`. */
+  foldersSupported: () => boolean;
   layoutMutable: () => boolean;
   orderedPeople: () => TeamPresenceMember[];
   personById: () => Map<string, TeamPresenceMember>;
   props: SidebarProps;
+  sectionCanNest: (sectionId: string, parentId: string | null) => boolean;
+  sectionChildren: (parentId: string | null) => string[];
   sectionLabel: (sectionId: string) => string;
+  sectionParent: (sectionId: string) => string | null;
   visiblePinnedKeys: () => string[];
   visibleSectionIds: () => string[];
 }) {
@@ -48,17 +53,61 @@ export function createSidebarLayoutActions(deps: {
     chatPinnedItems,
     draggedSidebarItem,
     filteredChatsBySection,
+    foldersSupported,
     layoutMutable,
     orderedPeople,
     personById,
     props,
+    sectionCanNest,
+    sectionChildren,
     sectionLabel,
+    sectionParent,
     visiblePinnedKeys,
     visibleSectionIds,
   } = deps;
   const { t } = currentText();
 
+  /** The folders next to this one, in its parent or at the top, and its index among them. */
+  function sectionSiblingIndex(sectionId: string): { index: number; total: number } {
+    const siblings = foldersSupported() ? sectionChildren(sectionParent(sectionId)) : visibleSectionIds();
+    return { index: siblings.indexOf(sectionId), total: siblings.length };
+  }
+
+  /** Puts a folder with its folders in `parentId` (null: the top), before `beforeSectionId` or last. */
+  function nestSection(sectionId: string, parentId: string | null, beforeSectionId: string | null): void {
+    if (!sectionCanNest(sectionId, parentId)) return;
+    void props.onMutateLayout({ type: "nest", sectionId, parentId, beforeSectionId }).then(() => {
+      const siblings = sectionChildren(parentId);
+      announce(
+        t("sidebar.announce.movedToPosition", {
+          name: sectionLabel(sectionId),
+          position: siblings.indexOf(sectionId) + 1,
+          total: siblings.length,
+        }),
+      );
+    }, announceError);
+  }
+
+  /** The folder menu's "Move to": the end of another folder, or of the top of the list. */
+  function moveFolderTo(sectionId: string, parentId: string | null): void {
+    if (sectionParent(sectionId) === parentId) return;
+    nestSection(sectionId, parentId, null);
+  }
+
   function moveSection(sectionId: string, direction: "up" | "down"): void {
+    if (foldersSupported()) {
+      const parentId = sectionParent(sectionId);
+      const siblings = sectionChildren(parentId);
+      const index = siblings.indexOf(sectionId);
+      if (index < 0) return;
+      if (direction === "up") {
+        const before = siblings[index - 1];
+        if (before) nestSection(sectionId, parentId, before);
+      } else if (index + 1 < siblings.length) {
+        nestSection(sectionId, parentId, siblings[index + 2] ?? null);
+      }
+      return;
+    }
     const visibleOrder = visibleSectionIds();
     const index = visibleOrder.indexOf(sectionId);
     const targetSectionId = visibleOrder[index + (direction === "up" ? -1 : 1)];
@@ -67,6 +116,11 @@ export function createSidebarLayoutActions(deps: {
     if (index < 0 || rawIndex < 0 || rawTargetIndex < 0) return;
     const steps = Math.abs(rawTargetIndex - rawIndex);
     void props.onMutateLayout({ type: "move", sectionId, direction, steps }).catch(announceError);
+  }
+
+  /** The host reports a failed copy itself; the live region only needs to hear that it failed. */
+  function duplicateSection(sectionId: string): void {
+    void props.onDuplicateSection?.(sectionId).catch(announceError);
   }
 
   /**
@@ -128,6 +182,18 @@ export function createSidebarLayoutActions(deps: {
 
   function reorderDraggedSection(sourceSectionId: string, target: SectionDropTarget): void {
     if (sourceSectionId === target.sectionId) return;
+    if (foldersSupported()) {
+      const parentId = sectionParent(target.sectionId);
+      const siblings = sectionChildren(parentId).filter((sectionId) => sectionId !== sourceSectionId);
+      const index = siblings.indexOf(target.sectionId);
+      if (index < 0) return;
+      nestSection(
+        sourceSectionId,
+        parentId,
+        target.placement === "before" ? target.sectionId : (siblings[index + 1] ?? null),
+      );
+      return;
+    }
     const sourceIndex = props.layout.order.indexOf(sourceSectionId);
     if (sourceIndex < 0) return;
     const orderWithoutSource = props.layout.order.filter((sectionId) => sectionId !== sourceSectionId);
@@ -254,6 +320,7 @@ export function createSidebarLayoutActions(deps: {
     }
 
     if (target?.kind === "section-order") reorderDraggedSection(source.id, target.target);
+    else if (target?.kind === "section-into") nestSection(source.id, target.sectionId, null);
   }
 
   function reorderPinnedItem(sourceKey: string, targetKey: string): void {
@@ -281,7 +348,9 @@ export function createSidebarLayoutActions(deps: {
   return {
     assignChatSection,
     commitSidebarDrop,
+    duplicateSection,
     moveDraggedChat,
+    moveFolderTo,
     movePersonByKeyboard,
     movePinnedItem,
     moveSection,
@@ -289,5 +358,6 @@ export function createSidebarLayoutActions(deps: {
     reorderDraggedPerson,
     reorderDraggedSection,
     reorderPinnedItem,
+    sectionSiblingIndex,
   };
 }

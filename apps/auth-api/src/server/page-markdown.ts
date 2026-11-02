@@ -259,8 +259,9 @@ function textContent(node: HtmlNode): string {
 
 function listBlock(list: ElementNode, base: string): string[] {
   const items = list.children.filter((child): child is ElementNode => typeof child !== "string" && child.tag === "li");
+  const start = Number(list.attributes.start ?? 1);
   const lines = items.flatMap((item, index) => {
-    const marker = list.tag === "ol" ? `${index + 1}. ` : "- ";
+    const marker = list.tag === "ol" ? `${index + start}. ` : "- ";
     const content = blocks(item.children, base).join("\n\n");
     if (!content) return [];
     // Continuation lines line up under the text; a blank line stays blank.

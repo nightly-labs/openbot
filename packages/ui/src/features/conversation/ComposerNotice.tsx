@@ -21,12 +21,12 @@ import { CloseIcon } from "./ConversationIcons";
  */
 export function ComposerNotice(props: {
   tone?: "warning" | "danger";
-  title?: string;
+  title?: string | undefined;
   body: string;
   /** The code of the failure the body states. */
   reference?: string | null | undefined;
   action?: JSX.Element;
-  conversationKey?: string | null;
+  conversationKey?: string | null | undefined;
   onDismiss?: () => void;
 }) {
   const { t } = useText();
@@ -76,7 +76,7 @@ export function ComposerNotice(props: {
 
 /** The icon, copy and optional action the card carries, whichever role announces it. */
 function NoticeContent(props: {
-  title?: string;
+  title?: string | undefined;
   body: string;
   reference?: string | null | undefined;
   action?: JSX.Element;

@@ -13,13 +13,13 @@ export const messages = defineMessages("remoteDesktop", {
   "remoteDesktop.viewerTitle": "Sunshine remote desktop",
   "remoteDesktop.viewerLoadFailed": "The Moonlight viewer could not load.",
   "remoteDesktop.streamNotReady":
-    "The host did not start the stream. Sunshine may have stopped on the host. Try again.",
-  "remoteDesktop.hostOfflineTitle": "Host is offline",
-  "remoteDesktop.hostOfflineMessage": "Reconnect to the host before you open its desktop.",
+    "The server did not start the stream. Sunshine may have stopped on the server. Try again.",
+  "remoteDesktop.hostOfflineTitle": "Server is offline",
+  "remoteDesktop.hostOfflineMessage": "Reconnect to the server before you open its desktop.",
   "remoteDesktop.openFailed": "Could not open the desktop",
   "remoteDesktop.notSharingTitle": "{name} is not sharing its screen",
   "remoteDesktop.notSharingDescription":
-    "The host blocks OpenBot from recording its screen. On that computer, open System Settings → Privacy & Security → Screen Recording, turn on OpenBot, then try again here.",
+    "The server blocks OpenBot from recording its screen. On that server, open System Settings → Privacy & Security → Screen Recording, turn on OpenBot, then try again here.",
   "remoteDesktop.setup.check.screenRecording": "Screen Recording",
   "remoteDesktop.setup.check.accessibility": "Accessibility",
   "remoteDesktop.setup.check.service": "Sunshine service",
@@ -38,7 +38,8 @@ export const messages = defineMessages("remoteDesktop", {
   "remoteDesktop.setup.endSessionFirst": "End this computer's remote desktop session before you start a test.",
   "remoteDesktop.setup.startFailed": "Could not start the remote desktop test.",
   "remoteDesktop.setup.connectionLost": "The test connection was lost.",
-  "remoteDesktop.setup.hostUpdateRequired": "Update OpenBot on the host to check permissions and test remote desktop.",
+  "remoteDesktop.setup.hostUpdateRequired":
+    "Update OpenBot on the server to check permissions and test remote desktop.",
   "remoteDesktop.setup.permissions": "Permissions",
   "remoteDesktop.setup.checked": "Checked",
   "remoteDesktop.setup.checkAgain": "Check again",
@@ -52,7 +53,7 @@ export const messages = defineMessages("remoteDesktop", {
   "remoteDesktop.setup.liveTest": "Live connection test",
   "remoteDesktop.setup.liveTestLocal": "Test the picture, mouse, and keyboard on this Mac.",
   "remoteDesktop.setup.liveTestRemote":
-    "The test opens a temporary panel on the host. Other remote sessions must end first. Input stays inside the panel.",
+    "The test opens a temporary panel on the server. Other remote sessions must end first. Input stays inside the panel.",
   "remoteDesktop.setup.testSummary": "Video: {video} · Picture: {picture} · Mouse: {mouse} · Keyboard: {keyboard}",
   "remoteDesktop.setup.received": "received",
   "remoteDesktop.setup.notReceived": "not received",
@@ -64,7 +65,7 @@ export const messages = defineMessages("remoteDesktop", {
   "remoteDesktop.setup.testRemote": "Test remote desktop",
   "remoteDesktop.setup.videoFailed": "The test video connection failed.",
   "remoteDesktop.setup.inputInstructions":
-    "Click the host target, then type {code}. Mouse: {mouse}. Keyboard: {keyboard}.",
+    "Click the target in the test panel, then type {code}. Mouse: {mouse}. Keyboard: {keyboard}.",
   "remoteDesktop.setup.videoOnly": "Video test only. Mouse and keyboard testing needs the updated Sunshine runtime.",
   "remoteDesktop.setup.pictureConfirmed": "Picture confirmed",
   "remoteDesktop.setup.seeDesktop": "I can see my desktop",

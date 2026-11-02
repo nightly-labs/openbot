@@ -67,6 +67,8 @@ export function presentProviderUpdate(
   const { name, runtime, availableVersion } = update;
   const updatable = providerUpdateAvailable(runtime, availableVersion);
   const busy = update.checking === true || runtime.phase === "downloading" || runtime.phase === "finishing";
+  // Main sends a message with a download only while the update waits for the provider's turns to end.
+  const waiting = runtime.phase === "downloading" && runtime.message !== null;
   const failed = runtime.phase === "download-error";
 
   let actionLabel: ProviderUpdatePresentation["actionLabel"];
@@ -76,6 +78,7 @@ export function presentProviderUpdate(
   let title = t("update.provider.upToDate", { name });
   if (update.checking) title = t("update.provider.checking", { name });
   else if (updatable) title = t("update.provider.available", { name });
+  else if (waiting) title = t("update.provider.waiting", { name });
   else if (busy) title = t("update.provider.updating", { name });
   else if (failed) title = t("update.provider.failed", { name });
 
@@ -86,7 +89,7 @@ export function presentProviderUpdate(
     actionLabel,
     title,
     detail: updateDetail(update, updatable, text),
-    progress: !update.checking && runtime.phase === "downloading" ? clampProgress(runtime.progress) : null,
+    progress: !update.checking && runtime.phase === "downloading" && !waiting ? clampProgress(runtime.progress) : null,
   };
 }
 
@@ -112,6 +115,8 @@ function versionTransition(version: string | null, availableVersion: string | nu
 
 function updateDetail(update: ProviderUpdate, updatable: boolean, text: UpdateText): string {
   const { runtime, availableVersion } = update;
+  if (runtime.phase === "downloading" && runtime.message !== null)
+    return text.errorMessage(runtime.message, versionTransition(runtime.version, availableVersion, text));
   if (updatable || runtime.phase === "downloading") return versionTransition(runtime.version, availableVersion, text);
   if (runtime.phase === "finishing") return text.t("update.provider.settingUp");
   if (runtime.phase === "download-error")

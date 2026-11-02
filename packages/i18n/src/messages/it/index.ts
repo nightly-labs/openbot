@@ -39,14 +39,18 @@ import { messages as settings } from "./settings";
 import { shared } from "./shared";
 import { messages as sharedTable } from "./sharedTable";
 import { messages as sidebar } from "./sidebar";
+import { messages as sitePage } from "./sitePage";
 import { messages as skill } from "./skill";
 import { source } from "./source";
 import { messages as startup } from "./startup";
 import { messages as team } from "./team";
+import { messages as uiBlock } from "./uiBlock";
 import { messages as update } from "./update";
 import { messages as usage } from "./usage";
+import { messages as vault } from "./vault";
 import { messages as webClient } from "./webClient";
 import { messages as window } from "./window";
+import { messages as workflow } from "./workflow";
 
 /**
  * Italian. Written from the English source: a key that is missing here renders its English source.
@@ -101,6 +105,7 @@ export const it = {
   ...sidebar,
   ...channel,
   ...diagram,
+  ...workflow,
   ...agent,
   ...agentTemplate,
   ...importAgent,
@@ -108,4 +113,7 @@ export const it = {
   ...island,
   ...computerUse,
   ...connector,
+  ...vault,
+  ...uiBlock,
+  ...sitePage,
 } as const satisfies PartialTranslation<AppMessages>;

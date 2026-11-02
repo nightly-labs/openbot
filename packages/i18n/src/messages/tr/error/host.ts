@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/host";
 export const messages = {
   // Errors from host setup, publishing, and host maintenance.
   "error.host.iceServersMissing": "Remote Signal ICE sunucularını sağlamadı.",
+  "error.host.keyRotationUnavailable": "Bu sunucu, hesap hizmeti olmadan anahtarını değiştiremez.",
+  "error.host.keyRotationRefused":
+    "Hesap hizmeti yeni sunucu anahtarını kabul etmedi. Mevcut anahtar kullanılmaya devam ediyor.",
   "error.host.webRtcNotConfigured": "WebRTC ana makine hizmeti yapılandırılmamış.",
   "error.host.runtimeNotInstalled": "Uzak masaüstü çalışma zamanı kurulu değil.",
   "error.host.setupUnavailable": "İzin kurulumu kullanılamıyor.",

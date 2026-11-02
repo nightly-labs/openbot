@@ -36,8 +36,11 @@ export const messages = {
   "account.usage.window.fiveHour": "5 saatlik",
   "account.usage.window.hours": { one: "{count} saatlik", other: "{count} saatlik" },
   "account.usage.window.minutes": "{minutes} dk",
+  "account.usage.window.cursorModels": "Cursor modelleri",
+  "account.usage.window.otherModels": "Diğer modeller",
+  "account.usage.window.group": "{group} · {window}",
   "account.update.failedRetry": "Güncelleme başarısız oldu. Tekrar deneyin.",
-  "account.update.managedByHost": "Ana makine tarafından yönetiliyor",
+  "account.update.managedByHost": "Ana makine yönetiyor",
   "account.update.restart": "Yeniden başlat",
   "account.update.retrying": "Tekrar deneniyor",
   "account.update.restarting": "Yeniden başlatılıyor",
@@ -98,4 +101,5 @@ export const messages = {
   "account.language.previous": "Önceki dil",
   "account.language.next": "Sonraki dil",
   "account.language.continue": "Devam et",
+  "account.language.change": "Dili değiştir",
 } as const satisfies PartialTranslation<typeof source>;

@@ -3,11 +3,27 @@ import { Effect, type Fiber } from "effect";
 import type { BrowserCdpEngine } from "./browser-cdp";
 import { type BrowserOperationError, browserSync } from "./browser-effects";
 import type { BrowserToolCall } from "./browser-tools";
+import type { DynamicToolResult } from "./protocol";
+import type { VaultCardSecret } from "./vault-items";
 
 export interface BrowserDynamicToolHooks {
   onUploadTargetResolved?: (inputId: string, documentId: string) => void;
   onUploadAssigned?: (inputId: string, documentId: string) => void;
   onUploadOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void;
+  /** A person controls the tab. The caller waits for the release and gives the result of the tool call. */
+  onUserControl?: (tabId: string) => Effect.Effect<DynamicToolResult>;
+  /** The saved cards that `fill_card` types. With none, `fill_card` fills nothing. */
+  cardVault?: BrowserCardVault | undefined;
+}
+
+/** The saved cards that `fill_card` types, and the owner's approval of each page that they go to. */
+export interface BrowserCardVault {
+  /** The values to type, or null when no such card is saved. */
+  secret(cardId: string): VaultCardSecret | null;
+  /** Whether the owner let agents fill `cardId` on the HTTPS `page` into fields of each of `frames`. */
+  approved(cardId: string, page: string, frames: readonly string[]): boolean;
+  /** Asks the owner and keeps the approval. False when the owner declined or nobody answered. */
+  approve(cardId: string, page: string, frames: readonly string[]): Effect.Effect<boolean, BrowserOperationError>;
 }
 
 export type BrowserInputCall = Extract<
@@ -39,9 +55,9 @@ export function browserInputAction(call: BrowserInputCall, hooks: BrowserDynamic
           engine.click(
             args.target,
             {
-              button: args.button,
-              clickCount: args.clickCount,
-              modifiers: args.modifiers,
+              ...(args.button === undefined ? {} : { button: args.button }),
+              ...(args.clickCount === undefined ? {} : { clickCount: args.clickCount }),
+              ...(args.modifiers === undefined ? {} : { modifiers: args.modifiers }),
             },
             deadline,
             markDispatched,
@@ -62,7 +78,7 @@ export function browserInputAction(call: BrowserInputCall, hooks: BrowserDynamic
             args.target,
             args.text,
             {
-              mode: args.target ? (args.mode ?? "replace") : undefined,
+              ...(args.target ? { mode: args.mode ?? "replace" } : {}),
               submit: args.submit === true,
             },
             deadline,

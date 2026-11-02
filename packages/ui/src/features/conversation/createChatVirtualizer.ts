@@ -1,5 +1,6 @@
 import {
   elementScroll,
+  measureElement as measureRowElement,
   observeElementOffset,
   observeElementRect,
   type VirtualItem,
@@ -32,9 +33,12 @@ export interface ChatVirtualizer<TItemElement extends Element> {
   itemStart: (index: number) => number | undefined;
   /** Opens a row at the top of the list, rendered or not. A smooth scroll animates there. */
   scrollToIndex: (index: number, options?: { smooth?: boolean }) => void;
+  /** Scrolls to a position in the scroll content. It replaces the target of an earlier `scrollToIndex`. */
+  scrollToOffset: (offset: number) => void;
 }
 
 const STATIC_CHAT_LIMIT = 100;
+const SCROLL_END_THRESHOLD = 80;
 
 export function createChatVirtualizer<TScrollElement extends Element, TItemElement extends Element>(
   options: ChatVirtualizerOptions<TScrollElement, TItemElement>,
@@ -46,6 +50,13 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
   );
   const [totalSize, setTotalSize] = createSignal(initialCount * options.estimateSize(0));
   const stableItems = new Map<VirtualItem["key"], { item: VirtualItem; update: (next: VirtualItem) => void }>();
+  // Within this threshold of the end, the virtualizer keeps the reader at the end when a row grows or
+  // one is added. The rows end above the activity line, so a reader who scrolled up a little still
+  // counts as at the end, and each growth of a streaming reply would move them down. Only a reader who
+  // follows the latest message counts. It is set before each measurement and each change of rows.
+  const syncScrollEndThreshold = (instance: Virtualizer<TScrollElement, TItemElement>): void => {
+    instance.options.scrollEndThreshold = options.stickToLatest?.() === false ? -1 : SCROLL_END_THRESHOLD;
+  };
   const virtualizer = new Virtualizer<TScrollElement, TItemElement>({
     count: 0,
     getScrollElement: options.getScrollElement,
@@ -53,16 +64,16 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     getItemKey: options.getItemKey,
     observeElementRect,
     observeElementOffset,
+    measureElement: (element, entry, instance) => {
+      syncScrollEndThreshold(instance);
+      return measureRowElement(element, entry, instance);
+    },
     scrollToFn: (offset, scroll, instance) => {
       const element = instance.scrollElement;
-      if (
-        element &&
-        scroll.adjustments !== undefined &&
-        options.count() <= STATIC_CHAT_LIMIT &&
-        options.stickToLatest?.()
-      ) {
-        // Static rows already occupy their measured space. An estimate correction can move
-        // the chat off the bottom after routine cards load. Follow the actual bottom instead.
+      if (element && scroll.adjustments !== undefined && options.stickToLatest?.()) {
+        // Rows end above the activity line. An estimate correction that follows the last row
+        // leaves that line below the view, then the chat's own follow pulls back to the real
+        // bottom, and the two move the chat up and down while a turn runs.
         elementScroll(element.scrollHeight - element.clientHeight, { ...scroll, adjustments: 0 }, instance);
         return;
       }
@@ -71,7 +82,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     overscan: 5,
     anchorTo: "end",
     followOnAppend: "auto",
-    scrollEndThreshold: 80,
+    scrollEndThreshold: SCROLL_END_THRESHOLD,
     initialRect: { width: 1, height: 600 },
   });
   let refreshQueued = false;
@@ -126,6 +137,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     ({ count, scrollMargin }) => {
       // The virtualizer calls `getItemKey` here; `keyVersion` above is what tracks the keys.
       untrack(() => {
+        syncScrollEndThreshold(virtualizer);
         virtualizer.setOptions({
           ...virtualizer.options,
           count,
@@ -171,6 +183,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     itemStart: (index) => virtualizer.measurementsCache[index]?.start,
     scrollToIndex: (index, scroll) =>
       virtualizer.scrollToIndex(index, { align: "start", behavior: scroll?.smooth ? "smooth" : "auto" }),
+    scrollToOffset: (offset) => virtualizer.scrollToOffset(offset, { align: "start", behavior: "auto" }),
   };
 }
 

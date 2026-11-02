@@ -4,6 +4,7 @@ import {
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RECOVERY_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-recovery-v1";
+import { WEBHOOK_TESTS_CAPABILITY, WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { type HostEventsApi, HostEventsFailure, hostEventsFailureMessage } from "../host-events-api";
@@ -25,7 +26,7 @@ export interface EventsRouteDependencies {
   events?: HostEventsApi | undefined;
 }
 
-async function runEventsEffect<A>(operation: Effect.Effect<A, HostEventsFailure>): Promise<A> {
+export async function runEventsEffect<A>(operation: Effect.Effect<A, HostEventsFailure>): Promise<A> {
   try {
     return await Effect.runPromise(operation);
   } catch (error) {
@@ -50,9 +51,13 @@ export async function routeEvents(
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   const path = url.pathname;
-  const recovery = RECOVERY_ROUTE_PATHS.has(path);
-  if ((!recovery && !EVENT_ROUTE_PATHS.has(path)) || method !== "POST") return "unmatched";
-  if (!events || !capabilities.has(recovery ? ROUTINE_RECOVERY_CAPABILITY : EVENTS_CAPABILITY)) {
+  const capability = RECOVERY_ROUTE_PATHS.has(path)
+    ? ROUTINE_RECOVERY_CAPABILITY
+    : path === WEBHOOK_TESTS_ROUTES.send
+      ? WEBHOOK_TESTS_CAPABILITY
+      : EVENTS_CAPABILITY;
+  if ((capability === EVENTS_CAPABILITY && !EVENT_ROUTE_PATHS.has(path)) || method !== "POST") return "unmatched";
+  if (!events || !capabilities.has(capability)) {
     throw new HttpError(400, sourceText("error.backend.eventsUnavailable"));
   }
   requireAdmin(member);
@@ -96,6 +101,8 @@ export async function routeEvents(
       return json(200, {});
     case EVENTS_ROUTES.rotateSecret:
       return json(200, await runEventsEffect(events.rotateSecret(input(parseEventRoutineRef))));
+    case WEBHOOK_TESTS_ROUTES.send:
+      return json(200, await runEventsEffect(events.sendTestEvent(input(parseEventRoutineRef))));
     case EVENTS_ROUTES.listActivity:
       return json(200, await runEventsEffect(events.listActivity(input(parseListEventActivity))));
   }

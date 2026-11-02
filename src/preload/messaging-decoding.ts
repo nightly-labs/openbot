@@ -3,7 +3,11 @@
 
 import {
   type AddMessagingOrchestratorResult,
+  type DiscordAccess,
+  type DiscordRoleList,
   isAddMessagingOrchestratorResult,
+  isDiscordAccess,
+  isDiscordRoleList,
   isMessagingOverview,
   isTelegramOverview,
   type MessagingOverview,
@@ -23,5 +27,15 @@ export function decodeMessagingOverviewReply(value: unknown): MessagingOverview 
 
 export function decodeTelegramOverviewReply(value: unknown): TelegramOverview {
   if (!isTelegramOverview(value)) throw new Error("Invalid Telegram overview response.");
+  return value;
+}
+
+export function decodeDiscordAccessReply(value: unknown): DiscordAccess {
+  if (!isDiscordAccess(value)) throw new Error("Invalid Discord access response.");
+  return value;
+}
+
+export function decodeDiscordRolesReply(value: unknown): DiscordRoleList {
+  if (!isDiscordRoleList(value)) throw new Error("Invalid Discord roles response.");
   return value;
 }

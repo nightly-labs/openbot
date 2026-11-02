@@ -37,8 +37,8 @@ One MCP entry reaches every provider. `CuaDriverRuntime.mcpServerConfig()` retur
 while the daemon runs, and `AgentService.enabledMcpServers()` appends it, which is the one function
 Codex, Claude, and ACP all read. Two properties keep it there: the name is not in
 `RESERVED_MCP_SERVER_NAMES`, which is a drop filter rather than a marker, and `workingDirectory`
-stays empty, because ACP has no field for one and Codex accepts none, so an entry with one would
-vanish for two providers with no error. Codex staleness needs no separate signal, because
+stays empty, because ACP has no field for one, so an entry with one would vanish for ACP providers
+with no error. Codex staleness needs no separate signal, because
 `toolFingerprint` already folds the MCP entries and a changed fingerprint forces a replacement
 session. `onMcpServerChanged` is what refreshes the agent runtimes, which deactivates every
 stored provider session: the next turn starts a new one, which keeps the public thread and loses
@@ -145,14 +145,17 @@ capability. On a server with an agent display, Sunshine runs on that display (se
 Codex saves an “Always allow” tool decision only when the MCP server is in a file-backed
 configuration layer. A thread configuration alone does not satisfy this check. Before starting or
 resuming a thread with Computer Use, OpenBot registers `computer_use` in the Codex user
-configuration through `config/value/write`. The new entry contains only the driver command and
-`enabled = false`. The write uses the user layer's version, and an existing entry is left unchanged.
+configuration through `config/batchWrite`. The new entry contains only a placeholder command
+(`openbot-mcp`) and `enabled = false`. The write uses the user layer's version, and an existing entry is left unchanged.
 OpenBot does not save the driver socket, environment, or credentials in that entry.
 
 The thread configuration enables the running driver and supplies its current command, arguments,
 and environment. It also carries the saved per-tool settings, including `set_value.approval_mode`.
 Saved tool settings are also in the session fingerprint. When an approval changes, the next turn
 replaces a loaded provider session that holds the old policy.
+An agent with Full access does not ask: OpenBot accepts each Computer Use tool consent once and
+saves nothing, as it does for other MCP tools. A Workspace only or Ask first agent shows the card,
+and Codex keeps "Always allow" per tool and per provider account.
 When Computer Use is off for the agent or the driver is unavailable, the thread keeps the saved
 entry disabled. A registration failure stops the thread with steps to repair the configuration or
 turn off Computer Use. The application-access questions from the driver still use their existing

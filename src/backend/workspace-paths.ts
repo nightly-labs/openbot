@@ -110,6 +110,7 @@ function decodePath(value: string): string {
 export const resolveSharedFile = Effect.fn("Workspace.resolveSharedFile")(function* (
   sharedRootPath: string,
   inputPath: string,
+  options: { allowDirectory?: boolean } = {},
 ): Effect.fn.Return<ResolvedSharedFile, AttachmentOperationError> {
   const sharedRoot = yield* attachmentCall(() => realpath(sharedRootPath));
   const candidatePath = sharedPathFromInput(sharedRootPath, inputPath);
@@ -118,7 +119,13 @@ export const resolveSharedFile = Effect.fn("Workspace.resolveSharedFile")(functi
     return yield* attachmentFailure(new Error(sourceText("error.backend.sharedFileOutside")));
   }
   const metadata = yield* attachmentCall(() => stat(resolvedPath));
-  if (!metadata.isFile()) return yield* attachmentFailure(new Error(sourceText("error.backend.sharedPathNotFile")));
+  // Agents link the folders they make. Only reveal accepts one, so a folder is never opened or read.
+  if (metadata.isDirectory() && !options.allowDirectory) {
+    return yield* attachmentFailure(new Error(sourceText("error.backend.sharedPathIsFolder")));
+  }
+  if (!metadata.isFile() && !metadata.isDirectory()) {
+    return yield* attachmentFailure(new Error(sourceText("error.backend.sharedPathNotFile")));
+  }
   return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size };
 });
 /**

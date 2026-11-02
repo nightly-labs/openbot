@@ -33,6 +33,8 @@ export const messages = {
   "mobile.auth.signIn.helpStep2": "2. Vai in Impostazioni → Mobile Connect.",
   "mobile.auth.signIn.helpStep3": "3. Scegli «Genera codice QR», poi scansionalo qui.",
   "mobile.auth.signIn.emailButton": "Continua con l'email",
+  "mobile.auth.done.title": "Connesso",
+  "mobile.auth.done.body": "Hai effettuato l'accesso.",
   "mobile.auth.email.title": "Accedi con l'email",
   "mobile.auth.email.description": "Inserisci il tuo indirizzo email. Ti invieremo un codice monouso.",
   "mobile.auth.email.label": "Email",

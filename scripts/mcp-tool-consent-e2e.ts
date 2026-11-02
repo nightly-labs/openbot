@@ -174,7 +174,8 @@ interface Outcome {
   errors: string[];
 }
 
-type Choose = (card: Card) => Record<string, string[]>;
+/** The user's answer to a card. Null leaves the card waiting. */
+type Choose = (card: Card) => Record<string, string[]> | null;
 const allowOnce: Choose = () => ({ [DECISION]: ["Allow once"] });
 const allowAlways: Choose = () => ({ [DECISION]: ["Always allow"] });
 const deny: Choose = () => ({ [DECISION]: ["Don't allow"] });
@@ -209,6 +210,7 @@ class Rig {
   readonly #cards: Card[] = [];
   readonly #errors: string[] = [];
   readonly #registry: AttentionRegistry;
+  readonly #unsubscribe: () => void;
   #choose: Choose = allowOnce;
   #current: { turnDone: () => void; tool: { text: string | null; status: string | null } } | null = null;
 
@@ -246,6 +248,8 @@ class Rig {
       },
       emitRuntimeSnapshot: () => {},
     });
+    // The application answers waiting requests when a grant changes (`AgentService.notifyAgentsChanged`).
+    this.#unsubscribe = setup.policy.subscribe(() => this.#registry.answerGrantedRequests());
     this.#client.on("request", (request) => {
       if (request.method === "mcpServer/elicitation/request")
         this.#registry.surfaceMcpElicitation(this.#client, request);
@@ -260,8 +264,10 @@ class Rig {
     this.#cards.push(card);
     // The user answers after the registry has stored the card, as in the application.
     queueMicrotask(() => {
-      runCauseEffect(this.#registry.respondToPrompt({ requestId: event.requestId, answers: this.#choose(card) })).catch(
-        (error: unknown) => this.#errors.push(String(error)),
+      const answers = this.#choose(card);
+      if (!answers) return;
+      runCauseEffect(this.#registry.respondToPrompt({ requestId: event.requestId, answers })).catch((error: unknown) =>
+        this.#errors.push(String(error)),
       );
     });
   }
@@ -342,6 +348,7 @@ class Rig {
   }
 
   stop(): Promise<void> {
+    this.#unsubscribe();
     return runCauseEffect(this.#client.stop());
   }
 }
@@ -521,6 +528,22 @@ try {
     oneCard(o);
     ran(o, "other/echo_b");
   });
+  // A card that waits when the agent moves to Full access is answered without the user.
+  const grantWhileWaiting: Choose = (card) => {
+    void runCauseEffect(policy.set({ agentId: card.agentId, autoApprove: true }));
+    return null;
+  };
+  record(
+    "card waits, then Full access: answered once",
+    await rig.call("manual", "other/echo_a", grantWhileWaiting),
+    (o) => {
+      oneCard(o);
+      ran(o, "other/echo_a");
+      assert.deepEqual(o.responses, [{ action: "accept", persist: null, contentKeys: [] }]);
+      assert.deepEqual(o.errors, []);
+    },
+  );
+  await runCauseEffect(policy.set({ agentId: "manual", autoApprove: false }));
 
   // Requests that are not Codex's consent to run a tool stay with the user, whatever the grant.
   record(
@@ -564,7 +587,8 @@ try {
   });
   await rig.stop();
 
-  // A tool that the user set to ask every time keeps its card, and Codex offers no Always allow for it.
+  // A tool that the user set to ask every time: Codex offers no Always allow for it. Full access still
+  // answers it, and Ask first keeps its card.
   const restricted = join(OUT, "codex-restricted");
   await mkdir(restricted, { recursive: true });
   await config(
@@ -575,8 +599,22 @@ try {
   );
   rig = await open(restricted);
   record(
-    "tool set to ask every time, auto approve on: card without Always allow",
-    await rig.call("auto", "probe/echo_a", deny),
+    "tool set to ask every time, auto approve on: no card, accepted once",
+    await rig.call("auto", "probe/echo_a"),
+    (o) => {
+      noCard(o);
+      ran(o, "probe/echo_a");
+      assert.deepEqual(o.responses, [{ action: "accept", persist: null, contentKeys: [] }]);
+    },
+  );
+  assert.doesNotMatch(
+    await savedApprovals(restricted),
+    /approval_mode = "approve"/,
+    "auto approve saved a tool approval",
+  );
+  record(
+    "tool set to ask every time, auto approve off: card without Always allow",
+    await rig.call("manual", "probe/echo_a", deny),
     (o) => {
       oneCard(o);
       assert.deepEqual(
@@ -592,15 +630,31 @@ try {
   });
   await rig.stop();
 
-  // Computer Use has its own switch, so its tool consent keeps the card.
+  // Full access covers Computer Use too; Ask first still shows its card.
   const computerUse = join(OUT, "codex-computer-use");
   await mkdir(computerUse, { recursive: true });
   await config(computerUse, { computer_use: script }, model.port);
   rig = await open(computerUse);
-  record("Computer Use tool, auto approve on: card", await rig.call("auto", "computer_use/echo_a", allowOnce), (o) => {
-    oneCard(o);
+  record("Computer Use tool, auto approve on: no card", await rig.call("auto", "computer_use/echo_a"), (o) => {
+    noCard(o);
     ran(o, "computer_use/echo_a");
   });
+  record(
+    "Computer Use tool, auto approve off: card",
+    await rig.call("manual", "computer_use/echo_b", allowOnce),
+    (o) => {
+      oneCard(o);
+      ran(o, "computer_use/echo_b");
+    },
+  );
+  record(
+    "Computer Use tool, auto approve on but Workspace only: card",
+    await rig.call("boxed", "computer_use/echo_a", allowOnce),
+    (o) => {
+      oneCard(o);
+      ran(o, "computer_use/echo_a");
+    },
+  );
   await rig.stop();
 
   await writeFile(

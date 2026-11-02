@@ -1,0 +1,153 @@
+/*
+ * The light palette of the desktop app and the web client. tokens.css declares every
+ * token, dark; this file changes only the colors that must change, when the root element
+ * has data-openbot-color-scheme="light". Each desktop window and the web client set that
+ * attribute from the saved choice, and resolve System from prefers-color-scheme. The public
+ * site never sets it, so it stays dark.
+ *
+ * The rules of the dark palette stay true here, turned over: a raised surface is lighter
+ * than the canvas, and a hover or a border is a translucent ink. In the dark palette that
+ * ink is white; here it is the primary text color, #141414.
+ *
+ * Not here, on purpose:
+ * - The native-only tokens (bg-native-canvas, chrome-*): mobile has its own light theme in
+ *   tokens-native.css. The desktop uses the native sidebar, sheet and grouped tokens, so they are here.
+ * - The landing-page materials (price-*, hero-grid, download-card-*): the public site is dark only.
+ * - The paper-* tokens: they stay on paper that is always light, such as a QR code.
+ * - Illustration and brand colors (logo-*, onboarding-*, sound-*, provider logos): a drawing
+ *   keeps its colors in both themes.
+ * - The Dynamic Island: it imitates the camera housing, so its window never sets the attribute.
+ */
+
+:root[data-openbot-color-scheme="light"] {
+  color-scheme: light;
+
+  --openbot-bg-canvas: #f5f5f6;
+  --openbot-bg-canvas-clear: rgba(245, 245, 246, 0);
+  --openbot-bg-frame: #e8e8eb;
+  --openbot-bg-sidebar: #f5f5f6;
+  --openbot-bg-native-sidebar: #f5f5f6;
+  --openbot-bg-sheet: #ffffff;
+  --openbot-bg-sheet-inset: #f0f0f2;
+  --openbot-bg-grouped: #ffffff;
+  --openbot-text-grouped-secondary: #6b6b70;
+  --openbot-border-grouped: #e3e3e6;
+  --openbot-marketplace-detail-bg: #ececee;
+  --openbot-bg-surface: #ffffff;
+  --openbot-bg-surface-raised: #fcfcfc;
+  --openbot-bg-control: #ffffff;
+  --openbot-bg-control-hover: #f0f0f2;
+  --openbot-bg-control-active: #e8e8eb;
+  --openbot-tabs-bar-bg: #ececee;
+  --openbot-tabs-pill-bg: #ffffff;
+  --openbot-bg-overlay: rgba(245, 245, 246, 0.92);
+  --openbot-dialog-overlay: rgba(20, 20, 20, 0.12);
+  --openbot-dialog-ring: rgba(20, 20, 20, 0.1);
+  --openbot-bg-glass: rgba(255, 255, 255, 0.76);
+  --openbot-glass-surface: rgba(20, 20, 20, 0.04);
+  --openbot-glass-surface-hover: rgba(20, 20, 20, 0.07);
+  --openbot-glass-border: rgba(20, 20, 20, 0.12);
+  --openbot-glass-highlight: rgba(255, 255, 255, 0.6);
+  --openbot-glass-shadow: transparent;
+  --openbot-scroll-edge-overlay: rgba(245, 245, 246, 0.72);
+
+  --openbot-border: rgba(20, 20, 20, 0.07);
+  --openbot-border-strong: rgba(20, 20, 20, 0.1);
+  --openbot-image-outline: rgba(20, 20, 20, 0.1);
+  --openbot-hover: rgba(20, 20, 20, 0.05);
+
+  /* Contrast on the canvas: primary 17:1, secondary 10:1, muted 4.9:1. Dim is for
+     marks and disabled text, as in the dark palette. */
+  --openbot-text-primary: #141414;
+  --openbot-text-secondary: #3a3a3c;
+  --openbot-text-muted: #6b6b70;
+  --openbot-text-dim: #8e8e93;
+  --openbot-text-placeholder: #5c5c61;
+  --openbot-text-readable: rgba(20, 20, 20, 0.6);
+  --openbot-settings-text-muted: rgba(20, 20, 20, 0.6);
+
+  /* The on-light family is the high-contrast inverted element: the default button, a checked
+     switch, the user's bubble, the light tooltip. On a light canvas it turns dark. */
+  --openbot-surface-light: #1c1c1e;
+  --openbot-text-on-light: #ffffff;
+  --openbot-text-muted-on-light: rgba(255, 255, 255, 0.64);
+  --openbot-text-dim-on-light: rgba(255, 255, 255, 0.4);
+  --openbot-border-on-light: rgba(255, 255, 255, 0.16);
+
+  /* The same hue 210 as the dark accent. The fill keeps its value, so a button looks the same
+     in both themes; text and hover go darker for contrast (accent-text 5.3:1 on the canvas). */
+  --openbot-accent-hover: #006ad4;
+  --openbot-accent-text: #0064c8;
+  --openbot-accent-soft: rgba(0, 124, 247, 0.12);
+  --openbot-accent-strong: rgba(0, 124, 247, 0.26);
+
+  /* Chart series: darker steps of the dark-palette hues, so each series reads on white.
+     Not yet checked with the dataviz palette validator in light mode. */
+  --openbot-chart-series-codex: #8e4fc0;
+  --openbot-chart-series-grok: #16849b;
+  --openbot-chart-storage-workspaces: #2f74c9;
+  --openbot-chart-storage-files: #c64d1d;
+  --openbot-chart-storage-chats: #148a61;
+  --openbot-chart-storage-downloads: #6f62d6;
+  --openbot-chart-storage-runtimes: #a86f00;
+
+  /* Status fills keep their hue. Status text is darker, for AA on white. */
+  --openbot-success: #1fa85a;
+  --openbot-success-text: #187a41;
+  --openbot-success-soft: rgba(31, 168, 90, 0.12);
+  --openbot-success-wash: rgba(31, 168, 90, 0.06);
+  --openbot-warning: #f08a00;
+  --openbot-warning-text: #9c5200;
+  --openbot-warning-soft: rgba(240, 138, 0, 0.14);
+  --openbot-approval-badge-soft: rgba(240, 138, 0, 0.18);
+  --openbot-danger: #e8222d;
+  --openbot-danger-hover: #f04a53;
+  --openbot-danger-text: #c0141d;
+  --openbot-danger-soft: rgba(232, 34, 45, 0.12);
+  --openbot-danger-soft-hover: rgba(232, 34, 45, 0.2);
+  --openbot-danger-focus: rgba(232, 34, 45, 0.36);
+  --openbot-danger-border: rgba(232, 34, 45, 0.45);
+
+  --openbot-question-option: #16849b;
+  --openbot-question-option-soft: rgba(22, 132, 155, 0.12);
+  --openbot-question-option-hover: rgba(22, 132, 155, 0.18);
+  --openbot-question-option-pressed: rgba(22, 132, 155, 0.24);
+  --openbot-question-badge-text: #0f6a7d;
+  --openbot-question-badge-soft: rgba(22, 132, 155, 0.14);
+  --openbot-message-badge-text: #0a5fb8;
+  --openbot-message-badge-soft: rgba(0, 124, 247, 0.12);
+  --openbot-badge-new: #e0004a;
+  --openbot-badge-new-soft: rgba(224, 0, 74, 0.12);
+
+  /* File references: the hues of the dark palette, darker so the name reads on white. */
+  --openbot-file-blue: #1a66c4;
+  --openbot-file-blue-soft: rgba(31, 111, 209, 0.12);
+  --openbot-file-yellow: #9c5200;
+  --openbot-file-yellow-soft: rgba(240, 138, 0, 0.14);
+  --openbot-file-orange: #a8521a;
+  --openbot-file-orange-soft: rgba(181, 90, 31, 0.12);
+  --openbot-file-teal: #127589;
+  --openbot-file-teal-soft: rgba(22, 132, 155, 0.12);
+  --openbot-file-green: #187a41;
+  --openbot-file-green-soft: rgba(31, 168, 90, 0.12);
+  --openbot-file-red: #c0141d;
+  --openbot-file-red-soft: rgba(232, 34, 45, 0.12);
+  --openbot-file-pink: #a3478f;
+  --openbot-file-pink-soft: rgba(163, 71, 143, 0.12);
+  --openbot-file-default: #0064c8;
+  --openbot-file-default-soft: rgba(0, 124, 247, 0.12);
+
+  --openbot-data-table-border: #e3e3e6;
+  --openbot-data-table-header-text: #6b6b70;
+  --openbot-data-table-text: #1c1c1e;
+  --openbot-data-table-outer-border: rgba(20, 20, 20, 0);
+  --openbot-data-table-ring: rgba(20, 20, 20, 0.1);
+
+  /* No drop shadows: on the dark canvas they do not show, but on white they read as a halo.
+     A raised surface keeps its 1px ring. */
+  --openbot-shadow-popover-ambient: transparent;
+  --openbot-shadow-dialog: transparent;
+  --openbot-shadow-menu: transparent;
+  --openbot-shadow-ring: rgba(20, 20, 20, 0.04);
+  --openbot-shadow-overlay: 0 0 0 transparent;
+}

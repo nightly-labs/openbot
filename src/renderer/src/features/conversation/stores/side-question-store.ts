@@ -1,7 +1,9 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-question-v1";
 import type { SideQuestionExchange } from "@openbot/ui/features/conversation/SideQuestionPanel";
 import { currentText } from "@openbot/ui/text";
 import type { Store, StoreSetter } from "solid-js";
+import { serverSupportsCapability } from "../../servers/server-capabilities";
 import { conversationPort } from "../conversation-port";
 import type { ConversationProps } from "../conversation-types";
 
@@ -30,8 +32,11 @@ export interface SideQuestionStoreDeps {
 export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
   const { questions, setQuestions } = deps;
 
-  /** Only the computer that runs the agent answers a side question. */
-  const sideQuestionAvailable = () => !deps.props.runtime && (deps.props.server?.id ?? "local") === "local";
+  /** The host that runs the agent answers a side question. A joined server or a web host needs `side-question-v1`. */
+  const sideQuestionAvailable = () =>
+    deps.props.runtime
+      ? Boolean(deps.props.runtime.askSideQuestion)
+      : serverSupportsCapability(deps.props.server, SIDE_QUESTION_CAPABILITY);
   const sideQuestion = (): SideQuestionState => {
     const agentId = deps.props.agent?.id;
     return (agentId && questions[agentId]) || SIDE_QUESTION_EMPTY;
@@ -78,9 +83,10 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
         ? []
         : [
             {
-              question: exchange.question.slice(0, INPUT_LIMITS.messageText),
-              // A longer answer still shows in full; only its start goes back to the agent.
-              answer: exchange.answer.slice(0, INPUT_LIMITS.sideQuestionAnswer),
+              // The prompt reads only the start of each turn. A shorter body also stays under a host's
+              // request limit. A longer answer still shows in full here.
+              question: exchange.question.slice(0, INPUT_LIMITS.sideQuestionEarlierText),
+              answer: exchange.answer.slice(0, INPUT_LIMITS.sideQuestionEarlierText),
             },
           ],
     );
@@ -90,30 +96,34 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
       draft.draft = "";
       draft.error = null;
     });
-    void conversationPort()
-      .agent.askSideQuestion({ agentId, question, earlier })
-      .then(
-        (answer) => {
-          if (!questions[agentId]) return;
-          update(agentId, (draft) => {
-            const exchange = draft.exchanges.find((item) => item.id === id);
-            if (!exchange) return;
-            exchange.answer = answer;
-            exchange.answeredAt = new Date().toISOString();
-          });
-        },
-        (error) => {
-          if (!questions[agentId]) return;
-          update(agentId, (draft) => {
-            if (!draft.exchanges.some((item) => item.id === id)) return;
-            // The question goes back to the composer, before text typed since, so that Send asks it again.
-            draft.exchanges = draft.exchanges.filter((item) => item.id !== id);
-            draft.error = errorMessage(error, t("conversation.sideQuestion.error"));
-            draft.draft = draft.draft.trim() ? `${question}\n${draft.draft.trim()}` : question;
-            draft.focusRequest = nextFocusRequest();
-          });
-        },
-      );
+    const runtimeAsk = deps.props.runtime?.askSideQuestion;
+    // The server is fixed now, so an answer cannot come from a server the user switches to.
+    const serverId = deps.props.server?.id;
+    const ask = runtimeAsk
+      ? runtimeAsk({ agentId, question, earlier })
+      : conversationPort().agent.askSideQuestion({ agentId, question, earlier }, serverId);
+    void ask.then(
+      (answer) => {
+        if (!questions[agentId]) return;
+        update(agentId, (draft) => {
+          const exchange = draft.exchanges.find((item) => item.id === id);
+          if (!exchange) return;
+          exchange.answer = answer;
+          exchange.answeredAt = new Date().toISOString();
+        });
+      },
+      (error) => {
+        if (!questions[agentId]) return;
+        update(agentId, (draft) => {
+          if (!draft.exchanges.some((item) => item.id === id)) return;
+          // The question goes back to the composer, before text typed since, so that Send asks it again.
+          draft.exchanges = draft.exchanges.filter((item) => item.id !== id);
+          draft.error = errorMessage(error, t("conversation.sideQuestion.error"));
+          draft.draft = draft.draft.trim() ? `${question}\n${draft.draft.trim()}` : question;
+          draft.focusRequest = nextFocusRequest();
+        });
+      },
+    );
   }
 
   /** Closing the pane deletes the side question. An answer that comes later finds no question and is dropped. */

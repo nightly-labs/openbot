@@ -1,0 +1,17 @@
+# Added to compose.yaml by `openbot-instance` when LXCFS runs on the host (see lxcfs_ready). LXCFS
+# shows the limits of the container in these files: with --enable-cfs, /proc/cpuinfo lists as many
+# CPUs as the CPU limit, and /proc/meminfo shows the memory limit. On cgroup v2, LXCFS 5.0 does not
+# limit the CPU lines of /proc/stat, so Node's os.cpus() still counts the CPUs of the host there:
+# OpenBot limits it in the Node programs of agents (resources/agent-runtime/cpu-limit.cjs).
+# See docs/docker.md#cpu-and-memory-of-the-instances.
+#
+# /sys/devices/system/cpu/online is not mounted. LXCFS lists CPUs 0 to limit-1 in it, but a process
+# still runs on any CPU of the host, and a program that keeps data for each online CPU then stops on
+# a CPU above the list: the Gemini CLI exits with SIGILL.
+services:
+  openbot:
+    volumes:
+      - /var/lib/lxcfs/proc/cpuinfo:/proc/cpuinfo:ro
+      - /var/lib/lxcfs/proc/stat:/proc/stat:ro
+      - /var/lib/lxcfs/proc/meminfo:/proc/meminfo:ro
+      - /var/lib/lxcfs/proc/swaps:/proc/swaps:ro

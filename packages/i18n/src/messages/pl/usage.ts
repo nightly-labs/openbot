@@ -14,9 +14,9 @@ export const messages = {
   "usage.chart.costDescription":
     "Dzienny szacowany koszt w USD według dostawcy. Dokładne wartości pokazuje „Pokaż dane dzienne”.",
   "usage.chart.tokensDescription":
-    "Dzienne przetworzone tokeny według dostawcy. Dokładne wartości pokazuje „Pokaż dane dzienne”.",
+    "Dzienne tokeny bez odczytów z pamięci podręcznej według dostawcy. Dokładne wartości pokazuje „Pokaż dane dzienne”.",
   "usage.chart.costLabel": "Dzienny szacowany koszt w USD według dostawcy",
-  "usage.chart.tokensLabel": "Dzienne przetworzone tokeny według dostawcy",
+  "usage.chart.tokensLabel": "Dzienne tokeny bez odczytów z pamięci podręcznej według dostawcy",
   "usage.column.cost": "Koszt",
   "usage.column.share": "Udział",
   "usage.column.tokens": "Tokeny",
@@ -33,7 +33,7 @@ export const messages = {
     other: "{sessions} sesji",
   },
   "usage.costEstimate": "Szacunek API · USD",
-  "usage.knownTokens": "Znane przetworzone tokeny",
+  "usage.knownTokens": "Znane tokeny bez odczytów z pamięci podręcznej",
   "usage.provider.shareOfCost": "{share} znanego kosztu",
   "usage.provider.shareOfTokens": "{share} znanych tokenów",
   "usage.dailyTrend": "Trend dzienny",
@@ -41,7 +41,8 @@ export const messages = {
   "usage.dailyTokens": "Tokeny dziennie",
   "usage.viewDailyData": "Pokaż dane dzienne",
   "usage.totals.title": "Sumy",
-  "usage.totals.processedTokens": "Przetworzone tokeny",
+  "usage.totals.tokens": "Tokeny bez odczytów z pamięci podręcznej",
+  "usage.totals.processedTokens": "Przetworzone tokeny z odczytami z pamięci podręcznej",
   "usage.totals.cachedInput": "Wejście z pamięci podręcznej",
   "usage.totals.uncachedInput": "Wejście spoza pamięci podręcznej",
   "usage.totals.cacheCreation": "Tworzenie pamięci podręcznej",
@@ -62,9 +63,12 @@ export const messages = {
   "usage.about.title": "O tych szacunkach",
   "usage.about.body":
     "Koszt tokenów w USD odpowiadający cenom API. To szacunek, a nie opłata za subskrypcję. Osobne opłaty za narzędzia i multimedia nie są liczone. Nieznane ceny i niepełne użycie pozostają niedostępne. Udziały uwzględniają tylko znane wartości; częściowe dane mogą zaniżać sumy.",
+  "usage.about.tokens":
+    "Liczby tokenów nie obejmują odczytów z pamięci podręcznej. Każde zapytanie do modelu w turze ponownie odczytuje zapisaną rozmowę, więc odczyty z pamięci podręcznej mogą wielokrotnie przewyższać pozostałe tokeny. Sumy pokazują je jako „Wejście z pamięci podręcznej”.",
   "usage.panel.label": "Użycie agentów",
   "usage.panel.title": "Użycie",
   "usage.panel.allAgents": "Wszyscy agenci",
+  "usage.panel.workflows": "Przepływy pracy",
   "usage.panel.agents": "Agenci (użycie)",
   "usage.panel.metric": "Miara użycia",
   "usage.panel.period": "Okres użycia",

@@ -61,8 +61,11 @@ export class MailboxSync {
     const context = this.#mailbox.getDelivery(deliveryId);
     const message = snapshot.messages.find((candidate) => candidate.id === deliveryId);
     if (!context || !message) return;
-    if (context.delivery.turnId === null) delete message.turnId;
-    else message.turnId = context.delivery.turnId;
+    // A plan continuation keeps the request in its first turn, so that turn's plan and answer stay
+    // between the request and the continuation's answer.
+    const turnId = context.planContinuation?.turnIds[0] ?? context.delivery.turnId;
+    if (turnId === null) delete message.turnId;
+    else message.turnId = turnId;
     message.delivery = {
       id: context.delivery.id,
       status: context.delivery.status,

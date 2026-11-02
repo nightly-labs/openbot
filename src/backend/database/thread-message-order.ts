@@ -32,7 +32,7 @@ const ROLE_RANK_SQL = `CASE
 function refreshOrderSql(filter: string): string {
   return `WITH ranked AS (
   SELECT message_id, created_at, ordinal, NULLIF(turn_id, '') AS turn, ${ROLE_RANK_SQL} AS role_rank
-  FROM projection_thread_messages WHERE thread_id = ?1 ${filter}
+  FROM projection_thread_messages WHERE thread_id = $thread ${filter}
 ), keyed AS (
   SELECT message_id,
     CASE WHEN turn IS NULL THEN created_at ELSE MIN(created_at) OVER turn_by_time END AS group_start,
@@ -48,14 +48,14 @@ UPDATE projection_thread_messages AS message
 SET group_start = keyed.group_start, group_first = keyed.group_first,
   group_id = keyed.group_id, turn_rank = keyed.turn_rank
 FROM keyed
-WHERE message.thread_id = ?1 AND message.message_id = keyed.message_id
+WHERE message.thread_id = $thread AND message.message_id = keyed.message_id
   AND (message.group_start, message.group_first, message.group_id, message.turn_rank)
     IS NOT (keyed.group_start, keyed.group_first, keyed.group_id, keyed.turn_rank)`;
 }
 
 /** Refreshes the keys of every row of a thread, after a write that can renumber or remove any of them. */
 export function refreshThreadOrder(db: DatabaseSync, threadId: string): void {
-  db.prepare(refreshOrderSql("")).run(threadId);
+  db.prepare(refreshOrderSql("")).run({ thread: threadId });
 }
 
 /** What the keys of one row are computed from, and its turn. */
@@ -112,11 +112,11 @@ export function refreshChangedOrder(
     else if (current) singles.add(messageId);
   }
   if (turns.size > 0) {
-    const refreshTurn = db.prepare(refreshOrderSql("AND turn_id = ?2"));
-    for (const turn of turns) refreshTurn.run(threadId, turn);
+    const refreshTurn = db.prepare(refreshOrderSql("AND turn_id = $key"));
+    for (const turn of turns) refreshTurn.run({ thread: threadId, key: turn });
   }
   if (singles.size > 0) {
-    const refreshMessage = db.prepare(refreshOrderSql("AND message_id = ?2"));
-    for (const messageId of singles) refreshMessage.run(threadId, messageId);
+    const refreshMessage = db.prepare(refreshOrderSql("AND message_id = $key"));
+    for (const messageId of singles) refreshMessage.run({ thread: threadId, key: messageId });
   }
 }

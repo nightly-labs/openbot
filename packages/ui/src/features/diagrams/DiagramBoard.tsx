@@ -643,13 +643,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
                 )}
               </For>
             </div>
-
-            <Show when={props.diagram.nodes.length === 0}>
-              <div class="diagram-board-empty">
-                <strong>{t("diagram.board.emptyTitle")}</strong>
-                <p>{t("diagram.board.emptyBody")}</p>
-              </div>
-            </Show>
           </div>
         </ContextMenu.Trigger>
         <Show when={props.onPlaceAgent}>

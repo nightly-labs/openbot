@@ -1,8 +1,9 @@
+import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import type {
-  AgentModelOption,
   AgentStatus,
-  AgentSummary,
   AvatarImageInput,
+  ClientAgentModelOption,
+  ClientAgentSummary,
   HiddenAgent,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -15,6 +16,7 @@ import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_STATUS } from "../../app-defaults";
 import { agentProfilesEqual, toAgentProfile } from "../../app-message-projection";
 import { createStoredProfile, updateStored } from "../../app-stored-values";
+import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useUiErrors } from "../../ui-errors";
@@ -23,8 +25,8 @@ import { useDirectMessages } from "../conversation/direct-messages-context";
 import { remoteAdminServer } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 import { useWindowPage } from "../window/window-page-context";
-import type { CreationPreference } from "./agent-creation-model";
-import { readAgentSelection, writeAgentSelection } from "./agent-selection";
+import type { CreationPreference, DevelopmentCreation } from "./agent-creation-model";
+import { AGENT_SELECTION_STORAGE_KEY, readAgentSelection, writeAgentSelection } from "./agent-selection";
 import { agentsPort } from "./agents-port";
 import {
   createHostAccounts,
@@ -81,10 +83,12 @@ const Agents = createSimpleContext({
     /** The first roster read of this scope succeeded. */
     const [agentListSettled, setAgentListSettled] = createSignal(false);
     const [duplicatingAgentIds, setDuplicatingAgentIds] = createSignal<Set<string>>(new Set());
-    const [modelOptions, setModelOptions] = createSignal<AgentModelOption[]>([]);
+    const [modelOptions, setModelOptions] = createSignal<ClientAgentModelOption[]>([]);
     const selectionServerId = untrack(activeServerId);
     const scopeIsCurrent = createScopeGuard();
-    let savedAgentId = readAgentSelection()[selectionServerId] ?? "";
+    // A chat window shows its one agent, and keeps the choice of the main window as it is.
+    const chatWindowAgentId = usePlatform().chatWindow?.agentId;
+    let savedAgentId = chatWindowAgentId ?? readAgentSelection(AGENT_SELECTION_STORAGE_KEY)[selectionServerId] ?? "";
     const [activeAgentId, updateActiveAgentId] = createSignal("");
     const [agentChatOpenRevision, setAgentChatOpenRevision] = createSignal(0);
     const [agentSetupOpen, setAgentSetupOpen] = createSignal(false);
@@ -144,6 +148,21 @@ const Agents = createSimpleContext({
       },
     });
     const agentStatus = createMemo(() => withHostAccounts(providerStatus(), hostAccounts.host()));
+    const platform = usePlatform();
+    /**
+     * A development build's own server starts a new agent on the development default, as its backend does.
+     * The status is read here, not in `providerAvailable`, so a provider that becomes available resolves
+     * the new-agent form again.
+     */
+    const developmentCreation = createMemo((): DevelopmentCreation | null => {
+      if (activeServer()?.kind !== "local" || platform.appInfo()?.variant !== "dev") return null;
+      const available = new Set(
+        agentStatus()
+          .providers?.filter((row) => row.state === "available")
+          .map((row) => row.id),
+      );
+      return { providerAvailable: (provider) => available.has(provider) };
+    });
     createEffect(providerStatus, hostAccounts.schedule);
     let openedAgentChatId: string | null = null;
     /** Agents whose delete can still be undone. Main still has them, so each roster read leaves them out. */
@@ -163,7 +182,9 @@ const Agents = createSimpleContext({
 
     const activeAgent = createMemo(() => {
       if (activeDirectMember()) return undefined;
-      return agentList().find((agent) => agent.id === activeAgentId()) ?? agentList()[0];
+      // Before the first read, a saved frame can show the agents: the saved choice is open in it.
+      const agentId = activeAgentId() || savedAgentId;
+      return agentList().find((agent) => agent.id === agentId) ?? agentList()[0];
     });
 
     function setActiveAgentId(value: string | ((current: string) => string)): void {
@@ -171,7 +192,7 @@ const Agents = createSimpleContext({
       updateActiveAgentId((current) => {
         const next = typeof value === "function" ? value(current) : value;
         savedAgentId = "";
-        writeAgentSelection(selectionServerId, next);
+        if (!chatWindowAgentId) writeAgentSelection(AGENT_SELECTION_STORAGE_KEY, selectionServerId, next);
         return next;
       });
     }
@@ -188,14 +209,15 @@ const Agents = createSimpleContext({
       const agent = agentList().find((candidate) => candidate.id === agentId);
       if (!agent) return null;
       return {
-        provider: agent.provider,
+        // Analytics names only the providers that this build knows.
+        ...(isKnownAgentProvider(agent.provider) ? { provider: agent.provider } : {}),
         model: agent.model,
         reasoning_effort: agent.reasoningEffort,
         server_kind: activeServer()?.kind ?? ("unknown" as const),
       };
     }
 
-    function applyStoredAgents(storedAgents: AgentSummary[]): void {
+    function applyStoredAgents(storedAgents: ClientAgentSummary[]): void {
       const currentById = new Map(agentList().map((agent) => [agent.id, agent]));
       const host = untrack(hostAccounts.host);
       const profiles = storedAgents.flatMap((stored) => {
@@ -225,6 +247,21 @@ const Agents = createSimpleContext({
     }
 
     /**
+     * Shows the agents of a saved frame (`remote-workspace-frame`) until the first read. The roster does
+     * not settle and no agent opens, so nothing reads the host for them, and the setup sheet stays shut.
+     */
+    function applyFrameAgents(storedAgents: ClientAgentSummary[]): void {
+      if (agentListSettled()) return;
+      const host = untrack(hostAccounts.host);
+      // The frame holds no message text: a row shows no preview, not "No messages yet".
+      setAgentList(
+        storedAgents.map((stored) =>
+          createStoredProfile({ ...toAgentProfile(withHostAgentAccount(stored, host)), preview: "" }),
+        ),
+      );
+    }
+
+    /**
      * Takes the agent off the roster while its delete can still be undone. Returns the function that
      * puts it back at the same place, or null when the roster has no such agent.
      */
@@ -249,7 +286,7 @@ const Agents = createSimpleContext({
       hiddenAgentIds.delete(agentId);
     }
 
-    function openBotSetup(): void {
+    function openAgentSetup(): void {
       // The form renders in the workspace content that a rail page covers, and the
       // sidebar button that asks for it is outside that markup. Above the guard
       // below, so a second press reveals a form that is already open rather than
@@ -375,6 +412,7 @@ const Agents = createSimpleContext({
       setSettingsRequest,
       agentStatus,
       setAgentStatus,
+      developmentCreation,
       hostAccountLimits: hostAccounts.limits,
       refreshHostAccounts: hostAccounts.refresh,
       refreshHostAccountUsage: hostAccounts.refreshUsage,
@@ -382,12 +420,13 @@ const Agents = createSimpleContext({
       setExplicitlyOpenedAgentChatId,
       analyticsAgentProperties,
       applyStoredAgents,
+      applyFrameAgents,
       hideAgent,
       forgetHiddenAgent,
       userHiddenAgents,
       userHiddenAgentIds,
       applyUserHiddenAgents,
-      openBotSetup,
+      openAgentSetup,
       cancelAgentSetup,
       updateAgent,
       setAgentAvatar,

@@ -22,13 +22,14 @@ export function fileTransferError(error: unknown): FileTransferError {
 
 // Native/DOM bridge copies Base64 strings. Keep its working set below the host's larger file limit.
 export const MOBILE_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-export interface RemoteFileUpload {
+// A type, not an interface: an upload crosses the native/DOM bridge as JSON, and only a type alias is a JSON object.
+export type RemoteFileUpload = {
   name: string;
   mimeType: string;
   base64: string;
   /** A larger cap for one kind of upload, such as an agent export. The host's file limit still applies. */
   maxBytes?: number;
-}
+};
 
 /** The slowest upload rate a transfer waits for, in bytes per millisecond (256 KB/s). */
 const MINIMUM_UPLOAD_RATE = 256;

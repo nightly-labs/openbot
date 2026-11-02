@@ -39,9 +39,11 @@ import { createEffect, createMemo, createStore, For, onCleanup, Show } from "sol
 import { type McpPanelSignInApp, McpSignInAppSection } from "./McpSignInAppSection";
 import {
   emptyMcpConfig,
+  isMcpHttpAddress,
   isMcpSignInCancelled,
   isMcpSignInOnHost,
   type McpServerConfig,
+  type McpSignInState,
   type McpTestResult,
   type McpTestState,
   mcpConfigChanged,
@@ -50,6 +52,7 @@ import {
   mcpConfigIsValid,
   mcpFailureKind,
   mcpProviderLimitNote,
+  mcpSaveConnects,
   mcpStatusLabel,
   mcpStatusVariant,
   mcpTestMessage,
@@ -80,11 +83,11 @@ export interface ServerMcpPanelProps {
   servers: McpServerConfig[];
   canManage: boolean;
   /** The dialog element the row menus portal into, so a menu is not clipped by the modal. */
-  menuMount?: HTMLElement;
+  menuMount?: HTMLElement | undefined;
   /** Reports the form view, so the header shows a breadcrumb instead of the panel holding a back row. */
-  onDetailChange?: (detail: McpPanelDetail | null) => void;
+  onDetailChange?: ((detail: McpPanelDetail | null) => void) | undefined;
   /** Empty-list reason when the read failed; a failed read must not say "No MCP servers yet." */
-  loadError?: string | null;
+  loadError?: string | null | undefined;
   /**
    * One sentence about the managed runtime a STDIO server is started with, or nothing.
    *
@@ -92,9 +95,9 @@ export interface ServerMcpPanelProps {
    * is doing right now, and the panel only repeats it. The caller leaves it out for a remote
    * server, whose host holds its own runtime.
    */
-  toolRuntimeNote?: string | null;
+  toolRuntimeNote?: string | null | undefined;
   /** Re-read the list; without it the error has no way out except closing the dialog. */
-  onRetryLoad?: () => void;
+  onRetryLoad?: (() => void) | undefined;
   onSave: (config: McpServerConfig) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onSetEnabled: (id: string, enabled: boolean) => Promise<void>;
@@ -104,12 +107,20 @@ export interface ServerMcpPanelProps {
    * Browser sign-in for http servers. This computer signs in with its own browser; a joined server
    * signs in with the host's browser, and this panel shows that page.
    */
-  signIn?: McpPanelSignIn;
+  signIn?: McpPanelSignIn | undefined;
+  /** A row to sign in to as soon as the list holds it: the user pressed Sign in on an agent's card. */
+  signInRequest?: string | null | undefined;
+  /** Called once the panel started the requested sign-in, so it does not start again. */
+  onSignInRequestHandled?: (() => void) | undefined;
+  /** Opens the form for a new server as soon as the panel shows: the user pressed Add custom in the Marketplace. */
+  addRequest?: boolean | undefined;
+  /** Called once the panel opened the requested form, so it does not open again. */
+  onAddRequestHandled?: (() => void) | undefined;
 }
 
 export interface McpPanelSignIn {
-  /** Whether the host holds a sign-in, by row id. A yes or no only. */
-  signedIn: Record<string, boolean>;
+  /** The host's sign-in state, by row id: whether it holds a sign-in, and whether one was lost. */
+  states: Record<string, McpSignInState>;
   /**
    * A joined server's host signs in with its own browser, and its page shows here: the grant comes
    * back on an address only that host can reach. Absent when this computer signs in.
@@ -213,8 +224,11 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   /** Row test result while it still describes the row; the enabled switch is not compared. */
   const rowTest = (config: McpServerConfig): McpTestState | undefined => {
     const entry = state.tests[config.id];
-    if (!entry || mcpConfigChanged({ ...config, enabled: entry.config.enabled }, entry.config)) return undefined;
-    return entry.test;
+    if (entry && !mcpConfigChanged({ ...config, enabled: entry.config.enabled }, entry.config)) return entry.test;
+    // The server refused the saved sign-in: the row asks for a new one as a failed test would.
+    if (canSignIn(config) && props.signIn?.states[config.id]?.needsSignIn)
+      return { status: "failed", error: t("error.backend.mcpSignInRequired"), kind: "sign-in" };
+    return undefined;
   };
   const visible = (key: "name" | "command" | "url") => (state.touched ? errors()[key] : undefined);
   const removeTarget = createMemo(() => props.servers.find((config) => config.id === state.removeId) ?? null);
@@ -316,15 +330,19 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   const testRow = (config: McpServerConfig) => runRow(config, "testing", runTest);
   const signInRow = (config: McpServerConfig) => runRow(config, "signing-in", runSignIn);
 
-  /** The form's test or sign-in, which answers for the draft on screen and not for any stored row. */
+  /**
+   * The form's test or sign-in, which answers for the draft on screen and not for any stored row.
+   * It also returns the answer; `null` when there is none for this draft: the user cancelled, or
+   * left or reset the form while it waited.
+   */
   async function runDraft(
     pending: "testing" | "signing-in",
     answer: (config: McpServerConfig) => Promise<SettledTest | null>,
-  ): Promise<void> {
+  ): Promise<SettledTest | null> {
     setState((current) => {
       current.touched = true;
     });
-    if (!mcpConfigIsValid(state.draft)) return;
+    if (!mcpConfigIsValid(state.draft)) return null;
     const run = ++draftTestRun;
     const tested = normalizeMcpConfig(state.draft);
     setState((current) => {
@@ -332,11 +350,12 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       current.formTestConfig = tested;
     });
     const test = await answer(tested);
-    if (run !== draftTestRun) return;
+    if (run !== draftTestRun) return null;
     setState((current) => {
       current.formTest = test;
       if (!test) current.formTestConfig = null;
     });
+    return test;
   }
 
   const testDraft = () => runDraft("testing", runTest);
@@ -399,13 +418,59 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   // Test connection, gets the focus one frame after the dialog left.
   const menuButtons: Record<string, HTMLElement> = {};
   let formTestButton: HTMLButtonElement | undefined;
+  // A URL in the command moves to Server URL, and refused credentials send the user to Headers.
+  let urlInput: HTMLInputElement | undefined;
+  let commandInput: HTMLInputElement | undefined;
+  let headerKeyInput: HTMLInputElement | undefined;
+
+  /** A web address in the stdio command names an http server: the form switches to it. */
+  function moveToUrl(address: string): void {
+    const from = document.activeElement;
+    setState((current) => {
+      current.draft.transport = "http";
+      current.draft.url = address.trim();
+      current.draft.command = "";
+    });
+    // A paste into an empty field leaves the stored command at "", so the field is not redrawn.
+    if (commandInput) commandInput.value = "";
+    // One frame later, once Server URL is mounted. The focus is still in the hidden command field
+    // after a paste, or nowhere after a blur to another stdio field. A click elsewhere keeps it.
+    requestAnimationFrame(() => {
+      if (document.activeElement === document.body || document.activeElement === from) urlInput?.focus();
+    });
+  }
+
+  createEffect(
+    () => Boolean(props.addRequest),
+    (requested) => {
+      if (!requested) return;
+      // A user who cannot add a server ends the request, so the form does not open later unasked.
+      props.onAddRequestHandled?.();
+      if (props.canManage) openForm(null);
+    },
+  );
+
+  createEffect(
+    () => {
+      const id = props.signInRequest;
+      return id ? props.servers.find((candidate) => candidate.id === id) : undefined;
+    },
+    (config) => {
+      if (!config) return;
+      // A row this panel cannot sign in to ends the request, so no sign-in starts later unasked.
+      props.onSignInRequestHandled?.();
+      if (canSignIn(config)) void signInRow(config);
+    },
+  );
+
   createEffect(
     () => remotePage()?.rowId,
     (rowId, previous) => {
       if (previous === undefined || rowId === previous) return;
       const target = previous === null ? formTestButton : menuButtons[previous];
       requestAnimationFrame(() => {
-        if (target?.isConnected && !document.querySelector(".mcp-sign-in-page-dialog, .mcp-sign-in-relay-dialog"))
+        // A connect dialog that is still open, such as the relayed sign-in, keeps the focus.
+        if (target?.isConnected && !document.querySelector(".integration-wizard-dialog"))
           target.focus({ preventScroll: true });
       });
     },
@@ -460,15 +525,55 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   }
 
   async function save(): Promise<void> {
+    // A test the user already ran for this draft answers for the save too.
+    const tested = formTest();
     setState((current) => {
       current.touched = true;
     });
     if (!mcpConfigIsValid(state.draft)) return;
-    // The draft's empty id stays empty: the store mints the id on insert, and a client-minted one
-    // reads to it as an edit of a row that is not there.
-    const config = normalizeMcpConfig(state.draft);
-    const saved = await run("save", () => props.onSave(config));
-    if (saved) backToList();
+    const connects = mcpSaveConnects(state.draft, state.baseline, state.editingId === null);
+    // The connect step runs inside the save latch, so the form stays locked until the row is stored.
+    let stored = false;
+    await run("save", async () => {
+      if (connects && !(await connectBeforeSave(tested))) return;
+      // The draft's empty id stays empty: the store mints the id on insert, and a client-minted one
+      // reads to it as an edit of a row that is not there.
+      await props.onSave(normalizeMcpConfig(state.draft));
+      stored = true;
+    });
+    if (stored) backToList();
+  }
+
+  /**
+   * Save connects an http server first, so a server that asks for a sign-in gets one before it is
+   * stored. A server that answered, or that cannot be reached now, saves as before: the address can
+   * be right while the server is down. Refused credentials do not save; the user fixes Headers.
+   * The save bar repeats why it did not save, as for a failed save: the test result can be off screen.
+   */
+  async function connectBeforeSave(tested: McpTestState | null): Promise<boolean> {
+    const test = tested?.status === "passed" || tested?.status === "failed" ? tested : await testDraft();
+    if (!test) return false;
+    if (test.status === "passed") return true;
+    if (test.kind === "refused") {
+      setState((current) => {
+        current.error = test.error;
+      });
+      // With every header row removed there is no field to focus: Add header's row comes back.
+      if (state.draft.headers.length === 0)
+        setState((current) => {
+          current.draft.headers.push({ key: "", value: "" });
+        });
+      // One frame later, once the busy latch no longer disables the field and the row is mounted.
+      requestAnimationFrame(() => headerKeyInput?.focus());
+      return false;
+    }
+    if (test.kind !== "sign-in" || !canSignIn(state.draft)) return true;
+    const signedIn = await signInDraft();
+    if (signedIn?.status === "failed")
+      setState((current) => {
+        current.error = signedIn.error;
+      });
+    return signedIn?.status === "passed";
   }
 
   /** Puts the form back to what is stored, the way the General tab's save bar resets its fields. */
@@ -496,7 +601,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       failed: Boolean(state.error),
       saving: state.busy === "save",
       resetDisabled: state.busy !== null,
-      saveDisabled: disabled() || (state.touched && !mcpConfigIsValid(state.draft)),
+      saveDisabled: disabled() || formWaiting() || (state.touched && !mcpConfigIsValid(state.draft)),
     };
   }
 
@@ -583,7 +688,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       <div class="server-mcp-row-title">
                         <ItemTitle>{config().name}</ItemTitle>
                         <Badge variant={mcpStatusVariant(test())}>{mcpStatusLabel(config(), t, test())}</Badge>
-                        <Show when={canSignIn(config()) && props.signIn?.signedIn[config().id]}>
+                        <Show when={canSignIn(config()) && props.signIn?.states[config().id]?.signedIn}>
                           <Badge variant="outline">{t("mcp.status.signedIn")}</Badge>
                         </Show>
                       </div>
@@ -662,7 +767,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                         signIn={
                           canSignIn(config())
                             ? {
-                                signedIn: Boolean(props.signIn?.signedIn[config().id]),
+                                signedIn: Boolean(props.signIn?.states[config().id]?.signedIn),
                                 busy: test()?.status === "signing-in",
                                 onSignIn: () => void signInRow(config()),
                                 onSignOut: () => signOut(config()),
@@ -742,20 +847,28 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                 error={visible("command")}
               >
                 <Input
+                  ref={(element: HTMLInputElement) => {
+                    commandInput = element;
+                  }}
                   size="md"
                   placeholder={COMMAND_PLACEHOLDER}
                   value={state.draft.command}
                   disabled={disabled()}
-                  onValueChange={(value) =>
-                    setState((current) => {
-                      current.draft.command = value;
-                    })
-                  }
-                  onBlur={() =>
+                  onValueChange={(value) => {
+                    // A paste moves at once. Typed text waits for the blur: the field leaves with the
+                    // stdio panel, and the keys typed before Server URL has the focus would be lost.
+                    if (isMcpHttpAddress(value) && value.length - state.draft.command.length > 1) moveToUrl(value);
+                    else
+                      setState((current) => {
+                        current.draft.command = value;
+                      });
+                  }}
+                  onBlur={() => {
                     setState((current) => {
                       current.touched = true;
-                    })
-                  }
+                    });
+                    if (isMcpHttpAddress(state.draft.command)) moveToUrl(state.draft.command);
+                  }}
                 />
               </Field>
 
@@ -932,6 +1045,9 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
             >
               <Field label={t("mcp.panel.serverUrl")} error={visible("url")}>
                 <Input
+                  ref={(element: HTMLInputElement) => {
+                    urlInput = element;
+                  }}
                   size="md"
                   type="url"
                   placeholder={URL_PLACEHOLDER}
@@ -964,6 +1080,9 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                   {(pair, index) => (
                     <div class="server-mcp-repeat-row server-mcp-repeat-row-pair">
                       <Input
+                        ref={(element: HTMLInputElement) => {
+                          if (index === 0) headerKeyInput = element;
+                        }}
                         size="md"
                         placeholder={t("mcp.panel.key")}
                         aria-label={t("mcp.panel.headerKey", { position: index + 1 })}
@@ -1211,7 +1330,7 @@ function McpRowList(props: {
 
 function McpRowMenu(props: {
   name: string;
-  mount?: HTMLElement;
+  mount?: HTMLElement | undefined;
   triggerRef?: (element: HTMLElement) => void;
   disabled: boolean;
   testDisabled: boolean;
@@ -1250,7 +1369,7 @@ function McpRowMenu(props: {
       >
         <Ellipsis aria-hidden="true" />
       </DropdownMenu.Trigger>
-      <DropdownMenu.Portal mount={props.mount}>
+      <DropdownMenu.Portal mount={props.mount ?? document.body}>
         <DropdownMenu.Content class="server-mcp-row-menu">
           <DropdownMenu.Item disabled={props.testDisabled} onSelect={() => props.onTest()}>
             <Plug aria-hidden="true" />

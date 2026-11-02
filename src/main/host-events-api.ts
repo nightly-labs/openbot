@@ -10,6 +10,7 @@ import type {
   SaveEventRoutineInput,
   SaveEventRoutineResult,
   WebhookSecret,
+  WebhookTestResult,
 } from "@openbot/contracts/ipc-events";
 import { matchingSourceKeys } from "@openbot/i18n/source";
 import { type Effect, Schema } from "effect";
@@ -42,6 +43,7 @@ export interface HostEventsApi {
   deleteRoutine(input: EventRoutineRef): Effect.Effect<void, HostEventsFailure>;
   testRoutine(input: EventRoutineRef): Effect.Effect<void, HostEventsFailure>;
   rotateSecret(input: EventRoutineRef): Effect.Effect<WebhookSecret, HostEventsFailure>;
+  sendTestEvent(input: EventRoutineRef): Effect.Effect<WebhookTestResult, HostEventsFailure>;
   listActivity(input: ListEventActivityInput): Effect.Effect<EventActivity[], HostEventsFailure>;
   listRoutineRuns(input: ListEventRoutineRunsInput): Effect.Effect<EventRoutineRun[], HostEventsFailure>;
 }

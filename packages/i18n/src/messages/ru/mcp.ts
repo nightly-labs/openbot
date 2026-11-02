@@ -45,7 +45,7 @@ export const messages = {
   "mcp.status.noAnswer": "Нет ответа",
   "mcp.status.didNotStart": "Не запустился",
   "mcp.status.unreachable": "Недоступен",
-  "mcp.server.providerLimitNote": "Только Claude: сервер с рабочей папкой не передаётся другим провайдерам.",
+  "mcp.server.providerLimitNote": "Только Claude и Codex: сервер с рабочей папкой не передаётся другим провайдерам.",
   "mcp.server.runtimeDownloading":
     "Загружается среда, в которой запускается сервер STDIO. Пока загрузка не завершится, сервер может не запуститься.",
   "mcp.server.runtimeDownloadingProgress":
@@ -87,7 +87,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Удалить пробрасываемую переменную {position}",
   "mcp.panel.workingDirectory": "Рабочая папка",
   "mcp.panel.workingDirectoryDescription":
-    "Агенты Claude и проверка подключения запускают сервер здесь. Оставьте поле пустым, чтобы передать этот сервер всем провайдерам: другие провайдеры не могут задать папку, поэтому пропускают сервер, у которого она указана.",
+    "Агенты Claude и Codex и проверка подключения запускают сервер здесь. Оставьте поле пустым, чтобы передать этот сервер всем провайдерам: другие провайдеры не могут задать папку, поэтому пропускают сервер, у которого она указана.",
   "mcp.panel.endpointTitle": "Эндпоинт",
   "mcp.panel.endpointDescription": "Любой провайдер может использовать сервер MCP по HTTP.",
   "mcp.panel.serverUrl": "URL сервера",

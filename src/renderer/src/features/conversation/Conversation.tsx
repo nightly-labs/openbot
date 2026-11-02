@@ -39,6 +39,8 @@ export function Conversation(props: ConversationProps) {
 
   onCleanup(() => {
     controller.stopComposerTyping();
+    // The next conversation mounts a new editor. A focus request from this one, such as a Reply, must not focus it.
+    controller.setComposerFocusRequest(0);
     const phase = controller.voicePhase();
     if (phase === "preparing" || phase === "requesting") {
       // A model download and a permission prompt both belong to the

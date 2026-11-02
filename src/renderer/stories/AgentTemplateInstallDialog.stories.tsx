@@ -10,6 +10,7 @@ const args: Parameters<typeof AgentTemplateInstallDialog>[0] = {
   detail: STORY_AGENT_TEMPLATE_DETAIL,
   loading: false,
   onInstall: fn(async () => undefined),
+  onOpenLink: fn(),
 };
 
 const meta = {
@@ -31,6 +32,16 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const MarkdownInstructions: Story = {
+  args: {
+    detail: {
+      ...STORY_AGENT_TEMPLATE_DETAIL,
+      description:
+        "## Identity and Mission\n\nKeep the **systems** healthy. Read the [runbook](https://example.com/runbook) first.\n\n## 1. Operating Principles\n\n- Prefer actual system state over assumptions.\n- Report what changed.\n\n1. Check the logs.\n2. Fix the cause.\n\n<script>alert(1)</script>",
+    },
+  },
+};
 
 export const Loading: Story = { args: { detail: null, loading: true } };
 

@@ -2,7 +2,8 @@
 // fixed set of subscriptions (#2242). The snapshot must not read canceled or expired subscriptions
 // from Stripe, must read each FX rate once, must count and leave out subscriptions that stay bad, and
 // must fail without an event when Stripe has a failure that can pass or when every row is bad. A second
-// run on the same day makes no Stripe call.
+// run on the same day makes no Stripe call. License subscriptions go in their own totals, and the
+// server plan totals do not include them.
 //
 // Run: bun apps/auth-api/scripts/billing-snapshot-e2e.ts
 // It writes .openbot-build/billing-snapshot-e2e/report.json and exits non-zero on a failure.
@@ -10,6 +11,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { LICENSE_METADATA, LICENSE_METADATA_KIND, licenseLookupKey } from "@openbot/contracts/license";
 import { Effect, Exit, Schema } from "effect";
 import { captureBillingSnapshot } from "../src/server/billing-snapshots";
 
@@ -84,7 +86,7 @@ function sqliteD1(database: DatabaseSync, queries: string[]): D1Database {
   };
 }
 
-type StoredRow = { id: string; status: string; serverId?: string };
+type StoredRow = { id: string; status: string; serverId?: string; licenseUsers?: number };
 
 function migratedDatabase(rows: readonly StoredRow[]): DatabaseSync {
   const database = new DatabaseSync(":memory:");
@@ -98,6 +100,17 @@ function migratedDatabase(rows: readonly StoredRow[]): DatabaseSync {
     database
       .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
       .run(userId, `email:${userId}@example.test`, `${userId}@example.test`);
+    if (row.licenseUsers !== undefined) {
+      database
+        .prepare(
+          `INSERT INTO licenses(
+             stripe_subscription_id, user_id, stripe_customer_id, users, currency, status, current_period_end,
+             cancel_at_period_end, updated_at
+           ) VALUES (?, ?, ?, ?, 'eur', ?, NULL, 0, 1)`,
+        )
+        .run(row.id, userId, `cus_${index}`, row.licenseUsers, row.status);
+      continue;
+    }
     database
       .prepare(
         `INSERT INTO billing_subscriptions(
@@ -110,13 +123,54 @@ function migratedDatabase(rows: readonly StoredRow[]): DatabaseSync {
   return database;
 }
 
-function stripeSubscription(id: string, status: string, currency: string, amount: number, interval: string) {
+function stripeSubscription(
+  id: string,
+  status: string,
+  currency: string,
+  amount: number,
+  interval: string,
+  quantity = 1,
+) {
   return {
     id,
     status,
     currency,
     cancel_at_period_end: false,
-    items: { data: [{ price: { currency, unit_amount: amount, recurring: { interval } }, quantity: 1 }] },
+    items: { data: [{ price: { currency, unit_amount: amount, recurring: { interval } }, quantity }] },
+    discounts: [],
+  };
+}
+
+/**
+ * The Team monthly license Price. It has graduated tiers, so Stripe sends no `unit_amount`, and its lookup key
+ * and metadata name the plan (`scripts/stripe-bootstrap.ts`).
+ */
+function stripeLicenseSubscription(id: string, currency: string, users: number) {
+  const plan = { tier: "team", interval: "month", bundle: false } as const;
+  return {
+    id,
+    status: "active",
+    currency,
+    cancel_at_period_end: false,
+    items: {
+      data: [
+        {
+          price: {
+            lookup_key: licenseLookupKey(plan),
+            metadata: {
+              [LICENSE_METADATA.kind]: LICENSE_METADATA_KIND,
+              [LICENSE_METADATA.tier]: plan.tier,
+              [LICENSE_METADATA.interval]: plan.interval,
+            },
+            currency,
+            unit_amount: null,
+            billing_scheme: "tiered",
+            recurring: { interval: plan.interval },
+          },
+          quantity: users,
+        },
+      ],
+    },
     discounts: [],
   };
 }
@@ -142,6 +196,11 @@ const SnapshotMetrics = Schema.Struct({
   paying_accounts: Schema.Int,
   paid_servers: Schema.Int,
   cancellations_scheduled: Schema.Int,
+  license_mrr: Schema.Int,
+  license_accounts: Schema.Int,
+  licensed_users: Schema.Int,
+  total_mrr: Schema.Int,
+  total_arr: Schema.Int,
   skipped_subscriptions: Schema.Int,
 });
 
@@ -162,6 +221,8 @@ async function snapshotSkipsTerminalAndBadRows() {
     { id: "sub_trial", status: "trialing" },
     { id: "sub_missing", status: "active" },
     { id: "sub_weekly", status: "active" },
+    { id: "sub_license", status: "active", licenseUsers: 7 },
+    { id: "sub_license_canceled", status: "canceled", licenseUsers: 2 },
   ]);
   const queries: string[] = [];
   const calls: string[] = [];
@@ -173,6 +234,7 @@ async function snapshotSkipsTerminalAndBadRows() {
       sub_trial: stripeSubscription("sub_trial", "trialing", "eur", 1_000, "month"),
       sub_missing: 404,
       sub_weekly: stripeSubscription("sub_weekly", "active", "eur", 1_000, "week"),
+      sub_license: stripeLicenseSubscription("sub_license", "eur", 7),
     },
     calls,
   );
@@ -183,13 +245,15 @@ async function snapshotSkipsTerminalAndBadRows() {
   check(
     "Stripe is read only for subscriptions that are not canceled or expired",
     JSON.stringify(read) ===
-      JSON.stringify(["sub_eur_1", "sub_eur_2", "sub_missing", "sub_trial", "sub_usd_year", "sub_weekly"].sort()),
+      JSON.stringify(
+        ["sub_eur_1", "sub_eur_2", "sub_missing", "sub_trial", "sub_usd_year", "sub_weekly", "sub_license"].sort(),
+      ),
     read,
   );
   const fxReads = queries.filter((query) => query.includes("FROM billing_fx_rates")).length;
   check("the EUR rate is read once", fxReads === 1, { fxReads });
   const [event] = storedEvents(database);
-  // EUR: round(1000 * 1.1) + round(2000 * 1.1); USD yearly: 12000 / 12.
+  // EUR: round(1000 * 1.1) + round(2000 * 1.1); USD yearly: 12000 / 12. License: 7 users = 2500 + 5 * 1500, round(10000 * 1.1).
   const expected = {
     snapshot_date: DAY,
     mrr: 1_100 + 2_200 + 1_000,
@@ -198,6 +262,11 @@ async function snapshotSkipsTerminalAndBadRows() {
     paying_accounts: 3,
     paid_servers: 1,
     cancellations_scheduled: 0,
+    license_mrr: 11_000,
+    license_accounts: 1,
+    licensed_users: 7,
+    total_mrr: 1_100 + 2_200 + 1_000 + 11_000,
+    total_arr: (1_100 + 2_200 + 1_000 + 11_000) * 12,
     skipped_subscriptions: 2,
   };
   check("the event has the expected metrics", JSON.stringify(event) === JSON.stringify(expected), {

@@ -1,0 +1,56 @@
+import java.security.MessageDigest
+
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'run.openbot'
+version = '1.0.0'
+
+// The official sherpa-onnx Android build, the version that desktop pins in scripts/prepare-voice.ts.
+// JitPack serves the release AAR of k2-fsa byte for byte; the hash check below stops a build that
+// receives anything else.
+def sherpaOnnx = 'com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.8@aar'
+def sherpaOnnxSha256 = '633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96'
+
+repositories {
+  exclusiveContent {
+    forRepository { maven { url 'https://jitpack.io' } }
+    filter { includeGroup 'com.github.k2-fsa.sherpa-onnx' }
+  }
+}
+
+android {
+  namespace "run.openbot.speech"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+    // The app's release build applies these rules when it shrinks the code with R8.
+    consumerProguardFiles 'consumer-rules.pro'
+  }
+}
+
+dependencies {
+  implementation sherpaOnnx
+}
+
+def verifySherpaOnnx = tasks.register('verifySherpaOnnx') {
+  def artifact = configurations.detachedConfiguration(dependencies.create(sherpaOnnx))
+  inputs.files(artifact)
+  doLast {
+    def file = artifact.singleFile
+    def digest = MessageDigest.getInstance('SHA-256')
+    file.withInputStream { stream ->
+      byte[] buffer = new byte[1 << 20]
+      int read
+      while ((read = stream.read(buffer)) > 0) digest.update(buffer, 0, read)
+    }
+    def actual = digest.digest().encodeHex().toString()
+    if (actual != sherpaOnnxSha256) {
+      throw new GradleException("OpenBotSpeech: ${file.name} has SHA-256 ${actual}, expected ${sherpaOnnxSha256}")
+    }
+  }
+}
+
+tasks.named('preBuild').configure { dependsOn verifySherpaOnnx }

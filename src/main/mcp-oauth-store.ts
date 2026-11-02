@@ -43,14 +43,18 @@ export class McpOAuthStore implements McpOAuthStorage {
   readonly #cipher: SecretCipher;
   #records = new Map<string, McpOAuthRecord>();
   #loaded = false;
-  /** Why the file could not be read. Kept until a sign-in replaces the whole envelope. */
+  /** Why no record in the file could be read. Cleared by the first change this store writes. */
   #loadError: Error | null = null;
   /**
-   * The encrypted records the file held when it could not be decrypted. Kept so a change that
-   * cannot read them refuses rather than writing them away; cleared on a successful read or write.
+   * Ciphertext for servers this build could not decrypt. Each blob is written back unchanged until
+   * a record with tokens, or a sign-in app the administrator saved, replaces that server's row.
+   * Discovery and a registration come before the user signs in, so they stay in memory, and a
+   * cancelled sign-in leaves the file as it was.
    * `null` when the file held nothing worth keeping (missing or unparseable).
    */
   #unreadableServers: Record<string, string> | null = null;
+  /** The file is there, but the operating system refused to read it. */
+  #readFailed = false;
   /** The change in progress, so a read-modify-write never overlaps another. See `#enqueue`. */
   #queue = Semaphore.makeUnsafe(1);
 
@@ -95,14 +99,9 @@ export class McpOAuthStore implements McpOAuthStorage {
     return this.#enqueue(
       Effect.gen({ self: this }, function* () {
         yield* this.#reloadIfUnreadable();
-        // A registration (`saveClientInformation`) carries no tokens and runs before the user signs
-        // in. When the file holds encrypted records this build cannot read, replacing it here would
-        // delete unrelated credentials even if the user cancels. Refuse instead: the retry above
-        // already gave a temporarily locked keychain its chance, and a corrupt file (nothing to
-        // keep) still takes the replacement path below.
-        if (this.#loadError && this.#unreadableServers) {
+        // Nothing of this file was ever read, so a write would replace rows this store never saw.
+        if (this.#readFailed && this.#loadError)
           return yield* new McpOperationError({ cause: new Error(sourceText("error.mcp.signInFileUnreadable")) });
-        }
         const next = yield* mcpSync(() => this.#editableRecords());
         registerAppSecret(record);
         // An empty record is the absence of one. `invalidateCredentials("all")` arrives as a clear, and
@@ -110,12 +109,14 @@ export class McpOAuthStore implements McpOAuthStorage {
         // that names only where the authorization server was found is not empty: the SDK saves
         // discovery state before it registers, and deleting it here would send the code exchange
         // back to default discovery. A sign-in app alone is not empty either: the administrator saves
-        // it before the first sign-in.
+        // it before the first sign-in. Nor is a sign-in the server ended: `lostAt` is what lets the
+        // row say so.
         if (
           record.app === undefined &&
           record.client === undefined &&
           record.tokens === undefined &&
-          record.discovery === undefined
+          record.discovery === undefined &&
+          record.lostAt === undefined
         )
           next.delete(resource);
         else next.set(resource, record);
@@ -130,10 +131,8 @@ export class McpOAuthStore implements McpOAuthStorage {
         if (!this.#loaded)
           return yield* new McpOperationError({ cause: new Error("The MCP sign-in store is not loaded.") });
         yield* this.#reloadIfUnreadable();
-        // An envelope this build cannot read holds nothing this can remove, and the file stays where
-        // it is: removing one server row is not the user asking to lose the sign-ins of the other
-        // five. A commit here would start from an empty map, and an empty map is `rm`. `write` is the
-        // one change that may replace an unreadable file, because it carries a sign-in that worked.
+        // A row this build cannot read holds nothing this can remove, and its ciphertext stays: the
+        // SDK clears a record when a sign-in fails, which is not the user asking to lose that server.
         if (this.#loadError || !this.#records.has(resource)) return;
         const next = yield* mcpSync(() => this.#editableRecords());
         next.delete(resource);
@@ -150,9 +149,13 @@ export class McpOAuthStore implements McpOAuthStorage {
    * wants to change it is what keeps that one refusal from costing the user every sign-in.
    */
   #reloadIfUnreadable = Effect.fn("McpOAuthStore.reload")(function* (this: McpOAuthStore) {
-    if (!this.#loadError) return;
+    if (!this.#loadError && !this.#unreadableServers) return;
     const result = yield* Effect.result(this.#read());
     if (Result.isSuccess(result)) {
+      // A record whose row on disk is still unread was never written: it is the sign-in in progress.
+      for (const [resource, record] of this.#records)
+        if (!result.success.has(resource) && this.#unreadableServers?.[resource] !== undefined)
+          result.success.set(resource, record);
       this.#records = result.success;
       for (const record of result.success.values()) registerAppSecret(record);
       this.#loadError = null;
@@ -173,9 +176,8 @@ export class McpOAuthStore implements McpOAuthStorage {
   }
 
   /**
-   * A copy to change. A file with nothing worth keeping (missing or unparseable) starts from
-   * empty, so the sign-in the user has just finished replaces it. A file holding encrypted
-   * records never reaches here: `write` refuses above rather than writing them away.
+   * A copy to change. A missing or unparseable file starts empty, so the sign-in the user has just
+   * finished replaces it. Unread rows are not in the copy: `#commit` writes them back.
    */
   #editableRecords(): Map<string, McpOAuthRecord> {
     if (!this.#loaded) throw new Error("The MCP sign-in store is not loaded.");
@@ -184,24 +186,27 @@ export class McpOAuthStore implements McpOAuthStorage {
 
   /**
    * Writes `next` and only then makes it the store's state. A failed write leaves memory and disk
-   * as they were, so a hand-off never sends a token the file does not hold.
+   * as they were, so a hand-off never sends a token the file does not hold. An unread row stays as
+   * it is on disk until a record with tokens or a sign-in app replaces it.
    */
   #commit = Effect.fn("McpOAuthStore.commit")(function* (this: McpOAuthStore, next: Map<string, McpOAuthRecord>) {
-    if (next.size === 0) yield* mcpIO(() => rm(this.#path, { force: true }));
-    else yield* this.#write(next);
+    const preserved = preservedUnread(this.#unreadableServers, next);
+    if (next.size === 0 && !preserved) yield* mcpIO(() => rm(this.#path, { force: true }));
+    else yield* this.#write(next, preserved);
     this.#records = next;
+    this.#unreadableServers = preserved;
     this.#loadError = null;
-    this.#unreadableServers = null;
   });
 
   #read = Effect.fn("McpOAuthStore.read")(function* (this: McpOAuthStore) {
     const source = yield* mcpIO(() => readFile(this.#path, "utf8")).pipe(
-      Effect.catch(({ cause }) =>
-        cause instanceof Error && "code" in cause && cause.code === "ENOENT"
-          ? Effect.succeed(null)
-          : Effect.fail(new McpOperationError({ cause })),
-      ),
+      Effect.catch(({ cause }) => {
+        if (cause instanceof Error && "code" in cause && cause.code === "ENOENT") return Effect.succeed(null);
+        this.#readFailed = true;
+        return Effect.fail(new McpOperationError({ cause }));
+      }),
     );
+    this.#readFailed = false;
     if (source === null) {
       this.#unreadableServers = null;
       return new Map<string, McpOAuthRecord>();
@@ -216,30 +221,37 @@ export class McpOAuthStore implements McpOAuthStorage {
         this.#unreadableServers = null;
         throw new Error(sourceText("error.mcp.signInFileUnreadable"));
       }
-      try {
-        const records = new Map<string, McpOAuthRecord>();
-        for (const [resource, encrypted] of Object.entries(envelope.servers)) {
+      const records = new Map<string, McpOAuthRecord>();
+      const unreadable: Record<string, string> = {};
+      for (const [resource, encrypted] of Object.entries(envelope.servers)) {
+        try {
           records.set(
             resource,
             mcpOAuthRecordSchema.parse(JSON.parse(this.#cipher.decrypt(Buffer.from(encrypted, "base64")))),
           );
+        } catch {
+          unreadable[resource] = encrypted;
         }
-        this.#unreadableServers = null;
-        return records;
-      } catch {
-        // The envelope parsed but a record did not decrypt: the encrypted records stay on disk and
-        // in this stash, so a change refuses rather than writing them away.
-        this.#unreadableServers = { ...envelope.servers };
+      }
+      if (records.size === 0 && Object.keys(unreadable).length > 0) {
+        this.#unreadableServers = unreadable;
         throw new Error(sourceText("error.mcp.signInFileUnreadable"));
       }
+      this.#unreadableServers = Object.keys(unreadable).length > 0 ? unreadable : null;
+      return records;
     });
   });
 
-  #write = Effect.fn("McpOAuthStore.write")(function* (this: McpOAuthStore, records: Map<string, McpOAuthRecord>) {
+  #write = Effect.fn("McpOAuthStore.write")(function* (
+    this: McpOAuthStore,
+    records: Map<string, McpOAuthRecord>,
+    preserved: Record<string, string> | null,
+  ) {
     const content = yield* mcpSync(() => {
       const servers: Record<string, string> = {};
       for (const [resource, record] of records)
         servers[resource] = this.#cipher.encrypt(JSON.stringify(record)).toString("base64");
+      if (preserved) Object.assign(servers, preserved);
       return `${JSON.stringify({ version: 1, servers })}\n`;
     });
     yield* writeFileAtomically(this.#path, content, { createDirectory: true }).pipe(
@@ -251,4 +263,18 @@ export class McpOAuthStore implements McpOAuthStorage {
 /** A sign-in app's secret is masked in every log line, as the other stored credentials are. */
 function registerAppSecret(record: McpOAuthRecord): void {
   if (record.app?.clientSecret) registerSecretValue(record.app.clientSecret);
+}
+
+/** Unread ciphertext that `next` does not replace with tokens or a sign-in app. */
+function preservedUnread(
+  unreadable: Record<string, string> | null,
+  next: Map<string, McpOAuthRecord>,
+): Record<string, string> | null {
+  if (!unreadable) return null;
+  const preserved: Record<string, string> = {};
+  for (const [resource, encrypted] of Object.entries(unreadable)) {
+    const record = next.get(resource);
+    if (record?.tokens === undefined && record?.app === undefined) preserved[resource] = encrypted;
+  }
+  return Object.keys(preserved).length > 0 ? preserved : null;
 }

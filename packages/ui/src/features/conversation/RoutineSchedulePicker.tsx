@@ -33,9 +33,9 @@ export interface RoutineSchedulePickerProps {
   /** `card` is the tighter row used inside a chat message. */
   density?: "panel" | "card";
   /** The first day a one-time run can use, and the source of new dates. Defaults to now. */
-  today?: Date;
+  today?: Date | undefined;
   /** The frequencies the menu offers. Defaults to all of them. */
-  kinds?: RoutineDraftKindOption[];
+  kinds?: RoutineDraftKindOption[] | undefined;
   /** A control at the end of the row, such as the menu that changes the trigger. */
   action?: JSX.Element;
 }

@@ -95,9 +95,9 @@ function readStamp(path: string): string | null {
 
 /**
  * The inputs of `bun install --frozen-lockfile`: the lockfile, every workspace manifest, the Bun
- * configuration and patches, the Bun version, and `OPENBOT_SKIP_SKIA`, which changes `postinstall`.
+ * configuration and patches, and the Bun version.
  */
-export function installFingerprint(projectRoot: string, environment: NodeJS.ProcessEnv = process.env): string {
+export function installFingerprint(projectRoot: string): string {
   const files = ["bun.lock", "bunfig.toml", "package.json", ...workspaceManifests(projectRoot)];
   const patches = join(projectRoot, "patches");
   if (existsSync(patches)) {
@@ -105,10 +105,7 @@ export function installFingerprint(projectRoot: string, environment: NodeJS.Proc
       if (entry.isFile()) files.push(join("patches", entry.name));
     }
   }
-  return fingerprintFiles(projectRoot, files, [
-    `bun ${process.versions.bun ?? "unknown"}`,
-    `OPENBOT_SKIP_SKIA=${environment.OPENBOT_SKIP_SKIA ?? ""}`,
-  ]);
+  return fingerprintFiles(projectRoot, files, [`bun ${process.versions.bun ?? "unknown"}`]);
 }
 
 /** The names and contents of the Account API migrations that `api:migrate:local` applies. */

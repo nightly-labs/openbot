@@ -1,5 +1,10 @@
-import type { SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
-import { SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
+import type { ChannelSummary, SidebarLayoutAction, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import {
+  SIDEBAR_UNASSIGNED_SECTION_ID,
+  sidebarFolderAncestors,
+  sidebarFolderParents,
+  sidebarFolderPath,
+} from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { currentText } from "@/shared/lib/text";
 import type { MobileAgent } from "./workspace-types";
@@ -7,15 +12,20 @@ import type { MobileAgent } from "./workspace-types";
 export type MobileSidebarItem =
   | { kind: "waiting"; id: string; count: number }
   | { kind: "section"; id: string; name: string; empty: boolean }
-  | { kind: "agent"; id: string; agent: MobileAgent };
+  | { kind: "agent"; id: string; agent: MobileAgent }
+  | { kind: "channel"; id: string; channel: ChannelSummary };
 
 export function mobileSidebarItems(
   layout: SidebarLayoutSnapshot | null,
   agents: MobileAgent[],
+  channels: ChannelSummary[],
   collapsedSectionIds: ReadonlySet<string> = new Set(),
   t: MobileTranslate = currentText().t,
 ): MobileSidebarItem[] {
-  const chats: MobileSidebarItem[] = agents.map((agent) => ({ kind: "agent" as const, id: agent.id, agent }));
+  const chats: MobileSidebarItem[] = [
+    ...channels.map((channel) => ({ kind: "channel" as const, id: channel.id, channel })),
+    ...agents.map((agent) => ({ kind: "agent" as const, id: agent.id, agent })),
+  ];
   if (!layout) return chats;
   const positions = new Map(layout.agentOrder.map((id, index) => [id, index]));
   chats.sort((a, b) => (positions.get(a.id) ?? positions.size) - (positions.get(b.id) ?? positions.size));
@@ -28,9 +38,17 @@ export function mobileSidebarItems(
     group.push(chat);
     groups.set(sectionId, group);
   }
+  // The list is flat: a folder in a folder shows its path, such as "Acme / Engineering", and a closed
+  // folder hides the folders in it too.
+  const parents = sidebarFolderParents(layout);
   return layout.order.flatMap((id) => {
+    if (sidebarFolderAncestors(parents, id).some((ancestorId) => collapsedSectionIds.has(ancestorId))) return [];
     const group = groups.get(id) ?? [];
-    const name = names.get(id) ?? (id === SIDEBAR_UNASSIGNED_SECTION_ID ? t("mobile.workspace.section.agents") : null);
+    const name = names.has(id)
+      ? sidebarFolderPath(layout, parents, id).join(" / ")
+      : id === SIDEBAR_UNASSIGNED_SECTION_ID
+        ? t("mobile.workspace.section.agents")
+        : null;
     if (!name || (id === SIDEBAR_UNASSIGNED_SECTION_ID && group.length === 0)) return [];
     return [
       { kind: "section" as const, id, name, empty: group.length === 0 },
@@ -54,4 +72,21 @@ export function mobileWaitingItems(layout: SidebarLayoutSnapshot | null, agents:
     { kind: "waiting", id: "needs-you", count: sorted.length },
     ...sorted.map((agent) => ({ kind: "agent" as const, id: agent.id, agent })),
   ];
+}
+
+/**
+ * The layout after a `move-agent` action, as the host applies it. The phone shows the move before the
+ * host answers; the answer of the host then replaces this layout.
+ */
+export function moveSidebarChat(
+  layout: SidebarLayoutSnapshot,
+  action: Extract<SidebarLayoutAction, { type: "move-agent" }>,
+): SidebarLayoutSnapshot {
+  const agentOrder = layout.agentOrder.filter((id) => id !== action.agentId);
+  const index = action.beforeAgentId === null ? -1 : agentOrder.indexOf(action.beforeAgentId);
+  agentOrder.splice(index < 0 ? agentOrder.length : index, 0, action.agentId);
+  const agentAssignments = { ...layout.agentAssignments };
+  if (action.sectionId === null) delete agentAssignments[action.agentId];
+  else agentAssignments[action.agentId] = action.sectionId;
+  return { ...layout, agentAssignments, agentOrder };
 }

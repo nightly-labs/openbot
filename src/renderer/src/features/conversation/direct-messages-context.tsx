@@ -46,7 +46,12 @@ function recoveredDirectConversation(
       firstUnreadMessageId: readState.firstUnreadMessageId ?? unread[0]?.id ?? null,
     };
   }
-  return { ...page, messages, revision: Math.max(page.revision, cached.revision), readState };
+  return {
+    ...page,
+    messages,
+    revision: Math.max(page.revision, cached.revision),
+    ...(readState === undefined ? {} : { readState }),
+  };
 }
 
 /**
@@ -223,13 +228,14 @@ const DirectMessages = createSimpleContext({
           const existing = current[memberId];
           if (!existing) return current;
           const ids = new Set(page.messages.map((message) => message.id));
+          const readState = page.readState ?? existing.readState;
           return {
             ...current,
             [memberId]: {
               ...existing,
               messages: [...page.messages, ...existing.messages.filter((message) => !ids.has(message.id))],
               revision: Math.max(existing.revision, page.revision),
-              readState: page.readState ?? existing.readState,
+              ...(readState === undefined ? {} : { readState }),
             },
           };
         });

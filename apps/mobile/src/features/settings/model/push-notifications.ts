@@ -87,20 +87,17 @@ export function mutedUntil(setting: ServerNotificationSetting, now: number): num
   return setting.mute.until > now ? setting.mute.until : null;
 }
 
+/**
+ * Whether the Live Activity can show a server. It follows the notification choices of the server:
+ * "Nothing" or a mute hides the server, and only that server.
+ */
+export function showsInLiveActivity(setting: ServerNotificationSetting, now: number): boolean {
+  return setting.level !== "nothing" && mutedUntil(setting, now) === null;
+}
+
 /** The sound that the hosts play for notifications and the Live Activity. */
 export function registeredSound(preference: Pick<StoredPreference, "playSound" | "sound">): PushNotificationSound {
   return preference.playSound ? preference.sound : "none";
-}
-
-/**
- * Whether a host tells this phone anything: notifications, or the sound of the Live Activity.
- * `liveActivities` is `false` on Android, which has no Live Activity.
- */
-export function alertsOn(
-  preference: Pick<StoredPreference, "enabled" | "playSound">,
-  liveActivities: boolean,
-): boolean {
-  return preference.enabled || (liveActivities && preference.playSound);
 }
 
 export function setNotificationPermission(permission: NotificationPermission): void {

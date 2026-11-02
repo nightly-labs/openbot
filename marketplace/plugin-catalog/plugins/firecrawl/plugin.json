@@ -4,7 +4,7 @@
   "tagline": "Web extraction and search",
   "description": "Firecrawl lets agents scrape pages, extract structured data, and search the web through one API. An API key from the Firecrawl dashboard is passed to the local server as one environment variable.",
   "category": "research",
-  "creatorName": "firecrawl.dev",
+  "creatorName": "Firecrawl",
   "iconUrl": "https://www.firecrawl.dev/favicon.ico",
   "version": "1.0.0",
   "prompts": [

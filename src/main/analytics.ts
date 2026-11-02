@@ -1,3 +1,4 @@
+import { isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import {
   AGENT_PROVIDERS,
   AGENT_REASONING_EFFORTS,
@@ -10,17 +11,28 @@ import {
   isAgentModel,
   parseRoutineRunConversationEventItemType,
   type RoutineRunConversationEventStatus,
+  type UsageTokens,
+  WORKFLOW_RUN_SOURCES,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isFunction, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
-import { classifyFailure, operationForCode, type ReportQueue, safeProperties } from "@openbot/telemetry";
+import {
+  ANALYTICS_GENERATIONS,
+  classifyFailure,
+  operationForCode,
+  type ReportQueue,
+  safeProperties,
+} from "@openbot/telemetry";
 import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
 import { Effect, Exit, Scope } from "effect";
 import { parse as parseDomain } from "tldts";
 import type { FailureSignal } from "../backend/agent/failure-signal";
 import type { ToolUsageSignal } from "../backend/agent/thread-items";
 import type { BrowserSiteVisit } from "../backend/browser-host";
+import type { TurnModelUsage } from "../backend/database/agent-usage";
+import type { WorkflowRunEnd } from "../backend/workflows/workflows";
 import { type AnalyticsOperationFailure, analyticsIO, analyticsSync } from "./analytics-effects";
+import { PROVIDER_AUTH_KINDS, type ProviderAuthKind } from "./analytics-provider-auth";
 import { localDay, RESOURCE_ENUMS, RESOURCE_PROPERTY_NAMES, type ResourceProperties } from "./resource-summary";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
@@ -38,10 +50,32 @@ const MAX_ACTIVE_TURNS = 1_000;
 const MAX_HOSTED_SITE_OPERATIONS = 10_000;
 const ACTIVE_TURN_TTL_MS = 24 * 60 * 60 * 1_000;
 const MAX_TOOL_ROWS_PER_TURN = 32;
+// One turn that reads a large cached context many times stays well below this.
+const MAX_TURN_TOKENS = 10_000_000_000;
+// Usage rows carry the time of the provider's turn start, which can precede the host event.
+const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
+// A turn uses its agent's model and sometimes a few more, such as a Claude subagent's model.
+const MAX_TOKEN_ROWS_PER_TURN = 8;
+const TOKEN_PROPERTIES = [
+  ["uncachedInput", "uncached_input_tokens"],
+  ["cachedInput", "cached_input_tokens"],
+  ["cacheCreation", "cache_write_tokens"],
+  ["output", "output_tokens"],
+] as const satisfies readonly (readonly [keyof UsageTokens, string])[];
 const MAX_SITE_TABS = 1_000;
 const MAX_ROUTINE_RUNS = 10_000;
+// A run holds at most this many nodes that run; a larger count is not sent.
+const MAX_WORKFLOW_RUN_STEPS = 1_000;
+/** A run can wait days for an approval, so its duration has a longer limit than a turn's. */
+const MAX_WORKFLOW_RUN_MS = 30 * 24 * 60 * 60 * 1_000;
+const WORKFLOW_RUN_STEP_COUNTS = [
+  ["agent_step_count", ["agent"]],
+  ["model_step_count", ["llm", "condition"]],
+  ["approval_step_count", ["approval"]],
+  ["output_step_count", ["output"]],
+] as const satisfies readonly (readonly [string, readonly WorkflowRunEnd["stepKinds"][number][]])[];
 const MAX_INVENTORY_ITEMS = 32;
-const ANALYTICS_SCHEMA_VERSION = 8;
+const ANALYTICS_SCHEMA_VERSION = ANALYTICS_GENERATIONS.desktop_host;
 const CURATED_AGENT_PREFIX = "openbot-curated-agent-";
 const LISTING_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 const TOOL_NAME_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/u;
@@ -80,6 +114,11 @@ const ROUTINE_TRIGGER_TYPES = [
 ] as const;
 
 type AnalyticsIdentity = Pick<CentralAuthUser, "id" | "email">;
+/**
+ * Who an event is about: the signed-in account (with its email) when the user shares analytics,
+ * else the install ID (with no email).
+ */
+type AnalyticsSubject = { id: string; email: string | null };
 type AnalyticsOperationKind = "clear" | "identify" | "track";
 type AnalyticsOperation = { kind: AnalyticsOperationKind; run: () => unknown };
 type AnalyticsOperationQueue = { active: boolean; operations: AnalyticsOperation[] };
@@ -89,11 +128,22 @@ type HostEventName =
   | "system_agent_input_requested"
   | "system_operation_failed"
   | "system_tool_used"
+  | "system_token_usage"
   | "system_site_visited"
   | "system_routine_run"
+  | "system_workflow_run"
   | "system_inventory"
   | "system_resources"
   | "hosted_site_action";
+/**
+ * Events that go only when the user links analytics to their account: the sites they visit, the
+ * tools their agents use and their setup. Other events go also when it is off, with the install ID.
+ */
+const LINKED_ONLY_EVENTS: ReadonlySet<HostEventName> = new Set([
+  "system_site_visited",
+  "system_tool_used",
+  "system_inventory",
+]);
 export type HostOpenPanelClient = Pick<OpenPanelBase, "setGlobalProperties" | "track" | "identify" | "clear">;
 type ClientFactory = (options: OpenPanelOptions) => HostOpenPanelClient;
 
@@ -108,11 +158,21 @@ export interface HostAnalyticsOptions {
   enabled: boolean;
   /** The OpenPanel API. Production when omitted; a dev capture server in `analytics-redaction-e2e`. */
   apiUrl?: string;
+  /** True when the user shares analytics with their account. Off: events go with `installId`. */
   trackingEnabled?: boolean;
+  /** The random install ID. Null: no saved ID, and events that have no account are not sent. */
+  installId?: string | null;
   appVersion: string;
   platform: "darwin" | "win32" | "linux";
   resolveOwner: () => AnalyticsIdentity | null;
   resolveAgent: (agentId: string) => AgentSummary | null;
+  /** How the agent's provider is paid for, read when a turn completes. */
+  resolveProviderAuth?: (agent: AgentSummary) => ProviderAuthKind;
+  /**
+   * The provider-reported token counts of a turn by provider and model, from the usage records that
+   * the Usage report reads. An empty list means the provider reported none.
+   */
+  resolveTurnUsage?: (agentId: string, turnId: string, since: string) => readonly TurnModelUsage[];
   /**
    * The user's MCP servers that a provider reports under `name`: `null` when there is none, else the
    * catalog plugin slug they all share, or `slug: null` for the user's own server.
@@ -141,6 +201,7 @@ interface AnalyticsRoutineRun {
 interface AnalyticsInventory {
   agentCount: number;
   enabledRoutineCount: number;
+  workflowCount: number;
   customMcpServerCount: number;
   plugins: string[];
   curatedSkills: string[];
@@ -161,7 +222,19 @@ const AGENT_PROPERTY_NAMES = ["provider", "model", "reasoning_effort", "agent_so
 
 const HOST_ALLOWLIST = {
   system_turn_started: [...AGENT_PROPERTY_NAMES, "origin"],
-  system_turn_completed: [...AGENT_PROPERTY_NAMES, "origin", "status", "duration_ms"],
+  system_turn_completed: [
+    ...AGENT_PROPERTY_NAMES,
+    "origin",
+    "status",
+    "provider_auth",
+    "duration_ms",
+    "token_usage",
+    "uncached_input_tokens",
+    "cached_input_tokens",
+    "cache_write_tokens",
+    "output_tokens",
+    "total_tokens",
+  ],
   system_agent_input_requested: [
     ...AGENT_PROPERTY_NAMES,
     "origin",
@@ -181,11 +254,33 @@ const HOST_ALLOWLIST = {
     "operation",
   ],
   system_tool_used: [...AGENT_PROPERTY_NAMES, "origin", "tool_kind", "plugin", "tool", "call_count", "failed_count"],
+  // `provider` and `model` name the model that used the tokens, which can differ from the agent's.
+  system_token_usage: [
+    "provider",
+    "model",
+    "agent_source",
+    "agent_listing",
+    "origin",
+    "token_usage",
+    "uncached_input_tokens",
+    "cached_input_tokens",
+    "cache_write_tokens",
+    "output_tokens",
+    "total_tokens",
+  ],
   system_site_visited: [...AGENT_PROPERTY_NAMES, "domain", "actor"],
   system_routine_run: [...AGENT_PROPERTY_NAMES, "status", "run_kind", "trigger_type"],
+  system_workflow_run: [
+    "status",
+    "source",
+    "duration_ms",
+    "step_count",
+    ...WORKFLOW_RUN_STEP_COUNTS.map(([property]) => property),
+  ],
   system_inventory: [
     "agent_count",
     "enabled_routine_count",
+    "workflow_count",
     "custom_mcp_server_count",
     "plugins",
     "curated_skills",
@@ -209,8 +304,9 @@ type ActiveTurn = {
   agentId: string;
   properties: HostProperties;
   startedAt: number;
+  startedAtTime: number;
   origin: string;
-  owner: AnalyticsIdentity | null;
+  owner: AnalyticsSubject | null;
   ownerResolutionPending: boolean;
   tools: Map<string, ToolUseRow>;
 };
@@ -219,6 +315,8 @@ export class HostAnalytics {
   readonly #reports: ReportQueue | undefined;
   readonly #resolveOwner: HostAnalyticsOptions["resolveOwner"];
   readonly #resolveAgent: HostAnalyticsOptions["resolveAgent"];
+  readonly #resolveProviderAuth: HostAnalyticsOptions["resolveProviderAuth"];
+  readonly #resolveTurnUsage: HostAnalyticsOptions["resolveTurnUsage"];
   readonly #resolveMcpServer: NonNullable<HostAnalyticsOptions["resolveMcpServer"]>;
   readonly #resolveRoutineRun: NonNullable<HostAnalyticsOptions["resolveRoutineRun"]>;
   readonly #resolveInventory: HostAnalyticsOptions["resolveInventory"];
@@ -227,14 +325,18 @@ export class HostAnalytics {
   readonly #client: HostOpenPanelClient | null;
   #identifiedOwner: AnalyticsIdentity | null = null;
   #trackingEnabled: boolean;
+  readonly #install: AnalyticsSubject | null;
   #bufferOwnerlessEvents = true;
   #pending: HostPendingEvent[] = [];
   readonly #activeTurns = new Map<string, ActiveTurn>();
-  readonly #hostedSiteOwners = new Map<string, AnalyticsIdentity | null>();
+  readonly #hostedSiteOwners = new Map<string, AnalyticsSubject | null>();
   readonly #hostedSiteTerminalOperations = new Set<string>();
   readonly #siteDomains = new Map<string, string>();
-  readonly #routineRunOwners = new Map<string, AnalyticsIdentity | null>();
+  readonly #routineRunOwners = new Map<string, AnalyticsSubject | null>();
   readonly #routineRunReports = new Set<string>();
+  readonly #workflowRunReports = new Set<string>();
+  /** A workflow run that began before this process is a replay after a restart, and is not sent. */
+  readonly #createdAt = Date.now();
   #closed = false;
   readonly #scope = Scope.makeUnsafe();
   #inventoryDay: string | null = null;
@@ -246,12 +348,15 @@ export class HostAnalytics {
     this.#reports = options.reports;
     this.#resolveOwner = options.resolveOwner;
     this.#resolveAgent = options.resolveAgent;
+    this.#resolveProviderAuth = options.resolveProviderAuth;
+    this.#resolveTurnUsage = options.resolveTurnUsage;
     this.#resolveMcpServer = options.resolveMcpServer ?? (() => null);
     this.#resolveRoutineRun = options.resolveRoutineRun ?? (() => null);
     this.#resolveInventory = options.resolveInventory;
     this.#inventoryDayStore = options.inventoryDay;
     this.#resources = options.resources;
     this.#trackingEnabled = options.trackingEnabled ?? true;
+    this.#install = options.installId ? { id: options.installId, email: null } : null;
     if (!options.enabled) {
       this.#client = null;
       return;
@@ -272,11 +377,11 @@ export class HostAnalytics {
   }
 
   handleAgentEvent(event: AgentEvent): void {
-    if (event.type === "conversation" && this.#client && this.#trackingEnabled) {
+    if (event.type === "conversation" && this.#client) {
       this.#handleHostedSiteConversation(event.snapshot.messages);
       this.#handleRoutineRunConversation(event.snapshot.agentId, event.snapshot.messages);
     }
-    if ((!this.#client && !this.#reports) || !this.#trackingEnabled) return;
+    if (!this.#client && !this.#reports) return;
     switch (event.type) {
       case "conversation":
         return;
@@ -286,12 +391,13 @@ export class HostAnalytics {
         this.#pruneActiveTurns(now);
         if (this.#activeTurns.has(event.turnId)) return;
         this.#makeTurnCapacity();
-        const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
+        const owner = this.#currentSubject();
         this.#activeTurns.set(event.turnId, {
           ...(this.#reports ? { failureScope: this.#reports.scope() } : {}),
           agentId: event.agentId,
           properties: this.#agentProperties(event.agentId),
           startedAt: now,
+          startedAtTime: Date.now(),
           origin: event.origin ?? "unknown",
           owner,
           ownerResolutionPending: owner === null && this.#bufferOwnerlessEvents,
@@ -314,15 +420,20 @@ export class HostAnalytics {
         this.#activeTurns.delete(event.turnId);
         const origin =
           event.origin && event.origin !== "unknown" ? event.origin : (activeTurn?.origin ?? event.origin ?? "unknown");
+        const usage = activeTurn && this.#turnUsage(event.agentId, event.turnId, activeTurn.startedAtTime);
         this.#track(
           "system_turn_completed",
           {
             ...this.#agentProperties(event.agentId),
             origin,
             status: normalizedTurnStatus(event.status),
+            ...this.#providerAuth(event.agentId),
             ...(activeTurn === undefined
               ? {}
-              : { duration_ms: Math.max(0, Math.round(performance.now() - activeTurn.startedAt)) }),
+              : {
+                  duration_ms: Math.max(0, Math.round(performance.now() - activeTurn.startedAt)),
+                  ...(usage ? tokenProperties(sumTokens(usage)) : {}),
+                }),
           },
           activeTurn?.owner,
         );
@@ -340,6 +451,25 @@ export class HostAnalytics {
             },
             activeTurn?.owner,
           );
+        }
+        if (usage) {
+          const { agent_source, agent_listing } = this.#agentProperties(event.agentId);
+          for (const row of usage
+            .toSorted((a, b) => tokenTotal(b.tokens) - tokenTotal(a.tokens))
+            .slice(0, MAX_TOKEN_ROWS_PER_TURN)) {
+            this.#track(
+              "system_token_usage",
+              {
+                provider: row.provider,
+                model: row.model,
+                ...(agent_source ? { agent_source } : {}),
+                ...(agent_listing ? { agent_listing } : {}),
+                origin,
+                ...tokenProperties(row.tokens),
+              },
+              activeTurn?.owner,
+            );
+          }
         }
         return;
       }
@@ -384,13 +514,16 @@ export class HostAnalytics {
     }
   }
 
+  /** Reports go with the account when the user shares analytics, else with the install ID. */
   #configureReports(): void {
-    if (this.#reports) Effect.runFork(this.#reports.configure(this.#trackingEnabled, this.#resolveOwner()?.id ?? null));
+    if (!this.#reports) return;
+    const subject = this.#trackingEnabled ? normalizeAnalyticsIdentity(this.#resolveOwner()) : this.#install;
+    Effect.runFork(this.#reports.configure(this.#trackingEnabled || subject !== null, subject?.id ?? null));
   }
 
   /** Only the local service emits this signal. Remote clients never send host reports. */
   handleFailure(failure: FailureSignal): void {
-    if (!this.#reports || !this.#trackingEnabled) return;
+    if (!this.#reports) return;
     this.#configureReports();
     const candidates = [...this.#activeTurns.values()].filter((turn) => turn.agentId === failure.agentId);
     const turn = failure.turnId
@@ -398,7 +531,7 @@ export class HostAnalytics {
       : candidates.length === 1
         ? candidates[0]
         : undefined;
-    if (turn?.owner && turn.owner.id !== this.#resolveOwner()?.id) return;
+    if (turn?.owner && turn.owner.id !== this.#currentSubject()?.id) return;
     const properties = turn?.properties ?? (failure.agentId ? this.#agentProperties(failure.agentId) : {});
     const provider =
       failure.provider ?? properties.provider ?? AGENT_PROVIDERS.find((id) => failure.code.startsWith(`${id}_`));
@@ -432,6 +565,36 @@ export class HostAnalytics {
     if (!existing) turn.tools.set(key, target);
   }
 
+  /**
+   * Reports a workflow run's end: its outcome, how it began and how many nodes of each kind ran.
+   * A retry can end the same run again; each outcome of a run is sent once.
+   */
+  handleWorkflowRun(end: WorkflowRunEnd): void {
+    if (!this.#client) return;
+    const startedAt = Date.parse(end.startedAt);
+    if (!(startedAt >= this.#createdAt)) return;
+    const reportKey = `${end.runId}:${end.status}`;
+    if (this.#workflowRunReports.has(reportKey)) return;
+    this.#workflowRunReports.add(reportKey);
+    while (this.#workflowRunReports.size > MAX_ROUTINE_RUNS) {
+      const oldest = this.#workflowRunReports.values().next();
+      if (oldest.done) break;
+      this.#workflowRunReports.delete(oldest.value);
+    }
+    this.#track("system_workflow_run", {
+      status: end.status,
+      source: end.source,
+      duration_ms: Math.max(0, Date.parse(end.endedAt) - startedAt),
+      step_count: end.stepKinds.length,
+      ...Object.fromEntries(
+        WORKFLOW_RUN_STEP_COUNTS.map(([property, kinds]) => [
+          property,
+          end.stepKinds.filter((kind) => kinds.some((item) => item === kind)).length,
+        ]),
+      ),
+    });
+  }
+
   /** Reports a tab that reached a new registrable domain. The hostname itself is never sent. */
   handleSiteVisit(visit: BrowserSiteVisit): void {
     if (!this.#client || !this.#trackingEnabled) return;
@@ -450,22 +613,23 @@ export class HostAnalytics {
 
   flushPending(): void {
     this.#configureReports();
-    if (!this.#client || !this.#trackingEnabled) return;
-    const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
-    if (!owner) return;
-    this.#bufferOwnerlessEvents = true;
-    for (const activeTurn of this.#activeTurns.values()) {
-      if (!activeTurn.ownerResolutionPending) continue;
-      activeTurn.owner = owner;
-      activeTurn.ownerResolutionPending = false;
+    if (!this.#client) return;
+    const owner = this.#trackingEnabled ? normalizeAnalyticsIdentity(this.#resolveOwner()) : null;
+    if (owner) {
+      this.#bufferOwnerlessEvents = true;
+      for (const activeTurn of this.#activeTurns.values()) {
+        if (!activeTurn.ownerResolutionPending) continue;
+        activeTurn.owner = owner;
+        activeTurn.ownerResolutionPending = false;
+      }
+      this.#flushPendingForOwner(owner);
     }
-    this.#flushPendingForOwner(owner);
     this.#checkInventory();
     this.checkResources();
   }
 
+  /** The account signed out. Later events go with the install ID only when the user does not share analytics. */
   clear(): void {
-    if (this.#reports) Effect.runFork(this.#reports.configure(this.#trackingEnabled, null));
     this.#pending = [];
     this.#bufferOwnerlessEvents = false;
     for (const activeTurn of this.#activeTurns.values()) {
@@ -473,6 +637,9 @@ export class HostAnalytics {
     }
     this.#identifiedOwner = null;
     if (this.#trackingEnabled) this.#enqueue("clear", () => this.#client?.clear());
+    if (!this.#reports) return;
+    const subject = this.#trackingEnabled ? null : this.#install;
+    Effect.runFork(this.#reports.configure(this.#trackingEnabled || subject !== null, subject?.id ?? null));
   }
 
   setTrackingEnabled(enabled: boolean): void {
@@ -484,6 +651,7 @@ export class HostAnalytics {
       this.#activeTurns.clear();
       this.#siteDomains.clear();
       this.#routineRunOwners.clear();
+      this.#workflowRunReports.clear();
       this.clear();
       this.#operationQueue.operations = [];
       this.#enqueue("clear", () => this.#client?.clear());
@@ -504,7 +672,7 @@ export class HostAnalytics {
     for (const event of events) {
       if (event.status === "running") {
         if (terminalOperations.has(event.operationId)) continue;
-        const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
+        const owner = this.#currentSubject();
         if (!this.#hostedSiteOwners.has(event.operationId)) this.#hostedSiteOwners.set(event.operationId, owner);
         continue;
       }
@@ -513,7 +681,7 @@ export class HostAnalytics {
       this.#hostedSiteTerminalOperations.add(event.operationId);
       const owner = this.#hostedSiteOwners.get(event.operationId) ?? null;
       this.#hostedSiteOwners.delete(event.operationId);
-      if (!owner || !this.#trackingEnabled) continue;
+      if (!owner) continue;
       this.#trackForOwner(
         "hosted_site_action",
         {
@@ -558,7 +726,7 @@ export class HostAnalytics {
     for (const event of events) {
       if (event.status === "running") {
         if (laterStatuses.has(event.runId) || this.#routineRunOwners.has(event.runId)) continue;
-        this.#routineRunOwners.set(event.runId, normalizeAnalyticsIdentity(this.#resolveOwner()));
+        this.#routineRunOwners.set(event.runId, this.#currentSubject());
         continue;
       }
       if (!observedRunning.has(event.runId)) continue;
@@ -609,14 +777,17 @@ export class HostAnalytics {
     return { kind: builtinKind ?? "mcp", plugin, ...(tool ? { tool } : {}), calls: 0, failed: 0 };
   }
 
-  /** Sends the inventory at most once per local day. It needs an owner, so it waits for sign-in. */
+  /**
+   * Sends the inventory at most once per local day. A user who shares analytics waits for sign-in,
+   * so the inventory goes with their account.
+   */
   #checkInventory(): void {
     const today = localDay(new Date());
     if (this.#closed || this.#inventoryDay === today || this.#inventoryCheck) return;
     const resolveInventory = this.#resolveInventory;
     const store = this.#inventoryDayStore;
     if (!this.#client || !this.#trackingEnabled || !resolveInventory || !store) return;
-    if (!normalizeAnalyticsIdentity(this.#resolveOwner())) return;
+    if (!this.#currentSubject()) return;
     this.#inventoryCheck = true;
     Effect.runFork(
       Effect.gen({ self: this }, function* () {
@@ -632,17 +803,18 @@ export class HostAnalytics {
           return;
         }
         const inventory = yield* resolveInventory();
-        if (this.#closed || !this.#trackingEnabled || !normalizeAnalyticsIdentity(this.#resolveOwner())) return;
+        if (this.#closed || !this.#trackingEnabled || !this.#currentSubject()) return;
         // The day is stored before the send, so a failed write sends nothing and a crash cannot send twice.
         yield* store.write(today);
         this.#inventoryDay = today;
-        const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
-        if (!owner || !this.#trackingEnabled) return;
+        const owner = this.#currentSubject();
+        if (!owner) return;
         this.#trackForOwner(
           "system_inventory",
           {
             agent_count: inventory.agentCount,
             enabled_routine_count: inventory.enabledRoutineCount,
+            workflow_count: inventory.workflowCount,
             custom_mcp_server_count: inventory.customMcpServerCount,
             plugins: inventory.plugins,
             curated_skills: inventory.curatedSkills,
@@ -668,23 +840,24 @@ export class HostAnalytics {
   }
 
   /**
-   * Sends the resource summary of the last closed day, once. It needs an owner, so it waits for
-   * sign-in. A day that closes while the user has analytics off is dropped, never sent later.
+   * Sends the resource summary of the last closed day, once. A user who shares analytics waits for
+   * sign-in, so the summary goes with their account.
    */
   checkResources(): void {
     const source = this.#resources;
     if (this.#closed || this.#resourceCheck || !source || !this.#client) return;
     const due = source.previousDay();
     if (!due) return;
-    const sending = this.#trackingEnabled;
-    if (sending && !normalizeAnalyticsIdentity(this.#resolveOwner())) return;
+    // A user who shares analytics waits for sign-in. Without an install ID, a day of a user who
+    // does not share analytics is cleared with no send, so it never goes later with the account.
+    if (!this.#currentSubject() && this.#trackingEnabled) return;
     this.#resourceCheck = true;
     Effect.runFork(
       Effect.gen({ self: this }, function* () {
         // Cleared before the send, so a failed write sends nothing and a crash cannot send twice.
         yield* source.clearPreviousDay(due.day);
-        const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
-        if (!sending || this.#closed || !this.#trackingEnabled || !owner) return;
+        const owner = this.#currentSubject();
+        if (this.#closed || !owner) return;
         this.#trackForOwner("system_resources", due.properties, owner);
       }).pipe(
         Effect.ignore,
@@ -699,31 +872,48 @@ export class HostAnalytics {
     );
   }
 
-  #trackForOwner(name: HostEventName, properties: HostProperties, owner: AnalyticsIdentity, flushPending = true): void {
+  /**
+   * The subject of a new event: the account when the user shares analytics, else the install ID.
+   * Null while a user who shares analytics is signed out, so the install ID never shows next to an
+   * account, and when there is no install ID.
+   */
+  #currentSubject(): AnalyticsSubject | null {
+    if (!this.#trackingEnabled) return this.#install;
+    return normalizeAnalyticsIdentity(this.#resolveOwner());
+  }
+
+  #trackForOwner(name: HostEventName, properties: HostProperties, owner: AnalyticsSubject, flushPending = true): void {
+    // An account taken before the user stopped sharing analytics is never sent after it.
+    if (!this.#trackingEnabled && LINKED_ONLY_EVENTS.has(name)) return;
+    // An install ID taken before the user started sharing analytics is never sent after it.
+    if (this.#trackingEnabled && owner.email === null) return;
+    const subject = owner.email !== null && !this.#trackingEnabled ? this.#install : owner;
+    if (!subject) return;
     const sanitized = sanitizeHostEvent(name, properties);
-    if (flushPending) this.#flushPendingForOwner(owner);
-    else this.#identify(owner);
-    this.#send(name, sanitized, owner.id);
-    const currentOwner = normalizeAnalyticsIdentity(this.#resolveOwner());
-    if (currentOwner?.id !== owner.id || currentOwner.email !== owner.email) {
+    if (flushPending) this.#flushPendingForOwner(subject);
+    else this.#identify(subject);
+    this.#send(name, sanitized, subject.id);
+    const current = this.#currentSubject();
+    if (current?.id !== subject.id || current.email !== subject.email) {
       this.#identifiedOwner = null;
       this.#enqueue("clear", () => this.#client?.clear());
     }
   }
 
-  #flushPendingForOwner(owner: AnalyticsIdentity): void {
+  /** Events that waited for the account go with the account only. */
+  #flushPendingForOwner(owner: AnalyticsSubject): void {
     this.#identify(owner);
+    if (owner.email === null) return;
     const pending = this.#pending;
     this.#pending = [];
     for (const event of pending) this.#send(event.name, event.properties, owner.id, event.timestamp);
   }
 
-  #track(name: HostEventName, properties: HostProperties, ownerOverride?: AnalyticsIdentity | null): void {
-    if (!this.#trackingEnabled) return;
+  #track(name: HostEventName, properties: HostProperties, ownerOverride?: AnalyticsSubject | null): void {
     const sanitized = sanitizeHostEvent(name, properties);
-    const owner = ownerOverride === undefined ? normalizeAnalyticsIdentity(this.#resolveOwner()) : ownerOverride;
+    const owner = ownerOverride === undefined ? this.#currentSubject() : ownerOverride;
     if (!owner) {
-      if (!this.#bufferOwnerlessEvents) return;
+      if (!this.#trackingEnabled || !this.#bufferOwnerlessEvents) return;
       this.#pending.push({ name, properties: sanitized, timestamp: new Date().toISOString() });
       if (this.#pending.length > MAX_PENDING_EVENTS) this.#pending.shift();
       return;
@@ -731,13 +921,20 @@ export class HostAnalytics {
     this.#trackForOwner(name, sanitized, owner, ownerOverride === undefined);
   }
 
-  #identify(owner: AnalyticsIdentity): void {
+  /** Puts the email on the account's profile. The install ID has no profile data. */
+  #identify(owner: AnalyticsSubject): void {
     if (!this.#client) return;
+    if (owner.email === null) {
+      if (this.#identifiedOwner) this.#enqueue("clear", () => this.#client?.clear());
+      this.#identifiedOwner = null;
+      return;
+    }
     const previous = this.#identifiedOwner;
     if (previous?.id === owner.id && previous.email === owner.email) return;
     if (previous && previous.id !== owner.id) this.#enqueue("clear", () => this.#client?.clear());
-    this.#identifiedOwner = { ...owner };
-    this.#enqueue("identify", () => this.#client?.identify({ profileId: owner.id, email: owner.email }));
+    const identity = { id: owner.id, email: owner.email };
+    this.#identifiedOwner = identity;
+    this.#enqueue("identify", () => this.#client?.identify({ profileId: identity.id, email: identity.email }));
   }
 
   #send(name: HostEventName, properties: HostProperties, profileId: string, timestamp?: string): void {
@@ -762,6 +959,27 @@ export class HostAnalytics {
       agent_source: listing ? "curated" : listingId ? "community" : "custom",
       ...(listing ? { agent_listing: listing } : {}),
     };
+  }
+
+  #providerAuth(agentId: string): HostProperties {
+    const agent = this.#resolveProviderAuth && this.#resolveAgent(agentId);
+    if (!agent || !this.#resolveProviderAuth) return {};
+    try {
+      return { provider_auth: this.#resolveProviderAuth(agent) };
+    } catch {
+      return { provider_auth: "unknown" };
+    }
+  }
+
+  /** The turn's usage rows, or `null` when they cannot be read and no token property is sent. */
+  #turnUsage(agentId: string, turnId: string, startedAtTime: number): readonly TurnModelUsage[] | null {
+    const resolve = this.#resolveTurnUsage;
+    if (!resolve) return null;
+    try {
+      return resolve(agentId, turnId, new Date(startedAtTime - TURN_USAGE_MARGIN_MS).toISOString());
+    } catch {
+      return null;
+    }
   }
 
   #pruneActiveTurns(now: number): void {
@@ -899,6 +1117,16 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
     if (key === "run_kind") return isOneOf(["scheduled", "manual"] as const, value) ? value : undefined;
     if (key === "trigger_type") return isOneOf(ROUTINE_TRIGGER_TYPES, value) ? value : undefined;
   }
+  if (name === "system_workflow_run") {
+    if (key === "status") return isOneOf(["done", "failed", "stopped"] as const, value) ? value : undefined;
+    if (key === "source") return isOneOf(WORKFLOW_RUN_SOURCES, value) ? value : undefined;
+    if (key === "step_count" || WORKFLOW_RUN_STEP_COUNTS.some(([property]) => property === key))
+      return boundedCount(value, MAX_WORKFLOW_RUN_STEPS);
+    if (key === "duration_ms")
+      return isNumber(value) && Number.isFinite(value) && value >= 0 && value <= MAX_WORKFLOW_RUN_MS
+        ? value
+        : undefined;
+  }
   if (name === "system_tool_used") {
     if (key === "tool_kind") return isOneOf(TOOL_KINDS, value) ? value : undefined;
     if (key === "plugin") {
@@ -921,6 +1149,7 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
     if (key === "computer_use_enabled") return isBoolean(value) ? value : undefined;
     return boundedCount(value, 10_000);
   }
+  if (key === "provider_auth") return isOneOf(PROVIDER_AUTH_KINDS, value) ? value : undefined;
   if (key === "agent_source") return isOneOf(["curated", "community", "custom"] as const, value) ? value : undefined;
   if (key === "agent_listing") return isString(value) && LISTING_SLUG_PATTERN.test(value) ? value : undefined;
   if (key === "status") return isString(value) ? normalizedTurnStatus(value) : undefined;
@@ -931,6 +1160,11 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
   if (key === "area") return value === "agent" ? value : undefined;
   if (key === "prompt_count") {
     return isNumber(value) && Number.isInteger(value) && value >= 0 && value <= 100 ? value : undefined;
+  }
+  if (name === "system_turn_completed" || name === "system_token_usage") {
+    if (key === "token_usage") return isOneOf(["reported", "partial", "unknown"] as const, value) ? value : undefined;
+    if (key === "total_tokens" || TOKEN_PROPERTIES.some(([, property]) => property === key))
+      return boundedCount(value, MAX_TURN_TOKENS);
   }
   if (key === "duration_ms") {
     return isNumber(value) && Number.isFinite(value) && value >= 0 && value <= ACTIVE_TURN_TTL_MS ? value : undefined;
@@ -961,6 +1195,46 @@ function boundedCount(value: unknown, max: number): number | undefined {
   return isNumber(value) && Number.isInteger(value) && value >= 0 && value <= max ? value : undefined;
 }
 
+/** The counts of all models of a turn. A count is `null` when one model lacks it. */
+function sumTokens(rows: readonly TurnModelUsage[]): UsageTokens | null {
+  if (rows.length === 0) return null;
+  const sum: UsageTokens = { uncachedInput: 0, cachedInput: 0, cacheCreation: 0, output: 0 };
+  for (const row of rows) {
+    for (const [key] of TOKEN_PROPERTIES) {
+      const value = row.tokens[key];
+      const total = sum[key];
+      sum[key] = value === null || total === null ? null : total + value;
+    }
+  }
+  return sum;
+}
+
+function tokenTotal(tokens: UsageTokens): number {
+  return TOKEN_PROPERTIES.reduce((total, [key]) => total + (tokens[key] ?? 0), 0);
+}
+
+/**
+ * Counts only: `token_usage` is `unknown` when the provider reported no usage, never a zero, and
+ * `partial` when a count is missing. A missing count is left out rather than sent as 0.
+ */
+function tokenProperties(tokens: UsageTokens | null): HostProperties {
+  if (!tokens) return { token_usage: "unknown" };
+  const properties: HostProperties = {};
+  let known = 0;
+  for (const [key, name] of TOKEN_PROPERTIES) {
+    const value = tokens[key];
+    if (value === null) continue;
+    properties[name] = value;
+    known++;
+  }
+  if (known === 0) return { token_usage: "unknown" };
+  return {
+    ...properties,
+    total_tokens: tokenTotal(tokens),
+    token_usage: known === TOKEN_PROPERTIES.length ? "reported" : "partial",
+  };
+}
+
 function slugList(value: unknown, allowed: (item: string) => boolean): readonly string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const items = [...new Set(value.filter((item): item is string => isString(item) && allowed(item)))];
@@ -978,9 +1252,13 @@ function isRoutineRunFinished(status: RoutineRunConversationEventStatus): boolea
  * That costs the model breakdown for OpenCode, which is the cheaper of the two mistakes.
  */
 function reportedModel(value: string): string {
+  // Hermes names a model of the user's own endpoint `custom:<endpoint name>:<model>`.
+  if (value.startsWith("custom:")) return "custom";
   const separator = value.indexOf("/");
   if (separator < 0) return value;
-  return isOneOf(AGENT_PROVIDERS, value.slice(0, separator)) ? value : "custom";
+  // A key-only provider never puts its own id before a model id, so that prefix comes from OpenCode.
+  const prefix = value.slice(0, separator);
+  return isOneOf(AGENT_PROVIDERS, prefix) && !isKeyOnlyProvider(prefix) ? value : "custom";
 }
 
 function hostedSiteFailureCode(value: string): string {

@@ -1,11 +1,13 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { runDebtRatchet } from "./debt-ratchet";
+import { typeCheckerScript } from "./type-checker";
 
 // Holds TypeScript options that are not yet on in tsconfig.base.json to the error count of each file
-// in tools/typescript/type-baseline.json. It runs `tsc` once for each project and option, with the
-// option turned on. `scripts/debt-ratchet.ts` has the rules of the baseline. When an option has no
-// errors left, turn it on in tsconfig.base.json and remove it from the baseline.
+// in tools/typescript/type-baseline.json. It runs the type checker (`scripts/type-checker.ts`) once for
+// each project and option, with the option turned on. `scripts/debt-ratchet.ts` has the rules of the
+// baseline. When an option has no errors left, turn it on in tsconfig.base.json and remove it from the
+// baseline.
 
 const ROOT = resolve(import.meta.dirname, "..");
 // Every project that extends tsconfig.base.json. apps/mobile extends the Expo base config.
@@ -28,7 +30,7 @@ runDebtRatchet({
   baselinePath: resolve(ROOT, "tools/typescript/type-baseline.json"),
   noun: "errors",
   finishedStep: "Turn it on in tsconfig.base.json and remove it from the baseline.",
-  inspectHint: "Run `bun node_modules/typescript/bin/tsc --noEmit -p <project> --<option>` to see them.",
+  inspectHint: "Run `bun scripts/type-checker.ts --noEmit -p <project> --<option>` to see them.",
   count: (options) => new Map(options.map((option) => [option, countErrors(option)])),
 });
 
@@ -40,22 +42,12 @@ function countErrors(option: string): Map<string, number> {
     // `--incremental false` keeps this run from replacing the build info of the normal typecheck.
     const result = spawnSync(
       process.execPath,
-      [
-        resolve(ROOT, "node_modules/typescript/bin/tsc"),
-        "--noEmit",
-        "--pretty",
-        "false",
-        "--incremental",
-        "false",
-        "-p",
-        project,
-        `--${option}`,
-      ],
+      [typeCheckerScript(), "--noEmit", "--pretty", "false", "--incremental", "false", "-p", project, `--${option}`],
       { cwd: ROOT, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 },
     );
     const lines = result.stdout.split("\n").filter((line) => ERROR_LINE.test(line));
     if (result.status !== 0 && lines.length === 0) {
-      throw new Error(`tsc failed on ${project} without type errors:\n${result.stdout}${result.stderr}`);
+      throw new Error(`The type checker failed on ${project} without type errors:\n${result.stdout}${result.stderr}`);
     }
     for (const line of lines) errors.add(line);
   }

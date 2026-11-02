@@ -19,6 +19,7 @@ export const messages = {
   "common.create": "Oluştur",
   "common.open": "Aç",
   "common.search": "Ara",
+  "common.noMatches": "Eşleşme yok",
   "common.loading": "Yükleniyor…",
   "common.saving": "Kaydediliyor…",
   "common.tryAgain": "Tekrar dene",

@@ -21,8 +21,15 @@ export interface OutboxRowStatus {
   cancel: () => void;
 }
 
-/** Touch and hold on a message that the host does not have yet opens Retry, Edit and Don't send. */
-export function OutboxMessageMenu({ status, children }: PropsWithChildren<{ status: OutboxRowStatus }>) {
+/**
+ * Touch and hold on a message that the host does not have yet opens Retry, Edit and Don't send.
+ * The iOS menu sizes the message to its content with no width limit, so `maxWidth` wraps its text.
+ */
+export function OutboxMessageMenu({
+  status,
+  maxWidth,
+  children,
+}: PropsWithChildren<{ status: OutboxRowStatus; maxWidth: number }>) {
   const { t } = useText();
   const { theme } = useUniwind();
   const { message } = status;
@@ -52,7 +59,7 @@ export function OutboxMessageMenu({ status, children }: PropsWithChildren<{ stat
         accessibilityRole="button"
         accessibilityHint={t("mobile.chat.outbox.menuHint")}
         // Not sent yet: drawn lighter than the messages the host has.
-        style={{ opacity: failed ? 1 : 0.55 }}
+        style={{ maxWidth, opacity: failed ? 1 : 0.55 }}
       >
         {children}
       </View>

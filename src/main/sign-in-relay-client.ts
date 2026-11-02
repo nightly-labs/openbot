@@ -60,6 +60,8 @@ interface Waiting {
   /** `null` for a page that returns nowhere: no callback is its own. */
   state: string | null;
   receive: (query: string) => void;
+  /** Whether a callback came back. The host then completes the sign-in, and nothing waits for a paste. */
+  accepted: () => boolean;
 }
 
 /** A page that the user already chose, as with a link in a conversation. */
@@ -94,7 +96,8 @@ export class SignInRelayClient {
 
   /** What the renderer shows while the sign-in of `key` waits, or `null`. */
   page(key: string): McpSignInRelayPage | null {
-    return this.#waiting.get(key)?.page ?? null;
+    const waiting = this.#waiting.get(key);
+    return waiting && !waiting.accepted() ? waiting.page : null;
   }
 
   /**
@@ -124,6 +127,8 @@ export class SignInRelayClient {
     if (waiting.state === null) throw new Error(sourceText("error.mcp.relayAddressInvalid"));
     const query = relayCallbackQuery(address, waiting.state);
     if (query === null) throw new Error(sourceText("error.mcp.relayAddressInvalid"));
+    // The sign-in already has its callback, and the host completes it: a second one would change nothing.
+    if (waiting.accepted()) return;
     waiting.receive(query);
   }
 
@@ -172,6 +177,7 @@ export class SignInRelayClient {
           url: page.toString(),
           state: null,
           receive: () => undefined,
+          accepted: () => false,
         });
         yield* self.#openChosen(key, chosen);
         return yield* awaitResult(remote, flowId);
@@ -193,6 +199,7 @@ export class SignInRelayClient {
         url: page.toString(),
         state,
         receive: (value) => Deferred.doneUnsafe(query, Effect.succeed(value)),
+        accepted: () => Deferred.isDoneUnsafe(query),
       });
       yield* self.#openChosen(key, chosen);
 
@@ -202,7 +209,6 @@ export class SignInRelayClient {
         awaitResult(remote, flowId).pipe(Effect.map((result) => ({ result }))),
       );
       if ("result" in ended) return ended.result;
-      forget();
       const completed = yield* remote.complete(flowId, ended.query);
       return completed.result ?? (yield* awaitResult(remote, flowId));
     }).pipe(

@@ -43,7 +43,7 @@ export function permissionFromQuery(search: string): MacPermissionId {
   return new URLSearchParams(search).get("permission") === "accessibility" ? "accessibility" : "screen-recording";
 }
 
-export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; sunshine?: boolean }) {
+export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; sunshine?: boolean | undefined }) {
   const { t, errorMessage } = useText();
   const permission = props.permission;
   const help = PERMISSION_HELP[permission];

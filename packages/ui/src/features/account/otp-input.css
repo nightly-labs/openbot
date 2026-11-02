@@ -54,13 +54,16 @@
   border-radius: var(--openbot-radius-md);
 }
 
+/* A surface can set the slots with `--otp-slot-border`, `--otp-slot-background`,
+   `--otp-slot-filled-background` and `--otp-slot-shadow`. The error and success states keep their colours. */
 .otp-input-slot {
   position: relative;
   display: grid;
   flex: 0 0 var(--otp-slot-size);
   place-items: center;
-  border: 1px solid var(--openbot-border-strong);
-  background: var(--openbot-bg-control);
+  border: 1px solid var(--otp-slot-border, var(--openbot-border-strong));
+  background: var(--otp-slot-background, var(--openbot-bg-control));
+  box-shadow: var(--otp-slot-shadow, none);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-xl);
@@ -70,6 +73,10 @@
     border-color var(--openbot-duration-hover) ease,
     background-color var(--openbot-duration-hover) ease,
     color var(--openbot-duration-hover) ease;
+}
+
+.otp-input-slot[data-filled="true"] {
+  background: var(--otp-slot-filled-background, var(--otp-slot-background, var(--openbot-bg-control)));
 }
 
 .otp-input-slot[data-group-start="true"] {
@@ -106,7 +113,8 @@
 .otp-input-caret {
   position: absolute;
   z-index: 2;
-  top: 13px;
+  /* Centred in the slot: 13px down in the default 50px slot. */
+  top: calc((var(--otp-slot-height) - 24px) / 2);
   left: 50%;
   width: 1px;
   height: 24px;
@@ -117,6 +125,22 @@
 
 .otp-input-caret[data-trailing="true"] {
   margin-left: 7px;
+}
+
+/* The compact code fits the width of its card, so that a long code does not push the card wider. */
+.otp-input[data-size="compact"] {
+  container-type: inline-size;
+  justify-items: start;
+}
+
+.otp-input[data-size="compact"] .otp-input-slots {
+  --otp-slot-height: 48px;
+  --otp-slot-gap: var(--openbot-space-2);
+  --otp-group-gap: 14px;
+  --otp-slot-size: min(
+    var(--openbot-control-xl),
+    calc((100cqw - (var(--otp-length) - 1) * var(--otp-slot-gap) - var(--otp-group-gap)) / var(--otp-length))
+  );
 }
 
 .otp-input[data-status="verifying"] .otp-input-slot {
@@ -179,6 +203,11 @@
 
 .otp-input[data-status="success"] .otp-input-message {
   color: var(--openbot-success);
+}
+
+.otp-input[data-size="compact"] .otp-input-message {
+  justify-content: flex-start;
+  text-align: start;
 }
 
 @keyframes otp-character-enter {

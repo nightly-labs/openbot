@@ -15,7 +15,7 @@ interface ResolveRuntimeInput {
   sourceRoot: string;
   platform: "darwin" | "win32" | "linux";
   architecture: string;
-  overrideRoot?: string;
+  overrideRoot?: string | undefined;
 }
 export const resolveRemoteDesktopRuntime = Effect.fn("RemoteDesktop.resolveRuntime")(function* (
   input: ResolveRuntimeInput,

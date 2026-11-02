@@ -9,6 +9,7 @@ import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import type { MobileAgentWaitReason } from "@/features/workspace/model/agent-activity";
 import { useText } from "@/shared/lib/text";
+import { typeScale } from "@/shared/lib/type-scale";
 
 /** One icon per wait reason, the same icons as the desktop sidebar. */
 const WAIT_ICON = {
@@ -18,7 +19,7 @@ const WAIT_ICON = {
 } as const satisfies Record<MobileAgentWaitReason, LucideIcon>;
 
 /** The chip in the time slot: what the user does next. */
-const WAIT_ACTION = {
+export const AGENT_WAIT_ACTION = {
   question: "mobile.agent.list.waiting.action.question",
   approval: "mobile.agent.list.waiting.action.approval",
   takeover: "mobile.agent.list.waiting.action.takeover",
@@ -70,8 +71,12 @@ export function AgentWaitChip({ reason }: { reason: MobileAgentWaitReason }) {
     >
       {/* Thin strokes on the tinted fill read darker than the solid mark, so the label is heavier. */}
       <Icon color={String(warning)} size={13} strokeWidth={2.8} />
-      <Typography.Paragraph type="body-xs" weight="bold" style={{ color: String(warning) }} numberOfLines={1}>
-        {t(WAIT_ACTION[reason])}
+      <Typography.Paragraph
+        className="font-bold"
+        style={[typeScale.small, { color: String(warning) }]}
+        numberOfLines={1}
+      >
+        {t(AGENT_WAIT_ACTION[reason])}
       </Typography.Paragraph>
     </View>
   );
@@ -91,14 +96,16 @@ export function AgentWaitingGroupHeader({ count }: { count: number }) {
       accessible
       accessibilityRole="header"
       accessibilityLabel={t("mobile.agent.list.waiting.label", { count })}
-      className="min-h-12 flex-row items-center gap-2 px-4 pt-5 pb-2"
+      className="flex-row items-center gap-1.5 px-5 pt-5 pb-1.5"
     >
-      <Typography.Paragraph className="text-muted">{t("mobile.agent.list.waiting.title")}</Typography.Paragraph>
+      <Typography.Paragraph className="font-medium text-muted" style={typeScale.caption}>
+        {t("mobile.agent.list.waiting.title")}
+      </Typography.Paragraph>
       <View
         className="h-5 min-w-5 items-center justify-center rounded-full px-1.5"
         style={{ backgroundColor: String(warning) }}
       >
-        <Typography.Paragraph type="body-xs" weight="semibold" style={{ color: String(background) }}>
+        <Typography.Paragraph className="font-semibold" style={[typeScale.small, { color: String(background) }]}>
           {format.number(count)}
         </Typography.Paragraph>
       </View>

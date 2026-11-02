@@ -2,6 +2,10 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/onboarding";
 
 export const messages = {
+  "onboarding.readFailed.title": "OpenBot は設定を読み込めませんでした。",
+  "onboarding.readFailed.description":
+    "ローカルのデータは変更されていません。もう一度お試しください。問題が続く場合は、OpenBot を設定し直してください。",
+  "onboarding.readFailed.setUpAgain": "設定し直す",
   "onboarding.setup.saveFailed": "OpenBot はローカルの設定を保存できませんでした。",
   "onboarding.setup.verifyFailed": "OpenBot はこの招待を確認できませんでした。",
   "onboarding.setup.connectFailed": "OpenBot はこのホストに接続できませんでした。",
@@ -39,6 +43,11 @@ export const messages = {
   "onboarding.provider.googlePlan": "Google AI Pro または Ultra プラン",
   "onboarding.provider.cursorPlan": "Cursor プランまたは API キー",
   "onboarding.provider.clineAccount": "Cline アカウントで無料モデル",
+  "onboarding.provider.kimiAccount": "Kimi Code アカウントで Kimi モデル",
+  "onboarding.provider.hermesNous": "Nous Portal プランまたはお使いの Hermes の設定",
+  "onboarding.provider.inceptionKey": "Inception API キーで Mercury モデル",
+  "onboarding.provider.deepseekKey": "DeepSeek API キーで使う DeepSeek モデル",
+  "onboarding.provider.openrouterKey": "OpenRouter API キーで使う多数のモデル",
   "onboarding.provider.tryFree": "無料で試す",
   "onboarding.provider.noSignIn": "サインイン不要",
   "onboarding.provider.more": "その他のプロバイダー",
@@ -77,6 +86,15 @@ export const messages = {
   "onboarding.choice.subscription": "サブスクリプションがあります",
   "onboarding.choice.subscriptionDetail": "ChatGPT、Claude、Grok",
   "onboarding.choice.startFreeInstead": "代わりに無料で始める",
+  "onboarding.consent.notice": "続行すると、{terms}に同意し、{privacy}を確認したものとみなされます。",
+  "onboarding.consent.analyticsTitle": "OpenBot の改善に協力する",
+  "onboarding.consent.analyticsDetail":
+    "機能の使用状況をアカウントとメールアドレスに関連付け、閲覧した Web サイト、ツールの使用状況、セットアップの日次概要を共有します。関連付けない場合は、基本的な使用状況のみがランダムなインストール ID とともに送信されます。チャット、ファイル、プロンプトは送信しません。",
+  "onboarding.consent.thanksTitle": "ありがとうございます！チーム一同、感謝しています。",
+  "onboarding.consent.thanksToast": "OpenBot の改善にご協力いただきありがとうございます 💜",
+  "onboarding.consent.thanksToastDetail": "この設定は「設定」からいつでも変更できます。",
+  "onboarding.consent.termsLink": "利用規約",
+  "onboarding.consent.privacyLink": "プライバシーポリシー",
   "onboarding.plan.title": "プランを接続",
   "onboarding.plan.description": "一度サインインするだけ。エージェントがあなたのプランを使います。",
   "onboarding.computer.title": "OpenBot がコンピューターを操作する場合があります",

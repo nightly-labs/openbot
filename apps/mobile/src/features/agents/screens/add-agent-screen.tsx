@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AvatarHue, CreateAgentInput } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
-import { router, Stack, useNavigation } from "expo-router";
+import { router, Stack } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import X from "lucide-react-native/icons/x";
@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
 import { AgentRuntimeFields } from "@/features/agents/components/agent-runtime-fields";
+import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
 import { agentInitialMessage } from "@/features/agents/model/agent-initial-message";
 import { useMobileWorkspace, useMobileWorkspaceReader } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
@@ -35,11 +36,10 @@ export function AddAgentScreen() {
   const [avatarHue, setAvatarHue] = useState<AvatarHue | null>(null);
   const [initialAvatarSeed] = useState(avatarSeed);
   const pending = useRef(false);
-  const navigation = useNavigation();
   const [finished, setFinished] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const valid = name.trim().length > 0;
+  const valid = name.trim().length > 0 && !instructionsTooLong(description);
 
   const dirty = Boolean(
     name.trim() ||
@@ -48,14 +48,19 @@ export function AddAgentScreen() {
       avatarHue !== null ||
       runtime.provider !== undefined,
   );
-  usePreventRemove(!finished && (dirty || saving), ({ data }) => {
+  // Discard turns prevention off before it repeats the action, so the hook does not warn.
+  const [discarding, setDiscarding] = useState(false);
+  usePreventRemove(!discarding && !finished && (dirty || saving), ({ repeat }) => {
     if (pending.current) return;
     Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
       { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
       {
         text: t("mobile.agent.discard.discard"),
         style: "destructive",
-        onPress: () => navigation.dispatch(data.action),
+        onPress: () => {
+          setDiscarding(true);
+          repeat();
+        },
       },
     ]);
   });
@@ -157,11 +162,11 @@ export function AddAgentScreen() {
         label={t("mobile.agent.add.descriptionLabel")}
         appearance="soft"
         multiline
-        maxLength={INPUT_LIMITS.agentDescription}
         placeholder={t("mobile.agent.add.descriptionPlaceholder")}
         value={description}
         onChangeText={setDescription}
       />
+      <InstructionsLimit text={description} />
 
       <NewAgentRuntimeFields
         serverId={serverId}
@@ -170,7 +175,7 @@ export function AddAgentScreen() {
         onChange={(value) => setRuntime((current) => ({ ...current, ...value }))}
       />
 
-      {dirty && !valid ? (
+      {dirty && !name.trim() ? (
         <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
           {t("mobile.agent.add.nameRequired")}
         </Typography.Paragraph>

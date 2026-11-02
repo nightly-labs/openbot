@@ -405,21 +405,231 @@
   height: var(--openbot-control-xs);
 }
 
-.routine-planner-empty {
+/*
+ * The calendar before its first routine: a faint month behind the pitch. The month and the pitch
+ * share one grid cell. Sample runs land on the month one at a time and write a note.
+ */
+.routine-planner-empty,
+.routine-planner-empty-board {
   display: grid;
+  min-width: 0;
+}
+
+.routine-planner-empty > *,
+.routine-planner-empty-board > * {
+  grid-area: 1 / 1;
+}
+
+.routine-planner-empty-board {
+  pointer-events: none;
+  user-select: none;
+}
+
+.routine-planner-empty-cells,
+.routine-planner-empty-runs {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: 10rem;
+}
+
+/* Only hairlines. They clear behind the pitch and fade towards every edge. */
+.routine-planner-empty-cells {
+  mask-image:
+    radial-gradient(ellipse 36% 36% at 50% 50%, var(--openbot-transparent) 68%, var(--openbot-text-primary) 100%),
+    radial-gradient(ellipse 72% 78% at 50% 50%, var(--openbot-text-primary) 50%, var(--openbot-transparent) 100%);
+  mask-composite: intersect;
+}
+
+.routine-planner-empty-cell {
+  border-top: 1px solid var(--openbot-border);
+  border-left: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-dim);
+  font-size: var(--openbot-text-md);
+}
+
+.routine-planner-empty-cell[data-outside] {
+  opacity: 0.45;
+}
+
+.routine-planner-empty-cell[data-today] {
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+/* A run lands, writes its note, holds, then fades. The animation is `LIFE` steps of `STEP_MS`. */
+.routine-planner-empty-run {
+  display: grid;
+  min-width: 0;
+  align-self: start;
+  justify-items: start;
+  gap: var(--openbot-space-2);
+  grid-row: var(--routine-planner-empty-row);
+  grid-column: var(--routine-planner-empty-column);
+  margin-top: calc(var(--openbot-space-8) + var(--openbot-space-1));
+  padding-inline: var(--openbot-space-2);
+  animation: routine-planner-empty-life var(--routine-planner-empty-life) var(--openbot-ease-out) both;
+}
+
+.routine-planner-empty-run > .routine-planner-run {
+  width: 100%;
+}
+
+.routine-planner-empty-day {
+  display: none;
+}
+
+.routine-planner-empty-check {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  opacity: 0;
+  animation: routine-planner-empty-draw 420ms var(--openbot-ease-out) 380ms forwards;
+}
+
+@keyframes routine-planner-empty-life {
+  0% {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(10px) scale(0.96);
+  }
+
+  8%,
+  88% {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+
+  100% {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes routine-planner-empty-draw {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Handwriting. The app has no hand font, so it uses the one of the system. */
+.routine-planner-hand {
+  color: var(--openbot-accent-text);
+  font-family: "Bradley Hand", "Noteworthy", "Segoe Print", cursive;
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.routine-planner-empty-note {
+  display: grid;
+  width: fit-content;
+  padding-inline: var(--openbot-space-1);
+  font-size: var(--openbot-text-xl);
+  line-height: 1.3;
+  transform: rotate(-1.5deg);
+  transform-origin: left top;
+}
+
+/* Each line writes itself from left to right, at the speed of its length. */
+.routine-planner-empty-line {
+  clip-path: inset(-0.4em 100% -0.4em -0.2em);
+  animation: routine-planner-empty-write var(--routine-planner-empty-length) linear var(--routine-planner-empty-delay)
+    forwards;
+}
+
+@keyframes routine-planner-empty-write {
+  to {
+    clip-path: inset(-0.4em -0.2em -0.4em -0.2em);
+  }
+}
+
+.routine-planner-empty-underline {
+  width: 100%;
+  height: var(--openbot-space-2);
+  overflow: visible;
+}
+
+.routine-planner-empty-underline path {
+  fill: none;
+  stroke: currentColor;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  stroke-linecap: round;
+  opacity: 0;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  animation: routine-planner-empty-draw 520ms var(--openbot-ease-out) var(--routine-planner-empty-delay) forwards;
+}
+
+.routine-planner-empty-pitch {
+  z-index: 1;
+  display: grid;
+  max-width: 34rem;
+  place-self: center;
   justify-items: center;
-  gap: var(--openbot-space-3);
-  border: 1px dashed var(--openbot-border-grouped);
-  border-radius: var(--openbot-radius-lg);
-  padding: var(--openbot-space-8) var(--openbot-space-4);
-  color: var(--openbot-text-muted);
+  gap: var(--openbot-space-4);
+  padding: var(--openbot-space-6);
   text-align: center;
 }
 
-.routine-planner-empty > svg {
-  width: var(--openbot-space-6);
-  height: var(--openbot-space-6);
-  stroke-width: var(--openbot-icon-stroke);
+.routine-planner-empty-title {
+  display: grid;
+  font-size: var(--openbot-text-display);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.routine-planner-empty-title > .routine-planner-empty-lead {
+  color: var(--openbot-text-muted);
+}
+
+/* The one handwritten word of the title. It writes itself once. */
+/* Inline, not inline-block: a reader then hears "done." with no space before the full stop. */
+.routine-planner-empty-done {
+  clip-path: inset(-0.4em 100% -0.4em -0.2em);
+  animation: routine-planner-empty-write 520ms linear 500ms forwards;
+}
+
+.routine-planner-empty-lines {
+  display: grid;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-xl);
+  line-height: 1.5;
+}
+
+.routine-planner-empty-action.ui-button {
+  width: 100%;
+  max-width: 22rem;
+  height: var(--openbot-control-lg);
+  margin-top: var(--openbot-space-2);
+}
+
+.routine-planner-empty-menu {
+  min-width: 14rem;
+  max-height: min(520px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 520px));
+  overflow-y: auto;
+}
+
+/* Less motion: one still frame with three runs and their notes. */
+.routine-planner-empty[data-still]
+:is(
+  .routine-planner-empty-run,
+  .routine-planner-empty-check,
+  .routine-planner-empty-line,
+  .routine-planner-empty-underline path,
+  .routine-planner-empty-done
+) {
+  animation: none;
+  clip-path: none;
+  stroke-dashoffset: 0;
+  opacity: 1;
 }
 
 .routine-planner-skeleton-heading {
@@ -473,5 +683,50 @@
 
   .routine-planner[data-view="month"] .routine-planner-day-button > span {
     display: inline;
+  }
+
+  /* The pitch comes first, then one row for each run on screen. */
+  .routine-planner-empty > .routine-planner-empty-board {
+    grid-area: 2 / 1;
+  }
+
+  .routine-planner-empty-pitch {
+    padding-inline: 0;
+  }
+
+  .routine-planner-empty-title {
+    font-size: var(--openbot-text-3xl);
+  }
+
+  .routine-planner-empty-lines {
+    font-size: var(--openbot-text-lg);
+  }
+
+  .routine-planner-empty-cells {
+    display: none;
+  }
+
+  .routine-planner-empty-runs {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(3, 8rem);
+    grid-auto-rows: 0;
+  }
+
+  .routine-planner-empty-run {
+    width: 100%;
+    grid-row: var(--routine-planner-empty-slot);
+    grid-column: 1;
+    margin-top: 0;
+    padding-inline: 0;
+  }
+
+  .routine-planner-empty-day {
+    display: block;
+    color: var(--openbot-text-dim);
+    font-size: var(--openbot-text-sm);
+  }
+
+  .routine-planner-empty-note {
+    font-size: var(--openbot-text-lg);
   }
 }

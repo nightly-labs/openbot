@@ -43,14 +43,23 @@ function fromHsl(hue: number, saturation: number, lightness: number): VoiceRgb {
 
 /**
  * The aurora stays inside the agent's own colour: its hue, two neighbours a
- * little to each side, and a lighter core.
+ * little to each side, and a lighter core. A channel takes one colour from each
+ * of its first members, so the glow mixes the agents the user speaks to.
  */
-export function voicePalette(color: string, dark: boolean): VoicePalette {
+export function voicePalette(colors: readonly string[], dark: boolean): VoicePalette {
+  const parsed = colors.map(parseHex).filter((color): color is VoiceRgb => color !== null);
   // A dark canvas takes the colours a little lighter. On a light canvas a light
   // colour fades into the background, so they go deeper and more saturated.
   const lift = dark ? 0.06 : -0.05;
   const minSaturation = dark ? 0.62 : 0.72;
-  const [hue, saturation, lightness] = toHsl(parseHex(color) ?? FALLBACK);
+  if (parsed.length >= 2) {
+    const pick = (index: number) => {
+      const [hue, saturation, lightness] = toHsl(parsed[index % parsed.length] ?? FALLBACK);
+      return fromHsl(hue, Math.max(saturation, minSaturation - 0.02), Math.min(0.7, lightness + lift));
+    };
+    return [pick(0), pick(1), pick(2), pick(3)];
+  }
+  const [hue, saturation, lightness] = toHsl(parsed[0] ?? FALLBACK);
   const vivid = Math.max(saturation, minSaturation);
   const base = Math.min(0.66, Math.max(0.42, lightness)) + lift;
   return [

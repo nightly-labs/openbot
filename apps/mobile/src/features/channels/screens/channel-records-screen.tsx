@@ -1,0 +1,149 @@
+import { useQuery } from "@tanstack/react-query";
+import { router, useLocalSearchParams } from "expo-router";
+import { Button, Typography } from "heroui-native";
+import { MemoryEditor, RoutineEditor } from "@/features/agents/components/agent-record-editor";
+import { useEventRoutines } from "@/features/agents/components/use-event-routines";
+import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { useChannels } from "@/features/channels/components/use-channels";
+import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { queryKeys } from "@/features/workspace/model/query-keys";
+import { useText } from "@/shared/lib/text";
+
+export function ChannelRecordsScreen({ section }: { section: "memories" | "memory" | "routines" | "routine" }) {
+  const { t } = useText();
+  const { channelId, serverId, recordId } = useLocalSearchParams<{
+    channelId: string;
+    serverId: string;
+    recordId?: string;
+  }>();
+  const queryScope = useQueryScope();
+  const online = useMobileWorkspaceSelector((current) =>
+    current.servers.some((server) => server.id === serverId && server.state === "online"),
+  );
+  const { store, channels } = useChannels(serverId);
+  const available = online && channels.some((channel) => channel.id === channelId);
+  const key = queryKeys.channelInfo(queryScope, serverId, channelId);
+  const memorySection = section === "memories" || section === "memory";
+  const options = { enabled: available, retry: false, staleTime: 0, gcTime: 0 };
+  const memories = useQuery({
+    ...options,
+    enabled: available && memorySection,
+    queryKey: queryKeys.channelInfo(queryScope, serverId, channelId, "memories"),
+    queryFn: () => store.memories(serverId, channelId),
+  });
+  const routines = useQuery({
+    ...options,
+    enabled: available && !memorySection,
+    queryKey: queryKeys.channelInfo(queryScope, serverId, channelId, "routines"),
+    queryFn: () => store.routines(serverId, channelId),
+  });
+  const { eventsEnabled, eventRoutines, webhookRoutines } = useEventRoutines(
+    { kind: "channel", id: channelId },
+    serverId,
+    available && !memorySection,
+    // Under "routines", so the routine change events of the channel reload this list too.
+    [...queryKeys.channelInfo(queryScope, serverId, channelId, "routines"), "events"],
+  );
+  const query = memorySection ? memories : routines;
+  const recordsPending = query.isPending || (eventsEnabled && eventRoutines.isPending);
+  const recordsError = query.isError || (eventsEnabled && eventRoutines.isError);
+  const target = { id: channelId, serverId };
+  const memory = memories.data?.find((item) => item.id === recordId);
+  const routine = routines.data?.find((item) => item.id === recordId);
+  const eventRoutine = eventRoutines.data?.find((item) => item.id === recordId);
+  const allRoutines = [...(routines.data ?? []), ...webhookRoutines];
+  return (
+    <SettingsContent>
+      {!available ? <Typography.Paragraph>{t("mobile.channel.records.connect")}</Typography.Paragraph> : null}
+      {recordsPending && (Boolean(recordId) || section === "memories" || section === "routines") ? (
+        <Typography.Paragraph>{t("common.loading")}</Typography.Paragraph>
+      ) : recordsError && !query.data && !eventRoutines.data ? (
+        <>
+          <Typography.Paragraph accessibilityRole="alert">
+            {t("mobile.channel.records.loadFailed")}
+          </Typography.Paragraph>
+          <Button onPress={() => void query.refetch()}>
+            <Button.Label>{t("common.tryAgain")}</Button.Label>
+          </Button>
+        </>
+      ) : recordId && !memory && !routine && !eventRoutine ? (
+        <Typography.Paragraph>{t("mobile.channel.records.gone")}</Typography.Paragraph>
+      ) : section === "memory" ? (
+        <MemoryEditor
+          agent={target}
+          memory={memory}
+          available={available}
+          port={{
+            queryKey: key,
+            save: (text, id) => store.saveMemory(serverId, channelId, text, id),
+            delete: (id) => store.deleteMemory(serverId, channelId, id),
+          }}
+        />
+      ) : section === "routine" ? (
+        <RoutineEditor
+          agent={target}
+          routine={eventRoutine ?? routine}
+          available={available}
+          port={{
+            queryKey: key,
+            create: (input) => store.createRoutine(serverId, { ...input, channelId }),
+            update: (input) => store.updateRoutine(serverId, { ...input, channelId }),
+            delete: (id) => store.deleteRoutine(serverId, channelId, id),
+            test: (id) => store.testRoutine(serverId, channelId, id),
+          }}
+        />
+      ) : (
+        <SettingsSection>
+          {memorySection
+            ? memories.data?.map((item) => (
+                <SettingsRow
+                  key={item.id}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/channel-info/[channelId]/memory",
+                      params: { channelId, serverId, recordId: item.id },
+                    })
+                  }
+                >
+                  <Typography.Paragraph numberOfLines={2}>{item.text}</Typography.Paragraph>
+                </SettingsRow>
+              ))
+            : allRoutines.map((item) => (
+                <SettingsRow
+                  key={item.id}
+                  supportingText={t(item.active ? "mobile.channel.records.enabled" : "mobile.channel.records.paused")}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/channel-info/[channelId]/routine",
+                      params: { channelId, serverId, recordId: item.id },
+                    })
+                  }
+                >
+                  <Typography.Paragraph>{item.name}</Typography.Paragraph>
+                </SettingsRow>
+              ))}
+          {!memorySection && !allRoutines.length ? (
+            <SettingsRow>
+              <Typography.Paragraph>
+                {t(memorySection ? "mobile.channel.records.noMemories" : "mobile.channel.records.noRoutines")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+          <SettingsRow
+            onPress={() =>
+              router.push({
+                pathname: memorySection ? "/channel-info/[channelId]/memory" : "/channel-info/[channelId]/routine",
+                params: { channelId, serverId },
+              })
+            }
+          >
+            <Typography.Paragraph>
+              {t(memorySection ? "mobile.channel.records.addMemory" : "mobile.channel.records.addRoutine")}
+            </Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
+      )}
+    </SettingsContent>
+  );
+}

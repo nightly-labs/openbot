@@ -2,7 +2,7 @@
  * The named shutdown steps `createApplicationServices` accumulates while it builds, so a quit that
  * arrives mid-startup tears down exactly what exists rather than nothing at all.
  *
- * Two things it does that the hand-written shutdown sequence it replaces did not:
+ * Three things it does that the hand-written shutdown sequence it replaces did not:
  *
  * - **Every step is caught.** A rejecting `remoteServers.stop()` used to skip the host, the WebRTC
  *   bridge and the agent service below it, leaving provider CLIs running after the app had quit.
@@ -15,6 +15,10 @@
  *   A step registered after `runAll` has returned is genuinely best-effort: nothing awaits it, and
  *   `app.quit()` can end the process first. Closing that last gap needs construction itself to
  *   abort on `before-quit`, which it does not do today.
+ * - **A step can wait for the steps it abandoned.** A step that passes its limit keeps running. The
+ *   database step waits for these before it closes, so a slow agent stop does not write to a closed
+ *   database (#3166). The wait ends at half the step limit, and the step then runs anyway: a database
+ *   that the process leaves open makes the next start check every page, which takes minutes.
  *
  * Steps declare an **order** rather than running last-in-first-out. Shutdown here is largely
  * *construction* order and not its reverse: the browser host is destroyed before the
@@ -40,6 +44,12 @@ interface TeardownStep {
   order: number;
   name: string;
   run: () => PromiseLike<unknown> | unknown;
+  afterAbandonedSteps: boolean;
+}
+
+export interface TeardownStepOptions {
+  /** Run after every step that passed its limit has ended, or at half the step limit. */
+  afterAbandonedSteps?: boolean;
 }
 
 export class TeardownRegistry {
@@ -50,6 +60,8 @@ export class TeardownRegistry {
   #pending: TeardownStep[] | null = null;
   #closed = false;
   #tail: Promise<void> = Promise.resolve();
+  /** Steps that passed their limit and still run. Each removes itself when it ends. */
+  readonly #abandoned = new Set<Promise<unknown>>();
 
   constructor({ reportError, stepTimeoutMs = DEFAULT_STEP_TIMEOUT_MS }: TeardownRegistryOptions) {
     this.#reportError = reportError;
@@ -57,8 +69,13 @@ export class TeardownRegistry {
   }
 
   /** `order` is the position in the shutdown sequence, not the position in this call sequence. */
-  push(order: number, name: string, run: () => PromiseLike<unknown> | unknown): void {
-    const step = { order, name, run };
+  push(
+    order: number,
+    name: string,
+    run: () => PromiseLike<unknown> | unknown,
+    { afterAbandonedSteps = false }: TeardownStepOptions = {},
+  ): void {
+    const step = { order, name, run, afterAbandonedSteps };
     if (!this.#closed) {
       this.#steps.push(step);
       return;
@@ -99,19 +116,36 @@ export class TeardownRegistry {
 
   async #runStep(step: TeardownStep): Promise<void> {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const running = (step.afterAbandonedSteps ? this.#abandonedSettled() : Promise.resolve()).then(() => step.run());
     const timedOut = new Promise<void>((resolve) => {
       timer = setTimeout(() => {
         this.#reportError(step.name, new Error(`It did not stop within ${this.#stepTimeoutMs} ms.`));
+        // The step is abandoned, not cancelled: it keeps running, but the steps after it no longer wait.
+        const abandoned = running.then(
+          () => undefined,
+          (error) => this.#reportError(step.name, error),
+        );
+        this.#abandoned.add(abandoned);
+        void abandoned.finally(() => this.#abandoned.delete(abandoned));
         resolve();
       }, this.#stepTimeoutMs);
     });
     try {
-      // The step is abandoned, not cancelled: it keeps running, but the steps after it no longer wait.
-      await Promise.race([Promise.resolve().then(() => step.run()), timedOut]);
+      await Promise.race([running, timedOut]);
     } catch (error) {
       this.#reportError(step.name, error);
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  async #abandonedSettled(): Promise<void> {
+    if (this.#abandoned.size === 0) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const waitEnded = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, this.#stepTimeoutMs / 2);
+    });
+    await Promise.race([Promise.allSettled([...this.#abandoned]), waitEnded]);
+    clearTimeout(timer);
   }
 }

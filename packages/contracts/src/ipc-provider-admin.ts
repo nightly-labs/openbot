@@ -13,13 +13,23 @@ import {
   isProviderAccountId,
   isProviderAccountStatus,
   MAX_PROVIDER_ACCOUNTS,
+  PROVIDER_USAGE_RESET_OUTCOMES,
   type ProviderApiKeyStatus,
   type ProviderCodeLoginStart,
   type ProviderHostSignInStatus,
   type ProviderRelaySignInStatus,
+  type ProviderUsageResetOutcome,
+  type ProviderUsageResets,
 } from "./ipc-agent-status";
 import type { ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "./ipc-app-auth";
 import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
+import {
+  CUSTOM_AGENT_LIMITS,
+  type CustomAgentResult,
+  type CustomAgentSummary,
+  isCustomAgentResult,
+  isCustomAgentSummary,
+} from "./ipc-custom-agents";
 import {
   type CustomProviderResult,
   type CustomProviderSummary,
@@ -87,6 +97,34 @@ export function decodeHostProviderAccounts(value: unknown): HostProviderAccounts
 export function decodeHostProviderAccountUsage(value: unknown): AccountUsage {
   if (!isAccountUsage(value) || value.limits.some((limit) => limit.accountId === undefined))
     throw new Error("Invalid provider account usage.");
+  return value;
+}
+
+/**
+ * The `accounts` of a `provider-usage-reset-v1` list, and the IPC answer. A provider this client
+ * does not know is left out, as the host's status leaves it out.
+ */
+export function decodeProviderUsageResets(value: unknown): ProviderUsageResets[] {
+  const invalid = () => new Error("Invalid provider usage resets.");
+  if (!Array.isArray(value)) throw invalid();
+  return value.flatMap((row: unknown) => {
+    if (
+      !isDynamicRecord(row) ||
+      !isProviderAccountId(row.accountId) ||
+      !isNumber(row.available) ||
+      !Number.isInteger(row.available) ||
+      row.available < 0
+    )
+      throw invalid();
+    return isAgentProvider(row.provider)
+      ? [{ provider: row.provider, accountId: row.accountId, available: row.available }]
+      : [];
+  });
+}
+
+/** The `outcome` of a `provider-usage-reset-v1` consume, and the IPC answer. */
+export function decodeProviderUsageResetOutcome(value: unknown): ProviderUsageResetOutcome {
+  if (!isOneOf(PROVIDER_USAGE_RESET_OUTCOMES, value)) throw new Error("Invalid provider usage reset.");
   return value;
 }
 
@@ -166,14 +204,56 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
         providers.cline === undefined
           ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
           : decodeProviderRuntimeStatus(providers.cline),
+      // A host before Kimi sends no Kimi row; this client cannot download Kimi there.
+      kimi:
+        providers.kimi === undefined
+          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
+          : decodeProviderRuntimeStatus(providers.kimi),
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };
 }
 
+/**
+ * The `providers-v8` snapshot, in which each runtime is a row keyed by `id`. The rows become the
+ * record that the IPC snapshot has, and `decodeProviderRuntimeSnapshot` checks them. The IPC record
+ * is closed, so a row for a provider that this build does not know is not kept: this client cannot
+ * download it. The host status still names that provider.
+ */
+export function decodeProviderRuntimeSnapshotV8(value: unknown): ProviderRuntimeSnapshot {
+  if (!isDynamicRecord(value) || !Array.isArray(value.providers) || !Array.isArray(value.toolRuntimes))
+    throw new Error("Invalid provider runtimes.");
+  return decodeProviderRuntimeSnapshot({
+    revision: value.revision,
+    providers: Object.fromEntries(runtimeRows(value.providers)),
+    toolRuntimes: Object.fromEntries(runtimeRows(value.toolRuntimes)),
+  });
+}
+
+function runtimeRows(rows: readonly unknown[]): Map<string, unknown> {
+  const byId = new Map<string, unknown>();
+  for (const row of rows) {
+    if (!isDynamicRecord(row) || !isString(row.id) || byId.has(row.id)) throw new Error("Invalid provider runtimes.");
+    byId.set(row.id, row);
+  }
+  return byId;
+}
+
 // The contract guard asserts that a summary carries no key, and fails closed on the whole list.
 export function decodeCustomProviderSummaries(value: unknown): CustomProviderSummary[] {
   if (!Array.isArray(value) || !value.every(isCustomProviderSummary)) throw new Error("Invalid custom providers.");
+  return value;
+}
+
+/** `custom-agents-v1`: the list fails closed, as the local list does. */
+export function decodeCustomAgentSummaries(value: unknown): CustomAgentSummary[] {
+  if (!Array.isArray(value) || value.length > CUSTOM_AGENT_LIMITS.agents || !value.every(isCustomAgentSummary))
+    throw new Error("Invalid custom agents.");
+  return value;
+}
+
+export function decodeCustomAgentResult(value: unknown): CustomAgentResult {
+  if (!isCustomAgentResult(value)) throw new Error("Invalid custom agent result.");
   return value;
 }
 

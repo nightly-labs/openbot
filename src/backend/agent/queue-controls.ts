@@ -26,7 +26,10 @@ import { providerForAgent } from "./thread-items";
 export interface QueueControlsHooks {
   /** The channel task that owns a delivery. Read late: the channel service is built after this. */
   channelAssignment(deliveryId: string): ChannelAssignment | null;
-  /** The thread of the open task that a delivery runs in, or null for the agent's own chat. */
+  /**
+   * The thread of the task that a delivery runs in, or null for the agent's own chat. It throws for a
+   * deleted task.
+   */
   taskThreadId(deliveryId: string): string | null;
 }
 
@@ -216,13 +219,13 @@ export class QueueControls {
 
   readonly steer = Effect.fn("QueueControls.steer")(function* (this: QueueControls, input: SteerQueuedMessageInput) {
     const agent = yield* this.#store.existing(input.agentId).pipe(toQueueOperationFailed);
-    const { client, session, snapshot, context, turnId } = yield* queueStep(() => {
+    const { client, session, snapshot, context, turnId, taskThreadId } = yield* queueStep(() => {
       const client = this.#providers.requireReadyClientForAgent(agent);
       // A task message steers the task's turn, in the task's own provider session.
       const taskThreadId = this.#hooks.taskThreadId(input.deliveryId);
       const session = taskThreadId
-        ? this.#store.database.activeProviderSession(taskThreadId, agent.provider)
-        : this.#store.activeProviderSession(agent.id);
+        ? this.#store.database.activeProviderSession(taskThreadId, agent.provider)?.externalSessionId
+        : this.#store.activeProviderSession(agent.id)?.externalSessionId;
       const snapshot = this.#conversation.ensureSnapshot(agent.id, taskThreadId ?? agent.threadId);
       if (!session || !snapshot.activeTurnId || snapshot.activeTurnId !== input.expectedTurnId)
         throw new Error(sourceText("error.backend.steerTurnChanged"));
@@ -233,14 +236,23 @@ export class QueueControls {
         throw new Error(sourceText("error.backend.steerQueuedOnly"));
       const turnId = snapshot.activeTurnId;
       // Steering uses the running turn's endpoint even when the saved model has changed.
-      if (!this.#endpoints.serves(this.#drain.modelForTurn(agent.id, turnId) ?? agent.model))
+      if (!this.#endpoints.serves(this.#drain.modelForTurn(agent.id, turnId) ?? agent.model, client.provider))
         throw new Error(REMOVED_ENDPOINT_MESSAGE);
-      return { client, session, snapshot, context, turnId };
+      return { client, session, snapshot, context, turnId, taskThreadId };
     });
+    // A routine run in the agent's chat has its own session, which ends with the run. A message
+    // steered into it would not stay in the chat's session, so it waits for the next turn.
+    if (!taskThreadId && this.#conversation.routineSession(agent.id)) {
+      yield* this.#mailbox.markSteerFallback(input.deliveryId, "steer-failed").pipe(toQueueOperationFailed);
+      this.#mailboxSync.emitQueue(agent.id);
+      return yield* new QueueOperationFailed({
+        cause: new SteerUnsupportedError(sourceText("error.backend.steerRoutineRun")),
+      });
+    }
     if (agentProviderDescriptor(providerForAgent(agent)).steer !== "native") {
       yield* this.#mailbox.markSteerFallback(input.deliveryId, "provider-unsupported").pipe(toQueueOperationFailed);
       this.#mailboxSync.emitQueue(agent.id);
-      return yield* new QueueOperationFailed({ cause: new Error(sourceText("error.backend.steerUnsupported")) });
+      return yield* new QueueOperationFailed({ cause: new SteerUnsupportedError() });
     }
     yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(agent.id);
@@ -248,7 +260,7 @@ export class QueueControls {
       .request(
         "turn/steer",
         {
-          threadId: session.externalSessionId,
+          threadId: session,
           expectedTurnId: turnId,
           clientUserMessageId: input.deliveryId,
           input: deliveryPromptInput(context, {
@@ -285,6 +297,13 @@ export class QueueControls {
       this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId: input.deliveryId });
     });
   }, Effect.uninterruptible);
+}
+
+/** The message cannot steer the running turn, so it stays queued. A refusal, not a failure. */
+export class SteerUnsupportedError extends Error {
+  constructor(message = sourceText("error.backend.steerUnsupported")) {
+    super(message);
+  }
 }
 
 export class QueueOperationFailed extends Schema.TaggedError<QueueOperationFailed>()("QueueOperationFailed", {

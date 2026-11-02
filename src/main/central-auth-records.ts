@@ -1,3 +1,4 @@
+import { type HostKeyHandover, optionalHostKeyHandovers } from "@openbot/contracts/host-key-handover";
 import { inviteUseCount, isPermanentInvite } from "@openbot/contracts/invite-links";
 import type { CentralAuthUser, MobileConnectedDevice } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
@@ -18,6 +19,8 @@ export interface RemoteHostSummary {
   name: string;
   logoKey: string | null;
   devicePublicKey: string | null;
+  /** The host's signed key handovers. An account server from before handovers sends none. */
+  keyHandovers: HostKeyHandover[];
   authEpoch: number;
   membershipId: string;
   role: "owner" | "admin" | "member";
@@ -49,6 +52,7 @@ export interface RemoteInvitePreview {
   emailBound: boolean;
   permanent: boolean;
   devicePublicKey: string | null;
+  keyHandovers: HostKeyHandover[];
 }
 
 export interface RemoteMemberRecord {
@@ -81,11 +85,15 @@ export function decodeCentralAuthUser(value: unknown): CentralAuthUser {
   const avatarUrl = record.avatarUrl;
   if (name !== null && !isString(name)) throw new Error("Invalid account name.");
   if (avatarUrl !== null && !isString(avatarUrl)) throw new Error("Invalid account avatar.");
+  // An account service from before the analytics answer sends no field: the user never answered.
+  const analyticsEnabled = record.analyticsEnabled ?? null;
+  if (analyticsEnabled !== null && !isBoolean(analyticsEnabled)) throw new Error("Invalid account analytics answer.");
   return {
     id: requiredString(record, "id"),
     email: requiredString(record, "email"),
     name,
     avatarUrl,
+    analyticsEnabled,
   };
 }
 
@@ -160,6 +168,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       name: requiredString(host, "name"),
       logoKey: host.logoKey,
       devicePublicKey: host.devicePublicKey,
+      keyHandovers: optionalHostKeyHandovers(host.keyHandovers),
       authEpoch: host.authEpoch,
       membershipId: requiredString(host, "membershipId"),
       role: host.role,
@@ -230,6 +239,7 @@ export function decodeRemoteInvitePreview(value: unknown): RemoteInvitePreview {
     emailBound: record.emailBound,
     permanent: isPermanentInvite(record.permanent, record.expiresAt),
     devicePublicKey: record.devicePublicKey,
+    keyHandovers: optionalHostKeyHandovers(record.keyHandovers),
   };
 }
 

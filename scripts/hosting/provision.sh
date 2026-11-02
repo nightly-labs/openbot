@@ -22,7 +22,7 @@ SOURCE=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=openbot-hosted-update
 source "$SOURCE/openbot-hosted-update"
 
-[[ $SERVICE_USER =~ ^[a-z_][a-z0-9_-]*$ ]] && id "$SERVICE_USER" >/dev/null || fail "Unknown service user."
+[[ $SERVICE_USER =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] && id "$SERVICE_USER" >/dev/null || fail "Unknown service user."
 [[ $APPIMAGE_URL == https://* ]] || fail "The AppImage URL must use HTTPS."
 [[ $APPIMAGE_SHA256 =~ ^[0-9a-f]{64}$ ]] || fail "The AppImage SHA-256 must be 64 hex digits."
 [[ $AUTH_API_URL =~ ^https://[^/?#[:space:]]+/?$ ]] || fail "The account server URL must be an HTTPS origin."

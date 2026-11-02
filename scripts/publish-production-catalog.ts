@@ -58,6 +58,8 @@ export interface Publication {
   catalogVersion: string;
   skills: PublishedSkill[];
   agents: PublishedAgent[];
+  /** Agent slugs that this catalog no longer lists. */
+  retiredAgents: string[];
 }
 
 export function createPublicationSql(publication: Publication, publishedAt: number): string {
@@ -86,6 +88,14 @@ export function createPublicationSql(publication: Publication, publishedAt: numb
     );
   }
 
+  /* A retired agent loses its listing only. Its versions and bundles stay, so installed copies keep
+     their snapshot, and a later catalog that lists the slug again approves a new version. */
+  for (const slug of publication.retiredAgents) {
+    statements.push(
+      `UPDATE marketplace_agents SET approved_version_id = NULL, featured = 0, updated_at = ${publishedAt} WHERE id = ${sql(`openbot-curated-agent-${slug}`)} AND owner_user_id = ${sql(owner.id)};`,
+    );
+  }
+
   return `${statements.join("\n")}\n`;
 }
 
@@ -104,6 +114,9 @@ export async function publishProductionCatalog(
       process.stdout.write(
         `Dry run: ${publication.skills.length} skills and ${publication.agents.length} agents from ${publication.catalogVersion} are ready for ${target} under owner ${owner.name}.\n`,
       );
+      if (publication.retiredAgents.length > 0) {
+        process.stdout.write(`Retired agents to unlist: ${publication.retiredAgents.join(", ")}.\n`);
+      }
       process.stdout.write(
         `No resources were changed. Add ${target === "local" ? "--local --apply" : "--apply --confirm-production"} to publish.\n`,
       );
@@ -147,7 +160,7 @@ export async function publishProductionCatalog(
     await writeFile(sqlPath, createPublicationSql(publication, Date.now()));
     await run(wrangler, ["d1", "execute", productionDatabase, mode, "--file", sqlPath, "--yes"]);
     process.stdout.write(
-      `Published ${publication.skills.length} skills and ${publication.agents.length} agents to ${target} under owner ${owner.name}.\n`,
+      `Published ${publication.skills.length} skills and ${publication.agents.length} agents to ${target} under owner ${owner.name}, and unlisted ${publication.retiredAgents.length} retired agents.\n`,
     );
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
@@ -184,7 +197,16 @@ async function readPublication(root: string): Promise<Publication> {
     catalogVersion: catalogValue.catalogVersion,
     skills: catalogValue.skills.map(parseSkill),
     agents: agentValue.agents.map(parseAgent),
+    retiredAgents: parseRetiredAgents(agentValue.retired),
   };
+}
+
+function parseRetiredAgents(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (!isDynamicRecord(value) || !Array.isArray(value.agents) || !value.agents.every(isString)) {
+    throw new Error("Generated production agent catalog has an invalid retired list.");
+  }
+  return value.agents;
 }
 
 function parseSkill(value: unknown): PublishedSkill {

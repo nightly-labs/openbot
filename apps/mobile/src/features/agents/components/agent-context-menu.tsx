@@ -22,7 +22,9 @@ function useAgentMenuActions(agent: MobileAgent) {
   const { toggleAgentPinAnimated } = useAgentPinTransition();
   const sectionMenu = useChatSectionMenu(agent.serverId, agent.id);
   const isPinned = useMobileWorkspaceSelector(({ pinnedAgentIds }) => pinnedAgentIds.includes(agent.id));
-  const canPin = useMobileWorkspaceSelector(({ pinnedAgentIds }) => canToggleAgentPin(pinnedAgentIds, agent.id));
+  const canPin = useMobileWorkspaceSelector(({ pinnedAgentIds, pinnedChannelIds }) =>
+    canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id),
+  );
   const isUnread = useAgentUnread(agent.id);
   const actionPending = useRef(false);
   const { t } = useText();

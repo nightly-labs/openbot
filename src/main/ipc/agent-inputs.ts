@@ -1,9 +1,11 @@
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AcknowledgeFailedTurnInput,
   type AgentIpcRequest,
   type AgentMemorySelectionChange,
   type AgentTaskInput,
+  agentThreadTitle,
+  type BranchAgentTaskInput,
   type CancelAgentWaitInput,
   type CancelMessageLinkInput,
   type CancelQueuedMessageInput,
@@ -37,13 +39,18 @@ import {
   isRoutineSchedule,
   type ListChannelRoutineRunsInput,
   type ListRoutineRunsInput,
+  type MarkAgentTaskReadInput,
   type MarkConversationReadInput,
+  type MarkConversationUnreadInput,
   type OpenAttachmentInput,
   type OpenMessageLinkInput,
   type OpenSharedFileInput,
   type OpenWorkspaceFileInput,
   type PasteMessageLinkInput,
+  type PreviewSharedFileInput,
+  type PreviewWorkspaceFileInput,
   type ReadConversationPageInput,
+  type RenameAgentTaskInput,
   type ReorderQueueInput,
   type RespondToApprovalInput,
   type RespondToBrowserTakeoverInput,
@@ -122,6 +129,28 @@ export function parseOptionalAgentId(value: unknown): string | undefined {
   return parseAgentId(value);
 }
 
+/** An action of the renderer or of `sidebar-folders-v1`: it can nest a folder in a folder. */
+export function parseSidebarFolderAction(value: unknown): SidebarLayoutAction {
+  if (!isObject(value) || !isString(value.type)) throw new Error("Invalid sidebar layout action.");
+  if (value.type === "nest") {
+    const parentId = value.parentId;
+    const beforeSectionId = value.beforeSectionId;
+    if (parentId !== null && !isString(parentId)) throw new Error("Invalid sidebar folder parent.");
+    if (beforeSectionId !== null && !isString(beforeSectionId)) throw new Error("Invalid sidebar folder order target.");
+    return {
+      type: "nest",
+      sectionId: requireString(value.sectionId, "sectionId", INPUT_LIMITS.identifier),
+      parentId: parentId === null ? null : requireString(parentId, "parentId", INPUT_LIMITS.identifier),
+      beforeSectionId:
+        beforeSectionId === null ? null : requireString(beforeSectionId, "beforeSectionId", INPUT_LIMITS.identifier),
+    };
+  }
+  const action = parseSidebarLayoutAction(value);
+  if (action.type !== "create" || value.parentId === undefined) return action;
+  return { ...action, parentId: requireString(value.parentId, "parentId", INPUT_LIMITS.identifier) };
+}
+
+/** An action of the released `/v1/sidebar-layout/actions` route: every folder is at the top level. */
 export function parseSidebarLayoutAction(value: unknown): SidebarLayoutAction {
   if (!isObject(value) || !isString(value.type)) throw new Error("Invalid sidebar layout action.");
   switch (value.type) {
@@ -415,9 +444,11 @@ export function parseListChannelRoutineRuns(value: unknown): ListChannelRoutineR
 
 export function parseReadConversationPage(value: unknown): ReadConversationPageInput {
   if (!isObject(value)) throw new Error("Invalid conversation page request.");
+  const agentId = requireString(value.agentId, "agentId", INPUT_LIMITS.identifier);
+  const anchor = parsePageAnchor(value.anchor);
   return {
-    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
-    anchor: parsePageAnchor(value.anchor),
+    agentId,
+    ...(anchor === undefined ? {} : { anchor }),
     limit: parsePageLimit(value.limit),
   };
 }
@@ -455,6 +486,7 @@ export function parseSearchConversationMessages(value: unknown): SearchConversat
       : { agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier) }),
     ...(value.cursor === undefined ? {} : { cursor: requireString(value.cursor, "cursor", 2048) }),
     limit,
+    ...(value.includeSideThreads === true ? { includeSideThreads: true } : {}),
   };
 }
 
@@ -518,6 +550,16 @@ export function parseSendMessage(value: unknown): SendMessageInput {
   if (taskId !== undefined && (!isString(taskId) || !taskId || taskId.length > INPUT_LIMITS.identifier)) {
     throw new Error("Invalid task id.");
   }
+  const voiceRecordingDraftId = value.voiceRecordingDraftId;
+  if (
+    voiceRecordingDraftId !== undefined &&
+    (!isString(voiceRecordingDraftId) ||
+      !voiceRecordingDraftId ||
+      voiceRecordingDraftId.length > INPUT_LIMITS.identifier ||
+      attachmentDraftIds.includes(voiceRecordingDraftId))
+  ) {
+    throw new Error("Invalid voice recording draft.");
+  }
   return {
     agentId: requireString(value.agentId, "agentId"),
     text: value.text,
@@ -525,6 +567,7 @@ export function parseSendMessage(value: unknown): SendMessageInput {
     replyToMessageId: replyToMessageId?.trim() || null,
     ...(clientMessageId === undefined ? {} : { clientMessageId }),
     ...(taskId === undefined ? {} : { taskId }),
+    ...(voiceRecordingDraftId === undefined ? {} : { voiceRecordingDraftId }),
   };
 }
 
@@ -554,6 +597,30 @@ export function parseAgentTask(value: unknown): AgentTaskInput {
   };
 }
 
+export function parseBranchAgentTask(value: unknown): BranchAgentTaskInput {
+  if (!isObject(value)) throw new Error("Invalid branch request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    taskId: value.taskId === null ? null : requireString(value.taskId, "taskId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    requestId: requireString(value.requestId, "requestId", INPUT_LIMITS.identifier),
+  };
+}
+
+export function parseRenameAgentTask(value: unknown): RenameAgentTaskInput {
+  const task = parseAgentTask(value);
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  const title = agentThreadTitle(value.title);
+  if (title === null) throw new Error("Invalid title.");
+  return { ...task, title };
+}
+
+export function parseMarkAgentTaskRead(value: unknown): MarkAgentTaskReadInput {
+  const task = parseAgentTask(value);
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  return { ...task, throughMessageId: requireString(value.throughMessageId, "throughMessageId") };
+}
+
 export function parseMessageReaction(value: unknown): SetMessageReactionInput {
   if (!isObject(value)) throw new Error("Invalid message reaction request.");
   const emoji = value.emoji;
@@ -577,6 +644,14 @@ export function parseMarkConversationRead(value: unknown): MarkConversationReadI
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     throughMessageId:
       throughMessageId === null ? null : requireString(throughMessageId, "throughMessageId", INPUT_LIMITS.identifier),
+  };
+}
+
+export function parseMarkConversationUnread(value: unknown): MarkConversationUnreadInput {
+  if (!isObject(value)) throw new Error("Invalid conversation unread request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    fromMessageId: requireString(value.fromMessageId, "fromMessageId", INPUT_LIMITS.identifier),
   };
 }
 
@@ -624,9 +699,24 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     if (!isBoolean(value.computerUse)) throw new Error("Invalid Computer Use value.");
     result.computerUse = value.computerUse;
   }
+  // `null` returns the agent to the account default.
   if (value.allowAutomation !== undefined) {
-    if (!isBoolean(value.allowAutomation)) throw new Error("Invalid automation value.");
+    if (value.allowAutomation !== null && !isBoolean(value.allowAutomation))
+      throw new Error("Invalid automation value.");
     result.allowAutomation = value.allowAutomation;
+  }
+  if (value.allowNewChat !== undefined) {
+    if (value.allowNewChat !== null && !isBoolean(value.allowNewChat)) throw new Error("Invalid new chat value.");
+    result.allowNewChat = value.allowNewChat;
+  }
+  if (value.quickAcknowledgement !== undefined) {
+    if (value.quickAcknowledgement !== null && !isBoolean(value.quickAcknowledgement))
+      throw new Error("Invalid quick acknowledgement value.");
+    result.quickAcknowledgement = value.quickAcknowledgement;
+  }
+  if (value.fastMode !== undefined) {
+    if (!isBoolean(value.fastMode)) throw new Error("Invalid fast mode value.");
+    result.fastMode = value.fastMode;
   }
   if (value.providerAccountId !== undefined) {
     if (value.providerAccountId !== null && !isProviderAccountId(value.providerAccountId))
@@ -706,6 +796,12 @@ export function parseImportAttachments(value: unknown): ImportAttachmentsInput {
   return { paths: value.paths, data };
 }
 
+/** A renderer can provide file bytes, but it cannot ask main to read a disk path. */
+export function parseAttachmentData(value: unknown): ImportAttachmentsInput["data"] {
+  if (!Array.isArray(value)) throw new Error("Invalid attachment data.");
+  return parseImportAttachments({ paths: [], data: value }).data;
+}
+
 export function parseChooseAttachments(value: unknown): ChooseAttachmentsInput {
   if (!isObject(value) || (value.filter !== "all" && value.filter !== "images")) {
     throw new Error("Invalid attachment picker filter.");
@@ -766,6 +862,23 @@ export function parseOpenWorkspaceFile(value: unknown): OpenWorkspaceFileInput {
   };
 }
 
+export function parsePreviewSharedFile(value: unknown): PreviewSharedFileInput {
+  if (!isObject(value)) throw new Error("Invalid shared file request.");
+  return { ...parseOpenSharedFile(value), ...optionalPreviewByteLimit(value.maxBytes) };
+}
+
+export function parsePreviewWorkspaceFile(value: unknown): PreviewWorkspaceFileInput {
+  if (!isObject(value)) throw new Error("Invalid workspace file request.");
+  return { ...parseOpenWorkspaceFile(value), ...optionalPreviewByteLimit(value.maxBytes) };
+}
+
+function optionalPreviewByteLimit(value: unknown): { maxBytes?: number } {
+  if (value === undefined) return {};
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1 || value > ATTACHMENT_LIMITS.fileBytes)
+    throw new Error("Invalid preview size limit.");
+  return { maxBytes: value };
+}
+
 export function parseCancelQueuedMessage(value: unknown): CancelQueuedMessageInput {
   if (!isObject(value)) throw new Error("Invalid queue cancellation request.");
   return {
@@ -822,14 +935,14 @@ export function parseReorderQueue(value: unknown): ReorderQueueInput {
   if (!isObject(value)) throw new Error("Invalid queue reorder request.");
   return {
     agentId: requireString(value.agentId, "agentId"),
-    deliveryIds: parseIdentifierList(value.deliveryIds, "delivery ids"),
+    deliveryIds: parseIdentifierList(value.deliveryIds, "delivery ids", INPUT_LIMITS.queueReorder),
   };
 }
 
-function parseIdentifierList(value: unknown, label: string): string[] {
+function parseIdentifierList(value: unknown, label: string, limit: number = INPUT_LIMITS.messageRecipients): string[] {
   if (
     !Array.isArray(value) ||
-    value.length > INPUT_LIMITS.messageRecipients ||
+    value.length > limit ||
     !value.every((item) => isString(item) && item.length <= INPUT_LIMITS.identifier)
   ) {
     throw new Error(`Invalid ${label}.`);

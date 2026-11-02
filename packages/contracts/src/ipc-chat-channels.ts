@@ -4,10 +4,13 @@ import { type ConversationMessage, isConversationMessage } from "./ipc-conversat
 import { optionalHistoryExtent } from "./ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
-// Deprecated: no host advertises these capabilities, so every client hides channels. The next
-// release removes the channel IPC types.
 export const CHANNEL_CHATS_CAPABILITY = "channel-chats-v1";
 export const CHANNEL_DELETE_CAPABILITY = "channel-delete-v1";
+/**
+ * The host takes the channel command `cancel`, which ends a stopped or failed task and the open tasks
+ * below it. A host without it rejects the command, so a client shows Cancel only with it.
+ */
+export const CHANNEL_TASK_CANCEL_CAPABILITY = "channel-task-cancel-v1";
 /**
  * The id a channel row carries for the reader, and for its own author, while no account is signed
  * in. The person behind it does not change when they sign in, so their read cursors follow them and
@@ -70,8 +73,18 @@ export interface ChannelMessage {
 /** One ellipsised sidebar line: enough to preview a channel, never a whole message body. */
 export interface ChannelPreview {
   authorName: string;
+  /** Who wrote it. Absent from a host without channel-attention-v1. */
+  author?: { kind: ChannelMessage["author"]["kind"]; id: string };
+  /** Whether it is still streaming. Absent from a host without channel-attention-v1. */
+  status?: ConversationMessage["status"];
   text: string;
   at: string;
+}
+
+/** The execution thread of one member agent in a channel. A prompt on it belongs to the channel. */
+export interface ChannelThread {
+  agentId: string;
+  threadId: string;
 }
 
 export const CHANNEL_PREVIEW_LIMIT = 160;
@@ -79,7 +92,11 @@ export const CHANNEL_PREVIEW_LIMIT = 160;
 export interface ChannelSummary extends Channel {
   unreadCount: number;
   activeTasks: number;
+  /** Its queued, waiting and running tasks; `activeTasks` counts only running ones. Absent from a host without channel-attention-v1. */
+  openTasks?: number;
   lastMessage: ChannelPreview | null;
+  /** One for each member agent that has worked here. Absent from a host without channel-attention-v1. */
+  threads?: ChannelThread[];
 }
 
 export interface ChannelPage {
@@ -88,7 +105,7 @@ export interface ChannelPage {
   tasks: ChannelTask[];
   olderCursor: number | null;
   throughSequence: number;
-  /** As in `ConversationPageInfo`: the unloaded length, for the day rail. Absent from a remote host. */
+  /** As in `ConversationPageInfo`: the unloaded length, for the scroll rail. Absent from a remote host. */
   olderCount?: number;
   oldestAt?: string;
 }
@@ -134,7 +151,7 @@ export type ChannelCommand =
       origin: { kind: "routine"; routineId: string; routineName: string; runId: string };
     }
   | {
-      type: "stop" | "resume" | "reassign";
+      type: "stop" | "resume" | "reassign" | "cancel";
       operationId: string;
       channelId: string;
       taskId: string;
@@ -144,7 +161,7 @@ export type ChannelCommand =
 
 export interface ChannelReadInput {
   channelId: string;
-  beforeSequence?: number;
+  beforeSequence?: number | undefined;
 }
 
 /**
@@ -290,14 +307,32 @@ function isChannelSummary(value: unknown): value is ChannelSummary {
     isChannel(value) &&
     sequence(value.unreadCount) &&
     sequence(value.activeTasks) &&
-    (value.lastMessage === null || isChannelPreview(value.lastMessage))
+    (value.openTasks === undefined || sequence(value.openTasks)) &&
+    (value.lastMessage === null || isChannelPreview(value.lastMessage)) &&
+    (value.threads === undefined ||
+      (Array.isArray(value.threads) &&
+        value.threads.length <= INPUT_LIMITS.agents &&
+        value.threads.every(isChannelThread)))
   );
+}
+
+function isChannelThread(value: unknown): value is ChannelThread {
+  return isDynamicRecord(value) && isIdentifier(value.agentId) && isIdentifier(value.threadId);
 }
 
 function isChannelPreview(value: unknown): value is ChannelPreview {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.authorName, INPUT_LIMITS.accountName) &&
+    (value.author === undefined ||
+      (isDynamicRecord(value.author) &&
+        (value.author.kind === "member" || value.author.kind === "agent" || value.author.kind === "coordinator") &&
+        isIdentifier(value.author.id))) &&
+    (value.status === undefined ||
+      value.status === "streaming" ||
+      value.status === "completed" ||
+      value.status === "failed" ||
+      value.status === "interrupted") &&
     isBoundedString(value.text, CHANNEL_PREVIEW_LIMIT) &&
     isBoundedString(value.at, 80)
   );
@@ -325,7 +360,7 @@ export function parseChannelCommand(value: unknown): ChannelCommand {
   if (value.type === "read" && sequence(value.throughSequence))
     return { ...common, type: value.type, throughSequence: value.throughSequence };
   if (
-    (value.type === "stop" || value.type === "resume" || value.type === "reassign") &&
+    (value.type === "stop" || value.type === "resume" || value.type === "reassign" || value.type === "cancel") &&
     isIdentifier(value.taskId) &&
     (value.recipientAgentId === null || isIdentifier(value.recipientAgentId))
   ) {

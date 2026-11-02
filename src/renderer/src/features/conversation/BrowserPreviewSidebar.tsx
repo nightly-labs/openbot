@@ -10,7 +10,7 @@ export default function BrowserPreviewSidebar(
   props: Omit<
     ComponentProps<typeof SharedBrowserPreviewSidebar>,
     "capturePreview" | "readWidth" | "readCustomWidth" | "saveWidth" | "resetWidth"
-  > & { capturePreview?: ((tabId: string) => Promise<BrowserPreview>) | null },
+  > & { capturePreview?: ((tabId: string) => Promise<BrowserPreview>) | null | undefined },
 ) {
   return (
     <SharedBrowserPreviewSidebar

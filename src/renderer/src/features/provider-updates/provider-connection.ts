@@ -36,6 +36,8 @@ interface ProviderCodeLoginTarget {
   relay?: ProviderRelayTarget;
   /** A joined server that signs in one account of a provider on a page in its own browser. */
   accountSignIn?: ProviderAccountSignInTarget;
+  /** A joined server whose account sign-in page opens in this computer's browser. */
+  accountRelay?: ProviderAccountRelayTarget;
 }
 
 /**
@@ -68,6 +70,15 @@ interface ProviderHostSignInTarget {
  * `accountId` is null, or a signed-out one again. The page opens as for `ProviderHostSignInTarget`.
  */
 interface ProviderAccountSignInTarget extends Omit<ProviderHostSignInTarget, "start"> {
+  start: (provider: AgentProviderId, accountId: string | null) => Promise<void>;
+}
+
+/**
+ * How a joined server relays the sign-in of one account of a provider (`provider-account-relay-v1`
+ * or `-v2`), for the `providers` it names. The page opens as for `ProviderRelayTarget`.
+ */
+interface ProviderAccountRelayTarget extends Omit<ProviderRelayTarget, "start"> {
+  providers: readonly AgentProviderId[];
   start: (provider: AgentProviderId, accountId: string | null) => Promise<void>;
 }
 
@@ -114,7 +125,10 @@ export interface ProviderConnectionOptions {
  * out; nothing it is later traded for reaches the renderer.
  */
 export interface ProviderConnectionController extends ProviderConnectionApi {
-  /** Signs one account of a joined server's provider in on the host's page. Null signs a new one in. */
+  /**
+   * Signs one account of a joined server's provider in: through the relay when the host relays it,
+   * otherwise on the host's page. Null signs a new one in.
+   */
   connectAccount: (provider: AgentProviderId, accountId: string | null) => void;
 }
 
@@ -312,20 +326,22 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
         if (status.result.error) {
           endProviderCodeLogin(provider, { kind: "failed", message: status.result.error });
         } else {
-          const row = options.agentStatus().providers?.find((candidate) => candidate.id === provider);
-          endProviderCodeLogin(provider, { kind: "connected", accountLabel: row?.email ?? null });
+          endProviderCodeLogin(provider, { kind: "connected", accountLabel: signedInLabel(provider) });
         }
         return;
       }
       const state = codeLoginState();
       const shown = state.phase === "relay" ? state.page : null;
       // A page whose callback comes back to this computer needs nothing pasted. When it does not
-      // come back, the ⋯ menu has the code. With no code, the address paste stays.
+      // come back, the ⋯ menu has the code. With no code, the address paste stays. The code signs in
+      // the provider's own account, so an account's sign-in keeps the paste.
       const page =
-        status.page?.listening && route(provider).alternative === "code"
+        status.page?.listening && codeLoginAccount === undefined && route(provider).alternative === "code"
           ? { ...status.page, pasteable: false }
           : status.page;
-      if (page && !samePage(shown, page)) setCodeLoginState({ phase: "relay", hostName: relay.hostName, page });
+      // The page went away before the result: the callback came back, and the host completes the sign-in.
+      if (!page && shown) setCodeLoginState({ phase: "verifying" });
+      else if (page && !samePage(shown, page)) setCodeLoginState({ phase: "relay", hostName: relay.hostName, page });
       await new Promise((resolve) => window.setTimeout(resolve, HOST_SIGN_IN_POLL_MS));
     }
   }
@@ -527,7 +543,10 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     state: codeLoginState,
     opener: codeLoginOpener,
     connect: (provider, opener) => run(provider, route(provider).connect, opener ?? null),
-    connectAccount: (provider, accountId) => void startProviderCodeLogin(provider, "host-page", null, accountId),
+    connectAccount: (provider, accountId) => {
+      const relay = options.target().accountRelay?.providers.includes(provider);
+      void startProviderCodeLogin(provider, relay ? "relay" : "host-page", null, accountId);
+    },
     alternative: (provider, opener) => run(provider, route(provider).alternative, opener ?? null),
     useApp,
     closeUseApp: () => setUseApp(null),
@@ -569,13 +588,20 @@ function samePage(shown: McpSignInRelayPage | null, page: McpSignInRelayPage): b
   );
 }
 
-/** The target whose host page signs the account in, or the target itself for the provider's own sign-in. */
+/**
+ * The target whose host page or relay signs the account in, or the target itself for the provider's
+ * own sign-in. The provider's own page and relay do not sign an account in, so they go.
+ */
 function accountTarget(target: ProviderCodeLoginTarget, accountId: string | null | undefined): ProviderCodeLoginTarget {
-  const account = target.accountSignIn;
   if (accountId === undefined) return target;
-  if (!account) {
-    const { hostSignIn: _ownSignIn, ...rest } = target;
-    return rest;
-  }
-  return { ...target, hostSignIn: { ...account, start: (provider) => account.start(provider, accountId) } };
+  const { hostSignIn: _ownSignIn, relay: _ownRelay, accountSignIn, accountRelay, ...rest } = target;
+  return {
+    ...rest,
+    ...(accountSignIn
+      ? { hostSignIn: { ...accountSignIn, start: (provider) => accountSignIn.start(provider, accountId) } }
+      : {}),
+    ...(accountRelay
+      ? { relay: { ...accountRelay, start: (provider) => accountRelay.start(provider, accountId) } }
+      : {}),
+  };
 }

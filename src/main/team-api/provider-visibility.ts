@@ -1,32 +1,48 @@
+import { isAgentProvider } from "@openbot/contracts/agent-providers";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import type { TeamProtocolV1JsonObject, TeamProtocolV1JsonValue } from "@openbot/contracts/team-protocol/v1";
 
 /**
- * Tells if a peer on this protocol must not see the provider. Protocols 1 to 5 do not know Cursor
- * (`cursor`) or Cline (`cline`), protocols 1 to 4 do not know Gemini (`antigravity`) or custom ACP
- * agents (`acp`), and protocols 1 to 3 do not know OpenCode.
+ * The providers that each frozen protocol knows. Protocol 8 and later accept any provider id, so they
+ * have no list. Do not change a list: it is released vocabulary. A provider added after protocol 7 is
+ * hidden from every peer below protocol 8 without a change here.
+ */
+const FROZEN_PROVIDERS: ReadonlyMap<number, readonly string[]> = (() => {
+  const v1 = ["codex", "claude", "grok"];
+  const v4 = [...v1, "opencode"];
+  const v5 = [...v4, "antigravity", "acp"];
+  const v6 = [...v5, "cursor", "cline"];
+  const v7 = [...v6, "pi", "muse"];
+  return new Map([
+    [1, v1],
+    [2, v1],
+    [3, v1],
+    [4, v4],
+    [5, v5],
+    [6, v6],
+    [7, v7],
+  ]);
+})();
+
+/**
+ * Tells if a peer on this protocol must not see the provider: a provider of this host that the
+ * protocol's frozen list does not have. Protocol 8 and later see every provider.
  */
 export function isPeerHiddenProvider(value: unknown, protocol: number): boolean {
-  return (
-    (protocol < 7 && (value === "pi" || value === "muse")) ||
-    (protocol < 6 && (value === "cursor" || value === "cline")) ||
-    (protocol < 5 && (value === "antigravity" || value === "acp")) ||
-    (protocol < 4 && value === "opencode")
-  );
+  const known = FROZEN_PROVIDERS.get(Math.max(1, Math.min(protocol, 8)));
+  return known !== undefined && isAgentProvider(value) && !known.includes(value);
 }
 
 /**
- * The same test for an object `id`. `acp`, `cursor` and `cline` count only for a provider status
- * row, which has a `state`, below the protocol that knows them: a custom endpoint saved with that id before the provider existed is a
- * peer-visible endpoint, also in the `providers` list of a custom endpoint save or delete reply, and
- * it must stay one.
+ * The same test for an object `id`. Only OpenCode and Gemini (`antigravity`) count for any object.
+ * A later provider counts only for a provider status row, which has a `state`:
+ * a custom endpoint saved with that id before the provider existed is a peer-visible endpoint, also in
+ * the `providers` list of a custom endpoint save or delete reply, and it must stay one.
  */
 function isPeerHiddenId(value: TeamProtocolV1JsonObject, protocol: number, listKey: string): boolean {
+  if (value.id === "opencode" || value.id === "antigravity") return isPeerHiddenProvider(value.id, protocol);
   const statusRow = listKey === "providers" && typeof value.state === "string";
-  if (value.id === "pi" || value.id === "muse") return protocol < 7 && statusRow;
-  if (value.id === "acp") return protocol < 5 && statusRow;
-  if (value.id === "cursor" || value.id === "cline") return protocol < 6 && statusRow;
-  return isPeerHiddenProvider(value.id, protocol);
+  return statusRow && isPeerHiddenProvider(value.id, protocol);
 }
 
 /** A protocol view never changes the host's stored agents or provider sessions. */
@@ -39,14 +55,11 @@ export function legacyProviderView(value: unknown, hiddenIds: ReadonlySet<string
   return project(json, hiddenIds, 1);
 }
 
-/**
- * Removes the named agents and the providers protocol 4, 5 or 6 does not know. Protocol 4 knows
- * OpenCode; protocol 5 also knows Gemini and custom ACP agents; protocol 6 also knows Cursor and Cline.
- */
+/** Removes the named agents and the providers that the protocol does not know. See `FROZEN_PROVIDERS`. */
 export function hiddenAgentView(
   value: unknown,
   hiddenIds: ReadonlySet<string>,
-  protocol: 4 | 5 | 6 | 7,
+  protocol: 4 | 5 | 6 | 7 | 8,
 ): TeamProtocolV1JsonValue {
   const json: TeamProtocolV1JsonValue = JSON.parse(JSON.stringify(value));
   return project(json, hiddenIds, protocol);

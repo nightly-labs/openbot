@@ -80,7 +80,7 @@ interface BunArtifactPin {
  */
 export async function pinBunRuntime(
   input: {
-    version?: string;
+    version?: string | undefined;
     fetchImpl?: typeof fetch;
     /** Set to false to skip the `--version` assertion on the target that matches this host. */
     runBinary?: boolean;

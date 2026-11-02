@@ -4,7 +4,7 @@
   "tagline": "Payments and billing review",
   "description": "Stripe lets agents look up payments, customers, and invoices, and draft payment links, in the account the signed-in user can reach. Each user signs in to their own Stripe account through the browser.",
   "category": "other",
-  "creatorName": "stripe.com",
+  "creatorName": "Stripe",
   "iconUrl": "https://stripe.com/favicon.ico",
   "version": "1.0.0",
   "prompts": [

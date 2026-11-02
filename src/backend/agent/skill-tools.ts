@@ -140,7 +140,10 @@ export const runLocalSkillTool = Effect.fn("SkillTools.run")(function* (
     }
     case "read_local_skill": {
       const input = yield* toolStep(() => readSkillSchema.parse(args));
-      const skill = yield* api.get(input);
+      const skill = yield* api.get({
+        skillId: input.skillId,
+        ...(input.revision === undefined ? {} : { revision: input.revision }),
+      });
       return { ...skillToolDetail(skill), archivePath: skill.archivePath };
     }
     case "install_local_skill": {

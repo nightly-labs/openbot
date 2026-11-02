@@ -72,7 +72,7 @@ export interface DiagnosticStream {
 export function createDiagnosticStream(options: {
   redact: (value: string) => string;
   emit: (message: string) => void;
-  limit?: number;
+  limit?: number | undefined;
 }): DiagnosticStream {
   const limit = options.limit ?? DEFAULT_LIMIT;
   let pending = "";

@@ -10,6 +10,7 @@ export const messages = {
   "error.team.accountChangedDuringCreate":
     "L'account con cui hai effettuato l'accesso è cambiato durante la creazione del server.",
   "error.team.notConfigured": "Questo OpenBot non è stato configurato.",
+  "error.team.keyRotationMissing": "Nessun cambio della chiave del server è in attesa.",
   "error.team.serverNotActive": "Questo server non è più quello attivo per l'account con cui hai effettuato l'accesso.",
   "error.team.logoInvalid": "Scegli un'immagine PNG, JPEG o WebP valida, fino a 512 KB.",
   "error.team.ownerMembershipConflict":
@@ -29,6 +30,8 @@ export const messages = {
   "error.team.loginIncorrect": "Nome utente o password non corretti.",
   "error.team.currentPasswordIncorrect": "La password attuale non è corretta.",
   "error.team.memberNotFound": "Membro del team non trovato.",
+  "error.team.directMessageSelf": "Non puoi aprire un messaggio diretto con te stesso.",
+  "error.team.directRecipientUnavailable": "Questo membro del team non è disponibile.",
   "error.team.ownerCannotChange": "L'account del proprietario non può essere modificato.",
   "error.team.ownerCannotRemove": "L'account del proprietario non può essere rimosso.",
   "error.team.serverNotConfigured": "Il server del team non è configurato.",
@@ -59,17 +62,27 @@ export const messages = {
   "error.team.providerNotManaged": "OpenBot non gestisce la CLI di questo provider.",
   "error.team.channelsUnsupported": "Le chat dei canali non sono supportate da questa connessione.",
   "error.team.channelDeleteUnsupported": "L'eliminazione dei canali non è supportata da questa connessione.",
+  "error.team.channelTaskCancelUnsupported":
+    "L'annullamento delle attività dei canali non è supportato da questa connessione.",
   "error.team.membersCannotDeleteChannels": "I membri non possono eliminare i canali.",
   "error.team.membersCannotArchiveChannels": "I membri non possono archiviare i canali.",
+  "error.team.membersCannotRestoreChannels": "I membri non possono ripristinare i canali.",
   "error.team.sharedDataUnsupported": "I dati condivisi non sono supportati da questa connessione.",
   "error.team.agentInstallUnsupported": "L'aggiunta di agenti non è supportata da questa connessione.",
   "error.team.agentHideUnsupported": "Nascondere gli agenti non è supportato da questa connessione.",
+  "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
+  "error.team.agentNotificationLevelsUnsupported":
+    "Questo server non può salvare il tuo livello di notifiche per ogni agente. Aggiorna OpenBot sul computer che lo esegue.",
+  "error.team.sidebarPinsUnsupported":
+    "Questo server non può salvare le chat fissate per tutti i tuoi dispositivi. Aggiorna OpenBot sul computer che lo esegue.",
   "error.team.agentPublishUnsupported": "La pubblicazione di agenti non è supportata da questa connessione.",
   "error.team.agentUpdateUnsupported": "L'aggiornamento degli agenti non è supportato da questa connessione.",
   "error.team.contextResetUnsupported": "L'avvio di una nuova chat non è supportato da questa connessione.",
+  "error.team.contextCompactUnsupported": "Questa connessione non supporta la compattazione del contesto.",
   "error.team.workspaceDirectoryUnsupported":
     "La visualizzazione delle cartelle non è supportata da questa connessione.",
   "error.team.conversationFileSearchUnsupported": "Questa connessione non supporta la ricerca nei file.",
+  "error.team.sideQuestionUnsupported": "Questa connessione non supporta le domande a parte.",
   "error.team.routineFlowsUnsupported":
     "Questo server non supporta i flussi di routine. Aggiorna OpenBot sul computer che lo esegue.",
   "error.team.routineCanvasTooLarge":
@@ -86,6 +99,14 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "La modifica dell'identità del server non è supportata da questa connessione.",
   "error.team.hostUpdateUnsupported": "Gli aggiornamenti dell'host non sono supportati da questa connessione.",
   "error.team.hostTimezoneUnsupported": "Questa connessione non supporta il fuso orario del server.",
+  "error.team.hostKeyRotationUnsupported": "Questa connessione non supporta il cambio della chiave del server.",
+  "error.team.routineResultsUnsupported": "Questa connessione non supporta le destinazioni delle routine.",
+  "error.team.agentMemoryLimitUnsupported": "Questa connessione non supporta il limite di memorie degli agenti.",
+  "error.team.agentFoldersUnsupported": "Questa connessione non supporta le cartelle degli agenti.",
+  "error.team.folderUnavailable": "Questa cartella non è disponibile sul computer host.",
+  "error.team.memoryReviewUnsupported": "Questa connessione non supporta la revisione delle memorie.",
+  "error.team.promptCacheTtlUnsupported": "Questa connessione non supporta la durata della cache dei prompt.",
+  "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",
   "error.team.attachmentNameRequired": "Serve un nome di allegato sicuro.",
   "error.team.attachmentNotFound": "Allegato non trovato.",
   "error.team.sharedFileTooLarge": "Il file condiviso supera il limite di 100 MB.",
@@ -94,6 +115,9 @@ export const messages = {
   "error.team.browserSessionNotFound": "Sessione della vista del browser non trovata.",
   "error.team.mcpUnsupported": "I server MCP non sono supportati da questa connessione.",
   "error.team.storageUnsupported": "L'archiviazione non è supportata da questa connessione.",
+  "error.team.machineResourcesUnsupported": "L'uso della macchina non è supportato da questa connessione.",
+  "error.team.machineAlertMemberInvalid":
+    "Solo un proprietario o un amministratore di questo server può ricevere gli avvisi della macchina.",
   "error.team.hostedSitesUnsupported": "I siti non sono supportati da questa connessione.",
   "error.team.hostedSitesUnregistered": "Questo server non è registrato con OpenBot, quindi non ha siti.",
   "error.team.hostedSiteNotFound": "Sito non trovato.",
@@ -115,10 +139,13 @@ export const messages = {
   "error.team.secureAuthUnsupported": "L'autenticazione sicura non è supportata da questo client.",
   "error.team.agentSettingsUnsupported": "Le impostazioni dell'agente non sono supportate da questa connessione.",
   "error.team.adminRequired": "Serve l'accesso come amministratore.",
+  "error.team.ownerRequired": "Solo il proprietario di questo server può farlo.",
   "error.team.requestTooLarge": "Il corpo della richiesta è troppo grande.",
   "error.team.signInRelayUnsupported": "Questo server non può inoltrare gli accessi. Aggiorna OpenBot sull'host.",
   "error.team.connectorsUnsupported":
     "Questo server non può gestire le proprie connessioni da qui. Aggiorna OpenBot sull'host.",
+  "error.team.discordAccessUnsupported":
+    "Questo server non può impostare i ruoli di Discord. Aggiorna OpenBot sul server.",
   "error.team.connectorPageRefused": "Il server ha inviato una pagina che OpenBot non apre.",
   "error.team.signInRelayUnknown": "Questo accesso è terminato o non esiste.",
   "error.team.signInRelayUsed": "Questo accesso è già stato inviato.",

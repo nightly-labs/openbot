@@ -129,8 +129,6 @@ export const messages = {
   "error.remote.serverDisconnected": "O servidor se desconectou.",
   "error.remote.preferencesUnreadable": "Não foi possível ler as preferências salvas do chat.",
   "error.remote.accountAuthRequired": "É necessário autenticar a conta.",
-  "error.remote.serverIdentityChanged":
-    "A identidade do servidor mudou. A chave confiável do computador anfitrião não será substituída.",
   "error.remote.pairedIdentityChanged":
     "A identidade do computador pareado está ausente ou mudou. Leia um novo código desse computador.",
   "error.remote.permanentInviteNoEmail": "Convites permanentes não podem ser enviados por e-mail.",
@@ -189,6 +187,8 @@ export const messages = {
   "error.remote.directoryTimeout": "O serviço do OpenBot não respondeu a tempo. Tente novamente.",
   "error.remote.inviteAlreadyUsed": "Este convite já foi usado. Peça um novo convite.",
   "error.remote.inviteNotFound": "Este convite não existe ou expirou. Peça um novo convite.",
+  "error.remote.licenseUsersFull":
+    "A licença do proprietário do servidor não tem usuários livres. Peça ao proprietário para adicionar um usuário à licença.",
   "error.remote.memberLimitReached":
     "Este computador anfitrião atingiu o limite de membros. Peça ao proprietário para liberar espaço.",
   "error.remote.hostNotRegistered": "Este computador anfitrião não está mais registrado no serviço do OpenBot.",
@@ -198,5 +198,10 @@ export const messages = {
   "error.remote.hostOtherAccount": "Este computador anfitrião pertence a outra conta.",
   "error.remote.remoteNotConfigured": "As conexões remotas não estão configuradas neste serviço do OpenBot.",
   "error.remote.hostRefused": "O computador anfitrião recusou a solicitação ({status}).",
+  "error.remote.formUnavailable": "Este formulário não está mais disponível.",
   "error.remote.hostedServerRemoval": "Use a seção Cobrança para excluir um servidor hospedado.",
+  "error.remote.channelsUnsupported": "Atualize este servidor no computador para usar canais.",
+  "error.remote.channelDeleteUnsupported": "Atualize este servidor no computador para excluir canais.",
+  "error.remote.historyRefreshFailed": "A mensagem foi enviada, mas não foi possível atualizar o histórico do chat.",
+  "error.remote.taskHistoryRefreshFailed": "A tarefa foi alterada, mas não foi possível atualizar o histórico do chat.",
 } as const satisfies PartialTranslation<typeof source>;

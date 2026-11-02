@@ -8,7 +8,9 @@ import {
   type AgentImportPreview,
   type ApplyAgentImportInput,
   decodeRemoteAgentImportResult,
+  parseAgentImportSkillSource,
   parseApplyAgentImportInput,
+  parseApplyHermesImportInput,
   resolveRemoteAgentImportResult,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -22,27 +24,31 @@ import { sourceText } from "@openbot/i18n/source";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, type SaveDialogOptions } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentImportService } from "../agent-import-service";
+import { hermesRoot, profileRoot } from "../hermes-import-reader";
+import type { HermesImportService } from "../hermes-import-service";
 import { decodeAgentSummaries } from "../remote-agent-decoding";
 import { AGENT_IMPORT_UPLOAD_TIMEOUT_MS, type RemoteServerManager } from "../remote-server-manager";
-import { handler, type IpcGroupHandlers } from "./define-ipc-group";
+import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { stringPayload } from "./validation";
 
 export interface AgentImportIpcDependencies {
   agentImport: AgentImportService;
+  hermesImport: HermesImportService;
   remoteServers: Pick<RemoteServerManager, "supportsCapability" | "request" | "stageAgentImport">;
   getMainWindow: () => BrowserWindow | null;
   translate: AppTranslate;
-  /** The export skill a user adds to Grok Bot by hand. It ships in the app's resources. */
-  exportSkillPath: string;
+  /** The folder of the export skills a user adds to Grok Bot or Hermes by hand: `<source>/SKILL.md`. */
+  exportSkillDirectory: string;
 }
 
 export function agentImportIpcHandlers({
   agentImport,
+  hermesImport,
   remoteServers,
   getMainWindow,
   translate,
-  exportSkillPath,
+  exportSkillDirectory,
 }: AgentImportIpcDependencies): Pick<IpcGroupHandlers, "agentImport"> {
   const chooseExport = async (): Promise<string | null> => {
     const mainWindow = getMainWindow();
@@ -50,6 +56,18 @@ export function agentImportIpcHandlers({
       title: translate("dialog.chooseAgentExport"),
       properties: ["openFile"],
       filters: [{ name: translate("dialog.filter.agentExports"), extensions: ["zip"] }],
+    };
+    const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
+    return result.canceled || !result.filePaths[0] ? null : result.filePaths[0];
+  };
+
+  // Hermes keeps its profiles in a folder, so the user names the folder and main reads it.
+  const chooseHermesFolder = async (): Promise<string | null> => {
+    const mainWindow = getMainWindow();
+    const options: OpenDialogOptions = {
+      title: translate("dialog.chooseHermesFolder"),
+      defaultPath: hermesRoot(),
+      properties: ["openDirectory", "showHiddenFiles"],
     };
     const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
     return result.canceled || !result.filePaths[0] ? null : result.filePaths[0];
@@ -110,8 +128,10 @@ export function agentImportIpcHandlers({
           );
         },
       }),
-      readSkill: handler(() => readFile(exportSkillPath, "utf8")),
-      saveSkill: handler(async () => {
+      readSkill: payloadHandler(parseAgentImportSkillSource, (source) =>
+        readFile(join(exportSkillDirectory, source, "SKILL.md"), "utf8"),
+      ),
+      saveSkill: payloadHandler(parseAgentImportSkillSource, async (source) => {
         const mainWindow = getMainWindow();
         const options: SaveDialogOptions = {
           title: translate("dialog.saveExportSkill"),
@@ -122,9 +142,19 @@ export function agentImportIpcHandlers({
           ? await dialog.showSaveDialog(mainWindow, options)
           : await dialog.showSaveDialog(options);
         if (result.canceled || !result.filePath) return { saved: false };
-        await copyFile(exportSkillPath, result.filePath);
+        await copyFile(join(exportSkillDirectory, source, "SKILL.md"), result.filePath);
         return { saved: true };
       }),
+      readHermes: handler(() => runCauseEffect(hermesImport.stage(hermesRoot()))),
+      chooseHermes: handler(async () => {
+        const folder = await chooseHermesFolder();
+        if (!folder) return null;
+        const preview = await runCauseEffect(hermesImport.stage(profileRoot(folder)));
+        if (!preview) throw new Error(sourceText("error.import.hermesNoProfiles"));
+        return preview;
+      }),
+      applyHermes: payloadHandler(parseApplyHermesImportInput, (input) => runCauseEffect(hermesImport.apply(input))),
+      discardHermes: payloadHandler(stringPayload("token"), (token) => Effect.runPromise(hermesImport.discard(token))),
     },
   };
 }

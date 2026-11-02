@@ -17,6 +17,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { createImageDimensionCache } from "../model/image-dimension-cache";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
+import { mediaFile } from "./use-media-file";
 
 // Sizes outlive the downloaded file and the launch. A chat that scrolls an image back into view,
 // or opens again, then reserves its real shape at once instead of a guess.
@@ -25,11 +26,16 @@ const dimensionCache = createImageDimensionCache({
     const file = new File(Paths.cache, "chat-image-dimensions-v1.json");
     return file.exists ? file.textSync() : null;
   },
-  write: (text) => new File(Paths.cache, "chat-image-dimensions-v1.json").write(text),
+  write: (text) => new File(Paths.cache, "chat-image-dimensions-v1.json").writeSync(text),
 });
 
 export function rememberImageDimensions(id: string, dimensions: ImageDimensions) {
   dimensionCache.remember(id, dimensions);
+}
+
+/** The size of an image the phone has decoded or read before, or null. */
+export function knownImageDimensions(id: string): ImageDimensions | null {
+  return dimensionCache.get(id);
 }
 
 /** The short type a file card shows, such as PDF or CSV, from the name the user sees. */
@@ -70,6 +76,48 @@ export function localAttachmentPreview(file: { mimeType: string; base64: string;
 }
 
 /**
+ * A downloaded image as a file in the chat media folder. The image view gets a short file URI, not
+ * a data URL of many megabytes: Android Glide copies its source text, and a large data URL ran
+ * the app out of memory. A file that cannot be written leaves the data URL.
+ */
+function keepImageFile(serverId: string, attachment: AttachmentSummary, data: RemoteFileUpload): string | undefined {
+  try {
+    const file = mediaFile(serverId, attachment);
+    if (!file.exists || file.size !== attachment.size) {
+      file.parentDirectory.create({ intermediates: true, idempotent: true });
+      file.writeSync(data.base64, { encoding: "base64" });
+    }
+    return file.uri;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * An image that this launch downloaded before, as a file that is whole, when the phone also knows
+ * its size. The chat then shows it again without a new download. Its data has no Base64.
+ */
+function keptImageFile(
+  serverId: string,
+  attachment: AttachmentSummary,
+): (RemoteFileUpload & { fileUri: string }) | null {
+  if (!attachment.mimeType.startsWith("image/") || !dimensionCache.get(attachment.id)) return null;
+  try {
+    const file = mediaFile(serverId, attachment);
+    if (!file.exists || file.size !== attachment.size) return null;
+    return { name: attachment.name, mimeType: attachment.mimeType, base64: "", fileUri: file.uri };
+  } catch {
+    return null;
+  }
+}
+
+/** The Base64 of a file, read from its kept copy when the data has none. */
+async function fileBase64(data: RemoteFileUpload & { fileUri?: string }): Promise<string> {
+  if (data.base64 || !data.fileUri) return data.base64;
+  return new File(data.fileUri).base64();
+}
+
+/**
  * One host file: its image for a preview, and the share sheet for opening it. The query key is the
  * one the chat uses, so a file read in a message is not downloaded a second time for a queue row.
  */
@@ -84,9 +132,15 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       : null;
   const query = useQuery({
     queryKey: queryKeys.chatAttachment(serverId, attachment.id),
-    queryFn: (): Promise<RemoteFileUpload & { localUri?: string }> => {
+    queryFn: async (): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
       if (attachment.size > MOBILE_ATTACHMENT_BYTES) throw new Error(t("mobile.chat.attachment.tooLargeForMobile"));
-      return downloadAttachment(serverId, attachment.id);
+      const kept = keptImageFile(serverId, attachment);
+      if (kept) return kept;
+      const data = await downloadAttachment(serverId, attachment.id);
+      return {
+        ...data,
+        fileUri: data.mimeType.startsWith("image/") ? keepImageFile(serverId, attachment, data) : undefined,
+      };
     },
     enabled: preview && !local && !pending,
     retry: false,
@@ -102,7 +156,8 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     return read;
   }, [attachment.id, data]);
   const localUri = local ?? query.data?.localUri;
-  const uri = localUri ?? (query.data ? `data:${query.data.mimeType};base64,${query.data.base64}` : null);
+  const uri =
+    localUri ?? query.data?.fileUri ?? (query.data ? `data:${query.data.mimeType};base64,${query.data.base64}` : null);
   async function share() {
     setSharing(true);
     let file: File | null = null;
@@ -113,7 +168,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
       const name = attachment.name.replace(/[/\\\p{Cc}]/gu, "_");
       file = new File(Paths.cache, `${Date.now()}-${name}`);
-      file.write(result.data.base64, { encoding: "base64" });
+      file.writeSync(await fileBase64(result.data), { encoding: "base64" });
       await Sharing.shareAsync(file.uri, { mimeType: result.data.mimeType, dialogTitle: attachment.name });
     } catch (error) {
       void haptics.notification("error");
@@ -145,7 +200,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       // The photo library reads the type from the extension, so the file keeps one.
       const extension = attachmentFileExtension(attachment.name) ?? result.data.mimeType.split("/")[1] ?? "png";
       file = new File(Paths.cache, `${Date.now()}-download.${extension}`);
-      file.write(result.data.base64, { encoding: "base64" });
+      file.writeSync(await fileBase64(result.data), { encoding: "base64" });
       await MediaLibrary.Asset.create(file.uri);
       return true;
     } catch (error) {
@@ -177,17 +232,18 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
 
 /**
  * Opens a file this phone holds in the share sheet, where the user can view it in another app
- * before sending. A pasted file has no path, so it gets a temporary one that is removed after.
+ * before sending, or save a file that the chat downloaded. A pasted file has no path, so it gets a temporary one that is removed after.
  */
-export async function shareLocalAttachment(file: { name: string; mimeType: string; base64: string; uri?: string }) {
+export async function shareLocalAttachment(file: { name: string; mimeType: string; base64?: string; uri?: string }) {
   const { t, sourceText } = currentText();
   let temporary: File | null = null;
   try {
     if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
     let uri = file.uri;
     if (!uri) {
+      if (!file.base64) throw new Error(t("mobile.chat.attachment.unavailable"));
       temporary = new File(Paths.cache, `${Date.now()}-${file.name.replace(/[/\\\p{Cc}]/gu, "_")}`);
-      temporary.write(file.base64, { encoding: "base64" });
+      temporary.writeSync(file.base64, { encoding: "base64" });
       uri = temporary.uri;
     }
     await Sharing.shareAsync(uri, { mimeType: file.mimeType, dialogTitle: file.name });

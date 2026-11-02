@@ -19,7 +19,12 @@ import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Semaphore } from "effect";
-import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import {
+  isEmptyStoredFile,
+  parseStoredJson,
+  setAsideDamagedFile,
+  writeJsonFileAtomically,
+} from "../backend/atomic-json-file";
 import {
   emptyStoredRemoteServers,
   readStoredRemoteServers,
@@ -88,9 +93,10 @@ export class RemoteServerStore implements RemoteServerDirectory {
     this.#cipher = options.cipher;
   }
 
-  // A missing file is a first run. Anything else -- a permission error, a truncated read, a file that
-  // is not JSON, a file this build cannot decode -- reaches the caller, because continuing would leave
-  // an empty list that the next write replaces the user's servers with.
+  // A missing file is a first run. So is a file that a power loss left without content: it holds no
+  // server to keep, and it is moved aside. Anything else -- a permission error, a truncated read, a
+  // file that is not JSON, a file this build cannot decode -- reaches the caller, because continuing
+  // would leave an empty list that the next write replaces the user's servers with.
 
   readonly load = Effect.fn("RemoteStore.load")(function* (
     this: RemoteServerStore,
@@ -104,7 +110,8 @@ export class RemoteServerStore implements RemoteServerDirectory {
         return yield* new RemoteWorkflowError({ cause: error });
       return;
     }
-    const stored = yield* remoteDecode(() => readStoredRemoteServers(JSON.parse(attempt0.success)));
+    if (isEmptyStoredFile(attempt0.success)) return yield* setAsideDamagedFile(this.#path);
+    const stored = yield* remoteDecode(() => parseStoredJson(this.#path, attempt0.success, readStoredRemoteServers));
     // Null means the *file* made no sense -- a `version` from a newer build, or no `servers` array at
     // all. An unreadable entry is not this: the reader drops it and returns the rest. Keeping the
     // empty default here would hand a file the newer build still reads to the next `persist()` to
@@ -231,6 +238,22 @@ export class RemoteServerStore implements RemoteServerDirectory {
     this.#forgetUnreadable(server.id);
     this.#state.servers = [...this.#state.servers.filter((candidate) => candidate.id !== server.id), server];
     this.setActiveServerId(server.id);
+    yield* this.persist();
+  });
+
+  // A local server that started again: a new port and a new session, in the slot it had. Only a new
+  // one is added at the end, and only a new one is selected - a restart must not move the user.
+
+  readonly attachLocal = Effect.fn("RemoteStore.attachLocal")(function* (
+    this: RemoteServerStore,
+    server: StoredRemoteServer,
+    select: boolean,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    this.#forgetUnreadable(server.id);
+    this.#state.servers = this.has(server.id)
+      ? this.#state.servers.map((candidate) => (candidate.id === server.id ? server : candidate))
+      : [...this.#state.servers, server];
+    if (select) this.setActiveServerId(server.id);
     yield* this.persist();
   });
 

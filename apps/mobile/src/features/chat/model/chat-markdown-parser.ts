@@ -1,5 +1,6 @@
 import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
+import { replaceEqualDeep } from "@tanstack/react-query";
 import { Marked, type Token, type TokensList } from "marked";
 
 const markdown = new Marked({
@@ -43,6 +44,17 @@ const markdown = new Marked({
         // The phone cannot open the quoted passage, so a quote reads as its text in quotation marks.
         if (reference?.start === 0 && reference.kind === "quote")
           return { type: "text", raw: source.slice(0, reference.end), text: `“${reference.name}”` };
+      },
+    },
+    {
+      name: "skillReference",
+      level: "inline",
+      start: (source) => source.indexOf("@["),
+      tokenizer(source) {
+        const reference = chatTagReferences(source)[0];
+        // A skill or an app that a message names, such as a Try from the Marketplace, draws as a chip.
+        if (reference?.start === 0 && (reference.kind === "skill" || reference.kind === "mcp"))
+          return { type: "skillMention", raw: source.slice(0, reference.end) };
       },
     },
   ],
@@ -99,10 +111,18 @@ export function parseStreamingChatMarkdown(body: string): TokensList {
       index = candidate;
   }
   const previous = index >= 0 ? streamingBodies.splice(index, 1)[0] : undefined;
-  const tokens = previous ? continueParse(body, previous) : parseChatMarkdown(body);
+  const tokens = previous ? shareUnchanged(previous.tokens, continueParse(body, previous)) : parseChatMarkdown(body);
   if (streamingBodies.length >= MAX_STREAMING_BODIES) streamingBodies.shift();
   streamingBodies.push({ body, tokens });
   return tokens;
+}
+
+function shareUnchanged(previous: TokensList, tokens: TokensList): TokensList {
+  if (tokens === previous) return tokens;
+  return Object.assign(
+    tokens.map((token, index) => replaceEqualDeep(previous[index], token)),
+    { links: tokens.links },
+  );
 }
 
 function continueParse(body: string, previous: { body: string; tokens: TokensList }): TokensList {

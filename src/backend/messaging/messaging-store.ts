@@ -41,6 +41,12 @@ export interface MessagingLink {
   updatedAt: string;
 }
 
+/** A role whose members can use OpenBot in one connection, by the name the user chose it from. */
+export interface MessagingAllowedRole {
+  id: string;
+  name: string;
+}
+
 export interface MessagingLinkInput {
   connectionId: string;
   agentId: string;
@@ -53,7 +59,8 @@ export interface MessagingLinkInput {
 const LINK_LIST_LIMIT = 200;
 
 /**
- * Owns `projection_messaging_connections` and `projection_messaging_threads`. It never stores a
+ * Owns `projection_messaging_connections`, `projection_messaging_threads` and
+ * `projection_messaging_allowed_roles`. It never stores a
  * token, and it never imports the database facade's callers.
  *
  * A connection row is configuration, so it is written directly, as MCP servers are. A link creates
@@ -135,6 +142,46 @@ export class MessagingStore {
         new Date().toISOString(),
         connectionId,
       );
+  }
+
+  /** The roles whose members can use OpenBot here. Empty lets everyone. */
+  allowedRoles(connectionId: string): MessagingAllowedRole[] {
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `SELECT role_id, role_name FROM projection_messaging_allowed_roles
+           WHERE connection_id = ? ORDER BY created_at, role_name, role_id`,
+        )
+        .all(connectionId),
+    ).map((row) => ({ id: requiredStringColumn(row, "role_id"), name: requiredStringColumn(row, "role_name") }));
+  }
+
+  /** Replaces the role list of a connection at once. A role kept from before keeps its place. */
+  replaceAllowedRoles(connectionId: string, roles: readonly MessagingAllowedRole[]): void {
+    const db = this.#database.connection;
+    const ownsTransaction = !db.isTransaction;
+    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
+    try {
+      const kept = new Set(roles.map((role) => role.id));
+      for (const current of this.allowedRoles(connectionId))
+        if (!kept.has(current.id))
+          db.prepare("DELETE FROM projection_messaging_allowed_roles WHERE connection_id = ? AND role_id = ?").run(
+            connectionId,
+            current.id,
+          );
+      const now = new Date().toISOString();
+      const upsert = db.prepare(
+        `INSERT INTO projection_messaging_allowed_roles (connection_id, role_id, role_name, created_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(connection_id, role_id) DO UPDATE SET role_name = excluded.role_name`,
+      );
+      for (const role of roles) upsert.run(connectionId, role.id, role.name, now);
+      if (ownsTransaction) db.exec("COMMIT");
+    } catch (error) {
+      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
+      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   link(linkId: string): MessagingLink | null {

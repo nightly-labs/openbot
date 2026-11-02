@@ -14,7 +14,10 @@ The flow is: signed request → route → routine → run.
 | Data | Owner | Where |
 | --- | --- | --- |
 | Trigger, route ID, encrypted secret, URL | Host SQLite | `projection_routine_webhooks`, `projection_channel_routine_webhooks` |
-| Receipts (no body) | Host SQLite | `projection_webhook_receipts` |
+| Workflow trigger route ID, encrypted secret, URL | Host SQLite | `workflow_trigger_webhooks` (schema v46) |
+| Receipts (no body) | Host SQLite | `projection_webhook_receipts`, `workflow_webhook_receipts` |
+| GitHub deliveries (no body), runs per item, changes made | Host SQLite | `workflow_github_deliveries`, `workflow_github_runs`, `workflow_github_actions` (schema v49) |
+| GitHub repository → ingress socket | Signal memory | `SignalService` |
 | Routes to revoke on the relay | Host SQLite | `projection_webhook_route_revocations` |
 | Route ID → host and owner account, link time, revoke time | Account service D1 | `webhook_routes` |
 | Route ID → ingress socket | Signal memory | `SignalService` |
@@ -25,7 +28,10 @@ runs do not change.
 - `RoutineStore` (`src/backend/routine-store.ts`) writes the trigger row with the routine, in the
   same transaction. A changed trigger kind keeps the routine ID and its runs.
 - `WebhookRouteStore` (`src/backend/webhook-route-store.ts`) reads routes, rotates secrets, keeps
-  receipts, and holds the revocation queue.
+  receipts, and holds the revocation queue. A route's owner is a `WebhookRouteOwner`: an agent or
+  channel routine (`EventRoutineOwner`), or `{ kind: "workflow" }` for a webhook trigger of a
+  [workflow](agents.md#workflows). The workflow arm stays in the backend; the events API and
+  `events-v1` encoders name routine owners only.
 - `RoutineRecords` (`src/backend/routine-records.ts`) is the one backend object that main uses. It
   selects the agent or channel scheduler by owner and holds the webhook route store.
 - `webhook-trigger.ts` has trigger validation, filter matching, the run instruction, and template
@@ -81,8 +87,8 @@ syntax (401), a socket that holds the route (503), rate limit by route and clien
 body size (413). So an unknown route uses no rate-limit entry and Signal does not read its body.
 Signal then sends the exact bytes and the three header values to the host socket and waits for the
 status. It also returns 503 when the host has too many pending requests or does not answer in 2.5
-seconds. Slack and webhook deliveries share one pending budget for each host (16 requests, 128 KiB),
-which stays below the socket backpressure limit. Signal has no queue and does not store or log the
+seconds. Slack, webhook and GitHub deliveries share one pending budget for each host (16 requests,
+768 KiB of base64), which stays below the 1 MiB socket backpressure limit. Signal has no queue and does not store or log the
 body. The header patterns are in `packages/contracts/src/signal-protocol/webhook-route.ts`.
 
 The host (`HostEventsService.receive`) returns:
@@ -95,7 +101,7 @@ The host (`HostEventsService.receive`) returns:
 | 400 | Body is not UTF-8 JSON `{ type, occurredAt?, data? }` |
 | 202 | Run started, or ignored: `event-type`, `filter`, or `inactive` |
 | 200 | Duplicate delivery ID for this routine |
-| 503 | The host cannot decrypt the secret, the agent is held or being deleted, the channel is archived or held, or the handler failed |
+| 503 | The host has no signed-in account or cannot decrypt the secret, the agent is held or being deleted, the channel is archived or held, or the handler failed |
 
 Verification comes before JSON decoding. The signature is
 `sha256=HMAC-SHA256(secret, "<timestamp>.<deliveryId>.<body>")`, compared in constant time. The
@@ -110,6 +116,44 @@ restart that resumes the run still has it. Runs use the existing agent and chann
 limits, and approval controls. While a restart waits for idle agents (`holdRoutines`), the host
 answers 503 and writes no receipt, so the sender retries after the restart.
 
+### Workflow webhook triggers
+
+A workflow webhook trigger has no route until its first secret: `rotateWorkflowSecret` makes the
+route ID and the secret together. Workflow routes count toward `WEBHOOK_ROUTES_LIMIT`. A
+`workflows-changed` event starts `syncRoutes`. A save that removes the trigger node, and a workflow
+delete, write the route ID to `projection_webhook_route_revocations` in the same transaction.
+`HostEventsService` checks the signature, then gives a request for a `workflow` owner to
+`Workflows.receiveWebhook`. The receipt is in `workflow_webhook_receipts` for 7 days, without the
+body. A body of more than 64,000 characters gets 413 and no receipt. A workflow with an open run
+answers 202 `ignored` with the reason `busy`, as a schedule skips an occurrence. The body, marked as
+data, is the trigger's output. Workflow triggers have no test event.
+
+### Workflow GitHub triggers
+
+A GitHub trigger has no secret or route of its own. The OpenBot GitHub App sends every event to
+Signal (`/v1/github/events`, see `remote/README.md`). `GitHubRelay` (`src/main/github-relay.ts`)
+asks the account service for a GitHub route ticket that names the repositories of the saved GitHub
+triggers, and the `ingress` socket sends it to Signal. The account service checks the repositories
+with the host's GitHub sign-in; D1 keeps none of them. Signal gives each event to every host that
+watches its repository, and the host answers with `github-delivery-result`.
+
+`Workflows.receiveGitHub` records each delivery in `workflow_github_deliveries`, without the body,
+the newest 50 per trigger (`WORKFLOW_GITHUB_DELIVERY_LIMIT`). A delivery ID that is there already
+records nothing. A delivery is `started`, `waiting` (its item has an open run), or `skipped` with a
+reason:
+
+- `filter`: the event or a filter of the trigger does not match.
+- `self`: the event is the echo of a change that a run of this workflow made, by the GitHub object
+  ID in `workflow_github_actions`.
+- `chain`: OpenBot's bot caused 3 runs on the item in 10 minutes.
+- `refused`: the run could not start.
+- `offline`: the host lost its GitHub route. Signal does not keep events for a host that is offline,
+  and GitHub does not send them again, so the history shows the gap. Gaps closer than 2 minutes are
+  one gap.
+
+`workflow_github_runs` links a run to its item. When a run ends, the oldest waiting delivery of its
+item starts. The event, marked as data, is the trigger's output.
+
 ## Management surfaces
 
 - Local desktop: the `events` IPC group (`packages/contracts/src/ipc-endpoints.ts`).
@@ -122,9 +166,19 @@ answers 503 and writes no receipt, so the sender retries after the restart.
   save that carry `missedPolicy`, and a run list that includes the records of missed occurrences. A
   client uses these routes in place of the `events-v1` list and save. For a host without the
   capability, the editor hides the missed-run choice and the host keeps its saved value.
+- Remote hosts with `webhook-tests-v1` (`WEBHOOK_TESTS_ROUTES`) also answer a test event. The host
+  makes an event that matches the trigger, signs it with the decrypted secret, and gives it to the
+  same verification and receipt path as a relayed request (`HostEventsService.sendTestEvent`). The
+  answer names the event type, the receipt status and reason, and the run. The secret stays on the
+  host. For a host without the capability, the editor leaves out the test step.
 - Released schedule-only routine views do not show webhook routines. Their delete and test routes
   answer "routine gone" for a webhook routine, because they have no administrator check. Only a
   schedule routine writes a conversation event.
+- Workflow webhook triggers: the `workflows` IPC group and the `workflows-v1` Team API capability
+  (`rotate-webhook-secret`). Only an owner or admin sees the URL or makes a new secret.
+- Workflow GitHub triggers and outputs: the `workflows` IPC group and the `workflows-github-v1` Team
+  API capability (`WORKFLOWS_GITHUB_ROUTES`: catalog, options, history, run with last event). All
+  routes need a host administrator. A client without the capability does not offer GitHub.
 - Desktop and web use the shared routine editor components in
   `packages/ui/src/features/conversation`. Mobile uses native components in
   `apps/mobile/src/features/agents/components`.
@@ -144,7 +198,12 @@ Controls:
 - A removed trigger revokes its route in the same transaction, and the relay revocation retries
   until it succeeds.
 - Only the events surface, which needs a host administrator, can change, test, or delete a webhook
-  routine.
+  routine. An agent can create one with `openbot.create_webhook_routine`, and change its events,
+  name, instruction or active state with `openbot.update_webhook_routine`, but only in a turn that a
+  person's message started: a routine run can carry a webhook body, which is untrusted. The tool saves through
+  `HostEventsService`, so the route limit, the encryption and the relay sync are the same. The tool
+  drops the first secret: the result goes to the model provider. The chat card makes a new secret
+  through the events surface.
 
 ## Rollout
 

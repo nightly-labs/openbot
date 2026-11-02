@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
 import { BillingSales } from "./billing-sales";
@@ -10,8 +10,14 @@ import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
 import { enforceMarketplaceIngress, MarketplaceRateLimitError } from "./marketplace-request-policy";
 import { pageMarkdownResponse } from "./page-markdown";
-import { deliverPendingRemoteAuthEvents, RemoteControlPlane, type RemoteFailure } from "./remote-control-plane";
+import {
+  deliverPendingRemoteAuthEvents,
+  type RemoteAuthEventBindings,
+  RemoteControlPlane,
+  type RemoteFailure,
+} from "./remote-control-plane";
 import { SalesAnalyticsDelivery } from "./sales-analytics-delivery";
+import { checkSignalEntry, SIGNAL_ENTRY_CRON, type SignalEntryBindings } from "./signal-entry-failover";
 import type { WorkerBindings } from "./types";
 
 type WorkerFetch = (request: Request) => Response | Promise<Response>;
@@ -84,10 +90,14 @@ export function createWorkerHandler(
       return response;
     },
     async scheduled(
-      controller: Pick<ScheduledController, "scheduledTime">,
-      bindings: Pick<WorkerBindings, "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_SECRET"> &
-        Partial<Pick<WorkerBindings, "SITES" | HostedServerTickBindingKey>>,
+      controller: Pick<ScheduledController, "scheduledTime"> & Partial<Pick<ScheduledController, "cron">>,
+      bindings: RemoteAuthEventBindings &
+        Partial<Pick<WorkerBindings, "SITES" | HostedServerTickBindingKey> & SignalEntryBindings>,
     ) {
+      if (controller.cron === SIGNAL_ENTRY_CRON) {
+        await runSignalEntryCheck(bindings);
+        return;
+      }
       const now = controller.scheduledTime;
       // Retention starts after the hosted server check; delivery and site cleanup run beside both.
       const hostingThenRetention = Effect.gen(function* () {
@@ -122,6 +132,20 @@ export function createWorkerHandler(
   } satisfies ExportedHandler<WorkerBindings>;
 }
 
+/** Logs only the result and the error tag: the Cloudflare token never reaches a log. */
+async function runSignalEntryCheck(bindings: Partial<SignalEntryBindings>): Promise<void> {
+  const result = await Effect.runPromise(
+    Effect.result(checkSignalEntry(bindings, { fetch: (input, init) => fetch(input, init) })),
+  );
+  if (Result.isFailure(result)) {
+    console.error("Signal entry check failed.", { operation: result.failure.operation, status: result.failure.status });
+    return;
+  }
+  const check = result.success;
+  if (check.status === "moved") console.warn("Signal entry moved.", check);
+  else if (check.status === "kept" || check.status === "unknown") console.warn("Signal entry not changed.", check);
+}
+
 type SalesBindings = Pick<WorkerBindings, "DB"> &
   Partial<Pick<WorkerBindings, "STRIPE_SECRET_KEY" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET">>;
 
@@ -147,7 +171,8 @@ const checkoutReturnResponse = Effect.fn("BillingSales.returnResponse")(function
 ) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
-  let destination = "/billing/return";
+  // Only a server plan Checkout has a return token, so the fallback page names that kind.
+  let destination = "/billing/return?kind=plan";
   if (token && bindings.DB && bindings.OPENPANEL_CLIENT_ID && bindings.OPENPANEL_CLIENT_SECRET) {
     const sales = new BillingSales({
       database: bindings.DB,
@@ -165,10 +190,14 @@ const checkoutReturnResponse = Effect.fn("BillingSales.returnResponse")(function
         ),
       )) ?? destination;
   }
+  // Stripe opens this endpoint only as the cancel URL of Checkout. The stored return URL already has
+  // the flag; the fallback page needs it too, so that it does not say that billing changed.
+  const location = new URL(destination, url.origin);
+  location.searchParams.set("cancelled", "1");
   return new Response(null, {
     status: 303,
     headers: {
-      Location: new URL(destination, url.origin).href,
+      Location: location.href,
       "Cache-Control": "no-store",
       "Referrer-Policy": "no-referrer",
     },
@@ -186,8 +215,7 @@ type HostedServerTickBindingKey =
   | "OPENPANEL_CLIENT_SECRET";
 
 function tickHostedServers(
-  bindings: Pick<WorkerBindings, "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_SECRET"> &
-    Partial<Pick<WorkerBindings, HostedServerTickBindingKey>>,
+  bindings: RemoteAuthEventBindings & Partial<Pick<WorkerBindings, HostedServerTickBindingKey>>,
   now: number,
 ) {
   // The check sends the queued auth events once, after its last change. A delivery reads the time when
@@ -198,12 +226,13 @@ function tickHostedServers(
       authEvents = delivery;
     },
   });
-  // The cron waits for the analytics sends itself. They never reject.
+  // The cron waits for the analytics sends and server start commands itself. They never reject.
   const sends: Effect.Effect<void>[] = [];
   return Effect.gen(function* () {
     const result = yield* createHostedBilling(bindings, {
       removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
       planChanged: (hostId) => remote.planChanged(hostId),
+      licenseChanged: (userId) => remote.licenseChanged(userId),
       schedule: (send) => sends.push(send),
     }).hosting.tick(now);
     return result;
@@ -254,7 +283,7 @@ function serveLocalHostedSite(
   hostedUrl.port = "";
   return routeHostedSiteRequest(
     new Request(hostedUrl, request),
-    { SITES: bindings.SITES, SITE_SERVE_ENABLED: "true" },
+    { SITES: bindings.SITES, SITE_SERVE_ENABLED: "true", ACCOUNT_ORIGIN: configuredOrigin.origin },
     Date.now(),
   );
 }

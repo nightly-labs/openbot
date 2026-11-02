@@ -1,11 +1,7 @@
-import type { MarketplaceAgentSummary, MarketplaceSkillSummary } from "@openbot/contracts/ipc";
-import { Badge, Button, Heading, Plus, Text } from "@openbot/ui";
-import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { Button, Plus, TriangleAlert } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
-import { For, Match, Show, Switch } from "solid-js";
-import { InstallSkill } from "./MarketplaceInstallSkill";
-import { AppLogo, Done, SkillMark } from "./MarketplaceParts";
-import { CATEGORY_LABELS } from "./marketplace-listing";
+import { Show } from "solid-js";
+import { AppLogo, Done } from "./MarketplaceParts";
 import type { MarketplaceApp } from "./marketplace-model";
 import type { MarketplaceScope } from "./marketplace-view";
 
@@ -13,121 +9,6 @@ import type { MarketplaceScope } from "./marketplace-view";
 export function useInstalls() {
   const { t, format } = useText();
   return (count: number) => t("marketplace.installs", { count, installs: format.number(count) });
-}
-
-/**
- * "Add", then "Added", or "Update available" when the user has an older version. Add keeps the
- * Marketplace open. The button is then gone, so `onAdded` gives the focus a new place.
- */
-function AgentState(props: { scope: MarketplaceScope; listing: MarketplaceAgentSummary; onAdded: () => void }) {
-  const { t } = useText();
-  const model = () => props.scope.model;
-  return (
-    <Switch>
-      <Match when={model().agentState(props.listing) === "add"}>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          loading={model().agentBusy(props.listing.id)}
-          aria-label={t("marketplace.agent.addNamed", { name: props.listing.name })}
-          onClick={() =>
-            void model()
-              .addAgent(props.listing)
-              .then((added) => {
-                if (added) props.onAdded();
-              })
-          }
-        >
-          <Plus aria-hidden="true" />
-          {t("marketplace.agent.add")}
-        </Button>
-      </Match>
-      <Match when={model().agentState(props.listing) === "added"}>
-        <Done>{t("marketplace.agent.added")}</Done>
-      </Match>
-      <Match when={model().agentState(props.listing) === "update"}>
-        <Badge variant="info-light">{t("marketplace.agent.updateAvailable")}</Badge>
-      </Match>
-    </Switch>
-  );
-}
-
-/** The whole card opens the agent page. "Add" sits above the hit area and adds at once. */
-function AgentCard(props: { scope: MarketplaceScope; listing: MarketplaceAgentSummary }) {
-  const { t } = useText();
-  const installs = useInstalls();
-  const id = () => `marketplace-agent-${props.listing.id}`;
-  let hit: HTMLButtonElement | undefined;
-  return (
-    <article class="marketplace-card" aria-labelledby={id()}>
-      <Button
-        type="button"
-        variant="ghost"
-        class="marketplace-hitarea"
-        data-cuelume-tap="navigate"
-        ref={(element) => (hit = element)}
-        aria-label={t("marketplace.open", { name: props.listing.name })}
-        onClick={() => props.scope.nav.go({ kind: "agent", listing: props.listing })}
-      />
-      <div class="marketplace-card-head">
-        <span class="marketplace-avatar" data-size="md">
-          <AgentAvatar agent={props.listing} motion="hover" />
-        </span>
-        <Heading as="h3" size="sm" class="marketplace-card-name" id={id()}>
-          {props.listing.name}
-        </Heading>
-        <div class="marketplace-card-action">
-          <AgentState scope={props.scope} listing={props.listing} onAdded={() => hit?.focus()} />
-        </div>
-      </div>
-      <Text as="p" variant="body-sm" class="marketplace-card-body">
-        {props.listing.description}
-      </Text>
-      <div class="marketplace-card-foot">
-        <Text as="span" variant="caption" tone="muted">
-          {[props.listing.creatorName, installs(props.listing.installs)].join(" · ")}
-        </Text>
-      </div>
-    </article>
-  );
-}
-
-function SkillCard(props: { scope: MarketplaceScope; skill: MarketplaceSkillSummary }) {
-  const { t } = useText();
-  const installs = useInstalls();
-  const id = () => `marketplace-skill-${props.skill.id}`;
-  return (
-    <article class="marketplace-card" aria-labelledby={id()}>
-      <Button
-        type="button"
-        variant="ghost"
-        class="marketplace-hitarea"
-        data-cuelume-tap="navigate"
-        aria-label={t("marketplace.open", { name: props.skill.name })}
-        onClick={() => props.scope.nav.go({ kind: "skill", listing: props.skill })}
-      />
-      <div class="marketplace-card-head">
-        <SkillMark skill={props.skill} size="md" />
-        <Heading as="h3" size="sm" class="marketplace-card-name" id={id()}>
-          {props.skill.name}
-        </Heading>
-        <Show when={props.scope.model.agents().length > 0}>
-          <div class="marketplace-card-action">
-            <InstallSkill scope={props.scope} skill={props.skill} />
-          </div>
-        </Show>
-      </div>
-      <Text as="p" variant="body-sm" class="marketplace-card-body">
-        {props.skill.description}
-      </Text>
-      <div class="marketplace-card-foot">
-        <Text as="span" variant="caption" tone="muted">
-          {[props.skill.creatorName, installs(props.skill.installs)].join(" · ")}
-        </Text>
-      </div>
-    </article>
-  );
 }
 
 /**
@@ -139,7 +20,11 @@ export function AppAction(props: {
   scope: MarketplaceScope;
   app: MarketplaceApp;
   size?: "sm";
-  /** A small button is outline in a list. The app page header uses the filled one. */
+  /**
+   * In a list, the button has an icon: a plus, or a warning for an app that needs attention. A
+   * connected app shows "Connected" there. The app page header uses the filled button, and its status
+   * already says "Connected".
+   */
   variant?: "default";
   /** Outside the app's own page the button says which app: "Connect Linear". */
   named?: boolean;
@@ -148,10 +33,24 @@ export function AppAction(props: {
   const { t } = useText();
   const model = () => props.scope.model;
   const attention = () => props.app.status === "attention";
-  const label = () =>
-    attention()
+  const list = () => props.size !== undefined && props.variant === undefined;
+  /** The app of a plugin whose server refused its saved sign-in. The button then signs in to it again. */
+  const refused = () => {
+    const app = props.app;
+    return app.kind === "plugin" ? app.plugin.apps.find((entry) => app.connections[entry.id]?.signInNeeded) : undefined;
+  };
+  const label = () => {
+    const app = refused();
+    if (app) return t("marketplace.app.signInTitle", { name: app.name });
+    return attention()
       ? t("marketplace.app.reconnectNamed", { name: props.app.name })
       : t("marketplace.app.connectNamed", { name: props.app.name });
+  };
+  /** The short text of the button, when it does not name the app. */
+  const shortLabel = () => {
+    if (refused()) return t("provider.account.signInAgain");
+    return attention() ? t("marketplace.app.reconnect") : t("marketplace.app.connect");
+  };
   const connect = () => {
     const app = props.app;
     /* A connector's page owns its dialogs: the GitHub device code, a password manager's setup. A
@@ -165,17 +64,23 @@ export function AppAction(props: {
       return;
     }
     if (app.kind !== "plugin") return;
-    void model()
-      .connectApp(app)
-      .then((connected) => {
-        if (connected) props.onConnected?.();
-      });
+    // An app whose server refused its sign-in signs in again; nothing else of the plugin changes.
+    const entry = refused();
+    const done = entry ? model().reconnectApp(app, entry.id) : model().connectApp(app);
+    void done.then((connected) => {
+      if (connected) props.onConnected?.();
+    });
+  };
+  const variant = () => {
+    if (props.variant) return props.variant;
+    if (!props.size) return "default";
+    return attention() ? "outline" : "secondary";
   };
   return (
     <Show
       when={props.app.status !== "connected"}
       fallback={
-        <Show when={props.size}>
+        <Show when={list()}>
           <Done>{t("marketplace.app.connected")}</Done>
         </Show>
       }
@@ -185,81 +90,57 @@ export function AppAction(props: {
       <Show when={props.app.kind === "connector" || (props.app.kind === "plugin" && model().canConnectApps())}>
         <Button
           type="button"
-          variant={props.variant ?? (props.size ? "outline" : "default")}
+          variant={variant()}
           size={props.size}
-          loading={model().appBusy(props.app.id)}
+          class={list() ? "marketplace-app-action" : undefined}
+          data-status={props.app.status}
+          loading={model().appBusy(props.app.id) || props.app.status === "connecting"}
           aria-label={label()}
           onClick={connect}
         >
-          {props.named ? label() : attention() ? t("marketplace.app.reconnect") : t("marketplace.app.connect")}
+          <Show when={list() && !model().appBusy(props.app.id) && props.app.status !== "connecting"}>
+            <Show when={attention()} fallback={<Plus aria-hidden="true" />}>
+              <TriangleAlert aria-hidden="true" />
+            </Show>
+          </Show>
+          {props.named ? label() : shortLabel()}
         </Button>
       </Show>
     </Show>
   );
 }
 
-/** The line under an app card: its category, or "MCP server" for a server that the user added. */
-function appKind(app: MarketplaceApp) {
-  return app.kind === "custom" ? ("marketplace.app.custom" as const) : CATEGORY_LABELS[app.category];
-}
-
-/** A connect moves the app to the apps that the user has, where its card is a new element. */
-function focusCard(label: string) {
+/** A connect moves the app into "Your apps", and the button is then gone. The row keeps the focus. */
+function focusRow(label: string) {
   requestAnimationFrame(() =>
     document
-      .querySelector<HTMLElement>(`.skills-marketplace .marketplace-hitarea[aria-label="${CSS.escape(label)}"]`)
+      .querySelector<HTMLElement>(`.skills-marketplace .marketplace-app-row-hit[aria-label="${CSS.escape(label)}"]`)
       ?.focus(),
   );
 }
 
-/** An app card, as on the Agents and Skills tabs. The card opens the app page; Connect sits above it. */
-export function AppCard(props: { scope: MarketplaceScope; app: MarketplaceApp }) {
+/** An app in the list: its logo, name and one line, and its status. The row opens the app page. */
+export function AppRow(props: { scope: MarketplaceScope; app: MarketplaceApp }) {
   const { t } = useText();
-  const id = () => `marketplace-app-${props.app.id}`;
   const open = () => t("marketplace.open", { name: props.app.name });
   return (
-    <article class="marketplace-card" aria-labelledby={id()}>
+    <li class="marketplace-app-row">
       <Button
         type="button"
         variant="ghost"
-        class="marketplace-hitarea"
+        class="marketplace-app-row-hit"
         data-cuelume-tap="navigate"
         aria-label={open()}
         onClick={() => props.scope.nav.go({ kind: "app", id: props.app.id })}
       />
-      <div class="marketplace-card-head">
-        <AppLogo app={props.app} />
-        <Heading as="h4" size="sm" class="marketplace-card-name" id={id()}>
-          {props.app.name}
-        </Heading>
-        <div class="marketplace-card-action">
-          <AppAction scope={props.scope} app={props.app} size="sm" onConnected={() => focusCard(open())} />
-        </div>
-      </div>
-      <Text as="p" variant="body-sm" class="marketplace-card-body">
-        {props.app.tagline}
-      </Text>
-      <div class="marketplace-card-foot">
-        <Text as="span" variant="caption" tone="muted">
-          {t(appKind(props.app))}
-        </Text>
-      </div>
-    </article>
-  );
-}
-
-export function AgentGrid(props: { scope: MarketplaceScope; items: readonly MarketplaceAgentSummary[] }) {
-  return (
-    <div class="marketplace-grid">
-      <For each={props.items}>{(listing) => <AgentCard scope={props.scope} listing={listing} />}</For>
-    </div>
-  );
-}
-
-export function SkillGrid(props: { scope: MarketplaceScope; items: readonly MarketplaceSkillSummary[] }) {
-  return (
-    <div class="marketplace-grid">
-      <For each={props.items}>{(skill) => <SkillCard scope={props.scope} skill={skill} />}</For>
-    </div>
+      <AppLogo app={props.app} />
+      <span class="marketplace-app-row-copy">
+        <span class="marketplace-app-row-name">{props.app.name}</span>
+        <span class="marketplace-app-row-tagline">{props.app.tagline}</span>
+      </span>
+      <span class="marketplace-app-row-status">
+        <AppAction scope={props.scope} app={props.app} size="sm" onConnected={() => focusRow(open())} />
+      </span>
+    </li>
   );
 }

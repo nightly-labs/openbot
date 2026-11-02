@@ -4,8 +4,35 @@ import type { messages as source } from "../en/diagram";
 export const messages = {
   "diagram.view.label": "Diagrama {name}",
   "diagram.board.label": "Canvas de {name}",
-  "diagram.board.emptyTitle": "Comece com uma rotina",
-  "diagram.board.emptyBody": "Adicione uma rotina que inicia o trabalho, depois conecte agentes a ela.",
+  "diagram.board.emptyLead": "Desenhe-a uma vez.",
+  "diagram.board.emptyTitle": "Depois veja-a {run}.",
+  "diagram.board.emptyRun": "rodar",
+  "diagram.board.emptyStart": "Uma rotina inicia o trabalho.",
+  "diagram.board.emptyHandoff": "Cada agente passa sua resposta para o próximo.",
+  "diagram.board.sample.routine": "Resumo da manhã",
+  "diagram.board.sample.instruction":
+    "Reúna o que mudou desde ontem no mercado e no funil de vendas, e transforme isso nas prioridades de hoje.",
+  "diagram.board.sample.researchName": "Pesquisa",
+  "diagram.board.sample.researchTitle": "Parceiro de pesquisa",
+  "diagram.board.sample.researchTask":
+    "Reúna as notícias de mercado e de produto desde ontem, com uma fonte para cada item.",
+  "diagram.board.sample.researchOutput":
+    "1. A Northwind cortou 20% dos preços da API.\n2. A orientação da UE para modelos de uso geral é final.\n3. Dois concorrentes lançaram canvas de agentes esta semana.",
+  "diagram.board.sample.salesName": "Vendas",
+  "diagram.board.sample.salesTitle": "Especialista em prospecção",
+  "diagram.board.sample.salesTask": "Liste os negócios que mudaram de etapa desde ontem e o próximo passo de cada um.",
+  "diagram.board.sample.salesOutput":
+    "- A Contoso passou para Negociação. Próximo passo: enviar a revisão de segurança.\n- A Fabrikam está parada há 9 dias. Próximo passo: ligar para o patrocinador.",
+  "diagram.board.sample.writerName": "Redator",
+  "diagram.board.sample.writerTitle": "Redator do resumo",
+  "diagram.board.sample.writerTask": "Escreva um resumo a partir da pesquisa e do funil. Menos de 200 palavras.",
+  "diagram.board.sample.writerOutput":
+    "A Northwind cortou os preços da API, a orientação da UE é final e a Contoso está perto de fechar. A Fabrikam precisa de uma ligação hoje.",
+  "diagram.board.sample.chiefName": "Chefe",
+  "diagram.board.sample.chiefTitle": "Chefe de gabinete",
+  "diagram.board.sample.chiefTask": "Leia o resumo, decida as três prioridades de hoje e publique-as para a equipe.",
+  "diagram.board.sample.chiefOutput":
+    "Prioridades de hoje:\n1. Enviar a revisão de segurança para a Contoso.\n2. Responder ao corte de preços da Northwind.\n3. Ligar para a Fabrikam.",
   "diagram.menu.label": "Canvas",
   "diagram.menu.addAgent": "Adicionar agente aqui",
   "diagram.menu.noAgents": "Todos os agentes estão no canvas",

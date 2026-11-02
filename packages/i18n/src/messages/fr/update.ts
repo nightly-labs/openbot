@@ -17,6 +17,7 @@ export const messages = {
   "update.provider.checking": "Recherche de mises à jour pour {name}",
   "update.provider.available": "Mise à jour de {name} disponible",
   "update.provider.updating": "Mise à jour de {name}",
+  "update.provider.waiting": "Mise à jour de {name} en attente",
   "update.provider.failed": "Échec de la mise à jour de {name}",
   "update.provider.settingUp": "Configuration",
   "update.provider.failedRetry": "La mise à jour a échoué. Réessayez.",
@@ -63,5 +64,6 @@ export const messages = {
   "update.whatsNew.empty.body":
     "Cette version n’a aucune note à afficher ici. Le journal des modifications complet affiche toutes les modifications.",
   "update.whatsNew.changelog": "Journal complet",
+  "update.whatsNew.changelogFailed": "OpenBot n’a pas pu ouvrir le journal des modifications.",
   "update.whatsNew.done": "Compris",
 } as const satisfies PartialTranslation<typeof source>;

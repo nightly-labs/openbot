@@ -3,8 +3,35 @@ import { defineMessages } from "../../message";
 export const messages = defineMessages("diagram", {
   "diagram.view.label": "Diagram {name}",
   "diagram.board.label": "Canvas for {name}",
-  "diagram.board.emptyTitle": "Start with a routine",
-  "diagram.board.emptyBody": "Add a routine that starts the work, then connect agents to it.",
+  "diagram.board.emptyLead": "Draw it once.",
+  "diagram.board.emptyTitle": "Watch it {run}.",
+  "diagram.board.emptyRun": "run",
+  "diagram.board.emptyStart": "A routine starts the work.",
+  "diagram.board.emptyHandoff": "Each agent hands its answer to the next.",
+  "diagram.board.sample.routine": "Morning brief",
+  "diagram.board.sample.instruction":
+    "Collect what changed since yesterday in the market and in the sales pipeline, then turn it into today's priorities.",
+  "diagram.board.sample.researchName": "Research",
+  "diagram.board.sample.researchTitle": "Research partner",
+  "diagram.board.sample.researchTask":
+    "Collect the market and product news since yesterday, with a source for each item.",
+  "diagram.board.sample.researchOutput":
+    "1. Northwind cut its API prices by 20%.\n2. The EU guidance for general-purpose models is final.\n3. Two competitors shipped agent canvases this week.",
+  "diagram.board.sample.salesName": "Sales",
+  "diagram.board.sample.salesTitle": "Outbound specialist",
+  "diagram.board.sample.salesTask": "List the deals that changed stage since yesterday and the next step for each.",
+  "diagram.board.sample.salesOutput":
+    "- Contoso moved to Negotiation. Next step: send the security review.\n- Fabrikam stalled for 9 days. Next step: call the champion.",
+  "diagram.board.sample.writerName": "Writer",
+  "diagram.board.sample.writerTitle": "Brief writer",
+  "diagram.board.sample.writerTask": "Write one brief from the research and the pipeline. Keep it under 200 words.",
+  "diagram.board.sample.writerOutput":
+    "Northwind cut its API prices, the EU guidance is final, and Contoso is close to a deal. Fabrikam needs a call today.",
+  "diagram.board.sample.chiefName": "Chief",
+  "diagram.board.sample.chiefTitle": "Chief of staff",
+  "diagram.board.sample.chiefTask": "Read the brief, decide the three priorities for today and post them to the team.",
+  "diagram.board.sample.chiefOutput":
+    "Priorities for today:\n1. Send the Contoso security review.\n2. Answer the Northwind price cut.\n3. Call Fabrikam.",
   "diagram.menu.label": "Canvas",
   "diagram.menu.addAgent": "Add agent here",
   "diagram.menu.noAgents": "Every agent is on the canvas",

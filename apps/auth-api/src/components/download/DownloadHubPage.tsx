@@ -12,9 +12,10 @@ import { SiteHeader } from "../landing/SiteHeader";
 import { InstallerButton } from "./DownloadPieces";
 import { DownloadResources } from "./DownloadResources";
 
-// The installer for this computer, as the landing hero offers it, then one card per system in the
-// colours of the landing download cards, and a row of cards for the phone apps under them. Each
-// card has every installer of its system, and a link to its page for the requirements and install steps.
+// The centred index hero of the other site pages, with the installer for this computer as the landing
+// hero offers it. Then one card per system in the colours of the landing download cards, and a row of
+// cards for the phone apps under them. Each card has every installer of its system, and a link to its
+// page for the requirements and install steps.
 export function DownloadHubPage() {
   onSettled(() => landingAnalytics.start(document, window.location.hostname, downloadPagePath("hub")));
 
@@ -23,9 +24,10 @@ export function DownloadHubPage() {
       <SiteHeader page="content" />
 
       <main class="download-main">
-        <header class="download-hub-hero" data-enter="post-copy">
-          <h1 class="download-hub-title">{DOWNLOAD_HUB.heading}</h1>
-          <p class="download-hub-intro">{DOWNLOAD_HUB.intro}</p>
+        <header class="compare-index-hero download-hub-hero" data-enter="post-copy">
+          <div class="landing-hero-grid" aria-hidden="true" />
+          <h1 class="compare-index-title">{DOWNLOAD_HUB.heading}</h1>
+          <p class="compare-index-description download-hub-intro">{DOWNLOAD_HUB.intro}</p>
           <HeroDownloadSelector />
         </header>
 

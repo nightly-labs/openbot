@@ -26,7 +26,24 @@
   color: var(--openbot-text-muted);
 }
 
+/* Over the image until it loads: a remote image arrives only after its last byte. It shows after a
+ * delay, so an image that loads at once does not flash a spinner. */
+.image-gallery-tile-loading {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-area: 1 / 1;
+  animation: image-gallery-loading-in 0s 400ms both;
+}
+
+@keyframes image-gallery-loading-in {
+  from {
+    visibility: hidden;
+  }
+}
+
 .image-gallery-tile img {
+  grid-area: 1 / 1;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -52,10 +69,9 @@
 /* The viewer. The backdrop is a sibling below the content, and the content covers the window so
  * that its empty stage can take the click that closes it. */
 .ui-dialog-overlay.image-lightbox-backdrop {
-  position: fixed;
-  z-index: var(--openbot-layer-dialog);
-  inset: 0;
   background: var(--openbot-bg-overlay);
+  /* The viewer animates its backdrop from script, with the zoom of the image. */
+  animation: none;
 }
 
 .ui-dialog-content.image-lightbox {
@@ -93,6 +109,11 @@
   padding: var(--openbot-space-3) var(--openbot-space-4);
 }
 
+/* The macOS traffic lights take x 12..71 (`src/main/main-window.ts`), as in `browser-full-view.css`. */
+.image-lightbox-mac-controls .image-lightbox-toolbar {
+  padding-inline-start: 82px;
+}
+
 .image-lightbox-caption {
   display: flex;
   min-width: 0;
@@ -120,11 +141,26 @@
   gap: var(--openbot-space-1);
 }
 
+.image-lightbox-zoom {
+  display: flex;
+  align-items: center;
+}
+
+:where(.ui-button).image-lightbox-zoom-level {
+  min-width: 56px;
+  font-variant-numeric: tabular-nums;
+}
+
 .image-lightbox-stage {
   position: relative;
   min-height: 0;
-  /* A sideways swipe steps the images; the browser keeps vertical scroll only. */
-  touch-action: pan-y;
+  /* A sideways swipe steps the images, and a pinch or a drag moves the zoom, all from script. */
+  touch-action: none;
+}
+
+/* A zoomed image stays inside the stage, clear of the toolbar and the strip. */
+.image-lightbox-stage[data-zoomed] {
+  overflow: hidden;
 }
 
 /* The current image and its neighbours sit side by side, one stage width apart. A step moves the
@@ -153,6 +189,24 @@
   border-radius: var(--openbot-radius-md);
   user-select: none;
   will-change: transform;
+  /* A drag moves a zoomed image; the browser must not start a drag of the file. */
+  -webkit-user-drag: none;
+}
+
+/* A layer of its own would scale the fitted bitmap, so the zoomed image draws again, sharp. */
+.image-lightbox-image[data-zoomed] {
+  will-change: auto;
+  cursor: grab;
+}
+
+.image-lightbox-stage[data-dragging] .image-lightbox-image {
+  cursor: grabbing;
+}
+
+.image-lightbox-image[data-settling] {
+  transition:
+    scale var(--openbot-duration-slow) var(--openbot-ease-out),
+    translate var(--openbot-duration-slow) var(--openbot-ease-out);
 }
 
 /* Hidden until it loads, so the zoom starts from the thumbnail rather than after a flash of the

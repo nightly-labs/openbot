@@ -123,7 +123,6 @@ export const messages = {
   "error.remote.serverDisconnected": "Сервер отключился.",
   "error.remote.preferencesUnreadable": "Не удалось прочитать сохранённые настройки чата.",
   "error.remote.accountAuthRequired": "Требуется аутентификация аккаунта.",
-  "error.remote.serverIdentityChanged": "Идентификатор сервера изменился. Замена доверенного ключа хоста отклонена.",
   "error.remote.pairedIdentityChanged":
     "Идентификатор сопряжённого компьютера отсутствует или изменился. Отсканируйте новый код с того компьютера.",
   "error.remote.permanentInviteNoEmail": "Постоянные приглашения нельзя отправить по электронной почте.",
@@ -181,6 +180,8 @@ export const messages = {
   "error.remote.directoryTimeout": "Служба OpenBot не ответила вовремя. Повторите попытку.",
   "error.remote.inviteAlreadyUsed": "Это приглашение уже использовано. Попросите новое приглашение.",
   "error.remote.inviteNotFound": "Это приглашение не существует или истекло. Попросите новое приглашение.",
+  "error.remote.licenseUsersFull":
+    "В лицензии владельца сервера нет свободных пользователей. Попросите владельца добавить пользователя в лицензию.",
   "error.remote.memberLimitReached": "На этом хосте достигнут лимит участников. Попросите владельца освободить место.",
   "error.remote.hostNotRegistered": "Этот хост больше не зарегистрирован в службе OpenBot.",
   "error.remote.membershipEnded": "Вы больше не участник этого хоста. Попросите у владельца новое приглашение.",
@@ -188,5 +189,10 @@ export const messages = {
   "error.remote.hostOtherAccount": "Этот хост принадлежит другому аккаунту.",
   "error.remote.remoteNotConfigured": "Удалённые подключения не настроены в этой службе OpenBot.",
   "error.remote.hostRefused": "Хост отклонил запрос ({status}).",
+  "error.remote.formUnavailable": "Эта форма больше недоступна.",
   "error.remote.hostedServerRemoval": "Чтобы удалить размещённый сервер, используйте раздел «Оплата».",
+  "error.remote.channelsUnsupported": "Обновите этот сервер на компьютере, чтобы использовать каналы.",
+  "error.remote.channelDeleteUnsupported": "Обновите этот сервер на компьютере, чтобы удалять каналы.",
+  "error.remote.historyRefreshFailed": "Сообщение отправлено, но историю чата обновить не удалось.",
+  "error.remote.taskHistoryRefreshFailed": "Задача изменена, но историю чата обновить не удалось.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,0 +1,63 @@
+/* Settings > Providers. The settings card and row classes do the layout; these rules add only what
+   they do not have. */
+
+.provider-settings-stack {
+  display: grid;
+  gap: var(--openbot-space-6);
+}
+
+/* The select value is a block; the logo and the name center in it. */
+.provider-settings-select {
+  width: 168px;
+}
+
+.provider-settings-select .ui-select-value,
+.provider-settings-select-option {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.provider-settings-logo-off {
+  opacity: 0.44;
+}
+
+.provider-settings-stack .ui-item-description.provider-settings-warning {
+  color: var(--openbot-warning-text);
+}
+
+.provider-settings-stack .ui-item-description.provider-settings-error {
+  color: var(--openbot-danger-text);
+}
+
+/* An account with two lines of text keeps its buttons on the title line. */
+.provider-settings-account.ui-item {
+  align-items: flex-start;
+}
+
+.provider-settings-account .ui-item-content {
+  gap: var(--openbot-space-1);
+}
+
+.provider-settings-account .provider-picker-account-rename {
+  max-width: 280px;
+}
+
+/* The usage badge is a shared badge that opens the usage popover of the app. */
+.provider-settings-usage-badge {
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-sm);
+}
+
+.provider-settings-usage-badge:focus-visible {
+  outline: 2px solid var(--openbot-focus-ring);
+  outline-offset: 2px;
+}
+
+.provider-settings-progress {
+  max-width: 320px;
+}

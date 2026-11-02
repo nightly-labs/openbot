@@ -27,9 +27,9 @@ Rules:
 - If no teammate fits, say so, and suggest which agent the OpenBot user could add.`;
 
 /** The facts the orchestrator starts with, for the guild it was added to. */
-export function discordOrchestratorMemories(guildName: string): string[] {
+export function discordOrchestratorMemories(): string[] {
   return [
-    `The OpenBot user connected the Discord server ${guildName}. Its members send me requests.`,
+    "The OpenBot user connected Discord servers. Their members send me requests, and each request names its server.",
     "In Discord, everyone sees my answers as OpenBot, not as me or my teammates.",
     "In Discord, a conversation is a chain of replies. A person continues it with a reply to an OpenBot message.",
     "A teammate's answer to my send_message request comes back to the same Discord conversation as a new turn of mine.",

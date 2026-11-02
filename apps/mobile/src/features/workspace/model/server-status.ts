@@ -111,10 +111,13 @@ export function serverFromHost(
     resuming: previous?.resuming,
     address: null,
     accent: serverAccent(host.hostId),
-    publicKey: previous?.publicKey ?? host.devicePublicKey,
+    // The directory gives the key that this app trusts: the pinned key, or the new key of a signed
+    // handover. A changed key connects again with it.
+    publicKey: host.devicePublicKey,
     membershipId: host.membershipId,
     role: host.role,
     ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
     ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
+    ...(host.keyChangedAt === undefined ? {} : { keyChangedAt: host.keyChangedAt }),
   };
 }

@@ -1,4 +1,5 @@
 import type { AgentProviderId } from "@openbot/contracts/ipc";
+import { Toaster } from "@openbot/ui";
 import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
 import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
 import { createSignal } from "solid-js";
@@ -254,22 +255,25 @@ function ProviderSwitchStory(props: {
 }) {
   const [off, setOff] = createSignal<readonly AgentProviderId[]>(props.off);
   return (
-    <ProviderPicker
-      {...args}
-      embedded
-      label={undefined}
-      hint={undefined}
-      allowUnavailableSelection
-      options={switchOptions.map((option) => ({
-        ...option,
-        off: off().includes(option.id),
-        usedBy: props.usedBy?.[option.id],
-      }))}
-      onSetProviderOn={async (provider, on) => {
-        await props.save?.();
-        setOff((current) => (on ? current.filter((id) => id !== provider) : [...current, provider]));
-      }}
-    />
+    <>
+      <ProviderPicker
+        {...args}
+        embedded
+        label={undefined}
+        hint={undefined}
+        allowUnavailableSelection
+        options={switchOptions.map((option) => ({
+          ...option,
+          off: off().includes(option.id),
+          usedBy: props.usedBy?.[option.id],
+        }))}
+        onSetProviderOn={async (provider, on) => {
+          await props.save?.();
+          setOff((current) => (on ? current.filter((id) => id !== provider) : [...current, provider]));
+        }}
+      />
+      <Toaster />
+    </>
   );
 }
 
@@ -277,7 +281,7 @@ export const ProvidersOff: Story = {
   render: () => <ProviderSwitchStory off={["cursor", "opencode"]} />,
 };
 
-/** Agents use Codex and Claude, so their switches stay on. Turning one off names its agents. */
+/** Agents use Codex and Claude, so their switches stay on. Turning one off shows a toast that tells why. */
 export const ProviderInUse: Story = {
   render: () => <ProviderSwitchStory off={["cursor"]} usedBy={{ codex: ["Ada"], claude: ["Rex", "Mila"] }} />,
 };
@@ -335,11 +339,15 @@ export const ProviderAccounts: Story = {
         name: "Claude",
         state: "available",
         email: "person@example.com",
-        accounts: [{ id: "default", label: null, email: "person@example.com", state: "available", message: null }],
+        accounts: [
+          { id: "default", label: null, email: "person@example.com", state: "available", message: null },
+          { id: "a00000000000000002", label: null, email: null, state: "connecting", message: null },
+        ],
       },
     ],
     accountActions: {
       connect: fn(async () => undefined),
+      cancel: fn(async () => undefined),
       rename: fn(async () => undefined),
       remove: fn(async () => undefined),
     },

@@ -1,14 +1,21 @@
 import type { AgentImportResult } from "@openbot/contracts/ipc";
-import { Blocks, Download, HardDrive, Monitor, Settings, Tabs, UsersRound } from "@openbot/ui";
+import { AgentImportSources } from "@openbot/ui/features/import/AgentImportSources";
 import { AgentImportView } from "@openbot/ui/features/import/AgentImportView";
-import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
+import { HermesImportView } from "@openbot/ui/features/import/HermesImportView";
+import type { JSX } from "@solidjs/web";
 import { createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_SKILL, AGENT_IMPORT_WARNINGS } from "./agent-import-fixtures";
+import {
+  AGENT_IMPORT_PREVIEW,
+  AGENT_IMPORT_SKILL,
+  AGENT_IMPORT_WARNINGS,
+  HERMES_EXPORT_SKILL,
+  HERMES_IMPORT_PREVIEW,
+} from "./agent-import-fixtures";
 import { FILES_NOW } from "./files-fixtures";
 import { STORY_AGENT_SUMMARIES } from "./fixtures";
-import { SettingsPageStory } from "./settings-page-story";
+import { ServerSettingsStory, serverSettingsArgs } from "./server-settings-story";
 
 const meta = {
   title: "Settings/AgentImport",
@@ -44,11 +51,11 @@ const RESULT: AgentImportResult = {
   warnings: [],
 };
 
-function Stage(props: { args: ViewArgs; narrow?: boolean }) {
+function Stage(props: { args?: ViewArgs; narrow?: boolean; children?: JSX.Element }) {
   return (
     <main class="files-story-stage">
       <div class="files-story-page" data-narrow={props.narrow ? "true" : undefined}>
-        <AgentImportView {...props.args} />
+        {props.args ? <AgentImportView {...props.args} /> : props.children}
       </div>
     </main>
   );
@@ -133,59 +140,188 @@ export const ReviewNarrow: Story = {
   render: () => <Stage args={viewArgs({ phase: "review", preview: AGENT_IMPORT_PREVIEW })} narrow />,
 };
 
-// The same sections and icons as the real ServerSettingsModal for this computer.
-const SERVER_SETTINGS_NAV = [
-  { value: "general", label: "General", icon: Settings },
-  { value: "members", label: "Members", icon: UsersRound },
-  { value: "desktop", label: "Remote desktop", icon: Monitor },
-  { value: "mcp", label: "MCP", icon: Blocks },
-  { value: "storage", label: "Storage", icon: HardDrive },
-  { value: "import", label: "Import", icon: Download },
-] as const;
-
-function ServerSettingsStage(props: { args: ViewArgs }) {
-  const [tab, setTab] = createSignal("import");
-  return (
-    <SettingsPageStory title="Server settings">
-      {(page) => (
-        <Tabs.Root value={tab()} onChange={setTab} orientation="vertical" class="settings-modal-tabs-root">
-          <SettingsDialogShell
-            class="server-settings-modal-shell"
-            open
-            page={page()}
-            title="Import"
-            description="Move your agents from Grok Bot to this computer."
-            contentKey={tab()}
-            sidebar={
-              <Tabs.List class="settings-modal-nav" aria-label="Server settings sections">
-                {SERVER_SETTINGS_NAV.map((item) => {
-                  const NavIcon = item.icon;
-                  return (
-                    <Tabs.Trigger class="settings-modal-nav-item" value={item.value}>
-                      <NavIcon aria-hidden="true" />
-                      <span>{item.label}</span>
-                    </Tabs.Trigger>
-                  );
-                })}
-              </Tabs.List>
-            }
-          >
-            <Tabs.Content value="import" class="settings-modal-tab-panel server-settings-panel" data-tab="import">
-              <AgentImportView {...props.args} />
-            </Tabs.Content>
-          </SettingsDialogShell>
-        </Tabs.Root>
-      )}
-    </SettingsPageStory>
-  );
-}
-
+/** Server settings > Import for this computer. The preview reads a Grok Bot export or the Hermes folder. */
 export const InServerSettings: Story = {
   name: "Import: Server settings",
-  render: () => <ServerSettingsStage args={viewArgs()} />,
+  render: () => (
+    <ServerSettingsStory
+      settings={{
+        ...serverSettingsArgs(),
+        agentImport: { onOpenAgent: fn(), onClose: fn() },
+        instanceTransfer: { onSignIn: fn() },
+        initialSection: "import",
+      }}
+    />
+  ),
 };
 
-export const ReviewInServerSettings: Story = {
-  name: "Import: Review in Server settings",
-  render: () => <ServerSettingsStage args={viewArgs({ phase: "review", preview: AGENT_IMPORT_PREVIEW })} />,
+type HermesArgs = Parameters<typeof HermesImportView>[0];
+
+const hermesArgs = (overrides: Partial<HermesArgs> = {}): HermesArgs => ({
+  phase: "review",
+  preview: HERMES_IMPORT_PREVIEW,
+  result: null,
+  onBack: fn(),
+  onChooseFolder: fn(),
+  onImport: fn(),
+  onDone: fn(),
+  onOpenAgent: fn(),
+  ...overrides,
+});
+
+/** The first screen: Hermes, Grok Bot, or another OpenBot computer. */
+export const Sources: Story = {
+  name: "Import: Sources",
+  render: () => (
+    <Stage>
+      <AgentImportSources transfer onHermes={fn()} onGrok={fn()} onTransfer={fn()} />
+    </Stage>
+  ),
+};
+
+/** A joined server the user does not administer: no Transfer. */
+export const SourcesJoinedServer: Story = {
+  name: "Import: Sources on a joined server",
+  render: () => (
+    <Stage>
+      <AgentImportSources transfer={false} onHermes={fn()} onGrok={fn()} onTransfer={fn()} />
+    </Stage>
+  ),
+};
+
+const hermesGuideArgs = (overrides: Partial<ViewArgs> = {}): ViewArgs =>
+  viewArgs({
+    source: "hermes-agent",
+    setup: "folder",
+    exportSkill: HERMES_EXPORT_SKILL,
+    onReadFolder: fn(),
+    ...overrides,
+  });
+
+/** Hermes on this computer: read its folder, install the export skill with a command, or add it by hand. */
+export const HermesSteps: Story = {
+  name: "Hermes: Steps",
+  render: () => {
+    const [setup, setSetup] = createSignal<ViewArgs["setup"]>("folder");
+    return (
+      <Stage>
+        <AgentImportView {...hermesGuideArgs({ setup: setup(), onSetupChange: setSetup })} />
+      </Stage>
+    );
+  },
+};
+
+export const HermesInstallCommand: Story = {
+  name: "Hermes: Install with a command",
+  render: () => (
+    <Stage>
+      <AgentImportView {...hermesGuideArgs({ setup: "command" })} />
+    </Stage>
+  ),
+};
+
+export const HermesSkillYourself: Story = {
+  name: "Hermes: Set it up yourself",
+  render: () => (
+    <Stage>
+      <AgentImportView {...hermesGuideArgs({ setup: "skill" })} />
+    </Stage>
+  ),
+};
+
+/** A joined server cannot read this computer's folder, so Hermes offers the export only. */
+export const HermesStepsJoinedServer: Story = {
+  name: "Hermes: Steps on a joined server",
+  render: () => (
+    <Stage>
+      <AgentImportView {...hermesGuideArgs({ setup: "command", onReadFolder: undefined })} />
+    </Stage>
+  ),
+};
+
+/** An export the skill made in Hermes: the same review as a Grok Bot export. */
+export const HermesExportReview: Story = {
+  name: "Hermes: Export review",
+  render: () => (
+    <Stage>
+      <AgentImportView
+        {...hermesGuideArgs({
+          phase: "review",
+          preview: {
+            ...AGENT_IMPORT_PREVIEW,
+            sourceApp: "hermes-agent",
+            exportedAt: "2026-10-21T10:00:00.000Z",
+            agents: AGENT_IMPORT_PREVIEW.agents.map((agent) => ({
+              ...agent,
+              avatarUrl: null,
+              fileCount: 0,
+              fileBytes: 0,
+            })),
+            channels: [],
+          },
+        })}
+      />
+    </Stage>
+  ),
+};
+
+/** Every item of every profile, with what needs approval and what stays in Hermes. */
+export const HermesReview: Story = {
+  name: "Hermes: Review",
+  render: () => (
+    <Stage>
+      <HermesImportView {...hermesArgs()} />
+    </Stage>
+  ),
+};
+
+/** A second import: the profile imported before updates its agent, or is left as it is. */
+export const HermesSecondImport: Story = {
+  name: "Hermes: Second import",
+  render: () => (
+    <Stage>
+      <HermesImportView
+        {...hermesArgs({
+          preview: {
+            ...HERMES_IMPORT_PREVIEW,
+            profiles: HERMES_IMPORT_PREVIEW.profiles.map((profile) =>
+              profile.key === "default" ? { ...profile, agent: { id: "agent-hermes", name: "Hermes" } } : profile,
+            ),
+          },
+        })}
+      />
+    </Stage>
+  ),
+};
+
+export const HermesNotFound: Story = {
+  name: "Hermes: No profiles found",
+  render: () => (
+    <Stage>
+      <HermesImportView {...hermesArgs({ phase: "missing", preview: null })} />
+    </Stage>
+  ),
+};
+
+export const HermesDone: Story = {
+  name: "Hermes: Done",
+  render: () => (
+    <Stage>
+      <HermesImportView
+        {...hermesArgs({
+          phase: "done",
+          preview: null,
+          updated: new Set(RESULT.agents.slice(0, 1).map((agent) => agent.id)),
+          result: {
+            ...RESULT,
+            channels: [],
+            warnings: [
+              "Research desk: SOUL.md is longer than 2000 characters, so the instructions keep its start. The full file is in imported/hermes/SOUL.md.",
+              "filesystem: the MCP server is added turned off. Check its command, enter its values and full address again, and turn it on in MCP settings.",
+            ],
+          },
+        })}
+      />
+    </Stage>
+  ),
 };

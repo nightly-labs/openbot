@@ -13,14 +13,19 @@ export interface BrowserTab {
   openerTabId?: string;
   /** Local popup failure, without authentication URLs or request data. */
   popupFailure?: { id: string; message: string };
+  /** A person controls this tab, so the owning agent waits for the release. */
+  userControl?: true;
+  /** Whether the tab has a page to go back or forward to. Absent: unknown, such as from an older host. */
+  canGoBack?: boolean;
+  canGoForward?: boolean;
 }
 
 export type BrowserImageMode = "auto" | "always" | "never";
 
 export type BrowserTarget =
   | { kind: "ref"; ref: string; revision: number }
-  | { kind: "role"; role: string; name?: string; exact?: boolean }
-  | { kind: "text"; text: string; exact?: boolean }
+  | { kind: "role"; role: string; name?: string | undefined; exact?: boolean | undefined }
+  | { kind: "text"; text: string; exact?: boolean | undefined }
   | { kind: "css"; selector: string }
   | { kind: "point"; x: number; y: number };
 
@@ -72,17 +77,17 @@ export interface BrowserDiagnosticEntry {
   kind: "console" | "network" | "load";
   level: "debug" | "info" | "warning" | "error";
   message: string;
-  url?: string;
-  method?: string;
-  status?: number;
+  url?: string | undefined;
+  method?: string | undefined;
+  status?: number | undefined;
 }
 
 export interface BrowserActionHistoryEntry {
   timestamp: string;
   action: string;
-  target?: string;
+  target?: string | undefined;
   outcome: "success" | "error";
-  detail?: string;
+  detail?: string | undefined;
 }
 
 export interface BrowserSnapshot {
@@ -200,6 +205,39 @@ export interface BrowserOpenInput {
   focus?: boolean;
 }
 
+/**
+ * A sign-in on this computer for a tab of the active remote server. OpenBot opens the tab's address
+ * in a local window with its own session in memory; Done sends the cookies of that site to the tab.
+ * When the site looks signed in, the window ends its wait before the person selects Done.
+ */
+export interface BrowserLocalSignInInput {
+  tabId: string;
+  url: string;
+}
+
+/** How the wait for the local sign-in window ends. */
+export interface BrowserLocalSignInEnd {
+  signedIn: boolean;
+}
+
+/**
+ * `send: false` discards the local sign-in. `check: true` keeps it when the server tab still shows a
+ * sign-in step after the send, so the person can finish the sign-in in the window.
+ */
+export interface BrowserLocalSignInFinish {
+  send: boolean;
+  check?: boolean | undefined;
+}
+
+/**
+ * The count of cookies that the server set in the tab's session. `signedIn` is false when a checked
+ * send left the server tab on a sign-in step.
+ */
+export interface BrowserLocalSignInResult {
+  cookies: number;
+  signedIn: boolean;
+}
+
 export type BrowserNavigationDirection = "back" | "forward";
 
 export type BrowserNavigateInput =
@@ -208,7 +246,7 @@ export type BrowserNavigateInput =
 
 export interface BrowserVisibilityInput {
   visible: boolean;
-  bounds?: BrowserBounds;
+  bounds?: BrowserBounds | undefined;
   target?: BrowserViewTarget;
 }
 

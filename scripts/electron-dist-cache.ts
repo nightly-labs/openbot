@@ -20,7 +20,8 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// The root `postinstall` runs `restore`, then `install-electron`, then `save`. `install-electron`
+// The root `postinstall` runs `restore`, then `install-electron` (through
+// `scripts/install-electron.ts`), then `save`. `install-electron`
 // extracts ~320 MB of Electron into every worktree, and an extracted file is never an APFS clone.
 // On macOS this keeps one extracted copy for each Electron version and architecture, and each
 // worktree gets an APFS clone of it. `install-electron` stays the only step that downloads and

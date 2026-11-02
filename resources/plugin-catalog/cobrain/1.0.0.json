@@ -4,7 +4,7 @@
   "tagline": "Shared memory for your AI agents",
   "description": "Cobrain is a Markdown memory that every AI you connect can read and write. Agents load the context of a client or project before working, search past notes and decisions, and save what they learn so the next thread starts where the last one ended. Each user signs in to their own Cobrain account.",
   "category": "productivity",
-  "creatorName": "cobrain.space",
+  "creatorName": "Cobrain",
   "iconUrl": "https://cobrain.space/apple-icon.png",
   "version": "1.0.0",
   "prompts": [

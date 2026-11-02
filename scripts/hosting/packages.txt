@@ -25,7 +25,7 @@ libcap2
 libcurl4t64
 libevdev2
 libglib2.0-0t64
-libminiupnpc17
+libnuma1
 libpulse0
 libssl3t64
 libva2

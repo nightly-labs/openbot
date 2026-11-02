@@ -1,3 +1,4 @@
+import { useIsFocused } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import type { LucideIcon } from "lucide-react-native";
@@ -6,17 +7,12 @@ import Cloud from "lucide-react-native/icons/cloud";
 import Mail from "lucide-react-native/icons/mail";
 import Monitor from "lucide-react-native/icons/monitor";
 import { View } from "react-native";
-import Animated from "react-native-reanimated";
 import { GlassChoice } from "@/features/onboarding/components/onboarding-glass";
-import {
-  glassAfter,
-  type OnboardingMotion,
-  popEntering,
-  STAGGER_MS,
-} from "@/features/onboarding/components/onboarding-motion";
+import { glassAfter, type OnboardingMotion, STAGGER_MS } from "@/features/onboarding/components/onboarding-motion";
 import { StepHeader, StepScroll } from "@/features/onboarding/components/onboarding-parts";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
-import { BloubLoader } from "@/shared/components/bloub-loader";
+import { useBloubStageRequest } from "@/shared/components/bloub-stage/bloub-stage-context";
+import { BLOUB_PRIORITY } from "@/shared/components/bloub-stage/bloub-stage-store";
 import { useText } from "@/shared/lib/text";
 
 interface ServerOption {
@@ -65,6 +61,8 @@ export function ServerStep({
   onComputer,
   onCloud,
   onInvitation,
+  onBack,
+  onSkip,
 }: {
   motion: OnboardingMotion;
   /** A server that the account has but that is not online yet. */
@@ -73,8 +71,29 @@ export function ServerStep({
   /** Absent when the account cannot have a cloud server. */
   onCloud: (() => void) | null;
   onInvitation: () => void;
+  /** The flow's own Back and Skip are under the loader, so the loader offers one of them. */
+  onBack: (() => void) | null;
+  onSkip: (() => void) | null;
 }) {
   const { t } = useText();
+  // The app loader covers the step while the server connects, and rolls up when it is online.
+  const focused = useIsFocused();
+  useBloubStageRequest(
+    connecting && focused
+      ? {
+          shape: { kind: "cover" },
+          mood: "think",
+          caption: { text: t("mobile.onboarding.server.connecting", { name: connecting.name }) },
+          loader: true,
+          back: onBack
+            ? { icon: "back", label: t("common.back"), onPress: onBack }
+            : onSkip
+              ? { icon: "close", label: t("mobile.onboarding.skip"), onPress: onSkip }
+              : undefined,
+        }
+      : null,
+    BLOUB_PRIORITY.loader,
+  );
   const options: ServerOption[] = [
     {
       id: "invitation",
@@ -109,17 +128,7 @@ export function ServerStep({
         body={t("mobile.onboarding.server.body")}
         motion={motion}
       />
-      {connecting ? (
-        <Animated.View
-          entering={popEntering(motion, STAGGER_MS * 3)}
-          className="flex-1 items-center justify-center gap-2"
-        >
-          <BloubLoader label={t("mobile.onboarding.server.connecting", { name: connecting.name })} />
-          <Typography.Paragraph align="center" color="muted">
-            {t("mobile.onboarding.server.connecting", { name: connecting.name })}
-          </Typography.Paragraph>
-        </Animated.View>
-      ) : (
+      {connecting ? null : (
         <View className="gap-3">
           {options.map((option, index) => (
             <OptionRow key={option.id} option={option} index={index} />

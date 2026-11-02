@@ -14,6 +14,7 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { type MobileAgent, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { haptics } from "@/shared/lib/haptics";
+import { nativeLabelFont } from "@/shared/lib/native-label-font";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 
@@ -236,7 +237,13 @@ function ManagedSkill({
           colorScheme={theme === "dark" ? "dark" : "light"}
         >
           {/* Older hosts send no `enabled`; such a skill is on. */}
-          <Switch label={skill.name} value={skill.enabled !== false} disabled={busy} onValueChange={onEnabledChange} />
+          <Switch
+            label={skill.name}
+            value={skill.enabled !== false}
+            disabled={busy}
+            modifiers={nativeLabelFont}
+            onValueChange={onEnabledChange}
+          />
         </Host>
         <SkillDescription skill={skill} />
       </SettingsRow>

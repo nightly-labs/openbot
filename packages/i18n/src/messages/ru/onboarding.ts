@@ -2,6 +2,10 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/onboarding";
 
 export const messages = {
+  "onboarding.readFailed.title": "OpenBot не удалось прочитать вашу настройку.",
+  "onboarding.readFailed.description":
+    "Ваши локальные данные не изменились. Повторите попытку. Если проблема не исчезнет, настройте OpenBot заново.",
+  "onboarding.readFailed.setUpAgain": "Настроить заново",
   "onboarding.setup.saveFailed": "OpenBot не удалось сохранить локальную настройку.",
   "onboarding.setup.verifyFailed": "OpenBot не удалось проверить это приглашение.",
   "onboarding.setup.connectFailed": "OpenBot не удалось подключиться к этому хосту.",
@@ -39,6 +43,11 @@ export const messages = {
   "onboarding.provider.googlePlan": "Тариф Google AI Pro или Ultra",
   "onboarding.provider.cursorPlan": "Тариф Cursor или API-ключ",
   "onboarding.provider.clineAccount": "Бесплатные модели с аккаунтом Cline",
+  "onboarding.provider.kimiAccount": "Модели Kimi с аккаунтом Kimi Code",
+  "onboarding.provider.hermesNous": "Подписка Nous Portal или ваша настройка Hermes",
+  "onboarding.provider.inceptionKey": "Модели Mercury с ключом API Inception",
+  "onboarding.provider.deepseekKey": "Модели DeepSeek с ключом API DeepSeek",
+  "onboarding.provider.openrouterKey": "Множество моделей с ключом API OpenRouter",
   "onboarding.provider.tryFree": "Попробовать бесплатно",
   "onboarding.provider.noSignIn": "Вход не нужен",
   "onboarding.provider.more": "Другие провайдеры",
@@ -74,6 +83,15 @@ export const messages = {
   "onboarding.choice.subscription": "У меня есть подписка",
   "onboarding.choice.subscriptionDetail": "ChatGPT, Claude или Grok",
   "onboarding.choice.startFreeInstead": "Лучше начать бесплатно",
+  "onboarding.consent.notice": "Продолжая, вы принимаете {terms}. Подробнее о данных: {privacy}.",
+  "onboarding.consent.analyticsTitle": "Помогите улучшить OpenBot",
+  "onboarding.consent.analyticsDetail":
+    "Связывайте использование функций с аккаунтом и почтой и делитесь посещёнными сайтами, использованием инструментов и ежедневной сводкой настройки. Без этого отправляется только базовое использование, со случайным ID установки. Ваши чаты, файлы и промпты — никогда.",
+  "onboarding.consent.thanksTitle": "Спасибо! Команда у вас в долгу.",
+  "onboarding.consent.thanksToast": "Спасибо, что помогаете улучшать OpenBot 💜",
+  "onboarding.consent.thanksToastDetail": "Это можно изменить в любой момент в настройках.",
+  "onboarding.consent.termsLink": "Условия использования",
+  "onboarding.consent.privacyLink": "Политика конфиденциальности",
   "onboarding.plan.title": "Подключите подписку",
   "onboarding.plan.description": "Войдите один раз. Агенты будут использовать вашу подписку.",
   "onboarding.computer.title": "OpenBot может управлять вашим компьютером",

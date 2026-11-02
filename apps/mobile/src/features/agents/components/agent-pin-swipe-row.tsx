@@ -7,6 +7,7 @@ import { Pressable, View } from "react-native";
 import { GestureDetector } from "react-native-gesture-handler";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import Animated, { type SharedValue, useAnimatedStyle } from "react-native-reanimated";
+import { ChatDragArea, type useChatDrag } from "@/features/agents/components/chat-drag";
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
@@ -87,20 +88,23 @@ export function AgentPinSwipeRow({
   pinned = false,
   pinBlocked,
   onPin,
+  drag,
   children,
 }: PropsWithChildren<{
   agentName: string;
   pinned?: boolean;
   pinBlocked: boolean;
   onPin: (withHaptic: boolean) => void;
+  /** The hold-and-move drag of the row (`useChatDrag`). */
+  drag?: ReturnType<typeof useChatDrag>;
 }>) {
   const [background] = useThemeColor(["background"]);
   const { openingGesture } = useAppDrawer();
-  const swipe = useAgentPinSwipe(openingGesture, onPin, pinBlocked);
+  const swipe = useAgentPinSwipe(openingGesture, onPin, pinBlocked, drag?.gesture);
   const { t } = useText();
 
   return (
-    <GestureDetector gesture={swipe.gesture}>
+    <GestureDetector gesture={swipe.detectorGesture}>
       <ReanimatedSwipeable
         ref={swipe.swipeable}
         enabled={!swipe.pinPending}
@@ -111,8 +115,8 @@ export function AgentPinSwipeRow({
         overshootFriction={1}
         rightThreshold={PIN_REVEAL_DISTANCE / 2}
         enableTrackpadTwoFingerGesture
-        simultaneousWithExternalGesture={swipe.gesture}
-        requireExternalGestureToFail={openingGesture}
+        simultaneousWith={swipe.gesture}
+        requireToFail={swipe.swipeRequires}
         onSwipeableWillOpen={swipe.onWillOpen}
         onSwipeableWillClose={swipe.onWillClose}
         onSwipeableClose={swipe.onClose}
@@ -132,7 +136,7 @@ export function AgentPinSwipeRow({
           accessibilityElementsHidden={swipe.revealed}
           importantForAccessibility={swipe.revealed ? "no-hide-descendants" : "auto"}
         >
-          {children}
+          {drag ? <ChatDragArea drag={drag}>{children}</ChatDragArea> : children}
         </View>
         {swipe.revealed ? (
           <Pressable

@@ -41,20 +41,24 @@ mock. The separate web preview implements the browser runtime with that same moc
 
 ## Behavior and limits
 
-- `/api/browser/*` exposes only email start/verify, session read/logout, host list, host logo read,
+- `/api/browser/*` exposes only email start/verify, session read/logout, checkout attribution
+  (`checkout-attribution`), host list, owned host removal, host logo read,
   session start/ticket/end, invitation preview/accept and email, host member and invite
   administration, and the account's display name, avatar, and session list/revoke
   (`v1/me/profile`, `v1/me/avatar`, `v1/me/sessions`), and billing (`v1/me/billing`,
   `v1/me/billing/portal`), and hosted servers (`v2/hosting/servers` list and create with
   `{name, plan, interval, currency}`, `v2/hosting/plans`, `v2/hosting/servers/:id` delete, and
-  `v2/hosting/servers/:id/wake` and `/checkout`), and the account's hosted site list/delete
+  `v2/hosting/servers/:id/wake`, `/restart`, `/status`, `/lifecycle` and `/checkout`), and the
+  account's hosted site list/delete
   (`v1/sites`), which the web client no longer calls: sites are in Server settings > Sites, through
   the host's `hosted-sites-v1`. It is not a general account or host proxy.
   Every write needs the same origin and `X-OpenBot-Browser: 1`; all send JSON except the avatar
   upload, which sends the image bytes. A site delete also needs an `Idempotency-Key`. A host logo is
   given to a member of that host, for its current `logoKey` only.
-- The page rail is the same as on desktop: Agents, Routines (when the host supports routines),
-  Schedule, Usage, Marketplace, Settings, and Help. Settings opens a page with the desktop Profile tab
+- The page rail is the same as on desktop: Agents, the pinned pages, More, Marketplace, Settings,
+  and Help. More lists Routines and Tasks (when the host supports them), Schedule, and Usage, and
+  each row has a pin that adds the page to the rail. Usage starts pinned. This browser keeps the
+  pins (`openbot:rail-pins`). Settings opens a page with the desktop Profile tab
   (with Sign out), Preferences (the interface language and the completion sound), and a Billing
   button below the tabs. The server menu opens the Server settings page of the connected host.
   This browser keeps both preferences, also before sign-in (`web-language-preference.ts`,
@@ -112,9 +116,10 @@ mock. The separate web preview implements the browser runtime with that same moc
   server that the account pays for. Its actions open the Stripe Customer Portal in the same tab, only
   at a `billing.stripe.com` URL. Stripe returns to `/app?billing=portal`. The client removes the field
   and opens the dialog. The webhook can be later than the return, so the dialog loads again on focus.
-- The application Settings page, permissions review, and hosted site publishing are desktop only.
-  Publishing sends a folder of this computer through a folder picker and local file reads in the main
-  process. The browser can list, open, and delete the account's sites.
+- The application Settings page (permissions, app updates), permissions review, and hosted site
+  publishing are desktop only. Publishing sends a folder of this computer through a folder picker
+  and local file reads in the main process. The browser can list and open the sites of the
+  connected host in Server settings > Sites. An owner or admin can delete them there.
 - Uploads and downloads retain the shared client's 10 MB limit. Message attachment count uses the
   shared contract limit. Cancelling a transfer sends the existing file-cancel frame. If the host
   has already committed an attachment, cancellation removes that draft after the response.
@@ -366,8 +371,9 @@ unchanged. People and desktop-only settings remain outside the implemented web c
 
 ### Channels
 
-The browser uses the desktop channel UI: the sidebar rows and menus, `ChannelCreateDialog`,
-`ChannelConversation`, and channel settings with memories and routines. `createChannelsController`
+The browser uses the desktop channel UI: the sidebar rows and menus, `ChannelCreateDialog`, the
+shared `Conversation` view with the channel source of `createChannelConversation`, and channel
+settings with memories and routines. `createChannelsController`
 holds the channel logic for both clients. Each client gives it a `ChannelsEnvironment` and a
 `ChannelsPort` runtime: the desktop uses preload, and the browser uses `createWebChannelsPort`
 over the host connection. The Team API calls come from `teamChannelsApi` in
@@ -385,7 +391,9 @@ local storage for each account and host, as on desktop.
 The browser uses the shared Sidebar context menu and delete confirmation for duplicate/delete.
 Duplication requires the existing host capability. Its operation ID remains stable when a response
 is uncertain, so an explicit retry can use the host's existing idempotency contract. No automatic
-retry is made. Deletion refreshes host state and removes the deleted agent's local draft and pins.
+retry is made. The section menu also offers Duplicate for a custom section when the host has the
+`agent-duplication` and `sidebar-layout` capabilities. It calls the same agent duplicate once for each
+agent of the section, with no new Team API route. Deletion refreshes host state and removes the deleted agent's local draft and pins.
 The same desktop activity and avatar-state functions now consume loaded web conversation state
 and pending prompts/approvals; unloaded conversations do not invent activity or unread counts.
 

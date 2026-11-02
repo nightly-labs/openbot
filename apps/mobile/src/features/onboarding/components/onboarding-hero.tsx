@@ -1,7 +1,7 @@
 import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 import type { AvatarHue } from "@openbot/contracts/ipc";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { View } from "react-native";
+import { View, type ViewInstance } from "react-native";
 import Animated, {
   cancelAnimation,
   ReduceMotion,
@@ -52,7 +52,7 @@ export const HeroSlotProvider = HeroSlotContext.Provider;
  */
 export function HeroSlot({ size }: { size: number }) {
   const report = useContext(HeroSlotContext);
-  const slot = useRef<View>(null);
+  const slot = useRef<ViewInstance>(null);
   const measure = useCallback(() => {
     slot.current?.measureInWindow((x, y, width, height) => {
       if (width > 0 && height > 0) report?.({ cx: x + width / 2, cy: y + height / 2, size: width });

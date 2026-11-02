@@ -61,5 +61,14 @@ export const messages = {
   "prompt.browser.cancelling": "Annulation…",
   "prompt.browser.pageFallback": "Page du navigateur",
   "prompt.browser.hostFallback": "le navigateur",
+  "prompt.browser.signInBlocked.label": "Connexion bloquée",
+  "prompt.browser.signInBlocked.title": "{host} a bloqué la connexion depuis {server}",
+  "prompt.browser.signInBlocked.cancelledTitle": "Connexion à {host} annulée",
+  "prompt.browser.signInBlocked.body":
+    "Connectez-vous sur cet ordinateur. OpenBot envoie uniquement la connexion à {host} vers {server}, et {name} continue.",
+  "prompt.browser.signInBlocked.cancelledBody": "La connexion a été annulée.",
+  "prompt.browser.signInBlocked.waiting": "En attente de la connexion",
+  "prompt.browser.signInBlocked.waitingButton": "En attente de la connexion…",
+  "prompt.browser.signInBlocked.page": "{host} sur {server}",
   "prompt.inputRequiredAnnouncement": "Réponse requise. {question}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,9 +1,10 @@
 import {
   DISCORD_CUSTOM_ID_PREFIX,
+  type DiscordInboundAttachment,
   type DiscordInboundInteraction,
   type DiscordInboundMessage,
 } from "@openbot/contracts/signal-protocol/discord-api";
-import type { InboundAction, InboundMessage } from "../messaging-types";
+import type { InboundAction, InboundFile, InboundMessage } from "../messaging-types";
 
 /** The actions of the buttons OpenBot posts, as the middle part of their custom id. */
 const DISCORD_BUTTON_ACTIONS = ["accept", "decline", "stop"] as const;
@@ -20,6 +21,7 @@ type DiscordButtonAction = (typeof DISCORD_BUTTON_ACTIONS)[number];
 export function discordInboundMessage(message: DiscordInboundMessage): InboundMessage {
   const reply = message.replyTo;
   const threadKey = reply?.authorIsBot ? (reply.rootId ?? reply.messageId) : message.id;
+  const quote = reply?.quote ?? null;
   return {
     dedupKey: `${message.channelId}:${message.id}`,
     platformChannelId: message.channelId,
@@ -31,13 +33,44 @@ export function discordInboundMessage(message: DiscordInboundMessage): InboundMe
     authorId: message.authorId,
     text: discordPlainText(message.content),
     mentionedUserIds: discordMentionIds(message.content),
-    files: message.attachments.map((attachment) => ({
-      id: attachment.id,
-      name: attachment.filename,
-      mimeType: attachment.contentType ?? "application/octet-stream",
-      size: attachment.size,
-      url: attachment.url,
-    })),
+    // The replied-to message's files are context too, as its text is.
+    files: [...message.attachments, ...(quote?.attachments ?? [])].map(inboundFile),
+    authorRoleIds: message.authorRoleIds,
+    // A reply to a person's message starts a new conversation, so it has no earlier messages: the
+    // replied-to message is its context.
+    replyTo: quote
+      ? {
+          authorName: quote.authorName,
+          // Names its files, so that the agent knows which of the message's files are the replied-to ones.
+          text: discordContextText(discordPlainText(quote.content), quote.attachments, quote.forwarded),
+          mentionedUserIds: discordMentionIds(quote.content),
+          sentAt: quote.sentAt,
+        }
+      : null,
+  };
+}
+
+/**
+ * The context text of a Discord message: its text and the names of its files. A forward says that
+ * it is one, and says so too when Discord gave neither, such as without the Message Content intent.
+ */
+export function discordContextText(text: string, attachments: DiscordInboundAttachment[], forwarded: boolean): string {
+  const files = attachments.length ? `(Attached files: ${attachments.map((file) => file.filename).join(", ")})` : "";
+  const forward = !forwarded
+    ? ""
+    : text || files
+      ? "(Forwarded message)"
+      : "(Forwarded message: Discord did not give its text or files)";
+  return [forward, text, files].filter(Boolean).join("\n");
+}
+
+export function inboundFile(attachment: DiscordInboundAttachment): InboundFile {
+  return {
+    id: attachment.id,
+    name: attachment.filename,
+    mimeType: attachment.contentType ?? "application/octet-stream",
+    size: attachment.size,
+    url: attachment.url,
   };
 }
 

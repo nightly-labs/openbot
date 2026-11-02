@@ -7,7 +7,6 @@ export const messages = {
   "plugin.link.terms": "Condiciones del servicio",
   "plugin.copyLink": "Copiar enlace",
   "plugin.askPrompt": "Pregunta a {name}: {prompt}",
-  "plugin.section.apps": "Apps",
   "plugin.section.skills": "Habilidades",
   "plugin.section.information": "Información",
   "plugin.info.developer": "Desarrollador",

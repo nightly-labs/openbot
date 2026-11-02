@@ -102,6 +102,38 @@
   line-height: var(--openbot-leading-sm);
 }
 
+/* The New chat and Compact rows sit under a full-width divider, in the shape of menu items. */
+.context-meter-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1-5);
+  margin: 0 calc(-1 * var(--openbot-space-4)) calc(-1 * var(--openbot-space-4));
+  border-top: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-1-5);
+}
+
+.context-meter-action {
+  width: 100%;
+  height: var(--openbot-control-md);
+  justify-content: flex-start;
+  gap: var(--openbot-space-2);
+  border-radius: var(--ui-menu-item-radius);
+  padding: 0 var(--ui-menu-inset);
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-regular);
+}
+
+.context-meter-action:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--ui-menu-item-hover);
+}
+
+.context-meter-action > svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+  color: var(--openbot-text-secondary);
+}
+
 .context-meter-tokens {
   margin-top: calc(-1 * var(--openbot-space-2));
   font-variant-numeric: tabular-nums;

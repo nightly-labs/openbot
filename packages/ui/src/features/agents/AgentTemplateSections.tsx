@@ -3,10 +3,11 @@ import type { AppTranslate } from "@openbot/i18n";
 import { Button, ChevronDown, ChevronRight, Text } from "@openbot/ui";
 import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
+import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
 import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
 
-/** The agent's standing remit: its title and description. */
-export function TemplateInstructions(props: { title: string; description: string }) {
+/** The agent's standing remit: its title and description. The description is Markdown. */
+export function TemplateInstructions(props: { title: string; description: string; onOpenLink: (url: string) => void }) {
   const { t } = useText();
   return (
     <section class="agent-template-section" aria-label={t("agentTemplate.section.instructions")}>
@@ -16,9 +17,16 @@ export function TemplateInstructions(props: { title: string; description: string
       <Show when={props.title}>
         <Text variant="body-sm">{props.title}</Text>
       </Show>
-      <Text variant="body-sm" tone="secondary" class="agent-template-prose">
-        {props.description}
-      </Text>
+      <div class="agent-template-prose message-markdown">
+        <MarkdownMessageText
+          imagesAsLinks
+          linkFavicons={false}
+          body={props.description}
+          agents={[]}
+          onSelectAgent={() => undefined}
+          onOpenLink={props.onOpenLink}
+        />
+      </div>
     </section>
   );
 }

@@ -173,7 +173,9 @@ class SlackAdapter implements MessagingAdapter {
     replaceMessageId: string | null,
   ) {
     const [first = "", ...rest] = slackChunks(slackMrkdwn(markdown));
+    let firstId: string;
     if (replaceMessageId) {
+      firstId = replaceMessageId;
       const updated = yield* Effect.result(
         this.#api.call("chat.update", {
           channel: target.platformChannelId,
@@ -186,10 +188,11 @@ class SlackAdapter implements MessagingAdapter {
         yield* this.#api
           .call("chat.delete", { channel: target.platformChannelId, ts: replaceMessageId })
           .pipe(Effect.catch(() => Effect.void));
-        yield* this.#postText(target, first);
+        firstId = yield* this.#postText(target, first);
       }
-    } else yield* this.#postText(target, first);
+    } else firstId = yield* this.#postText(target, first);
     for (const chunk of rest) yield* this.#postText(target, chunk);
+    return firstId;
   });
 
   readonly upload = Effect.fnUntraced(function* (
@@ -467,14 +470,17 @@ class SlackAdapter implements MessagingAdapter {
     this: SlackAdapter,
     target: MessageTarget,
     text: string,
-  ): Effect.fn.Return<void, MessagingAdapterError> {
-    yield* this.#api.call("chat.postMessage", {
+  ): Effect.fn.Return<string, MessagingAdapterError> {
+    const response = yield* this.#api.call("chat.postMessage", {
       channel: target.platformChannelId,
       thread_ts: target.replyThreadId ?? undefined,
       text,
       unfurl_links: false,
       unfurl_media: false,
     });
+    if (!isString(response.ts))
+      return yield* new MessagingAdapterError({ cause: new SlackApiError("chat.postMessage", "no_ts") });
+    return response.ts;
   });
 
   /** Status text is written by the host, so it is only escaped. Buttons become Block Kit. */

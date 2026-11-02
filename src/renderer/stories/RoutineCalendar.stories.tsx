@@ -223,7 +223,11 @@ export const ManyRoutinesMonth: Story = {
 /** Routines exist, but none of them runs in this range. */
 export const NoRunsThisWeek: Story = { args: { runs: [] } };
 
+/** No routine yet: sample runs land on a faint month and write what they did. Create Routine asks for the agent. */
 export const Empty: Story = { args: { routines: [], runs: [] } };
+
+/** With one agent, Create Routine opens that agent at once. */
+export const EmptyOneAgent: Story = { args: { routines: [], runs: [], agents: STORY_AGENTS.slice(0, 1) } };
 
 export const Loading: Story = { args: { state: "loading" } };
 
@@ -240,3 +244,6 @@ export const Narrow: Story = {
 
 /** The month becomes a list of its own days. */
 export const NarrowMonth: Story = { ...Narrow, args: { initialView: "month" } };
+
+/** The pitch comes first; the sample runs land in rows below it. */
+export const EmptyNarrow: Story = { ...Narrow, args: { routines: [], runs: [] } };

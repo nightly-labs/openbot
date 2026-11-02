@@ -1,4 +1,4 @@
-import { Easing, FadeIn, FadeInUp, FadeOut, Keyframe } from "react-native-reanimated";
+import { Easing, FadeIn, FadeInLeft, FadeInRight, FadeInUp, FadeOut, Keyframe } from "react-native-reanimated";
 
 /** Strong ease-out for elements that enter or leave. */
 export const SIGN_IN_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -10,16 +10,6 @@ export const SIGN_IN_EASE_MOVE = Easing.bezier(0.32, 0.72, 0, 1);
 
 /** A soft, symmetric curve for text that changes in place. */
 export const SIGN_IN_TEXT_EASE = Easing.bezier(0.45, 0, 0.55, 1);
-// The old text leaves first; the new one starts when the old one is nearly gone, so two texts never
-// show at full strength together. A 3 pt drift gives the change a direction without a jump.
-export const SIGN_IN_TEXT_OUT = new Keyframe({
-  0: { opacity: 1, transform: [{ translateY: 0 }] },
-  100: { opacity: 0, transform: [{ translateY: -3 }], easing: SIGN_IN_TEXT_EASE },
-}).duration(180);
-export const SIGN_IN_TEXT_IN = FadeInUp.duration(260)
-  .delay(140)
-  .easing(SIGN_IN_TEXT_EASE)
-  .withInitialValues({ opacity: 0, transform: [{ translateY: 3 }] });
 
 const ENTER_MS = 220;
 const EXIT_MS = 120;
@@ -47,12 +37,50 @@ export function signInMotion(reduced: boolean) {
     /** A cross-fade in place, for text that changes but keeps its position. */
     fadeIn,
     fadeOut: FadeOut.duration(EXIT_MS),
-    /** A paragraph that changes in place: out, then in. */
-    textIn: reduced ? undefined : SIGN_IN_TEXT_IN,
-    textOut: reduced ? undefined : SIGN_IN_TEXT_OUT,
-    /** False when movement must not play: reduced motion, or during the splash hand-off. */
-    moves: !reduced,
   };
 }
 
 export type SignInMotion = ReturnType<typeof signInMotion>;
+
+/** Where a pane comes from, or goes to. */
+export type PaneDirection = "vertical" | "left" | "right";
+
+// A pane waits for the block to make room: it starts when the block has done most of its move. A
+// pane that only changes places beside another one starts sooner.
+export const PANE_ENTER_DELAY_MS = 320;
+export const PANE_SIDE_ENTER_DELAY_MS = 160;
+export const PANE_STAGGER_MS = 45;
+const PANE_ENTER_MS = 300;
+const PANE_EXIT_MS = 160;
+const PANE_RISE = 10;
+const PANE_SHIFT = 24;
+
+/**
+ * The entrance of one element of a pane: the elements rise in one after another, or come in from
+ * the side when the pane replaces another one beside it. Reduced motion keeps only a fade.
+ */
+export function paneEnter(index: number, from: PaneDirection, reduced: boolean, startMs: number) {
+  const delay = startMs + index * PANE_STAGGER_MS;
+  if (reduced) return FadeIn.duration(ENTER_MS).delay(index * PANE_STAGGER_MS);
+  if (from === "vertical")
+    return FadeInUp.duration(PANE_ENTER_MS)
+      .delay(delay)
+      .easing(SIGN_IN_EASE_OUT)
+      .withInitialValues({ opacity: 0, transform: [{ translateY: PANE_RISE }] });
+  const Enter = from === "left" ? FadeInLeft : FadeInRight;
+  return Enter.duration(PANE_ENTER_MS)
+    .delay(delay)
+    .easing(SIGN_IN_EASE_OUT)
+    .withInitialValues({ opacity: 0, transform: [{ translateX: from === "left" ? -PANE_SHIFT : PANE_SHIFT }] });
+}
+
+/** The pane leaves as one piece, down a little or to the side, before the next one comes in. */
+export function paneExit(to: PaneDirection, reduced: boolean) {
+  if (reduced) return FadeOut.duration(EXIT_MS);
+  const x = to === "left" ? -PANE_SHIFT : to === "right" ? PANE_SHIFT : 0;
+  const y = to === "vertical" ? PANE_RISE : 0;
+  return new Keyframe({
+    0: { opacity: 1, transform: [{ translateX: 0 }, { translateY: 0 }] },
+    100: { opacity: 0, transform: [{ translateX: x }, { translateY: y }], easing: SIGN_IN_EASE_OUT },
+  }).duration(PANE_EXIT_MS);
+}

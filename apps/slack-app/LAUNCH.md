@@ -5,7 +5,7 @@ Checked against Slack docs and the Slack API Terms of Service on 2026-09-30. Sou
 ## The design
 
 One Slack app, `OpenBot`, for every workspace. A workspace installs it one time from OpenBot
-(**Server settings → Connectors → Slack → Connect Slack**), and the workspace is linked to that
+(**Marketplace → Apps → Slack → Connect Slack**), and the workspace is linked to that
 OpenBot server. People mention @OpenBot in a channel or send it a direct message. The Slack
 Orchestrator, an agent that the connect dialog adds, receives each new request, gives the work to the
 agent that fits best, and posts the answer in the thread. Every answer comes from OpenBot, with the

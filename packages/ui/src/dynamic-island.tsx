@@ -26,25 +26,25 @@ export interface DynamicIslandSharedElementMotion {
 }
 
 export interface DynamicIslandSharedMotion {
-  leading?: DynamicIslandSharedElementMotion;
-  trailing?: DynamicIslandSharedElementMotion;
+  leading?: DynamicIslandSharedElementMotion | undefined;
+  trailing?: DynamicIslandSharedElementMotion | undefined;
 }
 
 export interface DynamicIslandProps {
   label: string;
   compactLeading?: JSX.Element;
   compactTrailing?: JSX.Element;
-  compactWidth?: number;
+  compactWidth?: number | undefined;
   /** Overrides the compact height a notch or the default sets, for a user-chosen island size. */
-  compactHeight?: number;
+  compactHeight?: number | undefined;
   expandedContent: JSX.Element;
   state: DynamicIslandViewState;
   onStateChange: (state: DynamicIslandViewState, reason: DynamicIslandStateChangeReason) => void;
   hoverBehavior?: DynamicIslandHoverBehavior;
-  extendedHoverArea?: boolean;
-  suppressInitialHover?: boolean;
+  extendedHoverArea?: boolean | undefined;
+  suppressInitialHover?: boolean | undefined;
   hoverContentMotion?: DynamicIslandHoverContentMotion;
-  pointerToggle?: boolean;
+  pointerToggle?: boolean | undefined;
   sharedMotion?: DynamicIslandSharedMotion;
   /**
    * Moves the compact content with the surface when the compact size changes, so the leading and
@@ -52,9 +52,9 @@ export interface DynamicIslandProps {
    * size change turns it off for that change. Defaults to true.
    */
   compactContentFollowsResize?: boolean;
-  displayMode?: DynamicIslandDisplayMode;
-  notchSize?: DynamicIslandNotchSize;
-  ariaLive?: "off" | "polite" | "assertive";
+  displayMode?: DynamicIslandDisplayMode | undefined;
+  notchSize?: DynamicIslandNotchSize | undefined;
+  ariaLive?: "off" | "polite" | "assertive" | undefined;
   class?: string;
 }
 
@@ -485,7 +485,7 @@ interface SmoothSizeResizeOptions {
 interface IslandSilhouetteGeometry {
   topRadius: number;
   bottomRadius: number;
-  capsuleRadius?: number;
+  capsuleRadius?: number | undefined;
 }
 
 /**

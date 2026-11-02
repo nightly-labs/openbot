@@ -3,6 +3,7 @@ import { currentText } from "@openbot/ui/text";
 import { onSettled } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
+import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useAgents } from "../agents/agents-context";
 import { useConversationController } from "../conversation/conversation-controller-context";
@@ -40,10 +41,17 @@ const ServerSelection = createSimpleContext({
     const { pendingInviteUrl, setPendingInviteUrl, saveSetup } = useSetup();
     const { setSkillsMarketplaceOpen } = useSettings();
     const { disconnectRemoteDesktopWorkspace } = useRemoteDesktop();
-    const { setBrowserVisibilitySuspended, setPendingAgentSelection, setPreviousServerId } = useServerSwitch();
+    const {
+      setBrowserVisibilitySuspended,
+      setPendingAgentSelection,
+      setPendingChannelSelection,
+      setPendingThreadSelection,
+      setPreviousServerId,
+    } = useServerSwitch();
     const { agentSetupOpen, creatingAgent } = useAgents();
     const { stopComposerTyping } = useConversationController();
     const { setDirectTyping } = useDirectMessages();
+    const { chatWindow } = usePlatform();
 
     async function selectServer(
       serverId: string,
@@ -51,6 +59,9 @@ const ServerSelection = createSimpleContext({
       recoverAuthoritativeServer = true,
     ): Promise<boolean> {
       if (agentSetupOpen() && creatingAgent()) return false;
+      // Main has one active server for the app. A chat window stays on its own server, so a switch
+      // from it would move the main window instead.
+      if (chatWindow) return false;
       const selectionIsCurrent = beginServerSelection();
       const analytics = desktopAnalytics.scope();
       const previousServerId = servers().find((server) => server.active)?.id;
@@ -143,6 +154,11 @@ const ServerSelection = createSimpleContext({
       const onServer = servers().find((server) => server.active)?.id === event.serverId;
       if (!onServer && !(await selectServer(event.serverId, false))) return;
       // Published for the same reason as the marketplace agent above.
+      if (event.channelId) {
+        setPendingChannelSelection(event.channelId);
+        return;
+      }
+      if (event.threadId) setPendingThreadSelection({ agentId: event.agentId, threadId: event.threadId });
       setPendingAgentSelection(event.agentId);
     }
 
@@ -171,6 +187,12 @@ const ServerSelection = createSimpleContext({
       }
     }
 
+    /** Creates a server on this computer and opens it. Main resolves when the desktop is connected to it. */
+    async function createLocalServer(name: string): Promise<void> {
+      const server = await serversPort().localServers.create(name);
+      await selectServer(server.id, false);
+    }
+
     async function joinRemoteDuringSetup(input: { inviteUrl: string }, provider: AgentProviderId): Promise<void> {
       await joinServer(input);
       await saveSetup(provider);
@@ -179,6 +201,7 @@ const ServerSelection = createSimpleContext({
     return {
       selectServer,
       joinServer,
+      createLocalServer,
       joinRemoteDuringSetup,
       openInstalledMarketplaceAgent,
     };

@@ -13,9 +13,9 @@ export const messages = defineMessages("usage", {
   "usage.chart.costDescription":
     "Daily estimated cost in USD by provider. Exact values are available with View daily data.",
   "usage.chart.tokensDescription":
-    "Daily processed tokens by provider. Exact values are available with View daily data.",
+    "Daily tokens without cache reads by provider. Exact values are available with View daily data.",
   "usage.chart.costLabel": "Daily estimated cost in USD by provider",
-  "usage.chart.tokensLabel": "Daily processed tokens by provider",
+  "usage.chart.tokensLabel": "Daily tokens without cache reads by provider",
   "usage.column.cost": "Cost",
   "usage.column.share": "Share",
   "usage.column.tokens": "Tokens",
@@ -27,7 +27,7 @@ export const messages = defineMessages("usage", {
   "usage.summary": "Usage summary",
   "usage.sessions": { one: "{sessions} session", other: "{sessions} sessions" },
   "usage.costEstimate": "API estimate · USD",
-  "usage.knownTokens": "Known processed tokens",
+  "usage.knownTokens": "Known tokens without cache reads",
   "usage.provider.shareOfCost": "{share} of known cost",
   "usage.provider.shareOfTokens": "{share} of known tokens",
   "usage.dailyTrend": "Daily trend",
@@ -35,7 +35,8 @@ export const messages = defineMessages("usage", {
   "usage.dailyTokens": "Daily tokens",
   "usage.viewDailyData": "View daily data",
   "usage.totals.title": "Totals",
-  "usage.totals.processedTokens": "Processed tokens",
+  "usage.totals.tokens": "Tokens without cache reads",
+  "usage.totals.processedTokens": "Processed tokens with cache reads",
   "usage.totals.cachedInput": "Cached input",
   "usage.totals.uncachedInput": "Uncached input",
   "usage.totals.cacheCreation": "Cache creation",
@@ -56,9 +57,12 @@ export const messages = defineMessages("usage", {
   "usage.about.title": "About these estimates",
   "usage.about.body":
     "API-equivalent token cost in USD. This is an estimate, not a subscription charge. Separate tool and media fees are not calculated. Unknown prices and incomplete usage stay unavailable. Shares use known amounts only; partial data can understate totals.",
+  "usage.about.tokens":
+    "Token counts do not include cache reads. Each model request in a turn reads the cached conversation again, so cache reads can be many times larger than the other tokens. Totals show them as Cached input.",
   "usage.panel.label": "Agent usage",
   "usage.panel.title": "Usage",
   "usage.panel.allAgents": "All agents",
+  "usage.panel.workflows": "Workflows",
   "usage.panel.agents": "Usage agents",
   "usage.panel.metric": "Usage metric",
   "usage.panel.period": "Usage period",

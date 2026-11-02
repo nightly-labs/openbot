@@ -11,6 +11,9 @@ import {
   toWireAgentKeys,
   toWireAgentKeysObjectForPath,
 } from "./current-agent-keys";
+import { eventHasPromptQuestions, withEventPromptMultiSelect } from "./prompt-multi-select-v1";
+import { withConversationSubagents } from "./subagents-v1";
+import { withConversationUiBlocks } from "./ui-blocks-v1";
 import {
   decodeTeamProtocolV7BaseEvent,
   decodeTeamProtocolV7BaseHttpRequest,
@@ -37,7 +40,17 @@ export function decodeTeamProtocolV7BaseCurrentEvent(value: unknown): TeamProtoc
   const decodedValue: TeamProtocolV7BaseJsonValue = JSON.parse(JSON.stringify(decoded.event));
   let current: unknown;
   try {
-    current = withEventConversationPlans(restoreBrowserSecretMetadata(toCurrentAgentKeys(decodedValue), value), value);
+    current = withEventPromptMultiSelect(
+      withEventConversationPlans(
+        restoreBrowserSecretMetadata(toCurrentAgentKeys(decodedValue), value),
+        value,
+        // A host sends a UI block only under ui-blocks-v1, the subagents only under subagents-v1, and
+        // a multi-select flag only under prompt-multi-select-v1, so a present one is always kept.
+        value,
+        value,
+      ),
+      value,
+    );
   } catch {
     return { kind: "invalid", type: decoded.event.type };
   }
@@ -48,7 +61,13 @@ export function decodeTeamProtocolV7BaseCurrentEvent(value: unknown): TeamProtoc
 
 export function encodeTeamProtocolV7BaseCurrentEvent(
   event: AgentEvent | TeamRealtimeEvent,
-  options: { preserveSemanticTags?: boolean; preserveBrowserSecrets?: boolean } = {},
+  options: {
+    preserveSemanticTags?: boolean;
+    preserveBrowserSecrets?: boolean;
+    uiBlocks?: boolean;
+    subagents?: boolean;
+    promptMultiSelect?: boolean;
+  } = {},
 ): string | null {
   // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
   if (event.type === "turn-progress") return JSON.stringify(toWireAgentKeys(JSON.parse(JSON.stringify(event))));
@@ -58,27 +77,45 @@ export function encodeTeamProtocolV7BaseCurrentEvent(
   const decoded = decodeTeamProtocolV7BaseEvent(downconvertedValue);
   if (decoded.kind !== "known") return null;
   const encoded = encodeTeamProtocolV7BaseEvent(decoded.event);
-  if (!encoded || (!options.preserveBrowserSecrets && !eventConversationKey(event.type))) return encoded;
-  const output = withEventConversationPlans(JSON.parse(encoded), wireValue);
+  const promptMultiSelect = options.promptMultiSelect === true && eventHasPromptQuestions(event.type);
+  if (!encoded || (!options.preserveBrowserSecrets && !eventConversationKey(event.type) && !promptMultiSelect))
+    return encoded;
+  // The block and the subagents go as written: the key swap would rename a response value under a
+  // field id such as `agentId`.
+  const withPlans = withEventConversationPlans(
+    JSON.parse(encoded),
+    wireValue,
+    options.uiBlocks ? currentValue : null,
+    options.subagents ? currentValue : null,
+  );
+  const output = promptMultiSelect ? withEventPromptMultiSelect(withPlans, currentValue) : withPlans;
   return JSON.stringify(options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output);
 }
 
 /**
- * Puts the plans and the senders of a conversation event beside its frozen projection. See
- * `withConversationPlans` and `withConversationSenders`.
+ * Puts the plans and the senders of a conversation event beside its frozen projection, the UI blocks
+ * of `uiBlockSource` when it is not null, and the subagents of `subagentSource` when it is not null.
+ * See `withConversationPlans`, `withConversationSenders`, `withConversationUiBlocks` and
+ * `withConversationSubagents`.
  */
 function withEventConversationPlans(
   projected: TeamProtocolV7BaseJsonValue,
   source: unknown,
+  uiBlockSource: unknown,
+  subagentSource: unknown,
 ): TeamProtocolV7BaseJsonValue {
   if (projected === null || Array.isArray(projected) || typeof projected !== "object") return projected;
   if (!isDynamicRecord(source)) return projected;
   const key = eventConversationKey(projected.type);
   const conversation = key ? projected[key] : undefined;
   if (!key || conversation === undefined) return projected;
+  const withPlans = withConversationSenders(withConversationPlans(conversation, source[key]), source[key]);
+  const withBlocks = isDynamicRecord(uiBlockSource)
+    ? withConversationUiBlocks(withPlans, uiBlockSource[key])
+    : withPlans;
   return {
     ...projected,
-    [key]: withConversationSenders(withConversationPlans(conversation, source[key]), source[key]),
+    [key]: isDynamicRecord(subagentSource) ? withConversationSubagents(withBlocks, subagentSource[key]) : withBlocks,
   };
 }
 

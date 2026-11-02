@@ -4,7 +4,7 @@
   "tagline": "Product analytics and flags",
   "description": "PostHog lets agents query events and funnels, inspect feature flags, and summarize what changed after a release. A personal API key from the project settings goes into one Authorization header.",
   "category": "data-analytics",
-  "creatorName": "posthog.com",
+  "creatorName": "PostHog",
   "iconUrl": "https://app.posthog.com/static/icons/apple-touch-icon.png",
   "version": "1.0.0",
   "prompts": [

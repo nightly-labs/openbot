@@ -42,6 +42,13 @@ export interface ProviderPage {
   checkedAt: string;
 }
 
+/** The phone apps. */
+const OPENBOT_PHONE_ADD: ProviderAdd = {
+  icon: "phone",
+  title: "Your agents on your phone",
+  text: "The OpenBot apps for iPhone and Android connect to the computer that runs your agents, over an encrypted connection, with no VPN. Remote access needs an OpenBot account.",
+};
+
 /**
  * What OpenBot adds to every provider. The claims are the same as on the compare
  * pages (`content/compare/claude-cowork.ts`), and come from the repository.
@@ -52,15 +59,11 @@ export const OPENBOT_ADDS: readonly ProviderAdd[] = [
     title: "A team, not one chat",
     text: "Each agent has its own job and workspace. A lead agent gives parts of a task to other agents in a shared channel, and you step in when a decision needs you.",
   },
-  {
-    icon: "phone",
-    title: "Your agents on your phone",
-    text: "The OpenBot apps for iPhone and Android connect to the computer that runs your agents, over an encrypted connection, with no VPN. Remote access needs an OpenBot account.",
-  },
+  OPENBOT_PHONE_ADD,
   {
     icon: "blocks",
     title: "Change the provider, keep the work",
-    text: "Move an agent to a different provider and it keeps its role, workspace and conversation. Agents on different providers work in the same channel.",
+    text: "Move an agent to a different provider and it keeps its role, workspace and conversation. Agents on different providers work in the same channel. When a plan reaches its limit, an agent can move to a backup model.",
   },
   {
     icon: "lock",

@@ -1,3 +1,4 @@
+import { isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import type { AgentProviderId } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
@@ -49,10 +50,12 @@ export function createSetupNext(providers: SetupProviders) {
   /**
    * How the button connects `provider` now, or undefined when it cannot: the row's Connect, else the
    * OpenCode key. A browser sign-in reports in a toast; a dialog sign-in, such as a host's, is its
-   * own feedback.
+   * own feedback. A key-only provider, such as Inception, signs in only with a key, so it opens the
+   * key dialog.
    */
   function connectAction(provider: AgentProviderId): (() => void) | undefined {
     const source = providers.props;
+    if (isKeyOnlyProvider(provider) && source.providerKeys) return () => providers.signInProvider(provider);
     const kind = source.connection?.connectKind(provider);
     if (kind === "browser") {
       return () => {

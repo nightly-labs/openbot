@@ -111,6 +111,12 @@
   width: 100%;
 }
 
+/* The folder panel is the tallest and has no steps after it, so when it is hidden it takes no space.
+   The panels that do have steps after them share one height, so steps 2 and 3 never move. */
+.agent-import-setup-folder:not([data-selected]) {
+  display: none;
+}
+
 .agent-import-setup-panel {
   display: flex;
   flex-direction: column;
@@ -210,7 +216,7 @@
   font-weight: var(--openbot-weight-regular);
 }
 
-.agent-import-picker.ui-button:hover:not(:disabled) {
+.agent-import-picker.ui-button:hover:not(:disabled, [aria-disabled="true"]) {
   border-color: var(--openbot-border-strong);
   background: var(--openbot-bg-control-hover);
 }
@@ -329,12 +335,6 @@ label.agent-import-row:has(input:disabled) {
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* The review is inside Server settings, on the dialog layer. The shared tooltip layer is below it,
-   and Kobalte gives the positioner the content's z-index, so this one takes the step above. */
-.agent-import-name-tooltip.ui-tooltip {
-  z-index: calc(var(--openbot-layer-dialog) + 1);
-}
-
 /* A channel row shows up to three of its members, overlapped, where an agent row has one avatar. */
 .agent-import-members {
   display: flex;
@@ -360,4 +360,117 @@ label.agent-import-row:has(input:disabled) {
   flex: none;
   color: var(--openbot-text-secondary);
   stroke-width: var(--openbot-icon-stroke);
+}
+
+/* The first screen: one large button for each place the agents can be now. */
+.agent-import-sources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-import-source .agent-import-picker-copy {
+  flex: 1;
+}
+
+.agent-import-source-logo {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+  flex: 0 0 auto;
+  color: var(--openbot-text-primary);
+  fill: currentColor;
+}
+
+.agent-import-back.ui-button {
+  align-self: flex-start;
+}
+
+.agent-import-back.ui-button svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* The Hermes app icon: a light tile on a dark theme and a dark one on a light theme, as Hermes ships both. */
+.hermes-logo-tile {
+  fill: var(--openbot-text-primary);
+}
+
+.hermes-logo-mark {
+  fill: var(--openbot-bg-canvas);
+}
+
+.agent-import-source-label {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.agent-import-source-label-logo {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+}
+
+/* A Hermes profile: its head row, then every item it holds. */
+.agent-import-profile {
+  gap: var(--openbot-space-2);
+}
+
+.agent-import-profile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+.agent-import-profile-name {
+  margin: 0;
+}
+
+.agent-import-chevron {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.agent-import-chevron-open {
+  transform: rotate(180deg);
+}
+
+.agent-import-rerun {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-grouped);
+}
+
+.agent-import-items[data-muted="true"] {
+  opacity: 0.5;
+}
+
+.agent-import-item {
+  align-items: flex-start;
+}
+
+.agent-import-allow {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  cursor: pointer;
+}
+
+/* A command is the exact text to type, so it reads as code and wraps rather than hides its end. */
+.agent-import-command {
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  overflow-wrap: anywhere;
+  white-space: normal;
 }

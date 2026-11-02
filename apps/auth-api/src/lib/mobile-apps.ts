@@ -1,6 +1,6 @@
 import type { MobilePlatformLogoVariant } from "@openbot/brand";
 import { ANDROID_PLAY_STORE_URL } from "@openbot/ui/features/mobile-app/android-play-store";
-import { IOS_TESTFLIGHT_URL } from "@openbot/ui/features/mobile-app/ios-testflight";
+import { IOS_APP_STORE_URL } from "@openbot/ui/features/mobile-app/ios-app-store";
 import type { PlatformNavigator } from "./download-platforms";
 
 export type MobilePlatform = MobilePlatformLogoVariant;
@@ -11,7 +11,7 @@ export interface MobileAppDetails {
   href: string;
   id: MobilePlatform;
   label: string;
-  status: "Available" | "Beta";
+  status: "Available";
 }
 
 /** The phone apps on the landing cards. They open a store page, so the links leave the site. */
@@ -19,10 +19,10 @@ export const MOBILE_APPS: Record<MobilePlatform, MobileAppDetails> = {
   ios: {
     id: "ios",
     label: "iPhone",
-    status: "Beta",
-    description: "TestFlight beta · Connects to your computer",
-    action: "Join the TestFlight beta",
-    href: IOS_TESTFLIGHT_URL,
+    status: "Available",
+    description: "App Store · Connects to your computer",
+    action: "Download on the App Store",
+    href: IOS_APP_STORE_URL,
   },
   android: {
     id: "android",

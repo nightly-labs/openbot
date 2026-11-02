@@ -1,18 +1,38 @@
-import type { MessagingConnection, MessagingDesktopApi, MessagingPlatform } from "@openbot/contracts/ipc";
+import type {
+  MessagingConnection,
+  MessagingDesktopApi,
+  MessagingPlatform,
+  MessagingRole,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { clone } from "./mock-support";
 
-/** The platforms whose preview has one workspace. Telegram has a chat for each link. */
+/** The platforms whose preview adds a workspace for each connect. Telegram has a chat for each link. */
 type WorkspacePlatform = Exclude<MessagingPlatform, "telegram">;
 
+/** The preview workspace of the `count`th connect. The first keeps the names that stories show. */
 const PREVIEW_WORKSPACE = {
-  slack: { workspaceId: "T0PREVIEW", workspaceName: "Preview workspace", botUserId: "U0PREVIEW" },
-  discord: {
-    workspaceId: "100000000000000001",
-    workspaceName: "Preview Discord server",
+  slack: (count: number) => ({
+    workspaceId: count === 1 ? "T0PREVIEW" : `T0PREVIEW${count}`,
+    workspaceName: count === 1 ? "Preview workspace" : `Preview workspace ${count}`,
+    botUserId: "U0PREVIEW",
+  }),
+  discord: (count: number) => ({
+    workspaceId: String(100000000000000001n + BigInt(count - 1)),
+    workspaceName: count === 1 ? "Preview Discord server" : `Preview Discord server ${count}`,
     botUserId: "100000000000000002",
-  },
-} as const satisfies Record<WorkspacePlatform, { workspaceId: string; workspaceName: string; botUserId: string }>;
+  }),
+} as const satisfies Record<
+  WorkspacePlatform,
+  (count: number) => { workspaceId: string; workspaceName: string; botUserId: string }
+>;
+
+/** The roles of every preview Discord server, highest first. */
+const PREVIEW_ROLES: readonly MessagingRole[] = [
+  { id: "200000000000000001", name: "Admin" },
+  { id: "200000000000000002", name: "Moderator" },
+  { id: "200000000000000003", name: "Member" },
+];
 
 /** The time Telegram takes in the preview before a chat links: the user picks the chat there. */
 const TELEGRAM_LINK_MS = 1_500;
@@ -26,6 +46,7 @@ const TELEGRAM_LINK_MS = 1_500;
 export function createMockMessaging(orchestrator: () => string): MessagingDesktopApi {
   const platform = (name: WorkspacePlatform, notConnected: string) => {
     const connections = new Map<string, MessagingConnection>();
+    let connects = 0;
     const change = (workspaceId: string, update: Partial<MessagingConnection>) => {
       const current = connections.get(workspaceId);
       if (!current) throw new Error(notConnected);
@@ -34,8 +55,10 @@ export function createMockMessaging(orchestrator: () => string): MessagingDeskto
     return {
       overview: async () => clone({ connections: [...connections.values()] }),
       connect: async () => {
-        connections.set(PREVIEW_WORKSPACE[name].workspaceId, {
-          ...PREVIEW_WORKSPACE[name],
+        connects += 1;
+        const workspace = PREVIEW_WORKSPACE[name](connects);
+        connections.set(workspace.workspaceId, {
+          ...workspace,
           platform: name,
           enabled: true,
           state: "connected",
@@ -57,10 +80,15 @@ export function createMockMessaging(orchestrator: () => string): MessagingDeskto
         change(workspaceId, { orchestratorAgentId: agentId });
         return { agentId, sectionId: null };
       },
+      connected: (workspaceId: string) => {
+        if (!connections.has(workspaceId)) throw new Error(notConnected);
+      },
     };
   };
   const slack = platform("slack", sourceText("error.messaging.notConnected"));
   const discord = platform("discord", sourceText("error.messaging.discordNotConnected"));
+  /** The roles that each preview Discord server allows. None lets everyone. */
+  const allowedRoles = new Map<string, MessagingRole[]>();
   const chats = new Map<string, MessagingConnection>();
   /** One orchestrator answers every Telegram chat, so a new chat gets it too. */
   let telegramOrchestrator: string | null = null;
@@ -83,6 +111,19 @@ export function createMockMessaging(orchestrator: () => string): MessagingDeskto
     reconnectDiscordGuild: discord.reconnect,
     setDiscordEnabled: discord.setEnabled,
     addDiscordOrchestrator: discord.addOrchestrator,
+    getDiscordAccess: async ({ workspaceId }) => {
+      discord.connected(workspaceId);
+      return clone({ allowedRoles: allowedRoles.get(workspaceId) ?? [] });
+    },
+    listDiscordRoles: async ({ workspaceId }) => {
+      discord.connected(workspaceId);
+      return clone({ roles: [...PREVIEW_ROLES] });
+    },
+    setDiscordAccess: async ({ workspaceId, allowedRoles: roles }) => {
+      discord.connected(workspaceId);
+      allowedRoles.set(workspaceId, clone(roles));
+      return clone({ allowedRoles: roles });
+    },
     getTelegramOverview: async () => clone({ connections: [...chats.values()] }),
     connectTelegramChat: async ({ place }) => {
       linkedChats += 1;
@@ -154,5 +195,8 @@ export function createMockMessaging(orchestrator: () => string): MessagingDeskto
         : platform === "slack"
           ? api.addSlackOrchestrator({ workspaceId })
           : api.addDiscordOrchestrator({ workspaceId }),
+    hostGetDiscordAccess: (input) => api.getDiscordAccess(input),
+    hostListDiscordRoles: (input) => api.listDiscordRoles(input),
+    hostSetDiscordAccess: (input) => api.setDiscordAccess(input),
   };
 }

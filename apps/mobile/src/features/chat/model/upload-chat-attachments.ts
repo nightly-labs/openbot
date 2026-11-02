@@ -9,18 +9,18 @@ export class ChatUploadCancelledError extends Error {
 }
 
 /** Keep the ordered draft IDs together until send commits them to one message. */
-export async function uploadChatAttachments<T extends RemoteFileUpload>(
+export async function uploadChatAttachments<T extends RemoteFileUpload, R = string>(
   files: T[],
   actions: {
     upload: (file: T, onProgress: (fraction: number) => void) => Promise<{ id: string }>;
     discard: (id: string) => Promise<void>;
-    send: (ids: string[]) => Promise<string>;
+    send: (ids: string[]) => Promise<R>;
     cancelled?: () => boolean;
     progress?: (completed: number) => void;
     /** The sent fraction of the file uploading now, which is file number `completed`. */
     fileProgress?: (fraction: number) => void;
   },
-): Promise<string> {
+): Promise<R> {
   const ids: string[] = [];
   try {
     actions.progress?.(0);

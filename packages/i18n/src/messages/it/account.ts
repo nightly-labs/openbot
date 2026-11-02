@@ -36,6 +36,9 @@ export const messages = {
   "account.usage.window.fiveHour": "5 ore",
   "account.usage.window.hours": { one: "{count} ora", other: "{count} ore" },
   "account.usage.window.minutes": "{minutes} min",
+  "account.usage.window.cursorModels": "Modelli Cursor",
+  "account.usage.window.otherModels": "Altri modelli",
+  "account.usage.window.group": "{group} · {window}",
   "account.update.failedRetry": "Aggiornamento non riuscito. Riprova.",
   "account.update.managedByHost": "Gestito dall'host",
   "account.update.restart": "Riavvia",
@@ -98,4 +101,5 @@ export const messages = {
   "account.language.previous": "Lingua precedente",
   "account.language.next": "Lingua successiva",
   "account.language.continue": "Continua",
+  "account.language.change": "Cambia lingua",
 } as const satisfies PartialTranslation<typeof source>;

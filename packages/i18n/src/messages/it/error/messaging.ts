@@ -10,6 +10,7 @@ export const messages = {
   "error.messaging.discordUnsupported": "Questo computer non può collegarsi a Discord.",
   "error.messaging.discordRelayUnavailable":
     "OpenBot non può ricevere gli eventi di Discord su questo computer. Accedi, dai un nome a questo computer e riprova.",
+  "error.messaging.discordRolesUnsupported": "OpenBot non può ancora elencare i ruoli di Discord. Riprova più tardi.",
   "error.messaging.telegramNotConnected": "Questa chat Telegram non è collegata.",
   "error.messaging.telegramUnsupported": "Questo computer non può collegarsi a Telegram.",
   "error.messaging.telegramRelayUnavailable":

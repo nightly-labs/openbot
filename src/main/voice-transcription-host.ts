@@ -1,5 +1,5 @@
-// The process that runs local speech recognition (NVIDIA Parakeet TDT or OpenAI Whisper turbo
-// through sherpa-onnx).
+// The process that runs local speech recognition (NVIDIA Parakeet TDT, Underdog Bark or OpenAI
+// Whisper turbo through sherpa-onnx).
 //
 // It is separate from the main process because the loaded model holds about 2 GB of memory and
 // a decode cannot be interrupted. The main process ends this process when it is idle, when a
@@ -26,6 +26,8 @@ const WHISPER_MAXIMUM_SAMPLES = 28 * SAMPLE_RATE;
 /** A part ends at the quietest moment in its last seconds, so a cut seldom splits a word. */
 const WHISPER_SPLIT_SEARCH_SAMPLES = 4 * SAMPLE_RATE;
 const SPLIT_WINDOW_SAMPLES = SAMPLE_RATE / 50;
+/** The most leading silence a request can ask for. */
+const MAXIMUM_LEADING_SILENCE_SAMPLES = SAMPLE_RATE;
 
 /** The part of the sherpa-onnx offline recognizer configuration that OpenBot sets. */
 interface RecognizerConfig {
@@ -206,19 +208,20 @@ function useLanguage(loaded: LoadedRecognizer, language: string): void {
   loaded.language = language;
 }
 
-function toSamples(pcm: Uint8Array): Float32Array {
+/** Converts the PCM to samples after `leadingSilence` zero samples. */
+function toSamples(pcm: Uint8Array, leadingSilence: number): Float32Array {
   const aligned = pcm.byteOffset % 2 === 0 ? pcm : pcm.slice();
   const input = new Int16Array(aligned.buffer, aligned.byteOffset, aligned.byteLength >> 1);
-  const samples = new Float32Array(input.length);
-  for (let index = 0; index < input.length; index += 1) samples[index] = (input[index] ?? 0) / 32_768;
+  const samples = new Float32Array(leadingSilence + input.length);
+  for (let index = 0; index < input.length; index += 1) samples[leadingSilence + index] = (input[index] ?? 0) / 32_768;
   return samples;
 }
 
 async function transcribe(request: VoiceTranscriptionRequest): Promise<string> {
   const loaded = await recognizerFor(request);
   useLanguage(loaded, request.language);
-  const samples = toSamples(request.pcm);
-  if (samples.length === 0) return "";
+  if (request.pcm.byteLength < 2) return "";
+  const samples = toSamples(request.pcm, request.leadingSilenceSamples);
   const parts = loaded.engine === "whisper" ? splitForWhisper(samples) : [samples];
   let text = "";
   for (const part of parts) text = joinText(text, await decode(loaded, part));
@@ -299,6 +302,11 @@ function isRequest(value: unknown): value is VoiceTranscriptionRequest {
     (value.engine === "nemo-transducer" || value.engine === "whisper") &&
     "language" in value &&
     typeof value.language === "string" &&
+    "leadingSilenceSamples" in value &&
+    typeof value.leadingSilenceSamples === "number" &&
+    Number.isInteger(value.leadingSilenceSamples) &&
+    value.leadingSilenceSamples >= 0 &&
+    value.leadingSilenceSamples <= MAXIMUM_LEADING_SILENCE_SAMPLES &&
     "pcm" in value &&
     value.pcm instanceof Uint8Array
   );

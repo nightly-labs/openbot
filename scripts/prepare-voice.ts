@@ -1,10 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, createReadStream, existsSync } from "node:fs";
+import { copyFileSync, createReadStream, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
 import { PARAKEET_MODEL_FILES, VOICE_RUNTIME_ADDON } from "../src/main/voice-model-service";
+import { elfSearchPaths, ORIGIN_SEARCH_PATH } from "./elf-search-paths";
 
 const logger = createOpenBotLogger("prepare-voice");
 
@@ -36,6 +37,16 @@ const RUNTIME_PACKAGES: Readonly<Record<string, RuntimePackage>> = {
     integrity: "sha512-oZF1c9VPOKtMwn83Bboc5XSWL+76BRoyB3eUuVnCknBKxwSULZU2Foia9VHWzU+n4I12rPsP6z6H9Rp1hD9o8g==",
     files: [VOICE_RUNTIME_ADDON, "sherpa-onnx-c-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll"],
   },
+  "linux-x64": {
+    name: "sherpa-onnx-linux-x64",
+    integrity: "sha512-6plnhjagsSeTntCgnlag86hWbs/uZE9Crms1LgOb68/1nKsIQjMd+WG519m+aPwT6TrsBOiEMzrx41t8sL5L5g==",
+    files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.so", "libonnxruntime.so"],
+  },
+  "linux-arm64": {
+    name: "sherpa-onnx-linux-arm64",
+    integrity: "sha512-Tlg7a70b/Wge3OF8IgTHF9jhSVCsLyKQKhwc4BsJ5A+dL/SrFtGBjzuHp4XeLhiiOT7afCxX5PdSn/D4c8Lnuw==",
+    files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.so", "libonnxruntime.so"],
+  },
 };
 
 const buildRoot = resolve(".openbot-build/voice");
@@ -48,7 +59,9 @@ const target = `${process.platform}-${process.arch}`;
 const runtimePackage = RUNTIME_PACKAGES[target];
 
 if (!runtimePackage) {
-  throw new Error(`Voice assets can be prepared only on macOS (arm64, x64) or Windows (x64), not ${target}.`);
+  throw new Error(
+    `Voice assets can be prepared only on macOS (arm64, x64), Windows (x64) or Linux (x64, arm64), not ${target}.`,
+  );
 }
 
 requireCommand("tar", ["--version"]);
@@ -82,7 +95,10 @@ async function prepareRuntime(runtime: RuntimePackage): Promise<void> {
     await rm(runtimeMarker, { force: true });
     await rm(runtimeRoot, { recursive: true, force: true });
     await mkdir(runtimeRoot, { recursive: true });
-    for (const file of runtime.files) copyFileSync(join(extractRoot, "package", file), join(runtimeRoot, file));
+    for (const file of runtime.files) {
+      copyFileSync(join(extractRoot, "package", file), join(runtimeRoot, file));
+      if (process.platform === "linux") pinSearchPathToOrigin(join(runtimeRoot, file));
+    }
     await writeFile(runtimeMarker, `${marker}\n`);
   } finally {
     await rm(workRoot, { recursive: true, force: true });
@@ -122,6 +138,24 @@ async function removeOtherModels(): Promise<void> {
 async function isExpectedFile(path: string, bytes: number, expectedSha256: string): Promise<boolean> {
   if (!existsSync(path) || (await stat(path)).size !== bytes) return false;
   return (await sha256(path)) === expectedSha256;
+}
+
+/**
+ * The published Linux addon also searches its CI build directory, and the empty and relative entries
+ * of its RUNPATH search the working directory. A library planted there would load into the voice host.
+ * Shortens each search path to `$ORIGIN` in place, so the addon loads libraries only from its own directory.
+ */
+function pinSearchPathToOrigin(path: string): void {
+  const file = readFileSync(path);
+  const paths = elfSearchPaths(file).filter(({ value }) => value !== ORIGIN_SEARCH_PATH);
+  if (paths.length === 0) return;
+  for (const { offset, value } of paths) {
+    if (!value.startsWith(`${ORIGIN_SEARCH_PATH}:`))
+      throw new Error(`Unexpected library search path in ${path}: ${value}`);
+    file.fill(0, offset, offset + Buffer.byteLength(value));
+    file.write(ORIGIN_SEARCH_PATH, offset, "utf8");
+  }
+  writeFileSync(path, file);
 }
 
 function requireCommand(command: string, arguments_: string[]): void {

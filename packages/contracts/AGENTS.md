@@ -13,9 +13,14 @@ mock — so the cost of a change is paid by code you cannot edit.
   of each released wire format; no unit test reads them, so compare a codec change against them by
   hand. Do not serialize current IPC types across the boundary.
 - Use capabilities for additive, optional behaviour; a missing capability disables only its own
-  feature.
+  feature. Protocols 7 and 8 read at most 128 capabilities and their lists are full: a new one goes
+  in `TEAM_PROTOCOL_V9_ONLY_CAPABILITIES`. Check the list sizes of each protocol when you add one.
 - A required field, a removed field, or a semantic change needs a new protocol version. Never change
   the meaning of a released one.
+- A new value in an open field is not a protocol change. From protocol 8, provider ids and auth
+  kinds are open (`OPEN_PROVIDER_ID`): a new provider needs no new version. Peers below 8 keep their
+  frozen lists, and the host hides each provider outside them (`FROZEN_PROVIDERS` in
+  `src/main/team-api/provider-visibility.ts`). A client keeps an agent of a provider it does not know.
 - Age, release count and SemVer distance are not reasons to remove an adapter. Removal needs a
   separate architecture decision — a security issue, data-loss risk, semantics that cannot be kept,
   or cost an adapter cannot contain — plus a changelog entry, update instructions, an E2E check of

@@ -80,5 +80,7 @@ export function AgentListRowReveal({
     opacity: progress.get(),
     transform: [{ translateX: reducedMotion ? 0 : -18 * (1 - progress.get()) }],
   }));
-  return <Animated.View style={contentStyle}>{children}</Animated.View>;
+  // After the reveal the row has no animated style. A later render then cannot put back the
+  // first-render opacity of 0 when the animated value has not reached React.
+  return <Animated.View style={finished || skip ? undefined : contentStyle}>{children}</Animated.View>;
 }

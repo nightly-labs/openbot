@@ -8,9 +8,9 @@ import {
   bearerToken,
   requestAuthService,
   requestRemoteControlPlane,
-  requestSourceIp,
   requestTeamInviteEmailDelivery,
 } from "../../../server/request-auth";
+import { requestSourceIp } from "../../../server/source-ip";
 import { sendTeamInviteEmail } from "../../../server/team-invite-email";
 
 export const Route = createFileRoute("/v1/team-invitations/email")({

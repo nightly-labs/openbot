@@ -1,24 +1,11 @@
 import { DISCORD_ORCHESTRATOR_AVATAR } from "@openbot/contracts/discord-app";
-import type {
-  AgentModelId,
-  AgentModelOption,
-  AgentProviderId,
-  AgentStatus,
-  CustomAgentSummary,
-  CustomProviderSummary,
-  MessagingConnection,
-  MessagingPlatform,
-} from "@openbot/contracts/ipc";
+import type { MessagingConnection, MessagingPlatform, MessagingRole } from "@openbot/contracts/ipc";
+import { MESSAGING_LIMITS } from "@openbot/contracts/ipc";
 import { SLACK_ORCHESTRATOR_AVATAR } from "@openbot/contracts/slack-app";
 import type { AppMessages, AppTextKey } from "@openbot/i18n";
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  AlertIcon,
-  AlertTitle,
   Button,
-  Check,
+  Checkbox,
   ExternalLink,
   Item,
   ItemActions,
@@ -27,47 +14,58 @@ import {
   ItemGroup,
   ItemMedia,
   ItemTitle,
-  Link2Off,
   SettingsSection,
   Spinner,
   Text,
-  Trash2,
-  TriangleAlert,
 } from "@openbot/ui";
-import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
-import { ProviderModelPicker } from "../../components/ProviderModelPicker";
+import { createEffect, createSignal, createStore, createUniqueId, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
-import { AgentAvatar } from "../agents/AgentAvatar";
+import { DiscordMark, SlackMark } from "./brand-marks";
 import {
-  DetailHeader,
-  DiscordMark,
-  type IntegrationStatus,
+  type ChannelAgent,
+  type ChannelAvatar,
+  ChannelConnectChecklist,
+  ChannelConnectionRow,
+  ChannelDisconnectDialog,
+  type ChannelOrchestratorChoice,
+  type ChannelOrchestratorModels,
+  ChannelOrchestratorSection,
+  ChannelOrchestratorStep,
+  ChannelPage,
+  type ChannelState,
+  type ChannelText,
+  channelRowKind,
+} from "./ChannelParts";
+import {
+  type IntegrationPageSlots,
   LogoTile,
-  SlackMark,
+  ReadFailedAlert,
   Stepper,
+  UNKNOWN_STATUS,
   WizardDialog,
   type WizardLink,
 } from "./IntegrationLayout";
-import type { IntegrationAgent } from "./IntegrationsHub";
 
-export type SlackIntegrationAgent = IntegrationAgent & { title: string };
+export type SlackIntegrationAgent = ChannelAgent;
 
 /** The model of the Slack Orchestrator that the user picks in the connect dialog. */
-export interface SlackOrchestratorChoice {
-  provider: AgentProviderId;
-  model: AgentModelId;
-}
+export type SlackOrchestratorChoice = ChannelOrchestratorChoice;
 
 /** The catalog behind the model picker. Absent, the orchestrator starts on a new agent's default. */
-export interface SlackOrchestratorModels {
-  modelOptions: AgentModelOption[];
-  agentStatus: AgentStatus;
-  initial: SlackOrchestratorChoice | null;
-  customProviders?: readonly CustomProviderSummary[];
-  customAgents?: readonly CustomAgentSummary[];
+export type SlackOrchestratorModels = ChannelOrchestratorModels;
+
+/** Who can use OpenBot in each Discord server: the members with one of the saved roles. */
+export interface DiscordAccessControl {
+  /** The saved roles of a Discord server. Empty lets everyone; null while they are not known. */
+  allowed: (workspaceId: string) => readonly MessagingRole[] | null;
+  /** The roles of a Discord server to choose from. Rejects with the reason. */
+  loadRoles: (workspaceId: string) => Promise<readonly MessagingRole[]>;
+  onSave: (workspaceId: string, roles: MessagingRole[]) => void;
+  /** True when the joined server's OpenBot is too old to choose roles. */
+  unsupported?: boolean | undefined;
 }
 
-export interface SlackIntegrationPanelProps {
+export interface SlackIntegrationPanelProps extends IntegrationPageSlots {
   /** Slack when absent. Discord shows the same page with its own text, logo and orchestrator. */
   platform?: WorkspacePlatform | undefined;
   /** Every agent on this computer. */
@@ -79,29 +77,22 @@ export interface SlackIntegrationPanelProps {
   models?: SlackOrchestratorModels | undefined;
   onConnectWorkspace: () => void;
   onDisconnectWorkspace: (workspaceId: string) => void;
+  /** Disconnects every workspace. */
+  onDisconnectAll: () => void;
   onReconnect: (workspaceId: string) => void;
   onSetEnabled: (workspaceId: string, enabled: boolean) => void;
   onAddOrchestrator: (workspaceId: string, choice: SlackOrchestratorChoice | null) => void;
   /** The joined server's name, when the connections are that server's and not this computer's. */
   hostName?: string | undefined;
-}
-
-/** What a workspace row can do. */
-type RowKind = "live" | "setup" | "paused" | "attention";
-
-function rowKind(connection: MessagingConnection): RowKind {
-  switch (connection.state) {
-    case "connected":
-      return "live";
-    case "paused":
-      return "paused";
-    case "connecting":
-    case "reconnecting":
-    case "rate_limited":
-      return "setup";
-    default:
-      return "attention";
-  }
+  /**
+   * Why the last read of the connections failed. `connections` are from an earlier read; with none,
+   * the state is not known, so the page shows the reason and Retry and offers no connect.
+   */
+  loadError?: string | null | undefined;
+  /** Reads the connections again. */
+  onRetry?: (() => void) | undefined;
+  /** Who can use OpenBot in each Discord server. Discord only. */
+  access?: DiscordAccessControl | undefined;
 }
 
 /** The platforms that this page serves. Telegram has its own page (`TelegramIntegrationPanel`). */
@@ -123,7 +114,6 @@ const STATE_HELP: Record<WorkspacePlatform, Partial<Record<MessagingConnection["
 const SLACK_TEXT = {
   title: "connector.slack.title",
   description: "connector.slack.description",
-  statusNotSetUp: "connector.slack.statusNotSetUp",
   statusConnected: "connector.slack.statusConnected",
   statusAttention: "connector.slack.statusAttention",
   summaryConnected: "connector.slack.summaryConnected",
@@ -134,10 +124,11 @@ const SLACK_TEXT = {
   addAgent: "connector.slack.addAgent",
   workspaceTitle: "connector.slack.workspaceTitle",
   workspaceDescription: "connector.slack.workspaceDescription",
-  disconnectWorkspace: "connector.slack.disconnectWorkspace",
+  disconnect: "connector.slack.disconnectWorkspace",
   missingScopes: "connector.slack.missingScopes",
   retryAt: "connector.slack.retryAt",
   reconnect: "connector.slack.reconnect",
+  pause: "connector.slack.pause",
   resume: "connector.slack.resume",
   rowAction: "connector.slack.rowAction",
   orchestratorTitle: "connector.slack.orchestratorTitle",
@@ -173,12 +164,17 @@ const SLACK_TEXT = {
   removeEffectDeleted: "connector.slack.removeEffectDeleted",
   keep: "connector.slack.keep",
   close: "connector.slack.close",
-} as const satisfies Record<string, keyof AppMessages>;
+  addWorkspace: "connector.slack.addWorkspace",
+  limitReached: "connector.slack.limitReached",
+  summaryMany: "connector.slack.summaryMany",
+  disconnectAllTitle: "connector.slack.disconnectAllTitle",
+  disconnectAllSummary: "connector.slack.disconnectAllSummary",
+  disconnectAllSummaryOrchestrator: "connector.slack.disconnectAllSummaryOrchestrator",
+} as const satisfies ChannelText & Record<string, keyof AppMessages>;
 
 const DISCORD_TEXT = {
   title: "connector.discord.title",
   description: "connector.discord.description",
-  statusNotSetUp: "connector.discord.statusNotSetUp",
   statusConnected: "connector.discord.statusConnected",
   statusAttention: "connector.discord.statusAttention",
   summaryConnected: "connector.discord.summaryConnected",
@@ -189,10 +185,11 @@ const DISCORD_TEXT = {
   addAgent: "connector.discord.addAgent",
   workspaceTitle: "connector.discord.workspaceTitle",
   workspaceDescription: "connector.discord.workspaceDescription",
-  disconnectWorkspace: "connector.discord.disconnectWorkspace",
+  disconnect: "connector.discord.disconnectWorkspace",
   missingScopes: "connector.discord.missingScopes",
   retryAt: "connector.discord.retryAt",
   reconnect: "connector.discord.reconnect",
+  pause: "connector.discord.pause",
   resume: "connector.discord.resume",
   rowAction: "connector.discord.rowAction",
   orchestratorTitle: "connector.discord.orchestratorTitle",
@@ -228,9 +225,15 @@ const DISCORD_TEXT = {
   removeEffectDeleted: "connector.discord.removeEffectDeleted",
   keep: "connector.discord.keep",
   close: "connector.discord.close",
+  addWorkspace: "connector.discord.addWorkspace",
+  limitReached: "connector.discord.limitReached",
+  summaryMany: "connector.discord.summaryMany",
+  disconnectAllTitle: "connector.discord.disconnectAllTitle",
+  disconnectAllSummary: "connector.discord.disconnectAllSummary",
+  disconnectAllSummaryOrchestrator: "connector.discord.disconnectAllSummaryOrchestrator",
 } as const satisfies Record<keyof typeof SLACK_TEXT, keyof AppMessages>;
 
-/** The catalog keys of a platform's page. The Connectors list reads the title and summaries too. */
+/** The catalog keys of a platform's page. The Marketplace reads the title and summaries too. */
 export function messagingPlatformText(platform: WorkspacePlatform = "slack") {
   return platform === "discord" ? DISCORD_TEXT : SLACK_TEXT;
 }
@@ -238,7 +241,7 @@ export function messagingPlatformText(platform: WorkspacePlatform = "slack") {
 const ORCHESTRATOR_AVATAR = {
   slack: SLACK_ORCHESTRATOR_AVATAR,
   discord: DISCORD_ORCHESTRATOR_AVATAR,
-} as const satisfies Record<WorkspacePlatform, { avatarSeed: string; avatarHue: number }>;
+} as const satisfies Record<WorkspacePlatform, ChannelAvatar>;
 
 /** The logo of a platform. */
 export function MessagingMark(props: { platform?: WorkspacePlatform | undefined }) {
@@ -257,154 +260,232 @@ export function slackOrchestrator<Agent extends { id: string }>(
   return agents.find((agent) => agent.id === connection.orchestratorAgentId) ?? null;
 }
 
-/** The state of the whole Slack or Discord integration, for the page header and the Connectors list. */
+/**
+ * True when a read of the connections failed and no earlier read gave any. The state is not known, and
+ * "Not set up" would be wrong. Telegram's page uses it too.
+ */
+export function messagingStateUnknown(props: {
+  connections: readonly MessagingConnection[];
+  loadError?: string | null | undefined;
+}): boolean {
+  return Boolean(props.loadError) && props.connections.length === 0;
+}
+
+/** The state of the whole Slack or Discord integration, for the page header and the Marketplace. */
 export function slackIntegrationState(
   connections: readonly MessagingConnection[],
   agents: readonly { id: string }[],
   platform: WorkspacePlatform = "slack",
-): { status: IntegrationStatus; label: AppTextKey; attention: number } {
+  loadError?: string | null,
+): ChannelState {
+  if (messagingStateUnknown({ connections, loadError })) return { ...UNKNOWN_STATUS, attention: 0 };
   const text = messagingPlatformText(platform);
   const attention = connections.filter(
-    (connection) => rowKind(connection) === "attention" || !slackOrchestrator(connection, agents),
+    (connection) => channelRowKind(connection) === "attention" || !slackOrchestrator(connection, agents),
   ).length;
   if (attention > 0) return { status: "attention", label: text.statusAttention, attention };
-  if (connections.length === 0) return { status: "idle", label: text.statusNotSetUp, attention };
+  if (connections.length === 0) return { status: "idle", label: "marketplace.app.notConnected", attention };
   return { status: "connected", label: text.statusConnected, attention };
 }
 
 /**
- * Server settings > Connectors > Slack. A workspace installs the one OpenBot app, and its Slack
- * Orchestrator agent receives every request, asks the team and answers. The connect dialog does both
- * steps. No token reaches this component. Server settings > Connectors > Discord is the same page
- * for a Discord server, with `platform` "discord".
+ * The workspace that the connect dialog follows. A new one is the first connection that was not there
+ * when the dialog opened; until it comes back from the browser, the dialog shows the connect step.
+ */
+type DialogTarget = { kind: "new"; before: ReadonlySet<string> } | { kind: "existing"; workspaceId: string };
+
+/**
+ * Marketplace > Apps > Slack. A workspace installs the one OpenBot app, and its Slack Orchestrator
+ * agent receives every request, asks the team and answers. The connect dialog does both steps. No
+ * token reaches this component. Marketplace > Apps > Discord is the same page for a Discord server,
+ * with `platform` "discord".
  */
 export function SlackIntegrationPanel(props: SlackIntegrationPanelProps) {
-  const { t } = useText();
-  const [dialogOpen, setDialogOpen] = createSignal(false);
+  const { t, format } = useText();
+  const [target, setTarget] = createSignal<DialogTarget | null>(null);
   const [disconnecting, setDisconnecting] = createSignal<MessagingConnection | null>(null);
+  const [choosingRoles, setChoosingRoles] = createSignal<MessagingConnection | null>(null);
   const text = () => messagingPlatformText(props.platform);
-  const state = () => slackIntegrationState(props.connections, props.agents, props.platform);
-  const first = () => props.connections[0] ?? null;
-  /** Until the first workspace has its orchestrator, the header offers the next step of the dialog. */
-  const setUpDone = () => {
-    const connection = first();
-    return connection !== null && slackOrchestrator(connection, props.agents) !== null;
+  const avatar = () => ORCHESTRATOR_AVATAR[props.platform ?? "slack"];
+  const state = () => slackIntegrationState(props.connections, props.agents, props.platform, props.loadError);
+  const access = () => (props.platform === "discord" ? props.access : undefined);
+  /** The first workspace with no orchestrator: the next step of its dialog adds one. */
+  const needsAgent = () => props.connections.find((connection) => !slackOrchestrator(connection, props.agents)) ?? null;
+  const atLimit = () => props.connections.length >= MESSAGING_LIMITS.connections;
+  const openNew = () =>
+    setTarget({ kind: "new", before: new Set(props.connections.map((connection) => connection.workspaceId)) });
+  const openAddAgent = () => {
+    const connection = needsAgent();
+    if (connection) setTarget({ kind: "existing", workspaceId: connection.workspaceId });
   };
-  /** A disconnect deletes the workspace's orchestrator. */
+  const dialogConnection = () => {
+    const current = target();
+    if (!current) return null;
+    const found =
+      current.kind === "existing"
+        ? props.connections.find((connection) => connection.workspaceId === current.workspaceId)
+        : props.connections.find((connection) => !current.before.has(connection.workspaceId));
+    return found ?? null;
+  };
+  /** Each orchestrator once. An earlier build gave each workspace its own; now they share one. */
+  const orchestrators = () => [
+    ...new Map(
+      props.connections.flatMap((connection) => {
+        const agent = slackOrchestrator(connection, props.agents);
+        return agent ? [[agent.id, agent] as const] : [];
+      }),
+    ).values(),
+  ];
+  /** A disconnect deletes the orchestrator only when no other workspace uses it. */
   const disconnectDeletesOrchestrator = () => {
     const connection = disconnecting();
-    return connection !== null && slackOrchestrator(connection, props.agents) !== null;
+    const agent = connection ? slackOrchestrator(connection, props.agents) : null;
+    return (
+      agent !== null &&
+      !props.connections.some(
+        (other) => other.workspaceId !== connection?.workspaceId && other.orchestratorAgentId === agent.id,
+      )
+    );
   };
+  /** Disconnecting every workspace deletes the orchestrator too: no workspace uses it after. */
+  const disconnectAllSummary = () =>
+    t(orchestrators().length > 0 ? text().disconnectAllSummaryOrchestrator : text().disconnectAllSummary);
+  const note = (connection: MessagingConnection) => {
+    if (connection.missingScopes.length > 0)
+      return t(text().missingScopes, { scopes: format.list(connection.missingScopes) });
+    if (connection.retryAt)
+      return t(text().retryAt, {
+        time: format.date(new Date(connection.retryAt), { hour: "numeric", minute: "2-digit" }),
+      });
+    const help = STATE_HELP[props.platform ?? "slack"][connection.state];
+    return help ? t(help) : t(text().workspaceDescription);
+  };
+  const disconnectingName = () => disconnecting()?.workspaceName ?? "";
+  const disconnectDescription = () =>
+    props.hostName
+      ? t(text().disconnectDescriptionHost, { workspace: disconnectingName(), host: props.hostName })
+      : t(text().disconnectDescription, { workspace: disconnectingName() });
 
   return (
-    <div class="slack-integration">
-      <DetailHeader
-        logo={<MessagingMark platform={props.platform} />}
-        name={t(text().title)}
-        status={state().status}
-        statusLabel={t(state().label)}
-        subtitle={t(text().description)}
-        actions={
-          <Show when={!setUpDone()}>
-            <Button type="button" size="sm" disabled={props.busy} onClick={() => setDialogOpen(true)}>
-              {first() ? t(text().addAgent) : t(text().connect)}
-            </Button>
-          </Show>
-        }
-      />
-
-      <Show when={state().attention > 0}>
-        <Alert tone="warning" role="alert">
-          <AlertIcon>
-            <TriangleAlert />
-          </AlertIcon>
-          <AlertContent>
-            <AlertTitle>{t(text().attentionTitle, { count: state().attention })}</AlertTitle>
-            <AlertDescription>{t(text().attentionDescription)}</AlertDescription>
-          </AlertContent>
-        </Alert>
-      </Show>
-
-      {/* Not set up, the header holds the only step: Connect Slack. */}
-      <Show when={props.connections.length > 0}>
-        <SettingsSection title={t(text().workspaceTitle)}>
-          <ItemGroup class="settings-modal-card">
-            <For each={props.connections}>
-              {(connection) => (
-                <WorkspaceRow
-                  platform={props.platform}
-                  connection={connection}
-                  busy={props.busy}
-                  onReconnect={() => props.onReconnect(connection.workspaceId)}
-                  onSetEnabled={(enabled) => props.onSetEnabled(connection.workspaceId, enabled)}
-                  onDisconnect={() => setDisconnecting(connection)}
-                />
-              )}
-            </For>
-          </ItemGroup>
-        </SettingsSection>
-      </Show>
-
-      <For each={props.connections}>
-        {(connection) => (
-          <SettingsSection title={t(text().orchestratorTitle)} description={t(text().orchestratorDescription)}>
+    <ChannelPage
+      text={text()}
+      logo={<MessagingMark platform={props.platform} />}
+      state={state()}
+      connections={props.connections}
+      unknown={messagingStateUnknown(props)}
+      busy={props.busy}
+      loadError={props.loadError}
+      onRetry={props.onRetry}
+      onConnect={openNew}
+      headerAction={
+        // A second workspace with no orchestrator: the orchestrator card shows the one that exists,
+        // so the step that gives it to the new workspace is in the header.
+        <Show when={orchestrators().length > 0 && needsAgent()}>
+          <Button type="button" size="sm" disabled={props.busy} onClick={openAddAgent}>
+            {t(text().addAgent)}
+          </Button>
+        </Show>
+      }
+      disconnectAllSummary={disconnectAllSummary()}
+      onDisconnectAll={props.onDisconnectAll}
+      tagline={props.tagline}
+      intro={props.intro}
+      details={props.details}
+      sections={
+        <>
+          <SettingsSection
+            title={t(text().workspaceTitle)}
+            actions={
+              <Button type="button" size="sm" variant="outline" disabled={props.busy || atLimit()} onClick={openNew}>
+                {t(text().addWorkspace)}
+              </Button>
+            }
+          >
             <ItemGroup class="settings-modal-card">
-              <Show
-                when={slackOrchestrator(connection, props.agents)}
-                fallback={
-                  <Item class="settings-modal-row">
-                    <ItemMedia>
-                      <OrchestratorFace platform={props.platform} />
-                    </ItemMedia>
-                    <ItemContent>
-                      <ItemTitle>{t(text().orchestratorNone)}</ItemTitle>
-                      <ItemDescription>{t(text().orchestratorNoneDescription)}</ItemDescription>
-                    </ItemContent>
-                    <ItemActions>
-                      <Button type="button" size="sm" disabled={props.busy} onClick={() => setDialogOpen(true)}>
-                        {t(text().addAgent)}
-                      </Button>
-                    </ItemActions>
-                  </Item>
-                }
-              >
-                {(agent) => (
-                  <Item class="settings-modal-row">
-                    <ItemMedia>
-                      <span class="integrations-agent-face" data-size="md">
-                        <AgentAvatar agent={agent()} motion="idle" />
-                      </span>
-                    </ItemMedia>
-                    <ItemContent>
-                      <ItemTitle>{agent().name}</ItemTitle>
-                      <ItemDescription>{agent().title}</ItemDescription>
-                    </ItemContent>
-                  </Item>
+              <For each={props.connections}>
+                {(connection) => (
+                  <ChannelConnectionRow
+                    text={text()}
+                    logo={<MessagingMark platform={props.platform} />}
+                    connection={connection}
+                    note={note(connection)}
+                    busy={props.busy}
+                    onReconnect={() => props.onReconnect(connection.workspaceId)}
+                    onSetEnabled={(enabled) => props.onSetEnabled(connection.workspaceId, enabled)}
+                    onDisconnect={() => setDisconnecting(connection)}
+                  />
                 )}
+              </For>
+              <Show when={atLimit()}>
+                <Text class="integration-card-note" variant="caption" tone="muted">
+                  {t(text().limitReached, { count: MESSAGING_LIMITS.connections })}
+                </Text>
               </Show>
             </ItemGroup>
-            <Text class="slack-integration-note" variant="caption" tone="muted">
-              {t(text().note)}
-            </Text>
           </SettingsSection>
-        )}
-      </For>
 
+          {/* One orchestrator answers every workspace of the platform. */}
+          <ChannelOrchestratorSection
+            text={text()}
+            avatar={avatar()}
+            agents={orchestrators()}
+            busy={props.busy}
+            onAddAgent={openAddAgent}
+          />
+
+          <Show when={access()}>
+            {(control) => (
+              <SettingsSection
+                title={t("connector.discord.accessTitle")}
+                description={t("connector.discord.accessDescription")}
+              >
+                <ItemGroup class="settings-modal-card">
+                  <For each={props.connections}>
+                    {(connection) => (
+                      <AccessRow
+                        connection={connection}
+                        access={control()}
+                        hostName={props.hostName}
+                        busy={props.busy}
+                        onChoose={() => setChoosingRoles(connection)}
+                      />
+                    )}
+                  </For>
+                </ItemGroup>
+              </SettingsSection>
+            )}
+          </Show>
+        </>
+      }
+    >
       <SlackConnectDialog
         platform={props.platform}
-        open={dialogOpen()}
-        connection={first()}
+        open={target() !== null}
+        connection={dialogConnection()}
         agents={props.agents}
         busy={props.busy}
         models={props.models}
         onConnectWorkspace={props.onConnectWorkspace}
         onAddOrchestrator={props.onAddOrchestrator}
-        onClose={() => setDialogOpen(false)}
+        onClose={() => setTarget(null)}
       />
-      <DisconnectDialog
-        platform={props.platform}
-        hostName={props.hostName}
+      <Show when={access()}>
+        {(control) => (
+          <RolesDialog
+            connection={choosingRoles()}
+            access={control()}
+            busy={props.busy}
+            onClose={() => setChoosingRoles(null)}
+          />
+        )}
+      </Show>
+      <ChannelDisconnectDialog
+        text={text()}
+        logo={<MessagingMark platform={props.platform} />}
         connection={disconnecting()}
+        title={t(text().disconnectTitle, { workspace: disconnectingName() })}
+        description={disconnectDescription()}
+        effect={t(text().disconnectEffect, { workspace: disconnectingName() })}
         deletesOrchestrator={disconnectDeletesOrchestrator()}
         onConfirm={(workspaceId) => {
           setDisconnecting(null);
@@ -412,75 +493,232 @@ export function SlackIntegrationPanel(props: SlackIntegrationPanelProps) {
         }}
         onClose={() => setDisconnecting(null)}
       />
-    </div>
+    </ChannelPage>
   );
 }
 
-function OrchestratorFace(props: { platform?: WorkspacePlatform | undefined; size?: "md" | "lg" }) {
-  const avatar = () => ORCHESTRATOR_AVATAR[props.platform ?? "slack"];
-  return (
-    <span class="integrations-agent-face" data-size={props.size ?? "md"}>
-      <AgentAvatar seed={avatar().avatarSeed} hue={avatar().avatarHue} motion="idle" />
-    </span>
-  );
-}
-
-function WorkspaceRow(props: {
-  platform?: WorkspacePlatform | undefined;
+/** Who can mention OpenBot in one Discord server, and the button that changes it. */
+function AccessRow(props: {
   connection: MessagingConnection;
+  access: DiscordAccessControl;
+  hostName?: string | undefined;
   busy: boolean;
-  onReconnect: () => void;
-  onSetEnabled: (enabled: boolean) => void;
-  onDisconnect: () => void;
+  onChoose: () => void;
 }) {
   const { t, format } = useText();
-  const text = () => messagingPlatformText(props.platform);
-  const kind = () => rowKind(props.connection);
-  const note = () => {
-    const current = props.connection;
-    if (current.missingScopes.length > 0)
-      return t(text().missingScopes, { scopes: format.list(current.missingScopes) });
-    if (current.retryAt)
-      return t(text().retryAt, {
-        time: format.date(new Date(current.retryAt), { hour: "numeric", minute: "2-digit" }),
-      });
-    const help = STATE_HELP[props.platform ?? "slack"][current.state];
-    return help ? t(help) : t(text().workspaceDescription);
+  const allowed = () => props.access.allowed(props.connection.workspaceId);
+  // A host that cannot choose roles lets everyone mention OpenBot.
+  const everyone = () => props.access.unsupported === true || allowed()?.length === 0;
+  const summary = () => {
+    const roles = allowed();
+    if (everyone()) return t("connector.discord.accessEveryone");
+    if (roles === null) return t("connector.discord.accessLoading");
+    return t("connector.discord.accessRoles", { roles: format.list(roles.map((role) => role.name)) });
   };
-  const label = (action: string) => t(text().rowAction, { action, name: props.connection.workspaceName });
-  const action = (text: string, onClick: () => void) => (
-    <Button type="button" size="sm" variant="outline" disabled={props.busy} aria-label={label(text)} onClick={onClick}>
-      {text}
-    </Button>
-  );
+  const choose = () => t("connector.discord.accessChoose");
   return (
-    <Item class="settings-modal-row" data-status={kind()}>
+    <Item class="settings-modal-row">
       <ItemMedia>
         <LogoTile>
-          <MessagingMark platform={props.platform} />
+          <MessagingMark platform="discord" />
         </LogoTile>
       </ItemMedia>
       <ItemContent>
         <ItemTitle>{props.connection.workspaceName}</ItemTitle>
-        <ItemDescription>{note()}</ItemDescription>
-      </ItemContent>
-      <ItemActions>
+        <ItemDescription>{summary()}</ItemDescription>
         <Switch>
-          <Match when={kind() === "attention"}>{action(t(text().reconnect), props.onReconnect)}</Match>
-          <Match when={kind() === "paused"}>{action(t(text().resume), () => props.onSetEnabled(true))}</Match>
+          <Match when={props.access.unsupported}>
+            <ItemDescription>{t("connector.discord.accessHostUpdate", { host: props.hostName ?? "" })}</ItemDescription>
+          </Match>
+          <Match when={everyone()}>
+            <ItemDescription>{t("connector.discord.accessEveryoneDescription")}</ItemDescription>
+          </Match>
         </Switch>
-        <Button
-          type="button"
-          size="sm"
-          variant="destructive-ghost"
-          disabled={props.busy}
-          aria-label={label(t(text().disconnectWorkspace))}
-          onClick={props.onDisconnect}
-        >
-          {t(text().disconnectWorkspace)}
-        </Button>
-      </ItemActions>
+      </ItemContent>
+      <Show when={!props.access.unsupported}>
+        <ItemActions>
+          <Show when={allowed() === null}>
+            <Spinner size="sm" />
+          </Show>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={props.busy || allowed() === null}
+            aria-label={t("connector.discord.rowAction", { action: choose(), name: props.connection.workspaceName })}
+            onClick={props.onChoose}
+          >
+            {choose()}
+          </Button>
+        </ItemActions>
+      </Show>
     </Item>
+  );
+}
+
+/**
+ * Chooses the roles whose members can use OpenBot in one Discord server. It reads the server's roles
+ * when it opens. A saved role that the server no longer has stays in the list until the user removes it.
+ */
+function RolesDialog(props: {
+  /** The Discord server; the dialog is open while it is set. */
+  connection: MessagingConnection | null;
+  access: DiscordAccessControl;
+  busy: boolean;
+  onClose: () => void;
+}) {
+  const { t, errorMessage } = useText();
+  const id = createUniqueId();
+  const [view, setView] = createStore<{
+    status: "loading" | "ready" | "failed";
+    roles: MessagingRole[];
+    /** The roles that were saved when the dialog opened. */
+    saved: MessagingRole[];
+    selected: string[];
+    error: string;
+  }>({ status: "loading", roles: [], saved: [], selected: [], error: "" });
+  /** Each read replaces the one before it, so a slow answer never overwrites a newer one. */
+  let reads = 0;
+  const load = (workspaceId: string) => {
+    const read = ++reads;
+    setView((draft) => {
+      draft.status = "loading";
+      draft.error = "";
+    });
+    void props.access.loadRoles(workspaceId).then(
+      (roles) => {
+        if (read !== reads) return;
+        setView((draft) => {
+          draft.status = "ready";
+          draft.roles = roles.map((role) => ({ ...role }));
+        });
+      },
+      (error: unknown) => {
+        if (read !== reads) return;
+        setView((draft) => {
+          draft.status = "failed";
+          draft.error = errorMessage(error, t("connector.discord.accessLoadFailed"));
+        });
+      },
+    );
+  };
+  createEffect(
+    () => props.connection?.workspaceId,
+    (workspaceId) => {
+      reads += 1;
+      if (!workspaceId) return;
+      const saved = props.access.allowed(workspaceId) ?? [];
+      setView((draft) => {
+        draft.roles = [];
+        draft.saved = saved.map((role) => ({ ...role }));
+        draft.selected = saved.map((role) => role.id);
+      });
+      load(workspaceId);
+    },
+  );
+  /** The server's roles, then the saved roles that the server no longer has. */
+  const options = () => [
+    ...view.roles.map((role) => ({ role, deleted: false })),
+    ...view.saved
+      .filter((role) => !view.roles.some((current) => current.id === role.id))
+      .map((role) => ({ role, deleted: true })),
+  ];
+  const atCap = () => view.selected.length >= MESSAGING_LIMITS.allowedRoles;
+  const toggle = (roleId: string, checked: boolean) =>
+    setView((draft) => {
+      draft.selected = checked
+        ? [...draft.selected.filter((selected) => selected !== roleId), roleId]
+        : draft.selected.filter((selected) => selected !== roleId);
+    });
+  const save = (workspaceId: string) => {
+    const roles = options()
+      .map((option) => option.role)
+      .filter((role) => view.selected.includes(role.id))
+      .map((role) => ({ id: role.id, name: role.name }));
+    props.onClose();
+    props.access.onSave(workspaceId, roles);
+  };
+  return (
+    <WizardDialog
+      open={props.connection !== null}
+      closeLabel={t("connector.discord.close")}
+      onClose={props.onClose}
+      logo={<DiscordMark />}
+      link="connected"
+      title={t("connector.discord.accessDialogTitle", { workspace: props.connection?.workspaceName ?? "" })}
+      description={t("connector.discord.accessDialogDescription")}
+      footer={
+        <>
+          <Button type="button" size="sm" variant="ghost" onClick={props.onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Show when={props.connection}>
+            {(connection) => (
+              <Button
+                type="button"
+                size="sm"
+                disabled={view.status !== "ready" || props.busy}
+                onClick={() => save(connection().workspaceId)}
+              >
+                {t("connector.discord.accessSave")}
+              </Button>
+            )}
+          </Show>
+        </>
+      }
+    >
+      <Switch
+        fallback={
+          <ul class="discord-roles" aria-label={t("connector.discord.accessTitle")}>
+            <For each={options()}>
+              {(option) => {
+                const checked = () => view.selected.includes(option.role.id);
+                return (
+                  <li>
+                    <label class="discord-role-row" for={`${id}-${option.role.id}`}>
+                      <Checkbox
+                        id={`${id}-${option.role.id}`}
+                        checked={checked()}
+                        disabled={!checked() && atCap()}
+                        onChange={(event) => toggle(option.role.id, event.currentTarget.checked)}
+                      />
+                      <Text variant="body-sm" class="discord-role-name">
+                        {option.deleted
+                          ? t("connector.discord.accessRoleDeleted", { role: option.role.name })
+                          : option.role.name}
+                      </Text>
+                    </label>
+                  </li>
+                );
+              }}
+            </For>
+          </ul>
+        }
+      >
+        <Match when={view.status === "loading"}>
+          <div class="channel-waiting" aria-live="polite">
+            <Spinner size="sm" />
+            <Text variant="caption" tone="muted">
+              {t("connector.discord.accessLoading")}
+            </Text>
+          </div>
+        </Match>
+        <Match when={view.status === "failed"}>
+          <ReadFailedAlert
+            message={view.error}
+            onRetry={() => {
+              const workspaceId = props.connection?.workspaceId;
+              if (workspaceId) load(workspaceId);
+            }}
+          />
+        </Match>
+        <Match when={options().length === 0}>
+          <Text variant="body-sm" tone="muted" role="status">
+            {t("connector.discord.accessNoRoles")}
+          </Text>
+        </Match>
+      </Switch>
+    </WizardDialog>
   );
 }
 
@@ -588,162 +826,19 @@ export function SlackConnectDialog(props: {
     >
       <Switch>
         <Match when={step() === 0}>
-          <Show
-            when={waiting()}
-            fallback={
-              <ol class="slack-checklist">
-                <li>
-                  <span class="slack-checklist-dot" aria-hidden="true" />
-                  {t(text().connectStepBrowser)}
-                </li>
-                <li>
-                  <span class="slack-checklist-dot" aria-hidden="true" />
-                  {t(text().connectStepAllow)}
-                </li>
-                <li>
-                  <span class="slack-checklist-dot" aria-hidden="true" />
-                  {t(text().connectStepReturn)}
-                </li>
-              </ol>
-            }
-          >
-            <div class="slack-waiting" aria-live="polite">
-              <Spinner size="sm" />
-              <Text variant="caption" tone="muted">
-                {t(text().connectWaiting)}
-              </Text>
-            </div>
-          </Show>
+          <ChannelConnectChecklist text={text()} waiting={waiting()} />
         </Match>
         <Match when={step() === 1}>
-          <div class="slack-orchestrator-card">
-            <OrchestratorFace platform={props.platform} size="lg" />
-            <div class="slack-integration-stack">
-              <Text as="span" variant="label">
-                {t(text().orchestratorName)}
-              </Text>
-              <Text as="span" variant="caption" tone="muted">
-                {t(text().orchestratorRole)}
-              </Text>
-            </div>
-          </div>
-          <ol class="slack-checklist">
-            <li data-state="done">
-              <Check size={14} aria-hidden="true" />
-              {t(text().orchestratorDoesReceive)}
-            </li>
-            <li data-state="done">
-              <Check size={14} aria-hidden="true" />
-              {t(text().orchestratorDoesDelegate)}
-            </li>
-            <li data-state="done">
-              <Check size={14} aria-hidden="true" />
-              {t(text().orchestratorDoesAnswer)}
-            </li>
-          </ol>
-          <Show when={props.models}>
-            {(models) => (
-              <Show when={choice()}>
-                {(current) => (
-                  <div class="slack-orchestrator-model">
-                    <Text as="span" variant="label-sm">
-                      {t(text().orchestratorModel)}
-                    </Text>
-                    <ProviderModelPicker
-                      variant="field"
-                      ariaLabel={t(text().orchestratorModel)}
-                      provider={current().provider}
-                      value={current().model}
-                      modelOptions={models().modelOptions}
-                      agentStatus={models().agentStatus}
-                      customProviders={models().customProviders}
-                      customAgents={models().customAgents}
-                      disabled={props.busy}
-                      onChange={(model, provider) => setChoice({ provider, model })}
-                    />
-                  </div>
-                )}
-              </Show>
-            )}
-          </Show>
+          <ChannelOrchestratorStep
+            text={text()}
+            avatar={ORCHESTRATOR_AVATAR[props.platform ?? "slack"]}
+            models={props.models}
+            choice={choice()}
+            busy={props.busy}
+            onChoose={setChoice}
+          />
         </Match>
       </Switch>
-    </WizardDialog>
-  );
-}
-
-function DisconnectDialog(props: {
-  platform?: WorkspacePlatform | undefined;
-  hostName?: string | undefined;
-  connection: MessagingConnection | null;
-  deletesOrchestrator: boolean;
-  onConfirm: (workspaceId: string) => void;
-  onClose: () => void;
-}) {
-  const { t } = useText();
-  const text = () => messagingPlatformText(props.platform);
-  const workspace = () => props.connection?.workspaceName ?? "";
-  return (
-    <WizardDialog
-      open={props.connection !== null}
-      closeLabel={t(text().close)}
-      onClose={props.onClose}
-      logo={<MessagingMark platform={props.platform} />}
-      link="broken"
-      title={t(text().disconnectTitle, { workspace: workspace() })}
-      description={
-        props.hostName
-          ? t(text().disconnectDescriptionHost, { workspace: workspace(), host: props.hostName })
-          : t(text().disconnectDescription, { workspace: workspace() })
-      }
-      footer={
-        <>
-          <Button type="button" variant="ghost" onClick={props.onClose}>
-            {t(text().keep)}
-          </Button>
-          <Show when={props.connection}>
-            {(connection) => (
-              <Button
-                type="button"
-                variant="destructive"
-                data-cuelume-tap="close"
-                data-cuelume-emphasis="strong"
-                onClick={() => props.onConfirm(connection().workspaceId)}
-              >
-                <Link2Off aria-hidden="true" />
-                {t(text().disconnectWorkspace)}
-              </Button>
-            )}
-          </Show>
-        </>
-      }
-    >
-      <ul class="slack-effects">
-        <li data-tone="danger">
-          <span class="slack-effect-icon" aria-hidden="true">
-            <Link2Off />
-          </span>
-          {t(text().disconnectEffect, { workspace: workspace() })}
-        </li>
-        <Show
-          when={props.deletesOrchestrator}
-          fallback={
-            <li data-tone="success">
-              <span class="slack-effect-icon" aria-hidden="true">
-                <Check />
-              </span>
-              {t(text().removeEffectKept)}
-            </li>
-          }
-        >
-          <li data-tone="danger">
-            <span class="slack-effect-icon" aria-hidden="true">
-              <Trash2 />
-            </span>
-            {t(text().removeEffectDeleted)}
-          </li>
-        </Show>
-      </ul>
     </WizardDialog>
   );
 }

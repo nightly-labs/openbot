@@ -3,14 +3,22 @@ name: Status page
 # The public status page at https://status.openbot.run. GitHub hosts it, so it stays up when
 # Cloudflare does not. Each run checks the services, keeps the check history in `state.json` on the
 # `status-data` branch, opens or closes the automatic incident issues, and publishes the page with
-# the `status` issues. See apps/status/scripts/update.ts. The `alert` job reports runs that fail.
+# the `status` issues. See apps/status/scripts/update.ts. The `notify` job sends the status webhooks
+# of the team (apps/status/scripts/notify.ts). The `alert` job reports check runs that fail. The
+# `next` job starts the next check run, because GitHub drops most scheduled runs.
 on:
+  # In October 2026 GitHub started 5 to 7 of the 288 scheduled runs a day. A scheduled run checks the
+  # services as the other runs do, and starts the `next` chain again when it stopped.
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       bootstrap:
         description: Start a new check history. Only for the first run, when `status-data` does not exist.
+        type: boolean
+        default: false
+      test_webhooks:
+        description: Also send a test event to each active status webhook.
         type: boolean
         default: false
   # A maintainer's change to an incident issue shows on the page without a wait for the schedule.
@@ -175,6 +183,15 @@ jobs:
         with:
           path: .status-pages
 
+      - name: Upload the status file for the webhooks
+        if: steps.publish.outputs.publish == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: status-json
+          path: .status-site/status.json
+          if-no-files-found: error
+          retention-days: 1
+
   deploy:
     name: Deploy
     needs: update
@@ -194,6 +211,95 @@ jobs:
       - name: Deploy the page
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  # The status webhooks for the tools of the team. The subscriptions are in the `STATUS_WEBHOOKS`
+  # secret; see docs/status-webhooks.md. The sent events and the waiting deliveries are in
+  # `notify.json` on the `status-notify` branch. This job does not hold up the deploy, and a delivery
+  # that fails does not fail the job: the job summary shows it.
+  notify:
+    name: Send webhooks
+    needs: update
+    if: needs.update.outputs.publish == 'true'
+    # One job at a time, because each job replaces `status-notify`. A newer pending job replaces an
+    # older one. Its `status.json` holds the same incidents or newer ones, but a service change or a
+    # test event of the replaced job is lost.
+    concurrency:
+      group: status-page-notify
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Download the status file
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: status-json
+          path: .status-site
+
+      # Only a branch that does not exist (exit code 2) starts new state. The first run marks the
+      # current events as sent, so it sends no old incidents. Any other error stops the run.
+      - name: Read the webhook state
+        id: state
+        shell: bash
+        run: |
+          mkdir -p .status-notify
+          set +e
+          git ls-remote --exit-code origin refs/heads/status-notify > /dev/null
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            git fetch --depth=1 --no-tags origin refs/heads/status-notify
+            git show FETCH_HEAD:notify.json > .status-notify/notify.json
+            echo "lease=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_OUTPUT"
+            echo "bootstrap=false" >> "$GITHUB_OUTPUT"
+          elif [ "$code" -eq 2 ]; then
+            echo "lease=" >> "$GITHUB_OUTPUT"
+            echo "bootstrap=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Could not read the status-notify branch (git exit code $code)."
+            exit 1
+          fi
+
+      - name: Send the webhooks
+        id: send
+        shell: bash
+        env:
+          STATUS_WEBHOOKS: ${{ secrets.STATUS_WEBHOOKS }}
+          BOOTSTRAP: ${{ steps.state.outputs.bootstrap }}
+          TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.test_webhooks }}
+        run: |
+          flags=()
+          if [ "$BOOTSTRAP" = "true" ]; then flags+=(--bootstrap); fi
+          if [ "$TEST" = "true" ]; then flags+=(--test); fi
+          bun apps/status/scripts/notify.ts --status .status-site/status.json --state .status-notify/notify.json \
+            --summary "$GITHUB_STEP_SUMMARY" "${flags[@]}"
+
+      - name: Save the webhook state
+        if: steps.send.outcome == 'success'
+        shell: bash
+        env:
+          LEASE: ${{ steps.state.outputs.lease }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          blob=$(git hash-object -w .status-notify/notify.json)
+          tree=$(printf '100644 blob %s\tnotify.json\n' "$blob" | git mktree)
+          commit=$(git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit-tree "$tree" -m "Status webhook state")
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+            push --force-with-lease="refs/heads/status-notify:$LEASE" origin "$commit:refs/heads/status-notify"
 
   # The page cannot report that its own checks stopped. After 2 failed check runs in a row, this job
   # opens one issue, so the people who watch the repository get a notification. The next good check
@@ -228,10 +334,14 @@ jobs:
             --jq "[.[] | select(.title == \"$title\" and .user.login == \"github-actions[bot]\")][0].number // empty")
           if [ "$FAILED" = "true" ]; then
             if [ -n "$open" ]; then exit 0; fi
-            # One failed run can be a short GitHub error, so open the issue only after the second.
+            # One failed run can be a short GitHub error, so open the issue only after the second. Only
+            # the check and deploy jobs count: a failed webhook job also fails the run.
             previous=$(gh api -X GET "repos/$GH_REPO/actions/workflows/status-page.yml/runs" -f status=completed -f per_page=20 \
-              --jq "[.workflow_runs[] | select(.id != $GITHUB_RUN_ID and (.event == \"schedule\" or .event == \"workflow_dispatch\"))][0].conclusion // empty")
-            if [ "$previous" != "failure" ]; then exit 0; fi
+              --jq "[.workflow_runs[] | select(.id != $GITHUB_RUN_ID and (.event == \"schedule\" or .event == \"workflow_dispatch\"))][0].id // empty")
+            if [ -z "$previous" ]; then exit 0; fi
+            failed=$(gh api -X GET "repos/$GH_REPO/actions/runs/$previous/jobs" \
+              --jq '[.jobs[] | select((.name == "Check and publish" or .name == "Deploy") and .conclusion == "failure")] | length')
+            if [ "$failed" = "0" ]; then exit 0; fi
             gh issue create --title "$title" --body "The status page workflow failed 2 times in a row, so https://status.openbot.run can show old data. The page shows \"Checks are late\" after some minutes.
 
           Last failed run: $RUN_URL
@@ -240,3 +350,46 @@ jobs:
           elif [ "$PASSED" = "true" ] && [ -n "$open" ]; then
             gh issue close "$open" --comment "The checks run again: $RUN_URL"
           fi
+
+  # GitHub drops most scheduled runs, so each check run starts the next one, 5 minutes after it
+  # started. GITHUB_TOKEN can start a `workflow_dispatch` run. A failed check run also starts the next
+  # one, but a cancelled run does not: to stop the chain, cancel the newest run or disable the workflow.
+  next:
+    name: Start the next check run
+    needs: update
+    if: >-
+      !cancelled() && github.repository == 'nightly-labs/openbot' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+    steps:
+      - name: Wait, then start the next run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # One GitHub error must not stop the chain until the next scheduled run, so a failed query
+          # does not stop the step.
+          if started=$(gh api "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID" --jq .run_started_at); then
+            wait=$(( $(date -d "$started" +%s) + 300 - $(date +%s) ))
+          else
+            wait=300
+          fi
+          if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
+          # Only the newest check run on main starts the next run, so a scheduled run does not start a
+          # second chain. A newer run waits until 5 minutes after its own start, so it decides after
+          # this run. Issue events start many runs, so the query asks for each check event. When the
+          # query fails, this run starts the next run: the newest run stops a second chain later.
+          for event in schedule workflow_dispatch; do
+            newer=$(gh api -X GET "repos/$GH_REPO/actions/workflows/status-page.yml/runs" \
+              -f event="$event" -f branch=main -f per_page=10 \
+              --jq "[.workflow_runs[] | select(.id > $GITHUB_RUN_ID)] | length") || newer=0
+            if [ "$newer" != "0" ]; then
+              echo "::notice::A newer check run starts the next run."
+              exit 0
+            fi
+          done
+          gh workflow run status-page.yml --ref main || { sleep 30; gh workflow run status-page.yml --ref main; }

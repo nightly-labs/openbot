@@ -3,6 +3,8 @@ import type { messages as source } from "../en/dialog";
 
 export const messages = {
   "dialog.chooseSiteDirectory": "Verzeichnis für eine statische Website auswählen",
+  "dialog.chooseAgentFolder": "Ordner für {agent} auswählen",
+  "dialog.chooseAgentExclusion": "Ordner auswählen, den {agent} nicht ändern darf",
   "dialog.chooseSkill": "Fähigkeitsordner oder ZIP auswählen",
   "dialog.filter.skillPackages": "Fähigkeitspakete",
   "dialog.filter.images": "Bilder",
@@ -16,4 +18,6 @@ export const messages = {
   "dialog.saveTransfer": "Übertragungsdatei speichern",
   "dialog.chooseTransfer": "Übertragungsdatei wählen",
   "dialog.filter.transfer": "OpenBot-Übertragungsdateien",
+  "dialog.chooseExternalLinkApp": "Browser auswählen",
+  "dialog.filter.applications": "Programme",
 } as const satisfies PartialTranslation<typeof source>;

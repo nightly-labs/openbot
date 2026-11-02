@@ -79,7 +79,7 @@ export function encodeTeamProtocolV4BaseCurrentHttpRequest(
   method: string,
   path: string,
   value: unknown,
-  options: { preserveSemanticTags?: boolean } = {},
+  options: { preserveSemanticTags?: boolean | undefined } = {},
 ): string {
   const currentValue: TeamProtocolV4BaseJsonValue = JSON.parse(JSON.stringify(value));
   const wireValue = toWireAgentKeysForRequestPath(path, currentValue);

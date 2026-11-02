@@ -2,7 +2,8 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/agent";
 
 export const messages = {
-  "error.agent.historyUnavailable": "Bu istek için geçmiş kullanılamıyor. Son geçmişi tekrar okuyun.",
+  "error.agent.historyUnavailable":
+    "Bu istek için geçmiş kullanılamıyor. Son geçmişi tekrar okuyun veya kanal çalışması için channel_history kullanın.",
   "error.agent.toolRequestInvalid":
     "Geçersiz araç keşfi bağımsız değişkenleri. Bildirilen şemayı ve özgün nitelikli araç adını kullanın.",
   // Agent errors that the main process and the backend send.
@@ -19,7 +20,15 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Bir mesaj veya ek gereklidir.",
   "error.agent.promptAnswersTooLong": "İstem yanıtları çok uzun.",
   "error.agent.gone": "Bu ajan artık mevcut değil.",
+  "error.agent.instructionsTooLarge":
+    "Talimat dosyası burada açılamayacak kadar büyük. Bir metin düzenleyicide kısaltın.",
+  "error.agent.instructionsOutside":
+    "Talimat dosyası ajanın çalışma alanı dışındaki bir yeri gösteriyor, bu yüzden OpenBot onu açmıyor.",
+  "error.agent.instructionsReadFailed": "Talimat dosyası okunamadı.",
+  "error.agent.instructionsSaveFailed": "Talimat dosyası kaydedilemedi.",
   "error.agent.profileGenerationBusy": "Profil oluşturma meşgul. Kısa bir süre sonra tekrar deneyin.",
+  "error.agent.instructionsChanged":
+    "Ajan talimat dosyasını değiştirdi. Son değişikliğiniz kaydedilmedi. Lütfen tekrar yapın.",
   "error.agent.initialMessageRequired": "İlk mesaj gereklidir.",
   "error.agent.initialMessageTooLong": "İlk mesaj çok uzun.",
   "error.agent.setupCleanupFailed": "Ajan kurulumu başarısız oldu ve tamamlanmamış ajan kaldırılamadı.",
@@ -31,6 +40,8 @@ export const messages = {
     'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} hiç model listelemedi.',
   "error.agent.modelNotInProviderList":
     'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} bu modeli listelemiyor.',
+  "error.agent.modelVariantNotListed":
+    'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} bu modeli listelemiyor. {provider} bu model için şu değerleri listeliyor: {models}.',
   "error.agent.modelProviderMismatch": "Seçilen model o sağlayıcıya ait değil.",
   "error.agent.modelNotListed": '"{model}" modeli mevcut değil. Kullanılabilir modeller: {models}.',
   "error.agent.providerNotListed":
@@ -45,6 +56,8 @@ export const messages = {
   "error.agent.waitForTasksBeforeProviderChange":
     "Bu ajanın görevleri çalışıyor. Sağlayıcıyı değiştirmeden önce bitmelerini bekleyin veya onları durdurun.",
   "error.agent.waitBeforeClearContext": "Yeni bir sohbet başlatmadan önce etkin turun ve kuyruğun bitmesini bekleyin.",
+  "error.agent.waitBeforeCompactContext": "Bağlamı sıkıştırmadan önce etkin turun ve kuyruğun bitmesini bekleyin.",
+  "error.agent.compactContextUnavailable": "Bu ajan bağlamını şu anda sıkıştıramaz.",
   "error.agent.unknown": "Bilinmeyen ajan: {id}",
   "error.agent.onlyUserWidensSettings":
     "Yalnızca kullanıcı bir ajana Tam erişim verebilir veya Bilgisayar Kullanımını açabilir. Kullanıcıdan bunu ajanın ayarlarından değiştirmesini isteyin.",
@@ -59,6 +72,8 @@ export const messages = {
   "error.agent.duplicateIds": "Ajan durumu yinelenen ajan kimlikleri içeriyor; üzerine yazılması reddedildi.",
   "error.agent.copyNameFailed": "OpenBot benzersiz bir ajan kopya adı oluşturamadı.",
   "error.agent.endpointRemoved": "Bu ajanın kullandığı uç nokta kaldırıldı. Ajan için başka bir model seçin.",
+  "error.agent.turnStalled":
+    "{provider} yanıt vermeyi bıraktı, bu yüzden OpenBot bu turu bitirdi. Mesajı yeniden gönderin veya başka bir model seçin.",
   "error.agent.selectedGone": "Seçilen ajan artık mevcut değil.",
   "error.agent.profileEndpointsChanged": "Bu işlem oluşturulurken özel uç noktalar değişti. Tekrar deneyin.",
   "error.agent.profileInvalid": "Sağlayıcı geçersiz bir profil döndürdü. İsteminizi revize etmeyi deneyin.",
@@ -85,6 +100,10 @@ export const messages = {
   "error.agent.queueEditRejected": "Kuyruk düzenlemesi reddedildi: {reason}",
   "error.agent.computerUseLocalOnly": "Bilgisayar Kullanımı yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",
   "error.agent.automationLocalOnly": "Yerel betiklere yalnızca ajanı çalıştıran bilgisayarda izin verilebilir.",
+  "error.agent.newChatLocalOnly": "Yalnızca ajanı çalıştıran bilgisayar ona yeni sohbet başlatma izni verebilir.",
+  "error.agent.quickAcknowledgementLocalOnly": "Bu ayarı yalnızca ajanı çalıştıran bilgisayar değiştirebilir.",
+  "error.agent.sideQuestionBusy": "Çok fazla yan soru çalışıyor. Kısa bir süre sonra tekrar deneyin.",
+  "error.agent.sideQuestionFailed": "Ajan yan soruyu yanıtlayamadı. Tekrar deneyin.",
   "error.agent.busyMessageModeLocalOnly":
     "Ajan çalışırken mesajların ne yapacağı yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.backupModelsLocalOnly": "Yedek modeller yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
@@ -104,11 +123,13 @@ export const messages = {
     "Bu sunucunun belleği azaldı. Mesajınız kuyrukta bekler ve bellek boşaldığında başlar.",
   "error.agent.workspaceOnlyToolMissing":
     "“Yalnızca çalışma alanı” seçeneği, OpenBot'un bulamadığı {tool} aracına ihtiyaç duyar. Aracı yükleyin veya ajan ayarlarından Tam erişim'i seçin.",
+  "error.agent.claudeSandboxUnavailable":
+    "“Yalnızca çalışma alanı” Claude korumalı alanına ihtiyaç duyar, ancak Claude bu bilgisayarda onu başlatamıyor: {reason}. Ajan ayarlarından Tam erişim'i veya başka bir sağlayıcıyı seçin.",
   "error.agent.screenCaptureOff":
     "Bu ajan için ekran yakalama kapalı. Kullanıcı, ajan ayarlarında Bilgisayar Kullanımı'nı açabilir.",
   "error.agent.screenCaptureUnavailable": "Ekran yakalama bu bilgisayarda kullanılamıyor.",
   "error.agent.screenCaptureShared":
-    "Ekran yakalama bir kanalda veya bir Slack, Discord ya da Telegram konuşmasında çalışmaz, çünkü dosyalarını başka kişiler de alır.",
+    "Ekran yakalama bir Slack, Discord ya da Telegram konuşmasında çalışmaz, çünkü dosyalarını başka kişiler de alır.",
   "error.agent.screenCaptureDeclined": "Kullanıcı bu ekran yakalamaya izin vermedi. Hiçbir şey yakalanmadı.",
   "error.agent.screenCaptureWindowMissing":
     "Bu pencere şu anda açık değil. Geçerli pencere kimliklerini almak için list_capture_sources çağırın.",

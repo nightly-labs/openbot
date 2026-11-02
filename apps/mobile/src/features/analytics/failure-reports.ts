@@ -1,4 +1,5 @@
 import {
+  ANALYTICS_GENERATIONS,
   classifyFailure,
   type FailureProperties,
   openPanelTransport,
@@ -56,7 +57,7 @@ export function mobileReportQueue(): ReportQueue | undefined {
       surface: "mobile",
       platform: Platform.OS,
       app_version: Application.nativeApplicationVersion ?? "unknown",
-      event_schema_version: 2,
+      event_schema_version: ANALYTICS_GENERATIONS.mobile,
     },
     Date.now,
     Math.random,

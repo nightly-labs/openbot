@@ -29,7 +29,8 @@
   .openbot-playground-root .left-panel-resizer,
   .openbot-playground-root .sidebar-topbar,
   .openbot-playground-root .sidebar-search-wrap,
-  .openbot-playground-root .sidebar-chat-group[aria-labelledby="sidebar-people-heading"] {
+  .openbot-playground-root .sidebar-list-context-trigger,
+  .openbot-playground-root .sidebar-chat-group > header {
     display: none;
   }
 
@@ -52,21 +53,22 @@
     padding: var(--openbot-space-2) var(--openbot-space-3);
   }
 
-  .openbot-playground-root .sidebar-chat-group[aria-labelledby="sidebar-agents-heading"],
-  .openbot-playground-root .sidebar-chat-group[aria-label="Agents"] {
+  /* Every wrapper between the list and the rows becomes one row of avatars. */
+  .openbot-playground-root .agent-list-content,
+  .openbot-playground-root .sidebar-chat-group,
+  .openbot-playground-root .sidebar-section-collapse,
+  .openbot-playground-root .sidebar-section-body {
     display: flex;
     align-items: center;
     gap: var(--openbot-space-1-5);
     margin: 0;
   }
 
-  .openbot-playground-root .sidebar-chat-group[aria-labelledby="sidebar-agents-heading"] > header,
-  .openbot-playground-root .sidebar-chat-group[aria-label="Agents"] > header {
-    display: none;
-  }
-
   .openbot-playground-root .agent-row,
   .openbot-playground-root .sidebar-compact .agent-row {
+    --agent-row-avatar-size: 36px;
+    --sidebar-pinned-avatar-size: 36px;
+
     width: 48px;
     height: 48px;
     flex: 0 0 48px;
@@ -82,6 +84,8 @@
     display: none;
   }
 
+  /* The chat is inside the panes wrapper, which the frame puts in the first row. */
+  .openbot-playground-root .app-frame-panes,
   .openbot-playground-root .conversation-panel,
   .openbot-playground-root .app-frame-with-server-rail .conversation-panel {
     grid-column: 1;
