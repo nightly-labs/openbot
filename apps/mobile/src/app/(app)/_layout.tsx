@@ -67,6 +67,14 @@ function AuthenticatedStack() {
   const { t } = useText();
   const background = useThemeColor("background");
   const sheetBackground = String(useCSSVariable("--openbot-bg-sheet") ?? background);
+  // iOS shows the native bar over a chat and the browser, so its bar items morph with the items of the
+  // screen under it. The screen fills the bar with Back, the title and the buttons. Android draws them.
+  const nativeBarOptions = {
+    headerShown: isIOS,
+    headerBackVisible: false,
+    scrollEdgeEffects: { top: "hidden" },
+    title: "",
+  } as const;
   const largeTitlePage = {
     animation: pushAnimation,
     contentStyle: { backgroundColor: sheetBackground },
@@ -196,7 +204,7 @@ function AuthenticatedStack() {
             // reply: react-native-screens is patched so that the back swipe waits for it.
             fullScreenGestureEnabled: true,
             gestureEnabled: true,
-            headerShown: false,
+            ...nativeBarOptions,
           }}
         />
         <Stack.Screen
@@ -209,7 +217,7 @@ function AuthenticatedStack() {
             // reply: react-native-screens is patched so that the back swipe waits for it.
             fullScreenGestureEnabled: true,
             gestureEnabled: true,
-            headerShown: false,
+            ...nativeBarOptions,
           }}
         />
         <Stack.Screen
@@ -232,8 +240,7 @@ function AuthenticatedStack() {
             // Every finger on the page is the page's mouse, so only the screen edge goes back.
             fullScreenGestureEnabled: false,
             gestureEnabled: true,
-            // The screen draws the app's glass header over the page, as the chat does.
-            headerShown: false,
+            ...nativeBarOptions,
           }}
         />
         <Stack.Screen
@@ -269,7 +276,7 @@ function AuthenticatedStack() {
             // reply: react-native-screens is patched so that the back swipe waits for it.
             fullScreenGestureEnabled: true,
             gestureEnabled: true,
-            headerShown: false,
+            ...nativeBarOptions,
           }}
         />
         <Stack.Screen
