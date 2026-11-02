@@ -324,6 +324,7 @@ export const messages = {
   "error.provider.customAgentNoSecureStorage":
     "Questo computer non ha un archivio sicuro, quindi non si possono salvare i valori d'ambiente. Rimuovili e riprova.",
   "error.provider.customAgentNotSaved": "Questo agente personalizzato non è salvato. Aggiorna l'elenco e riprova.",
+  "error.provider.customAgentWorkspaceOnly": "{reason}. «Solo workspace» lo blocca. Prova «Accesso completo».",
   "error.provider.customAgentTooMany": "Puoi salvare al massimo {count} agenti personalizzati.",
   "error.provider.customAgentEnvValueMissing": "Inserisci un valore per {name}.",
   "error.provider.off": "{provider} è disattivato in OpenBot. Attivalo prima nelle impostazioni dei provider.",

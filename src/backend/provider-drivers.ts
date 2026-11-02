@@ -1192,6 +1192,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           customAgentChild(config, executable, folder, timeout, context, confinement, false, history, launchPath),
         undefined,
         context.history?.("acp"),
+        confinement !== undefined,
       ),
     createProfileClient: (_cli, timeout, context) =>
       new CustomAcpAgentsClient(

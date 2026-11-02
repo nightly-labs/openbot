@@ -321,6 +321,8 @@ export const messages = {
     "Deze computer heeft geen beveiligde opslag, dus omgevingswaarden kunnen niet worden opgeslagen. Verwijder ze en probeer het opnieuw.",
   "error.provider.customAgentNotSaved":
     "Deze aangepaste agent is niet opgeslagen. Vernieuw de lijst en probeer het opnieuw.",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}. ‘Alleen werkruimte’ blokkeert dit. Probeer ‘Volledige toegang’.",
   "error.provider.customAgentTooMany": "Je kunt maximaal {count} aangepaste agents opslaan.",
   "error.provider.customAgentEnvValueMissing": "Voer een waarde in voor {name}.",
   "error.provider.off": "{provider} staat uit in OpenBot. Zet het eerst aan in de instellingen voor aanbieders.",

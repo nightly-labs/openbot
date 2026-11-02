@@ -318,6 +318,8 @@ export const messages = {
   "error.provider.customAgentNoSecureStorage":
     "Ten komputer nie ma bezpiecznego magazynu, więc nie można zapisać wartości środowiskowych. Usuń je i spróbuj ponownie.",
   "error.provider.customAgentNotSaved": "Ten własny agent nie jest zapisany. Odśwież listę i spróbuj ponownie.",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}. Blokuje to tryb „Tylko obszar roboczy”. Wybierz „Pełny dostęp”.",
   "error.provider.customAgentTooMany": "Możesz zapisać maksymalnie {count} własnych agentów.",
   "error.provider.customAgentEnvValueMissing": "Wpisz wartość dla {name}.",
   "error.provider.off": "Dostawca {provider} jest wyłączony w OpenBot. Najpierw włącz go w ustawieniach dostawców.",

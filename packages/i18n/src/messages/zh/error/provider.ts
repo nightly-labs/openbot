@@ -282,6 +282,7 @@ export const messages = {
     "已保存的自定义助手由更新版本的 OpenBot 写入，或文件无法读取。请更新 OpenBot 后再修改。",
   "error.provider.customAgentNoSecureStorage": "该电脑没有安全存储，无法保存环境变量值。请移除它们后重试。",
   "error.provider.customAgentNotSaved": "该自定义助手未保存，请刷新列表后重试。",
+  "error.provider.customAgentWorkspaceOnly": "{reason}。“仅工作区”阻止了此操作。请尝试“完全访问”。",
   "error.provider.customAgentTooMany": "最多只能保存 {count} 个自定义助手。",
   "error.provider.customAgentEnvValueMissing": "请填写 {name} 的值。",
   "error.provider.off": "{provider} 在 OpenBot 中已关闭。请先在服务商设置中开启它。",
