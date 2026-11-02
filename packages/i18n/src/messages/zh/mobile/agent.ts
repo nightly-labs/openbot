@@ -15,6 +15,7 @@ export const messages = {
   "mobile.agent.pin.unpinNamed": "取消置顶 {name}",
   "mobile.agent.pin.limitReached": "已达置顶上限，请先取消一个对话的置顶。",
   "mobile.agent.pin.closeAction": "关闭 {name} 的置顶操作",
+  "mobile.agent.drag.pinHere": "拖到这里以置顶",
   "mobile.agent.appearance.preview": "{name} 的头像预览",
   "mobile.agent.appearance.newAgent": "新助手",
   "mobile.agent.appearance.faces": "外形与表情",

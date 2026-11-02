@@ -15,6 +15,7 @@ export const messages = {
   "mobile.agent.pin.unpinNamed": "Desafixar {name}",
   "mobile.agent.pin.limitReached": "Limite de itens fixados atingido. Desafixe um chat primeiro.",
   "mobile.agent.pin.closeAction": "Fechar ação de fixação de {name}",
+  "mobile.agent.drag.pinHere": "Solte aqui para fixar",
   "mobile.agent.appearance.preview": "Prévia do avatar de {name}",
   "mobile.agent.appearance.newAgent": "Novo agente",
   "mobile.agent.appearance.faces": "Forma e expressão",

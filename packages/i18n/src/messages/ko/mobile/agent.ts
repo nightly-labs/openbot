@@ -15,6 +15,7 @@ export const messages = {
   "mobile.agent.pin.unpinNamed": "{name} 고정 해제",
   "mobile.agent.pin.limitReached": "고정 한도에 도달했어요. 먼저 다른 채팅의 고정을 해제해 주세요.",
   "mobile.agent.pin.closeAction": "{name} 고정 작업 닫기",
+  "mobile.agent.drag.pinHere": "여기에 놓아 고정",
   "mobile.agent.appearance.preview": "{name} 아바타 미리보기",
   "mobile.agent.appearance.newAgent": "새 에이전트",
   "mobile.agent.appearance.faces": "모양과 표정",

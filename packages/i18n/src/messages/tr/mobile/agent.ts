@@ -15,6 +15,7 @@ export const messages = {
   "mobile.agent.pin.unpinNamed": "{name} sabitlemesini kaldır",
   "mobile.agent.pin.limitReached": "Sabitleme sınırına ulaşıldı. Önce bir sohbetin sabitlemesini kaldırın.",
   "mobile.agent.pin.closeAction": "{name} için sabitleme eylemini kapat",
+  "mobile.agent.drag.pinHere": "Sabitlemek için buraya bırakın",
   "mobile.agent.appearance.preview": "{name} için avatar önizlemesi",
   "mobile.agent.appearance.newAgent": "Yeni ajan",
   "mobile.agent.appearance.faces": "Şekil ve ifade",

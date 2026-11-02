@@ -7,6 +7,11 @@ export function canToggleAgentPin(pinned: readonly string[], agentId: string): b
   return pinned.includes(agentId) || pinned.length < MAX_PINNED_AGENTS;
 }
 
+/** True when a server with `count` pinned chats takes one more pin. */
+export function canAddChatPin(count: number): boolean {
+  return count < MAX_PINNED_AGENTS;
+}
+
 /** Call only with a complete server list, never a filtered or loading list. */
 export function reconcileAgentPins(
   store: ReturnType<typeof createWorkspacePreferences>,
@@ -91,5 +96,21 @@ export function withHostSidebarPins(
     pinned: items.flatMap((pin) => (pin.kind === "agent" ? [pin.id] : [])),
     pinnedChannels: items.flatMap((pin) => (pin.kind === "channel" ? [pin.id] : [])),
     pinOrder: items.map(({ kind, id }) => ({ kind, id })),
+  };
+}
+
+/**
+ * The preferences with the pins of this phone in a new order, such as after a drag. With a host that
+ * keeps the pins, `pinOrder` takes the new order too, so the next send carries it.
+ */
+export function withPhoneSidebarPins(
+  current: RemoteWorkspacePreferences,
+  items: readonly SidebarPin[],
+): RemoteWorkspacePreferences {
+  return {
+    ...current,
+    pinned: items.flatMap((pin) => (pin.kind === "agent" ? [pin.id] : [])),
+    pinnedChannels: items.flatMap((pin) => (pin.kind === "channel" ? [pin.id] : [])),
+    ...(current.pinOrder ? { pinOrder: items.map(({ kind, id }) => ({ kind, id })) } : {}),
   };
 }

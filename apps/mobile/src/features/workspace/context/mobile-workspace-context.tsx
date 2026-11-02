@@ -148,6 +148,7 @@ import {
   setChannelHidden,
   sidebarPinsChanged,
   withHostSidebarPins,
+  withPhoneSidebarPins,
 } from "@/features/workspace/model/agent-pins";
 import { ConnectionWaits } from "@/features/workspace/model/connection-waits";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
@@ -173,6 +174,7 @@ import {
   serverKind,
   showsOnline,
 } from "@/features/workspace/model/server-status";
+import { moveSidebarChat } from "@/features/workspace/model/sidebar-layout";
 import { taskThreadMessages, withoutTaskTurns } from "@/features/workspace/model/task-cache";
 import { applyBrowserEvent, syncEventQueries } from "@/features/workspace/model/team-events";
 import { runTeamRequest } from "@/features/workspace/model/team-request";
@@ -1486,6 +1488,36 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         );
         applySidebarLayout(serverId, layout);
       },
+      moveSidebarChat: async (serverId, action) => {
+        requireCapability(
+          serverCapabilities.current,
+          serverId,
+          SIDEBAR_LAYOUT_CAPABILITY,
+          "mobile.workspace.error.sectionsUnsupported",
+        );
+        const previous = sidebarByServerRef.current[serverId]?.layout;
+        const moved = previous ? moveSidebarChat(previous, action) : null;
+        if (moved) setSidebarByServer((current) => ({ ...current, [serverId]: { layout: moved, error: null } }));
+        try {
+          const layout = await request(
+            "POST",
+            TEAM_API_ROUTES.sidebarLayout.actions,
+            decodeSidebarLayout,
+            action,
+            serverId,
+          );
+          applySidebarLayout(serverId, layout);
+        } catch (error) {
+          // A newer layout from the host stays; only the move of this phone goes back.
+          if (previous && moved)
+            setSidebarByServer((current) =>
+              current[serverId]?.layout === moved
+                ? { ...current, [serverId]: { layout: previous, error: null } }
+                : current,
+            );
+          throw error;
+        }
+      },
       reorderServers,
       channelStore,
       teamDirectory: directory,
@@ -1801,6 +1833,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (!saved || (result === "pinned" && !saved.pinnedChannels?.includes(channelId))) return "error";
         return result;
       },
+      setChatPins: (serverId, items) => {
+        const saved = updatePreferences(serverId, (current) => withPhoneSidebarPins(current, items));
+        // The new order is in `pinOrder` too, so the check in `updatePreferences` sees no change to send.
+        if (saved?.pinOrder) pushSidebarPins(serverId);
+        return saved !== null;
+      },
+      readChatPins: (serverId) => phoneSidebarPins(preferencesRef.current[serverId] ?? preferenceStore.read(serverId)),
       toggleWorkflowPin: (workflowId, serverId) => {
         let result: "pinned" | "unpinned" = "pinned";
         const saved = updatePreferences(serverId, (current) => {
@@ -1874,6 +1913,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     markAllRead,
     updatePreferences,
     changeHostHidden,
+    pushSidebarPins,
+    preferenceStore,
   ]);
 
   const activeServer = useMemo(
