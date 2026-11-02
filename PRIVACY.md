@@ -790,6 +790,11 @@ server can change it.
   sets only their own levels, and the host applies them to the desktop notifications of this computer
   and to the notifications that it sends to that member's phones. A removed member's levels are
   deleted. It is never sent to the OpenBot account service.
+- `~/Library/Application Support/OpenBot/openbot-sidebar-pins-v1.json` holds the agents and channels
+  that the owner and each member of this host pinned, in their order, by member ID, with agent and
+  channel IDs only. Each member reads and sets only their own list, so their desktop app, web client
+  and phones show the same pins. A removed member's list is deleted. It is never sent to the OpenBot
+  account service.
 
 Attachments copied into OpenBot remain in managed storage after their original file is moved or
 deleted. By default, all agents share one embedded browser profile, including cookies and website

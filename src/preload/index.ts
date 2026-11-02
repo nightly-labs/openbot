@@ -112,6 +112,7 @@ import {
   decodeRoutineRuns,
   decodeRoutines,
   decodeSidebarLayout,
+  decodeSidebarPinsFromMain,
   decodeSideQuestionAnswer,
   decodeTables,
 } from "./agent-decoding";
@@ -522,6 +523,9 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   deleteChannel: decodeVoid,
   getSidebarLayout: decodeSidebarLayout,
   mutateSidebarLayout: decodeSidebarLayout,
+  getSidebarPins: decodeSidebarPinsFromMain,
+  setSidebarPins: decodeSidebarPinsFromMain,
+  seedSidebarPins: decodeSidebarPinsFromMain,
   generateProfile: decodeAgentProfileDraft,
   saveProfile: decodeSaveAgentProfileResult,
   askSideQuestion: decodeSideQuestionAnswer,

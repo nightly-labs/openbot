@@ -50,6 +50,8 @@ import type {
   SetAgentNotificationLevelInput,
   SetRoutineResultDestinationInput,
   SidebarLayoutSnapshot,
+  SidebarPin,
+  SidebarPinsSnapshot,
   TeamPresenceSnapshot,
   UpdateHostIdentityInput,
 } from "@openbot/contracts/ipc";
@@ -255,6 +257,26 @@ export interface TeamApiAgentNotificationLevels {
   set(memberId: string, input: SetAgentNotificationLevelInput): Effect.Effect<unknown, PreferenceFileFailure>;
   setServer(memberId: string, level: ServerNotificationLevel | null): Effect.Effect<unknown, PreferenceFileFailure>;
   /** Calls `listener` with the member after each change of their levels, from any of their devices. */
+  subscribe(listener: (memberId: string) => void): () => void;
+}
+
+/**
+ * `sidebar-pins-v1`: the chats that each member pinned on this server, in their order. The host keeps
+ * the pins of the owner under one key, so its desktop app and its phones read the same pins.
+ */
+export interface TeamApiSidebarPins {
+  snapshot(memberId: string, hidden: ReadonlySet<string>): SidebarPinsSnapshot;
+  set(
+    memberId: string,
+    items: SidebarPin[],
+    hidden: ReadonlySet<string>,
+  ): Effect.Effect<SidebarPinsSnapshot, PreferenceFileFailure>;
+  seed(
+    memberId: string,
+    items: SidebarPin[],
+    hidden: ReadonlySet<string>,
+  ): Effect.Effect<SidebarPinsSnapshot, PreferenceFileFailure>;
+  /** Calls `listener` with the member after each change of their pins, from any of their devices. */
   subscribe(listener: (memberId: string) => void): () => void;
 }
 
@@ -546,6 +568,7 @@ export interface TeamApiOptions {
   workflows?: TeamApiWorkflows;
   hiddenAgents?: TeamApiHiddenAgents;
   agentNotificationLevels?: TeamApiAgentNotificationLevels;
+  sidebarPins?: TeamApiSidebarPins;
   /** `agent-access-v1`: the roles that limit what a member can do with each agent. */
   agentAccess?: TeamApiAgentAccess;
   agentTasks?: TeamApiAgentTasks;

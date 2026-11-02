@@ -42,6 +42,8 @@ import type {
   SetMessageReactionInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  SidebarPin,
+  SidebarPinsSnapshot,
   SteerQueuedMessageInput,
   TeamInviteSummary,
   TeamMemberSummary,
@@ -121,10 +123,13 @@ import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery
 import {
   listAgentNotificationLevels,
   listHiddenAgents,
+  readSidebarPins,
+  seedSidebarPins,
   setAgentHidden,
   setAgentNotificationLevel,
   setAgentProviderAccount,
   setOwnServerNotificationLevel,
+  setSidebarPins,
 } from "@openbot/team-client/team-admin-requests";
 import {
   cancelQueuedMessage,
@@ -278,6 +283,13 @@ export interface WebWorkspaceRuntime {
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
   /** Hides or restores an agent, and returns the host's hidden list. Needs `agent-hidden-v1`. */
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
+  /** The user's own pinned chats on the open host, for all of their devices. Needs `sidebar-pins-v1`. */
+  sidebarPins?: {
+    read: () => Promise<SidebarPinsSnapshot>;
+    set: (items: SidebarPin[]) => Promise<SidebarPinsSnapshot>;
+    /** Saves `items` only when the user has no list on the host yet. */
+    seed: (items: SidebarPin[]) => Promise<SidebarPinsSnapshot>;
+  };
   /**
    * The user's own level for each agent of a host: the open host, or a host with a status connection.
    * Any member can call it. A host without `agent-notification-levels-v1` has no levels.
@@ -1206,6 +1218,11 @@ export function createWebWorkspaceRuntime(
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    sidebarPins: {
+      read: () => runTeamEffect(readSidebarPins(teamApi).pipe(Effect.mapError((error) => error.cause))),
+      set: (items) => runTeamEffect(setSidebarPins(teamApi, items).pipe(Effect.mapError((error) => error.cause))),
+      seed: (items) => runTeamEffect(seedSidebarPins(teamApi, items).pipe(Effect.mapError((error) => error.cause))),
+    },
     async listAgentNotificationLevels(hostId) {
       if (hostId !== lockedHostId) {
         if (!hosts) throw new Error(currentText().t("webClient.error.hostChanged"));
