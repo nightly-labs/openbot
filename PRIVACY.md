@@ -195,8 +195,10 @@ remote, and whether speech recognition runs on the computer or in the cloud. The
 the user said, the reply, a transcript, or audio.
 
 The production browser client at `/app` on `https://openbot.run` records the same product events
-as the desktop app, with the same limits, and labels them as web. Its **Share product analytics**
-setting in account settings controls these events and the error reports.
+as the desktop app, with the same limits, and labels them as web. When its **Link analytics to my
+account** setting in account settings is off, these events and the error reports are anonymous. They
+carry only the random install ID that "Install ID" describes, and no name, email or account. When the
+setting is on, they are linked to your account.
 
 The configured production mobile app records app opens and foreground returns, sign-in QR pairing
 and camera-permission outcomes, host connection attempts and losses, conversation-load outcomes,
@@ -255,11 +257,12 @@ install, and at web sign-in with no saved choice, the **Help make OpenBot better
 only when both the region (of the system on desktop, of the browser language on web) and the time
 zone are in the United States and its territories, Mexico, Australia, New Zealand or Japan. The
 check runs on the device and sends nothing. Everywhere else, and when the region is unknown, the box starts
-clear and nothing is sent until the user ticks it. Desktop users can disable it under **Settings →
-General → Permissions → Share product analytics**. The preference is stored locally and disables both UI
-analytics and lifecycle analytics emitted by the local host. Website analytics does not use the
-desktop preference. Mobile has its own phone-wide **Settings → Privacy → Share product analytics**
-preference, independent of desktop and host collection. It defaults to enabled in a
+clear, and only the anonymous events that "Install ID" describes go until the user ticks it. Desktop users can turn it off
+under **Settings → General → Permissions → Link analytics to my account**. The preference is stored
+locally and applies to UI analytics and to lifecycle analytics emitted by the local host: when it is
+off, both send only the anonymous events that "Install ID" describes. Website analytics does not use the desktop preference.
+Mobile has its own phone-wide **Settings → Privacy → Link analytics to my account** preference,
+independent of desktop and host collection. It defaults to enabled in a
 configured production build, is read before collection starts, and remains disabled if the stored
 preference cannot be read.
 When the user signs in, the account service keeps their latest analytics answer: on, off, or no
@@ -274,14 +277,17 @@ refresh; the account keeps it only if it has no newer answer from another device
 drops pending mobile events; it does not remove previously received events or retract an in-flight
 request. There is no persistent offline analytics queue.
 When a user turns product analytics off on desktop, web or mobile, the app first sends one event
-that says analytics was turned off, then stops. Turning it on again sends nothing.
+that says analytics was turned off, with the account. After that, events go with the install ID only.
+Turning it on again sends no separate event.
 Development and preview mobile builds do not collect product analytics. Mobile sign-in uses the
 same account ID and normalized email profile traits described above. Before mobile sign-in, up to
 100 sanitized events stay in process memory for at most 30 minutes from the first buffered event.
 They are sent once with their original timestamps after an account becomes available. Opt-out,
 expiry, and process exit discard unclaimed events. The oldest event is removed when the buffer is
 full. Sign-out ends the old account's operation scopes; later signed-out activity can be associated
-with the next account that signs in. No anonymous mobile event is sent before that association.
+with the next account that signs in. While analytics is on, no signed-out mobile event is sent before
+that association. While analytics is off, mobile events go at once with the install ID only, and
+nothing is buffered.
 
 The local host also records how the agents are used:
 
@@ -290,13 +296,15 @@ The local host also records how the agents are used:
   opened it. It never sends the subdomain, path, query, fragment or page title. A subdomain under a
   shared suffix is reduced to that suffix, so `user.github.io` is sent as `github.io`. IP addresses,
   single-label names, `localhost`, and names with no public suffix (for example `.local`, `.lan`,
-  `.internal` or `.home.arpa`) are not sent.
+  `.internal` or `.home.arpa`) are not sent. The host sends this only
+  when analytics is on.
 - **Tools.** When a turn completes, the host sends one count per kind of tool the agent used (for
   example command, file change, web search, browser, or MCP), how many of those calls failed (Claude
   does not report failed tool calls, so its count is 0), and
   the plugin: the slug of an OpenBot catalog plugin, `builtin` for OpenBot's own tools, or `custom`.
   The tool name is sent only for OpenBot's own tools and catalog plugins. The name, address and
-  command of a server the user added, the tool arguments and the tool results are not sent.
+  command of a server the user added, the tool arguments and the tool results are not sent. The
+  host sends this only when analytics is on.
 - **Routine runs.** The host sends the outcome of a routine run, whether it was scheduled or manual,
   and its schedule type (for example daily or weekly). The routine name and instruction are not
   sent.
@@ -305,14 +313,16 @@ The local host also records how the agents are used:
   (agent, model, approval, output). The workflow name, the step text and the IDs are not sent.
 - **Setup.** At most once a day, the host sends counts of agents, enabled routines, workflows,
   custom MCP servers, local skills and community skills; the slugs of enabled catalog plugins and of
-  curated skills and agents; the providers in use; and whether Computer Use is enabled.
+  curated skills and agents; the providers in use; and whether Computer Use is enabled. The host sends
+  this only when analytics is on.
 - **Resource use.** At most once a day, the host sends a summary of the previous day: the memory and
   CPU use of OpenBot's process groups (main, windows, browser tabs, GPU, the database and voice
   processes) and of each provider's CLI and its child processes, by provider id; the main process
   responsiveness; agent database statement times and counts; counts of processes that stopped
   unexpectedly, by reason; and the computer's memory and processor class, architecture, and whether
   it is a server. Memory is rounded to 50 MB. Process IDs, program names, command lines and paths
-  are not sent. A day that ends while analytics is off is not sent.
+  are not sent. A day that ends while analytics is off is sent with the install ID, and is not sent
+when there is no install ID.
 - **Token counts.** When a turn completes, the host sends the token counts that the provider
   reported for that turn: uncached input, cached input, cache write, output, and their total. These
   come from the same records as the Usage view. When the provider reported no usage, the host sends
@@ -335,6 +345,24 @@ does not create profiles for accounts without existing analytics activity.
 OpenPanel event and profile data has no automatic retention limit. It remains stored until it is
 removed manually or the analytics project is deleted. OpenPanel analytics does not change where
 agent workspaces, conversations, attachments, browser data, and team data are stored.
+
+### Install ID
+
+When analytics is off or not answered, the desktop app, the local host, the browser app and the
+mobile app still send basic product events and error reports. These are anonymous: they carry a
+random install ID (`install-` and a random UUID) and no name, email or account. The ID has no part
+of the account, the email, the device name or the hardware, and OpenBot does not join these
+events to an account. The events and their limits are the same as above, with one exception: the
+local host sends the **Websites**, **Tools** and **Setup** records only when analytics is on.
+The desktop app and the local host keep the ID in a file in the app data folder, the browser app in
+the `localStorage` of openbot.run, and the mobile app in the phone's keychain. At the first start
+after 13 months, a new ID replaces it. Deleting the desktop app data or the site data of
+openbot.run also makes a new ID. When the device cannot save the ID, it sends no events without an
+account. OpenPanel still derives session, device, browser, operating-system, network, and approximate
+geographic metadata from each request, as for other events. Because the session comes from the
+network and the browser, on the day that you turn analytics off, OpenPanel can show the last events
+with your account and the first events with the install ID in one session. The install ID is used
+only while analytics is off: with analytics on, events of a signed-out user carry no ID.
 
 ## Data stored by the central account service
 
@@ -965,7 +993,7 @@ in its local SQLite database. A run also keeps a copy of the graph and, for a we
 request body. Runs stay until the workflow is deleted. Nothing about a workflow goes to the account
 service, except the webhook route metadata above.
 
-When analytics is on, product analytics gets the kind of each workflow action (for example create,
+Product analytics gets the kind of each workflow action (for example create,
 run, approve or restore), the kind of the step, the result, the duration and a coarse failure code,
 and the outcome, duration and step counts of each run. It never gets a workflow name, step text,
 graph, or ID.
@@ -1614,11 +1642,12 @@ clients. Each queue is limited to 1,000 reports, 1 MiB, and seven days. Reports 
 OpenPanel accepts them, when they expire, or when the queue reaches its limits. Network failures
 can cause retries and duplicate delivery. Queue failures do not block the application.
 
-Turning off analytics or changing accounts clears pending reports and cancels active sends.
+Reports go also when analytics is off; then they carry the install ID and no account ID.
+Turning analytics off or on, or changing accounts, clears pending reports and cancels active sends.
 Requests already received by OpenPanel cannot be recalled. Anonymous error reports remain
 anonymous. The browser app has its own local analytics setting in account settings, separate
-from desktop and mobile. Collection is enabled by default; a malformed or unreadable setting
-keeps it disabled. Existing OpenPanel retention rules apply after delivery.
+from desktop and mobile. The account link is on by default; a malformed or unreadable setting
+keeps it off. Existing OpenPanel retention rules apply after delivery.
 
 ### Remote host release checks
 

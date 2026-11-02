@@ -158,8 +158,8 @@ export const messages = {
   "mobile.settings.notifications.channelSilent": "エージェントの通知（サウンドなし）",
   "mobile.settings.privacy.title": "プライバシー",
   "mobile.settings.privacy.footer":
-    "このスマートフォンの機能の使用状況と接続結果を共有します。メッセージの内容とファイルは送信されません。",
-  "mobile.settings.privacy.analytics": "製品の分析データを共有",
+    "このスマートフォンの機能の使用状況と接続結果は、常に OpenBot の分析基盤に送信されます。オン: アカウント ID とメールアドレスとともに送信。オフ: ランダムなインストール ID のみとともに送信。メッセージの内容とファイルは送信されません。",
+  "mobile.settings.privacy.analytics": "分析データをアカウントに関連付ける",
   "mobile.settings.privacy.retry": "プライバシー設定をもう一度保存",
   "mobile.settings.conversations.title": "会話",
   "mobile.settings.conversations.hiddenChats": "非表示のチャット",

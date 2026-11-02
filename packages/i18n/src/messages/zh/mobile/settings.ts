@@ -144,8 +144,9 @@ export const messages = {
   "mobile.settings.notifications.channel": "助手通知（{sound}）",
   "mobile.settings.notifications.channelSilent": "助手通知（静音）",
   "mobile.settings.privacy.title": "隐私",
-  "mobile.settings.privacy.footer": "分享这台手机的功能使用情况与连接结果。不会发送消息内容和文件。",
-  "mobile.settings.privacy.analytics": "分享产品分析数据",
+  "mobile.settings.privacy.footer":
+    "这台手机的功能使用情况与连接结果始终会发送到 OpenBot 的分析服务。开启：连同你的账号 ID 和邮箱。关闭：仅随一个随机安装 ID。不会发送消息内容和文件。",
+  "mobile.settings.privacy.analytics": "将分析数据关联到我的账号",
   "mobile.settings.privacy.retry": "重试保存隐私设置",
   "mobile.settings.conversations.title": "对话",
   "mobile.settings.conversations.hiddenChats": "隐藏的对话",

@@ -1412,7 +1412,7 @@ jobs:
             "$association_url")"
           require_status "$association_status" 200 "$association_url"
           require_header "$verification_dir/association.headers" '^content-type: application/json' "$association_url"
-          if ! jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]},{"appID":"ZTRDTUL87R.run.openbot.mobile","paths":["/join","/agents/*"]}]' \
+          if ! jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]},{"appID":"ZTRDTUL87R.run.openbot.mobile","paths":["/join","/agents/*"]},{"appID":"8A47NKRZSJ.run.openbot.mobile","paths":["/join","/agents/*"]}]' \
             "$verification_dir/association.json" >/dev/null; then
             echo "Response headers of $association_url:"
             tr -d '\r' < "$verification_dir/association.headers"
