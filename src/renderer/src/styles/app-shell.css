@@ -967,6 +967,8 @@ textarea {
   }
 
   .app-frame-edge .direct-conversation-person .person-avatar {
+    --agent-avatar-optical-offset: calc(26px * -0.14);
+
     width: 26px;
     height: 26px;
   }
