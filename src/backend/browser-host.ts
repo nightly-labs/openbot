@@ -2027,6 +2027,7 @@ export class BrowserHost {
     list_vault_items: rejectTakeoverTool,
     save_vault_item: rejectTakeoverTool,
     delete_vault_item: rejectTakeoverTool,
+    request_link_payment: rejectTakeoverTool,
   };
 
   readonly handleDynamicTool = Effect.fn("BrowserHost.handleDynamicTool")(function* (

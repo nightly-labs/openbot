@@ -26,6 +26,8 @@ export interface VaultContents {
   /** A saved card replaces payment-field takeover with `fill_card`. */
   cards: boolean;
   contacts: boolean;
+  /** The user connected Link: `request_link_payment` gives a one-time card. */
+  link?: boolean;
 }
 
 export interface DeveloperInstructionOptions {
@@ -87,16 +89,20 @@ function instructionsFileSection(file: PromptInstructionsFile | null | undefined
 /** When and how to use the OpenBot Vault. Its settings page is on the user's own computer only. */
 function vaultInstruction(vault: VaultContents, serverHost: boolean): string {
   const saved = [vault.cards ? "cards" : "", vault.contacts ? "contact info" : ""].filter(Boolean).join(" and ");
-  const noCard = vault.cards
-    ? ""
-    : serverHost
-      ? "No card is saved: use request_takeover for card fields."
-      : "No card is saved. When the user wants you to pay, ask the user to add the card in Server settings > Vault, or use request_takeover for the card fields.";
+  const noCard =
+    vault.cards || vault.link
+      ? ""
+      : serverHost
+        ? "No card is saved: use request_takeover for card fields."
+        : "No card is saved. When the user wants you to pay, ask the user to add the card in Server settings > Vault, or use request_takeover for the card fields.";
   return [
     "The OpenBot Vault keeps logins, cards, and contact info for all agents of this server.",
     saved ? `The user saved ${saved}.` : "",
     "At a checkout or address form, call openbot_browser.list_vault_items, use the item that fits the request, ask when more than one fits, and follow the browser guidance.",
     "Save contact info that the user asks you to keep with openbot_browser.save_vault_item kind=contact.",
+    vault.link
+      ? "The user connected Link: to pay, you can call openbot_browser.request_link_payment, and the user approves the payment in Link."
+      : "",
     noCard,
   ]
     .filter(Boolean)

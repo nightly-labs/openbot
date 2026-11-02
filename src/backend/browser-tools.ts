@@ -300,7 +300,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "fill_card",
     description:
-      "Type a saved card from list_vault_items into card fields from one fresh snapshot: the number, and any of the security code, a single expiry field or month and year fields (inputs or native selects), and the name on the card. Fields can be on the HTTPS page or in an HTTPS payment frame. You never see the number or the security code: snapshots hide them. Does not submit. The first fill of a card on a site waits for the server owner's approval. Returns the filled field names and a fresh snapshot. Screenshots, evaluate and recording are unavailable until the page navigates.",
+      "Type a saved card from list_vault_items, or a one-time Link card from request_link_payment, into card fields from one fresh snapshot: the number, and any of the security code, a single expiry field or month and year fields (inputs or native selects), and the name on the card. Fields can be on the HTTPS page or in an HTTPS payment frame. You never see the number or the security code: snapshots hide them. Does not submit. The first fill of a card on a site waits for the server owner's approval. Returns the filled field names and a fresh snapshot. Screenshots, evaluate and recording are unavailable until the page navigates.",
     shape: {
       tabId,
       cardId: identifier,
@@ -317,6 +317,38 @@ const BROWSER_TOOL_DEFINITIONS = [
           message: "Use expiry, or expMonth and expYear, not both.",
         }),
       timeoutMs: timeout,
+    },
+  }),
+  browserTool({
+    name: "request_link_payment",
+    description:
+      "Pay with the user's Link account (link.com, by Stripe) when Link is connected. Link asks the user to approve this one payment in their browser; the call waits up to 5 minutes for the answer. When the user approves, it returns a cardId for a one-time card: call fill_card with it on the merchant's checkout. It never returns the number or the security code. Call it once per purchase, with the final total.",
+    shape: {
+      amount: z
+        .number()
+        .int()
+        .positive()
+        .max(100_000_000)
+        .describe("The total in the smallest unit of the currency, such as cents."),
+      currency: z
+        .string()
+        .regex(/^[A-Za-z]{3}$/)
+        .optional()
+        .describe("ISO 4217 code, such as usd. Omit it to use the currency of the user's Link card."),
+      merchantName: requiredString(200).describe("The store name, as the checkout shows it."),
+      merchantUrl: requiredString(2048)
+        .refine((value) => URL.canParse(value) && new URL(value).protocol === "https:", {
+          message: "Use the https address of the merchant's site.",
+        })
+        .describe("The https address of the merchant's site."),
+      context: z
+        .string()
+        .trim()
+        .min(100)
+        .max(2000)
+        .describe(
+          "At least 100 characters: what you buy, the items and the quantity, and why. The user reads it in Link before approving.",
+        ),
     },
   }),
   browserTool({
