@@ -26,6 +26,7 @@ import {
   clipboard,
   type Display,
   dialog,
+  type Input,
   Menu,
   type MenuItemConstructorOptions,
   type Point,
@@ -152,6 +153,11 @@ export interface MainWindowController {
   loadRenderer: (window: BrowserWindow) => Promise<void>;
   restoreMainWindowBounds: () => Effect.Effect<void>;
   flushMainWindowBounds: () => Effect.Effect<void, RemoteWorkflowError>;
+  /**
+   * For a view in a window, such as the browser dock: true when the key is part of `Cmd + Q`, and
+   * the view must then stop it. See `createQuitShortcut`.
+   */
+  handleQuitShortcut: (window: BrowserWindow, input: Input) => boolean;
 }
 
 export function createMainWindowController({
@@ -400,6 +406,7 @@ export function createMainWindowController({
     loadRenderer,
     restoreMainWindowBounds,
     flushMainWindowBounds,
+    handleQuitShortcut: (window, input) => quitShortcut?.handleInput(window, input) ?? false,
   };
 }
 
@@ -863,7 +870,8 @@ let quitConfirmationOpen = false;
  * `Cmd + Q` is next to `Cmd + W` and `Cmd + A`, and one press stopped OpenBot with its agents and
  * routines (#4149). In a focused OpenBot page the keys never get here: `createQuitShortcut` quits
  * when they are held or pressed twice. The item gets the keys only with no OpenBot page focused, such
- * as with the browser dock focused, and there no page can show the hint, so OpenBot asks. A click on
+ * as with the window closed or a sign-in window focused. No page can show the hint there, so OpenBot
+ * asks. A click on
  * the item, the Dock, a system logout and an update still quit at once.
  */
 function macQuitItem(translate: AppTranslate, quit: (source: MenuQuitSource) => void): MenuItemConstructorOptions {

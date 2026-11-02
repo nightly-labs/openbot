@@ -13,7 +13,7 @@ export const messages = {
   "menu.quitConfirmTitle": "OpenBot beenden?",
   "menu.quitConfirmBody": "Agenten und Routinen stoppen, bis du OpenBot wieder öffnest.",
   "menu.quitConfirm": "Beenden",
-  "menu.quitHint": "Halten Sie ⌘Q gedrückt oder drücken Sie zweimal, um zu beenden",
+  "menu.quitHint": "Halte ⌘Q gedrückt oder drücke zweimal, um zu beenden",
   "menu.trayOpen": "OpenBot öffnen",
   "menu.trayQuit": "OpenBot beenden",
   "menu.trayTooltip": "OpenBot",

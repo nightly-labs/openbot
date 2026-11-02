@@ -8,6 +8,11 @@ const DOUBLE_PRESS_MS = 500;
 const HINT_MS = 1_200;
 /** The shortest quiet time after the last repeat that counts as a release. */
 const RELEASE_QUIET_MS = 600;
+/**
+ * The quiet time before the first repeat. The longest "Delay until repeat" in the macOS keyboard
+ * settings is 1.8 s, and a shorter wait would quit while a held second press is still down.
+ */
+const FIRST_REPEAT_QUIET_MS = 2_000;
 
 export interface QuitShortcutOptions {
   /** Starts the quit. */
@@ -42,7 +47,7 @@ interface Hold {
  * the window and waits for the release: a key up, the loss of focus, or a quiet time with no repeat.
  */
 export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutOptions): QuitShortcut {
-  let lastPressAt = Number.NEGATIVE_INFINITY;
+  let lastPress: { window: BrowserWindow; at: number } | null = null;
   let hold: Hold | null = null;
   let hintWindow: BrowserWindow | null = null;
   let hintTimer: ReturnType<typeof setTimeout> | null = null;
@@ -77,14 +82,20 @@ export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutO
 
   function waitForRelease(current: Hold): void {
     if (releaseTimer) clearTimeout(releaseTimer);
-    releaseTimer = setTimeout(finish, Math.max(RELEASE_QUIET_MS, current.repeatGapMs * 2));
+    const quietMs =
+      current.repeatGapMs > 0 ? Math.max(RELEASE_QUIET_MS, current.repeatGapMs * 2) : FIRST_REPEAT_QUIET_MS;
+    releaseTimer = setTimeout(finish, quietMs);
   }
 
   function complete(current: Hold): void {
     waitingForRelease = true;
     hideHint();
-    // A full-screen window cannot be made clear. It stays until the quit hides every window.
-    if (!current.window.isDestroyed() && !current.window.isFullScreen()) current.window.setOpacity(0);
+    // A full-screen window cannot be made clear. It stays until the quit hides every window. A clear
+    // window lets clicks through to the app that the user sees behind it.
+    if (!current.window.isDestroyed() && !current.window.isFullScreen()) {
+      current.window.setOpacity(0);
+      current.window.setIgnoreMouseEvents(true);
+    }
     waitForRelease(current);
   }
 
@@ -98,7 +109,11 @@ export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutO
       if (isQuitting()) return true;
       const now = Date.now();
       if (waitingForRelease) {
-        if (hold) waitForRelease(hold);
+        if (hold) {
+          if (input.isAutoRepeat && hold.lastKeyAt < now) hold.repeatGapMs = now - hold.lastKeyAt;
+          hold.lastKeyAt = now;
+          waitForRelease(hold);
+        }
         return true;
       }
       if (input.isAutoRepeat) {
@@ -109,8 +124,9 @@ export function createQuitShortcut({ quit, isQuitting, showHint }: QuitShortcutO
         if (now - hold.startedAt >= HOLD_MS) complete(hold);
         return true;
       }
-      const doublePress = now - lastPressAt <= DOUBLE_PRESS_MS;
-      lastPressAt = now;
+      // Two presses count only in one window, which showed the hint after the first.
+      const doublePress = lastPress?.window === window && now - lastPress.at <= DOUBLE_PRESS_MS;
+      lastPress = { window, at: now };
       hold = { window, startedAt: now, lastKeyAt: now, repeatGapMs: 0 };
       if (doublePress) complete(hold);
       else keepHint(window);
