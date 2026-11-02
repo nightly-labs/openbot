@@ -9,6 +9,7 @@ import {
   type ConversationTraceStep,
   type ConversationTraceStepKind,
   type ConversationTurnTrace,
+  TOOL_FAILURE_TEXT_LIMIT,
 } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 
@@ -44,6 +45,7 @@ export class TurnTraces {
       completed: boolean;
       failed?: boolean;
       text?: string | null;
+      error?: string | null;
       command?: string | null;
       recipientAgentIds?: string[] | null;
     },
@@ -65,6 +67,8 @@ export class TurnTraces {
     const command = event.command?.trim();
     if (kind === "tool" && step.command === undefined && command)
       step.command = redactText(command).slice(0, CONVERSATION_TRACE_TEXT_LIMIT);
+    const error = event.error?.trim();
+    if (kind === "tool" && step.error === undefined && error) step.error = error.slice(0, TOOL_FAILURE_TEXT_LIMIT);
     if (kind === "tool" && step.recipientAgentIds === undefined && event.recipientAgentIds?.length)
       step.recipientAgentIds = [...event.recipientAgentIds];
     if (event.completed && step.endedAt === null) step.endedAt = now;

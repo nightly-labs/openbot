@@ -73,6 +73,7 @@ import {
   refusedSessionFailure,
   type ToolUsageSignal,
   toolFailed,
+  toolFailureDetail,
   toolProgressText,
   toolTraceDetail,
   toolUsage,
@@ -1538,9 +1539,16 @@ export class TurnLifecycle {
     if (usage) this.#hooks.emitToolUsage({ ...usage, agentId, turnId });
     if (yield* this.#images.handleItem(agentId, threadId, turnId, item, completed)) return;
     const toolProgress = toolProgressText(item, completed);
-    this.#observeTraceStep(turnId, item, completed, toolProgress);
+    const failureDetail = completed ? toolFailureDetail(item) : null;
+    this.#observeTraceStep(turnId, item, completed, toolProgress, failureDetail);
     if (toolProgress) {
-      this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, toolProgress);
+      this.#emitTurnProgress(
+        agentId,
+        this.#conversation.publicThreadId(agentId, threadId),
+        turnId,
+        toolProgress,
+        failureDetail,
+      );
       return;
     }
     if (item.type !== "agentMessage" || !isString(item.id)) return;
@@ -1628,7 +1636,13 @@ export class TurnLifecycle {
   }
 
   /** Records a step for the trace: a tool step, a thought or an answer. Other items have no step. */
-  #observeTraceStep(turnId: string, item: ThreadItem, completed: boolean, toolProgress: string | null): void {
+  #observeTraceStep(
+    turnId: string,
+    item: ThreadItem,
+    completed: boolean,
+    toolProgress: string | null,
+    failureDetail: string | null,
+  ): void {
     if (!isString(item.id)) return;
     if (isToolItem(item)) {
       const failed = completed && toolFailed(item);
@@ -1636,6 +1650,7 @@ export class TurnLifecycle {
         completed,
         failed,
         text: toolProgress,
+        ...(failureDetail ? { error: failureDetail } : {}),
         ...toolTraceDetail(item),
       });
     } else if (item.type === "agentMessage")
@@ -1666,13 +1681,14 @@ export class TurnLifecycle {
     return message;
   }
 
-  #emitTurnProgress(agentId: string, threadId: string, turnId: string, text: string): void {
+  #emitTurnProgress(agentId: string, threadId: string, turnId: string, text: string, error: string | null): void {
     this.#hooks.emit({
       type: "turn-progress",
       agentId,
       threadId,
       turnId,
       detail: text,
+      ...(error ? { error } : {}),
     });
   }
 }

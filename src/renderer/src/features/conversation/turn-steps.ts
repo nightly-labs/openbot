@@ -228,7 +228,10 @@ export function createTurnSteps(deps: {
     }
     const lines = deps.lines()?.[turnId] ?? [];
     for (const line of lines) {
-      timed.push({ step: { id: line.id, kind: "progress", text: line.text }, at: line.at });
+      timed.push({
+        step: { id: line.id, kind: "progress", text: line.text, ...(line.error ? { error: line.error } : {}) },
+        at: line.at,
+      });
     }
     // After a restart the progress lines are gone. The stored trace keeps the text and start of each
     // tool step, so the turn keeps its steps.
@@ -236,7 +239,15 @@ export function createTurnSteps(deps: {
       for (const step of sources().traces.get(turnId)?.steps ?? []) {
         const at = Date.parse(step.startedAt);
         if (step.kind !== "tool" || !step.text?.trim() || !Number.isFinite(at)) continue;
-        timed.push({ step: { id: `${turnId}:trace:${step.id}`, kind: "progress", text: step.text }, at });
+        timed.push({
+          step: {
+            id: `${turnId}:trace:${step.id}`,
+            kind: "progress",
+            text: step.text,
+            ...(step.error ? { error: step.error } : {}),
+          },
+          at,
+        });
       }
     }
     // A stable sort keeps the thoughts in their order when they share a time.

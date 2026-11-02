@@ -17,7 +17,7 @@ import { type TraceKeyboard, type TraceSpan, TraceWaterfallDialog } from "./Trac
  */
 export type AgentStep =
   | { id: string; kind: "thinking"; text: string }
-  | { id: string; kind: "progress"; text: string }
+  | { id: string; kind: "progress"; text: string; error?: string }
   | { id: string; kind: "memory"; change: ConversationMemoryChange }
   | { id: string; kind: "memory-summary"; text: string };
 
@@ -109,7 +109,20 @@ function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Elemen
     );
   }
   const shown = step.kind === "thinking" ? step.text : text.sourceText(step.text);
-  return <span class={["agent-step-text", { "agent-activity-label": newest }]}>{shown}</span>;
+  const error = step.kind === "progress" ? step.error : undefined;
+  return (
+    <span class="agent-step-copy">
+      <span class={["agent-step-text", { "agent-activity-label": newest }]}>{shown}</span>
+      <Show when={error}>
+        {(message) => (
+          <details class="agent-step-error">
+            <summary>{text.t("chat.steps.error")}</summary>
+            <pre>{message()}</pre>
+          </details>
+        )}
+      </Show>
+    </span>
+  );
 }
 
 function StepIcon(props: { kind: AgentStep["kind"] }) {
