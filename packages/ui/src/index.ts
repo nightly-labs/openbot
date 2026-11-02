@@ -15,6 +15,7 @@ export * from "./item";
 export * from "./marker";
 export * from "./message";
 export * from "./motion-tooltip";
+export * from "./plush-loader";
 export * from "./progress";
 export * from "./qr-code";
 export * from "./questionnaire";

@@ -25,6 +25,11 @@ export default defineConfig(({ command }) => {
         "@openbot/renderer-web": rendererWebAlias,
       },
     },
+    optimizeDeps: {
+      // bloub finds its plush images with `new URL(..., import.meta.url)`. A pre-bundle moves the
+      // code away from the images, so Vite serves the package as it is.
+      exclude: ["@norbert_bodziony/bloub", "@norbert_bodziony/bloub/plush"],
+    },
     build: {
       // A caption file has to stay a file. It is small enough for Vite to fold
       // into the bundle as a `data:` URL, and a text track fetched from one is
