@@ -33,6 +33,10 @@ const ASKS_TO_CONTINUE = new RegExp(
 const NAMES_NEXT_STEP =
   /(?:\blet me now\b|\bnow let me\b|\bi['\u2019]ll now\b|\bi will now\b|\bnow i(?:['\u2019]ll| will)\b|\bnext,?\s+i(?:['\u2019]ll| will)\b)(?!\s+(?:wait|hold|pause|stop)\b)[^.!?\n]{0,100}[.:\u2026]?\s*$/i;
 
+/** A last line that says the agent waits for the user, such as "I'll now wait for your approval." */
+const WAITS_FOR_USER =
+  /\b(?:i['\u2019]ll|i will|i['\u2019]m going to|let me)\s+(?:now\s+)?(?:wait|hold|pause|stop)\b|\bwaiting\s+(?:for|on)\s+(?:you|your)\b/i;
+
 /** The last line of an answer, without Markdown emphasis, code, quote or heading marks. */
 function lastLine(answer: string | undefined): string {
   return (answer?.trimEnd().split("\n").at(-1) ?? "").replace(/[*_`>#]/g, "").trim();
@@ -43,13 +47,13 @@ function asksToContinue(answer: string | undefined): boolean {
 }
 
 /**
- * Whether the answer asks the user a question in its last line, so the turn waits for an answer.
- * A question anywhere in the line counts, so Markdown or a closing remark after it does not hide it.
- * A question that only asks whether to continue does not count: the work continues by itself.
+ * Whether the last line of the answer waits for the user: it asks a question, or says that the agent
+ * waits. A question anywhere in the line counts, so Markdown or a closing remark after it does not
+ * hide it. A question that only asks whether to continue does not count: the work continues by itself.
  */
-export function asksUserQuestion(answer: string | undefined): boolean {
+export function waitsForUser(answer: string | undefined): boolean {
   const line = lastLine(answer);
-  return /[?？]/.test(line) && !ASKS_TO_CONTINUE.test(line);
+  return (/[?？]/.test(line) && !ASKS_TO_CONTINUE.test(line)) || WAITS_FOR_USER.test(line);
 }
 
 /** Whether a turn stopped before the next step: it named the step, or asked whether to continue. */
@@ -59,10 +63,17 @@ function stoppedBeforeNextStep(answer: string | undefined): boolean {
   return text.length > 0 && text.length <= NEXT_STEP_ANSWER_MAX && NAMES_NEXT_STEP.test(text.slice(-160));
 }
 
+interface ContinuationCount {
+  current: number;
+  limit: number;
+}
+
 interface Chain {
   deliveryIds: ReadonlySet<string>;
   count: number;
   kind: ContinuationKind;
+  /** The number and the limit that the chat line and the note show for the last continuation. */
+  shown: ContinuationCount;
   /** The next-step continuations of the chain. */
   nextSteps: number;
   /** The plan of the last turn of the chain. A turn that sends no plan update keeps it. */
@@ -109,8 +120,8 @@ export class PlanContinuation {
   /**
    * Decides whether the turn that just ended continues. `plan` is the plan of that turn, or null when
    * the turn sent none. `earlierPlan` is the chat's last plan from before that turn; only the first
-   * turn of a request reads it. Returns the number and the kind of this continuation, or null; null
-   * also ends the chain.
+   * turn of a request reads it. Returns the kind of this continuation, with its number and limit, or
+   * null; null also ends the chain. A next-step continuation counts against `NEXT_STEP_LIMIT`.
    */
   consider(input: {
     agentId: string;
@@ -120,7 +131,7 @@ export class PlanContinuation {
     earlierPlan: ConversationPlan | null;
     /** The answer of that turn. */
     answer: string | undefined;
-  }): { count: number; kind: ContinuationKind } | null {
+  }): ({ kind: ContinuationKind } & ContinuationCount) | null {
     const key = laneKey(input.agentId, input.taskId);
     const previous = this.#chains.get(key);
     this.#chains.delete(key);
@@ -146,16 +157,21 @@ export class PlanContinuation {
       kind = "plan";
     } else if (nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
     else return null;
+    const shown =
+      kind === "plan"
+        ? { current: count + 1, limit: this.#limit }
+        : { current: nextSteps + 1, limit: nextSteps + Math.min(NEXT_STEP_LIMIT - nextSteps, this.#limit - count) };
     this.#chains.set(key, {
       deliveryIds: new Set(input.deliveryIds),
       count: count + 1,
       kind,
+      shown,
       nextSteps: kind === "nextStep" ? nextSteps + 1 : nextSteps,
       plan,
       openSteps: JSON.stringify(open.map(stepKey)),
       earlierSteps,
     });
-    return { count: count + 1, kind };
+    return { kind, ...shown };
   }
 
   /**
@@ -171,8 +187,8 @@ export class PlanContinuation {
       return null;
     }
     return chain.kind === "plan" && chain.plan
-      ? planContinuationPrompt(openSteps(chain.plan, chain.earlierSteps), chain.count, this.#limit)
-      : nextStepContinuationPrompt(chain.count, this.#limit);
+      ? planContinuationPrompt(openSteps(chain.plan, chain.earlierSteps), chain.shown.current, chain.shown.limit)
+      : nextStepContinuationPrompt(chain.shown.current, chain.shown.limit);
   }
 
   /** Ends the chain of one lane, or of every lane of the agent when `taskId` is undefined. */

@@ -55,7 +55,7 @@ import { markIncompleteImageGeneration } from "./image-generation";
 import { type InstructionsChanges, instructionsChangeMessage } from "./instructions-changes";
 import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
-import { asksUserQuestion, type PlanContinuation } from "./plan-continuation";
+import { type PlanContinuation, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
@@ -460,7 +460,7 @@ export class TurnLifecycle {
 
   /**
    * Whether a completed turn may continue its plan: it served only the user's or the agent's own
-   * messages, the user did not stop it, it asked nothing but whether to continue, opened no wait and holds no question,
+   * messages, the user did not stop it, its last line asks nothing but whether to continue and does not say it waits, opened no wait and holds no question,
    * approval or takeover, and no other message waits in its lane.
    */
   #planContinues(
@@ -480,7 +480,7 @@ export class TurnLifecycle {
       )
     )
       return false;
-    if (asksUserQuestion(answer)) return false;
+    if (waitsForUser(answer)) return false;
     return (
       !this.#hooks.turnStopped(agentId, taskId, turnId) &&
       !this.#hooks.hasOpenWait(
@@ -1215,8 +1215,8 @@ export class TurnLifecycle {
           text: sourceText(
             continuation.kind === "plan" ? "status.agent.planContinues" : "status.agent.nextStepContinues",
             {
-              current: continuation.count,
-              limit: this.#planContinuation.limit,
+              current: continuation.current,
+              limit: continuation.limit,
             },
           ),
         });

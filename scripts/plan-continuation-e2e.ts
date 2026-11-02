@@ -464,14 +464,15 @@ try {
       "I'll now wait for your approval.",
       "Next, I would restart the production service.",
     ];
-    for (const answer of answers) {
+    // Each request opens a new step, so a step left open by an earlier answer does not hide the plan.
+    for (const [index, answer] of answers.slice(0, 5).entries()) {
       const mark = loggedTurns().length;
       const id = await send(
         agent.id,
         `Check it. ${plan({
           steps: [
             ["Prepare", "completed"],
-            ["Run it", "pending"],
+            [`Run part ${index + 1}`, "pending"],
           ],
           answer,
         })}`,
@@ -485,7 +486,8 @@ try {
       assert.equal(await settled(id), "completed");
       assert.equal(turnsSince(mark).length, 1, `No next-step turn runs after: ${answer}`);
     }
-    assert.equal(continuationLines(agent.id).length, 0);
+    const lines = continuationLines(agent.id);
+    assert.equal(lines.length, 0);
     return { answers: answers.length };
   });
 
@@ -543,10 +545,11 @@ try {
       "Two next-step continuation turns run.",
     );
     assert.ok(turns[1]?.text.includes("Your last turn ended before the next step"), "The next-step note is sent.");
-    assert.ok(turns[2]?.text.includes("Automatic continuation 2 of 8."));
+    assert.ok(turns[2]?.text.includes("Automatic continuation 2 of 2."), "The note counts next-step continuations.");
     const lines = continuationLines(agent.id);
     assert.equal(lines.length, 2, "Two continuation lines show.");
     assert.ok(lines[0]?.text?.includes("stopped before its next step"), "The line names the next-step reason.");
+    assert.ok(lines[1]?.text?.includes("(2 of 2)"), "The line counts next-step continuations.");
     assert.equal(errorsFor(agent.id, since).length, 0, "No error shows.");
     assert.ok(
       chatMessages(agent.id).some((message) => message.text === "The fix is in and the tests pass."),
