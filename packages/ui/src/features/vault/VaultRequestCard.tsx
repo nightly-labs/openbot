@@ -130,7 +130,7 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
         </Show>
         <div class="vault-request-text">
           <h2 id={titleId} class="vault-request-title">
-            {props.saved?.name ?? props.title}
+            {props.saved?.name || props.title}
           </h2>
           <Switch>
             <Match when={pending()}>

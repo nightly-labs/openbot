@@ -14,11 +14,12 @@ import type {
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_RUNTIME_ATTENTION_LIMIT, BROWSER_TAKEOVER_REASONS } from "@openbot/contracts/ipc";
+import { AGENT_RUNTIME_ATTENTION_LIMIT, BROWSER_TAKEOVER_REASONS, cardBrand } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import {
   type ConversationUiBlock,
   normalizeConversationUiBlock,
+  UI_BLOCK_LIMITS,
   UI_BLOCK_TEXT_ACTION_ID,
   UI_BLOCK_VERSION,
   type UiBlockAutoAnswer,
@@ -171,9 +172,9 @@ const MESSAGING_QUESTION_REFUSED =
 /** The agent reads these, not the user. */
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
 const VAULT_LOGIN_ADD_REFUSED =
-  "You cannot add a login: a password comes only from the user. Call request_vault_item kind=login, or sign in with submit_secret, and the user can save the password from the card.";
+  "You cannot add a login: a password comes only from the user. Call request_vault_item kind=login, or sign in with submit_secret, and the user can save the password from the card. In a Slack, Discord or Telegram chat, ask the user to add it in Server settings > Vault.";
 const VAULT_CARD_ADD_REFUSED =
-  "You cannot add a card: its number comes only from the user. Call request_vault_item kind=card.";
+  "You cannot add a card: its number comes only from the user. Call request_vault_item kind=card. In a Slack, Discord or Telegram chat, ask the user to add it in Server settings > Vault.";
 const VAULT_FIELDS: Record<BrowserToolArguments<"save_vault_item">["kind"], readonly string[]> = {
   contact: ["label", "fullName", "address", "address2", "city", "region", "postalCode", "country", "phone", "email"],
   login: ["username"],
@@ -595,8 +596,11 @@ export class AttentionRegistry {
             responder,
             pending.autoAnswer?.state,
           );
-          // A client that does not know Vault requests shows the outcome line: the name, not the address.
-          if (savedItem) state.outcome = sourceText("status.agent.vaultAdded", { name: savedItem.item.name });
+          // Notifications and the history read the outcome line. It names the item, and must fit the limit.
+          if (savedItem)
+            state.outcome = sourceText("status.agent.vaultAdded", {
+              name: savedItem.item.name || (pending.uiBlock.spec.title ?? ""),
+            }).slice(0, UI_BLOCK_LIMITS.outcome);
           this.#resolvePersistedPrompt(
             pending,
             uiBlockResponse ? promptResolution(pending.questions, input.answers) : { status: "cancelled" },
@@ -686,13 +690,13 @@ export class AttentionRegistry {
         }),
       ),
     );
-    const card =
-      item.kind === "card" ? answer.vaultItems.listForAgent().cards.find(({ id }) => id === item.id) : undefined;
+    const digits = answer.item.kind === "card" ? (answer.item.number ?? "").replace(/\D/gu, "") : "";
+    const brand = digits ? cardBrand(digits) : null;
     const saved: UiVaultSavedItem = {
       id: item.id,
       name: item.name,
-      ...(card?.brand ? { brand: card.brand } : {}),
-      ...(card?.last4 ? { last4: card.last4 } : {}),
+      ...(brand ? { brand } : {}),
+      ...(digits ? { last4: digits.slice(-4) } : {}),
     };
     return { pending: answer.pending, item, saved };
   });

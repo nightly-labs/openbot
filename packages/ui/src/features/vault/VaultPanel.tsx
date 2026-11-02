@@ -324,11 +324,6 @@ function itemMatches(item: VaultItemSummary, query: string): boolean {
   return text.some((value) => value.toLowerCase().includes(needle));
 }
 
-/**
- * The Vault of the computer that runs the agents, in its server settings: filter tabs with counts,
- * one list, and a dialog to add or edit an item. A list item never carries a password, a card number,
- * a security code or an API key; the edit dialog asks for one only when the user shows it.
- */
 /** The countries that a contact can have, by name in the reader's language. */
 function useCountries() {
   const { locale } = useText();
@@ -340,6 +335,11 @@ function useCountries() {
   return { countryName, countries };
 }
 
+/**
+ * The Vault of the computer that runs the agents, in its server settings: filter tabs with counts,
+ * one list, and a dialog to add or edit an item. A list item never carries a password, a card number,
+ * a security code or an API key; the edit dialog asks for one only when the user shows it.
+ */
 export function VaultPanel(props: VaultPanelProps) {
   const { t, errorDetails } = useText();
   const [filter, setFilter] = createSignal<Filter>("all");
