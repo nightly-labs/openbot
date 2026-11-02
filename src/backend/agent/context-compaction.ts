@@ -396,11 +396,12 @@ export class ContextCompaction {
     return this.#budgets.get(threadId)?.compactionTurnId === turnId;
   }
 
-  markCompacted(threadId: string): void {
+  markCompacted(threadId: string, usedTokens?: number): void {
     const budget = this.#budgets.get(threadId);
     if (!budget) return;
     budget.pending = false;
-    budget.lastCompactedTokens = budget.usedTokens;
+    budget.lastCompactedTokens =
+      usedTokens !== undefined && Number.isFinite(usedTokens) && usedTokens > 0 ? usedTokens : budget.usedTokens;
   }
 
   finish(agentId: string, threadId: string, status: string): void {

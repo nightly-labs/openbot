@@ -87,6 +87,12 @@ const PiContextUsage = Schema.Struct({
   contextWindow: Schema.Finite.check(Schema.isGreaterThan(0)),
 });
 
+/** Pi's post-compaction estimate, when it is usable for the growth rule. */
+function piCompactionAfterTokens(record: DynamicRecord): number | undefined {
+  const afterTokens = getRecord(record, "result")?.estimatedTokensAfter;
+  return typeof afterTokens === "number" && Number.isFinite(afterTokens) && afterTokens > 0 ? afterTokens : undefined;
+}
+
 export interface PiProviderOptions {
   requestTimeoutMs?: number;
   discoveryCwd?: () => string;
@@ -758,9 +764,10 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
   }
 
   #notify(method: string, thread: PiThread, params: DynamicRecord): void {
-    // Usage contains only validated numeric counters. Generic secret-name matching masks `*Tokens`.
+    // These events contain only validated numeric counters. Generic secret-name matching masks
+    // `*Tokens`, which would turn `afterTokens` of a compaction event into text.
     const safe =
-      method === "openbot/usage" || method === "thread/tokenUsage/updated"
+      method === "openbot/usage" || method === "thread/tokenUsage/updated" || method === "openbot/context-compaction"
         ? params
         : redactMcpRecord(params, this.#secretValues());
     this.emit("notification", {
@@ -802,6 +809,23 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       );
     } else if (record.type === "compaction_start" || record.type === "compaction_end") {
       turn.compacting = record.type === "compaction_start";
+      // `thread/compact/start` runs as a manual compaction. OpenBot asked for it, so reporting it
+      // as a provider compaction would make it look like a second one.
+      if (getString(record, "reason") === "manual") return;
+      if (record.type === "compaction_start") {
+        this.#notify("openbot/context-compaction", thread, { status: "running" });
+        return;
+      }
+      const aborted = isBoolean(record.aborted) && record.aborted;
+      if (aborted || !getRecord(record, "result")) {
+        this.#notify("openbot/context-compaction", thread, { status: "failed" });
+        return;
+      }
+      const afterTokens = piCompactionAfterTokens(record);
+      this.#notify("openbot/context-compaction", thread, {
+        status: "completed",
+        ...(afterTokens === undefined ? {} : { afterTokens }),
+      });
     } else if (record.type === "message_update") {
       const update = getRecord(record, "assistantMessageEvent");
       const kind = getString(update, "type");
