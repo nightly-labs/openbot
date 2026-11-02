@@ -19,7 +19,8 @@ import { desktopWorkflowHost, type WorkflowHost } from "./workflows-port";
  * The workflows of one server on a page that covers the agent list. A joined server whose OpenBot
  * does not serve `workflows-v1` shows a notice.
  */
-export function WorkflowsPage(props: { serverId: string }) {
+/** `workflowId`: the workflow that opens first, from a card of All workflows. Else the first one opens. */
+export function WorkflowsPage(props: { serverId: string; workflowId?: string | undefined }) {
   const { t } = useText();
   const { servers } = useServers();
   const server = () => servers().find((entry) => entry.id === props.serverId);
@@ -45,20 +46,25 @@ export function WorkflowsPage(props: { serverId: string }) {
       }
     >
       {(serverId) => (
-        <WorkflowsCanvas host={desktopWorkflowHost(serverId, server)} admin={serverRoleCanAdminister(server())} />
+        <WorkflowsCanvas
+          host={desktopWorkflowHost(serverId, server)}
+          admin={serverRoleCanAdminister(server())}
+          workflowId={props.workflowId}
+        />
       )}
     </Show>
   );
 }
 
 /** `admin`: an owner or admin of the server, who may make a webhook secret. The host checks it again. */
-function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
+function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean; workflowId: string | undefined }) {
   const { agentList, agentStatus, modelOptions } = useAgents();
   const { signedInAccount } = useAuth();
   // The keyed parent mounts a new canvas for each server, so the host does not change.
   const workflows = createWorkflowsController(
     untrack(() => props.host),
     () => desktopAnalytics.scope(),
+    untrack(() => props.workflowId),
   );
   const catalogs: WorkflowCatalogs = {
     get agents() {

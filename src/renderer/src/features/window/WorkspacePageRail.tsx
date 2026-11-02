@@ -13,12 +13,14 @@ import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { useUpdates } from "../updates/updates-context";
 import { useWhatsNew } from "../updates/whats-new-context";
+import { useExternalPlanUsageRows } from "../usage/external-plan-usage";
 import { usePlanLimitRows } from "../usage/plan-limit-rows";
+import { overviewSettings } from "../workflows/overview-settings";
 import { RailHelpMenu } from "./RailHelpMenu";
 import { useWindowPage } from "./window-page-context";
 
 /**
- * The page rail of the desktop window. Agents, Routines, Workflows, Schedule, Usage, Marketplace and
+ * The page rail of the desktop window. Agents, Routines, Workflows, All workflows, Schedule, Usage, Marketplace and
  * Settings change the page in the card.
  */
 export function WorkspacePageRail(props: { hidden: boolean }) {
@@ -44,6 +46,11 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
     layout.setSidebarView(view);
   }
   const usageRows = usePlanLimitRows();
+  /** Plan readings from the local usage feed; none while it is not running. The page settings hide rows. */
+  const externalUsageRows = useExternalPlanUsageRows();
+  const hiddenUsageRows = () => new Set(overviewSettings().settings().hiddenUsageRows);
+  const shownExternalUsageRows = () =>
+    externalUsageRows().filter((row) => row.accountId === null || !hiddenUsageRows().has(row.accountId));
   const { customAgentUsage } = useCustomAgents();
   /** The custom agents run on this computer, so a joined server does not show their usage. */
   const localAgentUsage = () => (activeServer()?.kind === "local" ? customAgentUsage() : []);
@@ -69,12 +76,13 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
       current={current()}
       pinned={layout.railPinned()}
       onPinChange={layout.setRailPinned}
-      usageRows={usageRows()}
+      usageRows={[...usageRows(), ...shownExternalUsageRows()]}
       customAgentUsage={localAgentUsage()}
       onAgents={() => showSidebarView("agents")}
       onRoutines={() => showSidebarView("routines")}
       // A joined server without workflows shows its notice on the page.
       onWorkflows={() => windowPage.openWorkflows(null)}
+      onAllWorkflows={() => windowPage.openAllWorkflows(null)}
       onSchedule={windowPage.openSchedule}
       onTasks={tasksAvailable() ? windowPage.openTasks : undefined}
       onUsage={windowPage.openUsage}

@@ -144,6 +144,12 @@
   opacity: 0.15;
 }
 
+/* A window with nothing left has no arc: its whole track turns to the danger colour, so a wait stands out. */
+.window-rail-usage-track[data-usage-tone="critical"] {
+  stroke: var(--openbot-danger);
+  opacity: 1;
+}
+
 .window-rail-usage-arc {
   stroke: var(--openbot-success);
 }

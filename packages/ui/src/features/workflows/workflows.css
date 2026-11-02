@@ -1362,3 +1362,368 @@
 .wfs-menu.ui-action-menu [class~="lucide-rotate-ccw-clock"] > * {
   fill: none;
 }
+
+/* All workflows: every workflow of the server as cards. The header stays on top and the body below it
+   scrolls. */
+.wfo-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  padding: 0 var(--openbot-space-4);
+  color: var(--openbot-text-primary);
+  background: var(--openbot-bg-canvas);
+}
+
+.wfo-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-3) 0;
+  border-bottom: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-canvas);
+}
+
+.wfo-title {
+  margin: 0;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.wfo-meta,
+.wfo-line {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.wfo-filter {
+  flex: 0 1 260px;
+  min-width: 160px;
+  margin-left: auto;
+  padding: var(--openbot-space-1-5) var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  color: var(--openbot-text-primary);
+  background: var(--openbot-bg-control);
+  font: inherit;
+  font-size: var(--openbot-text-sm);
+}
+
+.wfo-filter:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 1px;
+}
+
+.wfo-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--openbot-space-4) 0;
+}
+
+.wfo-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+}
+
+.wfo-group-title {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.wfo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  align-items: start;
+  gap: var(--openbot-space-3);
+}
+
+.wfo-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1-5);
+  padding: var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-surface);
+}
+
+/* An idle card: the full name, then the trigger with the status and Run on one row. A failed or stopped
+   run adds its line below. */
+.wfo-card[data-compact] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--openbot-space-1) var(--openbot-space-2);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.wfo-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
+.wfo-name {
+  padding: 0;
+  border: 0;
+  color: var(--openbot-text-primary);
+  background: none;
+  font: inherit;
+  font-weight: var(--openbot-weight-medium);
+  text-align: left;
+  cursor: pointer;
+}
+
+.wfo-status {
+  flex: none;
+  padding: 0 var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-muted);
+  background: var(--openbot-bg-control);
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
+}
+
+.wfo-card[data-compact] .wfo-card-top {
+  display: contents;
+}
+
+.wfo-card[data-compact] .wfo-name {
+  grid-row: 1;
+  grid-column: 1 / -1;
+}
+
+.wfo-card[data-compact] .wfo-status {
+  grid-row: 2;
+  grid-column: 2;
+}
+
+.wfo-card[data-compact] .wfo-card-top > .ui-button {
+  grid-row: 2;
+  grid-column: 3;
+}
+
+.wfo-card[data-compact] > .wfo-line {
+  grid-column: 1;
+}
+
+.wfo-card[data-compact] > .wfo-line:first-of-type {
+  grid-row: 2;
+}
+
+.wfo-card[data-compact] > .wfo-line + .wfo-line {
+  grid-column: 1 / -1;
+}
+
+.wfo-card[data-active] {
+  border-color: var(--openbot-warning);
+}
+
+/* The name strip: a colour group that the page picks from the name. */
+.wfo-card[data-tone="plan"] {
+  --wfo-tone: var(--openbot-file-blue);
+  --wfo-tone-soft: var(--openbot-file-blue-soft);
+}
+
+.wfo-card[data-tone="build"] {
+  --wfo-tone: var(--openbot-file-teal);
+  --wfo-tone-soft: var(--openbot-file-teal-soft);
+}
+
+.wfo-card[data-tone="judge"] {
+  --wfo-tone: var(--openbot-file-orange);
+  --wfo-tone-soft: var(--openbot-file-orange-soft);
+}
+
+.wfo-card[data-tone="conflict"] {
+  --wfo-tone: var(--openbot-danger);
+  --wfo-tone-soft: var(--openbot-danger-soft);
+}
+
+.wfo-card[data-tone="violet"] {
+  --wfo-tone: var(--openbot-file-pink);
+  --wfo-tone-soft: var(--openbot-file-pink-soft);
+}
+
+.wfo-card[data-tone] .wfo-name {
+  flex: 1;
+  min-width: 0;
+  padding: var(--openbot-space-0-5) var(--openbot-space-2);
+  border-left: 3px solid var(--wfo-tone);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--wfo-tone-soft);
+}
+
+/* The name opens the workflow on the canvas. */
+.wfo-name:hover {
+  text-decoration: underline;
+}
+
+.wfo-name:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--openbot-radius-xs);
+}
+
+.wfo-status:is([data-status="running"], [data-status="stopping"]) {
+  color: var(--openbot-warning-text);
+}
+
+.wfo-status[data-status="approval"] {
+  color: var(--openbot-accent-text);
+  background: var(--openbot-accent-soft);
+}
+
+.wfo-status[data-status="done"] {
+  color: var(--openbot-success-text);
+}
+
+.wfo-status:is([data-status="failed"], [data-status="stopped"]) {
+  color: var(--openbot-danger-text);
+  background: var(--openbot-danger-soft);
+}
+
+.wfo-step {
+  color: var(--openbot-text-primary);
+}
+
+.wfo-actions {
+  display: flex;
+  gap: var(--openbot-space-2);
+  margin-top: auto;
+  padding-top: var(--openbot-space-1);
+}
+
+.wfo-empty {
+  color: var(--openbot-text-muted);
+}
+
+/* The settings of All workflows: one dialog over the page, the same frame the app's dialogs use. */
+.wfo-settings-backdrop {
+  align-items: start;
+  padding-top: min(14vh, 120px);
+}
+
+.wfo-settings-dialog {
+  width: min(520px, 100%);
+  max-height: min(560px, calc(100dvh - min(14vh, 120px) - var(--openbot-space-6)));
+}
+
+.wfo-settings-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  border-bottom: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+}
+
+.wfo-settings-title {
+  font-size: var(--openbot-text-md);
+  font-weight: 600;
+}
+
+.wfo-settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  overflow-y: auto;
+  padding: var(--openbot-space-4);
+}
+
+.wfo-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+}
+
+.wfo-settings-label {
+  font-size: var(--openbot-text-sm);
+  font-weight: 600;
+}
+
+.wfo-settings-hint {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.wfo-settings-rule {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.wfo-settings-pattern {
+  flex: 1;
+  min-width: 0;
+}
+
+.wfo-settings-rule-error {
+  color: var(--openbot-danger);
+  font-size: var(--openbot-text-sm);
+}
+
+.wfo-settings-swatch {
+  flex-shrink: 0;
+  padding: var(--openbot-space-0-5);
+}
+
+.wfo-settings-swatch-dot {
+  display: block;
+  width: var(--openbot-space-4);
+  height: var(--openbot-space-4);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.wfo-settings-swatch[data-tone="plan"] .wfo-settings-swatch-dot {
+  background: var(--openbot-file-blue);
+}
+
+.wfo-settings-swatch[data-tone="build"] .wfo-settings-swatch-dot {
+  background: var(--openbot-file-teal);
+}
+
+.wfo-settings-swatch[data-tone="judge"] .wfo-settings-swatch-dot {
+  background: var(--openbot-file-orange);
+}
+
+.wfo-settings-swatch[data-tone="conflict"] .wfo-settings-swatch-dot {
+  background: var(--openbot-danger);
+}
+
+.wfo-settings-swatch[data-tone="violet"] .wfo-settings-swatch-dot {
+  background: var(--openbot-file-pink);
+}
+
+.wfo-settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.wfo-settings-row-name {
+  font-size: var(--openbot-text-sm);
+}
+
+.wfo-settings-row-summary {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}

@@ -304,6 +304,8 @@
     "./features/workflows/WorkflowCanvas": "./src/features/workflows/WorkflowCanvas.tsx",
     "./features/workflows/WorkflowCanvasHud": "./src/features/workflows/WorkflowCanvasHud.tsx",
     "./features/workflows/WorkflowSwitcher": "./src/features/workflows/WorkflowSwitcher.tsx",
+    "./features/workflows/WorkflowOverview": "./src/features/workflows/WorkflowOverview.tsx",
+    "./features/workflows/WorkflowOverviewSettings": "./src/features/workflows/WorkflowOverviewSettings.tsx",
     "./features/workflows/WorkflowAddMenu": "./src/features/workflows/WorkflowAddMenu.tsx",
     "./features/workflows/WorkflowZoomMenu": "./src/features/workflows/WorkflowZoomMenu.tsx",
     "./features/workflows/WorkflowSearch": "./src/features/workflows/WorkflowSearch.tsx",

@@ -4,9 +4,9 @@ import { useServers } from "../servers/servers-context";
 
 /**
  * The host pane over the middle of the workspace: the usage report, the routine schedule, the
- * tasks or the workflows. One state holds them, so each path that uncovers the conversation closes any of them.
+ * tasks, the workflows or All workflows. One state holds them, so each path that uncovers the conversation closes any of them.
  */
-type HostPaneView = "usage" | "schedule" | "tasks" | "workflows";
+type HostPaneView = "usage" | "schedule" | "tasks" | "workflows" | "all-workflows";
 
 const context = createSimpleContext({
   name: "UsageProvider",
@@ -14,6 +14,8 @@ const context = createSimpleContext({
     const [state, setState] = createStore<{
       serverId: string | null;
       agentId?: string | undefined;
+      /** The workflow that the Workflows page opens first, from a card of All workflows. */
+      workflowId?: string | undefined;
       view: HostPaneView;
     }>({
       serverId: null,
@@ -28,6 +30,7 @@ const context = createSimpleContext({
         draft.serverId = serverId;
         if (agentId === undefined) delete draft.agentId;
         else draft.agentId = agentId;
+        delete draft.workflowId;
         draft.view = view;
       });
     }
@@ -44,8 +47,16 @@ const context = createSimpleContext({
       open("tasks", serverId, source);
     }
 
-    function openWorkflows(serverId: string, source: HTMLElement | null) {
+    function openWorkflows(serverId: string, source: HTMLElement | null, workflowId?: string) {
       open("workflows", serverId, source);
+      if (workflowId !== undefined)
+        setState((draft) => {
+          draft.workflowId = workflowId;
+        });
+    }
+
+    function openAllWorkflows(serverId: string, source: HTMLElement | null) {
+      open("all-workflows", serverId, source);
     }
 
     /**
@@ -85,6 +96,7 @@ const context = createSimpleContext({
       openSchedule,
       openTasks,
       openWorkflows,
+      openAllWorkflows,
       closeUsage() {
         clear();
         queueMicrotask(() => {

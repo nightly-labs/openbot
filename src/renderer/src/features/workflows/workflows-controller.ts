@@ -54,12 +54,16 @@ type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features
 /**
  * The state and the callbacks of the canvas over one host. The canvas keeps its edits; this saves
  * them after a pause, one save at a time, each on the revision of the one before. A change from
- * another device or a restore loads the graph again. The first workflow of the host opens; a host
+ * another device or a restore loads the graph again. `initialWorkflowId` opens, else the first workflow of the host; a host
  * with none gets a new one, as the canvas needs a workflow.
  *
  * `analytics` gives the scope of the account that acts. Stories give none.
  */
-export function createWorkflowsController(host: WorkflowHost, analytics?: () => DesktopAnalyticsScope) {
+export function createWorkflowsController(
+  host: WorkflowHost,
+  analytics?: () => DesktopAnalyticsScope,
+  initialWorkflowId?: string,
+) {
   const { t, errorMessage } = useText();
   /** Reports how a user action ended. No title, text or ID leaves the app. */
   const tracked = async <T>(
@@ -327,7 +331,10 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   });
   write(async () => {
     const list = await host.workflows.list();
-    const first = list[0] ?? (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary;
+    const first =
+      list.find((summary) => summary.id === initialWorkflowId) ??
+      list[0] ??
+      (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary;
     if (!disposed) await load(first.id);
   });
 
