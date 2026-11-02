@@ -320,20 +320,18 @@ export function agentIpcHandlers({
             decodeAgentModelOptions(logRejectedModels(value, "remote")),
           );
           // The released model list drops the fast tier, so a host with `agent-fast-mode-v1` gives it
-          // on its own route, and the picker shows the Fast switch as for a local agent.
+          // on its own route, and the picker shows the Fast switch as for a local agent. The tiers are
+          // optional: when that route fails, the picker gets the models with no Fast switch.
           if (!remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY)) return runCauseEffect(models);
           return runCauseEffect(
             Effect.gen(function* () {
               const options = yield* models;
-              const fast = yield* remoteServers.request(
-                serverId,
-                AGENT_FAST_MODE_ROUTES.models,
-                decodeAgentFastModels,
-                {
+              const fast = yield* remoteServers
+                .request(serverId, AGENT_FAST_MODE_ROUTES.models, decodeAgentFastModels, {
                   method: "POST",
                   body: {},
-                },
-              );
+                })
+                .pipe(Effect.orElseSucceed(() => []));
               return withFastServiceTiers(options, fast);
             }),
           );

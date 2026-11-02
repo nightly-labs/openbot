@@ -322,19 +322,18 @@ export interface AgentFastModel {
   fastServiceTier: string;
 }
 
+/** A model entry that this build cannot read is left out, as the released model list does. */
 export function decodeAgentFastModels(value: unknown): AgentFastModel[] {
   if (!isDynamicRecord(value) || !Array.isArray(value.models)) throw new Error("Invalid fast models.");
-  return value.models.map((model: unknown) => {
-    if (
-      !isDynamicRecord(model) ||
-      !isIdentifier(model.provider) ||
-      !isAgentModel(model.id) ||
-      !isBoundedString(model.fastServiceTier, INPUT_LIMITS.serviceTier) ||
-      !model.fastServiceTier
-    )
-      throw new Error("Invalid fast models.");
-    return { provider: model.provider, id: model.id, fastServiceTier: model.fastServiceTier };
-  });
+  return value.models.flatMap((model: unknown) =>
+    isDynamicRecord(model) &&
+    isIdentifier(model.provider) &&
+    isAgentModel(model.id) &&
+    isBoundedString(model.fastServiceTier, INPUT_LIMITS.serviceTier) &&
+    model.fastServiceTier
+      ? [{ provider: model.provider, id: model.id, fastServiceTier: model.fastServiceTier }]
+      : [],
+  );
 }
 
 /** Puts the fast tiers of `agent-fast-mode-v1` back on a host's model list, which drops them. */

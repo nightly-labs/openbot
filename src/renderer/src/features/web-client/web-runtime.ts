@@ -1295,10 +1295,9 @@ export function createWebWorkspaceRuntime(
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
       if (!capabilities.includes(AGENT_FAST_MODE_CAPABILITY)) return models;
-      return withFastServiceTiers(
-        models,
-        decodeAgentFastModels(await request("POST", AGENT_FAST_MODE_ROUTES.models, {})),
-      );
+      // The fast tiers are optional: when their route fails, the picker gets the models with no Fast switch.
+      const fast = await request("POST", AGENT_FAST_MODE_ROUTES.models, {}).then(decodeAgentFastModels, () => []);
+      return withFastServiceTiers(models, fast);
     },
     async status() {
       const value = await request("GET", TEAM_API_ROUTES.agents.status);
