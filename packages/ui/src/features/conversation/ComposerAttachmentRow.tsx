@@ -45,7 +45,7 @@ export function ComposerAttachmentRow(props: {
                 </Show>
                 <ImageRemoveButton
                   label={t("composer.attachment.remove", { name: attachment.name })}
-                  disabled={props.removeDisabled}
+                  disabled={props.removeDisabled === true}
                   onClick={() => props.onRemove(attachment)}
                 />
               </div>
