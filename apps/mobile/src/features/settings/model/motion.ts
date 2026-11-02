@@ -4,8 +4,6 @@ import { create } from "zustand";
 export interface MotionPreferences {
   /** Off reduces motion in the whole app, as the system Reduce Motion setting does. */
   allAnimations: boolean;
-  /** The iOS zoom from a home row into its chat and back. */
-  chatZoom: boolean;
   /** The faces that agent avatars make while they work and rest. */
   agentFaces: boolean;
   /** The message field shrinks to a small bar while the keyboard is closed. */
@@ -20,7 +18,6 @@ export type MotionPreference = keyof MotionPreferences;
 
 const DEFAULTS: MotionPreferences = {
   allAnimations: true,
-  chatZoom: true,
   agentFaces: true,
   composerResize: true,
   textReveal: true,
@@ -28,7 +25,6 @@ const DEFAULTS: MotionPreferences = {
 };
 export const MOTION_PREFERENCE_NAMES: readonly MotionPreference[] = [
   "allAnimations",
-  "chatZoom",
   "agentFaces",
   "composerResize",
   "textReveal",

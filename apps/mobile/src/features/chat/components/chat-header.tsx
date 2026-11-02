@@ -1,5 +1,5 @@
 import { GlassView } from "expo-glass-effect";
-import { Link, router, Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
@@ -106,28 +106,24 @@ export function ChatHeader({
   const iconColor = String(foreground);
   const identity = (
     <>
-      <Link.AppleZoomTarget>
-        {target.kind === "channel" ? (
-          <View collapsable={false}>
-            <ChannelAvatar
-              channel={{ members: target.members.map((member) => ({ agentId: member.id })) }}
-              agents={members}
-              size={28}
-              disconnected={disconnected}
-            />
-          </View>
-        ) : (
-          <AgentPinAvatar agentId={target.id} location="chat" size={28}>
-            <BloubAvatar
-              agentId={target.id}
-              serverId={target.serverId}
-              hue={target.avatarHue}
-              seed={target.avatarSeed}
-              size={28}
-            />
-          </AgentPinAvatar>
-        )}
-      </Link.AppleZoomTarget>
+      {target.kind === "channel" ? (
+        <ChannelAvatar
+          channel={{ members: target.members.map((member) => ({ agentId: member.id })) }}
+          agents={members}
+          size={28}
+          disconnected={disconnected}
+        />
+      ) : (
+        <AgentPinAvatar agentId={target.id} location="chat" size={28}>
+          <BloubAvatar
+            agentId={target.id}
+            serverId={target.serverId}
+            hue={target.avatarHue}
+            seed={target.avatarSeed}
+            size={28}
+          />
+        </AgentPinAvatar>
+      )}
       {kicker ? (
         <>
           <Typography.Paragraph className="font-semibold" numberOfLines={1} style={typeScale.rowTitle}>

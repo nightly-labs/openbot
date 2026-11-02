@@ -69,9 +69,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Disattiva le animazioni per ridurre il movimento in tutta l'app. Se «Riduci movimento» è attivo nelle impostazioni del telefono, anche l'app riduce il movimento. Le animazioni qui sotto restano allora disattivate.",
   "mobile.settings.animations.all": "Animazioni",
-  "mobile.settings.animations.chatZoom": "Zoom sulle chat",
-  "mobile.settings.animations.chatZoomFooter":
-    "Una chat si apre dall'avatar nella lista e si richiude su di esso. Se è disattivato, la chat scorre da lato.",
   "mobile.settings.animations.agentFaces": "Volti degli agenti animati",
   "mobile.settings.animations.agentFacesFooter":
     "Gli avatar degli agenti muovono il volto mentre gli agenti lavorano e riposano. Se è disattivato, i volti restano fermi.",

@@ -45,12 +45,14 @@ centers each line in its `lineHeight`. Without the offset, the text view drew ea
 of its line box, so iOS message bubbles had more space above the text than below it. Remove the
 patch when a release applies the offset.
 
-Expo Router 58.0.25 is patched in `patches/expo-router@58.0.25.patch` to apply zoom dismissal
-bounds when its enabler registers after the chat mounts. This keeps the avatar-to-header zoom
-interactive from the left edge without enabling dismissal from the middle of the chat.
+react-native-screens 4.30.0 is patched in `patches/react-native-screens@4.30.0.patch` so the full
+screen swipe back of a chat waits for a gesture handler pan in the top screen to fail. The swipe back
+starts anywhere in the chat, and a swipe to the right on a message bubble still replies. Without
+the patch, no rule sets which of the two recognizers gets the swipe. Remove the patch when a
+release sets this failure requirement.
 If a row or pinned avatar is tapped during the native return transition, the app retains that
 tap until the list is focused and `transitionEnd` fires. It then invokes the original Link
-handler once, preserving its AppleZoom source without a fixed delay.
+handler once, without a fixed delay.
 Focus is read from the route's live `isFocused()` state; nested navigators do not always emit
 an initial `focus` event, so a first tap must not depend on receiving one.
 

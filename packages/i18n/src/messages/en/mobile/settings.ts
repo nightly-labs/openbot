@@ -68,9 +68,6 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.animations.footer":
     "Turn off Animations to reduce motion in the whole app. When Reduce Motion is on in your phone settings, the app also reduces motion. The animations below then stay off.",
   "mobile.settings.animations.all": "Animations",
-  "mobile.settings.animations.chatZoom": "Zoom into chats",
-  "mobile.settings.animations.chatZoomFooter":
-    "A chat opens out of its avatar in the list and closes back into it. When this is off, a chat slides in from the side.",
   "mobile.settings.animations.agentFaces": "Animated agent faces",
   "mobile.settings.animations.agentFacesFooter":
     "Agent avatars move their faces while the agents work and rest. When this is off, the faces stay still.",
