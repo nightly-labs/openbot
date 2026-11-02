@@ -138,6 +138,7 @@ export const messages = {
   "marketplace.app.setup.account": "Tarayıcıda {name} hesabınızla oturum açın.",
   "marketplace.app.setup.key": "{name} hesabınızdan bir API anahtarı gerekir.",
   "marketplace.app.setup.keySaved": "{field}, {host} üzerinde kayıtlı.",
+  "marketplace.app.account.removeDescription": "OpenBot bu hesabın oturum bilgilerini {host} üzerinde siler.",
   "marketplace.app.setup.desktop": "{name} masaüstü uygulamasında {address} adresinde çalışır.",
   "marketplace.app.setup.desktopConnected": "{address} adresine bağlı.",
   "marketplace.app.setup.open": "Oturum açma veya anahtar gerekmez.",
@@ -417,6 +418,15 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Bana hangi Trello kartları atanmış?",
   "marketplace.plugin.trello.prompt.board": "Trello panomda devam eden işleri özetle.",
   "marketplace.plugin.trello.prompt.newCards": "Bu yapılacak maddeleri Trello panoma kart olarak ekle.",
+  "marketplace.plugin.clickup.tagline": "Görevler, belgeler ve ekip güncellemeleri",
+  "marketplace.plugin.clickup.description":
+    "ClickUp, ajanların görevlerde, belgelerde, yorumlarda ve sohbetlerde arama yapmasını, görev, liste ve belge oluşturup güncellemesini, yorum eklemesini, sohbet mesajı göndermesini ve süre kaydetmesini sağlar. Her kullanıcı tarayıcıdan kendi ClickUp hesabında oturum açar. Ajanlar kullanıcıyla aynı izinlere sahip olur. Görevleri çöp kutusuna taşıyabilir ve yorumları silebilirler.",
+  "marketplace.plugin.clickup.app":
+    "Görevler, belgeler, yorumlar, sohbet ve süre takibi; tarayıcıda oturum açılan ClickUp MCP sunucusu üzerinden.",
+  "marketplace.plugin.clickup.prompt.findTasks": "Bu hafta süresi dolan açık ClickUp görevlerimi bul.",
+  "marketplace.plugin.clickup.prompt.createTask": "Bu yapılacak maddelerden bir ClickUp görevi oluştur ve bana ata.",
+  "marketplace.plugin.clickup.prompt.summarizeDoc":
+    "ClickUp'taki en son proje güncellemesini bul ve açık soruları özetle.",
   "marketplace.plugin.huggingface.tagline": "Hub'daki modeller, veri kümeleri ve makaleler",
   "marketplace.plugin.huggingface.description":
     "Hugging Face, ajanların Hugging Face Hub'da modelleri, veri kümelerini, Spaces'i, koleksiyonları ve makaleleri aramasına, model kartlarını ve depo dosyalarını okumasına, veri kümelerini önizlemesine ve Hugging Face belgelerinde arama yapmasına olanak tanır. Herkese açık Hub verilerini kullanır ve hesap ya da anahtar gerektirmez. Araçlar yalnızca okur: ajanlar depo oluşturamaz ve iş (job) çalıştıramaz.",

@@ -93,7 +93,7 @@ export const messages = {
   "conversation.threads.error.start": "Kan de thread niet starten.",
   "conversation.threads.error.branch": "Kan de chat niet aftakken.",
   "conversation.threads.error.send": "Kan het bericht niet naar de thread sturen.",
-  "conversation.threads.error.files": "Bestanden kunnen alleen naar threads van agents op deze computer.",
+  "conversation.threads.error.files": "Deze server neemt geen bestanden aan in threads. Werk OpenBot daar bij.",
   "conversation.threads.error.stop": "Kan de thread niet stoppen.",
   "conversation.threads.error.archive": "Kan de thread niet archiveren.",
   "conversation.threads.error.restore": "Kan de thread niet herstellen.",

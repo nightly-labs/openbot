@@ -77,6 +77,10 @@ export function ConversationSideThread(props: { threadId: string }) {
     },
   );
   const draftKey = () => threadComposer.sideDraftKey(props.threadId);
+  const rowImages = () => {
+    const key = draftKey();
+    return key ? threadComposer.rowImages(key) : [];
+  };
   const draft = () => {
     const key = draftKey();
     return key ? threadComposer.draft(key) : undefined;
@@ -133,12 +137,17 @@ export function ConversationSideThread(props: { threadId: string }) {
             mcpServers={mcpServers()}
             draft={draft()?.text ?? ""}
             draftAttachments={draft()?.attachments}
+            rowAttachments={rowImages()}
+            pendingImages={threadComposer.pendingImages(draftKey())}
+            onRemoveAttachment={(attachment) => threadComposer.removeAttachment(draftKey(), attachment.id)}
+            onPasteFiles={(files, selection) => threadComposer.pasteFiles(files, selection, draftKey())}
             onDraftChange={(text) => threadComposer.setText(draftKey(), text)}
             onOpenDraftAttachment={(attachment) =>
               canPreviewAttachment(attachment)
                 ? void previewAttachment(attachment)
                 : attachmentAction(attachment, "open")
             }
+            mediaSource={view.runtime?.attachmentMedia}
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}

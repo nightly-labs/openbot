@@ -16,6 +16,7 @@ export const messages = {
   "mobile.agent.pin.unpinNamed": "{name} lösen",
   "mobile.agent.pin.limitReached": "Maximale Anzahl angehefteter Chats erreicht. Löse zuerst einen Chat los.",
   "mobile.agent.pin.closeAction": "Anheftaktion für {name} schließen",
+  "mobile.agent.drag.pinHere": "Hier ablegen zum Anheften",
   "mobile.agent.appearance.preview": "Avatarvorschau für {name}",
   "mobile.agent.appearance.newAgent": "Neuer Agent",
   "mobile.agent.appearance.faces": "Form und Ausdruck",

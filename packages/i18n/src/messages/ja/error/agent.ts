@@ -42,6 +42,8 @@ export const messages = {
     "選択したエージェントのモデル「{model}」を使用できません: {provider} はモデルを 1 つも返しませんでした。",
   "error.agent.modelNotInProviderList":
     "選択したエージェントのモデル「{model}」を使用できません: {provider} のモデル一覧にありません。",
+  "error.agent.modelVariantNotListed":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} のモデル一覧にありません。{provider} がこのモデルに用意している値を使ってください: {models}",
   "error.agent.modelProviderMismatch": "選択したモデルはそのプロバイダーのものではありません。",
   "error.agent.modelNotListed": "モデル「{model}」は使用できません。使用できるモデル: {models}。",
   "error.agent.providerNotListed":

@@ -73,9 +73,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Desactiva «Animaciones» para reducir el movimiento en toda la aplicación. Cuando «Reducir movimiento» está activado en los ajustes de tu teléfono, la aplicación también reduce el movimiento. En ese caso, las animaciones de abajo se mantienen desactivadas.",
   "mobile.settings.animations.all": "Animaciones",
-  "mobile.settings.animations.chatZoom": "Ampliar los chats",
-  "mobile.settings.animations.chatZoomFooter":
-    "Un chat se abre desde su avatar en la lista y se cierra de vuelta en él. Si esta opción está desactivada, el chat se desliza desde el lado.",
   "mobile.settings.animations.agentFaces": "Caras de agentes animadas",
   "mobile.settings.animations.agentFacesFooter":
     "Los avatares de los agentes mueven la cara mientras los agentes trabajan y descansan. Si esta opción está desactivada, las caras se quedan quietas.",
@@ -162,8 +159,8 @@ export const messages = {
   "mobile.settings.notifications.channelSilent": "Notificaciones de agentes (sin sonido)",
   "mobile.settings.privacy.title": "Privacidad",
   "mobile.settings.privacy.footer":
-    "Comparte el uso de funciones y los resultados de conexión de este teléfono. No se envían mensajes ni archivos.",
-  "mobile.settings.privacy.analytics": "Compartir datos de uso",
+    "El uso de funciones y los resultados de conexión de este teléfono siempre se envían a la analítica de OpenBot. Activado: con tu ID de cuenta y correo electrónico. Desactivado: solo con un ID de instalación aleatorio. No se envían mensajes ni archivos.",
+  "mobile.settings.privacy.analytics": "Vincular la analítica a mi cuenta",
   "mobile.settings.privacy.retry": "Reintentar guardar el ajuste de privacidad",
   "mobile.settings.conversations.title": "Conversaciones",
   "mobile.settings.conversations.hiddenChats": "Chats ocultos",

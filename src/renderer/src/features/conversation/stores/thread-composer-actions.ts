@@ -1,15 +1,19 @@
-import { attachmentReferenceIds, serializeAttachmentReference } from "@openbot/contracts/attachment-references";
+import {
+  attachmentReferenceIds,
+  removeAttachmentReferences,
+  serializeAttachmentReference,
+} from "@openbot/contracts/attachment-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DraftAttachment } from "@openbot/contracts/ipc";
 import type { ComposerPasteResult, ComposerSelection } from "@openbot/ui/features/conversation/ComposerEditor";
 import { DRAFT_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
 import { actionToast } from "../../../action-toast";
-import { EMPTY_DRAFT } from "../composer-draft";
+import { EMPTY_DRAFT, insertAtSelection } from "../composer-draft";
 import { threadDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationThreads } from "../conversation-types";
-import { importPastedFiles } from "./composer-actions";
+import { importPastedFiles, type PastePreview, pastePreviewTracker } from "./composer-actions";
 import { currentConversationTarget } from "./composer-store";
 
 // Each member reads the interface language when it is called.
@@ -21,11 +25,14 @@ export interface ThreadComposerActionsDeps {
   props: ConversationProps;
   threadDrafts: () => Drafts;
   setThreadDrafts: (update: (current: Drafts) => Drafts) => void;
+  pastePreviews: () => readonly PastePreview[];
+  setPastePreviews: (update: (current: readonly PastePreview[]) => readonly PastePreview[]) => void;
 }
 
 /**
- * The message box of the open side thread. Each file in it is a reference in the text, so the box
- * shows no file row. A thread takes files only on this computer: `agent-tasks-v1` carries text only.
+ * The message box of a side thread. Each file is a reference in the text, where it was added. An image
+ * also shows in the thumbnail row, as in the agent's own chat, and stays there when its reference goes. A thread takes files on this computer, or on a host with
+ * `agent-thread-files-v1`: `agent-tasks-v1` carries text only.
  */
 export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
   /** The thread draft that each import in progress goes to, by request id. A send waits for them. */
@@ -84,13 +91,38 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     actionToast.error(t("conversation.threads.error.files"));
   }
 
+  /** The images of the draft, in the thumbnail row. A send takes them, also when the text no longer names them. */
+  function rowImages(key: string): DraftAttachment[] {
+    return draft(key).attachments.filter((attachment) => attachment.kind === "image");
+  }
+
+  /** The pasted images that still import into the draft. */
+  function pendingImages(key: string | undefined): readonly PastePreview[] {
+    return key ? deps.pastePreviews().filter((preview) => preview.draftKey === key) : [];
+  }
+
+  function removeAttachment(key: string | undefined, id: string): void {
+    const target = currentConversationTarget(deps.props);
+    if (!key || !target) return;
+    const removed = draft(key).attachments.filter((attachment) => attachment.id === id);
+    if (!removed.length) return;
+    updateDraft(key, (current) => ({
+      ...current,
+      text: removeAttachmentReferences(current.text, id),
+      attachments: current.attachments.filter((attachment) => attachment.id !== id),
+    }));
+    discard(removed, target.serverId);
+  }
+
   /**
-   * Discards each file whose reference the user deleted. The box shows no file row, so such a file
-   * could not be removed, and it would still count toward the limit.
+   * Discards each file other than an image whose reference the user deleted. The row shows only
+   * images, so such a file could not be removed, and it would still count toward the limit.
    */
   function dropUnreferenced(key: string, serverId: string): void {
     const referenced = attachmentReferenceIds(draft(key).text);
-    const unreferenced = draft(key).attachments.filter((attachment) => !referenced.has(attachment.id));
+    const unreferenced = draft(key).attachments.filter(
+      (attachment) => attachment.kind !== "image" && !referenced.has(attachment.id),
+    );
     if (!unreferenced.length) return;
     const ids = new Set(unreferenced.map((attachment) => attachment.id));
     updateDraft(key, (current) => ({
@@ -136,25 +168,25 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     const references = accepted
       .map((attachment) => serializeAttachmentReference(attachment.name, attachment.id))
       .join(" ");
-    const current = draft(key).text;
-    const atSelection = at && current === at.before ? at.selection : undefined;
-    const text = atSelection
-      ? `${current.slice(0, atSelection.start)}${references}${current.slice(atSelection.end)}`
-      : [current, references].filter(Boolean).join(" ");
-    if (text.length > INPUT_LIMITS.messageText) {
+    const result = insertAtSelection(draft(key).text, references, at);
+    if (result.value.length > INPUT_LIMITS.messageText) {
       discard(accepted, serverId);
       actionToast.error(t("error.agent.messageTooLong"));
       return;
     }
-    updateDraft(key, (current) => ({ ...current, text, attachments: [...current.attachments, ...accepted] }));
-    return { value: text, caret: atSelection ? atSelection.start + references.length : text.length };
+    updateDraft(key, (current) => ({
+      ...current,
+      text: result.value,
+      attachments: [...current.attachments, ...accepted],
+    }));
+    return result;
   }
 
   async function pasteFiles(
     files: ReadonlyArray<File | Promise<File>>,
     selection: ComposerSelection,
+    key = openDraftKey(),
   ): Promise<ComposerPasteResult | undefined> {
-    const key = openDraftKey();
     const target = currentConversationTarget(deps.props);
     if (!key || !target) return;
     if (!deps.props.threads?.acceptsFiles) {
@@ -165,16 +197,19 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     const before = draft(key).text;
     const requestId = crypto.randomUUID();
     trackImport(requestId, key);
+    const previews = pastePreviewTracker(key, deps.setPastePreviews);
     try {
       const imported = await importPastedFiles(
         files,
         () => draft(key).attachments.length,
         (data) => conversationRuntime(deps.props).agent.importAttachmentData(data, target.serverId),
+        previews.onAccepted,
       );
       return addFiles(key, target.serverId, imported, { before, selection });
     } catch (error) {
       actionToast.error(errorMessage(error, t("composer.error.keepAttachments")));
     } finally {
+      previews.stop();
       releaseImport(requestId);
     }
   }
@@ -184,9 +219,9 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
   }
 
   /**
-   * Sends the draft with the files that it still names, after each import of the draft ended. When the
-   * message went, the sent text leaves the draft and each file whose reference the user deleted is
-   * discarded. A file that came during the send stays.
+   * Sends the draft with the files that it still names and the images of its row, after each import of
+   * the draft ended. When the message went, the sent text leaves the draft and each file whose
+   * reference the user deleted is discarded. A file that came during the send stays.
    */
   async function send(
     threads: Pick<ConversationThreads, "onSend">,
@@ -200,12 +235,16 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
       await Promise.all(pending);
     }
     // An import that ended put its reference in the draft after the user pressed Send.
-    const text = key ? draft(key).text.trim() : typed;
+    const images = key ? rowImages(key) : [];
+    const typedText = key ? draft(key).text.trim() : typed;
+    // A thread takes its title from the text, so a message of images only names them.
+    const text = typedText || images.map((image) => serializeAttachmentReference(image.name, image.id)).join(" ");
     if (!text) return false;
     const target = currentConversationTarget(deps.props);
     const before = key ? draft(key).text : "";
     const attachments = key ? draft(key).attachments : [];
     const referenced = attachmentReferenceIds(text);
+    for (const image of images) referenced.add(image.id);
     const sent = await threads.onSend(
       text,
       attachments.filter((attachment) => referenced.has(attachment.id)).map((attachment) => attachment.id),
@@ -226,5 +265,18 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     return sent;
   }
 
-  return { openDraftKey, sideDraftKey, draft, addFiles, pasteFiles, claimImport, releaseImport, setText, send };
+  return {
+    openDraftKey,
+    sideDraftKey,
+    draft,
+    rowImages,
+    pendingImages,
+    removeAttachment,
+    addFiles,
+    pasteFiles,
+    claimImport,
+    releaseImport,
+    setText,
+    send,
+  };
 }

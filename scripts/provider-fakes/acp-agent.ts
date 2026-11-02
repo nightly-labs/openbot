@@ -15,6 +15,8 @@ export interface AcpParams {
   prompt?: { type: string; text?: string }[];
   configId?: string;
   value?: string;
+  /** `session/set_model`. */
+  modelId?: string;
   /** `_x.ai/interject` of Grok. */
   text?: string;
   interjectionId?: string;

@@ -40,6 +40,8 @@ export const messages = {
   "onboarding.provider.googlePlan": "Google AI Pro 或 Ultra 套餐",
   "onboarding.provider.cursorPlan": "Cursor 套餐或 API 密钥",
   "onboarding.provider.clineAccount": "使用 Cline 账号的免费模型",
+  "onboarding.provider.kimiAccount": "使用 Kimi Code 账号的 Kimi 模型",
+  "onboarding.provider.hermesNous": "Nous Portal 套餐或你的 Hermes 设置",
   "onboarding.provider.inceptionKey": "使用 Inception API 密钥的 Mercury 模型",
   "onboarding.provider.deepseekKey": "使用 DeepSeek API 密钥的 DeepSeek 模型",
   "onboarding.provider.openrouterKey": "使用 OpenRouter API 密钥的众多模型",
@@ -80,7 +82,8 @@ export const messages = {
   "onboarding.choice.startFreeInstead": "改为免费开始",
   "onboarding.consent.notice": "继续即表示你接受{terms}并已阅读{privacy}。",
   "onboarding.consent.analyticsTitle": "帮助改进 OpenBot",
-  "onboarding.consent.analyticsDetail": "分享你使用了哪些功能。绝不分享你的聊天、文件或提示词。",
+  "onboarding.consent.analyticsDetail":
+    "将功能使用情况关联到你的账号和邮箱，并分享访问过的网站、工具使用情况和每日设置摘要。否则仅随一个随机安装 ID 发送基本使用情况。绝不发送你的聊天、文件或提示词。",
   "onboarding.consent.thanksTitle": "谢谢你！团队欠你一个人情。",
   "onboarding.consent.thanksToast": "感谢你帮助改进 OpenBot 💜",
   "onboarding.consent.thanksToastDetail": "你可以随时在设置中更改。",

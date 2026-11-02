@@ -301,7 +301,8 @@ responses. The mobile chat list and message history use virtualized lists. Chann
 uses static avatar thumbnails without activity subscriptions or animation timers. Channels appear
 next to agents in the same list, with up to four static member avatars that fade when the host
 is offline. Channel pins share the existing pinned grid and 16-chat limit; local preferences
-preserve agent pins and channel pins separately. Hide removes a channel from the home list and
+preserve agent pins and channel pins separately. A host with `sidebar-pins-v1` keeps both in one list
+for all devices of the user (see [servers](servers.md)). Hide removes a channel from the home list and
 unpins it; the shared Hidden chats sheet restores it. Channel and agent pinning use the same
 measured overlay movement, with static folder artwork for channels. Agent and channel screens
 use the same mobile `ChatView`, header, message list, reply gestures, composer, camera, and keyboard

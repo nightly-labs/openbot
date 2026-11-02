@@ -36,6 +36,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Result, Schema } from "effect";
+import { getDomain } from "tldts";
 import type { AgentApiKeys } from "../agent-api-keys";
 import type { AgentClient } from "../agent-client";
 import { type BrowserOperationError, browserFailure } from "../browser-effects";
@@ -43,6 +44,7 @@ import type { PreparedBrowserSecret } from "../browser-host";
 import type { BrowserCardVault } from "../browser-tool-actions";
 import { type BrowserToolArguments, parseBrowserToolCall } from "../browser-tools";
 import { causeHelpers } from "../effect-boundary";
+import { LINK_CARD_ID_PREFIX, type LinkWallet } from "../link-wallet";
 import type { PasswordVault, PasswordVaultError } from "../password-vault";
 import {
   type AppServerRequest,
@@ -173,6 +175,30 @@ const VAULT_FIELDS: Record<BrowserToolArguments<"save_vault_item">["kind"], read
   card: ["label", "nameOnCard", "expMonth", "expYear", "billingContactId"],
 };
 
+const LINK_UNAVAILABLE =
+  "Link is not connected. Ask the user to connect Link in Server settings > Vault > Cards, or use a saved card.";
+
+/** The host name of an https address, or null. */
+function httpsHost(address: string): string | null {
+  try {
+    const url = new URL(address);
+    return url.protocol === "https:" ? url.hostname.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The merchant's own site: the same registrable domain, such as shop.example.com for example.com. A
+ * public suffix, such as `myshopify.com` or `co.uk`, is never a site.
+ */
+function sameSite(address: string, merchant: string): boolean {
+  const host = httpsHost(address);
+  if (!host) return false;
+  const domain = getDomain(host, { allowPrivateDomains: true });
+  return domain !== null && domain === getDomain(merchant, { allowPrivateDomains: true });
+}
+
 /** The change that `save_vault_item` asks for, or the text that tells the agent what is wrong. */
 function vaultChange(args: BrowserToolArguments<"save_vault_item">): VaultAgentChange | string {
   const allowed = VAULT_FIELDS[args.kind];
@@ -234,6 +260,8 @@ interface PendingBrowserTakeover {
   submitting?: boolean;
   /** The saved login that OpenBot filled without the card, so the agent does not credit the user. */
   vaultLoginId?: string;
+  /** Why OpenBot did not fill a saved login, so the agent can tell the user and correct its call. */
+  vaultSkipped?: string;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
@@ -311,6 +339,8 @@ export interface AttentionRegistryOptions {
   passwordVault?: PasswordVault | null | undefined;
   /** The cards and contact info of the Vault, or null. `fill_card` types a card without the agent reading it. */
   vaultItems?: VaultItems | null | undefined;
+  /** The Link account of this computer, or null. Agents ask it for one-time cards that the user approves in Link. */
+  linkWallet?: LinkWallet | null | undefined;
   /** The name of an agent now. An item that an agent adds to the Vault keeps it. */
   agentName?(agentId: string): string | undefined;
   /** Adds a note to the chat that an agent changed the Vault. `text` is source text. */
@@ -353,6 +383,7 @@ export class AttentionRegistry {
   readonly #emitRuntimeSnapshot: () => void;
   readonly #passwordVault: PasswordVault | null;
   readonly #vaultItems: VaultItems | null;
+  readonly #linkWallet: LinkWallet | null;
   readonly #agentName: (agentId: string) => string | undefined;
   readonly #noteVaultChange: (agentId: string, threadId: string, turnId: string, text: string) => void;
   readonly #apiKeys: AgentApiKeys | null;
@@ -373,6 +404,7 @@ export class AttentionRegistry {
     this.#emitRuntimeSnapshot = options.emitRuntimeSnapshot;
     this.#passwordVault = options.passwordVault ?? null;
     this.#vaultItems = options.vaultItems ?? null;
+    this.#linkWallet = options.linkWallet ?? null;
     this.#agentName = options.agentName ?? (() => undefined);
     this.#noteVaultChange = options.noteVaultChange ?? (() => undefined);
     this.#apiKeys = options.apiKeys ?? null;
@@ -646,7 +678,7 @@ export class AttentionRegistry {
       secret.cancel();
     } else {
       pending.submitting = true;
-      const outcome = yield* secret.submit(input.secret).pipe(
+      const outcome = yield* secret.submit(input.secret, pending.vaultLoginId !== undefined).pipe(
         Effect.catch(() => Effect.succeed("takeover")),
         Effect.ensuring(
           Effect.sync(() => {
@@ -1053,6 +1085,103 @@ export class AttentionRegistry {
   }
 
   /**
+   * Answers `request_link_payment`: asks Link for a one-time card, and waits while the user approves or
+   * declines the payment in Link. The answer names the card for `fill_card`, never its number or code.
+   * Link's approval is the user's consent, so OpenBot asks nothing more here.
+   */
+  readonly requestLinkPayment = Effect.fn("AttentionRegistry.requestLinkPayment")(function* (
+    this: AttentionRegistry,
+    params: DynamicToolCallParams,
+  ) {
+    const call = yield* attentionStep(() => parseBrowserToolCall("request_link_payment", params.arguments));
+    if (call.tool !== "request_link_payment")
+      return yield* new AttentionOperationFailed({ cause: new Error("Invalid Link payment request.") });
+    const wallet = this.#linkWallet;
+    if (!wallet?.connected()) return browserTakeoverError(LINK_UNAVAILABLE);
+    const answer = yield* Effect.result(wallet.requestPayment(call.args));
+    if (Result.isFailure(answer)) return browserTakeoverError(`Link payment failed: ${answer.failure.message}`);
+    const result = answer.success;
+    const next =
+      result.status === "approved"
+        ? "Take a fresh snapshot of the checkout and call fill_card with this cardId."
+        : "Do not ask Link again for this purchase. Tell the user.";
+    return {
+      success: result.status === "approved",
+      contentItems: [{ type: "inputText", text: JSON.stringify({ ...result, next }) }],
+    } satisfies DynamicToolResult;
+  }).bind(this);
+
+  /**
+   * The one-time Link card for a `fill_card` call with a Link `cardId`, or null for a saved card. A
+   * fill on the merchant site that the user approved in Link runs at once; a fill on another site
+   * waits for the owner, because a page can tell an agent to type the card into a form that sends it
+   * away. That approval is not kept.
+   */
+  readonly linkCardVault = Effect.fn("AttentionRegistry.linkCardVault")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+  ): Effect.fn.Return<BrowserCardVault | DynamicToolResult | null> {
+    if (params.tool !== "fill_card") return null;
+    const call = yield* Effect.result(attentionStep(() => parseBrowserToolCall("fill_card", params.arguments)));
+    if (Result.isFailure(call) || call.success.tool !== "fill_card") return null;
+    const cardId = call.success.args.cardId;
+    if (!cardId.startsWith(LINK_CARD_ID_PREFIX)) return null;
+    const wallet = this.#linkWallet;
+    const agentId = params.ownerAgentId;
+    if (!wallet?.connected() || !agentId) return browserTakeoverError(LINK_UNAVAILABLE);
+    const read = yield* Effect.result(wallet.card(cardId));
+    if (Result.isFailure(read)) return browserTakeoverError(`Link card failed: ${read.failure.message}`);
+    const card = read.success;
+    if (!card) return browserTakeoverError("Link has no approved card with this id. Call request_link_payment first.");
+    const merchant = httpsHost(card.merchantUrl);
+    const onMerchant = (address: string) => merchant !== null && sameSite(address, merchant);
+    // The pages and frames that the owner let this one fill use. The approval is not kept.
+    const approvedFrames = new Map<string, Set<string>>();
+    return {
+      secret: (id) => (id === cardId ? card.secret : null),
+      approved: (id, page, frames) =>
+        id === cardId &&
+        [page, ...frames].every((frame) => onMerchant(frame) || approvedFrames.get(page)?.has(frame) === true),
+      approve: (id, page, frames) =>
+        Effect.gen({ self: this }, function* () {
+          if (id !== cardId) return false;
+          const others = frames.filter((frame) => frame !== page && !onMerchant(frame));
+          const decision = yield* this.awaitToolApproval(
+            client,
+            request,
+            {
+              requestId: request.id,
+              agentId,
+              threadId: params.threadId,
+              turnId: params.turnId,
+              kind: "permissions",
+              command: null,
+              cwd: null,
+              reason: [
+                sourceText("status.agent.linkCardFill", {
+                  card: `•••• ${card.secret.number.slice(-4)}`,
+                  site: page,
+                  merchant: card.merchantUrl || "?",
+                }),
+                ...(others.length > 0
+                  ? [sourceText("status.agent.vaultCardFillFrames", { origins: others.join(", ") })]
+                  : []),
+              ].join(" "),
+              grantRoot: null,
+              permissions: null,
+            },
+            { ownerOnly: true },
+          );
+          if (decision !== "accept") return false;
+          approvedFrames.set(page, new Set([...(approvedFrames.get(page) ?? []), page, ...frames]));
+          return true;
+        }),
+    } satisfies BrowserCardVault;
+  }).bind(this);
+
+  /**
    * Answers `save_vault_item`: adds or changes contact info, or changes the fields of a login or a card
    * that are not secret. The user does not approve it: the chat shows a note, and a new item keeps the
    * agent's name.
@@ -1428,8 +1557,7 @@ export class AttentionRegistry {
       const pendingTurnId = getString(pending.params, "turnId");
       if (pendingThreadId === threadId && (!pendingTurnId || pendingTurnId === turnId)) {
         this.#approvals.delete(requestId);
-        pending.decide?.("cancel");
-        this.#emitInputResolved("approval", requestId, pending.approval.agentId);
+        this.#cancelApproval(pending);
       }
     }
     for (const [requestId, pending] of this.#takeovers) {
@@ -1464,8 +1592,7 @@ export class AttentionRegistry {
     if (approval?.client === client) {
       this.#routines.markRunningForTurn(approval.approval.turnId);
       this.#approvals.delete(requestId);
-      approval.decide?.("cancel");
-      this.#emitInputResolved("approval", requestId, approval.approval.agentId);
+      this.#cancelApproval(approval);
       changed = true;
     }
     for (const [key, takeover] of this.#takeovers) {
@@ -1517,6 +1644,45 @@ export class AttentionRegistry {
   }
 
   /**
+   * Cancels one pending approval the way each waiter needs it, and every cancelled entry still emits
+   * its resolved event: the UI removes its card on that event alone, and a compaction turn sends no
+   * other notice. A built-in tool hears "cancel" through `decide` and answers the provider itself,
+   * so answering its request here too would answer it twice. A hosted site goes through its own
+   * resolver, which declines the provider and records the terminal event; the resolver reports its
+   * own failures, so this only keeps one from interrupting the remaining removals. A native approval
+   * that the provider still waits on gets the refusal a `respondToApproval` answer would send, so
+   * its request does not wait forever; a client that forgot the request ignores the answer (#4165).
+   * A client that no longer runs has nobody to answer, for a hosted site too: its write fails.
+   */
+  #cancelApproval(pending: PendingApproval): void {
+    this.#emitInputResolved("approval", pending.id, pending.approval.agentId);
+    pending.decide?.("cancel");
+    if (pending.decide || !pending.client.running) return;
+    if (pending.hostedSiteMutation) {
+      const report = (error: unknown) =>
+        Effect.sync(() => this.#emitError("approval_cleanup_failed", error, pending.approval.agentId));
+      Effect.runFork(
+        this.#hostedSites
+          .resolveApproval(
+            pending.hostedSiteMutation,
+            { client: pending.client, id: pending.id, agentId: pending.approval.agentId },
+            "decline",
+          )
+          .pipe(Effect.catch(report), Effect.catchDefect(report)),
+      );
+      return;
+    }
+    try {
+      pending.client.respond(
+        pending.id,
+        approvalReply(pending.method, pending.params, "decline", "This approval request is no longer pending."),
+      );
+    } catch (error) {
+      logger.warn("Unable to answer a cleared approval", { error: toLogValue(error) });
+    }
+  }
+
+  /**
    * Drops the approvals of one lost provider client, or of all clients when none is given. The other
    * clients are still running and wait for an answer, so their approvals stay.
    */
@@ -1524,8 +1690,7 @@ export class AttentionRegistry {
     for (const [requestId, pending] of this.#approvals) {
       if (client && pending.client !== client) continue;
       this.#approvals.delete(requestId);
-      pending.decide?.("cancel");
-      this.#emitInputResolved("approval", requestId, pending.approval.agentId);
+      this.#cancelApproval(pending);
     }
   }
 
@@ -1561,11 +1726,24 @@ export class AttentionRegistry {
   ) {
     const vault = this.#passwordVault;
     const request = pending.secret?.request;
-    if (!vault || !request || request.method === "otp") return false;
+    if (!vault?.connected() || !request || request.method === "otp") return false;
+    const kind = request.method === "password" ? "password" : "totp";
+    const skip = (reason: string, note: string, loginId?: string) => {
+      logger.info("Shared vault fill skipped", { origin: request.origin, method: request.method, loginId, reason });
+      pending.vaultSkipped = `OpenBot did not fill a saved login: ${note}`;
+      return false;
+    };
     // A script the agent ran on this site can read what is filled, and a field built for something
     // else can carry the value into a URL. In both cases the card lets the user decide.
-    if (pending.secret?.agentScriptedOrigin !== false || pending.secret.vaultFillable !== true) return false;
-    const kind = request.method === "password" ? "password" : "totp";
+    if (pending.secret?.agentScriptedOrigin !== false)
+      return skip("agent-scripted-origin", "you ran a script on this site since OpenBot started.");
+    if (pending.secret.vaultFillable !== true)
+      return skip(
+        "field-kind",
+        kind === "password"
+          ? "the field target is not a password input."
+          : 'the field targets do not have autocomplete="one-time-code".',
+      );
     const found = yield* Effect.result(
       Effect.gen(function* () {
         const call = yield* attentionStep(() => parseBrowserToolCall("submit_secret", pending.params.arguments));
@@ -1581,10 +1759,22 @@ export class AttentionRegistry {
     );
     if (Result.isFailure(found)) {
       logger.warn("Unable to fill from the shared vault", { error: toLogValue(found.failure.cause) });
+      pending.vaultSkipped = "OpenBot did not fill a saved login: the password manager could not be read.";
       return false;
     }
     const login = found.success;
-    if (!login?.secret || this.#takeovers.get(requestId) !== pending) return false;
+    if (this.#takeovers.get(requestId) !== pending) return false;
+    if (!login)
+      return skip(
+        "no-login",
+        "no saved login matches this site, or several match and the call has no loginId from list_logins.",
+      );
+    if (!login.secret)
+      return skip(
+        "no-secret",
+        `saved login ${login.loginId} has no ${kind === "password" ? "password" : "authenticator key"} for this site.`,
+        login.loginId,
+      );
     pending.vaultLoginId = login.loginId;
     const submitted = yield* Effect.result(
       this.respondToBrowserSecret({
@@ -1625,7 +1815,7 @@ export class AttentionRegistry {
       agentId: pending.request.agentId,
     });
     this.#emitRuntimeSnapshot();
-    pending.resolve(browserTakeoverResult(decision, vault));
+    pending.resolve(browserTakeoverResult(decision, vault, pending.vaultSkipped));
   }
 
   #persistQuestionPrompt(

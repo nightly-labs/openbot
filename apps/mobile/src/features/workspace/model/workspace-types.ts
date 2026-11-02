@@ -109,6 +109,7 @@ import type {
   SharedTable,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  SidebarPin,
   SignInRelayStatus,
   StorageUsage,
   UninstallSkillInput,
@@ -271,6 +272,11 @@ export interface MobileWorkspaceContextValue {
   respondToBrowserSecret: (serverId: string, input: RespondToBrowserSecretInput) => Promise<void>;
   sidebarByServer: Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>;
   mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
+  /**
+   * Moves a chat in the layout of a host. The list shows the move at once; a failure puts the chat
+   * back and rejects.
+   */
+  moveSidebarChat: (serverId: string, action: Extract<SidebarLayoutAction, { type: "move-agent" }>) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
   /** True when the host advertises `message-client-id-v1`: a repeat of a message is stored once. */
@@ -310,6 +316,10 @@ export interface MobileWorkspaceContextValue {
   hideChannel: (channelId: string, serverId: string) => boolean;
   unhideChannel: (channelId: string, serverId: string) => boolean;
   toggleChannelPin: (channelId: string, serverId: string) => ToggleAgentPinResult;
+  /** Replaces the pinned agents and channels of a server, in their order, such as after a drag. */
+  setChatPins: (serverId: string, items: readonly SidebarPin[]) => boolean;
+  /** The pinned agents and channels of a server in one list, in the order of the host. */
+  readChatPins: (serverId: string) => SidebarPin[];
   /** The pinned workflows of each server, in the order the drawer shows them. Saved on this device. */
   pinnedWorkflowIds: Readonly<Record<string, readonly string[]>>;
   toggleWorkflowPin: (workflowId: string, serverId: string) => ToggleAgentPinResult;

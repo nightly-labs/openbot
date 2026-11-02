@@ -20,6 +20,7 @@ export interface BridgeCommand {
     | "disconnect-peer"
     | "send"
     | "restart-ice"
+    | "renew-host-signal"
     | "set-private-network"
     | "close";
   peerId: string;
@@ -206,6 +207,9 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
       await sendChannelPayload(state, channel, command.data);
     } else if (command.type === "restart-ice") {
       await restartIce(requirePeer(command.peerId));
+    } else if (command.type === "renew-host-signal") {
+      // After a sleep. The device paths of the old socket are lost too; each device connects again.
+      for (const state of peers.values()) if (state.role === "host" && !state.signalHost) replaceSignal(state);
     } else if (command.type === "set-private-network") {
       // A host that is not connected now reads the route again when it connects.
       const host = peers.get(command.peerId);

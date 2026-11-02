@@ -120,6 +120,7 @@ const SCENARIOS = [
   "license-count",
   "license-renewal",
   "license-failed-renewal",
+  "license-trial-failed",
   "license-currency",
   "license-isolation",
   "license-limit",
@@ -144,6 +145,13 @@ const TEAM_BUNDLE_MONTH: LicensePlan = { tier: "team", interval: "month", bundle
 const TEAM_YEAR: LicensePlan = { tier: "team", interval: "year", bundle: false };
 /** `WELCOME_EMAIL_CLAIM_PREFIX` of `billing-service.ts`. That module needs the Worker types. */
 const WELCOME_EMAIL_CLAIM_PREFIX = "openbot_welcome_email:";
+/** `LICENSE_EMAIL_CLAIM_PREFIXES` of `license-service.ts`. */
+const LICENSE_EMAIL_CLAIM_PREFIXES = {
+  welcome: "openbot_license_email:",
+  payment_failed: "openbot_license_payment_failed:",
+  ended: "openbot_license_ended:",
+} as const;
+type LicenseEmailKind = keyof typeof LICENSE_EMAIL_CLAIM_PREFIXES;
 
 const stepSchema = z.object({
   scenario: z.enum(SCENARIOS),
@@ -1048,18 +1056,34 @@ function welcomeClaims(account: Account) {
   );
 }
 
+/**
+ * The claim that the Worker records when it sends a license email. The welcome and ended claims name the
+ * subscription, the failed payment claim names the invoice.
+ */
+function licenseEmailClaims(kind: LicenseEmailKind, id: string) {
+  return d1(
+    `SELECT event_id, type, received_at FROM billing_webhook_events
+     WHERE event_id = ${quote(`${LICENSE_EMAIL_CLAIM_PREFIXES[kind]}${id}`)}`,
+    welcomeClaimSchema,
+  );
+}
+
 const observabilitySchema = z.object({ result: z.object({ rows: z.array(z.tuple([z.string()])) }) });
 
 /**
- * The welcome email results that a local Worker logged since `since`: one line for each send. Only
- * `bun run dev:api` has this log query, so `--remote-d1` reads nothing.
+ * The results of one billing email that a local Worker logged since `since`: one line for each send.
+ * Only `bun run dev:api` has this log query, so `--remote-d1` reads nothing.
  */
-async function welcomeSends(api: string, since: number) {
+async function billingEmailSends(
+  api: string,
+  since: number,
+  email: "welcome email" | "license email" | `license email ${LicenseEmailKind}`,
+) {
   const response = await fetch(`${api}/cdn-cgi/local/explorer/api/local/observability/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      sql: `SELECT message FROM logs WHERE message LIKE '%billing: welcome email%' AND ts_ms >= ${since}`,
+      sql: `SELECT message FROM logs WHERE message LIKE '%billing: ${email}%' AND ts_ms >= ${since}`,
     }),
   });
   return observabilitySchema.parse(await response.json()).result.rows.map(([message]) => message);
@@ -1683,7 +1707,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       print("SKIP [welcome] send count: the remote Worker log is not available");
       return;
     }
-    const sends = await welcomeSends(account.api, since);
+    const sends = await billingEmailSends(account.api, since, "welcome email");
     record("welcome", "a second server and a renewed plan send no second welcome email", sends.length === 1, sends);
   },
   async boat(account) {
@@ -1963,6 +1987,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       before.available && before.license === null && before.used === 1,
       before,
     );
+    const since = Date.now();
     const sub = await account.buyLicense(7);
     const bought = await licenseWhere(account, "license active", (state) => state.license?.status === "active");
     record(
@@ -1997,6 +2022,22 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         claims: welcomeClaims(account),
       },
     );
+    const claimed = await waitFor("license email claim", async () => licenseEmailClaims("welcome", sub)[0]);
+    record(
+      "license-buy",
+      "the first payment of the license claims the license welcome email",
+      claimed.type === "license_email_welcome",
+      claimed,
+    );
+    if (REMOTE_D1) {
+      print("SKIP [license-buy] send count: the remote Worker log is not available");
+      return;
+    }
+    const sends = await waitFor("license email send", async () => {
+      const lines = await billingEmailSends(account.api, since, "license email welcome");
+      return lines.length > 0 ? lines : null;
+    });
+    record("license-buy", "the first payment sends one license welcome email", sends.length === 1, sends);
   },
 
   async "license-checkout"(account) {
@@ -2271,6 +2312,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
   },
 
   async "license-renewal"(account) {
+    const since = Date.now();
     const sub = await account.buyLicense(5);
     await licenseWhere(account, "license active", (state) => state.license?.status === "active");
     const cancel = await account.request("POST", "v1/me/license/renewal", { cancel: true });
@@ -2304,6 +2346,28 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       true,
       ended.license,
     );
+    const endedClaim = await waitFor("license ended claim", async () => licenseEmailClaims("ended", sub)[0]);
+    record(
+      "license-renewal",
+      "the end of a paid license claims the license ended email",
+      endedClaim.type === "license_email_ended",
+      endedClaim,
+    );
+    if (REMOTE_D1) {
+      print("SKIP [license-renewal] send count: the remote Worker log is not available");
+    } else {
+      const ends = await waitFor("license ended send", async () => {
+        const lines = await billingEmailSends(account.api, since, "license email ended");
+        return lines.length > 0 ? lines : null;
+      });
+      const sends = await billingEmailSends(account.api, since, "license email");
+      record(
+        "license-renewal",
+        "a cancel and a renew send no email; the end sends one ended email; no second welcome email",
+        ends.length === 1 && sends.length === 2 && licenseEmailClaims("welcome", sub).length === 1,
+        { sends, claims: licenseEmailClaims("welcome", sub) },
+      );
+    }
     const again = await account.request("POST", "v1/me/license/checkout", { users: 5, currency: "eur" });
     const url = licenseCheckoutSchema.safeParse(again.body).data?.url;
     record("license-renewal", "an ended license: the account can buy a new one", again.status === 200 && Boolean(url), {
@@ -2319,12 +2383,41 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
   },
 
   async "license-failed-renewal"(account) {
+    const since = Date.now();
     const sub = await account.buyLicense(5);
-    await licenseWhere(account, "license active", (state) => state.license?.status === "active");
+    const bought = await licenseWhere(account, "license active", (state) => state.license?.status === "active");
+    const firstPeriodEnd = bought.license?.currentPeriodEnd ?? 0;
+    await account.advance(32);
+    const renewed = await waitFor("paid renewal", async () => {
+      const list = await invoices(sub);
+      return list.find((invoice) => invoice.reason === "subscription_cycle" && invoice.status === "paid") ?? null;
+    });
+    if (!REMOTE_D1) {
+      // The webhook of the paid renewal arrives after the invoice is paid. The welcome send is the only line.
+      await licenseWhere(account, "renewal stored", (state) => (state.license?.currentPeriodEnd ?? 0) > firstPeriodEnd);
+      const sends = await billingEmailSends(account.api, since, "license email");
+      record(
+        "license-failed-renewal",
+        "a paid renewal sends no license email",
+        sends.length === 1 && sends.every((line) => line.includes("license email welcome")),
+        { invoice: renewed, sends },
+      );
+    }
     await account.useCard("pm_card_chargeCustomerFail");
     await account.advance(32);
     const due = await licenseWhere(account, "past_due", (state) => state.license?.status === "past_due", 120_000);
     record("license-failed-renewal", "a failed renewal shows the license as past_due", true, due.license);
+    const unpaid = (await subscription(sub)).latest_invoice ?? "";
+    const failedClaim = await waitFor(
+      "payment failed claim",
+      async () => licenseEmailClaims("payment_failed", unpaid)[0],
+    );
+    record(
+      "license-failed-renewal",
+      "the failed renewal invoice claims one payment failed email",
+      failedClaim.type === "license_email_payment_failed",
+      failedClaim,
+    );
     const second = await account.request("POST", "v1/me/license/checkout", { users: 5, currency: "eur" });
     record("license-failed-renewal", "a past_due license is open: no second license", second.status === 409, {
       status: second.status,
@@ -2336,6 +2429,50 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     await stripe("POST", `/v1/invoices/${current.latest_invoice}/pay`, idSchema, { payment_method: good });
     const recovered = await licenseWhere(account, "active again", (state) => state.license?.status === "active");
     record("license-failed-renewal", "paying the open invoice makes the license active again", true, recovered.license);
+    if (REMOTE_D1) {
+      print("SKIP [license-failed-renewal] send count: the remote Worker log is not available");
+      return;
+    }
+    const failed = await waitFor("license payment failed send", async () => {
+      const lines = await billingEmailSends(account.api, since, "license email payment_failed");
+      return lines.length > 0 ? lines : null;
+    });
+    const sends = await billingEmailSends(account.api, since, "license email");
+    record(
+      "license-failed-renewal",
+      "one payment failed email for the invoice; the payment after it sends no welcome or ended email",
+      failed.length === 1 && sends.length === 2 && licenseEmailClaims("ended", sub).length === 0,
+      { sends },
+    );
+  },
+
+  async "license-trial-failed"(account) {
+    const sub = await account.buyLicense(1, "eur", STARTER_MONTH, Date.now() + 3 * 86_400_000);
+    await licenseWhere(account, "license trialing", (state) => state.license?.status === "trialing");
+    await account.useCard("pm_card_chargeCustomerFail");
+    await account.advance(4);
+    const due = await licenseWhere(account, "past_due", (state) => state.license?.status === "past_due", 120_000);
+    const unpaid = (await subscription(sub)).latest_invoice ?? "";
+    const failedClaim = await waitFor(
+      "payment failed claim",
+      async () => licenseEmailClaims("payment_failed", unpaid)[0],
+    );
+    record(
+      "license-trial-failed",
+      "a failed first payment at the trial end claims one payment failed email and no welcome email",
+      failedClaim.type === "license_email_payment_failed" && licenseEmailClaims("welcome", sub).length === 0,
+      { license: due.license, claim: failedClaim },
+    );
+    const good = await account.useCard("pm_card_visa");
+    await stripe("POST", `/v1/invoices/${unpaid}/pay`, idSchema, { payment_method: good });
+    await licenseWhere(account, "active", (state) => state.license?.status === "active");
+    const welcome = await waitFor("license welcome claim", async () => licenseEmailClaims("welcome", sub)[0]);
+    record(
+      "license-trial-failed",
+      "the first payment after a failed trial end claims the welcome email, and no ended email",
+      welcome.type === "license_email_welcome" && licenseEmailClaims("ended", sub).length === 0,
+      { welcome, ended: licenseEmailClaims("ended", sub) },
+    );
   },
 
   async "license-currency"(account) {
@@ -3122,6 +3259,12 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         trial.license.amount === licensePeriodAmount(STARTER_MONTH, 1, "eur") &&
         charged.every((invoice) => invoice.amount === 0),
       { license: trial.license, invoices: charged },
+    );
+    record(
+      "license-trial",
+      "a trial is not a payment: no license email before the trial ends",
+      licenseEmailClaims("welcome", subscriptionId).length === 0,
+      { claims: licenseEmailClaims("welcome", subscriptionId) },
     );
   },
 

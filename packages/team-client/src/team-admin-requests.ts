@@ -25,11 +25,14 @@ import {
   isDiscordAccess,
   isDiscordRoleList,
   isHiddenAgentsSnapshot,
+  isSidebarPinsSnapshot,
   type ResetAgentSessionSettingInput,
   type SetAgentHiddenInput,
   type SetAgentNotificationLevelInput,
   type SetAgentSessionSettingInput,
   type SetOwnServerNotificationLevelInput,
+  type SidebarPin,
+  type SidebarPinsSnapshot,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
@@ -49,6 +52,7 @@ import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt
 import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provider-default-v1";
 import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
+import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the server timezone, the browser profiles, the server key, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
 //
@@ -1361,6 +1365,37 @@ export function setOwnServerNotificationLevel(
 ): Effect.Effect<AgentNotificationLevelsSnapshot, TeamAdminRequestError> {
   return adminCall(() =>
     request("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, decodeAgentNotificationLevels, { level }),
+  );
+}
+
+function decodeSidebarPins(value: unknown): SidebarPinsSnapshot {
+  if (!isSidebarPinsSnapshot(value)) throw new Error("Invalid pinned chats response.");
+  return value;
+}
+/** The member's own pinned chats, on a host that advertises `sidebar-pins-v1`. */
+export function readSidebarPins(request: TeamApiRequest): Effect.Effect<SidebarPinsSnapshot, TeamAdminRequestError> {
+  return adminCall(() => request("POST", SIDEBAR_PINS_ROUTES.read, decodeSidebarPins, {}));
+}
+/** Replaces the member's own pinned chats, for all of their devices. */
+export function setSidebarPins(
+  request: TeamApiRequest,
+  items: readonly SidebarPin[],
+): Effect.Effect<SidebarPinsSnapshot, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", SIDEBAR_PINS_ROUTES.set, decodeSidebarPins, {
+      items: items.map(({ kind, id }) => ({ kind, id })),
+    }),
+  );
+}
+/** Saves the pins of this device when the member has none on the host yet, and returns the host's list. */
+export function seedSidebarPins(
+  request: TeamApiRequest,
+  items: readonly SidebarPin[],
+): Effect.Effect<SidebarPinsSnapshot, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", SIDEBAR_PINS_ROUTES.seed, decodeSidebarPins, {
+      items: items.map(({ kind, id }) => ({ kind, id })),
+    }),
   );
 }
 

@@ -19,6 +19,7 @@ import {
   isCustomProviderHarness,
   isCustomProviderHeaderName,
   isCustomProviderId,
+  isCustomProviderMaxOutput,
   isNewCustomProviderId,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
@@ -77,19 +78,30 @@ function parseModels(providerId: string, value: unknown): CustomProviderModel[] 
     if (seen.has(id)) throw new Error(sourceText("error.provider.modelIdDuplicate"));
     seen.add(id);
     const name = requireString(entry.name, "Model name", INPUT_LIMITS.modelName);
-    if (entry.contextWindow === undefined) {
-      models.push({ id, name });
-      continue;
+    const model: CustomProviderModel = { id, name };
+    if (entry.contextWindow !== undefined) {
+      if (!isCustomProviderContextWindow(entry.contextWindow)) {
+        throw new Error(
+          sourceText("error.provider.contextWindowInvalid", {
+            min: CUSTOM_PROVIDER_LIMITS.contextWindowMin,
+            max: CUSTOM_PROVIDER_LIMITS.contextWindowMax,
+          }),
+        );
+      }
+      model.contextWindow = entry.contextWindow;
     }
-    if (!isCustomProviderContextWindow(entry.contextWindow)) {
-      throw new Error(
-        sourceText("error.provider.contextWindowInvalid", {
-          min: CUSTOM_PROVIDER_LIMITS.contextWindowMin,
-          max: CUSTOM_PROVIDER_LIMITS.contextWindowMax,
-        }),
-      );
+    if (entry.maxOutput !== undefined) {
+      if (!isCustomProviderMaxOutput(entry.maxOutput)) {
+        throw new Error(
+          sourceText("error.provider.maxOutputInvalid", {
+            min: CUSTOM_PROVIDER_LIMITS.maxOutputMin,
+            max: CUSTOM_PROVIDER_LIMITS.maxOutputMax,
+          }),
+        );
+      }
+      model.maxOutput = entry.maxOutput;
     }
-    models.push({ id, name, contextWindow: entry.contextWindow });
+    models.push(model);
   }
   return models;
 }

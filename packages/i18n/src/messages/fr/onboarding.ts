@@ -43,6 +43,8 @@ export const messages = {
   "onboarding.provider.googlePlan": "Forfait Google AI Pro ou Ultra",
   "onboarding.provider.cursorPlan": "Forfait Cursor ou clé API",
   "onboarding.provider.clineAccount": "Modèles gratuits avec un compte Cline",
+  "onboarding.provider.kimiAccount": "Modèles Kimi avec un compte Kimi Code",
+  "onboarding.provider.hermesNous": "Forfait Nous Portal ou votre configuration Hermes",
   "onboarding.provider.inceptionKey": "Modèles Mercury avec une clé d’API Inception",
   "onboarding.provider.deepseekKey": "Modèles DeepSeek avec une clé d’API DeepSeek",
   "onboarding.provider.openrouterKey": "De nombreux modèles avec une clé d’API OpenRouter",
@@ -84,7 +86,7 @@ export const messages = {
   "onboarding.consent.notice": "En continuant, vous acceptez les {terms} et prenez connaissance de la {privacy}.",
   "onboarding.consent.analyticsTitle": "Aidez-nous à améliorer OpenBot",
   "onboarding.consent.analyticsDetail":
-    "Partagez les fonctionnalités que vous utilisez. Jamais vos conversations, fichiers ou prompts.",
+    "Liez l’utilisation des fonctionnalités à votre compte et à votre e-mail, et partagez les sites web visités, l’utilisation des outils et un résumé quotidien de votre configuration. Sinon, seule l’utilisation de base est envoyée, avec un identifiant d’installation aléatoire. Jamais vos conversations, fichiers ou prompts.",
   "onboarding.consent.thanksTitle": "Merci ! L’équipe vous en doit une.",
   "onboarding.consent.thanksToast": "Merci de nous aider à améliorer OpenBot 💜",
   "onboarding.consent.thanksToastDetail": "Vous pouvez modifier ce choix à tout moment dans les Réglages.",

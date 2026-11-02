@@ -11,6 +11,7 @@ import type {
   TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
+import { withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { sourceText } from "@openbot/i18n/source";
 import { type Logger, toLogValue } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
@@ -18,7 +19,7 @@ import type { AgentProvider } from "../agent-client";
 import { causeHelpers } from "../effect-boundary";
 import type { McpOperationError } from "../mcp-effects";
 import { McpHandoffLog } from "../mcp-handoff-log";
-import { type McpOAuthAuthority, type McpSignInOpener, normalizeResource } from "../mcp-oauth-provider";
+import { type McpOAuthAuthority, type McpSignInOpener, mcpOAuthAccountKey } from "../mcp-oauth-provider";
 import { McpOAuthProxy, type McpOAuthProxyTarget, mcpOAuthProxyAgentKey, mcpOAuthProxyRoute } from "../mcp-oauth-proxy";
 import { inspectMcpServer, type McpSignInPlace, testMcpServer } from "../mcp-probe";
 import {
@@ -181,7 +182,8 @@ export class McpGateway {
       if (token) this.#handoff.recordSecret(token);
       return { url: config.url, authorization: token, proxied: false };
     }
-    if (!this.#proxied(config)) return { url: config.url, authorization: null, proxied: false };
+    if (!this.#proxied(config))
+      return { url: withoutMcpAccountFragment(config.url), authorization: null, proxied: false };
     const route = yield* this.#proxy
       .route(mcpOAuthProxyRoute(config.id, config.url), agentId === null ? null : mcpOAuthProxyAgentKey(agentId))
       .pipe(Effect.result);
@@ -245,9 +247,10 @@ export class McpGateway {
       .listEnabled()
       .find((row) => this.#proxied(row) && mcpOAuthProxyRoute(row.id, row.url) === route);
     if (!config || !oauth) return Effect.succeed(null);
-    return oauth
-      .accessToken(config.url)
-      .pipe(Effect.map((token) => (token ? { url: config.url, headers: config.headers, token } : null)));
+    return oauth.accessToken(config.url).pipe(
+      // The row address with its account: a refresh after a refusal reads the sign-in of this row.
+      Effect.map((token) => (token ? { url: config.url, headers: config.headers, token } : null)),
+    );
   }
 
   /**
@@ -288,14 +291,15 @@ export class McpGateway {
      * A row that goes takes its sign-in with it: a refresh token nothing can reach again is a secret
      * kept for no reason. Only when no row is left naming the same account, because two rows on one
      * URL are one account to the server and dropping it would sign the other one out too. Compared
-     * normalized, as the store keys it: `https://mcp.stripe.com` and `https://mcp.stripe.com/` share
-     * one credential, and removing either row must keep the other's.
+     * as the store keys it: `https://mcp.stripe.com` and `https://mcp.stripe.com/` share one
+     * credential, and removing either row must keep the other's. A row with its own `#account-…`
+     * fragment is another account, and removing it forgets only its own sign-in.
      */
-    const removedResource = removed?.transport === "http" ? normalizeResource(removed.url) : null;
+    const removedResource = removed?.transport === "http" ? mcpOAuthAccountKey(removed.url) : null;
     if (
       removed &&
       removedResource &&
-      !list.some((config) => config.transport === "http" && normalizeResource(config.url) === removedResource)
+      !list.some((config) => config.transport === "http" && mcpOAuthAccountKey(config.url) === removedResource)
     ) {
       if (this.#oauth) yield* this.#oauth.forget(removed.url).pipe(toMcpGatewayFailed);
     }
@@ -400,12 +404,12 @@ export class McpGateway {
    */
   readonly signIn = Effect.fnUntraced(function* (this: McpGateway, input: TestMcpServerInput, open?: McpSignInOpener) {
     const result = yield* this.test(input, { interactive: true, signInPlace: "here", ...(open ? { open } : {}) });
-    const resource = normalizeResource(input.config.url);
+    const resource = mcpOAuthAccountKey(input.config.url);
     const inUse =
       resource !== null &&
       this.#servers
         .listEnabled()
-        .some((config) => config.transport === "http" && normalizeResource(config.url) === resource);
+        .some((config) => config.transport === "http" && mcpOAuthAccountKey(config.url) === resource);
     if (result.error === null && inUse) yield* this.#hooks.refreshAllAgentRuntimes();
     return result;
   });

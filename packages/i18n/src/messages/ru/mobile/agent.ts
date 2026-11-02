@@ -16,6 +16,7 @@ export const messages = {
   "mobile.agent.pin.unpinNamed": "Открепить: {name}",
   "mobile.agent.pin.limitReached": "Достигнут лимит закреплённых. Сначала открепите один чат.",
   "mobile.agent.pin.closeAction": "Закрыть действие закрепления для {name}",
+  "mobile.agent.drag.pinHere": "Перетащите сюда, чтобы закрепить",
   "mobile.agent.appearance.preview": "Аватар: {name}",
   "mobile.agent.appearance.newAgent": "Новый агент",
   "mobile.agent.appearance.faces": "Форма и выражение",

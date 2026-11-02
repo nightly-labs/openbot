@@ -26,6 +26,8 @@ export class MobileConversationStore {
   #latestPages = new Map<string, { firstId: string; pageInfo: ConversationPage["pageInfo"] }>();
   /** Chats whose latest page loaded on the current connection, so events keep them up to date. */
   #upToDate = new Set<string>();
+  /** Chats from the phone's cache. The first latest page from the host replaces them, at any revision. */
+  #cached = new Set<string>();
 
   constructor(private schedule: (flush: () => void) => () => void) {}
 
@@ -86,6 +88,7 @@ export class MobileConversationStore {
     this.#entries.delete(agentId);
     this.#latestPages.delete(agentId);
     this.#upToDate.delete(agentId);
+    this.#cached.delete(agentId);
     this.#indices.delete(agentId);
     this.#deltas.delete(agentId);
     this.#loads.delete(agentId);
@@ -143,12 +146,29 @@ export class MobileConversationStore {
     };
   }
 
+  /** Shows a chat from the phone's cache. A chat that is already loaded stays. */
+  restore(page: ConversationPage) {
+    if (this.get(page.agentId)) return;
+    this.applyPage(page);
+    this.#cached.add(page.agentId);
+  }
+
+  /** The chat as the phone keeps it: the last latest page and the messages after it. */
+  cachedPage(agentId: string): ConversationPage | undefined {
+    const current = this.get(agentId);
+    const entry = current && !current.detached ? this.#trim(agentId, current) : undefined;
+    if (!entry) return undefined;
+    const { olderLoading: _loading, olderError: _error, detached: _detached, ...page } = entry;
+    return page;
+  }
+
   /** `attach` lets a latest page replace a window around a searched message. */
   applyPage(page: ConversationPage, cursor?: string, attach = false) {
     this.flush();
     const current = this.get(page.agentId);
     if (cursor && (!current || current.threadId !== page.threadId || current.pageInfo.olderCursor !== cursor)) return;
-    if (!cursor && current && page.revision < current.revision) return;
+    if (!cursor && current && page.revision < current.revision && !this.#cached.has(page.agentId)) return;
+    if (!cursor) this.#cached.delete(page.agentId);
     const sameThread = current?.threadId === page.threadId;
     const indices = sameThread ? this.#indices.get(page.agentId) : undefined;
     const overlap = page.messages.find((message) => indices?.has(message.id));

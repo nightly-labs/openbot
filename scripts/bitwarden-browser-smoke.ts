@@ -96,7 +96,7 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
         const value = await runCauseEffect(
           vault.secretFor(login.id, prepared.request.origin, method === "password" ? "password" : "totp"),
         );
-        if (!value || (await runCauseEffect(prepared.submit(value))) !== "submitted")
+        if (!value || (await runCauseEffect(prepared.submit(value, true))) !== "submitted")
           throw new Error("Bitwarden fixture did not submit.");
         const snapshot = await runCauseEffect(browser.snapshot(tab.id));
         if (!snapshot.url.endsWith("/complete") || JSON.stringify(snapshot).includes(value))

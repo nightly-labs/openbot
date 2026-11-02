@@ -11,6 +11,7 @@ import {
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
+import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
 // Every one of these routes to the local service or to a remote server by the
@@ -44,7 +45,9 @@ import {
   parseSetAgentHiddenInput,
   parseSetAgentNotificationLevelInput,
   parseSetAgentSessionSetting,
+  parseSetSidebarPinsInput,
   remoteBrowserSecretResponse,
+  type SetSidebarPinsInput,
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
@@ -104,9 +107,11 @@ import {
   decodeRemoteTaskConversation,
   decodeRemoteTaskReadState,
   decodeSidebarLayoutSnapshot,
+  decodeSidebarPinsFromHost,
 } from "../remote-agent-decoding";
 import { acceptEmpty, decodeVoid, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
+import { OWNER_PIN_KEY, type SidebarPinStore } from "../sidebar-pin-store";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
   parseAcknowledgeFailedTurn,
@@ -192,6 +197,7 @@ function logRejectedModels<T>(models: T, source: "local" | "remote"): T {
 export interface AgentIpcDependencies {
   service: AgentService;
   sidebarLayout: SidebarLayoutStore;
+  sidebarPins: SidebarPinStore;
   host: HostService;
   remoteServers: RemoteServerManager;
   skills: SkillMarketplaceService;
@@ -202,6 +208,7 @@ export interface AgentIpcDependencies {
 export function agentIpcHandlers({
   service,
   sidebarLayout,
+  sidebarPins,
   host,
   remoteServers,
   skills,
@@ -214,6 +221,11 @@ export function agentIpcHandlers({
     if (body.attachmentDraftIds?.length && !remoteServers.supportsCapability(serverId, AGENT_THREAD_FILES_CAPABILITY))
       taskRemoteUnsupported();
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
+  };
+  const saveRemoteSidebarPins = (serverId: string, path: string, body: SetSidebarPinsInput) => {
+    if (!remoteServers.supportsCapability(serverId, SIDEBAR_PINS_CAPABILITY))
+      throw new Error(sourceText("error.team.sidebarPinsUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decodeSidebarPinsFromHost, { method: "POST", body }));
   };
   const remoteThreadRequest = (serverId: string, path: string, body: AgentTaskInput & { title?: string }) => {
     if (!remoteServers.supportsCapability(serverId, AGENT_THREADS_CAPABILITY)) taskRemoteUnsupported();
@@ -444,6 +456,28 @@ export function agentIpcHandlers({
             }),
           );
         },
+      }),
+      // The owner of this computer shares the pins of this server with their phones.
+      getSidebarPins: scopedQueryHandler({
+        local: () => sidebarPins.snapshot(OWNER_PIN_KEY),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, SIDEBAR_PINS_CAPABILITY))
+            throw new Error(sourceText("error.team.sidebarPinsUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, SIDEBAR_PINS_ROUTES.read, decodeSidebarPinsFromHost, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
+      }),
+      setSidebarPins: scopedHandler(parseSetSidebarPinsInput, {
+        local: ({ items }) => runCauseEffect(sidebarPins.set(OWNER_PIN_KEY, items)),
+        remote: (input, serverId) => saveRemoteSidebarPins(serverId, SIDEBAR_PINS_ROUTES.set, input),
+      }),
+      seedSidebarPins: scopedHandler(parseSetSidebarPinsInput, {
+        local: ({ items }) => runCauseEffect(sidebarPins.seed(OWNER_PIN_KEY, items)),
+        remote: (input, serverId) => saveRemoteSidebarPins(serverId, SIDEBAR_PINS_ROUTES.seed, input),
       }),
       generateProfile: scopedHandler(parseGenerateAgentProfile, {
         local: (input) => runCauseEffect(service.generateProfile(input, sidebarLayout.getSnapshot().sections)),

@@ -156,10 +156,11 @@ export const messages = {
   "settings.notch.size.height": "高度",
   "settings.notch.size.previewNotch": "内置显示器",
   "settings.notch.size.previewIsland": "外接显示器",
-  "settings.analytics.title": "分享产品分析数据",
-  "settings.analytics.description": "将使用情况和稳定性元数据，连同你的账号 ID 和邮箱发送到 OpenBot 自建的分析服务。",
+  "settings.analytics.title": "将分析数据关联到我的账号",
+  "settings.analytics.description":
+    "开启：使用情况和可靠性元数据连同你的账号 ID 和邮箱发送到 OpenBot 自托管的分析服务，包括你和你的助手访问的网站、工具使用情况和每日设置摘要。关闭：仅随一个随机安装 ID 发送基本使用情况，例如轮次和 token 数量。绝不发送聊天、文件和提示词。",
   "settings.analytics.webDescription":
-    "将使用情况和可靠性元数据连同你的账号 ID 和邮箱发送到 OpenBot 自托管的分析服务。该设置仅对该浏览器生效。",
+    "开启：使用情况和可靠性元数据连同你的账号 ID 和邮箱发送到 OpenBot 自托管的分析服务。关闭：相同的元数据仅随一个随机安装 ID 发送。绝不发送聊天、文件和提示词。该设置仅对该浏览器生效。",
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "通用",
   "settings.tab.general.description": "控制 OpenBot 在这台电脑上的行为。",

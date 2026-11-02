@@ -62,6 +62,7 @@ export const messages = {
   "composer.reply.attachment": "첨부 파일",
   "composer.reply.cancel": "답장 취소",
   "composer.attachment.remove": "{name} 제거",
+  "composer.attachment.adding": "{name} 추가 중",
   "composer.placeholder.hostSetup": "시작하려면 호스트에서 제공자 설정을 완료하세요",
   "composer.placeholder.connectHost": "시작하려면 호스트에 연결하세요",
   "composer.placeholder.hostSleeping": "서버가 잠들어 있어요. 아무 키나 누르거나 클릭하면 깨워요",

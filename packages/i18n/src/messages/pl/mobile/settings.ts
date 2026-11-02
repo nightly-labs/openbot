@@ -74,9 +74,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Wyłącz animacje, aby ograniczyć ruch w całej aplikacji. Gdy w ustawieniach telefonu jest włączona opcja Ogranicz ruch, aplikacja także ogranicza ruch. Poniższe animacje pozostają wtedy wyłączone.",
   "mobile.settings.animations.all": "Animacje",
-  "mobile.settings.animations.chatZoom": "Powiększanie czatów",
-  "mobile.settings.animations.chatZoomFooter":
-    "Czat otwiera się z awatara na liście i zamyka się z powrotem do niego. Gdy to jest wyłączone, czat wsuwa się z boku.",
   "mobile.settings.animations.agentFaces": "Animowane twarze agentów",
   "mobile.settings.animations.agentFacesFooter":
     "Awatary agentów poruszają twarzami, gdy agenci pracują i odpoczywają. Gdy to jest wyłączone, twarze są nieruchome.",
@@ -162,8 +159,8 @@ export const messages = {
   "mobile.settings.notifications.channelSilent": "Powiadomienia agentów (bez dźwięku)",
   "mobile.settings.privacy.title": "Prywatność",
   "mobile.settings.privacy.footer":
-    "Udostępniaj dane o użyciu funkcji i wynikach połączeń z tego telefonu. Treść wiadomości i pliki nie są wysyłane.",
-  "mobile.settings.privacy.analytics": "Udostępniaj analitykę produktu",
+    "Dane o użyciu funkcji i wynikach połączeń z tego telefonu zawsze trafiają do analityki OpenBot. Włączone: wraz z ID konta i adresem e-mail. Wyłączone: tylko z losowym ID instalacji. Treść wiadomości i pliki nie są wysyłane.",
+  "mobile.settings.privacy.analytics": "Łącz analitykę z moim kontem",
   "mobile.settings.privacy.retry": "Ponów zapis ustawienia prywatności",
   "mobile.settings.conversations.title": "Rozmowy",
   "mobile.settings.conversations.hiddenChats": "Ukryte czaty",

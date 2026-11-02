@@ -16,6 +16,7 @@ export const messages = {
   "mobile.agent.pin.unpinNamed": "Odepnij: {name}",
   "mobile.agent.pin.limitReached": "Osiągnięto limit przypiętych czatów. Najpierw odepnij jeden z nich.",
   "mobile.agent.pin.closeAction": "Zamknij akcję przypinania: {name}",
+  "mobile.agent.drag.pinHere": "Upuść tutaj, aby przypiąć",
   "mobile.agent.appearance.preview": "Podgląd awatara: {name}",
   "mobile.agent.appearance.newAgent": "Nowy agent",
   "mobile.agent.appearance.faces": "Kształt i mina",

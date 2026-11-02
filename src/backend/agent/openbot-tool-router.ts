@@ -434,11 +434,17 @@ export class OpenBotToolRouter {
                   return yield* this.#attention.saveVaultItem(params);
                 case "delete_vault_item":
                   return yield* this.#attention.deleteVaultItem(params);
-                default:
+                case "request_link_payment":
+                  return yield* this.#attention.requestLinkPayment(params);
+                default: {
+                  // A Link card is read from Link before the fill; a saved card comes from the Vault.
+                  const linkVault = yield* this.#attention.linkCardVault(client, toolRequest, params);
+                  if (linkVault && !("secret" in linkVault)) return linkVault;
                   return yield* this.#browser.handleDynamicTool(params, {
                     onUserControl: userControl,
-                    cardVault: this.#attention.cardVault(client, toolRequest, params),
+                    cardVault: linkVault ?? this.#attention.cardVault(client, toolRequest, params),
                   });
+                }
               }
             });
             const signal = toolRequest.signal;

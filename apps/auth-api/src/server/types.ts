@@ -3,7 +3,7 @@ import { isDynamicRecord, isFunction } from "@openbot/contracts/runtime-values";
 import type { Effect } from "effect";
 import type { AuthStoreError } from "./d1-auth-repository";
 import type { EmailDeliveryError } from "./email-delivery";
-import type { SmtpContactMessage, SmtpFailure, SmtpWelcomeMessage } from "./smtp-email-delivery";
+import type { SmtpContactMessage, SmtpFailure, SmtpLicenseMessage, SmtpWelcomeMessage } from "./smtp-email-delivery";
 
 export interface WorkerBindings {
   DB: D1Database;
@@ -23,6 +23,8 @@ export interface WorkerBindings {
   EMAIL_SMTP_USERNAME?: string;
   EMAIL_SMTP_PASSWORD?: string;
   EMAIL_FROM?: string;
+  /** The sender of license emails. Empty uses `EMAIL_FROM`. The SMTP account must be allowed to send as it. */
+  EMAIL_LICENSE_FROM?: string;
   EMAIL_DELIVERY_WEBHOOK_URL?: string;
   EMAIL_DELIVERY_WEBHOOK_SECRET?: string;
   SKILLS_ADMIN_TOKEN?: string;
@@ -219,6 +221,10 @@ export interface TeamInviteEmailDelivery {
 
 export interface WelcomeEmailDelivery {
   send(message: SmtpWelcomeMessage): Effect.Effect<void, SmtpFailure>;
+}
+
+export interface LicenseEmailDelivery {
+  send(message: SmtpLicenseMessage): Effect.Effect<void, SmtpFailure>;
 }
 
 export interface ContactMessageDelivery {

@@ -160,11 +160,13 @@ export type AgentAuthState =
   | { kind: "antigravity"; email: string | null }
   | { kind: "cursor"; email: string | null }
   | { kind: "cline"; email: string | null }
+  | { kind: "kimi"; email: string | null }
   | { kind: "pi"; email: string | null }
   | { kind: "muse"; email: string | null }
   | { kind: "inception"; email: string | null }
   | { kind: "deepseek"; email: string | null }
   | { kind: "openrouter"; email: string | null }
+  | { kind: "hermes"; email: string | null }
   | { kind: "acp"; email: string | null };
 
 export interface AccountUsageWindow {

@@ -106,6 +106,11 @@ export interface ChannelHooks {
   /** The schedule routines of the channels, for the routine tools. Omitted, those tools fail. */
   routines?: ChannelRoutineToolPort;
   error(error: unknown): void;
+  /**
+   * A routing turn failed. The channel text names no cause, so this gets each failure, also one that
+   * the channel shows as catalog text, for the log. A question of the lead is not a failure.
+   */
+  routingFailed?(failure: { channelId: string; taskId: string; lead: AgentSummary | undefined; error: unknown }): void;
 }
 
 class ChannelRoutingError extends Schema.TaggedError<ChannelRoutingError>()("ChannelRoutingError", {
@@ -1280,6 +1285,9 @@ export class ChannelService {
           // A cause without channel text goes to the redacted error path; without it no one could
           // see why routing failed.
           const shown = error instanceof ChannelRoutingError ? error.message : routingFailureText(error);
+          // A routing error that is not catalog text is the lead's question to the user, from the chat.
+          if (!(error instanceof ChannelRoutingError) || isFixedSourceText(error.message))
+            this.hooks.routingFailed?.({ channelId, taskId: task.id, lead, error });
           if (shown === null) this.hooks.error(error);
           const detail = shown ?? sourceText("error.backend.channelRoutingFailed");
           yield* channelSync(() =>

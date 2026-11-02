@@ -2,7 +2,8 @@
 // to check that a custom endpoint saved with "Runs on: Pi" runs through Pi, and that an endpoint that
 // runs on OpenCode stays out of Pi. Pi reads `$` and a leading `!` in a key or a header as an
 // environment reference or a shell command, so the key and the header must arrive literally. The
-// key and the header value must not reach the extension file or an error message.
+// key and the header value must not reach the extension file or an error message. A saved output
+// limit must reach the request as the model's budget (#4234).
 // `PI_CLI=<pi> bun run test:custom-provider-pi`. Writes .openbot-build/custom-provider-pi-harness/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -18,7 +19,7 @@ import {
   OPENCODE_PROFILE_CONFIG,
   openCodeConfigEnv,
 } from "../src/backend/opencode-config";
-import { getArray, getRecord, getString } from "../src/backend/protocol";
+import { getArray, getRecord, getString, isRecord } from "../src/backend/protocol";
 import { requireProviderDriver } from "../src/backend/provider-drivers";
 import { runTurn, startThread, stopClients } from "./provider-fakes/host";
 
@@ -33,6 +34,8 @@ interface Request {
   authorization: string | null;
   header: string | null;
   model: string | null;
+  /** `max_completion_tokens` or `max_tokens`, whichever Pi sent. */
+  budget: number | null;
 }
 
 interface Report {
@@ -57,12 +60,15 @@ function header(request: IncomingMessage, name: string): string | null {
   return typeof value === "string" ? value : null;
 }
 
-/** The model that a chat completion request names. */
-async function requestedModel(request: IncomingMessage): Promise<string | null> {
+/** The model that a chat completion request names, and the output budget that it asks for. */
+async function requestedModel(request: IncomingMessage): Promise<Pick<Request, "model" | "budget">> {
   const chunks: Buffer[] = [];
   for await (const part of request) chunks.push(Buffer.from(part));
   const text = Buffer.concat(chunks).toString("utf8");
-  return text ? getString(JSON.parse(text), "model") : null;
+  const value = text ? JSON.parse(text) : null;
+  const sent = isRecord(value) ? (value.max_completion_tokens ?? value.max_tokens) : null;
+  const budget = typeof sent === "number" ? sent : null;
+  return { model: getString(value, "model"), budget };
 }
 
 /** One server-sent event of a streamed chat completion: the reply text, or the end of the reply. */
@@ -76,9 +82,9 @@ function chunk(model: string, content: string | null): string {
 
 const server = createServer((request: IncomingMessage, response: ServerResponse) => {
   void (async () => {
-    const model = await requestedModel(request);
+    const { model, budget } = await requestedModel(request);
     const authorization = header(request, "authorization");
-    report.requests.push({ path: request.url ?? "", authorization, header: header(request, "x-e2e"), model });
+    report.requests.push({ path: request.url ?? "", authorization, header: header(request, "x-e2e"), model, budget });
     if (model === FAILING_MODEL) {
       // A server that names the key it refused. Pi passes the body on, so OpenBot must redact it.
       response.writeHead(401, { "content-type": "application/json" });
@@ -132,7 +138,7 @@ try {
     apiKey: KEY,
     headers: [{ name: "X-E2E", value: HEADER_VALUE }],
     models: [
-      { id: "fake-coder", name: "Fake coder", contextWindow: 32_768 },
+      { id: "fake-coder", name: "Fake coder", contextWindow: 32_768, maxOutput: 12_000 },
       { id: FAILING_MODEL, name: "Fake broken" },
     ],
     harness: "pi",
@@ -195,6 +201,7 @@ try {
   assert.equal(sent.path, "/v1/chat/completions");
   assert.equal(sent.authorization, `Bearer ${KEY}`, "Pi must send the key literally.");
   assert.equal(sent.header, HEADER_VALUE, "Pi must send the header literally.");
+  assert.equal(sent.budget, 12_000, "Pi must ask for the saved output limit.");
 
   // A refused request: the error reaches the user, but not the key.
   const failure = await runTurn(client, thread, {

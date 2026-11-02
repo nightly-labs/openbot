@@ -43,6 +43,8 @@ export const messages = {
   "onboarding.provider.googlePlan": "Google AI Pro- oder Ultra-Tarif",
   "onboarding.provider.cursorPlan": "Cursor-Tarif oder API-Schlüssel",
   "onboarding.provider.clineAccount": "Kostenlose Modelle mit einem Cline-Konto",
+  "onboarding.provider.kimiAccount": "Kimi-Modelle mit einem Kimi-Code-Konto",
+  "onboarding.provider.hermesNous": "Nous-Portal-Abo oder deine Hermes-Einrichtung",
   "onboarding.provider.inceptionKey": "Mercury-Modelle mit einem Inception-API-Schlüssel",
   "onboarding.provider.deepseekKey": "DeepSeek-Modelle mit einem DeepSeek-API-Schlüssel",
   "onboarding.provider.openrouterKey": "Viele Modelle mit einem OpenRouter-API-Schlüssel",
@@ -85,7 +87,8 @@ export const messages = {
   "onboarding.choice.startFreeInstead": "Lieber kostenlos starten",
   "onboarding.consent.notice": "Wenn du fortfährst, akzeptierst du die {terms} und nimmst die {privacy} zur Kenntnis.",
   "onboarding.consent.analyticsTitle": "Hilf mit, OpenBot besser zu machen",
-  "onboarding.consent.analyticsDetail": "Teile, welche Funktionen du nutzt. Nie deine Chats, Dateien oder Prompts.",
+  "onboarding.consent.analyticsDetail":
+    "Verknüpfe die Nutzung von Funktionen mit deinem Konto und deiner E-Mail-Adresse und teile besuchte Websites, Tool-Nutzung und eine tägliche Übersicht deiner Einrichtung. Sonst wird nur die grundlegende Nutzung mit einer zufälligen Installations-ID gesendet. Nie deine Chats, Dateien oder Prompts.",
   "onboarding.consent.thanksTitle": "Danke! Das Team schuldet dir was.",
   "onboarding.consent.thanksToast": "Danke, dass du OpenBot besser machst 💜",
   "onboarding.consent.thanksToastDetail": "Du kannst das jederzeit in den Einstellungen ändern.",

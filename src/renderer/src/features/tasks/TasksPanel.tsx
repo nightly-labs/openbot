@@ -56,6 +56,11 @@ export function TasksPanel(props: TasksPanelProps) {
       voice={createTasksVoice}
       onOpenLink={(url) => void appPort().openUrl(url)}
       onAttachmentAction={openAttachment}
+      files={{
+        accepted: threads.filesAccepted,
+        import: (data, serverId) => window.openbot.agent.importAttachmentData(data, serverId),
+        discard: (id, serverId) => window.openbot.agent.discardDraftAttachment(id, serverId),
+      }}
       approvals={approvals()}
       // A question and a browser takeover wait by thread, as the thread tab reads them.
       waitsForAnswer={(task) => pendingPrompts()[attentionKey(task.agentId, task.threadId)] !== undefined}

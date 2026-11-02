@@ -27,6 +27,7 @@ import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
@@ -97,6 +98,7 @@ import type { SettingsPagePlacement } from "@openbot/ui/features/settings/Settin
 import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/stores/hosted-servers-store";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
+import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import {
   computeSidebarAgentStates,
   sidebarAgentWaits,
@@ -122,6 +124,8 @@ import {
 } from "solid-js";
 // Copying a selection with a formula in it gives its LaTeX source, as on desktop.
 import "katex/contrib/copy-tex";
+// Copying a selection gives clean HTML, as on desktop.
+import "../../selection-copy";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { toAgentMessage } from "../../app-message-projection";
@@ -663,6 +667,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     openAccountSettings();
   }
   const [searchOpen, setSearchOpen] = createSignal(false);
+  const hiddenAgentIds = createMemo(() => new Set(workspace.state.userHiddenAgents.map((entry) => entry.agentId)));
+  // In sidebar order, so that ⌘1-9 opens the agents the user put at the top.
+  const searchAgents = createMemo(() =>
+    sidebarAgentOrder(workspace.profiles(), {
+      layout: workspace.state.sidebarLayout,
+      pinnedItems: workspace.preferences.pinnedSidebarItems(),
+      hiddenAgentIds: hiddenAgentIds(),
+    }),
+  );
   const communityCard = createCommunityCardVisibility();
   const [messageFocusRequest, setMessageFocusRequest] = createSignal<{
     agentId: string;
@@ -2357,7 +2370,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   <ChannelCreateOverlay />
                   <GlobalSearchOverlay
                     open={searchOpen()}
-                    agents={workspace.profiles()}
+                    agents={searchAgents()}
                     channels={channels.supported() ? globalSearchChannels(channels.state.channels) : undefined}
                     onSearchMessages={searchAllMessages}
                     onOpenChange={setSearchOpen}
@@ -2381,6 +2394,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       agentsOpen={!tasksAgentsHidden()}
                       onToggleAgents={() => setTasksAgentsOpen(tasksAgentsHidden())}
                       source={tasksSource}
+                      mediaSource={runtime.attachmentMedia}
+                      files={{
+                        accepted: () => workspace.state.capabilities.includes(AGENT_THREAD_FILES_CAPABILITY),
+                        import: (data, serverId) => runtime.agent.importAttachmentData(data, serverId),
+                        discard: (id, serverId) => runtime.agent.discardDraftAttachment(id, serverId),
+                      }}
                       agents={workspace.profiles()}
                       onOpenLink={(url) => void openWebLink(url)}
                       // The browser only downloads a file.
@@ -2488,7 +2507,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       },
                       approvals: () => workspace.state.approvals,
                       takeovers: () => workspace.state.takeovers,
-                      hiddenAgentIds: () => new Set(workspace.state.userHiddenAgents.map((entry) => entry.agentId)),
+                      hiddenAgentIds,
                     });
                     return (
                       <Conversation

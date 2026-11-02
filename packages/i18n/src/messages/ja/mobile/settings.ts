@@ -71,9 +71,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "アニメーションをオフにすると、アプリ全体の動きを減らします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。その場合、下のアニメーションはオフのままです。",
   "mobile.settings.animations.all": "アニメーション",
-  "mobile.settings.animations.chatZoom": "チャットへのズーム",
-  "mobile.settings.animations.chatZoomFooter":
-    "チャットはリストのアバターから開き、閉じるとアバターに戻ります。オフにすると、チャットは横からスライドして開きます。",
   "mobile.settings.animations.agentFaces": "エージェントの表情アニメーション",
   "mobile.settings.animations.agentFacesFooter":
     "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動きません。",
@@ -161,8 +158,8 @@ export const messages = {
   "mobile.settings.notifications.channelSilent": "エージェントの通知（サウンドなし）",
   "mobile.settings.privacy.title": "プライバシー",
   "mobile.settings.privacy.footer":
-    "このスマートフォンの機能の使用状況と接続結果を共有します。メッセージの内容とファイルは送信されません。",
-  "mobile.settings.privacy.analytics": "製品の分析データを共有",
+    "このスマートフォンの機能の使用状況と接続結果は、常に OpenBot の分析基盤に送信されます。オン: アカウント ID とメールアドレスとともに送信。オフ: ランダムなインストール ID のみとともに送信。メッセージの内容とファイルは送信されません。",
+  "mobile.settings.privacy.analytics": "分析データをアカウントに関連付ける",
   "mobile.settings.privacy.retry": "プライバシー設定をもう一度保存",
   "mobile.settings.conversations.title": "会話",
   "mobile.settings.conversations.hiddenChats": "非表示のチャット",

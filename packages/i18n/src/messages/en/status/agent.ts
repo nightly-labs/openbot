@@ -26,6 +26,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.vaultCardFill":
     "Fill the saved card {card} on {site}. After you approve, agents can fill this card on this site with no approval. Remove the site in Server settings > Vault.",
   "status.agent.vaultCardFillFrames": "The card fields are in frames from {origins}.",
+  "status.agent.linkCardFill":
+    "Fill the one-time Link card {card} on {site}. You approved this payment in Link for {merchant}.",
   "status.agent.screenCaptureProgress": "Asking to capture the screen…",
   "status.agent.screenCaptureReviewing": "Reviewing the screen capture…",
   "status.agent.browserOpening": "Opening a web page…",
@@ -42,6 +44,19 @@ export const messages = defineMessages("status.agent", {
   "status.agent.memoriesUpdating": "Updating its memories…",
   "status.agent.skillUsing": "Using the skill {name}…",
   "status.agent.skillReading": "Reading a skill…",
+  "status.agent.toolStepFailed": "A tool step failed; reviewing the result and deciding what to try next…",
+  "status.agent.toolResultReviewing": "Reviewing the latest tool result…",
+  "status.agent.sourcesSearching": "Searching for current information…",
+  "status.agent.sourcesReviewing": "Reviewing the sources and information I found…",
+  "status.agent.informationGathering": "Gathering the relevant information…",
+  "status.agent.informationReviewing": "Reviewing the information I gathered…",
+  "status.agent.workChecking": "Checking the work…",
+  "status.agent.workReviewing": "Reviewing the verification results…",
+  "status.agent.changesMaking": "Making the requested changes…",
+  "status.agent.changesReviewing": "Reviewing the changes I made…",
+  "status.agent.agentCoordinating": "Coordinating with another agent…",
+  "status.agent.agentResponseReviewing": "Reviewing the other agent’s response…",
+  "status.agent.toolStepWorking": "Working through the next tool-assisted step…",
   "status.agent.memoryChanges": "Memory: {saved} saved, {updated} updated, {forgotten} forgotten.",
   "status.agent.memoryChangesWithConflicts":
     "Memory: {saved} saved, {updated} updated, {forgotten} forgotten, {notChanged} not changed because another thread changed it first.",

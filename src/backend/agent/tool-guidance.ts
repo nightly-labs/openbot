@@ -25,7 +25,13 @@ export function toolGuidance(
 }
 
 const BROWSER_SIGN_IN_TOOLS = new Set(["submit_secret", "list_logins", "request_takeover"]);
-const BROWSER_VAULT_TOOLS = new Set(["list_vault_items", "fill_card", "save_vault_item", "delete_vault_item"]);
+const BROWSER_VAULT_TOOLS = new Set([
+  "list_vault_items",
+  "fill_card",
+  "save_vault_item",
+  "delete_vault_item",
+  "request_link_payment",
+]);
 
 /**
  * Each browser tool gets the core. A detailed section comes only with the tools that it is about, and the

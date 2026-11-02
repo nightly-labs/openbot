@@ -37,6 +37,7 @@ export function serverSupportsCapability(
       capability === "mcp-servers-v1" ||
       capability === "mcp-sign-in-v1" ||
       capability === "mcp-sign-in-app-v1" ||
+      capability === "mcp-accounts-v1" ||
       capability === "sign-in-relay-v1" ||
       capability === "connectors-v1" ||
       capability === "onepassword-connector-v1" ||
@@ -95,7 +96,8 @@ export function serverSupportsCapability(
       capability === "channel-task-cancel-v1" ||
       capability === "side-question-v1" ||
       capability === "workflows-github-v1" ||
-      capability === "agent-notification-levels-v1") &&
+      capability === "agent-notification-levels-v1" ||
+      capability === "sidebar-pins-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;

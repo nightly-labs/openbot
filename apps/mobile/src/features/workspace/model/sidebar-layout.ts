@@ -1,4 +1,4 @@
-import type { ChannelSummary, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import type { ChannelSummary, SidebarLayoutAction, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
 import {
   SIDEBAR_UNASSIGNED_SECTION_ID,
   sidebarFolderAncestors,
@@ -72,4 +72,21 @@ export function mobileWaitingItems(layout: SidebarLayoutSnapshot | null, agents:
     { kind: "waiting", id: "needs-you", count: sorted.length },
     ...sorted.map((agent) => ({ kind: "agent" as const, id: agent.id, agent })),
   ];
+}
+
+/**
+ * The layout after a `move-agent` action, as the host applies it. The phone shows the move before the
+ * host answers; the answer of the host then replaces this layout.
+ */
+export function moveSidebarChat(
+  layout: SidebarLayoutSnapshot,
+  action: Extract<SidebarLayoutAction, { type: "move-agent" }>,
+): SidebarLayoutSnapshot {
+  const agentOrder = layout.agentOrder.filter((id) => id !== action.agentId);
+  const index = action.beforeAgentId === null ? -1 : agentOrder.indexOf(action.beforeAgentId);
+  agentOrder.splice(index < 0 ? agentOrder.length : index, 0, action.agentId);
+  const agentAssignments = { ...layout.agentAssignments };
+  if (action.sectionId === null) delete agentAssignments[action.agentId];
+  else agentAssignments[action.agentId] = action.sectionId;
+  return { ...layout, agentAssignments, agentOrder };
 }

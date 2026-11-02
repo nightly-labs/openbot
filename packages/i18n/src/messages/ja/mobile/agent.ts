@@ -16,6 +16,7 @@ export const messages = {
   "mobile.agent.pin.unpinNamed": "{name} のピン留めを解除",
   "mobile.agent.pin.limitReached": "ピン留めの上限に達しました。先にチャットのピン留めを解除してください。",
   "mobile.agent.pin.closeAction": "{name} のピン留め操作を閉じる",
+  "mobile.agent.drag.pinHere": "ここにドロップしてピン留め",
   "mobile.agent.appearance.preview": "{name} のアバターのプレビュー",
   "mobile.agent.appearance.newAgent": "新しいエージェント",
   "mobile.agent.appearance.faces": "形と表情",
