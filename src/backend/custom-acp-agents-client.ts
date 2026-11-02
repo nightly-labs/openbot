@@ -74,6 +74,9 @@ export type CustomAgentChildFactory = (
 
 const MODEL_LIST_TIMEOUT_MS = 5_000;
 
+/** What a write that the macOS sandbox denied looks like: `EPERM`, and SQLite's read-only fallback (#4324). */
+const WRITE_DENIED = /\bEPERM\b|operation not permitted|attempt to write a readonly database/iu;
+
 interface ClientEvents {
   notification: [notification: AppServerNotification];
   request: [request: AppServerRequest];
@@ -137,6 +140,8 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   readonly #createChild: CustomAgentChildFactory;
   readonly #resolve: typeof resolveAgentCommand;
   readonly #history: AcpHistoryPersistence | undefined;
+  /** Whether the processes run in the Workspace only sandbox (`process-confinement.ts`). */
+  readonly #confined: boolean;
   readonly #children = new Map<string, Deferred.Deferred<AgentClient, ProviderClientOperationError>>();
   /** The process that opened or loaded each session, by the routed id that the caller knows. */
   readonly #sessions = new Map<string, HeldSession>();
@@ -154,12 +159,14 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     createChild: CustomAgentChildFactory,
     resolve = resolveAgentCommand,
     history?: AcpHistoryPersistence,
+    confined = false,
   ) {
     super();
     this.#source = source;
     this.#createChild = createChild;
     this.#resolve = resolve;
     this.#history = history;
+    this.#confined = confined;
   }
 
   get running(): boolean {
@@ -445,7 +452,9 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
           });
       }
     },
-    Effect.mapError((error) => new ProviderClientOperationError({ cause: this.#redactError(error.cause) })),
+    Effect.mapError(
+      (error) => new ProviderClientOperationError({ cause: this.#explainError(this.#redactError(error.cause)) }),
+    ),
   );
 
   notify(): void {
@@ -557,7 +566,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       child = created;
       const route = (sessionId: string) => this.#routedSessionId(created, prefix, sessionId);
       created.on("notification", (notification) => {
-        this.emit("notification", withRoutedThreadId(notification, route));
+        const message = notification.method === "error" ? getString(notification.params, "message") : null;
+        const explained =
+          message === null
+            ? notification
+            : { ...notification, params: { ...getRecord(notification, "params"), message: this.#explain(message) } };
+        this.emit("notification", withRoutedThreadId(explained, route));
       });
       created.on("request", (request) => {
         this.#nextRequestId += 1;
@@ -566,7 +580,9 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         this.emit("request", withRoutedThreadId({ ...request, id }, route));
       });
       created.on("diagnostic", (message, origin) => this.emit("diagnostic", this.#redact(message), origin));
-      created.once("exit", (error) => this.#childExited(key, folder, created, this.#redactError(error)));
+      created.once("exit", (error) =>
+        this.#childExited(key, folder, created, this.#explainError(this.#redactError(error))),
+      );
       yield* customStep(() => created.start());
       yield* created
         .request("initialize", {}, decodeRecordResponse)
@@ -621,6 +637,22 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   #redactError<E>(error: E): E | Error {
     if (!(error instanceof Error)) return error;
     const message = this.#redact(error.message);
+    return message === error.message ? error : new Error(message);
+  }
+
+  /**
+   * A custom agent gets no state folder in the sandbox (`customAgentStatePaths`), so most agents
+   * fail when they write in their home folder. The provider's own text does not name the cause.
+   */
+  #explain(message: string): string {
+    return this.#confined && WRITE_DENIED.test(message)
+      ? sourceText("error.provider.customAgentWorkspaceOnly", { reason: message.trimEnd().replace(/\.$/u, "") })
+      : message;
+  }
+
+  #explainError<E>(error: E): E | Error {
+    if (!(error instanceof Error)) return error;
+    const message = this.#explain(error.message);
     return message === error.message ? error : new Error(message);
   }
 

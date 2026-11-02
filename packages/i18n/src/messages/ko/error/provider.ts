@@ -318,6 +318,7 @@ export const messages = {
     "이 컴퓨터에는 보안 저장소가 없어서 환경 값을 저장할 수 없어요. 제거한 후 다시 시도해 주세요.",
   "error.provider.customAgentNotSaved":
     "이 사용자 지정 에이전트는 저장되지 않았어요. 목록을 새로 고친 후 다시 시도해 주세요.",
+  "error.provider.customAgentWorkspaceOnly": "{reason}. '워크스페이스만'이 이를 막습니다. '전체 접근'을 사용해 보세요.",
   "error.provider.customAgentTooMany": "사용자 지정 에이전트는 최대 {count}개까지 저장할 수 있어요.",
   "error.provider.customAgentEnvValueMissing": "{name}의 값을 입력하세요.",
   "error.provider.off": "OpenBot에서 {provider}이(가) 꺼져 있어요. 먼저 제공자 설정에서 켜세요.",

@@ -315,6 +315,8 @@ export const messages = {
   "error.provider.customAgentNoSecureStorage":
     "На этом компьютере нет защищённого хранилища, поэтому значения среды сохранить нельзя. Удалите их и повторите попытку.",
   "error.provider.customAgentNotSaved": "Этот свой агент не сохранён. Обновите список и повторите попытку.",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}. Режим «Рабочее пространство» блокирует это. Попробуйте «Полный доступ».",
   "error.provider.customAgentTooMany": "Можно сохранить не более {count} своих агентов.",
   "error.provider.customAgentEnvValueMissing": "Введите значение для {name}.",
   "error.provider.off": "{provider} выключен в OpenBot. Сначала включите его в настройках провайдеров.",

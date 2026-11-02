@@ -333,6 +333,8 @@ export const messages = {
     "このコンピューターには安全なストレージがないため、環境変数の値を保存できません。値を削除して、もう一度お試しください。",
   "error.provider.customAgentNotSaved":
     "このカスタムエージェントは保存されていません。一覧を更新して、もう一度お試しください。",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}。「ワークスペースのみ」がこれをブロックしています。「フルアクセス」をお試しください。",
   "error.provider.customAgentTooMany": "保存できるカスタムエージェントは最大 {count} 個です。",
   "error.provider.customAgentEnvValueMissing": "{name} の値を入力してください。",
   "error.provider.off": "{provider} は OpenBot でオフになっています。まずプロバイダーの設定でオンにしてください。",

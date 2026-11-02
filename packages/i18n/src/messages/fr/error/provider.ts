@@ -342,6 +342,8 @@ export const messages = {
     "Cet ordinateur n’a pas de stockage sécurisé : impossible d’enregistrer les valeurs d’environnement. Supprimez-les et réessayez.",
   "error.provider.customAgentNotSaved":
     "Cet agent personnalisé n’est pas enregistré. Actualisez la liste et réessayez.",
+  "error.provider.customAgentWorkspaceOnly":
+    "{reason}. « Espace de travail seul » bloque cette action. Essayez « Accès complet ».",
   "error.provider.customAgentTooMany": "Vous pouvez enregistrer au plus {count} agents personnalisés.",
   "error.provider.customAgentEnvValueMissing": "Saisissez une valeur pour {name}.",
   "error.provider.off": "{provider} est désactivé dans OpenBot. Activez-le d’abord dans les réglages des fournisseurs.",
