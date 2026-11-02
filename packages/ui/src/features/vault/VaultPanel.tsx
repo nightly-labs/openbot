@@ -19,6 +19,7 @@ import {
   VAULT_NOTES_LIMIT,
   VAULT_PASSWORD_LIMIT,
   VAULT_TEXT_LIMIT,
+  vaultExpiryText,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -139,9 +140,6 @@ const SECRET_TEXT = {
 
 const digitsOf = (value: string) => value.replace(/\D/gu, "");
 
-const twoDigits = (value: number) => String(value).padStart(2, "0");
-const expiryText = (month: number, year: number) => `${twoDigits(month)}/${twoDigits(year % 100)}`;
-
 /** `MM/YY` or `MM/YYYY`, or null when the text is not a date. */
 function parseExpiry(text: string): { month: number; year: number } | null {
   const match = /^\s*(\d{1,2})\s*\/\s*(\d{2}|\d{4})\s*$/u.exec(text);
@@ -193,7 +191,7 @@ function draftOf(kind: VaultItemKind, item: VaultItemSummary | null): Draft {
           label: item.label,
           nameOnCard: item.nameOnCard,
           number: "",
-          expiry: expiryText(item.expMonth, item.expYear),
+          expiry: vaultExpiryText(item.expMonth, item.expYear),
           securityCode: "",
           billingContactId: item.billingContactId ?? "",
           fillSites: item.fillSites,
@@ -368,7 +366,7 @@ export function VaultPanel(props: VaultPanelProps) {
   const itemDetail = (item: VaultItemSummary) => {
     if (item.kind === "login") return item.username || t("vault.noUsername");
     if (item.kind === "card")
-      return t("vault.cardSummary", { last4: item.last4, expiry: expiryText(item.expMonth, item.expYear) });
+      return t("vault.cardSummary", { last4: item.last4, expiry: vaultExpiryText(item.expMonth, item.expYear) });
     if (item.kind === "apiKey") return item.notes || t("vault.kind.apiKey");
     return contactLine(item) || item.email || item.phone;
   };

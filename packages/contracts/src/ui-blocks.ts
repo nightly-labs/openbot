@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import type { AgentPromptQuestion, ConversationMessageSender } from "./ipc-conversation-messages";
-import { VAULT_TEXT_LIMIT, type VaultCardBrand } from "./ipc-vault";
+import { VAULT_CARD_BRANDS, VAULT_TEXT_LIMIT, type VaultCardBrand } from "./ipc-vault";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 /**
@@ -790,8 +790,6 @@ function readState(spec: UiBlockSpec, value: unknown): UiBlockState {
   if (record.autoAnswer !== undefined) state.autoAnswer = readAutoAnswer(spec, record.autoAnswer);
   return state;
 }
-
-const VAULT_CARD_BRANDS = ["visa", "mastercard", "amex", "discover"] as const satisfies readonly VaultCardBrand[];
 
 function readVaultRequest(spec: UiBlockSpec, value: unknown): UiBlockVaultRequest {
   const record = readRecord(value);

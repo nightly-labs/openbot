@@ -295,7 +295,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "request_vault_item",
     description:
-      'Ask the user to add a login, a card or contact info to the OpenBot Vault, and wait for the answer. The chat shows a card that opens the Vault form. Fill in the fields that you know, so the user only checks them: a contact\'s fields, a login\'s website and username, or a card\'s label, name and expiry. You cannot fill in a password, a card number or a security code: only the user types them, and you never see them. Use it when a task needs an item that list_vault_items does not have, such as a card to pay with. The result is JSON: {"status":"saved","id","kind","name"} when the user saved the item; {"status":"skipped"} when the user closed the card; or {"status":"expired"} when the turn ended first. Only the server owner or an admin can save. It does not work in a Slack, Discord or Telegram chat.',
+      'Ask the user to add a login, card or contact info to the Vault, and wait. The chat shows a card that opens the Vault form with the fields that you give. The user types the password, card number and security code; you never see them. Use it when a task needs an item that list_vault_items does not have. Result JSON: {"status":"saved","id","kind","name"}, {"status":"skipped"}, or {"status":"expired"}. Only the owner or an admin can save. Not in a Slack, Discord or Telegram chat.',
     shape: {
       kind: z.enum(UI_VAULT_REQUEST_KINDS),
       title: requiredString(UI_BLOCK_LIMITS.title).describe(

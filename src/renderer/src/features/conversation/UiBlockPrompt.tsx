@@ -1,4 +1,4 @@
-import type { VaultSaveInput } from "@openbot/contracts/ipc";
+import { type VaultSaveInput, vaultExpiryText } from "@openbot/contracts/ipc";
 import {
   type ConversationUiBlock,
   UI_BLOCK_SUBMIT_ACTION_ID,
@@ -37,9 +37,6 @@ export interface UiBlockPromptProps {
   elementRef?: ((element: HTMLElement | undefined) => void) | undefined;
 }
 
-const expiryText = (month: number, year: number) =>
-  `${String(month).padStart(2, "0")}/${String(year % 100).padStart(2, "0")}`;
-
 /** The form values of a Vault item, keyed by the field ids of `UI_VAULT_REQUEST_FIELDS`. */
 function vaultFormValues(input: VaultSaveInput): Record<string, string> {
   switch (input.kind) {
@@ -50,7 +47,7 @@ function vaultFormValues(input: VaultSaveInput): Record<string, string> {
         label: input.label,
         nameOnCard: input.nameOnCard,
         number: input.number ?? "",
-        expiry: expiryText(input.expMonth, input.expYear),
+        expiry: vaultExpiryText(input.expMonth, input.expYear),
         securityCode: input.securityCode ?? "",
       };
     case "contact": {

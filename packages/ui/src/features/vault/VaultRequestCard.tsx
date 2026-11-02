@@ -165,7 +165,7 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
               )}
             </Show>
           </Match>
-          <Match when={props.status === "answered"}>
+          <Match when={props.status === "answered" && props.saved}>
             <span class="vault-request-done">
               <CircleCheck aria-hidden="true" />
               {t("vault.request.saved")}

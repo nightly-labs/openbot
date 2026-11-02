@@ -590,9 +590,11 @@ export class AttentionRegistry {
       this.#emitInputResolved("prompt", input.requestId, pending.agentId);
       try {
         if (pending.uiBlock) {
+          // A Vault request that saved nothing, such as an empty form from an older client, is closed.
+          const frozenResponse = pending.uiBlock.vault && !savedItem ? null : uiBlockResponse;
           const state = answeredUiBlockState(
             pending.uiBlock.spec,
-            uiBlockResponse,
+            frozenResponse,
             responder,
             pending.autoAnswer?.state,
           );
@@ -603,7 +605,7 @@ export class AttentionRegistry {
             }).slice(0, UI_BLOCK_LIMITS.outcome);
           this.#resolvePersistedPrompt(
             pending,
-            uiBlockResponse ? promptResolution(pending.questions, input.answers) : { status: "cancelled" },
+            frozenResponse ? promptResolution(pending.questions, input.answers) : { status: "cancelled" },
             state,
             savedItem?.saved,
           );

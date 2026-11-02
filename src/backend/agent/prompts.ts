@@ -6,7 +6,11 @@ import type {
   AgentPromptResolution,
   RespondToBrowserTakeoverInput,
 } from "@openbot/contracts/ipc";
-import { COMPUTER_USE_MCP_SERVER_NAME, MCP_ELICITATION_DECISION_QUESTION_ID } from "@openbot/contracts/ipc";
+import {
+  COMPUTER_USE_MCP_SERVER_NAME,
+  MCP_ELICITATION_DECISION_QUESTION_ID,
+  vaultExpiryText,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import {
   normalizeUiBlockSpec,
@@ -366,7 +370,7 @@ type VaultRequestArguments = BrowserToolArguments<"request_vault_item">;
 const VAULT_REQUEST_PREFILL: Record<VaultRequestArguments["kind"], readonly string[]> = {
   login: ["website", "username"],
   card: ["label", "nameOnCard", "expMonth", "expYear"],
-  contact: ["label", "fullName", "address", "address2", "city", "region", "postalCode", "country", "phone", "email"],
+  contact: UI_VAULT_REQUEST_FIELDS.contact,
 };
 
 const VAULT_REQUEST_REQUIRED: readonly UiVaultRequestField[] = ["website", "password", "number", "expiry"];
@@ -392,14 +396,10 @@ const VAULT_REQUEST_LABEL = {
 } as const satisfies Record<UiVaultRequestField, string>;
 
 /** Two-digit month and year, as the Vault dialog shows an expiry. */
-function expiryText(month: number, year: number): string {
-  return `${String(month).padStart(2, "0")}/${String(year % 100).padStart(2, "0")}`;
-}
-
 function vaultRequestValue(args: VaultRequestArguments, field: UiVaultRequestField): string | undefined {
   if (field === "expiry")
     return args.expMonth !== undefined && args.expYear !== undefined
-      ? expiryText(args.expMonth, args.expYear)
+      ? vaultExpiryText(args.expMonth, args.expYear)
       : undefined;
   if (UI_VAULT_SECRET_FIELDS.includes(field)) return undefined;
   const value = Object.entries(args).find(([key]) => key === field)?.[1];

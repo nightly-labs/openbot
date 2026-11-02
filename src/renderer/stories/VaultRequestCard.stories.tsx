@@ -1,5 +1,5 @@
 import type { VaultSaveInput } from "@openbot/contracts/ipc";
-import { cardBrand } from "@openbot/contracts/ipc";
+import { cardBrand, vaultExpiryText } from "@openbot/contracts/ipc";
 import type { UiBlockStatus, UiVaultRequestKind, UiVaultSavedItem } from "@openbot/contracts/ui-blocks";
 import { VaultRequestCard } from "@openbot/ui/features/vault/VaultRequestCard";
 import { createSignal } from "solid-js";
@@ -35,9 +35,6 @@ const REQUESTS = {
   },
 } satisfies Record<UiVaultRequestKind, { title: string; prefill: Record<string, string> }>;
 
-const expiry = (month: number, year: number) =>
-  `${String(month).padStart(2, "0")}/${String(year % 100).padStart(2, "0")}`;
-
 /** The item and its summary values, as the host stores them: no secret value. */
 function savedFrom(input: VaultSaveInput): { saved: UiVaultSavedItem; values: Record<string, string> } {
   switch (input.kind) {
@@ -51,7 +48,7 @@ function savedFrom(input: VaultSaveInput): { saved: UiVaultSavedItem; values: Re
           ...(brand ? { brand } : {}),
           last4: digits.slice(-4),
         },
-        values: { label: input.label, expiry: expiry(input.expMonth, input.expYear) },
+        values: { label: input.label, expiry: vaultExpiryText(input.expMonth, input.expYear) },
       };
     }
     case "login":
