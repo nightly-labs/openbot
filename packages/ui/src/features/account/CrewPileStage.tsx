@@ -1,6 +1,6 @@
 import type { BotExpression, ExpressionId } from "@norbert_bodziony/bloub";
 import { PLUSH_CHARACTER_BY_ID, PlushBot } from "@norbert_bodziony/bloub/plush";
-import { createSignal, For, onSettled } from "solid-js";
+import { createSignal, For, onSettled, untrack } from "solid-js";
 import { PlushMascot, type PlushMascotFace } from "../../plush-loader";
 import { clamp } from "../../utils";
 import { CREW_PIT, type CrewFace, type CrewMember, type CrewPile } from "./crew-pile";
@@ -152,7 +152,8 @@ export function CrewPileStage(props: CrewPileStageProps) {
       >
         <For each={pile.crew}>
           {(member, position) => {
-            const index = position();
+            // The crew of a pile never changes, so each plush keeps its index.
+            const index = untrack(position);
             const face = () => faces[index]?.[0]() ?? pile.bodies[index]?.face;
             const crewState = () => face()?.state ?? "idle";
             const expression = () => {
