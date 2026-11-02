@@ -20,6 +20,7 @@ import { installAppLock } from "@/features/app-lock/model/app-lock";
 import { DevelopmentConnectLinkHandler } from "@/features/auth/components/development-connect-link-handler";
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { loadOnboardingProgress } from "@/features/onboarding/model/onboarding-progress";
+import { resetNotificationAvatars } from "@/features/push-notifications/notification-avatars";
 import { installNotificationHandler } from "@/features/push-notifications/use-notification-taps";
 import { installQuickActions, resetQuickActions } from "@/features/quick-actions/quick-actions-native";
 import { loadAppLanguage } from "@/features/settings/model/app-language";
@@ -109,11 +110,13 @@ function RootNavigator() {
   const blocked = covered || isLoaderPresent;
 
   // A quick action stays on the app icon after the session ends, such as one that another device revoked.
-  // The share extension keeps its copy of the session and the share sheet its agents, so both go too.
+  // The share extension keeps its copy of the session and the share sheet its agents, so both go too,
+  // with the agent pictures of the notifications.
   useEffect(() => {
     if (loading || session) return;
     resetQuickActions();
     resetShareExtension();
+    resetNotificationAvatars();
   }, [loading, session]);
 
   useLayoutEffect(() => {
