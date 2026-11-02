@@ -1,5 +1,6 @@
 import type { PlushCharacterId } from "@norbert_bodziony/bloub/plush";
 import { PLUSH_MASCOT_BODY } from "../../plush-loader";
+import { clamp } from "../../utils";
 
 /*
  * The crew pile of the app loading screen: each run, a different crew of felt plushes rains into a
@@ -108,8 +109,11 @@ const RUSH_RATE = 2.2;
 /** If the lead does not land in this time after its drop, a ready app does not wait for it. */
 const LEAD_LANDING_LIMIT = 1;
 const EXIT = { stagger: 0.035, leadDelay: 0.12, length: 1.1, zoom: 9 } as const;
-/** A throw: the release speed limit, and the impact that startles a plush in the pile. */
-const THROW = { maxSpeed: 3200, startle: 700 } as const;
+/**
+ * A throw: the release speed limit, the impact that startles a plush in the pile, the shortest time
+ * between two pointer points for a speed, and the time after the last move that a release drops.
+ */
+const THROW = { maxSpeed: 3200, startle: 700, minMove: 1 / 60, still: 0.1 } as const;
 /** A glance: one crew member looks up at the lead, in turn. */
 const GLANCE = { every: 1.1, hold: 0.8 } as const;
 /** The longest frame that the simulation takes in one go, so a slow frame does not tunnel. */
@@ -128,10 +132,6 @@ function createRandom(seed: number): () => number {
 
 function between(random: () => number, min: number, max: number): number {
   return min + random() * (max - min);
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 /** A new crew: how many, who, how large, and where and how each one falls. */
@@ -352,6 +352,8 @@ export class CrewPile {
   private glanceIndex = 0;
   private events: { at: number; run: () => void }[] = [];
   private held: Hold | undefined;
+  /** The user put the lead down before it landed. A soft contact then counts as its landing. */
+  private leadPlaced = false;
 
   /** `reduced` builds the pile at once and keeps it still. */
   constructor(seed: number, reduced: boolean) {
@@ -446,7 +448,8 @@ export class CrewPile {
     const held = this.held;
     const body = held && this.bodies[held.index];
     if (!held || !body) return;
-    const seconds = Math.max(at - held.at, STEP);
+    // Coalesced pointer events can have the same time: a minimum time keeps the speed real.
+    const seconds = Math.max(at - held.at, THROW.minMove);
     // The held plush carries the pointer's speed, so the plushes that it hits get pushed.
     body.vx = (x - held.x) / seconds;
     body.vy = (y - held.y) / seconds;
@@ -456,11 +459,17 @@ export class CrewPile {
     this.held = { ...held, x, y, at };
   }
 
-  release(): void {
+  /** Lets go of the held plush. A plush that the pointer held still for a moment drops; it is not thrown. */
+  release(at?: number): void {
     const held = this.held;
     const body = held && this.bodies[held.index];
     this.held = undefined;
-    if (!body) return;
+    if (!held || !body) return;
+    if (at === undefined || at - held.at > THROW.still) {
+      body.vx = 0;
+      body.vy = 0;
+    }
+    if (held.index === this.lead && this.leadLandedAt < 0) this.leadPlaced = true;
     const speed = Math.hypot(body.vx, body.vy);
     const limit = speed > THROW.maxSpeed ? THROW.maxSpeed / speed : 1;
     body.vx *= limit;
@@ -480,6 +489,7 @@ export class CrewPile {
     const lead = this.bodies[leadIndex];
     if (!lead) return;
     this.leadLandedAt = this.time;
+    this.leadPlaced = false;
     setFace(lead, { state: "wink" });
     this.schedule(0.6, () => setFace(lead, { state: "idle" }));
     this.bodies.forEach((body, index) => {
@@ -541,7 +551,8 @@ export class CrewPile {
       }
       step(this.bodies, collide);
       this.bodies.forEach((body, index) => {
-        if (this.phase === "exit" || body.pinned || body.impact < LANDING_SPEED) return;
+        const placedLead = index === leadIndex && this.leadPlaced;
+        if (this.phase === "exit" || body.pinned || body.impact < (placedLead ? SETTLE.speed : LANDING_SPEED)) return;
         if (this.phase === "intro" && index === leadIndex && this.leadLandedAt < 0) {
           this.leadLanded();
         } else if (

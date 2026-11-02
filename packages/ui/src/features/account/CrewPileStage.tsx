@@ -1,11 +1,15 @@
-import { type BotExpression, EXPRESSION_BY_ID, type ExpressionId } from "@norbert_bodziony/bloub";
+import type { BotExpression, ExpressionId } from "@norbert_bodziony/bloub";
 import { PLUSH_CHARACTER_BY_ID, PlushBot } from "@norbert_bodziony/bloub/plush";
 import { createSignal, For, onSettled } from "solid-js";
 import { PlushMascot, type PlushMascotFace } from "../../plush-loader";
+import { clamp } from "../../utils";
 import { CREW_PIT, type CrewFace, type CrewMember, type CrewPile } from "./crew-pile";
 
-/** The largest scale of the pit, and the room that the text under it needs, in pixels. */
-const PIT_FIT = { maxScale: 1.2, minScale: 0.45, sideRoom: 32, textRoom: 200 } as const;
+/**
+ * The scale limits of the pit, and the free room in pixels at the sides and above and below the
+ * stage. The stage also holds the text, the detail and the actions under the pit, which are measured.
+ */
+const PIT_FIT = { maxScale: 1.2, minScale: 0.45, sideRoom: 32, edgeRoom: 152 } as const;
 
 /**
  * The neutral face of a crew plush, turned to look at a point `dx`, `dy` pixels away (y down). The
@@ -15,7 +19,6 @@ function faceToward(member: CrewMember, dx: number, dy: number): BotExpression |
   const neutral = member.character ? PLUSH_CHARACTER_BY_ID.get(member.character)?.face : undefined;
   if (!neutral) return "neutre";
   const distance = Math.hypot(dx, dy) || 1;
-  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
   return {
     ...neutral,
     gaze: {
@@ -27,7 +30,7 @@ function faceToward(member: CrewMember, dx: number, dy: number): BotExpression |
 }
 
 function crewExpression(member: CrewMember, face: CrewFace): BotExpression | ExpressionId | undefined {
-  if (face.happy) return EXPRESSION_BY_ID.has("heureux") ? "heureux" : undefined;
+  if (face.happy) return "heureux";
   return face.look ? faceToward(member, face.look.dx, face.look.dy) : undefined;
 }
 
@@ -92,16 +95,22 @@ export function CrewPileStage(props: CrewPileStageProps) {
   }
 
   onSettled(() => {
-    const room = frame?.parentElement?.closest<HTMLElement>(".app-loading");
+    const stage = frame?.parentElement;
+    const room = stage?.closest<HTMLElement>(".app-loading");
     const fitPit = () => {
-      if (!room) return;
+      if (!frame || !stage || !room) return;
+      // The text, detail and actions under the pit do not change with its scale.
+      const below = stage.offsetHeight - frame.offsetHeight;
       const width = (room.clientWidth - PIT_FIT.sideRoom) / CREW_PIT.width;
-      const height = (room.clientHeight - PIT_FIT.textRoom) / CREW_PIT.height;
-      setScale(Math.max(PIT_FIT.minScale, Math.min(PIT_FIT.maxScale, width, height)));
+      const height = (room.clientHeight - below - PIT_FIT.edgeRoom) / CREW_PIT.height;
+      setScale(clamp(Math.min(width, height), PIT_FIT.minScale, PIT_FIT.maxScale));
     };
     fitPit();
     const observer = new ResizeObserver(fitPit);
-    if (room) observer.observe(room);
+    if (room && stage) {
+      observer.observe(room);
+      observer.observe(stage);
+    }
     draw();
     let request = 0;
     let last = -1;
@@ -136,8 +145,8 @@ export function CrewPileStage(props: CrewPileStageProps) {
         style={{ width: `${CREW_PIT.width}px`, height: `${CREW_PIT.height}px`, scale: `${scale()}` }}
       >
         <For each={pile.crew}>
-          {(member) => {
-            const index = pile.crew.indexOf(member);
+          {(member, position) => {
+            const index = position();
             const face = () => faces[index]?.[0]() ?? pile.bodies[index]?.face;
             const crewState = () => face()?.state ?? "idle";
             const expression = () => {
@@ -157,7 +166,7 @@ export function CrewPileStage(props: CrewPileStageProps) {
                 data-lead={member.lead ? "true" : undefined}
                 onPointerDown={(event) => grab(index, event)}
                 onPointerMove={drag}
-                onPointerUp={() => pile.release()}
+                onPointerUp={(event) => pile.release(event.timeStamp / 1000)}
                 onPointerCancel={() => pile.release()}
                 style={{
                   width: `${member.size}px`,

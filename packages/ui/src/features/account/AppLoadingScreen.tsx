@@ -1,6 +1,6 @@
 import type { AppTextKey } from "@openbot/i18n";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, For, onSettled, untrack } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onSettled, untrack } from "solid-js";
 import { ErrorReference } from "../../error-reference";
 import { PlushLoader } from "../../plush-loader";
 import { useText } from "../../text";
@@ -35,48 +35,65 @@ const STATUS_LINES = [
 /*
  * The screens on one page share one pile. The `/app` page shows a screen while the web client's code
  * loads, and the web client then shows its own. The second screen continues the pile of the first,
- * so the crew do not fall again at the handoff. Only the first screen that is still shown moves it.
+ * so the crew do not fall again at the handoff. Only the first screen that still shows a pile moves
+ * it. A pile whose crew started to hop out is not shared again: a new screen gets a new pile.
  */
 const HANDOFF_MS = 1000;
 
-interface PileSeat {
+interface PileRun {
   pile: CrewPile;
   /** When the run started, from `performance.now()`. */
+  start: number;
+  /** The screens that show this pile, in mount order. */
+  screens: object[];
+  leaving: boolean;
+}
+
+interface PileSeat {
+  pile: CrewPile;
   start: number;
   owns: () => boolean;
   /** No other screen shows this pile, so its crew can hop out. */
   alone: () => boolean;
+  /** The crew hop out: no new screen can show this pile. */
+  hopOut: () => void;
   leave: () => void;
 }
 
-const shared: { pile: CrewPile | undefined; start: number; screens: object[]; lastUnmount: number } = {
-  pile: undefined,
-  start: 0,
-  screens: [],
+const shared: { run: PileRun | undefined; lastUnmount: number } = {
+  run: undefined,
   lastUnmount: Number.NEGATIVE_INFINITY,
 };
+
+function newRun(seed: number, reduced: boolean, now: number): PileRun {
+  return { pile: new CrewPile(seed, reduced), start: now, screens: [], leaving: false };
+}
 
 /** A pile for a screen that mounts now. A screen with its own seed gets its own pile. */
 function takeSeat(seed: number | undefined, reduced: boolean): PileSeat {
   const now = performance.now();
+  let run: PileRun;
   if (seed !== undefined) {
-    return { pile: new CrewPile(seed, reduced), start: now, owns: () => true, alone: () => true, leave: () => {} };
-  }
-  const recent = shared.screens.length > 0 || now - shared.lastUnmount <= HANDOFF_MS;
-  const reusable = shared.pile && shared.pile.phase !== "exit" && shared.pile.reduced === reduced;
-  if (!(recent && reusable) || !shared.pile) {
-    shared.pile = new CrewPile(randomCrewSeed(), reduced);
-    shared.start = now;
+    run = newRun(seed, reduced, now);
+  } else {
+    const last = shared.run;
+    const recent = last && (last.screens.length > 0 || now - shared.lastUnmount <= HANDOFF_MS);
+    const reusable = last && !last.leaving && last.pile.phase !== "exit" && last.pile.reduced === reduced;
+    run = last && recent && reusable ? last : newRun(randomCrewSeed(), reduced, now);
+    shared.run = run;
   }
   const token = {};
-  shared.screens.push(token);
+  run.screens.push(token);
   return {
-    pile: shared.pile,
-    start: shared.start,
-    owns: () => shared.screens[0] === token,
-    alone: () => shared.screens.length === 1,
+    pile: run.pile,
+    start: run.start,
+    owns: () => run.screens[0] === token,
+    alone: () => run.screens.length === 1,
+    hopOut: () => {
+      run.leaving = true;
+    },
     leave: () => {
-      shared.screens = shared.screens.filter((screen) => screen !== token);
+      run.screens = run.screens.filter((screen) => screen !== token);
       shared.lastUnmount = performance.now();
     },
   };
@@ -112,13 +129,15 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
         reducedMotion,
       )
     : undefined;
+  // A screen can be disposed before it settles, so the seat is given back on cleanup.
+  onCleanup(() => seat?.leave());
   const start = seat?.start ?? performance.now();
   const age = () => (performance.now() - start) / 1000;
   const mountedAt = age();
   const [clock, setClock] = createSignal(mountedAt);
   const [phase, setPhase] = createSignal<Phase>("loading");
   const status = () => STATUS_LINES[Math.floor(clock() / STATUS_EVERY_S) % STATUS_LINES.length] ?? STATUS_LINES[0];
-  let frameRequest = 0;
+  let statusTimer: ReturnType<typeof setTimeout> | undefined;
   let exitTimer: ReturnType<typeof setTimeout> | undefined;
   let exited = false;
   let root: HTMLElement | undefined;
@@ -141,9 +160,10 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
     () => props.ready,
     (ready) => {
       if (!ready || untrack(phase) !== "loading") return;
-      cancelAnimationFrame(frameRequest);
+      clearTimeout(statusTimer);
       exitTimer ??= setTimeout(finishExit, EXIT_LIMIT_MS);
       const hop = seat && !reducedMotion && seat.owns() && seat.alone() && age() >= QUICK_EXIT_S;
+      if (hop) seat.hopOut();
       setPhase(hop ? "leaving" : "fade");
     },
   );
@@ -156,16 +176,17 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
     if (current === "leaving" && seat.pile.phase === "exit") setPhase("exit");
   }
 
+  // The status line changes at each step of the run's clock, so screens on one pile show the same line.
   onSettled(() => {
-    const tick = () => {
-      frameRequest = requestAnimationFrame(tick);
-      setClock(age());
+    const next = () => {
+      const now = age();
+      setClock(now);
+      statusTimer = setTimeout(next, (STATUS_EVERY_S - (now % STATUS_EVERY_S)) * 1000 + 16);
     };
-    if (!props.ready) frameRequest = requestAnimationFrame(tick);
+    if (!props.ready) next();
     return () => {
-      cancelAnimationFrame(frameRequest);
+      clearTimeout(statusTimer);
       clearTimeout(exitTimer);
-      seat?.leave();
     };
   });
 
@@ -192,7 +213,7 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
         {seat ? (
           <CrewPileStage pile={seat.pile} onFrame={onFrame} />
         ) : (
-          <PlushLoader layout="stack" size={THINKING_SIZE} class="app-loading-thinking" />
+          <PlushLoader layout="stack" size={THINKING_SIZE} />
         )}
         <p class="app-loading-status">
           {props.title ?? <For each={[status()]}>{(line) => <span class="app-loading-line">{t(line)}</span>}</For>}
