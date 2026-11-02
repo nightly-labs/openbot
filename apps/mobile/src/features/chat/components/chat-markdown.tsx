@@ -129,19 +129,26 @@ function textContainerStyle(source: string, presentation: TextPresentation): Tex
     ) || plainMentionParts(source, presentation.agents).some((part) => part.agent);
   // Inline math is moved down to the math axis in the same way.
   const hasMath = chatMathStart(source) !== undefined;
-  // Android moves code chips down as well; see `inlineChipStyle`.
-  const hasAndroidChip = Platform.OS === "android" && source.includes("`");
-  return hasMention || hasMath || hasAndroidChip
+  // Code chips move down as well; see `inlineChipStyle`.
+  const hasChip = source.includes("`");
+  return hasMention || hasMath || hasChip
     ? { ...presentation.style, paddingBottom: presentation.mentionOffset, overflow: "visible" }
     : presentation.style;
 }
 
+/** The height of an inline code chip: its line and one point above and below. */
+function codeChipHeight(presentation: TextPresentation): number {
+  return (CHAT_CODE_STYLES[presentation.type === "body-sm" ? "small" : "body"].lineHeight ?? 20) + 2;
+}
+
 /**
- * Android puts the bottom of a view inside text on the text baseline, so a chip sits too high. It
- * moves down by the descender, as a mention does.
+ * A view inside text sits with its bottom edge on the text baseline, so a chip sits too high. It
+ * moves down until its middle is on the middle of the letters around it, as a mention does. A chip
+ * in a wrapping row is centred by the row and does not move.
  */
-function inlineChipStyle(presentation: TextPresentation): ViewStyle | undefined {
-  return Platform.OS === "android" ? { transform: [{ translateY: presentation.mentionOffset }] } : undefined;
+function inlineChipStyle(presentation: TextPresentation, height: number, inRow: boolean): ViewStyle | undefined {
+  if (inRow) return undefined;
+  return { transform: [{ translateY: (height / 2 - TEXT_SIZES[presentation.type] * 0.45) * presentation.fontScale }] };
 }
 
 /** Joins the type badge of a file to the first characters of its name, so a line never ends between them. */
@@ -182,7 +189,15 @@ const FILE_TONE_COLORS: Record<FileReferenceTone, [string, string]> = {
  * Inline code that names a file, drawn as the desktop file reference: a type badge and the name
  * in the colour of its file family. Mobile cannot open workspace files, so it is not a control.
  */
-function FileReference({ text, presentation }: { text: string; presentation: TextPresentation }) {
+function FileReference({
+  text,
+  presentation,
+  inRow,
+}: {
+  text: string;
+  presentation: TextPresentation;
+  inRow: boolean;
+}) {
   const name = fileReferenceName(text.trim());
   const [color, soft] = useCSSVariable(FILE_TONE_COLORS[fileReferenceTone(name)]);
   const small = presentation.type === "body-sm";
@@ -192,7 +207,11 @@ function FileReference({ text, presentation }: { text: string; presentation: Tex
     // paragraph and wraps as text does.
     return (
       <>
-        <View collapsable={false} className="pl-0.5 pr-1" style={inlineChipStyle(presentation)}>
+        <View
+          collapsable={false}
+          className="pl-0.5 pr-1"
+          style={{ transform: [{ translateY: presentation.mentionOffset }] }}
+        >
           <FileBadge name={name} color={String(color)} soft={String(soft)} />
         </View>
         <Text style={{ color: String(color), fontWeight: "600", ...(small ? { fontSize: 12 } : null) }}>
@@ -202,7 +221,11 @@ function FileReference({ text, presentation }: { text: string; presentation: Tex
     );
   }
   return (
-    <View collapsable={false} className="max-w-full shrink flex-row items-center gap-1 self-start px-0.5">
+    <View
+      collapsable={false}
+      className="max-w-full shrink flex-row items-center gap-1 self-start px-0.5"
+      style={inlineChipStyle(presentation, small ? 16 : (CHAT_TEXT_STYLES[presentation.type].lineHeight ?? 22), inRow)}
+    >
       <FileBadge name={name} color={String(color)} soft={String(soft)} />
       <Text
         selectable={presentation.selectable}
@@ -252,10 +275,19 @@ function codePieces(text: string): string[] {
   });
 }
 
-function CodeSpan({ text, presentation }: { text: string; presentation: TextPresentation }) {
-  if (isFileReference(text.trim())) return <FileReference text={text} presentation={presentation} />;
+function CodeSpan({
+  text,
+  presentation,
+  inRow = false,
+}: {
+  text: string;
+  presentation: TextPresentation;
+  /** The chip is an item of a wrapping row, not a view inside text. */
+  inRow?: boolean;
+}) {
+  if (isFileReference(text.trim())) return <FileReference text={text} presentation={presentation} inRow={inRow} />;
   const pieces = codePieces(text);
-  const chipStyle = inlineChipStyle(presentation);
+  const chipStyle = inlineChipStyle(presentation, codeChipHeight(presentation), inRow);
   return sourceEntries(pieces, (piece) => piece).map(({ value: piece, offset }, index) => (
     // Only the ends of the span are rounded, so touching pieces read as one chip.
     <View
@@ -720,7 +752,7 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
             const [token] = run;
             if (!token) return null;
             if (tokenIs(token, "codespan")) {
-              return <CodeSpan key={offset} text={token.text} presentation={presentation} />;
+              return <CodeSpan key={offset} text={token.text} presentation={presentation} inRow />;
             }
             return (
               <Text
