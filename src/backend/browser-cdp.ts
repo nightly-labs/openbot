@@ -309,13 +309,13 @@ export class BrowserCdpEngine {
     submitTarget?: BrowserTarget,
   ): Effect.fn.Return<
     {
-      enter: (secret: string) => Effect.Effect<void, BrowserOperationError>;
+      /** `vault` blocks a native GET submission of the filled fields, which would put the value in a URL. */
+      enter: (secret: string, vault: boolean) => Effect.Effect<void, BrowserOperationError>;
       clear: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
       /**
        * Which secret the fields are built for, so a fill that no user approves goes only there: every
-       * field is a password field, or every field asks for a one-time code, and no native submission of
-       * them or of the submit button is GET, which would put the value in a URL. The fingerprint check
-       * of `enter` keeps this true until the fill.
+       * field is a password field, or every field asks for a one-time code. The fingerprint check of
+       * `enter` keeps this true until the fill.
        */
       fields: { password: boolean; oneTimeCode: boolean };
     },
@@ -381,45 +381,27 @@ export class BrowserCdpEngine {
             return yield* browserFailure(new Error(`${labels[index]} is no longer available. Take a fresh snapshot.`));
           fingerprints.push(value);
         }
-        // A native submission that could send the value in a URL: a form whose effective method is not
-        // POST (a form with no method is GET), or a submitter in it that overrides to GET. A field with
-        // no form is sent only by the page's own script.
+        // A native GET submission would put the value in a URL. `enter` blocks that for a vault fill
+        // at submit time, as many sign-in forms have no method and send with their own script.
         const fields = { password: inputs.length > 0, oneTimeCode: inputs.length > 0 };
         for (const node of inputs) {
           const kind = yield* this.#callOnNode(
             send,
             node.backendNodeId,
             `function() {
-              const form = this.form;
-              const overrides = (element) => element.hasAttribute('formmethod') && element.getAttribute('formmethod').trim().toLowerCase() !== 'post';
-              const posts = !form || (form.method === 'post' && ![...form.elements].some(overrides));
-              return { password: this.type === 'password', oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), posts };
+              return { password: this.type === 'password', oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code') };
             }`,
             [],
           );
-          const posts = isDynamicRecord(kind) && kind.posts === true;
-          fields.password &&= isDynamicRecord(kind) && kind.password === true && posts;
-          fields.oneTimeCode &&= isDynamicRecord(kind) && kind.oneTimeCode === true && posts;
-        }
-        if (button) {
-          const posts = yield* this.#callOnNode(
-            send,
-            button.backendNodeId,
-            `function() {
-              if (!this.form) return true;
-              if (this.hasAttribute('formmethod')) return this.getAttribute('formmethod').trim().toLowerCase() === 'post';
-              return this.form.method === 'post';
-            }`,
-            [],
-          );
-          if (posts !== true) fields.password = fields.oneTimeCode = false;
+          fields.password &&= isDynamicRecord(kind) && kind.password === true;
+          fields.oneTimeCode &&= isDynamicRecord(kind) && kind.oneTimeCode === true;
         }
         return { inputs, button, fingerprints, fields };
       }),
     );
     if (generation !== this.#navigationGeneration)
       return yield* browserFailure(new Error("Authentication page changed."));
-    const enter = (secret: string) =>
+    const enter = (secret: string, vault: boolean) =>
       Effect.gen({ self: this }, function* () {
         yield* Effect.gen({ self: this }, function* () {
           yield* this.#leaseEffect((send) =>
@@ -437,6 +419,24 @@ export class BrowserCdpEngine {
                 );
                 if (valid !== true) return yield* browserFailure(new Error("Authentication target changed."));
               }
+              // Runs after the submit handlers of the form and the document, so a form that the page sends
+              // with its script still works. `form.submit()` fires no event, but it is the page's choice, like any URL
+              // that its script makes from the value.
+              if (vault)
+                for (const node of nodes.inputs)
+                  yield* this.#callOnNode(
+                    send,
+                    node.backendNodeId,
+                    `function() {
+                const field = this;
+                window.addEventListener('submit', (event) => {
+                  if (event.target !== field.form || event.defaultPrevented || field.value === '') return;
+                  const method = event.submitter?.hasAttribute('formmethod') ? event.submitter.formMethod : field.form.method;
+                  if (method !== 'post') event.preventDefault();
+                });
+              }`,
+                    [],
+                  );
               for (const [index, node] of nodes.inputs.entries()) {
                 if (generation !== this.#navigationGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));

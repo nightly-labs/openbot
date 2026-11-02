@@ -354,6 +354,7 @@ export function apiKeyPromptResult(blockId: string, saved: SavedApiKey | null): 
 export function browserTakeoverResult(
   decision: RespondToBrowserTakeoverInput["decision"],
   vault?: string,
+  vaultSkipped?: string,
 ): DynamicToolResult {
   return {
     success: true,
@@ -363,6 +364,7 @@ export function browserTakeoverResult(
         text: JSON.stringify({
           status: decision === "complete" ? "completed" : "cancelled",
           ...(vault ? { vault } : {}),
+          ...(vaultSkipped ? { vaultSkipped } : {}),
           ...(decision === "complete" ? { next: "Take a fresh snapshot and continue the task." } : {}),
         }),
       },

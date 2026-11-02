@@ -286,11 +286,12 @@ export interface PreparedBrowserSecret {
   agentScriptedOrigin: boolean;
   /**
    * True when the target fields are built for this secret: password fields for a password, one-time
-   * code fields for an authenticator code, none in a `method="get"` form. A field that the agent
-   * chose for something else, such as a search box, could put the value in a URL the agent reads.
+   * code fields for an authenticator code. A field that the agent chose for something else, such as a
+   * search box, could put the value in a URL the agent reads.
    */
   vaultFillable: boolean;
-  submit(secret: string): Effect.Effect<"submitted" | "takeover", BrowserOperationError>;
+  /** `vault` is true for a value that no user typed: a native GET submission of it is then blocked. */
+  submit(secret: string, vault: boolean): Effect.Effect<"submitted" | "takeover", BrowserOperationError>;
   cancel(): void;
 }
 
@@ -1228,7 +1229,7 @@ export class BrowserHost {
             this.#emitChanged();
           }
         },
-        submit: (secret: string) =>
+        submit: (secret: string, vault: boolean) =>
           Effect.gen({ self: this }, function* (): Effect.fn.Return<"submitted" | "takeover", BrowserOperationError> {
             if (tab.secret !== protection || protection.submitted)
               return yield* browserFailure(new Error(sourceText("error.backend.authExpired")));
@@ -1248,7 +1249,7 @@ export class BrowserHost {
                   Effect.gen({ self: this }, function* () {
                     yield* boundEngineOperation(
                       tab,
-                      entry.enter(secret),
+                      entry.enter(secret, vault),
                       10_000,
                       "Authentication submission timed out.",
                       keepQueueBlocked,

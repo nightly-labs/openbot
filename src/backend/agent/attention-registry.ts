@@ -234,6 +234,8 @@ interface PendingBrowserTakeover {
   submitting?: boolean;
   /** The saved login that OpenBot filled without the card, so the agent does not credit the user. */
   vaultLoginId?: string;
+  /** Why OpenBot did not fill a saved login, so the agent can tell the user and correct its call. */
+  vaultSkipped?: string;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
@@ -646,7 +648,7 @@ export class AttentionRegistry {
       secret.cancel();
     } else {
       pending.submitting = true;
-      const outcome = yield* secret.submit(input.secret).pipe(
+      const outcome = yield* secret.submit(input.secret, pending.vaultLoginId !== undefined).pipe(
         Effect.catch(() => Effect.succeed("takeover")),
         Effect.ensuring(
           Effect.sync(() => {
@@ -1562,10 +1564,23 @@ export class AttentionRegistry {
     const vault = this.#passwordVault;
     const request = pending.secret?.request;
     if (!vault || !request || request.method === "otp") return false;
+    const kind = request.method === "password" ? "password" : "totp";
+    const skip = (reason: string, note: string, loginId?: string) => {
+      logger.info("Shared vault fill skipped", { origin: request.origin, method: request.method, loginId, reason });
+      pending.vaultSkipped = `OpenBot did not fill a saved login: ${note}`;
+      return false;
+    };
     // A script the agent ran on this site can read what is filled, and a field built for something
     // else can carry the value into a URL. In both cases the card lets the user decide.
-    if (pending.secret?.agentScriptedOrigin !== false || pending.secret.vaultFillable !== true) return false;
-    const kind = request.method === "password" ? "password" : "totp";
+    if (pending.secret?.agentScriptedOrigin !== false)
+      return skip("agent-scripted-origin", "you ran a script on this site since OpenBot started.");
+    if (pending.secret.vaultFillable !== true)
+      return skip(
+        "field-kind",
+        kind === "password"
+          ? "the field target is not a password input."
+          : 'the field targets do not have autocomplete="one-time-code".',
+      );
     const found = yield* Effect.result(
       Effect.gen(function* () {
         const call = yield* attentionStep(() => parseBrowserToolCall("submit_secret", pending.params.arguments));
@@ -1581,10 +1596,22 @@ export class AttentionRegistry {
     );
     if (Result.isFailure(found)) {
       logger.warn("Unable to fill from the shared vault", { error: toLogValue(found.failure.cause) });
+      pending.vaultSkipped = "OpenBot did not fill a saved login: the password manager could not be read.";
       return false;
     }
     const login = found.success;
-    if (!login?.secret || this.#takeovers.get(requestId) !== pending) return false;
+    if (this.#takeovers.get(requestId) !== pending) return false;
+    if (!login)
+      return skip(
+        "no-login",
+        "no saved login matches this site, or several match and the call has no loginId from list_logins.",
+      );
+    if (!login.secret)
+      return skip(
+        "no-secret",
+        `saved login ${login.loginId} has no ${kind === "password" ? "password" : "authenticator key"} for this site.`,
+        login.loginId,
+      );
     pending.vaultLoginId = login.loginId;
     const submitted = yield* Effect.result(
       this.respondToBrowserSecret({
@@ -1625,7 +1652,7 @@ export class AttentionRegistry {
       agentId: pending.request.agentId,
     });
     this.#emitRuntimeSnapshot();
-    pending.resolve(browserTakeoverResult(decision, vault));
+    pending.resolve(browserTakeoverResult(decision, vault, pending.vaultSkipped));
   }
 
   #persistQuestionPrompt(
