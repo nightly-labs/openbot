@@ -1428,8 +1428,7 @@ export class AttentionRegistry {
       const pendingTurnId = getString(pending.params, "turnId");
       if (pendingThreadId === threadId && (!pendingTurnId || pendingTurnId === turnId)) {
         this.#approvals.delete(requestId);
-        pending.decide?.("cancel");
-        this.#emitInputResolved("approval", requestId, pending.approval.agentId);
+        this.#cancelApproval(pending);
       }
     }
     for (const [requestId, pending] of this.#takeovers) {
@@ -1464,8 +1463,7 @@ export class AttentionRegistry {
     if (approval?.client === client) {
       this.#routines.markRunningForTurn(approval.approval.turnId);
       this.#approvals.delete(requestId);
-      approval.decide?.("cancel");
-      this.#emitInputResolved("approval", requestId, approval.approval.agentId);
+      this.#cancelApproval(approval);
       changed = true;
     }
     for (const [key, takeover] of this.#takeovers) {
@@ -1517,6 +1515,46 @@ export class AttentionRegistry {
   }
 
   /**
+   * Cancels one pending approval the way each waiter needs it, and every cancelled entry still emits
+   * its resolved event: the UI removes its card on that event alone, and a compaction turn sends no
+   * other notice. A built-in tool hears "cancel" through `decide` and answers the provider itself,
+   * so answering its request here too would answer it twice. A hosted site goes through its own
+   * resolver, which declines the provider and records the terminal event; the resolver reports its
+   * own failures, so this only keeps one from interrupting the remaining removals. A native approval
+   * that the provider still waits on gets the refusal a `respondToApproval` answer would send, so
+   * its request does not wait forever; a client that forgot the request ignores the answer (#4165).
+   * A client that no longer runs has nobody to answer.
+   */
+  #cancelApproval(pending: PendingApproval): void {
+    this.#emitInputResolved("approval", pending.id, pending.approval.agentId);
+    pending.decide?.("cancel");
+    if (pending.decide) return;
+    if (pending.hostedSiteMutation) {
+      const report = (error: unknown) =>
+        Effect.sync(() => this.#emitError("approval_cleanup_failed", error, pending.approval.agentId));
+      Effect.runFork(
+        this.#hostedSites
+          .resolveApproval(
+            pending.hostedSiteMutation,
+            { client: pending.client, id: pending.id, agentId: pending.approval.agentId },
+            "decline",
+          )
+          .pipe(Effect.catch(report), Effect.catchDefect(report)),
+      );
+      return;
+    }
+    if (!pending.client.running) return;
+    try {
+      pending.client.respond(
+        pending.id,
+        approvalReply(pending.method, pending.params, "decline", "This approval request is no longer pending."),
+      );
+    } catch (error) {
+      logger.warn("Unable to answer a cleared approval", { error: toLogValue(error) });
+    }
+  }
+
+  /**
    * Drops the approvals of one lost provider client, or of all clients when none is given. The other
    * clients are still running and wait for an answer, so their approvals stay.
    */
@@ -1524,8 +1562,7 @@ export class AttentionRegistry {
     for (const [requestId, pending] of this.#approvals) {
       if (client && pending.client !== client) continue;
       this.#approvals.delete(requestId);
-      pending.decide?.("cancel");
-      this.#emitInputResolved("approval", requestId, pending.approval.agentId);
+      this.#cancelApproval(pending);
     }
   }
 
