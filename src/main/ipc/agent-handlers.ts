@@ -7,6 +7,10 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import {
+  SIDEBAR_FOLDERS_CAPABILITY,
+  SIDEBAR_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
@@ -44,6 +48,8 @@ import {
   parseSetSidebarPinsInput,
   remoteBrowserSecretResponse,
   type SetSidebarPinsInput,
+  type SidebarLayoutAction,
+  type SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -137,7 +143,7 @@ import {
   parseSearchConversationMessages,
   parseSendMessage,
   parseSetAgentAvatar,
-  parseSidebarLayoutAction,
+  parseSidebarFolderAction,
   parseStartAgentTask,
   parseSteerQueuedMessage,
   parseUpdateAgent,
@@ -225,6 +231,23 @@ export function agentIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, AGENT_THREADS_CAPABILITY)) taskRemoteUnsupported();
     return runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
   };
+  // `sidebar-folders-v1` reads the layout with the parent of each folder. A released route answers it
+  // without them, so a result of one is read again: the renderer would show the folders flat.
+  const remoteFolderLayout = (serverId: string, body: SidebarLayoutAction | Record<string, never>) =>
+    runCauseEffect(
+      remoteServers.request(
+        serverId,
+        "type" in body ? SIDEBAR_FOLDERS_ROUTES.actions : SIDEBAR_FOLDERS_ROUTES.read,
+        decodeSidebarLayoutSnapshot,
+        { method: "POST", body },
+      ),
+    );
+  // The save or the copy is done when the second read starts. A failed read keeps the layout of the
+  // answer, so the caller does not try again and make a second agent; the next layout event has the parents.
+  const withRemoteFolders = async <T extends { layout: SidebarLayoutSnapshot }>(serverId: string, result: T) =>
+    remoteServers.supportsCapability(serverId, SIDEBAR_FOLDERS_CAPABILITY)
+      ? { ...result, layout: await remoteFolderLayout(serverId, {}).catch(() => result.layout) }
+      : result;
   return {
     agent: {
       getStatus: scopedQueryHandler({
@@ -412,19 +435,27 @@ export function agentIpcHandlers({
       getSidebarLayout: scopedQueryHandler({
         local: () => sidebarLayout.getSnapshot(),
         remote: (serverId) =>
-          runCauseEffect(
-            remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayoutSnapshot),
-          ),
+          remoteServers.supportsCapability(serverId, SIDEBAR_FOLDERS_CAPABILITY)
+            ? remoteFolderLayout(serverId, {})
+            : runCauseEffect(
+                remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayoutSnapshot),
+              ),
       }),
-      mutateSidebarLayout: scopedHandler(parseSidebarLayoutAction, {
+      mutateSidebarLayout: scopedHandler(parseSidebarFolderAction, {
         local: (action) => runCauseEffect(sidebarLayout.mutate(action, service.sidebarChatIds())),
-        remote: (action, serverId) =>
-          runCauseEffect(
+        remote: (action, serverId) => {
+          if (remoteServers.supportsCapability(serverId, SIDEBAR_FOLDERS_CAPABILITY))
+            return remoteFolderLayout(serverId, action);
+          // The released route has every folder at the top: it refuses `nest`, and would drop a parent.
+          if (action.type === "nest" || (action.type === "create" && action.parentId !== undefined))
+            throw new Error(sourceText("error.team.sidebarFoldersUnsupported"));
+          return runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.actions, decodeSidebarLayoutSnapshot, {
               method: "POST",
               body: action,
             }),
-          ),
+          );
+        },
       }),
       // The owner of this computer shares the pins of this server with their phones.
       getSidebarPins: scopedQueryHandler({
@@ -480,12 +511,15 @@ export function agentIpcHandlers({
       }),
       saveProfile: scopedHandler(parseSaveAgentProfile, {
         local: (input) => runCauseEffect(service.saveProfile(input, sidebarLayout, host.conversationSender())),
-        remote: (input, serverId) =>
-          runCauseEffect(
-            remoteServers.request(serverId, TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
-              method: "POST",
-              body: input,
-            }),
+        remote: async (input, serverId) =>
+          withRemoteFolders(
+            serverId,
+            await runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
+                method: "POST",
+                body: input,
+              }),
+            ),
           ),
       }),
       createAgent: scopedHandler(parseCreateAgent, {
@@ -505,7 +539,8 @@ export function agentIpcHandlers({
               host.copyAgentAccess(agentId, copyId),
             ),
           ),
-        remote: (agentId, serverId) => runCauseEffect(remoteServers.duplicateAgent(agentId, serverId)),
+        remote: async (agentId, serverId) =>
+          withRemoteFolders(serverId, await runCauseEffect(remoteServers.duplicateAgent(agentId, serverId))),
       }),
       updateAgent: scopedHandler(parseUpdateAgent, {
         local: (input) => runCauseEffect(service.updateAgent(input)),

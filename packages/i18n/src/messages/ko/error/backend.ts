@@ -238,6 +238,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "서버 하나에는 사이드바 섹션을 최대 {limit}개까지 둘 수 있어요.",
   "error.backend.sectionNameRequired": "섹션 이름이 필요해요.",
   "error.backend.sectionNameTooLong": "섹션 이름이 너무 길어요.",
+  "error.backend.sidebarFolderTooDeep": "폴더는 3단계까지만 만들 수 있습니다.",
+  "error.backend.sidebarFolderMoveInvalid": "이 폴더는 그곳으로 옮길 수 없습니다.",
   "error.backend.sectionNameDuplicate": "섹션 이름은 고유해야 해요.",
   "error.backend.directMessageRequired": "먼저 메시지를 작성하세요.",
   "error.backend.directMessageTooLong": "다이렉트 메시지는 최대 {limit}자까지 쓸 수 있어요.",

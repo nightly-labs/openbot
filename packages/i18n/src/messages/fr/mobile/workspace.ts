@@ -12,9 +12,9 @@ export const messages = {
   "mobile.workspace.status.retryIn": "Nouvel essai dans {seconds} secondes",
   "mobile.workspace.section.agents": "Agents",
   "mobile.workspace.error.directoryUnavailable": "L’annuaire des serveurs est indisponible.",
-  "mobile.workspace.error.sectionsLoadFailed": "Impossible de charger les sections. Réessayez.",
+  "mobile.workspace.error.sectionsLoadFailed": "Impossible de charger les dossiers. Réessayez.",
   "mobile.workspace.error.transportNotReady": "La connexion mobile n’est pas prête.",
-  "mobile.workspace.error.sectionsUnsupported": "Cet hôte ne prend pas en charge la modification des sections.",
+  "mobile.workspace.error.sectionsUnsupported": "Cet hôte ne prend pas en charge la modification des dossiers.",
   "mobile.workspace.error.leaveOwnServer":
     "Vous pouvez quitter uniquement les serveurs distants que vous avez rejoints.",
   "mobile.workspace.error.removeOwnedServerOnly": "Seul le propriétaire peut supprimer ce serveur.",

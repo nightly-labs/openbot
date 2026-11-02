@@ -255,6 +255,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Een server kan maximaal {limit} zijbalksecties hebben.",
   "error.backend.sectionNameRequired": "Een naam voor de sectie is verplicht.",
   "error.backend.sectionNameTooLong": "De naam van de sectie is te lang.",
+  "error.backend.sidebarFolderTooDeep": "Mappen kunnen maar drie niveaus diep zijn.",
+  "error.backend.sidebarFolderMoveInvalid": "Deze map kan daar niet naartoe worden verplaatst.",
   "error.backend.sectionNameDuplicate": "Namen van secties moeten uniek zijn.",
   "error.backend.directMessageRequired": "Schrijf eerst een bericht.",
   "error.backend.directMessageTooLong": "Een direct bericht kan maximaal {limit} tekens hebben.",

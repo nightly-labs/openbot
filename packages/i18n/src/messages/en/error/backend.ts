@@ -241,6 +241,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sidebarSectionLimit": "A server can have up to {limit} sidebar sections.",
   "error.backend.sectionNameRequired": "Section name is required.",
   "error.backend.sectionNameTooLong": "Section name is too long.",
+  "error.backend.sidebarFolderTooDeep": "Folders can go only three levels deep.",
+  "error.backend.sidebarFolderMoveInvalid": "This folder cannot move there.",
   "error.backend.sectionNameDuplicate": "Section names must be unique.",
   "error.backend.directMessageRequired": "Write a message first.",
   "error.backend.directMessageTooLong": "A direct message can have up to {limit} characters.",

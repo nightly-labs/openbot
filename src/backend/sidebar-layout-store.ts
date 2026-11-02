@@ -5,11 +5,16 @@ import { dirname } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   isCompleteSectionOrder,
+  SIDEBAR_FOLDER_LEVELS,
   SIDEBAR_PEOPLE_SECTION_ID,
   SIDEBAR_UNASSIGNED_SECTION_ID,
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
   type SidebarSection,
+  sidebarFolderAncestors,
+  sidebarFolderHeight,
+  sidebarFolderParents,
+  sidebarFolderTreeOrder,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isUuidV4, legacyAgentId } from "@openbot/contracts/validation";
@@ -58,7 +63,8 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
           return yield* storedSync(() => {
             const parsed = JSON.parse(contents);
             if (isStoredSidebarLayout(parsed)) return snapshotFromStored(parsed);
-            if (isLegacyStoredSidebarLayout(parsed)) return { ...snapshotFromLegacyStored(parsed), agentOrder: [] };
+            if (isLegacyStoredSidebarLayout(parsed))
+              return withFolderTree({ ...snapshotFromLegacyStored(parsed), agentOrder: [] });
             throw new Error("Invalid sidebar layout state.");
           });
         }),
@@ -238,7 +244,40 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
   });
 }
 
+/**
+ * Applies one action and puts the folders back in tree order. An action that changes nothing answers
+ * `current` itself, so the store does not write the file or raise the revision.
+ */
 function applySidebarLayoutAction(
+  current: SidebarLayoutSnapshot,
+  action: SidebarLayoutAction,
+  agentIds: ReadonlySet<string>,
+): SidebarLayoutSnapshot {
+  const next = applyFlatSidebarLayoutAction(current, action, agentIds);
+  if (next === current) return current;
+  const normalized = withFolderTree(next);
+  // A move between a folder and its own folders leaves the tree as it was.
+  return action.type === "move" && arraysEqual(normalized.order, current.order) ? current : normalized;
+}
+
+/**
+ * The layout with each parent that `sidebarFolderParents` keeps, and the order that walks the tree.
+ * An older version keeps `parentId` in the file but does not maintain it, so a loaded layout can name
+ * a parent that it deleted; that folder goes to the top rather than the file being reset.
+ */
+function withFolderTree(layout: SidebarLayoutSnapshot): SidebarLayoutSnapshot {
+  const parents = sidebarFolderParents(layout);
+  return {
+    ...layout,
+    sections: layout.sections.map(({ id, name }) => {
+      const parentId = parents.get(id);
+      return parentId === undefined ? { id, name } : { id, name, parentId };
+    }),
+    order: sidebarFolderTreeOrder(layout.order, parents),
+  };
+}
+
+function applyFlatSidebarLayoutAction(
   current: SidebarLayoutSnapshot,
   action: SidebarLayoutAction,
   agentIds: ReadonlySet<string>,
@@ -250,7 +289,16 @@ function applySidebarLayoutAction(
       }
       const name = validSectionName(action.name, current.sections);
       if (action.agentId !== undefined && !agentIds.has(action.agentId)) throw new Error("Unknown agent.");
-      const section: SidebarSection = { id: randomUUID(), name };
+      if (action.parentId !== undefined) {
+        requireCustomSection(current, action.parentId);
+        if (folderDepth(current, action.parentId) + 1 >= SIDEBAR_FOLDER_LEVELS)
+          throw new Error(sourceText("error.backend.sidebarFolderTooDeep"));
+      }
+      // A new folder goes last: at the end of its parent once the tree order is rebuilt.
+      const section: SidebarSection =
+        action.parentId === undefined
+          ? { id: randomUUID(), name }
+          : { id: randomUUID(), name, parentId: action.parentId };
       return {
         revision: current.revision + 1,
         sections: [...current.sections, section],
@@ -279,15 +327,56 @@ function applySidebarLayoutAction(
     }
     case "delete": {
       requireCustomSection(current, action.sectionId);
+      // The folders and chats of a deleted folder go to its parent; at the top, the chats are unassigned.
+      const parentId = sidebarFolderParents(current).get(action.sectionId);
       return {
         revision: current.revision + 1,
-        sections: current.sections.filter((section) => section.id !== action.sectionId),
+        sections: current.sections
+          .filter((section) => section.id !== action.sectionId)
+          .map((section) => (section.parentId === action.sectionId ? withParent(section, parentId) : section)),
         order: current.order.filter((sectionId) => sectionId !== action.sectionId),
         agentAssignments: Object.fromEntries(
-          Object.entries(current.agentAssignments).filter(([, sectionId]) => sectionId !== action.sectionId),
+          Object.entries(current.agentAssignments).flatMap(([agentId, sectionId]) => {
+            if (sectionId !== action.sectionId) return [[agentId, sectionId]];
+            return parentId === undefined ? [] : [[agentId, parentId]];
+          }),
         ),
         agentOrder: [...current.agentOrder],
       };
+    }
+    case "nest": {
+      // People and Unassigned stay at the top level, but they can move among the folders there.
+      if (action.sectionId === SIDEBAR_PEOPLE_SECTION_ID || action.sectionId === SIDEBAR_UNASSIGNED_SECTION_ID) {
+        if (action.parentId !== null) throw new Error(sourceText("error.backend.sidebarFolderMoveInvalid"));
+      } else requireCustomSection(current, action.sectionId);
+      const parents = sidebarFolderParents(current);
+      if (action.parentId !== null) {
+        requireCustomSection(current, action.parentId);
+        if (
+          action.parentId === action.sectionId ||
+          sidebarFolderAncestors(parents, action.parentId).includes(action.sectionId)
+        )
+          throw new Error(sourceText("error.backend.sidebarFolderMoveInvalid"));
+      }
+      const depth = action.parentId === null ? 0 : folderDepth(current, action.parentId) + 1;
+      if (depth + sidebarFolderHeight(parents, action.sectionId) >= SIDEBAR_FOLDER_LEVELS)
+        throw new Error(sourceText("error.backend.sidebarFolderTooDeep"));
+      if (action.beforeSectionId !== null) {
+        if (action.beforeSectionId === action.sectionId || !current.order.includes(action.beforeSectionId))
+          throw new Error("Unknown sidebar section order target.");
+        if ((parents.get(action.beforeSectionId) ?? null) !== action.parentId)
+          throw new Error(sourceText("error.backend.sidebarFolderMoveInvalid"));
+      }
+      const order = current.order.filter((sectionId) => sectionId !== action.sectionId);
+      const insertionIndex = action.beforeSectionId === null ? order.length : order.indexOf(action.beforeSectionId);
+      order.splice(insertionIndex, 0, action.sectionId);
+      const sections = current.sections.map((section) =>
+        section.id === action.sectionId ? withParent(section, action.parentId ?? undefined) : section,
+      );
+      const next = withFolderTree({ ...current, sections, order });
+      if (arraysEqual(next.order, current.order) && (parents.get(action.sectionId) ?? null) === action.parentId)
+        return current;
+      return { ...next, revision: current.revision + 1 };
     }
     case "move": {
       const index = current.order.indexOf(action.sectionId);
@@ -373,6 +462,17 @@ function validSectionName(name: string, existing: readonly SidebarSection[]): st
   return trimmed;
 }
 
+function withParent(section: SidebarSection, parentId: string | undefined): SidebarSection {
+  return parentId === undefined
+    ? { id: section.id, name: section.name }
+    : { id: section.id, name: section.name, parentId };
+}
+
+/** 0 for a folder at the top of the list. */
+function folderDepth(layout: SidebarLayoutSnapshot, sectionId: string): number {
+  return sidebarFolderAncestors(sidebarFolderParents(layout), sectionId).length;
+}
+
 function requireCustomSection(layout: SidebarLayoutSnapshot, sectionId: string): SidebarSection {
   const section = layout.sections.find((candidate) => candidate.id === sectionId);
   if (!section) throw new Error("Unknown sidebar section.");
@@ -422,20 +522,29 @@ function isStoredSidebarLayoutBody(value: unknown): boolean {
 }
 
 function snapshotFromStored(stored: StoredSidebarLayout): SidebarLayoutSnapshot {
-  return {
+  return withFolderTree({
     revision: stored.revision,
-    sections: stored.sections.map((section) => ({ ...section })),
+    sections: stored.sections.map(storedSection),
     order: [...stored.order],
     agentAssignments: { ...stored.agentAssignments },
     agentOrder: [...stored.agentOrder],
-  };
+  });
 }
 
 function snapshotFromLegacyStored(stored: LegacyStoredSidebarLayout): Omit<SidebarLayoutSnapshot, "agentOrder"> {
   return {
     revision: stored.revision,
-    sections: stored.sections.map((section) => ({ ...section })),
+    sections: stored.sections.map(storedSection),
     order: [...stored.order],
     agentAssignments: { ...stored.agentAssignments },
   };
+}
+
+/**
+ * The id, the name and a text `parentId`. Other fields are dropped; a parent that is not text is
+ * dropped too and the folder goes to the top, so the file is not reset.
+ */
+function storedSection({ id, name, parentId }: SidebarSection): SidebarSection {
+  // The file check above does not read `parentId`, so this check runs on the value in the file.
+  return isString(parentId) ? { id, name, parentId } : { id, name };
 }

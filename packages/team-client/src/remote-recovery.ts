@@ -1,5 +1,6 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { SIDEBAR_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { errorReference } from "@openbot/user-errors/reference";
 import { Effect, Result, Schema } from "effect";
@@ -453,8 +454,10 @@ export const resyncRemoteConversations = Effect.fn("RemoteRecovery.resyncConvers
 
 /** Bound the reads that make a workspace usable; file transfers and writes retain their own limits. */
 export function remoteWorkspaceReadTimeout(method: string, path: string): number | undefined {
-  if (method !== "GET") return undefined;
   const route = path.split("?")[0];
+  // `sidebar-folders-v1` reads the layout with a POST.
+  if (method === "POST" && route === SIDEBAR_FOLDERS_ROUTES.read) return 15_000;
+  if (method !== "GET") return undefined;
   return route === TEAM_API_ROUTES.compatibility ||
     route === TEAM_API_ROUTES.agents.all ||
     route === TEAM_API_ROUTES.agents.status ||

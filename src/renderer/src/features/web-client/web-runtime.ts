@@ -92,6 +92,10 @@ import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-prot
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
+import {
+  SIDEBAR_FOLDERS_CAPABILITY,
+  SIDEBAR_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -609,6 +613,14 @@ export function createWebWorkspaceRuntime(
     }
     if (!completedDraftIdsByHost.has(hostId)) draftCleanupRetryHosts.delete(hostId);
   }
+  /** With `sidebar-folders-v1`, the layout has the parent of each folder. */
+  async function readSidebarLayout(): Promise<SidebarLayoutSnapshot> {
+    const value = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
+      ? await request("POST", SIDEBAR_FOLDERS_ROUTES.read, {})
+      : await request("GET", TEAM_API_ROUTES.sidebarLayout.state);
+    if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
+    return value;
+  }
   async function request(method: string, path: string, body: TeamProtocolV2Json = {}, upload?: RemoteFileUpload) {
     if (disposed) throw new Error(currentText().t("webClient.error.connectionClosed"));
     const current = generation;
@@ -953,13 +965,17 @@ export function createWebWorkspaceRuntime(
     async browserPreview(tabId) {
       return decodeWebBrowserPreview(await request("POST", TEAM_API_ROUTES.browser.preview, { tabId }));
     },
-    async getSidebarLayout() {
-      const value = await request("GET", TEAM_API_ROUTES.sidebarLayout.state);
-      if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
-    },
+    getSidebarLayout: readSidebarLayout,
     async mutateSidebarLayout(action) {
-      const value = await request("POST", TEAM_API_ROUTES.sidebarLayout.actions, { ...action });
+      const folders = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY);
+      // The released route has every folder at the top: it refuses `nest`, and would drop a parent.
+      if (!folders && (action.type === "nest" || (action.type === "create" && action.parentId !== undefined)))
+        throw new Error(currentText().t("error.team.sidebarFoldersUnsupported"));
+      const value = await request(
+        "POST",
+        folders ? SIDEBAR_FOLDERS_ROUTES.actions : TEAM_API_ROUTES.sidebarLayout.actions,
+        { ...action },
+      );
       if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
     },
@@ -1297,7 +1313,13 @@ export function createWebWorkspaceRuntime(
       if (!isDynamicRecord(value) || !isClientAgentSummary(value.agent) || !isSidebarLayoutSnapshot(value.layout))
         throw new Error(currentText().t("error.remote.invalidData"));
       duplicateOperationIds.delete(operationKey);
-      return { agent: value.agent, layout: value.layout } satisfies DuplicateAgentResult;
+      // The released route answers the layout without the parents of the folders. The copy exists, so a
+      // failed read keeps that layout rather than failing the copy; the next layout event has the parents.
+      const answered = value.layout;
+      const layout = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
+        ? await readSidebarLayout().catch(() => answered)
+        : answered;
+      return { agent: value.agent, layout } satisfies DuplicateAgentResult;
     },
     async updateAgent(input) {
       // The released agent route ignores the account, so it goes on `provider-accounts-v1` after the

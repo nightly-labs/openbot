@@ -4,7 +4,15 @@
  * safe for the drag engine to hold - it satisfies the engine's list model and can do nothing else.
  */
 
-import { type ChannelSummary, SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
+import {
+  type ChannelSummary,
+  SIDEBAR_FOLDER_LEVELS,
+  SIDEBAR_PEOPLE_SECTION_ID,
+  SIDEBAR_UNASSIGNED_SECTION_ID,
+  sidebarFolderAncestors,
+  sidebarFolderHeight,
+  sidebarFolderParents,
+} from "@openbot/contracts/ipc";
 import { createMemo } from "solid-js";
 import type { AgentProfile } from "../../../data";
 import { currentText } from "../../../text";
@@ -195,6 +203,66 @@ export function createSidebarDataStore(deps: {
     }),
   );
 
+  /** The folder that holds each folder that has one. */
+  const folderParents = createMemo(() => sidebarFolderParents(props.layout));
+  /** The visible sections in each folder, and at the top (`null`), in the order of the layout. */
+  const folderChildren = createMemo(() => {
+    const children = new Map<string | null, string[]>();
+    for (const sectionId of visibleSectionIds()) {
+      const parentId = folderParents().get(sectionId) ?? null;
+      children.set(parentId, [...(children.get(parentId) ?? []), sectionId]);
+    }
+    return children;
+  });
+
+  function sectionChildren(parentId: string | null): string[] {
+    return folderChildren().get(parentId) ?? [];
+  }
+
+  function sectionParent(sectionId: string): string | null {
+    return folderParents().get(sectionId) ?? null;
+  }
+
+  /** 0 for a folder at the top of the list. */
+  function sectionDepth(sectionId: string): number {
+    return sidebarFolderAncestors(folderParents(), sectionId).length;
+  }
+
+  /** True when `sectionId` is `ancestorId` or a folder in it, at any level. */
+  function sectionIsInside(sectionId: string, ancestorId: string): boolean {
+    return sectionId === ancestorId || sidebarFolderAncestors(folderParents(), sectionId).includes(ancestorId);
+  }
+
+  /**
+   * Whether a folder can go into `parentId` (null: the top of the list): not into itself or a folder
+   * in it, and three levels at most with the folders it holds.
+   */
+  function sectionCanNest(sectionId: string, parentId: string | null): boolean {
+    if (!customSectionById().has(sectionId)) return parentId === null;
+    if (parentId === null) return true;
+    if (!customSectionById().has(parentId) || sectionIsInside(parentId, sectionId)) return false;
+    return sectionDepth(parentId) + 1 + sidebarFolderHeight(folderParents(), sectionId) < SIDEBAR_FOLDER_LEVELS;
+  }
+
+  /** The chats in a folder and in the folders in it, for the count on a closed folder. */
+  function sectionChatIdsDeep(sectionId: string): string[] {
+    return [
+      ...(filteredChatsBySection().get(sectionId) ?? []).map((item) => item.id),
+      ...sectionChildren(sectionId).flatMap(sectionChatIdsDeep),
+    ];
+  }
+
+  /** The unread messages in a folder and in the folders in it, for the badge on a closed folder. */
+  function sectionUnreadCount(sectionId: string): number {
+    let count = 0;
+    for (const chatId of sectionChatIdsDeep(sectionId)) {
+      const state = props.agentStates[chatId];
+      if (state?.kind === "unread") count += state.count;
+      count += channelById().get(chatId)?.unreadCount ?? 0;
+    }
+    return count;
+  }
+
   function sectionIsCollapsed(sectionId: string): boolean {
     return collapsedSectionIds().has(sectionId);
   }
@@ -235,7 +303,11 @@ export function createSidebarDataStore(deps: {
     const { t } = currentText();
     if (sectionId === SIDEBAR_PEOPLE_SECTION_ID) return t("sidebar.section.people");
     if (sectionId === SIDEBAR_UNASSIGNED_SECTION_ID) return t("sidebar.section.unassigned");
-    return customSectionById().get(sectionId)?.name ?? t("sidebar.section.fallback");
+    const names = sidebarFolderAncestors(folderParents(), sectionId).flatMap((ancestorId) => {
+      const name = customSectionById().get(ancestorId)?.name;
+      return name === undefined ? [] : [name];
+    });
+    return [...names, customSectionById().get(sectionId)?.name ?? t("sidebar.section.fallback")].join(" / ");
   }
 
   function visiblePinnedKeys(): string[] {
@@ -264,9 +336,14 @@ export function createSidebarDataStore(deps: {
     personById,
     resolvedPinnedItems,
     sectionAcceptsChat,
+    sectionCanNest,
+    sectionChildren,
     sectionIsCollapsed,
+    sectionIsInside,
+    sectionParent,
     sectionLabel,
     sectionPosition,
+    sectionUnreadCount,
     visiblePinnedKeys,
     userHiddenAgentList,
     userHiddenSince,
