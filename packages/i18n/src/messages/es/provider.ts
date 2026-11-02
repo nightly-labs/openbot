@@ -123,6 +123,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, predeterminado",
   "provider.picker.effort": "Esfuerzo",
   "provider.picker.effortLabel": "Esfuerzo de razonamiento del agente",
+  "provider.picker.effortFixed": "{effort}, fijado por {provider}",
   "provider.picker.fast": "Rápido",
   "provider.picker.fastLabel": "Modo rápido",
   "provider.picker.selectEffort": "Seleccionar esfuerzo",
