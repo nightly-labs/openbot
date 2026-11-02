@@ -361,6 +361,8 @@ export interface DiscoveredModel {
   name?: string;
   /** For a saved model: the context window the user set, which Edit must keep. */
   contextWindow?: number;
+  /** For a saved model: the max output the user set, which Edit must keep. */
+  maxOutput?: number;
 }
 
 /** The state of one `GET {baseUrl}/models` request, owned by the host that makes it. */

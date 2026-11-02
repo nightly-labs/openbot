@@ -45,7 +45,7 @@ interface OpenCodeProviderOptions {
 
 /**
  * One model of an endpoint. OpenCode refuses a `limit` without `output`, and then lists none of the
- * endpoint's models. `output: 0` is not a safe marker: OpenCode then asks for its own 32,000-token
+ * endpoint's models. `output: 0` is not a safe marker: OpenCode 2.2.5 then asks for its own 32,000-token
  * fallback, which a model with a smaller output cap refuses on every turn (#4234). So the entry always
  * writes a real output limit, from {@link customModelOutputLimit}.
  */
