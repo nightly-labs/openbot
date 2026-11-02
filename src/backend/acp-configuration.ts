@@ -310,12 +310,13 @@ export class AcpConfiguration {
       if (category === "thought_level" && thread.currentModelId) {
         const currentModel = models.find((candidate) => candidate.id === thread.currentModelId);
         if (currentModel && currentModel.usesModelReasoningEffort !== null) {
-          if (currentModel.usesModelReasoningEffort && currentModel.supportedReasoningEfforts.includes(value)) {
+          const effort = listedEffort(value, (level) => currentModel.supportedReasoningEfforts.includes(level));
+          if (currentModel.usesModelReasoningEffort && effort) {
             yield* this.#timed("session/set_model", () =>
               this.#connection(thread).request("session/set_model", {
                 sessionId: thread.id,
                 modelId: thread.currentModelId,
-                _meta: { reasoningEffort: currentModel.reasoningEffortWireValues.get(value) ?? value },
+                _meta: { reasoningEffort: currentModel.reasoningEffortWireValues.get(effort) ?? effort },
               }),
             );
           }
@@ -371,8 +372,7 @@ export class AcpConfiguration {
       // An effort travels by OpenBot's name, and the agent's own name for it is read from the option
       // this session published, not from the catalog: the session is the one that has to accept it.
       const values = selectValues(option);
-      const wanted =
-        category === "thought_level" ? reasoningEffortWireValues(values.map((entry) => entry.value)).get(value) : value;
+      const wanted = category === "thought_level" ? effortWireValue(values, value) : value;
       const listed = values.some((candidate) => candidate.value === wanted);
       const selected = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
       if (!selected) continue;
@@ -729,6 +729,21 @@ function reasoningEffortWireValues(values: string[]): Map<string, string> {
     }
   }
   return result;
+}
+
+function effortWireValue(values: { value: string }[], effort: string): string | undefined {
+  const wireValues = reasoningEffortWireValues(values.map((entry) => entry.value));
+  const listed = listedEffort(effort, (level) => wireValues.has(level));
+  return listed ? wireValues.get(listed) : undefined;
+}
+
+/**
+ * The level to send for a saved effort. `minimal`, `none` and `off` were `low` before OpenBot had a
+ * name for them, so an agent saved as `low` on a model without it still sends the lowest level.
+ */
+function listedEffort(effort: string, listed: (level: string) => boolean): string | undefined {
+  if (listed(effort)) return effort;
+  return effort === "low" ? ["minimal", "none"].find(listed) : undefined;
 }
 
 function normalizeEffort(value: string): string | null {

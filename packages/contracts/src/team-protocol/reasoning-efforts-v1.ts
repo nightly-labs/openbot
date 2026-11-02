@@ -23,14 +23,27 @@ export const TEAM_REASONING_EFFORTS = [
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
+const EFFORT_FIELDS = new Set(["reasoningEffort", "defaultReasoningEffort", "supportedReasoningEfforts"]);
+
 /**
- * A copy of a JSON value for a peer without reasoning-efforts-v1: each effort field has the nearest
- * level that the peer knows. Only the effort fields change, so a workflow step `effort` and text stay
- * as they are.
+ * The value for a peer without reasoning-efforts-v1: each effort field has the nearest level that the
+ * peer knows. Only the effort fields change, so a workflow step `effort` and text stay as they are.
+ * A value with no new level is returned as it is, so most responses and events are not copied.
  */
-export function withLegacyReasoningEfforts(value: unknown): JsonValue {
-  const json: JsonValue = JSON.parse(JSON.stringify(value ?? null));
+export function withLegacyReasoningEfforts<T>(value: T): T | JsonValue {
+  if (!hasNewReasoningEffort(value, "")) return value;
+  const json: JsonValue = JSON.parse(JSON.stringify(value));
   return legacyEfforts(json);
+}
+
+function hasNewReasoningEffort(value: unknown, key: string): boolean {
+  if (EFFORT_FIELDS.has(key)) {
+    const levels = Array.isArray(value) ? value : [value];
+    return levels.some((level) => isReasoningEffort(level) && legacyReasoningEffort(level) !== level);
+  }
+  if (Array.isArray(value)) return value.some((item) => hasNewReasoningEffort(item, ""));
+  if (value === null || typeof value !== "object") return false;
+  return Object.entries(value).some(([field, child]) => hasNewReasoningEffort(child, field));
 }
 
 function legacyEfforts(value: JsonValue, key = ""): JsonValue {
