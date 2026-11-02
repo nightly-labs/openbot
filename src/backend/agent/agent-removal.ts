@@ -107,7 +107,10 @@ export class AgentRemoval {
     return this.#deleting;
   }
 
-  /** Fails as `delete` would when the agent is being deleted, has an active turn or an unfinished delivery. */
+  /**
+   * Fails as `delete` would when the agent is being deleted, has an active turn or a started delivery.
+   * Queued messages do not block: a usage limit can hold them for days, and they go with the agent.
+   */
   readonly ensureDeletable = Effect.fn("AgentRemoval.ensureDeletable")(function* (this: AgentRemoval, agentId: string) {
     yield* removalStep(() => this.#deletable(agentId));
   });
@@ -123,6 +126,10 @@ export class AgentRemoval {
       }),
       ({ wasPending }) =>
         Effect.gen({ self: this }, function* () {
+          // The drain now holds this agent. A drain that started before can still start a queued
+          // message, so wait for it and check again.
+          yield* this.#drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void;
+          yield* removalStep(() => this.#assertNotStarted(agentId));
           yield* removalStep(() => this.#routines.arm());
           yield* this.deleteData(agent ?? { id: agentId, threadId: null });
           yield* removalStep(() => {
@@ -144,11 +151,14 @@ export class AgentRemoval {
 
   #deletable(agentId: string): AgentSummary | undefined {
     if (this.#deleting.has(agentId)) throw new Error(sourceText("error.agent.deletionBusy"));
-    const candidate = this.#store.list().find((entry) => entry.id === agentId);
-    if (this.#mailbox.hasUnfinishedDelivery(agentId) || this.#conversation.anyWorkingSnapshot(agentId)?.activeTurnId) {
+    this.#assertNotStarted(agentId);
+    return this.#store.list().find((entry) => entry.id === agentId);
+  }
+
+  #assertNotStarted(agentId: string): void {
+    if (this.#mailbox.hasStartedDelivery(agentId) || this.#conversation.anyWorkingSnapshot(agentId)?.activeTurnId) {
       throw new Error(sourceText("error.agent.stopBeforeDelete"));
     }
-    return candidate;
   }
 
   readonly deleteData = Effect.fn("AgentRemoval.deleteData")(function* (
