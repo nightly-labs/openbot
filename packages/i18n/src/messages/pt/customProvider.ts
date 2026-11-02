@@ -35,6 +35,8 @@ export const messages = {
   "customProvider.error.modelIdInvalid":
     "Este ID de modelo não pode ser usado. Remova espaços, aspas e outros sinais de pontuação.",
   "customProvider.error.contextWindowInvalid": "Digite um número inteiro de tokens entre {min} e {max}.",
+  "customProvider.error.maxOutputInvalid": "Digite um número inteiro de tokens entre {min} e {max}.",
+  "customProvider.error.maxOutputNeedsWindow": "A saída máxima precisa de uma janela de contexto.",
   "customProvider.error.headerNameRequired": "Digite um nome de cabeçalho.",
   "customProvider.error.headerNameInvalid": "Use um nome de cabeçalho HTTP válido.",
   "customProvider.error.headerDuplicate": "Este provedor já define {name}.",
@@ -76,6 +78,8 @@ export const messages = {
   "customProvider.model.namePlaceholder": "Nome de exibição",
   "customProvider.model.contextWindow": "Janela de contexto do modelo {number}",
   "customProvider.model.contextWindowPlaceholder": "Tokens",
+  "customProvider.model.maxOutput": "Saída máxima do modelo {number}",
+  "customProvider.model.maxOutputPlaceholder": "Tokens",
   "customProvider.model.remove": "Remover modelo {number}",
   "customProvider.model.add": "Adicionar modelo",
   "customProvider.headers": "Cabeçalhos",

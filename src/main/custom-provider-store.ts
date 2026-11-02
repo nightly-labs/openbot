@@ -21,6 +21,7 @@ import {
   CUSTOM_PROVIDER_HARNESSES,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isCustomProviderContextWindow,
+  isCustomProviderMaxOutput,
   sameCustomProviderOrigin,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -43,13 +44,15 @@ export interface CustomProviderCipher {
 }
 
 /**
- * `contextWindow` was added in a later release: a file without it still reads, and an older build drops it.
- * A value out of range is dropped, not refused, so that it cannot hide every saved endpoint.
+ * `contextWindow` and `maxOutput` were added in later releases: a file without them still reads, and an
+ * older build drops them. A value out of range is dropped, not refused, so that it cannot hide every
+ * saved endpoint.
  */
 const modelSchema = z.object({
   id: z.string(),
   name: z.string(),
   contextWindow: z.number().refine(isCustomProviderContextWindow).optional().catch(undefined),
+  maxOutput: z.number().refine(isCustomProviderMaxOutput).optional().catch(undefined),
 });
 const headerSchema = z.object({ name: z.string(), value: z.string() });
 
@@ -356,11 +359,14 @@ function storedHarness(harness: CustomProviderHarness | undefined): { harness?: 
   return harness && harness !== DEFAULT_CUSTOM_PROVIDER_HARNESS ? { harness } : {};
 }
 
-/** The parse keeps an out-of-range `contextWindow` key as undefined. The copy drops that key. */
+/** The parse keeps an out-of-range `contextWindow` or `maxOutput` key as undefined. The copy drops that key. */
 function copyModel(model: z.infer<typeof modelSchema>): CustomProviderModel {
-  return model.contextWindow === undefined
-    ? { id: model.id, name: model.name }
-    : { id: model.id, name: model.name, contextWindow: model.contextWindow };
+  return {
+    id: model.id,
+    name: model.name,
+    ...(model.contextWindow !== undefined ? { contextWindow: model.contextWindow } : {}),
+    ...(model.maxOutput !== undefined ? { maxOutput: model.maxOutput } : {}),
+  };
 }
 
 /** The same names in the same order, each with its saved value. */

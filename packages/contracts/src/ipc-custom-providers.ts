@@ -27,6 +27,12 @@ export const CUSTOM_PROVIDER_LIMITS = {
    */
   contextWindowMin: 1_024,
   contextWindowMax: 100_000_000,
+  /**
+   * The largest completion of one model, in tokens. No model returns a million, so the ceiling only
+   * stops a typo from reaching the endpoint as `max_completion_tokens`.
+   */
+  maxOutputMin: 256,
+  maxOutputMax: 1_000_000,
 } as const;
 
 /** A `provider` key in OpenCode's config, so lowercase and free of separators. */
@@ -52,6 +58,15 @@ export interface CustomProviderModel {
    * 2.1.4. This computer only: a Team API list and save keep their released model fields.
    */
   contextWindow?: number;
+  /**
+   * The largest completion the model returns, in tokens (#4234). Absent: OpenBot writes half the
+   * context window as a guess, which a model whose real output cap is smaller still refuses. An
+   * output cap has no relation to the context size — a 128K-window model with a 16K cap is
+   * ordinary — so it needs a field of its own. It is written with a `contextWindow`: without one
+   * the entry keeps OpenCode's defaults and the cap is stored but not written. This computer
+   * only, like `contextWindow`.
+   */
+  maxOutput?: number;
 }
 
 /** A context window that OpenCode can use for a model. */
@@ -61,6 +76,16 @@ export function isCustomProviderContextWindow(value: unknown): value is number {
     Number.isSafeInteger(value) &&
     value >= CUSTOM_PROVIDER_LIMITS.contextWindowMin &&
     value <= CUSTOM_PROVIDER_LIMITS.contextWindowMax
+  );
+}
+
+/** A completion cap that OpenCode can use for a model. */
+export function isCustomProviderMaxOutput(value: unknown): value is number {
+  return (
+    isNumber(value) &&
+    Number.isSafeInteger(value) &&
+    value >= CUSTOM_PROVIDER_LIMITS.maxOutputMin &&
+    value <= CUSTOM_PROVIDER_LIMITS.maxOutputMax
   );
 }
 

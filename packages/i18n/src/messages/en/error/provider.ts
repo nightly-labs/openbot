@@ -103,6 +103,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.modelIdDuplicate": "Two models have the same ID.",
   "error.provider.contextWindowInvalid":
     "A model's context window must be a whole number of tokens from {min} to {max}.",
+  "error.provider.maxOutputInvalid": "A model's max output must be a whole number of tokens from {min} to {max}.",
   "error.provider.headersTooMany": "There are too many headers.",
   "error.provider.headerNameCharacter": "A header name has a character HTTP does not allow.",
   "error.provider.headerNameTooLong": "A header name is too long.",

@@ -34,6 +34,8 @@ export const messages = {
   "customProvider.error.modelIdInvalid":
     "Cet ID de modèle n’est pas utilisable. Supprimez les espaces, les guillemets et les autres signes de ponctuation.",
   "customProvider.error.contextWindowInvalid": "Saisissez un nombre entier de jetons entre {min} et {max}.",
+  "customProvider.error.maxOutputInvalid": "Saisissez un nombre entier de jetons entre {min} et {max}.",
+  "customProvider.error.maxOutputNeedsWindow": "La sortie maximale nécessite une fenêtre de contexte.",
   "customProvider.error.headerNameRequired": "Saisissez un nom d’en-tête.",
   "customProvider.error.headerNameInvalid": "Utilisez un nom d’en-tête HTTP valide.",
   "customProvider.error.headerDuplicate": "Ce fournisseur définit déjà {name}.",
@@ -77,6 +79,8 @@ export const messages = {
   "customProvider.model.namePlaceholder": "Nom d’affichage",
   "customProvider.model.contextWindow": "Fenêtre de contexte du modèle {number}",
   "customProvider.model.contextWindowPlaceholder": "Jetons",
+  "customProvider.model.maxOutput": "Sortie maximale du modèle {number}",
+  "customProvider.model.maxOutputPlaceholder": "Jetons",
   "customProvider.model.remove": "Supprimer le modèle {number}",
   "customProvider.model.add": "Ajouter un modèle",
   "customProvider.headers": "En-têtes",

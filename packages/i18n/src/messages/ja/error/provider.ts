@@ -106,6 +106,7 @@ export const messages = {
   "error.provider.modelIdDuplicate": "2 つのモデルの ID が同じです。",
   "error.provider.contextWindowInvalid":
     "モデルのコンテキストウィンドウは {min} から {max} までの整数のトークン数にしてください。",
+  "error.provider.maxOutputInvalid": "モデルの最大出力は {min} から {max} までの整数のトークン数にしてください。",
   "error.provider.headersTooMany": "ヘッダーが多すぎます。",
   "error.provider.headerNameCharacter": "ヘッダー名に HTTP で使用できない文字が含まれています。",
   "error.provider.headerNameTooLong": "ヘッダー名が長すぎます。",

@@ -34,6 +34,8 @@ export const messages = {
   "customProvider.error.modelIdInvalid":
     "Questo ID del modello non può essere usato. Rimuovi spazi, virgolette e altra punteggiatura.",
   "customProvider.error.contextWindowInvalid": "Inserisci un numero intero di token tra {min} e {max}.",
+  "customProvider.error.maxOutputInvalid": "Inserisci un numero intero di token tra {min} e {max}.",
+  "customProvider.error.maxOutputNeedsWindow": "L’output massimo richiede una finestra di contesto.",
   "customProvider.error.headerNameRequired": "Inserisci un nome per l'header.",
   "customProvider.error.headerNameInvalid": "Usa un nome di header HTTP valido.",
   "customProvider.error.headerDuplicate": "Questo provider imposta già {name}.",
@@ -75,6 +77,8 @@ export const messages = {
   "customProvider.model.namePlaceholder": "Nome visualizzato",
   "customProvider.model.contextWindow": "Finestra di contesto del modello {number}",
   "customProvider.model.contextWindowPlaceholder": "Token",
+  "customProvider.model.maxOutput": "Output massimo del modello {number}",
+  "customProvider.model.maxOutputPlaceholder": "Token",
   "customProvider.model.remove": "Rimuovi il modello {number}",
   "customProvider.model.add": "Aggiungi modello",
   "customProvider.headers": "Header",

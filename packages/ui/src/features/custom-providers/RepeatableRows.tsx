@@ -27,13 +27,14 @@ interface RepeatableRowsProps<T> {
   removeLabel: (number: number) => string;
   addLabel: string;
   /**
-   * One column for a plain list, such as addresses; two for a name and its value; three for a model
-   * with its context window.
+   * One column for a plain list, such as addresses; two for a name and its value; four for a model
+   * with its context window and output cap.
    */
   columns:
     | readonly [RepeatableColumn<T>]
     | readonly [RepeatableColumn<T>, RepeatableColumn<T>]
-    | readonly [RepeatableColumn<T>, RepeatableColumn<T>, RepeatableColumn<T>];
+    | readonly [RepeatableColumn<T>, RepeatableColumn<T>, RepeatableColumn<T>]
+    | readonly [RepeatableColumn<T>, RepeatableColumn<T>, RepeatableColumn<T>, RepeatableColumn<T>];
   rows: readonly T[];
   limit: number;
   busy: boolean;
@@ -75,6 +76,7 @@ export function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
                 {
                   "custom-provider-row-single": props.columns.length === 1,
                   "custom-provider-row-triple": props.columns.length === 3,
+                  "custom-provider-row-quad": props.columns.length === 4,
                 },
               ]}
             >

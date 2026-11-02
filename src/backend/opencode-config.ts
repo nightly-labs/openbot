@@ -45,13 +45,17 @@ interface OpenCodeProviderOptions {
 
 /**
  * One model of an endpoint. OpenCode refuses a `limit` without `output`, and then lists none of the
- * endpoint's models. `output: 0` keeps OpenCode's own output budget, which it also cuts to the room
- * the context leaves. Checked in OpenCode 2.1.4: a model with no `limit` reports 200K context, and
- * `{ context: 32768, output: 0 }` sent `max_completion_tokens: 21071`.
+ * endpoint's models. Per #4234, OpenCode 2.2.5 treats `output: 0` as unknown and serves every
+ * request with its own fixed output budget of 32,000; in 2.1.4 it instead cut the budget to the
+ * room the context leaves. A model that allows less than 32,000, such as the endpoint's 16K-output
+ * model behind a 128K window, had every turn refused before the first token. The entry now writes a
+ * real value: the model's own `maxOutput` when the user saved one, and otherwise half the window,
+ * capped at OpenCode's own budget, as a guess — an output cap has no relation to the context size,
+ * so the guess is wrong for exactly the models #4234 reports, and the field is the fix.
  */
 interface OpenCodeModelEntry {
   readonly name: string;
-  readonly limit?: { readonly context: number; readonly output: 0 };
+  readonly limit?: { readonly context: number; readonly output: number };
 }
 
 /** One entry under OpenCode's own `provider` key, keyed there by the endpoint's id. */
@@ -187,10 +191,28 @@ function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
   };
 }
 
+/**
+ * OpenCode's own output budget, written as the guess for a model whose output limit the user did
+ * not save (per #4234, 2.2.5).
+ *
+ * The runtime this repo pins in native-runtime.lock.json is 2.1.1, which predates that fallback,
+ * so the value only reaches users who run a newer `opencode` they installed themselves. It matches
+ * the 2.2.5 default that #4234 reports, so a model with a large window keeps the budget that
+ * OpenCode would pick anyway. Revisit when the runtime pin moves past 2.2.5.
+ */
+const OPENCODE_OUTPUT_BUDGET = 32_000;
+
 function modelEntry(model: CustomProviderModel): OpenCodeModelEntry {
-  return model.contextWindow === undefined
-    ? { name: model.name }
-    : { name: model.name, limit: { context: model.contextWindow, output: 0 } };
+  if (model.contextWindow === undefined) return { name: model.name };
+  return {
+    name: model.name,
+    limit: {
+      context: model.contextWindow,
+      // The saved cap wins verbatim. Without one, half the window is a guess; a model with no
+      // saved cap and no window never reaches here and keeps OpenCode's own defaults.
+      output: model.maxOutput ?? Math.min(OPENCODE_OUTPUT_BUDGET, Math.floor(model.contextWindow / 2)),
+    },
+  };
 }
 
 /**
