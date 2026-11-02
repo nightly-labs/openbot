@@ -102,9 +102,10 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
          * the whole of an update, so a mask that ignored the phase would report the row as ready
          * throughout, and hide both the progress the Cancel button reverses and the failure the
          * Retry button answers.
+         *
+         * A CLI the user installed that failed shows its own version too, so the row names the CLI
+         * that failed. A copy that is not downloaded keeps its Download then.
          */
-        // A CLI the user installed that failed shows its own version too, so the row names the CLI
-        // that failed. A copy that is not downloaded keeps its Download then.
         runtimeStatus:
           runtime &&
           agent &&

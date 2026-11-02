@@ -6,6 +6,6 @@
 ### Fixed
 
 - A provider CLI update could fail with "OpenBot could not activate the managed CLI." when you
-  also installed the CLI yourself, as for OpenCode. OpenBot started your CLI in place of the new
-  version, and showed its version or its failure as a failure of the update. The update now starts
+  also installed the CLI yourself, as for OpenCode. The update checked your CLI in place of the new
+  version, and showed its version or its failure as a failure of the update. The update now checks
   the new version. When the new version does not start, the error says so.
