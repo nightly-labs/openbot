@@ -15,7 +15,7 @@ import {
   Link2Off,
   Text,
 } from "@openbot/ui";
-import { createStore, Match, Show, Switch } from "solid-js";
+import { createStore, Show } from "solid-js";
 import { useText } from "../../text";
 
 export interface VaultLinkAccountProps {
@@ -97,56 +97,54 @@ export function VaultLinkAccount(props: VaultLinkAccountProps) {
             </Show>
           </ItemContent>
           <ItemActions>
-            <Switch
-              fallback={
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={ui.busy}
-                  onClick={() => void run(props.onConnect)}
+            <Show when={props.status.state !== "connected" && props.status.state !== "pending"}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={ui.busy}
+                onClick={() => void run(props.onConnect)}
+              >
+                {t("vault.link.connect")}
+              </Button>
+            </Show>
+            <Show when={props.status.state === "pending"}>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={ui.busy}
+                onClick={() => void run(props.onCancel)}
+              >
+                {t("vault.link.cancel")}
+              </Button>
+            </Show>
+            {/* An expired sign-in keeps its file, so Disconnect stays available. */}
+            <Show when={props.status.state === "connected" || props.status.state === "expired"}>
+              <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
+                <DropdownMenu.Trigger
+                  class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} ui-icon-button`}
+                  aria-label={t("vault.link.actions")}
                 >
-                  {t("vault.link.connect")}
-                </Button>
-              }
-            >
-              <Match when={props.status.state === "pending"}>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={ui.busy}
-                  onClick={() => void run(props.onCancel)}
-                >
-                  {t("vault.link.cancel")}
-                </Button>
-              </Match>
-              <Match when={props.status.state === "connected"}>
-                <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
-                  <DropdownMenu.Trigger
-                    class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} ui-icon-button`}
-                    aria-label={t("vault.link.actions")}
-                  >
-                    <Ellipsis aria-hidden="true" />
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
-                    <DropdownMenu.Content>
-                      <DropdownMenu.Item
-                        onSelect={() =>
-                          setUi((draft) => {
-                            draft.failure = null;
-                            draft.disconnecting = true;
-                          })
-                        }
-                      >
-                        <Link2Off aria-hidden="true" />
-                        {t("vault.link.disconnect")}
-                      </DropdownMenu.Item>
-                    </DropdownMenu.Content>
-                  </DropdownMenu.Portal>
-                </DropdownMenu.Root>
-              </Match>
-            </Switch>
+                  <Ellipsis aria-hidden="true" />
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
+                  <DropdownMenu.Content>
+                    <DropdownMenu.Item
+                      onSelect={() =>
+                        setUi((draft) => {
+                          draft.failure = null;
+                          draft.disconnecting = true;
+                        })
+                      }
+                    >
+                      <Link2Off aria-hidden="true" />
+                      {t("vault.link.disconnect")}
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            </Show>
           </ItemActions>
         </Item>
       </ItemGroup>

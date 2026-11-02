@@ -44,7 +44,7 @@ export const Connected: Story = {
   args: { status: { state: "connected", email: "ada@example.com", error: null } },
 };
 
-/** Link refused the saved sign-in. The user connects again. */
+/** Link refused the saved sign-in. The user connects again, or disconnects from the menu. */
 export const Expired: Story = {
   args: {
     status: { state: "expired", email: "ada@example.com", error: "The Link connection expired. Connect Link again." },
