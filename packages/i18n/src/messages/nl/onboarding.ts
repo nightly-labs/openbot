@@ -83,7 +83,8 @@ export const messages = {
   "onboarding.choice.startFreeInstead": "Toch gratis beginnen",
   "onboarding.consent.notice": "Door verder te gaan, accepteer je de {terms} en neem je kennis van het {privacy}.",
   "onboarding.consent.analyticsTitle": "Help OpenBot beter te maken",
-  "onboarding.consent.analyticsDetail": "Deel welke functies je gebruikt. Nooit je chats, bestanden of prompts.",
+  "onboarding.consent.analyticsDetail":
+    "Koppel functiegebruik aan je account en e-mailadres, en deel bezochte websites, gebruik van tools en een dagelijks overzicht van je installatie. Anders gaat alleen basisgebruik, met een willekeurige installatie-ID. Nooit je chats, bestanden of prompts.",
   "onboarding.consent.thanksTitle": "Bedankt! Het team staat bij je in het krijt.",
   "onboarding.consent.thanksToast": "Bedankt dat je helpt OpenBot beter te maken 💜",
   "onboarding.consent.thanksToastDetail": "Je kunt dit altijd wijzigen in Instellingen.",

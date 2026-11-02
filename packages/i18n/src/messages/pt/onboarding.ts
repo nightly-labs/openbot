@@ -85,7 +85,8 @@ export const messages = {
   "onboarding.choice.startFreeInstead": "Prefiro começar grátis",
   "onboarding.consent.notice": "Ao continuar, você aceita os {terms} e declara ter lido a {privacy}.",
   "onboarding.consent.analyticsTitle": "Ajude a melhorar o OpenBot",
-  "onboarding.consent.analyticsDetail": "Compartilhe quais recursos você usa. Nunca seus chats, arquivos ou prompts.",
+  "onboarding.consent.analyticsDetail":
+    "Vincule o uso de recursos à sua conta e ao seu e-mail, e compartilhe os sites visitados, o uso de ferramentas e um resumo diário da sua configuração. Sem isso, só o uso básico é enviado, com um ID de instalação aleatório. Nunca seus chats, arquivos ou prompts.",
   "onboarding.consent.thanksTitle": "Obrigado! A equipe fica te devendo uma.",
   "onboarding.consent.thanksToast": "Obrigado por ajudar a melhorar o OpenBot 💜",
   "onboarding.consent.thanksToastDetail": "Você pode mudar isso a qualquer momento nas Configurações.",

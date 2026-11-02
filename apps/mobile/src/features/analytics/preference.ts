@@ -1,4 +1,6 @@
 import { isBoolean, isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
+import { currentAnalyticsInstallId, newAnalyticsInstallId } from "@openbot/telemetry";
+import { randomUUID } from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 import { mobileAnalytics } from "./mobile-analytics";
@@ -8,6 +10,8 @@ const key = "openbot.mobile.analytics.v1";
 const accountPendingKey = "openbot.mobile.analytics.account-pending.v1";
 /** "true" or "false". Missing: an app from before the account kept answers saved the choice. */
 const keepOffKey = "openbot.mobile.analytics.keep-off.v1";
+/** JSON `{ id, createdAt }`: the random ID of events while tracking is off. It changes after 13 months. */
+const installIdKey = "openbot.mobile.analytics.install-id.v1";
 // The longest wait for the opt-out event before tracking stops. The opt-out must not wait for a slow network.
 const OPT_OUT_EVENT_LIMIT_MS = 2_000;
 export const useAnalyticsPreference = create<{ enabled: boolean; ready: boolean; saving: boolean }>(() => ({
@@ -17,8 +21,37 @@ export const useAnalyticsPreference = create<{ enabled: boolean; ready: boolean;
 }));
 let loading: Promise<void> | null = null;
 
+/**
+ * The saved install ID, or a new one when it is missing, damaged or 13 months old. Null when the
+ * keychain cannot be read or written: an ID that changes at each start would count one phone as many.
+ */
+async function readInstallId(): Promise<string | null> {
+  const now = Date.now();
+  let stored: string | null;
+  try {
+    stored = await SecureStore.getItemAsync(installIdKey);
+  } catch {
+    return null;
+  }
+  try {
+    const current = currentAnalyticsInstallId(JSON.parse(stored ?? "null"), now);
+    if (current) return current.id;
+  } catch {
+    // A damaged value gets a new ID.
+  }
+  const created = newAnalyticsInstallId(randomUUID(), now);
+  try {
+    await SecureStore.setItemAsync(installIdKey, JSON.stringify(created));
+    return created.id;
+  } catch {
+    return null;
+  }
+}
+
 export function loadAnalyticsPreference(): Promise<void> {
-  loading ??= SecureStore.getItemAsync(key)
+  loading ??= readInstallId()
+    .then((installId) => mobileAnalytics.setInstallId(installId))
+    .then(() => SecureStore.getItemAsync(key))
     .then((stored) => {
       const enabled = stored === null || stored === "true";
       mobileAnalytics.setEnabled(enabled);
@@ -38,7 +71,8 @@ export async function saveAnalyticsPreference(enabled: boolean): Promise<void> {
   useAnalyticsPreference.setState({ saving: true });
   if (!enabled) {
     useAnalyticsPreference.setState({ enabled: false });
-    // The opt-out event goes out before the client stops. Nothing else is sent after the choice.
+    // The opt-out event goes out with the account before the client stops. After the choice, events
+    // go with the install ID only.
     if (wasEnabled) {
       await mobileAnalytics.sendLast("analytics_preference_changed", { enabled: false }, OPT_OUT_EVENT_LIMIT_MS);
     }

@@ -26,7 +26,12 @@ import { isBoolean, isDynamicRecord, isFunction, isNumber, isOneOf, isString } f
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { ANALYTICS_GENERATIONS } from "@openbot/telemetry";
 import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
-import { ANALYTICS_SCHEMA_VERSION, configureDesktopReports, configureErrorReports } from "./error-reports";
+import {
+  ANALYTICS_SCHEMA_VERSION,
+  configureDesktopReports,
+  configureErrorReports,
+  webAnalyticsInstallId,
+} from "./error-reports";
 import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
@@ -458,6 +463,7 @@ type SanitizedAnalyticsProperties = Partial<Record<AnalyticsPropertyName, Analyt
 type PendingEvent = {
   name: AnalyticsEventName;
   properties: SanitizedAnalyticsProperties;
+  /** The account ID, or null for an event that goes with the install ID. */
   profileId: string | null;
   timestamp: string;
 };
@@ -833,7 +839,10 @@ class DesktopAnalytics {
   #client: OpenPanelClient | null = null;
   #anonymousClient: OpenPanelClient | null = null;
   #disabled = false;
+  /** The user shares analytics with their account. Off: events go with the install ID only. */
   #trackingEnabled = true;
+  /** The random install ID, for events that do not go with the account. */
+  #installId: string | null = null;
   #identity: AnalyticsIdentity | null = null;
   #pending: PendingEvent[] = [];
   readonly #clientQueue: AnalyticsOperationQueue = { active: false, operations: [] };
@@ -862,6 +871,7 @@ class DesktopAnalytics {
       };
       const client = this.#createClient(clientOptions);
       const anonymousClient = this.#createClient(clientOptions);
+      this.#installId = appInfo.analyticsInstallId ?? null;
       const globalProperties = {
         __referrer: "",
         surface: "desktop",
@@ -875,7 +885,7 @@ class DesktopAnalytics {
       this.#client = client;
       this.#anonymousClient = anonymousClient;
       if (this.#trackingEnabled && this.#identity) this.#identifyClient(this.#identity);
-      if (this.#trackingEnabled) this.#flush();
+      this.#flush();
       return true;
     } catch {
       return false;
@@ -898,6 +908,7 @@ class DesktopAnalytics {
         const clientOptions = { apiUrl: OPENPANEL_API_URL, clientId: OPENPANEL_CLIENT_ID };
         const client = this.#createClient(clientOptions);
         const anonymousClient = this.#createClient(clientOptions);
+        this.#installId = webAnalyticsInstallId();
         const globalProperties = {
           __referrer: "",
           surface: "web",
@@ -911,7 +922,7 @@ class DesktopAnalytics {
         this.#client = client;
         this.#anonymousClient = anonymousClient;
         if (this.#trackingEnabled && this.#identity) this.#identifyClient(this.#identity);
-        if (this.#trackingEnabled) this.#flush();
+        this.#flush();
       } catch {
         return false;
       }
@@ -945,7 +956,8 @@ class DesktopAnalytics {
 
   /**
    * `recordOptOut` is for the user's own change from on to off: one last event records it. A value
-   * loaded at start, a reverted save or another tab's change records nothing.
+   * loaded at start, a reverted save or another tab's change records nothing. After "off", events
+   * go with the install ID, never with the account.
    */
   setTrackingEnabled(enabled: boolean, options: { recordOptOut?: boolean } = {}): void {
     if (this.#trackingEnabled === enabled) return;
@@ -991,9 +1003,10 @@ class DesktopAnalytics {
   #track<Name extends AnalyticsEventName>(
     name: Name,
     properties: DesktopAnalyticsEvents[Name],
-    profileId: string | null,
+    accountId: string | null,
   ): void {
-    if (this.#disabled || !this.#trackingEnabled) return;
+    if (this.#disabled) return;
+    const profileId = this.#trackingEnabled ? accountId : null;
     const sanitized = sanitizeDesktopAnalyticsEvent(name, properties);
     if (!this.#client) {
       this.#pending.push({ name, properties: sanitized, profileId, timestamp: new Date().toISOString() });
@@ -1003,18 +1016,25 @@ class DesktopAnalytics {
     this.#send(name, sanitized, profileId);
   }
 
+  /**
+   * `profileId` is the account ID. A user who does not share analytics sends with the install ID,
+   * and nothing when there is no install ID. A signed-out user who shares analytics sends with no
+   * ID, so the install ID never shows next to an account.
+   */
   #send(
     name: AnalyticsEventName,
     properties: SanitizedAnalyticsProperties,
     profileId: string | null,
     timestamp?: string,
   ): void {
+    const subject = profileId ?? (this.#trackingEnabled ? null : this.#installId);
+    if (!subject && !this.#trackingEnabled) return;
     const client = profileId ? this.#client : this.#anonymousClient;
     this.#enqueue(profileId ? this.#clientQueue : this.#anonymousQueue, "track", () =>
       client?.track(name, {
         ...properties,
         ...(timestamp ? { __timestamp: timestamp } : {}),
-        ...(profileId ? { profileId } : {}),
+        ...(subject ? { profileId: subject } : {}),
       }),
     );
   }
