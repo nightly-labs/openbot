@@ -488,9 +488,12 @@ the token and does the platform work for the hosts:
   Another account gets `discord_guild_taken`.
 - **Events.** Signal keeps one Gateway connection (`@discordjs/ws`) with the guilds, guild messages
   and direct messages intents, and no privileged intent. It passes on only a guild message that
-  mentions the bot, and a press of an OpenBot button, which it acknowledges to Discord at once. It
-  normalizes each into `DiscordDelivery` (`@openbot/contracts/signal-protocol/discord-api`), takes the
-  bot's own mention out, and sends a `discord-delivery` frame to the `ingress` socket that holds a
+  mentions the bot or the bot's own role, and a press of an OpenBot button, which it acknowledges to
+  Discord at once. Discord makes that role, with the bot's name, when the bot joins a guild, and its
+  autocomplete can choose it instead of the bot. Signal finds the role by its `tags.bot_id` in the
+  guild and role events, and keeps only its ID in memory. It normalizes each message into
+  `DiscordDelivery` (`@openbot/contracts/signal-protocol/discord-api`), takes the bot's own mention
+  and role mention out, and sends a `discord-delivery` frame to the `ingress` socket that holds a
   Discord route ticket for the guild. The ticket mirrors the Slack one (audience
   `openbot-discord-route`, `/v2/remote/hosts/:id/discord-route`, `discord-route-revoked`,
   `/v2/remote/discord-route/validate`). The socket asks for a route only for the platforms whose

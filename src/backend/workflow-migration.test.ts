@@ -88,7 +88,7 @@ function workflowTables(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 49 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 50 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -170,9 +170,9 @@ describe("workflow migration", () => {
     const db = databaseAt(45);
     seed(db, 45);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(50,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(51,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=50; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=51; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(workflowTables(db)).toEqual([]);
@@ -337,9 +337,9 @@ describe("workflow GitHub migration", () => {
     seedWorkflow(db);
     const before = contents(db);
     const check = runSourceCheck(db);
-    db.exec("INSERT INTO schema_migrations VALUES(50,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(51,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=50; DELETE FROM schema_migrations WHERE version=46");
+    db.exec("DELETE FROM schema_migrations WHERE version=51; DELETE FROM schema_migrations WHERE version=46");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 46");
     expect(contents(db)).toEqual(before);
     expect(runSourceCheck(db)).toBe(check);
@@ -398,5 +398,87 @@ describe("workflow GitHub migration", () => {
     db.exec("DELETE FROM workflows WHERE workflow_id='workflow-1'");
     for (const table of WORKFLOW_TABLES) expect(count(db, table)).toBe(0);
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
+});
+
+// Migration 50 rebuilds the run table again to add the Discord run source. Failure modes: the rebuild
+// loses or changes a run, or a step, output delivery or GitHub row loses its run; a failed upgrade
+// leaves the staging table or the marker; the old CHECK survives; the run indexes are lost.
+function discordRun(runId: string, number: number): string {
+  return `INSERT INTO workflow_runs (run_id, workflow_id, number, trigger_node_id, source, idempotency_key,
+      graph_revision, graph_json, payload, status, started_at, updated_at)
+    VALUES ('${runId}', 'workflow-1', ${number}, 'trigger', 'discord', 'discord:trigger:${runId}', 0,
+      '{"nodes":[],"edges":[],"strokes":[]}', 'Mention 界', 'done', '2026-01-06', '2026-01-06')`;
+}
+
+describe("workflow Discord migration", () => {
+  it.each([46, 47, 48, 49])("keeps every run, step and delivery from released schema %i", (version) => {
+    const db = databaseAt(version);
+    seed(db, version);
+    seedWorkflow(db);
+    if (version >= 49) seedGitHub(db);
+    const before = contents(db);
+    expect(() => db.exec(discordRun("run-3", 3))).toThrow("constraint failed");
+
+    migrateOpenBotDatabase(db);
+
+    expect(contents(db)).toEqual(version >= 49 ? before : { ...before, ...EMPTY_GITHUB_TABLES });
+    expectHealthy(db);
+    expect(runSourceCheck(db)).toContain("'discord'");
+    expect(runSourceCheck(db)).toContain("'github'");
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name LIKE '%_v50'").all()).toEqual([]);
+    expect(
+      db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='workflow_runs' ORDER BY name").all(),
+    ).toEqual([
+      { name: "sqlite_autoindex_workflow_runs_1" },
+      { name: "sqlite_autoindex_workflow_runs_2" },
+      { name: "sqlite_autoindex_workflow_runs_3" },
+      { name: "workflow_runs_open" },
+      { name: "workflow_runs_recent" },
+    ]);
+    db.exec(discordRun("run-3", 3));
+    expect(count(db, "workflow_runs")).toBe(version >= 49 ? 3 : 2);
+    // The steps and GitHub rows still belong to their runs: deleting a run deletes them.
+    db.exec("DELETE FROM workflow_runs WHERE run_id='run-1'");
+    expect(count(db, "workflow_steps")).toBe(1);
+    expect(count(db, "workflow_output_deliveries")).toBe(0);
+    if (version < 49) return;
+    db.exec("DELETE FROM workflow_runs WHERE run_id='run-2'");
+    expect(count(db, "workflow_github_runs")).toBe(0);
+    expect(count(db, "workflow_github_actions")).toBe(0);
+  });
+
+  it("rolls back the rebuild and the marker after a late failure, then retries", () => {
+    const db = databaseAt(49);
+    seed(db, 49);
+    seedWorkflow(db);
+    seedGitHub(db);
+    const before = contents(db);
+    const schemaBefore = db.prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name").all();
+    db.exec(`CREATE TEMP TRIGGER fail_marker BEFORE INSERT ON schema_migrations WHEN new.version=50
+      BEGIN SELECT RAISE(ABORT, 'late failure'); END;`);
+    expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 50 failed");
+    expect(contents(db)).toEqual(before);
+    expect(db.prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name").all()).toEqual(schemaBefore);
+    expect(db.prepare("SELECT version FROM schema_migrations WHERE version=50").all()).toEqual([]);
+    expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
+    db.exec("DROP TRIGGER fail_marker");
+    migrateOpenBotDatabase(db);
+    expect(contents(db)).toEqual(before);
+    expectHealthy(db);
+  });
+
+  it("rejects newer and incomplete migration histories before it rebuilds the run table", () => {
+    const db = databaseAt(49);
+    seed(db, 49);
+    seedWorkflow(db);
+    const before = contents(db);
+    const check = runSourceCheck(db);
+    db.exec("INSERT INTO schema_migrations VALUES(51,'now')");
+    expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
+    db.exec("DELETE FROM schema_migrations WHERE version=51; DELETE FROM schema_migrations WHERE version=47");
+    expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 47");
+    expect(contents(db)).toEqual(before);
+    expect(runSourceCheck(db)).toBe(check);
   });
 });

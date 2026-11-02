@@ -1064,7 +1064,8 @@ holds it. Unlike Slack, both directions go through Signal:
 - **To the computer.** Signal keeps the bot's connection to Discord. Discord sends it the messages of
   the channels OpenBot can view. When OpenBot's Signal has the Message Content intent, they include
   the text of every message; otherwise only the messages that mention OpenBot have text. Signal
-  passes on only the messages that mention OpenBot and the presses of OpenBot's buttons: the message
+  passes on only the messages that mention OpenBot or OpenBot's own role in the server, and the
+  presses of OpenBot's buttons: the message
   text, the author's ID, name and role IDs in the server, the channel, the addresses of its files, and
   the message it replies to when a person wrote it (with its author, time, and the text and file
   addresses that Discord gave). The computer downloads the files from Discord directly.

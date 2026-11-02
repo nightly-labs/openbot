@@ -71,6 +71,8 @@ export const messages = {
   "mobile.workflow.trigger.messageHint": "Bu tetikleyiciyi bilgisayarınızdaki OpenBot'ta değiştirin.",
   "mobile.workflow.trigger.github": "GitHub",
   "mobile.workflow.trigger.githubHint": "Bir GitHub deposunda bir şey olduğunda çalışır.",
+  "mobile.workflow.trigger.discord": "Discord",
+  "mobile.workflow.trigger.discordHint": "Biri bir Discord sunucusunda OpenBot'u andığında çalışır.",
   "mobile.workflow.trigger.startsWhen": "Başlangıç",
   "mobile.workflow.trigger.timezone": "Saat dilimi: {zone}",
   "mobile.workflow.trigger.serverZone": "Zamanlama sunucunun saat dilimini kullanır.",

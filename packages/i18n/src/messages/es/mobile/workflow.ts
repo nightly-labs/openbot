@@ -72,6 +72,8 @@ export const messages = {
   "mobile.workflow.trigger.messageHint": "Cambia este activador en OpenBot en tu ordenador.",
   "mobile.workflow.trigger.github": "GitHub",
   "mobile.workflow.trigger.githubHint": "Se ejecuta cuando ocurre algo en un repositorio de GitHub.",
+  "mobile.workflow.trigger.discord": "Discord",
+  "mobile.workflow.trigger.discordHint": "Se ejecuta cuando alguien menciona a OpenBot en un servidor de Discord.",
   "mobile.workflow.trigger.startsWhen": "Inicio",
   "mobile.workflow.trigger.timezone": "Zona horaria: {zone}",
   "mobile.workflow.trigger.serverZone": "La programación usa la zona horaria del servidor.",
