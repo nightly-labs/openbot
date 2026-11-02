@@ -765,11 +765,13 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       !mcpFlowFields(flow).some((field) => field.url)
     );
   };
+  /** The catalog gives the server a short name, such as `notion`; the user knows the app's. */
+  const accountName = (app: MarketplacePluginApp, row: McpServerConfig) =>
+    row.name === app.server.name ? app.name : row.name;
   function appConnection(app: MarketplacePluginApp): MarketplaceAppConnection {
     const accounts = heldApps(app).map((row) => ({
       id: row.id,
-      // The catalog gives the server a short name, such as `notion`; the user knows the app's.
-      name: row.name === app.server.name ? app.name : row.name,
+      name: accountName(app, row),
       signInNeeded: signIns()[row.id]?.needsSignIn === true,
       signedIn: signIns()[row.id]?.signedIn ?? true,
       renamable: mcpAccountFragment(row.url) !== null,
@@ -1038,11 +1040,8 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
    * step replaces only the fields it asks for, so the user's own changes to the row stay.
    */
   function pluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
-    const held = heldApp(app);
-    if (held) return held;
-    const config = createPluginAppConfig(app);
-    // A first account with its own sign-in can take another name later and stay this app's row.
-    return accountsOffered(app) ? { ...config, url: mcpAccountUrl(config.url, crypto.randomUUID()) } : config;
+    // The first account keeps the listing address and name, as a released client matches it by them.
+    return heldApp(app) ?? createPluginAppConfig(app);
   }
 
   /** `<app> 2`, `<app> 3`, …: the first name that no row of the host has, in any case. */
@@ -1323,11 +1322,11 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     const analytics = desktopAnalytics.scope();
     const failures: string[] = [];
     let lastCause: unknown;
-    for (const config of plugin.apps.flatMap(heldApps)) {
+    for (const [app, config] of plugin.apps.flatMap((app) => heldApps(app).map((row) => [app, row] as const))) {
       try {
         setServers(await calls().mcp.removeMcpServer({ mcpServerId: config.id }, serverId));
       } catch (cause) {
-        failures.push(`${config.name}: ${marketplaceErrorMessage(cause)}`);
+        failures.push(`${accountName(app, config)}: ${marketplaceErrorMessage(cause)}`);
         lastCause = cause;
       }
     }

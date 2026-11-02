@@ -127,6 +127,8 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.setup.account": "Sign in with your {name} account in the browser.",
   "marketplace.app.setup.key": "Needs an API key from your {name} account.",
   "marketplace.app.setup.keySaved": "{field} saved on {host}.",
+  // {host} is "this computer" or a server name.
+  "marketplace.app.account.removeDescription": "OpenBot deletes the sign-in of this account on {host}.",
   "marketplace.app.setup.desktop": "Runs in the {name} desktop app at {address}.",
   "marketplace.app.setup.desktopConnected": "Connected to {address}.",
   "marketplace.app.setup.open": "No sign-in or key needed.",

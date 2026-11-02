@@ -137,6 +137,7 @@ export const messages = {
   "marketplace.app.setup.account": "Zaloguj się w przeglądarce na konto {name}.",
   "marketplace.app.setup.key": "Wymaga klucza API z konta {name}.",
   "marketplace.app.setup.keySaved": "{field} – zapisano na: {host}.",
+  "marketplace.app.account.removeDescription": "OpenBot usunie dane logowania tego konta – miejsce: {host}.",
   "marketplace.app.setup.desktop": "Działa w aplikacji desktopowej {name} pod adresem {address}.",
   "marketplace.app.setup.desktopConnected": "Połączono z {address}.",
   "marketplace.app.setup.open": "Nie wymaga logowania ani klucza.",

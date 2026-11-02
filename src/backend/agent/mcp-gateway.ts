@@ -247,13 +247,10 @@ export class McpGateway {
       .listEnabled()
       .find((row) => this.#proxied(row) && mcpOAuthProxyRoute(row.id, row.url) === route);
     if (!config || !oauth) return Effect.succeed(null);
-    return oauth
-      .accessToken(config.url)
-      .pipe(
-        Effect.map((token) =>
-          token ? { url: withoutMcpAccountFragment(config.url), headers: config.headers, token } : null,
-        ),
-      );
+    return oauth.accessToken(config.url).pipe(
+      // The row address with its account: a refresh after a refusal reads the sign-in of this row.
+      Effect.map((token) => (token ? { url: config.url, headers: config.headers, token } : null)),
+    );
   }
 
   /**

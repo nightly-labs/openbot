@@ -267,6 +267,8 @@ function AccountRow(props: {
   const signInAgain = () => void model().reconnectApp(props.app, props.entry.id, props.account.id);
   // A refused sign-in, or none at all, as after a sign-out in MCP settings: agents cannot use it.
   const signInNeeded = () => props.account.signInNeeded || !props.account.signedIn;
+  // A sign-in with tokens on file opens no browser, so a signed-in account has no "Sign in again".
+  const above = () => props.account.renamable || signInNeeded();
   return (
     <Item class="settings-modal-row">
       <ItemMedia>
@@ -296,7 +298,7 @@ function AccountRow(props: {
             {t("provider.account.signInAgain")}
           </Button>
         </Show>
-        <Show when={model().canConnectApps()}>
+        <Show when={model().canConnectApps() && (above() || props.removable)}>
           <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
             <DropdownMenu.Trigger
               class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} ui-icon-button`}
@@ -313,12 +315,16 @@ function AccountRow(props: {
                     {t("common.rename")}
                   </DropdownMenu.Item>
                 </Show>
-                <DropdownMenu.Item onSelect={signInAgain}>
-                  <LogIn aria-hidden="true" />
-                  {t("provider.account.signInAgain")}
-                </DropdownMenu.Item>
+                <Show when={signInNeeded()}>
+                  <DropdownMenu.Item onSelect={signInAgain}>
+                    <LogIn aria-hidden="true" />
+                    {t("provider.account.signInAgain")}
+                  </DropdownMenu.Item>
+                </Show>
                 <Show when={props.removable}>
-                  <DropdownMenu.Separator />
+                  <Show when={above()}>
+                    <DropdownMenu.Separator />
+                  </Show>
                   <DropdownMenu.Item onSelect={() => setRemoving(true)}>
                     <Trash2 aria-hidden="true" />
                     {t("provider.account.remove")}
@@ -334,7 +340,9 @@ function AccountRow(props: {
         open={removing()}
         tone="destructive"
         title={t("provider.settings.removeTitle", { name: props.account.name })}
-        description={t("provider.settings.removeCredentials")}
+        description={t("marketplace.app.account.removeDescription", {
+          host: model().appHostName ?? t("mcp.connect.thisComputer"),
+        })}
         confirmLabel={t("provider.account.remove")}
         onCancel={() => setRemoving(false)}
         onConfirm={() => {

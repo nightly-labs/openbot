@@ -2040,7 +2040,9 @@ export class TeamApiServer {
               this.#options.remoteScreen?.checkSetup !== undefined && this.#options.remoteScreen?.test !== undefined
             );
           if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
-          if (capability === MCP_ACCOUNTS_CAPABILITY) return this.#options.mcpServers !== undefined;
+          // Each account signs in with the browser, so it needs the sign-in routes too.
+          if (capability === MCP_ACCOUNTS_CAPABILITY)
+            return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
           if (capability === MCP_SIGN_IN_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
           if (capability === MCP_SIGN_IN_APP_CAPABILITY)
