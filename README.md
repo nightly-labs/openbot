@@ -203,9 +203,9 @@ Kimi uses a Kimi Code account. OpenBot downloads and pins the Kimi Code CLI (`ki
 Download on the Kimi row in More providers, and starts it with `kimi acp`. Sign in runs `kimi login`,
 which opens Kimi's sign-in page in your browser. If you installed `kimi` 1.52.0 or newer yourself,
 OpenBot uses it until a download exists. Set `OPENBOT_KIMI_PATH` to select an executable yourself.
-In Workspace only mode, a Kimi agent cannot change its model, because the CLI saves the model in
-`~/.kimi/config.toml`. Kimi agents run on this computer. Team members see them when their app
-supports Kimi.
+When a Full access Kimi agent changes its model, the CLI saves that model as its default in
+`~/.kimi/config.toml`, so a Kimi session that you start in a terminal also uses it. Kimi agents run
+on this computer. Team members see them when their app supports Kimi.
 
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.

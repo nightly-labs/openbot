@@ -303,9 +303,16 @@ const KIMI_ENV: Readonly<Record<string, string>> = { KIMI_CLI_NO_AUTO_UPDATE: "1
 const KIMI_CODE_LOGIN_ENV: Readonly<Record<string, string>> =
   process.platform === "win32" ? KIMI_ENV : { ...KIMI_ENV, BROWSER: "true" };
 
-/** The sandbox lets a Kimi process write in `~/.kimi`, not create it, so OpenBot makes it. */
-function confineKimiTarget(target: SpawnTarget, confinement: ProcessConfinement): SpawnTarget {
-  const state = kimiStatePaths();
+/**
+ * The sandbox lets a Kimi process write in `~/.kimi`, not create it, so OpenBot makes it. The
+ * agent's own environment can move that folder with `KIMI_SHARE_DIR`.
+ */
+function confineKimiTarget(
+  target: SpawnTarget,
+  confinement: ProcessConfinement,
+  agentEnvironment: Readonly<Record<string, string>> | undefined,
+): SpawnTarget {
+  const state = kimiStatePaths({ ...process.env, ...agentEnvironment });
   for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
   return confineSpawnTarget(target, confinement, state);
 }
@@ -1040,7 +1047,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         flavor: KIMI_ACP_FLAVOR,
         argv: ["acp"],
         env: { ...KIMI_ENV },
-        ...(confinement ? { confine: (target) => confineKimiTarget(target, confinement) } : {}),
+        ...(confinement
+          ? { confine: (target) => confineKimiTarget(target, confinement, context.agentEnvironment?.()) }
+          : {}),
         extraEnv: () => ({ ...context.agentEnvironment?.() }),
         signInMessage: sourceText("error.provider.kimiSignIn"),
         servesModel: context.servesModel,

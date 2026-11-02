@@ -746,15 +746,19 @@ hash. `resolveKimiCli` refuses a CLI older than 1.52.0.
 Every Kimi process gets `KIMI_CLI_NO_AUTO_UPDATE=1` (`KIMI_ENV` in `provider-drivers.ts`). The ACP
 `authenticate` call of Kimi only checks the stored token, so Sign in runs `kimi login` and the code
 sign-in runs `kimi login --json`, which prints the device code as JSON lines (`deviceCodeEvent` in
-`cli-code-login.ts`). On macOS and Linux the sign-in gets `BROWSER=true`, so the CLI does not open a
-browser itself. Sign out runs `kimi logout`. `kimiStatePaths` lets a confined process write
+`cli-code-login.ts`). On macOS and Linux the code sign-in gets `BROWSER=true`, so the CLI does not
+open a browser on the host. On Windows the page can open on the host. Sign out runs `kimi logout`. `kimiStatePaths` lets a confined process write
 `KIMI_SHARE_DIR` (`~/.kimi`) and protects `config.toml`, `config.json`, `mcp.json`, `plugins`,
 `skills` and `bin` there, because every other Kimi process loads them. Kimi answers a lost session
 with `-32602` and `{ session_id: "Session not found" }`, which `KIMI_ACP_FLAVOR` reads as a missing
 session.
 
-`kimi acp` saves the selected model in `config.toml` when OpenBot changes the model. A Workspace only
-Kimi process cannot write that file, so a model change there fails.
+Kimi CLI 1.52.0 has no ACP configuration options, so OpenBot changes the model with
+`session/set_model`. Kimi moves the session to the model, and then saves the model as its default in
+`config.toml`. A Workspace only Kimi process cannot write that file, and the save fails with `-32603`
+and the path in `data.details`. `AcpFlavor.modelSetUnsaved` reads that failure as a model change
+that applied. A Full access Kimi agent saves the model, so it becomes the default model of each new
+Kimi session, also in a terminal.
 
 No frozen Team API protocol knows `kimi`. The host hides Kimi agents, models, status, and sign-in
 state from peers below protocol 8, and `providers-v8` carries it.
