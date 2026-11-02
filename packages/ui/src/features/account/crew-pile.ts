@@ -514,11 +514,10 @@ export class CrewPile {
     this.bodies.forEach((body, index) => {
       setFace(body, { happy: true, look: null });
       const isLead = index === leadIndex;
-      if (isLead) {
-        body.pinned = true;
-        body.vx = 0;
-        body.vy = 0;
-      }
+      // The exit has no floor, so each plush stays still until its hop.
+      body.pinned = true;
+      body.vx = 0;
+      body.vy = 0;
       const delay = isLead ? (this.crew.length - 1) * EXIT.stagger + EXIT.leadDelay : index * EXIT.stagger;
       this.schedule(delay, () => {
         const side = Math.sign(body.x - CREW_PIT.width / 2) || (index % 2 ? 1 : -1);
