@@ -60,7 +60,7 @@ export interface ServerAuditLog {
  * A name cut to the length that the log keeps. An email or an agent name can be longer, and a longer
  * name would fail the codec of the file and of the wire. The cut does not split a character.
  */
-export function serverAuditText(name: string): string {
+function serverAuditText(name: string): string {
   if (name.length <= NAME_LIMIT) return name;
   let cut = "";
   for (const character of name) {
