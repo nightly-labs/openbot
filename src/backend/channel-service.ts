@@ -25,7 +25,6 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { type ChannelOperationError, channelFailure, channelResult, channelSync } from "./channel-effects";
 import {
@@ -107,6 +106,11 @@ export interface ChannelHooks {
   /** The schedule routines of the channels, for the routine tools. Omitted, those tools fail. */
   routines?: ChannelRoutineToolPort;
   error(error: unknown): void;
+  /**
+   * A routing turn failed. The channel text names no cause, so this gets each failure, also one that
+   * the channel shows as catalog text, for the log. A question of the lead is not a failure.
+   */
+  routingFailed?(failure: { channelId: string; taskId: string; lead: AgentSummary | undefined; error: unknown }): void;
 }
 
 class ChannelRoutingError extends Schema.TaggedError<ChannelRoutingError>()("ChannelRoutingError", {
@@ -117,10 +121,6 @@ class ChannelRoutingError extends Schema.TaggedError<ChannelRoutingError>()("Cha
   }
 }
 
-/** Its lines also go to `main.log`, so a support report can show why routing failed (#3041). */
-const routingLogger = createOpenBotLogger("channel-routing");
-/** The longest part of a failure cause that the routing log keeps. A provider text can quote the request. */
-const ROUTING_LOG_CAUSE_CHARACTERS = 500;
 /**
  * The routing prompt budget. A router needs the subject of the work and the shape of the last
  * exchange, not the transcript: the persisted channel summary already carries everything older, and
@@ -1285,14 +1285,9 @@ export class ChannelService {
           // A cause without channel text goes to the redacted error path; without it no one could
           // see why routing failed.
           const shown = error instanceof ChannelRoutingError ? error.message : routingFailureText(error);
-          // The channel text names no cause, so the log always gets it, also when the channel shows
-          // catalog text. Only a cause with no channel text also reaches the user as an error.
-          routingLogger.warn("channel_coordination_failed", {
-            channelId,
-            taskId: task.id,
-            ...(lead ? { provider: lead.provider, model: lead.model, effort: lead.reasoningEffort } : {}),
-            cause: failureCauses(error),
-          });
+          // A routing error that is not catalog text is the lead's question to the user, from the chat.
+          if (!(error instanceof ChannelRoutingError) || isFixedSourceText(error.message))
+            this.hooks.routingFailed?.({ channelId, taskId: task.id, lead, error });
           if (shown === null) this.hooks.error(error);
           const detail = shown ?? sourceText("error.backend.channelRoutingFailed");
           yield* channelSync(() =>
@@ -3069,16 +3064,6 @@ function routingFailureText(error: unknown): string | null {
   const keys = matchingSourceKeys(error.message);
   if (keys.some((key) => key.startsWith("error.agent.profile"))) return sourceText("error.backend.channelLeadFailed");
   return keys.some((key) => key.startsWith("error.backend.")) ? error.message : null;
-}
-
-/** The messages of a failure and of its causes, each one shortened. The logger redacts them. */
-function failureCauses(error: unknown): string[] {
-  const causes: string[] = [];
-  for (let cause = error; cause !== undefined && cause !== null && causes.length < 4; ) {
-    causes.push((cause instanceof Error ? cause.message : String(cause)).slice(0, ROUTING_LOG_CAUSE_CHARACTERS));
-    cause = cause instanceof Error ? cause.cause : undefined;
-  }
-  return causes;
 }
 
 function terminal(task: ChannelTask): boolean {
