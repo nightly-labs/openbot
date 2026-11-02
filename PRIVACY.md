@@ -80,7 +80,7 @@ off on your devices, so that the paid account is not anonymous in the sales data
 copied into the events.
 
 For each email that the account service sends from its mailbox (a sign-in code, an invitation, a contact
-message or a welcome email), it sends OpenPanel one event with the kind of email and the result of the send. This
+message, a welcome email for a server plan, or a license email), it sends OpenPanel one event with the kind of email and the result of the send. This
 event has no account ID, email address, name or message content.
 
 Every 5 minutes, each Signal host sends OpenPanel one event with the number of TURN relay allocations
@@ -555,7 +555,13 @@ OpenBot sends sign-in, team invitation, and welcome messages through the configu
 provider receives the recipient address and the message content. A sign-in message contains the
 one-time code and its expiration time. A team invitation can contain the inviter address, team name,
 role, and invite URL. When the first cloud server plan of an account starts, a welcome message goes
-to the account address. It contains the plan name and the server name. The HTML version of a message loads the OpenBot logo from `openbot.run` when
+to the account address. It contains the plan name and the server name. License messages go to the
+account address from `licenses@openbot.run` through the same provider. When a license has its first
+payment, the message contains the license tier, the number of users, the list price when no discount
+applies, the currency, the billing period, and the date of the next payment. When a renewal payment fails, the message contains
+the license tier, the number of users, the amount due, the currency, the date of the next payment
+try, and the link to the Stripe page of the invoice. When a paid license ends, the message contains
+the license tier, the number of users, and whether it ended after a failed payment. The HTML version of a message loads the OpenBot logo from `openbot.run` when
 the mail client shows images. The image address is the same in every message and identifies no
 recipient.
 
