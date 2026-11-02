@@ -13,6 +13,9 @@ import { haptics } from "@/shared/lib/haptics";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
 
+/** Room for a pasted code with separators or a prefix. Only its digits are kept. */
+const CODE_FIELD_MAX_LENGTH = 32;
+
 /**
  * The surface of a browser request above the composer: one opaque gray, as the chat scrolls under
  * it, and the neutral action color for the one main action. Cancel is the close button.
@@ -276,14 +279,24 @@ export function BrowserSecretComposer({
             autoCapitalize="none"
             keyboardType={password ? "default" : "number-pad"}
             autoComplete={password ? "off" : "one-time-code"}
-            maxLength={password ? 4096 : digits}
+            // A pasted code can have a space, a dash or a prefix, such as "123 456" or "G-123456". The
+            // digits are read from the text below, so the native field takes more than the code.
+            maxLength={password ? 4096 : CODE_FIELD_MAX_LENGTH}
             value={value}
             editable={!pending}
             returnKeyType="send"
             onSubmitEditing={() => {
               if (ready) void send("submit");
             }}
-            onChangeText={(text) => setValue(password ? text : text.replace(/[^0-9]/gu, "").slice(0, digits))}
+            onChangeText={(text) => {
+              if (password) {
+                setValue(text);
+                return;
+              }
+              // A full code pasted after part of a code replaces that part.
+              const added = (text.startsWith(value) ? text.slice(value.length) : text).replace(/[^0-9]/gu, "");
+              setValue(added.length >= digits ? added.slice(0, digits) : text.replace(/[^0-9]/gu, "").slice(0, digits));
+            }}
           />
           <Pressable
             accessibilityRole="button"
