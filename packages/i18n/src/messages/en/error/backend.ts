@@ -227,6 +227,10 @@ export const messages = defineMessages("error.backend", {
     "This computer blocked the connection to the server. Check your firewall or security software, then try again.",
   "error.backend.mcpServerIncompatible":
     "Something answered at this address, but not as an MCP server over Streamable HTTP. Check the URL, and update the app that runs the server.",
+  "error.backend.mcpHtmlLogin":
+    "This server returned a web login page. Add an Authorization header in Server settings, MCP, with the value Bearer and your token. Do not use the Sign in card.",
+  "error.backend.mcpHtmlLoginRejected":
+    "This server returned a web login page. The Authorization header was not accepted. In Server settings, MCP, set the value to Bearer and your token.",
   "error.backend.mcpRemoteBridge":
     "{reason} This command runs the mcp-remote bridge. Choose Streamable HTTP with the URL {url} instead, and OpenBot signs you in.",
   "error.backend.oauthNotHttps": "The OAuth endpoint {origin} is not https, so the credentials were not sent.",
