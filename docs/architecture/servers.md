@@ -728,8 +728,9 @@ does not decode is left out. The next write removes those entries, so a downgrad
 of a kind that the older build does not know. A failed write only logs; it never stops the change.
 The roles store records each save that changes the revision (`agentAccessAuditChanges`), except the
 levels of an agent that was deleted. `HostService` compares the stored members before and after a
-member update, a removal, and each account directory sync (`memberAuditChanges`); one directory sync
-runs at a time. A join keeps the time when the membership was made.
+member update, a removal, and each account directory sync (`memberAuditChanges`). One member read
+or change runs at a time, from the read of the directory to the audit entry, so a slow read cannot
+apply an older list after a newer one. A join keeps the time when the membership was made.
 
 Server settings → Audit log (`ServerAuditSection.tsx`, `@openbot/ui/features/servers/ServerAuditLog`)
 shows the log on desktop and web, with a filter by kind and a search. The tab shows for an owner or

@@ -276,8 +276,12 @@ export class HostService extends EventEmitter<HostEvents> {
   #startOperation: Fiber.Fiber<HostStatus, RemoteWorkflowError> | null = null;
   /** A registration and a key rotation each read the host key, so only one of them runs at a time. */
   readonly #hostKeyLock = Semaphore.makeUnsafe(1);
-  /** One directory sync at a time, so each audit compares the list before and after its own sync. */
-  readonly #directorySync = Semaphore.makeUnsafe(1);
+  /**
+   * One member read or change at a time, from the read of the member list to the audit entry. A
+   * list read before another change could otherwise apply an older list, and the audit of two
+   * changes at the same time would compare the same `before` list.
+   */
+  readonly #memberWrites = Semaphore.makeUnsafe(1);
   #webRtcOnline = false;
   /**
    * The home Signal of the last start that got a ticket but did not reach Signal. The next start names
@@ -968,8 +972,11 @@ export class HostService extends EventEmitter<HostEvents> {
       );
       if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       if (this.#usesAccountDirectory() && optionalListRemoteMembers) {
-        const members = yield* optionalListRemoteMembers(identity.serverId);
-        yield* this.#syncRemoteDirectory(identity.serverId, members);
+        yield* this.#memberWrites.withPermit(
+          Effect.flatMap(optionalListRemoteMembers(identity.serverId), (members) =>
+            this.#syncRemoteDirectory(identity.serverId, members),
+          ),
+        );
         if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       }
       // The host peer meets its devices on its home Signal machine. Chat apps and webhooks stay on
@@ -1158,6 +1165,7 @@ export class HostService extends EventEmitter<HostEvents> {
       }
       return this.#options.store.listMembers();
     },
+    (operation) => this.#memberWrites.withPermit(operation),
     (operation) => this.#provide(operation),
   ).bind(this);
 
@@ -1373,6 +1381,7 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#api.refreshPresence();
       return member;
     },
+    (operation) => this.#memberWrites.withPermit(operation),
     (operation) => this.#provide(operation),
   ).bind(this);
 
@@ -1409,6 +1418,7 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#options.browser.releaseUserControlHeldBy({ kind: "member", memberId });
       this.#api.refreshPresence();
     },
+    (operation) => this.#memberWrites.withPermit(operation),
     (operation) => this.#provide(operation),
   ).bind(this);
 
@@ -1532,7 +1542,8 @@ export class HostService extends EventEmitter<HostEvents> {
 
   /**
    * Records the directory, and closes the sessions that it no longer allows. `by` names the admin
-   * and the member that they changed; see `#auditMembers`.
+   * and the member that they changed; see `#auditMembers`. The caller holds `#memberWrites` from
+   * the read of `members`.
    */
   readonly #syncRemoteDirectory = Effect.fn("HostService.syncRemoteDirectory")(function* (
     this: HostService,
@@ -1540,14 +1551,9 @@ export class HostService extends EventEmitter<HostEvents> {
     members: RemoteDirectoryMember[],
     by?: MemberAuditActor,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
-    const closed = yield* this.#directorySync.withPermit(
-      Effect.gen({ self: this }, function* () {
-        const before = this.#options.store.listStoredMembers();
-        const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members);
-        yield* this.#auditMembers(hostId, before, by);
-        return closed;
-      }),
-    );
+    const before = this.#options.store.listStoredMembers();
+    const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members);
+    yield* this.#auditMembers(hostId, before, by);
     if (closed.length === 0) return;
     for (const sessionId of closed) yield* this.#closeLocalSession(sessionId);
     this.#api.refreshPresence();
