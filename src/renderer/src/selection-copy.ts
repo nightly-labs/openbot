@@ -28,7 +28,8 @@ function writeSelection(event: ClipboardEvent): void {
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
   const handled = event.defaultPrevented;
   if (handled && !event.clipboardData.getData("text/html").includes("katex-mathml")) return;
-  const text = selection.toString();
+  // As the native copy: without unselectable text, which `toString` also skips, and with no-break spaces as spaces.
+  const text = selection.toString().replace(/\u00a0/gu, " ");
   if (!text) return;
   const container = document.createElement("div");
   for (let index = 0; index < selection.rangeCount; index += 1) {
