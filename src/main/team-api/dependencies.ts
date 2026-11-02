@@ -24,6 +24,7 @@ import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { RequestedUpdate } from "../requested-update";
+import type { ServerAuditStore } from "../server-audit-store";
 import type { ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 // What `TeamApiServer` needs from the rest of the main process, and nothing else.
@@ -541,6 +542,7 @@ export type TeamApiBitwardenConnector = Pick<BitwardenConnectorService, "status"
 export type TeamApiVault = VaultService;
 
 export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "levels" | "set" | "subscribe">;
+export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
 
 export interface TeamApiOptions {
   /** `events-v1`: admin-only event source and routine management. */
@@ -571,6 +573,8 @@ export interface TeamApiOptions {
   sidebarPins?: TeamApiSidebarPins;
   /** `agent-access-v1`: the roles that limit what a member can do with each agent. */
   agentAccess?: TeamApiAgentAccess;
+  /** `server-audit-v1`: the changes to members, roles and agent access, for owners and admins. */
+  serverAudit?: TeamApiServerAudit;
   agentTasks?: TeamApiAgentTasks;
   browserProfiles?: TeamApiBrowserProfiles;
   admin?: TeamApiAdmin;

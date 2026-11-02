@@ -103,6 +103,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "Deze verbinding ondersteunt de standaardaanbieder niet.",
   "error.team.agentAccessUnsupported": "Deze verbinding ondersteunt geen rollen.",
   "error.team.agentAccessStale": "Iemand heeft de rollen gewijzigd. Open ze opnieuw en breng je wijziging aan.",
+  "error.team.serverAuditUnsupported": "Deze verbinding ondersteunt het auditlog niet.",
   "error.team.agentViewOnly": "Je kunt deze agent alleen bekijken.",
   "error.team.agentManageDenied": "Je kunt deze agent niet wijzigen.",
   "error.team.attachmentNameRequired": "Een veilige naam voor de bijlage is verplicht.",

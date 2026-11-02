@@ -57,6 +57,7 @@ import {
   decodeRegistryOperations,
   decodeRemovableRuntimes,
   decodeSaveAgentProfileResult,
+  decodeServerAuditLog,
   decodeWorkspaceDirectory,
   type EventEndpoint,
   type GroupApi,
@@ -1072,6 +1073,7 @@ const openbotApi: OpenBotDesktopApi = {
     setPromptCacheTtl: decodePromptCacheTtlSetting,
     getAgentAccess: decodeAgentAccessSnapshot,
     setAgentAccess: decodeAgentAccessSnapshot,
+    getAuditLog: decodeServerAuditLog,
   }),
   agentImport: bridgeGroup(IPC_ENDPOINTS.agentImport, {
     choose: decodeAgentImportPreview,

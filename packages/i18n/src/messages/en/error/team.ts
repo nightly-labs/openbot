@@ -101,6 +101,7 @@ export const messages = defineMessages("error.team", {
   "error.team.providerDefaultUnsupported": "The default provider is not supported by this connection.",
   "error.team.agentAccessUnsupported": "Roles are not supported by this connection.",
   "error.team.agentAccessStale": "Someone changed the roles. Open them again and make your change.",
+  "error.team.serverAuditUnsupported": "The audit log is not supported by this connection.",
   "error.team.agentViewOnly": "You can only view this agent.",
   "error.team.agentManageDenied": "You cannot change this agent.",
   "error.team.attachmentNameRequired": "A safe attachment name is required.",

@@ -126,6 +126,7 @@ import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
 import { RoutineWake } from "./routine-wake";
+import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
@@ -598,6 +599,7 @@ function registerIpcHandlers({
   agentMemoryLimit,
   memoryReview,
   agentAccess,
+  serverAudit,
   teamStore,
   serverTimezone,
   promptCacheTtl,
@@ -802,8 +804,15 @@ function registerIpcHandlers({
       machineAlerts,
       promptCacheTtl,
       agentAccess,
+      serverAudit,
       localServerId: () => teamStore.getIdentity()?.serverId,
       localAgentIds: () => service.listAgents().map((agent) => agent.id),
+      localOwner: () => {
+        const owner = teamStore.configured
+          ? teamStore.listMembers().find((member) => member.role === "owner")
+          : undefined;
+        return owner ? memberAuditName(owner) : null;
+      },
     }),
     ...providerAdminIpcHandlers({
       service,

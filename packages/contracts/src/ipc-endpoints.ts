@@ -10,6 +10,7 @@ import type {
   ResetAgentSessionSettingInput,
   SetAgentSessionSettingInput,
 } from "./ipc-agent-session-settings";
+import type { ServerAuditLog } from "./ipc-server-audit";
 // The one channel list. Each endpoint holds its wire value, the group it belongs to, and whether it
 // is a request the renderer invokes or an event the main process sends. That is what lets a
 // registrar bind its handlers as an object keyed by endpoint, so a channel with no handler, and a
@@ -1159,6 +1160,8 @@ export const IPC_ENDPOINTS = {
     // The roles of the server and the level each gives for each agent. A member reads only `mine`.
     getAgentAccess: scopedQuery<AgentAccessSnapshot, "required">()("host-admin:get-agent-access"),
     setAgentAccess: scopedRequest<AgentAccessChange, AgentAccessSnapshot, "required">()("host-admin:set-agent-access"),
+    // The changes to members, roles and agent access of the server, newest first (`server-audit-v1`).
+    getAuditLog: scopedQuery<ServerAuditLog, "required">()("host-admin:get-audit-log"),
   },
   // The built-in GitHub connection of this computer. The token stays in main; every answer is the
   // status only. The `host*` endpoints reach the connection of a joined server (`connectors-v1`): the

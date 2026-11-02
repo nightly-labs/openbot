@@ -39,7 +39,12 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
-import { type AgentAccessLevel, conversationMessageSender, SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
+import {
+  type AgentAccessLevel,
+  conversationMessageSender,
+  type ServerAuditName,
+  SIGNED_OUT_CHANNEL_MEMBER_ID,
+} from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -63,6 +68,7 @@ import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifac
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { RemoteScreenGateway, type RemoteScreenGatewayCreateRuntime } from "./remote-screen-gateway";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
+import { memberAuditChanges, memberAuditName, type ServerAuditStore } from "./server-audit-store";
 import { OWNER_PIN_KEY, type SidebarPinStore } from "./sidebar-pin-store";
 import type { TeamApiAgentNotificationLevels, TeamApiSidebarPins } from "./team-api/dependencies";
 import { TeamApiServer } from "./team-api-server";
@@ -117,6 +123,8 @@ interface HostServiceOptions {
   /** The chats that each person pinned (`sidebar-pins-v1`). */
   sidebarPins?: SidebarPinStore;
   agentAccess?: AgentAccessStore;
+  /** Records who joined, left, or got another server role. */
+  serverAudit?: Pick<ServerAuditStore, "read" | "record">;
   agentTasks?: ForwardedApiOptions["agentTasks"];
   browserProfiles?: ForwardedApiOptions["browserProfiles"];
   admin?: ForwardedApiOptions["admin"];
@@ -436,6 +444,7 @@ export class HostService extends EventEmitter<HostEvents> {
         : { agentNotificationLevels: this.#agentNotificationLevels(options.agentNotificationLevels) }),
       ...(options.sidebarPins === undefined ? {} : { sidebarPins: this.#sidebarPins(options.sidebarPins) }),
       ...(options.agentAccess === undefined ? {} : { agentAccess: options.agentAccess }),
+      ...(options.serverAudit === undefined ? {} : { serverAudit: options.serverAudit }),
       ...(options.agentTasks === undefined ? {} : { agentTasks: options.agentTasks }),
       ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),
       // The identity route changes this host's name and logo through `updateIdentity`, so a change
@@ -461,8 +470,8 @@ export class HostService extends EventEmitter<HostEvents> {
       onDirectMessage: (event) => this.emit("directMessage", event),
       onDirectTyping: (event) => this.emit("directTyping", event),
       createInvite: (input) => this.createInvite(input),
-      updateMember: (input) => this.updateMember(input),
-      removeMember: (memberId) => this.removeMember(memberId),
+      updateMember: (input, actor) => this.updateMember(input, actor),
+      removeMember: (memberId, actor) => this.removeMember(memberId, actor),
       onSessionRevoked: (sessionId) => this.#revokeWebRtcSession(sessionId),
       ...(this.#liveActivityPush === undefined ? {} : { liveActivityPush: this.#liveActivityPush }),
       ...(this.#pushNotifications === undefined ? {} : { pushNotifications: this.#pushNotifications }),
@@ -1292,7 +1301,10 @@ export class HostService extends EventEmitter<HostEvents> {
     function* (
       this: HostService,
       input: UpdateTeamMemberInput,
+      // The admin who makes the change; the owner of this computer when not given.
+      requestedBy?: ServerAuditName,
     ): Effect.fn.Return<TeamMemberSummary, RemoteWorkflowError> {
+      const actor = requestedBy ?? this.#ownerActor();
       const optionalListRemoteMembers = this.#options.listRemoteMembers;
       const optionalUpdateRemoteMember = this.#options.updateRemoteMember;
       const optionalRemoveRemoteMember = this.#options.removeRemoteMember;
@@ -1321,7 +1333,7 @@ export class HostService extends EventEmitter<HostEvents> {
         const updated = members.find((member) => member.membershipId === input.memberId);
         if (!updated)
           return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.memberNotFound")) });
-        yield* this.#syncRemoteDirectory(hostId, members);
+        yield* this.#syncRemoteDirectory(hostId, members, actor);
         // Recording the directory is a write too, so the switch can land inside it and the
         // member below would be the previous account's.
         yield* remoteDecode(() => this.#assertStillActiveHost(hostId));
@@ -1338,10 +1350,12 @@ export class HostService extends EventEmitter<HostEvents> {
           disabled: updated.status !== "active",
         };
       }
+      const before = this.#options.store.listStoredMembers();
       const member = yield* this.#options.store.updateMember(input.memberId, {
         ...(input.role ? { role: input.role } : {}),
         ...(input.disabled === undefined ? {} : { disabled: input.disabled }),
       });
+      if (hostId) yield* this.#auditMembers(hostId, actor, before);
       if (member.disabled) {
         yield* this.#remoteScreen.revokeMember(member.id);
         this.#options.browser.releaseUserControlHeldBy({ kind: "member", memberId: member.id });
@@ -1355,7 +1369,13 @@ export class HostService extends EventEmitter<HostEvents> {
   ).bind(this);
 
   readonly removeMember = Effect.fn("HostService.removeMember")(
-    function* (this: HostService, memberId: string): Effect.fn.Return<void, RemoteWorkflowError> {
+    function* (
+      this: HostService,
+      memberId: string,
+      // The admin who removes the member, or the member who leaves; the owner of this computer when not given.
+      requestedBy?: ServerAuditName,
+    ): Effect.fn.Return<void, RemoteWorkflowError> {
+      const actor = requestedBy ?? this.#ownerActor();
       const optionalListRemoteMembers = this.#options.listRemoteMembers;
       const optionalRemoveRemoteMember = this.#options.removeRemoteMember;
       const hostId = this.#options.store.getIdentity()?.serverId;
@@ -1363,7 +1383,7 @@ export class HostService extends EventEmitter<HostEvents> {
         yield* optionalRemoveRemoteMember(hostId, memberId);
         if (optionalListRemoteMembers) {
           const members = yield* optionalListRemoteMembers(hostId);
-          yield* this.#syncRemoteDirectory(hostId, members);
+          yield* this.#syncRemoteDirectory(hostId, members, actor);
         }
         yield* this.#revokeMemberSessions(memberId);
         yield* this.#forgetMemberRoles(hostId, memberId);
@@ -1371,7 +1391,9 @@ export class HostService extends EventEmitter<HostEvents> {
         yield* this.#forgetSidebarPins(memberId);
         return;
       }
+      const before = this.#options.store.listStoredMembers();
       yield* this.#options.store.removeMember(memberId);
+      if (hostId) yield* this.#auditMembers(hostId, actor, before);
       if (hostId) yield* this.#forgetMemberRoles(hostId, memberId);
       yield* this.#forgetNotificationLevels(memberId);
       yield* this.#forgetSidebarPins(memberId);
@@ -1476,13 +1498,38 @@ export class HostService extends EventEmitter<HostEvents> {
     (operation) => this.#provide(operation),
   ).bind(this);
 
-  /** Records the directory, and closes the sessions that it no longer allows. */
+  /** The owner of this computer's host, who makes each change from this computer. */
+  #ownerActor(): ServerAuditName | null {
+    const owner = this.#options.store.listStoredMembers().find((member) => member.role === "owner");
+    return owner ? memberAuditName(owner) : null;
+  }
+
+  /** Records the member changes since `before`. The change is made, so a failed write only logs. */
+  #auditMembers(
+    hostId: string,
+    actor: ServerAuditName | null,
+    before: readonly TeamMemberSummary[],
+  ): Effect.Effect<void> {
+    const audit = this.#options.serverAudit;
+    if (!audit) return Effect.void;
+    return Effect.suspend(() =>
+      audit.record(hostId, actor, memberAuditChanges(before, this.#options.store.listStoredMembers())),
+    );
+  }
+
+  /**
+   * Records the directory, and closes the sessions that it no longer allows. `actor` made the change
+   * that the directory shows; null for a change from another place, such as a member who joined.
+   */
   readonly #syncRemoteDirectory = Effect.fn("HostService.syncRemoteDirectory")(function* (
     this: HostService,
     hostId: string,
     members: RemoteDirectoryMember[],
+    actor: ServerAuditName | null = null,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
+    const before = this.#options.store.listStoredMembers();
     const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members);
+    yield* this.#auditMembers(hostId, actor, before);
     if (closed.length === 0) return;
     for (const sessionId of closed) yield* this.#closeLocalSession(sessionId);
     this.#api.refreshPresence();

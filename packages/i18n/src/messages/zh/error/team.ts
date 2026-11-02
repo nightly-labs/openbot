@@ -98,6 +98,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "当前连接不支持默认服务商。",
   "error.team.agentAccessUnsupported": "当前连接不支持角色。",
   "error.team.agentAccessStale": "有人更改了角色。请重新打开并再进行更改。",
+  "error.team.serverAuditUnsupported": "此连接不支持审计日志。",
   "error.team.agentViewOnly": "你只能查看该助手。",
   "error.team.agentManageDenied": "你无权更改该助手。",
   "error.team.attachmentNameRequired": "需要提供安全的附件名称。",

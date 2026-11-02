@@ -478,6 +478,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
 | `agent-access-v1` | Read and set the roles that give members access to agents (see [Roles](#roles)) | `hostAdmin` |
+| `server-audit-v1` | Read the changes to the members, roles and agent access of the server (see [Audit log](#audit-log)). Protocol 9 only | `hostAdmin` |
 | `discord-access-v1` | Read and set which Discord roles can use OpenBot in a Discord server; list its roles | `messaging` |
 | `events-v1` | Manage webhook routines, their secrets, and activity | `events` |
 | `routine-recovery-v1` | Read and set a routine's missed-run policy; read its runs with the missed occurrences | `events` |
@@ -690,6 +691,37 @@ Known limits:
 - `GET /v1/attachments/:id` does not check the agent of the attachment.
 - Channel messages of an agent that a member cannot see stay in the channel. A send to a channel does
   not check the levels of the agents in it; only a save that adds an agent checks `chat`.
+
+### Audit log
+
+`server-audit-v1` lets an owner or admin read the changes to the access of the server, newest first:
+a member joined, left, was removed, or got another server role; a role was made, renamed or deleted;
+a member was added to or removed from a role; and the level that a role or Everyone got for an agent.
+Its one route is `POST /v1/admin/host/audit` (`route-server-audit.ts`). `requireAdmin` is the only
+gate, so a member gets 403. A client that does not send the capability gets 400
+`error.team.serverAuditUnsupported`. The capability is in the protocol 9 list only, because the
+protocol 7 and 8 lists are full.
+
+Each entry keeps the names of the time of the change, so a removed member or a deleted agent keeps its
+name. `actor` is the member who made the change: the admin of a Team API request, the owner of this
+computer for a local change, the member for a member who leaves, and null for a join. A client leaves
+out an entry whose `kind` it does not know, so a later kind needs no new capability.
+
+The host keeps the log in `openbot-server-audit-v1.json`, by server ID (`src/main/server-audit-store.ts`),
+with the newest 500 entries of each server. Like the roles file it is a preference file: no migration,
+and an older build ignores it. A file that does not decode reads as an empty log. A failed write only
+logs; it never stops the change. The roles store records each save that changes the revision
+(`agentAccessAuditChanges`). `HostService` compares the stored members before and after a member
+update, a removal, and each account directory sync (`memberAuditChanges`). A join keeps the time when
+the membership was made.
+
+Server settings → Audit log (`ServerAuditSection.tsx`, `@openbot/ui/features/servers/ServerAuditLog`)
+shows the log on desktop and web, with a filter by kind and a search. The tab shows for an owner or
+admin of the local server and of a joined server whose host advertises the capability. It reads the log
+again each time it shows.
+
+Known limits: a host with no account directory records no join from a local-store invite, and the log
+has no page or date filter.
 
 ### Webhook routines
 
