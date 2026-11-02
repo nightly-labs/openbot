@@ -26,6 +26,8 @@ export const messages = {
   "error.workflow.notRetryable": "Снова можно запустить только шаг, который завершился ошибкой или был остановлен.",
   "error.workflow.noDecision": "Этот шаг не ждет решения.",
   "error.workflow.outputPlaceMissing": "Выберите место в мессенджере для этого вывода.",
+  "error.workflow.discordNoMessage":
+    "Этот вывод действует на сообщение Discord, которое запустило выполнение. Запустите его упоминанием в Discord или выберите «Опубликовать в канале».",
   "error.workflow.outputConnectionOff":
     "Подключение мессенджера для этого вывода выключено или удалено. Выберите место снова.",
   "error.workflow.outputNotRunning": "Подключение мессенджера сейчас не работает. Повторите, когда оно заработает.",

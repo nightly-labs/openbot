@@ -140,7 +140,7 @@ const INPUT_NAME = /(?<=^|\n)Input \d+:\n\n/gu;
  * The input without the framed events of triggers. A loop joins the event into the input of a later
  * pass, so the names of the joined inputs go with their events, and one text that stays keeps no name.
  */
-function withoutEvents(input: string): string {
+export function withoutEvents(input: string): string {
   let text = input;
   for (let start = text.indexOf(EXTERNAL_EVENT_START); start >= 0; start = text.indexOf(EXTERNAL_EVENT_START)) {
     // The event is one line of JSON, which keeps no line break, so a marker in a comment does not end it.

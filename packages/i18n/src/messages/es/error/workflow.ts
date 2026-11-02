@@ -26,6 +26,8 @@ export const messages = {
   "error.workflow.notRetryable": "Solo un paso que falló o se detuvo puede ejecutarse de nuevo.",
   "error.workflow.noDecision": "Este paso no espera una decisión.",
   "error.workflow.outputPlaceMissing": "Elige un lugar de mensajería para esta salida.",
+  "error.workflow.discordNoMessage":
+    "Esta salida actúa sobre el mensaje de Discord que inició la ejecución. Inicia la ejecución desde una mención en Discord o elige Publicar en canal.",
   "error.workflow.outputConnectionOff":
     "La conexión de mensajería de esta salida está desactivada o se eliminó. Elige un lugar de nuevo.",
   "error.workflow.outputNotRunning":
