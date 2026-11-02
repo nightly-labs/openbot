@@ -1,7 +1,11 @@
+import { type VaultSaveInput, vaultExpiryText } from "@openbot/contracts/ipc";
 import {
   type ConversationUiBlock,
+  UI_BLOCK_SUBMIT_ACTION_ID,
+  UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
   type UiBlockState,
+  type UiVaultRequestKind,
   uiBlockAnswersFromResponse,
   uiBlockFallbackQuestions,
   uiBlockOutcomeText,
@@ -9,14 +13,17 @@ import {
 import type { AgentProfile } from "@openbot/ui/data";
 import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { UiBlockingBlock } from "@openbot/ui/features/conversation/ui-blocks/UiBlockingBlock";
+import { VaultRequestCard } from "@openbot/ui/features/vault/VaultRequestCard";
 import { useText } from "@openbot/ui/text";
-import { createSignal, onCleanup } from "solid-js";
+import { createSignal, onCleanup, Show } from "solid-js";
 import type { PromptAnswerOptions } from "./conversation-types";
 
 export interface UiBlockPromptProps {
   /** A block the person answers through the prompt it sits beside. */
   block: ConversationUiBlock;
   agents: AgentProfile[];
+  /** The agent that asks, which a Vault request names. */
+  agentId?: string | undefined;
   onSelectAgent: (agentId: string) => void;
   onOpenLink: (url: string) => void;
   /**
@@ -28,6 +35,28 @@ export interface UiBlockPromptProps {
   onAnswered?: (() => void) | undefined;
   /** Gets the card's element, and undefined once the card is gone. */
   elementRef?: ((element: HTMLElement | undefined) => void) | undefined;
+}
+
+/** The form values of a Vault item, keyed by the field ids of `UI_VAULT_REQUEST_FIELDS`. */
+function vaultFormValues(input: VaultSaveInput): Record<string, string> {
+  switch (input.kind) {
+    case "login":
+      return { website: input.website, username: input.username, password: input.password ?? "" };
+    case "card":
+      return {
+        label: input.label,
+        nameOnCard: input.nameOnCard,
+        number: input.number ?? "",
+        expiry: vaultExpiryText(input.expMonth, input.expYear),
+        securityCode: input.securityCode ?? "",
+      };
+    case "contact": {
+      const { kind: _kind, id: _id, ...fields } = input;
+      return fields;
+    }
+    case "apiKey":
+      return {};
+  }
 }
 
 /**
@@ -91,27 +120,90 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     void send(answers, { status: "closed" });
   }
 
+  /** The fields that the agent filled in. */
+  const prefill = () => {
+    const spec = props.block.spec;
+    if (spec.type !== "form") return {};
+    return Object.fromEntries(
+      spec.fields.flatMap((field) => (field.kind === "text" && field.value ? [[field.id, field.value]] : [])),
+    );
+  };
+
+  /**
+   * Sends the item as the form's answer. The host saves it to the Vault and gives the agent only its
+   * name. The frozen state keeps no secret value. A failure goes to the dialog.
+   */
+  async function saveVaultItem(input: VaultSaveInput): Promise<void> {
+    const answer = props.onAnswer;
+    if (!answer || state().status !== "pending") return;
+    const values = Object.fromEntries(Object.entries(vaultFormValues(input)).filter(([, value]) => value !== ""));
+    const response: UiBlockResponse = { actionId: UI_BLOCK_SUBMIT_ACTION_ID, values };
+    const kept = Object.fromEntries(
+      Object.entries(values).filter(([id]) => !UI_VAULT_SECRET_FIELDS.some((secret) => secret === id)),
+    );
+    let failure: unknown;
+    setBusy(true);
+    setError(undefined);
+    const completed = await answer(uiBlockAnswersFromResponse(props.block.spec, response), {
+      onError: (cause) => {
+        failure = cause;
+      },
+    }).catch((cause: unknown) => {
+      failure = cause;
+      return false;
+    });
+    setBusy(false);
+    if (!completed) throw failure ?? new Error(t("uiBlock.error.answerFailed"));
+    setSent({ status: "answered", response: { actionId: UI_BLOCK_SUBMIT_ACTION_ID, values: kept } });
+    props.onAnswered?.();
+  }
+
+  const vaultRequest = (): UiVaultRequestKind | undefined => props.block.vault?.kind;
+
   return (
-    <UiBlockingBlock
-      spec={props.block.spec}
-      state={state()}
-      busy={busy()}
-      error={error()}
-      disabled={!props.onAnswer}
-      onRespond={respond}
-      onSkip={props.onAnswer ? skip : undefined}
-      elementRef={(element) => props.elementRef?.(element)}
-      renderPreview={(markdown) => (
-        <div class="message-markdown">
-          <MarkdownMessageText
-            imagesAsLinks
-            body={markdown}
-            agents={props.agents}
-            onSelectAgent={props.onSelectAgent}
-            onOpenLink={props.onOpenLink}
-          />
-        </div>
+    <Show when={vaultRequest()} fallback={uiBlockCard()}>
+      {(kind) => (
+        <VaultRequestCard
+          kind={kind()}
+          title={props.block.spec.title ?? ""}
+          agentName={props.agents.find((agent) => agent.id === props.agentId)?.name}
+          prefill={prefill()}
+          status={state().status}
+          saved={props.block.vault?.saved}
+          values={state().response?.values}
+          error={error()}
+          busy={busy()}
+          onSave={props.onAnswer ? saveVaultItem : undefined}
+          onSkip={props.onAnswer ? skip : undefined}
+          elementRef={(element) => props.elementRef?.(element)}
+        />
       )}
-    />
+    </Show>
   );
+
+  function uiBlockCard() {
+    return (
+      <UiBlockingBlock
+        spec={props.block.spec}
+        state={state()}
+        busy={busy()}
+        error={error()}
+        disabled={!props.onAnswer}
+        onRespond={respond}
+        onSkip={props.onAnswer ? skip : undefined}
+        elementRef={(element) => props.elementRef?.(element)}
+        renderPreview={(markdown) => (
+          <div class="message-markdown">
+            <MarkdownMessageText
+              imagesAsLinks
+              body={markdown}
+              agents={props.agents}
+              onSelectAgent={props.onSelectAgent}
+              onOpenLink={props.onOpenLink}
+            />
+          </div>
+        )}
+      />
+    );
+  }
 }

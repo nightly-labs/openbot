@@ -253,6 +253,32 @@ A joined desktop, the web client and the mobile app use the optional `agent-hidd
 owner or an admin hides or restores an agent on a host.
 `/v1/agents` and the released agent codecs do not carry `hiddenAt`.
 
+## Sidebar folders
+
+The sidebar groups chats in folders. In the stored layout and the released contracts a folder is a
+section. A section can have an optional `parentId`, so a folder can hold folders: three levels in
+all (`SIDEBAR_FOLDER_LEVELS`). The layout stays in `sidebar-layout.json`; the field needs no file
+version and no SQL migration.
+
+`SidebarLayoutStore` rebuilds the tree after each action and at load (`sidebarFolderParents`,
+`sidebarFolderTreeOrder`). A parent that is unknown, that makes a loop or that is too deep counts
+as absent, so the folder goes to the top level and keeps its chats. An older version keeps the
+field in the file but does not maintain it. The store writes the file only on a change. `create`
+takes a `parentId`, and `nest` puts a folder with its folders in a parent before a sibling. A delete
+moves the folders and chats of the folder to its parent; at the top level the chats have no folder.
+The store refuses a fourth level, a folder that goes into itself, and a sibling of another parent.
+
+The renderer shows folders when the server can nest them (`foldersSupported`). A nested header shows
+"Parent / Name", and the headers stay at the top when the list scrolls. A joined desktop, the web
+client and the mobile app use the optional `sidebar-folders-v1` capability
+(`packages/contracts/src/team-protocol/sidebar-folders-v1.ts`), protocol 9 only. Its routes take the
+released actions, `parentId` on `create`, and `nest`. A peer with the capability gets
+`sidebar-folders-changed`; other peers get `sidebar-layout-changed`, and the released
+`/v1/sidebar-layout` routes leave out `parentId`. A peer without the capability shows each folder at
+the top level, and its changes keep the parents. The iPhone app shows nested folders as one list,
+with the path in each name. An instance transfer creates each folder at the top level, because its
+file has no field for the parent.
+
 ## Browser profile
 
 Agent settings > Advanced selects the browser profile of an agent: Shared or a named profile

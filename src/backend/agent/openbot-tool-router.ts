@@ -405,6 +405,16 @@ export class OpenBotToolRouter {
               if (client.running) client.respond(toolRequest.id, result);
               return;
             }
+            // It needs no tab: the card waits in the chat, and the registry answers it.
+            if (toolRequest.params.tool === "request_vault_item") {
+              const result = yield* this.#attention.requestVaultItem(client, toolRequest, {
+                ...toolRequest.params,
+                threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
+                ownerAgentId: agentId,
+              });
+              if (result && client.running) client.respond(toolRequest.id, result);
+              return;
+            }
             if (this.#attention.hasBrowserTakeoverForAgent(agentId)) {
               client.respond(toolRequest.id, {
                 success: false,
@@ -434,11 +444,17 @@ export class OpenBotToolRouter {
                   return yield* this.#attention.saveVaultItem(params);
                 case "delete_vault_item":
                   return yield* this.#attention.deleteVaultItem(params);
-                default:
+                case "request_link_payment":
+                  return yield* this.#attention.requestLinkPayment(params);
+                default: {
+                  // A Link card is read from Link before the fill; a saved card comes from the Vault.
+                  const linkVault = yield* this.#attention.linkCardVault(client, toolRequest, params);
+                  if (linkVault && !("secret" in linkVault)) return linkVault;
                   return yield* this.#browser.handleDynamicTool(params, {
                     onUserControl: userControl,
-                    cardVault: this.#attention.cardVault(client, toolRequest, params),
+                    cardVault: linkVault ?? this.#attention.cardVault(client, toolRequest, params),
                   });
+                }
               }
             });
             const signal = toolRequest.signal;

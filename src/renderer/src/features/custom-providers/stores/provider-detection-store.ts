@@ -76,11 +76,12 @@ function modelsRow(server: DetectedModelServer, saved: CustomProviderSummary | u
     name: saved.name,
     baseUrl: saved.baseUrl,
     added: true,
-    savedModels: saved.models.map((model) =>
-      model.contextWindow === undefined
-        ? { id: model.id, name: model.name }
-        : { id: model.id, name: model.name, contextWindow: model.contextWindow },
-    ),
+    savedModels: saved.models.map((model) => ({
+      id: model.id,
+      name: model.name,
+      ...(model.contextWindow !== undefined ? { contextWindow: model.contextWindow } : {}),
+      ...(model.maxOutput !== undefined ? { maxOutput: model.maxOutput } : {}),
+    })),
     keyStored: saved.hasApiKey,
     savedHeaderNames: saved.headerNames ?? [],
     ...(saved.harness ? { harness: saved.harness } : {}),

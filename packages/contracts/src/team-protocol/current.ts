@@ -93,6 +93,8 @@ import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
+import { SIDEBAR_FOLDERS_CAPABILITY } from "./sidebar-folders-v1";
+import { SIDEBAR_PINS_CAPABILITY } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "./sign-in-relay-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
@@ -125,6 +127,13 @@ export const TEAM_MEDIA_ATTACHMENTS_CAPABILITY = "media-attachments";
 export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
 export const TEAM_ZIP_ATTACHMENTS_CAPABILITY = "zip-attachments";
 export const TEAM_MP4_ATTACHMENTS_CAPABILITY = "mp4-attachments";
+export const TEAM_SVG_ATTACHMENTS_CAPABILITY = "svg-attachments";
+/**
+ * A host that keeps a separate MCP sign-in for each row whose URL ends in an `#account-…` fragment.
+ * An older host files every row on one URL under one sign-in, so the client offers "Add account"
+ * for a listing only when the host advertises this.
+ */
+export const MCP_ACCOUNTS_CAPABILITY = "mcp-accounts-v1";
 /**
  * Frozen optional member-leave-v1 contract: a bodyless `POST /v1/team/leave` answered with 204. The
  * caller, a member or an admin, removes their own membership with the same effects as an admin's
@@ -223,6 +232,8 @@ export {
   ROUTINE_RESULTS_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
+  SIDEBAR_FOLDERS_CAPABILITY,
+  SIDEBAR_PINS_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
@@ -380,6 +391,10 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CHANNEL_TASK_CANCEL_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY,
+  TEAM_SVG_ATTACHMENTS_CAPABILITY,
+  MCP_ACCOUNTS_CAPABILITY,
+  SIDEBAR_PINS_CAPABILITY,
+  SIDEBAR_FOLDERS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -524,7 +539,11 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CUSTOM_AGENTS_CAPABILITY &&
     capability !== CHANNEL_TASK_CANCEL_CAPABILITY &&
     capability !== WORKFLOWS_GITHUB_CAPABILITY &&
-    capability !== TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY,
+    capability !== TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY &&
+    capability !== TEAM_SVG_ATTACHMENTS_CAPABILITY &&
+    capability !== MCP_ACCOUNTS_CAPABILITY &&
+    capability !== SIDEBAR_PINS_CAPABILITY &&
+    capability !== SIDEBAR_FOLDERS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -545,6 +564,10 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CHANNEL_TASK_CANCEL_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY,
+  TEAM_SVG_ATTACHMENTS_CAPABILITY,
+  MCP_ACCOUNTS_CAPABILITY,
+  SIDEBAR_PINS_CAPABILITY,
+  SIDEBAR_FOLDERS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -648,6 +671,10 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CUSTOM_AGENTS_CAPABILITY &&
       capability !== CHANNEL_TASK_CANCEL_CAPABILITY &&
       capability !== WORKFLOWS_GITHUB_CAPABILITY &&
-      capability !== TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY,
+      capability !== TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY &&
+      capability !== TEAM_SVG_ATTACHMENTS_CAPABILITY &&
+      capability !== MCP_ACCOUNTS_CAPABILITY &&
+      capability !== SIDEBAR_PINS_CAPABILITY &&
+      capability !== SIDEBAR_FOLDERS_CAPABILITY,
   );
 }

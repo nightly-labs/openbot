@@ -4,11 +4,20 @@
  * safe for the drag engine to hold - it satisfies the engine's list model and can do nothing else.
  */
 
-import { type ChannelSummary, SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
+import {
+  type ChannelSummary,
+  SIDEBAR_FOLDER_LEVELS,
+  SIDEBAR_PEOPLE_SECTION_ID,
+  SIDEBAR_UNASSIGNED_SECTION_ID,
+  sidebarFolderAncestors,
+  sidebarFolderHeight,
+  sidebarFolderParents,
+} from "@openbot/contracts/ipc";
 import { createMemo } from "solid-js";
 import type { AgentProfile } from "../../../data";
 import { currentText } from "../../../text";
 import { teamMemberName } from "../../team/TeamPersonAvatar";
+import { sidebarSectionResolver, sortByLayoutOrder } from "../sidebar-agent-order";
 import { sidebarPinnedItemKey } from "../sidebar-pins";
 import type { ResolvedPinnedItem, SidebarChatItem, SidebarProps } from "../sidebar-types";
 
@@ -103,21 +112,15 @@ export function createSidebarDataStore(deps: {
   const filteredAgents = createMemo(() => listedAgents().filter((agent) => !chatWaits(agent.id)));
   /** The hidden agents, pinned ones included, in their layout order. They are not drag sources. */
   const userHiddenAgentList = createMemo(() =>
-    sortByLayoutOrder(props.agents.filter((agent) => agentIsUserHidden(agent.id))),
+    sortByLayoutOrder(
+      props.agents.filter((agent) => agentIsUserHidden(agent.id)),
+      props.layout.agentOrder,
+    ),
   );
   const listedChannels = createMemo(() =>
     channels().filter((channel) => !pinnedKeys().has(sidebarPinnedItemKey({ kind: "channel", id: channel.id }))),
   );
   const filteredChannels = createMemo(() => listedChannels().filter((channel) => !chatWaits(channel.id)));
-  function sortByLayoutOrder<T extends { id: string }>(items: T[]): T[] {
-    const orderIndex = new Map(props.layout.agentOrder.map((chatId, index) => [chatId, index]));
-    const naturalIndex = new Map(items.map((item, index) => [item.id, index]));
-    return items.sort(
-      (left, right) =>
-        (orderIndex.get(left.id) ?? props.layout.agentOrder.length + (naturalIndex.get(left.id) ?? 0)) -
-        (orderIndex.get(right.id) ?? props.layout.agentOrder.length + (naturalIndex.get(right.id) ?? 0)),
-    );
-  }
   /**
    * Agents and channels as one ordered list, because the layout places them together: a channel is a
    * chat the user files and drags exactly like an agent. `agentOrder` is the persisted sequence and
@@ -139,10 +142,13 @@ export function createSidebarDataStore(deps: {
         return resolved;
       };
       const current = sources();
-      const items = sortByLayoutOrder<SidebarChatItem>([
-        ...current.channels.map((channel) => keep(channel, () => ({ kind: "channel", id: channel.id, channel }))),
-        ...current.agents.map((agent) => keep(agent, () => ({ kind: "agent", id: agent.id, agent }))),
-      ]);
+      const items = sortByLayoutOrder<SidebarChatItem>(
+        [
+          ...current.channels.map((channel) => keep(channel, () => ({ kind: "channel", id: channel.id, channel }))),
+          ...current.agents.map((agent) => keep(agent, () => ({ kind: "agent", id: agent.id, agent }))),
+        ],
+        props.layout.agentOrder,
+      );
       cache = nextCache;
       return items;
     });
@@ -173,21 +179,17 @@ export function createSidebarDataStore(deps: {
   });
   const customSectionById = createMemo(() => new Map(props.layout.sections.map((section) => [section.id, section])));
   const collapsedSectionIds = createMemo(() => new Set(props.collapsedSectionIds));
-  const orderedSectionIds = createMemo(() => new Set(props.layout.order));
   // A section has to be in `order` as well as in `sections` for its group to be drawn, because
   // `visibleSectionIds` walks `order`. An agent grouped under a section that `order` leaves out is on
   // no screen while its chat and every message in it are intact, which reads as history that
   // disappeared -- so it goes to the unassigned section, where the user can still open it and move it.
   // `isCompleteSectionOrder` rejects such a layout at the IPC boundary; this keeps the agent visible if
-  // one ever reaches the sidebar another way.
+  // one ever reaches the sidebar another way. `sidebarSectionResolver` holds the rule.
   const filteredChatsBySection = createMemo(() => {
     const groups = new Map<string, SidebarChatItem[]>();
+    const sectionOf = sidebarSectionResolver(props.layout);
     for (const item of filteredChats()) {
-      const assigned = props.layout.agentAssignments[item.id];
-      const sectionId =
-        assigned && customSectionById().has(assigned) && orderedSectionIds().has(assigned)
-          ? assigned
-          : SIDEBAR_UNASSIGNED_SECTION_ID;
+      const sectionId = sectionOf(item.id);
       groups.set(sectionId, [...(groups.get(sectionId) ?? []), item]);
     }
     return groups;
@@ -200,6 +202,66 @@ export function createSidebarDataStore(deps: {
       return (filteredChatsBySection().get(sectionId)?.length ?? 0) > 0;
     }),
   );
+
+  /** The folder that holds each folder that has one. */
+  const folderParents = createMemo(() => sidebarFolderParents(props.layout));
+  /** The visible sections in each folder, and at the top (`null`), in the order of the layout. */
+  const folderChildren = createMemo(() => {
+    const children = new Map<string | null, string[]>();
+    for (const sectionId of visibleSectionIds()) {
+      const parentId = folderParents().get(sectionId) ?? null;
+      children.set(parentId, [...(children.get(parentId) ?? []), sectionId]);
+    }
+    return children;
+  });
+
+  function sectionChildren(parentId: string | null): string[] {
+    return folderChildren().get(parentId) ?? [];
+  }
+
+  function sectionParent(sectionId: string): string | null {
+    return folderParents().get(sectionId) ?? null;
+  }
+
+  /** 0 for a folder at the top of the list. */
+  function sectionDepth(sectionId: string): number {
+    return sidebarFolderAncestors(folderParents(), sectionId).length;
+  }
+
+  /** True when `sectionId` is `ancestorId` or a folder in it, at any level. */
+  function sectionIsInside(sectionId: string, ancestorId: string): boolean {
+    return sectionId === ancestorId || sidebarFolderAncestors(folderParents(), sectionId).includes(ancestorId);
+  }
+
+  /**
+   * Whether a folder can go into `parentId` (null: the top of the list): not into itself or a folder
+   * in it, and three levels at most with the folders it holds.
+   */
+  function sectionCanNest(sectionId: string, parentId: string | null): boolean {
+    if (!customSectionById().has(sectionId)) return parentId === null;
+    if (parentId === null) return true;
+    if (!customSectionById().has(parentId) || sectionIsInside(parentId, sectionId)) return false;
+    return sectionDepth(parentId) + 1 + sidebarFolderHeight(folderParents(), sectionId) < SIDEBAR_FOLDER_LEVELS;
+  }
+
+  /** The chats in a folder and in the folders in it, for the count on a closed folder. */
+  function sectionChatIdsDeep(sectionId: string): string[] {
+    return [
+      ...(filteredChatsBySection().get(sectionId) ?? []).map((item) => item.id),
+      ...sectionChildren(sectionId).flatMap(sectionChatIdsDeep),
+    ];
+  }
+
+  /** The unread messages in a folder and in the folders in it, for the badge on a closed folder. */
+  function sectionUnreadCount(sectionId: string): number {
+    let count = 0;
+    for (const chatId of sectionChatIdsDeep(sectionId)) {
+      const state = props.agentStates[chatId];
+      if (state?.kind === "unread") count += state.count;
+      count += channelById().get(chatId)?.unreadCount ?? 0;
+    }
+    return count;
+  }
 
   function sectionIsCollapsed(sectionId: string): boolean {
     return collapsedSectionIds().has(sectionId);
@@ -241,7 +303,11 @@ export function createSidebarDataStore(deps: {
     const { t } = currentText();
     if (sectionId === SIDEBAR_PEOPLE_SECTION_ID) return t("sidebar.section.people");
     if (sectionId === SIDEBAR_UNASSIGNED_SECTION_ID) return t("sidebar.section.unassigned");
-    return customSectionById().get(sectionId)?.name ?? t("sidebar.section.fallback");
+    const names = sidebarFolderAncestors(folderParents(), sectionId).flatMap((ancestorId) => {
+      const name = customSectionById().get(ancestorId)?.name;
+      return name === undefined ? [] : [name];
+    });
+    return [...names, customSectionById().get(sectionId)?.name ?? t("sidebar.section.fallback")].join(" / ");
   }
 
   function visiblePinnedKeys(): string[] {
@@ -270,9 +336,14 @@ export function createSidebarDataStore(deps: {
     personById,
     resolvedPinnedItems,
     sectionAcceptsChat,
+    sectionCanNest,
+    sectionChildren,
     sectionIsCollapsed,
+    sectionIsInside,
+    sectionParent,
     sectionLabel,
     sectionPosition,
+    sectionUnreadCount,
     visiblePinnedKeys,
     userHiddenAgentList,
     userHiddenSince,

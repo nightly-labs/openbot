@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, realpathSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
@@ -10,7 +10,7 @@ import { isPathInside } from "./path-containment";
  * The folders one Workspace only agent may write: its workspace and the shared folder. The temporary
  * folders and the provider's state are added to them.
  *
- * Grok, OpenCode, Antigravity, Cursor and Cline take no sandbox per session, so a Workspace only
+ * Grok, OpenCode, Antigravity, Cursor, Cline and Kimi take no sandbox per session, so a Workspace only
  * agent on them gets a provider process of its own, and OpenBot starts that process inside an
  * operating system sandbox. The whole process is confined: the file edit tools, the shell, and every
  * command and MCP server it starts. Nothing inside the process can take the sandbox away. Only macOS
@@ -246,6 +246,94 @@ export function clineStatePaths(env: NodeJS.ProcessEnv = process.env, home = hom
 }
 
 /**
+ * The folder where Hermes Agent keeps its sign-ins, settings, sessions and memories: `HERMES_HOME`,
+ * else `~/.hermes`, or `%LOCALAPPDATA%\hermes` on Windows. OpenBot shares it with the user's own Hermes.
+ * When the user selected a profile with `hermes profile use <name>`, it is `<root>/profiles/<name>`.
+ */
+export function hermesHome(
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir(),
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const configured = env.HERMES_HOME?.trim();
+  const root = configured
+    ? configured === "~" || configured.startsWith("~/")
+      ? join(home, configured.slice(1))
+      : configured
+    : platform === "win32"
+      ? join(env.LOCALAPPDATA?.trim() || join(home, "AppData", "Local"), "hermes")
+      : join(home, ".hermes");
+  return basename(dirname(root)) === "profiles" ? root : hermesActiveProfile(root);
+}
+
+/** Hermes 0.21.5 reads `<root>/active_profile` at each start and then uses that profile's folder. */
+function hermesActiveProfile(root: string): string {
+  let name: string;
+  try {
+    name = readFileSync(join(root, "active_profile"), "utf8")
+      .replace(/^\uFEFF/, "")
+      .trim()
+      .toLowerCase();
+  } catch {
+    return root;
+  }
+  if (name === "" || name === "default" || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) return root;
+  const profile = join(root, "profiles", name);
+  return existsSync(profile) ? profile : root;
+}
+
+/**
+ * Hermes writes its sessions, memories, sign-in refreshes, caches and logs across its whole folder.
+ * Its install, settings, `.env`, identity, skills, hooks, schedules, plugins, profiles and the tools
+ * it downloads load code, commands or instructions for every other Hermes process, so they stay
+ * read-only.
+ */
+export function hermesStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const root = hermesHome(env, home);
+  return {
+    writable: [root],
+    protected: [
+      "hermes-agent",
+      "hermes-setup",
+      "config.yaml",
+      ".env",
+      "SOUL.md",
+      "skills",
+      "skill-bundles",
+      "hooks",
+      "cron",
+      "scripts",
+      "plugins",
+      "desktop-plugins",
+      "relay-plugins.toml",
+      "profiles",
+      "active_profile",
+      "pairing",
+      "platforms",
+      "installs",
+      "bootstrap-cache",
+      "tools",
+    ].map((name) => join(root, name)),
+  };
+}
+
+/**
+ * The Kimi Code CLI keeps its sign-in, sessions, logs and caches in `KIMI_SHARE_DIR`, `~/.kimi` by
+ * default, and writes its plans in `~/.kimi/plans`. Its settings and hooks (`config.toml`), MCP
+ * servers, plugins, skills and downloaded tools are in that folder too, and every other Kimi process
+ * loads them, so they stay read-only.
+ */
+export function kimiStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const kimiHome = env.KIMI_SHARE_DIR?.trim() || join(home, ".kimi");
+  return {
+    writable: unique([kimiHome, join(home, ".kimi", "plans")]),
+    protected: ["config.toml", "config.json", "mcp.json", "plugins", "skills", "bin"].map((name) =>
+      join(kimiHome, name),
+    ),
+  };
+}
+
+/**
  * A custom agent keeps its state where it wants, and OpenBot cannot know where. A Workspace only
  * custom agent gets no state folder: an agent that must write in its home folder to run needs Full
  * access.
@@ -309,6 +397,8 @@ const PROJECT_SETTINGS = [
   // Cline reads its project rules, workflows, hooks, skills and agents from these two.
   ".cline",
   ".clinerules",
+  // Kimi reads its project skills and instructions from `.kimi`.
+  ".kimi",
   ".pi",
   ".muse",
   // Antigravity reads project skills from `.gemini` and its customizations from these four.

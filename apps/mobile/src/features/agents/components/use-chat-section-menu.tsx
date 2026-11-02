@@ -1,4 +1,4 @@
-import { SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
+import { SIDEBAR_UNASSIGNED_SECTION_ID, sidebarFolderParents, sidebarFolderPath } from "@openbot/contracts/ipc";
 import { Link } from "expo-router";
 import { useRef, useState } from "react";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -21,7 +21,12 @@ export function useChatSectionMenu(serverId: string, chatId: string) {
   const pending = useRef(false);
   const [saving, setSaving] = useState(false);
   const disabled = saving || !online;
-  const names = new Map(layout?.sections.map((section) => [section.id, section.name]));
+  const names = new Map<string, string>();
+  if (layout) {
+    const parents = sidebarFolderParents(layout);
+    for (const section of layout.sections)
+      names.set(section.id, sidebarFolderPath(layout, parents, section.id).join(" / "));
+  }
   const sections = (layout?.order ?? []).flatMap((id) => {
     const name = id === SIDEBAR_UNASSIGNED_SECTION_ID ? t("mobile.agent.section.unassigned") : names.get(id);
     return name ? [{ id, name }] : [];

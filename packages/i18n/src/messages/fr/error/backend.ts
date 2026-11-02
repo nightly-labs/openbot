@@ -264,6 +264,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Un serveur peut avoir jusqu’à {limit} sections de barre latérale.",
   "error.backend.sectionNameRequired": "Le nom de la section est requis.",
   "error.backend.sectionNameTooLong": "Le nom de la section est trop long.",
+  "error.backend.sidebarFolderTooDeep": "Les dossiers ne peuvent avoir que trois niveaux.",
+  "error.backend.sidebarFolderMoveInvalid": "Ce dossier ne peut pas être déplacé ici.",
   "error.backend.sectionNameDuplicate": "Les noms de section doivent être uniques.",
   "error.backend.directMessageRequired": "Écrivez d’abord un message.",
   "error.backend.directMessageTooLong": "Un message direct peut contenir jusqu’à {limit} caractères.",

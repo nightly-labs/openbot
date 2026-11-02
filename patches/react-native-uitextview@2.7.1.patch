@@ -40,3 +40,53 @@ index e2e062d4f7be71217ffe479182cff4e71d0cbaac..47ea37e935ce559add45bbbc31ced041
  
  @interface RNUITextViewManager : RCTViewManager
  @end
+diff --git a/ios/RNUITextViewShadowNode.cpp b/ios/RNUITextViewShadowNode.cpp
+index 88843d86d592006a2bf562d952796a0fbcdbf777..9ad079aefd7762bd6c030d7bb0b133a1bdfcfabe 100644
+--- a/ios/RNUITextViewShadowNode.cpp
++++ b/ios/RNUITextViewShadowNode.cpp
+@@ -5,7 +5,9 @@
+ #include <react/renderer/graphics/rounding.h>
+ #include <react/renderer/mounting/ShadowView.h>
+ 
++#include <algorithm>
+ #include <cmath>
++#include <limits>
+ 
+ namespace facebook::react {
+ 
+@@ -54,12 +56,34 @@ Size RNUITextViewShadowNode::measureContent(
+     };
+     const auto textLayoutManager = std::make_shared<const TextLayoutManager>(getContextContainer());
+ 
+-    return textLayoutManager->measure(
++    auto size = textLayoutManager->measure(
+       AttributedStringBox{content.attributedString},
+       paragraphAttributes,
+       textLayoutContext,
+       layoutConstraints
+     ).size;
++
++    // React Native gives text that wraps the full available width. The text
++    // view takes the width of its widest line instead, so a bubble around it
++    // ends where its text ends.
++    const auto maximumWidth = layoutConstraints.maximumSize.width;
++    if (std::isfinite(maximumWidth) && size.width >= maximumWidth) {
++      const auto lines = textLayoutManager->measureLines(
++        AttributedStringBox{content.attributedString},
++        paragraphAttributes,
++        Size{maximumWidth, std::numeric_limits<Float>::infinity()}
++      );
++      Float widest = 0;
++      for (const auto &line : lines) {
++        widest = std::max(widest, line.frame.origin.x + line.frame.size.width);
++      }
++      if (widest > 0) {
++        const auto fitted = roundToPixel<&ceil>(
++          Size{widest + 0.01f, size.height}, layoutContext.pointScaleFactor);
++        size.width = std::min(size.width, std::max(fitted.width, layoutConstraints.minimumSize.width));
++      }
++    }
++    return size;
+ }
+ 
+ RNUITextViewContent RNUITextViewShadowNode::getContentWithMeasuredAttachments(

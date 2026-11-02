@@ -19,7 +19,7 @@ Every event has these low-cardinality properties:
 - `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, `account_api`, or `signal`;
 - `environment`: currently `production` only;
 - `event_schema_version`: the integer schema generation of that surface: currently `12` on `desktop`,
-  `11` on `desktop_host`, `10` on `landing`, `12` on `account_api`, `4` on `mobile`, `2` on `web`, and `1` on
+  `11` on `desktop_host`, `10` on `landing`, `13` on `account_api`, `4` on `mobile`, `2` on `web`, and `1` on
   `signal`;
 - `app_version` and `platform` on desktop surfaces;
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
@@ -48,6 +48,7 @@ properties on `payment_succeeded` and `revenue`, `reactivated` on `plan_started`
 on `plan_ended`. Account service generation 11 adds licenses to `billing_action` and `revenue`
 (`product` is `server` or `license`; a license adds `users`), `entry_point` on `checkout_started`,
 and the license fields of `billing_snapshot`. Account service generation 12 adds `email_sent`.
+Account service generation 13 adds the `license` kind of `email_sent`.
 
 Landing reports must filter to `event_schema_version = 10`. Generation 10 adds
 `billing_return_viewed` and `contact_form_submitted`. In generation 9, an iPhone or Android visitor
@@ -184,7 +185,7 @@ off. Turning analytics off on any surface first sends one `analytics_preference_
 | `revenue` | How much did accounts pay for servers and licenses? | Verified paid invoices only. From account service generation 11, `product` is `server` or `license`, and a license adds `users`. `__revenue` and `amount_usd` in USD cents; `original_amount`, `original_currency`, `fx_rate`, `fx_date`, `plan`, `interval`, `payment_kind`, and optional `recovery` and `first_touch_*` properties. Zero-amount invoices do not emit revenue. |
 | `billing_snapshot` | What is recurring revenue at the sample time? | Daily aggregate without a profile. `snapshot_date`, `as_of`, `reported_at`, `currency`, `mrr`, `arr`, `overdue_mrr`, `paying_accounts`, `paid_servers`, `cancellations_scheduled`, `checkout_mature_accounts`, `checkout_converted_accounts`, `checkout_pending_accounts`, `skipped_subscriptions` (subscriptions left out because Stripe has no valid data for them). From account service generation 11, `mrr`, `arr`, `overdue_mrr` and `paying_accounts` count servers only; `license_mrr`, `license_accounts` and `licensed_users` count licenses; `total_mrr` and `total_arr` count both. `skipped_subscriptions` counts both. Money is USD cents. Never sum snapshots across days. |
 | `hosted_server_action` | Do paid hosted servers start, stay in use and come back? | `action`: `provisioned`, `setup_failed`, `idle_stopped`, `woken`, `resized`, `plan_stopped`, `renewed`, or `deleted`, when the account service changes the server. Optional `plan`, `size`, `reason` (`message`, `restart`, `schedule` or `retention`) and `error` (an allowlisted hosted server error code) |
-| `email_sent` | How much of the hourly quota of the SMTP mailbox (500 messages) does the account service use? | One event for each message that the account service tries to send by SMTP from `hello@openbot.run`, after its retries. The webhook delivery does not use the mailbox and sends none. `kind`: `sign_in_code`, `team_invite`, `contact`, or `welcome`. `result`: `accepted`; `rate_limited` (the mail server refused it for its sender limit); `unknown` (the send stopped after the server may have taken the message); or `failed` (also a message that a check stopped before the connection). Count `accepted` and `unknown` against the quota. No `profileId`, address, name or content |
+| `email_sent` | How much of the hourly quota of the SMTP mailbox (500 messages) does the account service use? | One event for each message that the account service tries to send by SMTP through the `hello@openbot.run` account, after its retries. The webhook delivery does not use the mailbox and sends none. `kind`: `sign_in_code`, `team_invite`, `contact`, `welcome` (the welcome email of the first server plan of an account), or, from account service generation 13, `license` (a license email from `licenses@openbot.run`: the first payment, a failed renewal payment, or the end of a license). `result`: `accepted`; `rate_limited` (the mail server refused it for its sender limit); `unknown` (the send stopped after the server may have taken the message); or `failed` (also a message that a check stopped before the connection). Count `accepted` and `unknown` against the quota. No `profileId`, address, name or content |
 | `signal_capacity` | How near is the TURN relay to its allocation quota (`total-quota` in `remote/coturn/turnserver.conf`)? | One event every 5 minutes from each Signal host. `turn_host` (`turn.openbot.run`, or `turn2.openbot.run` on the standby); `turn_allocations`, and `turn_allocations_udp`, `_tcp` and `_tls` for the client transports (0 when a transport has none); `signal_sockets` and `signal_peer_connections`. Generation 1 |
 
 ## Privacy and runtime validation

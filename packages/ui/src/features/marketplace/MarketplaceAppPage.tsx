@@ -1,3 +1,4 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { mcpFlowFields } from "@openbot/contracts/mcp-connect-flows";
 import { pluginLinkText } from "@openbot/contracts/plugin-links";
 import type { AppTextKey } from "@openbot/i18n";
@@ -8,6 +9,10 @@ import {
   AlertIcon,
   AlertTitle,
   Button,
+  buttonVariants,
+  ConfirmDialog,
+  DropdownMenu,
+  Ellipsis,
   ExternalLink,
   Item,
   ItemActions,
@@ -17,14 +22,19 @@ import {
   ItemMedia,
   ItemTitle,
   Link2,
+  LogIn,
+  Pencil,
   Plug,
+  Plus,
   SettingsSection,
   SwitchField,
   Text,
+  Trash2,
   TriangleAlert,
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
+import { ProviderAccountRenameField } from "../../components/ProviderAccountList";
 import { type ConnectorDetail, ConnectorDetailPanel, connectorDescription } from "../connectors/ConnectorDetailPanel";
 import type { ConnectorId } from "../connectors/connectors";
 import { DangerZone, IntegrationPage, StatusPill, WizardDialog } from "../settings/IntegrationLayout";
@@ -35,6 +45,7 @@ import { CATEGORY_LABELS } from "./marketplace-listing";
 import {
   appSetup,
   type MarketplaceApp,
+  type MarketplaceAppAccount,
   type MarketplaceAppConnection,
   type MarketplaceAppStatus,
   type MarketplaceMacAutomation,
@@ -67,6 +78,9 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
     ].flatMap((link) => (link.url ? [{ label: link.label, url: link.url, text: pluginLinkText(link.url) }] : []));
   /** The first app whose server refused its saved sign-in. */
   const refused = () => plugin().apps.find((app) => props.app.connections[app.id]?.signInNeeded);
+  /** The app that can sign in to one more account here, when the host keeps a sign-in for each. */
+  const accountsEntry = () =>
+    model().canConnectApps() ? plugin().apps.find((app) => props.app.connections[app.id]?.multipleAccounts) : undefined;
   const automation = () =>
     model().canConnectApps() && plugin().apps.some((app) => app.macAutomation?.length)
       ? model().macAutomation
@@ -162,10 +176,46 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
       }
     >
       <Show when={plugin().apps.length > 0}>
-        <SettingsSection title={t("marketplace.app.connection")}>
+        <SettingsSection
+          title={t("marketplace.app.connection")}
+          actions={
+            <Show when={accountsEntry()}>
+              {(entry) => (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-label={t("provider.account.addLabel", { name: entry().name })}
+                  disabled={model().appBusy(props.app.id)}
+                  onClick={() => void model().addAccount(props.app, entry().id)}
+                >
+                  <Plus aria-hidden="true" />
+                  {t("provider.account.add")}
+                </Button>
+              )}
+            </Show>
+          }
+        >
           <ItemGroup class="settings-modal-card">
             <For each={plugin().apps}>
-              {(entry) => <ConnectionRow scope={props.scope} app={props.app} entry={entry} />}
+              {(entry) => (
+                <Show
+                  when={props.app.connections[entry.id]?.multipleAccounts}
+                  fallback={<ConnectionRow scope={props.scope} app={props.app} entry={entry} />}
+                >
+                  <For each={props.app.connections[entry.id]?.accounts ?? []} keyed={(account) => account.id}>
+                    {(account) => (
+                      <AccountRow
+                        scope={props.scope}
+                        app={props.app}
+                        entry={entry}
+                        account={account()}
+                        removable={(props.app.connections[entry.id]?.accounts.length ?? 0) > 1}
+                      />
+                    )}
+                  </For>
+                </Show>
+              )}
             </For>
             <Show when={automation()}>
               {(current) => <AutomationRow scope={props.scope} app={props.app} automation={current()} />}
@@ -196,7 +246,113 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
   );
 }
 
-const NOT_HELD: MarketplaceAppConnection = { held: false, signInNeeded: false };
+const NOT_HELD: MarketplaceAppConnection = { held: false, signInNeeded: false, accounts: [], multipleAccounts: false };
+
+/**
+ * One account of an app that can sign in to more than one: its name, which a message tags with @,
+ * and the actions of that account alone. The last account goes with Disconnect, as the app does.
+ */
+function AccountRow(props: {
+  scope: MarketplaceScope;
+  app: PluginApp;
+  entry: MarketplacePluginApp;
+  account: MarketplaceAppAccount;
+  removable: boolean;
+}) {
+  const { t } = useText();
+  const model = () => props.scope.model;
+  const [renaming, setRenaming] = createSignal(false);
+  const [removing, setRemoving] = createSignal(false);
+  const busy = () => model().appBusy(props.app.id);
+  const signInAgain = () => void model().reconnectApp(props.app, props.entry.id, props.account.id);
+  // A refused sign-in, or none at all, as after a sign-out in MCP settings: agents cannot use it.
+  const signInNeeded = () => props.account.signInNeeded || !props.account.signedIn;
+  // A sign-in with tokens on file opens no browser, so a signed-in account has no "Sign in again".
+  const above = () => props.account.renamable || signInNeeded();
+  return (
+    <Item class="settings-modal-row">
+      <ItemMedia>
+        <PluginIcon iconUrl={props.entry.iconUrl} />
+      </ItemMedia>
+      <ItemContent>
+        <Show when={renaming()} fallback={<ItemTitle>{props.account.name}</ItemTitle>}>
+          <ProviderAccountRenameField
+            value={props.account.name}
+            placeholder={props.account.name}
+            label={t("provider.account.renameLabel", { name: props.account.name })}
+            maxLength={INPUT_LIMITS.mcpServerName}
+            onDone={(value) => {
+              setRenaming(false);
+              if (value) void model().renameAccount(props.app, props.account.id, value);
+            }}
+          />
+        </Show>
+        <Show when={!signInNeeded()}>
+          <ItemDescription>{t("mcp.status.signedIn")}</ItemDescription>
+        </Show>
+      </ItemContent>
+      <ItemActions>
+        <Show when={signInNeeded()}>
+          <StatusPill status="attention" label={t("mcp.status.signInNeeded")} />
+          <Button type="button" variant="outline" size="sm" disabled={busy()} onClick={signInAgain}>
+            {t("provider.account.signInAgain")}
+          </Button>
+        </Show>
+        <Show when={model().canConnectApps() && (above() || props.removable)}>
+          <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
+            <DropdownMenu.Trigger
+              class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} ui-icon-button`}
+              aria-label={t("provider.account.moreActions", { name: props.account.name })}
+              disabled={busy()}
+            >
+              <Ellipsis aria-hidden="true" />
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content>
+                <Show when={props.account.renamable}>
+                  <DropdownMenu.Item onSelect={() => setRenaming(true)}>
+                    <Pencil aria-hidden="true" />
+                    {t("common.rename")}
+                  </DropdownMenu.Item>
+                </Show>
+                <Show when={signInNeeded()}>
+                  <DropdownMenu.Item onSelect={signInAgain}>
+                    <LogIn aria-hidden="true" />
+                    {t("provider.account.signInAgain")}
+                  </DropdownMenu.Item>
+                </Show>
+                <Show when={props.removable}>
+                  <Show when={above()}>
+                    <DropdownMenu.Separator />
+                  </Show>
+                  <DropdownMenu.Item onSelect={() => setRemoving(true)}>
+                    <Trash2 aria-hidden="true" />
+                    {t("provider.account.remove")}
+                  </DropdownMenu.Item>
+                </Show>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+        </Show>
+      </ItemActions>
+      {/* As provider settings remove an account: the sign-in goes, and a new one needs the browser. */}
+      <ConfirmDialog
+        open={removing()}
+        tone="destructive"
+        title={t("provider.settings.removeTitle", { name: props.account.name })}
+        description={t("marketplace.app.account.removeDescription", {
+          host: model().appHostName ?? t("mcp.connect.thisComputer"),
+        })}
+        confirmLabel={t("provider.account.remove")}
+        onCancel={() => setRemoving(false)}
+        onConfirm={() => {
+          setRemoving(false);
+          void model().removeAccount(props.app, props.account.id);
+        }}
+      />
+    </Item>
+  );
+}
 
 /** The address that a desktop app's server answers on, as the listing gives it. */
 function localAddress(entry: MarketplacePluginApp): string {

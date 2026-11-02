@@ -15,7 +15,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect, Exit, Option } from "effect";
 import type { AgentService } from "../backend/agent-service";
 import type { BrowserHost } from "../backend/browser-host";
-import { normalizeResource } from "../backend/mcp-oauth-provider";
+import { mcpOAuthAccountKey } from "../backend/mcp-oauth-provider";
 import { HostSignInPages } from "./host-sign-in-pages";
 
 /** The bound of an error on the wire, as `mcp-sign-in-v1` reads it. */
@@ -124,7 +124,7 @@ function onWire(states: readonly McpSignInState[]): McpSignInState[] {
 }
 
 function signInKey(url: string): string {
-  return normalizeResource(url) ?? url;
+  return mcpOAuthAccountKey(url) ?? url;
 }
 
 function resultOf(exit: Exit.Exit<McpTestResult, { cause: unknown }>): McpTestResult {

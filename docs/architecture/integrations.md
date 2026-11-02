@@ -21,7 +21,7 @@ computer of the user who signs in. A sign-in uses one of these kinds:
 | Kind | Example | On this computer | On a joined server |
 | --- | --- | --- | --- |
 | Loopback callback | URL MCP servers (`McpOAuth`), Codex browser sign-in, a page that an agent's CLI prints | The page sends the browser to `http://127.0.0.1:<port>/...`. The MCP listener uses port 28417 and path `/mcp-auth` ([`mcp-oauth-redirect-server.ts`](../../src/main/mcp-oauth-redirect-server.ts)). | The [callback relay](#remote-sign-in-the-callback-relay) (`sign-in-relay-v1`). MCP on an older host: the host's live view (`mcp-sign-in-v1`). |
-| Device code | Codex (`codex-device`), Grok, Cline, Muse, the GitHub connector | The user types a short code on the provider's page. Nothing comes back to OpenBot. | The host starts it and the client shows the code (`providers-v1` to `providers-v5`). Muse: the relay opens its device page with no callback. GitHub: `connectors-v1`. |
+| Device code | Codex (`codex-device`), Grok, Cline, Kimi, Muse, the GitHub connector | The user types a short code on the provider's page. Nothing comes back to OpenBot. | The host starts it and the client shows the code (`providers-v1` to `providers-v5`; Kimi `providers-v8` only). Muse: the relay opens its device page with no callback. GitHub: `connectors-v1`. |
 | Pasted code | Claude on Linux (`cli` / `paste`), Cursor (`cli` / `link`) | The page shows a code, and the user pastes it into OpenBot. | The host starts it and the client takes the code (`providers-v3` to `providers-v5`). |
 | CLI-owned browser login | Claude (`auth login`), Codex, Gemini (`acp-authenticate`) | The provider's CLI opens the browser and takes its own callback. | The relay (`provider/start`): the host captures the page, and the client sends the callback query to the CLI's listener on the host. Grok, Cursor and Cline: a code kind. |
 | Deep link | Slack, Discord (`openbot://slack-workspace`, `openbot://discord-guild`), MCP fallback (`openbot://mcp-auth`) | A hosted page ends in an `openbot://` link, which reaches only the computer that opened it. | Slack and Discord: `connectors-v1`. The client sends the sealed grant on to the host that started the install. The browser client gets the grant from a return page of its own origin (`web-messaging-install.ts`). |
@@ -64,6 +64,22 @@ fails with `error.backend.mcpOAuthPrivateEndpoint` before it connects. A failed 
 the request. A LAN or localhost MCP URL has no such check. The check does not pin the address, so
 DNS can change between the check and the connection; this residual risk is accepted.
 Run `bun run test:mcp-oauth` to check the sign-in paths against a local authorization server.
+
+### More than one account of one MCP server
+
+An app on a fixed address that signs in with a browser, such as Notion, can have more than one
+account. Each account is one http row on the same address. The row name is the account name, and a
+message tags the account with `@<row name>`.
+
+| Part | Rule |
+| --- | --- |
+| Address | The first account keeps the listing URL and name, so a released client still finds it. Add account adds `#account-<id>` to the URL ([`mcp-accounts.ts`](../../packages/contracts/src/mcp-accounts.ts)). A row from before accounts has no fragment and keeps its sign-in. |
+| Sign-in | `McpOAuth` keeps one record for each address with its fragment (`mcpOAuthAccountKey`). Discovery, registration, tokens and revocation use the address without the fragment, so the fragment never leaves the computer. |
+| Provider | `McpGateway.endpoint` removes the fragment. The proxy target keeps it, so a token refresh reads the sign-in of that account, and the proxy removes it before each request. The proxy route is a digest of the row id and its URL, so each account has its own route. |
+| Catalog | `isPluginAppConfig` gives each row with an account fragment to the catalog app, whatever its name. A row with no fragment needs the catalog name, so it has no Rename. Disconnect removes all accounts of the app. |
+| Joined server | The client offers Add account only when the host sends `mcp-accounts-v1`. An older host keys sign-ins by the address without the fragment, so two accounts would share one sign-in. |
+
+Run `bun scripts/mcp-oauth-store-e2e.ts` to check that two accounts keep separate sign-ins.
 
 ### How an agent reaches a signed-in MCP server
 

@@ -44,6 +44,8 @@ export const messages = {
   "onboarding.provider.googlePlan": "Google AI Pro veya Ultra planı",
   "onboarding.provider.cursorPlan": "Cursor planı veya API anahtarı",
   "onboarding.provider.clineAccount": "Cline hesabıyla ücretsiz modeller",
+  "onboarding.provider.kimiAccount": "Kimi Code hesabıyla Kimi modelleri",
+  "onboarding.provider.hermesNous": "Nous Portal planı veya Hermes kurulumunuz",
   "onboarding.provider.inceptionKey": "Inception API anahtarıyla Mercury modelleri",
   "onboarding.provider.deepseekKey": "DeepSeek API anahtarıyla DeepSeek modelleri",
   "onboarding.provider.openrouterKey": "OpenRouter API anahtarıyla birçok model",
@@ -85,7 +87,7 @@ export const messages = {
   "onboarding.consent.notice": "Devam ederek {terms}’nı kabul etmiş ve {privacy}’nı okumuş olursunuz.",
   "onboarding.consent.analyticsTitle": "OpenBot'u geliştirmemize yardım edin",
   "onboarding.consent.analyticsDetail":
-    "Hangi özellikleri kullandığınızı paylaşın. Sohbetleriniz, dosyalarınız ve istemleriniz asla paylaşılmaz.",
+    "Özellik kullanımını hesabınıza ve e-postanıza bağlayın; ziyaret edilen web sitelerini, araç kullanımını ve günlük kurulum özetini paylaşın. Aksi halde yalnızca temel kullanım, rastgele bir kurulum kimliğiyle gönderilir. Sohbetleriniz, dosyalarınız ve istemleriniz asla gönderilmez.",
   "onboarding.consent.thanksTitle": "Teşekkürler! Ekip size bir iyilik borçlu.",
   "onboarding.consent.thanksToast": "OpenBot'u geliştirmemize yardım ettiğiniz için teşekkürler 💜",
   "onboarding.consent.thanksToastDetail": "Bunu istediğiniz zaman Ayarlar'dan değiştirebilirsiniz.",

@@ -102,6 +102,7 @@ export const messages = {
   "error.provider.modelIdCharacter": "모델 ID에 사용할 수 없는 문자가 있어요.",
   "error.provider.modelIdDuplicate": "모델 두 개의 ID가 같아요.",
   "error.provider.contextWindowInvalid": "모델의 컨텍스트 창은 {min}에서 {max} 사이의 정수 토큰 수여야 해요.",
+  "error.provider.maxOutputInvalid": "모델의 최대 출력은 {min}에서 {max} 사이의 정수 토큰 수여야 해요.",
   "error.provider.headersTooMany": "헤더가 너무 많아요.",
   "error.provider.headerNameCharacter": "헤더 이름에 HTTP에서 허용하지 않는 문자가 있어요.",
   "error.provider.headerNameTooLong": "헤더 이름이 너무 길어요.",
@@ -175,6 +176,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider}이(가) 인증된 계정을 반환하지 않았어요.",
   "error.provider.signInExpired": "{provider} 로그인이 만료되었어요. 계속하려면 다시 로그인하세요.",
   "error.provider.cliActivateFailed": "OpenBot이 관리형 CLI를 활성화할 수 없었어요.",
+  "error.provider.cliNewVersionNotStarted": "새 버전이 시작되지 않았어요.",
   "error.provider.cliBusyReconnect": "{provider} CLI가 턴을 처리하는 중이에요. 끝날 때까지 기다린 후 다시 연결하세요.",
   "error.provider.cliBusySignOut":
     "{provider} CLI가 턴을 처리하고 있습니다. 끝날 때까지 기다린 다음 연결을 해제하세요.",
@@ -251,6 +253,19 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline을 시작할 수 없었어요. 터미널에서 `cline --version`을 실행해 보세요.",
   "error.provider.clineVersionUnreadable": "Cline CLI 버전을 읽을 수 없어요.",
   "error.provider.clineSignIn": "Cline을 사용하려면 Cline으로 로그인하거나 CLINE_API_KEY를 설정하세요.",
+  "error.provider.kimiArchivePath": "Kimi 아카이브에 예상하지 못한 경로가 있어요.",
+  "error.provider.kimiChecksum": "Kimi 런타임 체크섬이 일치하지 않아요.",
+  "error.provider.kimiLicenseChecksum": "Kimi 라이선스 체크섬이 일치하지 않아요.",
+  "error.provider.kimiMissing": "Kimi가 다운로드되지 않았어요. 계속하려면 OpenBot에서 다운로드하세요.",
+  "error.provider.kimiOutdated": "Kimi CLI {version}이(가) 너무 오래되었어요. OpenBot에는 1.52.0 이상이 필요해요.",
+  "error.provider.kimiNotStarted": "Kimi를 시작할 수 없었어요. 터미널에서 `kimi --version`을 실행해 보세요.",
+  "error.provider.kimiVersionUnreadable": "Kimi CLI 버전을 읽을 수 없어요.",
+  "error.provider.kimiSignIn": "Kimi를 사용하려면 Kimi Code로 로그인하세요.",
+  "error.provider.hermesMissing": "Hermes Agent가 설치되어 있지 않습니다. 설치한 후 다시 시도하세요.",
+  "error.provider.hermesNotStarted": "Hermes Agent를 시작할 수 없습니다. 터미널에서 `hermes --version`을 실행하세요.",
+  "error.provider.hermesVersionUnreadable": "Hermes Agent 버전을 읽을 수 없습니다.",
+  "error.provider.hermesSignIn":
+    "Hermes를 사용하려면 Nous Portal로 로그인하거나 터미널에서 `hermes setup`을 실행하세요.",
   "error.provider.usageLimitReached": "계정이 사용 한도에 도달했어요.",
   "error.provider.foreignReasoning":
     "다른 계정이나 API 키가 받은 추론이라서 {provider}이(가) 이 채팅의 이전 추론을 수락하지 않았어요. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했어요. 다시 시도해 주세요.",
@@ -304,6 +319,7 @@ export const messages = {
     "이 컴퓨터에는 보안 저장소가 없어서 환경 값을 저장할 수 없어요. 제거한 후 다시 시도해 주세요.",
   "error.provider.customAgentNotSaved":
     "이 사용자 지정 에이전트는 저장되지 않았어요. 목록을 새로 고친 후 다시 시도해 주세요.",
+  "error.provider.customAgentWorkspaceOnly": "{reason}. '워크스페이스만'이 이를 막습니다. '전체 접근'을 사용해 보세요.",
   "error.provider.customAgentTooMany": "사용자 지정 에이전트는 최대 {count}개까지 저장할 수 있어요.",
   "error.provider.customAgentEnvValueMissing": "{name}의 값을 입력하세요.",
   "error.provider.off": "OpenBot에서 {provider}이(가) 꺼져 있어요. 먼저 제공자 설정에서 켜세요.",

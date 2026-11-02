@@ -1,4 +1,4 @@
-import type { ChannelSummary, HiddenAgent, SidebarLayoutAction, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import type { ChannelSummary, HiddenAgent, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
 import type { AvatarMood } from "@openbot/ui/bloub-avatar";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
@@ -11,7 +11,9 @@ import { createSignal, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
+import { applySidebarLayoutAction } from "../src/preview/mock-sidebar-layout";
 import { requireFixture, STORY_AGENTS, STORY_DIRECT_THREADS, STORY_PRESENCE, STORY_SERVERS } from "./fixtures";
+import { SettledArgs } from "./settled-args";
 
 const agentStates: Record<string, SidebarAgentState> = {
   chief: { kind: "working" },
@@ -213,7 +215,7 @@ function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
         props.onReorderPeople(memberIds);
       }}
       onMutateLayout={async (action) => {
-        setLayout((current) => applyStoryLayoutAction(current, action));
+        setLayout((current) => applySidebarLayoutAction(current, action));
         await props.onMutateLayout(action);
       }}
       onToggleSection={(sectionId) => {
@@ -228,71 +230,10 @@ function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
   );
 }
 
-function applyStoryLayoutAction(layout: SidebarLayoutSnapshot, action: SidebarLayoutAction): SidebarLayoutSnapshot {
-  const revision = layout.revision + 1;
-  if (action.type === "create") {
-    const id = crypto.randomUUID();
-    return {
-      ...layout,
-      revision,
-      sections: [...layout.sections, { id, name: action.name.trim() }],
-      order: [...layout.order, id],
-      agentAssignments: action.agentId
-        ? { ...layout.agentAssignments, [action.agentId]: id }
-        : { ...layout.agentAssignments },
-      agentOrder: [...layout.agentOrder],
-    };
-  }
-  if (action.type === "rename") {
-    return {
-      ...layout,
-      revision,
-      sections: layout.sections.map((section) =>
-        section.id === action.sectionId ? { ...section, name: action.name.trim() } : section,
-      ),
-    };
-  }
-  if (action.type === "delete") {
-    return {
-      ...layout,
-      revision,
-      sections: layout.sections.filter((section) => section.id !== action.sectionId),
-      order: layout.order.filter((sectionId) => sectionId !== action.sectionId),
-      agentAssignments: Object.fromEntries(
-        Object.entries(layout.agentAssignments).filter(([, sectionId]) => sectionId !== action.sectionId),
-      ),
-      agentOrder: [...layout.agentOrder],
-    };
-  }
-  if (action.type === "move") {
-    const order = [...layout.order];
-    const index = order.indexOf(action.sectionId);
-    const target = index + (action.direction === "up" ? -1 : 1) * (action.steps ?? 1);
-    if (index >= 0 && target >= 0 && target < order.length) {
-      const [movedSectionId] = order.splice(index, 1);
-      if (movedSectionId) order.splice(target, 0, movedSectionId);
-    }
-    return { ...layout, revision, order };
-  }
-  if (action.type === "move-agent") {
-    const agentOrder = layout.agentOrder.filter((agentId) => agentId !== action.agentId);
-    const insertionIndex = action.beforeAgentId === null ? agentOrder.length : agentOrder.indexOf(action.beforeAgentId);
-    agentOrder.splice(insertionIndex < 0 ? agentOrder.length : insertionIndex, 0, action.agentId);
-    const agentAssignments = { ...layout.agentAssignments };
-    if (action.sectionId === null) delete agentAssignments[action.agentId];
-    else agentAssignments[action.agentId] = action.sectionId;
-    return { ...layout, revision, agentAssignments, agentOrder };
-  }
-  const agentAssignments = { ...layout.agentAssignments };
-  if (action.sectionId === null) delete agentAssignments[action.agentId];
-  else agentAssignments[action.agentId] = action.sectionId;
-  return { ...layout, revision, agentAssignments };
-}
-
 const meta = {
   title: "Navigation/Sidebar",
   component: Sidebar,
-  render: (storyArgs) => <InteractiveSidebar {...storyArgs} />,
+  render: (storyArgs) => <SettledArgs>{() => <InteractiveSidebar {...storyArgs} />}</SettledArgs>,
   args,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof Sidebar>;
@@ -536,6 +477,74 @@ export const Sections: Story = {
     pinnedItems: pinnedOne,
     sectionDuplicateSupported: true,
     onDuplicateSection: fn(),
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+const folderIds = {
+  clients: "55555555-5555-4555-8555-555555555550",
+  acme: "55555555-5555-4555-8555-555555555551",
+  launch: "55555555-5555-4555-8555-555555555552",
+  northwind: "55555555-5555-4555-8555-555555555553",
+  internal: "55555555-5555-4555-8555-555555555554",
+  archive: "55555555-5555-4555-8555-555555555555",
+};
+/** Three levels: "Clients / Acme Robotics / Launch". "Archive" is empty. */
+const folderLayout: SidebarLayoutSnapshot = {
+  revision: 1,
+  sections: [
+    { id: folderIds.clients, name: "Clients" },
+    { id: folderIds.acme, name: "Acme Robotics", parentId: folderIds.clients },
+    { id: folderIds.launch, name: "Launch", parentId: folderIds.acme },
+    { id: folderIds.northwind, name: "Northwind", parentId: folderIds.clients },
+    { id: folderIds.internal, name: "Internal" },
+    { id: folderIds.archive, name: "Archive" },
+  ],
+  order: [
+    "people",
+    folderIds.clients,
+    folderIds.acme,
+    folderIds.launch,
+    folderIds.northwind,
+    folderIds.internal,
+    folderIds.archive,
+    "unassigned",
+  ],
+  agentAssignments: {
+    chief: folderIds.internal,
+    research: folderIds.acme,
+    sales: folderIds.clients,
+    "stress-agent-1": folderIds.acme,
+    "stress-agent-2": folderIds.launch,
+    "stress-agent-3": folderIds.launch,
+    "stress-agent-4": folderIds.northwind,
+    "stress-agent-5": folderIds.internal,
+  },
+  agentOrder: ["sales", "research", "stress-agent-1", "stress-agent-2", "stress-agent-3", "chief"],
+};
+const folderAgents = stressAgents.slice(0, 11);
+
+/** Folders in folders. A folder header stays at the top while its chats scroll under it. */
+export const Folders: Story = {
+  args: {
+    agents: folderAgents,
+    layout: folderLayout,
+    pinnedItems: [],
+    foldersSupported: true,
+    sectionDuplicateSupported: true,
+    onDuplicateSection: fn(),
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+/** Closed folders are a list of headers. A closed folder shows its unread count. */
+export const FoldersClosed: Story = {
+  args: {
+    agents: folderAgents,
+    layout: folderLayout,
+    pinnedItems: [],
+    foldersSupported: true,
+    collapsedSectionIds: [folderIds.acme, folderIds.internal],
   },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };

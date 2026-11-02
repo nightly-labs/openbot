@@ -11,6 +11,7 @@ import { useServerSelection } from "./features/servers/server-selection";
 import { useSettings } from "./features/settings/settings-context";
 import { StartupSplash } from "./features/startup/StartupSplash";
 import { WhatsNewOverlay } from "./features/updates/WhatsNewOverlay";
+import { QuitShortcutHint } from "./features/window/QuitShortcutHint";
 import { useI18n } from "./i18n-context";
 import { AccountLogin, FirstRunFlow, InitialSetup, LanguageStep } from "./lazy-views";
 import { usePlatform } from "./platform";
@@ -162,6 +163,7 @@ export function AppAccessGate() {
           (setup.setupState()?.completed === true || !scope.connection.hasContent)
         }
       />
+      <QuitShortcutHint />
       <Show when={splashShown()}>
         {/* Before `appInfo` loads, the build's own mode picks the logo colour. */}
         <StartupSplash

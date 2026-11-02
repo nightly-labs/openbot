@@ -1,6 +1,6 @@
 import { attachmentMimeTypeForName, playableMediaKind } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { base64ToBytes } from "@openbot/team-client/base64";
+import { base64ToBytes, bytesToBase64 } from "@openbot/team-client/base64";
 import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import { createSignal } from "solid-js";
@@ -28,6 +28,11 @@ const MEDIA_TYPES: ReadonlySet<string> = new Set([
   "video/quicktime",
   "video/mp4",
 ]);
+/**
+ * An SVG thumbnail gets a `data:` URL, not an object URL. An `<img>` does not run SVG scripts, and
+ * a `data:` document has no origin of its own, so the file cannot get the keys of this tab.
+ */
+const SVG_TYPE = "image/svg+xml";
 
 export interface WebAttachmentMedia extends AttachmentMediaSource {
   /** Revokes every object URL. */
@@ -37,6 +42,8 @@ export interface WebAttachmentMedia extends AttachmentMediaSource {
 interface Entry {
   url: string;
   bytes: number;
+  /** A `data:` URL has nothing to revoke. */
+  object: boolean;
 }
 
 /**
@@ -67,7 +74,7 @@ export function createWebAttachmentMedia(
   // No publish here: a card row calls `load` while it renders, and Solid refuses a write there.
   // `url` reads only keys of the current host, so the old host's URLs are never shown.
   const clear = () => {
-    for (const entry of entries.values()) urls.revoke(entry.url);
+    for (const entry of entries.values()) if (entry.object) urls.revoke(entry.url);
     entries.clear();
     loading.clear();
     total = 0;
@@ -89,7 +96,7 @@ export function createWebAttachmentMedia(
       if (total <= CACHE_BYTES || oldKey === key) break;
       entries.delete(oldKey);
       total -= old.bytes;
-      urls.revoke(old.url);
+      if (old.object) urls.revoke(old.url);
     }
     publish();
   };
@@ -110,7 +117,12 @@ export function createWebAttachmentMedia(
       const file = await remote.download(attachment.id);
       const bytes = base64ToBytes(file.base64);
       if (bytes.byteLength > limit || generation !== started) return false;
-      store(key, { url: urls.create(new Blob([bytes], { type })), bytes: bytes.byteLength });
+      store(
+        key,
+        type === SVG_TYPE
+          ? { url: `data:${SVG_TYPE};base64,${bytesToBase64(bytes)}`, bytes: bytes.byteLength, object: false }
+          : { url: urls.create(new Blob([bytes], { type })), bytes: bytes.byteLength, object: true },
+      );
       return true;
     } catch {
       // The card keeps its icon and its download button.
@@ -156,5 +168,5 @@ export function createWebAttachmentMedia(
 function mediaType(attachment: AttachmentSummary): string | null {
   const declared =
     attachment.mimeType.split(";")[0]?.trim().toLowerCase() || attachmentMimeTypeForName(attachment.name);
-  return MEDIA_TYPES.has(declared) ? declared : null;
+  return MEDIA_TYPES.has(declared) || declared === SVG_TYPE ? declared : null;
 }

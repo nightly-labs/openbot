@@ -65,8 +65,11 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Paylaşılan veriler bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentInstallUnsupported": "Ajan ekleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentHideUnsupported": "Ajan gizleme bu bağlantı tarafından desteklenmiyor.",
+  "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentNotificationLevelsUnsupported":
     "Bu sunucu her ajan için kendi bildirim düzeyinizi saklayamıyor. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
+  "error.team.sidebarPinsUnsupported":
+    "Bu sunucu sabitlenmiş sohbetlerinizi tüm cihazlarınız için saklayamaz. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
   "error.team.agentPublishUnsupported": "Ajan yayımlama bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentUpdateUnsupported": "Ajan güncelleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.contextResetUnsupported": "Yeni bir sohbet başlatma bu bağlantı tarafından desteklenmiyor.",

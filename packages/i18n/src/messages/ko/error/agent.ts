@@ -38,6 +38,8 @@ export const messages = {
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에서 모델 목록이 비어 있어요.',
   "error.agent.modelNotInProviderList":
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}의 목록에 없어요.',
+  "error.agent.modelVariantNotListed":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}의 목록에 없어요. {provider}가 이 모델에 제공하는 값 중 하나를 사용하세요: {models}',
   "error.agent.modelProviderMismatch": "선택한 모델이 해당 제공자의 모델이 아니에요.",
   "error.agent.modelNotListed": '모델 "{model}"을(를) 사용할 수 없어요. 사용 가능한 모델: {models}.',
   "error.agent.providerNotListed":

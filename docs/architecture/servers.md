@@ -473,6 +473,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
+| `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
@@ -577,6 +578,21 @@ agents (`NotificationMatrix` in `@openbot/ui`, and its own screen on the phone).
 notification section on any device; the server menu (desktop and web) and the agent settings show the
 current level and open the matrix. A joined server
 without the capability keeps the level of each device and shows "This computer only".
+
+`sidebar-pins-v1` keeps the agents and channels that the signed-in member pinned on this server, in
+their order, for all of their devices. The host keeps the lists in `openbot-sidebar-pins-v1.json` by
+member ID (`SidebarPinStore`); the owner's list has the key `owner`, so the desktop app of the host
+computer and the owner's phones read the same list. `set` replaces the list; `seed` saves it only when
+the member has no list yet (`updatedAt` is `null`), so the first connect after the upgrade moves the
+pins of the device to the host once, and a second device does not replace them. The read leaves out
+the agents that the member cannot see, and a save keeps their pins. After each change, the host sends
+`sidebar-pins-changed` with the whole list to each connection of that member only. A removed member's
+list is deleted. Each client keeps its own copy as a cache: the desktop and the web client in
+`localStorage` (`createSidebarPreferences`), the phone in its workspace preferences (`pinOrder`). A
+change that does not reach the host stays pending on that device and goes first at the next connect.
+The desktop shows agents and channels in one order; the phone keeps that order when it adds or removes
+a pin (`phoneSidebarPins`). Workflow pins stay on each phone. A server without the capability keeps the
+pins of each device, as before.
 
 `prompt-cache-ttl-v1` reads and sets how long Claude keeps the prompt cache of the host's agents
 (`openbot-prompt-cache-ttl-v1.json`; `5m` or `1h`, default `5m`). With `1h` the host starts each

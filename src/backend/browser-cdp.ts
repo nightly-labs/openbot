@@ -313,9 +313,8 @@ export class BrowserCdpEngine {
       clear: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
       /**
        * Which secret the fields are built for, so a fill that no user approves goes only there: every
-       * field is a password field, or every field asks for a one-time code, and no native submission of
-       * them or of the submit button is GET, which would put the value in a URL. The fingerprint check
-       * of `enter` keeps this true until the fill.
+       * field is a password field, or every field asks for a one-time code. The fingerprint check of
+       * `enter` keeps this true until the fill.
        */
       fields: { password: boolean; oneTimeCode: boolean };
     },
@@ -348,18 +347,21 @@ export class BrowserCdpEngine {
           );
         const inputs = nodes.slice(0, targets.length);
         const button = submitTarget ? nodes[targets.length] : undefined;
+        const inFrame = (index: number) =>
+          browserFailure(
+            new Error(`${labels[index]} is inside a frame. Secure input does not support frames, so use takeover.`),
+          );
         for (const [index, node] of nodes.entries()) {
-          if (node.sessionId)
-            return yield* browserFailure(
-              new Error(`${labels[index]} is inside a frame. Secure input does not support frames, so use takeover.`),
-            );
+          if (node.sessionId) return yield* inFrame(index);
           const input = index < inputs.length;
+          // A frame in the page's process has no session of its own; its document is not the top one.
           const valid = yield* this.#callOnNode(
             send,
             node.backendNodeId,
-            `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
+            `function(origin, input) { if (this.isConnected && this.ownerDocument !== document) return 'frame'; return this.isConnected && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
             [origin, input],
           );
+          if (valid === "frame") return yield* inFrame(index);
           if (valid !== true)
             return yield* browserFailure(
               new Error(
@@ -378,38 +380,20 @@ export class BrowserCdpEngine {
             return yield* browserFailure(new Error(`${labels[index]} is no longer available. Take a fresh snapshot.`));
           fingerprints.push(value);
         }
-        // A native submission that could send the value in a URL: a form whose effective method is not
-        // POST (a form with no method is GET), or a submitter in it that overrides to GET. A field with
-        // no form is sent only by the page's own script.
+        // The form method does not count: many sign-in forms have no method and send with their own
+        // script. The host blocks a navigation that would carry a vault value in its URL.
         const fields = { password: inputs.length > 0, oneTimeCode: inputs.length > 0 };
         for (const node of inputs) {
           const kind = yield* this.#callOnNode(
             send,
             node.backendNodeId,
             `function() {
-              const form = this.form;
-              const overrides = (element) => element.hasAttribute('formmethod') && element.getAttribute('formmethod').trim().toLowerCase() !== 'post';
-              const posts = !form || (form.method === 'post' && ![...form.elements].some(overrides));
-              return { password: this.type === 'password', oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), posts };
+              return { password: this.type === 'password', oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code') };
             }`,
             [],
           );
-          const posts = isDynamicRecord(kind) && kind.posts === true;
-          fields.password &&= isDynamicRecord(kind) && kind.password === true && posts;
-          fields.oneTimeCode &&= isDynamicRecord(kind) && kind.oneTimeCode === true && posts;
-        }
-        if (button) {
-          const posts = yield* this.#callOnNode(
-            send,
-            button.backendNodeId,
-            `function() {
-              if (!this.form) return true;
-              if (this.hasAttribute('formmethod')) return this.getAttribute('formmethod').trim().toLowerCase() === 'post';
-              return this.form.method === 'post';
-            }`,
-            [],
-          );
-          if (posts !== true) fields.password = fields.oneTimeCode = false;
+          fields.password &&= isDynamicRecord(kind) && kind.password === true;
+          fields.oneTimeCode &&= isDynamicRecord(kind) && kind.oneTimeCode === true;
         }
         return { inputs, button, fingerprints, fields };
       }),

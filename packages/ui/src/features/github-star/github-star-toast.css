@@ -1,0 +1,67 @@
+/* Sonner gives an unstyled toast no width, so the host takes the toaster width. */
+.github-star-toast-host {
+  width: var(--width);
+}
+
+/* The raised toast surface with the 1px ring only. */
+.github-star-toast {
+  position: relative;
+  display: grid;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-4);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: 0 0 0 1px var(--openbot-border);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-sans);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.github-star-toast-close {
+  position: absolute;
+  top: var(--openbot-space-2);
+  right: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+}
+
+/* The end padding keeps the title clear of the close button. */
+.github-star-toast-head {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding-right: var(--openbot-space-6);
+}
+
+.github-star-toast-head > strong {
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.github-star-toast-mark {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+  flex: none;
+}
+
+/* A full star fill with a darker edge, so the star also reads on the light main button. */
+.github-star-toast-star {
+  color: var(--openbot-star-edge);
+  fill: var(--openbot-star);
+}
+
+.github-star-toast-body {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-wrap: pretty;
+}
+
+/* A long label in a translation moves the buttons to a new line, not past the edge. */
+.github-star-toast-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--openbot-space-1-5);
+  margin-top: var(--openbot-space-1);
+}

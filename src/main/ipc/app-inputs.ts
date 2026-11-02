@@ -282,6 +282,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
   if (
     input !== "agent-setup" &&
     input !== "claude-install" &&
+    input !== "hermes-install" &&
     input !== "opencode-install" &&
     input !== "opencode-auth" &&
     input !== "feedback" &&
@@ -289,6 +290,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "changelog" &&
     input !== "guides" &&
     input !== "discord" &&
+    input !== "github" &&
     input !== "x" &&
     input !== "grok-bot-export" &&
     input !== "hosted-server-contact" &&

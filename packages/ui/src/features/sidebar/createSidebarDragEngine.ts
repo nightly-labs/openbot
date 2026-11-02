@@ -24,6 +24,7 @@ import {
   pointInRect,
   reorderOffsets,
   type SectionDragSlot,
+  type SidebarDragFolders,
   type SidebarDragGeometry,
   type SidebarDragPoint,
   type SidebarDragSession,
@@ -53,9 +54,16 @@ export interface SidebarDragEngineDeps {
   props: SidebarProps;
   scrollFades: ReturnType<typeof createScrollFades>;
   sectionAcceptsChat: (sectionId: string) => boolean;
+  /** The folder rules for a dragged folder. Null when the host keeps sections flat. */
+  folders: () => SidebarDragFolders | null;
+  /** Whether a section is closed, so a drag that rests on it can open it. */
+  sectionIsCollapsed: (sectionId: string) => boolean;
   visiblePinnedKeys: () => string[];
   visibleSectionIds: () => string[];
 }
+
+/** A drag that rests this long on a closed folder opens it. */
+const SPRING_OPEN_MS = 700;
 
 export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
   const {
@@ -101,12 +109,16 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
 
   let suppressSidebarClickUntil = 0;
 
+  let springOpen: { sectionId: string; timer: number } | null = null;
+
   const dragPreview = createBoundedDragPreview();
 
   function stopSidebarDragging(): void {
     if (dragTargetFrame !== null) cancelAnimationFrame(dragTargetFrame);
     if (dragScrollFrame !== null) cancelAnimationFrame(dragScrollFrame);
     window.removeEventListener("blur", stopSidebarDragging);
+    deps.getAgentList()?.removeEventListener("transitionend", remeasureAfterTransition);
+    stopSpringOpen();
     dragSession = null;
     dragPoint = null;
     dragTarget = null;
@@ -122,6 +134,36 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     sectionDragSlots.clear();
     pinnedDragSlots = [];
     dragPreview.stop();
+  }
+
+  function stopSpringOpen(): void {
+    if (springOpen) clearTimeout(springOpen.timer);
+    springOpen = null;
+  }
+
+  /** Waits to open the closed section that the drag now aims at, and forgets any other. */
+  function updateSpringOpen(target: SidebarDropTarget | null): void {
+    const sectionId = target?.kind === "section" || target?.kind === "section-into" ? target.sectionId : null;
+    if (!sectionId || !deps.sectionIsCollapsed(sectionId)) {
+      stopSpringOpen();
+      return;
+    }
+    if (springOpen?.sectionId === sectionId) return;
+    stopSpringOpen();
+    springOpen = {
+      sectionId,
+      timer: window.setTimeout(() => {
+        springOpen = null;
+        if (dragSession && deps.sectionIsCollapsed(sectionId)) deps.props.onToggleSection(sectionId);
+      }, SPRING_OPEN_MS),
+    };
+  }
+
+  /** A section that opens or closes during a drag moves the rows under it: measure them again. */
+  function remeasureAfterTransition(event: TransitionEvent): void {
+    if (!dragSession || event.propertyName !== "grid-template-rows") return;
+    measureSidebarDragTargets();
+    if (dragPoint) scheduleSidebarDragTarget(dragPoint);
   }
 
   function sidebarClickIsSuppressed(event: MouseEvent): boolean {
@@ -180,6 +222,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       previewSize: options.previewSize,
       source: event.currentTarget,
     });
+    list.addEventListener("transitionend", remeasureAfterTransition);
     window.addEventListener("blur", stopSidebarDragging, { once: true });
   }
 
@@ -232,6 +275,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       sectionAcceptsChat,
       sectionScrollDelta: scrollTop - sectionDragStartScrollTop,
       sectionSlots: sectionDragSlots,
+      folders: deps.folders(),
       session,
       sessionScrollDelta: scrollTop - session.startScrollTop,
     };
@@ -296,7 +340,9 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
         );
       }
       case "section-order": {
-        if (source.kind !== "section") return {};
+        // Folders in folders draw a drop line and move no rows: the folder's new place can be far
+        // from the one it leaves, in another folder.
+        if (source.kind !== "section" || deps.folders()) return {};
         return reorderOffsets(
           visibleSectionIds(),
           source.id,
@@ -313,6 +359,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
   function applySidebarDropTarget(target: SidebarDropTarget | null): void {
     if (sidebarDropTargetsEqual(dragTarget, target)) return;
     dragTarget = target;
+    updateSpringOpen(target);
     dragState.setDragTarget(target);
     dragState.setDragOffsets(sidebarDragOffsets(target));
   }

@@ -25,7 +25,14 @@ export function toolGuidance(
 }
 
 const BROWSER_SIGN_IN_TOOLS = new Set(["submit_secret", "list_logins", "request_takeover"]);
-const BROWSER_VAULT_TOOLS = new Set(["list_vault_items", "fill_card", "save_vault_item", "delete_vault_item"]);
+const BROWSER_VAULT_TOOLS = new Set([
+  "list_vault_items",
+  "fill_card",
+  "save_vault_item",
+  "request_vault_item",
+  "delete_vault_item",
+  "request_link_payment",
+]);
 
 /**
  * Each browser tool gets the core. A detailed section comes only with the tools that it is about, and the
@@ -52,7 +59,7 @@ function browserGuidance(tool: string, options: ToolGuidanceOptions): string[] {
       : []),
   ].join("\n");
   const vault = [
-    `Before a checkout or address form, call ${OPENBOT_BROWSER_NAMESPACE}.list_vault_items. It lists each card with its label, brand, last four digits, and expiry, never the number or security code, and each contact in full. Type contact fields yourself: fill_fields in the main frame, and type and select_option in a frame. For a card, take a fresh snapshot and call ${OPENBOT_BROWSER_NAMESPACE}.fill_card with the cardId and a target for each card field: number; securityCode when hasSecurityCode is true; expiry for one MM/YY field, or expMonth and expYear for two; and nameOnCard. Targets can be in an HTTPS payment frame, and the result names only the filled fields. The first fill of a card on a site waits for the owner's approval; when the owner declines, do not try again: ask the user or use request_takeover. After a fill, screenshots, previews, evaluate, and recording are off in the tab until it navigates. Use request_takeover for 3-D Secure, bank confirmation, or a field that fill_card refuses. Save contact info that the user asks you to keep with ${OPENBOT_BROWSER_NAMESPACE}.save_vault_item kind=contact; with an id from list_vault_items, it changes that item. You can change a login's username, and a card's label, name, expiry, and billing contact. You cannot add a login or a card. For submit_secret with method=password, pass the username, so that the user can save the password from the card. Change or delete a Vault item only when you added it or the user asks.`,
+    `Before a checkout or address form, call ${OPENBOT_BROWSER_NAMESPACE}.list_vault_items. It lists each card with its label, brand, last four digits, and expiry, never the number or security code, and each contact in full. Type contact fields yourself: fill_fields in the main frame, and type and select_option in a frame. For a card, take a fresh snapshot and call ${OPENBOT_BROWSER_NAMESPACE}.fill_card with the cardId and a target for each card field: number; securityCode when hasSecurityCode is true; expiry for one MM/YY field, or expMonth and expYear for two; and nameOnCard. Targets can be in an HTTPS payment frame, and the result names only the filled fields. The first fill of a card on a site waits for the owner's approval; when the owner declines, do not try again: ask the user or use request_takeover. After a fill, screenshots, previews, evaluate, and recording are off in the tab until it navigates. Use request_takeover for 3-D Secure, bank confirmation, or a field that fill_card refuses. Save contact info that the user asks you to keep with ${OPENBOT_BROWSER_NAMESPACE}.save_vault_item kind=contact; with an id from list_vault_items, it changes that item. You can change a login's username, and a card's label, name, expiry, and billing contact. To add a login, a card, or contact info that you do not know in full, call ${OPENBOT_BROWSER_NAMESPACE}.request_vault_item with the fields that you know. For submit_secret with method=password, pass the username, so that the user can save the password from the card. Change or delete a Vault item only when you added it or the user asks.`,
   ].join("\n");
   const fillFields = [
     "Use fill_fields only for an inspected ordinary form: 1 to 16 main-frame text input or textarea refs from one fresh snapshot revision, literal text, at most 16 KiB in total, and a 30 s deadline. It does not submit, click, press Enter, fill frames, or run JavaScript, and it refuses password, one-time-code, and card fields: use fill_card for cards, and the secure input and takeover tools for authentication, payment confirmation, or unclear decisions. A partial result lists the confirmed zero-based indices and an uncertain index. Nothing retries or undoes the input, so read a fresh snapshot before you continue. When inputCompleted is true and status is snapshot_failed, all input went in: do not fill the form again.",

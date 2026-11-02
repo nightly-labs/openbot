@@ -136,6 +136,13 @@ const CODEX_TOOLS_CONFIG = { update_plan: { enabled: true } } as const;
 export const CODEX_FEATURES_CONFIG = { "features.goals": false } as const;
 
 /**
+ * Codex gives each MCP server that is not `required` 1 second to start before a turn's first step,
+ * then leaves it out of that step with only a trace log (#4410). A cold `npx` server takes longer,
+ * mostly on Windows. A server that starts in time adds no wait.
+ */
+const CODEX_MCP_STARTUP_GRACE_MS = 10_000;
+
+/**
  * In code mode the model calls tools from an `exec` cell, and `exec` gives control back to the model
  * after its yield time while `ask_user` still waits. A model that then ends its turn expires the
  * question within seconds. Direct calls keep the turn waiting for the answer. It goes in as one
@@ -811,6 +818,7 @@ export class ThreadLifecycle {
         mcp_servers?: Record<string, CodexMcpServer | CodexDisabledMcpServer>;
         tools: typeof CODEX_TOOLS_CONFIG;
         project_doc_max_bytes: number;
+        mcp_optional_startup_grace_ms: number;
         "features.goals": false;
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
@@ -833,6 +841,7 @@ export class ThreadLifecycle {
         // Codex reads 32 KiB of `AGENTS.md` by default. A file that the editor saves in a non-Latin
         // script can be longer, and Codex would drop its end.
         project_doc_max_bytes: AGENT_INSTRUCTIONS_FILE_BYTES,
+        mcp_optional_startup_grace_ms: CODEX_MCP_STARTUP_GRACE_MS,
         "features.code_mode.direct_only_tool_namespaces": [
           ...CODEX_DIRECT_ONLY_NAMESPACES,
           ...codexMcpNamespaces(servers),

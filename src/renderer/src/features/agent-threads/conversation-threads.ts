@@ -154,7 +154,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     running: list.filter(isAgentTaskActive).length,
     conversation: open ? tasks.conversation(open.id) : undefined,
     approval,
-    acceptsFiles: tasks.local(),
+    acceptsFiles: tasks.filesAccepted(),
     onSend: (text, attachmentDraftIds) =>
       open ? tabs.send(agentId, open.id, text, attachmentDraftIds) : tabs.sendDraft(agentId, text, attachmentDraftIds),
     onStop: () => {

@@ -369,6 +369,18 @@ const PLUGIN_TEXT = {
       "prompt-new-cards": "marketplace.plugin.trello.prompt.newCards",
     },
   },
+  clickup: {
+    tagline: "marketplace.plugin.clickup.tagline",
+    description: "marketplace.plugin.clickup.description",
+    apps: {
+      "app-clickup-mcp": "marketplace.plugin.clickup.app",
+    },
+    prompts: {
+      "prompt-find-tasks": "marketplace.plugin.clickup.prompt.findTasks",
+      "prompt-create-task": "marketplace.plugin.clickup.prompt.createTask",
+      "prompt-summarize-doc": "marketplace.plugin.clickup.prompt.summarizeDoc",
+    },
+  },
   huggingface: {
     tagline: "marketplace.plugin.huggingface.tagline",
     description: "marketplace.plugin.huggingface.description",

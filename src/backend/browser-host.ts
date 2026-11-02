@@ -36,9 +36,10 @@ import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
 import {
   app,
-  type BrowserWindow,
+  BrowserWindow,
   type BrowserWindowConstructorOptions,
   clipboard,
+  type Event as ElectronEvent,
   type Input,
   Menu,
   type NativeImage,
@@ -47,6 +48,7 @@ import {
   session,
   type WebContents,
   WebContentsView,
+  type WebContentsWillFrameNavigateEventParams,
   webContents,
 } from "electron";
 import { writeJsonFileAtomically } from "./atomic-json-file";
@@ -286,11 +288,15 @@ export interface PreparedBrowserSecret {
   agentScriptedOrigin: boolean;
   /**
    * True when the target fields are built for this secret: password fields for a password, one-time
-   * code fields for an authenticator code, none in a `method="get"` form. A field that the agent
-   * chose for something else, such as a search box, could put the value in a URL the agent reads.
+   * code fields for an authenticator code. A field that the agent chose for something else, such as a
+   * search box, could put the value in a URL the agent reads.
    */
   vaultFillable: boolean;
-  submit(secret: string): Effect.Effect<"submitted" | "takeover", BrowserOperationError>;
+  /**
+   * `vault` is true for a value that no user typed. A navigation that would carry it in its URL, such as
+   * a GET form submission, is then blocked, and the user finishes in the tab.
+   */
+  submit(secret: string, vault: boolean): Effect.Effect<"submitted" | "takeover", BrowserOperationError>;
   cancel(): void;
 }
 
@@ -319,6 +325,21 @@ function runBrowserTool<Name extends BrowserToolName>(
 
 function urlOrigin(value: string): string | null {
   return URL.canParse(value) ? new URL(value).origin : null;
+}
+
+/** Whether `url` carries `secret` as typed, percent-encoded, or form-encoded. */
+function urlCarriesSecret(url: string, secret: string): boolean {
+  if (url.includes(secret)) return true;
+  try {
+    if (decodeURIComponent(url.replaceAll("+", " ")).includes(secret)) return true;
+  } catch {
+    // A malformed escape elsewhere in the URL; the query values below still decode.
+  }
+  try {
+    return [...new URL(url).searchParams.values()].some((value) => value.includes(secret));
+  } catch {
+    return false;
+  }
 }
 
 function rejectTakeoverTool(): Effect.Effect<DynamicToolResult, BrowserOperationError> {
@@ -350,6 +371,7 @@ export class BrowserHost {
   readonly #tabSessions = new Map<string, Session>();
   readonly #browserProfile: (agentId: string) => AgentBrowserProfile;
   readonly #profileExists: (profileId: string) => boolean;
+  readonly #quitShortcut: (input: Input) => boolean;
   readonly #downloadsRoot: string;
   readonly #statePath: string;
   readonly #tabs = new Map<string, BrowserHostTab>();
@@ -401,12 +423,15 @@ export class BrowserHost {
       browserProfile?: (agentId: string) => AgentBrowserProfile;
       /** Whether a named profile still exists. A tab never opens in a deleted profile. */
       profileExists?: (profileId: string) => boolean;
+      /** True when the key is part of the Mac quit shortcut, which a focused tab must not give to the menu. */
+      quitShortcut?: (input: Input) => boolean;
     } = {},
   ) {
     this.#window = window;
     this.#memoryLow = options.memoryLow ?? (() => false);
     this.#browserProfile = options.browserProfile ?? (() => ({ kind: "shared" }));
     this.#profileExists = options.profileExists ?? (() => false);
+    this.#quitShortcut = options.quitShortcut ?? (() => false);
     this.#downloadsRoot = downloadsRoot;
     this.#statePath = statePath;
     this.#session = session.fromPartition("persist:openbot-browser", { cache: true });
@@ -777,6 +802,8 @@ export class BrowserHost {
     this.#bindTabEvents(tab);
     this.#activeTabId = tab.id;
     tab.focusOnVisible = focus;
+    // A view without a document cannot hold focus, so the first commit gives it.
+    tab.focusOnCommit = focus;
     this.#syncAttachedView();
     if (!focus) restoreWebContentsFocus(previouslyFocused, tab.contents);
     this.#emitChanged();
@@ -868,9 +895,19 @@ export class BrowserHost {
       (tab) =>
         Effect.gen({ self: this }, function* () {
           tab.loadGeneration += 1;
+          // The person entered this address, so the page keeps the focus that its document takes when it
+          // commits. The view can be hidden under the address suggestions, and then `#focusTab` does nothing.
+          tab.focusOnCommit = true;
           yield* untilStopped(
             tab,
             navigateAndWait(tab.contents, () => tab.contents.loadURL(normalizedUrl, browserLoadOptions())),
+          ).pipe(
+            // A same-document load or a load that does not start leaves the flag for the next navigation.
+            Effect.ensuring(
+              Effect.sync(() => {
+                tab.focusOnCommit = false;
+              }),
+            ),
           );
           this.#focusTab(tab);
         }),
@@ -1216,7 +1253,7 @@ export class BrowserHost {
             this.#emitChanged();
           }
         },
-        submit: (secret: string) =>
+        submit: (secret: string, vault: boolean) =>
           Effect.gen({ self: this }, function* (): Effect.fn.Return<"submitted" | "takeover", BrowserOperationError> {
             if (tab.secret !== protection || protection.submitted)
               return yield* browserFailure(new Error(sourceText("error.backend.authExpired")));
@@ -1229,6 +1266,17 @@ export class BrowserHost {
             protection.running = true;
             this.#syncAttachedView();
             let kept = false;
+            let leaked = false;
+            // A blocked navigation ends the wait for one, so the user gets the tab at once.
+            let stopWaiting = () => {};
+            const contents = tab.contents;
+            const blockLeak = (event: ElectronEvent<WebContentsWillFrameNavigateEventParams>) => {
+              if (!urlCarriesSecret(event.url, secret)) return;
+              leaked = true;
+              event.preventDefault();
+              stopWaiting();
+            };
+            if (vault) contents.on("will-frame-navigate", blockLeak);
             yield* Effect.gen({ self: this }, function* () {
               yield* this.#enqueue(
                 args.tabId,
@@ -1241,11 +1289,12 @@ export class BrowserHost {
                       "Authentication submission timed out.",
                       keepQueueBlocked,
                     );
-                    if (!protection.replaced) {
+                    if (!protection.replaced && !leaked) {
                       yield* Effect.callback<void>((resume) => {
                         const contents = tab.contents;
                         const cleanup = () => {
                           clearTimeout(timer);
+                          stopWaiting = () => {};
                           contents.off("did-navigate", finish);
                           contents.off("destroyed", finish);
                         };
@@ -1254,6 +1303,7 @@ export class BrowserHost {
                           resume(Effect.void);
                         };
                         const timer = setTimeout(finish, 5_000);
+                        stopWaiting = finish;
                         contents.once("did-navigate", finish);
                         contents.once("destroyed", finish);
                         return Effect.sync(cleanup);
@@ -1290,6 +1340,7 @@ export class BrowserHost {
             }).pipe(
               Effect.ensuring(
                 Effect.sync(() => {
+                  contents.off("will-frame-navigate", blockLeak);
                   protection.running = false;
                   tab.diagnostics.clearDiagnostics();
                   if (protection.replaced) {
@@ -1305,7 +1356,7 @@ export class BrowserHost {
                 }),
               ),
             );
-            return protection.replaced || kept ? "submitted" : "takeover";
+            return !leaked && (protection.replaced || kept) ? "submitted" : "takeover";
           }),
       };
     }).pipe(
@@ -2014,7 +2065,9 @@ export class BrowserHost {
     list_logins: rejectTakeoverTool,
     list_vault_items: rejectTakeoverTool,
     save_vault_item: rejectTakeoverTool,
+    request_vault_item: rejectTakeoverTool,
     delete_vault_item: rejectTakeoverTool,
+    request_link_payment: rejectTakeoverTool,
   };
 
   readonly handleDynamicTool = Effect.fn("BrowserHost.handleDynamicTool")(function* (
@@ -2733,6 +2786,12 @@ export class BrowserHost {
         });
     });
     contents.on("before-input-event", (event, input) => {
+      // Only a tab in the main window: a Picture in Picture tab leaves Cmd+Q to the menu item, which asks
+      // first, because the hint shows in the main window and that window can be hidden.
+      if (this.#mountedViews.get(tab.view) === this.#window && this.#quitShortcut(input)) {
+        event.preventDefault();
+        return;
+      }
       if (isToggleDevToolsShortcut(input)) {
         event.preventDefault();
         this.#window.webContents.toggleDevTools();
@@ -2841,6 +2900,27 @@ export class BrowserHost {
       this.#emitChanged();
     });
     contents.on("page-title-updated", changed);
+    // Chromium gives a visible page the focus when a new document commits. A navigation that an
+    // agent or the page starts must not take the keys from a person who types in the app.
+    let focusedBeforeCommit: WebContents | null = null;
+    const restoreFocusAfterCommit = () => {
+      const previous = focusedBeforeCommit;
+      focusedBeforeCommit = null;
+      // With no focused window the app is in the background, and a restore would raise it.
+      if (previous && contents.isFocused() && BrowserWindow.getFocusedWindow())
+        restoreWebContentsFocus(previous, contents);
+    };
+    contents.on("did-start-navigation", (details) => {
+      if (!details.isMainFrame || details.isSameDocument) return;
+      focusedBeforeCommit = tab.focusOnCommit ? null : this.#focusedContentsOutsideTabs();
+      tab.focusOnCommit = false;
+    });
+    contents.on("did-navigate", restoreFocusAfterCommit);
+    // An error page also commits, but Electron reports it as a failed load. A load that a newer
+    // navigation cancels has no commit, so the tab has no focus and the newer start stays recorded.
+    contents.on("did-fail-load", (_event, _code, _description, _url, isMainFrame) => {
+      if (isMainFrame && contents.isFocused()) restoreFocusAfterCommit();
+    });
     contents.on("did-navigate", (_event, url) => {
       tab.documents += 1;
       if (tab.secretDocument) {

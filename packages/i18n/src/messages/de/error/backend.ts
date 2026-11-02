@@ -268,6 +268,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Ein Server kann bis zu {limit} Seitenleistenabschnitte haben.",
   "error.backend.sectionNameRequired": "Ein Abschnittsname ist erforderlich.",
   "error.backend.sectionNameTooLong": "Der Abschnittsname ist zu lang.",
+  "error.backend.sidebarFolderTooDeep": "Ordner können nur drei Ebenen tief sein.",
+  "error.backend.sidebarFolderMoveInvalid": "Dieser Ordner kann nicht dorthin verschoben werden.",
   "error.backend.sectionNameDuplicate": "Abschnittsnamen müssen eindeutig sein.",
   "error.backend.directMessageRequired": "Schreibe zuerst eine Nachricht.",
   "error.backend.directMessageTooLong": "Eine Direktnachricht kann bis zu {limit} Zeichen haben.",

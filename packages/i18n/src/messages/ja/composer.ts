@@ -64,6 +64,7 @@ export const messages = {
   "composer.reply.attachment": "添付ファイル",
   "composer.reply.cancel": "返信をキャンセル",
   "composer.attachment.remove": "{name} を削除",
+  "composer.attachment.adding": "{name} を追加中",
   "composer.placeholder.hostSetup": "開始するには、ホストでプロバイダーの設定を完了してください",
   "composer.placeholder.connectHost": "開始するには、ホストに接続してください",
   "composer.placeholder.hostSleeping": "このサーバーはスリープ中です。キーを押すかクリックして起動してください",

@@ -51,7 +51,13 @@ import {
 } from "./billing-errors";
 import { type BillingSales, type BillingSalesSynced, type PaymentReversal, paymentReversal } from "./billing-sales";
 import type { HostedFailure } from "./hosted-server-service";
-import { LicenseService, type LicenseSync, ordersLicense } from "./license-service";
+import {
+  type FailedLicenseInvoice,
+  LicenseService,
+  type LicenseServiceOptions,
+  type LicenseSync,
+  ordersLicense,
+} from "./license-service";
 import type { RemoteFailure } from "./remote-control-plane";
 import type { StripeTransportError } from "./stripe-client";
 import {
@@ -139,6 +145,8 @@ export interface BillingServiceOptions {
    * email goes after the webhook answers.
    */
   onFirstPlanStarted?: (start: FirstPlanStart) => void;
+  /** Runs once for each license email (`LicenseServiceOptions`). It must not throw or wait. */
+  onLicenseEmail?: LicenseServiceOptions["onLicenseEmail"];
 }
 
 /** The first plan of an account, for its welcome email. */
@@ -237,6 +245,7 @@ export class BillingService {
       analytics: this.#analytics,
       sales: this.#sales,
       ...(options.onLicenseChanged ? { onLicenseChanged: options.onLicenseChanged } : {}),
+      ...(options.onLicenseEmail ? { onLicenseEmail: options.onLicenseEmail } : {}),
     });
   }
 
@@ -809,6 +818,9 @@ export class BillingService {
         yield* this.cancelSubscription(payment.subscriptionId);
         yield* this.#syncSubscription(payment.subscriptionId);
       }
+      // Stripe tries a failed renewal again by itself. The account gets one email for each unpaid invoice.
+      const failedInvoice = synced?.kind === "license" ? failedRenewalInvoice(event, synced.currency) : null;
+      if (synced?.kind === "license" && failedInvoice) yield* this.license.paymentFailed(synced, failedInvoice);
       // License events count as sales with `product: license`. The sync reports the license lifecycle.
       const sold: BillingSalesSynced | null =
         synced?.kind === "license"
@@ -1286,6 +1298,41 @@ function isLicenseCheckout(event: StripeEvent): boolean {
   if (!event.type.startsWith("checkout.session.")) return false;
   const metadata = event.data.object.metadata;
   return isDynamicRecord(metadata) && metadata[LICENSE_METADATA.kind] === LICENSE_METADATA_KIND;
+}
+
+/**
+ * The unpaid invoice of a failed renewal or trial end (`subscription_cycle`), at Stripe's first try. Null for
+ * another event, for a later try, for the first payment, for a plan change, or for an amount in another
+ * currency. The claim of an email stays only 7 days, and Stripe tries again for longer.
+ */
+function failedRenewalInvoice(event: StripeEvent, currency: BillingCurrency): FailedLicenseInvoice | null {
+  if (event.type !== "invoice.payment_failed") return null;
+  const object = event.data.object;
+  const amountDue = object.amount_due;
+  if (
+    object.billing_reason !== "subscription_cycle" ||
+    object.attempt_count !== 1 ||
+    !isString(object.id) ||
+    !isBillingAmount(amountDue) ||
+    !isString(object.currency) ||
+    object.currency.toLowerCase() !== currency
+  ) {
+    return null;
+  }
+  const nextAttempt = object.next_payment_attempt;
+  return {
+    invoiceId: object.id,
+    amountDue,
+    nextAttemptAt: typeof nextAttempt === "number" && Number.isSafeInteger(nextAttempt) ? nextAttempt * 1000 : null,
+    invoiceUrl: stripeInvoiceUrl(object.hosted_invoice_url),
+  };
+}
+
+/** Only a Stripe invoice page goes into an email. */
+function stripeInvoiceUrl(value: unknown): string | null {
+  if (!isString(value) || !URL.canParse(value)) return null;
+  const url = new URL(value);
+  return url.protocol === "https:" && url.hostname === "invoice.stripe.com" ? url.href : null;
 }
 
 /** The subscription that an event is about, or null for an event that does not change one. */

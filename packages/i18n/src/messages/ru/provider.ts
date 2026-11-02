@@ -137,6 +137,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, по умолчанию",
   "provider.picker.effort": "Усилие",
   "provider.picker.effortLabel": "Уровень усилий агента",
+  "provider.picker.effortFixed": "{effort}, задаёт {provider}",
   "provider.picker.fast": "Быстро",
   "provider.picker.fastLabel": "Быстрый режим",
   "provider.picker.selectEffort": "Выбрать уровень усилий",
@@ -227,6 +228,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot выйдет из {provider} на этом компьютере. CLI {provider} в терминале тоже выйдет из аккаунта.",
   "provider.settings.disconnectHost": "OpenBot выйдет из {provider} на сервере.",
+  "provider.settings.versionInstalledByUser": "{version} · установлена вами",
+  "provider.settings.versionDownloaded": "{version} · загружена OpenBot",
   "provider.settings.cache": "Кэш",
   "provider.settings.promptCache": "Кэш промптов",
   "provider.settings.promptCacheDescription": "Как долго Claude хранит контекст агента в кэше между ходами.",

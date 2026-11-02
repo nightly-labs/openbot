@@ -161,4 +161,9 @@ export class AgentProcessExitError extends Error {
       cause: this.cause,
     });
   }
+
+  /** The same error with another message. The stderr line stays, for `withDetail`. */
+  withMessage(message: string): AgentProcessExitError {
+    return new AgentProcessExitError(message, this.#detail, { cause: this.cause });
+  }
 }

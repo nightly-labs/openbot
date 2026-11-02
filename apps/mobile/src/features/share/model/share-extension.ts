@@ -1,10 +1,12 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type NativeModule, requireOptionalNativeModule } from "expo";
 import { Directory, File, Paths } from "expo-file-system";
-import { renderBloubAvatar } from "@/features/live-activity/model/live-activity-bloub";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
-import { savedAgentAvatar } from "@/features/workspace/model/agent-avatar-cache";
-import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import {
+  type AvatarFileAgent as AvatarAgent,
+  agentAvatarFile,
+  syncAvatarFolder,
+} from "@/features/workspace/model/agent-avatar-file";
 
 /**
  * What the iOS share extension needs to send a share without the app. It reads this file from the
@@ -54,9 +56,12 @@ const native = requireOptionalNativeModule<ShareExtensionModule>("OpenBotShareEx
 
 /** The App Group of the app and its extensions. `app.json` names the same group. */
 const APP_GROUP = "group.run.openbot.mobile";
-/** `plugins/share-extension/ShareExtensionData.swift` reads this file. */
+/** `plugins/share-extension/ShareExtensionData.swift` and `NotificationService.swift` read this file. */
 const DIRECTORY_FILE = "share-extension.json";
-/** `plugins/share-extension/ShareView.swift` reads the pictures from this folder. */
+/**
+ * `plugins/share-extension/ShareView.swift` reads the pictures from this folder, and
+ * `plugins/notification-service/NotificationService.swift` reads them with the agents of the file.
+ */
 const AVATAR_FOLDER = "share-extension-avatars";
 /** 36 points at 3x, the size of the extension's avatar. */
 const AVATAR_PIXELS = 108;
@@ -77,36 +82,9 @@ function avatarFolder(): Directory | null {
   return container ? new Directory(container, AVATAR_FOLDER) : null;
 }
 
-/** FNV-1a, so that a file name changes when its picture changes. */
-function nameHash(value: string): string {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < value.length; index++) {
-    hash = Math.imul(hash ^ value.charCodeAt(index), 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
-type AvatarAgent = Pick<MobileAgent, "serverId" | "id" | "avatarUrl" | "avatarSeed" | "avatarHue">;
-
-/** The agent's photo when this phone has saved it, else its bloub, as the app's share sheet shows it. */
-function avatarSource(agent: AvatarAgent): { name: string; write: (file: File) => void } {
-  const photo = agent.avatarUrl ? savedAgentAvatar(agent.serverId, agent.id, agent.avatarUrl) : null;
-  if (photo) {
-    const source = new File(photo);
-    return { name: `${nameHash(photo)}${source.extension}`, write: (file) => source.copySync(file) };
-  }
-  return {
-    name: `${nameHash(`${agent.avatarSeed}|${agent.avatarHue}`)}.png`,
-    write: (file) => {
-      const image = renderBloubAvatar(agent.avatarSeed, agent.avatarHue, "idle", AVATAR_PIXELS);
-      if (image) file.writeSync(image.slice(image.indexOf(",") + 1), { encoding: "base64" });
-    },
-  };
-}
-
 /** The file name of the agent's picture. `writeShareExtensionDirectory` writes the file. */
 export function shareAvatarName(agent: AvatarAgent): string {
-  return avatarSource(agent).name;
+  return agentAvatarFile(agent, AVATAR_PIXELS).name;
 }
 
 function decodeAgent(value: unknown): ShareExtensionAgent | null {
@@ -141,19 +119,8 @@ let avatarUris = new Map<string, string>();
 function writeAvatars(directory: ShareExtensionDirectory, avatars: readonly AvatarAgent[]): void {
   const folder = avatarFolder();
   if (!folder) return;
-  folder.create({ intermediates: true, idempotent: true });
   const named = new Set(directory.agents.flatMap((agent) => agent.avatar ?? []));
-  for (const agent of avatars) {
-    const source = avatarSource(agent);
-    const file = new File(folder, source.name);
-    if (!named.has(source.name) || file.exists) continue;
-    try {
-      source.write(file);
-    } catch (error) {
-      supportLog.add("warn", "app", `Share extension avatar not saved: ${supportLogValue(error)}`);
-    }
-  }
-  for (const entry of folder.list()) if (!named.has(entry.name)) entry.delete();
+  syncAvatarFolder(folder, named, avatars, AVATAR_PIXELS, "Share extension avatar");
   avatarUris = new Map(
     directory.agents.flatMap((agent) =>
       agent.avatar ? [[shareConversationId(agent.serverId, agent.id), new File(folder, agent.avatar).uri]] : [],

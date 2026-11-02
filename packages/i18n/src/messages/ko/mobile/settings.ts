@@ -69,9 +69,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "애니메이션을 끄면 앱 전체의 움직임이 줄어들어요. 휴대전화 설정에서 동작 줄이기가 켜져 있으면 앱도 움직임을 줄여요. 그러면 아래 애니메이션은 꺼진 상태로 유지돼요.",
   "mobile.settings.animations.all": "애니메이션",
-  "mobile.settings.animations.chatZoom": "채팅 확대 전환",
-  "mobile.settings.animations.chatZoomFooter":
-    "채팅이 목록의 아바타에서 펼쳐지고 다시 그 안으로 닫혀요. 끄면 채팅이 옆에서 밀려 들어와요.",
   "mobile.settings.animations.agentFaces": "에이전트 얼굴 애니메이션",
   "mobile.settings.animations.agentFacesFooter":
     "에이전트가 작업하거나 쉬는 동안 아바타의 얼굴이 움직여요. 끄면 얼굴이 가만히 있어요.",
@@ -157,8 +154,8 @@ export const messages = {
   "mobile.settings.notifications.channelSilent": "에이전트 알림 (소리 없음)",
   "mobile.settings.privacy.title": "개인정보 보호",
   "mobile.settings.privacy.footer":
-    "이 휴대전화의 기능 사용 현황과 연결 결과를 공유해요. 메시지 내용과 파일은 전송하지 않아요.",
-  "mobile.settings.privacy.analytics": "제품 분석 공유",
+    "이 휴대전화의 기능 사용 현황과 연결 결과는 항상 OpenBot 분석 서비스로 전송돼요. 켜짐: 계정 ID 및 이메일과 함께. 꺼짐: 임의의 설치 ID만 함께. 메시지 내용과 파일은 전송하지 않아요.",
+  "mobile.settings.privacy.analytics": "분석 데이터를 내 계정에 연결",
   "mobile.settings.privacy.retry": "개인정보 설정 다시 저장",
   "mobile.settings.conversations.title": "대화",
   "mobile.settings.conversations.hiddenChats": "숨긴 채팅",

@@ -334,7 +334,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "attach_files_to_response",
     description:
-      "Attach existing local files to the current response for the user. Use this after creating screenshots, charts, diagrams, reports, ZIP archives, or other files that the user should receive. OpenBot copies each file and shows image previews in the conversation. SVG files cannot be attached; write their absolute path in the answer, and the chat shows them.",
+      "Attach existing local files to the current response for the user. Use this after creating screenshots, charts, diagrams, reports, ZIP archives, or other files that the user should receive. OpenBot copies each file and shows image previews in the conversation.",
     shape: { paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments) },
   },
   {

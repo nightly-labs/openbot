@@ -1,3 +1,4 @@
+import { rasterImageMimeType } from "@openbot/contracts/attachment-files";
 import {
   attachmentReferenceIds,
   expandAttachmentReferences,
@@ -25,7 +26,13 @@ import { playActionSound } from "../../../action-sounds";
 import { claimDictatedSend, forgetDictatedMessage } from "../../speech/speech-replies";
 import { rememberAttachmentKinds } from "../attachment-analytics";
 import { type PastedComposerCopy, rememberComposerFile } from "../composer-clipboard";
-import { copyComposerDraft, EMPTY_DRAFT, QUEUE_EDIT_STORAGE_KEY, type StoredQueueEdit } from "../composer-draft";
+import {
+  copyComposerDraft,
+  EMPTY_DRAFT,
+  insertAtSelection,
+  QUEUE_EDIT_STORAGE_KEY,
+  type StoredQueueEdit,
+} from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
@@ -43,11 +50,72 @@ export interface VoiceSend {
   onFailed: () => void;
 }
 
+/** A pasted image that is still importing. The composer shows it until the import ends. */
+export interface PastePreview {
+  id: string;
+  draftKey: string;
+  name: string;
+  /** A `data:` URL: the desktop CSP allows no `blob:` image. */
+  url: string;
+}
+
+/** A paste that imports faster than this shows no preview, so the row does not flash. */
+const PASTE_PREVIEW_DELAY_MS = 150;
+
+/** The local previews of the raster images in `files`. A file that cannot be read gets none. */
+async function readPastePreviews(files: readonly File[], draftKey: string): Promise<PastePreview[]> {
+  const previews = await Promise.all(
+    files.map(async (file) => {
+      const type = rasterImageMimeType(file.name);
+      if (!type) return null;
+      const url = await new Promise<string | null>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(new Blob([file], { type }));
+      });
+      return url ? { id: crypto.randomUUID(), draftKey, name: file.name, url } : null;
+    }),
+  );
+  return previews.filter((preview) => preview !== null);
+}
+
+type SetPastePreviews = (update: (current: readonly PastePreview[]) => readonly PastePreview[]) => void;
+
+/**
+ * Shows the local previews of a paste that imports for longer than `PASTE_PREVIEW_DELAY_MS`.
+ * `onAccepted` starts it when the files pass the limits; `stop` removes the previews.
+ */
+export function pastePreviewTracker(draftKey: string, setPastePreviews: SetPastePreviews) {
+  let importing = true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const ids = new Set<string>();
+  return {
+    onAccepted(files: readonly File[]): void {
+      timer = setTimeout(() => {
+        void readPastePreviews(files, draftKey).then((ready) => {
+          if (!importing || ready.length === 0) return;
+          for (const preview of ready) ids.add(preview.id);
+          setPastePreviews((current) => [...current, ...ready]);
+        });
+      }, PASTE_PREVIEW_DELAY_MS);
+    },
+    stop(): void {
+      importing = false;
+      clearTimeout(timer);
+      if (ids.size) setPastePreviews((current) => current.filter((preview) => !ids.has(preview.id)));
+    },
+  };
+}
+
 export interface ComposerActionsDeps {
   props: ConversationProps;
   agentReady: () => boolean;
-  attachmentBusy: () => boolean;
-  setAttachmentBusy: (busy: boolean) => void;
+  /** True while a file import for the chat, the current one by default, waits. */
+  attachmentBusy: (target?: ConversationTarget) => boolean;
+  /** Reads the chats that wait for an import again from `attachmentImports`. */
+  syncAttachmentImports: () => void;
+  setPastePreviews: SetPastePreviews;
   attachmentImports: Map<string, ConversationTarget>;
   drafts: () => Record<string, ComposerDraft>;
   setDrafts: (update: (current: Record<string, ComposerDraft>) => Record<string, ComposerDraft>) => void;
@@ -117,6 +185,7 @@ export async function importPastedFiles(
   files: ReadonlyArray<File | Promise<File>>,
   attached: () => number,
   importData: (data: AttachmentDataInput[]) => Promise<DraftAttachment[]>,
+  onAccepted?: (files: readonly File[]) => void,
 ): Promise<DraftAttachment[]> {
   const originals = await Promise.all(files);
   if (originals.length + attached() > INPUT_LIMITS.attachments)
@@ -126,6 +195,7 @@ export async function importPastedFiles(
     throw new Error(t("error.attachment.fileTooLarge"));
   if (originals.reduce((total, file) => total + file.size, 0) > ATTACHMENT_LIMITS.totalBytes)
     throw new Error(t("error.attachment.totalTooLarge"));
+  onAccepted?.(originals);
   const data = await Promise.all(
     originals.map(async (file) => ({
       name: file.name,
@@ -252,30 +322,29 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     // Puts `text` at the selection. A view can unmount during import, so newer edits stay and the
     // text goes at the end. Returns undefined when the message would be too long.
     const insert = (text: string): ComposerPasteResult | undefined => {
-      const current = deps.drafts()[key] ?? EMPTY_DRAFT;
-      const next =
-        current.text === before
-          ? `${before.slice(0, selection.start)}${text}${before.slice(selection.end)}`
-          : [current.text, text].filter(Boolean).join(" ");
-      if (next.length > INPUT_LIMITS.messageText) return;
-      deps.setDrafts((drafts) => ({ ...drafts, [key]: { ...(drafts[key] ?? EMPTY_DRAFT), text: next } }));
-      return { value: next, caret: current.text === before ? selection.start + text.length : next.length };
+      const result = insertAtSelection((deps.drafts()[key] ?? EMPTY_DRAFT).text, text, { before, selection });
+      if (result.value.length > INPUT_LIMITS.messageText) return;
+      deps.setDrafts((drafts) => ({ ...drafts, [key]: { ...(drafts[key] ?? EMPTY_DRAFT), text: result.value } }));
+      return result;
     };
     const requestId = crypto.randomUUID();
     const runtime = conversationRuntime(deps.props);
     deps.attachmentImports.set(requestId, target);
-    deps.setAttachmentBusy(true);
+    deps.syncAttachmentImports();
     deps.clearConversationError(target);
+    const previews = pastePreviewTracker(key, deps.setPastePreviews);
     try {
       const imported = await importPastedFiles(
         files,
         () => (deps.drafts()[key] ?? EMPTY_DRAFT).attachments.length,
         (data) => runtime.agent.importAttachmentData(data, target.serverId),
+        previews.onAccepted,
       );
       const accepted = await addAttachments(imported, target);
       // The draft refused the files and shows why. The text of a copy still comes, with their names.
       if (!accepted.length) return copy?.text ? insert(expandAttachmentReferences(copy.text)) : undefined;
       const replacements = new Map((copy?.sourceIds ?? []).map((id, index) => [id, accepted[index]]));
+      // Each file goes in the text where it was pasted. An image also shows in the thumbnail row.
       const text =
         copy === undefined
           ? accepted.map((attachment) => serializeAttachmentReference(attachment.name, attachment.id)).join(" ")
@@ -292,8 +361,9 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       // When the files of a copy cannot come, its text comes with their names, as in another app.
       return copy?.text ? insert(expandAttachmentReferences(copy.text)) : undefined;
     } finally {
+      previews.stop();
       deps.attachmentImports.delete(requestId);
-      deps.setAttachmentBusy(deps.attachmentImports.size > 0);
+      deps.syncAttachmentImports();
     }
   }
 
@@ -507,7 +577,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const serverId = target?.serverId ?? deps.editingServerId() ?? deps.props.server?.id ?? "local";
     const deliveryId = target?.deliveryId ?? deps.editingDeliveryId();
     const draft = draftOverride ?? deps.currentDraft();
-    if (!agentId || !deliveryId || deps.submitting() || deps.attachmentBusy()) return false;
+    if (!agentId || !deliveryId || deps.submitting() || deps.attachmentBusy({ agentId, serverId })) return false;
     const editId = deps.editingEditId();
     if (
       !editId &&
@@ -712,7 +782,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     voice?: VoiceSend,
     steer = false,
   ): Promise<boolean> {
-    if (deps.attachmentBusy()) return false;
+    if (deps.attachmentBusy(targetOverride)) return false;
     if (!draftOverride && deps.currentEditingDeliveryId()) {
       return saveQueuedMessageEdit();
     }

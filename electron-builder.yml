@@ -38,6 +38,8 @@ asarUnpack:
   - out/main/voice-speech-host.js
   # The unpacked host resolves Effect without loading any application module from asar.
   - node_modules/effect/**/*
+  # The FFI addon that stops the Dynamic Island panel from activating the app on macOS.
+  - node_modules/@koromix/koffi-*/**/*
 extraResources:
   - from: resources/managed-skills
     to: managed-skills

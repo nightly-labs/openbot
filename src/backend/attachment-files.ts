@@ -407,11 +407,6 @@ export class AttachmentFiles {
             );
           if (metadata.size > MAX_FILE_BYTES)
             return yield* attachmentFailure(new Error(`${basename(source.path)} exceeds the 100 MB limit.`));
-          // SVG is not an attachment type (see `attachmentMimeTypeForName`), but the chat shows a named one.
-          if (extname(source.path).toLowerCase() === ".svg")
-            return yield* attachmentFailure(
-              new Error(sourceText("error.backend.attachSvg", { name: basename(source.path) })),
-            );
           yield* attachmentSync(() => assertSupportedAttachmentName(source.path));
           return { ...source, size: metadata.size };
         }),
@@ -697,9 +692,12 @@ function attachmentMetadata(
   explicitMimeType?: string,
 ): { kind: AttachmentKind; mimeType: string; previewKind: AttachmentPreviewKind } {
   const inferred = attachmentMimeTypeForName(name);
-  // Media and archives stay opaque files even if an importer supplies a preview MIME type.
+  // Media, archives and SVG keep the type of their name even if an importer supplies another MIME type.
   const mimeType =
-    inferred.startsWith("audio/") || inferred.startsWith("video/") || inferred === "application/zip"
+    inferred.startsWith("audio/") ||
+    inferred.startsWith("video/") ||
+    inferred === "application/zip" ||
+    inferred === "image/svg+xml"
       ? inferred
       : explicitMimeType?.trim() || inferred;
   const previewKind: AttachmentPreviewKind = mimeType.startsWith("image/")
@@ -712,7 +710,9 @@ function attachmentMetadata(
         mimeType.startsWith("text/") || mimeType === "application/json" || mimeType === "message/rfc822"
         ? "text"
         : "none";
-  return { kind: previewKind === "image" ? "image" : "file", mimeType, previewKind };
+  // Providers take only raster image blocks, so an SVG is a file that the agent reads as text.
+  const svg = mimeType.split(";", 1)[0]?.trim().toLowerCase() === "image/svg+xml";
+  return { kind: previewKind === "image" && !svg ? "image" : "file", mimeType, previewKind };
 }
 
 function attachmentPreviewUrl(id: string): string {

@@ -43,6 +43,8 @@ export const messages = {
   "onboarding.provider.googlePlan": "Google AI Pro または Ultra プラン",
   "onboarding.provider.cursorPlan": "Cursor プランまたは API キー",
   "onboarding.provider.clineAccount": "Cline アカウントで無料モデル",
+  "onboarding.provider.kimiAccount": "Kimi Code アカウントで Kimi モデル",
+  "onboarding.provider.hermesNous": "Nous Portal プランまたはお使いの Hermes の設定",
   "onboarding.provider.inceptionKey": "Inception API キーで Mercury モデル",
   "onboarding.provider.deepseekKey": "DeepSeek API キーで使う DeepSeek モデル",
   "onboarding.provider.openrouterKey": "OpenRouter API キーで使う多数のモデル",
@@ -86,7 +88,8 @@ export const messages = {
   "onboarding.choice.startFreeInstead": "代わりに無料で始める",
   "onboarding.consent.notice": "続行すると、{terms}に同意し、{privacy}を確認したものとみなされます。",
   "onboarding.consent.analyticsTitle": "OpenBot の改善に協力する",
-  "onboarding.consent.analyticsDetail": "使用している機能を共有します。チャット、ファイル、プロンプトは共有しません。",
+  "onboarding.consent.analyticsDetail":
+    "機能の使用状況をアカウントとメールアドレスに関連付け、閲覧した Web サイト、ツールの使用状況、セットアップの日次概要を共有します。関連付けない場合は、基本的な使用状況のみがランダムなインストール ID とともに送信されます。チャット、ファイル、プロンプトは送信しません。",
   "onboarding.consent.thanksTitle": "ありがとうございます！チーム一同、感謝しています。",
   "onboarding.consent.thanksToast": "OpenBot の改善にご協力いただきありがとうございます 💜",
   "onboarding.consent.thanksToastDetail": "この設定は「設定」からいつでも変更できます。",

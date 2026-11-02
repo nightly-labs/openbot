@@ -243,6 +243,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Bir sunucu en fazla {limit} kenar çubuğu bölümüne sahip olabilir.",
   "error.backend.sectionNameRequired": "Bölüm adı gereklidir.",
   "error.backend.sectionNameTooLong": "Bölüm adı çok uzun.",
+  "error.backend.sidebarFolderTooDeep": "Klasörler en fazla üç seviye derinliğinde olabilir.",
+  "error.backend.sidebarFolderMoveInvalid": "Bu klasör oraya taşınamaz.",
   "error.backend.sectionNameDuplicate": "Bölüm adları benzersiz olmalıdır.",
   "error.backend.directMessageRequired": "Önce bir mesaj yazın.",
   "error.backend.directMessageTooLong": "Doğrudan mesaj en fazla {limit} karakter içerebilir.",

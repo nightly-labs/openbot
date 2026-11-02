@@ -126,15 +126,18 @@ export function createWebConversationRuntime(
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const files = createWebAttachmentFiles(remote, hostId);
   let importing: { cancelled: boolean; serverId: string } | undefined;
-  // A new upload cancels the one in flight (`uploadGeneration` in web-runtime.ts), so imports run one at a time.
-  let uploads: Promise<void> = Promise.resolve();
-  function oneAtATime<T>(run: () => Promise<T>): Promise<T> {
-    const result = uploads.then(run);
-    uploads = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
+  // A new upload cancels the one in flight (`uploadGeneration` in web-runtime.ts), so one import runs
+  // at a time. Each chat sends on its own while another chat imports, so a second import fails, as a
+  // second upload does on desktop. A queued import would land in the chat that is open when it
+  // starts, and the stop button would end the first one.
+  let importBusy = false;
+  async function runImport<T>(run: () => Promise<T>): Promise<T> {
+    importBusy = true;
+    try {
+      return await run();
+    } finally {
+      importBusy = false;
+    }
   }
   async function cancelImportFiles() {
     if (!importing) return;
@@ -188,8 +191,9 @@ export function createWebConversationRuntime(
   return {
     agent: {
       ...messageLinks,
-      importAttachmentData: (data, serverId) =>
-        oneAtATime(async () => {
+      importAttachmentData: async (data, serverId) => {
+        if (importBusy) throw new Error(currentText().t("error.remote.attachmentBusy"));
+        return runImport(async () => {
           if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
           const files = data.map((file) => new File([new Uint8Array(file.bytes)], file.name, { type: file.mimeType }));
           // The composer's stop button reaches a paste through `importing`, as it reaches a picked file.
@@ -207,7 +211,8 @@ export function createWebConversationRuntime(
           } finally {
             importing = undefined;
           }
-        }),
+        });
+      },
       discardDraftAttachment: (id) => remote.discard(id),
       downloadAttachments: unavailable,
       editQueuedMessage: async (input, serverId) => {
@@ -294,13 +299,17 @@ export function createWebConversationRuntime(
     visualPage: files.visualPage,
     async importFiles(files) {
       if (files.length === 0) return;
-      // A picked or dropped file waits for the upload in flight; it does not start while another one runs.
-      await oneAtATime(async () => {
-        const serverId = hostId();
+      const serverId = hostId();
+      const requestId = crypto.randomUUID();
+      // `started` names the chat on screen, so it comes before any wait.
+      emit({ type: "started", serverId, requestId });
+      if (importBusy) {
+        emit({ type: "error", serverId, requestId, message: currentText().t("error.remote.attachmentBusy") });
+        return;
+      }
+      await runImport(async () => {
         const job = { cancelled: false, serverId };
         importing = job;
-        const requestId = crypto.randomUUID();
-        emit({ type: "started", serverId, requestId });
         try {
           if (files.length > INPUT_LIMITS.attachments)
             throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));

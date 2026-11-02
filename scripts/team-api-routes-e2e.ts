@@ -108,6 +108,7 @@ import {
   ROUTINE_RESULTS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
+import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -138,6 +139,7 @@ import { createBrowserProfileService } from "../src/main/browser-profile-service
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
+import { SidebarPinStore } from "../src/main/sidebar-pin-store";
 import type { TeamApiAgents, TeamApiBrowser, TeamApiMailbox } from "../src/main/team-api/dependencies";
 import { isPeerHiddenProvider } from "../src/main/team-api/provider-visibility";
 import { TeamApiServer } from "../src/main/team-api-server";
@@ -637,6 +639,9 @@ const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
 // The real store of the levels that each member chose for each agent, on a temporary file.
 const agentLevelsFile = join(root, "agent-notification-levels.json");
 const agentLevels = new AgentNotificationLevelStore(agentLevelsFile);
+// The real store of the chats that each member pinned, on a temporary file.
+const sidebarPinsFile = join(root, "sidebar-pins.json");
+const sidebarPinStore = new SidebarPinStore(sidebarPinsFile);
 // The host's endpoints in memory. The one on Pi has a header and a context window that stay on the host.
 let customEndpoints: CustomProviderSummary[] = [
   {
@@ -923,6 +928,12 @@ try {
           record("resetProviderUsage", { provider, accountId });
           return "reset" as const;
         }),
+    },
+    sidebarPins: {
+      snapshot: (memberId, hiddenIds) => sidebarPinStore.snapshot(memberId, hiddenIds),
+      set: (memberId, items, hiddenIds) => sidebarPinStore.set(memberId, items, hiddenIds),
+      seed: (memberId, items, hiddenIds) => sidebarPinStore.seed(memberId, items, hiddenIds),
+      subscribe: (listener) => sidebarPinStore.subscribe(listener),
     },
     agentNotificationLevels: {
       snapshot: (memberId, hiddenIds) => agentLevels.snapshot(memberId, hiddenIds),
@@ -1447,12 +1458,50 @@ try {
     const hiddenBy = (protocol: number) =>
       AGENT_PROVIDERS.filter((provider) => isPeerHiddenProvider(provider, protocol));
     const expectedHidden: Record<number, readonly string[]> = {
-      1: ["opencode", "antigravity", "acp", "cursor", "cline", "pi", "muse", "inception", "deepseek", "openrouter"],
-      3: ["opencode", "antigravity", "acp", "cursor", "cline", "pi", "muse", "inception", "deepseek", "openrouter"],
-      4: ["antigravity", "acp", "cursor", "cline", "pi", "muse", "inception", "deepseek", "openrouter"],
-      5: ["cursor", "cline", "pi", "muse", "inception", "deepseek", "openrouter"],
-      6: ["pi", "muse", "inception", "deepseek", "openrouter"],
-      7: ["inception", "deepseek", "openrouter"],
+      1: [
+        "opencode",
+        "antigravity",
+        "acp",
+        "cursor",
+        "cline",
+        "pi",
+        "muse",
+        "inception",
+        "deepseek",
+        "openrouter",
+        "kimi",
+        "hermes",
+      ],
+      3: [
+        "opencode",
+        "antigravity",
+        "acp",
+        "cursor",
+        "cline",
+        "pi",
+        "muse",
+        "inception",
+        "deepseek",
+        "openrouter",
+        "kimi",
+        "hermes",
+      ],
+      4: [
+        "antigravity",
+        "acp",
+        "cursor",
+        "cline",
+        "pi",
+        "muse",
+        "inception",
+        "deepseek",
+        "openrouter",
+        "kimi",
+        "hermes",
+      ],
+      5: ["cursor", "cline", "pi", "muse", "inception", "deepseek", "openrouter", "kimi", "hermes"],
+      6: ["pi", "muse", "inception", "deepseek", "openrouter", "kimi", "hermes"],
+      7: ["inception", "deepseek", "openrouter", "kimi", "hermes"],
       8: [],
       9: [],
     };
@@ -2592,6 +2641,233 @@ try {
           },
         ]),
       [bobEvents, adaEvents],
+    );
+  }
+
+  // ---- Pinned chats (sidebar-pins-v1) ----
+  {
+    const capabilities = [SIDEBAR_PINS_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises sidebar-pins-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(SIDEBAR_PINS_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(SIDEBAR_PINS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", SIDEBAR_PINS_ROUTES.read, { token: bobToken, json: {} });
+    check(
+      "the pinned chats routes without the capability get 400 sidebarPinsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.sidebarPinsUnsupported")),
+      summary(unsupported),
+    );
+    const first = await call("POST", SIDEBAR_PINS_ROUTES.read, { token: bobToken, json: {}, capabilities });
+    const seeded = await call("POST", SIDEBAR_PINS_ROUTES.seed, {
+      token: bobToken,
+      json: {
+        items: [
+          { kind: "agent", id: "agent-ada" },
+          { kind: "channel", id: "channel-plans" },
+        ],
+      },
+      capabilities,
+    });
+    const seededAgain = await call("POST", SIDEBAR_PINS_ROUTES.seed, {
+      token: bobToken,
+      json: { items: [{ kind: "agent", id: "agent-oc" }] },
+      capabilities,
+    });
+    check(
+      "a member without pins reads an empty list with no time, and the first seed saves the pins of the device once",
+      first.status === 200 &&
+        isDeepStrictEqual(first.body, { items: [], updatedAt: null }) &&
+        seeded.status === 200 &&
+        isDynamicRecord(seeded.body) &&
+        isDeepStrictEqual(seeded.body.items, [
+          { kind: "agent", id: "agent-ada" },
+          { kind: "channel", id: "channel-plans" },
+        ]) &&
+        typeof seeded.body.updatedAt === "string" &&
+        isDeepStrictEqual(seededAgain.body, seeded.body),
+      [summary(first), summary(seeded), summary(seededAgain)],
+    );
+    const replaced = await call("POST", SIDEBAR_PINS_ROUTES.set, {
+      token: bobToken,
+      json: {
+        items: [
+          { kind: "channel", id: "channel-plans" },
+          { kind: "agent", id: "agent-oc" },
+          { kind: "agent", id: "agent-pi" },
+        ],
+      },
+      capabilities,
+    });
+    const adminRead = await call("POST", SIDEBAR_PINS_ROUTES.read, { token: adaToken, json: {}, capabilities });
+    check(
+      "a member replaces their pins in a new order, and another member does not see them",
+      replaced.status === 200 &&
+        isDynamicRecord(replaced.body) &&
+        isDeepStrictEqual(replaced.body.items, [
+          { kind: "channel", id: "channel-plans" },
+          { kind: "agent", id: "agent-oc" },
+          { kind: "agent", id: "agent-pi" },
+        ]) &&
+        isDeepStrictEqual(adminRead.body, { items: [], updatedAt: null }),
+      [summary(replaced), summary(adminRead)],
+    );
+    // A protocol 6 peer does not see the Pi agent: the read leaves its pin out, and a save keeps it.
+    const olderRead = await call("POST", SIDEBAR_PINS_ROUTES.read, {
+      token: bobToken,
+      json: {},
+      capabilities,
+      protocol: 6,
+    });
+    const olderSet = await call("POST", SIDEBAR_PINS_ROUTES.set, {
+      token: bobToken,
+      json: { items: [{ kind: "agent", id: "agent-oc" }] },
+      capabilities,
+      protocol: 6,
+    });
+    const afterOlder = await call("POST", SIDEBAR_PINS_ROUTES.read, { token: bobToken, json: {}, capabilities });
+    check(
+      "a peer that cannot see an agent does not read its pin, and its save keeps that pin",
+      isDynamicRecord(olderRead.body) &&
+        isDeepStrictEqual(olderRead.body.items, [
+          { kind: "channel", id: "channel-plans" },
+          { kind: "agent", id: "agent-oc" },
+        ]) &&
+        isDynamicRecord(olderSet.body) &&
+        isDeepStrictEqual(olderSet.body.items, [{ kind: "agent", id: "agent-oc" }]) &&
+        isDynamicRecord(afterOlder.body) &&
+        isDeepStrictEqual(afterOlder.body.items, [
+          { kind: "agent", id: "agent-oc" },
+          { kind: "agent", id: "agent-pi" },
+        ]),
+      [summary(olderRead), summary(olderSet), summary(afterOlder)],
+    );
+    const invalid = await Promise.all(
+      [
+        {
+          items: [
+            { kind: "agent", id: "agent-oc" },
+            { kind: "agent", id: "agent-oc" },
+          ],
+        },
+        { items: [{ kind: "workflow", id: "workflow-1" }] },
+        { items: [], extra: true },
+        { items: [{ kind: "agent", id: "" }] },
+      ].map((json) => call("POST", SIDEBAR_PINS_ROUTES.set, { token: bobToken, json, capabilities })),
+    );
+    const afterInvalid = await call("POST", SIDEBAR_PINS_ROUTES.read, { token: bobToken, json: {}, capabilities });
+    check(
+      "a duplicate pin, an unknown kind, an extra field and an empty id get 400 and change nothing",
+      invalid.every((reply) => reply.status === 400) && isDeepStrictEqual(afterInvalid.body, afterOlder.body),
+      [invalid.map(summary), summary(afterInvalid)],
+    );
+    // The file has one entry: the member that pinned. A restart reads it.
+    const saved = JSON.parse(readFileSync(sidebarPinsFile, "utf8"));
+    const pinKeys = isDynamicRecord(saved) && isDynamicRecord(saved.members) ? Object.keys(saved.members) : [];
+    const reloaded = new SidebarPinStore(sidebarPinsFile);
+    await runCauseEffect(reloaded.load());
+    check(
+      "the host keeps the pins after a restart",
+      pinKeys.length === 1 &&
+        isDeepStrictEqual(
+          pinKeys.map((key) => reloaded.snapshot(key)),
+          [afterOlder.body],
+        ),
+      pinKeys.map((key) => reloaded.snapshot(key)),
+    );
+
+    // A change on one device reaches the other devices of the same member at once, and no other member.
+    const openPinsSocket = async (token: string) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${token}`,
+      ]);
+      const events: unknown[] = [];
+      const waiters = new Set<() => void>();
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "sidebar-pins-changed") {
+          events.push(value);
+          for (const wake of waiters) wake();
+        }
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities }));
+      const arrived = (deadlineMs: number) =>
+        new Promise<boolean>((resolveArrived) => {
+          if (events.length > 0) return resolveArrived(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveArrived(false);
+          }, deadlineMs);
+          const wake = () => {
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveArrived(true);
+          };
+          waiters.add(wake);
+        });
+      return { socket, events, arrived };
+    };
+    // The host reads the capabilities of the socket from its first message, and no answer says that it
+    // did, so a change can come before it. Each attempt saves a different list, so each one is a change.
+    const changeUntilEvent = async (
+      device: Awaited<ReturnType<typeof openPinsSocket>>,
+      token: string,
+      lists: { kind: string; id: string }[][],
+    ) => {
+      for (const items of lists) {
+        await call("POST", SIDEBAR_PINS_ROUTES.set, { token, json: { items }, capabilities });
+        if (await device.arrived(5_000)) return items;
+      }
+      return null;
+    };
+    // A protocol 9 save replaces the pin of the Pi agent too, so the events below hold only what was sent.
+    await call("POST", SIDEBAR_PINS_ROUTES.set, { token: bobToken, json: { items: [] }, capabilities });
+    const bobOther = await openPinsSocket(bobToken);
+    const adaDevice = await openPinsSocket(adaToken);
+    // Channel pins: these sockets send no protocol capability, so the host leaves out the OpenCode agent.
+    const bobLists = [
+      [{ kind: "channel", id: "channel-bob-1" }],
+      [{ kind: "channel", id: "channel-bob-2" }],
+      [
+        { kind: "channel", id: "channel-bob-1" },
+        { kind: "channel", id: "channel-bob-2" },
+      ],
+    ];
+    const bobSent = await changeUntilEvent(bobOther, bobToken, bobLists);
+    const adaLists = [
+      [{ kind: "channel", id: "channel-ada-1" }],
+      [{ kind: "channel", id: "channel-ada-2" }],
+      [
+        { kind: "channel", id: "channel-ada-1" },
+        { kind: "channel", id: "channel-ada-2" },
+      ],
+    ];
+    const adaSent = await changeUntilEvent(adaDevice, adaToken, adaLists);
+    const bobEvent = bobOther.events[0];
+    const adaEvent = adaDevice.events[0];
+    bobOther.socket.close();
+    adaDevice.socket.close();
+    check(
+      "a change of a member's pins reaches the other devices of that member at once, and no other member",
+      bobSent !== null &&
+        adaSent !== null &&
+        isDynamicRecord(bobEvent) &&
+        // An event of an earlier attempt can come late, so the first event holds one of the sent lists.
+        bobLists.some((items) => isDeepStrictEqual(bobEvent.items, items)) &&
+        typeof bobEvent.updatedAt === "string" &&
+        isDynamicRecord(adaEvent) &&
+        // Ada's own change is her first event: an event of bob would have come before it on her socket.
+        adaLists.some((items) => isDeepStrictEqual(adaEvent.items, items)),
+      [bobEvent, adaEvent],
     );
   }
 

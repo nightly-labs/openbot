@@ -45,13 +45,13 @@ interface OpenCodeProviderOptions {
 
 /**
  * One model of an endpoint. OpenCode refuses a `limit` without `output`, and then lists none of the
- * endpoint's models. `output: 0` keeps OpenCode's own output budget, which it also cuts to the room
- * the context leaves. Checked in OpenCode 2.1.4: a model with no `limit` reports 200K context, and
- * `{ context: 32768, output: 0 }` sent `max_completion_tokens: 21071`.
+ * endpoint's models. `output: 0` is not a safe marker: OpenCode 2.2.5 then asks for its own 32,000-token
+ * fallback, which a model with a smaller output cap refuses on every turn (#4234). So the entry always
+ * writes a real output limit, from {@link customModelOutputLimit}.
  */
 interface OpenCodeModelEntry {
   readonly name: string;
-  readonly limit?: { readonly context: number; readonly output: 0 };
+  readonly limit?: { readonly context: number; readonly output: number };
 }
 
 /** One entry under OpenCode's own `provider` key, keyed there by the endpoint's id. */
@@ -187,10 +187,26 @@ function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
   };
 }
 
+/** The output limit for a model with no saved `maxOutput`. Pi uses the same default. */
+const DEFAULT_OUTPUT_LIMIT = 16_384;
+
+/**
+ * The output limit to write for a custom model: the saved `maxOutput`, or else a guess that a model
+ * with a small output cap still accepts. An output cap has no relation to the context window, so the
+ * guess only takes half the window when the window is small: the prompt needs the other half.
+ */
+export function customModelOutputLimit(model: CustomProviderModel, contextWindow: number): number {
+  return model.maxOutput ?? Math.min(DEFAULT_OUTPUT_LIMIT, Math.floor(contextWindow / 2));
+}
+
 function modelEntry(model: CustomProviderModel): OpenCodeModelEntry {
+  // With no window, the entry keeps OpenCode's own defaults, and a saved cap is not written.
   return model.contextWindow === undefined
     ? { name: model.name }
-    : { name: model.name, limit: { context: model.contextWindow, output: 0 } };
+    : {
+        name: model.name,
+        limit: { context: model.contextWindow, output: customModelOutputLimit(model, model.contextWindow) },
+      };
 }
 
 /**

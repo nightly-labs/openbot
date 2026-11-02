@@ -67,8 +67,9 @@ commands, and release checks.
 
 Browser chat pages, drafts, file bytes, and chat visibility preferences stay in memory. A protected
 cookie holds the account credential. Local storage holds account-scoped trusted host public keys,
-the shared file panel's width, and for each account and host the pinned item ids, collapsed section
-ids and selected channel id, not chat content. The channel UI takes a `ChannelsPort` runtime; its
+the shared file panel's width, and for each account and host the pinned item ids (a copy of the list
+that a host with `sidebar-pins-v1` keeps), collapsed section ids and selected channel id, not chat
+content. The channel UI takes a `ChannelsPort` runtime; its
 desktop default is the preload API. A Web Lock permits one live tab per account
 and host because the existing control plane reuses that credential's logical host session.
 Host switches discard the prior host's chat state. Temporary connection loss keeps drafts; a
@@ -87,6 +88,13 @@ and hashes the archive; OpenBot never extracts it. Remote support is additive th
 
 MP4 attachments use the MP3 and MOV contract with `video/mp4`. Remote support is additive through
 the `mp4-attachments` capability, because a host with only `media-attachments` refuses MP4.
+
+SVG attachments are stored as `image/svg+xml` with `kind: "file"` and `previewKind: "image"`. The
+type comes from the file extension. Providers take only raster image blocks, so delivery sends the
+path as a mention and the agent reads the SVG text. The attachment schemes serve SVG with a `sandbox`
+policy. The browser client shows an SVG thumbnail from a `data:` URL, never from an object URL: an
+object URL has the origin of the app. Remote support is additive through the
+`svg-attachments` capability, which only protocol 9 peers get.
 
 ## Browser tool execution
 
@@ -379,6 +387,14 @@ A password can also go to the Vault of the server that runs the agent. The local
 `saveToVault` over IPC. A remote client sends the same submit on `browser-secret-vault-v1`, which
 only an owner or admin can use; the released route keeps its fields. The card shows the save box on
 every password request, and for a member or an older host it shows the box off with the reason.
+
+`openbot_browser.request_vault_item` asks the user to add a login, a card or contact info that the
+Vault does not have. The attention registry surfaces a `form` UI block with `uiBlock.vault.kind`.
+The agent can fill in the fields that are not secret; the password, card number and security code
+are secret form fields, so the stored block never holds them. The desktop card opens the Vault
+dialog with the agent's values. The host saves the answer through `VaultItems.addEntered` (owner or
+admin only) and answers the tool with only the item's id, kind and name. The `ui-blocks-v1` wire
+leaves out `vault`, so a remote client shows the ordinary form. Messaging threads refuse the tool.
 
 The browser host owns the protection state and serializes entry behind existing browser work. CDP
 resolves fields before consent and checks the document and origin again before entry. The host

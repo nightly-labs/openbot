@@ -29,6 +29,7 @@ import {
 } from "@/features/auth/api/mobile-auth";
 import { deleteAgentAvatars } from "@/features/workspace/model/agent-avatar-cache";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
+import { deleteWorkspaceCaches } from "@/features/workspace/model/workspace-cache";
 import { queryClient } from "@/shared/lib/query-client";
 import { untilForeground } from "@/shared/lib/until-foreground";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
@@ -68,6 +69,8 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       // The hosted server plans keep the last answer for the life of the app; a new session drops it.
       queryClient.removeQueries({ queryKey: queryKeys.hostedServerPlans() });
     }
+    // Sign-out, and a session that the account service refused or that expired, delete the phone's copy.
+    if (sessionRef.current && !session) void deleteWorkspaceCaches();
     mobileAnalytics.setUser(session?.user ?? null);
     sessionRef.current = session;
     setSessionState(session);

@@ -43,6 +43,8 @@ export const messages = {
   "onboarding.provider.googlePlan": "Тариф Google AI Pro или Ultra",
   "onboarding.provider.cursorPlan": "Тариф Cursor или API-ключ",
   "onboarding.provider.clineAccount": "Бесплатные модели с аккаунтом Cline",
+  "onboarding.provider.kimiAccount": "Модели Kimi с аккаунтом Kimi Code",
+  "onboarding.provider.hermesNous": "Подписка Nous Portal или ваша настройка Hermes",
   "onboarding.provider.inceptionKey": "Модели Mercury с ключом API Inception",
   "onboarding.provider.deepseekKey": "Модели DeepSeek с ключом API DeepSeek",
   "onboarding.provider.openrouterKey": "Множество моделей с ключом API OpenRouter",
@@ -84,7 +86,7 @@ export const messages = {
   "onboarding.consent.notice": "Продолжая, вы принимаете {terms}. Подробнее о данных: {privacy}.",
   "onboarding.consent.analyticsTitle": "Помогите улучшить OpenBot",
   "onboarding.consent.analyticsDetail":
-    "Делитесь тем, какими функциями вы пользуетесь. Ваши чаты, файлы и промпты — никогда.",
+    "Связывайте использование функций с аккаунтом и почтой и делитесь посещёнными сайтами, использованием инструментов и ежедневной сводкой настройки. Без этого отправляется только базовое использование, со случайным ID установки. Ваши чаты, файлы и промпты — никогда.",
   "onboarding.consent.thanksTitle": "Спасибо! Команда у вас в долгу.",
   "onboarding.consent.thanksToast": "Спасибо, что помогаете улучшать OpenBot 💜",
   "onboarding.consent.thanksToastDetail": "Это можно изменить в любой момент в настройках.",

@@ -82,6 +82,12 @@ export function createSidebarDragStateStore(deps: {
     return target?.kind === "section-order" ? target.target : null;
   });
 
+  /** The folder a dragged folder would go into. */
+  const sectionIntoId = createMemo(() => {
+    const target = drag.target;
+    return target?.kind === "section-into" ? target.sectionId : null;
+  });
+
   function draggedSidebarItem(): SidebarPinnedItem | null {
     const chatId = draggedChatId();
     const kind = chatId ? chatKind(chatId) : null;
@@ -111,7 +117,8 @@ export function createSidebarDragStateStore(deps: {
   function sectionDragClasses(sectionId: string) {
     const target = sectionDropTarget();
     return {
-      "sidebar-section-agent-drop-target": chatDropSectionId() === sectionId && sectionAcceptsChat(sectionId),
+      "sidebar-section-agent-drop-target":
+        (chatDropSectionId() === sectionId && sectionAcceptsChat(sectionId)) || sectionIntoId() === sectionId,
       "sidebar-section-dragging": draggedSectionId() === sectionId,
       "sidebar-drag-shifting": dragOffset(sectionId).y !== 0,
       "sidebar-section-drop-before":
