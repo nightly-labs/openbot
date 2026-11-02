@@ -90,6 +90,12 @@ export class ContextCompaction {
   readonly #rotatesSession: ContextCompactionOptions["rotatesSession"];
   readonly #isStopping: () => boolean;
   readonly #budgets = new Map<string, ThreadContextBudget>();
+  /**
+   * The post-compaction fill of a native compaction that arrived before this thread had a budget.
+   * A first turn can compact before `thread/tokenUsage/updated` creates the budget; the next budget
+   * takes this value instead of losing it.
+   */
+  readonly #pendingNativeCompacted = new Map<string, number>();
   /** The agent of each provider thread that compacts, and the client that runs it once `request` sends it. */
   readonly #compacting = new Map<string, { agentId: string; client: AgentClient | null }>();
   readonly #refusals = new Map<string, RefusalHold>();
@@ -261,13 +267,15 @@ export class ContextCompaction {
     const contextWindow = finiteNumberOrNull(usage?.modelContextWindow);
     if (usedTokens === null || usedTokens < 0 || contextWindow === null || contextWindow <= 0) return;
 
+    const lastCompactedTokens = this.#pendingNativeCompacted.get(threadId) ?? null;
+    this.#pendingNativeCompacted.delete(threadId);
     const budget = this.#budgets.get(threadId) ?? {
       usedTokens,
       contextWindow,
       pending: false,
       phase: "idle" as const,
       compactionTurnId: null,
-      lastCompactedTokens: null,
+      lastCompactedTokens,
     };
     budget.usedTokens = usedTokens;
     budget.contextWindow = contextWindow;
@@ -397,11 +405,16 @@ export class ContextCompaction {
   }
 
   markCompacted(threadId: string, usedTokens?: number): void {
+    const afterTokens =
+      usedTokens !== undefined && Number.isFinite(usedTokens) && usedTokens > 0 ? usedTokens : undefined;
     const budget = this.#budgets.get(threadId);
-    if (!budget) return;
+    if (!budget) {
+      if (afterTokens !== undefined) this.#pendingNativeCompacted.set(threadId, afterTokens);
+      return;
+    }
+    this.#pendingNativeCompacted.delete(threadId);
     budget.pending = false;
-    budget.lastCompactedTokens =
-      usedTokens !== undefined && Number.isFinite(usedTokens) && usedTokens > 0 ? usedTokens : budget.usedTokens;
+    budget.lastCompactedTokens = afterTokens ?? budget.usedTokens;
   }
 
   finish(agentId: string, threadId: string, status: string): void {
@@ -420,6 +433,7 @@ export class ContextCompaction {
   /** Drops a retired provider thread's budget. The agent keeps compacting until `forgetAgent`. */
   forgetThread(threadId: string): void {
     this.#budgets.delete(threadId);
+    this.#pendingNativeCompacted.delete(threadId);
     const displayed = this.#display.delete(threadId);
     this.#durations.delete(threadId);
     this.#awaitingPostCompaction.delete(threadId);
@@ -482,6 +496,7 @@ export class ContextCompaction {
     for (const hold of this.#refusals.values()) clearTimeout(hold.timer);
     this.#refusals.clear();
     this.#budgets.clear();
+    this.#pendingNativeCompacted.clear();
     this.#display.clear();
     this.#durations.clear();
     this.#awaitingPostCompaction.clear();

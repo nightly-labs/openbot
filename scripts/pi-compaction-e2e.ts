@@ -110,7 +110,12 @@ lines.on("line", (line) => {
       contextField = "present";
       compaction = null;
       if (text.includes("no-context")) contextField = "omit";
-      else if (text.includes("threshold-low")) {
+      else if (text.includes("initial-threshold-grown")) {
+        contextUsage = { tokens: 171000, contextWindow: 200000, percent: 85.5 };
+      } else if (text.includes("initial-threshold-guard")) {
+        contextUsage = { tokens: 165000, contextWindow: 200000, percent: 82.5 };
+        compaction = { reason: "threshold", afterTokens: 160000 };
+      } else if (text.includes("threshold-low")) {
         contextUsage = { tokens: 32000, contextWindow: 200000, percent: 16 };
         compaction = { reason: "threshold", afterTokens: 32000 };
       } else if (text.includes("threshold-guard")) {
@@ -118,6 +123,12 @@ lines.on("line", (line) => {
         compaction = { reason: "threshold", afterTokens: 160000 };
       } else if (text.includes("threshold-grown")) {
         contextUsage = { tokens: 171000, contextWindow: 200000, percent: 85.5 };
+      } else if (text.includes("native-aborted-low")) {
+        contextUsage = { tokens: 50000, contextWindow: 200000, percent: 25 };
+        compaction = { reason: "threshold", aborted: true };
+      } else if (text.includes("native-failed-low")) {
+        contextUsage = { tokens: 50000, contextWindow: 200000, percent: 25 };
+        compaction = { reason: "overflow", failed: true };
       } else if (text.includes("overflow-guard")) {
         contextUsage = { tokens: 165000, contextWindow: 200000, percent: 82.5 };
         compaction = { reason: "overflow", afterTokens: 160000 };
@@ -620,6 +631,40 @@ try {
   totalCompact = compactCount();
   assert.equal(totalCompact, 3, "The failed turn added one OpenBot compaction.");
 
+  const abortedLowTurn = await sendTurn(agent.id, chatThread, "native-aborted-low");
+  const abortedLow = inspect("native aborted at low fill", chatThread, abortedLowTurn, agent.id, {
+    usageEvents: 1,
+    contextEvents: 1,
+    records: 1,
+    nativeRunning: 1,
+    nativeCompleted: 0,
+    nativeFailed: 1,
+    afterTokens: null,
+    context: { totalTokens: 50000, modelContextWindow: 200000, estimated: true },
+  });
+  assert.equal(contextStatus(agent.id), "failed", "An aborted native compaction is failed in the snapshot.");
+  abortedLow.contextStatus = "failed";
+  await warmup(agent.id, chatThread);
+  assert.equal(compactCount(), totalCompact, "A low-fill aborted compaction did not compact.");
+  abortedLow.compactRequests = 0;
+
+  const failedLowTurn = await sendTurn(agent.id, chatThread, "native-failed-low");
+  const failedLow = inspect("native failed at low fill", chatThread, failedLowTurn, agent.id, {
+    usageEvents: 1,
+    contextEvents: 1,
+    records: 1,
+    nativeRunning: 1,
+    nativeCompleted: 0,
+    nativeFailed: 1,
+    afterTokens: null,
+    context: { totalTokens: 50000, modelContextWindow: 200000, estimated: true },
+  });
+  assert.equal(contextStatus(agent.id), "failed", "A failed native compaction is failed in the snapshot.");
+  failedLow.contextStatus = "failed";
+  await warmup(agent.id, chatThread);
+  assert.equal(compactCount(), totalCompact, "A low-fill failed compaction did not compact.");
+  failedLow.compactRequests = 0;
+
   const manualTurn = await sendTurn(agent.id, chatThread, "native-manual");
   const manual = inspect("native manual is not reported", chatThread, manualTurn, agent.id, {
     usageEvents: 1,
@@ -662,6 +707,74 @@ try {
   await warmup(agent.id, chatThread);
   assert.equal(compactCount(), totalCompact, "The timeout turn did not compact.");
   timeout.compactRequests = 0;
+
+  // A separate agent, with no warmup: Pi compacts on its first turn, before any usage event has
+  // created a budget. The pending value must survive until that budget is created.
+  const firstTurnBaseline = compactCount();
+  const firstTurnAgent = await runCauseEffect(
+    agents.createAgent({
+      name: "Pi First Compaction",
+      description: "Checks a native compaction on the first turn.",
+      avatarSeed: "pi-first-compaction",
+      avatarHue: null,
+      initialMessage: "initial-threshold-guard",
+    }),
+  );
+  assert.match(firstTurnAgent.model, /^openai\//, "The first-turn agent runs the fake Pi model.");
+  const firstTurnThread = await waitFor(
+    "the first-turn agent's thread",
+    () => store.list().find((entry) => entry.id === firstTurnAgent.id)?.threadId,
+  );
+  const firstTurnId = await waitFor("the first-turn compaction turn", () => turnsOf(firstTurnThread)[0] ?? null);
+  await waitFor("the first-turn agent to be idle", () =>
+    agents
+      .listQueue(firstTurnAgent.id)
+      .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status)),
+  );
+  const firstTurnGuard = inspect("first turn native guard", firstTurnThread, firstTurnId, firstTurnAgent.id, {
+    usageEvents: 1,
+    contextEvents: 1,
+    records: 1,
+    nativeRunning: 1,
+    nativeCompleted: 1,
+    nativeFailed: 0,
+    afterTokens: 160000,
+    context: { totalTokens: 165000, modelContextWindow: 200000, estimated: true },
+  });
+  assert.equal(contextStatus(firstTurnAgent.id), "completed", "The first-turn compaction is completed.");
+  firstTurnGuard.contextStatus = "completed";
+  assert.equal(
+    compactCount(),
+    firstTurnBaseline,
+    "A native compaction before the first budget did not ask OpenBot to compact.",
+  );
+
+  const firstTurnGrownTurn = await sendTurn(firstTurnAgent.id, firstTurnThread, "initial-threshold-grown");
+  const firstTurnGrown = inspect(
+    "first turn grown after native guard",
+    firstTurnThread,
+    firstTurnGrownTurn,
+    firstTurnAgent.id,
+    {
+      usageEvents: 1,
+      contextEvents: 1,
+      records: 1,
+      nativeRunning: 0,
+      nativeCompleted: 0,
+      nativeFailed: 0,
+      afterTokens: null,
+      context: { totalTokens: 171000, modelContextWindow: 200000, estimated: true },
+    },
+  );
+  await waitForCompact(firstTurnBaseline + 1, "the first-turn grown fill to compact");
+  assert.equal(compactCount(), firstTurnBaseline + 1, "The grown fill after the first budget compacted once.");
+  assert.equal(
+    compactBetweenPrompts("initial-threshold-guard", "initial-threshold-grown"),
+    0,
+    "The first-turn guard did not compact before the grown turn.",
+  );
+  firstTurnGuard.compactRequests = 0;
+  firstTurnGrown.compactRequests = 1;
 
   report.compactRequests = compactCount();
   report.passed = true;

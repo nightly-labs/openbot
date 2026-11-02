@@ -754,7 +754,9 @@ export class TurnLifecycle {
         if (status !== "running" && status !== "completed" && status !== "failed") return;
         // Native Claude compaction does not report comparable full-context counts.
         this.#compaction.observeCompaction(threadId, status, "none");
-        if (status === "completed") {
+        // Only Pi (mode `request`) reports a usable post-compaction fill. Claude and ACP keep their
+        // own budgets untouched; `observeCompaction` above still updates their UI state.
+        if (status === "completed" && source.contextCompaction === "request") {
           const value = isRecord(params) ? params.afterTokens : undefined;
           const afterTokens = typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
           this.#compaction.markCompacted(threadId, afterTokens);
