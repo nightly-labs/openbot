@@ -68,6 +68,8 @@ export const messages = {
   "error.team.agentHideUnsupported": "Esta conexión no permite ocultar agentes.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor no puede guardar tu propio nivel de notificaciones para cada agente. Actualiza OpenBot en el ordenador que lo ejecuta.",
+  "error.team.sidebarPinsUnsupported":
+    "Este servidor no puede guardar tus chats fijados para todos tus dispositivos. Actualiza OpenBot en el ordenador que lo ejecuta.",
   "error.team.agentPublishUnsupported": "Esta conexión no permite publicar agentes.",
   "error.team.agentUpdateUnsupported": "Esta conexión no permite actualizar agentes.",
   "error.team.contextResetUnsupported": "Esta conexión no permite iniciar un nuevo chat.",

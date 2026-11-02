@@ -679,6 +679,12 @@ server can change it.
   the OpenBot GitHub App's installation tokens in plain text, with mode 0600, for `gh` and `git` in
   agent tools. OpenBot deletes that folder when you disconnect and when the app closes; after a crash
   it stays until the next start. The tokens are redacted from logs, exports and diagnostics.
+- The Link payment account (Server settings › Vault › Cards) is kept in
+  `~/Library/Application Support/OpenBot/openbot-link-account-v1.json`, encrypted by the operating
+  system's secret storage. It holds the Link access and refresh tokens and the account email.
+  Disconnect deletes the file and asks Link to revoke the sign-in. A one-time Link card is not
+  stored: OpenBot reads it from Link for each fill and types it into the page. The tokens and the
+  card number are redacted from logs, exports and diagnostics.
 - The ElevenLabs API key for dictation is kept in
   `~/Library/Application Support/OpenBot/voice-api-key.json`, encrypted by the operating system's
   secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
@@ -784,6 +790,11 @@ server can change it.
   sets only their own levels, and the host applies them to the desktop notifications of this computer
   and to the notifications that it sends to that member's phones. A removed member's levels are
   deleted. It is never sent to the OpenBot account service.
+- `~/Library/Application Support/OpenBot/openbot-sidebar-pins-v1.json` holds the agents and channels
+  that the owner and each member of this host pinned, in their order, by member ID, with agent and
+  channel IDs only. Each member reads and sets only their own list, so their desktop app, web client
+  and phones show the same pins. A removed member's list is deleted. It is never sent to the OpenBot
+  account service.
 
 Attachments copied into OpenBot remain in managed storage after their original file is moved or
 deleted. By default, all agents share one embedded browser profile, including cookies and website
@@ -916,6 +927,14 @@ Network traffic can also occur when:
   tokens for those repositories. It does not store or log either token, and it gets no chats, files
   or commands. Agents reach the GitHub MCP server through a local server on `127.0.0.1`, which adds
   the right token to each call;
+- the user connects Link in Server settings › Vault. OpenBot asks `login.link.com` for a sign-in
+  code and a token, with the label "OpenBot on" and this computer's name, which Link shows in its list
+  of connected apps. OpenBot renews and revokes the token there, and reads the account email from
+  `api.link.com`. When an agent pays with Link, OpenBot reads the payment methods of the account
+  from `api.link.com` and sends a payment request: the method ID, the amount and currency, the
+  merchant name and address, and the agent's description of the purchase. Link asks the user to
+  approve it, and OpenBot then reads the one-time card from `api.link.com`. Nothing else about the
+  user's agents, conversations or files is sent to Link;
 - an installed build checks GitHub Releases for updates;
 - OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
   `Check for updates`. It asks `api.github.com` for Codex and Kimi, `registry.npmjs.org` for Claude,

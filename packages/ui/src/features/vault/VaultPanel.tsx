@@ -19,6 +19,7 @@ import {
   VAULT_NOTES_LIMIT,
   VAULT_PASSWORD_LIMIT,
   VAULT_TEXT_LIMIT,
+  vaultExpiryText,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -71,6 +72,7 @@ import type { UserErrorDetails } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createStore, For, Match, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
+import { VaultLinkAccount, type VaultLinkAccountProps } from "./VaultLinkAccount";
 
 export interface VaultPanelProps {
   state: VaultState;
@@ -91,6 +93,8 @@ export interface VaultPanelProps {
   onReset: () => Promise<void>;
   /** Where the menus open, so they stay inside the settings page. */
   menuMount?: HTMLElement | undefined;
+  /** The Link account of this computer, above the cards. Absent for a joined server. */
+  link?: Omit<VaultLinkAccountProps, "menuMount"> | undefined;
 }
 
 type Filter = VaultItemKind | "all";
@@ -138,9 +142,6 @@ const SECRET_TEXT = {
 } as const satisfies Record<VaultSecretField, { show: AppTextKey; hide: AppTextKey; copy: AppTextKey }>;
 
 const digitsOf = (value: string) => value.replace(/\D/gu, "");
-
-const twoDigits = (value: number) => String(value).padStart(2, "0");
-const expiryText = (month: number, year: number) => `${twoDigits(month)}/${twoDigits(year % 100)}`;
 
 /** `MM/YY` or `MM/YYYY`, or null when the text is not a date. */
 function parseExpiry(text: string): { month: number; year: number } | null {
@@ -193,7 +194,7 @@ function draftOf(kind: VaultItemKind, item: VaultItemSummary | null): Draft {
           label: item.label,
           nameOnCard: item.nameOnCard,
           number: "",
-          expiry: expiryText(item.expMonth, item.expYear),
+          expiry: vaultExpiryText(item.expMonth, item.expYear),
           securityCode: "",
           billingContactId: item.billingContactId ?? "",
           fillSites: item.fillSites,
@@ -217,6 +218,38 @@ function draftOf(kind: VaultItemKind, item: VaultItemSummary | null): Draft {
     return { kind, ...fields };
   }
   return { kind, ...EMPTY_CONTACT };
+}
+
+/** The values that a chat request filled in, over a new item's draft. A secret field is never one of them. */
+function prefilled(draft: Draft, values: Readonly<Record<string, string>>): Draft {
+  const value = (key: string, current: string) => values[key] ?? current;
+  switch (draft.kind) {
+    case "login":
+      return { ...draft, website: value("website", draft.website), username: value("username", draft.username) };
+    case "card":
+      return {
+        ...draft,
+        label: value("label", draft.label),
+        nameOnCard: value("nameOnCard", draft.nameOnCard),
+        expiry: value("expiry", draft.expiry),
+      };
+    case "contact":
+      return {
+        ...draft,
+        label: value("label", draft.label),
+        fullName: value("fullName", draft.fullName),
+        address: value("address", draft.address),
+        address2: value("address2", draft.address2),
+        city: value("city", draft.city),
+        region: value("region", draft.region),
+        postalCode: value("postalCode", draft.postalCode),
+        country: value("country", draft.country).toUpperCase(),
+        phone: value("phone", draft.phone),
+        email: value("email", draft.email),
+      };
+    case "apiKey":
+      return draft;
+  }
 }
 
 /** Whether a draft has the fields that the item needs. A saved secret counts as present. */
@@ -292,13 +325,24 @@ function itemMatches(item: VaultItemSummary, query: string): boolean {
   return text.some((value) => value.toLowerCase().includes(needle));
 }
 
+/** The countries that a contact can have, by name in the reader's language. */
+function useCountries() {
+  const { locale } = useText();
+  const regionNames = createMemo(() => new Intl.DisplayNames([locale()], { type: "region" }));
+  const countryName = (code: string) => (code ? (regionNames().of(code) ?? code) : "");
+  const countries = createMemo(() =>
+    VAULT_COUNTRY_CODES.map((code) => ({ code, name: countryName(code) })).sort((a, b) => a.name.localeCompare(b.name)),
+  );
+  return { countryName, countries };
+}
+
 /**
  * The Vault of the computer that runs the agents, in its server settings: filter tabs with counts,
  * one list, and a dialog to add or edit an item. A list item never carries a password, a card number,
  * a security code or an API key; the edit dialog asks for one only when the user shows it.
  */
 export function VaultPanel(props: VaultPanelProps) {
-  const { t, errorDetails, locale } = useText();
+  const { t, errorDetails } = useText();
   const [filter, setFilter] = createSignal<Filter>("all");
   const [query, setQuery] = createSignal("");
   const [ui, setUi] = createStore<{
@@ -310,11 +354,7 @@ export function VaultPanel(props: VaultPanelProps) {
     notice: string | null;
   }>({ editing: null, deleting: null, importing: false, resetting: false, failure: null, notice: null });
 
-  const regionNames = createMemo(() => new Intl.DisplayNames([locale()], { type: "region" }));
-  const countryName = (code: string) => (code ? (regionNames().of(code) ?? code) : "");
-  const countries = createMemo(() =>
-    VAULT_COUNTRY_CODES.map((code) => ({ code, name: countryName(code) })).sort((a, b) => a.name.localeCompare(b.name)),
-  );
+  const { countryName, countries } = useCountries();
   const contactLine = (contact: VaultContactFields) =>
     [contact.address, contact.city, contact.postalCode, countryName(contact.country)].filter(Boolean).join(", ");
   const maskedCard = (card: Pick<VaultCardSummary, "brand" | "last4">) =>
@@ -329,7 +369,7 @@ export function VaultPanel(props: VaultPanelProps) {
   const itemDetail = (item: VaultItemSummary) => {
     if (item.kind === "login") return item.username || t("vault.noUsername");
     if (item.kind === "card")
-      return t("vault.cardSummary", { last4: item.last4, expiry: expiryText(item.expMonth, item.expYear) });
+      return t("vault.cardSummary", { last4: item.last4, expiry: vaultExpiryText(item.expMonth, item.expYear) });
     if (item.kind === "apiKey") return item.notes || t("vault.kind.apiKey");
     return contactLine(item) || item.email || item.phone;
   };
@@ -502,6 +542,17 @@ export function VaultPanel(props: VaultPanelProps) {
               <For each={filters()}>
                 {(tab) => (
                   <SlidingTabs.Content value={tab.value}>
+                    <Show when={tab.value === "card" && props.link}>
+                      {(link) => (
+                        <VaultLinkAccount
+                          status={link().status}
+                          onConnect={link().onConnect}
+                          onCancel={link().onCancel}
+                          onDisconnect={link().onDisconnect}
+                          menuMount={props.menuMount}
+                        />
+                      )}
+                    </Show>
                     <ItemGroup class="settings-modal-card" surface="subtle" aria-label={t(tab.label)}>
                       <Show
                         when={visible(tab.value).length > 0}
@@ -967,12 +1018,18 @@ function ItemDialog(props: {
   contacts: readonly VaultContactSummary[];
   countries: readonly { code: string; name: string }[];
   contactLine: (contact: VaultContactFields) => string;
+  /** The values of a chat request for a new item. */
+  prefill?: Readonly<Record<string, string>> | undefined;
+  /** A request from the chat: no billing address and no notes, which it does not carry. */
+  fromChat?: boolean | undefined;
   onSave: (input: VaultSaveInput) => Promise<void>;
   onReveal: (request: VaultSecretRequest) => Promise<string>;
   onClose: () => void;
 }) {
   const { t, errorDetails } = useText();
-  const [draft, setDraft] = createSignal<Draft>(untrack(() => draftOf(props.kind, props.item)));
+  const [draft, setDraft] = createSignal<Draft>(
+    untrack(() => prefilled(draftOf(props.kind, props.item), props.prefill ?? {})),
+  );
   const [saving, setSaving] = createSignal(false);
   const [failure, setFailure] = createSignal<UserErrorDetails | null>(null);
   const set = <T extends Draft>(current: T, patch: Partial<T>) => setDraft((): Draft => ({ ...current, ...patch }));
@@ -1052,14 +1109,16 @@ function ItemDialog(props: {
                 onChange={(password) => set(login(), { password })}
               />
             </Field>
-            <Field label={t("vault.field.notes")} class="vault-wide">
-              <Textarea
-                rows={2}
-                maxlength={VAULT_NOTES_LIMIT}
-                value={login().notes}
-                onInput={(event) => set(login(), { notes: event.currentTarget.value })}
-              />
-            </Field>
+            <Show when={!props.fromChat}>
+              <Field label={t("vault.field.notes")} class="vault-wide">
+                <Textarea
+                  rows={2}
+                  maxlength={VAULT_NOTES_LIMIT}
+                  value={login().notes}
+                  onInput={(event) => set(login(), { notes: event.currentTarget.value })}
+                />
+              </Field>
+            </Show>
           </div>
         )}
       </Match>
@@ -1110,21 +1169,23 @@ function ItemDialog(props: {
                 onChange={(securityCode) => set(card(), { securityCode })}
               />
             </Field>
-            <Field label={t("vault.field.billing")} class="vault-wide">
-              <NativeSelect
-                value={card().billingContactId}
-                onChange={(event) => set(card(), { billingContactId: event.currentTarget.value })}
-              >
-                <option value="">{t("vault.billingNone")}</option>
-                <For each={props.contacts}>
-                  {(contact) => (
-                    <option value={contact.id}>
-                      {[contact.label || contact.fullName, props.contactLine(contact)].filter(Boolean).join(" · ")}
-                    </option>
-                  )}
-                </For>
-              </NativeSelect>
-            </Field>
+            <Show when={!props.fromChat}>
+              <Field label={t("vault.field.billing")} class="vault-wide">
+                <NativeSelect
+                  value={card().billingContactId}
+                  onChange={(event) => set(card(), { billingContactId: event.currentTarget.value })}
+                >
+                  <option value="">{t("vault.billingNone")}</option>
+                  <For each={props.contacts}>
+                    {(contact) => (
+                      <option value={contact.id}>
+                        {[contact.label || contact.fullName, props.contactLine(contact)].filter(Boolean).join(" · ")}
+                      </option>
+                    )}
+                  </For>
+                </NativeSelect>
+              </Field>
+            </Show>
             <Show when={card().fillSites.length > 0}>
               <fieldset class="vault-wide vault-fill-sites">
                 <legend class="ui-label">{t("vault.field.fillSites")}</legend>
@@ -1323,3 +1384,40 @@ function ItemDialog(props: {
     </Dialog.Root>
   );
 }
+
+/**
+ * The Vault dialog for a request from the chat: a new login, card or contact, with the values that the
+ * agent filled in. It has no billing address and no notes, which a request does not carry.
+ */
+export function VaultRequestDialog(props: {
+  kind: Exclude<VaultItemKind, "apiKey">;
+  title: string;
+  prefill: Readonly<Record<string, string>>;
+  /** Saves the item. A failure stays in the dialog, so the user can correct a value. */
+  onSave: (input: VaultSaveInput) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { countries } = useCountries();
+  return (
+    <ItemDialog
+      kind={props.kind}
+      item={null}
+      title={props.title}
+      contacts={[]}
+      countries={countries()}
+      contactLine={() => ""}
+      prefill={props.prefill}
+      fromChat
+      onSave={props.onSave}
+      onReveal={() => Promise.resolve("")}
+      onClose={props.onClose}
+    />
+  );
+}
+
+export {
+  BRAND_NAME as VAULT_BRAND_NAME,
+  CardLogo as VaultCardLogo,
+  ContactLogo as VaultContactLogo,
+  SiteLogo as VaultSiteLogo,
+};

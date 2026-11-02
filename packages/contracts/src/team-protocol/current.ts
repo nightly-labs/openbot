@@ -93,6 +93,7 @@ import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
+import { SIDEBAR_PINS_CAPABILITY } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "./sign-in-relay-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
@@ -231,6 +232,7 @@ export {
   ROUTINE_RESULTS_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
+  SIDEBAR_PINS_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
@@ -392,6 +394,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY,
   TEAM_SVG_ATTACHMENTS_CAPABILITY,
   MCP_ACCOUNTS_CAPABILITY,
+  SIDEBAR_PINS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -539,7 +542,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY &&
     capability !== WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY &&
     capability !== TEAM_SVG_ATTACHMENTS_CAPABILITY &&
-    capability !== MCP_ACCOUNTS_CAPABILITY,
+    capability !== MCP_ACCOUNTS_CAPABILITY &&
+    capability !== SIDEBAR_PINS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -563,6 +567,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY,
   TEAM_SVG_ATTACHMENTS_CAPABILITY,
   MCP_ACCOUNTS_CAPABILITY,
+  SIDEBAR_PINS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -669,6 +674,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY &&
       capability !== WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY &&
       capability !== TEAM_SVG_ATTACHMENTS_CAPABILITY &&
-      capability !== MCP_ACCOUNTS_CAPABILITY,
+      capability !== MCP_ACCOUNTS_CAPABILITY &&
+      capability !== SIDEBAR_PINS_CAPABILITY,
   );
 }

@@ -14,6 +14,7 @@ import { type HostRestartEvent, hostRestartEvent } from "./host-update-v1";
 import { type MachineAlertEvent, machineAlertEvent } from "./machine-resources-v1";
 import { type QuietTurnCompletedEvent, quietTurnEvent } from "./quiet-turn-v1";
 import { type RoutineFlowsEvent, routineFlowsEvent } from "./routine-flows-v1";
+import { type SidebarPinsEvent, sidebarPinsEvent } from "./sidebar-pins-v1";
 import { type SkillsEvent, skillsEvent } from "./skills-events-v1";
 import { type VaultEvent, vaultEvent } from "./vault-v1";
 import { type WorkflowsEvent, workflowsEvent } from "./workflows-v1";
@@ -30,6 +31,7 @@ export type OptionalTeamEvent =
   | ChannelEvent
   | HostRestartEvent
   | MachineAlertEvent
+  | SidebarPinsEvent
   | SkillsEvent
   | QuietTurnCompletedEvent
   | RoutineFlowsEvent
@@ -58,6 +60,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     channelEvent(value) ??
     hostRestartEvent(value) ??
     machineAlertEvent(value) ??
+    sidebarPinsEvent(value) ??
     skillsEvent(value) ??
     quietTurnEvent(value) ??
     routineFlowsEvent(value) ??

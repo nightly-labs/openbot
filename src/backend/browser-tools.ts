@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { BROWSER_TAKEOVER_REASONS, VAULT_TEXT_LIMIT, type VaultContactFields } from "@openbot/contracts/ipc";
+import { UI_BLOCK_LIMITS, UI_VAULT_REQUEST_KINDS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import { advertisedJsonSchema } from "./agent/advertised-json-schema";
 import {
@@ -292,6 +293,24 @@ const BROWSER_TOOL_DEFINITIONS = [
     },
   }),
   browserTool({
+    name: "request_vault_item",
+    description:
+      'Ask the user to add a login, card or contact info to the Vault, and wait. The chat shows a card that opens the Vault form with the fields that you give. The user types the password, card number and security code; you never see them. Use it when a task needs an item that list_vault_items does not have. Result JSON: {"status":"saved","id","kind","name"}, {"status":"skipped"}, or {"status":"expired"}. Only the owner or an admin can save. Not in a Slack, Discord or Telegram chat.',
+    shape: {
+      kind: z.enum(UI_VAULT_REQUEST_KINDS),
+      title: requiredString(UI_BLOCK_LIMITS.title).describe(
+        "What the item is for, in the user's language, such as Card for the flight to Lisbon.",
+      ),
+      label: vaultText.describe("Contact or card: a short name, such as Home or Work card."),
+      ...vaultContactShape,
+      website: vaultText.describe("Login: the HTTPS website, such as example.com."),
+      username: vaultText.describe("Login: the username or email."),
+      nameOnCard: vaultText.describe("Card: the name on the card."),
+      expMonth: z.number().int().min(1).max(12).optional().describe("Card: the expiry month."),
+      expYear: z.number().int().min(2000).max(2099).optional().describe("Card: the four-digit expiry year."),
+    },
+  }),
+  browserTool({
     name: "delete_vault_item",
     description:
       "Delete a login, card or contact from the OpenBot Vault by its id from list_vault_items (not from list_logins). A card that uses a deleted contact for billing keeps no billing address. This cannot be undone: ask first unless you added the item or the user asked for the delete.",
@@ -317,6 +336,34 @@ const BROWSER_TOOL_DEFINITIONS = [
           message: "Use expiry, or expMonth and expYear, not both.",
         }),
       timeoutMs: timeout,
+    },
+  }),
+  browserTool({
+    name: "request_link_payment",
+    description:
+      "Pay with the user's Link account (link.com). The user approves this one payment in Link; the call waits up to 5 minutes. On approval it returns a cardId of a one-time card for fill_card. Call it once per purchase, with the final total.",
+    shape: {
+      amount: z
+        .number()
+        .int()
+        .positive()
+        .max(100_000_000)
+        .describe("The total in the smallest currency unit, such as cents."),
+      currency: z
+        .string()
+        .regex(/^[A-Za-z]{3}$/)
+        .optional()
+        .describe("ISO 4217 code. Default: the currency of the Link card."),
+      merchantName: requiredString(200),
+      merchantUrl: requiredString(2048).refine((value) => URL.canParse(value) && new URL(value).protocol === "https:", {
+        message: "Use the https address of the merchant's site.",
+      }),
+      context: z
+        .string()
+        .trim()
+        .min(100)
+        .max(2000)
+        .describe("What you buy, the quantity, and why. The user reads it in Link."),
     },
   }),
   browserTool({

@@ -277,6 +277,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.apiKeySaveFailed": "OpenBot could not save the API key. Try again.",
   "error.backend.apiKeyNotAllowed": "Only the server owner or an admin can enter an API key.",
   "error.backend.apiKeySaving": "The API key is already being saved.",
+  "error.backend.vaultItemNotAllowed": "Only the server owner or an admin can add an item to the Vault.",
+  "error.backend.vaultItemSaving": "The Vault item is already being saved.",
   "error.backend.authRequestInactive": "This secure authentication request is no longer active.",
   "error.backend.secureAuthUnavailable": "Secure authentication is unavailable.",
   "error.backend.browserUrlRequired": "A browser URL is required.",

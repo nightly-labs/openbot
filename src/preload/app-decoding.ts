@@ -86,6 +86,7 @@ import {
   isVoiceModelId,
   isVoiceServerProbe,
   isVoiceServerSettings,
+  type LinkAccountStatus,
   type MobileConnectedDevice,
   type MobileConnectLink,
   type MobileConnectTicket,
@@ -95,6 +96,7 @@ import {
   type ProviderDetectionSettings,
   parseGitHubConnectorRepositories,
   parseGitHubConnectorStatus,
+  parseLinkAccountStatus,
   parseOnePasswordConnectorStatus,
   parseTelegramAccountConnectorStatus,
   parseWhatsAppAccountConnectorStatus,
@@ -578,6 +580,12 @@ export function decodeGitHubConnectorRepositories(value: unknown): GitHubConnect
   const repositories = parseGitHubConnectorRepositories(value);
   if (!repositories) throw new Error("Invalid GitHub repository list response.");
   return repositories;
+}
+
+export function decodeLinkAccountStatus(value: unknown): LinkAccountStatus {
+  const status = parseLinkAccountStatus(value);
+  if (!status) throw new Error("Invalid Link account response.");
+  return status;
 }
 
 export function decodeOnePasswordConnectorStatus(value: unknown): OnePasswordConnectorStatus {

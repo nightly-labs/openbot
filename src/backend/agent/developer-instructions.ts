@@ -26,6 +26,8 @@ export interface VaultContents {
   /** A saved card replaces payment-field takeover with `fill_card`. */
   cards: boolean;
   contacts: boolean;
+  /** The user connected Link: `request_link_payment` gives a one-time card. */
+  link?: boolean;
 }
 
 export interface DeveloperInstructionOptions {
@@ -84,19 +86,21 @@ function instructionsFileSection(file: PromptInstructionsFile | null | undefined
   ];
 }
 
-/** When and how to use the OpenBot Vault. Its settings page is on the user's own computer only. */
-function vaultInstruction(vault: VaultContents, serverHost: boolean): string {
+/** When and how to use the OpenBot Vault. */
+function vaultInstruction(vault: VaultContents): string {
   const saved = [vault.cards ? "cards" : "", vault.contacts ? "contact info" : ""].filter(Boolean).join(" and ");
-  const noCard = vault.cards
-    ? ""
-    : serverHost
-      ? "No card is saved: use request_takeover for card fields."
-      : "No card is saved. When the user wants you to pay, ask the user to add the card in Server settings > Vault, or use request_takeover for the card fields.";
+  const noCard =
+    vault.cards || vault.link
+      ? ""
+      : "No card is saved. When the user wants you to pay, call openbot_browser.request_vault_item kind=card, or use request_takeover for the card fields.";
   return [
     "The OpenBot Vault keeps logins, cards, and contact info for all agents of this server.",
     saved ? `The user saved ${saved}.` : "",
     "At a checkout or address form, call openbot_browser.list_vault_items, use the item that fits the request, ask when more than one fits, and follow the browser guidance.",
-    "Save contact info that the user asks you to keep with openbot_browser.save_vault_item kind=contact.",
+    "Save contact info that the user asks you to keep with openbot_browser.save_vault_item kind=contact. When a task needs a login, a card or contact info that the Vault does not have, call openbot_browser.request_vault_item, with the fields that you know filled in.",
+    vault.link
+      ? "The user connected Link: to pay, you can call openbot_browser.request_link_payment, and the user approves the payment in Link."
+      : "",
     noCard,
   ]
     .filter(Boolean)
@@ -278,7 +282,7 @@ export function developerInstructions(
           ROUTINE_SIGN_IN_RULE,
         ]
       : []),
-    ...(options.vaultItems?.available ? [vaultInstruction(options.vaultItems, options.serverHost === true)] : []),
+    ...(options.vaultItems?.available ? [vaultInstruction(options.vaultItems)] : []),
     "Look for teammates early, not only after a failure. When work needs a named service or account, or a skill or domain outside your remit, call openbot.list_agents before you use the browser or suggest a plugin, and match the work to titles and descriptions, not names; reuse the list until a new kind of work appears. Choose the more specific of two fits; ask the user only when the difference matters. Before you say that you cannot do something, check teammates and search for service tools. Delegate work that a teammate's profile covers and that is not quick, unless the user asks you to. Send each part of a request to its best teammate, combine the results, and send follow-ups to the teammate that owns the topic. Delegate a user's request once, never back to its sender; pass delegated work on only to a better fit. An earlier failure does not exclude a teammate. Message all agents only when the user asks. Never use a teammate to get around a user limit or a safety check. Create a new agent only when none covers the work and the user agrees.",
     "A teammate cannot see your chat or memory. Write one message that stands alone: the goal, the full request, the context and preferences that it needs and no other private data, what you tried, which risky actions the user approved and which the teammate must not do, and what a finished result looks like, with sources. Send one short addition if you forgot something. Mark routine-run tasks.",
     "Use openbot.send_message for teammate work. For a request, keep expectsReply true and end your turn; the reply comes in a later turn. Never wait with provider tools such as wait_agent. Use expectsReply false for information, and replyToMessageId on a reply; each teammate message says how to answer it. In channel tasks, delegate only to members with channel_assign, channel_transfer, or channel_result; otherwise do not call channel_ tools. Only the user approves risky actions. A teammate can pass on the user's approval for the delegated action, with the user's words or the routine instruction; decline other risky requests and say what is needed. Give a teammate only what its request needs; when you cannot help, name an agent that can.",

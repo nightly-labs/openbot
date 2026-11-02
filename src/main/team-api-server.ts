@@ -142,6 +142,7 @@ import {
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
@@ -271,6 +272,7 @@ import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutineResults } from "./team-api/route-routine-results";
 import { routeSharedTables } from "./team-api/route-shared-tables";
 import { routeSideQuestion } from "./team-api/route-side-question";
+import { routeSidebarPins } from "./team-api/route-sidebar-pins";
 import { routeSignInRelay } from "./team-api/route-sign-in-relay";
 import { routeSkillsAdmin } from "./team-api/route-skills-admin";
 import { routeStorage } from "./team-api/route-storage";
@@ -387,6 +389,7 @@ export class TeamApiServer {
   #stopAgentAccessListener: (() => void) | null = null;
   #stopMachineAlertListener: (() => void) | null = null;
   #stopNotificationLevelsListener: (() => void) | null = null;
+  #stopSidebarPinsListener: (() => void) | null = null;
   #localTypingAgentId: string | null = null;
   readonly #reportedUnrepresentableAgents = new Set<string>();
   #nextRateLimitSweepAt = 0;
@@ -489,6 +492,8 @@ export class TeamApiServer {
     // A change on one device of a member shows at once on their other devices.
     this.#stopNotificationLevelsListener =
       this.#options.agentNotificationLevels?.subscribe((memberId) => this.#sendNotificationLevels(memberId)) ?? null;
+    this.#stopSidebarPinsListener =
+      this.#options.sidebarPins?.subscribe((memberId) => this.#sendSidebarPins(memberId)) ?? null;
     this.#heartbeat = setInterval(() => {
       for (const [client, connection] of this.#eventClients) {
         if (!this.#options.store.authenticate(connection.token)) {
@@ -514,6 +519,8 @@ export class TeamApiServer {
     this.#stopMachineAlertListener = null;
     this.#stopNotificationLevelsListener?.();
     this.#stopNotificationLevelsListener = null;
+    this.#stopSidebarPinsListener?.();
+    this.#stopSidebarPinsListener = null;
     yield* Scope.close(this.#legacyConversationScope, Exit.void);
     this.#legacyConversationScope = Scope.makeUnsafe();
     for (const [client, connection] of this.#eventClients) {
@@ -698,6 +705,26 @@ export class TeamApiServer {
       const member = this.#connectionMember(connection);
       const hidden = this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member);
       client.send(JSON.stringify({ type: "agent-notification-levels-changed", ...levels.snapshot(memberId, hidden) }));
+    }
+  }
+
+  /**
+   * Sends a member's own pinned chats to each connection of that member, and to no other member. The
+   * list leaves out the agents that the connection cannot see, as `/v1/sidebar-pins` does.
+   */
+  #sendSidebarPins(memberId: string): void {
+    const pins = this.#options.sidebarPins;
+    if (!pins) return;
+    for (const [client, connection] of this.#eventClients) {
+      if (
+        connection.memberId !== memberId ||
+        !connection.capabilities.has(SIDEBAR_PINS_CAPABILITY) ||
+        client.readyState !== webSockets.WebSocket.OPEN
+      )
+        continue;
+      const member = this.#connectionMember(connection);
+      const hidden = this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member);
+      client.send(JSON.stringify({ type: "sidebar-pins-changed", ...pins.snapshot(memberId, hidden) }));
     }
   }
 
@@ -995,6 +1022,7 @@ export class TeamApiServer {
         )) === "handled"
       )
         return;
+      if ((await routeSidebarPins(context, this.#options.sidebarPins, hidden)) === "handled") return;
       if ((await routeAgentTasks(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreads(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadReads(context, this.#options.agentTasks, hidden)) === "handled") return;
@@ -2148,6 +2176,7 @@ export class TeamApiServer {
           if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;
           if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
             return this.#options.agentNotificationLevels !== undefined;
+          if (capability === SIDEBAR_PINS_CAPABILITY) return this.#options.sidebarPins !== undefined;
           return true;
         },
       ),

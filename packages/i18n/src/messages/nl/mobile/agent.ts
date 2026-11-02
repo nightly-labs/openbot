@@ -16,6 +16,7 @@ export const messages = {
   "mobile.agent.pin.unpinNamed": "{name} losmaken",
   "mobile.agent.pin.limitReached": "Maximum aantal vastgezette chats bereikt. Maak eerst een chat los.",
   "mobile.agent.pin.closeAction": "Vastzetactie voor {name} sluiten",
+  "mobile.agent.drag.pinHere": "Zet hier neer om vast te pinnen",
   "mobile.agent.appearance.preview": "Avatarvoorvertoning voor {name}",
   "mobile.agent.appearance.newAgent": "Nieuwe agent",
   "mobile.agent.appearance.faces": "Vorm en uitdrukking",

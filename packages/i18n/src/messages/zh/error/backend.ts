@@ -256,6 +256,8 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot 无法保存 API 密钥，请重试。",
   "error.backend.apiKeyNotAllowed": "只有服务器所有者或管理员可以输入 API 密钥。",
   "error.backend.apiKeySaving": "API 密钥正在保存中。",
+  "error.backend.vaultItemNotAllowed": "只有服务器所有者或管理员可以向保险库添加项目。",
+  "error.backend.vaultItemSaving": "该保险库项目正在保存中。",
   "error.backend.authRequestInactive": "该安全验证请求已不再有效。",
   "error.backend.secureAuthUnavailable": "安全验证不可用。",
   "error.backend.browserUrlRequired": "需要提供浏览器地址。",

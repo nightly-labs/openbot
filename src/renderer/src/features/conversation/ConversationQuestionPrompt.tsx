@@ -58,6 +58,7 @@ export function ConversationQuestionPrompt(props: {
                 <UiBlockPrompt
                   block={block()}
                   agents={view.agents}
+                  agentId={entry.prompt.agentId}
                   onSelectAgent={view.onSelectAgent}
                   onOpenLink={(url) => void openExternalMessageUrl(url)}
                   elementRef={(element) => props.elementRef?.(element)}

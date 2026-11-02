@@ -11,6 +11,7 @@ import { useUniwind } from "uniwind";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
+import { ChatDragArea, DRAG_AVATAR_SIZE, useChatDrag, useHoldMenu } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { PinnedChatItem } from "@/features/agents/components/pinned-agents-grid";
@@ -260,6 +261,13 @@ export const ChannelListRow = memo(function ChannelListRow({
   );
   // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
+  const drag = useChatDrag(pinned ? "pin" : "row", () => ({
+    chat: { kind: "channel", id: channel.id },
+    pinned,
+    name: channel.name,
+    preview: <ChannelAvatar channel={channel} agents={agents} size={DRAG_AVATAR_SIZE} disconnected={disconnected} />,
+  }));
+  const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const previewLine = useMemo(
     () => (channel.lastMessage ? markdownPreviewText(channel.lastMessage.text) : t("mobile.channel.list.noMessages")),
     [channel.lastMessage, t],
@@ -301,10 +309,8 @@ export const ChannelListRow = memo(function ChannelListRow({
       }}
       className={pinned ? "w-full items-center gap-2 px-1" : "w-full"}
       delayLongPress={longPressDelay}
-      onLongPress={() => {
-        void haptics.longPress();
-        if (isAndroid) setMenuKey((key) => key + 1);
-      }}
+      onLongPress={holdMenu.onLongPress}
+      onPressOut={holdMenu.onPressOut}
       style={pinned ? ({ pressed }) => ({ opacity: pressed ? 0.58 : 1 }) : undefined}
     >
       {pinned ? (
@@ -386,9 +392,13 @@ export const ChannelListRow = memo(function ChannelListRow({
     </ChannelContextMenuLink>
   );
   return pinned ? (
-    <PinnedChatItem>{content}</PinnedChatItem>
+    <PinnedChatItem>
+      <ChatDragArea drag={drag} fill>
+        {content}
+      </ChatDragArea>
+    </PinnedChatItem>
   ) : (
-    <AgentPinSwipeRow pinned={isPinned} agentName={channel.name} pinBlocked={pinBlocked} onPin={togglePin}>
+    <AgentPinSwipeRow pinned={isPinned} agentName={channel.name} pinBlocked={pinBlocked} onPin={togglePin} drag={drag}>
       {content}
     </AgentPinSwipeRow>
   );
