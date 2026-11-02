@@ -1,7 +1,8 @@
 import { Effect, Semaphore } from "effect";
 
-// The user's own ACP agents: list, save, delete, check and the answers to their usage prompts. This computer only: no Team API route
-// reaches these. `custom-agent-changes.ts` owns the order of the writes.
+// The user's own ACP agents: list, save, delete, check and the answers to their usage prompts. An
+// owner or admin of this server also lists, saves and deletes them through `custom-agents-v1`.
+// `custom-agent-changes.ts` owns the order of the writes.
 
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { CustomAgentChanges } from "../custom-agent-changes";

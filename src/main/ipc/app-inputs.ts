@@ -282,6 +282,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
   if (
     input !== "agent-setup" &&
     input !== "claude-install" &&
+    input !== "hermes-install" &&
     input !== "opencode-install" &&
     input !== "opencode-auth" &&
     input !== "feedback" &&
@@ -289,6 +290,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "changelog" &&
     input !== "guides" &&
     input !== "discord" &&
+    input !== "github" &&
     input !== "x" &&
     input !== "grok-bot-export" &&
     input !== "hosted-server-contact" &&
@@ -352,10 +354,13 @@ export function parseMarketplaceAgentQuery(input: unknown): MarketplaceAgentQuer
   if (!isObject(input)) throw new Error("Invalid agent marketplace query.");
   const category = input.category;
   if (category !== undefined && !isSkillCategory(category)) throw new Error("Unknown agent category.");
+  const verified = input.verified;
+  if (verified !== undefined && !isBoolean(verified)) throw new Error("Invalid agent source filter.");
   return {
     ...parseMarketplaceQueryFields(input),
     ...parseMarketplaceSort(input.sort, ["installs"] as const, "Unknown agent sort order."),
     ...(category ? { category } : {}),
+    ...(verified === undefined ? {} : { verified }),
   };
 }
 

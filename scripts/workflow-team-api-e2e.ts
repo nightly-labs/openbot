@@ -51,6 +51,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { SidebarLayoutStore } from "../src/backend/sidebar-layout-store";
+import { WorkflowGitHubStore } from "../src/backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../src/backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../src/backend/workflows/workflow-store";
 import { workflowScheduleDueAt } from "../src/backend/workflows/workflow-triggers";
@@ -244,6 +245,8 @@ async function startHost(): Promise<Host> {
     createWorkflows({
       store: new WorkflowStore({ database, nextDueAt: workflowScheduleDueAt(() => "UTC") }),
       runs: new WorkflowRunStore({ database }),
+      github: new WorkflowGitHubStore({ database }),
+      githubApp: () => null,
       delivery: (deliveryId) => {
         const agentId = deliveries.get(deliveryId);
         if (agentId === undefined) return null;

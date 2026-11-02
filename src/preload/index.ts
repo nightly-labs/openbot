@@ -11,6 +11,8 @@ import {
   decodeAgentFolderListFromMain,
   decodeAgentImportPreview,
   decodeAgentImportResult,
+  decodeAgentInstructionsFileFromMain,
+  decodeAgentPlanCardSettings,
   decodeAgentProfileDraft,
   decodeAgentTaskLimitSettings,
   decodeBrowserProfileList,
@@ -166,6 +168,7 @@ import {
   decodeOnePasswordConnectorStatus,
   decodePendingAgentTemplate,
   decodePendingListing,
+  decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
   decodeRemoteDesktopSetupFromMain,
   decodeRemoteDesktopTestFromMain,
@@ -312,6 +315,9 @@ import {
 import { decodeVaultImportResult, decodeVaultSecret, decodeVaultState } from "./vault-decoding";
 import {
   decodeWorkflowDetail,
+  decodeWorkflowGitHubCatalog,
+  decodeWorkflowGitHubHistory,
+  decodeWorkflowGitHubOptions,
   decodeWorkflowGraph,
   decodeWorkflowRunDetail,
   decodeWorkflowRunPage,
@@ -562,6 +568,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   readTask: decodeTaskConversation,
   startTask: decodeAgentTask,
   runQueuedMessageAsTask: decodeAgentTask,
+  branchTask: decodeAgentTask,
   stopTask: decodeVoid,
   closeTask: decodeVoid,
   reopenTask: decodeVoid,
@@ -783,6 +790,10 @@ const openbotApi: OpenBotDesktopApi = {
     runs: decodeWorkflowRunPage,
     run: decodeWorkflowRunDetail,
     rotateWebhookSecret: decodeWorkflowWebhookSecret,
+    githubCatalog: decodeWorkflowGitHubCatalog,
+    githubOptions: decodeWorkflowGitHubOptions,
+    githubHistory: decodeWorkflowGitHubHistory,
+    githubRunLastEvent: decodeWorkflowRunDetail,
   }),
   routineResults: bridgeGroup(IPC_ENDPOINTS.routineResults, {
     options: decodeRoutineResultOptions,
@@ -853,6 +864,7 @@ const openbotApi: OpenBotDesktopApi = {
     localInstall: decodeInstalledSkill,
     list: decodeSkillPage,
     get: decodeSkillDetail,
+    getBySlug: decodeSkillDetail,
     listMine: decodeSubmissions,
     choosePackage: decodeSkillPreview,
     submit: decodeSubmission,
@@ -1130,6 +1142,7 @@ const openbotApi: OpenBotDesktopApi = {
   marketplaceAgents: bridgeGroup(IPC_ENDPOINTS.marketplaceAgents, {
     list: decodeMarketplaceAgentPage,
     get: decodeMarketplaceAgentDetail,
+    getListing: decodeMarketplaceAgentDetail,
     listMine: decodeAgentSubmissions,
     preview: decodeAgentPublicationPreview,
     submit: decodeAgentSubmission,
@@ -1210,6 +1223,8 @@ const openbotApi: OpenBotDesktopApi = {
       updateAgentBackupModels: decodeAgentBackupModelSettings,
       getAgentTaskLimit: decodeAgentTaskLimitSettings,
       updateAgentTaskLimit: decodeAgentTaskLimitSettings,
+      getAgentPlanCard: decodeAgentPlanCardSettings,
+      updateAgentPlanCard: decodeAgentPlanCardSettings,
       listBrowserProfiles: decodeBrowserProfileList,
       createBrowserProfile: decodeBrowserProfileSummary,
       updateBrowserProfile: decodeBrowserProfileSummary,
@@ -1240,6 +1255,11 @@ const openbotApi: OpenBotDesktopApi = {
       listWorkspaceDirectory: decodeWorkspaceDirectory,
     }),
     ...agentFoldersGroup,
+    ...bridgeGroup(IPC_ENDPOINTS.agentInstructions, {
+      readAgentInstructions: decodeAgentInstructionsFileFromMain,
+      saveAgentInstructions: decodeAgentInstructionsFileFromMain,
+      revealAgentInstructions: decodeVoid,
+    }),
     // The page gets the folder, not its path, as for a dropped attachment.
     addDroppedAgentFolder: async (agentId, folder) => {
       const path = webUtils.getPathForFile(folder);
@@ -1343,6 +1363,10 @@ const openbotApi: OpenBotDesktopApi = {
   plugins: bridgeGroup(IPC_ENDPOINTS.plugins, {
     takePendingListing: decodePendingListing,
     openListing: dropInvalid(decodePendingListing),
+  }),
+  marketplace: bridgeGroup(IPC_ENDPOINTS.marketplace, {
+    takePendingListing: decodePendingMarketplaceListing,
+    openListing: dropInvalid(decodePendingMarketplaceListing),
   }),
   host: bridgeGroup(IPC_ENDPOINTS.host, {
     getStatus: decodeHostStatus,

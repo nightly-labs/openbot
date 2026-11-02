@@ -215,7 +215,7 @@ try {
   await choice("Destination platform", "Linux");
   await choice("Destination architecture", "x64");
   await page.getByRole("textbox", { name: "Destination OpenBot version", exact: true }).fill("1.2.3");
-  await page.getByRole("textbox", { name: "Destination schema version", exact: true }).fill("47");
+  await page.getByRole("textbox", { name: "Destination schema version", exact: true }).fill("49");
   await choice("Destination executor", "Container");
   await choice("Destination data ownership", "Owned by this destination");
   await choice("Destination persistence", "Persistent");

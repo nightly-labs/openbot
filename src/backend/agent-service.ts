@@ -26,6 +26,7 @@ import type {
   AskSideQuestionInput,
   AttachmentDataInput,
   AvatarImageInput,
+  BranchAgentTaskInput,
   CancelMcpSignInInput,
   CapabilityState,
   ChannelMemory,
@@ -162,9 +163,10 @@ import { DuplicationGate, toAgentDuplicationFailed } from "./agent/duplication-g
 import type { FailureContext, FailureSignal } from "./agent/failure-signal";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
+import { InstructionsChanges } from "./agent/instructions-changes";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
-import { mcpServersFromGateway } from "./agent/mcp-tools";
+import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
 import { MemoryHold } from "./agent/memory-hold";
 import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
 import {
@@ -217,7 +219,7 @@ import type { AgentApiKeys } from "./agent-api-keys";
 import type { AgentProvider } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
 import type { AgentStore } from "./agent-store";
-import { AgentTasks } from "./agent-tasks/agent-tasks";
+import { type AgentTaskBranchFailed, AgentTasks } from "./agent-tasks/agent-tasks";
 import { type AgentThreadRecord, AgentThreadStore } from "./agent-threads/agent-thread-store";
 import { AgentWaitStore } from "./agent-waits/agent-wait-store";
 import { AgentWaits } from "./agent-waits/agent-waits";
@@ -310,6 +312,8 @@ export interface AgentServiceOptions {
    * runtimes a stdio command may need. Without it the test runs with what this machine holds.
    */
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
+  /** The saved server that a Marketplace app installs, for an agent that suggests the app. */
+  marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
   sidebarLayout?: AgentSidebar | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
@@ -438,6 +442,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #browser: AgentBrowserHost;
   readonly #reader: ConversationReader;
   readonly #memories: AgentMemories;
+  readonly #instructionChanges = new InstructionsChanges();
   readonly #memoryReview: MemoryReview;
   readonly #waits: AgentWaits;
   readonly #tasks: AgentTasks;
@@ -483,7 +488,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** The agents that asked for a new chat with `start_new_chat`. A restart forgets the request. */
   readonly #requestedNewChats = new Set<string>();
   /** A turn that ends with open plan steps runs again, at most 3 times for one request. */
-  readonly #planContinuation = new PlanContinuation({ limit: 3 });
+  readonly #planContinuation = new PlanContinuation({ limit: 8 });
   #initialized = false;
   #stopping = false;
 
@@ -1037,6 +1042,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       serverHost: hostMemory !== null,
       sectionTeammates: (agentId) => this.sectionTeammates(agentId),
       channelThread: (threadId) => this.channels.store.channelForThread(threadId) !== null,
+      branchThread: (threadId) => this.#tasks.isBranchThread(threadId),
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
@@ -1380,6 +1386,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       providers: this.#providers,
       memories: this.#memories,
+      instructions: this.#instructionChanges,
       attention: this.#attention,
       browser,
       compaction: this.#compaction,
@@ -1498,6 +1505,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.surfaceHostToolAsk === undefined ? {} : { surfaceHostToolAsk: options.surfaceHostToolAsk }),
       hostMcpEndpoint: (config, agentId) => this.#mcp.endpoint(config, agentId),
       mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
+      ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       apiKeys: options.agentApiKeys ?? null,
       hooks: {
         listAgents: () => this.listAgents(),
@@ -1726,6 +1734,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (this.channels.hasActiveWork()) reasons.push("channel-work");
     if (this.#providers.activeProcessCount() > 0) reasons.push("provider-process");
     return reasons;
+  }
+
+  /**
+   * The user starts to save the agent's instruction file: a turn that runs now does not show the
+   * save as the agent's change. Call the result when the save ends.
+   */
+  instructionsSaving(agentId: string, text: string): (written: boolean) => void {
+    return this.#instructionChanges.saving(agentId, text);
   }
 
   listMemories(agentId: string): AgentMemory[] {
@@ -2161,6 +2177,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** The Vault of this computer changed. A joined admin's Server settings read it again (`vault-v1`). */
   notifyVaultChanged(): void {
     this.#emit({ type: "vault-changed" });
+  }
+
+  /**
+   * The named browser profiles, or the profile of an agent, changed. The settings of this window and
+   * of each joined client read them again (`browser-profiles-events-v1`).
+   */
+  notifyBrowserProfilesChanged(): void {
+    this.#emit({ type: "browser-profiles-changed" });
   }
 
   notifyWorkflowRunEnded(end: WorkflowRunEnd): void {
@@ -4339,6 +4363,28 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#tasks.publicTask(task);
   }).bind(this);
 
+  /**
+   * Makes a branch of a conversation of the agent: a new side thread with a copy of the conversation
+   * through the turn of the chosen message. No turn starts. The person who branched has read the copy.
+   */
+  readonly branchTask = Effect.fn("AgentService.branchTask")(function* (
+    this: AgentService,
+    input: BranchAgentTaskInput,
+    readerId: string,
+  ): Effect.fn.Return<AgentTask, AgentLifecycleFailed | AgentTaskBranchFailed> {
+    yield* lifecycleStep("find agent", () => {
+      if (!this.listAgents().some((agent) => agent.id === input.agentId))
+        throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
+      this.#requireNotHidden(input.agentId);
+    });
+    const task = yield* this.#tasks.branch(input);
+    const through = task.branch?.throughMessageId;
+    if (through)
+      yield* lifecycleStep("mark branch read", () => this.#reader.markThreadRead(readerId, task.threadId, through));
+    this.#tasks.changed(task.agentId);
+    return this.#tasks.publicTask(task);
+  }).bind(this);
+
   /** A teammate's answer that waits in a closing thread goes to the agent's own chat, so it is not cancelled. */
   #returnTaskAnswers(task: { agentId: string; taskId: string }): Effect.Effect<void, AgentLifecycleFailed> {
     return this.#mailbox.returnTaskAnswers(task.agentId, task.taskId).pipe(
@@ -5091,7 +5137,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     for (const session of sessions) {
       this.#conversation.unbindThread(session.externalSessionId);
       this.#conversation.unloadThread(session.externalSessionId);
-      this.#compaction.forgetThread(session.externalSessionId);
+      this.#compaction.endThread(session.externalSessionId);
     }
     this.#conversation.forgetExecutionThread(threadId);
   }, Effect.uninterruptible);

@@ -8,6 +8,7 @@ import Ellipsis from "lucide-react-native/icons/ellipsis";
 import EllipsisVertical from "lucide-react-native/icons/ellipsis-vertical";
 import Layers3 from "lucide-react-native/icons/layers";
 import MessagesSquare from "lucide-react-native/icons/messages-square";
+import PanelLeft from "lucide-react-native/icons/panel-left";
 import WifiOff from "lucide-react-native/icons/wifi-off";
 import {
   memo,
@@ -357,9 +358,10 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const hasSelectedServer = servers.some((server) => server.id === activeServer.id);
   const planLimits = usePlanLimits(activeServer.id);
   const showsPlanLimits = hasSelectedServer && planLimits.rows.length > 0;
+  // A server that the phone shows from its cache has its list at once, while it connects.
   const showLoader =
     (serverDirectoryState === "loading" && servers.length === 0) ||
-    (hasSelectedServer && activeServer.initialConnectionPending);
+    (hasSelectedServer && activeServer.initialConnectionPending && channelAgents.size === 0);
   // The list comes in as the loader starts to roll up, so the two overlap instead of waiting in turn.
   const listReady = !showLoader && !isLoaderPresent;
   // A new account gets the first-run flow in place of the empty home. The flow shows its own
@@ -631,7 +633,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         glass={buttonGlass}
         onPress={openDrawer}
       >
-        <Layers3 color={iconColor} size={22} strokeWidth={2} />
+        <PanelLeft color={iconColor} size={22} strokeWidth={2} />
       </HeaderIconButton>
       <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} fill={pane} />
     </View>
@@ -691,7 +693,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
           glass={buttonGlass}
           onPress={openDrawer}
         >
-          <Layers3 color={iconColor} size={22} strokeWidth={2} />
+          <PanelLeft color={iconColor} size={22} strokeWidth={2} />
         </HeaderIconButton>
       }
       pinnedAgents={pinnedAgents}
@@ -920,7 +922,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         <>
           <Stack.Toolbar placement="left">
             {/* The search takes the screen, so the bar buttons go while it is open. */}
-            <Stack.Toolbar.Button icon="square.stack.3d.up.fill" hidden={search.open} onPress={openDrawer} />
+            <Stack.Toolbar.Button icon="sidebar.leading" hidden={search.open} onPress={openDrawer} />
             <Stack.Toolbar.View hidesSharedBackground hidden={search.open}>
               <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} />
             </Stack.Toolbar.View>

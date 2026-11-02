@@ -10,11 +10,13 @@ import type {
   MarketplaceAgentSummary,
   MarketplaceSkillDetail,
   MarketplaceSkillQuery,
+  MarketplaceSkillSummary,
   McpServerConfig,
   McpSignInRelayPage,
   McpSignInState,
 } from "@openbot/contracts/ipc";
 import { assignedSkillCount, isRemovableSkill, isSkillEnabled, mcpConfigErrors } from "@openbot/contracts/ipc";
+import { createMarketplaceShareUrl, type MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import type { McpConnectFlow } from "@openbot/contracts/mcp-connect-flows";
 import { createPluginShareUrl } from "@openbot/contracts/plugin-links";
 import { TOAST_DURATION, toast } from "@openbot/ui";
@@ -73,6 +75,11 @@ export type MarketplaceAgentRow = Pick<
 > & {
   marketplaceSource?: ClientAgentSummary["marketplaceSource"];
 };
+
+/** What a Marketplace link opened: an agent, a pending one included, or a skill. */
+export type LinkedListing =
+  | { kind: "agent"; detail: MarketplaceAgentDetail }
+  | { kind: "skill"; skill: MarketplaceSkillSummary };
 
 export interface MarketplaceControllerProps {
   open: boolean;
@@ -143,13 +150,22 @@ function takesUpdate(skill: InstalledSkill): boolean {
   );
 }
 
-/** The agent catalog has no source filter, and it orders only by installs. */
-function agentQuery({ query, category, featured, sort, cursor, limit }: MarketplaceSkillQuery): MarketplaceAgentQuery {
+/** The agent catalog orders only by installs. */
+function agentQuery({
+  query,
+  category,
+  featured,
+  verified,
+  sort,
+  cursor,
+  limit,
+}: MarketplaceSkillQuery): MarketplaceAgentQuery {
   return {
     query,
     cursor,
     ...(category ? { category } : {}),
     ...(featured === undefined ? {} : { featured }),
+    ...(verified === undefined ? {} : { verified }),
     ...(sort === "installs" ? { sort } : {}),
     ...(limit === undefined ? {} : { limit }),
   };
@@ -1248,6 +1264,37 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       .catch((cause) => setError(t("marketplace.error.copyLink"), cause));
   }
 
+  /* The agent or skill link of a listing. The address is built from its id, as for a plugin. */
+  function copyListingLink(link: MarketplaceListingLink) {
+    void Promise.resolve()
+      .then(() => writeClipboardText(createMarketplaceShareUrl(link, calls().shareOrigin)))
+      .catch((cause) => setError(t("marketplace.error.copyLink"), cause));
+  }
+
+  /**
+   * The listing a Marketplace link names, or undefined when the catalog has none. A failure is the
+   * Missing notice on the page, so it shows no error toast.
+   */
+  async function readListing(link: MarketplaceListingLink): Promise<LinkedListing | undefined> {
+    const analytics = desktopAnalytics.scope();
+    const listing: LinkedListing | undefined = await (link.kind === "agent"
+      ? calls()
+          .agents.getListing(link.id)
+          .then((detail) => ({ kind: "agent" as const, detail }))
+      : calls()
+          .skills.getBySlug(link.id)
+          .then((skill) => ({ kind: "skill" as const, skill }))
+    ).catch(() => undefined);
+    // No listing id: a shared link can name an agent that waits for its first review.
+    analytics.track("marketplace_action", {
+      entity: link.kind,
+      action: "view",
+      result: listing ? "succeeded" : "failed",
+      ...(listing ? {} : { failure_code: "load_failed" }),
+    });
+    return listing;
+  }
+
   /* The connect step and the confirmation are siblings of the window. Closing the window stops them. */
   const stopDialogs = () => {
     untrack(connecting)?.settle(null);
@@ -1330,6 +1377,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       return run && agentId ? (prompt: MarketplacePluginPrompt) => run(agentId, prompt) : undefined;
     },
     copyLink,
+    copyListingLink,
     openUrl: openPluginUrl,
     connector,
 
@@ -1341,6 +1389,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
 
   return {
     model,
+    readListing,
     appStatesRead,
     connecting,
     uninstalling,

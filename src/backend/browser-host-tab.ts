@@ -81,13 +81,15 @@ export interface BrowserHostTab {
    */
   pendingRestore?: (() => Effect.Effect<void, BrowserOperationError>) | undefined;
   /**
-   * An idle agent tab whose page was unloaded to free its renderer's memory. The title and the last
+   * An idle agent tab whose page and renderer process were closed to free memory. The title and the last
    * preview frame stand in for the page until `pendingRestore` loads it again.
    */
   sleeping?: { title: string; preview: BrowserPreview | null } | undefined;
   /** When a person or an agent last used the tab. A preview request does not count as use. */
   lastUsedAt: number;
   focusOnVisible: boolean;
+  /** The next document keeps the focus that it takes when it commits: a person opened the tab or entered its address. */
+  focusOnCommit?: boolean | undefined;
   /** Whether the tab had focus when its page closed itself, so its opener can take focus over. */
   focusedAtPageClose?: boolean | undefined;
   environment: BrowserEnvironment;

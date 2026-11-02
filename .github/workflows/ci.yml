@@ -195,6 +195,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: xvfb-run -a bun run test:browser-steps
 
+      - name: Run the browser dialogs E2E
+        if: ${{ !cancelled() }}
+        run: xvfb-run -a bun run test:browser-dialogs
+
+      - name: Run the browser ambiguous targets E2E
+        if: ${{ !cancelled() }}
+        run: xvfb-run -a bun run test:browser-ambiguous-targets
+
       - name: Upload browser safety reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -548,6 +556,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun scripts/agent-mcp-scope-e2e.ts
 
+      - name: Run the SVG attachment E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:svg-attachments
+
       - name: Run the agent MCP server tools E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-mcp-tools
@@ -659,6 +671,7 @@ jobs:
             .openbot-build/backup-model-failover-e2e/
             .openbot-build/zip-attachment-e2e/
             .openbot-build/mp4-attachment-e2e/
+            .openbot-build/svg-attachment-e2e/
             .openbot-build/agent-mcp-tools-e2e/
             .openbot-build/agent-mcp-scope-e2e/
             .openbot-build/mcp-server-unreadable-row-e2e/
@@ -715,6 +728,10 @@ jobs:
       - name: Run the Antigravity MCP load failure E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-mcp-load-failure
+
+      - name: Run the Antigravity tool filter E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-tool-filter
 
       - name: Run the ACP additional directories E2E test
         if: ${{ !cancelled() }}
@@ -787,6 +804,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:acp-instructions-once
 
+      - name: Run the ACP audio input E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:acp-audio-input
+
       - name: Run the Grok steer E2E test
         if: ${{ !cancelled() }}
         run: bun run test:grok-steer
@@ -858,6 +879,7 @@ jobs:
             .openbot-build/codex-login-path-e2e/
             .openbot-build/antigravity-login-path-e2e/
             .openbot-build/antigravity-mcp-load-failure-e2e/
+            .openbot-build/antigravity-tool-filter-e2e/
             .openbot-build/acp-additional-directories-e2e/
             .openbot-build/acp-flavor-e2e/
             .openbot-build/acp-mcp-server-names-e2e/
@@ -877,6 +899,7 @@ jobs:
             .openbot-build/hermes-gateway-chat-e2e/
             .openbot-build/provider-detection-e2e/
             .openbot-build/acp-instructions-once-e2e/
+            .openbot-build/acp-audio-input-e2e/
             .openbot-build/grok-steer-e2e/
             .openbot-build/pi-steer-e2e/
             .openbot-build/muse-instructions-once-e2e/

@@ -32,6 +32,8 @@ export interface MarketplaceAgentSummary {
   version: number;
   installs: number;
   featured: boolean;
+  /** OpenBot checked the agent beyond the listing review. Absent from a Worker that has no such flag. */
+  verified?: boolean;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
   avatarUrl: string | null;
@@ -43,6 +45,13 @@ export interface MarketplaceAgentSummary {
 
 export interface MarketplaceAgentDetail extends MarketplaceAgentSummary {
   versionId: string;
+  /**
+   * True when OpenBot has not reviewed the agent yet: its shared link shows the version that waits for
+   * the first review. Only the listing read returns one; the catalog and the install never do.
+   */
+  pending?: boolean;
+  /** The share card of this version, on the Worker's origin. Absent from a Worker that draws none. */
+  cardUrl?: string | null;
   skills: MarketplaceAgentSkill[];
   routines: MarketplaceAgentRoutine[];
 }
@@ -56,6 +65,8 @@ export interface MarketplaceAgentQuery {
   category?: SkillCategory;
   query?: string | undefined;
   featured?: boolean;
+  /** True: only verified agents. False: only the other agents. */
+  verified?: boolean | undefined;
   sort?: "installs" | undefined;
   cursor?: string | undefined;
   limit?: number;
@@ -128,6 +139,8 @@ export function decodeMarketplaceAgentDetail(value: unknown): MarketplaceAgentDe
   const item = value;
   if (
     !isString(item.versionId) ||
+    (item.pending !== undefined && !isBoolean(item.pending)) ||
+    (item.cardUrl !== undefined && item.cardUrl !== null && !isString(item.cardUrl)) ||
     !Array.isArray(item.skills) ||
     !item.skills.every(isSkill) ||
     !Array.isArray(item.routines) ||
@@ -171,6 +184,7 @@ function isMarketplaceAgentSummary(value: unknown): value is MarketplaceAgentSum
     isNumber(value.version) &&
     isNumber(value.installs) &&
     isBoolean(value.featured) &&
+    (value.verified === undefined || isBoolean(value.verified)) &&
     isAvatarSeed(value.avatarSeed) &&
     (value.avatarHue === null || isAvatarHue(value.avatarHue)) &&
     (value.avatarUrl === null || isString(value.avatarUrl)) &&

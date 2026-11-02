@@ -6,8 +6,9 @@
 // It checks that a stopped task has the stop reason (so Continue and Reassign show), that "continue"
 // resumes the tasks of the newest stopped request and not an older stopped one, that the resumed
 // members answer that request, that a typed "@Name" goes to that member with no routing turn, that a
-// lead that answers alone gets no "Assigned to" row, and that a restore gives archived work the stop
-// reason. It makes its own channel and deletes it. Writes
+// lead that answers alone gets no "Assigned to" row, that a restore gives archived work the stop
+// reason, and that Cancel ends a stopped task and leaves other stopped work. It makes its own channel
+// and deletes it. Writes
 // .openbot-build/channel-stuck-tasks-e2e/report.json.
 import assert from "node:assert/strict";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
@@ -31,6 +32,7 @@ interface Report {
   typedAddress?: { ownerAgentId: string | null; routingRows: number };
   leadAlone?: { ownerAgentId: string | null; routingRows: number; checked: boolean };
   restoreReason?: string | null;
+  cancelled?: { state: string; error: string | null; otherStoppedState: string };
   passed: boolean;
 }
 
@@ -233,6 +235,19 @@ try {
   await client.command({ type: "restore", operationId: crypto.randomUUID(), channelId: channel.id });
   report.restoreReason = taskOf(await client.read(channel.id), archivedTask.id)?.error ?? null;
   assert.equal(report.restoreReason, stopped);
+
+  // 7. Cancel ends the stopped task, so it shows no Continue or Reassign, and leaves the older
+  // stopped request as it is.
+  await client.taskCommand("cancel", channel.id, archivedTask.id);
+  const afterCancel = await client.read(channel.id);
+  report.cancelled = {
+    state: taskOf(afterCancel, archivedTask.id)?.state ?? "missing",
+    error: taskOf(afterCancel, archivedTask.id)?.error ?? null,
+    otherStoppedState: taskOf(afterCancel, olderTask.id)?.state ?? "missing",
+  };
+  assert.equal(report.cancelled.state, "cancelled", "Cancel did not end the stopped task.");
+  assert.equal(report.cancelled.error, null, "The cancelled task kept its stop reason.");
+  assert.equal(report.cancelled.otherStoppedState, "paused", "Cancel changed another stopped request.");
   report.passed = true;
 } finally {
   await client.cleanup();

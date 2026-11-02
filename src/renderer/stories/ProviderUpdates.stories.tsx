@@ -13,7 +13,18 @@ import {
   showProviderUpdateToast,
 } from "../src/features/provider-updates/provider-update-toast";
 
-const PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity", "cursor", "cline", "pi", "muse"] as const;
+const PROVIDERS = [
+  "codex",
+  "claude",
+  "grok",
+  "opencode",
+  "antigravity",
+  "cursor",
+  "cline",
+  "kimi",
+  "pi",
+  "muse",
+] as const;
 const NAMES: Record<ManagedProviderId, string> = {
   codex: "ChatGPT",
   claude: "Claude",
@@ -22,6 +33,7 @@ const NAMES: Record<ManagedProviderId, string> = {
   antigravity: "Gemini",
   cursor: "Cursor",
   cline: "Cline",
+  kimi: "Kimi",
   pi: "Pi",
   muse: "Muse",
 };
@@ -33,6 +45,7 @@ const INSTALLED: Record<ManagedProviderId, string> = {
   antigravity: "1.2.1",
   cursor: "2026.09.28-64d2043",
   cline: "3.0.68",
+  kimi: "1.52.0",
   pi: "1.1.0",
   muse: "1.4.4-R5419.1",
 };
@@ -46,6 +59,7 @@ const AVAILABLE: Record<ManagedProviderId, string | null> = {
   antigravity: null,
   cursor: null,
   cline: null,
+  kimi: null,
   pi: null,
   muse: null,
 };
@@ -64,6 +78,7 @@ function readyRuntimes(): Record<ManagedProviderId, ProviderRuntimeStatus> {
     antigravity: { phase: "ready", progress: 100, message: null, version: INSTALLED.antigravity },
     cursor: { phase: "ready", progress: 100, message: null, version: INSTALLED.cursor },
     cline: { phase: "ready", progress: 100, message: null, version: INSTALLED.cline },
+    kimi: { phase: "ready", progress: 100, message: null, version: INSTALLED.kimi },
     pi: { phase: "ready", progress: 100, message: null, version: INSTALLED.pi },
     muse: { phase: "ready", progress: 100, message: null, version: INSTALLED.muse },
   };

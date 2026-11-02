@@ -11,6 +11,7 @@ import {
   type AccountUsage,
   AGENT_DEFAULT_KEYS,
   AGENT_FOLDER_LIMIT,
+  AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
   type AgentAccessChange,
   type AgentBrowserProfile,
   type AgentDefaults,
@@ -18,6 +19,7 @@ import {
   type AgentExclusionChange,
   type AgentFolderChange,
   type AgentFolderList,
+  type AgentInstructionsFile,
   type AgentMemory,
   type AgentMemoryLimitPreference,
   type AgentMemorySelection,
@@ -46,6 +48,7 @@ import {
   agentComputerUseEnabled,
   agentExclusionCoverage,
   agentFolderCoverage,
+  agentQuickAcknowledgementEnabled,
   agentTaskLimit,
   type BackgroundProcess,
   type BrowserProfileSummary,
@@ -748,6 +751,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return agent;
   }
 
+  // The instruction file of each agent, in memory. An agent with none shows an empty AGENTS.md.
+  const mockInstructionFiles = new Map<string, AgentInstructionsFile>();
+
+  function mockAgentInstructions(agentId: string): AgentInstructionsFile {
+    requireMockAgent(agentId);
+    return mockInstructionFiles.get(agentId) ?? { fileName: "AGENTS.md", exists: false, text: "" };
+  }
+
   /** The preview has no disk: a folder whose path ends in "(missing)" is not found. */
   function mockAgentFolders(agentId: string): AgentFolderList {
     const agent = requireMockAgent(agentId);
@@ -815,6 +826,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const taskConversations = new Map<string, ConversationSnapshot>(
     Object.entries(clone(options.taskConversations ?? {})),
   );
+  /** The branch of each `branchTask` request id, so a retry returns the same branch. */
+  const branches = new Map<string, AgentTask>();
 
   function taskList(agentId: string): AgentTasksSnapshot {
     const list = tasks.get(agentId) ?? [];
@@ -1278,7 +1291,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     cancelProviderRestart: async () => clone(agentStatus),
     // A code that never completes: the preview has no provider to finish the sign-in, so this shows
     // the waiting screen and leaves it there. Claude signs in with a code its page shows, which the
-    // user pastes back, and Cursor with a page that signs its CLI in by itself.
+    // user pastes back, Cursor with a page that signs its CLI in by itself, and Hermes with a Nous
+    // Portal code.
     startProviderCodeLogin: async (provider) =>
       provider === "claude"
         ? {
@@ -1292,12 +1306,19 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
               verificationUrl: "https://cursor.com/loginDeepControl?mode=login&redirectTarget=cli",
               expiresAt: Date.now() + 10 * 60_000,
             }
-          : {
-              kind: "code",
-              userCode: "KTQ4-B62MX",
-              verificationUrl: "https://auth.openai.com/codex/device",
-              expiresAt: Date.now() + 10 * 60_000,
-            },
+          : provider === "hermes"
+            ? {
+                kind: "code",
+                userCode: "NOUS-1234",
+                verificationUrl: "https://portal.nousresearch.com",
+                expiresAt: Date.now() + 10 * 60_000,
+              }
+            : {
+                kind: "code",
+                userCode: "KTQ4-B62MX",
+                verificationUrl: "https://auth.openai.com/codex/device",
+                expiresAt: Date.now() + 10 * 60_000,
+              },
     cancelProviderCodeLogin: async () => clone(agentStatus),
     cancelProviderSignIn: async () => clone(agentStatus),
     setProviderApiKey: async ({ provider, key }) => {
@@ -1749,7 +1770,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           (agent) =>
             matchesQuery(`${agent.name} ${agent.title} ${agent.description} ${agent.creatorName}`, query?.query) &&
             (!query?.category || (agent.category ?? "other") === query.category) &&
-            (query?.featured !== true || agent.featured),
+            (query?.featured !== true || agent.featured) &&
+            (query?.verified === undefined || (agent.verified === true) === query.verified),
         );
         const start = Number(query?.cursor ?? 0);
         const end = start + (query?.limit ?? 50);
@@ -1760,6 +1782,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       get: async (listingId) => {
         const detail = STORY_MARKETPLACE_AGENT_DETAILS[listingId];
+        if (!detail) throw new Error("Agent not found");
+        return clone(detail);
+      },
+      getListing: async (agentId) => {
+        const detail = STORY_MARKETPLACE_AGENT_DETAILS[agentId];
         if (!detail) throw new Error("Agent not found");
         return clone(detail);
       },
@@ -2028,6 +2055,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         );
         return { outcome: "included", path, list: mockAgentFolders(agentId) };
       },
+      readAgentInstructions: async (agentId) => mockAgentInstructions(agentId),
+      saveAgentInstructions: async ({ agentId, text, expected }) => {
+        const current = mockAgentInstructions(agentId);
+        if (current.text !== expected) throw new Error(sourceText("error.agent.instructionsChanged"));
+        const file: AgentInstructionsFile = { fileName: current.fileName, exists: true, text };
+        mockInstructionFiles.set(agentId, file);
+        return file;
+      },
+      revealAgentInstructions: async (agentId) => {
+        requireMockAgent(agentId);
+      },
       getAgentTaskLimit: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
         if (!agent) throw new Error("Agent not found");
@@ -2036,6 +2074,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgentTaskLimit: async (input) => {
         await api.agent.updateAgent(input);
         return api.agent.getAgentTaskLimit(input.agentId);
+      },
+      getAgentPlanCard: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return { quickAcknowledgement: agentQuickAcknowledgementEnabled(agent, agentDefaults) };
+      },
+      updateAgentPlanCard: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentPlanCard(input.agentId);
       },
       listBrowserProfiles: async () => ({
         profiles: browserProfiles.map(browserProfileSummary),
@@ -2046,6 +2093,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         const hue = nextBrowserProfileHue(browserProfiles.map((profile) => profile.hue));
         const profile = { id: crypto.randomUUID().replaceAll("-", ""), name, hue };
         browserProfiles = [...browserProfiles, profile];
+        emitAgentEvent({ type: "browser-profiles-changed" });
         return browserProfileSummary(profile);
       },
       updateBrowserProfile: async ({ profileId, name, hue }) => {
@@ -2053,10 +2101,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (name !== undefined) requireFreeBrowserProfileName(name, profileId);
         const next = { ...current, name: name ?? current.name, hue: hue ?? current.hue };
         browserProfiles = browserProfiles.map((profile) => (profile.id === profileId ? next : profile));
+        emitAgentEvent({ type: "browser-profiles-changed" });
         return browserProfileSummary(requireBrowserProfile(profileId));
       },
       clearBrowserData: async (input) => {
         if ("profileId" in input) requireBrowserProfile(input.profileId);
+        emitAgentEvent({ type: "browser-profiles-changed" });
       },
       deleteBrowserProfile: async (profileId) => {
         requireBrowserProfile(profileId);
@@ -2065,6 +2115,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           agent.browserProfileId === profileId ? withBrowserProfile(agent, { kind: "shared" }) : agent,
         );
         emitAgentEvent({ type: "agents-changed", agents });
+        emitAgentEvent({ type: "browser-profiles-changed" });
       },
       getAgentBrowserProfile: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
@@ -2075,6 +2126,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (profile.kind === "profile") requireBrowserProfile(profile.profileId);
         agents = agents.map((agent) => (agent.id === agentId ? withBrowserProfile(agent, profile) : agent));
         emitAgentEvent({ type: "agents-changed", agents });
+        emitAgentEvent({ type: "browser-profiles-changed" });
         return api.agent.getAgentBrowserProfile(agentId);
       },
       listBrowserTabProfiles: async () => [],
@@ -2744,16 +2796,39 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
                   id: `${turnId}:plan-continuation`,
                   author: "system",
                   source: "system",
-                  text: sourceText("status.agent.planContinues", { current: 1, limit: 3 }),
+                  text: sourceText("status.agent.planContinues", { current: 1, limit: 8 }),
                   createdAt: new Date().toISOString(),
                   status: "completed",
                   itemType: PLAN_CONTINUATION_ITEM_TYPE,
                 },
               ]
             : [];
+          // A message that asks for a rule adds it to the instruction file, as a real agent does.
+          const instructionsChange: ConversationMessage[] = [];
+          if (/\brule\b/iu.test(input.text)) {
+            const before = mockAgentInstructions(input.agentId);
+            const after = `${before.text}${before.text && !before.text.endsWith("\n") ? "\n" : ""}- ${input.text.slice(0, 200)}\n`;
+            mockInstructionFiles.set(input.agentId, { ...before, exists: true, text: after });
+            instructionsChange.push({
+              id: `${turnId}:instructions-change`,
+              author: "system",
+              source: "system",
+              text: sourceText("status.agent.instructionsChanged"),
+              createdAt: new Date().toISOString(),
+              status: "completed",
+              itemType: AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
+              instructionsChange: { before: before.text, after },
+            });
+          }
           updateSnapshot(input.agentId, (snapshot) => {
             snapshot.activeTurnId = null;
-            snapshot.messages = [...snapshot.messages, assistantMessage, ...memoryMessage, ...planContinuation];
+            snapshot.messages = [
+              ...snapshot.messages,
+              assistantMessage,
+              ...memoryMessage,
+              ...instructionsChange,
+              ...planContinuation,
+            ];
           });
           queues.set(input.agentId, {
             agentId: input.agentId,
@@ -2807,6 +2882,46 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "queue-changed", snapshot: clone(queue) });
         const task = createTask(input.agentId, delivery.text);
         runTaskTurn(task, delivery.text);
+        return clone(task);
+      },
+      branchTask: async (input) => {
+        const earlier = branches.get(input.requestId);
+        if (earlier) return clone(earlier);
+        const sourceTask = input.taskId === null ? null : findTask(input.agentId, input.taskId);
+        const source = sourceTask ? taskConversation(sourceTask) : getSnapshot(input.agentId);
+        if (source.activeTurnId) throw new Error(sourceText("error.backend.branchSourceBusy"));
+        const index = source.messages.findIndex((message) => message.id === input.messageId);
+        const chosen = source.messages[index];
+        if (chosen?.author !== "assistant" || chosen.status === "streaming") {
+          throw new Error(sourceText("error.backend.branchMessageNotFound"));
+        }
+        const messages = source.messages
+          .slice(0, index + 1)
+          .map(({ delivery: _delivery, reaction: _reaction, reactions: _reactions, ...message }) => ({
+            ...clone(message),
+            id: `mock-branch-message-${messageCounter++}`,
+          }));
+        const lastUserText = messages.findLast((message) => message.author === "user")?.text;
+        const task = createTask(
+          input.agentId,
+          sourceTask ? `${sourceTask.title} #2` : lastUserText?.trim() || sourceText("status.agent.branchTitle"),
+        );
+        const through = messages.at(-1);
+        task.branch = {
+          sourceTaskId: input.taskId,
+          sourceTitle: sourceTask?.title ?? null,
+          sourceMessageId: input.messageId,
+          throughMessageId: through?.id ?? input.messageId,
+        };
+        taskConversations.set(task.id, {
+          agentId: task.agentId,
+          threadId: task.threadId,
+          activeTurnId: null,
+          revision: 0,
+          messages,
+        });
+        branches.set(input.requestId, task);
+        emitTasks(input.agentId);
         return clone(task);
       },
       stopTask: async (input) => {
@@ -3057,6 +3172,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     localServers: mockTeam.localServers,
     plugins: {
       // The preview is never opened by a link, so there is nothing pending and nothing to push.
+      takePendingListing: async () => null,
+      onOpenListing: (listener) => {
+        void listener;
+        return () => undefined;
+      },
+    },
+    marketplace: {
       takePendingListing: async () => null,
       onOpenListing: (listener) => {
         void listener;

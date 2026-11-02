@@ -1,28 +1,48 @@
+import {
+  expandAttachmentReferences,
+  removeAttachmentReferences,
+  serializeAttachmentReference,
+} from "@openbot/contracts/attachment-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentApproval,
   AgentTask,
   AgentTaskInput,
   AgentTasksSnapshot,
+  AttachmentDataInput,
   AttachmentSummary,
   ConversationSnapshot,
+  DraftAttachment,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { plainTaskTitle, taskApproval } from "@openbot/team-client/agent-tasks";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { AgentTaskWait } from "@openbot/ui/features/conversation/AgentTasks";
+import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
+import type { ComposerPasteResult, ComposerSelection } from "@openbot/ui/features/conversation/ComposerEditor";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { AgentThreadView } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import { TaskAnswerCard, TaskPanel } from "@openbot/ui/features/tasks/TaskPanel";
 import { TasksPage, type TasksVoice } from "@openbot/ui/features/tasks/TasksPage";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createMemo, createProjection, createStore, onCleanup, Show, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createProjection,
+  createSignal,
+  createStore,
+  onCleanup,
+  Show,
+  untrack,
+} from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
 import { usePlatform } from "../../platform";
 import { readAgentSelection, writeAgentSelection } from "../agents/agent-selection";
+import { insertAtSelection, rowAttachments } from "../conversation/composer-draft";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
+import { importPastedFiles, type PastePreview, pastePreviewTracker } from "../conversation/stores/composer-actions";
 import { createTurnSteps } from "../conversation/turn-steps";
 import type { TaskEvent, TasksSource } from "./tasks-port";
 
@@ -42,6 +62,16 @@ export interface TasksVoiceControls {
   focus: () => void;
 }
 
+/**
+ * The files of a task message: a start or a message to a task. Only a server that takes files in a
+ * side thread has them: this computer, or a host with `agent-thread-files-v1`.
+ */
+export interface TaskFiles {
+  accepted: () => boolean;
+  import: (data: AttachmentDataInput[], serverId: string) => Promise<DraftAttachment[]>;
+  discard: (id: string, serverId: string) => Promise<void>;
+}
+
 /** The voice of the composer. `submit` sends while it records: the transcript starts the task. */
 export type TasksVoiceAdapter = TasksVoice & { submit: () => void };
 
@@ -57,6 +87,10 @@ interface TasksViewProps {
   voice?: ((controls: TasksVoiceControls) => TasksVoiceAdapter) | undefined;
   onOpenLink: (url: string) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
+  /** Absent where the client cannot send files with a task message. */
+  files?: TaskFiles | undefined;
+  /** Loads the images of a client that gets no `previewUrl`. */
+  mediaSource?: AttachmentMediaSource | undefined;
   /** The waiting approvals of the server's agents. */
   approvals: readonly AgentApproval[];
   onRespondApproval: (approval: AgentApproval, decision: "accept" | "decline") => Promise<boolean>;
@@ -73,6 +107,7 @@ interface TasksViewProps {
 interface PendingStart {
   task: AgentTask;
   text: string;
+  attachments: DraftAttachment[];
   clientMessageId: string;
   /** The server of the start. A server change commits it after `props.serverId` names the new one. */
   serverId: string;
@@ -86,6 +121,8 @@ interface TasksViewState {
   conversations: Record<string, ConversationSnapshot>;
   /** The unsent text of each task's message box, by task id. */
   drafts: Record<string, string>;
+  /** The files of each message box that the text does not name: `START_FILES` for the start, or a task id. */
+  files: Record<string, DraftAttachment[]>;
   pending: AgentTask | null;
   agentId: string;
   draft: string;
@@ -94,6 +131,9 @@ interface TasksViewState {
   took: { taskId: string; pending: boolean } | null;
   selectedId: string | null;
 }
+
+/** The key of the start composer's files in `TasksViewState.files`. A task id never has this form. */
+const START_FILES = "start";
 
 function toastError(error: unknown, fallback: AppTextKey): void {
   const { t, errorMessage } = currentText();
@@ -110,6 +150,7 @@ export function TasksView(props: TasksViewProps) {
     snapshots: {},
     conversations: {},
     drafts: {},
+    files: {},
     pending: null,
     agentId: "",
     draft: "",
@@ -124,6 +165,103 @@ export function TasksView(props: TasksViewProps) {
   let generation = 0;
   const listRequests = new Map<string, number>();
   const readRequests = new Map<string, number>();
+  const [pastePreviews, setPastePreviews] = createSignal<readonly PastePreview[]>([]);
+  const filesOf = (key: string) => state.files[key] ?? [];
+  const pendingImagesOf = (key: string) => pastePreviews().filter((preview) => preview.draftKey === key);
+  const filesAccepted = () => props.files?.accepted() === true;
+
+  function discardFiles(attachments: readonly DraftAttachment[], serverId: string): void {
+    for (const attachment of attachments) void props.files?.discard(attachment.id, serverId).catch(() => undefined);
+  }
+
+  /** The text of a message box: `START_FILES` for the start, or a task id. */
+  const textOf = (key: string) => (key === START_FILES ? state.draft : (state.drafts[key] ?? ""));
+  function setText(key: string, text: string): void {
+    setState((draft) => {
+      if (key === START_FILES) draft.draft = text;
+      else draft.drafts[key] = text;
+    });
+  }
+  const rowFilesOf = (key: string) => rowAttachments(textOf(key), filesOf(key));
+
+  /**
+   * Imports pasted files into a message box, and puts their references at the selection, or at the end
+   * when the text changed. The files go to the server of the paste only.
+   */
+  async function pasteFiles(
+    key: string,
+    files: ReadonlyArray<File | Promise<File>>,
+    selection: ComposerSelection,
+  ): Promise<ComposerPasteResult | undefined> {
+    const port = props.files;
+    if (!port || !filesAccepted()) return;
+    const before = textOf(key);
+    const current = generation;
+    const serverId = untrack(() => props.serverId);
+    const previews = pastePreviewTracker(key, setPastePreviews);
+    try {
+      const imported = await importPastedFiles(
+        files,
+        () => filesOf(key).length,
+        (data) => port.import(data, serverId),
+        previews.onAccepted,
+      );
+      if (current !== generation) {
+        discardFiles(imported, serverId);
+        return;
+      }
+      // Another paste can fill the box while this one imports.
+      const accepted = imported.slice(0, Math.max(0, INPUT_LIMITS.attachments - filesOf(key).length));
+      discardFiles(imported.slice(accepted.length), serverId);
+      if (accepted.length < imported.length)
+        actionToast.error(currentText().t("composer.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
+      if (!accepted.length) return;
+      setState((draft) => {
+        draft.files[key] = [...(draft.files[key] ?? []), ...accepted];
+      });
+      const references = accepted.map((file) => serializeAttachmentReference(file.name, file.id)).join(" ");
+      const result = insertAtSelection(textOf(key), references, { before, selection });
+      // A message that would be too long keeps the files in the row only.
+      if (result.value.length > INPUT_LIMITS.messageText) return;
+      setText(key, result.value);
+      return result;
+    } catch (error) {
+      if (current === generation) toastError(error, "composer.error.keepAttachments");
+    } finally {
+      previews.stop();
+    }
+  }
+
+  function removeFile(key: string, attachment: DraftAttachment): void {
+    setText(key, removeAttachmentReferences(textOf(key), attachment.id));
+    setState((draft) => {
+      const next = (draft.files[key] ?? []).filter((file) => file.id !== attachment.id);
+      if (next.length) draft.files[key] = next;
+      else delete draft.files[key];
+    });
+    discardFiles(
+      [attachment],
+      untrack(() => props.serverId),
+    );
+  }
+
+  /** Takes the files of a message box out of the page state, for a message that carries them. */
+  function takeFiles(key: string): DraftAttachment[] {
+    const taken = filesOf(key);
+    if (taken.length)
+      setState((draft) => {
+        delete draft.files[key];
+      });
+    return taken;
+  }
+
+  /** Puts files back in front of a message box's row, after a start that failed or was undone. */
+  function returnFiles(key: string, attachments: readonly DraftAttachment[]): void {
+    if (!attachments.length) return;
+    setState((draft) => {
+      draft.files[key] = [...attachments, ...(draft.files[key] ?? [])];
+    });
+  }
 
   // The agent chosen last on this server stays the default, so the user does not choose it again on each visit.
   const savedAgentId = createMemo(() => readAgentSelection(TASK_AGENT_STORAGE_KEY)[props.serverId] ?? "");
@@ -259,7 +397,12 @@ export function TasksView(props: TasksViewProps) {
     const current = generation;
     try {
       const task = await props.source.start(
-        { agentId: start.task.agentId, text: start.text, clientMessageId: start.clientMessageId },
+        {
+          agentId: start.task.agentId,
+          text: start.text,
+          clientMessageId: start.clientMessageId,
+          ...(start.attachments.length ? { attachmentDraftIds: start.attachments.map((file) => file.id) } : {}),
+        },
         start.serverId,
       );
       if (current !== generation) return task;
@@ -273,6 +416,7 @@ export function TasksView(props: TasksViewProps) {
     } catch (error) {
       if (current !== generation) {
         toastError(error, "conversation.tasks.error.start");
+        discardFiles(start.attachments, start.serverId);
         return null;
       }
       const { t, errorMessage } = currentText();
@@ -287,6 +431,7 @@ export function TasksView(props: TasksViewProps) {
         }
         draft.startError = errorMessage(error, t("conversation.tasks.error.start"));
       });
+      returnFiles(START_FILES, start.attachments);
       return null;
     }
   }
@@ -297,7 +442,12 @@ export function TasksView(props: TasksViewProps) {
   }
 
   function start(text: string): boolean {
-    const title = plainTaskTitle(text);
+    // A start of images only names them, as a side thread does. A file gives its name to the title.
+    if (!plainTaskTitle(expandAttachmentReferences(text)))
+      text = filesOf(START_FILES)
+        .map((file) => serializeAttachmentReference(file.name, file.id))
+        .join(" ");
+    const title = plainTaskTitle(expandAttachmentReferences(text));
     const owner = agentId();
     if (!title || !owner) return false;
     commitNow();
@@ -323,6 +473,7 @@ export function TasksView(props: TasksViewProps) {
     pending = {
       task,
       text,
+      attachments: takeFiles(START_FILES),
       clientMessageId,
       serverId: props.serverId,
       timer: setTimeout(() => void commit(), UNDO_MS),
@@ -350,6 +501,7 @@ export function TasksView(props: TasksViewProps) {
       draft.agentId = start.task.agentId;
       draft.focusRequest += 1;
     });
+    returnFiles(START_FILES, start.attachments);
   }
 
   /** A waiting task opens as soon as it starts; the panel shows it as queued until then. */
@@ -398,6 +550,10 @@ export function TasksView(props: TasksViewProps) {
         draft.snapshots = {};
         draft.conversations = {};
         draft.drafts = {};
+        // The old server discarded the files, so the start text no longer names them.
+        for (const file of draft.files[START_FILES] ?? [])
+          draft.draft = removeAttachmentReferences(draft.draft, file.id);
+        draft.files = {};
         draft.pending = null;
         draft.selectedId = null;
         draft.took = null;
@@ -417,6 +573,8 @@ export function TasksView(props: TasksViewProps) {
       return () => {
         // A waiting start goes to the server it was sent on.
         commitNow();
+        // The files of the message boxes are drafts on the old server, so they go.
+        discardFiles(Object.values(untrack(() => state.files)).flat(), serverId);
         generation++;
         unsubscribe();
       };
@@ -527,14 +685,29 @@ export function TasksView(props: TasksViewProps) {
       const target = input();
       if (!target) return false;
       const serverId = untrack(() => props.serverId);
+      const files = untrack(() => filesOf(taskId));
       const sent = await runAction(async () => {
         if (hosted()?.state === "closed") await props.source.reopen(target, serverId);
-        await props.source.send({ ...target, text, clientMessageId: crypto.randomUUID() }, serverId);
+        await props.source.send(
+          {
+            ...target,
+            text,
+            clientMessageId: crypto.randomUUID(),
+            ...(files.length ? { attachmentDraftIds: files.map((file) => file.id) } : {}),
+          },
+          serverId,
+        );
       }, "conversation.tasks.error.send");
-      if (sent)
+      if (sent) {
+        const sentIds = new Set(files.map((file) => file.id));
         setState((draft) => {
           delete draft.drafts[taskId];
+          // A file that came during the send stays.
+          const rest = (draft.files[taskId] ?? []).filter((file) => !sentIds.has(file.id));
+          if (rest.length) draft.files[taskId] = rest;
+          else delete draft.files[taskId];
         });
+      }
       return sent;
     };
     return (
@@ -564,6 +737,11 @@ export function TasksView(props: TasksViewProps) {
               agents={props.agents}
               messages={messages}
               draft={state.drafts[taskId] ?? ""}
+              draftAttachments={filesOf(taskId)}
+              rowAttachments={rowFilesOf(taskId)}
+              pendingImages={pendingImagesOf(taskId)}
+              onRemoveAttachment={filesAccepted() ? (attachment) => removeFile(taskId, attachment) : undefined}
+              onPasteFiles={filesAccepted() ? (files, selection) => pasteFiles(taskId, files, selection) : undefined}
               onDraftChange={(text) =>
                 setState((draft) => {
                   draft.drafts[taskId] = text;
@@ -578,6 +756,7 @@ export function TasksView(props: TasksViewProps) {
               onOpenLink={props.onOpenLink}
               onPreview={(attachment) => props.onAttachmentAction(attachment, "open")}
               onAttachmentAction={props.onAttachmentAction}
+              mediaSource={props.mediaSource}
               approval={approval()}
               onRespondApproval={async (decision) => {
                 const current = approval();
@@ -623,6 +802,11 @@ export function TasksView(props: TasksViewProps) {
       }}
       draft={state.draft}
       onDraftChange={voiceControls.setDraft}
+      files={filesOf(START_FILES)}
+      rowFiles={rowFilesOf(START_FILES)}
+      pendingImages={pendingImagesOf(START_FILES)}
+      onRemoveFile={(attachment) => removeFile(START_FILES, attachment)}
+      onPasteFiles={filesAccepted() ? (files, selection) => pasteFiles(START_FILES, files, selection) : undefined}
       focusRequest={state.focusRequest}
       startError={state.startError}
       onDismissStartError={() =>

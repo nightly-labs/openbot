@@ -62,6 +62,7 @@ export const messages = {
   "composer.reply.attachment": "附件",
   "composer.reply.cancel": "取消回复",
   "composer.attachment.remove": "移除 {name}",
+  "composer.attachment.adding": "正在添加 {name}",
   "composer.placeholder.hostSetup": "请先在主机上完成服务商设置，才能开始",
   "composer.placeholder.connectHost": "请先连接你的主机，才能开始",
   "composer.placeholder.hostSleeping": "服务器已休眠，按任意键或点击唤醒",

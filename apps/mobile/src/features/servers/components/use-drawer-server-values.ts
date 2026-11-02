@@ -81,7 +81,7 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
   });
   const range = lastUsageDays();
   const usage = useQuery({
-    queryKey: queryKeys.serverUsage(queryScope, serverId, range, undefined),
+    queryKey: queryKeys.serverUsage(queryScope, serverId, range),
     queryFn: () => loadHostAnalytics(range, serverId),
     enabled,
     retry: false,

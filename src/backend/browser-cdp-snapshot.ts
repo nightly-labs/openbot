@@ -28,6 +28,11 @@ const MAX_SCANNED_TEXT = 100_000;
  */
 const MAX_SNAPSHOT_TEXT = 20_000;
 export const MAX_SNAPSHOT_SCANNED_NODES = 10_000;
+/** The matches an ambiguous target collects, so that its error can name the candidates. */
+export const MAX_TARGET_CANDIDATES = 5;
+const MAX_CANDIDATE_TEXT = 120;
+const MAX_CANDIDATE_ITEM_TEXT = 200;
+const MAX_CANDIDATE_PEERS = 500;
 const MAX_SNAPSHOT_ELEMENT_VALUE = 2_000;
 const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
 
@@ -400,7 +405,7 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
         const matches = [];
         let scanned = 0;
         let truncated = false;
-        while (roots.length && matches.length < 2) {
+        while (roots.length && matches.length < ${MAX_TARGET_CANDIDATES}) {
           if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
             truncated = true;
             break;
@@ -409,7 +414,7 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
           if (!root || seen.has(root)) continue;
           seen.add(root);
           const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-          while (matches.length < 2) {
+          while (matches.length < ${MAX_TARGET_CANDIDATES}) {
             const node = walker.nextNode();
             if (!node) break;
             if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
@@ -435,33 +440,24 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
   );
   const exception = recordValue(collection.exceptionDetails);
   if (exception) return yield* browserFailure(new Error(exceptionDescription(exception)));
-  const collectionId = stringValue(recordValue(collection.result)?.objectId);
-  if (!collectionId) return { ambiguous: false };
+  return yield* collectionElements(send, stringValue(recordValue(collection.result)?.objectId), sessionId);
+});
+
+/** The first elements of a page array, as objects that the caller releases. The array is released. */
+const collectionElements = Effect.fn("Browser.collectionElements")(function* (
+  send: SendCommand,
+  collectionId: string,
+  sessionId: string | undefined,
+) {
+  if (!collectionId) return [];
   return yield* Effect.gen(function* () {
-    const lengthResult = yield* send(
-      "Runtime.callFunctionOn",
-      {
-        objectId: collectionId,
-        functionDeclaration: "function() { return this.length; }",
-        returnByValue: true,
-      },
-      sessionId,
-    );
-    const length = numberValue(recordValue(lengthResult.result)?.value);
-    if (length === 0) return { ambiguous: false };
-    if (length > 1) return { ambiguous: true };
-    const element = yield* send(
-      "Runtime.callFunctionOn",
-      {
-        objectId: collectionId,
-        functionDeclaration: "function() { return this[0]; }",
-        returnByValue: false,
-      },
-      sessionId,
-    );
-    const objectId = stringValue(recordValue(element.result)?.objectId);
-    if (!objectId) return yield* browserFailure(new Error(`Unable to resolve CSS selector: ${selector}`));
-    return { objectId, ambiguous: false };
+    const properties = yield* send("Runtime.getProperties", { objectId: collectionId, ownProperties: true }, sessionId);
+    return (Array.isArray(properties.result) ? properties.result.filter(isRecord) : [])
+      .filter((descriptor) => /^\d+$/.test(stringValue(descriptor.name)))
+      .sort((left, right) => Number(left.name) - Number(right.name))
+      .map((descriptor) => stringValue(recordValue(descriptor.value)?.objectId))
+      .filter(Boolean)
+      .slice(0, MAX_TARGET_CANDIDATES);
   }).pipe(
     Effect.ensuring(
       Effect.gen(function* () {
@@ -509,7 +505,7 @@ export const semanticAxMatches = Effect.fn("Browser.semanticAxMatches")(function
         role,
         name,
       });
-      if (matches.length >= 2) return matches;
+      if (matches.length >= MAX_TARGET_CANDIDATES) return matches;
     }
   }
   return matches;
@@ -556,7 +552,7 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
           if (!semantic && !roles.has(explicitRole)) return false;
           return node.getClientRects().length > 0;
         };
-        while (roots.length && matches.length < 2) {
+        while (roots.length && matches.length < ${MAX_TARGET_CANDIDATES}) {
           if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
             truncated = true;
             break;
@@ -565,7 +561,7 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
           if (!root || seenRoots.has(root)) continue;
           seenRoots.add(root);
           const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-          while (matches.length < 2) {
+          while (matches.length < ${MAX_TARGET_CANDIDATES}) {
             const node = walker.nextNode();
             if (!node) break;
             if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
@@ -593,24 +589,110 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
   );
   const exception = recordValue(collection.exceptionDetails);
   if (exception) return yield* browserFailure(new Error(exceptionDescription(exception)));
-  const collectionId = stringValue(recordValue(collection.result)?.objectId);
-  if (!collectionId) return [];
+  return yield* collectionElements(send, stringValue(recordValue(collection.result)?.objectId), capture.sessionId);
+});
+
+/** What tells the candidates of an ambiguous target apart. */
+export interface TargetCandidateText {
+  tag: string;
+  /** The candidate's own visible text. */
+  text: string;
+  /** The visible text of the largest element around the candidate that holds no other candidate, such as its card. */
+  item: string;
+}
+
+/**
+ * Reads the candidates of one frame together, because the item of a candidate is the part of the page
+ * that no other candidate shares. The text is visible page text, which a snapshot also returns. The
+ * result is in the order of `backendNodeIds`, with no entry for a node that could not be read.
+ */
+export const describeTargetCandidates = Effect.fn("Browser.describeTargetCandidates")(function* (
+  send: SendCommand,
+  sessionId: string | undefined,
+  backendNodeIds: number[],
+) {
+  const executionContextId = yield* automationContextId(send, sessionId);
+  const objectIds: string[] = [];
   return yield* Effect.gen(function* () {
-    const properties = yield* send(
-      "Runtime.getProperties",
-      { objectId: collectionId, ownProperties: true },
-      capture.sessionId,
+    // A node that cannot be resolved, such as one removed after the match, has no text. The others keep theirs.
+    for (const backendNodeId of backendNodeIds) {
+      const resolved = yield* send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId).pipe(
+        Effect.catch(() => Effect.succeed<CdpResult>({})),
+      );
+      objectIds.push(stringValue(recordValue(resolved.object)?.objectId));
+    }
+    const resolvedIds = objectIds.filter(Boolean);
+    const [first] = resolvedIds;
+    if (!first) return [];
+    const result = yield* send(
+      "Runtime.callFunctionOn",
+      {
+        objectId: first,
+        functionDeclaration: String.raw`function(...nodes) {
+          const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+          // innerText gives all of textContent for a node that is not rendered, so a hidden node gets no text.
+          const rendered = (element) =>
+            element.checkVisibility ? element.checkVisibility() : element.getClientRects().length > 0;
+          return nodes.map((node) => {
+            if (!rendered(node)) return { tag: node.localName, text: '', item: '' };
+            const text = clean(node.innerText);
+            const own = clean(node.textContent);
+            // Another element with the same tag and text, such as the next card's button, which a
+            // capped candidate list can leave out. Its item is not this candidate's item. Each peer is
+            // compared once, and only when it has the same shape, so that large wrappers cost little.
+            const twins = new Map();
+            const isTwin = (peer) => {
+              let known = twins.get(peer);
+              if (known === undefined) {
+                known = peer !== node && peer.childElementCount === node.childElementCount && clean(peer.textContent) === own;
+                twins.set(peer, known);
+              }
+              return known;
+            };
+            const holdsTwin = (parent) => {
+              const peers = parent.getElementsByTagName(node.localName);
+              for (let index = 0; index < peers.length && index < ${MAX_CANDIDATE_PEERS}; index++) {
+                if (isTwin(peers[index])) return true;
+              }
+              return false;
+            };
+            let item = '';
+            for (let parent = node.parentElement, depth = 0; parent && depth < 8; parent = parent.parentElement, depth++) {
+              if (nodes.some((other) => other !== node && parent.contains(other)) || holdsTwin(parent)) break;
+              const parentText = clean(parent.innerText);
+              if (parentText.length > ${MAX_CANDIDATE_ITEM_TEXT}) {
+                if (!item) item = parentText;
+                break;
+              }
+              if (parentText.length > text.length) item = parentText;
+            }
+            return { tag: node.localName, text: text.slice(0, ${MAX_CANDIDATE_TEXT}), item: item.slice(0, ${MAX_CANDIDATE_ITEM_TEXT}) };
+          });
+        }`,
+        arguments: resolvedIds.map((objectId) => ({ objectId })),
+        returnByValue: true,
+      },
+      sessionId,
     );
-    return (Array.isArray(properties.result) ? properties.result.filter(isRecord) : [])
-      .filter((descriptor) => /^\d+$/.test(stringValue(descriptor.name)))
-      .sort((left, right) => Number(left.name) - Number(right.name))
-      .map((descriptor) => stringValue(recordValue(descriptor.value)?.objectId))
-      .filter(Boolean)
-      .slice(0, 2);
+    const values = recordValue(result.result)?.value;
+    const described = (Array.isArray(values) ? values.filter(isRecord) : []).map(
+      (value): TargetCandidateText => ({
+        tag: stringValue(value.tag),
+        text: stringValue(value.text),
+        item: stringValue(value.item),
+      }),
+    );
+    let next = 0;
+    return objectIds.map((objectId) => (objectId ? described[next++] : undefined));
   }).pipe(
     Effect.ensuring(
       Effect.gen(function* () {
-        yield* send("Runtime.releaseObject", { objectId: collectionId }, capture.sessionId).pipe(Effect.ignore);
+        yield* Effect.all(
+          objectIds
+            .filter(Boolean)
+            .map((objectId) => Effect.exit(send("Runtime.releaseObject", { objectId }, sessionId))),
+          { concurrency: "unbounded" },
+        );
       }).pipe(Effect.orDie),
     ),
   );

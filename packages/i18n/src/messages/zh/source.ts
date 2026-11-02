@@ -6,12 +6,14 @@ import { messages as errorBackend } from "./error/backend";
 import { messages as errorBilling } from "./error/billing";
 import { messages as errorComputerUse } from "./error/computerUse";
 import { messages as errorConnector } from "./error/connector";
+import { messages as errorHermesGateway } from "./error/hermesGateway";
 import { messages as errorHost } from "./error/host";
 import { messages as errorImport } from "./error/import";
 import { messages as errorKind } from "./error/kind";
 import { messages as errorMarketplace } from "./error/marketplace";
 import { messages as errorMcp } from "./error/mcp";
 import { messages as errorMessaging } from "./error/messaging";
+import { messages as errorMigration } from "./error/migration";
 import { messages as errorProvider } from "./error/provider";
 import { messages as errorReference } from "./error/reference";
 import { messages as errorRemote } from "./error/remote";
@@ -25,6 +27,7 @@ import { messages as errorVoice } from "./error/voice";
 import { messages as errorWorkflow } from "./error/workflow";
 import { messages as statusAgent } from "./status/agent";
 import { messages as statusComputerUse } from "./status/computerUse";
+import { messages as statusHermesGateway } from "./status/hermesGateway";
 import { messages as statusHost } from "./status/host";
 import { messages as statusMessaging } from "./status/messaging";
 import { messages as statusProvider } from "./status/provider";
@@ -33,6 +36,8 @@ import { messages as statusUpdate } from "./status/update";
 
 /** Text the main process, a host or the team client sends as English and a screen translates. */
 export const source = {
+  ...errorHermesGateway,
+  ...statusHermesGateway,
   ...errorKind,
   ...errorReference,
   ...errorApp,
@@ -58,6 +63,7 @@ export const source = {
   ...errorConnector,
   ...errorStorage,
   ...errorMessaging,
+  ...errorMigration,
   ...statusHost,
   ...statusMessaging,
   ...statusRemote,

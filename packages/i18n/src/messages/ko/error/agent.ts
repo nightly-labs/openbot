@@ -19,7 +19,13 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "메시지 또는 첨부 파일이 필요해요.",
   "error.agent.promptAnswersTooLong": "프롬프트 답변이 너무 길어요.",
   "error.agent.gone": "이 에이전트는 더 이상 없어요.",
+  "error.agent.instructionsTooLarge": "지침 파일이 너무 커서 여기서 열 수 없어요. 텍스트 편집기에서 줄여 주세요.",
+  "error.agent.instructionsOutside": "지침 파일이 에이전트 작업 공간 밖을 가리켜서 OpenBot에서 열지 않아요.",
+  "error.agent.instructionsReadFailed": "지침 파일을 읽지 못했어요.",
+  "error.agent.instructionsSaveFailed": "지침 파일을 저장하지 못했어요.",
   "error.agent.profileGenerationBusy": "프로필 생성이 바빠요. 잠시 후 다시 시도해 주세요.",
+  "error.agent.instructionsChanged":
+    "에이전트가 지침 파일을 변경했습니다. 마지막 변경 사항이 저장되지 않았습니다. 다시 변경하세요.",
   "error.agent.initialMessageRequired": "첫 메시지가 필요해요.",
   "error.agent.initialMessageTooLong": "첫 메시지가 너무 길어요.",
   "error.agent.setupCleanupFailed": "에이전트 설정에 실패했고 불완전한 에이전트를 제거할 수 없었어요.",
@@ -32,6 +38,8 @@ export const messages = {
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에서 모델 목록이 비어 있어요.',
   "error.agent.modelNotInProviderList":
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}의 목록에 없어요.',
+  "error.agent.modelVariantNotListed":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}의 목록에 없어요. {provider}가 이 모델에 제공하는 값 중 하나를 사용하세요: {models}',
   "error.agent.modelProviderMismatch": "선택한 모델이 해당 제공자의 모델이 아니에요.",
   "error.agent.modelNotListed": '모델 "{model}"을(를) 사용할 수 없어요. 사용 가능한 모델: {models}.',
   "error.agent.providerNotListed":

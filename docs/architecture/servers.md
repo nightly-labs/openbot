@@ -278,6 +278,15 @@ for a connection that advertises the capability; the frozen agent-tasks-v1 decod
 every other client. The HTTP and WebRTC clients accept it whenever it is present, and the WebRTC host
 peer encodes the local response and the events again with the same option.
 
+`ui-block-auto-answer-v1` (`team-protocol/ui-block-auto-answer-v1.ts`, protocol 9 only) adds
+`state.autoAnswer` to the blocks that the two capabilities above already send: the action that the
+host presses when nobody answers, its time, and `done` after the host pressed it. The plan card of
+`acknowledge_request` uses it. The frozen `ui-blocks-v1` codecs leave the key out in both
+directions, so the host adds it after it encodes a response or an event (`withUiBlockAutoAnswers`),
+and the WebRTC host peer adds it again after its own encoding. A client copies it back from the wire
+value after it decodes (`addUiBlockAutoAnswers`); the shared team client does this, and the mobile
+app shows the countdown with it. The desktop transports do not copy it yet.
+
 ### Subagents
 
 `subagents-v1` carries the subagents that an agent started in one turn (see
@@ -404,6 +413,16 @@ too. The event carries no skill data: a client reads the list again through `ins
 `skills-admin-v1`. `team-protocol/optional-events.ts` is the one place where each transport
 recognizes the optional events that the frozen base vocabularies reject.
 
+### Browser profile events
+
+`browser-profiles-events-v1` adds one optional event, `browser-profiles-changed`, with no data. The
+host sends it after each create, rename, color change, clear and delete of a named browser profile,
+and after each change of an agent's profile. `BrowserProfileService` calls its `onChanged` callback
+after each change that succeeds, and that callback emits the event through `AgentService`, so this
+computer's windows get it too. A client reads the list again through `browser-profiles-v1`: the
+desktop Browser profiles section and agent setting, the web client and the phone show a change made on
+another device while the page is open.
+
 ### Focus use
 
 `focus-use-v1` adds `POST /v1/client/focus` with an empty body. Only a hosted server advertises it
@@ -429,7 +448,11 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-host-settings-v1` | Agent Computer Use, local scripts, and messages while it works; reads the host default | `agentAdmin` |
 | `agent-backup-models-v1` | Agent backup models: the order and whether to switch without asking. Unknown providers are refused | `agentAdmin` |
 | `agent-task-limit-v1` | Agent task limit: how many tasks run at the same time, 1 to 4, or the host default | `agentAdmin` |
+| `agent-new-chat-v1` | Whether the agent starts a new chat itself when its chat gets long. The read gives the agent's choice or the host default; a change saves the agent's choice. Protocol 9 only | none: only the mobile app sends it |
+| `agent-plan-card-v1` | Whether the agent shows its plan before a long task; reads the value that applies on the host. Protocol 9 only | `agentAdmin` |
+| `agent-folders-v1` | The folders that an agent can change besides its workspace, and the folders in them that it must not change: read, add, remove, exclude, include. Lists the folders in one host folder (no files, no hidden folders, at most 500), with the home folder and at most 32 disks, so that a phone can pick one. The host checks each folder as the desktop folder picker does (`src/main/agent-folders.ts`). Protocol 9 only | `agentFolders` |
 | `browser-profiles-v1` | Named browser profiles of the host: list, create, rename, recolor, clear, delete, and the profile of each agent. One route, `/v1/browser/tab-profiles`, also answers a member: the profile label of each tab that the member can see. Cookies and site data stay on the host. Advertised when the host has `browserProfiles` | `agentAdmin` |
+| `browser-profiles-events-v1` | One event with no data, `browser-profiles-changed`, after each change of the named browser profiles or of an agent's profile. A client reads the `browser-profiles-v1` routes again. Advertised when the host has `browserProfiles` | `browserProfiles` |
 | `skills-admin-v1` | List, install, remove, enable skills by marketplace id | `agentAdmin` |
 | `shared-tables-v1` | List and delete shared tables | `sharedTables` |
 | `agent-install-v1` | Add an agent from a listing or a shared template, by id | `agentAdmin` |
@@ -439,12 +462,14 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `providers-v3` | Code sign-in for Codex, Claude and Grok; send the code a Claude sign-in page shows | `providerAdmin` |
 | `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
 | `custom-provider-harness-v1` | List, add and remove custom endpoints as `providers-v1` does; each endpoint in a response names its harness (`opencode` or `pi`). A save names no harness: a new endpoint runs on OpenCode | `providerAdmin` |
+| `custom-agents-v1` | List, add, replace and remove the host's custom ACP agents. The host starts each command on its computer. An environment value goes only in a save body; a response names the variables only, and `value: null` keeps a saved value. Protocol 9 only | `providerAdmin` |
 | `claude-api-key-v1` | No routes. The host saves an Anthropic API key for Claude through the `providers-v1` key routes | `providerAdmin` |
 | `provider-usage-reset-v1` | Read the usage reset credits of each provider account on the host, and spend one. Only Codex gives credits | `providerAdmin` |
 | `provider-sign-out-v1` | Sign the host's own Claude or Codex sign-in out. The host's other accounts stay | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
+| `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
@@ -501,6 +526,16 @@ automatic, the system zone of the host). When an agent creates a routine, the zo
 call first, then from the sender's last message in that turn, then from this setting. The sender's
 zone stays in memory only, so after a restart a queued message uses the server timezone. Agent import
 and instance transfer use it in place of the system zone. A change does not move existing routines.
+
+`host-key-rotation-v1` lets the owner change the host's key from another device, with the same steps
+as Server settings → General → Server key on the host computer (`HostService.rotateIdentityKey`).
+The host makes the new key, signs one handover with the current and the new key, and answers with the
+new public key only after the account service accepts the handover. No private key leaves the host.
+The client does not trust the answer: it reads the server list again and follows the signed handover
+from the key that it trusts. The desktop and mobile apps show the time of the last verified handover
+to every member, in Server settings → Server key (`hostKeyChangedAt`, `ServerSummary.keyChangedAt` on
+desktop). The mobile app reads the server list again when Server settings opens. The host advertises the capability only when it can send a
+handover to the account service.
 
 `agent-memory-limit-v1` reads and sets how many memories each agent of the host can keep. It is the
 same value as "Memories per agent" in the host's own Server settings. The snapshot gives the limit and
@@ -926,3 +961,118 @@ requests always wait for idle time and preserve any existing schedule. Host rest
 apply. Cancellation, preferences, and forced restarts stay on the administrator-only
 `host-update-v1` routes. Desktop and web clients show member controls only after this capability
 is negotiated; older hosts keep the administrator-only panel.
+
+## Remote connect measurement
+
+`bun run perf:remote` (`scripts/remote-sync-perf-e2e.ts`) is the baseline for lazy sync. It reports
+the time until the workspace can be used, and the host requests that block that point.
+
+- `packages/team-client/src/sync-profile.ts` records each request of `RemotePeer` (web, mobile), of
+  `TeamWebRtcClientTransport` and of the HTTPS arm `requestJson` (desktop main): route template,
+  method, transport, times, bytes and the requests in flight. The dev test client uses the HTTPS arm
+  when its account has no WebRTC membership of the host, so the report names the transport. It records only when a sink is installed. The web harness installs
+  `globalThis.__openbotSyncProfile` before the page loads. Desktop main installs a file sink only in an
+  unpackaged build with `OPENBOT_DEV_SYNC_PROFILE=1`; it writes `dev-sync-profile.ndjson` in the profile
+  root, which no export reads. A route keeps its words and `v<n>` segments; every other segment becomes
+  `:id`, and query values are dropped. Records never go to the trace file, the logs or analytics.
+- Marks use fixed names only, `openbot:remote-<step>`. Web: `session`, `workspace-code`,
+  `hosts-start`, `hosts`, `connect-start`, `peer:<step>`, `connected`, `workspace-ready`,
+  `panels-ready` and `conversation-ready`. Desktop renderer:
+  `workspace-load`, `workspace-shell`, `workspace-ready` and `conversation-ready`. Desktop main keeps
+  its `remote-connect:*` spans in `logs/trace.ndjson`; the harness aligns them by their `at` time.
+- A request that ends before `workspace-ready` is a gate request. The report gives their count, bytes,
+  critical-path depth (the longest chain of requests that do not overlap) and repeated routes, and the
+  count and bytes of the background requests until the client is idle for 500 ms. A repeat is the same
+  method and route template, so one read for each agent also counts; the route table separates them.
+- The `desktop` client has one cold sample, the process that is running, and with
+  `--allow-mutations` it reloads the renderer for the next runs. Main keeps its connection during a
+  reload, so those runs measure the renderer gate only. The cold sample starts with the host when
+  `dev:test-client` starts both, so it includes the host start.
+- The `desktop-start` client (`--allow-mutations`) restarts only the test client with
+  `bun run dev:restart-client`, while the host stays live. The supervisor stops its own test-client
+  child by PID on `SIGUSR2` and starts it again. The run measures from the main process start, which
+  is the first line of `dev-sync-profile.ndjson`. It writes `steps.md`, the time of each step from
+  that origin.
+- `OPENBOT_DEV_CLIENT_TRANSPORT=webrtc` makes the test client sign in as the dev host user. The
+  account directory then lists the host, and the client connects over `webrtc-v2` as real users do.
+  Without it, the client joins over the HTTPS arm. A new `dev:seed` gives the host a new id while the account keeps the old one; pass
+  `--host-id=<id>` so the web client opens the new host.
+- `web` runs start with no saved workspace frame and `web-warm` runs start with the frame of the
+  first load; `frameMs` is the time to the `workspace-frame` mark. The first warm web run and the
+  first desktop reload write `web-warm-frame.png` and `desktop-frame.png`. A desktop reload keeps
+  the connection of main, so the host often answers before the screenshot ends; the log says which. `--latency=<ms>` delays
+  each document and fetch request of the web page by that time, and each WebSocket message by half
+  of it. Module files keep their time, because the dev server sends hundreds of them. The page wrapper
+  also delays each `RTCDataChannel` send and message by half of it. For the desktop client, start
+  the stack with `OPENBOT_DEV_RTT_MS=<ms>`: an unpackaged main then delays the account service calls
+  by the full time and each data-channel send and message by half of it. The desktop Signal socket is
+  in the hidden peer window, so it keeps its time. The report warns when this value is not equal to
+  `--latency`.
+- A failed request records a safe code (`http/<status>/<code>`, `errno/<code>` or `error/<tag>`), and
+  an interrupted one is `aborted`. The report counts them by route. It never records a message, a URL
+  or a host.
+
+## Remote connect order
+
+A client connects to a live host with as few serial round trips as it can.
+
+- Desktop main does not wait for the Dynamic Island before it loads the main window. Startup reads
+  only the Island preference, and the Island pages load at the same time as the main window.
+- After the WebRTC peer is `connected`, desktop main reads `/v1/compatibility` once
+  (`refreshWebRtcCompatibility` forces the read). It does not read it twice in sequence.
+- The web app loads the workspace code at the same time as the session request.
+- The web client stores the negotiated host protocol in `localStorage`
+  (`openbot.web.host-protocol:<account>:<host>`). It holds the protocol number only. When it has one,
+  the gate reads start with that protocol at the same time as the compatibility read. When the new
+  compatibility gives a different protocol, the client drops the early results and reads again. A
+  first connection, with no stored protocol, reads compatibility first: without it the request frames
+  name the bootstrap capabilities only, and the host answers less or fails.
+- A web server switch does not wait for the old host's session end (`POST .../sessions/<id>/end`).
+  Each switch gives the opened host a new peer, and the old peer ends its sessions in the
+  background. The old host's tab lock stays held until the end returns: the account service gives
+  a new connection to that host the same session while it is active, and a late end would close it.
+- When this tab has an online status connection to the target host, that connection becomes the
+  opened host (`WebHostConnections.handOver`). It keeps its session, Signal socket, WebRTC path and
+  tab lock, and takes the opened host's actions and `waitForHost`. The switch then sends no session,
+  ticket, Signal or ICE step. Status connections use the same stored host protocols as the opened
+  host, so a handed-over peer sends the right capabilities.
+
+## Remote workspace frame
+
+A client that comes back to a joined server shows the workspace of its last load at once, read-only,
+and replaces it when the host answers (`src/renderer/src/features/servers/remote-workspace-frame.ts`).
+
+- The frame holds the agent summaries, the model options, the sidebar layout, the hidden agents, the
+  channel rows and, on the web, the agent that was open. It holds no message text: the `preview` of
+  each agent is removed before the write, and a channel keeps its name, title, members and lead
+  agent, with no last message, instructions or counts. It does not hold capabilities, status,
+  queues or conversations. The channel rows stop the agents below them from moving down when the
+  channel list comes.
+- It is in the renderer's `localStorage`, one key for each account and server
+  (`openbot:remote-frame:v1:<account>:<server>`), not in `openbot.db`. The host stays the source of
+  truth. A frame older than 30 days is not shown, and a frame with no agents is not shown.
+- Desktop applies the frame only when setup is complete and the remote server has no content yet:
+  `hasContent` turns on while `loaded` stays off, so the shell shows the cached-content notice. The
+  frame agents do not become the active agent, and the reads of all queues wait for the first roster
+  from the host, so no host request starts before the connection.
+- Web applies the frame in `connectWorkspace` when it does not keep a loaded workspace of the same
+  host. It does not seed capabilities, so the capability-gated reads wait for the connection, and
+  agent avatars load only when the host is online. The web connect starts before the frame renders.
+- A frame agent's row shows no preview: the last message is not known, so it does not say that
+  there are no messages. Until the host lists channels, the sidebar sets `channelPreviewsPending`,
+  and a channel row with no last message shows no preview and no time.
+- The frame costs one render of the sidebar before the host answers. On a local host with 50 agents
+  in a dev build, the web workspace is ready about 230 ms later than with no frame, and the frame
+  shows about 140 ms before a cold start is ready. With 300 ms added latency the frame shows about
+  1.4 s before a cold start is ready.
+- Both clients write the frame after the workspace read and after the panels read, and again when
+  the user hides, restores or moves an agent, and when the channel rows change. The web also writes
+  the open agent when it changes. An agent that the user opens during the frame stays open after
+  the load.
+- While the frame shows, the composer says that the client connects, and the setup prompts wait
+  for the host's status, so a frame does not show "Complete provider setup".
+- The host answers `GET /v1/agents` when its agents are loaded (`AgentInitializationGate.awaitRoster`).
+  It does not wait for the later start steps (automation sync and the routine sweeps), which do not
+  change the roster. The frame of a server is deleted when the host ends access
+  (revoke), and when the server leaves the account's server list. All frames are deleted on
+  sign-out.

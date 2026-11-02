@@ -326,6 +326,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "現在のキーと新しいキーの両方が引き継ぎに署名します。メンバーのアプリは次回の接続時に新しいキーに切り替わります。キーファイルがコピーまたは漏えいした場合に実行してください。",
   "server.settings.hostKeyRotated": "サーバーキーを変更しました",
+  "server.settings.hostKeyChanged": "最終変更",
+  "server.settings.hostKeyChangedDescription": "{date}。以前のキーと新しいキーの両方がこの変更に署名しました。",
   "server.settings.hostKeyLocalOnly": "ここでキーを変更できるのは、このコンピューターのサーバーだけです。",
   "server.settings.removeTitle": "サーバーを削除",
   "server.settings.removeDescription":

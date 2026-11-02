@@ -32,6 +32,7 @@ import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
+import { isOpenCodeInternalFailure } from "./../acp-flavor-opencode";
 import { startAcpAuthentication } from "./../acp-sign-in";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -87,11 +88,7 @@ import type { ProviderAccountStore, StoredProviderAccount } from "./provider-acc
 import { defaultUsageModel, ProviderAccountFailed, ProviderAccounts } from "./provider-accounts";
 import {
   createAcpRequestEchoReader,
-  ignoredCodexSettings,
   isAcpHandlerDiagnostic,
-  isBackgroundRefreshDiagnostic,
-  isBundledSandboxFallbackDiagnostic,
-  isCodexCredentialFallbackDiagnostic,
   isGlogBelowErrorDiagnostic,
   isGrokHookLoadDiagnostic,
   isIgnoredConfigDiagnostic,
@@ -155,13 +152,17 @@ const SIGN_IN_FILE_POLL_MS = 2_000;
  * Identifies one write of a sign-in file. The time alone is not enough: a file system with 1 s
  * times shows two writes in the same second as one, such as an empty file and then the credentials.
  */
-function signInFileVersion(path: string): string {
-  try {
-    const stats = statSync(path, { throwIfNoEntry: false });
-    return stats ? `${stats.ino}:${stats.size}:${stats.mtimeMs}` : "missing";
-  } catch {
-    return "unreadable";
-  }
+function signInFileVersion(paths: readonly string[]): string {
+  return paths
+    .map((path) => {
+      try {
+        const stats = statSync(path, { throwIfNoEntry: false });
+        return stats ? `${stats.ino}:${stats.size}:${stats.mtimeMs}` : "missing";
+      } catch {
+        return "unreadable";
+      }
+    })
+    .join("|");
 }
 /**
  * Starts that fail in a row before OpenBot stops starting a provider by itself. A start that fails,
@@ -185,6 +186,8 @@ const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = [
   "antigravity",
   "cursor",
   "cline",
+  "kimi",
+  "hermes",
   "acp",
 ];
 
@@ -452,7 +455,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #customAgentUsageLock = Semaphore.makeUnsafe(1);
   #idleCheck: NodeJS.Timeout | null = null;
   /** Each provider's sign-in file, and the version of it that the last account check saw. */
-  readonly #signInFiles = new Map<AgentProvider, { path: string; seen: string }>();
+  readonly #signInFiles = new Map<AgentProvider, { paths: readonly string[]; seen: string }>();
   #signInCheck: NodeJS.Timeout | null = null;
   #status: AgentStatus = structuredClone(INITIAL_STATUS);
   #providerRefresh: Deferred.Deferred<AgentStatus, ProviderOperationFailed> | null = null;
@@ -481,11 +484,6 @@ export class ProviderRuntime implements ProviderPort {
    * Their next connect runs `onProvidersReady`, also when it is a retry after a timeout.
    */
   readonly #exitRecovery = new Set<AgentProvider>();
-  /**
-   * Ignored-settings warnings already shown. Codex repeats one at each start, and a reconnect does
-   * not change the file it reads, so the user sees each one once per app run.
-   */
-  readonly #reportedConfigWarnings = new Set<string>();
   /**
    * Hook-load notices and recovered missing-session lines already written. The CLI repeats one of
    * each for every session, and the log keeps the first.
@@ -664,6 +662,7 @@ export class ProviderRuntime implements ProviderPort {
           ...(lastError ? { lastError: lastError.message, lastErrorAt: lastError.at } : {}),
           ...(row.id === "antigravity" && this.#credentials.apiKey("antigravity") ? { apiKeyInUse: true } : {}),
           ...(row.id === "codex" && this.#accounts.get("codex")?.type === "apiKey" ? { apiKeyInUse: true } : {}),
+          ...(row.id === "muse" && this.#credentials.apiKey("muse") ? { apiKeyInUse: true } : {}),
         };
         const accounts =
           row.state === "available" && row.id !== "acp"
@@ -1302,9 +1301,9 @@ export class ProviderRuntime implements ProviderPort {
    */
   #watchSignInFiles(): void {
     for (const driver of BUILT_IN_PROVIDER_DRIVERS) {
-      const path = driver.signInFile?.();
-      if (path && !this.#signInFiles.has(driver.id))
-        this.#signInFiles.set(driver.id, { path, seen: signInFileVersion(path) });
+      const paths = driver.signInFiles?.() ?? [];
+      if (paths.length > 0 && !this.#signInFiles.has(driver.id))
+        this.#signInFiles.set(driver.id, { paths, seen: signInFileVersion(paths) });
     }
     if (this.#signInFiles.size === 0) return;
     this.#signInCheck ??= setInterval(() => this.#checkSignInFiles(), SIGN_IN_FILE_POLL_MS);
@@ -1323,7 +1322,7 @@ export class ProviderRuntime implements ProviderPort {
       const row = this.#status.providers?.find((candidate) => candidate.id === provider);
       if (row?.state !== "sign-in-required") continue;
       if (this.#cliLogin.has(provider) || this.#providerConnectionCommands.has(provider)) continue;
-      const version = signInFileVersion(file.path);
+      const version = signInFileVersion(file.paths);
       if (version === file.seen) continue;
       file.seen = version;
       Effect.runFork(
@@ -1664,7 +1663,13 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     provider: AgentProvider,
   ) {
-    const accounts = yield* this.#requireAccounts(provider);
+    // A provider with one account, such as Muse, can sign out too. A CLI with no sign-out is refused
+    // before a sign-in is cancelled.
+    const accounts = this.#providerAccounts;
+    if (!accounts || !ProviderAccounts.signOutCommand(provider))
+      return yield* new ProviderOperationFailed({
+        cause: new Error(sourceText("error.provider.signOutUnsupported", { provider: providerLabel(provider) })),
+      });
     // Codex signs in, by browser or by code, through its own login client.
     const codex = requireProviderDriver(provider).signIn.kind === "browser";
     return yield* this.#runProviderConnectionCommand(provider, () =>
@@ -1819,6 +1824,7 @@ export class ProviderRuntime implements ProviderPort {
             argv: command.argv,
             env: { ...cliPathEnvironment(cli), ...command.env(cli) },
             timeoutMs: command.timeoutMs,
+            ...(command.closeInput ? { closeInput: true } : {}),
           }),
         command.timeoutMs,
       )
@@ -1889,7 +1895,14 @@ export class ProviderRuntime implements ProviderPort {
     harness: CustomProviderHarness,
   ): Effect.fn.Return<CustomProviderRestart> {
     this.#environmentReloadPending.delete(harness);
-    if (!this.#clients.has(harness)) return "not-running";
+    if (!this.#clients.has(harness)) {
+      // A process stopped for idle keeps its old catalogue, and only an agent's turn starts it again.
+      // A new endpoint would then list no model, so no agent could be set to it (#4443). The start is
+      // not awaited, as a save does not wait for model discovery; a failure shows on the status.
+      if (this.#released.has(harness))
+        yield* this.ensureProvider(harness).pipe(Effect.ignore, Effect.forkIn(this.#scope));
+      return "not-running";
+    }
     if (this.#hooks.isProviderBusy(harness)) {
       this.#environmentReloadPending.add(harness);
       return "skipped-busy";
@@ -2800,7 +2813,7 @@ export class ProviderRuntime implements ProviderPort {
   });
 
   /** A CLI exit with its last stderr line in the message, after the MCP values are out of it. */
-  #withExitDetail(error: unknown): unknown {
+  #withExitDetail<E>(error: E): E | AgentProcessExitError {
     if (!(error instanceof AgentProcessExitError)) return error;
     const detailed = error.withDetail(this.#redactMcp);
     // OpenCode 2 makes a database with only `session_v2`, and OpenCode 1 refuses it (OpenCode issue #53221).
@@ -3063,7 +3076,9 @@ export class ProviderRuntime implements ProviderPort {
               ? sourceText("error.provider.deepseekSignIn")
               : provider === "openrouter"
                 ? sourceText("error.provider.openrouterSignIn")
-                : agentProviderDescriptor(provider).signInMessage)
+                : provider === "hermes"
+                  ? sourceText("error.provider.hermesSignIn")
+                  : agentProviderDescriptor(provider).signInMessage)
     );
   }
 
@@ -3152,11 +3167,14 @@ export class ProviderRuntime implements ProviderPort {
         this.#startFailures.delete(provider);
         this.#slowStarts.delete(provider);
       });
-      // Other providers can have live turns. Replacement must not run start recovery.
+      // Other providers can have live turns. Replacement must not run start recovery. The start checks
+      // the copy just installed: a CLI the user installed that is as new ran in its place, and its
+      // version or its failure read as the copy's (#4375).
       yield* this.#connect("starting", [provider], {
         preserveCheckErrors: true,
         notifyReady: false,
         startTimeoutMs: learnedWaitMs ?? this.#longStartTimeoutMs,
+        preferInstalled: false,
       });
       const timedOut = this.#slowStarts.has(provider);
       if (!timedOut && learnedWaitMs !== undefined) this.#slowStarts.set(provider, learnedWaitMs);
@@ -3170,7 +3188,7 @@ export class ProviderRuntime implements ProviderPort {
           cause:
             message && matchingSourceKeys(message).length > 0
               ? new Error(message)
-              : new Error(sourceText("error.provider.cliActivateFailed"), { cause: message }),
+              : new Error(sourceText("error.provider.cliNewVersionNotStarted"), { cause: message }),
         });
       }
       return;
@@ -3284,6 +3302,7 @@ export class ProviderRuntime implements ProviderPort {
       refreshRuntimeInBackground?: boolean;
       notifyReady?: boolean;
       startTimeoutMs?: number;
+      preferInstalled?: boolean;
     } = {},
   ) {
     requestedProviders = requestedProviders.filter((provider) => !this.#off.has(provider));
@@ -3343,7 +3362,9 @@ export class ProviderRuntime implements ProviderPort {
         return Effect.gen({ self: this }, function* () {
           if (this.#clients.has(provider)) return null;
           const driver = requireProviderDriver(provider);
-          const resolvedCli = yield* this.#resolveProviderCli(provider);
+          const resolvedCli = yield* this.#resolveProviderCli(provider, {
+            preferInstalled: options.preferInstalled ?? true,
+          });
           cli = resolvedCli;
           logger.info("Resolved a provider CLI.", {
             provider,
@@ -3467,6 +3488,10 @@ export class ProviderRuntime implements ProviderPort {
                 if (!(failed instanceof ProviderTempDiskSpaceError) && this.#countStartFailure(provider))
                   return this.#showStartStopped(provider);
               }
+              // OpenCode can fail a start on a slow computer, and a later start works. Without a retry
+              // the provider stayed off until the user refreshed it (#4237).
+              if (provider === "opencode" && isOpenCodeInternalFailure(failed))
+                this.#retryAfterTimeout(provider, !disposed());
               return message;
             }),
           ),
@@ -3577,10 +3602,6 @@ export class ProviderRuntime implements ProviderPort {
       // logged or turned into a renderer error event. Shortened after that, because a value cut in
       // half is a value the redactor does not match.
       const message = shortenDiagnostic(this.#redactMcp(raw));
-      if (client.provider === "codex" && isCodexCredentialFallbackDiagnostic(raw)) {
-        logger.info("Codex completed a credential storage fallback.", { provider: client.provider, message });
-        return;
-      }
       // An agent that tears down its sessions while OpenBot stops it (idle release, restart, quit)
       // can write an error for each one. It is not a failure the user can act on, so it goes to the log.
       if (origin?.duringStop) {
@@ -3612,10 +3633,6 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("A provider reported a failed tool call.", { provider: client.provider, message });
         return;
       }
-      if (isBackgroundRefreshDiagnostic(message)) {
-        stderrLogger.warn("A provider reported a failed background refresh.", { provider: client.provider, message });
-        return;
-      }
       if (client.provider === "grok" && isUsageReadDiagnostic(message)) {
         stderrLogger.warn("A provider reported a failed usage reading.", { provider: client.provider, message });
         return;
@@ -3625,14 +3642,6 @@ export class ProviderRuntime implements ProviderPort {
           provider: client.provider,
           message,
         });
-        return;
-      }
-      if (isIgnoredConfigDiagnostic(message)) {
-        stderrLogger.warn("A provider ignored settings in its configuration.", { provider: client.provider, message });
-        return;
-      }
-      if (isBundledSandboxFallbackDiagnostic(message)) {
-        stderrLogger.warn("A provider uses its bundled bubblewrap.", { provider: client.provider, message });
         return;
       }
       // The usage notice reports the limit only for a provider with a usage reading. Another
@@ -3645,6 +3654,22 @@ export class ProviderRuntime implements ProviderPort {
       ) {
         stderrLogger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });
         Effect.runFork(this.refreshUsageAfterLimit(client));
+        return;
+      }
+      if (client.provider === "codex") {
+        // Codex reports each failure the user can act on in its protocol: a failed turn, a sign-in
+        // error, a usage limit. Its stderr also has records that need nothing from the user, such as
+        // a folder that is not trusted, one "ChatGPT error" toast per start (#4265). An exit keeps
+        // the last error record in its message.
+        stderrLogger.warn("Codex logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
+      if (client.provider === "hermes") {
+        // Hermes Agent 0.21.5 reports each failure in the protocol: a failed turn in its prompt error,
+        // a missing sign-in in the auth methods of `initialize`, and a crash as the process exit. Its
+        // stderr is the Python log, `2026-11-02 10:00:00 [WARNING] mcp: …`, which repeats them as
+        // records and tracebacks, one "Hermes error" toast per line at each start.
+        stderrLogger.warn("Hermes logged a diagnostic.", { provider: client.provider, message });
         return;
       }
       if (isGlogBelowErrorDiagnostic(message)) {
@@ -3678,27 +3703,23 @@ export class ProviderRuntime implements ProviderPort {
 
   /**
    * Codex's report of the settings it ignored, with each key named: the stderr copy of it has only
-   * the summary (see `isIgnoredConfigDiagnostic`). The full text, with the path of each file, goes
-   * to the log; the user gets the keys, because the renderer does not show paths.
+   * the summary (see `isIgnoredConfigDiagnostic`). It goes to the log only. Codex works without the
+   * keys, and a key can belong to another Codex app that shares the file, such as the desktop app's
+   * saved Windows app approvals (#4179), so the user has nothing to correct.
    *
    * Other configuration warnings are not reported here.
    */
   #reportConfigWarning(client: AgentClient, params: unknown): void {
     const summary = getString(params, "summary");
-    const ignored = summary ? ignoredCodexSettings(summary) : null;
-    if (!summary || !ignored) return;
-    const redacted = shortenDiagnostic(this.#redactMcp(summary));
-    logger.warn("A provider ignored settings in its configuration.", { provider: client.provider, message: redacted });
-    if (this.#reportedConfigWarnings.has(redacted)) return;
-    this.#reportedConfigWarnings.add(redacted);
-    const message =
-      ignored.keys.length > 0
-        ? sourceText("error.provider.codexConfigIgnored", { count: ignored.count, settings: ignored.keys.join(", ") })
-        : sourceText("error.provider.codexConfigIgnoredUnnamed", { count: ignored.count });
-    this.#emitError(`${client.provider}_config_ignored`, message);
+    if (!summary || !isIgnoredConfigDiagnostic(summary)) return;
+    logger.warn("A provider ignored settings in its configuration.", {
+      provider: client.provider,
+      message: shortenDiagnostic(this.#redactMcp(summary)),
+    });
   }
 
-  #handleExit(client: AgentClient, error: Error): void {
+  #handleExit(client: AgentClient, exit: Error): void {
+    const error = this.#withExitDetail(exit);
     if (this.#handleConfinedExit(client, error)) return;
     if (this.#clients.get(client.provider) !== client || this.#hooks.isStopping()) return;
     this.#clients.delete(client.provider);
@@ -3856,8 +3877,9 @@ export class ProviderRuntime implements ProviderPort {
   }, Effect.uninterruptible);
 
   /**
-   * Starts a provider whose CLI did not answer in time again later, with the backoff and the attempt
-   * count of `#handleExit`. Answers the status message: whether OpenBot tries again, or the user has to.
+   * Starts a provider whose CLI did not answer in time, or whose start OpenCode failed, again later,
+   * with the backoff and the attempt count of `#handleExit`. Answers the status message for a
+   * timeout: whether OpenBot tries again, or the user has to.
    */
   #retryAfterTimeout(provider: AgentProvider, schedule: boolean): string {
     const attempts = this.#restartAttempts.get(provider) ?? 0;

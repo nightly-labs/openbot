@@ -346,6 +346,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "当前密钥和新密钥会共同签署一次交接。成员的应用会在下次连接时改用新密钥。如果密钥文件被复制或泄露，请执行该操作。",
   "server.settings.hostKeyRotated": "服务器密钥已更换",
+  "server.settings.hostKeyChanged": "上次更改",
+  "server.settings.hostKeyChangedDescription": "{date}。之前的密钥和新密钥都为这次更改签了名。",
   "server.settings.hostKeyLocalOnly": "只有这台电脑上的服务器可以在此更换其密钥。",
   "server.settings.removeTitle": "移除服务器",
   "server.settings.removeDescription": "为所有成员从账号服务中移除该服务器。当它的电脑已不可用时使用该项。",

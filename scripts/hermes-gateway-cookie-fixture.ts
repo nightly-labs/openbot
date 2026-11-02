@@ -22,11 +22,11 @@ interface SessionTokens {
   binding: string;
 }
 interface CookieFixtureOptions {
-  tls?: FixtureTls;
-  path?: "" | "/hermes";
-  additionalCookies?: readonly string[];
-  expiredTicket?: boolean;
-  holdUpgrade?: () => Promise<void>;
+  tls?: FixtureTls | undefined;
+  path?: "" | "/hermes" | undefined;
+  additionalCookies?: readonly string[] | undefined;
+  expiredTicket?: boolean | undefined;
+  holdUpgrade?: (() => Promise<void>) | undefined;
 }
 
 const LOGIN_PASSWORD = "cookie-lifecycle-fixture-password";

@@ -73,6 +73,7 @@ export const messages = {
     "To żądanie przekracza limit kontekstu kierowania. Wybierz członka lub wyślij krótsze żądanie.",
   "error.backend.channelTaskMemberRequired": "Wybierz członka do tego zadania.",
   "error.backend.channelTaskStopped": "Zatrzymano. Kontynuuj lub przydziel ponownie to zadanie.",
+  "error.backend.channelTaskNotStopped": "Anulować można tylko zatrzymane lub nieudane zadanie.",
   "error.backend.channelRoutingUnreadable": "Lider nie mógł przydzielić tej wiadomości. Przydziel ją członkowi.",
   "error.backend.channelRoutingFailed": "Kierowanie nie powiodło się. Wybierz członka lub spróbuj ponownie.",
   "error.backend.channelLeadTimedOut": "Lider kanału nie odpowiedział na czas. Wybierz członka lub spróbuj ponownie.",
@@ -334,6 +335,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Liczba otwartych wątków tego agenta: {count}. Zarchiwizuj wątek, a potem rozpocznij lub przywróć inny.",
   "error.backend.threadRemoteUnsupported": "Wątki są dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.branchSourceBusy": "Zatrzymaj bieżącą turę, zanim utworzysz odgałęzienie tego czatu.",
+  "error.backend.branchMessageNotFound": "Odgałęzienie możesz utworzyć tylko od ukończonej odpowiedzi agenta.",
+  "error.backend.branchRemoteUnsupported": "Odgałęzienia są dostępne tylko dla agentów na tym komputerze.",
   "error.backend.threadMoveRefused": "W nowym wątku można uruchomić tylko wiadomość wysłaną wyłącznie do tego agenta.",
   "error.backend.taskTitleRequired": "Nadaj zadaniu krótki tytuł.",
   "error.backend.taskToolInvalid":

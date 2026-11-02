@@ -77,6 +77,7 @@ export const messages = {
     "Esta solicitação excede o limite de contexto de encaminhamento. Selecione um membro ou envie uma solicitação mais curta.",
   "error.backend.channelTaskMemberRequired": "Escolha um membro para esta tarefa.",
   "error.backend.channelTaskStopped": "Parada. Continue ou reatribua esta tarefa.",
+  "error.backend.channelTaskNotStopped": "Só é possível cancelar uma tarefa parada ou com falha.",
   "error.backend.channelRoutingUnreadable": "O líder não conseguiu encaminhar esta mensagem. Reatribua-a a um membro.",
   "error.backend.channelRoutingFailed": "O encaminhamento falhou. Escolha um membro ou tente novamente.",
   "error.backend.channelLeadTimedOut": "O líder do canal não respondeu a tempo. Escolha um membro ou tente novamente.",
@@ -343,6 +344,10 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Este agente tem {count} tópicos abertos. Arquive um tópico e depois inicie ou restaure outro.",
   "error.backend.threadRemoteUnsupported": "Os tópicos só estão disponíveis para agentes neste computador.",
+  "error.backend.branchSourceBusy": "Interrompa o turno atual antes de criar uma ramificação deste chat.",
+  "error.backend.branchMessageNotFound":
+    "Só é possível criar uma ramificação a partir de uma resposta concluída do agente.",
+  "error.backend.branchRemoteUnsupported": "As ramificações só estão disponíveis para agentes neste computador.",
   "error.backend.threadMoveRefused":
     "Só uma mensagem que você enviou apenas para este agente pode ser executada em um novo tópico.",
   "error.backend.taskTitleRequired": "Dê um título curto à tarefa.",

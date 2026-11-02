@@ -419,6 +419,34 @@ export class OpenBotDatabase {
     }
   }
 
+  /**
+   * Writes the mailbox changes and runs `write` in one transaction, so the mailbox rows and the rows
+   * that name them commit together or not at all.
+   */
+  persistMailboxChangesWith<T>(
+    mailboxState: MailboxProjectionState,
+    mailboxChanges: MailboxProjectionChanges,
+    mailboxEventType: string,
+    write: () => T,
+  ): T {
+    const db = this.connection;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      this.applyMailboxChanges(
+        `mailbox:${mailboxEventType}:${randomUUID()}`,
+        mailboxState,
+        mailboxChanges,
+        mailboxEventType,
+      );
+      const result = write();
+      db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   activeProviderSession(threadId: string, provider: AgentProviderId): ProviderSession | null {
     return this.#sessions.activeProviderSession(threadId, provider);
   }

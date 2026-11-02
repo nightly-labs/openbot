@@ -7,9 +7,11 @@ import {
   BoardProvider,
   createBoard,
   type WfnEdge,
+  type WfnFields,
   type WfnResult,
   type WfnRunStatus,
 } from "@openbot/ui/features/workflows/workflow-board";
+import type { WorkflowGitHubCanvas } from "@openbot/ui/features/workflows/workflow-github";
 import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
 import type { JSX } from "@solidjs/web";
 import { createStore, onCleanup, untrack } from "solid-js";
@@ -25,6 +27,14 @@ export function NodeGallery(props: {
   locked?: readonly string[];
   /** The choices of the nodes. The story catalogs when absent. */
   catalogs?: WorkflowCatalogs;
+  /** The GitHub of the GitHub cards. */
+  github?: WorkflowGitHubCanvas;
+  /** Approve at an approval step runs the steps after it. Without it, and on Reject, the run does not go on. */
+  runOnApprove?: boolean;
+  /** The fields of the nodes when the story opens, so every card that reads a field reads the same value. */
+  fields?: Record<string, WfnFields>;
+  /** The result that a story run of a step records. Without it, or when it gives nothing, the kind of the node decides. */
+  answer?: (id: string) => string | undefined;
   children: JSX.Element;
 }) {
   const [run, setRun] = createStore<{ status: Record<string, WfnRunStatus> }>({
@@ -58,21 +68,30 @@ export function NodeGallery(props: {
         setRun((draft) => {
           draft.status[id] = "done";
         });
-        const value = answer(id);
+        const value = props.answer?.(id) ?? answer(id);
         if (value !== undefined) gallery.board.record(id, value);
       }, 1400),
     );
   };
   const gallery = createBoard({
     catalogs: () => props.catalogs ?? STORY_CATALOGS,
+    github: () => props.github,
     selected: untrack(() => props.selected),
     edges: untrack(() => props.edges),
     results: untrack(() => props.results),
+    fields: untrack(() => props.fields),
     locked: untrack(() => props.locked),
     status: (id) => run.status[id],
     error: (id) => props.errors?.[id],
     retry: runStep,
     runStep,
+    decide: (id, approved) => {
+      if (!props.runOnApprove || !approved) return;
+      setRun((draft) => {
+        draft.status[id] = "done";
+      });
+      for (const edge of props.edges ?? []) if (edge.from === id) runStep(edge.to);
+    },
     // Each trigger of the gallery has the schedule of the story workflow.
     schedule: () => STORY_SEED.schedule,
   });

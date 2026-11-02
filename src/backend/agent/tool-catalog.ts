@@ -29,6 +29,7 @@ const DIRECT_NAMES = new Set([
   "forget_memory",
   "react_to_user_message",
   "request_api_key",
+  "suggest_marketplace_app",
 ]);
 
 const BROWSER_SCRIPT_TOOL = requireTool(`${OPENBOT_BROWSER_NAMESPACE}.run_script`);

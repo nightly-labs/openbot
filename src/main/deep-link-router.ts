@@ -21,12 +21,14 @@
 
 import { parseAgentTemplateUrl } from "@openbot/contracts/agent-template-links";
 import { type InviteLinkOptions, parseInviteUrl } from "@openbot/contracts/invite-links";
+import { type MarketplaceListingLink, parseMarketplaceUrl } from "@openbot/contracts/marketplace-links";
 import { parsePluginUrl } from "@openbot/contracts/plugin-links";
 
 export type DeepLink =
   | { kind: "invite"; url: string }
   | { kind: "plugin"; slug: string }
   | { kind: "agent-template"; id: string }
+  | { kind: "marketplace"; link: MarketplaceListingLink }
   | { kind: "mcp-auth"; state: string; code: string }
   | { kind: "slack-workspace"; nonce: string; grant: string }
   | { kind: "discord-guild"; nonce: string; grant: string };
@@ -63,6 +65,12 @@ export function parseDeepLink(value: string, options: InviteLinkOptions = {}): D
     return { kind: "agent-template", id: parseAgentTemplateUrl(value) };
   } catch {
     // Not an agent template. It carries no query either, so it can never be a sign-in grant.
+  }
+
+  try {
+    return { kind: "marketplace", link: parseMarketplaceUrl(value) };
+  } catch {
+    // Not a Marketplace listing. It opens the listing's page only; adding it is still a press of Add.
   }
 
   return parseMcpAuthUrl(value) ?? parseSlackUrl(value);

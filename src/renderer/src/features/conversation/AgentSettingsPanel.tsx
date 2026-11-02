@@ -7,9 +7,13 @@ import {
   type FilePreview,
   type ServerNotificationLevel,
 } from "@openbot/contracts/ipc";
-import { BookMarked, CalendarClock, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
+import { BookMarked, CalendarClock, FileText, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
+import {
+  type AgentInstructionsCalls,
+  AgentInstructionsView,
+} from "@openbot/ui/features/conversation/AgentInstructionsView";
 import {
   AgentSessionSettings,
   type AgentSessionSettingsApi,
@@ -29,7 +33,7 @@ import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
 import { createBrowserProfilesStore } from "../browser/stores/browser-profiles-store";
 import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesSettings";
 import { createStorageUsage } from "../files/storage-usage";
-import { AgentMemoriesModal } from "./AgentMemoriesModal";
+import { AgentMemoriesSettings } from "./AgentMemoriesSettings";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, type SkillDetail } from "./AgentSkillsModal";
 import { conversationPort, type SharedTableCalls } from "./conversation-port";
@@ -56,6 +60,10 @@ interface AgentSettingsPanelProps
   onOpenUsage?: ((trigger: HTMLButtonElement) => void) | undefined;
   onWidthChange: (width: number) => void;
   skillSelectionRequest?: { skillId: string } | null | undefined;
+  /** The instruction file in the agent's workspace. Local-only: the Team API does not carry it. */
+  instructionsFile?: AgentInstructionsCalls | undefined;
+  /** Opens the Instructions page, from the chat line that says the agent changed the file. */
+  instructionsRequest?: { agentId: string } | null | undefined;
   routineSelectionRequest?: RoutineSelectionRequest | null | undefined;
   onRoutineSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   onOpenRoutineRun?: ((messageId: string) => void) | undefined;
@@ -122,6 +130,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     memories: { count: 0, open: false },
     routines: { count: 0, open: false },
     files: { open: false },
+    instructions: { open: false },
     skills: { count: 0, open: false, reopenAfterMarketplace: false },
   });
   // One store per host. It goes with the host, so the list of the last server never shows for the next.
@@ -134,7 +143,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const [hostChoice, setHostChoice] = createSignal<AgentBrowserProfile | undefined>(undefined);
   let choiceRequest = 0;
   // The settings page covers the conversation while it changes the profiles, so the list loads again
-  // each time the conversation shows.
+  // each time the conversation shows. A change made on another device, such as the phone, shows while
+  // the settings are open. The choice of an agent on this computer comes with its summary.
   createEffect(
     () => ({
       store: props.workspaceCovered === true ? undefined : browserProfiles(),
@@ -143,18 +153,25 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       local: props.localHost === true,
     }),
     ({ store, calls, agentId, local }) => {
-      const request = ++choiceRequest;
+      // A read that an earlier agent or server started does not show.
+      ++choiceRequest;
       setHostChoice(undefined);
       if (!store || !calls) return;
       const failed = (error: unknown) => actionToast.error(errorMessage(error, t("browser.profiles.loadFailed")));
+      const readChoice = (report: (error: unknown) => void) => {
+        const request = ++choiceRequest;
+        calls
+          .readAgent(agentId)
+          .then((choice) => {
+            if (request === choiceRequest) setHostChoice(choice);
+          })
+          .catch(report);
+      };
       store.refresh().catch(failed);
-      if (local) return;
-      calls
-        .readAgent(agentId)
-        .then((choice) => {
-          if (request === choiceRequest) setHostChoice(choice);
-        })
-        .catch(failed);
+      if (local) return store.follow();
+      readChoice(failed);
+      // A read after a change keeps the shown choice when it fails; the next change reads it again.
+      return store.follow(() => readChoice(() => undefined));
     },
   );
   const browserProfileOptions = (): AgentBrowserProfileOptions | undefined => {
@@ -268,6 +285,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         state.memories.open = false;
         state.routines.open = false;
         state.files.open = false;
+        state.instructions.open = false;
         state.skills.open = false;
         state.skills.reopenAfterMarketplace = false;
       });
@@ -398,6 +416,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       });
   });
 
+  // Like the skill request: a new request object opens the page again.
+  const instructionsRequest = createMemo(() => props.instructionsRequest);
+  createEffect(instructionsRequest, (request) => {
+    if (request)
+      setDraft((state) => {
+        state.instructions.open = true;
+      });
+  });
+
   return (
     <SharedAgentSettingsPanel
       {...props}
@@ -406,7 +433,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={panelWidth()}
       onResize={setPanelWidth}
       onResizeEnd={saveSettingsPanelWidth}
-      detailOpen={draft.routines.open || draft.files.open}
+      detailOpen={draft.routines.open || draft.files.open || draft.memories.open || draft.instructions.open}
       links={
         <>
           <Show when={sessionSettings()}>
@@ -418,8 +445,27 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               />
             )}
           </Show>
-          <Show when={!props.remoteClient || skillsMode() !== "hidden" || props.tablesVisible !== false || props.files}>
+          <Show
+            when={
+              !props.remoteClient ||
+              skillsMode() !== "hidden" ||
+              props.tablesVisible !== false ||
+              props.files ||
+              props.instructionsFile
+            }
+          >
             <SettingsLinkGroup inset title={t("agentSettings.groups.knows")}>
+              <Show when={props.instructionsFile}>
+                <SettingsLinkRow
+                  icon={<FileText aria-hidden="true" />}
+                  label={t("agentSettings.instructions")}
+                  onClick={() =>
+                    setDraft((state) => {
+                      state.instructions.open = true;
+                    })
+                  }
+                />
+              </Show>
               <Show when={!props.remoteClient}>
                 <SettingsLinkRow
                   icon={<BookMarked aria-hidden="true" />}
@@ -503,6 +549,22 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         </>
       }
     >
+      <Show when={draft.instructions.open && props.instructionsFile}>
+        {(calls) => (
+          <AgentInstructionsView
+            agentId={props.agent.id}
+            folder={props.agent.workspacePath}
+            working={props.working}
+            calls={calls()}
+            onBack={() =>
+              setDraft((state) => {
+                state.instructions.open = false;
+              })
+            }
+            onClose={props.onClose}
+          />
+        )}
+      </Show>
       <Show when={draft.files.open && props.files}>
         {(files) => (
           <AgentFilesSettings
@@ -556,14 +618,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           }
         />
       </Show>
-      <AgentMemoriesModal
+      <AgentMemoriesSettings
         port={memoriesPort()}
         open={draft.memories.open}
-        onOpenChange={(open) =>
+        onBack={() =>
           setDraft((state) => {
-            state.memories.open = open;
+            state.memories.open = false;
           })
         }
+        onClose={props.onClose}
         onCountChange={(count) =>
           setDraft((state) => {
             state.memories.count = count;

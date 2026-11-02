@@ -13,15 +13,18 @@
 }
 
 /* The browser has no window controls, so the rail starts at the top. */
-.web-app-frame > .server-rail {
+.web-app-frame > .server-rail,
+.web-other-tab-window > .server-rail {
   padding-top: var(--openbot-space-3);
 }
 
-.web-app-frame > .server-rail::before {
+.web-app-frame > .server-rail::before,
+.web-other-tab-window > .server-rail::before {
   display: none;
 }
 
-.web-app-frame > .server-rail::after {
+.web-app-frame > .server-rail::after,
+.web-other-tab-window > .server-rail::after {
   top: 0;
 }
 
@@ -417,4 +420,20 @@
 .web-connect-refresh.ui-button svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
+}
+
+/* Takes the whole window in place of the workspace. */
+.web-other-tab-window {
+  display: flex;
+  height: 100%;
+}
+
+.web-other-tab.web-connect.conversation-panel {
+  height: 100%;
+  flex: 1;
+  min-width: 0;
+}
+
+.web-other-tab-use.ui-button {
+  min-width: 200px;
 }

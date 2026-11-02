@@ -126,7 +126,7 @@ export async function routeAgentQueue(
     await runCauseEffect(
       agents.reorderQueue({
         agentId,
-        deliveryIds: stringArray(body, "deliveryIds", INPUT_LIMITS.messageRecipients),
+        deliveryIds: stringArray(body, "deliveryIds", INPUT_LIMITS.queueReorder),
       } satisfies ReorderQueueInput),
     );
     return empty(204);

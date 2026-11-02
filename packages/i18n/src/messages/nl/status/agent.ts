@@ -5,6 +5,7 @@ export const messages = {
   "status.agent.claudeWriteOutside":
     "{path} schrijven, buiten de werkruimte van de agent, de gedeelde map en de tijdelijke mappen.",
   "status.agent.contextCleared": "Context gewist. Hier begint een nieuwe chat.",
+  "status.agent.instructionsChanged": "Heeft zijn instructies bijgewerkt",
   "status.agent.modelSwitchedForLimit": "Gebruikslimiet bereikt. Overgeschakeld naar {model}.",
   "status.agent.modelReturnedAfterLimit": "Gebruikslimiet voorbij. Teruggeschakeld naar {model}.",
   "status.agent.modelSwitchedForError": "Fout bij de aanbieder. Overgeschakeld naar {model}.",
@@ -58,5 +59,7 @@ export const messages = {
   "status.agent.vaultAdded": "Opgeslagen in de Kluis: {name}",
   "status.agent.vaultUpdated": "Gewijzigd in de Kluis: {name}",
   "status.agent.vaultDeleted": "Verwijderd uit de Kluis: {name}",
+  "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
+  "status.agent.branchTitle": "Afgetakte chat",
 } as const satisfies PartialTranslation<typeof source>;

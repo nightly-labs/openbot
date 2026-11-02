@@ -24,7 +24,15 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Eine Nachricht oder ein Anhang ist erforderlich.",
   "error.agent.promptAnswersTooLong": "Die Antworten auf die Fragen sind zu lang.",
   "error.agent.gone": "Dieser Agent existiert nicht mehr.",
+  "error.agent.instructionsTooLarge":
+    "Die Anweisungsdatei ist zu groß, um sie hier zu öffnen. Kürze sie in einem Texteditor.",
+  "error.agent.instructionsOutside":
+    "Die Anweisungsdatei verweist auf einen Ort außerhalb des Arbeitsbereichs des Agenten, daher öffnet OpenBot sie nicht.",
+  "error.agent.instructionsReadFailed": "Die Anweisungsdatei konnte nicht gelesen werden.",
+  "error.agent.instructionsSaveFailed": "Die Anweisungsdatei konnte nicht gespeichert werden.",
   "error.agent.profileGenerationBusy": "Die Profilerstellung ist ausgelastet. Versuche es gleich noch einmal.",
+  "error.agent.instructionsChanged":
+    "Der Agent hat die Anweisungsdatei geändert. Ihre letzte Änderung wurde nicht gespeichert. Nehmen Sie sie erneut vor.",
   "error.agent.initialMessageRequired": "Eine erste Nachricht ist erforderlich.",
   "error.agent.initialMessageTooLong": "Die erste Nachricht ist zu lang.",
   "error.agent.setupCleanupFailed":
@@ -38,6 +46,8 @@ export const messages = {
     "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} hat keine Modelle aufgeführt.",
   "error.agent.modelNotInProviderList":
     "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} führt es nicht auf.",
+  "error.agent.modelVariantNotListed":
+    "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} führt es nicht auf. Nutze einen dieser Werte, die {provider} für dieses Modell aufführt: {models}.",
   "error.agent.modelProviderMismatch": "Das gewählte Modell gehört nicht zu diesem Anbieter.",
   "error.agent.modelNotListed": "Das Modell „{model}“ ist nicht verfügbar. Verfügbare Modelle: {models}.",
   "error.agent.providerNotListed":

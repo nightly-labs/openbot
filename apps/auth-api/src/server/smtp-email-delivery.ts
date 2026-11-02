@@ -4,8 +4,10 @@ import { isValidHostname as isSharedValidHostname } from "@openbot/contracts/val
 import { Effect, Fiber, Result, Schema } from "effect";
 import {
   type ContactMessageEmailInput,
+  type LicenseEmailInput,
   type RenderedEmail,
   renderContactMessageEmail,
+  renderLicenseEmail,
   renderSignInCodeEmail,
   renderTeamInviteEmail,
   renderWelcomeEmail,
@@ -39,6 +41,9 @@ export type SmtpContactMessage = ContactMessageEmailInput;
 export interface SmtpWelcomeMessage extends WelcomeEmailInput {
   email: string;
 }
+
+/** A license email and its address. */
+export type SmtpLicenseMessage = LicenseEmailInput & { email: string };
 
 interface PreparedEmailMessage {
   email: string;
@@ -190,6 +195,14 @@ export const sendPrivateWelcomeEmail = Effect.fn("Smtp.sendPrivateWelcomeEmail")
     { email: message.email, content: renderWelcomeEmail({ plan: message.plan, serverName: message.serverName }) },
     connector,
   );
+});
+
+export const sendPrivateLicenseEmail = Effect.fn("Smtp.sendPrivateLicenseEmail")(function* (
+  config: SmtpEmailConfig,
+  message: SmtpLicenseMessage,
+  connector?: SmtpConnector,
+) {
+  return yield* sendPrivateEmail(config, { email: message.email, content: renderLicenseEmail(message) }, connector);
 });
 
 /** Sends a message from the site's contact form to the sending mailbox. A reply goes to the visitor. */

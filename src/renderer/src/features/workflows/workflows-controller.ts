@@ -2,6 +2,9 @@ import {
   type AgentAccessLevels,
   graphAgentIds,
   type WorkflowDetail,
+  type WorkflowGitHubCatalog,
+  type WorkflowGitHubHistory,
+  type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
   type WorkflowNodeKind,
   type WorkflowSaveResult,
@@ -11,16 +14,25 @@ import {
 import type { AppTextKey } from "@openbot/i18n";
 import { toast } from "@openbot/ui";
 import type { WorkflowCanvasProps } from "@openbot/ui/features/workflows/WorkflowCanvas";
+import {
+  EMPTY_GITHUB_HISTORY,
+  githubItemUrl,
+  type WorkflowGitHubCanvas,
+} from "@openbot/ui/features/workflows/workflow-github";
 import type { WorkflowPlace } from "@openbot/ui/features/workflows/workflow-model";
 import { EMPTY_WORKFLOW_RUN_VIEW, type WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
 import type { DesktopAnalyticsScope, WorkflowAnalyticsAction } from "../../analytics";
+import { createGitHubConnector } from "../connectors/github-connector";
 import type { WorkflowHost } from "./workflows-port";
 
 const RUN_PAGE = 20;
 /** The pause after the last edit before the canvas saves. */
 const SAVE_DELAY_MS = 400;
+
+/** The options of a repository that the host could not read. */
+const NO_OPTIONS: WorkflowGitHubRepositoryOptions = { labels: [], people: [] };
 
 const FAILURE_CODES = {
   create: "create_failed",
@@ -89,6 +101,7 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     detail: WorkflowDetail;
     runs: WorkflowRunView;
     versions: readonly WorkflowVersion[];
+    github: WorkflowGitHubHistory;
   }>();
   const [summaries, setSummaries] = createSignal<readonly WorkflowSummary[]>([]);
   const [places, setPlaces] = createSignal<readonly WorkflowPlace[]>([]);
@@ -147,6 +160,62 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     setResetKey((key) => key + 1);
   };
 
+  /**
+   * The GitHub events of the open workflow. A failed read shows no events rather than no workflow:
+   * the Events row is a view of the triggers, and the next change reads it again.
+   */
+  const readGitHubHistory = (workflowId: string) =>
+    host.githubSupported()
+      ? host.workflows.githubHistory(workflowId).catch(() => EMPTY_GITHUB_HISTORY)
+      : Promise.resolve(EMPTY_GITHUB_HISTORY);
+
+  const connector = createGitHubConnector(
+    () => host.githubConnector,
+    () => host.hostName(),
+  );
+  /** Undefined while it is read, and for an account that may not read it: only an admin adds GitHub steps. */
+  const [githubCatalog, setGitHubCatalog] = createSignal<WorkflowGitHubCatalog>();
+  /** The labels and people of each repository that a card asked for, by lower-case name, for this page. */
+  const [githubOptions, setGitHubOptions] = createSignal<ReadonlyMap<string, WorkflowGitHubRepositoryOptions>>(
+    new Map(),
+  );
+  const askedOptions = new Set<string>();
+  /** Each read replaces the one before it, so a slow answer never overwrites a newer one. */
+  let catalogRead = 0;
+  const readGitHubCatalog = () => {
+    if (!host.githubSupported()) return;
+    const request = ++catalogRead;
+    host.workflows.githubCatalog().then(
+      (next) => {
+        if (!disposed && request === catalogRead) setGitHubCatalog(next);
+      },
+      () => undefined,
+    );
+  };
+  /** A change on GitHub can give or take repositories, labels and people, so all are read again. */
+  const refreshGitHub = () => {
+    askedOptions.clear();
+    setGitHubOptions(new Map());
+    readGitHubCatalog();
+  };
+  // A connection that starts or ends changes the repositories that the host reaches.
+  let connectionState: string | undefined;
+  createEffect(
+    () => connector.detail.props.status.state,
+    (state) => {
+      const before = connectionState;
+      connectionState = state;
+      if (before !== undefined && state !== before) refreshGitHub();
+    },
+  );
+  /** Set when GitHub opened to change the installation. The next window focus reads the repositories again. */
+  let awaitingInstall = false;
+  const onFocus = () => {
+    if (!awaitingInstall) return;
+    awaitingInstall = false;
+    refreshGitHub();
+  };
+
   /** Reads the library and, for the open workflow, its detail, runs and versions. */
   const read = async (workflowId: string) => {
     const seen = edits;
@@ -155,10 +224,11 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     setSummaries(list);
     // A delete changes the library too: the delete then opens another workflow.
     if (workflowId !== current || !list.some((summary) => summary.id === workflowId)) return;
-    const [next, page, versions] = await Promise.all([
+    const [next, page, versions, github] = await Promise.all([
       host.workflows.get(workflowId),
       host.workflows.runs({ workflowId, limit }),
       host.workflows.versions(workflowId),
+      readGitHubHistory(workflowId),
     ]);
     if (disposed || workflowId !== current) return;
     const outside =
@@ -168,7 +238,7 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
       writing === 0 &&
       pending === undefined;
     // The canvas reads the graph only when it opens or resets, so a read under its edits keeps them.
-    setStored({ detail: next, runs: page, versions });
+    setStored({ detail: next, runs: page, versions, github });
     if (outside) reset(next);
     return next;
   };
@@ -234,12 +304,15 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     if (workflowId !== null) return;
     readPlaces();
     readLevels();
+    readGitHubCatalog();
   };
 
   onSettled(() => {
     const stop = host.onChanged(refresh);
+    window.addEventListener("focus", onFocus);
     return () => {
       stop();
+      window.removeEventListener("focus", onFocus);
       // A pending edit still saves after the page closes.
       flush();
       disposed = true;
@@ -250,6 +323,7 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   untrack(() => {
     readPlaces();
     readLevels();
+    readGitHubCatalog();
   });
   write(async () => {
     const list = await host.workflows.list();
@@ -290,6 +364,46 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     flush();
     const workflowId = current;
     write(() => tracked(action, () => call(workflowId), nodeKind));
+  };
+
+  const github: WorkflowGitHubCanvas = {
+    catalog: githubCatalog,
+    history: () => stored()?.github ?? EMPTY_GITHUB_HISTORY,
+    run: (runId) => {
+      const entry = stored()?.runs.runs.find((candidate) => candidate.run.id === runId);
+      return entry && { number: entry.run.number, status: entry.run.status };
+    },
+    options: (repository) => {
+      const key = repository.toLowerCase();
+      const known = githubOptions().get(key);
+      if (known || askedOptions.has(key) || !host.githubSupported()) return known;
+      askedOptions.add(key);
+      host.workflows.githubOptions({ repository }).then(
+        (next) => {
+          if (!disposed && askedOptions.has(key)) setGitHubOptions((map) => new Map(map).set(key, next));
+        },
+        (error: unknown) => {
+          // The menus stop loading and show no options. A change on GitHub reads them again.
+          if (!disposed && askedOptions.has(key)) setGitHubOptions((map) => new Map(map).set(key, NO_OPTIONS));
+          report(error);
+        },
+      );
+      return undefined;
+    },
+    connection: () => connector.detail.props,
+    openGitHub: () => {
+      awaitingInstall = true;
+      connector.detail.props.onOpenInstall();
+    },
+    opening: connector.busy,
+    openItem: (item) => {
+      host.openUrl(githubItemUrl(item)).catch(report);
+    },
+    runLastEvent: (nodeId) => {
+      start("run", (workflowId) =>
+        host.workflows.githubRunLastEvent({ workflowId, nodeId, requestId: crypto.randomUUID() }),
+      );
+    },
   };
 
   const props: WorkflowsControllerProps = {
@@ -401,5 +515,5 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     },
   };
 
-  return { detail: () => stored()?.detail, places, readOnly: () => lock() !== undefined, props };
+  return { detail: () => stored()?.detail, places, readOnly: () => lock() !== undefined, github, props };
 }

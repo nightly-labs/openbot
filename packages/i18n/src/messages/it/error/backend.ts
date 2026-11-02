@@ -73,6 +73,7 @@ export const messages = {
     "Questa richiesta supera il limite del contesto di instradamento. Seleziona un membro o invia una richiesta più breve.",
   "error.backend.channelTaskMemberRequired": "Scegli un membro per questa attività.",
   "error.backend.channelTaskStopped": "Interrotta. Continua o riassegna questa attività.",
+  "error.backend.channelTaskNotStopped": "Si può annullare solo un'attività interrotta o non riuscita.",
   "error.backend.channelRoutingUnreadable":
     "Il responsabile non ha potuto instradare questo messaggio. Riassegnalo a un membro.",
   "error.backend.channelRoutingFailed": "L'instradamento non è riuscito. Scegli un membro o riprova.",
@@ -345,6 +346,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Questo agente ha {count} thread aperti. Archivia un thread, poi avviane o ripristinane un altro.",
   "error.backend.threadRemoteUnsupported": "I thread sono disponibili solo per gli agenti su questo computer.",
+  "error.backend.branchSourceBusy": "Interrompi il turno in corso prima di creare un ramo di questa chat.",
+  "error.backend.branchMessageNotFound": "Puoi creare un ramo solo da una risposta completata dell'agente.",
+  "error.backend.branchRemoteUnsupported": "I rami sono disponibili solo per gli agenti su questo computer.",
   "error.backend.threadMoveRefused":
     "Solo un messaggio che hai inviato soltanto a questo agente può essere eseguito in un nuovo thread.",
   "error.backend.taskTitleRequired": "Dai all'attività un titolo breve.",

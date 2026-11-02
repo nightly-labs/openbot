@@ -94,10 +94,16 @@ export const messages = {
   "agentSettings.agentTitle": "肩書き",
   "agentSettings.agentTitleLabel": "エージェントの肩書き",
   "agentSettings.agentTitlePlaceholder": "エージェントの役割を説明してください",
+  "agentSettings.description": "説明",
+  "agentSettings.descriptionLabel": "エージェントの説明",
+  "agentSettings.descriptionResize": "説明欄のサイズを変更",
+  "agentSettings.descriptionPlaceholder": "このエージェントの用途",
   "agentSettings.instructions": "指示",
   "agentSettings.instructionsLabel": "エージェントへの指示",
-  "agentSettings.instructionsResize": "指示欄のサイズを変更",
-  "agentSettings.instructionsPlaceholder": "このエージェントの用途",
+  "agentSettings.instructionsEdit": "指示を編集",
+  "agentSettings.instructionsChangedWhileEditing":
+    "編集中にエージェントが指示を変更しました。もう一度保存すると、エージェントの版を置き換えます。",
+  "agentSettings.instructionsPlaceholder": "このエージェントが常に守るルール",
 
   "agentSettings.avatar.edit": "エージェントのアバターを編集",
   "agentSettings.avatar.editor": "アバターエディター",

@@ -47,6 +47,11 @@ interface FilePreviewPanelProps {
   onWrapLinesChange: (wrap: boolean) => void;
   /** Empty while the panel shows a folder. */
   preview: FilePreview | null;
+  /**
+   * Names the shown file. A new preview with the same key is the same file read again, so the panel
+   * keeps the source view. Absent means that each preview is another file.
+   */
+  fileKey?: string | undefined;
   /** A workspace folder. The panel lists it instead of a file. */
   directory?: WorkspaceDirectory | null;
   agents: AgentProfile[];
@@ -121,7 +126,9 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
       props.onWidthChange(width);
     },
   );
-  createEffect(file, () => {
+  // A memo, because an effect runs again on an equal value and a file read again has an equal key.
+  const shownFile = createMemo(() => props.fileKey ?? file());
+  createEffect(shownFile, () => {
     setRawSource(false);
   });
   createEffect(

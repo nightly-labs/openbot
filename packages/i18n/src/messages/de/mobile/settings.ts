@@ -73,9 +73,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Schalte Animationen aus, um Bewegungen in der ganzen App zu reduzieren. Wenn „Bewegung reduzieren“ in den Einstellungen deines Telefons aktiviert ist, reduziert die App die Bewegungen ebenfalls. Die Animationen unten bleiben dann aus.",
   "mobile.settings.animations.all": "Animationen",
-  "mobile.settings.animations.chatZoom": "In Chats zoomen",
-  "mobile.settings.animations.chatZoomFooter":
-    "Ein Chat öffnet sich aus seinem Avatar in der Liste und schließt sich wieder in ihn. Wenn dies aus ist, gleitet ein Chat von der Seite herein.",
   "mobile.settings.animations.agentFaces": "Animierte Agentengesichter",
   "mobile.settings.animations.agentFacesFooter":
     "Die Gesichter der Agenten-Avatare bewegen sich, während die Agenten arbeiten und ruhen. Wenn dies aus ist, bleiben die Gesichter still.",
@@ -151,6 +148,8 @@ export const messages = {
   "mobile.settings.notifications.offForEveryone": "Für alle auf diesem Server aus",
   "mobile.settings.notifications.turnOn": "Einschalten",
   "mobile.settings.notifications.turnOnFor": "Benachrichtigungen von {name} für alle auf diesem Server einschalten",
+  "mobile.settings.notifications.chooseAgent": "Für einen Agenten wählen",
+  "mobile.settings.notifications.chooseAnotherAgent": "Weiteren Agenten wählen",
   "mobile.settings.notifications.levelsFooter":
     "Tippe noch einmal auf die Stufe eines Agents, damit er wieder dem Server folgt.",
   "mobile.settings.notifications.agentsUnsupported": "Aktualisiere OpenBot auf diesem Server, um Agents zu wählen.",

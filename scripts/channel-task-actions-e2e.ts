@@ -550,7 +550,13 @@ try {
     recipientAgentId: agent.id,
   });
   assert.equal(task(recoverHttp.channelId, recoverHttp.taskId).state, "queued");
-  assert.throws(() => channelRequest(CHANNEL_ROUTES.command, { ...httpInput, type: "cancel", recipientAgentId: null }));
+  assert.deepEqual(channelRequest(CHANNEL_ROUTES.command, { ...httpInput, type: "cancel", recipientAgentId: null }), {
+    type: "cancel",
+    operationId: httpInput.operationId,
+    channelId: httpInput.channelId,
+    taskId: httpInput.taskId,
+    recipientAgentId: null,
+  });
   assert.throws(() => parseCancelChannelTask({ ...httpInput, expectedChannelRevision: undefined }));
   assert.throws(() => parseRecoverChannelTask({ ...httpInput, action: "reassign", recipientAgentId: null }));
   assert.throws(() => parseRecoverChannelTask({ ...httpInput, action: "resume", recipientAgentId: agent.id }));

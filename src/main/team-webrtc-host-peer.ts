@@ -23,6 +23,11 @@ import {
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import {
+  addUiBlockAutoAnswers,
+  TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
+  withUiBlockAutoAnswers,
+} from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
   decodeTeamProtocolV2AuthFrame,
@@ -756,33 +761,38 @@ export class TeamWebRtcHostPeer {
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
             promptMultiSelect: peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
           };
+          const autoAnswers = peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY);
           return yield* remoteDecode(() => ({
             status: response.status,
-            body: sideRoute
-              ? sideRoute.response(input.path, response.status, body, responseOptions)
-              : // A protocol 9 peer reads more capabilities than the protocol 7 and 8 encoders allow.
-                peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY) &&
-                  input.method === "GET" &&
-                  input.path === TEAM_API_ROUTES.compatibility &&
-                  response.status === 200
-                ? { ...decodeTeamProtocolSupportV9(body) }
-                : (peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
-                    ? encodeTeamProtocolV8WebRtcHttpResponse
-                    : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
-                      ? encodeTeamProtocolV7WebRtcHttpResponse
-                      : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
-                        ? encodeTeamProtocolV6WebRtcHttpResponse
-                        : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
-                          ? encodeTeamProtocolV5WebRtcHttpResponse
-                          : peerCapabilities.has("opencode")
-                            ? encodeTeamProtocolV4WebRtcHttpResponse
-                            : encodeTeamProtocolV3WebRtcHttpResponse)(
-                    input.method,
-                    input.path,
-                    response.status,
-                    body,
-                    responseOptions,
-                  ),
+            body: withAutoAnswers(
+              autoAnswers,
+              body,
+              sideRoute
+                ? sideRoute.response(input.path, response.status, body, responseOptions)
+                : // A protocol 9 peer reads more capabilities than the protocol 7 and 8 encoders allow.
+                  peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY) &&
+                    input.method === "GET" &&
+                    input.path === TEAM_API_ROUTES.compatibility &&
+                    response.status === 200
+                  ? { ...decodeTeamProtocolSupportV9(body) }
+                  : (peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
+                      ? encodeTeamProtocolV8WebRtcHttpResponse
+                      : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
+                        ? encodeTeamProtocolV7WebRtcHttpResponse
+                        : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
+                          ? encodeTeamProtocolV6WebRtcHttpResponse
+                          : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
+                            ? encodeTeamProtocolV5WebRtcHttpResponse
+                            : peerCapabilities.has("opencode")
+                              ? encodeTeamProtocolV4WebRtcHttpResponse
+                              : encodeTeamProtocolV3WebRtcHttpResponse)(
+                      input.method,
+                      input.path,
+                      response.status,
+                      body,
+                      responseOptions,
+                    ),
+            ),
           }));
         }),
       (response) =>
@@ -847,6 +857,8 @@ export class TeamWebRtcHostPeer {
                 promptMultiSelect: this.#peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
               }),
         );
+        if (this.#peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY))
+          frame = withUiBlockAutoAnswers(frame, event);
       } catch {
         return;
       }
@@ -1180,4 +1192,10 @@ class GatewayError extends Error {
   ) {
     super(message);
   }
+}
+
+/** A response body with the automatic answer of each block, for a peer with `ui-block-auto-answer-v1`. */
+function withAutoAnswers(enabled: boolean, source: unknown, encoded: TeamProtocolV2Json): TeamProtocolV2Json {
+  if (enabled) addUiBlockAutoAnswers(encoded, source);
+  return encoded;
 }

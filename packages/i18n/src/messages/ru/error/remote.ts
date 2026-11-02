@@ -123,7 +123,6 @@ export const messages = {
   "error.remote.serverDisconnected": "Сервер отключился.",
   "error.remote.preferencesUnreadable": "Не удалось прочитать сохранённые настройки чата.",
   "error.remote.accountAuthRequired": "Требуется аутентификация аккаунта.",
-  "error.remote.serverIdentityChanged": "Идентификатор сервера изменился. Замена доверенного ключа хоста отклонена.",
   "error.remote.pairedIdentityChanged":
     "Идентификатор сопряжённого компьютера отсутствует или изменился. Отсканируйте новый код с того компьютера.",
   "error.remote.permanentInviteNoEmail": "Постоянные приглашения нельзя отправить по электронной почте.",

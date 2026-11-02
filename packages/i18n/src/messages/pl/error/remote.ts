@@ -123,7 +123,6 @@ export const messages = {
   "error.remote.serverDisconnected": "Serwer rozłączył się.",
   "error.remote.preferencesUnreadable": "Nie udało się odczytać zapisanych preferencji czatu.",
   "error.remote.accountAuthRequired": "Wymagane jest uwierzytelnienie konta.",
-  "error.remote.serverIdentityChanged": "Tożsamość serwera zmieniła się. Zaufany klucz hosta nie zostanie zastąpiony.",
   "error.remote.pairedIdentityChanged":
     "Tożsamość sparowanego komputera nie istnieje lub zmieniła się. Zeskanuj nowy kod z tego komputera.",
   "error.remote.permanentInviteNoEmail": "Stałych zaproszeń nie można wysyłać e-mailem.",

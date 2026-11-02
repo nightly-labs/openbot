@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 
-export const HOST_TOOL_ACTIONS = [
+const HOST_TOOL_ACTIONS = [
   "shell",
   "screenshot",
   "read-file",

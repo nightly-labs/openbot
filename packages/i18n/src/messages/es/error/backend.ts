@@ -73,6 +73,7 @@ export const messages = {
     "Esta solicitud supera el límite de contexto de asignación. Selecciona un miembro o envía una solicitud más corta.",
   "error.backend.channelTaskMemberRequired": "Elige un miembro para esta tarea.",
   "error.backend.channelTaskStopped": "Detenida. Continúa o reasigna esta tarea.",
+  "error.backend.channelTaskNotStopped": "Solo se puede cancelar una tarea detenida o fallida.",
   "error.backend.channelRoutingUnreadable": "El líder no pudo dirigir este mensaje. Reasígnalo a un miembro.",
   "error.backend.channelRoutingFailed": "La asignación falló. Elige un miembro o inténtalo de nuevo.",
   "error.backend.channelLeadTimedOut":
@@ -345,6 +346,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Este agente tiene {count} hilos abiertos. Archiva un hilo y después inicia o restaura otro.",
   "error.backend.threadRemoteUnsupported": "Los hilos solo están disponibles para los agentes de este equipo.",
+  "error.backend.branchSourceBusy": "Detén el turno actual antes de crear una rama de este chat.",
+  "error.backend.branchMessageNotFound": "Solo puedes crear una rama desde una respuesta terminada del agente.",
+  "error.backend.branchRemoteUnsupported": "Las ramas solo están disponibles para los agentes de este equipo.",
   "error.backend.threadMoveRefused":
     "Solo un mensaje que enviaste únicamente a este agente puede ejecutarse en un hilo nuevo.",
   "error.backend.taskTitleRequired": "Dale a la tarea un título corto.",

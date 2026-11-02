@@ -350,6 +350,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "현재 키와 새 키가 모두 인계에 서명해요. 멤버의 앱은 다시 연결할 때 새 키로 바뀌어요. 키 파일이 복사되었거나 노출되었다면 변경하세요.",
   "server.settings.hostKeyRotated": "서버 키를 변경했어요",
+  "server.settings.hostKeyChanged": "마지막 변경",
+  "server.settings.hostKeyChangedDescription": "{date}. 이전 키와 새 키가 모두 이 변경에 서명했어요.",
   "server.settings.hostKeyLocalOnly": "이 컴퓨터의 서버만 여기서 키를 변경할 수 있어요.",
   "server.settings.removeTitle": "서버 제거",
   "server.settings.removeDescription":

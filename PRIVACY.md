@@ -1,7 +1,9 @@
 # Privacy
 
 OpenBot is local-first, but it is not offline-only. Agent workspaces, conversations, attachments,
-browser data, and team data stay on the computer that runs OpenBot. The optional OpenBot account
+browser data, and team data stay on the computer that runs OpenBot. The one exception is the
+encrypted copy that the signed-in mobile app keeps of what it shows (see the mobile section below).
+The optional OpenBot account
 service stores the minimum central data needed for email sign-in, account avatars, remote host
 configuration, memberships, invitations, logical sessions, and the account's product analytics
 answer.
@@ -71,9 +73,14 @@ Stripe reports, the place in the app where the plans were opened, the server siz
 and an error code. It has
 no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
 because the account service sends them and not your computer.
+When you pay for a plan or a license (it starts, each payment succeeds, it changes, or its renewal
+is cancelled or resumed), the account service also sets your normalized account email on the OpenPanel
+profile of your account ID, as the apps do at sign-in. It does this also when product analytics is
+off on your devices, so that the paid account is not anonymous in the sales data. The email is not
+copied into the events.
 
 For each email that the account service sends from its mailbox (a sign-in code, an invitation, a contact
-message or a welcome email), it sends OpenPanel one event with the kind of email and the result of the send. This
+message, a welcome email for a server plan, or a license email), it sends OpenPanel one event with the kind of email and the result of the send. This
 event has no account ID, email address, name or message content.
 
 Every 5 minutes, each Signal host sends OpenPanel one event with the number of TURN relay allocations
@@ -473,6 +480,16 @@ account identity (name, email and avatar URL), not conversations or workspace co
 Mobile hidden and pinned chat preferences are stored on the phone, separately per account and server.
 Conversation read/unread changes are stored on the desktop host and shared with your other connected devices.
 
+The mobile app keeps a copy of what it shows for each server: the agent list, the hidden agents,
+the sections, and the latest page (up to 50 messages) of each chat that it loaded, up to 4 MB for
+each server. So after a start the app shows them at once, while it connects to the server. The copy
+is in the phone's system cache (`Library/Caches` on iOS), which is not in a device backup and which
+the system can delete when the phone is low on storage. Each file is encrypted with AES-256-GCM and
+bound to the account and the server. The key is in the phone's keychain, and it does not leave this
+device. The copy is never sent anywhere. The app replaces it with what the server sends, and deletes
+a server's copy when the account no longer has that server. Sign-out and an expired or disconnected
+session delete all copies and the key. Attachments and files are not in the copy.
+
 The mobile app keeps a support log of up to 1,000 events in the phone's system cache: app version,
 system and device model, app state changes, connection steps with server IDs and error text, the
 desktop app version and protocol support of each server, the method, address without query, status
@@ -560,7 +577,13 @@ OpenBot sends sign-in, team invitation, and welcome messages through the configu
 provider receives the recipient address and the message content. A sign-in message contains the
 one-time code and its expiration time. A team invitation can contain the inviter address, team name,
 role, and invite URL. When the first cloud server plan of an account starts, a welcome message goes
-to the account address. It contains the plan name and the server name. The HTML version of a message loads the OpenBot logo from `openbot.run` when
+to the account address. It contains the plan name and the server name. License messages go to the
+account address from `licenses@openbot.run` through the same provider. When a license has its first
+payment, the message contains the license tier, the number of users, the list price when no discount
+applies, the currency, the billing period, and the date of the next payment. When a renewal payment fails, the message contains
+the license tier, the number of users, the amount due, the currency, the date of the next payment
+try, and the link to the Stripe page of the invoice. When a paid license ends, the message contains
+the license tier, the number of users, and whether it ended after a failed payment. The HTML version of a message loads the OpenBot logo from `openbot.run` when
 the mail client shows images. The image address is the same in every message and identifies no
 recipient.
 
@@ -787,8 +810,9 @@ Agents, conversations, queues, direct messages, attachments, browser data, promp
 Remote Desktop data remain on the host. The central account service does not copy them into D1 or
 R2. The Signal service does not proxy them or write them to logs. The host does not need a public
 inbound port. The things Signal passes to a host are the Slack events of an agent's Slack app, the
-Discord mentions of the Discord app, the updates of the OpenBot Telegram bot, and the requests to
-webhook routines, in transit; see [Slack connections](#slack-connections),
+Discord mentions of the Discord app, the updates of the OpenBot Telegram bot, the GitHub events of
+the repositories that its GitHub triggers watch, and the requests to webhook routines, in transit;
+see [Workflows](#workflows), [Slack connections](#slack-connections),
 [Discord connections](#discord-connections), [Telegram connections](#telegram-connections), and
 [Webhook routines](#webhook-routines). For Discord and Telegram, Signal also carries the host's
 answers to the platform.
@@ -798,7 +822,7 @@ browser client at `/app`. A provider API key, a custom endpoint key or header, t
 provider sign-in page shows, and a new server logo then travel from that computer or browser to the host over the same encrypted team connection. The
 browser does not store a key. The host stores them as it stores a change made on the host.
 No response returns a key, and neither computer writes request bodies to its logs. For a sign-in on
-another device, the host sends the provider's sign-in link, and for Codex, Grok and Cline its
+another device, the host sends the provider's sign-in link, and for Codex, Grok, Cline and Kimi its
 one-time code, to that computer or browser, which shows them and opens the link only when the admin
 asks. The provider's CLI on the host receives the login; no token travels to the admin.
 
@@ -888,7 +912,7 @@ Network traffic can also occur when:
   the right token to each call;
 - an installed build checks GitHub Releases for updates;
 - OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
-  `Check for updates`. It asks `api.github.com` for Codex, `registry.npmjs.org` for Claude,
+  `Check for updates`. It asks `api.github.com` for Codex and Kimi, `registry.npmjs.org` for Claude,
   OpenCode and Cline, `x.ai/cli` for Grok, and `raw.githubusercontent.com/agentclientprotocol/registry` and
   `dl.google.com` (for the download size) for Gemini, and the same registry and
   `downloads.cursor.com` (for the download size) for Cursor, and it reads a list of blocked
@@ -958,6 +982,16 @@ graph, or ID.
   signing secret, and 7-day receipts without the request body. The host refuses a body of more than
   64,000 characters. The body, marked as data, is the trigger's output and goes to the next steps.
   Remove the trigger, or delete the workflow, to stop its URL.
+- **GitHub triggers** receive the events of the OpenBot GitHub App: issues, comments, pull requests,
+  reviews and checks. GitHub sends each event to OpenBot's Signal service (`signal.openbot.run`).
+  Signal checks GitHub's signature, reads only the installation and repository IDs, and passes the
+  event to every computer that watches the repository, in transit only: it does not store or log it.
+  When the Signal connection opens, the computer sends the account service its GitHub sign-in and the
+  repositories that its GitHub triggers watch. The account service asks GitHub which of them that
+  sign-in can see, signs a 5-minute route for those repositories, and stores neither the sign-in nor
+  the list. The computer keeps the newest 50 deliveries of each trigger, without the event body: the
+  delivery ID, event name, item number, time, and whether it started a run. An event that arrives
+  while the computer is offline is lost; the history shows the gap.
 
 Members of a joined server can read, change, and run a workflow when they can see and use each
 agent in it (`workflows-v1`). The graph and the step text then go to their computer. Only owners
@@ -1281,6 +1315,31 @@ models, which the CLI does not list. The request has no account, key, or prompt 
 sees the IP address of this computer. Cline's terms apply:
 <https://cline.bot/tos>. Team members see the host's Cline agents, as
 for the other providers, when their app supports Cline.
+
+### Kimi
+
+OpenBot downloads the Kimi Code CLI from `github.com` (GitHub release assets), and its license file
+from `github.com`, when you select Download on the Kimi row. OpenBot starts the CLI as a local
+process. Prompts, attachments, and tool results go to that process, and the CLI sends them to
+Moonshot AI (`api.kimi.com`). Sign in runs `kimi login`, which opens Kimi's sign-in page
+(`auth.kimi.com`) in your browser. The CLI keeps its login, device ID, session files, and settings
+in `~/.kimi`, or in `$KIMI_SHARE_DIR`. OpenBot does not read, copy, or upload these files. Unless you
+set `telemetry = false` in `~/.kimi/config.toml`, or set `KIMI_DISABLE_TELEMETRY=1` in the
+environment that starts OpenBot, the CLI sends anonymous usage events to
+`telemetry-logs.kimi.com`. OpenBot does not change this setting. Moonshot AI's terms for Kimi Code
+apply. Team members see the host's Kimi agents when their app supports Kimi.
+### Hermes
+
+OpenBot does not download Hermes Agent. It starts the `hermes` that you installed, with `hermes acp`,
+as a local process. Prompts, attachments, and tool results go to that process, and Hermes sends them
+to Nous Portal or to the model provider that you select in Hermes. Sign in runs
+`hermes auth add nous`, which opens Nous Portal's sign-in page in your browser. Hermes keeps its
+sign-ins, settings, memories, skills and session history in `~/.hermes`, or in `$HERMES_HOME`, and
+it can change them during a turn. OpenBot does not read, copy, or upload these files. It reads only
+the change time of `auth.json`, `.env` and `config.yaml` in that folder, or in the Hermes profile
+that you use, to see that you signed in. Hermes can also use the network
+for its own tools and plugins, as you set them up in Hermes. Nous Research's terms apply. Team
+members see the host's Hermes agents, as for the other providers, when their app supports Hermes.
 
 ### Inception
 

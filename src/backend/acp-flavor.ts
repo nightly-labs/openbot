@@ -1,7 +1,14 @@
 import { win32 } from "node:path";
-import type { RequestError } from "@agentclientprotocol/sdk";
+import type { LoadSessionResponse, NewSessionRequest, RequestError } from "@agentclientprotocol/sdk";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
+
+/** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
+export interface AcpCustomEndpoint {
+  readonly name: string;
+  /** Whether the endpoint has a saved API key or header. */
+  readonly hasCredentials: boolean;
+}
 
 /**
  * What one ACP agent does differently from the protocol. `AcpAgentClient` reads each hook at the
@@ -18,7 +25,8 @@ export interface AcpFlavor {
   sessionNotFound?(error: RequestError, sessionId: string): boolean | null;
   /**
    * The message of a failed turn, from the redacted failure text. `redact` masks more text, `log`
-   * writes a diagnostic that it redacts first, and `model` is the session's model.
+   * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
+   * custom endpoint that serves that model, or null.
    */
   turnFailure?(
     error: unknown,
@@ -26,6 +34,7 @@ export interface AcpFlavor {
     redact: (text: string) => string,
     log: (text: string) => void,
     model: string | null,
+    endpoint: AcpCustomEndpoint | null,
   ): string;
   /** The message of a turn that ended with no answer text. Absent: such a turn succeeds. */
   emptyAnswerFailure?(reasoned: boolean): string;
@@ -41,6 +50,11 @@ export interface AcpFlavor {
    * to it. A set of the model the process already runs on is not sent again.
    */
   processWideModel?: true;
+  /**
+   * A `session/set_model` failure after which the session already runs on the new model. The agent
+   * changes the session first and then fails to save the model as its default.
+   */
+  modelSetUnsaved?(error: RequestError): boolean;
   /**
    * The agent frees what a session holds only when its process ends, not at `session/close`. Model
    * discovery then resumes one probe session for each process rather than opening another.
@@ -105,6 +119,13 @@ export interface AcpFlavor {
   contextCompaction?: "handoff";
   /** A whole answer chunk that is the agent's own transport error, not answer text. OpenBot drops it. */
   noiseChunk?: RegExp;
+  /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
+  sessionMeta?: NewSessionRequest["_meta"];
+  /**
+   * OpenBot opens a saved session with `session/load`, also when the agent advertises
+   * `session/resume`, and this tells from a successful load reply that the session is missing.
+   */
+  loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
 }
 
 /**
@@ -128,6 +149,16 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
 export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
 
 /**
+ * Hermes Agent 0.21.5 answers a `session/resume` of a missing session with a new session, and the
+ * reply does not give its id: each later prompt to the saved id then ends as "refusal". Its
+ * `session/load` of a missing session answers null, which the SDK gives as an empty reply. A load of
+ * a session that exists always gives its `modes`.
+ */
+export const HERMES_ACP_FLAVOR: AcpFlavor = {
+  loadInsteadOfResume: { missing: (response) => response.modes == null },
+};
+
+/**
  * Cursor puts the missing session in `data.message` and reports only "Invalid params" in `message`.
  * Other invalid parameters must not cause a provider session to be replaced.
  */
@@ -144,6 +175,23 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   // finds no OpenBot tools (#3058).
   mcpServersLoadWithSession: true,
   enableMcpServers: enableCursorMcpServers,
+};
+
+/**
+ * Kimi CLI 1.52.0 refuses `session/load` and `session/resume` for a session that it does not have
+ * with "Invalid params" and `{ session_id: "Session not found" }`. Only that exact data counts: other
+ * invalid parameters, such as an unknown model, must not cause a provider session to be replaced.
+ */
+export const KIMI_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: (error) =>
+    error.code === -32602 ? isRecord(error.data) && error.data.session_id === "Session not found" : null,
+  // Kimi CLI 1.52.0 moves the session to the new model, and then saves it as the default model in
+  // its config.toml. In a confined process that file is protected, and the save fails with -32603.
+  modelSetUnsaved: (error) =>
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    typeof error.data.details === "string" &&
+    error.data.details.includes("config.toml"),
 };
 
 /**

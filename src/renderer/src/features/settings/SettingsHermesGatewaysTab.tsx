@@ -25,7 +25,7 @@ import { useText } from "@openbot/ui/text";
 import { createStore, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
 import { type HermesGatewayPort, hermesGatewayPort } from "./hermes-gateway-port";
 
-export function SettingsHermesGatewaysTab(props: { api?: HermesGatewayPort; mount?: HTMLElement }) {
+export function SettingsHermesGatewaysTab(props: { api?: HermesGatewayPort; mount?: HTMLElement | undefined }) {
   const { t, errorMessage } = useText();
   const api = props.api ?? hermesGatewayPort();
   const [state, setState] = createStore<{
@@ -146,7 +146,7 @@ export function SettingsHermesGatewaysTab(props: { api?: HermesGatewayPort; moun
 
 function GatewayCard(props: {
   entry: HermesGatewaySetup;
-  mount?: HTMLElement;
+  mount?: HTMLElement | undefined;
   busy: boolean;
   signingIn: boolean;
   onSignIn: (provider: string) => void;
@@ -304,7 +304,7 @@ function GatewaySelect(props: {
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
-  mount?: HTMLElement;
+  mount?: HTMLElement | undefined;
 }) {
   const labelId = createUniqueId();
   const selectId = `hermes-${labelId}`;

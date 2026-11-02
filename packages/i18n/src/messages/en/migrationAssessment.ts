@@ -43,7 +43,6 @@ export const messages = defineMessages("migrationAssessment", {
     "Check the destination declaration. Use a supported version format and a whole schema version, or leave version fields empty if unknown.",
   "migrationAssessment.failed":
     "OpenBot could not confirm the assessment request. Reload the assessment and the preparation plan before you try again.",
-  "migrationAssessment.comparison": "Metadata comparison",
   "migrationAssessment.comparison.no-known-mismatch": "No known mismatch",
   "migrationAssessment.comparison.declared-mismatch": "Mismatch",
   "migrationAssessment.comparison.insufficient-info": "Insufficient information",

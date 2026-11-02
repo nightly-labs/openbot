@@ -46,10 +46,12 @@ import type {
   AgentAdminSettings,
   AgentBackupModelSettings,
   AgentHostSettings,
+  AgentPlanCardSettings,
   AgentTaskLimitSettings,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
   UpdateAgentHostSettingsInput,
+  UpdateAgentPlanCardInput,
   UpdateAgentTaskLimitInput,
 } from "./ipc-agent-admin";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
@@ -68,6 +70,7 @@ import type {
   AgentImportSkillSource,
   ApplyAgentImportInput,
 } from "./ipc-agent-import";
+import type { AgentInstructionsFile, SaveAgentInstructionsInput } from "./ipc-agent-instructions";
 import type {
   AgentMemory,
   AgentMemoryLimitPreference,
@@ -112,6 +115,7 @@ import type {
   AgentTaskInput,
   AgentTaskReadState,
   AgentTasksSnapshot,
+  BranchAgentTaskInput,
   MarkAgentTaskReadInput,
   RenameAgentTaskInput,
   RunQueuedMessageAsTaskInput,
@@ -551,6 +555,13 @@ import type {
   VoiceTranscriptionResult,
 } from "./ipc-voice";
 import type {
+  WorkflowGitHubCatalog,
+  WorkflowGitHubHistory,
+  WorkflowGitHubLastEventInput,
+  WorkflowGitHubRepositoryInput,
+  WorkflowGitHubRepositoryOptions,
+} from "./ipc-workflow-github";
+import type {
   CreateWorkflowInput,
   DecideWorkflowStepInput,
   RenameWorkflowInput,
@@ -578,6 +589,7 @@ import type {
   LicenseState,
   LicenseUsersRequest,
 } from "./license";
+import type { MarketplaceListingLink } from "./marketplace-links";
 import type { AccountSession, MobileConnectedDevice, MobileConnectLink, MobileConnectTicket } from "./mobile-connect";
 
 declare const payloadType: unique symbol;
@@ -798,7 +810,7 @@ export const IPC_ENDPOINTS = {
     getProviderApiKeyState: request<AgentProviderId, ProviderApiKeyState>()("app:get-provider-api-key-state"),
     /**
      * Starts a sign-in the user finishes on another device, for a provider whose backend driver has
-     * one: Codex, Grok, Cursor, Cline and Muse, and Claude on Linux. A pasted code goes to
+     * one: Codex, Grok, Cursor, Cline, Kimi and Muse, and Claude on Linux. A pasted code goes to
      * `providerAdmin.submitCodeLogin` with `LOCAL_SERVER_ID`. Cancel it with
      * `cancelProviderCodeLogin`; leaving it running holds one provider process open until the code
      * expires.
@@ -968,6 +980,8 @@ export const IPC_ENDPOINTS = {
 
     list: request<MarketplaceSkillQuery | undefined, MarketplaceSkillPage>()("skills:list"),
     get: request<string, MarketplaceSkillDetail>()("skills:get"),
+    // The skill a shared link names, by its slug.
+    getBySlug: request<string, MarketplaceSkillDetail>()("skills:get-by-slug"),
     listMine: request<undefined, SkillSubmission[]>()("skills:list-mine"),
     choosePackage: request<undefined, SkillPackagePreview | null>()("skills:choose-package"),
     submit: request<SubmitSkillInput, SkillSubmission>()("skills:submit"),
@@ -1333,6 +1347,9 @@ export const IPC_ENDPOINTS = {
   marketplaceAgents: {
     list: request<MarketplaceAgentQuery | undefined, MarketplaceAgentPage>()("marketplace-agents:list"),
     get: request<string, MarketplaceAgentDetail>()("marketplace-agents:get"),
+    // The agent a shared link names: the approved version, else the one that waits for its first
+    // review, with `pending`. Only a link opens it; the catalog reads `get`.
+    getListing: request<string, MarketplaceAgentDetail>()("marketplace-agents:get-listing"),
     listMine: request<undefined, AgentSubmission[]>()("marketplace-agents:list-mine"),
     preview: request<string, AgentPublicationPreview>()("marketplace-agents:preview"),
     submit: request<SubmitMarketplaceAgentInput, AgentSubmission>()("marketplace-agents:submit"),
@@ -1473,6 +1490,8 @@ export const IPC_ENDPOINTS = {
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
     startTask: scopedRequest<StartAgentTaskInput, AgentTask>()("agent:tasks:start"),
     runQueuedMessageAsTask: scopedRequest<RunQueuedMessageAsTaskInput, AgentTask>()("agent:tasks:run-queued-message"),
+    // A joined server takes this through `agent-thread-branches-v1`.
+    branchTask: scopedRequest<BranchAgentTaskInput, AgentTask>()("agent:tasks:branch"),
     stopTask: scopedRequest<AgentTaskInput, void>()("agent:tasks:stop"),
     closeTask: scopedRequest<AgentTaskInput, void>()("agent:tasks:close"),
     reopenTask: scopedRequest<AgentTaskInput, void>()("agent:tasks:reopen"),
@@ -1583,6 +1602,17 @@ export const IPC_ENDPOINTS = {
     rotateWebhookSecret: scopedRequest<WorkflowTriggerInput, WorkflowWebhookSecret>()(
       "workflows:rotate-webhook-secret",
     ),
+    /** The repositories of the host's GitHub connection. A joined server gives them only to an owner or admin. */
+    githubCatalog: scopedQuery<WorkflowGitHubCatalog>()("workflows:github-catalog"),
+    /** The labels and people of one repository. A joined server gives them only to an owner or admin. */
+    githubOptions: scopedRequest<WorkflowGitHubRepositoryInput, WorkflowGitHubRepositoryOptions>()(
+      "workflows:github-options",
+    ),
+    githubHistory: scopedRequest<string, WorkflowGitHubHistory>()("workflows:github-history"),
+    /** Runs a GitHub trigger with the newest item that matches it, as GitHub has it now. */
+    githubRunLastEvent: scopedRequest<WorkflowGitHubLastEventInput, WorkflowRunDetail>()(
+      "workflows:github-run-last-event",
+    ),
   },
   /**
    * Routine results: an agent routine's answer sent on to a messaging place. Only this computer's host
@@ -1628,6 +1658,14 @@ export const IPC_ENDPOINTS = {
     chooseAgentExclusion: request<string, AgentExclusionChange>()("agent:folders:exclusions:choose"),
     addAgentExclusion: request<AgentFolderInput, AgentExclusionChange>()("agent:folders:exclusions:add"),
     removeAgentExclusion: request<AgentFolderInput, AgentExclusionChange>()("agent:folders:exclusions:remove"),
+  },
+  // The instruction file at the root of a local agent's workspace. A joined server has no route for
+  // it: the Team API does not carry it.
+  agentInstructions: {
+    readAgentInstructions: request<string, AgentInstructionsFile>()("agent:instructions:read"),
+    saveAgentInstructions: request<SaveAgentInstructionsInput, AgentInstructionsFile>()("agent:instructions:save"),
+    // Main finds the file from the agent id: the page never names a path to show.
+    revealAgentInstructions: request<string, void>()("agent:instructions:reveal"),
   },
   // Not part of `agentAttachments`: the preload sends the paths of dropped and pasted files, and the
   // renderer must never name a path to import. So this group is never bridged to the renderer.
@@ -1721,6 +1759,11 @@ export const IPC_ENDPOINTS = {
     getAgentTaskLimit: scopedRequest<string, AgentTaskLimitSettings>()("agent:admin:get-task-limit"),
     updateAgentTaskLimit: scopedRequest<UpdateAgentTaskLimitInput, AgentTaskLimitSettings>()(
       "agent:admin:update-task-limit",
+    ),
+    // Plan card before long tasks: `agent-plan-card-v1` on a joined server.
+    getAgentPlanCard: scopedRequest<string, AgentPlanCardSettings>()("agent:admin:get-plan-card"),
+    updateAgentPlanCard: scopedRequest<UpdateAgentPlanCardInput, AgentPlanCardSettings>()(
+      "agent:admin:update-plan-card",
     ),
     // Browser profiles of the computer that runs the agents, and the profile of one agent.
     listBrowserProfiles: scopedQuery<BrowserProfileList>()("agent:admin:list-browser-profiles"),
@@ -1872,6 +1915,12 @@ export const IPC_ENDPOINTS = {
     takePendingListing: request<undefined, string | null>()("plugins:take-pending-listing"),
     openListing: event<string>()("plugins:open-listing"),
   },
+  // The Marketplace agent and skill deep link, as `plugins`: the registrar holds the pending link.
+  // There is no endpoint that adds from a link; adding is still a press of Add on the listing page.
+  marketplace: {
+    takePendingListing: request<undefined, MarketplaceListingLink | null>()("marketplace:take-pending-listing"),
+    openListing: event<MarketplaceListingLink>()("marketplace:open-listing"),
+  },
   host: {
     getStatus: request<undefined, HostStatus>()("host:get-status"),
     configure: request<ConfigureHostInput, HostStatus>()("host:configure"),
@@ -1987,6 +2036,7 @@ export const IPC_GROUP_PATHS = {
   channelRoutines: "agent",
   agentAttachments: "agent",
   agentFolders: "agent",
+  agentInstructions: "agent",
   // The preload calls it from its own drop, paste, and file input handlers.
   attachmentImports: null,
   browser: "browser",
@@ -2001,6 +2051,7 @@ export const IPC_GROUP_PATHS = {
   migrationPreparation: "migrationPreparation",
   migrationAssessment: "migrationAssessment",
   plugins: "plugins",
+  marketplace: "marketplace",
   host: "host",
   events: "events",
   remoteDesktop: "remoteDesktop",

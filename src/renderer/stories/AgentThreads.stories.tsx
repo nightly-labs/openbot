@@ -51,5 +51,19 @@ export const QueuedThread: Story = {
   render: () => <AgentThreadsApp open={["links"]} active="links" />,
 };
 
+/**
+ * A branch of "Pricing page copy". The line after the copied messages opens the source at the
+ * answer that the branch came from. Open the thread menu: each branch shows under its source.
+ * Hover the last answer of a turn for "Branch in new thread", or right-click it for "Branch from here".
+ */
+export const Branch: Story = {
+  render: () => <AgentThreadsApp open={["pricing", "pricing-short"]} active="pricing-short" />,
+};
+
+/** A branch whose source thread was deleted: the line has no link. */
+export const BranchOfDeletedThread: Story = {
+  render: () => <AgentThreadsApp open={["pricing-orphan"]} active="pricing-orphan" />,
+};
+
 /** No side thread is open: the header shows only "New thread" and the menu. */
 export const NoTabs: Story = { render: () => <AgentThreadsApp open={[]} active={null} /> };

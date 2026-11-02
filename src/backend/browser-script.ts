@@ -11,6 +11,7 @@ import {
   shouldInterruptAfterDeadline,
 } from "quickjs-emscripten-core";
 import { browserCall, browserSync } from "./browser-effects";
+import type { DialogTabResult } from "./browser-tab-operations";
 import { type BrowserStep, parseBrowserStep } from "./browser-tools";
 import { withTimeout } from "./with-timeout";
 
@@ -26,15 +27,18 @@ export type BrowserStepOutcome =
   | { status: "ok"; value?: BrowserJsonValue | BrowserSnapshot }
   | { status: "error"; error: string }
   | { status: "user_control" }
-  | { status: "tab_closed" };
+  | { status: "tab_closed" }
+  | { status: "dialog"; dialog: DialogTabResult };
 
 export const BROWSER_SCRIPT_USER_CONTROL_ERROR =
   "A person took control of the tab. Wait for the release, then take a fresh snapshot.";
 
 export interface BrowserScriptResult {
-  status: "completed" | "failed" | "timeout" | "step_limit" | "user_control" | "tab_closed";
+  status: "completed" | "failed" | "timeout" | "step_limit" | "user_control" | "tab_closed" | "dialog";
   value?: BrowserJsonValue;
   error?: string;
+  /** The page dialog that a step opened. The script stops, and the agent answers it with `handle_dialog`. */
+  dialog?: DialogTabResult["dialog"];
   steps: number;
   log?: string[];
 }
@@ -250,7 +254,7 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
         let steps = 0;
         const result = (
           status: BrowserScriptResult["status"],
-          detail: { value?: BrowserJsonValue; error?: string } = {},
+          detail: Pick<BrowserScriptResult, "value" | "error" | "dialog"> = {},
         ): BrowserScriptResult => ({
           status,
           ...detail,
@@ -301,6 +305,11 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
               });
             case "tab_closed":
               return result("tab_closed", { error: "A step closed the tab." });
+            case "dialog":
+              return result("dialog", {
+                error: `A step opened a page dialog. ${outcome.success.dialog.note}`,
+                dialog: outcome.success.dialog.dialog,
+              });
           }
         }
       }),

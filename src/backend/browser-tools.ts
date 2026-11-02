@@ -477,6 +477,12 @@ const BROWSER_TOOL_DEFINITIONS = [
     },
   }),
   browserTool({
+    name: "handle_dialog",
+    description:
+      "Answer the dialog that your action opened. accept: true is OK, false is Cancel. Returns the next dialog or the page status.",
+    shape: { tabId, dialogId: identifier, accept: z.boolean() },
+  }),
+  browserTool({
     name: "close_tab",
     description: "Close a browser tab and clean up its CDP leases and recorder.",
     shape: { tabId },

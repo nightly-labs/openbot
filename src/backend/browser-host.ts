@@ -33,10 +33,10 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
-import { Deferred, Effect, Exit, Fiber, Result, Scope, Semaphore } from "effect";
+import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
 import {
   app,
-  type BrowserWindow,
+  BrowserWindow,
   type BrowserWindowConstructorOptions,
   clipboard,
   type Input,
@@ -117,10 +117,13 @@ import {
 } from "./browser-state";
 import {
   type ActionResultReader,
+  BrowserDialogTurn,
   type BrowserFillFieldsResult,
   BrowserToolHold,
   BrowserUserControlHeld,
   boundEngineOperation,
+  type DialogTabResult,
+  dialogTabResult,
   enqueueTabOperation,
   hasCurrentImage,
   isTimeoutError,
@@ -200,6 +203,11 @@ const VIEW_FRAME_MAX_HEIGHT = 800;
 const TAB_SET_TOOLS: ReadonlySet<string> = new Set(["open", "list_tabs", "status"]);
 /** How long after a live view's right-click the page's menu still belongs to that view. */
 const VIEW_CONTEXT_MENU_MS = 1_500;
+/**
+ * How long `handle_dialog` waits for the action that opened the dialog. After it, the status read waits
+ * in the tab queue for the action, under the action's own deadline.
+ */
+const DIALOG_ACTION_WAIT_MS = 10_000;
 /** The `keyCode` of `sendInputEvent` for a key whose `Input.key` name is different. */
 const FORWARDED_KEY_CODES: Partial<Record<string, string>> = { ArrowLeft: "Left", ArrowRight: "Right" };
 /**
@@ -471,14 +479,6 @@ export class BrowserHost {
     for (const tab of tabs) tab.pendingRestore = () => loadSavedPage(tab);
     const activeTab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
     if (activeTab) yield* this.#wake(activeTab);
-    // A view that never navigated is a debugger target that never answers, which stops a CDP client
-    // from attaching to the app. A blank page answers, and costs far less than the saved page.
-    for (const tab of tabs) {
-      if (tab.pendingRestore)
-        yield* Effect.forkIn(browserCall(() => tab.contents.loadURL("about:blank")).pipe(Effect.ignore), tab.scope, {
-          startImmediately: true,
-        });
-    }
   }).bind(this);
 
   /**
@@ -545,9 +545,9 @@ export class BrowserHost {
   }
 
   /**
-   * Unloads the page and keeps the tab: its id, owner, URL and settings stay, and the next use loads
-   * the page again through `#wake`. The page's own state, such as its history and unsent form
-   * input, is lost, as when a browser discards a background tab.
+   * Unloads the page and ends its renderer process, and keeps the tab: its id, owner, URL and settings
+   * stay, and the next use loads the page again through `#wake`. The page's own state, such as its
+   * history and unsent form input, is lost, as when a browser discards a background tab.
    */
   readonly #sleep = Effect.fn("BrowserHost.sleep")(function* (this: BrowserHost, tab: BrowserHostTab) {
     const saved = savedPreview(tab);
@@ -560,13 +560,13 @@ export class BrowserHost {
       enqueueTabOperation(
         tab,
         () =>
-          Effect.gen(function* () {
+          Effect.gen({ self: this }, function* () {
             sleeping.preview =
               saved ??
               (capture ? yield* Deferred.await(capture.frame).pipe(Effect.catch(() => Effect.succeed(null))) : null);
             if (tab.sleeping !== sleeping || tab.closing || tab.contents.isDestroyed()) return;
             unloaded = true;
-            yield* browserCall(() => tab.contents.loadURL("about:blank"));
+            yield* this.#closeRenderer(tab);
           }),
         true,
       ).pipe(Effect.ignore),
@@ -574,6 +574,31 @@ export class BrowserHost {
       { startImmediately: true },
     );
     this.#emitChanged();
+  });
+
+  /**
+   * Gives the tab a new view that has loaded no page, and closes the old one. A blank page keeps its
+   * renderer process and that memory; a view with no page has no process until `#wake` loads one.
+   */
+  readonly #closeRenderer = Effect.fn("BrowserHost.closeRenderer")(function* (this: BrowserHost, tab: BrowserHostTab) {
+    const { view, contents, engine } = tab;
+    engine.releaseDialogs();
+    yield* engine.destroy();
+    yield* browserSync(() => {
+      // The tab can close, or the host stop, while the engine stops. Their own cleanup closes the old view.
+      if (tab.closing || this.#destroying || this.#tabs.get(tab.id) !== tab) return;
+      const next = this.#createView(undefined, this.#tabSession(tab));
+      this.#mountView(next);
+      next.setBounds(view.getBounds());
+      tab.view = next;
+      tab.contents = next.webContents;
+      tab.engine = engine.forContents(next.webContents);
+      this.#bindTabEvents(tab);
+      this.#unmountView(view);
+      if (!contents.isDestroyed()) contents.close();
+      // A person can open the tab while the engine stops, which shows the old view.
+      this.#syncAttachedView();
+    });
   });
 
   onChanged(listener: (...args: BrowserHostEvents["changed"]) => void): () => void {
@@ -601,10 +626,13 @@ export class BrowserHost {
 
   endControl(threadId: string, turnId: string): void {
     this.#controls.end(threadId, turnId);
+    // A dialog that the turn did not answer stays open in Electron's box for a person.
+    for (const tab of this.#tabs.values()) tab.engine.handOffDialogs(threadId, turnId);
   }
 
   clearControls(): void {
     this.#controls.clear();
+    for (const tab of this.#tabs.values()) tab.engine.handOffDialogs();
   }
 
   /** Whether `openPrivate` opened this tab, or a popup of one: it holds a sign-in that is not for every member. */
@@ -749,6 +777,8 @@ export class BrowserHost {
     this.#bindTabEvents(tab);
     this.#activeTabId = tab.id;
     tab.focusOnVisible = focus;
+    // A view without a document cannot hold focus, so the first commit gives it.
+    tab.focusOnCommit = focus;
     this.#syncAttachedView();
     if (!focus) restoreWebContentsFocus(previouslyFocused, tab.contents);
     this.#emitChanged();
@@ -840,9 +870,19 @@ export class BrowserHost {
       (tab) =>
         Effect.gen({ self: this }, function* () {
           tab.loadGeneration += 1;
+          // The person entered this address, so the page keeps the focus that its document takes when it
+          // commits. The view can be hidden under the address suggestions, and then `#focusTab` does nothing.
+          tab.focusOnCommit = true;
           yield* untilStopped(
             tab,
             navigateAndWait(tab.contents, () => tab.contents.loadURL(normalizedUrl, browserLoadOptions())),
+          ).pipe(
+            // A same-document load or a load that does not start leaves the flag for the next navigation.
+            Effect.ensuring(
+              Effect.sync(() => {
+                tab.focusOnCommit = false;
+              }),
+            ),
           );
           this.#focusTab(tab);
         }),
@@ -963,6 +1003,8 @@ export class BrowserHost {
     this.#syncAttachedView();
     this.#emitChanged();
     tab.closing = true;
+    // An open dialog holds the tab queue until it closes.
+    tab.engine.releaseDialogs();
     const destroy = yield* Effect.forkIn(
       Effect.gen({ self: this }, function* () {
         yield* Deferred.await(tab.queue);
@@ -1900,7 +1942,13 @@ export class BrowserHost {
         let result: BrowserScriptResult = run;
         let snapshot: BrowserSnapshot | undefined;
         let snapshotError: string | undefined;
-        if (args.finalSnapshot !== false && run.status !== "user_control" && run.status !== "tab_closed") {
+        // The page waits for its dialog, so a snapshot would wait too.
+        if (
+          args.finalSnapshot !== false &&
+          run.status !== "user_control" &&
+          run.status !== "tab_closed" &&
+          run.status !== "dialog"
+        ) {
           // The steps are done when the final snapshot fails, so the result keeps their value and log.
           // Otherwise the agent sees only an error and can run the same clicks or submits again.
           const read = yield* Effect.result(this.#finalStepsSnapshot(params, tabId));
@@ -1928,6 +1976,30 @@ export class BrowserHost {
           success: result.status === "completed",
         };
       }),
+    handle_dialog: ({ args }, params) =>
+      Effect.gen({ self: this }, function* () {
+        yield* browserSync(() => this.#requireToolTab(params, args.tabId, true));
+        const tab = yield* this.#requireTab(args.tabId);
+        yield* tab.engine.answerDialog(args.dialogId, args.accept, {
+          threadId: params.threadId,
+          turnId: params.turnId,
+        });
+        const answered = args.accept ? "accepted" : "dismissed";
+        // The action that opened the dialog goes on, and can open the next one.
+        const next = Option.getOrUndefined(
+          yield* tab.engine.nextDialog().pipe(Effect.timeoutOption(DIALOG_ACTION_WAIT_MS)),
+        );
+        if (next) return textResult({ answered, ...dialogTabResult(args.tabId, next) });
+        // Waits in the tab queue for the action, then for the page to settle. A dialog can open meanwhile.
+        const status = yield* this.#runAction(
+          args.tabId,
+          "handle_dialog",
+          undefined,
+          () => Effect.void,
+          readActionStatus,
+        );
+        return textResult({ answered, ...status });
+      }),
     close_tab: ({ args }, params) =>
       Effect.gen({ self: this }, function* () {
         const tabId = args.tabId;
@@ -1935,7 +2007,7 @@ export class BrowserHost {
         // success and a repeated close is idempotent.
         const tab = this.#tabs.get(tabId);
         if (tab) {
-          yield* browserSync(() => this.#requireToolTab(params, tabId));
+          yield* browserSync(() => this.#requireToolTab(params, tabId, true));
           logger.info("Agent closed a browser tab.", {
             tabId,
             host: logUrlHost(tab.requestedUrl),
@@ -1969,6 +2041,7 @@ export class BrowserHost {
     })
       .pipe(
         Effect.provideService(BrowserToolHold, (tabId: string) => this.#heldByUser(tabId)),
+        Effect.provideService(BrowserDialogTurn, { threadId: params.threadId, turnId: params.turnId }),
         Effect.catch((operationFailure) =>
           Effect.sync((): { result: DynamicToolResult } | { heldTabId: string } => {
             const error = operationFailure.cause;
@@ -2202,8 +2275,10 @@ export class BrowserHost {
   ): Effect.fn.Return<BrowserStepOutcome> {
     const run = Effect.gen({ self: this }, function* (): Effect.fn.Return<BrowserStepOutcome, BrowserOperationError> {
       yield* browserSync(() => this.#requireToolTab(params, tabId));
-      const actionResult = (result: { closed: true } | object | null): BrowserStepOutcome =>
-        result !== null && "closed" in result ? { status: "tab_closed" } : { status: "ok" };
+      const actionResult = (result: ClosedTabResult | DialogTabResult | null): BrowserStepOutcome => {
+        if (result === null) return { status: "ok" };
+        return "closed" in result ? { status: "tab_closed" } : { status: "dialog", dialog: result };
+      };
       switch (step.action) {
         case "navigate":
           return actionResult(yield* this.#navigate(tabId, step, skipActionResult));
@@ -2341,6 +2416,7 @@ export class BrowserHost {
         for (const target of this.#persistentSessions()) target.flushStorageData();
         for (const tab of this.#tabs.values()) {
           tab.closing = true;
+          tab.engine.releaseDialogs();
           this.#unmountView(tab.view);
           drains.push(
             Effect.gen(function* () {
@@ -2618,10 +2694,13 @@ export class BrowserHost {
     const contents = tab.contents;
     const changed = () => this.#emitChanged();
     contents.on("close", () => {
+      // `#closeRenderer` closes the old contents of a tab that stays open.
+      if (tab.contents !== contents) return;
       tab.closing = true;
       tab.focusedAtPageClose = contents.isFocused();
     });
     contents.once("destroyed", () => {
+      if (tab.contents !== contents) return;
       // Finish native destruction before removing the view and draining queued work.
       setImmediate(() => {
         void runCauseEffect(this.close(tab.id)).catch((error) =>
@@ -2745,7 +2824,7 @@ export class BrowserHost {
       void contents.insertCSS(":where(html) { scrollbar-gutter: stable; }").catch(() => undefined);
     });
     contents.on("did-stop-loading", () => {
-      if (tab.closing || contents.isDestroyed()) return;
+      if (tab.closing || tab.contents !== contents || contents.isDestroyed()) return;
       changed();
       Effect.runFork(
         this.#syncViewBackground(tab).pipe(Effect.ignore, Effect.forkIn(tab.scope, { startImmediately: true })),
@@ -2774,6 +2853,27 @@ export class BrowserHost {
       this.#emitChanged();
     });
     contents.on("page-title-updated", changed);
+    // Chromium gives a visible page the focus when a new document commits. A navigation that an
+    // agent or the page starts must not take the keys from a person who types in the app.
+    let focusedBeforeCommit: WebContents | null = null;
+    const restoreFocusAfterCommit = () => {
+      const previous = focusedBeforeCommit;
+      focusedBeforeCommit = null;
+      // With no focused window the app is in the background, and a restore would raise it.
+      if (previous && contents.isFocused() && BrowserWindow.getFocusedWindow())
+        restoreWebContentsFocus(previous, contents);
+    };
+    contents.on("did-start-navigation", (details) => {
+      if (!details.isMainFrame || details.isSameDocument) return;
+      focusedBeforeCommit = tab.focusOnCommit ? null : this.#focusedContentsOutsideTabs();
+      tab.focusOnCommit = false;
+    });
+    contents.on("did-navigate", restoreFocusAfterCommit);
+    // An error page also commits, but Electron reports it as a failed load. A load that a newer
+    // navigation cancels has no commit, so the tab has no focus and the newer start stays recorded.
+    contents.on("did-fail-load", (_event, _code, _description, _url, isMainFrame) => {
+      if (isMainFrame && contents.isFocused()) restoreFocusAfterCommit();
+    });
     contents.on("did-navigate", (_event, url) => {
       tab.documents += 1;
       if (tab.secretDocument) {
@@ -3095,7 +3195,8 @@ export class BrowserHost {
     return tab;
   });
 
-  #requireToolTab(params: DynamicToolCallParams, tabId: string): void {
+  /** `dialogTool` is true for a tool that works while a page dialog is open: `handle_dialog` and `close_tab`. */
+  #requireToolTab(params: DynamicToolCallParams, tabId: string, dialogTool = false): void {
     const tab = this.listTabs().find((candidate) => candidate.id === tabId);
     if (!tab || !this.#canUseToolTab(params, tab)) throw new Error(`Unknown browser tab: ${tabId}`);
     // The user holds this tab. `AgentService` already refuses an agent's browser tools while its own
@@ -3107,6 +3208,17 @@ export class BrowserHost {
       throw new Error("Browser inspection is protected during authentication. Use takeover.");
     if (this.#takeoverTabIds.has(tabId)) throw new Error(`Browser tab is under user takeover: ${tabId}`);
     if (this.#heldByUser(tabId)) throw new BrowserUserControlHeld(tabId);
+    const engine = this.#tabs.get(tabId)?.engine;
+    const dialog = engine?.dialog;
+    // The page waits for its dialog, so every other tool would wait until its timeout.
+    if (!dialog || dialogTool) return;
+    if (engine?.dialogOwnedBy({ threadId: params.threadId, turnId: params.turnId }))
+      throw new Error(
+        `A ${dialog.type} dialog is open in this tab: ${JSON.stringify(dialog.message)}. Answer it first with handle_dialog, dialogId ${dialog.id}.`,
+      );
+    throw new Error(
+      "A dialog is open in this tab, and only a person can answer it. Ask the user to answer it, then try again.",
+    );
   }
 
   #canUseToolTab(params: DynamicToolCallParams, tab: BrowserTab): boolean {
@@ -3139,7 +3251,7 @@ export class BrowserHost {
     readResult: ActionResultReader<A>,
     timeoutMs?: number,
     onOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void,
-  ): Effect.fn.Return<A | ClosedTabResult, BrowserOperationError> {
+  ): Effect.fn.Return<A | ClosedTabResult | DialogTabResult, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
     return yield* runTabAction(tab, action, target, operation, readResult, timeoutMs, onOperationStarted);
   });
@@ -3375,9 +3487,12 @@ type ClosedTabResult = { tabId: string; closed: true; openerTabId?: string };
 type SnapshotToolPayload =
   | BrowserSnapshot
   | ClosedTabResult
+  | DialogTabResult
   | BrowserFillFieldsResult
   | (Pick<BrowserCardFillResult, "filled"> &
-      Partial<Pick<BrowserCardFillResult, "unconfirmed">> & { snapshot: BrowserSnapshot | ClosedTabResult | null })
+      Partial<Pick<BrowserCardFillResult, "unconfirmed">> & {
+        snapshot: BrowserSnapshot | ClosedTabResult | DialogTabResult | null;
+      })
   | (BrowserScriptResult & { tabId: string; snapshotError?: string; url?: string; snapshot?: BrowserSnapshot });
 
 function snapshotTextResult(value: SnapshotToolPayload): DynamicToolResult {

@@ -31,7 +31,9 @@ const NOT_COVERED = ["codex", "claude", "pi", "inception", "deepseek", "openrout
 interface DriverCase {
   provider: AgentProviderId;
   /** The form of the missing-session error that this provider's CLI gives. */
-  missing: "protocol" | "opencode" | "antigravity" | "cursor" | "chisel";
+  missing: "protocol" | "opencode" | "antigravity" | "cursor" | "chisel" | "kimi" | "hermes";
+  /** The agent's own form of a model set, when it differs from the configuration option. */
+  modelSet?: "kimi";
   /** Why the sign-in case does not apply, when it does not. */
   noSignIn?: string;
 }
@@ -41,7 +43,9 @@ const DRIVERS: readonly DriverCase[] = [
   { provider: "antigravity", missing: "antigravity" },
   { provider: "cursor", missing: "cursor" },
   { provider: "cline", missing: "protocol" },
+  { provider: "kimi", missing: "kimi", modelSet: "kimi" },
   { provider: "grok", missing: "chisel" },
+  { provider: "hermes", missing: "hermes" },
   {
     provider: "acp",
     missing: "protocol",
@@ -126,7 +130,11 @@ async function conform(driver: DriverCase): Promise<DriverResult> {
   const name = `${driver.provider}-agent`;
   const log = join(root, `${driver.provider}.jsonl`);
   const workspace = join(root, "workspace");
-  const setup = await driverSetup(driver, name, { FAKE_LOG: log, FAKE_MISSING: driver.missing });
+  const setup = await driverSetup(driver, name, {
+    FAKE_LOG: log,
+    FAKE_MISSING: driver.missing,
+    ...(driver.modelSet ? { FAKE_MODEL_SET: driver.modelSet } : {}),
+  });
   const label = driver.provider;
 
   // Start: the client lists the agent's models.
@@ -200,7 +208,9 @@ async function conform(driver: DriverCase): Promise<DriverResult> {
   if (!driver.noSignIn) {
     const signedIn = await runCauseEffect(client.request("account/read", {}, decodeAccountReadResult));
     assert.notEqual(signedIn.account, null, `${label}: a signed-in agent has an account.`);
-    const signedOut = (await driverSetup(driver, `${name}-signed-out`, { FAKE_SIGNED_OUT: "1" })).open();
+    const signedOut = (
+      await driverSetup(driver, `${name}-signed-out`, { FAKE_SIGNED_OUT: "1", FAKE_MISSING: driver.missing })
+    ).open();
     await runCauseEffect(signedOut.request("initialize", {}, (value) => value));
     const account = await runCauseEffect(signedOut.request("account/read", {}, decodeAccountReadResult));
     signInRequired = account.account === null;

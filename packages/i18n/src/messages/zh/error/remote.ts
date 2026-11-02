@@ -117,7 +117,6 @@ export const messages = {
   "error.remote.serverDisconnected": "服务器已断开。",
   "error.remote.preferencesUnreadable": "无法读取已保存的聊天偏好。",
   "error.remote.accountAuthRequired": "需要账号身份验证。",
-  "error.remote.serverIdentityChanged": "服务器身份已变更，拒绝替换受信任的主机密钥。",
   "error.remote.pairedIdentityChanged": "已配对的桌面身份缺失或已变更，请从该桌面重新扫码。",
   "error.remote.permanentInviteNoEmail": "永久邀请无法通过邮件发送。",
   "error.remote.selfHostedInviteNoEmail": "自建账号服务的邀请无法通过邮件发送，请复制链接。",

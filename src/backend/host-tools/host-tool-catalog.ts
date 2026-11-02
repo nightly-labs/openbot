@@ -13,7 +13,7 @@ const CATALOG_ACTIONS = {
   host_mcp: "mcp",
 } as const satisfies Record<string, HostToolAction>;
 
-export const HOST_CATALOG_TOOLS = new Set<string>([...Object.keys(CATALOG_ACTIONS), "host_list_machines"]);
+const HOST_CATALOG_TOOLS = new Set<string>([...Object.keys(CATALOG_ACTIONS), "host_list_machines"]);
 
 export function isHostCatalogTool(name: string): boolean {
   return HOST_CATALOG_TOOLS.has(name);

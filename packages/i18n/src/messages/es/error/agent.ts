@@ -19,7 +19,15 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Se requiere un mensaje o un archivo adjunto.",
   "error.agent.promptAnswersTooLong": "Las respuestas a las preguntas son demasiado largas.",
   "error.agent.gone": "Este agente ya no existe.",
+  "error.agent.instructionsTooLarge":
+    "El archivo de instrucciones es demasiado grande para abrirlo aquí. Acórtalo en un editor de texto.",
+  "error.agent.instructionsOutside":
+    "El archivo de instrucciones enlaza a un lugar fuera del espacio de trabajo del agente, así que OpenBot no lo abre.",
+  "error.agent.instructionsReadFailed": "No se pudo leer el archivo de instrucciones.",
+  "error.agent.instructionsSaveFailed": "No se pudo guardar el archivo de instrucciones.",
   "error.agent.profileGenerationBusy": "La generación de perfiles está ocupada. Inténtalo de nuevo en breve.",
+  "error.agent.instructionsChanged":
+    "El agente cambió el archivo de instrucciones. Tu último cambio no se guardó. Vuelve a hacerlo.",
   "error.agent.initialMessageRequired": "Se requiere un mensaje inicial.",
   "error.agent.initialMessageTooLong": "El mensaje inicial es demasiado largo.",
   "error.agent.setupCleanupFailed": "No se pudo configurar el agente ni eliminar el agente incompleto.",
@@ -32,6 +40,8 @@ export const messages = {
     "El modelo de agente seleccionado «{model}» no está disponible: {provider} no mostró ningún modelo.",
   "error.agent.modelNotInProviderList":
     "El modelo de agente seleccionado «{model}» no está disponible: {provider} no lo incluye en su lista.",
+  "error.agent.modelVariantNotListed":
+    "El modelo de agente seleccionado «{model}» no está disponible: {provider} no lo incluye en su lista. Usa uno de estos valores que {provider} incluye para este modelo: {models}.",
   "error.agent.modelProviderMismatch": "El modelo seleccionado no pertenece a ese proveedor.",
   "error.agent.modelNotListed": "El modelo «{model}» no está disponible. Modelos disponibles: {models}.",
   "error.agent.providerNotListed":

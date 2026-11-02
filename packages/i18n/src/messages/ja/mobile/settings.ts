@@ -71,9 +71,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "アニメーションをオフにすると、アプリ全体の動きを減らします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。その場合、下のアニメーションはオフのままです。",
   "mobile.settings.animations.all": "アニメーション",
-  "mobile.settings.animations.chatZoom": "チャットへのズーム",
-  "mobile.settings.animations.chatZoomFooter":
-    "チャットはリストのアバターから開き、閉じるとアバターに戻ります。オフにすると、チャットは横からスライドして開きます。",
   "mobile.settings.animations.agentFaces": "エージェントの表情アニメーション",
   "mobile.settings.animations.agentFacesFooter":
     "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動きません。",
@@ -148,6 +145,8 @@ export const messages = {
   "mobile.settings.notifications.offForEveryone": "このサーバーの全員に対してオフ",
   "mobile.settings.notifications.turnOn": "オンにする",
   "mobile.settings.notifications.turnOnFor": "このサーバーの全員に対して {name} の通知をオンにする",
+  "mobile.settings.notifications.chooseAgent": "エージェントごとに選ぶ",
+  "mobile.settings.notifications.chooseAnotherAgent": "別のエージェントを選ぶ",
   "mobile.settings.notifications.levelsFooter":
     "エージェントのレベルをもう一度タップすると、サーバーの設定に従います。",
   "mobile.settings.notifications.agentsUnsupported":

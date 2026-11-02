@@ -37,6 +37,52 @@ export function versionsOnBothStores(changelog: string): string[] {
   });
 }
 
+/** Version headings in `changelog`, newest first. `Unreleased` is not a version. */
+function changelogVersions(changelog: string): string[] {
+  return changelog.split(/\r?\n/).flatMap((line) => {
+    const version = /^## \[([^\]]+)\] - /u.exec(line)?.[1];
+    return version !== undefined && version !== "Unreleased" ? [version] : [];
+  });
+}
+
+function versionParts(version: string): number[] {
+  return version.split(".").map((part) => Number(part));
+}
+
+/** Whether `left` is a later `x.y.z` than `right`. */
+function isNewerVersion(left: string, right: string): boolean {
+  const leftParts = versionParts(left);
+  const rightParts = versionParts(right);
+  const length = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (difference !== 0) return difference > 0;
+  }
+  return false;
+}
+
+/**
+ * The announcement file holds one version. A sync can record an older version on both stores in the
+ * same change that prepares the next version. That older completion is history: the file already
+ * names the newer version, and that version is not on both stores yet.
+ */
+function readAnnouncementVersion(): string {
+  try {
+    const parsed = JSON.parse(readFileSync(MOBILE_ANNOUNCEMENT_FILE, "utf8"));
+    if (typeof parsed === "object" && parsed !== null && "version" in parsed && typeof parsed.version === "string")
+      return parsed.version;
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function announcementCoversNewerVersion(changelog: string, completed: string): boolean {
+  const announced = readAnnouncementVersion();
+  if (announced === "" || announced === completed || !isNewerVersion(announced, completed)) return false;
+  return changelogVersions(changelog).includes(announced) && !versionsOnBothStores(changelog).includes(announced);
+}
+
 /** What stops `announcement` from being posted for `version`. Empty when it is ready. */
 export function mobileAnnouncementProblems(announcement: string, version: string): string[] {
   return announcementFileProblems(announcement, version, MOBILE_ANNOUNCEMENT_FILE, (highlights) =>
@@ -83,7 +129,8 @@ if (import.meta.main) {
     const before = new Set(versionsOnBothStores(readFileSync(argument, "utf8")));
     // The newest one only: the announcement file holds one version, and an older one is old news.
     const [version] = versionsOnBothStores(changelog).filter((candidate) => !before.has(candidate));
-    if (version !== undefined) process.stdout.write(`${version}\n`);
+    if (version !== undefined && !announcementCoversNewerVersion(changelog, version))
+      process.stdout.write(`${version}\n`);
     process.exit(0);
   }
 

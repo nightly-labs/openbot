@@ -85,7 +85,7 @@ interface DesktopAnalyticsEvents {
         failure_code?: string;
       })
     | (Partial<AgentAnalyticsProperties> & {
-        action: "delete" | "duplicate";
+        action: "delete" | "duplicate" | "branch";
         result: AnalyticsResult;
         failure_code?: string;
       });
@@ -555,7 +555,7 @@ const SAFE_FAILURE_CODES = new Set([
 ]);
 
 const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
-  agent_action: ["create", "update", "delete", "duplicate"],
+  agent_action: ["create", "update", "delete", "duplicate", "branch"],
   agent_input_action: ["prompt", "approval"],
   queue_action: ["cancel", "steer", "edit", "reorder", "interrupt"],
   routine_action: ["create", "update", "delete", "test"],
@@ -751,6 +751,8 @@ function sanitizeDesktopAnalyticsEvent(
  * "custom". The main process uses the same rule.
  */
 function reportedModel(value: string): string {
+  // Hermes names a model of the user's own endpoint `custom:<endpoint name>:<model>`.
+  if (value.startsWith("custom:")) return "custom";
   const separator = value.indexOf("/");
   if (separator < 0) return value;
   // A key-only provider never puts its own id before a model id, so that prefix comes from OpenCode.

@@ -117,14 +117,6 @@ export const messages = {
   "error.provider.codexNotStartedHint": "找到了 Codex CLI，但无法启动。请在新终端中运行 `codex --version`。",
   "error.provider.codexManagedNotStarted": "ChatGPT 已下载，但无法启动。请在 OpenBot 中重新下载。",
   "error.provider.codexMissing": "ChatGPT 尚未下载。请在 OpenBot 中下载后继续。",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex 忽略了配置中的 {count} 项设置：{settings}。请修正或移除它，或更新 Codex。",
-    other: "Codex 忽略了配置中的 {count} 项设置：{settings}。请修正或移除它们，或更新 Codex。",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex 忽略了配置中的 {count} 项设置。请修正或移除它，或更新 Codex。",
-    other: "Codex 忽略了配置中的 {count} 项设置。请修正或移除它们，或更新 Codex。",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} 版本过低。OpenBot 需要 2.1.232 或更高版本。",
   "error.provider.claudeNotStarted": "找到了 Claude CLI，但无法启动。",
   "error.provider.claudeNotStartedHint": "找到了 Claude CLI，但无法启动。请在新终端中运行 `claude --version`。",
@@ -163,6 +155,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} 未返回已验证的账号。",
   "error.provider.signInExpired": "你的 {provider} 登录已过期，请重新登录以继续。",
   "error.provider.cliActivateFailed": "OpenBot 无法激活托管的 CLI。",
+  "error.provider.cliNewVersionNotStarted": "新版本未能启动。",
   "error.provider.cliBusyReconnect": "{provider} CLI 正在处理对话，请等它结束后再重新连接。",
   "error.provider.cliBusySignOut": "{provider} CLI 正在处理一轮对话。请等待其完成，然后断开连接。",
   "error.provider.opencodeCredentialsRejected":
@@ -171,6 +164,10 @@ export const messages = {
     "OpenCode 尚未登录模型服务商“{provider}”。请选择带“免费”标签的模型，或连接该服务商：在 OpenCode 设置中粘贴 OpenCode Go 密钥，或在终端中运行 `opencode auth login`。然后重试。",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode 尚未登录该模型的服务商。请选择带“免费”标签的模型，或连接该服务商：在 OpenCode 设置中粘贴 OpenCode Go 密钥，或在终端中运行 `opencode auth login`。然后重试。",
+  "error.provider.customEndpointKeyRefused":
+    "端点“{provider}”拒绝了它的 API 密钥或请求头。请在“服务器设置 → 服务商”中重新输入，然后重试。",
+  "error.provider.customEndpointKeyMissing":
+    "端点“{provider}”需要 API 密钥。请在“服务器设置 → 服务商”中添加密钥，然后重试。",
   "error.provider.opencodeKeyExpired":
     "你的 OpenCode API 密钥已过期。请在 OpenCode Console 中创建新密钥，粘贴到 OpenCode 设置中，然后重试。",
   "error.provider.opencodeServiceFailure":
@@ -232,6 +229,18 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline 无法启动。请在终端中运行 `cline --version`。",
   "error.provider.clineVersionUnreadable": "无法读取 Cline CLI 版本。",
   "error.provider.clineSignIn": "请使用 Cline 登录，或设置 CLINE_API_KEY 以使用 Cline。",
+  "error.provider.kimiArchivePath": "Kimi 压缩包中包含异常的路径。",
+  "error.provider.kimiChecksum": "Kimi 运行时校验和不匹配。",
+  "error.provider.kimiLicenseChecksum": "Kimi 许可证校验和不匹配。",
+  "error.provider.kimiMissing": "Kimi 尚未下载。请在 OpenBot 中下载后继续。",
+  "error.provider.kimiOutdated": "Kimi CLI {version} 版本过低。OpenBot 需要 1.52.0 或更高版本。",
+  "error.provider.kimiNotStarted": "Kimi 无法启动。请在终端中运行 `kimi --version`。",
+  "error.provider.kimiVersionUnreadable": "无法读取 Kimi CLI 版本。",
+  "error.provider.kimiSignIn": "请使用 Kimi Code 登录以使用 Kimi。",
+  "error.provider.hermesMissing": "未安装 Hermes Agent。请安装后重试。",
+  "error.provider.hermesNotStarted": "无法启动 Hermes Agent。请在终端中运行 `hermes --version`。",
+  "error.provider.hermesVersionUnreadable": "无法读取 Hermes Agent 的版本。",
+  "error.provider.hermesSignIn": "要使用 Hermes，请使用 Nous Portal 登录，或在终端中运行 `hermes setup`。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",
   "error.provider.foreignReasoning":
     "此前的推理内容由另一个账号或 API 密钥接收，因此 {provider} 未接受它。OpenBot 已带着聊天记录开启新的 {provider} 会话，请重试。",
@@ -273,6 +282,7 @@ export const messages = {
     "已保存的自定义助手由更新版本的 OpenBot 写入，或文件无法读取。请更新 OpenBot 后再修改。",
   "error.provider.customAgentNoSecureStorage": "该电脑没有安全存储，无法保存环境变量值。请移除它们后重试。",
   "error.provider.customAgentNotSaved": "该自定义助手未保存，请刷新列表后重试。",
+  "error.provider.customAgentWorkspaceOnly": "{reason}。“仅工作区”阻止了此操作。请尝试“完全访问”。",
   "error.provider.customAgentTooMany": "最多只能保存 {count} 个自定义助手。",
   "error.provider.customAgentEnvValueMissing": "请填写 {name} 的值。",
   "error.provider.off": "{provider} 在 OpenBot 中已关闭。请先在服务商设置中开启它。",

@@ -20,7 +20,6 @@ import {
   CopyPlus,
   DropdownMenu,
   File,
-  Hash,
   Image,
   LabelTooltipTrigger,
   LoaderCircle,
@@ -773,52 +772,12 @@ export const BLOCK_RESIZE: Record<BlockKind, { width: Range; height?: Range }> =
   shape: { width: { min: 48, max: 960 }, height: { min: 48, max: 960 } },
 };
 
-/* --------------------------------------------------------------- Pill */
+/* ------------------------------------------------------------- Choices */
 
 export interface Choice<T extends string> {
   value: T;
   label: string;
   icon: () => JSX.Element;
-}
-
-/** A pill that opens a list of choices, as the agent pill of an agent step. */
-export function ChoicePill<T extends string>(props: {
-  name: string;
-  value: T;
-  choices: readonly Choice<T>[];
-  /** The text of the pill when no choice has the value. */
-  placeholder?: string;
-  disabled?: boolean | undefined;
-  onChange: (value: T) => void;
-}) {
-  const { t } = useText();
-  const current = () => props.choices.find((choice) => choice.value === props.value);
-  const shown = () => current()?.label ?? props.placeholder ?? props.value;
-  return (
-    <DropdownMenu.Root placement="bottom-start" gutter={6}>
-      <DropdownMenu.Trigger
-        class={`${buttonVariants({ variant: "ghost", size: "xs" })} wfn-pill`}
-        aria-label={t("workflow.node.choice", { name: props.name, value: shown() })}
-        disabled={props.disabled}
-      >
-        {current()?.icon()}
-        <span>{shown()}</span>
-        <ChevronDown aria-hidden="true" />
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <PickerMenu
-          label={props.name}
-          groups={[
-            {
-              options: props.choices.map((choice) => ({ value: choice.value, label: choice.label, tile: choice.icon })),
-            },
-          ]}
-          value={props.value}
-          onSelect={props.onChange}
-        />
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
-  );
 }
 
 /* ------------------------------------------------------------- Colours */
@@ -932,7 +891,7 @@ export function ToolbarChoice<T extends string>(props: {
 /* --------------------------------------------------------------- Places */
 
 /** The key of a place in a choice list. */
-const placeKey = (connectionId: string, placeId: string) => JSON.stringify([connectionId, placeId]);
+export const placeKey = (connectionId: string, placeId: string) => JSON.stringify([connectionId, placeId]);
 
 /**
  * The place of a node, such as the channel that an output posts to. A new node takes the first place
@@ -961,35 +920,4 @@ export function usePlace(
     placeId,
     set: (place: WorkflowPlace) => board.setFields(id(), { connectionId: place.connectionId, placeId: place.placeId }),
   };
-}
-
-/** A pill with the places of the catalog, such as the channels. */
-export function PlacePill(props: {
-  name: string;
-  connectionId: string;
-  placeId: string;
-  disabled?: boolean;
-  onChange: (place: WorkflowPlace) => void;
-}) {
-  const board = useBoard();
-  const { t } = useText();
-  const choices = () =>
-    board.catalogs().places.map((place) => ({
-      value: placeKey(place.connectionId, place.placeId),
-      label: place.label,
-      icon: () => <Hash aria-hidden="true" />,
-    }));
-  return (
-    <ChoicePill
-      name={props.name}
-      value={placeKey(props.connectionId, props.placeId)}
-      choices={choices()}
-      placeholder={t("workflow.node.place.choose")}
-      disabled={props.disabled}
-      onChange={(key) => {
-        const place = board.catalogs().places.find((entry) => placeKey(entry.connectionId, entry.placeId) === key);
-        if (place) props.onChange(place);
-      }}
-    />
-  );
 }

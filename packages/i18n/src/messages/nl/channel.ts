@@ -8,6 +8,7 @@ export const messages = {
   "channel.stoppedTask.label": "Gestopte taak van {name}",
   "channel.stoppedTask.reassignLabel": "Gestopte taak van {name} opnieuw toewijzen",
   "channel.stoppedTask.reassign": "Opnieuw toewijzen",
+  "channel.stoppedTask.cancel": "Taak annuleren",
   "channel.conversation.noMembers": "Voeg agents toe in de kanaalinstellingen om te beginnen.",
   "channel.conversation.archivedNotice": "Verwijderd kanaal. Alleen voorvertoning.",
   "channel.composer.label": "Bericht aan kanaal",

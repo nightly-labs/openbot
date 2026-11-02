@@ -1,10 +1,10 @@
 {
-  "version": "0.56.0",
+  "version": "0.58.0",
   "highlights": [
-    "Agents do many browser actions in one step, so browser tasks finish sooner and use fewer tokens, and Cloudflare checks pass in the built-in browser.",
-    "Right-click an agent message and select Mark unread to come back to it later.",
-    "Hide the Local server when you have another server; its agents, chats and files stay on your computer.",
-    "Choose the sound that plays when a task finishes, in Settings › Notifications.",
-    "Each provider CLI now uses about half the disk space, and OpenBot uses the CLI you installed when it is as new as its own copy."
+    "Start a workflow from a GitHub issue, comment, pull request or failed check, and let it comment, label or review on GitHub.",
+    "A joined server opens much faster: the agents and sidebar from your last visit show at once while the app connects.",
+    "On the web, a switch to another server takes about 1 second.",
+    "Marketplace has 17 new OpenBot agents, such as QA Tester, PR Shepherd and Chief of Staff.",
+    "You can move queued messages in a queue of more than 32 messages."
   ]
 }

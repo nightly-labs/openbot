@@ -20,6 +20,7 @@ export interface BridgeCommand {
     | "disconnect-peer"
     | "send"
     | "restart-ice"
+    | "renew-host-signal"
     | "set-private-network"
     | "close";
   peerId: string;
@@ -206,6 +207,9 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
       await sendChannelPayload(state, channel, command.data);
     } else if (command.type === "restart-ice") {
       await restartIce(requirePeer(command.peerId));
+    } else if (command.type === "renew-host-signal") {
+      // After a sleep. The device paths of the old socket are lost too; each device connects again.
+      for (const state of peers.values()) if (state.role === "host" && !state.signalHost) replaceSignal(state);
     } else if (command.type === "set-private-network") {
       // A host that is not connected now reads the route again when it connects.
       const host = peers.get(command.peerId);
@@ -362,7 +366,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
 }
 
 async function handleSignal(state: PeerState, message: SignalServerMessage): Promise<void> {
-  // Signal sends Slack, Discord, webhook and Telegram messages only to the main process's `ingress`
+  // Signal sends Slack, Discord, webhook, GitHub and Telegram messages only to the main process's `ingress`
   // socket, never to this peer. `host-waiting` answers only a hello with `waitForHost`, which this
   // peer does not send.
   if (
@@ -372,6 +376,8 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     message.type === "discord-delivery" ||
     message.type === "webhook-ready" ||
     message.type === "webhook-delivery" ||
+    message.type === "github-ready" ||
+    message.type === "github-delivery" ||
     message.type === "telegram-delivery" ||
     message.type === "telegram-call-result" ||
     message.type === "queued-delivery"

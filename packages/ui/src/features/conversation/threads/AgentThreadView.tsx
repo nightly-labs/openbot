@@ -16,8 +16,14 @@ import {
   AgentStepsDisclosure,
   type AgentStepsFacts,
 } from "@openbot/ui/features/conversation/AgentSteps";
+import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
+import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
+import {
+  ComposerAttachmentRow,
+  type ComposerPendingImage,
+} from "@openbot/ui/features/conversation/ComposerAttachmentRow";
 import {
   ComposerEditor,
   type ComposerPasteResult,
@@ -27,12 +33,14 @@ import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice
 import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { children, createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
+import { children, createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import { HostToolApprovalCard, type HostToolApprovalCardProps } from "../HostToolApprovalCard";
+import { type AgentThreadBranchSource, BranchDivider } from "./BranchDivider";
 
 const HOLD_TEXT = {
   "agent-restarting": "conversation.threads.hold.agentRestarting",
@@ -108,6 +116,13 @@ export interface AgentThreadViewProps {
   draft: string;
   /** The files that the draft names. */
   draftAttachments?: DraftAttachment[] | undefined;
+  /** The images of the draft that show in the thumbnail row. A send takes them with the text. */
+  rowAttachments?: readonly DraftAttachment[] | undefined;
+  /** The pasted images that still import, with their local previews. */
+  pendingImages?: readonly ComposerPendingImage[] | undefined;
+  onRemoveAttachment?: ((attachment: DraftAttachment) => void) | undefined;
+  /** Loads the images of a client that gets no `previewUrl`. */
+  mediaSource?: AttachmentMediaSource | undefined;
   onDraftChange: (text: string) => void;
   /** Receives pasted files. Without it, a file paste does nothing here. */
   onPasteFiles?:
@@ -155,6 +170,19 @@ export interface AgentThreadViewProps {
   scrollRef?: ((element: HTMLElement) => void) | undefined;
   /** The user's send shortcut. Enter when absent. */
   sendShortcut?: SendShortcut | undefined;
+  /** Copies a message. Without it, the messages have no action row and no right-click menu. */
+  onCopyMessage?: ((message: AgentMessage) => void) | undefined;
+  /** The message that the copy action copied a moment ago. */
+  copiedMessageId?: string | null | undefined;
+  /**
+   * Copies the thread through an answer into a new thread. Only the last answer of each finished turn
+   * offers it. Missing where the host cannot branch.
+   */
+  onBranch?: ((messageId: string) => void) | undefined;
+  /** Where the thread came from, when it is a branch. A line shows after the copied messages. */
+  branchSource?: AgentThreadBranchSource | undefined;
+  /** A message to scroll to and mark once, when it shows. Each new request has a new nonce. */
+  focusMessage?: { messageId: string; nonce: number } | undefined;
 }
 
 /**
@@ -204,7 +232,42 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       fades.stop();
     };
   });
+  let focusedNonce: number | undefined;
+  // The thread scrolls to a message once, when its row shows, for example its source after "Branched from".
+  createEffect(
+    () => ({ focus: props.focusMessage, count: props.messages.length, taskId: props.task?.id }),
+    ({ focus }) => {
+      if (!focus || focus.nonce === focusedNonce || !scroller) return;
+      const message = scroller.querySelector<HTMLElement>(
+        `[data-chat-search-message="${CSS.escape(focus.messageId)}"]`,
+      );
+      const row = message?.closest<HTMLElement>(".virtual-chat-row");
+      if (!row) return;
+      focusedNonce = focus.nonce;
+      atEnd = false;
+      row.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+      // The same mark as a click on a quote: the row lights up, then fades.
+      delete row.dataset.replyFlash;
+      void row.offsetWidth;
+      row.dataset.replyFlash = "";
+      const end = (event: AnimationEvent) => {
+        if (event.target !== row || event.animationName !== "reply-flash") return;
+        row.removeEventListener("animationend", end);
+        delete row.dataset.replyFlash;
+      };
+      row.addEventListener("animationend", end);
+    },
+  );
   const active = () => (props.task ? isAgentTaskActive(props.task) : false);
+  /** The answers that end a finished turn: each offers a branch. */
+  const branchPoints = createMemo(() => branchPointIds(props.messages, props.task?.activeTurnId));
+  /** A turn runs, so a branch waits: the backend copies only a thread that does not run. */
+  const branchBusy = () => props.task?.activeTurnId != null;
+  const branchAction = (message: AgentMessage) => {
+    const onBranch = props.onBranch;
+    if (!onBranch || !branchPoints().has(message.id)) return undefined;
+    return () => onBranch(message.id);
+  };
   const title = () => props.task?.title ?? t("conversation.threads.new");
   const placeholder = () =>
     props.task
@@ -221,7 +284,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       return;
     }
     const text = props.draft.trim();
-    if (!text || sending() || voiceBusy()) return;
+    if (draftEmpty() || sending() || voiceBusy()) return;
     setSending(true);
     try {
       await props.onSend(text);
@@ -243,13 +306,58 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       avatarSeed: senderId,
     };
   };
+  /** The action row of a message: Copy, and Branch on the last answer of a finished turn. */
+  function messageActions(message: AgentMessage): JSX.Element | undefined {
+    const onCopy = props.onCopyMessage;
+    if (!onCopy || message.streaming) return undefined;
+    return (
+      <MessageActions
+        message={message}
+        authorName={author(message).name}
+        reactions={false}
+        pickerOpen={false}
+        expandedEmoji={false}
+        copied={props.copiedMessageId === message.id}
+        onTogglePicker={() => undefined}
+        onExpandEmoji={() => undefined}
+        onReact={() => undefined}
+        onCopy={() => onCopy(message)}
+        onBranch={branchAction(message)}
+        branchDisabled={branchBusy()}
+      />
+    );
+  }
+  /** The right-click menu of a message, with the actions of its action row. */
+  function messageMenu(message: AgentMessage): (() => JSX.Element) | undefined {
+    const onCopy = props.onCopyMessage;
+    if (!onCopy || message.streaming) return undefined;
+    return () => (
+      <MessageMenu
+        message={message}
+        authorName={author(message).name}
+        reactions={false}
+        onReact={() => undefined}
+        onCopy={() => onCopy(message)}
+        onBranch={branchAction(message)}
+        branchDisabled={branchBusy()}
+      />
+    );
+  }
+  /** The branch line shows after the last message that the branch copied. */
+  function branchDividerAfter(messageId: string): AgentThreadBranchSource | undefined {
+    const source = props.branchSource;
+    return source?.throughMessageId === messageId ? source : undefined;
+  }
   const failed = () => (props.task?.state === "idle" && props.task.outcome === "failed" ? props.task : undefined);
   const running = () =>
     props.task?.state === "running" && !props.approval && !props.waitsForAnswer ? props.task : undefined;
   const queued = () => (props.task && props.task.queuedMessages.length > 0 ? props.task : undefined);
   const hold = () => (props.task ? agentThreadHoldText(props.task, props.limit, t) : null);
   const sendLabel = () => t(recording() ? "composer.send.voice" : "composer.send.message");
-  const draftEmpty = () => props.draft.trim().length === 0;
+  const hasRow = () =>
+    Boolean(props.onRemoveAttachment) &&
+    ((props.rowAttachments?.length ?? 0) > 0 || (props.pendingImages?.length ?? 0) > 0);
+  const draftEmpty = () => props.draft.trim().length === 0 && (props.rowAttachments?.length ?? 0) === 0;
   /** As in the agent's own chat: Send, Send what was said while a recording runs, or Stop while the thread works. */
   const sendButton = () => (
     <ComposerSendControl
@@ -299,10 +407,14 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                   onOpenLink={props.onOpenLink}
                   onPreview={props.onPreview}
                   onAttachmentAction={props.onAttachmentAction}
+                  mediaSource={props.mediaSource}
                   onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
                   macWindowControls={props.macWindowControls}
+                  actions={messageActions(message())}
+                  menu={messageMenu(message())}
                   data-chat-search-message={message().id}
                 />
+                <Show when={branchDividerAfter(message().id)}>{(source) => <BranchDivider source={source()} />}</Show>
               </div>
             )}
           </For>
@@ -380,12 +492,23 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         </Show>
         <form
           class="composer agent-thread-composer"
-          data-compact="true"
+          data-compact={hasRow() ? undefined : "true"}
+          data-has-attachments={hasRow() ? "" : undefined}
           onSubmit={(event) => {
             event.preventDefault();
             void send();
           }}
         >
+          <Show when={props.onRemoveAttachment}>
+            {(remove) => (
+              <ComposerAttachmentRow
+                attachments={props.rowAttachments ?? []}
+                pending={props.pendingImages}
+                removeDisabled={sending() || voicePhase() === "transcribing"}
+                onRemove={(attachment) => remove()(attachment)}
+              />
+            )}
+          </Show>
           <div class="composer-input-label">
             <ComposerEditor
               agentId={props.agent.id}

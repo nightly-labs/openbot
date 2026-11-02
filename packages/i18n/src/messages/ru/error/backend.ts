@@ -71,6 +71,7 @@ export const messages = {
     "Этот запрос превышает лимит контекста маршрутизации. Выберите участника или отправьте запрос короче.",
   "error.backend.channelTaskMemberRequired": "Выберите участника для этой задачи.",
   "error.backend.channelTaskStopped": "Остановлено. Продолжите или переназначьте эту задачу.",
+  "error.backend.channelTaskNotStopped": "Отменить можно только остановленную или неудавшуюся задачу.",
   "error.backend.channelRoutingUnreadable": "Ведущий не смог распределить это сообщение. Назначьте его участнику.",
   "error.backend.channelRoutingFailed": "Не удалось выполнить маршрутизацию. Выберите участника или повторите попытку.",
   "error.backend.channelLeadTimedOut": "Ведущий канала не ответил вовремя. Выберите участника или повторите попытку.",
@@ -334,6 +335,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "У этого агента открыто веток: {count}. Архивируйте ветку, затем начните или восстановите другую.",
   "error.backend.threadRemoteUnsupported": "Ветки доступны только для агентов на этом компьютере.",
+  "error.backend.branchSourceBusy": "Остановите текущий ход, прежде чем создать ответвление этого чата.",
+  "error.backend.branchMessageNotFound": "Ответвление можно создать только от завершённого ответа агента.",
+  "error.backend.branchRemoteUnsupported": "Ответвления доступны только для агентов на этом компьютере.",
   "error.backend.threadMoveRefused":
     "В новой ветке можно запустить только сообщение, которое вы отправили одному этому агенту.",
   "error.backend.taskTitleRequired": "Дайте задаче короткое название.",

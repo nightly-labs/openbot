@@ -36,6 +36,11 @@ function endsQuietResume(status: RemoteRecoveryStatus): boolean {
 export interface ServerConnectionHandle {
   client: RemoteTeamTransportRef;
   refresh(): void;
+  /**
+   * The phone shows this server from its cache, so the first attempt after the start runs in a quiet
+   * time, as a return to the app does. Only once, and only before that attempt ends.
+   */
+  quietStart(): void;
 }
 
 export interface ServerLoadContext {
@@ -102,6 +107,16 @@ export const ServerConnection = memo(function ServerConnection({
     if (last && last.status.phase !== "online") onStatusRef.current(hostId, last.status, last.failure, false);
   }, [hostId]);
   useEffect(() => () => clearTimeout(resumeTimer.current), []);
+  const quietStartUsed = useRef(false);
+  const quietStart = useCallback(() => {
+    const last = lastStatus.current;
+    if (quietStartUsed.current || !activeRef.current || resuming.current || inactiveSince.current !== null) return;
+    quietStartUsed.current = true;
+    if (last && (last.status.phase !== "connecting" || last.status.attempt > 1)) return;
+    resuming.current = true;
+    resumeTimer.current = setTimeout(endResume, QUIET_RESUME_MS);
+    if (last) onStatusRef.current(hostId, last.status, last.failure, true);
+  }, [hostId, endResume]);
   const attach = useCallback((value: RemoteTeamTransportRef | null) => setClient(value), []);
   const onMembershipChangedRef = useRef(onMembershipChanged);
   onMembershipChangedRef.current = onMembershipChanged;
@@ -191,7 +206,7 @@ export const ServerConnection = memo(function ServerConnection({
       },
     );
     controller.current = recovery;
-    register(hostId, { client, refresh: () => recovery.refresh() });
+    register(hostId, { client, refresh: () => recovery.refresh(), quietStart });
     recovery.setActive(activeRef.current);
     return () => {
       disposed = true;
@@ -200,7 +215,7 @@ export const ServerConnection = memo(function ServerConnection({
       controller.current = null;
       register(hostId, null);
     };
-  }, [client, hostId, publicKey, register, load, onStatus, analytics]);
+  }, [client, hostId, publicKey, register, load, onStatus, analytics, quietStart]);
 
   useEffect(() => {
     const returned = active && inactiveSince.current !== null;

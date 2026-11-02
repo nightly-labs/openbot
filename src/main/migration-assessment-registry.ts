@@ -86,8 +86,11 @@ export const MIGRATION_ASSESSMENT_TABLES = {
     "workflow_runs",
     "workflow_steps",
     "workflow_output_deliveries",
+    "workflow_github_runs",
+    "workflow_github_deliveries",
+    "workflow_github_actions",
   ],
   "events-receipts": ["orchestration_events", "orchestration_command_receipts"],
 } as const;
 
-export const MIGRATION_ASSESSMENT_EXPECTED_SCHEMA = 47;
+export const MIGRATION_ASSESSMENT_EXPECTED_SCHEMA = 49;

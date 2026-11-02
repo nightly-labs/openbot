@@ -62,6 +62,8 @@ export const messages = {
   "error.team.providerNotManaged": "OpenBot non gestisce la CLI di questo provider.",
   "error.team.channelsUnsupported": "Le chat dei canali non sono supportate da questa connessione.",
   "error.team.channelDeleteUnsupported": "L'eliminazione dei canali non è supportata da questa connessione.",
+  "error.team.channelTaskCancelUnsupported":
+    "L'annullamento delle attività dei canali non è supportato da questa connessione.",
   "error.team.membersCannotDeleteChannels": "I membri non possono eliminare i canali.",
   "error.team.membersCannotArchiveChannels": "I membri non possono archiviare i canali.",
   "error.team.membersCannotRestoreChannels": "I membri non possono ripristinare i canali.",
@@ -94,8 +96,11 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "La modifica dell'identità del server non è supportata da questa connessione.",
   "error.team.hostUpdateUnsupported": "Gli aggiornamenti dell'host non sono supportati da questa connessione.",
   "error.team.hostTimezoneUnsupported": "Questa connessione non supporta il fuso orario del server.",
+  "error.team.hostKeyRotationUnsupported": "Questa connessione non supporta il cambio della chiave del server.",
   "error.team.routineResultsUnsupported": "Questa connessione non supporta le destinazioni delle routine.",
   "error.team.agentMemoryLimitUnsupported": "Questa connessione non supporta il limite di memorie degli agenti.",
+  "error.team.agentFoldersUnsupported": "Questa connessione non supporta le cartelle degli agenti.",
+  "error.team.folderUnavailable": "Questa cartella non è disponibile sul computer host.",
   "error.team.memoryReviewUnsupported": "Questa connessione non supporta la revisione delle memorie.",
   "error.team.promptCacheTtlUnsupported": "Questa connessione non supporta la durata della cache dei prompt.",
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",
@@ -131,6 +136,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "L'autenticazione sicura non è supportata da questo client.",
   "error.team.agentSettingsUnsupported": "Le impostazioni dell'agente non sono supportate da questa connessione.",
   "error.team.adminRequired": "Serve l'accesso come amministratore.",
+  "error.team.ownerRequired": "Solo il proprietario di questo server può farlo.",
   "error.team.requestTooLarge": "Il corpo della richiesta è troppo grande.",
   "error.team.signInRelayUnsupported": "Questo server non può inoltrare gli accessi. Aggiorna OpenBot sull'host.",
   "error.team.connectorsUnsupported":

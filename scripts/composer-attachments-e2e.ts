@@ -155,9 +155,12 @@ try {
   const source = await openAgent("Chief");
   await clearTestDraft(source);
   await source.fill("Before  after");
-  // A synthetic copy event has no default action: a native copy leaves its clipboard empty.
-  assert.deepEqual(await copy(source), {});
-  results.push("A selection without attachments keeps the native copy.");
+  // The copy of the app gives the text and HTML without the app styles, not the native rich text.
+  const textCopy = await copy(source);
+  assert.equal(textCopy["text/plain"], "Before  after");
+  assert.ok(textCopy["text/html"]?.includes("Before"));
+  assert.ok(!/style=|class=|data-openbot-composer-fragment/u.test(textCopy["text/html"] ?? ""));
+  results.push("A selection without attachments copies its text without the app styles.");
   await source.evaluate((element) => {
     element.focus();
     const range = document.createRange();

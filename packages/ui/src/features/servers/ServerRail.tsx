@@ -79,7 +79,8 @@ interface ServerRailProps extends ServerActionCallbacks {
   servers: ServerSummary[];
   onSelect: (serverId: string) => void;
   onReorder: (serverIds: string[]) => void;
-  onAdd: () => void;
+  /** Without it, the rail has no add button. */
+  onAdd?: (() => void) | undefined;
   /** True when the plus button opens the hosted server plans, where the user can also join with an invite. */
   addCreatesServer?: boolean | undefined;
   /** Opens the dialog that creates a server on this computer. With it, the plus button opens a menu. */
@@ -362,38 +363,40 @@ export function ServerRail(props: ServerRailProps) {
             </For>
           </ul>
         </Show>
-        <Show
-          when={props.onCreateLocal || props.hiddenLocal}
-          fallback={
-            <Tooltip.Root
-              placement="right"
-              gutter={10}
-              openDelay={SERVER_RAIL_TOOLTIP_OPEN_DELAY}
-              closeDelay={0}
-              skipDelayDuration={300}
-            >
-              <Tooltip.Trigger
-                type="button"
-                class={`${buttonVariants({ variant: "outline", size: "sm" })} server-rail-button server-rail-action`}
-                aria-label={t(addServerLabel(props))}
-                data-cuelume-open=""
-                data-cuelume-emphasis="subtle"
-                onClick={props.onAdd}
+        <Show when={props.onAdd}>
+          <Show
+            when={props.onCreateLocal || props.hiddenLocal}
+            fallback={
+              <Tooltip.Root
+                placement="right"
+                gutter={10}
+                openDelay={SERVER_RAIL_TOOLTIP_OPEN_DELAY}
+                closeDelay={0}
+                skipDelayDuration={300}
               >
-                <span class="server-rail-monogram">+</span>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Content class="server-rail-tooltip">{t(addServerLabel(props))}</Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-          }
-        >
-          <ServerRailAddMenu
-            addLabel={addServerLabel(props)}
-            onAdd={props.onAdd}
-            onCreateLocal={props.onCreateLocal}
-            hiddenLocal={props.hiddenLocal}
-          />
+                <Tooltip.Trigger
+                  type="button"
+                  class={`${buttonVariants({ variant: "outline", size: "sm" })} server-rail-button server-rail-action`}
+                  aria-label={t(addServerLabel(props))}
+                  data-cuelume-open=""
+                  data-cuelume-emphasis="subtle"
+                  onClick={() => props.onAdd?.()}
+                >
+                  <span class="server-rail-monogram">+</span>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                  <Tooltip.Content class="server-rail-tooltip">{t(addServerLabel(props))}</Tooltip.Content>
+                </Tooltip.Portal>
+              </Tooltip.Root>
+            }
+          >
+            <ServerRailAddMenu
+              addLabel={addServerLabel(props)}
+              onAdd={() => props.onAdd?.()}
+              onCreateLocal={props.onCreateLocal}
+              hiddenLocal={props.hiddenLocal}
+            />
+          </Show>
         </Show>
         <span class="sr-only" aria-live="polite">
           {announcement()}

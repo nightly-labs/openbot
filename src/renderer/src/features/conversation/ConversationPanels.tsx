@@ -34,7 +34,7 @@ const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { Portal } from "@solidjs/web";
 import { createEffect, createMemo, Loading, lazy, onSettled, Show, untrack } from "solid-js";
-import { agentFolderCalls } from "./agent-folders-port";
+import { agentFolderCalls, agentInstructionsCalls } from "./agent-folders-port";
 import { conversationPort } from "./conversation-port";
 import { GrokBotSideComputer } from "./GrokBotSideComputer";
 import { grokBotDesktopChat } from "./grok-bot-side";
@@ -93,6 +93,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
     previewQuoteId,
+    previewFileKey,
     previewWorkspaceAgentId,
     sidebarFileBack,
     openSidebarFileBack,
@@ -104,6 +105,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     sidebarFilePreview,
     settingsOpen,
     skillSettingsRequest,
+    instructionsSettingsRequest,
     routineSettingsRequest,
     settingsModel,
     settingsProvider,
@@ -144,8 +146,15 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   // A remote agent's host resolves its settings, so the account defaults of this computer do not apply.
   const localAgentDefaults = () => (props.server?.kind === "local" ? props.agentDefaults : undefined);
   const folderCalls = agentFolderCalls();
-  /** An agent's folders are on the computer that runs it, and the Team API does not carry them. */
+  /** An agent's folders are on the computer that runs it. The desktop does not use `agent-folders-v1` yet. */
   const localFolderCalls = () => (props.server?.kind === "local" && !props.runtime ? folderCalls : undefined);
+  const instructionsCalls = {
+    ...agentInstructionsCalls(),
+    openLink: (url: string) => void openExternalMessageUrl(url),
+  };
+  /** The instruction file is in the agent's workspace on this computer. */
+  const localInstructionsCalls = () =>
+    props.server?.kind === "local" && !props.runtime ? instructionsCalls : undefined;
   const canPublish = () =>
     props.runtime
       ? props.runtime.admin !== undefined && serverCanAdminister(props.server, "agent-publish-v1")
@@ -345,6 +354,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 sourceUrl={attached()?.previewUrl ?? null}
                 pageUrl={htmlAttachmentPageUrl(attached()) ?? file().preview?.pageUrl}
                 pageHtml={props.runtime?.visualPage ? htmlAttachmentPageHtml(attached(), file().preview) : undefined}
+                fileKey={previewFileKey()}
                 selectionQuoteId={previewQuoteId()}
                 onOpenExternally={openSidebarFileExternally}
                 onDownload={downloadSidebarFile}
@@ -488,6 +498,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               remoteClient={Boolean(props.runtime)}
               localHost={props.server?.kind === "local"}
               folders={localFolderCalls()}
+              instructionsFile={localInstructionsCalls()}
               sessionSettingsEditable={serverCanAdminister(props.server, "agent-session-settings-v1")}
               adminCalls={props.runtime?.admin}
               skillsMarketplaceOpen={props.skillsMarketplaceOpen}
@@ -517,7 +528,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               busyMessageModeEditable={props.server?.kind === "local" || props.remoteBusyMessageModeLoaded === true}
               busyMessageDefaultIsHost={props.server?.kind === "remote"}
               newChatEditable={props.server?.kind === "local"}
-              quickAcknowledgementEditable={props.server?.kind === "local"}
+              quickAcknowledgementEditable={props.server?.kind === "local" || props.remotePlanCardLoaded === true}
               taskLimitEditable={props.server?.kind === "local" || props.remoteTaskLimitLoaded === true}
               backupModelsEditable={props.server?.kind === "local" || props.remoteBackupModelsLoaded === true}
               usageLimited={props.usageLimited}
@@ -587,6 +598,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               onUpdateRuntimeSettings={updateRuntimeSettings}
               onSetAgentAvatar={props.onSetAgentAvatar}
               skillSelectionRequest={skillSettingsRequest()?.agentId === agent().id ? skillSettingsRequest() : null}
+              instructionsRequest={
+                instructionsSettingsRequest()?.agentId === agent().id ? instructionsSettingsRequest() : null
+              }
               routineSelectionRequest={
                 routineSettingsRequest()?.agentId === agent().id ? routineSettingsRequest() : null
               }

@@ -1,5 +1,4 @@
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import type { HostToolAction } from "./host-tool-policy";
 import type { HostToolRequest, ListedMachine } from "./host-tool-types";
 
 export const LOCAL_EXEC_REQUESTS_PATH = "/local-exec/requests";
@@ -275,5 +274,3 @@ export function readResultMessage(filePath: string, content: string): Json {
 export function refusedControlMessage(requestId: string, error: string): LocalExecResponseFrame {
   return { kind: "control", requestId, message: { throw: { error } } };
 }
-
-export type { HostToolAction };

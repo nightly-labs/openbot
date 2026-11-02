@@ -254,6 +254,13 @@
   justify-content: flex-end;
 }
 
+.account-login-language {
+  align-self: center;
+  width: auto;
+  margin-top: var(--openbot-space-6);
+  color: var(--openbot-text-muted);
+}
+
 .account-login-development-code {
   margin: 0;
   color: var(--openbot-warning);

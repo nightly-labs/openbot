@@ -19,7 +19,14 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Wymagana jest wiadomość lub załącznik.",
   "error.agent.promptAnswersTooLong": "Odpowiedzi na pytania są za długie.",
   "error.agent.gone": "Ten agent już nie istnieje.",
+  "error.agent.instructionsTooLarge": "Plik instrukcji jest za duży, aby go tu otworzyć. Skróć go w edytorze tekstu.",
+  "error.agent.instructionsOutside":
+    "Plik instrukcji wskazuje miejsce poza obszarem roboczym agenta, więc OpenBot go nie otwiera.",
+  "error.agent.instructionsReadFailed": "Nie udało się odczytać pliku instrukcji.",
+  "error.agent.instructionsSaveFailed": "Nie udało się zapisać pliku instrukcji.",
   "error.agent.profileGenerationBusy": "Generowanie profilu już trwa. Spróbuj ponownie za chwilę.",
+  "error.agent.instructionsChanged":
+    "Agent zmienił plik instrukcji. Twoja ostatnia zmiana nie została zapisana. Wprowadź ją ponownie.",
   "error.agent.initialMessageRequired": "Wymagana jest wiadomość początkowa.",
   "error.agent.initialMessageTooLong": "Wiadomość początkowa jest za długa.",
   "error.agent.setupCleanupFailed": "Konfiguracja agenta nie powiodła się i nie udało się usunąć niepełnego agenta.",
@@ -32,6 +39,8 @@ export const messages = {
     "Wybrany model agenta „{model}” jest niedostępny: {provider} nie zwrócił żadnych modeli.",
   "error.agent.modelNotInProviderList":
     "Wybrany model agenta „{model}” jest niedostępny: {provider} nie ma go na liście.",
+  "error.agent.modelVariantNotListed":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} nie ma go na liście. Użyj jednej z wartości, które {provider} podaje dla tego modelu: {models}.",
   "error.agent.modelProviderMismatch": "Wybrany model nie należy do tego dostawcy.",
   "error.agent.modelNotListed": "Model „{model}” jest niedostępny. Dostępne modele: {models}.",
   "error.agent.providerNotListed":

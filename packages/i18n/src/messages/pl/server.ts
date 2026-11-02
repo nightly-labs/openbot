@@ -338,6 +338,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "Obecny i nowy klucz podpisują przekazanie. Aplikacje członków przełączą się na nowy klucz przy następnym połączeniu. Zrób to, jeśli plik klucza został skopiowany lub ujawniony.",
   "server.settings.hostKeyRotated": "Zmieniono klucz serwera",
+  "server.settings.hostKeyChanged": "Ostatnia zmiana",
+  "server.settings.hostKeyChangedDescription": "{date}. Poprzedni i nowy klucz podpisały tę zmianę.",
   "server.settings.hostKeyLocalOnly": "Tutaj klucz może zmienić tylko serwer na tym komputerze.",
   "server.settings.removeTitle": "Usuń serwer",
   "server.settings.removeDescription":

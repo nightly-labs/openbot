@@ -1258,14 +1258,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   onBlur={saveTitle}
                 />
               </SettingsField>
-              <SettingsField label={t("agentSettings.instructions")}>
+              <SettingsField label={t("agentSettings.description")}>
                 <ResizableTextarea
-                  class="settings-instructions-input"
-                  rows="5"
+                  class="settings-instructions-input settings-description-input"
+                  rows="3"
                   value={draft.fields.description}
-                  aria-label={t("agentSettings.instructionsLabel")}
-                  resizeLabel={t("agentSettings.instructionsResize")}
-                  placeholder={t("agentSettings.instructionsPlaceholder")}
+                  aria-label={t("agentSettings.descriptionLabel")}
+                  resizeLabel={t("agentSettings.descriptionResize")}
+                  placeholder={t("agentSettings.descriptionPlaceholder")}
                   invalid={instructionsTooLong(draft.fields.description)}
                   onValueChange={(value) => {
                     setDraft((state) => {
@@ -1276,7 +1276,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   }}
                   onBlur={saveDescription}
                 />
-                <InstructionsLimit text={draft.fields.description} />
+                <InstructionsLimit text={draft.fields.description} tooLong="agent.description.tooLong" />
               </SettingsField>
               <SettingsLinkGroup inset class="agent-settings-runtime-rows" title={t("agentSettings.groups.brain")}>
                 <ProviderModelPicker
@@ -1744,7 +1744,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
 }
 
 /** Lets a long path wrap after a slash instead of inside a folder name. */
-function breakablePath(path: string) {
+export function breakablePath(path: string) {
   return path.split("/").map((part, index) =>
     index === 0 ? (
       part

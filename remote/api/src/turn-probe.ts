@@ -31,7 +31,7 @@ const CREDENTIAL_TTL_SECONDS = 60;
 const PROBE_USER = "openbot-status-probe";
 
 /** `full`: the relay refused the allocation at its quota. `refused`: another error. `no-answer`: no reply in time. */
-class TurnProbeError extends Schema.TaggedError<TurnProbeError>()("TurnProbeError", {
+export class TurnProbeError extends Schema.TaggedError<TurnProbeError>()("TurnProbeError", {
   reason: Schema.Literals(["full", "refused", "no-answer"]),
 }) {}
 
@@ -166,11 +166,11 @@ const openSocket = (address: string, port: number) => {
   );
 };
 
-/** Allocates one UDP relay on the TURN server and frees it at once. */
+/** Allocates one UDP relay on the TURN server `host` and frees it at once. */
 export const probeTurnAllocation = Effect.fn("TurnProbe.allocate")(
-  function* (config: Pick<RemoteApiConfig, "turnHost" | "turnPort" | "turnSecret">) {
+  function* (host: string, config: Pick<RemoteApiConfig, "turnPort" | "turnSecret">) {
     const { address } = yield* Effect.tryPromise({
-      try: () => lookup(config.turnHost, { family: 4 }),
+      try: () => lookup(host, { family: 4 }),
       catch: noAnswer,
     });
     const socket = yield* openSocket(address, config.turnPort);

@@ -69,9 +69,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Uygulamanın tamamında hareketi azaltmak için “Animasyonlar” ayarını kapatın. Telefon ayarlarında “Hareketi Azalt” açıkken uygulama da hareketi azaltır. Bu durumda aşağıdaki animasyonlar kapalı kalır.",
   "mobile.settings.animations.all": "Animasyonlar",
-  "mobile.settings.animations.chatZoom": "Sohbetlere yakınlaştır",
-  "mobile.settings.animations.chatZoomFooter":
-    "Sohbet, listedeki avatarından açılır ve kapanınca ona geri döner. Kapalıyken sohbet yandan kayarak açılır.",
   "mobile.settings.animations.agentFaces": "Hareketli ajan yüzleri",
   "mobile.settings.animations.agentFacesFooter":
     "Ajanlar çalışırken ve dinlenirken avatarlarının yüzleri hareket eder. Kapalıyken yüzler sabit kalır.",
@@ -146,6 +143,8 @@ export const messages = {
   "mobile.settings.notifications.offForEveryone": "Bu sunucudaki herkes için kapalı",
   "mobile.settings.notifications.turnOn": "Aç",
   "mobile.settings.notifications.turnOnFor": "Bu sunucudaki herkes için {name} bildirimlerini aç",
+  "mobile.settings.notifications.chooseAgent": "Bir ajan için seç",
+  "mobile.settings.notifications.chooseAnotherAgent": "Başka bir ajan seç",
   "mobile.settings.notifications.levelsFooter": "Sunucuyu izlemesi için bir ajanın düzeyine yeniden dokun.",
   "mobile.settings.notifications.agentsUnsupported": "Ajanları seçmek için bu sunucudaki OpenBot’u güncelle.",
   "mobile.settings.notifications.agentsOffline": "Bu sunucu çevrimiçi olduğunda ajanlar görünür.",

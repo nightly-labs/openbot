@@ -74,9 +74,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Wyłącz animacje, aby ograniczyć ruch w całej aplikacji. Gdy w ustawieniach telefonu jest włączona opcja Ogranicz ruch, aplikacja także ogranicza ruch. Poniższe animacje pozostają wtedy wyłączone.",
   "mobile.settings.animations.all": "Animacje",
-  "mobile.settings.animations.chatZoom": "Powiększanie czatów",
-  "mobile.settings.animations.chatZoomFooter":
-    "Czat otwiera się z awatara na liście i zamyka się z powrotem do niego. Gdy to jest wyłączone, czat wsuwa się z boku.",
   "mobile.settings.animations.agentFaces": "Animowane twarze agentów",
   "mobile.settings.animations.agentFacesFooter":
     "Awatary agentów poruszają twarzami, gdy agenci pracują i odpoczywają. Gdy to jest wyłączone, twarze są nieruchome.",
@@ -151,6 +148,8 @@ export const messages = {
   "mobile.settings.notifications.offForEveryone": "Wyłączone dla wszystkich na tym serwerze",
   "mobile.settings.notifications.turnOn": "Włącz",
   "mobile.settings.notifications.turnOnFor": "Włącz powiadomienia od {name} dla wszystkich na tym serwerze",
+  "mobile.settings.notifications.chooseAgent": "Wybierz dla jednego agenta",
+  "mobile.settings.notifications.chooseAnotherAgent": "Wybierz innego agenta",
   "mobile.settings.notifications.levelsFooter": "Stuknij ponownie poziom agenta, aby wrócił do ustawienia serwera.",
   "mobile.settings.notifications.agentsUnsupported": "Zaktualizuj OpenBot na tym serwerze, aby wybierać agentów.",
   "mobile.settings.notifications.agentsOffline": "Agenci pojawią się, gdy ten serwer będzie online.",

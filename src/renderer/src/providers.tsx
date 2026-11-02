@@ -2,6 +2,7 @@ import {
   type AgentProviderId,
   type AgentStatus,
   agentProviderDescriptor,
+  type CustomProviderSummary,
   isManagedRuntimeProvider,
   LOCAL_SERVER_ID,
   type ProviderRuntimeDownload,
@@ -23,6 +24,7 @@ import { type DesktopAnalyticsProperties, desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
 import { useAgents } from "./features/agents/agents-context";
 import { conversationPort } from "./features/conversation/conversation-port";
+import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { hostCustomProvidersApi } from "./features/custom-providers/custom-providers-port";
 import { createCustomProvidersStore } from "./features/custom-providers/stores/custom-providers-store";
 import { createProviderConnection } from "./features/provider-updates/provider-connection";
@@ -99,14 +101,24 @@ const Providers = createSimpleContext({
         },
       };
     });
-    /**
-     * The host's own endpoints, for Settings. The machine-local list in `CustomProvidersProvider`
-     * stays what the model picker reads.
-     */
+    /** The host's own endpoints, for Settings and for the picker of a joined server. */
     const hostCustomProviders = createCustomProvidersStore(() => {
       const serverId = providerAdminServerId();
       return serverId ? hostCustomProvidersApi(providerAdmin, serverId) : undefined;
     });
+    const localCustomProviders = useCustomProviders();
+    /**
+     * The endpoints whose models the active server's OpenCode or Pi lists, which is how the picker puts
+     * those models on its Custom tab. Each computer runs its own endpoints, so a joined server's agents
+     * read the host's list, and this computer's list would file the host's models under OpenCode.
+     * Undefined for a member who does not administer the host: the Team API gives the list only to
+     * an administrator, and the picker then shows those models on the OpenCode tab.
+     */
+    function activeCustomProviders(): CustomProviderSummary[] | undefined {
+      if (activeServer()?.kind === "local") return localCustomProviders.customProviders();
+      if (providerAdminServerId()) return hostCustomProviders.customProviders();
+      return undefined;
+    }
     createEffect(providerAdminServerId, (serverId) => {
       // As for this computer's list: a failure leaves it empty, and nothing retries it from here.
       if (serverId) void hostCustomProviders.refreshCustomProviders().catch(() => undefined);
@@ -490,6 +502,7 @@ const Providers = createSimpleContext({
       providerAdminServerId,
       providerKeys,
       hostCustomProviders,
+      activeCustomProviders,
       refreshingProviders,
       applyAgentStatus,
       connectProvider,

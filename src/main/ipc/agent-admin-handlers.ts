@@ -10,6 +10,7 @@ import {
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
   decodeAgentBrowserProfile,
+  decodeAgentPlanCardSettings,
   decodeAgentTaskLimitSettings,
   decodeBrowserProfileList,
   decodeBrowserProfileSummary,
@@ -24,6 +25,7 @@ import {
   parseUpdateAgentBackupModelsInput,
   parseUpdateAgentBrowserProfileInput,
   parseUpdateAgentHostSettingsInput,
+  parseUpdateAgentPlanCardInput,
   parseUpdateAgentTaskLimitInput,
   parseUpdateBrowserProfileInput,
 } from "@openbot/contracts/ipc";
@@ -37,6 +39,10 @@ import {
   AGENT_HOST_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_INSTALL_CAPABILITY, AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-install-v1";
+import {
+  AGENT_PLAN_CARD_CAPABILITY,
+  AGENT_PLAN_CARD_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
@@ -160,6 +166,14 @@ export function agentAdminIpcHandlers({
         local: (input) => runCauseEffect(hostSettings.updateTaskLimit(input)),
         remote: (input, serverId) => remoteTaskLimit(serverId, AGENT_TASK_LIMIT_ROUTES.update, input),
       }),
+      getAgentPlanCard: scopedHandler((value) => requireString(value, "agentId"), {
+        local: (agentId) => hostSettings.readPlanCard(agentId),
+        remote: (agentId, serverId) => remotePlanCard(serverId, AGENT_PLAN_CARD_ROUTES.settings, { agentId }),
+      }),
+      updateAgentPlanCard: scopedHandler(parseUpdateAgentPlanCardInput, {
+        local: (input) => runCauseEffect(hostSettings.updatePlanCard(input)),
+        remote: (input, serverId) => remotePlanCard(serverId, AGENT_PLAN_CARD_ROUTES.update, input),
+      }),
       listBrowserProfiles: scopedQueryHandler({
         local: () => browserProfiles.list(),
         remote: (serverId) =>
@@ -274,6 +288,12 @@ export function agentAdminIpcHandlers({
     return runCauseEffect(
       remoteServers.request(serverId, path, decodeAgentTaskLimitSettings, { method: "POST", body }),
     );
+  }
+
+  function remotePlanCard(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, AGENT_PLAN_CARD_CAPABILITY))
+      throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decodeAgentPlanCardSettings, { method: "POST", body }));
   }
 }
 

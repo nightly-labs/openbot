@@ -51,6 +51,8 @@ export type AgentEvent =
   | { type: "workflows-changed"; workflowId: string }
   /** The Vault of this server changed. Server settings of a joined server read it again. */
   | { type: "vault-changed" }
+  /** The named browser profiles of this server, or the profile of one of its agents, changed. */
+  | { type: "browser-profiles-changed" }
   | { type: "agent-session-settings-changed"; agentId: string }
   | { type: "channel-memories-changed"; channelId: string }
   | { type: "channel-routines-changed"; channelId: string }
@@ -197,6 +199,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "workflows-changed":
       return isIdentifier(value.workflowId);
     case "vault-changed":
+    case "browser-profiles-changed":
       return true;
     case "channel-memories-changed":
     case "channel-routines-changed":

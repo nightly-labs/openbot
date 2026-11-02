@@ -2,6 +2,8 @@
 // OpenAI-compatible server with two models, as a llama-swap user has them: the user's own OpenCode
 // config names one as `model` and `small_model`, and the agent runs on the other. A local server like llama-swap loads
 // the model that each request names, so every request must name the agent's model.
+// A second endpoint needs an API key: a turn must send the saved key, and a refused or missing key
+// must name the endpoint, not an OpenCode sign-in.
 // `OPENCODE_CLI=<opencode> bun run test:opencode-custom-model`.
 // Writes .openbot-build/opencode-custom-model/report.json.
 import assert from "node:assert/strict";
@@ -12,6 +14,7 @@ import { createServer as createTcpServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient } from "../src/backend/agent-client";
 import { resolveOpencodeCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -24,11 +27,16 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/opencode-custom-mode
 const ENDPOINT = "spark";
 const DEFAULT_MODEL = "default-model";
 const AGENT_MODEL = "agent-model";
+const KEYED_ENDPOINT = "vault";
+const KEYED_PATH = "/keyed/v1";
+const KEY = "e2e-endpoint-key";
 
 interface Request {
   path: string;
   model: string | null;
   stream: boolean;
+  /** For the keyed endpoint: whether the request carried its key. */
+  auth?: "key" | "other" | "none";
 }
 
 interface Report {
@@ -46,7 +54,7 @@ const clients: AgentClient[] = [];
 const run = promisify(execFile);
 
 /** The model and the stream flag of one chat request. */
-async function readRequest(request: IncomingMessage): Promise<Omit<Request, "path">> {
+async function readRequest(request: IncomingMessage): Promise<Omit<Request, "path" | "auth">> {
   const chunks: Buffer[] = [];
   for await (const part of request) chunks.push(Buffer.from(part));
   const text = Buffer.concat(chunks).toString("utf8");
@@ -65,7 +73,19 @@ function chunk(model: string, content: string | null): string {
 const server = createServer((request: IncomingMessage, response: ServerResponse) => {
   void (async () => {
     const { model, stream } = await readRequest(request);
-    report.requests.push({ path: request.url ?? "", model, stream });
+    const path = request.url ?? "";
+    if (!path.startsWith(KEYED_PATH)) report.requests.push({ path, model, stream });
+    else {
+      const header = request.headers.authorization;
+      const auth = header === `Bearer ${KEY}` ? "key" : header ? "other" : "none";
+      report.requests.push({ path, model, stream, auth });
+      if (auth !== "key") {
+        // TokenMe's answer to a missing or refused key, which OpenCode 2.2.5 reports as `-32000`.
+        response.writeHead(401, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: { message: "The API key is invalid", type: "authentication_error" } }));
+        return;
+      }
+    }
     const reply = `reply from ${model}`;
     if (!stream) {
       response.writeHead(200, { "content-type": "application/json" });
@@ -105,7 +125,8 @@ try {
   await new Promise<void>((listening) => server.listen(0, "127.0.0.1", listening));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("The fake endpoint has no port.");
-  const baseUrl = `http://127.0.0.1:${address.port}/v1`;
+  const origin = `http://127.0.0.1:${address.port}`;
+  const baseUrl = `${origin}/v1`;
 
   // OpenCode must not read the developer's own config, keys or sessions.
   for (const [name, folder] of [
@@ -174,8 +195,38 @@ try {
   }
 
   assert.ok(report.requests.length > 0, "The endpoint got no request.");
-  const others = report.requests.filter((request) => request.model !== null && request.model !== AGENT_MODEL);
+  const others = report.requests.filter(
+    (request) => request.auth === undefined && request.model !== null && request.model !== AGENT_MODEL,
+  );
   assert.deepEqual(others, [], "Each request must name the agent's model.");
+
+  const keyedModel = `${KEYED_ENDPOINT}/${AGENT_MODEL}`;
+  const keyedTurn = async (apiKey: string | null) => {
+    const keyed = requireProviderDriver("opencode").createClient(cli, 60_000, {
+      apiKey: () => null,
+      customProviders: () => [
+        { ...endpoint, id: KEYED_ENDPOINT, name: "Vault", baseUrl: `${origin}${KEYED_PATH}`, apiKey },
+      ],
+      mcpServers: () => [],
+      providerStateDirectory: join(root, "provider-state"),
+    });
+    clients.push(keyed);
+    keyed.start();
+    const keyedThread = await startThread(keyed, { cwd: workspace, model: keyedModel });
+    const turn = await runTurn(keyed, keyedThread, { text: "Say one word.", timeoutMs: 120_000 });
+    report.turns.push(turn);
+    return turn;
+  };
+  const sent = await keyedTurn(KEY);
+  assert.equal(sent.error, null, `The turn with the saved key failed: ${sent.error}`);
+  assert.ok(
+    report.requests.some((request) => request.auth === "key"),
+    "The endpoint must get the saved key.",
+  );
+  const refused = await keyedTurn("e2e-refused-key");
+  assert.equal(refused.error, sourceText("error.provider.customEndpointKeyRefused", { provider: "Vault" }));
+  const missing = await keyedTurn(null);
+  assert.equal(missing.error, sourceText("error.provider.customEndpointKeyMissing", { provider: "Vault" }));
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

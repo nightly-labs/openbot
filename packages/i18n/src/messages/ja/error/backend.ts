@@ -74,6 +74,7 @@ export const messages = {
     "この依頼はルーティングのコンテキスト上限を超えています。メンバーを選択するか、短い依頼を送信してください。",
   "error.backend.channelTaskMemberRequired": "このタスクのメンバーを選択してください。",
   "error.backend.channelTaskStopped": "停止しました。このタスクを続行するか、再割り当てしてください。",
+  "error.backend.channelTaskNotStopped": "キャンセルできるのは、停止したタスクか失敗したタスクだけです。",
   "error.backend.channelRoutingUnreadable":
     "リーダーがこのメッセージを振り分けられませんでした。メンバーに再割り当てしてください。",
   "error.backend.channelRoutingFailed": "ルーティングに失敗しました。メンバーを選択するか、もう一度お試しください。",
@@ -345,6 +346,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "このエージェントには {count} 件の開いているスレッドがあります。スレッドをアーカイブしてから、別のスレッドを開始するか復元してください。",
   "error.backend.threadRemoteUnsupported": "スレッドは、このコンピューター上のエージェントでのみ利用できます。",
+  "error.backend.branchSourceBusy": "このチャットを分岐する前に、現在のターンを停止してください。",
+  "error.backend.branchMessageNotFound": "分岐できるのは、エージェントの完了した回答からのみです。",
+  "error.backend.branchRemoteUnsupported": "分岐は、このコンピューター上のエージェントでのみ利用できます。",
   "error.backend.threadMoveRefused":
     "新しいスレッドで実行できるのは、このエージェントだけに送信したメッセージのみです。",
   "error.backend.taskTitleRequired": "タスクに短いタイトルを付けてください。",

@@ -2,10 +2,17 @@ import { agentTemplateIdFromWebAppSearch, WEB_APP_AGENT_TEMPLATE_PARAM } from "@
 import { type FirstTouch, readFirstTouch } from "@openbot/contracts/first-touch";
 import { inviteUrlFromWebAppSearch, WEB_APP_INVITE_FIELDS } from "@openbot/contracts/invite-links";
 import type { AppVariant, CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
+import {
+  type MarketplaceListingLink,
+  marketplaceListingFromWebAppSearch,
+  WEB_APP_MARKETPLACE_AGENT_PARAM,
+  WEB_APP_MARKETPLACE_SKILL_PARAM,
+} from "@openbot/contracts/marketplace-links";
 import { pluginSlugFromWebAppSearch, WEB_APP_PLUGIN_PARAM } from "@openbot/contracts/plugin-links";
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
+import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { classifyFailure } from "@openbot/telemetry";
 import { NotificationObserver, Toaster, toast } from "@openbot/ui";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
@@ -27,6 +34,7 @@ import {
 import { StaticI18nProvider } from "../../i18n-context";
 import { AnalyticsConsentRow, ConsentNotice } from "../onboarding/AnalyticsConsent";
 import { createOnboardingTeam, onboardingSessionSeed } from "../onboarding/onboarding-avatars";
+import { deleteRemoteWorkspaceFrames } from "../servers/remote-workspace-frame";
 import type { WebWorkspace } from "./WebWorkspace";
 import { createWebAccountCalls } from "./web-account";
 import { createWebAppearancePreference } from "./web-appearance-preference";
@@ -39,8 +47,8 @@ import { createWebLanguagePreference } from "./web-language-preference";
 export { loadSavedLanguage } from "./web-language-preference";
 
 /**
- * The workspace is its own chunk, so the sign-in screen does not wait for it. A signed-in account
- * loads it after the session check; the sign-in screen loads it after it shows. A failed import is
+ * The workspace is its own chunk, so the sign-in screen does not wait for it. Each session check
+ * starts it beside the session request; a signed-in account waits for both. A failed import is
  * tried again on the next check.
  */
 let workspaceImport: Promise<typeof WebWorkspace> | null = null;
@@ -92,6 +100,20 @@ function takePluginLink(): string | null {
   url.searchParams.delete(WEB_APP_PLUGIN_PARAM);
   window.history.replaceState(window.history.state, "", url);
   return slug;
+}
+
+/**
+ * The agent or skill a `/app?marketplaceAgent=<id>` or `/app?marketplaceSkill=<slug>` link names.
+ * The query is removed after it is read.
+ */
+function takeMarketplaceLink(): MarketplaceListingLink | null {
+  const url = new URL(window.location.href);
+  const params = [WEB_APP_MARKETPLACE_AGENT_PARAM, WEB_APP_MARKETPLACE_SKILL_PARAM];
+  if (!params.some((param) => url.searchParams.has(param))) return null;
+  const link = marketplaceListingFromWebAppSearch(url.search);
+  for (const param of params) url.searchParams.delete(param);
+  window.history.replaceState(window.history.state, "", url);
+  return link;
 }
 
 type BillingReturn = DesktopAnalyticsProperties<"billing_return_viewed">;
@@ -165,6 +187,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   const [agentTemplateId, setAgentTemplateId] = createSignal(takeAgentTemplateLink());
   const [inviteUrl, setInviteUrl] = createSignal(takeInviteLink());
   const [pluginSlug, setPluginSlug] = createSignal(takePluginLink());
+  const [marketplaceListing, setMarketplaceListing] = createSignal(takeMarketplaceLink());
   const [startLink, setStartLink] = createSignal(takeStartLink());
   const initialBillingReturn = takeBillingReturn();
   const initialHostingReturn = takeHostingReturn();
@@ -193,6 +216,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   let sessionEnded = false;
   function clearSession(ended = true) {
     sessionEnded = ended;
+    // The saved workspace frames name the agents of the account's servers.
+    if (ended) deleteRemoteWorkspaceFrames(null);
     sessionGeneration += 1;
     setState((draft) => {
       draft.account = null;
@@ -298,8 +323,13 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   }
   async function checkSession() {
     const generation = sessionGeneration;
+    // The workspace code loads beside the session check, not after it.
+    void loadWorkspace().catch(() => undefined);
     try {
-      const account = await showAccount(accountFrom(await request("session")));
+      const session = await request("session");
+      markRemoteSync("session");
+      const account = await showAccount(accountFrom(session));
+      markRemoteSync("workspace-code");
       if (!disposed && generation === sessionGeneration) {
         sessionEnded = false;
         setState((draft) => {
@@ -475,6 +505,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
                   onInviteClose={() => setInviteUrl(null)}
                   pluginSlug={pluginSlug()}
                   onPluginSlugConsumed={() => setPluginSlug(null)}
+                  marketplaceListing={marketplaceListing()}
+                  onMarketplaceListingConsumed={() => setMarketplaceListing(null)}
                   start={startLink()}
                   onStartConsumed={() => setStartLink(null)}
                   billingReturn={billingReturn()}

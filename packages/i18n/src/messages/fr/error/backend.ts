@@ -75,6 +75,7 @@ export const messages = {
     "Cette demande dépasse la limite de contexte de routage. Sélectionnez un membre ou envoyez une demande plus courte.",
   "error.backend.channelTaskMemberRequired": "Choisissez un membre pour cette tâche.",
   "error.backend.channelTaskStopped": "Arrêtée. Continuez ou réassignez cette tâche.",
+  "error.backend.channelTaskNotStopped": "Seule une tâche arrêtée ou en échec peut être annulée.",
   "error.backend.channelRoutingUnreadable":
     "Le responsable n'a pas pu acheminer ce message. Réassignez-le à un membre.",
   "error.backend.channelRoutingFailed": "Le routage a échoué. Choisissez un membre ou réessayez.",
@@ -354,6 +355,11 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Cet agent a {count} fils ouverts. Archivez un fil, puis lancez-en ou restaurez-en un autre.",
   "error.backend.threadRemoteUnsupported": "Les fils sont disponibles uniquement pour les agents de cet ordinateur.",
+  "error.backend.branchSourceBusy": "Arrêtez le tour en cours avant de créer une branche de ce chat.",
+  "error.backend.branchMessageNotFound":
+    "Vous pouvez créer une branche uniquement à partir d'une réponse terminée de l'agent.",
+  "error.backend.branchRemoteUnsupported":
+    "Les branches sont disponibles uniquement pour les agents de cet ordinateur.",
   "error.backend.threadMoveRefused":
     "Seul un message envoyé uniquement à cet agent peut s’exécuter dans un nouveau fil.",
   "error.backend.taskTitleRequired": "Donnez un titre court à la tâche.",

@@ -74,6 +74,7 @@ export const messages = {
     "Dit verzoek overschrijdt de contextlimiet voor routering. Kies een lid of stuur een korter verzoek.",
   "error.backend.channelTaskMemberRequired": "Kies een lid voor deze taak.",
   "error.backend.channelTaskStopped": "Gestopt. Ga verder of wijs deze taak opnieuw toe.",
+  "error.backend.channelTaskNotStopped": "Alleen een gestopte of mislukte taak kan worden geannuleerd.",
   "error.backend.channelRoutingUnreadable": "De leider kon dit bericht niet toewijzen. Wijs het toe aan een lid.",
   "error.backend.channelRoutingFailed": "Routering is mislukt. Kies een lid of probeer het opnieuw.",
   "error.backend.channelLeadTimedOut": "De kanaalleider reageerde niet op tijd. Kies een lid of probeer het opnieuw.",
@@ -141,8 +142,6 @@ export const messages = {
   "error.backend.recipientHidden": "Deze agent is verborgen. Herstel de agent om berichten te sturen.",
   "error.backend.attachBetween": "Voeg tussen 1 en {limit} bestanden toe.",
   "error.backend.attachmentNotFile": "Bijlage is geen bestand: {path}",
-  "error.backend.attachSvg":
-    "{name} is een SVG-bestand en kan niet worden bijgevoegd. Schrijf het absolute pad in je antwoord: de chat toont de afbeelding daar.",
   "error.backend.generatedImageTooLarge": "De gemaakte afbeelding is groter dan de limiet van 100 MB.",
   "error.backend.attachmentNotRegularFile": "Alleen gewone bestanden kunnen worden bijgevoegd: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot kon {name} niet kopiëren.",
@@ -348,6 +347,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Deze agent heeft {count} open threads. Archiveer een thread en start of herstel dan een andere.",
   "error.backend.threadRemoteUnsupported": "Threads zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.branchSourceBusy": "Stop de huidige beurt voordat je een aftakking van deze chat maakt.",
+  "error.backend.branchMessageNotFound": "Je kunt alleen aftakken vanaf een voltooid antwoord van de agent.",
+  "error.backend.branchRemoteUnsupported": "Aftakkingen zijn alleen beschikbaar voor agents op deze computer.",
   "error.backend.threadMoveRefused":
     "Alleen een bericht dat je alleen naar deze agent hebt gestuurd, kan in een nieuwe thread draaien.",
   "error.backend.taskTitleRequired": "Geef de taak een korte titel.",

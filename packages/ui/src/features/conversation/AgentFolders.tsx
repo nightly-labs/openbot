@@ -11,8 +11,9 @@ import {
   type AgentFolderChange,
   type AgentFolderCoverageReason,
   type AgentFolderList,
+  agentExclusionPlace,
   agentFolderName,
-  folderInside,
+  agentFolderParent,
 } from "@openbot/contracts/ipc";
 import {
   Button,
@@ -286,34 +287,6 @@ export function createAgentFolders(source: () => AgentFolderSource | undefined) 
 
 export type AgentFolders = ReturnType<typeof createAgentFolders>;
 
-/** Where the folder is. The name is on the line above, so the path stops at its parent. */
-function folderParent(path: string): string {
-  const end = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return end > 0 ? path.slice(0, end) : path;
-}
-
-/**
- * The folder that holds an excluded folder, as the page names it, with the path below it. A folder
- * the user removed from the list no longer holds it, so the path is shown in full.
- */
-function exclusionPlace(
-  path: string,
-  list: AgentFolderList,
-  names: { workspace: string; shared: string },
-): string | null {
-  const holders: [string, string][] = [
-    [list.workspace, names.workspace],
-    [list.shared, names.shared],
-    ...list.folders.map((folder): [string, string] => [folder.path, agentFolderName(folder.path)]),
-  ];
-  const holder = holders.find(([root]) => folderInside(root, path));
-  if (!holder) return null;
-  const below = folderParent(path)
-    .slice(holder[0].length)
-    .replace(/^[/\\]+/, "");
-  return below ? `${holder[1]}/${below}` : holder[1];
-}
-
 /** Drag handlers for a place that takes a dropped folder, with the state that shows it. */
 function createFolderDropTarget(onDrop: (folders: readonly File[]) => void) {
   const [over, setOver] = createSignal(false);
@@ -433,7 +406,7 @@ function FolderRow(props: {
 }) {
   const { t } = useText();
   const name = () => props.name ?? agentFolderName(props.path);
-  const where = () => (props.name ? props.path : folderParent(props.path));
+  const where = () => (props.name ? props.path : agentFolderParent(props.path));
   return (
     <div
       class="agent-folders-row"
@@ -494,7 +467,7 @@ function ExclusionRow(props: {
   const name = () => agentFolderName(props.path);
   const where = () => {
     const place = props.place;
-    return place ? t("agentSettings.folders.excludedIn", { folder: place }) : folderParent(props.path);
+    return place ? t("agentSettings.folders.excludedIn", { folder: place }) : agentFolderParent(props.path);
   };
   return (
     <div
@@ -634,7 +607,7 @@ export function AgentFoldersPage(props: {
                     return (
                       <ExclusionRow
                         path={path()}
-                        place={exclusionPlace(path(), list(), {
+                        place={agentExclusionPlace(path(), list(), {
                           workspace: t("agentSettings.folders.workspace"),
                           shared: t("agentSettings.folders.shared"),
                         })}

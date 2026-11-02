@@ -56,6 +56,7 @@ import { agentAdminIpcHandlers } from "./ipc/agent-admin-handlers";
 import { agentFolderIpcHandlers } from "./ipc/agent-folder-handlers";
 import { agentIpcHandlers } from "./ipc/agent-handlers";
 import { agentImportIpcHandlers } from "./ipc/agent-import-handlers";
+import { agentInstructionsIpcHandlers } from "./ipc/agent-instructions-handlers";
 import { agentTemplateIpcHandlers } from "./ipc/agent-template-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
 import { attachmentIpcHandlers } from "./ipc/attachment-handlers";
@@ -84,6 +85,7 @@ import { licenseIpcHandlers } from "./ipc/license-handlers";
 import { localServerIpcHandlers } from "./ipc/local-server-handlers";
 import { macAutomationIpcHandlers } from "./ipc/mac-automation-handlers";
 import { marketplaceAgentIpcHandlers } from "./ipc/marketplace-agent-handlers";
+import { marketplaceLinkIpcHandlers } from "./ipc/marketplace-link-handlers";
 import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { messagingIpcHandlers } from "./ipc/messaging-handlers";
@@ -135,6 +137,7 @@ import { trustSystemCertificates } from "./system-certificates";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
+import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setWindowAppearance } from "./window-appearance";
 
 const logger = createOpenBotLogger("main");
@@ -585,6 +588,7 @@ function registerIpcHandlers({
   approvalAutomation,
   agentAdminSettings,
   agentHostSettings,
+  agentFolders,
   browserProfiles,
   language,
   logoColor,
@@ -652,6 +656,7 @@ function registerIpcHandlers({
   resourceMonitor,
   routineFlows,
   workflows,
+  workflowGitHub,
   routineResults,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
@@ -710,11 +715,11 @@ function registerIpcHandlers({
     ...accountIpcHandlers({ centralAuth, host }),
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
-      service,
-      userDataPath: app.getPath("userData"),
+      folders: agentFolders,
       getMainWindow: getDialogParent,
       translate: language.translate,
     }),
+    ...agentInstructionsIpcHandlers({ service }),
     ...hostedSiteIpcHandlers({
       hostedSites,
       remoteServers,
@@ -739,7 +744,7 @@ function registerIpcHandlers({
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
     ...agentTemplateIpcHandlers({
       agentTemplates,
-      takePendingLink: () => takePendingDeepLink("agent-template"),
+      takePendingLink: () => takePendingDeepLink("agent-template")?.id ?? null,
     }),
     ...hermesGatewayIpcHandlers({ hermesGateways }),
     ...grokBotIpcHandlers({ grokBotAccount }),
@@ -773,16 +778,19 @@ function registerIpcHandlers({
       host,
       remoteDesktop,
       remoteServers,
-      takePendingInvite: () => takePendingDeepLink("invite"),
+      takePendingInvite: () => takePendingDeepLink("invite")?.url ?? null,
     }),
     ...pluginIpcHandlers({
-      takePendingPluginSlug: () => takePendingDeepLink("plugin"),
+      takePendingPluginSlug: () => takePendingDeepLink("plugin")?.slug ?? null,
+    }),
+    ...marketplaceLinkIpcHandlers({
+      takePendingListing: () => takePendingDeepLink("marketplace")?.link ?? null,
     }),
     ...memoryIpcHandlers({ service, remoteServers }),
     ...sharedTableIpcHandlers({ service, remoteServers }),
     ...routineIpcHandlers({ service, remoteServers }),
     ...routineFlowIpcHandlers({ routineFlows, remoteServers }),
-    ...workflowIpcHandlers({ workflows, events, remoteServers }),
+    ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
     ...routineResultIpcHandlers({ routineResults }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
@@ -1030,25 +1038,41 @@ function acceptDeepLink(link: DeepLink): void {
   const window = windowHolder.current;
   if (!window || window.isDestroyed() || !deepLinkReceiverReady) return;
   showMainWindow(window);
-  const delivered =
-    link.kind === "invite"
-      ? sendToRenderer(window, IPC_ENDPOINTS.servers.invite, link.url)
-      : link.kind === "plugin"
-        ? sendToRenderer(window, IPC_ENDPOINTS.plugins.openListing, link.slug)
-        : sendToRenderer(window, IPC_ENDPOINTS.agentTemplates.openLink, link.id);
-  if (delivered) pendingDeepLink = null;
+  if (sendDeepLink(window, link)) pendingDeepLink = null;
+}
+
+function sendDeepLink(window: BrowserWindow, link: RendererDeepLink): boolean {
+  switch (link.kind) {
+    case "invite":
+      return sendToRenderer(window, IPC_ENDPOINTS.servers.invite, link.url);
+    case "plugin":
+      return sendToRenderer(window, IPC_ENDPOINTS.plugins.openListing, link.slug);
+    case "agent-template":
+      return sendToRenderer(window, IPC_ENDPOINTS.agentTemplates.openLink, link.id);
+    case "marketplace":
+      return sendToRenderer(window, IPC_ENDPOINTS.marketplace.openListing, link.link);
+  }
 }
 
 /**
  * The pending link, if it is the kind that asked. Any request marks the receiver ready, because
  * the renderer subscribes to every kind before it asks for any.
  */
-function takePendingDeepLink(kind: RendererDeepLink["kind"]): string | null {
+function takePendingDeepLink<Kind extends RendererDeepLink["kind"]>(
+  kind: Kind,
+): Extract<RendererDeepLink, { kind: Kind }> | null {
   deepLinkReceiverReady = true;
   const link = pendingDeepLink;
-  if (link?.kind !== kind) return null;
+  if (!link || !isDeepLinkKind(link, kind)) return null;
   pendingDeepLink = null;
-  return link.kind === "invite" ? link.url : link.kind === "plugin" ? link.slug : link.id;
+  return link;
+}
+
+function isDeepLinkKind<Kind extends RendererDeepLink["kind"]>(
+  link: RendererDeepLink,
+  kind: Kind,
+): link is Extract<RendererDeepLink, { kind: Kind }> {
+  return link.kind === kind;
 }
 
 /** A link of a kind a renderer can be sent, or null for one it cannot - which includes no link. */
@@ -1334,22 +1358,35 @@ if (!hasSingleInstanceLock) {
         ),
       ).catch((error) => logger.warn("Unable to start the selected server's connection:", toLogValue(error)));
       updater.on("status", forwardUpdateStatus);
+      // An install that fails after shutdown preparation has no window left to show the failure, and
+      // the process still holds the single-instance lock. Exit now, not at the install deadline.
+      updater.on("status", (status) => {
+        if (!shutdownStarted || status.errorCode !== "install_failed") return;
+        logger.error("OpenBot update install failed after shutdown preparation and will exit now.");
+        app.exit(0);
+      });
       built.requestedUpdate.on("preference", forwardUpdatePreference);
       updater.start();
       // Each tenant quits only itself. The host verifies process exit independently.
       built.hostUpdateCoordinator.setStopHandler(async () => {
-        await prepareForUpdateInstall();
+        await prepareForUpdateInstall(SHUTDOWN_DEADLINE_MS);
         app.quit();
       });
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
       // be in place before the first request can arrive.
       registerIpcHandlers(built);
+      // A Signal socket of the host can be dead after sleep without knowing it; devices then cannot connect.
+      const renewHostSignal = () =>
+        void runCauseEffect(built.teamWebRtcBridge.renewHostSignal()).catch((error) =>
+          logger.warn("Unable to renew the host Signal connection after sleep:", toLogValue(error)),
+        );
       if (localServerChild) {
         // No window, menu, tray, Dynamic Island or renderer: the desktop app is the interface.
         const childRoutineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
         powerMonitor.on("suspend", () => childRoutineWake.suspend());
         powerMonitor.on("resume", () => childRoutineWake.resume());
         powerMonitor.on("resume", () => built.messaging.resume());
+        powerMonitor.on("resume", renewHostSignal);
         teardown.push(0, "routine wake", () => childRoutineWake.dispose());
         void runCauseEffect(built.agentInitialization.start()).catch((error) => {
           logger.error("Unable to initialize the local agent backend:", toLogValue(error));
@@ -1428,6 +1465,12 @@ if (!hasSingleInstanceLock) {
       await runCauseEffect(dynamicIsland.initialize()).catch((error) =>
         logger.error("Unable to initialize Dynamic Island:", toLogValue(error)),
       );
+      const reconcileDynamicIsland = () =>
+        void Effect.runPromise(dynamicIsland.reconcileWindow()).catch((error) =>
+          logger.error("Unable to reconcile Dynamic Island displays:", toLogValue(error)),
+        );
+      // The island pages load beside the main window, not before it.
+      reconcileDynamicIsland();
       await windows.loadRenderer(mainWindow);
       performance.mark("openbot:renderer-loaded");
       // `sendToRenderer` dropped the server changes made while the window loaded: the host list and
@@ -1435,10 +1478,6 @@ if (!hasSingleInstanceLock) {
       forwardServers(remoteServers.list());
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       await Effect.runPromise(remoteServers.startEventConnections());
-      const reconcileDynamicIsland = () =>
-        void Effect.runPromise(dynamicIsland.reconcileWindow()).catch((error) =>
-          logger.error("Unable to reconcile Dynamic Island displays:", toLogValue(error)),
-        );
       screen.on("display-added", reconcileDynamicIsland);
       screen.on("display-removed", reconcileDynamicIsland);
       screen.on("display-metrics-changed", reconcileDynamicIsland);
@@ -1446,6 +1485,7 @@ if (!hasSingleInstanceLock) {
       powerMonitor.on("resume", () => void Effect.runPromise(remoteServers.wake()));
       // A Slack socket can be dead after sleep without knowing it; reconnect instead of waiting for a ping.
       powerMonitor.on("resume", () => built.messaging.resume());
+      powerMonitor.on("resume", renewHostSignal);
       const routineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
       powerMonitor.on("suspend", () => routineWake.suspend());
       powerMonitor.on("resume", () => routineWake.resume());
@@ -1610,16 +1650,23 @@ function reopenMainWindow(): void {
  */
 const SHUTDOWN_DEADLINE_MS = 30_000;
 
-function forceExitAfterShutdownDeadline(): void {
+function forceExitAfterShutdownDeadline(deadlineMs: number): void {
   setTimeout(() => {
-    logger.error(`OpenBot did not quit within ${SHUTDOWN_DEADLINE_MS} ms and will exit now.`);
+    logger.error(`OpenBot did not quit within ${deadlineMs} ms and will exit now.`);
     app.exit(0);
-  }, SHUTDOWN_DEADLINE_MS);
+  }, deadlineMs);
 }
 
-async function prepareForUpdateInstall(): Promise<void> {
+/**
+ * An in-app update keeps the process alive after the teardown: on macOS Squirrel only now copies,
+ * unpacks and verifies the downloaded ZIP, and quits when that is done. On a slow Mac this takes
+ * longer than a quit may, and an exit before it ends leaves the old version installed (#4244). The
+ * update uses the install timeout of the update service. It counts from the start of the teardown,
+ * so Squirrel gets that time less the teardown.
+ */
+async function prepareForUpdateInstall(deadlineMs = UPDATE_INSTALL_TIMEOUT_MS): Promise<void> {
   if (services) await runCauseEffect(services.browser.flushPersistentStorage());
-  await prepareForShutdown();
+  await prepareForShutdown(deadlineMs);
 }
 
 /**
@@ -1629,14 +1676,14 @@ async function prepareForUpdateInstall(): Promise<void> {
  * registered as well, for the case where the quit arrives before those services exist; both are
  * idempotent, so running twice costs nothing.
  */
-async function prepareForShutdown(): Promise<void> {
+async function prepareForShutdown(deadlineMs = SHUTDOWN_DEADLINE_MS): Promise<void> {
   if (shutdownStarted) return;
   // An update install runs this before its `app.quit()`, and the teardown closes the trace.
   recordExit("quit");
   shutdownStarted = true;
   isQuitting = true;
   hideExceptionErrorBox();
-  forceExitAfterShutdownDeadline();
+  forceExitAfterShutdownDeadline(deadlineMs);
   if (services) Effect.runFork(services.updater.stop());
   await runCauseEffect(windows.flushMainWindowBounds()).catch((error) =>
     logger.error("Unable to save the main window position:", toLogValue(error)),

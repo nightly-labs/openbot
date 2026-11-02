@@ -88,6 +88,13 @@ and hashes the archive; OpenBot never extracts it. Remote support is additive th
 MP4 attachments use the MP3 and MOV contract with `video/mp4`. Remote support is additive through
 the `mp4-attachments` capability, because a host with only `media-attachments` refuses MP4.
 
+SVG attachments are stored as `image/svg+xml` with `kind: "file"` and `previewKind: "image"`. The
+type comes from the file extension. Providers take only raster image blocks, so delivery sends the
+path as a mention and the agent reads the SVG text. The attachment schemes serve SVG with a `sandbox`
+policy. The browser client shows an SVG thumbnail from a `data:` URL, never from an object URL: an
+object URL has the origin of the app. Remote support is additive through the
+`svg-attachments` capability, which only protocol 9 peers get.
+
 ## Browser tool execution
 
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
@@ -271,7 +278,10 @@ named profile has. "Only this agent" has no color, and the select offers it only
 already uses it, so the agent keeps its sign-ins. An owner or admin of a joined server uses the same
 operations through `browser-profiles-v1` (`route-browser-profiles.ts`); each member reads the labels of
 the tabs that they can see, and a private tab is hidden from a member. A host without the capability
-answers `agentSettingsUnsupported`, and the client shows no select, section or label for it.
+answers `agentSettingsUnsupported`, and the client shows no select, section or label for it. A host
+with `browser-profiles-events-v1` sends `browser-profiles-changed` after each change, so every open
+list and agent setting reads the profiles again. The phone shows the same operations in Server
+settings > Browser profiles and in Agent info > Advanced > Browser profile.
 
 ### Tab lifetime
 
@@ -294,7 +304,7 @@ refusal in `AgentService` stays beside it rather than being folded in: it also c
 | Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
 | Retry | Same thread and agent, so the same tabs are still reachable. |
 | Restart | Restored from the browser's own state file. |
-| Idle 30 min (5 min when memory is low) | Stays open, but its page unloads. The next use loads the page again. |
+| Idle 30 min (5 min when memory is low) | Stays open, but its page unloads and its renderer process ends. The next use loads the page again. |
 | Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. Its own browser session is cleared. |
 | Browser profile changed | That agent's tabs are closed. Its next tab opens in the profile it chose. Both profiles keep their data. |
 | Profile cleared or deleted | Every tab in that profile is closed, then its data is cleared. |
@@ -305,6 +315,36 @@ agent passes the owner check for them, and the renderer lists tabs per agent, so
 view the user cannot see to close, across restarts. Closing is idempotent -- `close()` returns early
 on an id it does not hold -- and tab ids are UUIDs with no reorder feature at any layer, so a stale id
 can never name a tab that took its place.
+
+### Page dialogs
+
+A page `alert` or `confirm` that an agent action opens goes to that agent; every other dialog stays in
+Electron's native box for a person. `runTabAction` watches for a dialog only while the agent's own
+input action runs (`BrowserDialogTurn` names the thread and turn), and until the page settles after it.
+The engine then sends `Page.enable` on its own debugger and keeps the debugger attached while a watch
+runs, so it also sees a dialog that a page load or a timer opens with no command in flight. A tab
+queue drain ends the watch. `Page.javascriptDialogOpening` ends the action with the dialog:
+an opaque id, the type, and the message, scrubbed and redacted like snapshot text. A `run_script` step
+stops with status `dialog`. The agent answers with `handle_dialog`, which sends
+`Page.handleJavaScriptDialog` and returns the next dialog or the page status. Until then, every other
+tool on that tab is refused; `close_tab` still works.
+
+Electron shows its own box for the same dialog, after the CDP event. After the CDP answer, the engine
+emits Electron's internal `-cancel-dialogs` on the tab, which aborts the box without its callback. The
+agent gets a dialog only when the engine owns the debugger and Electron has a `-cancel-dialogs`
+listener. Otherwise, for example under an external debugger, the result says that a person must answer.
+`scripts/browser-dialogs-e2e.ts` fails if an Electron upgrade changes these internal events.
+
+| Event | Dialog |
+| --- | --- |
+| Person's click, or a tool that is not an input action | Native box. The agent is not told. |
+| Turn ends | Handed off: the box stays for a person, and the agent can no longer answer it. |
+| Person answers first | `handle_dialog` fails with "This dialog is closed". |
+| Tab closed or browser destroyed | The engine detaches its debugger, so the tab queue drains. Then it cancels every box of the tab, a person's box too, also a box that shows after the close: Electron keeps a box open after its page closes. |
+| `prompt()` or `beforeunload` | Electron answers `prompt` with no box, and `will-prevent-unload` handles `beforeunload`. Not intercepted. |
+
+The agent never gets a dialog that an `evaluate`, `wait_for`, or `fill_fields` call opens, or one in a
+cross-origin frame: those dialogs stay native.
 
 A member on a remote server cannot see the host's tab, because the tab is a native view on the host's
 own screen. `browser-view-gateway.ts` answers that with a session and a websocket: `BrowserHost`

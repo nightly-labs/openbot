@@ -19,12 +19,23 @@ interface Download {
   received: number;
   digest: string;
   complete: boolean;
+  /** An allowed larger file. It does not count against the attachment total. */
+  allowed: boolean;
   timer: ReturnType<typeof setTimeout>;
+}
+
+interface DownloadAllowance {
+  maxBytes: number;
+  mimeType: string;
+  taken: boolean;
 }
 
 /** Receives the released file protocol; bytes are exposed only after digest validation. */
 export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Effect<void, E, R>) {
   const downloads = new Map<string, Download>();
+  // Requests that wait for one file larger than an attachment, such as a transfer file. Each one
+  // takes the first larger file of its type that fits it, and it ends with its request.
+  const allowances = new Set<DownloadAllowance>();
   const waiters = new Map<
     string,
     { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
@@ -120,8 +131,17 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
     });
     if (frame.type === "file-open") {
       if (downloads.has(frame.transferId)) return yield* transferFailure("The host repeated an attachment transfer.");
-      const total = [...downloads.values()].reduce((sum, entry) => sum + entry.bytes.length, 0);
-      if (
+      const total = [...downloads.values()]
+        .filter((entry) => !entry.allowed)
+        .reduce((sum, entry) => sum + entry.bytes.length, 0);
+      const allowance =
+        frame.size > MOBILE_ATTACHMENT_BYTES
+          ? [...allowances].find(
+              (entry) => !entry.taken && entry.mimeType === frame.mimeType && frame.size <= entry.maxBytes,
+            )
+          : undefined;
+      if (allowance) allowance.taken = true;
+      else if (
         frame.size > MOBILE_ATTACHMENT_BYTES ||
         total + frame.size > MOBILE_ATTACHMENT_BYTES * 2 ||
         downloads.size >= 10
@@ -143,6 +163,7 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
         received: 0,
         digest: frame.sha256,
         complete: false,
+        allowed: allowance !== undefined,
         timer: setTimeout(() => expire(frame.transferId), 60_000),
       });
       touch(frame.transferId);
@@ -178,6 +199,17 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
     return false;
   });
   return {
+    /**
+     * Lets one file of `mimeType` and up to `maxBytes` arrive while a request waits for it. Call the
+     * answer when the request ends; a file still arriving then keeps its place.
+     */
+    allow(maxBytes: number, mimeType: string) {
+      const allowance: DownloadAllowance = { maxBytes, mimeType, taken: false };
+      allowances.add(allowance);
+      return () => {
+        allowances.delete(allowance);
+      };
+    },
     clear() {
       for (const id of downloads.keys()) remove(id);
       for (const waiter of waiters.values()) {

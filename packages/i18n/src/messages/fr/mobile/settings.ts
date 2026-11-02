@@ -71,9 +71,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "Désactivez « Animations » pour réduire les mouvements dans toute l’app. Quand « Réduire les animations » est activé dans les réglages du téléphone, l’app réduit aussi les mouvements. Les animations ci-dessous restent alors désactivées.",
   "mobile.settings.animations.all": "Animations",
-  "mobile.settings.animations.chatZoom": "Zoom sur les discussions",
-  "mobile.settings.animations.chatZoomFooter":
-    "Une discussion s’ouvre depuis son avatar dans la liste et s’y referme. Désactivé, la discussion glisse depuis le côté.",
   "mobile.settings.animations.agentFaces": "Visages animés des agents",
   "mobile.settings.animations.agentFacesFooter":
     "Les avatars des agents bougent leur visage pendant que les agents travaillent et se reposent. Désactivé, les visages restent immobiles.",
@@ -149,6 +146,8 @@ export const messages = {
   "mobile.settings.notifications.offForEveryone": "Désactivé pour tous sur ce serveur",
   "mobile.settings.notifications.turnOn": "Activer",
   "mobile.settings.notifications.turnOnFor": "Activer les notifications de {name} pour tous sur ce serveur",
+  "mobile.settings.notifications.chooseAgent": "Choisir pour un agent",
+  "mobile.settings.notifications.chooseAnotherAgent": "Choisir un autre agent",
   "mobile.settings.notifications.levelsFooter": "Touchez à nouveau le niveau d’un agent pour qu’il suive le serveur.",
   "mobile.settings.notifications.agentsUnsupported": "Mettez à jour OpenBot sur ce serveur pour choisir des agents.",
   "mobile.settings.notifications.agentsOffline": "Les agents s’affichent quand ce serveur est en ligne.",

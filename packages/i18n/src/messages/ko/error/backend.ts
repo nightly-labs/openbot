@@ -71,6 +71,7 @@ export const messages = {
     "이 요청이 라우팅 컨텍스트 한도를 넘었어요. 멤버를 선택하거나 더 짧은 요청을 보내세요.",
   "error.backend.channelTaskMemberRequired": "이 작업을 맡을 멤버를 선택하세요.",
   "error.backend.channelTaskStopped": "중지됨. 이 작업을 계속하거나 다시 배정하세요.",
+  "error.backend.channelTaskNotStopped": "중지되었거나 실패한 작업만 취소할 수 있어요.",
   "error.backend.channelRoutingUnreadable": "리더가 이 메시지를 배정하지 못했어요. 멤버에게 다시 배정하세요.",
   "error.backend.channelRoutingFailed": "라우팅에 실패했어요. 멤버를 선택하거나 다시 시도해 주세요.",
   "error.backend.channelLeadTimedOut": "채널 리더가 제시간에 답하지 않았어요. 멤버를 선택하거나 다시 시도해 주세요.",
@@ -322,6 +323,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "이 에이전트에는 열린 스레드가 {count}개 있어요. 스레드 하나를 보관한 후 다른 스레드를 시작하거나 복원하세요.",
   "error.backend.threadRemoteUnsupported": "스레드는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.branchSourceBusy": "이 채팅을 분기하기 전에 현재 턴을 중지하세요.",
+  "error.backend.branchMessageNotFound": "에이전트의 완료된 답변에서만 분기할 수 있어요.",
+  "error.backend.branchRemoteUnsupported": "분기는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.threadMoveRefused": "이 에이전트에게만 보낸 메시지만 새 스레드에서 실행할 수 있어요.",
   "error.backend.taskTitleRequired": "작업에 짧은 제목을 지정하세요.",
   "error.backend.taskToolInvalid": "작업에 120자 이하의 제목과 할 일을 설명하는 지시문을 지정하세요.",

@@ -11,7 +11,7 @@ export interface HostCommandResult {
   readonly stderr: string;
 }
 
-export interface HostCaptureResult {
+interface HostCaptureResult {
   readonly png: Uint8Array;
   readonly thumbnailPng: Uint8Array;
 }
@@ -72,7 +72,7 @@ export function closeBackgroundShells(): void {
 }
 
 /** Resolves `target` under `root`. Throws when the path leaves `root`. */
-export function containPath(root: string, target: string): string {
+function containPath(root: string, target: string): string {
   const base = resolve(root);
   const resolved = resolve(base, target);
   const fromRoot = relative(base, resolved);

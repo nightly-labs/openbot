@@ -2332,7 +2332,8 @@ fieldset.wfn-picker-group {
  * Content that scrolls fades out at an edge where more of it is. Each fade grows over the first or the
  * last fade size of the scroll, so an edge at the start or the end stays sharp. The ranges are lengths,
  * not parts of the scroll range: content that fits gets no fade, also where the engine puts a timeline
- * with no scroll range at its end.
+ * with no scroll range at its end. A browser without scroll timelines shows no fade: there the animation
+ * runs on the clock, ends at once, and keeps the start fade on content that does not scroll.
  */
 @property --wfn-fade-start {
   syntax: "<length>";
@@ -2346,32 +2347,34 @@ fieldset.wfn-picker-group {
   initial-value: 0px;
 }
 
-.wfn-node :is(textarea, .wfn-field-result p),
-.wfn-strip-list {
-  --wfn-fade-size: var(--openbot-space-4);
-  --wfn-fade-side: to bottom;
+@supports (animation-timeline: scroll()) {
+  .wfn-node :is(textarea, .wfn-field-result p),
+  .wfn-strip-list {
+    --wfn-fade-size: var(--openbot-space-4);
+    --wfn-fade-side: to bottom;
 
-  mask-image: linear-gradient(
-    var(--wfn-fade-side),
-    transparent,
-    var(--openbot-text-primary) var(--wfn-fade-start),
-    var(--openbot-text-primary) calc(100% - var(--wfn-fade-end)),
-    transparent
-  );
-  animation:
-    wfn-fade-start linear both,
-    wfn-fade-end linear both;
-  animation-timeline: scroll(self block), scroll(self block);
-  animation-range:
-    0 var(--wfn-fade-size),
-    calc(100% - var(--wfn-fade-size)) 100%;
-}
+    mask-image: linear-gradient(
+      var(--wfn-fade-side),
+      transparent,
+      var(--openbot-text-primary) var(--wfn-fade-start),
+      var(--openbot-text-primary) calc(100% - var(--wfn-fade-end)),
+      transparent
+    );
+    animation:
+      wfn-fade-start linear both,
+      wfn-fade-end linear both;
+    animation-timeline: scroll(self block), scroll(self block);
+    animation-range:
+      0 var(--wfn-fade-size),
+      calc(100% - var(--wfn-fade-size)) 100%;
+  }
 
-.wfn-strip-list {
-  --wfn-fade-size: var(--openbot-space-6);
-  --wfn-fade-side: to right;
+  .wfn-strip-list {
+    --wfn-fade-size: var(--openbot-space-6);
+    --wfn-fade-side: to right;
 
-  animation-timeline: scroll(self inline), scroll(self inline);
+    animation-timeline: scroll(self inline), scroll(self inline);
+  }
 }
 
 @keyframes wfn-fade-start {
@@ -2447,37 +2450,6 @@ fieldset.wfn-picker-group {
 
 /* -------------------------------------------------------------- Fields */
 
-.wfn-block-meta {
-  display: inline-flex;
-  gap: var(--openbot-space-1);
-  align-items: center;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--openbot-text-muted);
-  font-size: var(--wfn-small);
-  line-height: var(--openbot-leading-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.wfn-block-copy {
-  display: flex;
-  gap: var(--openbot-space-1);
-  align-items: center;
-  min-width: 0;
-}
-
-.wfn-block-url {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--openbot-text-secondary);
-  font-family: var(--openbot-font-mono);
-  font-size: var(--wfn-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* A pill alone on its row keeps its own width. */
 .wfn-stage .wfn-block-field > .wfn-pill {
   justify-self: start;
@@ -2487,14 +2459,245 @@ fieldset.wfn-picker-group {
   justify-content: flex-start;
 }
 
-.wfn-block-field > .wfn-field-foot > .wfn-block-meta {
-  margin-left: auto;
-}
-
 .wfn-block-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--openbot-space-2);
+}
+
+/* -------------------------------------------------------- Setting rows */
+
+.wfn-github-mark {
+  flex: none;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  fill: currentcolor;
+}
+
+/* The settings of a card: a list of full-width rows on the field colour. */
+.wfn-settings {
+  --wfn-settings-gap: 2px;
+
+  display: grid;
+  gap: var(--wfn-settings-gap);
+  padding: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-md);
+  background: var(--wfn-field);
+}
+
+/* The type or target is the first row; its settings follow under a hairline. The margin less the grid gap
+   puts the hairline midway between two rows. */
+.wfn-settings-head:not(:last-child) {
+  padding-bottom: var(--openbot-space-1);
+  border-bottom: 1px solid var(--wfn-ring);
+  margin-bottom: calc(var(--openbot-space-1) - var(--wfn-settings-gap));
+}
+
+/* The last event closes the settings under a hairline. */
+.wfn-settings-foot {
+  padding-top: var(--openbot-space-1);
+  border-top: 1px solid var(--wfn-ring);
+  margin-top: calc(var(--openbot-space-1) - var(--wfn-settings-gap));
+}
+
+.wfn-settings > .ui-button {
+  justify-self: start;
+  margin: var(--openbot-space-1);
+}
+
+.wfn-settings > .wfn-alert {
+  margin: var(--openbot-space-1);
+}
+
+/* A control of its own layout among the rows, such as the schedule picker or a webhook secret. */
+.wfn-settings-block {
+  padding: var(--openbot-space-1) var(--openbot-space-2);
+}
+
+.wfn-row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  padding: var(--openbot-space-1) var(--openbot-space-2);
+  border: 0;
+  border-radius: var(--wfn-radius-row);
+  background: transparent;
+  color: var(--openbot-text-primary);
+  font: inherit;
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+
+.wfn-row:not([data-static]):is(:hover, [aria-expanded="true"]) {
+  background: var(--wfn-hover);
+}
+
+.wfn-row:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
+}
+
+.wfn-row[data-static] {
+  cursor: default;
+}
+
+.wfn-row:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.wfn-row-name {
+  color: var(--openbot-text-muted);
+}
+
+.wfn-row-value {
+  display: flex;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+  min-width: 0;
+  font-weight: var(--openbot-weight-medium);
+}
+
+/* Tags wrap to more lines; one value ends with "…". */
+.wfn-row-value:has(> .wfn-tag) {
+  flex-wrap: wrap;
+}
+
+.wfn-row-value[data-empty] {
+  color: var(--openbot-text-secondary);
+  font-weight: var(--openbot-weight-regular);
+}
+
+.wfn-row-value > svg {
+  flex: none;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-row-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-row-arrow {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  color: var(--openbot-text-muted);
+  transition: opacity var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+
+/* A setting row shows its arrow on hover, so the values read as one column. The type row always shows it. */
+:is(.wfn-settings, .wfn-settings-foot) > .wfn-row:not(:hover, :focus-visible, [aria-expanded="true"]) .wfn-row-arrow {
+  opacity: 0;
+}
+
+/* The type row has no name: its icon sits on a tile of the kind colour, as in the add menu. */
+.wfn-settings-head .wfn-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 40px;
+}
+
+.wfn-settings-head .wfn-row-value {
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.wfn-settings-head .wfn-row-name {
+  display: none;
+}
+
+.wfn-settings-head .wfn-row-value > svg {
+  box-sizing: content-box;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  padding: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-sm);
+  background: color-mix(in srgb, var(--wfn-kind) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wfn-kind) 14%, transparent);
+  color: var(--wfn-kind);
+}
+
+/* A row that the user types in: the field fills the value and arrow columns, with no border of its own. */
+.wfn-row[data-input] {
+  cursor: text;
+}
+
+.wfn-row[data-input]:focus-within {
+  box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
+}
+
+.wfn-stage .wfn-row-input {
+  grid-column: 2 / -1;
+  min-width: 0;
+  height: auto;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.wfn-stage .wfn-row-input:focus,
+.wfn-stage .wfn-row-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* An address to copy, such as the URL of a webhook. */
+.wfn-row-code {
+  display: block;
+  overflow: hidden;
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A value in a list row, such as a label. A GitHub label has its own colour on a tint of it. */
+.wfn-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--wfn-hover);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  white-space: nowrap;
+}
+
+.wfn-tag[data-tone] {
+  background: color-mix(in srgb, var(--wfn-tone) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wfn-tone) 24%, transparent);
+  color: color-mix(in srgb, var(--wfn-tone) 80%, var(--openbot-text-primary));
+}
+
+/* The colour of a label in its menu. */
+.wfn-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--wfn-tone);
+}
+
+/* A value with a count tag at its end, such as the events row: the text ends with "…", the tag stays. */
+.wfn-row-value[data-one-line] {
+  flex-wrap: nowrap;
+}
+
+.wfn-row-value[data-one-line] > .wfn-row-text {
+  flex: 1 1 auto;
+}
+
+.wfn-row-value[data-one-line] > .wfn-tag {
+  flex: none;
 }
 
 /* ------------------------------------------------------------ Branches */
@@ -2752,11 +2955,8 @@ fieldset.wfn-picker-group {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-warning) 64%, transparent);
 }
 
-/* A required input with no line stays visible in the warning colour. */
+/* A required input with no line stays visible, in the colour of the other ports. */
 .wfn-stage .wfn-port[data-missing]:not([data-target], [data-armed]) {
-  background: var(--openbot-warning-soft);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-warning) 64%, transparent);
-  color: var(--openbot-warning-text);
   opacity: 1;
 }
 

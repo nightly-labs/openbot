@@ -2,7 +2,20 @@ import { execFile } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { createReadStream, createWriteStream } from "node:fs";
-import { access, lstat, mkdir, readdir, readFile, rename, rm, stat, statfs, utimes, writeFile } from "node:fs/promises";
+import {
+  access,
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  readlink,
+  rename,
+  rm,
+  stat,
+  statfs,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { finished } from "node:stream/promises";
@@ -11,6 +24,7 @@ import {
   type AgentProviderId,
   type AgentProviderRef,
   agentProviderDescriptor,
+  type CustomProviderHarness,
   isKeyOnlyProvider,
   isManagedToolRuntime,
   KEY_ONLY_PROVIDERS,
@@ -35,12 +49,14 @@ import {
   configuredCliPath,
   isVersion,
   olderVersion,
+  resolveOpencodeCli,
   resolvePiCli,
 } from "../backend/cli";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { sha256File } from "../backend/file-hash";
 import { type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "../backend/mcp-provider-shapes";
 import { measureTree } from "../backend/storage-usage";
+import { isSafeLinkTarget } from "./provider-runtime-archive";
 import {
   type ArchiveDigest,
   bunxExecutableName,
@@ -282,6 +298,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       antigravity: emptyStatus(unsupportedMessage),
       cursor: emptyStatus(unsupportedMessage),
       cline: emptyStatus(unsupportedMessage),
+      kimi: emptyStatus(unsupportedMessage),
       pi: emptyStatus(unsupportedMessage),
       muse: emptyStatus(unsupportedMessage),
       bun: emptyStatus(unsupportedMessage),
@@ -822,11 +839,35 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    */
   startKeyProviderCli(provider: AgentProviderRef): Effect.Effect<boolean, ProviderRuntimeFailure> {
     if (!isKeyOnlyProvider(provider)) return Effect.succeed(false);
-    return resolvePiCli({ bundledExecutable: this.executablePath("pi") }).pipe(
+    return this.#startMissingCli("pi");
+  }
+  /**
+   * Starts the download of the provider that runs a saved custom endpoint, when that provider is on
+   * and cannot start. The endpoint form saves on OpenCode by default and nothing else downloads it,
+   * so the endpoint stayed out of every model list. Does not wait, also not for the release check
+   * that a download waits for: an endpoint change holds every other one until it ends, and the model
+   * picker shows the download.
+   */
+  startCustomProviderHarness(harness: CustomProviderHarness): Effect.Effect<void> {
+    if (!this.#isProviderOn(harness)) return Effect.void;
+    return this.#startMissingCli(harness).pipe(Effect.ignore, Effect.forkIn(this.#scope), Effect.asVoid);
+  }
+  /**
+   * Starts the download of a CLI that cannot start, and keeps one that can, from OpenBot or from the
+   * user. True while that download runs.
+   */
+  #startMissingCli(provider: CustomProviderHarness): Effect.Effect<boolean, ProviderRuntimeFailure> {
+    const resolveCli = provider === "pi" ? resolvePiCli : resolveOpencodeCli;
+    return Effect.suspend(() => {
+      // A removal of the download that runs now would take away the CLI that this finds.
+      const removal = this.#removals.get(provider);
+      return removal ? Fiber.await(removal) : Effect.void;
+    }).pipe(
+      Effect.andThen(Effect.suspend(() => resolveCli({ bundledExecutable: this.executablePath(provider) }))),
       Effect.as(false),
       Effect.catch(() =>
-        this.download("pi").pipe(
-          Effect.map((snapshot) => ["downloading", "finishing"].includes(snapshot.providers.pi.phase)),
+        this.download(provider).pipe(
+          Effect.map((snapshot) => ["downloading", "finishing"].includes(snapshot.providers[provider].phase)),
         ),
       ),
     );
@@ -1763,7 +1804,10 @@ function parseVerificationRecord(text: string): { key: string; versionChecked: b
   return { key: value.key, versionChecked: value.versionChecked, files };
 }
 
-/** One line per file under `root`, sorted, or `null` when something there is not a plain file or folder. */
+/**
+ * One line per file and link under `root`, sorted, or `null` when something there is not a plain
+ * file, folder or link. A link is replaced, not changed, so its inode tells a new one apart.
+ */
 const runtimeFingerprint = Effect.fn("ProviderRuntime.runtimeFingerprint")(function* (
   root: string,
   prefix = "",
@@ -1779,6 +1823,10 @@ const runtimeFingerprint = Effect.fn("ProviderRuntime.runtimeFingerprint")(funct
     } else if (entry.isFile()) {
       const info = yield* runtimeIO(() => lstat(join(root, path), { bigint: true }));
       lines.push([path, info.size, info.mtimeNs, info.ctimeNs, info.ino, info.dev].join("\0"));
+    } else if (entry.isSymbolicLink()) {
+      const info = yield* runtimeIO(() => lstat(join(root, path), { bigint: true }));
+      const target = yield* runtimeIO(() => readlink(join(root, path)));
+      lines.push([path, "link", target, info.ctimeNs, info.ino, info.dev].join("\0"));
     } else return null;
   }
   return lines.sort();
@@ -2127,9 +2175,12 @@ const writeInstallRecord = Effect.fn("ProviderRuntime.writeInstallRecord")(funct
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   const files: Record<string, string> = {};
   for (const file of yield* installedFiles(root))
-    files[file] = yield* sha256File(join(root, file)).pipe(
-      Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
-    );
+    files[file.path] =
+      file.link === null
+        ? yield* sha256File(join(root, file.path)).pipe(
+            Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
+          )
+        : `${INSTALL_RECORD_LINK}${file.link}`;
   const record: InstallRecord = {
     layoutVersion: 1,
     runtime: spec.runtime,
@@ -2165,30 +2216,44 @@ const verifyInstallRecord = Effect.fn("ProviderRuntime.verifyInstallRecord")(fun
   if (files.length !== Object.keys(record.files).length)
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.runtimeChecksum")) });
   for (const file of files) {
-    const expected = record.files[file];
+    const expected = record.files[file.path];
     if (
       !isString(expected) ||
-      (yield* sha256File(join(root, file)).pipe(
-        Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
-      )) !== expected
+      (file.link === null
+        ? yield* sha256File(join(root, file.path)).pipe(
+            Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
+          )
+        : `${INSTALL_RECORD_LINK}${file.link}`) !== expected
     ) {
       return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.runtimeChecksum")) });
     }
   }
 });
 
-/** Every file under `root` but the record, as `/`-separated paths. A link or special file fails. */
+/** How the install record keeps a link: this prefix and its target, which no SHA-256 hex starts with. */
+const INSTALL_RECORD_LINK = "link:";
+
+/**
+ * Every file under `root` but the record, as `/`-separated paths, and the target of each link. Only
+ * a link that `isSafeLinkTarget` accepts is kept: Kimi's macOS framework has some. A special file or
+ * another link fails.
+ */
 const installedFiles = Effect.fn("ProviderRuntime.installedFiles")(function* (
   root: string,
   prefix = "",
-): Effect.fn.Return<string[], ProviderRuntimeFailure> {
-  const files: string[] = [];
+): Effect.fn.Return<{ path: string; link: string | null }[], ProviderRuntimeFailure> {
+  const files: { path: string; link: string | null }[] = [];
   for (const entry of yield* runtimeIO(() => readdir(join(root, prefix), { withFileTypes: true }))) {
     const path = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.isDirectory()) files.push(...(yield* installedFiles(root, path)));
-    else if (!entry.isFile())
+    else if (entry.isSymbolicLink()) {
+      const link = yield* runtimeIO(() => readlink(join(root, path)));
+      if (!isSafeLinkTarget(link))
+        return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.runtimeSpecialFile")) });
+      files.push({ path, link });
+    } else if (!entry.isFile())
       return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.runtimeSpecialFile")) });
-    else if (path !== INSTALL_RECORD) files.push(path);
+    else if (path !== INSTALL_RECORD) files.push({ path, link: null });
   }
   return files;
 });

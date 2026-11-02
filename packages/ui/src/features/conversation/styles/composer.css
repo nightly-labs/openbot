@@ -971,3 +971,14 @@
   height: 100%;
   object-fit: cover;
 }
+
+/* A pasted image that is still importing: its local preview, dimmed, under a spinner. */
+.composer-attachment[data-pending] .composer-attachment-preview img {
+  opacity: 0.5;
+}
+
+.composer-attachment[data-pending] > .ui-spinner {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}

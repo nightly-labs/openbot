@@ -47,7 +47,7 @@ export function ConversationView(props: ConversationProps) {
   /**
    * A local agent in Workspace only mode can get a folder from a drop on the chat. With wider access a
    * folder gives it nothing new, except to a provider whose own file tools reach only its folders.
-   * The Team API does not carry an agent's folders.
+   * The desktop changes the folders of a local agent only; `agent-folders-v1` is used by the mobile app.
    */
   function folderDropAgent() {
     const agent = props.agent;

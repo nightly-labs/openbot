@@ -5,6 +5,7 @@ import {
   type DynamicIslandGeometry,
   type ExternalLinkTarget,
 } from "@openbot/contracts/ipc";
+import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
@@ -82,6 +83,11 @@ const Settings = createSimpleContext({
      * page starts the connect step. A link never sets it.
      */
     const [pendingPluginConnect, setPendingPluginConnect] = createSignal(false);
+    /**
+     * The agent or skill that a Marketplace link named, held as the plugin slug is. It is a kind and
+     * an id, never a listing: the page loads the listing, and only Add on that page adds it.
+     */
+    const [pendingMarketplaceListing, setPendingMarketplaceListing] = createSignal<MarketplaceListingLink | null>(null);
     /**
      * The template an `openbot://agents/<id>` link named. The install dialog reads the template by
      * this id and installs only after the user presses Add agent.
@@ -653,6 +659,8 @@ const Settings = createSimpleContext({
       setPendingPluginSlug,
       pendingPluginConnect,
       setPendingPluginConnect,
+      pendingMarketplaceListing,
+      setPendingMarketplaceListing,
       pendingAgentTemplateId,
       setPendingAgentTemplateId,
     };

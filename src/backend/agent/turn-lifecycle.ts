@@ -52,9 +52,10 @@ import type { FailureContext, FailureSignal } from "./failure-signal";
 import { readCapturedSteps } from "./handoff-tool-steps";
 import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
+import { type InstructionsChanges, instructionsChangeMessage } from "./instructions-changes";
 import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
-import type { PlanContinuation } from "./plan-continuation";
+import { type PlanContinuation, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
@@ -88,9 +89,11 @@ const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
 /**
  * The provider errors that move an agent set to switch without asking to its next backup model. Each
  * one can pass on another provider, account or model; a request the model refuses fails on each.
+ * A usage limit that the usage-limit gate does not hold comes here too, such as a spent Gemini quota (#4368).
  */
 const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "billing",
+  "usage_limit",
   "provider_unavailable",
   "rate_limit",
   "authentication",
@@ -206,6 +209,7 @@ export interface TurnLifecycleOptions {
   conversation: ConversationRuntime;
   providers: ProviderRuntime;
   memories: AgentMemories;
+  instructions: InstructionsChanges;
   attention: AttentionRegistry;
   browser: AgentBrowserHost;
   compaction: ContextCompaction;
@@ -232,6 +236,7 @@ export class TurnLifecycle {
   readonly #conversation: ConversationRuntime;
   readonly #providers: ProviderRuntime;
   readonly #memories: AgentMemories;
+  readonly #instructions: InstructionsChanges;
   readonly #attention: AttentionRegistry;
   readonly #browser: AgentBrowserHost;
   readonly #compaction: ContextCompaction;
@@ -312,6 +317,7 @@ export class TurnLifecycle {
     this.#conversation = options.conversation;
     this.#providers = options.providers;
     this.#memories = options.memories;
+    this.#instructions = options.instructions;
     this.#attention = options.attention;
     this.#browser = options.browser;
     this.#compaction = options.compaction;
@@ -412,6 +418,7 @@ export class TurnLifecycle {
       ) {
         // The turn does not end here, so it keeps no trace.
         this.#traces.drop(turnId);
+        this.#instructions.dropTurn(turn.agentId, turnId);
         // The client is gone, so no browser tool of this turn can run. Other agents keep their controls.
         this.#browser.endControl(this.#conversation.publicThreadId(turn.agentId, turn.threadId), turnId);
         // The turn does not end here, so a provider error held for a failover shows now.
@@ -455,7 +462,7 @@ export class TurnLifecycle {
 
   /**
    * Whether a completed turn may continue its plan: it served only the user's or the agent's own
-   * messages, the user did not stop it, it asked nothing, opened no wait and holds no question,
+   * messages, the user did not stop it, its last line asks nothing but whether to continue and does not say it waits, opened no wait and holds no question,
    * approval or takeover, and no other message waits in its lane.
    */
   #planContinues(
@@ -475,8 +482,7 @@ export class TurnLifecycle {
       )
     )
       return false;
-    // A question anywhere in the last line, so Markdown or a closing remark after it does not hide it.
-    if (/[?？]/.test(answer?.trimEnd().split("\n").at(-1) ?? "")) return false;
+    if (waitsForUser(answer)) return false;
     return (
       !this.#hooks.turnStopped(agentId, taskId, turnId) &&
       !this.#hooks.hasOpenWait(
@@ -580,6 +586,8 @@ export class TurnLifecycle {
         }
         this.#hooks.emit({ type: "turn-started", agentId, threadId: publicThreadId, turnId, origin });
         this.#conversation.emitConversation(snapshot, "turn.started", { turnId });
+        const workspace = this.#store.list().find((entry) => entry.id === agentId)?.workspacePath;
+        if (workspace) yield* this.#instructions.startTurn(agentId, turnId, workspace);
         return;
       }
       case "item/started":
@@ -956,6 +964,8 @@ export class TurnLifecycle {
       const association = this.#turnAssociations.get(turnId);
       if (association) yield* Deferred.await(association).pipe(Effect.catch(() => Effect.void));
       const memoryChanges = this.#memories.finishTurn(turnId, status).get(agentId) ?? [];
+      const workspace = this.#store.list().find((entry) => entry.id === agentId)?.workspacePath;
+      const instructionsChange = yield* this.#instructions.finishTurn(agentId, turnId, workspace);
       // A refused session is closed below, and a spent plan would refuse the summary turn too, so
       // neither is compacted.
       // A routine run's own session closes after this turn, so it is not compacted either. Nor is a
@@ -1149,6 +1159,7 @@ export class TurnLifecycle {
               snapshot.messages.findLast(
                 (message) => message.itemType === CONVERSATION_PLAN_ITEM_TYPE && message.turnId !== turnId,
               )?.plan ?? null,
+            answer: latestAssistant?.text,
           })
         : null;
       if (!continuation) this.#planContinuation.cancel(agentId, laneTaskId);
@@ -1212,6 +1223,7 @@ export class TurnLifecycle {
       if (trace) this.#attachTrace(snapshot.messages, agentId, turnId, trace);
       const memoryLine = memoryChangesMessage(turnId, memoryChanges, (text) => this.#hooks.redactMcp(text));
       if (memoryLine) snapshot.messages.push(memoryLine);
+      if (instructionsChange) snapshot.messages.push(instructionsChangeMessage(turnId, instructionsChange));
       if (continuation) {
         // No `turnId`: inside the turn, a system row sorts before the answer. Alone, the line shows
         // after this turn's answer and before the continuation turn.
@@ -1222,10 +1234,13 @@ export class TurnLifecycle {
           status: "completed",
           createdAt: new Date().toISOString(),
           itemType: PLAN_CONTINUATION_ITEM_TYPE,
-          text: sourceText("status.agent.planContinues", {
-            current: continuation.count,
-            limit: this.#planContinuation.limit,
-          }),
+          text: sourceText(
+            continuation.kind === "plan" ? "status.agent.planContinues" : "status.agent.nextStepContinues",
+            {
+              current: continuation.current,
+              limit: continuation.limit,
+            },
+          ),
         });
       }
       this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: outcome });
@@ -1299,6 +1314,7 @@ export class TurnLifecycle {
     this.#runningTurns.delete(turnId);
     this.#reportedFailures.delete(turnId);
     this.#markEnded(turnId);
+    this.#instructions.dropTurn(agentId, turnId);
     const trace = this.#traces.take(turnId, new Date().toISOString());
     const deliveries = yield* turnStep(() => this.#mailbox.findDeliveriesByTurn(agentId, turnId)).pipe(
       Effect.catchCause((cause) => report(cause).pipe(Effect.as([]))),

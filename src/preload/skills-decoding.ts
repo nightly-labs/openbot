@@ -185,6 +185,7 @@ function decodeMarketplaceAgentSummary(value: unknown): MarketplaceAgentSummary 
     version: requiredNumber(item, "version"),
     installs: requiredNumber(item, "installs"),
     featured: requiredBoolean(item, "featured"),
+    ...(isBoolean(item.verified) ? { verified: item.verified } : {}),
     avatarSeed: item.avatarSeed,
     avatarHue: item.avatarHue,
     avatarUrl: nullableString(item, "avatarUrl"),
@@ -227,7 +228,13 @@ export function decodeMarketplaceAgentDetail(value: unknown): MarketplaceAgentDe
     )
   )
     throw new Error("Invalid marketplace agent routines.");
-  return { ...summary, versionId: requiredString(item, "versionId"), skills: item.skills, routines: item.routines };
+  return {
+    ...summary,
+    versionId: requiredString(item, "versionId"),
+    ...(isBoolean(item.pending) ? { pending: item.pending } : {}),
+    skills: item.skills,
+    routines: item.routines,
+  };
 }
 
 export function decodeAgentSubmission(value: unknown): AgentSubmission {

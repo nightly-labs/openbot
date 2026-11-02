@@ -6,11 +6,240 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
-## [0.56.1] - 2026-10-30
+## [0.58.1] - 2026-11-02
 
 ### Changed
 
-- This fork build is version 0.56.1 and includes OpenBot 0.56.0. The application id stays `app.openbot.desktop`, so this build stays installed when the public update feed offers 0.56.0.
+- This fork build is version 0.58.1 and includes OpenBot 0.58.0. The application id stays `app.openbot.desktop`, so this build stays installed when the public update feed offers 0.58.0.
+
+## [0.58.0] - 2026-11-01
+
+### Added
+
+- Show the OpenCode Go monthly limit as a third bar in Usage, under the 5-hour and weekly bars.
+  Before, Usage showed only the one of the weekly and monthly limits that was closer to its end.
+- Add 17 OpenBot agents to Marketplace: QA Tester, PR Shepherd, Skill Smith, Prototype Builder,
+  Design Critic, Accessibility Desk, Handoff Spec Writer, Copy Editor, Search Content Planner,
+  Prospect Researcher, Call Coach, Chief of Staff, Spend Auditor, Request Triage Desk, Ops Digest,
+  Home Care Log and Bill Tracker. Each agent does one job and asks before it sends, spends, merges
+  or publishes.
+- Add 15 OpenBot skills for these agents, such as Acceptance Check, PR Follow-up, Voice Edit, Daily
+  Brief, Spend Audit and Care Log.
+- Some agents install with an active routine, such as the weekday morning brief of Chief of Staff.
+  A routine asks once for its setup and sends nothing when there is nothing new.
+- Start a workflow from GitHub. A GitHub trigger runs on new issues, comments, labels, pull requests,
+  reviews, merges, closes, assignments, failed checks, or a mention of `@openbotgit`, in a repository
+  that the OpenBot GitHub App can see. A second event for the same issue waits for the first run, and
+  events for other issues run at the same time. The trigger shows the newest 50 events and why each
+  one started a run, waited, or was skipped.
+- Change GitHub from a workflow. A GitHub output comments, adds or removes labels, assigns a person,
+  asks for a review, approves or requests changes, closes, reopens, or creates an issue, as the
+  OpenBot GitHub App. An agent can choose the labels or the person from the repository's own lists.
+- Show each open run on the workflow canvas, and the events that wait for one.
+
+### Changed
+
+- The server invitation page has one Open OpenBot button. Below it, links let you join in the browser or download OpenBot. When OpenBot does not open on a computer, a dialog tells you to install it and gives a download button.
+- The invitation, Slack and Discord connect, billing and report pages no longer show a blue glow and a shadow behind the card.
+- Rewrite the OpenBot agents and skills in Marketplace. Each one now has a named result, the
+  evidence it gives for each claim, and a fixed rubric. Agents that you installed get the update
+  offer in Marketplace.
+- Remote connections now use two Signal machines at the same time. Each server has a home machine.
+  When one machine stops, its servers and their devices move to the other machine in about one minute.
+- The first conversation of a joined server opens faster when the server has many agents. Before,
+  the app showed it only after it read the queue of each agent. On a server with 50 agents, the
+  desktop app now shows it in about half the time.
+- The web app reads the agent settings, connectors and routine calendar of a server once when it
+  opens, not up to three times. On a server with 50 agents, its side panels show about a quarter
+  sooner.
+- When you open the app again, the agents and sidebar of a joined server show at once from the last
+  visit, while the app connects to the server. The saved view holds no messages. Server actions
+  start when the connection is made. The channels show in their place too, and a hidden or moved
+  agent stays hidden or moved in the saved view.
+- The desktop app opens its window about 3 seconds sooner when the Dynamic Island is on. The window
+  does not wait for the Island to load.
+- A client connects to a joined server with fewer steps in sequence. The desktop app reads the
+  server compatibility once, not twice. The web app loads its workspace code while it signs in, and
+  on a server it connected to before, it reads the workspace at the same time as the compatibility.
+  With 100 ms network latency, the web workspace is ready about 250 ms sooner.
+- On the web, a switch to another server is about 2.5 times faster. The app uses the connection
+  that it already keeps to that server for notifications, and it does not wait for the old server's
+  session to end. On openbot.run, a switch took 0.7 to 1.0 seconds, against 1.7 to 2.8 seconds
+  before.
+
+### Removed
+
+- Remove six OpenBot agents from Marketplace: Product Design Lead, Communications Partner, Meeting
+  Assistant, Account Research Partner, Outreach Writer and Operations Planner. Other agents now do
+  their jobs. Copies that you installed keep working.
+
+### Fixed
+
+- A custom provider that you add now appears in the model picker when OpenCode or Pi is not installed. OpenBot downloads the provider that runs the endpoint when you save it. Before, the endpoint was saved, but the Custom tab stayed hidden until you downloaded OpenCode yourself.
+- The account service does less database work when a phone or browser connects to a server. Before,
+  each connection read the connections of all users of that server, and each server or account
+  deletion read every connection of every server.
+- Accept the Claude sign-in check when Claude reports that it is signed in but its status text is
+  not readable. Before, this stopped the turn of an agent with its own Claude account, and the
+  message to that agent failed.
+- The download button in the "Nothing opened?" dialog of the invitation, Slack and Discord pages now uses your language. Before, it was always in English.
+- Moving a queued message works when more than 32 messages wait in the queue, on this computer and on a joined server. Before, every move failed with "Invalid delivery ids." or a 400 error and the order did not change.
+- A Pi agent turn now fails with a message when Pi sends nothing for 10 minutes. Before, the turn stayed "working" until you stopped it, and other messages waited behind it.
+- Long model names in the model picker, such as the Fusion models of Devin, now go to a second line. Before, the picker cut off the end of the name.
+- In the web app, a server that is open in another browser tab now shows a full-window screen that
+  says so, with "Use here" to move the server to this tab. Before, the page showed "Starting" for
+  15 minutes, started the server again every few seconds, and then showed "did not start in time",
+  while the server ran.
+- A host that starts lists its agents as soon as they load. Before, a client could wait about
+  15 seconds for the list while the host ran its routine checks.
+- On the web, an agent that you open while the app connects stays open after the connection.
+- While a joined server connects, the conversation says that it connects. It does not ask you to
+  complete the provider setup.
+- While a joined server connects, a channel from the last visit does not say "No messages yet" or
+  show its creation date.
+
+## [0.57.0] - 2026-10-31
+
+### Added
+
+- An agent can now answer a website's alert or confirmation that its own browser action opened.
+  Before, the dialog stopped the agent until you answered it. A dialog that you open, or one that is
+  still open when the agent's turn ends, stays for you to answer.
+- An owner or admin of a joined server can now turn **Agent starts new chats** on or off for an agent from the mobile app. The computer that runs the agent must have this version. A change on the phone shows at once in the agent settings on the computer, and a change on the computer shows at once on the phone.
+- An owner or admin of a joined server can now turn "Show the plan before long tasks" on or off for
+  the server's agents, in the agent settings on desktop and in the web client. Before, only the
+  computer that runs the agent could change it. The server must run this version.
+- A phone that runs the new mobile app now gets the time at which the plan card starts by itself,
+  so it can show the countdown and say when nobody answered in time.
+- An owner or admin can change the folders of an agent from the mobile app: add, remove, exclude
+  and include again. The host checks each folder as the desktop folder picker does. A change on the
+  phone or on the desktop shows on the other device at once. The computer that runs the agents needs
+  this version.
+- The owner of a server can change its server key from the mobile app. The server on your computer
+  makes the new key and signs the change with the current key and the new key, so paired devices
+  stay paired. Update OpenBot on the server computer to use it.
+- **Server settings → General → Server key** shows when the server last changed its key. Every member
+  sees it. Only a change that the previous key and the new key both signed shows.
+- The phone connection can now receive a transfer file of up to 100 MB from a server, so the mobile app can export a server. Other files that the app downloads keep the 10 MB limit.
+- Agent settings have an Instructions page that shows the agent's `AGENTS.md` file as formatted
+  text, with the file name and its folder at the top. Edit opens the whole file on the page, and
+  Show in Finder shows the file. The agent keeps its standing rules in this file, as short
+  bullets under headings, and changes the file when you ask it to change its instructions. A
+  workspace that has only a `CLAUDE.md` file keeps that file. Each provider gets the file, also a
+  provider that does not read it by itself.
+- When the agent changes its instructions, the chat shows "Updated its instructions" after its
+  answer. View opens the instructions, and Undo puts back the text from before the change.
+- You can branch a conversation with an agent. On the last agent message of a turn, select the branch button, or right-click the message and select **Branch from here**. A new thread of the same agent opens with the conversation up to that message, and its message box is ready for you to type a different direction. The original thread does not change. A line at the top of the new messages shows the thread that you branched from; select it to go back to that message. Files in the agent's workspace are not copied or rolled back. Joined servers and the web app can branch when the server has this version.
+- An owner or admin can add, change and remove the custom ACP agents of a server from the mobile
+  app. A server that runs this version accepts these changes. Each agent's command runs on the
+  server's computer, and the values of its environment variables go only to the server.
+- A stopped or failed channel task now has a Cancel task button next to Continue and Reassign. It ends
+  the whole run of that task, and keeps the messages. Before, a stopped task stayed above
+  the composer until you continued or reassigned it.
+- Disconnect Grok, Muse and Cursor from Settings > Providers, in the ⋯ menu of their sign-in, as
+  Claude and Codex already do. On this computer, the CLI in your terminal also signs out. A joined
+  server must run this version to disconnect them.
+- The Marketplace is now on openbot.run at `/marketplace`, with the Agents, Skills and Apps tabs.
+  Each agent and each skill has its own page. A shared link shows a picture of that listing.
+- Agent and skill pages in the app have Copy link. The link opens the same listing on openbot.run,
+  and its button opens it in the app. A link never adds the agent or the skill: you still press Add.
+- The Agents tab in the app shows Featured agents, and a switch between Verified and Public agents.
+
+### Changed
+
+- Settings > Notifications shows one card for each server, with All, Needs me and Nothing as one
+  control. Only the agents that have their own level show under their server. "Choose another
+  agent" gives one more agent its own level, and the X button gives it the server level again.
+- An agent that a member turned off for everyone in an earlier version turns on again when you give
+  it its own level. Settings no longer shows "Off for everyone on this server".
+- Memories now open in the settings pane of an agent or a channel, not in a dialog. The list shows a short title for each memory, in "Always used" and "Used when relevant" groups. A title opens the memory on its own page, where you read, edit or delete it, and where a "Use in every chat" switch sets whether the agent always uses it. A search field above the list finds memories by their words.
+- Agents now start a long memory with a short label, such as "Release notes:", so the list shows a clear title.
+- Show a browser profile change made on another device at once in the desktop and web Browser
+  profiles settings and in the agent settings. A host that runs this version tells each client
+  about each change.
+- The old Instructions field is now Description: a short summary that teammates read to choose who
+  does a task.
+- When a tab or the thread menu cuts a long thread title, a number at its end, such as **#2**, stays visible.
+- The reaction button below a message now has the same hover color as the copy and reply buttons.
+- Remote connections that need a relay server now spread over two relay servers. When one relay
+  server is full or stops, new connections use the other one.
+- Remote access now uses two connection servers at the same time. Each server and its devices meet on
+  one of them. When that connection server stops, the server and its devices move to the other one
+  automatically.
+- Show the OpenBot server offer at the bottom of the Routines panel, below the routine list, with
+  its buttons on the right. Before, it was above the routines.
+- A chat shows one schedule card for each routine: the newest change by the agent. Earlier changes show as one line that opens the routine.
+- Show each routine in the agent's Routines list as its own card, with a switch at the end that
+  pauses or resumes it. The Pause and Resume buttons are gone.
+- When you pay for a plan or a license, the account service sets your account email on your
+  analytics profile, also when product analytics is off on your devices. See `PRIVACY.md`.
+- Send an attached MP3 file to an agent as audio when its provider accepts audio input, such as
+  Antigravity. The agent hears the file and still gets its path. Audio over about 14 MB a message
+  goes as a path only, as before.
+- Put more space between the top bar and the title of each Marketplace list and page.
+- Send about 3k fewer tokens in each Claude agent request. Claude agents no longer get the
+  `Workflow` and `ListAgents` tools, which OpenBot does not show, and Claude auto memory is off:
+  OpenBot memory is the agent's only memory. Earlier Claude memory files stay on disk.
+- Send fewer tokens in each request of the other providers:
+  - Pi loads the tools of your own MCP servers only when the agent searches for them. With computer
+    use on, this removes about 24k tokens from each request.
+  - Grok no longer gets its `send_feedback` and `workflow` tools.
+  - Antigravity no longer gets its `schedule` and `run_workflow` tools. Use OpenBot routines.
+  - Codex goals are off. OpenBot has no control to pause or stop a goal.
+  - OpenCode no longer gets its tools that rename or move a session, or that make or list worktrees.
+- The agent page in the app shows the skills, routines and information of the agent in sections.
+- `openbot.run/plugins` now opens the Apps tab of the Marketplace.
+- When an agent's browser action matches more than one element, the browser still sends no input,
+  and the error now lists up to five of the matches with their text and the text of their item.
+  The agent can then act on the intended item, for example one lesson in a calendar, or ask you.
+
+### Fixed
+
+- Update the file preview panel when the agent changes the open file or folder. Before, the panel
+  showed the file as it was when you opened it.
+- While the phone downloads a file from a server, other answers from that server no longer wait for the download to finish.
+- An agent with no title no longer saves "General assistant" as its title.
+- A computer that joined a server over a direct connection now gets the newer server features, such as thread branches and notification levels for agents. Before, it got only the older features of the server.
+- An agent's change to a routine schedule stays saved. Before, when the agent changed a routine to a schedule that only the cron field can show, each older routine card in the chat saved the earlier schedule again, and the chat filled with "Updated routine" lines.
+- Install an in-app update on a slow Mac, such as an Intel Mac. Before, OpenBot closed 30 seconds
+  after "Restart to update", before macOS finished preparing the update, so the old version opened
+  again and offered the same update.
+- An agent on an OpenCode Go model now moves to its backup model when the Go usage limit is
+  reached, and continues the unfinished work there. Before, the turn failed with
+  "Go usage limit exceeded", and each retry went to the same model again.
+- Change the language again from the sign-in screen. The button under the form shows the current
+  language and opens the language choice. Before, a language chosen by mistake stayed until sign-in.
+- Fill the macOS installer window with its background. Before, a white strip showed below the
+  background when Finder showed no tab bar or status bar.
+- In the sign-in dialog for a provider on a joined server, such as ChatGPT on a cloud server, the
+  "Stored on" line no longer touches the "Open sign-in page" button.
+- OpenCode now starts again by itself when a start fails with "Internal service failure", as it can
+  on a slow computer. Before, OpenCode stayed off and messages waited until you refreshed the
+  providers.
+- Deleting a side thread while Codex compacts its context no longer holds the agent's own chat. Before, every later message to the agent stayed queued until OpenBot restarted.
+- ChatGPT no longer shows a "Codex configuration warning" at each start when the shared Codex
+  configuration has a setting that Codex does not know, such as the Windows app approvals that the
+  Codex desktop app saves. Codex works without these settings. Before, the warning told you to remove
+  the setting, which made the desktop app forget its approvals. The warning is now in the log.
+- ChatGPT no longer shows Codex log lines as "ChatGPT error" messages while it works. Before, a
+  line such as the notice about a folder that is not trusted showed again at each Codex start. When
+  Codex stops with an error, the message now shows its last error line.
+- Choose a server's custom provider models from the Custom tab in the desktop app. Before, the model
+  picker of a joined server's agent used the endpoints of this computer, so the Custom tab was
+  missing and the server's custom models showed on the OpenCode tab.
+- When a custom endpoint refuses its API key, or needs a key and has none, the error now names the
+  endpoint and tells you to enter the key in Server settings → Providers. Before, it said that
+  OpenCode had no sign-in and asked for an OpenCode Go key.
+- An agent's browser tab that is idle for 30 minutes now ends its renderer process, not only its
+  page. Saved tabs also start with no renderer process until they are used. Before, each such tab
+  kept about 85 MB, and a server with many agent tabs used more than 1 GB for them.
+- When you ask an agent to connect or use an app such as Figma, Notion or Linear, the agent now shows the Connect card in the chat more reliably.
+- When the app is already installed and does not work, the agent now tells you what to do. It shows the Sign in card, gives the setup steps for an app on your computer such as Figma, or says that the app is turned off. Before, the card only said Connected.
+
+### Security
+
+- The web client keeps the first key that it sees for each server. A later key change is used only
+  when the previous key signed a handover to it, as on desktop.
 
 ## [0.56.0] - 2026-10-30
 

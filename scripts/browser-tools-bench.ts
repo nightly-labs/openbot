@@ -14,7 +14,8 @@
 // the npx cache. Each run makes a new agent, opens the start page in a tab of the built app, sends
 // one task, and reads the token use of that turn from the agent's analytics. Tool names come from
 // the Claude session file of the turn, so a run that used a tool outside its variant is flagged.
-// Ground truth is read from the sites at run time.
+// Ground truth is read from the sites at run time. The calendar tasks use a loopback lesson
+// calendar instead (#4264): their score is the registration the server recorded, not the reply.
 //
 // Everything runs on the bench's own profile (`OpenBot Dev wt-<hash>#browser-tools-bench`) and the
 // process group it started. It never reaches a dev instance or the developer's own profile.
@@ -22,14 +23,16 @@
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type AgentAnalytics, analyticsRange } from "@openbot/contracts/ipc";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { type Browser, chromium, type Page } from "playwright-core";
 import { developmentInstanceIdForWorktree, developmentUserDataName } from "../src/main/development-profile";
+import { LessonCalendar, TARGET_LESSON } from "./browser-lesson-calendar-fixture";
 import { ensureBenchAuthApi, signInBenchAccount } from "./dev-automation/bench-auth";
 import { type BenchApp, launchBenchApp } from "./dev-automation/bench-launch";
 import { verifyBrowserOwnership } from "./dev-automation/cdp-client";
@@ -70,6 +73,8 @@ interface BenchTask {
   truth: () => Promise<string>;
   /** True when the agent's answer matches the truth. */
   score: (answer: string, truth: string) => boolean;
+  /** Serves the start page from the loopback lesson calendar, which is reset before each run. */
+  calendar?: true;
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -119,7 +124,53 @@ async function pages(first: string, next: RegExp, limit = 20): Promise<string[]>
   return found;
 }
 
+// The loopback lesson calendar. `main` starts it only when a selected task needs it.
+const lessonCalendar = new LessonCalendar();
+const lessonCalendarServer = createServer((request, response) => {
+  if (!lessonCalendar.handle(request, response)) {
+    response.statusCode = 404;
+    response.end();
+  }
+});
+let lessonCalendarUrl = "";
+
+const CALENDAR_REQUEST = `Register me for the ${TARGET_LESSON.title} lesson on ${TARGET_LESSON.day} at ${TARGET_LESSON.time.slice(0, 5)} in ${TARGET_LESSON.location}. Register only once, and do not register for any other lesson. Then answer with the confirmation that the page shows.`;
+// Correct only when the server recorded exactly one registration, for the requested lesson.
+const registeredOnce = (_answer: string, truth: string) => lessonCalendar.registrations.join(",") === truth;
+
 const TASKS: BenchTask[] = [
+  {
+    id: "calendar-register",
+    get startUrl() {
+      return lessonCalendarUrl;
+    },
+    question: CALENDAR_REQUEST,
+    truth: async () => TARGET_LESSON.id,
+    score: registeredOnce,
+    calendar: true,
+  },
+  {
+    // The failure in #4264: a layout attribute that five different lessons share.
+    id: "calendar-register-shared-selector",
+    get startUrl() {
+      return lessonCalendarUrl;
+    },
+    question: `${CALENDAR_REQUEST} The lesson cards on this page match the CSS selector div[data-mh="event-7"].`,
+    truth: async () => TARGET_LESSON.id,
+    score: registeredOnce,
+    calendar: true,
+  },
+  {
+    // Starts from the refusal itself, so every run measures the recovery from it.
+    id: "calendar-register-after-refusal",
+    get startUrl() {
+      return lessonCalendarUrl;
+    },
+    question: `${CALENDAR_REQUEST} Make your first browser action this click: openbot_browser.click with target {"kind":"css","selector":"div[data-mh=\\"event-7\\"] button"}.`,
+    truth: async () => TARGET_LESSON.id,
+    score: registeredOnce,
+    calendar: true,
+  },
   {
     id: "books-travel",
     startUrl: "https://books.toscrape.com/",
@@ -390,8 +441,8 @@ async function claudeSessionDirectories(): Promise<string[]> {
   return directories;
 }
 
-/** Reads the tool calls after the marker from the session file that holds it. Null when no file has it. */
-async function readToolUses(marker: string, since: number): Promise<ToolUse[] | null> {
+/** The session file entries after the marker, from the file that holds it. Null when no file has it. */
+async function readSessionEntries(marker: string, since: number): Promise<DynamicRecord[] | null> {
   for (const directory of await claudeSessionDirectories()) {
     const files = await readdir(directory).catch(() => []);
     for (const file of files) {
@@ -402,30 +453,51 @@ async function readToolUses(marker: string, since: number): Promise<ToolUse[] | 
       const text = await readFile(path, "utf8").catch(() => "");
       const start = text.indexOf(marker);
       if (start < 0) continue;
-      const uses: ToolUse[] = [];
+      const entries: DynamicRecord[] = [];
       for (const line of text.slice(start).split("\n")) {
-        if (!line.includes('"tool_use"')) continue;
         let entry: unknown;
         try {
           entry = JSON.parse(line);
         } catch {
+          // The marker line starts mid-entry.
           continue;
         }
-        // The file also keeps a copy of some calls in `api-request-blob` entries; only assistant entries are calls.
-        if (!isDynamicRecord(entry) || entry.type !== "assistant") continue;
-        const message = entry.message;
-        const content = isDynamicRecord(message) ? message.content : undefined;
-        if (!Array.isArray(content)) continue;
-        for (const item of content) {
-          if (isDynamicRecord(item) && item.type === "tool_use" && typeof item.name === "string") {
-            uses.push(classifyTool(item.name, item.input));
-          }
-        }
+        if (isDynamicRecord(entry)) entries.push(entry);
       }
-      return uses;
+      return entries;
     }
   }
   return null;
+}
+
+function contentItems(entry: DynamicRecord, type: string): DynamicRecord[] {
+  const message = entry.message;
+  const content = isDynamicRecord(message) ? message.content : undefined;
+  if (!Array.isArray(content)) return [];
+  return content.filter((item): item is DynamicRecord => isDynamicRecord(item) && item.type === type);
+}
+
+/** The tool calls of the turn. The file also keeps a copy of some calls in `api-request-blob` entries; only assistant entries are calls. */
+function toolUses(entries: DynamicRecord[]): ToolUse[] {
+  return entries
+    .filter((entry) => entry.type === "assistant")
+    .flatMap((entry) => contentItems(entry, "tool_use"))
+    .flatMap((item) => (typeof item.name === "string" ? [classifyTool(item.name, item.input)] : []));
+}
+
+/** The tool results of the turn that refused an ambiguous target. A snapshot can quote the error in its diagnostics, so only a result that starts with it counts. */
+function ambiguousRefusals(entries: DynamicRecord[]): number {
+  const texts = (content: unknown): string[] =>
+    typeof content === "string"
+      ? [content]
+      : Array.isArray(content)
+        ? content.flatMap((part) => (isDynamicRecord(part) && typeof part.text === "string" ? [part.text] : []))
+        : [];
+  return entries
+    .filter((entry) => entry.type === "user")
+    .flatMap((entry) => contentItems(entry, "tool_result"))
+    .filter((item) => texts(item.content).some((text) => /^Error: (?:CSS selector|Target) is ambiguous\b/u.test(text)))
+    .length;
 }
 
 function violations(variant: Variant, uses: ToolUse[]): string[] {
@@ -644,6 +716,10 @@ interface RunRow {
   toolsByFamily: Record<string, number>;
   toolNames: Record<string, number>;
   toolNamesKnown: boolean;
+  /** Tool results that refused an ambiguous target. */
+  ambiguousRefusals: number;
+  /** The lessons that the calendar server recorded in the run. */
+  registrations?: string[];
   uncachedInput: number;
   cachedInput: number;
   cacheCreation: number;
@@ -676,6 +752,7 @@ async function runOnce(
     toolsByFamily: {},
     toolNames: {},
     toolNamesKnown: false,
+    ambiguousRefusals: 0,
     uncachedInput: 0,
     cachedInput: 0,
     cacheCreation: 0,
@@ -757,7 +834,10 @@ async function runOnce(
     const reply = await readReply(page, agent.id);
     row.answer = extractAnswer(reply.text);
     row.correct = row.answer !== "" && task.score(row.answer, truth);
-    const uses = await readToolUses(marker, started - MINUTE);
+    const entries = await readSessionEntries(marker, started - MINUTE);
+    const uses = entries === null ? null : toolUses(entries);
+    row.ambiguousRefusals = entries === null ? 0 : ambiguousRefusals(entries);
+    if (task.calendar) row.registrations = [...lessonCalendar.registrations];
     row.toolNamesKnown = uses !== null;
     row.toolCalls = uses?.length ?? reply.toolSteps;
     for (const use of uses ?? []) {
@@ -802,6 +882,7 @@ function summarize(rows: RunRow[]) {
       medianUncachedInput: median(own.map((row) => row.uncachedInput)),
       medianOutput: median(own.map((row) => row.output)),
       medianToolCalls: median(own.map((row) => row.toolCalls)),
+      ambiguousRefusals: sum((row) => row.ambiguousRefusals),
       medianDurationMs: median(own.map((row) => row.durationMs)),
       medianCostUsd: median(own.map((row) => row.costUsd)),
       totalInput: sum((row) => row.inputTotal),
@@ -867,8 +948,11 @@ function harnessInstalled(): boolean {
 }
 
 function selectTasks(raw: string | undefined): BenchTask[] {
-  if (raw === undefined) return TASKS;
-  if (/^\d+$/u.test(raw)) return TASKS.slice(0, Number(raw));
+  // The calendar tasks measure one recovery path and run only by id, so the default and a number
+  // select the same public-site tasks as before.
+  const publicTasks = TASKS.filter((task) => !task.calendar);
+  if (raw === undefined) return publicTasks;
+  if (/^\d+$/u.test(raw)) return publicTasks.slice(0, Number(raw));
   const wanted = raw.split(",").map((part) => part.trim());
   const selected = TASKS.filter((task) => wanted.includes(task.id));
   if (selected.length === 0) throw new Error(`No task matches "${raw}".`);
@@ -893,6 +977,18 @@ async function main(): Promise<void> {
 
   await mkdir(OUTPUT_ROOT, { recursive: true });
   const reportPath = join(OUTPUT_ROOT, "report.json");
+  if (tasks.some((task) => task.calendar)) {
+    await new Promise<void>((resolveListen, rejectListen) => {
+      lessonCalendarServer.once("error", rejectListen);
+      lessonCalendarServer.listen(0, "127.0.0.1", resolveListen);
+    });
+    // The setup below runs before the try that closes the server. If it fails, the server must not
+    // keep the process alive.
+    lessonCalendarServer.unref();
+    const address = lessonCalendarServer.address();
+    if (address === null || typeof address === "string") throw new Error("The lesson calendar has no port.");
+    lessonCalendarUrl = `http://127.0.0.1:${address.port}/calendar`;
+  }
   const truths = new Map<string, string>();
   for (const task of tasks) {
     truths.set(task.id, await task.truth());
@@ -931,6 +1027,7 @@ async function main(): Promise<void> {
         for (const variant of variants) {
           await enableOnly(page, servers, variant.mcp);
           logger.info(`run ${repeat}/${repeats} ${task.id} ${variant.id}`);
+          if (task.calendar) lessonCalendar.reset();
           const row = await runOnce(page, variant, task, repeat, truths.get(task.id) ?? "", cdpUrl);
           rows.push(row);
           logger.info(
@@ -945,6 +1042,10 @@ async function main(): Promise<void> {
     if (variants.some((variant) => variant.id === "D")) await stopHarnessDaemon();
     await app.stop();
     await authApi.stop();
+    if (lessonCalendarServer.listening) {
+      lessonCalendarServer.closeAllConnections();
+      await new Promise<void>((resolveClose) => lessonCalendarServer.close(() => resolveClose()));
+    }
   }
   const summary = await write();
   process.stdout.write(`${markdown(summary)}\n`);

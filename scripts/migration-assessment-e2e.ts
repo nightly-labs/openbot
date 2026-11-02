@@ -40,7 +40,7 @@ const declared = (
   platform: "darwin",
   architecture: "arm64",
   appVersion: "1.2.3",
-  schemaVersion: 47,
+  schemaVersion: 49,
   executor: "process",
   dataRoot: "owned",
   persistence: "persistent",
@@ -234,7 +234,7 @@ try {
         expectedAssessmentRevision: 1,
         destination: declared({
           appVersion: "9.0.0",
-          schemaVersion: 48,
+          schemaVersion: 50,
           platform: "win32",
           architecture: "arm64",
           dataRoot: "external",

@@ -108,6 +108,17 @@ const OPENCODE_TITLE_OFF = { title: { disable: true } } as const;
  */
 export const OPENCODE_PROFILE_CONFIG: OpenCodeConfigBase = { permission: { "*": "deny", bash: "ask", read: "ask" } };
 
+/**
+ * OpenCode 2.2.5 lists its `session_*` and `worktree_*` tools in the Code Mode catalog of each
+ * request, about 1.2k characters. OpenBot names its own chats, and `session_move` would move the
+ * session out of the agent's workspace. OpenCode leaves a denied tool out of the catalog. A rule names
+ * the tool id, `opencode_<name>`, and OpenCode checks `worktree_remove` with the `edit` permission, so
+ * that tool stays.
+ */
+export const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
+  permission: { "opencode_session_*": "deny", "opencode_worktree_*": "deny" },
+};
+
 const OPENCODE_CONFIG_ENV = "OPENCODE_CONFIG_CONTENT";
 
 /** The built-in providers that read `OPENCODE_API_KEY`: OpenCode Go and the free tier. */

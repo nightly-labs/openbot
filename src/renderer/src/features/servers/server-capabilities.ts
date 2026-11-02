@@ -53,6 +53,7 @@ export function serverSupportsCapability(
       capability === "agent-host-settings-v1" ||
       capability === "agent-backup-models-v1" ||
       capability === "agent-task-limit-v1" ||
+      capability === "agent-plan-card-v1" ||
       capability === "browser-profiles-v1" ||
       capability === "provider-usage-reset-v1" ||
       capability === "skills-admin-v1" ||
@@ -89,7 +90,10 @@ export function serverSupportsCapability(
       capability === "agent-tasks-v1" ||
       capability === "agent-threads-v1" ||
       capability === "agent-thread-reads-v1" ||
+      capability === "agent-thread-branches-v1" ||
+      capability === "channel-task-cancel-v1" ||
       capability === "side-question-v1" ||
+      capability === "workflows-github-v1" ||
       capability === "agent-notification-levels-v1") &&
     server?.kind === "remote"
   ) {

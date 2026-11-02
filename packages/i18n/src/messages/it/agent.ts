@@ -14,6 +14,8 @@ export const messages = {
   "agent.setup.name": "Nome",
   "agent.setup.purpose": "Di cosa dovrebbe occuparsi questo agente?",
   "agent.setup.purposePlaceholder": "Pianificare viaggi, confrontare opzioni o aiutare nel lavoro di tutti i giorni.",
+  "agent.description.tooLong":
+    "Accorcia la descrizione a {limit} caratteri. Una descrizione più lunga non viene salvata.",
   "agent.instructions.length": "{length} / {limit}",
   "agent.instructions.tooLong":
     "Accorcia le istruzioni a {limit} caratteri. Le istruzioni più lunghe non vengono salvate.",
@@ -64,7 +66,6 @@ export const messages = {
     "Le impostazioni dell'agente possono essere modificate solo da un amministratore del server.",
   "agent.error.continueFailed": "L'agente non è riuscito a continuare. Riprova.",
   "agent.error.mcpNotStarted": "Server MCP non avviato",
-  "agent.error.codexConfigIgnored": "Avviso sulla configurazione di Codex",
   "agent.error.provider": "Errore del provider",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "Errore di {provider}",

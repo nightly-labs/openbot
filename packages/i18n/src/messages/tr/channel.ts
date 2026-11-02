@@ -8,6 +8,7 @@ export const messages = {
   "channel.stoppedTask.label": "{name} için durdurulan görev",
   "channel.stoppedTask.reassignLabel": "{name} ajanının durdurulan görevini yeniden ata",
   "channel.stoppedTask.reassign": "Yeniden ata",
+  "channel.stoppedTask.cancel": "Görevi iptal et",
   "channel.conversation.noMembers": "Çalışmayı başlatmak için kanal ayarlarından ajan ekleyin.",
   "channel.conversation.archivedNotice": "Silinmiş kanal. Yalnızca önizleme.",
   "channel.composer.label": "Kanala mesaj",
