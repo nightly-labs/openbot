@@ -215,7 +215,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   };
   const customIds = createMemo(() => customProviderIds(props.customProviders ?? []));
   const selectedModel = createMemo(() =>
-    props.modelOptions.find((option) => option.provider === props.provider && option.id === props.value),
+    props.modelOptions.find(
+      (option) => option.provider === props.provider && cursorModelSelected(option.id, props.value),
+    ),
   );
   const selectedFixed = createMemo(() => fixedModelSettings(selectedModel()));
   /** The tab the current selection lives on: the Custom one for the user's endpoints and agents. */
@@ -666,7 +668,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     : models().find(
                         (model) =>
                           model.provider === props.provider &&
-                          (model.id === props.value || model.variants.some((variant) => variant.id === props.value)),
+                          (cursorModelSelected(model.id, props.value) ||
+                            model.variants.some((variant) => variant.id === props.value)),
                       ),
                 );
                 const selectedKey = () => {
@@ -1066,8 +1069,38 @@ interface FixedModelSettings {
 
 /**
  * The settings that a Cursor model value fixes, as in `grok-4.7[context=256k,reasoning=high,fast=true]`.
- * Cursor ACP lists one value for each model and refuses the others, so these are not choices (#4411).
+ * Each speed is its own value. Cursor refuses a value it did not list (#4411).
  */
+/**
+ * A saved Cursor id from before the speed rows existed still names the same model. It can carry
+ * `reasoning`, which the effort control owns, so that key does not have to be on the row.
+ */
+function cursorModelSelected(listed: string, saved: string): boolean {
+  if (listed === saved) return true;
+  const left = cursorModelParameters(listed);
+  const right = cursorModelParameters(saved);
+  if (!left || !right || left.base !== right.base || left.params.size === 0) return false;
+  for (const [key, value] of left.params) {
+    if (right.params.get(key) !== value) return false;
+  }
+  return true;
+}
+
+function cursorModelParameters(value: string): { base: string; params: Map<string, string> } | null {
+  const open = value.indexOf("[");
+  if (open <= 0 || !value.endsWith("]")) return null;
+  const params = new Map<string, string>();
+  for (const pair of value.slice(open + 1, -1).split(",")) {
+    if (!pair) continue;
+    const separator = pair.indexOf("=");
+    if (separator <= 0) return null;
+    const key = pair.slice(0, separator);
+    if (key === "reasoning" || key === "effort") continue;
+    params.set(key, pair.slice(separator + 1));
+  }
+  return { base: value.slice(0, open), params };
+}
+
 function fixedModelSettings(model: ClientAgentModelOption | undefined): FixedModelSettings | null {
   if (model?.provider !== "cursor") return null;
   const params = /\[([^\]]*)\]$/u.exec(model.id)?.[1];
