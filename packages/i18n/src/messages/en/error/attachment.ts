@@ -15,5 +15,7 @@ export const messages = defineMessages("error.attachment", {
     "This server does not support ZIP attachments. Update OpenBot on the host and retry.",
   "error.attachment.mp4Unsupported":
     "This server does not support MP4 attachments. Update OpenBot on the host and retry.",
+  "error.attachment.svgUnsupported":
+    "This server does not support SVG attachments. Update OpenBot on the host and retry.",
   "error.attachment.previewTooLarge": "The file exceeds the 100 MB limit.",
 });

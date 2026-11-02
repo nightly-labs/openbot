@@ -134,8 +134,6 @@ export const messages = defineMessages("error.backend", {
   "error.backend.recipientHidden": "This agent is hidden. Restore it to send messages.",
   "error.backend.attachBetween": "Attach between 1 and {limit} files.",
   "error.backend.attachmentNotFile": "Attachment is not a file: {path}",
-  "error.backend.attachSvg":
-    "{name} is an SVG file and cannot be attached. Write its absolute path in your answer: the chat shows the image there.",
   "error.backend.generatedImageTooLarge": "Generated image exceeds the 100 MB limit.",
   "error.backend.attachmentNotRegularFile": "Only regular files can be attached: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot could not copy {name}.",
