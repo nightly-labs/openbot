@@ -147,11 +147,14 @@ const RUNTIME_ACTION_LABEL = {
 } as const satisfies Record<string, AppTextKey>;
 
 const REASONING_LABEL = {
+  none: "provider.effort.none",
+  minimal: "provider.effort.minimal",
   low: "provider.effort.low",
   medium: "provider.effort.medium",
   high: "provider.effort.high",
   xhigh: "provider.effort.xhigh",
   max: "provider.effort.max",
+  ultra: "provider.effort.ultra",
 } as const satisfies Record<AgentReasoningEffort, AppTextKey>;
 
 /**
