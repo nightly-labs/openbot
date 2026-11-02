@@ -253,11 +253,22 @@ const profileCompletion = Effect.fnUntraced(function* (client: AgentClient, obse
   return yield* Effect.callback<string, ProfileGenerationFailed | GenerationUsageLimitError>((resume) => {
     let text = "";
     let limit: { resetsAt: number | null } | null = null;
+    // The last error text from the provider. The failure keeps it as its cause and not as its message:
+    // a channel shows the message, and a provider text can quote the prompt or a key. A log redacts
+    // the cause, and without it no one can see why a routing turn failed (#3041).
+    let providerError: string | null = null;
     const finish = (effect: Effect.Effect<string, ProfileGenerationFailed | GenerationUsageLimitError>) => {
       cleanup();
       resume(effect);
     };
-    const reject = (message: string) => finish(Effect.fail(new ProfileGenerationFailed({ cause: new Error(message) })));
+    const reject = (message: string) =>
+      finish(
+        Effect.fail(
+          new ProfileGenerationFailed({
+            cause: new Error(message, providerError ? { cause: new Error(providerError) } : undefined),
+          }),
+        ),
+      );
     const exit = () => reject(sourceText("error.agent.profileDisconnected"));
     const request = (request: AppServerRequest) => {
       client.respondError(request.id, { code: -32601, message: "Tools are unavailable during profile generation." });
@@ -272,6 +283,7 @@ const profileCompletion = Effect.fnUntraced(function* (client: AgentClient, obse
       if (notification.method === "error" && !(isRecord(params) && params.willRetry === true)) {
         const error = getRecord(params, "error");
         const message = getString(params, "message") ?? getString(error, "message") ?? "";
+        if (message) providerError = message;
         if (
           isPlanLimitDiagnostic(message) ||
           (error?.codexErrorInfo === "usageLimitExceeded" && !isBalanceDiagnostic(message))
@@ -285,6 +297,7 @@ const profileCompletion = Effect.fnUntraced(function* (client: AgentClient, obse
       }
       if (notification.method === "turn/completed") {
         const turn = getRecord(notification.params, "turn");
+        providerError = getString(getRecord(turn, "error"), "message") ?? providerError;
         if (getString(turn, "status") === "completed") finish(Effect.succeed(text));
         else if (limit)
           finish(
