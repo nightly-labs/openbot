@@ -17,6 +17,7 @@ import {
   decodeAgentFolderBrowse,
   decodeAgentFolderChangeFromMain,
   decodeAgentFolderListFromMain,
+  decodeServerAuditLog,
   type HiddenAgentsSnapshot,
   type HostDiscordAccessInput,
   type HostSetDiscordAccessInput,
@@ -27,6 +28,7 @@ import {
   isHiddenAgentsSnapshot,
   isSidebarPinsSnapshot,
   type ResetAgentSessionSettingInput,
+  type ServerAuditLog,
   type SetAgentHiddenInput,
   type SetAgentNotificationLevelInput,
   type SetAgentSessionSettingInput,
@@ -262,6 +264,7 @@ import { PROVIDERS_SIGN_IN_V3_ROUTES } from "@openbot/contracts/team-protocol/pr
 import type { PROVIDERS_V4_ROUTES } from "@openbot/contracts/team-protocol/providers-v4";
 import { ROUTINE_RECOVERY_ROUTES } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_ROUTES } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { type SIGN_IN_RELAY_PROVIDERS, SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
@@ -660,6 +663,11 @@ export function setHostMemoryReview(
 /** The roles of the host (`agent-access-v1`). A member reads only `mine`. */
 export function getHostAgentAccess(request: TeamApiRequest): Effect.Effect<AgentAccessSnapshot, TeamAdminRequestError> {
   return adminCall(() => request("POST", AGENT_ACCESS_ROUTES.read, decodeAgentAccessSnapshot, {}));
+}
+
+/** The changes to the access of the host, newest first (`server-audit-v1`). Owners and admins only. */
+export function getHostAuditLog(request: TeamApiRequest): Effect.Effect<ServerAuditLog, TeamAdminRequestError> {
+  return adminCall(() => request("POST", SERVER_AUDIT_ROUTES.read, decodeServerAuditLog, {}));
 }
 
 /** Replaces the roles. The host answers 409 when another admin saved after `change.revision`. */

@@ -748,6 +748,7 @@ try {
         { revision: access.get(identity.serverId).revision, everyone: { [duplicate.copyId]: level }, roles: [] },
         agentIds,
         agentIds,
+        null,
       ),
     );
   }

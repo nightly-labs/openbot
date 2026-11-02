@@ -220,6 +220,8 @@
     "./features/servers/ServerRail": "./src/features/servers/ServerRail.tsx",
     "./features/servers/ServerRoles": "./src/features/servers/ServerRoles.tsx",
     "./features/servers/server-roles.css": "./src/features/servers/server-roles.css",
+    "./features/servers/ServerAuditLog": "./src/features/servers/ServerAuditLog.tsx",
+    "./features/servers/server-audit-log.css": "./src/features/servers/server-audit-log.css",
     "./features/settings/AgentSelect": "./src/features/settings/AgentSelect.tsx",
     "./features/settings/GitHubConnectorPanel": "./src/features/settings/GitHubConnectorPanel.tsx",
     "./features/settings/IntegrationLayout": "./src/features/settings/IntegrationLayout.tsx",

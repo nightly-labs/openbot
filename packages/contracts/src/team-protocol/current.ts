@@ -92,6 +92,7 @@ import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
+import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CAPABILITY } from "./sidebar-folders-v1";
@@ -230,6 +231,7 @@ export {
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
+  SERVER_AUDIT_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
@@ -395,6 +397,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   SIDEBAR_PINS_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
   TEAM_REASONING_EFFORTS_CAPABILITY,
+  SERVER_AUDIT_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -543,7 +546,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== MCP_ACCOUNTS_CAPABILITY &&
     capability !== SIDEBAR_PINS_CAPABILITY &&
     capability !== SIDEBAR_FOLDERS_CAPABILITY &&
-    capability !== TEAM_REASONING_EFFORTS_CAPABILITY,
+    capability !== TEAM_REASONING_EFFORTS_CAPABILITY &&
+    capability !== SERVER_AUDIT_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -568,6 +572,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   SIDEBAR_PINS_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
   TEAM_REASONING_EFFORTS_CAPABILITY,
+  SERVER_AUDIT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -675,6 +680,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== MCP_ACCOUNTS_CAPABILITY &&
       capability !== SIDEBAR_PINS_CAPABILITY &&
       capability !== SIDEBAR_FOLDERS_CAPABILITY &&
-      capability !== TEAM_REASONING_EFFORTS_CAPABILITY,
+      capability !== TEAM_REASONING_EFFORTS_CAPABILITY &&
+      capability !== SERVER_AUDIT_CAPABILITY,
   );
 }

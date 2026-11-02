@@ -810,6 +810,7 @@ function ServerSettings() {
           memoryReview={{}}
           hostPromptCacheTtl={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
+          serverAudit={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}
           // Any member imports into this computer or a remote host with `agent-import-v1`.
           agentImport={
