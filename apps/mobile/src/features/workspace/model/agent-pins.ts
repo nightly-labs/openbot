@@ -71,17 +71,30 @@ export function phoneSidebarPins(current: RemoteWorkspacePreferences): SidebarPi
   return [...ordered.map(({ kind, id }) => ({ kind, id })), ...wanted.filter((pin) => !placed.has(sidebarPinKey(pin)))];
 }
 
-/** True when the pins of this phone differ from the last list that the host gave. */
-export function sidebarPinsChanged(current: RemoteWorkspacePreferences): boolean {
+function samePinList(left: readonly SidebarPin[], right: readonly SidebarPin[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((pin, index) => {
+      const other = right[index];
+      return other !== undefined && sidebarPinKey(pin) === sidebarPinKey(other);
+    })
+  );
+}
+
+/**
+ * True when the pins of this phone must go to the host: they differ from the last list that the host
+ * gave, or they changed while a send waits. A change back to that list during a send must go too, or
+ * the answer of the host puts the earlier change back.
+ */
+export function sidebarPinsChanged(
+  current: RemoteWorkspacePreferences,
+  previous?: RemoteWorkspacePreferences,
+): boolean {
   const order = current.pinOrder;
   if (!order) return false;
   const pins = phoneSidebarPins(current);
   return (
-    pins.length !== order.length ||
-    pins.some((pin, index) => {
-      const saved = order[index];
-      return saved === undefined || sidebarPinKey(pin) !== sidebarPinKey(saved);
-    })
+    !samePinList(pins, order) || (previous?.pinsPending === true && !samePinList(pins, phoneSidebarPins(previous)))
   );
 }
 

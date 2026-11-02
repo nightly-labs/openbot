@@ -1361,10 +1361,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const updatePreferences = useCallback(
     (serverId: string, change: (current: RemoteWorkspacePreferences) => RemoteWorkspacePreferences) => {
       try {
-        const next = change(preferenceStore.read(serverId));
+        const previous = preferenceStore.read(serverId);
+        const next = change(previous);
         preferenceStore.write(serverId, next);
         setPreferences((current) => ({ ...current, [serverId]: next }));
-        if (sidebarPinsChanged(next)) pushSidebarPins(serverId);
+        if (sidebarPinsChanged(next, previous)) pushSidebarPins(serverId);
         return next;
       } catch (error) {
         showFailureAlert(
