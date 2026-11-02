@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "checkedAt": "2026-11-02T04:52:42.888Z",
+  "services": {
+    "accounts": "ok",
+    "connections": "ok",
+    "hosted": "ok",
+    "updates": "ok",
+    "marketplace": "ok"
+  },
+  "seen": {
+    "service.changed:hosted:2026-10-18T10:31:53.815Z": "2026-10-18T10:32:28.428Z",
+    "service.changed:hosted:2026-10-18T14:08:55.190Z": "2026-10-18T14:09:28.720Z",
+    "service.changed:hosted:2026-10-29T14:04:16.872Z": "2026-10-29T14:05:08.995Z",
+    "incident.created:3879": "2026-10-29T14:15:03.945Z",
+    "incident.updated:3879:2026-10-29T14:09:31Z:investigating": "2026-10-29T14:15:03.945Z",
+    "service.changed:hosted:2026-10-29T14:14:24.651Z": "2026-10-29T14:15:03.945Z",
+    "incident.resolved:3879:2026-10-29T14:19:27Z": "2026-10-29T14:20:04.426Z",
+    "service.changed:hosted:2026-10-29T14:44:41.232Z": "2026-10-29T14:45:38.559Z",
+    "service.changed:hosted:2026-10-29T14:49:40.000Z": "2026-10-29T14:50:19.426Z",
+    "service.changed:hosted:2026-10-29T20:08:27.759Z": "2026-10-29T20:09:12.095Z",
+    "service.changed:hosted:2026-10-29T20:13:30.342Z": "2026-10-29T20:14:03.873Z",
+    "service.changed:hosted:2026-10-30T10:18:02.200Z": "2026-10-30T10:18:55.893Z",
+    "incident.created:3990": "2026-10-30T10:29:02.556Z",
+    "incident.updated:3990:2026-10-30T10:23:25Z:investigating": "2026-10-30T10:29:02.556Z",
+    "service.changed:hosted:2026-10-30T10:33:08.243Z": "2026-10-30T10:33:56.755Z",
+    "incident.resolved:3990:2026-10-30T10:38:21Z": "2026-10-30T10:38:56.083Z",
+    "service.changed:hosted:2026-10-31T11:05:18.951Z": "2026-10-31T11:06:15.422Z",
+    "service.changed:hosted:2026-10-31T11:10:28.306Z": "2026-10-31T11:11:02.831Z"
+  },
+  "open": {},
+  "outbox": []
+}
