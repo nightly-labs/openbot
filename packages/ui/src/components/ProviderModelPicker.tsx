@@ -214,7 +214,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const selectedModel = createMemo(() =>
     props.modelOptions.find((option) => option.provider === props.provider && option.id === props.value),
   );
-  const selectedFixed = createMemo(() => fixedModelSettings(props.provider, props.value));
+  const selectedFixed = createMemo(() => fixedModelSettings(selectedModel()));
   /** The tab the current selection lives on: the Custom one for the user's endpoints and agents. */
   const activeProvider = (): RailId =>
     props.provider === "acp" || isCustomEndpointModel(props.provider, props.value, customIds())
@@ -427,12 +427,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   /** Only an effort that the model can use. */
   const triggerEffort = () => {
     const effort = props.reasoningEffort;
-    if (props.foreignProvider !== undefined || !showsReasoningEffort() || selectedHasVariants()) return;
-    const model = selectedModel();
+    if (props.foreignProvider !== undefined || selectedHasVariants()) return;
+    // The effort that the model value fixes is part of the model, also where the effort is not a setting.
     const fixed = selectedFixed()?.effort;
-    if (fixed && model?.reasoningEffortConfigurable === false) return reasoningLabel(fixed, t);
-    if (!effort || !model?.supportedReasoningEfforts.includes(effort) || model.reasoningEffortConfigurable === false)
-      return;
+    if (fixed) return reasoningLabel(fixed, t);
+    if (!showsReasoningEffort() || !effort) return;
+    const model = selectedModel();
+    if (!model?.supportedReasoningEfforts.includes(effort) || model.reasoningEffortConfigurable === false) return;
     return reasoningLabel(effort, t);
   };
   /** The account name, only while the agent's provider lists more than one. */
@@ -873,7 +874,14 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                             const model = item.rawValue;
                             const isSelected = () => selectedKey() === pickerModelKey(model);
                             const settings = () =>
-                              fixedModelSettingsText(fixedModelSettings(model.provider, model.id), t);
+                              fixedModelSettingsText(
+                                fixedModelSettings(
+                                  props.modelOptions.find(
+                                    (option) => option.provider === model.provider && option.id === model.id,
+                                  ),
+                                ),
+                                t,
+                              );
                             const label = () =>
                               [displayModelName(model.name, model.id), settings()].filter(Boolean).join(", ");
                             return (
@@ -1047,8 +1055,9 @@ function displayModelName(name: string | undefined, fallback: string): string {
 }
 
 interface FixedModelSettings {
-  context?: string;
-  effort?: AgentReasoningEffort;
+  context: string | null;
+  /** Only when the model has no effort setting of its own. */
+  effort: AgentReasoningEffort | null;
   fast: boolean;
 }
 
@@ -1056,15 +1065,20 @@ interface FixedModelSettings {
  * The settings that a Cursor model value fixes, as in `grok-4.7[context=256k,reasoning=high,fast=true]`.
  * Cursor ACP lists one value for each model and refuses the others, so these are not choices (#4411).
  */
-function fixedModelSettings(provider: AgentProviderId, id: string): FixedModelSettings | null {
-  if (provider !== "cursor") return null;
-  const params = /\[([^\]]*)\]$/u.exec(id)?.[1];
+function fixedModelSettings(model: ClientAgentModelOption | undefined): FixedModelSettings | null {
+  if (model?.provider !== "cursor") return null;
+  const params = /\[([^\]]*)\]$/u.exec(model.id)?.[1];
   if (!params) return null;
-  const settings: FixedModelSettings = { fast: false };
+  const settings: FixedModelSettings = { context: null, effort: null, fast: false };
   for (const pair of params.split(",")) {
     const [key, value = ""] = pair.split("=");
     if (key === "context" && /^\d+(?:\.\d+)?[km]$/iu.test(value)) settings.context = value;
-    else if ((key === "reasoning" || key === "effort") && isReasoningEffort(value)) settings.effort = value;
+    else if (
+      (key === "reasoning" || key === "effort") &&
+      model.reasoningEffortConfigurable === false &&
+      isReasoningEffort(value)
+    )
+      settings.effort = value;
     else if (key === "fast") settings.fast = value === "true";
   }
   return settings;

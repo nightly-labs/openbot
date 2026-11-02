@@ -229,13 +229,14 @@ export function requestedToolModel(request: ModelRequest, models: AgentModelOpti
     if (!chosen) {
       // Cursor puts the settings of a model in its value (`grok-4.7[context=256k,…]`) and lists only
       // some of them. The short list can leave them out, so name the listed values of that model (#4411).
-      const base = model.includes("[") ? model.slice(0, model.indexOf("[") + 1) : null;
-      const variants = base
-        ? models.filter(
-            (candidate) => candidate.id.startsWith(base) && (provider === undefined || candidate.provider === provider),
-          )
+      // `grok-4.7` and `grok-4.7[context=500k]` both name the model `grok-4.7`.
+      const base = `${model.includes("[") ? model.slice(0, model.indexOf("[")) : model}[`;
+      const first = models.find(
+        (candidate) => candidate.id.startsWith(base) && (provider === undefined || candidate.provider === provider),
+      );
+      const variants = first
+        ? models.filter((candidate) => candidate.provider === first.provider && candidate.id.startsWith(base))
         : [];
-      const first = variants[0];
       throw new AgentSettingsRefused(
         first
           ? sourceText("error.agent.modelVariantNotListed", {
