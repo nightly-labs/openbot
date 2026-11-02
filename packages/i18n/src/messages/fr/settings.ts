@@ -40,6 +40,9 @@ export const messages = {
   "settings.launchAtLogin.description": "Ouvrir l’application lorsque vous vous connectez à cet ordinateur.",
   "settings.keepRunning.title": "Garder OpenBot actif en arrière-plan",
   "settings.keepRunning.description": "Poursuivre les tâches en cours après la fermeture de la fenêtre.",
+  "settings.menuBar.title": "Afficher OpenBot dans la barre des menus",
+  "settings.menuBar.description":
+    "Masque l’icône du Dock après la fermeture de la fenêtre. Les tâches actives continuent.",
   "settings.keepAwake.title": "Empêcher la mise en veille",
   "settings.keepAwake.description":
     "Les routines s’exécutent à l’heure tant que l’ordinateur est branché. L’écran peut quand même s’éteindre.",

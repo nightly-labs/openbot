@@ -1252,7 +1252,8 @@ export async function createApplicationServices({
       appVariant,
       server: Boolean(hostedServer || serverModeEnvironment || localServerChild),
     }),
-    offersBackground: process.platform !== "darwin" && !hostedServer && !serverModeEnvironment && !localServerChild,
+    offersBackground: !hostedServer && !serverModeEnvironment && !localServerChild,
+    menuBar: process.platform === "darwin",
     offersKeepAwake: process.platform !== "linux" && !hostedServer && !serverModeEnvironment && !localServerChild,
   });
   await runCauseEffect(appBehavior.load());
