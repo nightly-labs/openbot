@@ -1274,8 +1274,12 @@ export function createWebWorkspaceRuntime(
       if (!isDynamicRecord(value) || !isClientAgentSummary(value.agent) || !isSidebarLayoutSnapshot(value.layout))
         throw new Error(currentText().t("error.remote.invalidData"));
       duplicateOperationIds.delete(operationKey);
-      // The released route answers the layout without the parents of the folders.
-      const layout = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY) ? await readSidebarLayout() : value.layout;
+      // The released route answers the layout without the parents of the folders. The copy exists, so a
+      // failed read keeps that layout rather than failing the copy; the next layout event has the parents.
+      const answered = value.layout;
+      const layout = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
+        ? await readSidebarLayout().catch(() => answered)
+        : answered;
       return { agent: value.agent, layout } satisfies DuplicateAgentResult;
     },
     async updateAgent(input) {

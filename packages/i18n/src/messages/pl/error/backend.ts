@@ -250,6 +250,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Serwer może mieć maksymalnie {limit} sekcji paska bocznego.",
   "error.backend.sectionNameRequired": "Nazwa sekcji jest wymagana.",
   "error.backend.sectionNameTooLong": "Nazwa sekcji jest za długa.",
+  "error.backend.sidebarFolderTooDeep": "Foldery mogą mieć tylko trzy poziomy.",
+  "error.backend.sidebarFolderMoveInvalid": "Tego folderu nie można tam przenieść.",
   "error.backend.sectionNameDuplicate": "Nazwy sekcji muszą być unikalne.",
   "error.backend.directMessageRequired": "Najpierw napisz wiadomość.",
   "error.backend.directMessageTooLong": "Wiadomość prywatna może mieć maksymalnie {limit} znaków.",

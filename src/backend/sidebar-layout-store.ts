@@ -292,7 +292,7 @@ function applyFlatSidebarLayoutAction(
       if (action.parentId !== undefined) {
         requireCustomSection(current, action.parentId);
         if (folderDepth(current, action.parentId) + 1 >= SIDEBAR_FOLDER_LEVELS)
-          throw new Error("Sidebar folder is too deep.");
+          throw new Error(sourceText("error.backend.sidebarFolderTooDeep"));
       }
       // A new folder goes last: at the end of its parent once the tree order is rebuilt.
       const section: SidebarSection =
@@ -345,7 +345,10 @@ function applyFlatSidebarLayoutAction(
       };
     }
     case "nest": {
-      requireCustomSection(current, action.sectionId);
+      // People and Unassigned stay at the top level, but they can move among the folders there.
+      if (action.sectionId === SIDEBAR_PEOPLE_SECTION_ID || action.sectionId === SIDEBAR_UNASSIGNED_SECTION_ID) {
+        if (action.parentId !== null) throw new Error(sourceText("error.backend.sidebarFolderMoveInvalid"));
+      } else requireCustomSection(current, action.sectionId);
       const parents = sidebarFolderParents(current);
       if (action.parentId !== null) {
         requireCustomSection(current, action.parentId);
@@ -353,16 +356,16 @@ function applyFlatSidebarLayoutAction(
           action.parentId === action.sectionId ||
           sidebarFolderAncestors(parents, action.parentId).includes(action.sectionId)
         )
-          throw new Error("A sidebar folder cannot go into itself.");
+          throw new Error(sourceText("error.backend.sidebarFolderMoveInvalid"));
       }
       const depth = action.parentId === null ? 0 : folderDepth(current, action.parentId) + 1;
       if (depth + sidebarFolderHeight(parents, action.sectionId) >= SIDEBAR_FOLDER_LEVELS)
-        throw new Error("Sidebar folder is too deep.");
+        throw new Error(sourceText("error.backend.sidebarFolderTooDeep"));
       if (action.beforeSectionId !== null) {
         if (action.beforeSectionId === action.sectionId || !current.order.includes(action.beforeSectionId))
           throw new Error("Unknown sidebar section order target.");
         if ((parents.get(action.beforeSectionId) ?? null) !== action.parentId)
-          throw new Error("Sidebar section order target belongs to another folder.");
+          throw new Error(sourceText("error.backend.sidebarFolderMoveInvalid"));
       }
       const order = current.order.filter((sectionId) => sectionId !== action.sectionId);
       const insertionIndex = action.beforeSectionId === null ? order.length : order.indexOf(action.beforeSectionId);

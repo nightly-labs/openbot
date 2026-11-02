@@ -269,11 +269,6 @@ export function createSidebarDataStore(deps: {
     return count;
   }
 
-  /** A section is shown when it and every folder that holds it are open. */
-  function sectionIsShown(sectionId: string): boolean {
-    return sidebarFolderAncestors(folderParents(), sectionId).every((ancestorId) => !sectionIsCollapsed(ancestorId));
-  }
-
   function sectionIsCollapsed(sectionId: string): boolean {
     return collapsedSectionIds().has(sectionId);
   }
@@ -348,12 +343,9 @@ export function createSidebarDataStore(deps: {
     resolvedPinnedItems,
     sectionAcceptsChat,
     sectionCanNest,
-    sectionChatIdsDeep,
     sectionChildren,
-    sectionDepth,
     sectionIsCollapsed,
     sectionIsInside,
-    sectionIsShown,
     sectionParent,
     sectionLabel,
     sectionPosition,

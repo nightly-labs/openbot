@@ -1185,6 +1185,14 @@ export class TeamApiServer {
     this.#nextRateLimitSweepAt = now + RATE_LIMIT_SWEEP_MS;
   }
 
+  /** The value without the agents that this peer cannot see, as its event protocol describes them. */
+  #peerView(value: unknown, capabilities: ReadonlySet<string>, blocked: ReadonlySet<string>): unknown {
+    const protocol = eventProtocol(capabilities);
+    const hidden = hiddenProviderAgentIds(this.#options.agents.listAgents(), protocol);
+    for (const id of blocked) hidden.add(id);
+    return protocol === 1 ? legacyProviderView(value, hidden) : hiddenAgentView(value, hidden, protocol);
+  }
+
   #encodeProviderEvent(
     event: AgentEvent | TeamRealtimeEvent,
     capabilities: ReadonlySet<string>,
@@ -1192,9 +1200,7 @@ export class TeamApiServer {
     blocked: ReadonlySet<string> = new Set(),
   ): string | null {
     const protocol = eventProtocol(capabilities);
-    const hidden = hiddenProviderAgentIds(this.#options.agents.listAgents(), protocol);
-    for (const id of blocked) hidden.add(id);
-    const visible = protocol === 1 ? legacyProviderView(event, hidden) : hiddenAgentView(event, hidden, protocol);
+    const visible = this.#peerView(event, capabilities, blocked);
     if (!isAgentEvent(visible) && !isTeamRealtimeEvent(visible)) return null;
     if (protocol !== 1) {
       const encoded = (
@@ -1381,7 +1387,11 @@ export class TeamApiServer {
               }
             : event.type === "sidebar-layout-changed" && connection.capabilities.has(SIDEBAR_FOLDERS_CAPABILITY)
               ? // The layout with the parents. `sidebar-layout-changed` goes through the frozen adapter, which drops them.
-                sidebarFoldersEvent({ type: "sidebar-folders-changed", layout: event.layout })
+                // The layout leaves out the agents that this peer cannot see, as the read route does.
+                sidebarFoldersEvent({
+                  type: "sidebar-folders-changed",
+                  layout: this.#peerView(event.layout, connection.capabilities, blocked),
+                })
               : optionalTeamEvent(
                   event.type === "agent-task-conversation"
                     ? {

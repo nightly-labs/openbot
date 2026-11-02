@@ -246,6 +246,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "На сервере может быть не более {limit} разделов боковой панели.",
   "error.backend.sectionNameRequired": "Нужно название раздела.",
   "error.backend.sectionNameTooLong": "Название раздела слишком длинное.",
+  "error.backend.sidebarFolderTooDeep": "Папки могут иметь только три уровня вложенности.",
+  "error.backend.sidebarFolderMoveInvalid": "Эту папку нельзя туда переместить.",
   "error.backend.sectionNameDuplicate": "Названия разделов должны быть уникальными.",
   "error.backend.directMessageRequired": "Сначала напишите сообщение.",
   "error.backend.directMessageTooLong": "Личное сообщение может содержать не более {limit} символов.",

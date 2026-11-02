@@ -222,6 +222,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "一个服务器最多可有 {limit} 个侧边栏分区。",
   "error.backend.sectionNameRequired": "需要填写分区名称。",
   "error.backend.sectionNameTooLong": "分区名称过长。",
+  "error.backend.sidebarFolderTooDeep": "文件夹最多只能有三层。",
+  "error.backend.sidebarFolderMoveInvalid": "无法将此文件夹移到那里。",
   "error.backend.sectionNameDuplicate": "分区名称必须唯一。",
   "error.backend.directMessageRequired": "请先写下消息内容。",
   "error.backend.directMessageTooLong": "私信最多可有 {limit} 个字符。",

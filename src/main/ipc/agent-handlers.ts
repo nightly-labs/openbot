@@ -230,9 +230,11 @@ export function agentIpcHandlers({
         { method: "POST", body },
       ),
     );
+  // The save or the copy is done when the second read starts. A failed read keeps the layout of the
+  // answer, so the caller does not try again and make a second agent; the next layout event has the parents.
   const withRemoteFolders = async <T extends { layout: SidebarLayoutSnapshot }>(serverId: string, result: T) =>
     remoteServers.supportsCapability(serverId, SIDEBAR_FOLDERS_CAPABILITY)
-      ? { ...result, layout: await remoteFolderLayout(serverId, {}) }
+      ? { ...result, layout: await remoteFolderLayout(serverId, {}).catch(() => result.layout) }
       : result;
   return {
     agent: {
