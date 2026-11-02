@@ -90,6 +90,7 @@ class FakeClient implements WhatsAppClientLike {
   readonly read: Array<{ chat: string; ids: string[] }> = [];
   readonly pairingRequests: string[] = [];
   readonly downloads: string[] = [];
+  readonly older: Array<{ chat: string; anchor: string }> = [];
   readonly files: Array<{ chat: string; file: WhatsAppOutgoingFile; replyTo: string | null }> = [];
 
   constructor(options: { auth: WhatsAppStoredAuth; history: WhatsAppHistory; events: WhatsAppAccountClientEvents }) {
@@ -162,9 +163,15 @@ class FakeClient implements WhatsAppClientLike {
     this.read.push({ chat, ids: messages.map((message) => message.id) });
     this.history.upsertChat({ id: chat, unread: { set: 0 } });
   }
-  async fetchOlder(): Promise<boolean> {
-    return false;
+  /** The phone sends the messages before `anchor` again, in full: a file that came before OpenBot kept files gets its media part. */
+  async fetchOlder(chat: string, anchor: WhatsAppStoredMessage): Promise<boolean> {
+    this.older.push({ chat, anchor: anchor.id });
+    const legacy = this.history.message(chat, "L1");
+    if (anchor.id !== "P1" || !legacy) return false;
+    this.history.upsertMessage({ ...legacy, attachment: PHOTO });
+    return true;
   }
+
   async logOut(): Promise<void> {
     this.loggedOut = true;
   }
@@ -209,6 +216,8 @@ class FakeClient implements WhatsAppClientLike {
       edited: false,
       deleted: false,
     };
+    // A photo that came before OpenBot kept files: a media word, no media part.
+    this.history.upsertMessage({ ...own, id: "L1", at: 1_800_000_004, text: "", media: "image", attachment: null });
     this.history.upsertMessage({
       ...own,
       id: "P1",
@@ -537,12 +546,15 @@ try {
   assert.deepEqual(
     groupPage.messages.map((message) => [message.id, message.attachment?.kind ?? null]),
     [
+      ["L1", null],
       ["P1", "photo"],
       ["V1", "voice"],
       ["G1", null],
     ],
   );
   assert.ok(!groupRead.text.includes(PHOTO.media) && !groupRead.text.includes("c2VjcmV0"), "no media key for agents");
+  // Reading asked the phone for messages older than L1; nothing more is asked below until L1.
+  const askedBefore = linkClient.older.length;
   const photo = await mcp(first.service, "whatsapp_download_media", { chat: GROUP, message_id: "P1" });
   assert.equal(photo.isError, false, photo.text);
   const photoPath = z.object({ path: z.string() }).parse(JSON.parse(photo.text)).path;
@@ -551,6 +563,7 @@ try {
   assert.deepEqual(photo.images, [PNG.toString("base64")]);
   await mcp(first.service, "whatsapp_download_media", { chat: "Lab team", message_id: "P1" });
   assert.deepEqual(linkClient.downloads, ["P1"]);
+  assert.equal(linkClient.older.length, askedBefore, "a file with its media part needs no phone");
   const tooLarge = await mcp(first.service, "whatsapp_download_media", { chat: GROUP, message_id: "V1" });
   assert.equal(tooLarge.isError, true);
   assert.match(tooLarge.text, /more than max_mb/u);
@@ -558,6 +571,12 @@ try {
   assert.equal(voice.isError, false, voice.text);
   assert.deepEqual(voice.images, []);
   assert.match(voice.text, /V1-voice\.ogg/u);
+  // A photo from before OpenBot kept files: the phone is asked for the messages before the next one.
+  const legacyPhoto = await mcp(first.service, "whatsapp_download_media", { chat: GROUP, message_id: "L1" });
+  assert.equal(legacyPhoto.isError, false, legacyPhoto.text);
+  assert.match(legacyPhoto.text, /L1-photo\.png/u);
+  assert.deepEqual(linkClient.older.at(-1), { chat: GROUP, anchor: "P1" });
+  assert.deepEqual(linkClient.downloads.at(-1), "L1");
   const noFile = await mcp(first.service, "whatsapp_download_media", { chat: GROUP, message_id: "G1" });
   assert.equal(noFile.isError, true);
   assert.match(noFile.text, /has no file/u);

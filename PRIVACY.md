@@ -1173,7 +1173,8 @@ it thinks is automated.
   the phone for them.
 - **Received from WhatsApp.** As WhatsApp Web does, the phone sends the device recent history when it
   links, then every new message. History can have gaps. A file comes from WhatsApp's media servers
-  only when an agent downloads it; for an older file, OpenBot asks the phone to upload it again.
+  only when an agent downloads it; for an older file, OpenBot asks the phone to upload it again, and
+  for a file of a message that came before OpenBot kept files, to send the messages around it again.
 - **Kept on the computer.** In `~/Library/Application Support/OpenBot/`, encrypted by the operating
   system's secret storage: the account name and phone number, the sending switch and the port and
   secret of the local WhatsApp MCP server (`openbot-whatsapp-account-connector-v1.json`); the keys of

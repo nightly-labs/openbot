@@ -50,6 +50,7 @@ import {
   attachmentItem,
   jidPhone,
   WhatsAppHistory,
+  type WhatsAppStoredAttachment,
   type WhatsAppStoredChat,
   type WhatsAppStoredMessage,
 } from "./whatsapp-account-history";
@@ -69,6 +70,9 @@ const OPEN_WAIT_MS = 10_000;
 /** How long a read waits for older messages from the phone. */
 const OLDER_WAIT_MS = 8_000;
 const OLDER_COUNT = 50;
+
+/** The media words of messages that carry a file, as `whatsapp-account-client.ts` writes them. */
+const FILE_LABEL = /^(?:image|GIF|sticker|video \(|video message \(|voice message \(|audio \(|file: )/u;
 
 const NOT_CONNECTED_FOR_AGENT =
   "WhatsApp is not connected. Ask the user to link their WhatsApp account in OpenBot (Marketplace > Apps > WhatsApp account).";
@@ -784,6 +788,42 @@ export class WhatsAppAccountConnectorService {
       : Effect.fail(whatsappToolFailure(`No message with id ${replyToId} is in this chat.`));
   }
 
+  /**
+   * The file of a message that came before OpenBot kept files: the message has a media word but
+   * not what downloads the file. The phone sends the messages before a given message again, in full,
+   * so OpenBot asks for the messages before the next one in the chat. That works only while the phone
+   * is online. Answers null for a message that has no file; fails when the phone cannot help.
+   */
+  #recoverAttachment(
+    session: Session,
+    chat: string,
+    message: WhatsAppStoredMessage,
+  ): Effect.Effect<WhatsAppStoredAttachment | null, WhatsAppAccountOperationError> {
+    return Effect.gen(function* () {
+      if (message.deleted || !message.media || !FILE_LABEL.test(message.media)) return null;
+      const messages = session.history.messages(chat);
+      const next = messages[messages.findIndex((item) => item.id === message.id) + 1];
+      if (!next)
+        return yield* whatsappToolFailure(
+          "This file came before OpenBot kept files, and it is the newest message of the chat. OpenBot can ask the phone for it again when a newer message is in the chat. Or ask the user to forward the file, or to save it from the phone.",
+        );
+      const client = session.client;
+      if (!client) return yield* whatsappToolFailure(OFFLINE_FOR_AGENT);
+      const open = yield* whatsappAccountCall(() => client.whenOpen(OPEN_WAIT_MS));
+      if (!open) return yield* whatsappToolFailure(OFFLINE_FOR_AGENT);
+      yield* whatsappAccountCall(() => client.fetchOlder(chat, next, OLDER_COUNT, OLDER_WAIT_MS)).pipe(
+        Effect.orElseSucceed(() => false),
+      );
+      const recovered = session.history.message(chat, message.id)?.attachment ?? null;
+      if (!recovered)
+        return yield* whatsappToolFailure(
+          "This file came before OpenBot kept files. OpenBot asked the phone to send it again, but the phone did not answer in time. The phone must be online with WhatsApp open, and must still have the file. Try again in a moment.",
+        );
+      logger.info("The phone sent an older WhatsApp file again.");
+      return recovered;
+    });
+  }
+
   /** The tools of the MCP server. Sending and marking as read check the user's switch at each call. */
   #tools(): WhatsAppAccountMcpTools {
     return {
@@ -856,7 +896,7 @@ export class WhatsAppAccountConnectorService {
             return yield* whatsappToolFailure(
               `No message with id ${options.messageId} is in ${session.history.chatName(chat)} on this computer.`,
             );
-          const attachment = message.attachment;
+          const attachment = message.attachment ?? (yield* this.#recoverAttachment(session, chat.id, message));
           if (!attachment || message.deleted)
             return yield* whatsappToolFailure(
               message.media
