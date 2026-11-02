@@ -48,6 +48,9 @@ All notable changes to OpenBot will be documented here. The project follows
 - Start a workflow when someone mentions OpenBot in a Discord server, with filters for the channel, the role and the text.
 - Send a workflow result to Discord: reply to the message, post in a channel, or add a reaction.
 - On a Mac, OpenBot now has an icon in the menu bar. After you close the window, the Dock icon hides and active tasks keep running. To keep the Dock icon, turn off Settings > General > Show OpenBot in the menu bar.
+- Choose the None, Minimal and Ultra reasoning levels when a model offers them, such as Ultra on the
+  newest Codex models and None or Minimal on OpenCode and Pi models. A remote client on an older
+  version shows the nearest level that it knows: Low for None and Minimal, Max for Ultra.
 
 ### Changed
 
