@@ -99,7 +99,7 @@ interface ChatDragContextValue {
 const ChatDragContext = createContext<ChatDragContextValue | null>(null);
 
 /** The key of a drop target or a drag source. */
-export function chatDragKey(place: "pin" | "row", chat: SidebarPin): string {
+function chatDragKey(place: "pin" | "row", chat: SidebarPin): string {
   return `${place}:${sidebarPinKey(chat)}`;
 }
 
