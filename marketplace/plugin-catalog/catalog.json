@@ -32,7 +32,8 @@
     "firecrawl",
     "brave-search",
     "resend",
-    "composio"
+    "composio",
+    "hindsight"
   ],
   "featured": ["aave", "canva", "notion", "figma"]
 }
