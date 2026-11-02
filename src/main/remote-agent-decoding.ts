@@ -22,6 +22,8 @@ import {
 
 import type {
   AccountUsage,
+  AgentExclusionChange,
+  AgentFolderChange,
   AgentMemory,
   AgentStatus,
   AgentSummary,
@@ -38,6 +40,10 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   isAccountUsage,
+  isAgentExclusionChange,
+  isAgentFolderChange,
+  isAgentFolderList,
+  isAgentInstructionsFile,
   isAgentMemory,
   isAgentStatus,
   isAttachmentSummary,
@@ -140,6 +146,21 @@ function decodeMarketplaceSource(value: unknown): AgentSummary["marketplaceSourc
     skillIds: [...skillIds],
     routineIds: [...routineIds],
   };
+}
+
+// The `agent-folders-v1` and `agent-instructions-v1` replies. The preload has its own `FromMain`
+// decoders for the same shapes, because the main process is a different sender from a joined server.
+export const decodeRemoteAgentFolderList = guardedDecoder(isAgentFolderList, "remote agent folders");
+export const decodeRemoteAgentInstructionsFile = guardedDecoder(isAgentInstructionsFile, "remote agent instructions");
+
+export function decodeRemoteAgentFolderChange(value: unknown): AgentFolderChange {
+  if (!isDynamicRecord(value) || !isAgentFolderChange(value)) throw new Error("Invalid remote agent folder change.");
+  return value;
+}
+
+export function decodeRemoteAgentExclusionChange(value: unknown): AgentExclusionChange {
+  if (!isDynamicRecord(value) || !isAgentExclusionChange(value)) throw new Error("Invalid remote agent folder change.");
+  return value;
 }
 
 export function decodeAgentStatusFromHost(value: unknown): AgentStatus {

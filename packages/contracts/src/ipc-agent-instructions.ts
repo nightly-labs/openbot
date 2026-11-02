@@ -37,14 +37,17 @@ export interface SaveAgentInstructionsInput {
  */
 export const AGENT_INSTRUCTIONS_READ_LIMIT = INPUT_LIMITS.agentInstructionsFile * 8;
 
+export function isAgentInstructionsFile(value: unknown): value is AgentInstructionsFile {
+  return (
+    isDynamicRecord(value) &&
+    isOneOf(AGENT_INSTRUCTION_FILE_NAMES, value.fileName) &&
+    typeof value.exists === "boolean" &&
+    isBoundedString(value.text, AGENT_INSTRUCTIONS_READ_LIMIT)
+  );
+}
+
 export function decodeAgentInstructionsFileFromMain(value: unknown): AgentInstructionsFile {
-  if (
-    !isDynamicRecord(value) ||
-    !isOneOf(AGENT_INSTRUCTION_FILE_NAMES, value.fileName) ||
-    typeof value.exists !== "boolean" ||
-    !isBoundedString(value.text, AGENT_INSTRUCTIONS_READ_LIMIT)
-  )
-    throw new Error("Invalid agent instructions.");
+  if (!isAgentInstructionsFile(value)) throw new Error("Invalid agent instructions.");
   return { fileName: value.fileName, exists: value.exists, text: value.text };
 }
 

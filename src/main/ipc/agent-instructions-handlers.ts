@@ -1,7 +1,7 @@
 // The instruction file at the root of an agent's workspace. On a joined server the host reads and
 // saves it through `agent-instructions-v1`, and the host answers only an owner or admin.
 
-import { decodeAgentInstructionsFileFromMain, parseSaveAgentInstructionsInput } from "@openbot/contracts/ipc";
+import { parseSaveAgentInstructionsInput } from "@openbot/contracts/ipc";
 import {
   AGENT_INSTRUCTIONS_CAPABILITY,
   AGENT_INSTRUCTIONS_ROUTES,
@@ -12,6 +12,7 @@ import type { Effect } from "effect";
 import { shell } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentInstructionsFiles } from "../agent-instructions-files";
+import { decodeRemoteAgentInstructionsFile } from "../remote-agent-decoding";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { RemoteWorkflowError } from "../remote-service-effects";
@@ -42,7 +43,7 @@ export function agentInstructionsIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, AGENT_INSTRUCTIONS_CAPABILITY))
       throw new Error(sourceText("error.team.agentInstructionsUnsupported"));
     return runCauseEffect(
-      remoteServers.request(serverId, path, decodeAgentInstructionsFileFromMain, { method: "POST", body }),
+      remoteServers.request(serverId, path, decodeRemoteAgentInstructionsFile, { method: "POST", body }),
     );
   }
 

@@ -5,10 +5,7 @@
 import { join } from "node:path";
 import {
   type AgentExclusionChange,
-  decodeAgentExclusionChangeFromMain,
   decodeAgentFolderBrowse,
-  decodeAgentFolderChangeFromMain,
-  decodeAgentFolderListFromMain,
   parseAddAgentFolderInput,
   parseAgentFolderInput,
   parseBrowseAgentFoldersInput,
@@ -22,6 +19,11 @@ import type { Effect } from "effect";
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentFolders } from "../agent-folders";
+import {
+  decodeRemoteAgentExclusionChange,
+  decodeRemoteAgentFolderChange,
+  decodeRemoteAgentFolderList,
+} from "../remote-agent-decoding";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { RemoteWorkflowError } from "../remote-service-effects";
@@ -79,7 +81,7 @@ export function agentFolderIpcHandlers({
       listAgentFolders: scopedHandler(parseAgentId, {
         local: (agentId) => folders.list(agentId),
         remote: (agentId, serverId) =>
-          remote(serverId, AGENT_FOLDERS_ROUTES.read, decodeAgentFolderListFromMain, { agentId }),
+          remote(serverId, AGENT_FOLDERS_ROUTES.read, decodeRemoteAgentFolderList, { agentId }),
       }),
       chooseAgentFolder: payloadHandler(parseChooseAgentFolderInput, async ({ agentId, replace }) => {
         const agent = folders.requireAgent(agentId);
@@ -93,7 +95,7 @@ export function agentFolderIpcHandlers({
       }),
       addAgentFolder: scopedHandler(parseAddAgentFolderInput, {
         local: ({ agentId, path, replace }) => folders.add(agentId, path, replace),
-        remote: (input, serverId) => remote(serverId, AGENT_FOLDERS_ROUTES.add, decodeAgentFolderChangeFromMain, input),
+        remote: (input, serverId) => remote(serverId, AGENT_FOLDERS_ROUTES.add, decodeRemoteAgentFolderChange, input),
       }),
       chooseAgentExclusion: payloadHandler(parseAgentId, async (agentId): Promise<AgentExclusionChange> => {
         const agent = folders.requireAgent(agentId);
@@ -109,17 +111,17 @@ export function agentFolderIpcHandlers({
       addAgentExclusion: scopedHandler(parseAgentFolderInput, {
         local: ({ agentId, path }) => folders.exclude(agentId, path),
         remote: (input, serverId) =>
-          remote(serverId, AGENT_FOLDERS_ROUTES.exclude, decodeAgentExclusionChangeFromMain, input),
+          remote(serverId, AGENT_FOLDERS_ROUTES.exclude, decodeRemoteAgentExclusionChange, input),
       }),
       removeAgentExclusion: scopedHandler(parseAgentFolderInput, {
         local: ({ agentId, path }) => folders.include(agentId, path),
         remote: (input, serverId) =>
-          remote(serverId, AGENT_FOLDERS_ROUTES.include, decodeAgentExclusionChangeFromMain, input),
+          remote(serverId, AGENT_FOLDERS_ROUTES.include, decodeRemoteAgentExclusionChange, input),
       }),
       removeAgentFolder: scopedHandler(parseAgentFolderInput, {
         local: ({ agentId, path }) => folders.remove(agentId, path),
         remote: (input, serverId) =>
-          remote(serverId, AGENT_FOLDERS_ROUTES.remove, decodeAgentFolderChangeFromMain, input),
+          remote(serverId, AGENT_FOLDERS_ROUTES.remove, decodeRemoteAgentFolderChange, input),
       }),
       browseAgentFolders: scopedHandler(parseBrowseAgentFoldersInput, {
         local: async ({ agentId, path }) => {

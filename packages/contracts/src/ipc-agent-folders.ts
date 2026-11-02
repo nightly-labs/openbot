@@ -161,7 +161,7 @@ function isAgentFolder(value: unknown): value is AgentFolder {
   return isDynamicRecord(value) && isBoundedString(value.path, INPUT_LIMITS.path) && isBoolean(value.found);
 }
 
-function isAgentFolderList(value: unknown): value is AgentFolderList {
+export function isAgentFolderList(value: unknown): value is AgentFolderList {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.workspace, INPUT_LIMITS.path) &&
@@ -181,7 +181,7 @@ function isCoverage(value: unknown): value is AgentFolderCoverage {
   );
 }
 
-function isAgentFolderChange(value: DynamicRecord): value is AgentFolderChange & DynamicRecord {
+export function isAgentFolderChange(value: DynamicRecord): value is AgentFolderChange & DynamicRecord {
   if (!isAgentFolderList(value.list)) return false;
   if (value.outcome === "cancelled") return true;
   if (!isBoundedString(value.path, INPUT_LIMITS.path)) return false;
@@ -191,7 +191,7 @@ function isAgentFolderChange(value: DynamicRecord): value is AgentFolderChange &
   return value.outcome === "refused" && isOneOf(AGENT_FOLDER_REFUSALS, value.refusal);
 }
 
-function isAgentExclusionChange(value: DynamicRecord): value is AgentExclusionChange & DynamicRecord {
+export function isAgentExclusionChange(value: DynamicRecord): value is AgentExclusionChange & DynamicRecord {
   if (!isAgentFolderList(value.list)) return false;
   if (value.outcome === "cancelled") return true;
   if (!isBoundedString(value.path, INPUT_LIMITS.path)) return false;
