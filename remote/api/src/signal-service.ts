@@ -215,6 +215,8 @@ export interface SlackDelivery {
   body: Uint8Array;
   /** The request addresses OpenBot: a mention, a direct message, a thread reply or a button press. */
   wakes: boolean;
+  /** A message that does not address OpenBot. */
+  chatter: boolean;
 }
 
 export interface SlackDeliveryResponse {
@@ -788,7 +790,8 @@ export class SignalService {
    * Passes one signed Slack request to the `ingress` socket of the workspace's host and waits for
    * its answer. It resolves 503 when no host holds the workspace, the host is too busy, or it does
    * not answer in time: Slack then sends the request again. For a hosted server that sleeps it
-   * resolves 200, and keeps the request when it addresses OpenBot (`IngressQueue`).
+   * resolves 200, and keeps the request when it addresses OpenBot (`IngressQueue`). Chatter for a
+   * host with no socket resolves 200 and is lost.
    */
   readonly deliverSlack = Effect.fn("Signal.deliverSlack")((appId: string, teamId: string, delivery: SlackDelivery) => {
     const route = slackRouteKey(appId, teamId);
@@ -804,7 +807,9 @@ export class SignalService {
         retryReason: delivery.retryReason,
         bodyBase64,
       }) as const;
-    // A hosted server that sleeps: Slack gets 200, so it does not count a failure or send again.
+    // A hosted server that sleeps, or chatter: Slack gets 200, so it does not count a failure or send
+    // again. Slack turns off events for the whole app when more than 95% of deliveries fail for 60
+    // minutes, and a computer that is off gets every channel message.
     if (!socketId || !this.#peers.has(socketId)) {
       this.#undelivered("slack");
       return this.#keep(
@@ -813,7 +818,10 @@ export class SignalService {
         delivery.wakes,
         frame(randomIdentifier(), Buffer.from(delivery.body).toString("base64")),
       ).pipe(
-        Effect.map((outcome): SlackDeliveryResponse => (outcome === "unavailable" ? UNAVAILABLE : { status: 200 })),
+        Effect.map(
+          (outcome): SlackDeliveryResponse =>
+            outcome === "unavailable" && !delivery.chatter ? UNAVAILABLE : { status: 200 },
+        ),
       );
     }
     return this.#deliver("slack", socketId, delivery.body, frame).pipe(

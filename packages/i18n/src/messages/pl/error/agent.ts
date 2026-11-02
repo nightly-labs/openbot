@@ -39,6 +39,8 @@ export const messages = {
     "Wybrany model agenta „{model}” jest niedostępny: {provider} nie zwrócił żadnych modeli.",
   "error.agent.modelNotInProviderList":
     "Wybrany model agenta „{model}” jest niedostępny: {provider} nie ma go na liście.",
+  "error.agent.modelVariantNotListed":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} nie ma go na liście. Użyj jednej z wartości, które {provider} podaje dla tego modelu: {models}.",
   "error.agent.modelProviderMismatch": "Wybrany model nie należy do tego dostawcy.",
   "error.agent.modelNotListed": "Model „{model}” jest niedostępny. Dostępne modele: {models}.",
   "error.agent.providerNotListed":

@@ -121,6 +121,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, 기본",
   "provider.picker.effort": "강도",
   "provider.picker.effortLabel": "에이전트 추론 강도",
+  "provider.picker.effortFixed": "{effort} ({provider}에서 고정)",
   "provider.picker.fast": "빠르게",
   "provider.picker.fastLabel": "빠른 모드",
   "provider.picker.selectEffort": "강도 선택",

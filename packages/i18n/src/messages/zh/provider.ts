@@ -132,6 +132,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}，默认",
   "provider.picker.effort": "强度",
   "provider.picker.effortLabel": "助手推理强度",
+  "provider.picker.effortFixed": "{effort}（由 {provider} 固定）",
   "provider.picker.fast": "快速",
   "provider.picker.fastLabel": "快速模式",
   "provider.picker.selectEffort": "选择强度",

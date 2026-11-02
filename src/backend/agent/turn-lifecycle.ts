@@ -89,9 +89,11 @@ const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
 /**
  * The provider errors that move an agent set to switch without asking to its next backup model. Each
  * one can pass on another provider, account or model; a request the model refuses fails on each.
+ * A usage limit that the usage-limit gate does not hold comes here too, such as a spent Gemini quota (#4368).
  */
 const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "billing",
+  "usage_limit",
   "provider_unavailable",
   "rate_limit",
   "authentication",

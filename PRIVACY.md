@@ -1,7 +1,9 @@
 # Privacy
 
 OpenBot is local-first, but it is not offline-only. Agent workspaces, conversations, attachments,
-browser data, and team data stay on the computer that runs OpenBot. The optional OpenBot account
+browser data, and team data stay on the computer that runs OpenBot. The one exception is the
+encrypted copy that the signed-in mobile app keeps of what it shows (see the mobile section below).
+The optional OpenBot account
 service stores the minimum central data needed for email sign-in, account avatars, remote host
 configuration, memberships, invitations, logical sessions, and the account's product analytics
 answer.
@@ -455,6 +457,16 @@ account identity (name, email and avatar URL), not conversations or workspace co
 
 Mobile hidden and pinned chat preferences are stored on the phone, separately per account and server.
 Conversation read/unread changes are stored on the desktop host and shared with your other connected devices.
+
+The mobile app keeps a copy of what it shows for each server: the agent list, the hidden agents,
+the sections, and the latest page (up to 50 messages) of each chat that it loaded, up to 4 MB for
+each server. So after a start the app shows them at once, while it connects to the server. The copy
+is in the phone's system cache (`Library/Caches` on iOS), which is not in a device backup and which
+the system can delete when the phone is low on storage. Each file is encrypted with AES-256-GCM and
+bound to the account and the server. The key is in the phone's keychain, and it does not leave this
+device. The copy is never sent anywhere. The app replaces it with what the server sends, and deletes
+a server's copy when the account no longer has that server. Sign-out and an expired or disconnected
+session delete all copies and the key. Attachments and files are not in the copy.
 
 The mobile app keeps a support log of up to 1,000 events in the phone's system cache: app version,
 system and device model, app state changes, connection steps with server IDs and error text, the

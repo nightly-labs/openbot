@@ -541,6 +541,10 @@ original file and extracts it with its own tools. An agent sends a ZIP archive b
 archive in the file manager instead of opening it. Remote hosts must advertise the `zip-attachments`
 capability.
 
+SVG images use the same limits. The chat shows an SVG as an image, but the agent gets it as a file,
+not as an image: providers take only raster images, so the agent reads the SVG text. Open shows an SVG
+in the file manager. Remote hosts must advertise the `svg-attachments` capability.
+
 ## Local data and network boundaries
 
 - `~/OpenBot/Agents/<agent-id>` — one working directory per agent. A profile written before the
