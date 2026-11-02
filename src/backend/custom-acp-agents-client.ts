@@ -24,7 +24,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit } from "effect";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
 import type { AcpHistoryPersistence } from "./acp-client";
-import type { AgentClient, DiagnosticOrigin } from "./agent-client";
+import { type AgentClient, AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
 import { agentLaunchPath } from "./cli";
 import { causeHelpers } from "./effect-boundary";
 import {
@@ -76,6 +76,11 @@ const MODEL_LIST_TIMEOUT_MS = 5_000;
 
 /** What a write that the macOS sandbox denied looks like: `EPERM`, and SQLite's read-only fallback (#4324). */
 const WRITE_DENIED = /\bEPERM\b|operation not permitted|attempt to write a readonly database/iu;
+const WORKSPACE_ONLY_HINT = sourceText("error.provider.customAgentWorkspaceOnly", { reason: "" });
+
+function withWorkspaceOnlyHint(message: string): string {
+  return sourceText("error.provider.customAgentWorkspaceOnly", { reason: message.trimEnd().replace(/\.$/u, "") });
+}
 
 interface ClientEvents {
   notification: [notification: AppServerNotification];
@@ -452,9 +457,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
           });
       }
     },
-    Effect.mapError(
-      (error) => new ProviderClientOperationError({ cause: this.#explainError(this.#redactError(error.cause)) }),
-    ),
+    Effect.mapError((error) => new ProviderClientOperationError({ cause: this.#publicError(error.cause) })),
   );
 
   notify(): void {
@@ -580,9 +583,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         this.emit("request", withRoutedThreadId({ ...request, id }, route));
       });
       created.on("diagnostic", (message, origin) => this.emit("diagnostic", this.#redact(message), origin));
-      created.once("exit", (error) =>
-        this.#childExited(key, folder, created, this.#explainError(this.#redactError(error))),
-      );
+      created.once("exit", (error) => this.#childExited(key, folder, created, this.#publicError(error)));
       yield* customStep(() => created.start());
       yield* created
         .request("initialize", {}, decodeRecordResponse)
@@ -590,7 +591,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         .pipe(Effect.onError(() => created.stop().pipe(Effect.catch(() => Effect.void))));
       return created;
     },
-    Effect.mapError((error) => new ProviderClientOperationError({ cause: this.#redactError(error.cause) })),
+    Effect.mapError((error) => new ProviderClientOperationError({ cause: this.#publicError(error.cause) })),
   );
 
   /**
@@ -641,19 +642,35 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   }
 
   /**
-   * A custom agent gets no state folder in the sandbox (`customAgentStatePaths`), so most agents
-   * fail when they write in their home folder. The provider's own text does not name the cause.
+   * Whether this text reports a write that the sandbox denied. A custom agent gets no state folder in
+   * the sandbox (`customAgentStatePaths`), so most agents fail when they write in their home folder,
+   * and their own text does not name the cause. A start error passes here twice, through
+   * `#startChild` and `request`, so the cause is added once.
    */
-  #explain(message: string): string {
-    return this.#confined && WRITE_DENIED.test(message)
-      ? sourceText("error.provider.customAgentWorkspaceOnly", { reason: message.trimEnd().replace(/\.$/u, "") })
-      : message;
+  #deniedWrite(message: string): boolean {
+    return this.#confined && WRITE_DENIED.test(message) && !message.endsWith(WORKSPACE_ONLY_HINT);
   }
 
-  #explainError<E>(error: E): E | Error {
-    if (!(error instanceof Error)) return error;
-    const message = this.#explain(error.message);
-    return message === error.message ? error : new Error(message);
+  #explain(message: string): string {
+    return this.#deniedWrite(message) ? withWorkspaceOnlyHint(message) : message;
+  }
+
+  /**
+   * The error a caller may show: saved values masked, and the cause of a denied write named. The
+   * denial of an exit is only in its stderr line. That line is read here, but it stays out of the
+   * message: the runtime masks the MCP values in it, and this client does not know them.
+   */
+  #publicError<E>(error: E): E | Error {
+    const redacted = this.#redactError(error);
+    if (!(redacted instanceof Error)) return redacted;
+    if (redacted instanceof AgentProcessExitError) {
+      return this.#deniedWrite(redacted.withDetail((text) => this.#redact(text)).message)
+        ? new AgentProcessExitError(withWorkspaceOnlyHint(redacted.message), null, { cause: redacted })
+        : redacted;
+    }
+    return this.#deniedWrite(redacted.message)
+      ? new Error(withWorkspaceOnlyHint(redacted.message), { cause: redacted })
+      : redacted;
   }
 
   readonly #listModels = Effect.fn("CustomAcp.listModels")(function* (
