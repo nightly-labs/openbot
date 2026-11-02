@@ -156,7 +156,12 @@ EMAIL_SMTP_PORT=465
 EMAIL_SMTP_USERNAME=hello@openbot.run
 EMAIL_SMTP_PASSWORD=<PRIVATE_EMAIL_APP_PASSWORD>
 EMAIL_FROM=hello@openbot.run
+EMAIL_LICENSE_FROM=licenses@openbot.run
 ```
+
+License emails (the first payment, a failed renewal payment, and the end of a license) go from
+`EMAIL_LICENSE_FROM`. The SMTP account must be allowed to send as that address: on Private Email,
+make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAIL_FROM`.
 
 `bun run env:set:smtp` encrypts the app password into `.env.production` only.
 
