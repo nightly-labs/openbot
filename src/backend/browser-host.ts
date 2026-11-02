@@ -1263,11 +1263,14 @@ export class BrowserHost {
             this.#syncAttachedView();
             let kept = false;
             let leaked = false;
+            // A blocked navigation ends the wait for one, so the user gets the tab at once.
+            let stopWaiting = () => {};
             const contents = tab.contents;
             const blockLeak = (event: ElectronEvent<WebContentsWillFrameNavigateEventParams>) => {
               if (!urlCarriesSecret(event.url, secret)) return;
               leaked = true;
               event.preventDefault();
+              stopWaiting();
             };
             if (vault) contents.on("will-frame-navigate", blockLeak);
             yield* Effect.gen({ self: this }, function* () {
@@ -1282,11 +1285,12 @@ export class BrowserHost {
                       "Authentication submission timed out.",
                       keepQueueBlocked,
                     );
-                    if (!protection.replaced) {
+                    if (!protection.replaced && !leaked) {
                       yield* Effect.callback<void>((resume) => {
                         const contents = tab.contents;
                         const cleanup = () => {
                           clearTimeout(timer);
+                          stopWaiting = () => {};
                           contents.off("did-navigate", finish);
                           contents.off("destroyed", finish);
                         };
@@ -1295,6 +1299,7 @@ export class BrowserHost {
                           resume(Effect.void);
                         };
                         const timer = setTimeout(finish, 5_000);
+                        stopWaiting = finish;
                         contents.once("did-navigate", finish);
                         contents.once("destroyed", finish);
                         return Effect.sync(cleanup);
