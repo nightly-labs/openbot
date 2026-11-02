@@ -2369,15 +2369,29 @@ async function runFocusScenario(browser: BrowserHost, origin: string, window: Br
   });
   await runCauseEffect(browser.loadUrl(sameWindowTab.id, `${origin}/`));
   await runCauseEffect(browser.close(sameWindowTab.id));
+  // A tab that a person opens with focus has it when its document commits.
+  window.webContents.focus();
+  await waitFor(async () => webContents.getFocusedWebContents() === window.webContents, "app window focus for open");
+  let openedFocusedTab = false;
+  const createdContents = new Promise<WebContents>((resolve) =>
+    app.once("web-contents-created", (_event, created) => resolve(created)),
+  );
+  const focusedOpen = runCauseEffect(browser.open(`${origin}/focus-navigation`, "smoke-thread", "smoke-bot", true));
+  const openedContents = await createdContents;
+  openedContents.once("did-navigate", () => {
+    openedFocusedTab = webContents.getFocusedWebContents() === openedContents;
+  });
+  await runCauseEffect(browser.close((await focusedOpen).id));
   await mkdir(".openbot-build", { recursive: true });
   await writeFile(
     ".openbot-build/browser-focus-same-window.json",
-    JSON.stringify({ sameWindowFocus, addressFocusedTab }, null, 2),
+    JSON.stringify({ sameWindowFocus, addressFocusedTab, openedFocusedTab }, null, 2),
   );
   const lost = Object.entries(sameWindowFocus).filter(([, kept]) => !kept);
   if (lost.length > 0)
     throw new Error(`Agent navigation took focus from the app window: ${lost.map(([name]) => name).join(", ")}.`);
   if (!addressFocusedTab) throw new Error("An address that the person entered did not focus the page.");
+  if (!openedFocusedTab) throw new Error("A tab that the person opened did not have focus when its page committed.");
 
   const focusSentinel = new BrowserWindow({
     show: false,

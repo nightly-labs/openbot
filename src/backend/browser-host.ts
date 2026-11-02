@@ -777,6 +777,8 @@ export class BrowserHost {
     this.#bindTabEvents(tab);
     this.#activeTabId = tab.id;
     tab.focusOnVisible = focus;
+    // A view without a document cannot hold focus, so the first commit gives it.
+    tab.focusOnCommit = focus;
     this.#syncAttachedView();
     if (!focus) restoreWebContentsFocus(previouslyFocused, tab.contents);
     this.#emitChanged();
@@ -2854,7 +2856,9 @@ export class BrowserHost {
         restoreWebContentsFocus(previous, contents);
     };
     contents.on("did-start-navigation", (details) => {
-      if (details.isMainFrame && !details.isSameDocument) focusedBeforeCommit = this.#focusedContentsOutsideTabs();
+      if (!details.isMainFrame || details.isSameDocument) return;
+      focusedBeforeCommit = tab.focusOnCommit ? null : this.#focusedContentsOutsideTabs();
+      tab.focusOnCommit = false;
     });
     contents.on("did-navigate", restoreFocusAfterCommit);
     // An error page also commits, but Electron reports it as a failed load. A load that a newer
