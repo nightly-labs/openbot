@@ -358,15 +358,16 @@ export function ChatView({
         queueSends.current.has(message.clientMessageId) &&
         !queueDeliveries?.some((delivery) => delivery.id === message.messageId),
     ) ?? null;
+  // A message that sends comes first, so its upload progress and cancel stay reachable.
   const queuePending = useMemo(() => {
-    if (sentToQueue) return { message: outboxRow(outbox, sentToQueue), progress: 0, total: 0, cancel: () => {} };
-    if (!sendsToQueue || !sendingMessage) return null;
-    return {
-      message: outboxRow(outbox, sendingMessage),
-      progress: sendingUpload?.completed ?? 0,
-      total: sendingMessage.files.length,
-      cancel: () => outbox.cancelUpload(sendingMessage.clientMessageId),
-    };
+    if (sendsToQueue && sendingMessage)
+      return {
+        message: outboxRow(outbox, sendingMessage),
+        progress: sendingUpload?.completed ?? 0,
+        total: sendingMessage.files.length,
+        cancel: () => outbox.cancelUpload(sendingMessage.clientMessageId),
+      };
+    return sentToQueue ? { message: outboxRow(outbox, sentToQueue), progress: 0, total: 0, cancel: () => {} } : null;
   }, [sentToQueue, sendsToQueue, sendingMessage, sendingUpload?.completed, outbox]);
   // The sheet keeps a held edit in its rows when the host hides it. Count it here as
   // well, so a saved edit with a lost response stays reachable after a restart.
