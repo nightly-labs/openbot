@@ -320,13 +320,12 @@ export class DrainScheduler {
     if (agent?.hiddenAt !== undefined) return "hidden";
     // No turn starts on a provider that waits for a sign-in, so its messages wait for the sign-in
     // rather than fail (#4326). The provider runtime schedules the drain again when it is signed in.
-    // Channel work and an external conversation still start and fail, so that their channel or
-    // their sender hears of it and the work does not hold a channel assignment.
-    if (agent && this.#providers.signInRequired(providerForAgent(agent))) {
-      const head = this.#mailbox.nextQueued(agentId, taskId)?.delivery.id;
-      if (!head || !(this.#channels?.store.assignmentForDelivery(head) || this.#messaging?.ownsDelivery(head)))
-        return "sign-in";
-    }
+    if (
+      agent &&
+      this.#providers.signInRequired(providerForAgent(agent)) &&
+      this.#waitsForSignIn(this.#mailbox.nextQueued(agentId, taskId)?.delivery)
+    )
+      return "sign-in";
     // Channel work holds only the agent's own chat. Its tasks run beside a channel turn.
     if (taskId === null && !(this.#channels?.mayDrain(agentId) ?? true)) return "channel";
     if (!this.#profileSave.mayDrain(agentId)) return "profile-save";
@@ -957,9 +956,14 @@ export class DrainScheduler {
             );
             return;
           }
-          // The provider started a turn of its own after the check above. Nothing ran, and `mayDrain`
-          // holds the messages until that turn ends.
-          if (error instanceof ProviderTurnActiveError) {
+          // The provider started a turn of its own after the check above, or the start found the
+          // agent's provider signed out. Nothing ran, and `mayDrain` holds the messages until that turn
+          // ends or the provider is signed in again.
+          const recipient = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
+          if (
+            error instanceof ProviderTurnActiveError ||
+            (recipient && this.#providers.signInRequired(providerForAgent(recipient)) && this.#waitsForSignIn(delivery))
+          ) {
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
             return;
@@ -980,19 +984,6 @@ export class DrainScheduler {
                 Effect.delay(TURN_START_GRACE_MS),
               ),
             );
-            return;
-          }
-          // The start found the provider signed out, so nothing ran. The messages wait for the sign-in,
-          // as `#heldBy` holds them, and a channel or an external conversation fails its work as before.
-          if (
-            !channelDelivery &&
-            !messagingDelivery &&
-            this.#deliveryProviders(delivery.recipientAgentId).some((provider) =>
-              this.#providers.signInRequired(provider),
-            )
-          ) {
-            for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
-            this.#mailboxSync.emitQueue(delivery.recipientAgentId);
             return;
           }
           const reason = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
@@ -1133,6 +1124,20 @@ export class DrainScheduler {
    * The providers a delivery to this agent can reach. One for an agent that exists; an agent
    * startDelivery has still to create can land on any of them, so all of them are claimed.
    */
+  /**
+   * Whether this delivery waits while its agent's provider waits for a sign-in. A teammate's message,
+   * channel work and an external conversation still start and fail, so that the sender or the channel
+   * hears of it and is not held for a sign-in that can take any time.
+   */
+  #waitsForSignIn(delivery: DeliveryContext["delivery"] | undefined): boolean {
+    if (!delivery) return true;
+    return !(
+      delivery.sender.kind === "agent" ||
+      this.#channels?.store.assignmentForDelivery(delivery.id) ||
+      this.#messaging?.ownsDelivery(delivery.id)
+    );
+  }
+
   #deliveryProviders(agentId: string): AgentProvider[] {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     return agent ? [providerForAgent(agent)] : [...AGENT_PROVIDERS];

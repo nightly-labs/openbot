@@ -2784,6 +2784,7 @@ export class ProviderRuntime implements ProviderPort {
             version,
             message: this.#signInRequiredMessage(provider),
             email: null,
+            checkError: null,
           }),
         });
         yield* client.stop().pipe(toProviderOperationFailed).pipe(Effect.ignore);
@@ -3946,14 +3947,16 @@ export class ProviderRuntime implements ProviderPort {
   });
 
   #setStatus(patch: Partial<AgentStatus>): void {
-    const signedIn: AgentProvider[] = [];
+    const available: AgentProvider[] = [];
     if (patch.providers) {
       logProviderStateChanges(this.#status.providers ?? [], patch.providers, this.#redactMcp);
       // A provider with no CLI has nothing left to diagnose, and its row already says why: an error
       // from a removed custom agent must not stay under an empty list.
       for (const row of patch.providers) if (row.state === "not-installed") this.#lastErrors.delete(row.id);
-      for (const row of patch.providers)
-        if (row.state !== "sign-in-required" && this.signInRequired(row.id)) signedIn.push(row.id);
+      for (const row of patch.providers) {
+        const current = this.#status.providers?.find((candidate) => candidate.id === row.id);
+        if (row.state === "available" && current?.state !== "available") available.push(row.id);
+      }
     }
     this.#status = {
       ...this.#status,
@@ -3961,8 +3964,9 @@ export class ProviderRuntime implements ProviderPort {
       capabilities: patch.capabilities ?? this.#status.capabilities,
     };
     this.#emit({ type: "status", status: this.status() });
-    // The drain holds the messages of a provider that waits for a sign-in, and no other event wakes them.
-    for (const provider of signedIn) this.#hooks.onProviderResumed(provider);
+    // The drain holds the messages of a provider that waits for a sign-in, and no other event wakes
+    // them. A provider that becomes available again can start them.
+    for (const provider of available) this.#hooks.onProviderResumed(provider);
   }
 }
 
