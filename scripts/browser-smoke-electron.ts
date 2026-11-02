@@ -2371,6 +2371,19 @@ async function runFocusScenario(browser: BrowserHost, origin: string, window: Br
   });
   await runCauseEffect(browser.loadUrl(sameWindowTab.id, `${origin}/`));
   await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
+  // An address that changes only the fragment has no commit. The next agent navigation still gives the focus back.
+  await runCauseEffect(browser.loadUrl(sameWindowTab.id, `${origin}/#fragment`));
+  window.webContents.focus();
+  await waitFor(
+    async () => webContents.getFocusedWebContents() === window.webContents,
+    "app window focus after fragment",
+  );
+  const afterFragment = await callBrowserTool(browser, "navigate", {
+    tabId: sameWindowTab.id,
+    url: `${origin}/focus-navigation`,
+  });
+  if (!afterFragment.success) throw new Error(`The navigation after a fragment failed: ${toolError(afterFragment)}`);
+  sameWindowFocus.afterFragment = webContents.getFocusedWebContents() === window.webContents;
   await runCauseEffect(browser.close(sameWindowTab.id));
   // A tab that a person opens with focus has it when its document commits.
   window.webContents.focus();

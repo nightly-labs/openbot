@@ -876,6 +876,13 @@ export class BrowserHost {
           yield* untilStopped(
             tab,
             navigateAndWait(tab.contents, () => tab.contents.loadURL(normalizedUrl, browserLoadOptions())),
+          ).pipe(
+            // A same-document load or a load that does not start leaves the flag for the next navigation.
+            Effect.ensuring(
+              Effect.sync(() => {
+                tab.focusOnCommit = false;
+              }),
+            ),
           );
           this.#focusTab(tab);
         }),
