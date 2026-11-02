@@ -2061,6 +2061,7 @@ export class BrowserHost {
     list_logins: rejectTakeoverTool,
     list_vault_items: rejectTakeoverTool,
     save_vault_item: rejectTakeoverTool,
+    request_vault_item: rejectTakeoverTool,
     delete_vault_item: rejectTakeoverTool,
   };
 

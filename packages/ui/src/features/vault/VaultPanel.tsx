@@ -219,6 +219,38 @@ function draftOf(kind: VaultItemKind, item: VaultItemSummary | null): Draft {
   return { kind, ...EMPTY_CONTACT };
 }
 
+/** The values that a chat request filled in, over a new item's draft. A secret field is never one of them. */
+function prefilled(draft: Draft, values: Readonly<Record<string, string>>): Draft {
+  const value = (key: string, current: string) => values[key] ?? current;
+  switch (draft.kind) {
+    case "login":
+      return { ...draft, website: value("website", draft.website), username: value("username", draft.username) };
+    case "card":
+      return {
+        ...draft,
+        label: value("label", draft.label),
+        nameOnCard: value("nameOnCard", draft.nameOnCard),
+        expiry: value("expiry", draft.expiry),
+      };
+    case "contact":
+      return {
+        ...draft,
+        label: value("label", draft.label),
+        fullName: value("fullName", draft.fullName),
+        address: value("address", draft.address),
+        address2: value("address2", draft.address2),
+        city: value("city", draft.city),
+        region: value("region", draft.region),
+        postalCode: value("postalCode", draft.postalCode),
+        country: value("country", draft.country).toUpperCase(),
+        phone: value("phone", draft.phone),
+        email: value("email", draft.email),
+      };
+    case "apiKey":
+      return draft;
+  }
+}
+
 /** Whether a draft has the fields that the item needs. A saved secret counts as present. */
 function draftReady(draft: Draft, saved: VaultItemSummary | null): boolean {
   if (draft.kind === "login")
@@ -297,8 +329,19 @@ function itemMatches(item: VaultItemSummary, query: string): boolean {
  * one list, and a dialog to add or edit an item. A list item never carries a password, a card number,
  * a security code or an API key; the edit dialog asks for one only when the user shows it.
  */
+/** The countries that a contact can have, by name in the reader's language. */
+function useCountries() {
+  const { locale } = useText();
+  const regionNames = createMemo(() => new Intl.DisplayNames([locale()], { type: "region" }));
+  const countryName = (code: string) => (code ? (regionNames().of(code) ?? code) : "");
+  const countries = createMemo(() =>
+    VAULT_COUNTRY_CODES.map((code) => ({ code, name: countryName(code) })).sort((a, b) => a.name.localeCompare(b.name)),
+  );
+  return { countryName, countries };
+}
+
 export function VaultPanel(props: VaultPanelProps) {
-  const { t, errorDetails, locale } = useText();
+  const { t, errorDetails } = useText();
   const [filter, setFilter] = createSignal<Filter>("all");
   const [query, setQuery] = createSignal("");
   const [ui, setUi] = createStore<{
@@ -310,11 +353,7 @@ export function VaultPanel(props: VaultPanelProps) {
     notice: string | null;
   }>({ editing: null, deleting: null, importing: false, resetting: false, failure: null, notice: null });
 
-  const regionNames = createMemo(() => new Intl.DisplayNames([locale()], { type: "region" }));
-  const countryName = (code: string) => (code ? (regionNames().of(code) ?? code) : "");
-  const countries = createMemo(() =>
-    VAULT_COUNTRY_CODES.map((code) => ({ code, name: countryName(code) })).sort((a, b) => a.name.localeCompare(b.name)),
-  );
+  const { countryName, countries } = useCountries();
   const contactLine = (contact: VaultContactFields) =>
     [contact.address, contact.city, contact.postalCode, countryName(contact.country)].filter(Boolean).join(", ");
   const maskedCard = (card: Pick<VaultCardSummary, "brand" | "last4">) =>
@@ -967,12 +1006,18 @@ function ItemDialog(props: {
   contacts: readonly VaultContactSummary[];
   countries: readonly { code: string; name: string }[];
   contactLine: (contact: VaultContactFields) => string;
+  /** The values of a chat request for a new item. */
+  prefill?: Readonly<Record<string, string>> | undefined;
+  /** A request from the chat: no billing address and no notes, which it does not carry. */
+  fromChat?: boolean | undefined;
   onSave: (input: VaultSaveInput) => Promise<void>;
   onReveal: (request: VaultSecretRequest) => Promise<string>;
   onClose: () => void;
 }) {
   const { t, errorDetails } = useText();
-  const [draft, setDraft] = createSignal<Draft>(untrack(() => draftOf(props.kind, props.item)));
+  const [draft, setDraft] = createSignal<Draft>(
+    untrack(() => prefilled(draftOf(props.kind, props.item), props.prefill ?? {})),
+  );
   const [saving, setSaving] = createSignal(false);
   const [failure, setFailure] = createSignal<UserErrorDetails | null>(null);
   const set = <T extends Draft>(current: T, patch: Partial<T>) => setDraft((): Draft => ({ ...current, ...patch }));
@@ -1052,14 +1097,16 @@ function ItemDialog(props: {
                 onChange={(password) => set(login(), { password })}
               />
             </Field>
-            <Field label={t("vault.field.notes")} class="vault-wide">
-              <Textarea
-                rows={2}
-                maxlength={VAULT_NOTES_LIMIT}
-                value={login().notes}
-                onInput={(event) => set(login(), { notes: event.currentTarget.value })}
-              />
-            </Field>
+            <Show when={!props.fromChat}>
+              <Field label={t("vault.field.notes")} class="vault-wide">
+                <Textarea
+                  rows={2}
+                  maxlength={VAULT_NOTES_LIMIT}
+                  value={login().notes}
+                  onInput={(event) => set(login(), { notes: event.currentTarget.value })}
+                />
+              </Field>
+            </Show>
           </div>
         )}
       </Match>
@@ -1110,21 +1157,23 @@ function ItemDialog(props: {
                 onChange={(securityCode) => set(card(), { securityCode })}
               />
             </Field>
-            <Field label={t("vault.field.billing")} class="vault-wide">
-              <NativeSelect
-                value={card().billingContactId}
-                onChange={(event) => set(card(), { billingContactId: event.currentTarget.value })}
-              >
-                <option value="">{t("vault.billingNone")}</option>
-                <For each={props.contacts}>
-                  {(contact) => (
-                    <option value={contact.id}>
-                      {[contact.label || contact.fullName, props.contactLine(contact)].filter(Boolean).join(" · ")}
-                    </option>
-                  )}
-                </For>
-              </NativeSelect>
-            </Field>
+            <Show when={!props.fromChat}>
+              <Field label={t("vault.field.billing")} class="vault-wide">
+                <NativeSelect
+                  value={card().billingContactId}
+                  onChange={(event) => set(card(), { billingContactId: event.currentTarget.value })}
+                >
+                  <option value="">{t("vault.billingNone")}</option>
+                  <For each={props.contacts}>
+                    {(contact) => (
+                      <option value={contact.id}>
+                        {[contact.label || contact.fullName, props.contactLine(contact)].filter(Boolean).join(" · ")}
+                      </option>
+                    )}
+                  </For>
+                </NativeSelect>
+              </Field>
+            </Show>
             <Show when={card().fillSites.length > 0}>
               <fieldset class="vault-wide vault-fill-sites">
                 <legend class="ui-label">{t("vault.field.fillSites")}</legend>
@@ -1323,3 +1372,40 @@ function ItemDialog(props: {
     </Dialog.Root>
   );
 }
+
+/**
+ * The Vault dialog for a request from the chat: a new login, card or contact, with the values that the
+ * agent filled in. It has no billing address and no notes, which a request does not carry.
+ */
+export function VaultRequestDialog(props: {
+  kind: Exclude<VaultItemKind, "apiKey">;
+  title: string;
+  prefill: Readonly<Record<string, string>>;
+  /** Saves the item. A failure stays in the dialog, so the user can correct a value. */
+  onSave: (input: VaultSaveInput) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { countries } = useCountries();
+  return (
+    <ItemDialog
+      kind={props.kind}
+      item={null}
+      title={props.title}
+      contacts={[]}
+      countries={countries()}
+      contactLine={() => ""}
+      prefill={props.prefill}
+      fromChat
+      onSave={props.onSave}
+      onReveal={() => Promise.resolve("")}
+      onClose={props.onClose}
+    />
+  );
+}
+
+export {
+  BRAND_NAME as VAULT_BRAND_NAME,
+  CardLogo as VaultCardLogo,
+  ContactLogo as VaultContactLogo,
+  SiteLogo as VaultSiteLogo,
+};

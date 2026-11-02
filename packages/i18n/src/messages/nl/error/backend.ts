@@ -291,6 +291,9 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
   "error.backend.apiKeyNotAllowed": "Alleen de eigenaar van de server of een beheerder kan een API-sleutel invoeren.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
+  "error.backend.vaultItemNotAllowed":
+    "Alleen de eigenaar van de server of een beheerder kan een item aan de Kluis toevoegen.",
+  "error.backend.vaultItemSaving": "Het Kluis-item wordt al opgeslagen.",
   "error.backend.authRequestInactive": "Dit beveiligde verificatieverzoek is niet meer actief.",
   "error.backend.secureAuthUnavailable": "Beveiligde verificatie is niet beschikbaar.",
   "error.backend.browserUrlRequired": "Een URL voor de browser is verplicht.",
