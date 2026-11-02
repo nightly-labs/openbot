@@ -6,10 +6,24 @@ import type {
   AgentPromptResolution,
   RespondToBrowserTakeoverInput,
 } from "@openbot/contracts/ipc";
-import { COMPUTER_USE_MCP_SERVER_NAME, MCP_ELICITATION_DECISION_QUESTION_ID } from "@openbot/contracts/ipc";
+import {
+  COMPUTER_USE_MCP_SERVER_NAME,
+  MCP_ELICITATION_DECISION_QUESTION_ID,
+  vaultExpiryText,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { normalizeUiBlockSpec, type UiBlockResponse, type UiBlockSpec } from "@openbot/contracts/ui-blocks";
+import {
+  normalizeUiBlockSpec,
+  UI_VAULT_REQUEST_FIELDS,
+  UI_VAULT_SECRET_FIELDS,
+  type UiBlockResponse,
+  type UiBlockSpec,
+  type UiFormField,
+  type UiVaultRequestField,
+} from "@openbot/contracts/ui-blocks";
+import { sourceText } from "@openbot/i18n/source";
 import type { SavedApiKey } from "../agent-api-keys";
+import type { BrowserToolArguments } from "../browser-tools";
 import { type DynamicToolResult, getArray, getRecord, getString, isRecord } from "../protocol";
 
 const MCP_ELICITATION_ALLOW_ONCE = "Allow once";
@@ -346,6 +360,88 @@ export function apiKeyFormSpec(input: {
 export function apiKeyPromptResult(blockId: string, saved: SavedApiKey | null): DynamicToolResult {
   const value = saved
     ? { status: "saved", blockId, name: saved.name, path: saved.path }
+    : { status: "skipped", blockId };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
+type VaultRequestArguments = BrowserToolArguments<"request_vault_item">;
+
+/** The arguments that an agent may fill in, for each kind. A secret field is never one of them. */
+const VAULT_REQUEST_PREFILL: Record<VaultRequestArguments["kind"], readonly string[]> = {
+  login: ["website", "username"],
+  card: ["label", "nameOnCard", "expMonth", "expYear"],
+  contact: UI_VAULT_REQUEST_FIELDS.contact,
+};
+
+const VAULT_REQUEST_REQUIRED: readonly UiVaultRequestField[] = ["website", "password", "number", "expiry"];
+
+const VAULT_REQUEST_LABEL = {
+  website: sourceText("status.agent.vaultField.website"),
+  username: sourceText("status.agent.vaultField.username"),
+  password: sourceText("status.agent.vaultField.password"),
+  label: sourceText("status.agent.vaultField.label"),
+  nameOnCard: sourceText("status.agent.vaultField.nameOnCard"),
+  number: sourceText("status.agent.vaultField.number"),
+  expiry: sourceText("status.agent.vaultField.expiry"),
+  securityCode: sourceText("status.agent.vaultField.securityCode"),
+  fullName: sourceText("status.agent.vaultField.fullName"),
+  address: sourceText("status.agent.vaultField.address"),
+  address2: sourceText("status.agent.vaultField.address2"),
+  city: sourceText("status.agent.vaultField.city"),
+  region: sourceText("status.agent.vaultField.region"),
+  postalCode: sourceText("status.agent.vaultField.postalCode"),
+  country: sourceText("status.agent.vaultField.country"),
+  phone: sourceText("status.agent.vaultField.phone"),
+  email: sourceText("status.agent.vaultField.email"),
+} as const satisfies Record<UiVaultRequestField, string>;
+
+/** Two-digit month and year, as the Vault dialog shows an expiry. */
+function vaultRequestValue(args: VaultRequestArguments, field: UiVaultRequestField): string | undefined {
+  if (field === "expiry")
+    return args.expMonth !== undefined && args.expYear !== undefined
+      ? vaultExpiryText(args.expMonth, args.expYear)
+      : undefined;
+  if (UI_VAULT_SECRET_FIELDS.includes(field)) return undefined;
+  const value = Object.entries(args).find(([key]) => key === field)?.[1];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+/**
+ * The form of `request_vault_item`: the fields of the Vault dialog for the kind, with the values the
+ * agent gave. A secret field has no value. A string tells the agent what is wrong with the arguments.
+ */
+export function vaultRequestFormSpec(args: VaultRequestArguments): UiBlockSpec | string {
+  const allowed = VAULT_REQUEST_PREFILL[args.kind];
+  const misplaced = Object.entries(args).find(
+    ([key, value]) => value !== undefined && key !== "kind" && key !== "title" && !allowed.includes(key),
+  );
+  if (misplaced) return `${misplaced[0]} is not a field of a ${args.kind}. You can fill in: ${allowed.join(", ")}.`;
+  if ((args.expMonth === undefined) !== (args.expYear === undefined)) return "Give expMonth and expYear together.";
+  const fields = UI_VAULT_REQUEST_FIELDS[args.kind].map((id): UiFormField => {
+    const value = vaultRequestValue(args, id);
+    return {
+      id,
+      kind: "text",
+      label: VAULT_REQUEST_LABEL[id],
+      ...(VAULT_REQUEST_REQUIRED.includes(id) ? { required: true } : {}),
+      ...(UI_VAULT_SECRET_FIELDS.includes(id) ? { secret: true } : {}),
+      ...(id === "expiry" ? { placeholder: sourceText("status.agent.vaultExpiryHint") } : {}),
+      ...(value === undefined ? {} : { value }),
+    };
+  });
+  return (
+    normalizeUiBlockSpec({ type: "form", title: args.title, fields, submit: sourceText("status.agent.vaultSave") }) ??
+    "OpenBot could not show this form. Use a shorter title or shorter values and retry."
+  );
+}
+
+/** The `request_vault_item` result: what the user saved, or a skip. It never holds a form value. */
+export function vaultPromptResult(
+  blockId: string,
+  saved: { id: string; kind: string; name: string } | null,
+): DynamicToolResult {
+  const value = saved
+    ? { status: "saved", blockId, id: saved.id, kind: saved.kind, name: saved.name }
     : { status: "skipped", blockId };
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
