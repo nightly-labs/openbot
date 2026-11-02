@@ -11,7 +11,7 @@ import {
   MessageHeader,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createMemo, For, Show } from "solid-js";
+import { children, createMemo, For, Show } from "solid-js";
 import { avatarHeadColor } from "../../bloub-avatar";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
@@ -162,7 +162,9 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       { capture: true },
     );
   };
-  const messageBody = (frame?: (content: JSX.Element, imagesOnly: boolean) => JSX.Element) => (
+  // Read once: a person's row shows its bubble only when the bubble holds something, such as a voice player.
+  const extra = children(() => props.children);
+  const messageBody = (frame?: (content: JSX.Element, imagesOnly: () => boolean) => JSX.Element) => (
     <MessageBody
       frame={frame}
       animate={props.animate}
@@ -197,7 +199,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
     >
       <BubbleContent>
         {content}
-        {props.children}
+        {extra()}
       </BubbleContent>
       <Show when={(props.reactions?.length ?? 0) > 0}>
         <BubbleReactions
@@ -292,9 +294,11 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
           {/* A person's images stand above the bubble, outside it. A message of images only has no bubble. */}
           <Show when={person()} fallback={bubble(messageBody())}>
             <div class="message-stack">
-              {messageBody((content, imagesOnly) =>
-                imagesOnly && (props.reactions?.length ?? 0) === 0 ? undefined : bubble(content),
-              )}
+              {messageBody((content, imagesOnly) => (
+                <Show when={!imagesOnly() || (props.reactions?.length ?? 0) > 0 || extra.toArray().length > 0}>
+                  {bubble(content)}
+                </Show>
+              ))}
             </div>
           </Show>
         </div>

@@ -313,9 +313,9 @@ export function MessageBody(props: {
   mediaSource?: AttachmentMediaSource | undefined;
   /**
    * Draws the images of the message first, outside `frame`, which wraps the rest: the text, the quote
-   * and the files. `imagesOnly` is true when the rest is empty. Absent, the images stay in the body.
+   * and the files. `imagesOnly` reads true when the rest is empty. Absent, the images stay in the body.
    */
-  frame?: ((content: JSX.Element, imagesOnly: boolean) => JSX.Element) | undefined;
+  frame?: ((content: JSX.Element, imagesOnly: () => boolean) => JSX.Element) | undefined;
   /**
    * Reads an image file that an agent message names, for a preview under the text. Resolves the
    * image as a `data:` URL, or `null` when it cannot show. Absent, a named file is only a chip.
@@ -796,7 +796,8 @@ export function MessageBody(props: {
               {imageBlock()}
             </div>
           </Show>
-          {frame()(body(false), imagesOnly() && standaloneImageAttachments().length > 0)}
+          {/* Built once: a change that the frame reads must not draw the body again. */}
+          {untrack(() => frame()(body(false), () => imagesOnly() && standaloneImageAttachments().length > 0))}
           {lightboxBlock()}
         </>
       )}

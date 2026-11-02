@@ -214,10 +214,16 @@ export function TasksView(props: TasksViewProps) {
         discardFiles(imported, serverId);
         return;
       }
+      // Another paste can fill the box while this one imports.
+      const accepted = imported.slice(0, Math.max(0, INPUT_LIMITS.attachments - filesOf(key).length));
+      discardFiles(imported.slice(accepted.length), serverId);
+      if (accepted.length < imported.length)
+        actionToast.error(currentText().t("composer.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
+      if (!accepted.length) return;
       setState((draft) => {
-        draft.files[key] = [...(draft.files[key] ?? []), ...imported];
+        draft.files[key] = [...(draft.files[key] ?? []), ...accepted];
       });
-      const references = imported.map((file) => serializeAttachmentReference(file.name, file.id)).join(" ");
+      const references = accepted.map((file) => serializeAttachmentReference(file.name, file.id)).join(" ");
       const latest = textOf(key);
       const atSelection = latest === before ? selection : undefined;
       const text = atSelection

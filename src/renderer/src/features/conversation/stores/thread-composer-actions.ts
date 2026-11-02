@@ -235,9 +235,11 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
       await Promise.all(pending);
     }
     // An import that ended put its reference in the draft after the user pressed Send.
-    const text = key ? draft(key).text.trim() : typed;
     const images = key ? rowImages(key) : [];
-    if (!text && !images.length) return false;
+    const typedText = key ? draft(key).text.trim() : typed;
+    // A thread takes its title from the text, so a message of images only names them.
+    const text = typedText || images.map((image) => serializeAttachmentReference(image.name, image.id)).join(" ");
+    if (!text) return false;
     const target = currentConversationTarget(deps.props);
     const before = key ? draft(key).text : "";
     const attachments = key ? draft(key).attachments : [];

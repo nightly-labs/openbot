@@ -533,7 +533,8 @@ export function createWebWorkspaceRuntime(
   const completedDraftIdsByHost = new Map<string, Set<string>>();
   const draftCleanupRetryHosts = new Set<string>();
   // The host names a draft's preview with the desktop `openbot-attachment:` scheme, so a draft image
-  // shows from its local bytes. Each URL lives until its draft is sent or discarded.
+  // shows from its local bytes. A discard revokes the URL. A sent draft keeps it until the runtime ends:
+  // the pending row of the message shows it until the host's row comes.
   const localDraftPreviews = new Map<string, string>();
   function localDraftPreview(id: string, file: File): string | null {
     const type = rasterImageMimeType(file.name);
@@ -562,7 +563,6 @@ export function createWebWorkspaceRuntime(
     ids.add(id);
   }
   function removeCompletedDrafts(idsToRemove: string[], hostId = lockedHostId): void {
-    revokeLocalDraftPreviews(idsToRemove);
     if (!hostId) return;
     const ids = completedDraftIdsByHost.get(hostId);
     if (!ids) return;
@@ -1179,6 +1179,7 @@ export function createWebWorkspaceRuntime(
     async discard(id) {
       await Effect.runPromise(discardAttachmentDraft(teamApi, id).pipe(Effect.mapError((error) => error.cause)));
       removeCompletedDrafts([id]);
+      revokeLocalDraftPreviews([id]);
     },
     async download(id) {
       return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id)));
