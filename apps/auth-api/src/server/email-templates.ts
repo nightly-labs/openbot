@@ -48,7 +48,7 @@ export interface WelcomeEmailInput {
 }
 
 /** The first payment of a license. */
-export interface LicenseWelcomeEmailInput {
+interface LicenseWelcomeEmailInput {
   plan: LicensePlan;
   users: number;
   currency: BillingCurrency;
@@ -59,7 +59,7 @@ export interface LicenseWelcomeEmailInput {
 }
 
 /** A renewal payment of a license that failed. */
-export interface LicensePaymentFailedEmailInput {
+interface LicensePaymentFailedEmailInput {
   plan: LicensePlan;
   users: number;
   currency: BillingCurrency;
@@ -72,7 +72,7 @@ export interface LicensePaymentFailedEmailInput {
 }
 
 /** A license that ended. */
-export interface LicenseEndedEmailInput {
+interface LicenseEndedEmailInput {
   plan: LicensePlan;
   users: number;
   /** `unpaid` after the last failed try; `canceled` for a cancel, a refund, or a dispute. */
