@@ -25,6 +25,11 @@ export default defineConfig(({ command }) => {
         "@openbot/renderer-web": rendererWebAlias,
       },
     },
+    optimizeDeps: {
+      // bloub finds its plush images with `new URL(..., import.meta.url)`. A pre-bundle moves the
+      // code away from the images, so Vite serves the package as it is.
+      exclude: ["@norbert_bodziony/bloub", "@norbert_bodziony/bloub/plush"],
+    },
     // Vite removes license comments by default. The home page beam's license requires its notice
     // in each copy, so the minifier moves `/*!` and `@license` comments to the end of each file.
     esbuild: { legalComments: "eof" },

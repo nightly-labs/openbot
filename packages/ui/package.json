@@ -15,6 +15,7 @@
     "./text": "./src/text.tsx",
     "./reference-chip": "./src/reference-chip.tsx",
     "./progress": "./src/progress.tsx",
+    "./plush-loader": "./src/plush-loader.tsx",
     "./surface": "./src/surface.tsx",
     "./chart": "./src/chart.tsx",
     "./radial-progress": "./src/radial-progress.tsx",
