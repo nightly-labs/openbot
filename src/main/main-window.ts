@@ -216,6 +216,7 @@ export function createMainWindowController({
     window.once("ready-to-show", () => {
       performance.mark("openbot:window-ready");
       if (
+        !windowsKeptHidden &&
         shouldShowDevelopmentWindow({
           remoteRole: developmentRemoteRole,
           testClientEnabled: developmentTestClientEnabled,
@@ -767,8 +768,17 @@ export function sendComputerUseHighlightPlacement(
   sendToRenderer(window, IPC_ENDPOINTS.computerUse.highlightPlacement, placement);
 }
 
-/** Set by `hideWindowsForQuit` and never cleared: the process ends after it. */
-let windowsHiddenForQuit = false;
+/** Set by `hideWindowsForQuit` or `keepWindowsHidden` and never cleared. */
+let windowsKeptHidden = false;
+
+/**
+ * A server (`OPENBOT_SERVER=1` or a hosted server) shows no window. Its windows are on a virtual
+ * display that has no viewer and no GPU, so a shown window drew each frame in software for nobody
+ * (#4482). A hidden window draws nothing, and its renderer runs as in the background on a desktop.
+ */
+export function keepWindowsHidden(): void {
+  windowsKeptHidden = true;
+}
 
 /**
  * The renderer keeps reading while the services stop, and a read that the closing services fail
@@ -776,12 +786,12 @@ let windowsHiddenForQuit = false;
  * then does not show the window again.
  */
 export function hideWindowsForQuit(): void {
-  windowsHiddenForQuit = true;
+  windowsKeptHidden = true;
   for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.hide();
 }
 
 export function showMainWindow(window: BrowserWindow): void {
-  if (windowsHiddenForQuit) return;
+  if (windowsKeptHidden) return;
   presentMainWindow(window, process.platform, () => app.show());
 }
 
