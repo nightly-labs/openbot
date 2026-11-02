@@ -1383,7 +1383,7 @@ const CLICKUP: MarketplacePluginDetail = {
     "ClickUp lets agents search tasks, docs, comments and chat, create and update tasks, lists and docs, post comments, send chat messages and track time. Each user signs in to their own ClickUp account through the browser. Agents get the same permissions as the user. They can move tasks to the trash and delete comments.",
   category: "productivity",
   creatorName: "ClickUp",
-  iconUrl: "https://clickup.com/favicon.ico",
+  iconUrl: "https://clickup.com/favicons/apple-touch-icon.png",
   version: "1.0.0",
   prompts: [
     { id: "prompt-find-tasks", text: "Find my open ClickUp tasks due this week." },
@@ -1395,7 +1395,7 @@ const CLICKUP: MarketplacePluginDetail = {
       id: "app-clickup-mcp",
       name: "ClickUp",
       description: "Tasks, docs, comments, chat and time tracking, over ClickUp's MCP server with browser sign-in.",
-      iconUrl: "https://clickup.com/favicon.ico",
+      iconUrl: "https://clickup.com/favicons/apple-touch-icon.png",
       server: {
         name: "clickup",
         transport: "http",
