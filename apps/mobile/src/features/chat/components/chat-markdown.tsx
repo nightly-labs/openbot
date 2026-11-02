@@ -113,11 +113,9 @@ interface TextPresentation {
   linkFavicons: boolean;
 }
 
-/** The font size of each text type, in points, which inline math is sized against. */
-const TEXT_SIZES: Record<TextPresentation["type"], number> = { body: 16, "body-sm": 14, h4: 20, h5: 18 };
-
+/** The font size of a text type, in points, which inline math is sized against. */
 function textSize(presentation: TextPresentation): number {
-  return TEXT_SIZES[presentation.type] * presentation.fontScale;
+  return CHAT_TEXT_STYLES[presentation.type].fontSize * presentation.fontScale;
 }
 
 // The inline badge is shifted to align its label with native text. Reserve the
@@ -138,7 +136,7 @@ function textContainerStyle(source: string, presentation: TextPresentation): Tex
 
 /** The height of an inline code chip: its line and one point above and below. */
 function codeChipHeight(presentation: TextPresentation): number {
-  return (CHAT_CODE_STYLES[presentation.type === "body-sm" ? "small" : "body"].lineHeight ?? 20) + 2;
+  return CHAT_CODE_STYLES[presentation.type === "body-sm" ? "small" : "body"].lineHeight + 2;
 }
 
 /**
@@ -148,7 +146,11 @@ function codeChipHeight(presentation: TextPresentation): number {
  */
 function inlineChipStyle(presentation: TextPresentation, height: number, inRow: boolean): ViewStyle | undefined {
   if (inRow) return undefined;
-  return { transform: [{ translateY: (height / 2 - TEXT_SIZES[presentation.type] * 0.45) * presentation.fontScale }] };
+  return {
+    transform: [
+      { translateY: (height / 2 - CHAT_TEXT_STYLES[presentation.type].fontSize * 0.45) * presentation.fontScale },
+    ],
+  };
 }
 
 /** Joins the type badge of a file to the first characters of its name, so a line never ends between them. */
@@ -224,7 +226,7 @@ function FileReference({
     <View
       collapsable={false}
       className="max-w-full shrink flex-row items-center gap-1 self-start px-0.5"
-      style={inlineChipStyle(presentation, small ? 16 : (CHAT_TEXT_STYLES[presentation.type].lineHeight ?? 22), inRow)}
+      style={inlineChipStyle(presentation, small ? 16 : CHAT_TEXT_STYLES[presentation.type].lineHeight, inRow)}
     >
       <FileBadge name={name} color={String(color)} soft={String(soft)} />
       <Text
@@ -317,12 +319,12 @@ function CodeSpan({
  * their bottom edge, so the chip moves down until it is centred on the letters around it.
  */
 function mentionChip(presentation: TextPresentation) {
-  const size = TEXT_SIZES[presentation.type] - 1;
+  const size = CHAT_TEXT_STYLES[presentation.type].fontSize - 1;
   const lineHeight = Math.round(size * 1.25);
   const padding = 1;
   // The chip's middle goes on the middle of the letters around it, a little under half the text size
   // above their baseline (set on a device); the chip's bottom edge starts on that baseline.
-  const below = (lineHeight + padding * 2) / 2 - TEXT_SIZES[presentation.type] * 0.45;
+  const below = (lineHeight + padding * 2) / 2 - CHAT_TEXT_STYLES[presentation.type].fontSize * 0.45;
   return {
     label: [CHAT_TEXT_STYLES[presentation.type], presentation.style, { fontSize: size, lineHeight, flexShrink: 1 }],
     mark: (size + 1) * presentation.fontScale,

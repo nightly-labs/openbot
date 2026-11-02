@@ -5,8 +5,8 @@ import { useText } from "@/shared/lib/text";
 import { CHAT_TEXT_STYLES } from "./chat-text-styles";
 
 /** The body text of a message. */
-const FONT_SIZE = CHAT_TEXT_STYLES.body.fontSize ?? 16;
-const LINE_HEIGHT = CHAT_TEXT_STYLES.body.lineHeight ?? 22;
+const FONT_SIZE = CHAT_TEXT_STYLES.body.fontSize;
+const LINE_HEIGHT = CHAT_TEXT_STYLES.body.lineHeight;
 /** The natural line height of Inter, as a multiple of its size: (1984 + 494) / 2048. */
 const FONT_LINE_RATIO = 1.21;
 /**
