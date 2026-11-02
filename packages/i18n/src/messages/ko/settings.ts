@@ -155,11 +155,11 @@ export const messages = {
   "settings.notch.size.height": "높이",
   "settings.notch.size.previewNotch": "내장 디스플레이",
   "settings.notch.size.previewIsland": "외부 디스플레이",
-  "settings.analytics.title": "제품 분석 공유",
+  "settings.analytics.title": "분석 데이터를 내 계정에 연결",
   "settings.analytics.description":
-    "계정 ID와 이메일이 포함된 사용 및 안정성 메타데이터를 OpenBot의 자체 호스팅 분석 서비스로 보내요.",
+    "켜짐: 사용 및 안정성 메타데이터를 계정 ID 및 이메일과 함께 OpenBot의 자체 호스팅 분석 서비스로 보내요. 나와 에이전트가 방문한 웹사이트, 도구 사용 현황, 설정 세부 정보도 함께 보내요. 꺼짐: 턴 수와 토큰 수 같은 기본 사용 현황만 임의의 설치 ID와 함께 보내요. 채팅, 파일, 프롬프트는 절대 보내지 않아요.",
   "settings.analytics.webDescription":
-    "계정 ID와 이메일이 포함된 사용 및 안정성 메타데이터를 OpenBot의 자체 호스팅 분석 서비스로 보내요. 이 설정은 이 브라우저에 적용돼요.",
+    "켜짐: 사용 및 안정성 메타데이터를 계정 ID 및 이메일과 함께 OpenBot의 자체 호스팅 분석 서비스로 보내요. 꺼짐: 같은 메타데이터를 임의의 설치 ID만 함께 보내요. 채팅, 파일, 프롬프트는 절대 보내지 않아요. 이 설정은 이 브라우저에 적용돼요.",
   "settings.tab.general.title": "일반",
   "settings.tab.general.description": "이 컴퓨터에서 OpenBot이 동작하는 방식을 설정해요.",
   "settings.tab.agents.title": "에이전트",

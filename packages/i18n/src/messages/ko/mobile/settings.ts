@@ -154,8 +154,8 @@ export const messages = {
   "mobile.settings.notifications.channelSilent": "에이전트 알림 (소리 없음)",
   "mobile.settings.privacy.title": "개인정보 보호",
   "mobile.settings.privacy.footer":
-    "이 휴대전화의 기능 사용 현황과 연결 결과를 공유해요. 메시지 내용과 파일은 전송하지 않아요.",
-  "mobile.settings.privacy.analytics": "제품 분석 공유",
+    "이 휴대전화의 기능 사용 현황과 연결 결과는 항상 OpenBot 분석 서비스로 전송돼요. 켜짐: 계정 ID 및 이메일과 함께. 꺼짐: 임의의 설치 ID만 함께. 메시지 내용과 파일은 전송하지 않아요.",
+  "mobile.settings.privacy.analytics": "분석 데이터를 내 계정에 연결",
   "mobile.settings.privacy.retry": "개인정보 설정 다시 저장",
   "mobile.settings.conversations.title": "대화",
   "mobile.settings.conversations.hiddenChats": "숨긴 채팅",

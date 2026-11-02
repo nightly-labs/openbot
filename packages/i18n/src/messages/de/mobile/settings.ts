@@ -160,8 +160,8 @@ export const messages = {
   "mobile.settings.notifications.channelSilent": "Agenten-Benachrichtigungen (ohne Ton)",
   "mobile.settings.privacy.title": "Datenschutz",
   "mobile.settings.privacy.footer":
-    "Teile die Nutzung von Funktionen und Verbindungsergebnisse dieses Telefons. Nachrichteninhalte und Dateien werden nicht gesendet.",
-  "mobile.settings.privacy.analytics": "Nutzungsdaten teilen",
+    "Die Nutzung von Funktionen und Verbindungsergebnisse dieses Telefons gehen immer an die Analyse von OpenBot. An: mit deiner Konto-ID und E-Mail-Adresse. Aus: nur mit einer zufälligen Installations-ID. Nachrichteninhalte und Dateien werden nicht gesendet.",
+  "mobile.settings.privacy.analytics": "Analysedaten mit meinem Konto verknüpfen",
   "mobile.settings.privacy.retry": "Datenschutzeinstellung erneut speichern",
   "mobile.settings.conversations.title": "Unterhaltungen",
   "mobile.settings.conversations.hiddenChats": "Ausgeblendete Chats",

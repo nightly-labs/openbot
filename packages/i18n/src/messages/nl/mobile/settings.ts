@@ -154,8 +154,8 @@ export const messages = {
   "mobile.settings.notifications.channelSilent": "Agentmeldingen (geen geluid)",
   "mobile.settings.privacy.title": "Privacy",
   "mobile.settings.privacy.footer":
-    "Deel functiegebruik en verbindingsresultaten van deze telefoon. Berichtinhoud en bestanden worden niet verstuurd.",
-  "mobile.settings.privacy.analytics": "Productanalyses delen",
+    "Functiegebruik en verbindingsresultaten van deze telefoon gaan altijd naar de analyse van OpenBot. Aan: met je account-ID en e-mailadres. Uit: alleen met een willekeurige installatie-ID. Berichtinhoud en bestanden worden niet verstuurd.",
+  "mobile.settings.privacy.analytics": "Analyse aan mijn account koppelen",
   "mobile.settings.privacy.retry": "Opslaan van privacyinstelling opnieuw proberen",
   "mobile.settings.conversations.title": "Gesprekken",
   "mobile.settings.conversations.hiddenChats": "Verborgen chats",

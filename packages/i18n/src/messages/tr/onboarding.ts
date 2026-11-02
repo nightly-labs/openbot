@@ -87,7 +87,7 @@ export const messages = {
   "onboarding.consent.notice": "Devam ederek {terms}’nı kabul etmiş ve {privacy}’nı okumuş olursunuz.",
   "onboarding.consent.analyticsTitle": "OpenBot'u geliştirmemize yardım edin",
   "onboarding.consent.analyticsDetail":
-    "Hangi özellikleri kullandığınızı paylaşın. Sohbetleriniz, dosyalarınız ve istemleriniz asla paylaşılmaz.",
+    "Özellik kullanımını hesabınıza ve e-postanıza bağlayın; ziyaret edilen web sitelerini, araç kullanımını ve kurulum ayrıntılarını paylaşın. Aksi halde yalnızca temel kullanım, rastgele bir kurulum kimliğiyle gönderilir. Sohbetleriniz, dosyalarınız ve istemleriniz asla gönderilmez.",
   "onboarding.consent.thanksTitle": "Teşekkürler! Ekip size bir iyilik borçlu.",
   "onboarding.consent.thanksToast": "OpenBot'u geliştirmemize yardım ettiğiniz için teşekkürler 💜",
   "onboarding.consent.thanksToastDetail": "Bunu istediğiniz zaman Ayarlar'dan değiştirebilirsiniz.",

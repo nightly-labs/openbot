@@ -82,7 +82,8 @@ export const messages = {
   "onboarding.choice.startFreeInstead": "대신 무료로 시작",
   "onboarding.consent.notice": "계속하면 {terms}에 동의하고 {privacy}을 확인한 것으로 간주됩니다.",
   "onboarding.consent.analyticsTitle": "OpenBot 개선에 참여하기",
-  "onboarding.consent.analyticsDetail": "어떤 기능을 쓰는지 공유해요. 채팅, 파일, 프롬프트는 절대 공유하지 않아요.",
+  "onboarding.consent.analyticsDetail":
+    "기능 사용 현황을 계정과 이메일에 연결하고, 방문한 웹사이트, 도구 사용 현황, 설정 세부 정보를 공유해요. 연결하지 않으면 기본 사용 현황만 임의의 설치 ID와 함께 보내요. 채팅, 파일, 프롬프트는 절대 보내지 않아요.",
   "onboarding.consent.thanksTitle": "고마워요! 팀이 신세를 졌어요.",
   "onboarding.consent.thanksToast": "OpenBot 개선을 도와주셔서 고마워요 💜",
   "onboarding.consent.thanksToastDetail": "설정에서 언제든지 바꿀 수 있어요.",

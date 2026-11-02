@@ -161,11 +161,11 @@ export const messages = defineMessages("settings", {
   "settings.notch.size.height": "Height",
   "settings.notch.size.previewNotch": "Built-in display",
   "settings.notch.size.previewIsland": "External display",
-  "settings.analytics.title": "Share product analytics",
+  "settings.analytics.title": "Link analytics to my account",
   "settings.analytics.description":
-    "Send usage and reliability metadata with your account ID and email to OpenBot’s self-hosted analytics.",
+    "On: usage and reliability metadata goes to OpenBot’s self-hosted analytics with your account ID and email, with the websites that you and your agents visit, tool use and setup details. Off: only basic usage, such as turns and token counts, goes with a random install ID. Chats, files and prompts are never sent.",
   "settings.analytics.webDescription":
-    "Send usage and reliability metadata with your account ID and email to OpenBot’s self-hosted analytics. This setting applies to this browser.",
+    "On: usage and reliability metadata goes to OpenBot’s self-hosted analytics with your account ID and email. Off: the same metadata goes with a random install ID only. Chats, files and prompts are never sent. This setting applies to this browser.",
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "General",
   "settings.tab.general.description": "Control how OpenBot behaves on this computer.",

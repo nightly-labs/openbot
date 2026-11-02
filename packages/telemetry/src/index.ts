@@ -8,6 +8,8 @@ export {
   safeProperties,
   safeReport,
 } from "./events";
+export type { AnalyticsInstallId } from "./install-id";
+export { ANALYTICS_INSTALL_ID_MAX_AGE_MS, currentAnalyticsInstallId, newAnalyticsInstallId } from "./install-id";
 export type { ReportStorage, ReportTransport } from "./queue";
 export { REPORT_BYTES, REPORT_LIMIT, REPORT_TTL, ReportQueue, TelemetryFailure, telemetryIO } from "./queue";
 export { openPanelTransport } from "./transport";
