@@ -112,6 +112,7 @@ import {
   createRemoteTeamPeer,
   MOBILE_ATTACHMENT_BYTES,
   type RemoteFileUpload,
+  type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
   type RemoteTeamPeerActions,
 } from "@openbot/team-client/remote-peer";
@@ -608,7 +609,7 @@ export function createWebWorkspaceRuntime(
     }
     if (!result.ok || (result.status ?? 500) >= 400)
       throw new WebHostRequestError(
-        hostRefusal(result.status, result.body) ?? currentText().t("webClient.error.requestIncomplete"),
+        hostRefusal(result) ?? currentText().t("webClient.error.requestIncomplete"),
         result.status === undefined ? (result.reference ?? null) : referenceFrom("http", result.status),
       );
     return result.body;
@@ -1338,11 +1339,17 @@ function decodeWebFile(value: unknown): WebFile {
   };
 }
 
-/** The host's own reason for a refusal. It redacts it; a server failure keeps the generic text. */
-function hostRefusal(status: number | undefined, body: unknown): string | null {
-  if (status === undefined || status < 400 || status >= 500) return null;
-  if (!isDynamicRecord(body) || !isString(body.error) || !body.error.trim()) return null;
-  const text = body.error.trim();
+/**
+ * The host's own reason for a refusal. It redacts it; a server failure keeps the generic text. Over
+ * WebRTC the host sends a refusal as an error frame, so it arrives as a failed command whose
+ * reference is `host/<4xx status>/<code>`.
+ */
+function hostRefusal(result: RemoteTeamCommandResult): string | null {
+  const status = result.ok ? result.status : Number(/^host\/(\d{3})(?:\/|$)/u.exec(result.reference ?? "")?.[1]);
+  if (status === undefined || !(status >= 400 && status < 500)) return null;
+  const reason = result.ok ? (isDynamicRecord(result.body) ? result.body.error : undefined) : result.error;
+  if (!isString(reason) || !reason.trim()) return null;
+  const text = reason.trim();
   return text.length > 300 ? `${text.slice(0, 299)}…` : text;
 }
 
