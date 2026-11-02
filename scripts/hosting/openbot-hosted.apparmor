@@ -3,4 +3,5 @@ include <tunables/global>
 
 profile openbot-hosted /opt/OpenBot/app/openbot flags=(unconfined) {
   userns,
+  network,
 }
