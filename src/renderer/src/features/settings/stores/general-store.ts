@@ -103,13 +103,22 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
          * throughout, and hide both the progress the Cancel button reverses and the failure the
          * Retry button answers.
          */
+        // A CLI the user installed that failed shows its own version too, so the row names the CLI
+        // that failed. A copy that is not downloaded keeps its Download then.
         runtimeStatus:
           runtime &&
+          agent &&
           (runtime.phase === "ready" || runtime.phase === "not-downloaded") &&
-          (agent?.state === "available" || agent?.state === "sign-in-required") &&
-          (agent.cliSource === "system" || (runtime.phase === "not-downloaded" && !runtime.availableVersion))
+          (agent.cliSource === "system"
+            ? agent.state === "available" ||
+              agent.state === "sign-in-required" ||
+              (agent.state === "error" && runtime.phase === "ready")
+            : (agent.state === "available" || agent.state === "sign-in-required") &&
+              runtime.phase === "not-downloaded" &&
+              !runtime.availableVersion)
             ? { ...runtime, phase: "ready", version: agent.version ?? null }
             : runtime,
+        cliSource: agent?.cliSource,
       };
     }),
   );

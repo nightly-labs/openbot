@@ -1283,6 +1283,11 @@ function RuntimeSection(props: SectionProps) {
     if (row().updatable() && installed) {
       return t("provider.settings.versionAvailable", { installed, available: props.option.availableVersion ?? "" });
     }
+    // Names the CLI that runs, so a failure of the user's own install does not read as OpenBot's (#4375).
+    if (installed && props.option.cliSource === "system")
+      return t("provider.settings.versionInstalledByUser", { version: installed });
+    if (installed && props.option.cliSource === "managed")
+      return t("provider.settings.versionDownloaded", { version: installed });
     return installed;
   };
   /** The sign-in card already shows a check error, so the same text does not show twice. */

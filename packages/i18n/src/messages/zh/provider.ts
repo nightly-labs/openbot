@@ -249,6 +249,8 @@ export const messages = {
   "provider.settings.runtime": "运行时",
   "provider.settings.version": "版本",
   "provider.settings.versionAvailable": "{installed} · 有 {available} 可用",
+  "provider.settings.versionInstalledByUser": "{version} · 你自己安装的",
+  "provider.settings.versionDownloaded": "{version} · 由 OpenBot 下载",
   "provider.settings.update": "更新",
   "provider.settings.downloadLabel": "{name} 的下载",
   "provider.settings.diagnostics": "诊断",
