@@ -105,8 +105,10 @@ export function pastePreviewTracker(draftKey: string, setPastePreviews: SetPaste
 export interface ComposerActionsDeps {
   props: ConversationProps;
   agentReady: () => boolean;
-  attachmentBusy: () => boolean;
-  setAttachmentBusy: (busy: boolean) => void;
+  /** True while a file import for the chat, the current one by default, waits. */
+  attachmentBusy: (target?: ConversationTarget) => boolean;
+  /** Reads the chats that wait for an import again from `attachmentImports`. */
+  syncAttachmentImports: () => void;
   setPastePreviews: SetPastePreviews;
   attachmentImports: Map<string, ConversationTarget>;
   drafts: () => Record<string, ComposerDraft>;
@@ -326,7 +328,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const requestId = crypto.randomUUID();
     const runtime = conversationRuntime(deps.props);
     deps.attachmentImports.set(requestId, target);
-    deps.setAttachmentBusy(true);
+    deps.syncAttachmentImports();
     deps.clearConversationError(target);
     const previews = pastePreviewTracker(key, deps.setPastePreviews);
     try {
@@ -359,7 +361,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     } finally {
       previews.stop();
       deps.attachmentImports.delete(requestId);
-      deps.setAttachmentBusy(deps.attachmentImports.size > 0);
+      deps.syncAttachmentImports();
     }
   }
 
@@ -573,7 +575,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const serverId = target?.serverId ?? deps.editingServerId() ?? deps.props.server?.id ?? "local";
     const deliveryId = target?.deliveryId ?? deps.editingDeliveryId();
     const draft = draftOverride ?? deps.currentDraft();
-    if (!agentId || !deliveryId || deps.submitting() || deps.attachmentBusy()) return false;
+    if (!agentId || !deliveryId || deps.submitting() || deps.attachmentBusy({ agentId, serverId })) return false;
     const editId = deps.editingEditId();
     if (
       !editId &&
@@ -778,7 +780,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     voice?: VoiceSend,
     steer = false,
   ): Promise<boolean> {
-    if (deps.attachmentBusy()) return false;
+    if (deps.attachmentBusy(targetOverride)) return false;
     if (!draftOverride && deps.currentEditingDeliveryId()) {
       return saveQueuedMessageEdit();
     }

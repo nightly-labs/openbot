@@ -348,18 +348,21 @@ export class BrowserCdpEngine {
           );
         const inputs = nodes.slice(0, targets.length);
         const button = submitTarget ? nodes[targets.length] : undefined;
+        const inFrame = (index: number) =>
+          browserFailure(
+            new Error(`${labels[index]} is inside a frame. Secure input does not support frames, so use takeover.`),
+          );
         for (const [index, node] of nodes.entries()) {
-          if (node.sessionId)
-            return yield* browserFailure(
-              new Error(`${labels[index]} is inside a frame. Secure input does not support frames, so use takeover.`),
-            );
+          if (node.sessionId) return yield* inFrame(index);
           const input = index < inputs.length;
+          // A frame in the page's process has no session of its own; its document is not the top one.
           const valid = yield* this.#callOnNode(
             send,
             node.backendNodeId,
-            `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
+            `function(origin, input) { if (this.isConnected && this.ownerDocument !== document) return 'frame'; return this.isConnected && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
             [origin, input],
           );
+          if (valid === "frame") return yield* inFrame(index);
           if (valid !== true)
             return yield* browserFailure(
               new Error(

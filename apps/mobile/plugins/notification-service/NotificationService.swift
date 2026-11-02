@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Intents
 import UserNotifications
 
 /// Opens a notification that an OpenBot host sealed, before iOS shows it. The host sends the agent
@@ -43,6 +44,12 @@ final class NotificationService: UNNotificationServiceExtension {
       ]
       userInfo["body"] = data
       content.userInfo = userInfo
+      // The agent picture takes the place of the app icon. Without a picture, iOS shows the content as before.
+      if let sender = AgentSender.content(content, for: notification) {
+        contentHandler(sender)
+        self.contentHandler = nil
+        return
+      }
     }
     contentHandler(content)
     self.contentHandler = nil
@@ -51,6 +58,64 @@ final class NotificationService: UNNotificationServiceExtension {
   override func serviceExtensionTimeWillExpire() {
     if let contentHandler, let bestAttempt { contentHandler(bestAttempt) }
     contentHandler = nil
+  }
+}
+
+/// Makes an agent notification a communication notification, with the agent as the sender, so iOS and
+/// a paired Apple Watch show the agent picture in place of the app icon. The picture is the one of the
+/// share extension: the app writes the agents and their pictures into the App Group
+/// (`share-extension.ts`). The title, the text and the data of the notification do not change.
+enum AgentSender {
+  private static let directoryFile = "share-extension.json"
+  private static let avatarFolder = "share-extension-avatars"
+
+  static func content(_ content: UNMutableNotificationContent, for notification: OpenedNotification) -> UNNotificationContent? {
+    guard let image = picture(serverId: notification.serverId, agentId: notification.agentId) else { return nil }
+    // The ID of the agent's share suggestion, as the app donates it.
+    let conversationId = "\(notification.serverId)/\(notification.agentId)"
+    let sender = INPerson(
+      personHandle: INPersonHandle(value: conversationId, type: .unknown),
+      nameComponents: nil,
+      displayName: content.title,
+      image: image,
+      contactIdentifier: nil,
+      customIdentifier: conversationId
+    )
+    let intent = INSendMessageIntent(
+      recipients: nil,
+      outgoingMessageType: .outgoingMessageText,
+      // The donation keeps no message text. The notification shows the text of `content`.
+      content: nil,
+      speakableGroupName: nil,
+      conversationIdentifier: conversationId,
+      serviceName: nil,
+      sender: sender,
+      attachments: nil
+    )
+    let interaction = INInteraction(intent: intent, response: nil)
+    interaction.direction = .incoming
+    // The app removes the suggestions of an agent by this group (`ShareExtensionModule.swift`).
+    interaction.groupIdentifier = conversationId
+    interaction.donate(completion: nil)
+    // Fails without the Communication Notifications entitlement.
+    return try? content.updating(from: intent)
+  }
+
+  private static func picture(serverId: String, agentId: String) -> INImage? {
+    guard
+      let group = Bundle.main.object(forInfoDictionaryKey: "OpenBotAppGroup") as? String,
+      let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group),
+      let data = try? Data(contentsOf: container.appendingPathComponent(directoryFile)),
+      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      json["version"] as? Int == 1,
+      let agents = json["agents"] as? [[String: Any]],
+      let agent = agents.first(where: { $0["serverId"] as? String == serverId && $0["id"] as? String == agentId }),
+      let name = agent["avatar"] as? String,
+      // The file names a picture in the folder only.
+      !name.contains("/"),
+      let image = try? Data(contentsOf: container.appendingPathComponent(avatarFolder).appendingPathComponent(name))
+    else { return nil }
+    return INImage(imageData: image)
   }
 }
 

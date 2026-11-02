@@ -13,6 +13,7 @@ import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
   TEAM_MP4_ATTACHMENTS_CAPABILITY,
+  TEAM_SVG_ATTACHMENTS_CAPABILITY,
   TEAM_ZIP_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
@@ -334,6 +335,7 @@ export function ConversationComposer() {
       media: local || capabilities.includes(TEAM_MEDIA_ATTACHMENTS_CAPABILITY),
       zip: local || capabilities.includes(TEAM_ZIP_ATTACHMENTS_CAPABILITY),
       mp4: local || capabilities.includes(TEAM_MP4_ATTACHMENTS_CAPABILITY),
+      svg: local || capabilities.includes(TEAM_SVG_ATTACHMENTS_CAPABILITY),
     })
       .map((extension) => `.${extension}`)
       .join(",");

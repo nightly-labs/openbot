@@ -171,6 +171,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} не вернул аккаунт с выполненным входом.",
   "error.provider.signInExpired": "Срок входа в {provider} истёк. Войдите снова, чтобы продолжить.",
   "error.provider.cliActivateFailed": "OpenBot не смог активировать управляемый CLI.",
+  "error.provider.cliNewVersionNotStarted": "Новая версия не запустилась.",
   "error.provider.cliBusyReconnect":
     "{provider} CLI обрабатывает ход. Дождитесь его завершения, затем подключитесь заново.",
   "error.provider.cliBusySignOut": "CLI {provider} обрабатывает ход. Дождитесь окончания, затем отключите.",
@@ -248,6 +249,19 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline не удалось запустить. Выполните `cline --version` в терминале.",
   "error.provider.clineVersionUnreadable": "Не удалось прочитать версию Cline CLI.",
   "error.provider.clineSignIn": "Войдите через Cline или задайте CLINE_API_KEY, чтобы использовать Cline.",
+  "error.provider.kimiArchivePath": "В архиве Kimi неожиданный путь.",
+  "error.provider.kimiChecksum": "Контрольная сумма среды выполнения Kimi не совпадает.",
+  "error.provider.kimiLicenseChecksum": "Контрольная сумма лицензии Kimi не совпадает.",
+  "error.provider.kimiMissing": "Kimi не загружен. Загрузите его в OpenBot, чтобы продолжить.",
+  "error.provider.kimiOutdated": "Kimi CLI {version} слишком старый. OpenBot требует версию 1.52.0 или новее.",
+  "error.provider.kimiNotStarted": "Kimi не удалось запустить. Выполните `kimi --version` в терминале.",
+  "error.provider.kimiVersionUnreadable": "Не удалось прочитать версию Kimi CLI.",
+  "error.provider.kimiSignIn": "Войдите через Kimi Code, чтобы использовать Kimi.",
+  "error.provider.hermesMissing": "Hermes Agent не установлен. Установите его и повторите попытку.",
+  "error.provider.hermesNotStarted": "Не удалось запустить Hermes Agent. Выполните `hermes --version` в терминале.",
+  "error.provider.hermesVersionUnreadable": "Не удаётся прочитать версию Hermes Agent.",
+  "error.provider.hermesSignIn":
+    "Войдите через Nous Portal или выполните `hermes setup` в терминале, чтобы использовать Hermes.",
   "error.provider.usageLimitReached": "Аккаунт достиг лимита использования.",
   "error.provider.foreignReasoning":
     "{provider} не принял предыдущие рассуждения в этом чате, потому что их получил другой аккаунт или API-ключ. OpenBot начал новую сессию {provider} с историей чата. Повторите попытку.",

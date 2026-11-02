@@ -417,6 +417,7 @@ export type ExternalDestination =
   | "opencode-auth"
   | "agent-setup"
   | "claude-install"
+  | "hermes-install"
   | "feedback"
   | "message"
   // The release notes, the guides and the Discord community of OpenBot, from the Help menu of the window rail.
@@ -424,6 +425,8 @@ export type ExternalDestination =
   | "changelog"
   | "guides"
   | "discord"
+  // The OpenBot repository, from the toast that asks for a GitHub star.
+  | "github"
   // The OpenBot account on X, from the community card of the sidebar.
   | "x"
   // The x.ai marketplace listing of the Grok Bot agent that exports agents for OpenBot.

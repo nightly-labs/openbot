@@ -528,6 +528,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       requestTimeoutMs,
       discoveryCwd: options.discoveryCwd,
       processWideModel: options.flavor.processWideModel === true,
+      modelSetUnsaved: options.flavor.modelSetUnsaved,
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
     });
   }
@@ -1377,8 +1378,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.#initialization?.agentCapabilities?.promptCapabilities?.audio === true;
   }
 
-  /** Whether the agent can resume without replaying its transcript. */
+  /** Whether the agent can resume without replaying its transcript, and OpenBot uses that resume. */
   get #supportsSessionResume(): boolean {
+    if (this.#flavor.loadInsteadOfResume) return false;
     return this.#initialization?.agentCapabilities?.sessionCapabilities?.resume != null;
   }
 
@@ -1645,8 +1647,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       );
     let failure: unknown;
     let recovery: "wait-for-start" | "list-sessions" | null = null;
+    let restored: LoadSessionResponse | ResumeSessionResponse | undefined;
     try {
-      return providerResult(yield* Effect.result(providerSync(connection).pipe(Effect.flatMap(restore))));
+      restored = providerResult(yield* Effect.result(providerSync(connection).pipe(Effect.flatMap(restore))));
     } catch (error) {
       // For `thread/resume` and `turn/start`, `request` forgets the session and converts this response.
       if (method === "load" && isSessionNotFound(error, request.sessionId, this.#flavor)) {
@@ -1655,6 +1658,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       recovery = this.#flavor.restoreFailure?.(error, method) ?? null;
       if (!recovery) return yield* providerFailure(error);
       failure = error;
+    }
+    if (restored) {
+      if (method === "load" && this.#flavor.loadInsteadOfResume?.missing(restored))
+        return yield* providerFailure(
+          new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, "empty session/load reply"),
+        );
+      return restored;
     }
     if (recovery === "wait-for-start") {
       yield* Effect.sleep(RESTORE_START_RETRY_MS);

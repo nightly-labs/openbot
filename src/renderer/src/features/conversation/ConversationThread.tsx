@@ -23,7 +23,13 @@ import type { ConversationThreads } from "./conversation-types";
 import { createTurnSteps } from "./turn-steps";
 
 /** A thread takes files only from this computer, which reads every supported type. */
-const THREAD_ATTACHMENT_ACCEPT = supportedAttachmentExtensions({ eml: true, media: true, zip: true, mp4: true })
+const THREAD_ATTACHMENT_ACCEPT = supportedAttachmentExtensions({
+  eml: true,
+  media: true,
+  zip: true,
+  mp4: true,
+  svg: true,
+})
   .map((extension) => `.${extension}`)
   .join(",");
 

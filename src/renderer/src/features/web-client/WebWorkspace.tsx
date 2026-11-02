@@ -98,6 +98,7 @@ import type { SettingsPagePlacement } from "@openbot/ui/features/settings/Settin
 import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/stores/hosted-servers-store";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
+import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import {
   computeSidebarAgentStates,
   sidebarAgentWaits,
@@ -664,6 +665,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     openAccountSettings();
   }
   const [searchOpen, setSearchOpen] = createSignal(false);
+  const hiddenAgentIds = createMemo(() => new Set(workspace.state.userHiddenAgents.map((entry) => entry.agentId)));
+  // In sidebar order, so that ⌘1-9 opens the agents the user put at the top.
+  const searchAgents = createMemo(() =>
+    sidebarAgentOrder(workspace.profiles(), {
+      layout: workspace.state.sidebarLayout,
+      pinnedItems: workspace.preferences.pinnedSidebarItems(),
+      hiddenAgentIds: hiddenAgentIds(),
+    }),
+  );
   const communityCard = createCommunityCardVisibility();
   const [messageFocusRequest, setMessageFocusRequest] = createSignal<{
     agentId: string;
@@ -2355,7 +2365,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   <ChannelCreateOverlay />
                   <GlobalSearchOverlay
                     open={searchOpen()}
-                    agents={workspace.profiles()}
+                    agents={searchAgents()}
                     channels={channels.supported() ? globalSearchChannels(channels.state.channels) : undefined}
                     onSearchMessages={searchAllMessages}
                     onOpenChange={setSearchOpen}
@@ -2492,7 +2502,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       },
                       approvals: () => workspace.state.approvals,
                       takeovers: () => workspace.state.takeovers,
-                      hiddenAgentIds: () => new Set(workspace.state.userHiddenAgents.map((entry) => entry.agentId)),
+                      hiddenAgentIds,
                     });
                     return (
                       <Conversation

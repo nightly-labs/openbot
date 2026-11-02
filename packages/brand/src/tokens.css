@@ -205,6 +205,10 @@
      announcement is not an action. */
   --openbot-badge-new: #ff1e5e;
   --openbot-badge-new-soft: rgba(255, 30, 94, 0.16);
+  /* The star of a GitHub star request: a full yellow fill and a darker edge, so the star reads on
+     a white button as well as on a dark surface. Both themes use the same pair. */
+  --openbot-star: #facc15;
+  --openbot-star-edge: #ca8a04;
   /* The moving border of an offer, such as the hosted server offer: teal, blue, then pink. */
   --openbot-beam-teal: var(--openbot-file-teal);
   --openbot-beam-blue: var(--openbot-accent-text);
@@ -418,6 +422,10 @@
 }
 
 [data-provider="cline"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="kimi"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }
 

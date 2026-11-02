@@ -179,6 +179,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} não retornou uma conta autenticada.",
   "error.provider.signInExpired": "Seu login em {provider} expirou. Entre novamente para continuar.",
   "error.provider.cliActivateFailed": "O OpenBot não conseguiu ativar a CLI gerenciada.",
+  "error.provider.cliNewVersionNotStarted": "A nova versão não foi iniciada.",
   "error.provider.cliBusyReconnect": "A CLI de {provider} está executando um turno. Aguarde o término e reconecte.",
   "error.provider.cliBusySignOut":
     "A CLI do {provider} está processando um turno. Aguarde terminar e depois desconecte.",
@@ -257,6 +258,19 @@ export const messages = {
   "error.provider.clineNotStarted": "Não foi possível iniciar o Cline. Execute `cline --version` em um terminal.",
   "error.provider.clineVersionUnreadable": "Não foi possível ler a versão da CLI do Cline.",
   "error.provider.clineSignIn": "Entre com o Cline ou defina CLINE_API_KEY para usar o Cline.",
+  "error.provider.kimiArchivePath": "O arquivo compactado do Kimi tem um caminho inesperado.",
+  "error.provider.kimiChecksum": "A soma de verificação do ambiente de execução do Kimi não corresponde.",
+  "error.provider.kimiLicenseChecksum": "A soma de verificação da licença do Kimi não corresponde.",
+  "error.provider.kimiMissing": "O Kimi não foi baixado. Baixe-o no OpenBot para continuar.",
+  "error.provider.kimiOutdated": "A CLI do Kimi {version} é muito antiga. O OpenBot exige 1.52.0 ou posterior.",
+  "error.provider.kimiNotStarted": "Não foi possível iniciar o Kimi. Execute `kimi --version` em um terminal.",
+  "error.provider.kimiVersionUnreadable": "Não foi possível ler a versão da CLI do Kimi.",
+  "error.provider.kimiSignIn": "Entre com o Kimi Code para usar o Kimi.",
+  "error.provider.hermesMissing": "O Hermes Agent não está instalado. Instale-o e tente novamente.",
+  "error.provider.hermesNotStarted":
+    "Não foi possível iniciar o Hermes Agent. Execute `hermes --version` em um terminal.",
+  "error.provider.hermesVersionUnreadable": "Não é possível ler a versão do Hermes Agent.",
+  "error.provider.hermesSignIn": "Entre com o Nous Portal ou execute `hermes setup` em um terminal para usar o Hermes.",
   "error.provider.usageLimitReached": "A conta atingiu seu limite de uso.",
   "error.provider.foreignReasoning":
     "{provider} não aceitou o raciocínio anterior neste chat porque ele foi recebido por outra conta ou chave de API. O OpenBot iniciou uma nova sessão de {provider} com o histórico do chat. Tente novamente.",

@@ -52,6 +52,7 @@ import {
 } from "./conversation-read-state";
 import type { SendMessageResult } from "./conversation-types";
 import { useDirectMessages } from "./direct-messages-context";
+import { noteAgentMessageSent } from "./github-star-prompt";
 
 const LATEST_PAGE_SIZE = 50;
 /**
@@ -851,6 +852,7 @@ const Conversation = createSimpleContext({
           result: "succeeded",
           delivery_count: receipt.deliveries.length,
         });
+        noteAgentMessageSent();
         const messageId = receipt.deliveries[0]?.id ?? receipt.messageId;
         // The pending message does not wait for read state: it is the user's own message.
         markAgentMessagesRead(agentId, messageId, serverId).catch((error: unknown) => {

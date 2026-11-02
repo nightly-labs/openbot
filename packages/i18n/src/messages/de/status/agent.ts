@@ -44,6 +44,8 @@ export const messages = {
   "status.agent.memoryChanges": "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen.",
   "status.agent.memoryChangesWithConflicts":
     "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen, {notChanged} nicht geändert, weil ein anderer Thread sie zuerst geändert hat.",
+  "status.agent.nextStepContinues":
+    "Der Agent hat vor dem nächsten Schritt angehalten. Er macht weiter ({current} von {limit}).",
   "status.agent.planContinues": "Der Plan hat offene Schritte. Der Agent macht weiter ({current} von {limit}).",
   "status.agent.branchTitle": "Abgezweigter Chat",
 } as const satisfies PartialTranslation<typeof source>;
