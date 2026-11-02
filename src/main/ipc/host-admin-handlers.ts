@@ -323,7 +323,11 @@ export function hostAdminIpcHandlers({
         remote: (change, serverId) => remoteAccess(serverId, AGENT_ACCESS_ROUTES.set, change),
       }),
       getAuditLog: scopedQueryHandler({
-        local: (): ServerAuditLog => serverAudit.read(localAccessServerId()),
+        // A computer that does not host a server has no changes to show.
+        local: (): ServerAuditLog => {
+          const serverId = localServerId();
+          return serverId ? serverAudit.read(serverId) : { entries: [] };
+        },
         remote: (serverId) => {
           if (!remoteServers.supportsCapability(serverId, SERVER_AUDIT_CAPABILITY))
             throw new Error(sourceText("error.team.serverAuditUnsupported"));
