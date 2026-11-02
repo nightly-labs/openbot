@@ -44,22 +44,29 @@ import type {
   AddedAgent,
   AgentAdminSettings,
   AgentBackupModelSettings,
+  AgentFastModeSettings,
   AgentHostSettings,
+  AgentNewChatSettings,
   AgentPlanCardSettings,
   AgentTaskLimitSettings,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
+  UpdateAgentFastModeInput,
   UpdateAgentHostSettingsInput,
+  UpdateAgentNewChatInput,
   UpdateAgentPlanCardInput,
   UpdateAgentTaskLimitInput,
 } from "./ipc-agent-admin";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
 import type {
+  AddAgentFolderInput,
   AgentExclusionChange,
+  AgentFolderBrowse,
   AgentFolderChange,
   AgentFolderInput,
   AgentFolderList,
+  BrowseAgentFoldersInput,
   ChooseAgentFolderInput,
 } from "./ipc-agent-folders";
 import type { ClientAgentModelOption } from "./ipc-agent-identity";
@@ -1602,26 +1609,32 @@ export const IPC_ENDPOINTS = {
       "agent:list-workspace-directory",
     ),
   },
-  // The folders a local agent can change besides its workspace. A joined server has no route for them:
-  // the Team API does not carry them, as it does not carry `access`.
+  // The folders an agent can change besides its workspace. On a joined server the host serves them
+  // through `agent-folders-v1`, for an owner or admin. The native picker shows only this computer, so
+  // for a joined server the renderer lists host folders with `browseAgentFolders` and then adds one.
   agentFolders: {
-    listAgentFolders: request<string, AgentFolderList>()("agent:folders:list"),
-    // Opens the folder picker in main.
+    listAgentFolders: scopedRequest<string, AgentFolderList>()("agent:folders:list"),
+    // Opens the folder picker in main. Only for an agent on this computer.
     chooseAgentFolder: request<ChooseAgentFolderInput, AgentFolderChange>()("agent:folders:choose"),
-    // A dropped folder, or the Undo of a removal. Main checks each path as it checks a picked one.
-    addAgentFolder: request<AgentFolderInput, AgentFolderChange>()("agent:folders:add"),
-    removeAgentFolder: request<AgentFolderInput, AgentFolderChange>()("agent:folders:remove"),
+    // A dropped or browsed folder, or the Undo of a removal. The host checks each path as it checks a
+    // picked one. `replace` puts the folder in the place of a folder that is gone.
+    addAgentFolder: scopedRequest<AddAgentFolderInput, AgentFolderChange>()("agent:folders:add"),
+    removeAgentFolder: scopedRequest<AgentFolderInput, AgentFolderChange>()("agent:folders:remove"),
     // Folders in those that the agent must not change. The picker opens in main; add is the Undo.
     chooseAgentExclusion: request<string, AgentExclusionChange>()("agent:folders:exclusions:choose"),
-    addAgentExclusion: request<AgentFolderInput, AgentExclusionChange>()("agent:folders:exclusions:add"),
-    removeAgentExclusion: request<AgentFolderInput, AgentExclusionChange>()("agent:folders:exclusions:remove"),
+    addAgentExclusion: scopedRequest<AgentFolderInput, AgentExclusionChange>()("agent:folders:exclusions:add"),
+    removeAgentExclusion: scopedRequest<AgentFolderInput, AgentExclusionChange>()("agent:folders:exclusions:remove"),
+    browseAgentFolders: scopedRequest<BrowseAgentFoldersInput, AgentFolderBrowse>()("agent:folders:browse"),
   },
-  // The instruction file at the root of a local agent's workspace. A joined server has no route for
-  // it: the Team API does not carry it.
+  // The instruction file at the root of an agent's workspace. On a joined server the host reads and
+  // saves it through `agent-instructions-v1`, for an owner or admin.
   agentInstructions: {
-    readAgentInstructions: request<string, AgentInstructionsFile>()("agent:instructions:read"),
-    saveAgentInstructions: request<SaveAgentInstructionsInput, AgentInstructionsFile>()("agent:instructions:save"),
-    // Main finds the file from the agent id: the page never names a path to show.
+    readAgentInstructions: scopedRequest<string, AgentInstructionsFile>()("agent:instructions:read"),
+    saveAgentInstructions: scopedRequest<SaveAgentInstructionsInput, AgentInstructionsFile>()(
+      "agent:instructions:save",
+    ),
+    // Main finds the file from the agent id: the page never names a path to show. Only this computer
+    // shows a file, so a joined server has no reveal.
     revealAgentInstructions: request<string, void>()("agent:instructions:reveal"),
   },
   // Not part of `agentAttachments`: the preload sends the paths of dropped and pasted files, and the
@@ -1717,10 +1730,26 @@ export const IPC_ENDPOINTS = {
     updateAgentTaskLimit: scopedRequest<UpdateAgentTaskLimitInput, AgentTaskLimitSettings>()(
       "agent:admin:update-task-limit",
     ),
+    // Whether the agent starts a new chat itself: `agent-new-chat-v1` on a joined server.
+    getAgentNewChat: scopedRequest<string, AgentNewChatSettings>()("agent:admin:get-new-chat"),
+    updateAgentNewChat: scopedRequest<UpdateAgentNewChatInput, AgentNewChatSettings>()("agent:admin:update-new-chat"),
+    // Publishing an agent as a link-only template. On a joined server the host publishes with its own
+    // account (`agent-publish-v1`), for an owner or admin.
+    previewAgentTemplate: scopedRequest<string, AgentTemplatePreview>()("agent:admin:preview-template"),
+    publishAgentTemplate: scopedRequest<PublishAgentTemplateInput, AgentTemplatePublication>()(
+      "agent:admin:publish-template",
+    ),
+    unpublishAgentTemplate: scopedRequest<string, void>()("agent:admin:unpublish-template"),
     // Plan card before long tasks: `agent-plan-card-v1` on a joined server.
     getAgentPlanCard: scopedRequest<string, AgentPlanCardSettings>()("agent:admin:get-plan-card"),
     updateAgentPlanCard: scopedRequest<UpdateAgentPlanCardInput, AgentPlanCardSettings>()(
       "agent:admin:update-plan-card",
+    ),
+    // Fast mode: `agent-fast-mode-v1` on a joined server. A member can change it, as the model and
+    // effort. The remote model list carries the fast tiers of the host.
+    getAgentFastMode: scopedRequest<string, AgentFastModeSettings>()("agent:admin:get-fast-mode"),
+    updateAgentFastMode: scopedRequest<UpdateAgentFastModeInput, AgentFastModeSettings>()(
+      "agent:admin:update-fast-mode",
     ),
     // Browser profiles of the computer that runs the agents, and the profile of one agent.
     listBrowserProfiles: scopedQuery<BrowserProfileList>()("agent:admin:list-browser-profiles"),

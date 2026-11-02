@@ -1,3 +1,7 @@
+import {
+  AGENT_FAST_MODE_CAPABILITY,
+  AGENT_FAST_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import {
   AGENT_SESSION_SETTINGS_CAPABILITY,
@@ -25,6 +29,7 @@ import {
   BROWSER_SECRET_RESPONSE_PATH,
   CHANNEL_DELETE_CAPABILITY,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  decodeAgentFastModels,
   decodeAgentProfileDraft,
   decodeChannel,
   decodeChannelPage,
@@ -50,6 +55,7 @@ import {
   type SetSidebarPinsInput,
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
+  withFastServiceTiers,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -69,6 +75,10 @@ import {
 } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import {
+  CONTEXT_COMPACT_CAPABILITY,
+  CONTEXT_COMPACT_ROUTES,
+} from "@openbot/contracts/team-protocol/context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY, CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
@@ -227,6 +237,12 @@ export function agentIpcHandlers({
       throw new Error(sourceText("error.team.sidebarPinsUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, path, decodeSidebarPinsFromHost, { method: "POST", body }));
   };
+  // The context-compact-v1 codec has already checked the empty reply.
+  const remoteCompact = async (serverId: string, path: string, body: AgentTaskInput | { agentId: string }) => {
+    if (!remoteServers.supportsCapability(serverId, CONTEXT_COMPACT_CAPABILITY))
+      throw new Error(sourceText("error.team.contextCompactUnsupported"));
+    await runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
+  };
   const remoteThreadRequest = (serverId: string, path: string, body: AgentTaskInput & { title?: string }) => {
     if (!remoteServers.supportsCapability(serverId, AGENT_THREADS_CAPABILITY)) taskRemoteUnsupported();
     return runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
@@ -299,12 +315,29 @@ export function agentIpcHandlers({
       }),
       listModels: scopedQueryHandler({
         local: () => logRejectedModels(service.listModels(), "local"),
-        remote: (serverId) =>
-          runCauseEffect(
-            remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
-              decodeAgentModelOptions(logRejectedModels(value, "remote")),
-            ),
-          ),
+        remote: (serverId) => {
+          const models = remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
+            decodeAgentModelOptions(logRejectedModels(value, "remote")),
+          );
+          // The released model list drops the fast tier, so a host with `agent-fast-mode-v1` gives it
+          // on its own route, and the picker shows the Fast switch as for a local agent.
+          if (!remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY)) return runCauseEffect(models);
+          return runCauseEffect(
+            Effect.gen(function* () {
+              const options = yield* models;
+              const fast = yield* remoteServers.request(
+                serverId,
+                AGENT_FAST_MODE_ROUTES.models,
+                decodeAgentFastModels,
+                {
+                  method: "POST",
+                  body: {},
+                },
+              );
+              return withFastServiceTiers(options, fast);
+            }),
+          );
+        },
       }),
       readAgentSessionSettings: scopedHandler(parseAgentId, {
         local: (agentId) => runCauseEffect(service.readAgentSessionSettings(agentId)),
@@ -937,18 +970,15 @@ export function agentIpcHandlers({
           );
         },
       }),
-      // Local only: the Team API has no route, and a joined server's agent shows no context ring.
+      // A joined server compacts with `context-compact-v1`.
       compactContext: scopedHandler(parseAgentId, {
         local: (agentId) => runCauseEffect(service.compactAgentContext(agentId)),
-        remote: () => {
-          throw new Error(sourceText("error.team.contextCompactUnsupported"));
-        },
+        remote: (agentId, serverId) => remoteCompact(serverId, CONTEXT_COMPACT_ROUTES.compact, { agentId }),
       }),
       compactTaskContext: scopedHandler(parseAgentTask, {
         local: (parsed) => runCauseEffect(service.compactTaskContext(parsed)),
-        remote: () => {
-          throw new Error(sourceText("error.team.contextCompactUnsupported"));
-        },
+        remote: ({ agentId, taskId }, serverId) =>
+          remoteCompact(serverId, CONTEXT_COMPACT_ROUTES.compactTask, { agentId, taskId }),
       }),
       respondToPrompt: scopedHandler(parsePromptResponse, {
         local: (parsed) => runCauseEffect(service.respondToPrompt(parsed)),

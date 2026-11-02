@@ -5,6 +5,7 @@ import type { AgentAccessStore } from "../agent-access-store";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
 import type { AgentFolders } from "../agent-folders";
 import type { AgentHostSettingsService } from "../agent-host-settings";
+import type { AgentInstructionsFiles } from "../agent-instructions-files";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { AgentTemplateService } from "../agent-template-service";
@@ -154,6 +155,8 @@ type TeamApiAgentMethods = Pick<
   | "reorderQueue"
   | "interrupt"
   | "clearAgentContext"
+  | "compactAgentContext"
+  | "compactTaskContext"
   | "agentIdForRequest"
   | "respondToPrompt"
   | "respondToApproval"
@@ -398,6 +401,8 @@ export interface TeamApiAdmin {
   agentHost?: AgentHostSettingsService;
   /** `agent-folders-v1`: the folders that one agent can change besides its workspace. */
   folders?: Omit<AgentFolders, "requireAgent">;
+  /** `agent-instructions-v1`: read and save the instruction file of one agent. */
+  instructions?: Pick<AgentInstructionsFiles, "listAgents" | "read" | "save">;
   sessionSettings?: Pick<
     AgentService,
     "readAgentSessionSettings" | "setAgentSessionSetting" | "resetAgentSessionSetting"

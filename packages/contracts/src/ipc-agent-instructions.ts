@@ -11,9 +11,9 @@ export const AGENT_INSTRUCTION_FILE_NAMES = ["AGENTS.md", "CLAUDE.md"] as const;
 export type AgentInstructionFileName = (typeof AGENT_INSTRUCTION_FILE_NAMES)[number];
 
 /**
- * The agent's instruction file. Local-only: the Team API does not carry it, so a joined server's
- * agent has none here. `exists` is false when no file is there yet: `text` is empty, and a save
- * writes `fileName`.
+ * The agent's instruction file. A joined server sends it through `agent-instructions-v1` to an owner
+ * or admin. `exists` is false when no file is there yet: `text` is empty, and a save writes
+ * `fileName`.
  */
 export interface AgentInstructionsFile {
   fileName: AgentInstructionFileName;

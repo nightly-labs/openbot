@@ -6,11 +6,13 @@ import { ACP_REGISTRY_CAPABILITY } from "./acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "./agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
+import { AGENT_FAST_MODE_CAPABILITY } from "./agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "./agent-hidden-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "./agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
+import { AGENT_INSTRUCTIONS_CAPABILITY } from "./agent-instructions-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "./agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "./agent-memory-limit-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "./agent-new-chat-v1";
@@ -45,6 +47,7 @@ import {
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
 import { CONNECTORS_CAPABILITY } from "./connectors-v1";
+import { CONTEXT_COMPACT_CAPABILITY } from "./context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY } from "./context-reset-v1";
 import { TEAM_CONTEXT_USAGE_CAPABILITY } from "./context-usage-v1";
 import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "./conversation-file-search-v1";
@@ -157,11 +160,13 @@ export {
   AGENT_ACCESS_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
+  AGENT_FAST_MODE_CAPABILITY,
   AGENT_FOLDERS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
+  AGENT_INSTRUCTIONS_CAPABILITY,
   AGENT_MEMORIES_CAPABILITY,
   AGENT_MEMORY_LIMIT_CAPABILITY,
   AGENT_NEW_CHAT_CAPABILITY,
@@ -188,6 +193,7 @@ export {
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   CONNECTORS_CAPABILITY,
+  CONTEXT_COMPACT_CAPABILITY,
   CONTEXT_RESET_CAPABILITY,
   CONVERSATION_FILE_SEARCH_CAPABILITY,
   CUSTOM_AGENTS_CAPABILITY,
@@ -392,6 +398,9 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MCP_ACCOUNTS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
+  AGENT_FAST_MODE_CAPABILITY,
+  CONTEXT_COMPACT_CAPABILITY,
+  AGENT_INSTRUCTIONS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -539,7 +548,10 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== TEAM_SVG_ATTACHMENTS_CAPABILITY &&
     capability !== MCP_ACCOUNTS_CAPABILITY &&
     capability !== SIDEBAR_PINS_CAPABILITY &&
-    capability !== SIDEBAR_FOLDERS_CAPABILITY,
+    capability !== SIDEBAR_FOLDERS_CAPABILITY &&
+    capability !== AGENT_FAST_MODE_CAPABILITY &&
+    capability !== CONTEXT_COMPACT_CAPABILITY &&
+    capability !== AGENT_INSTRUCTIONS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -563,6 +575,9 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MCP_ACCOUNTS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
+  AGENT_FAST_MODE_CAPABILITY,
+  CONTEXT_COMPACT_CAPABILITY,
+  AGENT_INSTRUCTIONS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -669,6 +684,9 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== TEAM_SVG_ATTACHMENTS_CAPABILITY &&
       capability !== MCP_ACCOUNTS_CAPABILITY &&
       capability !== SIDEBAR_PINS_CAPABILITY &&
-      capability !== SIDEBAR_FOLDERS_CAPABILITY,
+      capability !== SIDEBAR_FOLDERS_CAPABILITY &&
+      capability !== AGENT_FAST_MODE_CAPABILITY &&
+      capability !== CONTEXT_COMPACT_CAPABILITY &&
+      capability !== AGENT_INSTRUCTIONS_CAPABILITY,
   );
 }

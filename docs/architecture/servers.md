@@ -106,6 +106,16 @@ The next provider session gets a handoff of only the messages after the last mar
 the request while a turn runs or a message waits in the queue. A client without the capability shows
 the marker as its text. Channel execution threads are not reset.
 
+### Compact now
+
+`context-compact-v1` adds `POST /v1/agent-context/compact` with `{ agentId }` and
+`POST /v1/agent-context/compact-task` with `{ agentId, taskId }`. Any member who can send the agent a
+message can send them. The host asks the provider to compact the session of the agent's own chat or of
+one open task, as "Compact now" on the host does; the messages stay. The answer is empty. The host
+refuses with 409 while a turn runs or a message waits, or when the provider cannot compact the session.
+The progress and the result arrive in the `compaction` of `context-usage-v1`. Protocol 9 only. The web
+client shows no context meter, so it does not use the capability.
+
 ### Workspace folders
 
 `workspace-directory-v1` adds `POST /v1/workspace-directory` with `{ agentId, path }`. Any member who
@@ -439,7 +449,8 @@ does not count it. See [hosted servers](../hosted-servers.md) step 5.
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.
 Each capability has a frozen codec in `team-protocol/<name>-v1.ts`, registered in
 `team-protocol/optional-routes.ts`, and both transports use it. Every route calls `requireAdmin`,
-except two that also answer a member: `/v1/browser/tab-profiles` and `storage-disk-v1`. The
+except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1` and
+`agent-fast-mode-v1`. The
 host advertises a capability only when its `TeamApiAdmin` member exists.
 
 | Capability | Grants | IPC group |
@@ -448,15 +459,18 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-host-settings-v1` | Agent Computer Use, local scripts, and messages while it works; reads the host default | `agentAdmin` |
 | `agent-backup-models-v1` | Agent backup models: the order and whether to switch without asking. Unknown providers are refused | `agentAdmin` |
 | `agent-task-limit-v1` | Agent task limit: how many tasks run at the same time, 1 to 4, or the host default | `agentAdmin` |
-| `agent-new-chat-v1` | Whether the agent starts a new chat itself when its chat gets long. The read gives the agent's choice or the host default; a change saves the agent's choice. Protocol 9 only | none: only the mobile app sends it |
+| `agent-new-chat-v1` | Whether the agent starts a new chat itself when its chat gets long. The read gives the agent's choice or the host default; a change saves the agent's choice. Protocol 9 only | `agentAdmin` |
 | `agent-plan-card-v1` | Whether the agent shows its plan before a long task; reads the value that applies on the host. Protocol 9 only | `agentAdmin` |
-| `agent-folders-v1` | The folders that an agent can change besides its workspace, and the folders in them that it must not change: read, add, remove, exclude, include. Lists the folders in one host folder (no files, no hidden folders, at most 500), with the home folder and at most 32 disks, so that a phone can pick one. The host checks each folder as the desktop folder picker does (`src/main/agent-folders.ts`). Protocol 9 only | `agentFolders` |
+| `agent-fast-mode-v1` | Whether the agent asks for the fast service tier, and the host models that have one with the tier id (the released model list drops it). A member reads it with view access to the agent and changes it with manage access, as the model and effort. Protocol 9 only | `agentAdmin` |
+| `agent-folders-v1` | The folders that an agent can change besides its workspace, and the folders in them that it must not change: read, add, remove, exclude, include. Lists the folders in one host folder (no files, no hidden folders, at most 500), with the home folder and at most 32 disks, so that a phone or the desktop app of a member can pick one. The host checks each folder as the desktop folder picker does (`src/main/agent-folders.ts`). Protocol 9 only | `agentFolders` |
+| `agent-instructions-v1` | Read and save the instruction file at the root of an agent's workspace (`AGENTS.md`, or `CLAUDE.md` in an older workspace). A save sends the text that the edit started from; the host refuses it with 409 when the file changed. The workspace path does not cross the wire, and a client cannot show the file in its file manager. Protocol 9 only | `agentInstructions` |
 | `browser-profiles-v1` | Named browser profiles of the host: list, create, rename, recolor, clear, delete, and the profile of each agent. One route, `/v1/browser/tab-profiles`, also answers a member: the profile label of each tab that the member can see. Cookies and site data stay on the host. Advertised when the host has `browserProfiles` | `agentAdmin` |
 | `browser-profiles-events-v1` | One event with no data, `browser-profiles-changed`, after each change of the named browser profiles or of an agent's profile. A client reads the `browser-profiles-v1` routes again. Advertised when the host has `browserProfiles` | `browserProfiles` |
 | `skills-admin-v1` | List, install, remove, enable skills by marketplace id | `agentAdmin` |
 | `shared-tables-v1` | List and delete shared tables | `sharedTables` |
 | `agent-install-v1` | Add an agent from a listing or a shared template, by id | `agentAdmin` |
 | `agent-update-v1` | Update an agent added from a listing to the listing's current version, by id | `agentAdmin` |
+| `agent-publish-v1` | Preview, publish and unpublish an agent's share link. The host builds the template, checks it for secrets and publishes it with its own account; the client sends only the share card | `agentAdmin` |
 | `providers-v1` | Code sign-in, provider API keys, managed runtimes, custom endpoints | `providerAdmin` |
 | `instance-transfer-v1` | Export and import the server's agents and server settings as a transfer file | `instanceTransfer` |
 | `providers-v3` | Code sign-in for Codex, Claude and Grok; send the code a Claude sign-in page shows | `providerAdmin` |

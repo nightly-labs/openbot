@@ -56,6 +56,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   canAdministerServer,
+  decodeAgentFastModels,
   decodeWorkspaceDirectory,
   isAccountUsage,
   isAgentStatus,
@@ -68,10 +69,15 @@ import {
   isQueueSnapshot,
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
+  withFastServiceTiers,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  AGENT_FAST_MODE_CAPABILITY,
+  AGENT_FAST_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
   BROWSER_PAGE_STATE_CAPABILITY,
@@ -1284,10 +1290,15 @@ export function createWebWorkspaceRuntime(
       return runTeamEffect(setOwnServerNotificationLevel(teamApi, level).pipe(Effect.mapError((error) => error.cause)));
     },
     async models() {
-      return guardedListDecoder(
+      const models = guardedListDecoder(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
+      if (!capabilities.includes(AGENT_FAST_MODE_CAPABILITY)) return models;
+      return withFastServiceTiers(
+        models,
+        decodeAgentFastModels(await request("POST", AGENT_FAST_MODE_ROUTES.models, {})),
+      );
     },
     async status() {
       const value = await request("GET", TEAM_API_ROUTES.agents.status);

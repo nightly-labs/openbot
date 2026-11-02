@@ -321,6 +321,10 @@ export interface ConversationProps {
   remoteTaskLimitLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's plan card setting: owners and admins only. */
   remotePlanCardLoaded?: boolean | undefined;
+  /** Whether a joined server's host answered with the agent's Computer Use setting: owners and admins only. */
+  remoteComputerUseLoaded?: boolean | undefined;
+  /** Whether a joined server's host answered with the agent's new chat setting: owners and admins only. */
+  remoteNewChatLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's busy-message mode: owners and admins only. */
   remoteBusyMessageModeLoaded?: boolean | undefined;
   /**

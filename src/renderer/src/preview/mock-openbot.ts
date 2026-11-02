@@ -48,6 +48,7 @@ import {
   agentComputerUseEnabled,
   agentExclusionCoverage,
   agentFolderCoverage,
+  agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
   agentTaskLimit,
   type BackgroundProcess,
@@ -1983,7 +1984,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listAgentFolders: async (agentId) => mockAgentFolders(agentId),
       chooseAgentFolder: async ({ agentId, replace }) =>
         addMockAgentFolder(agentId, replace ? `${replace} (found)` : "/mock/Projects/Leads", replace),
-      addAgentFolder: async ({ agentId, path }) => addMockAgentFolder(agentId, path),
+      addAgentFolder: async ({ agentId, path, replace }) => addMockAgentFolder(agentId, path, replace),
       addDroppedAgentFolder: async (agentId, folder) => addMockAgentFolder(agentId, `/mock/Dropped/${folder.name}`),
       removeAgentFolder: async ({ agentId, path }) => {
         const agent = requireMockAgent(agentId);
@@ -2005,6 +2006,20 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         );
         return { outcome: "included", path, list: mockAgentFolders(agentId) };
       },
+      // A small host tree for the folder browser of a joined server.
+      browseAgentFolders: async ({ path }) => {
+        const home = "/mock";
+        const folder = path ?? home;
+        const names = folder === home ? ["Documents", "Projects"] : [];
+        return {
+          path: folder,
+          parentPath: folder === "/" ? null : folder.slice(0, folder.lastIndexOf("/")) || "/",
+          entries: names.map((name) => ({ name, path: `${folder}/${name}` })),
+          truncated: false,
+          home,
+          volumes: [],
+        };
+      },
       readAgentInstructions: async (agentId) => mockAgentInstructions(agentId),
       saveAgentInstructions: async ({ agentId, text, expected }) => {
         const current = mockAgentInstructions(agentId);
@@ -2025,6 +2040,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         await api.agent.updateAgent(input);
         return api.agent.getAgentTaskLimit(input.agentId);
       },
+      getAgentNewChat: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return { allowNewChat: agentNewChatAllowed(agent, agentDefaults) };
+      },
+      updateAgentNewChat: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentNewChat(input.agentId);
+      },
+      previewAgentTemplate: (agentId) => api.agentTemplates.preview(agentId),
+      publishAgentTemplate: (input) => api.agentTemplates.publish(input),
+      unpublishAgentTemplate: (agentId) => api.agentTemplates.unpublish(agentId),
       getAgentPlanCard: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
         if (!agent) throw new Error("Agent not found");
@@ -2033,6 +2060,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgentPlanCard: async (input) => {
         await api.agent.updateAgent(input);
         return api.agent.getAgentPlanCard(input.agentId);
+      },
+      getAgentFastMode: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return { fastMode: agent.fastMode ?? null };
+      },
+      updateAgentFastMode: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentFastMode(input.agentId);
       },
       listBrowserProfiles: async () => ({
         profiles: browserProfiles.map(browserProfileSummary),

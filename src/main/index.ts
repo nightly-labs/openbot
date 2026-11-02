@@ -599,6 +599,7 @@ function registerIpcHandlers({
   agentAdminSettings,
   agentHostSettings,
   agentFolders,
+  agentInstructions,
   browserProfiles,
   language,
   logoColor,
@@ -723,10 +724,11 @@ function registerIpcHandlers({
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
       folders: agentFolders,
+      remoteServers,
       getMainWindow: getDialogParent,
       translate: language.translate,
     }),
-    ...agentInstructionsIpcHandlers({ service }),
+    ...agentInstructionsIpcHandlers({ files: agentInstructions, remoteServers }),
     ...hostedSiteIpcHandlers({
       hostedSites,
       remoteServers,

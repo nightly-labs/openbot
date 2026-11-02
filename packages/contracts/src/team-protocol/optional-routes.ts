@@ -6,11 +6,13 @@ import type { OptionalRouteCodec } from "./admin-wire";
 import { AGENT_ACCESS_CODECS } from "./agent-access-v1";
 import { AGENT_ADMIN_CODECS } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CODECS } from "./agent-backup-models-v1";
+import { AGENT_FAST_MODE_CODECS } from "./agent-fast-mode-v1";
 import { AGENT_FOLDERS_CODECS } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CODECS } from "./agent-hidden-v1";
 import { AGENT_HOST_SETTINGS_CODECS } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_CODECS } from "./agent-import-v1";
 import { AGENT_INSTALL_CODECS } from "./agent-install-v1";
+import { AGENT_INSTRUCTIONS_CODECS } from "./agent-instructions-v1";
 import { AGENT_MEMORIES_CODECS } from "./agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CODECS } from "./agent-memory-limit-v1";
 import { AGENT_NEW_CHAT_CODECS } from "./agent-new-chat-v1";
@@ -32,6 +34,7 @@ import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
 import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
 import { CONNECTORS_CODECS } from "./connectors-v1";
+import { CONTEXT_COMPACT_CODECS } from "./context-compact-v1";
 import { CONTEXT_RESET_CODECS } from "./context-reset-v1";
 import { CONVERSATION_FILE_SEARCH_CODECS } from "./conversation-file-search-v1";
 import { CUSTOM_AGENTS_CODECS } from "./custom-agents-v1";
@@ -132,6 +135,9 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_TASK_LIMIT_CODECS,
   ...AGENT_NEW_CHAT_CODECS,
   ...AGENT_FOLDERS_CODECS,
+  ...AGENT_FAST_MODE_CODECS,
+  ...CONTEXT_COMPACT_CODECS,
+  ...AGENT_INSTRUCTIONS_CODECS,
   ...MCP_SIGN_IN_CODECS,
   ...PROVIDER_HOST_SIGN_IN_CODECS,
   ...MCP_SIGN_IN_APP_CODECS,
