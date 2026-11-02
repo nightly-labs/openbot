@@ -14,6 +14,7 @@ import { type TraceKeyboard, type TraceSpan, TraceWaterfallDialog } from "./Trac
  * One step of an agent's turn: a thought, a progress line of the host, or a memory change that the
  * turn committed. `memory-summary` is the count that a host without the changes sends instead.
  * The text of `progress` and `memory-summary` is the host's English source text.
+ * A thought can be that text too. The step list reads both with `sourceText`.
  */
 export type AgentStep =
   | { id: string; kind: "thinking"; text: string }
@@ -108,7 +109,7 @@ function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Elemen
       </span>
     );
   }
-  const shown = step.kind === "thinking" ? step.text : text.sourceText(step.text);
+  const shown = text.sourceText(step.text);
   return <span class={["agent-step-text", { "agent-activity-label": newest }]}>{shown}</span>;
 }
 

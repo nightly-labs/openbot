@@ -152,7 +152,7 @@ export function TasksEmptyBoard(props: { agents: readonly AgentProfile[] }) {
  * position, so a change of state moves it up.
  */
 function SampleRow(props: { sample: SampleTask; age: Age; agent: AgentProfile | undefined }) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const task = createMemo((): AgentTask => {
     const at = new Date(0).toISOString();
     return {
@@ -183,7 +183,7 @@ function SampleRow(props: { sample: SampleTask; age: Age; agent: AgentProfile | 
         <AgentTaskMark task={task()} decorative />
         <span class="tasks-page-row-title">{task().title}</span>
         <span class="tasks-page-status" data-tone={taskTone(task())}>
-          <SwapLabel text={agentTaskStatus(task(), t)} />
+          <SwapLabel text={agentTaskStatus(task(), t, sourceText)} />
         </span>
         <AgentAvatar agent={props.agent} mood={MOOD[props.age]} class="tasks-page-avatar" />
       </span>

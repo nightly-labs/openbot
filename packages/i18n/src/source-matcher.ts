@@ -120,8 +120,11 @@ export function createSourceLocalizer(input: {
   }
 
   function localize(text: string, locale: TranslatedLocale, depth: number): string {
-    for (const template of candidates(text)) {
-      const match = template.pattern.exec(text);
+    // Templates end with the Unicode ellipsis. A host or a thought can send three ASCII dots.
+    // Only this copy is matched. A miss returns the original text, dots included.
+    const normalized = text.replaceAll("...", "…");
+    for (const template of candidates(normalized)) {
+      const match = template.pattern.exec(normalized);
       if (!match) continue;
       const values = new Map<string, string | number>();
       template.names.forEach((name, position) => {
