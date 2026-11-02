@@ -5,6 +5,6 @@
     "Start a workflow when someone mentions OpenBot in Discord, and send its result back to Discord.",
     "Sidebar folders can now hold folders, up to three levels.",
     "Pinned agents and channels stay the same on each device that connects to a server.",
-    "On a Mac, hold ⌘Q or press it twice to quit OpenBot, so one press by mistake no longer stops your agents."
+    "On a Mac, OpenBot has a menu bar icon and keeps your tasks running after you close the window. Hold ⌘Q or press it twice to quit."
   ]
 }

@@ -47,6 +47,7 @@ All notable changes to OpenBot will be documented here. The project follows
   from an older release shows each folder at the top level, and its changes keep the folders.
 - Start a workflow when someone mentions OpenBot in a Discord server, with filters for the channel, the role and the text.
 - Send a workflow result to Discord: reply to the message, post in a channel, or add a reaction.
+- On a Mac, OpenBot now has an icon in the menu bar. After you close the window, the Dock icon hides and active tasks keep running. To keep the Dock icon, turn off Settings > General > Show OpenBot in the menu bar.
 
 ### Changed
 
