@@ -380,6 +380,23 @@ export function toolFailed(item: ThreadItem): boolean {
   return status === "failed" || status === "declined" || (typeof exitCode === "number" && exitCode !== 0);
 }
 
+/** Error output or message from a failed tool item, if any. */
+export function toolErrorText(item: ThreadItem): string | null {
+  if (!toolFailed(item)) return null;
+  const direct =
+    getString(item, "error") ??
+    getString(item, "result") ??
+    getString(item, "output") ??
+    getString(item, "stderr");
+  if (direct && direct.trim()) return direct.trim();
+  const obj = getRecord(item, "error") ?? getRecord(item, "result");
+  if (obj) {
+    const text = getString(obj, "message") ?? getString(obj, "error") ?? getString(obj, "text");
+    if (text && text.trim()) return text.trim();
+  }
+  return null;
+}
+
 /** Whether an item is a tool step: a tool call, a command, a file change, a web search or a computer action. */
 export function isToolItem(item: ThreadItem): boolean {
   return /(tool.*call|commandexecution|filechange|websearch|computeraction)/u.test(item.type.toLowerCase());

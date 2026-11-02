@@ -102,7 +102,14 @@ export type AgentEvent =
       createdAt: string;
       revision: number;
     }
-  | { type: "turn-progress"; agentId: string; threadId: string; turnId: string; detail: string }
+  | {
+      type: "turn-progress";
+      agentId: string;
+      threadId: string;
+      turnId: string;
+      detail: string;
+      error?: string | undefined;
+    }
   | { type: "turn-started"; agentId: string; threadId: string; turnId: string; origin?: AgentTurnOrigin }
   | {
       type: "turn-completed";
@@ -276,7 +283,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isIdentifier(value.turnId) &&
         isString(value.detail) &&
         value.detail.length > 0 &&
-        value.detail.length <= INPUT_LIMITS.promptQuestion
+        value.detail.length <= INPUT_LIMITS.promptQuestion &&
+        (value.error === undefined || (isString(value.error) && value.error.length <= INPUT_LIMITS.messageText))
       );
     case "turn-started":
     case "turn-completed":
