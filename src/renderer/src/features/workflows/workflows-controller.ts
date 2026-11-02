@@ -1,6 +1,7 @@
 import {
   type AgentAccessLevels,
   graphAgentIds,
+  WORKFLOW_CHAT_HISTORY,
   type WorkflowDetail,
   type WorkflowGitHubCatalog,
   type WorkflowGitHubHistory,
@@ -26,6 +27,8 @@ import { createEffect, createMemo, createSignal, onSettled, untrack } from "soli
 import type { DesktopAnalyticsScope, WorkflowAnalyticsAction } from "../../analytics";
 import { createGitHubConnector } from "../connectors/github-connector";
 import type { WorkflowHost } from "./workflows-port";
+
+type DraftChatMessage = NonNullable<WorkflowCanvasProps["draftChat"]>[number];
 
 const RUN_PAGE = 20;
 /** The pause after the last edit before the canvas saves. */
@@ -123,6 +126,21 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   /** Counts each edit and each save, so that a read that started before one does not reset the canvas. */
   let edits = 0;
   let writing = 0;
+  /** Counts each saved AI draft, so that an edit made on the graph before it does not save over it. */
+  let drafts = 0;
+  /** The Ask AI chat of each workflow, for as long as this page is open, and the workflows that wait for a reply. */
+  const [chats, setChats] = createSignal<ReadonlyMap<string, readonly DraftChatMessage[]>>(new Map());
+  const [drafting, setDrafting] = createSignal<ReadonlySet<string>>(new Set());
+  const chatOf = (workflowId: string) => chats().get(workflowId) ?? [];
+  const say = (workflowId: string, message: DraftChatMessage) =>
+    setChats((all) => new Map(all).set(workflowId, [...(all.get(workflowId) ?? []), message]));
+  const setDraftingIn = (workflowId: string, on: boolean) =>
+    setDrafting((all) => {
+      const next = new Set(all);
+      if (on) next.add(workflowId);
+      else next.delete(workflowId);
+      return next;
+    });
   /** Counts each preview request, so that the graph of an older one does not show. */
   let previewRequest = 0;
 
@@ -259,8 +277,10 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     const edit = pending;
     pending = undefined;
     if (!edit) return;
+    const round = drafts;
     write(async () => {
-      if (base.workflowId !== edit.workflowId) return;
+      // A draft that saved after this edit replaced the graph; undo on the canvas gets the edit back.
+      if (base.workflowId !== edit.workflowId || round !== drafts) return;
       let result: WorkflowSaveResult;
       try {
         result = await host.workflows.saveGraph({
@@ -481,6 +501,50 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
         reset(await tracked("restore_version", () => host.workflows.restoreVersion({ workflowId, versionId })));
       });
     },
+    get draftChat() {
+      return chatOf(stored()?.detail.summary.id ?? current);
+    },
+    get drafting() {
+      return drafting().has(stored()?.detail.summary.id ?? current);
+    },
+    // The edit that waits saves first, so the draft starts from it and the version before the draft has it.
+    // The chat shows a failure as a reply, so the queue gets no error to show.
+    onDraft: host.canDraft()
+      ? (request) => {
+          flush();
+          const workflowId = current;
+          const history = chatOf(workflowId)
+            .filter((message) => !message.failed)
+            .slice(-WORKFLOW_CHAT_HISTORY)
+            .map(({ role, text }) => ({ role, text }));
+          say(workflowId, { role: "user", text: request });
+          setDraftingIn(workflowId, true);
+          write(async () => {
+            try {
+              const result = await host.workflows.draft({ workflowId, baseRevision: base.revision, request, history });
+              if (result.detail && !disposed) {
+                drafts += 1;
+                // An edit made while the AI worked is on the graph before the draft, so it does not save.
+                if (pending?.workflowId === workflowId) {
+                  clearTimeout(timer);
+                  timer = undefined;
+                  pending = undefined;
+                }
+                if (workflowId === current) reset(result.detail);
+              }
+              say(workflowId, { role: "assistant", text: result.reply || t("workflow.canvas.chat.changed") });
+            } catch (error) {
+              say(workflowId, {
+                role: "assistant",
+                text: errorMessage(error, t("workflow.page.failed")),
+                failed: true,
+              });
+            } finally {
+              setDraftingIn(workflowId, false);
+            }
+          });
+        }
+      : undefined,
     onPreviewVersion: (versionId) => {
       closePreview();
       if (versionId === null) return;

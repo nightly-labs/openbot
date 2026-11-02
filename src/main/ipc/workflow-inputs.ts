@@ -5,8 +5,10 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type CreateWorkflowInput,
   type DecideWorkflowStepInput,
+  type DraftWorkflowInput,
   isCreateWorkflowInput,
   isDecideWorkflowStepInput,
+  isDraftWorkflowInput,
   isRenameWorkflowInput,
   isRetryWorkflowStepInput,
   isRunWorkflowStepInput,
@@ -119,6 +121,16 @@ export function parseSaveWorkflowGraph(value: unknown): SaveWorkflowGraphInput {
 export function parseWorkflowVersion(value: unknown): WorkflowVersionInput {
   if (!isWorkflowVersionInput(value)) throw new Error("Invalid workflow version.");
   return { workflowId: value.workflowId, versionId: value.versionId };
+}
+
+export function parseDraftWorkflow(value: unknown): DraftWorkflowInput {
+  if (!isDraftWorkflowInput(value)) throw new Error("Invalid workflow draft request.");
+  return {
+    workflowId: value.workflowId,
+    baseRevision: value.baseRevision,
+    request: value.request.trim(),
+    history: value.history.map(({ role, text }) => ({ role, text })),
+  };
 }
 
 export function parseStartWorkflowRun(value: unknown): StartWorkflowRunInput {

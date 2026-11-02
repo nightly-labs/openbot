@@ -34,6 +34,8 @@ import {
   type AgentReasoningEffort,
   type CreateWorkflowInput,
   type DecideWorkflowStepInput,
+  type DraftWorkflowInput,
+  type DraftWorkflowResult,
   graphAgentIds,
   isReasoningEffort,
   nodeAgentId,
@@ -43,6 +45,7 @@ import {
   type RunWorkflowStepInput,
   type SaveWorkflowGraphInput,
   type StartWorkflowRunInput,
+  WORKFLOW_CHAT_HISTORY,
   WORKFLOW_GITHUB_EVENTS,
   type WorkflowDetail,
   type WorkflowGitHubHistory,
@@ -100,6 +103,7 @@ import {
   githubOutputText,
   githubResultKeys,
 } from "./github-output";
+import { draftedGraph, draftPrompt, type WorkflowDraftContext } from "./workflow-draft";
 import { REPEATABLE_GITHUB_ACTIONS, type WorkflowGitHubApi } from "./workflow-github-api";
 import type { WaitingGitHubDelivery, WorkflowGitHubStore } from "./workflow-github-store";
 import {
@@ -197,6 +201,8 @@ export interface WorkflowsDependencies {
   /** One tool-less generation; the failure is a message the user can read. */
   generateText(request: WorkflowTextRequest): Effect.Effect<string, { readonly message: string }>;
   notify(notice: WorkflowNotice): void;
+  /** The agents and messaging places that a drafted workflow may name; none without it. */
+  draftContext?: () => Effect.Effect<WorkflowDraftContext>;
   /** Whether a messaging connection of this host is on. */
   connectionOn(connectionId: string): boolean;
   /** Posts Markdown to a place of a messaging connection, in more than one post when it is long. */
@@ -279,6 +285,11 @@ interface WorkflowsShape {
   saveGraph(input: SaveWorkflowGraphInput): Effect.Effect<WorkflowSaveResult, WorkflowFailed>;
   versions(workflowId: string): Effect.Effect<WorkflowVersion[], WorkflowFailed>;
   restoreVersion(input: WorkflowVersionInput): Effect.Effect<WorkflowDetail, WorkflowFailed>;
+  /**
+   * Drafts a graph for a request with a model, and puts it in place of the graph at the base revision.
+   * A draft that breaks a graph rule goes back to the model once with the reason.
+   */
+  draft(input: DraftWorkflowInput): Effect.Effect<DraftWorkflowResult, WorkflowFailed>;
   /** The graph that a restore of the version would put back, or null when there is no such version. */
   /** The graph that a version keeps, so a person can look at it before a restore. */
   versionGraph(input: WorkflowVersionInput): Effect.Effect<WorkflowGraph, WorkflowFailed>;
@@ -1088,6 +1099,52 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return detail;
         });
 
+        const draft = Effect.fn("Workflows.draft")(function* (input: DraftWorkflowInput) {
+          const before = yield* attempt(() => detailOf(input.workflowId));
+          if (before.revision !== input.baseRevision)
+            return yield* refuse("refused", sourceText("error.workflow.draftChanged"));
+          const context = dependencies.draftContext ? yield* dependencies.draftContext() : { agents: [], places: [] };
+          const history = input.history.slice(-WORKFLOW_CHAT_HISTORY);
+          let problem: string | undefined;
+          for (let attempts = 0; attempts < 2; attempts += 1) {
+            const answer = yield* dependencies
+              .generateText({
+                provider: null,
+                model: null,
+                effort: null,
+                prompt: draftPrompt(input.request, history, before.graph, context, problem),
+              })
+              .pipe(Effect.mapError((failure) => refuse("refused", failure.message)));
+            const result = draftedGraph(answer, before.graph, context);
+            let graph: WorkflowGraph | undefined;
+            let reply = "";
+            if ("problem" in result) problem = result.problem;
+            else if (!result.graph) return { reply: result.reply, detail: null };
+            else {
+              reply = result.reply;
+              // A schedule that the host refuses, such as one that runs too often, goes back to the model too.
+              try {
+                graph = prepareWorkflowSchedules(result.graph, dependencies.timezone(), now());
+              } catch (error) {
+                problem = error instanceof Error ? error.message : "The schedule is not valid.";
+              }
+            }
+            if (!graph) {
+              // The reason can quote the model's answer, so the log does not.
+              logger.warn("A drafted workflow broke a rule.", { workflowId: input.workflowId, attempt: attempts + 1 });
+              continue;
+            }
+            const saved = graph;
+            const detail = yield* attempt(() => store.replaceGraph(input.workflowId, input.baseRevision, saved, now()));
+            if (!detail) return yield* refuse("refused", sourceText("error.workflow.draftChanged"));
+            changed(input.workflowId);
+            rearm();
+            watchGitHub();
+            return { reply, detail };
+          }
+          return yield* refuse("refused", sourceText("error.workflow.draftFailed"));
+        });
+
         // --- Run actions ---------------------------------------------------------------------------
 
         /**
@@ -1704,6 +1761,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           saveGraph,
           versions,
           restoreVersion,
+          draft,
           versionGraph,
           startRun,
           startScheduled,

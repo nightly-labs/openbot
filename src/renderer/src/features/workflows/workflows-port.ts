@@ -48,6 +48,8 @@ export interface WorkflowHost {
   githubSupported(): boolean;
   /** The GitHub connection that the host's GitHub triggers and outputs use. */
   githubConnector: GitHubConnectorPort;
+  /** Whether the host drafts a workflow with AI: only this computer does. */
+  canDraft(): boolean;
   /** The joined server, as its server row names it, or undefined for this computer. */
   hostName(): string | undefined;
   /** Opens an http or https page in the browser. */
@@ -76,6 +78,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       versions: (workflowId) => api().versions(workflowId, serverId),
       versionGraph: (input) => api().versionGraph(input, serverId),
       restoreVersion: (input) => api().restoreVersion(input, serverId),
+      draft: (input) => api().draft(input, serverId),
       startRun: (input) => api().startRun(input, serverId),
       runStep: (input) => api().runStep(input, serverId),
       stopStep: (stepId) => api().stopStep(stepId, serverId),
@@ -153,6 +156,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     get githubConnector() {
       return local() ? githubConnectorPort() : hostGitHub;
     },
+    canDraft: local,
     hostName: () => (local() ? undefined : server()?.name),
     openUrl: (url) => window.openbot.openUrl(url),
   };

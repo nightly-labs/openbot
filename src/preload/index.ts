@@ -303,6 +303,7 @@ import {
 } from "./team-decoding";
 import { decodeVaultImportResult, decodeVaultSecret, decodeVaultState } from "./vault-decoding";
 import {
+  decodeDraftWorkflowResult,
   decodeWorkflowDetail,
   decodeWorkflowGitHubCatalog,
   decodeWorkflowGitHubHistory,
@@ -773,6 +774,7 @@ const openbotApi: OpenBotDesktopApi = {
     versions: decodeWorkflowVersions,
     versionGraph: decodeWorkflowGraph,
     restoreVersion: decodeWorkflowDetail,
+    draft: decodeDraftWorkflowResult,
     startRun: decodeWorkflowRunDetail,
     runStep: decodeWorkflowStep,
     stopStep: decodeVoid,

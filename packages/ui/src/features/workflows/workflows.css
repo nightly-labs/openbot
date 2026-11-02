@@ -902,6 +902,151 @@
   text-align: left;
 }
 
+/* Buildbot sits apart at the bottom right, with a soft glow that pulses faster while it works. */
+.wfn-hud.wfn-buildbot-dock {
+  right: var(--wfn-hud-inset);
+  bottom: var(--wfn-hud-inset);
+  height: calc(var(--openbot-control-lg) + var(--openbot-space-3));
+  padding: var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-pill);
+  box-shadow:
+    0 0 0 1px var(--openbot-accent-strong),
+    0 0 18px 2px var(--openbot-accent-soft);
+  animation: wfn-buildbot-glow 3.2s ease-in-out infinite;
+}
+
+.wfn-hud.wfn-buildbot-dock[data-busy] {
+  animation-duration: 1.1s;
+}
+
+.wfn-stage .wfn-buildbot-dock .wfn-buildbot {
+  gap: var(--openbot-space-2);
+  height: var(--openbot-control-lg);
+  padding-inline: var(--openbot-space-1) var(--openbot-space-3);
+  border-radius: var(--openbot-radius-pill);
+  font-weight: 600;
+}
+
+.wfn-stage .wfn-buildbot-dock .wfn-buildbot[aria-pressed="true"] {
+  background: var(--openbot-accent-soft);
+}
+
+@keyframes wfn-buildbot-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px var(--openbot-accent-strong),
+      0 0 14px 1px var(--openbot-accent-soft);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px var(--openbot-accent),
+      0 0 28px 6px var(--openbot-accent-strong);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wfn-hud.wfn-buildbot-dock {
+    animation: none;
+  }
+}
+
+/* The Ask AI chat: a column at the right edge, between the top bar and the tool bar. */
+.wfn-hud.wfn-chat {
+  top: calc(var(--wfn-hud-inset) + var(--openbot-control-md) + var(--openbot-space-2) + var(--openbot-space-3));
+  right: var(--wfn-hud-inset);
+  bottom: calc(var(--wfn-hud-inset) + var(--openbot-control-lg) + var(--openbot-space-3) + var(--openbot-space-2));
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  align-items: stretch;
+  width: min(360px, calc(100% - var(--openbot-space-8)));
+  height: auto;
+}
+
+/* In a window, the top bar is in the window's top row, so the chat starts below that row. */
+.wfn-canvas[data-frame="window"] .wfn-hud.wfn-chat {
+  top: calc(var(--left-header-height) + var(--wfn-hud-inset));
+}
+
+.wfn-chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: var(--openbot-space-2);
+}
+
+.wfn-chat-title {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  margin: 0;
+  font-size: var(--openbot-text-sm);
+  font-weight: 600;
+}
+
+.wfn-chat-messages {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  min-height: 0;
+  margin: 0;
+  padding: var(--openbot-space-2);
+  overflow-y: auto;
+  border-top: 1px solid var(--wfn-ring);
+  list-style: none;
+}
+
+.wfn-chat-empty {
+  color: var(--openbot-text-muted);
+  text-wrap: pretty;
+}
+
+.wfn-chat-message {
+  max-width: 88%;
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--wfn-ring);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.wfn-chat-message[data-role="user"] {
+  align-self: flex-end;
+  background: var(--openbot-bg-control-active);
+}
+
+.wfn-chat-message[data-failed] {
+  color: var(--openbot-danger-text);
+}
+
+.wfn-chat-working {
+  display: flex;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+  color: var(--openbot-text-muted);
+}
+
+.wfn-stage .wfn-hud .wfn-chat-working svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  animation: wfn-spin 1s linear infinite;
+}
+
+.wfn-chat-composer {
+  display: flex;
+  gap: var(--openbot-space-1);
+  align-items: flex-end;
+}
+
+.wfn-stage .wfn-chat-input {
+  flex: 1 1 auto;
+  min-height: 0;
+  resize: none;
+  font-size: var(--openbot-text-sm);
+}
+
 .wfn-search-result .wfn-menu-text {
   flex: 0 0 auto;
 }

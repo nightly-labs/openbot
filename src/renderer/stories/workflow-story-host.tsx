@@ -153,6 +153,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     agentLevels: async () => null,
     githubSupported: () => true,
     githubConnector: createMockGitHubConnector(),
+    canDraft: () => true,
     hostName: () => undefined,
     // A story opens no browser.
     openUrl: async () => undefined,

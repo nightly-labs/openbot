@@ -1948,6 +1948,25 @@ export async function createApplicationServices({
           })),
         ),
       notify: forwardWorkflowNotice,
+      draftContext: () =>
+        service.messaging.destinationOptions().pipe(
+          Effect.map((connections) => ({
+            agents: service.listAgents().map(({ id, name, description, provider, model }) => ({
+              id,
+              name,
+              description,
+              provider,
+              model,
+            })),
+            places: connections.flatMap((connection) =>
+              connection.places.map((place) => ({
+                connectionId: connection.connectionId,
+                placeId: place.id,
+                label: `${connection.connectionName} · ${place.name}`,
+              })),
+            ),
+          })),
+        ),
       connectionOn: (connectionId) => service.messaging.store.connection(connectionId)?.enabled === true,
       post: (connectionId, placeId, markdown) => service.messaging.deliver(connectionId, placeId, markdown),
       discordSend: (connectionId, send) => service.messaging.discordSend(connectionId, send),

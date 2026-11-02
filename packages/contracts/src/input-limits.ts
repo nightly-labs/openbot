@@ -50,6 +50,8 @@ export const INPUT_LIMITS = {
   workflowStrokes: 500,
   workflowStrokePoints: 2_000,
   workflowTitle: 160,
+  // What a person asks the AI to build or change in one workflow.
+  workflowDraftRequest: 4_000,
   // The JSON of one saved graph. A workflow and its triggers must fit one WebRTC frame (1.5 MiB of
   // body) when a member reads it.
   workflowGraphBytes: 1024 * 1024,
