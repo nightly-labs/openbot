@@ -64,7 +64,8 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   },
   // CLDR: one is the integer 1.
   tr: (count) => (count === 1 ? "one" : "other"),
-  // CLDR Chinese has one form for every count, like Japanese.
+  // CLDR Chinese has one form for every count, like Japanese. The lookup reads the primary
+  // subtag, so zh-TW lands here too.
   zh: () => "other",
 };
 
