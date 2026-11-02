@@ -318,6 +318,15 @@ export class DrainScheduler {
       return "agent-client-changing";
     // A hidden agent finishes the turn that runs. Its queued messages wait until the user restores it.
     if (agent?.hiddenAt !== undefined) return "hidden";
+    // No turn starts on a provider that waits for a sign-in, so its messages wait for the sign-in
+    // rather than fail (#4326). The provider runtime schedules the drain again when it is signed in.
+    // Channel work and an external conversation still start and fail, so that their channel or
+    // their sender hears of it and the work does not hold a channel assignment.
+    if (agent && this.#providers.signInRequired(providerForAgent(agent))) {
+      const head = this.#mailbox.nextQueued(agentId, taskId)?.delivery.id;
+      if (!head || !(this.#channels?.store.assignmentForDelivery(head) || this.#messaging?.ownsDelivery(head)))
+        return "sign-in";
+    }
     // Channel work holds only the agent's own chat. Its tasks run beside a channel turn.
     if (taskId === null && !(this.#channels?.mayDrain(agentId) ?? true)) return "channel";
     if (!this.#profileSave.mayDrain(agentId)) return "profile-save";
@@ -971,6 +980,19 @@ export class DrainScheduler {
                 Effect.delay(TURN_START_GRACE_MS),
               ),
             );
+            return;
+          }
+          // The start found the provider signed out, so nothing ran. The messages wait for the sign-in,
+          // as `#heldBy` holds them, and a channel or an external conversation fails its work as before.
+          if (
+            !channelDelivery &&
+            !messagingDelivery &&
+            this.#deliveryProviders(delivery.recipientAgentId).some((provider) =>
+              this.#providers.signInRequired(provider),
+            )
+          ) {
+            for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
+            this.#mailboxSync.emitQueue(delivery.recipientAgentId);
             return;
           }
           const reason = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
