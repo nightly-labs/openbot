@@ -1310,7 +1310,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#openingSessionProcesses.add(transport);
     const startTimeout = this.#startTimeout(this.#startTimeoutMs ?? this.#requestTimeoutMs);
     yield* Effect.gen({ self: this }, function* () {
-      yield* providerSync(() => transport.start());
+      yield* providerSync(() => {
+        // A stop that started before this spawn did not see the process. In the same step, so no stop starts between.
+        if (!this.running) throw new Error("ACP client is not running.");
+        transport.start();
+      });
       const connection = yield* providerSync(() => transport.requireConnection());
       const initialization = yield* this.#initializeConnection(connection).pipe(startTimeout);
       yield* (this.options.authenticate?.(connection, initialization) ?? Effect.void).pipe(startTimeout);
