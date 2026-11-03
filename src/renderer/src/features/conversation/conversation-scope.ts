@@ -488,6 +488,8 @@ export function createConversationViewScope(props: ConversationProps) {
     if (browserTabs().length === 0) void openBrowserAddress();
   }
   function openSidePanelPane(pane: SidePanelPane) {
+    // A file read that is still running must not replace the pane.
+    resources.filePreviewRequestGeneration += 1;
     if (pane === "browser") showBrowserPanel();
     else setActiveRightPanel(SIDE_PANEL_MODES[pane]);
   }
@@ -511,8 +513,8 @@ export function createConversationViewScope(props: ConversationProps) {
     const pane = selected && panes.includes(selected) ? selected : null;
     const thread = shownPanelThreadId() ?? sideThreadIds()[0];
     if (file && files.some((item) => item.key === file)) {
+      setActiveRightPanel("side-panel");
       openSidePanelFile(file);
-      if (!sidePanelOpen()) setActiveRightPanel("side-panel");
     } else if (pane) openSidePanelPane(pane);
     else if (thread && selected === null) openPanelThread(thread);
     else if (panes[0]) openSidePanelPane(panes[0]);
