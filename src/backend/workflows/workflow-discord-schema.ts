@@ -8,7 +8,7 @@ import type { DatabaseSync } from "node:sqlite";
 // deliveries and GitHub rows that point to them stay as they are. A Discord trigger has no table of its
 // own: the run payload keeps the message that started it, and a Discord output's post or reaction is a
 // row of `workflow_output_deliveries`.
-export const V50_WORKFLOW_RUN_SOURCE_SQL =
+const V50_WORKFLOW_RUN_SOURCE_SQL =
   "source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github', 'discord')),";
 
 const V50_WORKFLOW_RUN_INDEXES_SQL = `

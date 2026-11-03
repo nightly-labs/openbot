@@ -1303,25 +1303,28 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           );
         });
 
-        const receiveDiscord = Effect.fn("Workflows.receiveDiscord")(function* (mention: MessagingDiscordMention) {
-          return yield* locked(
+        /**
+         * Starts a run for each chat trigger that a new conversation matches. Discord and Telegram differ only
+         * in these values, so a fix here applies to both.
+         */
+        const receiveMention = (chat: {
+          matches: (node: WorkflowNode) => boolean;
+          /** True when an open run started from the same chat message. */
+          sameMessage: (run: StoredWorkflowRun) => boolean;
+          origin: (node: WorkflowNode) => Omit<RunOrigin, "scheduledFor">;
+          failure: string;
+        }) =>
+          locked(
             Effect.gen(function* (): Effect.fn.Return<MessagingMentionResult, WorkflowFailed> {
               const triggers = (yield* attempt(() => store.listWithGraphs())).flatMap(({ summary, graph }) =>
-                graph.nodes
-                  .filter((node) => discordTriggerMatches(node, mention))
-                  .map((node) => ({ workflowId: summary.id, node })),
+                graph.nodes.filter(chat.matches).map((node) => ({ workflowId: summary.id, node })),
               );
               if (triggers.length === 0) return "none";
               let started = false;
               for (const { workflowId, node } of triggers) {
                 const open = runs.openRuns().filter((run) => run.workflowId === workflowId);
                 // A mention that Signal gives again, after a restart, has its run already.
-                if (
-                  open.some(
-                    (run) =>
-                      run.source === "discord" && discordTriggerMessage(run.payload)?.messageId === mention.messageId,
-                  )
-                ) {
+                if (open.some(chat.sameMessage)) {
                   started = true;
                   continue;
                 }
@@ -1329,20 +1332,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 if (open.length > 0) continue;
                 const detail = yield* attempt(() => store.detail(workflowId));
                 if (!detail) continue;
-                const result = yield* begin(detail, node, {
-                  source: "discord",
-                  scheduledFor: null,
-                  idempotencyKey: `discord:${node.id}:${mention.messageId}`,
-                  payload: workflowDiscordPayload(node.id, mention),
-                }).pipe(Effect.result);
+                const result = yield* begin(detail, node, { ...chat.origin(node), scheduledFor: null }).pipe(
+                  Effect.result,
+                );
                 if (Result.isFailure(result)) {
                   // After a run started, the mention stays with the workflows: no agent answers it too.
                   if (!started && !(result.failure.cause instanceof WorkflowStoreError)) return yield* result.failure;
-                  logger.warn("A Discord mention did not start a workflow run.", {
-                    workflowId,
-                    nodeId: node.id,
-                    cause: String(result.failure.cause),
-                  });
+                  logger.warn(chat.failure, { workflowId, nodeId: node.id, cause: String(result.failure.cause) });
                   continue;
                 }
                 started = true;
@@ -1350,56 +1346,36 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               return started ? "started" : "skipped";
             }),
           );
+
+        const receiveDiscord = Effect.fn("Workflows.receiveDiscord")(function* (mention: MessagingDiscordMention) {
+          return yield* receiveMention({
+            matches: (node) => discordTriggerMatches(node, mention),
+            sameMessage: (run) =>
+              run.source === "discord" && discordTriggerMessage(run.payload)?.messageId === mention.messageId,
+            origin: (node) => ({
+              source: "discord",
+              idempotencyKey: `discord:${node.id}:${mention.messageId}`,
+              payload: workflowDiscordPayload(node.id, mention),
+            }),
+            failure: "A Discord mention did not start a workflow run.",
+          });
         });
 
         const receiveTelegram = Effect.fn("Workflows.receiveTelegram")(function* (mention: MessagingTelegramMention) {
-          return yield* locked(
-            Effect.gen(function* (): Effect.fn.Return<MessagingMentionResult, WorkflowFailed> {
-              const triggers = (yield* attempt(() => store.listWithGraphs())).flatMap(({ summary, graph }) =>
-                graph.nodes
-                  .filter((node) => telegramTriggerMatches(node, mention))
-                  .map((node) => ({ workflowId: summary.id, node })),
-              );
-              if (triggers.length === 0) return "none";
-              let started = false;
-              for (const { workflowId, node } of triggers) {
-                const open = runs.openRuns().filter((run) => run.workflowId === workflowId);
-                // A mention that Signal gives again, after a restart, has its run already. A Telegram message
-                // id is unique only in its chat, so the chat is part of the match and of the key.
-                if (
-                  open.some((run) => {
-                    const message = run.source === "telegram" ? telegramTriggerMessage(run.payload) : null;
-                    return message?.connectionId === mention.connectionId && message.messageId === mention.messageId;
-                  })
-                ) {
-                  started = true;
-                  continue;
-                }
-                // A busy workflow skips the mention, as a schedule skips an occurrence.
-                if (open.length > 0) continue;
-                const detail = yield* attempt(() => store.detail(workflowId));
-                if (!detail) continue;
-                const result = yield* begin(detail, node, {
-                  source: "telegram",
-                  scheduledFor: null,
-                  idempotencyKey: `telegram:${node.id}:${mention.connectionId}:${mention.messageId}`,
-                  payload: workflowTelegramPayload(node.id, mention),
-                }).pipe(Effect.result);
-                if (Result.isFailure(result)) {
-                  // After a run started, the mention stays with the workflows: no agent answers it too.
-                  if (!started && !(result.failure.cause instanceof WorkflowStoreError)) return yield* result.failure;
-                  logger.warn("A Telegram message did not start a workflow run.", {
-                    workflowId,
-                    nodeId: node.id,
-                    cause: String(result.failure.cause),
-                  });
-                  continue;
-                }
-                started = true;
-              }
-              return started ? "started" : "skipped";
+          // A Telegram message id is unique only in its chat, so the chat is part of the match and of the key.
+          return yield* receiveMention({
+            matches: (node) => telegramTriggerMatches(node, mention),
+            sameMessage: (run) => {
+              const message = run.source === "telegram" ? telegramTriggerMessage(run.payload) : null;
+              return message?.connectionId === mention.connectionId && message.messageId === mention.messageId;
+            },
+            origin: (node) => ({
+              source: "telegram",
+              idempotencyKey: `telegram:${node.id}:${mention.connectionId}:${mention.messageId}`,
+              payload: workflowTelegramPayload(node.id, mention),
             }),
-          );
+            failure: "A Telegram message did not start a workflow run.",
+          });
         });
 
         // --- GitHub --------------------------------------------------------------------------------
