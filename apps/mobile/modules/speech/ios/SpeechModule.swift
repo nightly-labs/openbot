@@ -182,7 +182,6 @@ private final class SpeechCapture {
   /// Its own engine: the playback engine changes its configuration when a reply starts.
   let engine = AVAudioEngine()
   private let target = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: captureSampleRate, channels: 1, interleaved: false)!
-  private var converter: AVAudioConverter?
   private var meter = LoudnessMeter()
   private var pending: [Float] = []
   private var segment: [Float] = []
@@ -217,14 +216,18 @@ private final class SpeechCapture {
     try audio.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP])
     try audio.setActive(true)
     let input = engine.inputNode
-    let format = input.outputFormat(forBus: 0)
-    guard format.sampleRate > 0, format.channelCount > 0, let converter = AVAudioConverter(from: format, to: target) else {
-      throw CaptureError.noMicrophone
-    }
-    self.converter = converter
+    let hardware = input.inputFormat(forBus: 0)
+    guard hardware.sampleRate > 0, hardware.channelCount > 0 else { throw CaptureError.noMicrophone }
     let own = session
-    input.installTap(onBus: 0, bufferSize: 4_096, format: format) { [weak self] buffer, _ in
-      guard let self, let samples = self.convert(buffer) else { return }
+    // A reply that plays, or a new route, changes the session between two captures, and the input
+    // node can still report the format of the route before. A tap with a format that differs from
+    // the hardware raises an Objective-C exception, which Swift cannot catch, and the app stops. So
+    // the tap takes the format of the node itself, and the converter follows the buffers it gets.
+    var converter: AVAudioConverter?
+    input.installTap(onBus: 0, bufferSize: 4_096, format: nil) { [weak self] buffer, _ in
+      guard let self else { return }
+      if converter?.inputFormat != buffer.format { converter = AVAudioConverter(from: buffer.format, to: self.target) }
+      guard let converter, let samples = self.convert(buffer, with: converter) else { return }
       self.queue.async {
         guard own == self.session else { return }
         self.receive(samples)
@@ -293,12 +296,10 @@ private final class SpeechCapture {
   private func stopEngine() {
     if engine.isRunning { engine.stop() }
     engine.inputNode.removeTap(onBus: 0)
-    converter = nil
   }
 
   /// Runs on the tap's thread, one buffer after another, so the converter keeps its state.
-  private func convert(_ buffer: AVAudioPCMBuffer) -> [Float]? {
-    guard let converter else { return nil }
+  private func convert(_ buffer: AVAudioPCMBuffer, with converter: AVAudioConverter) -> [Float]? {
     let capacity = AVAudioFrameCount(Double(buffer.frameLength) * captureSampleRate / buffer.format.sampleRate) + 1
     guard let output = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return nil }
     var consumed = false
