@@ -271,7 +271,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         {
           listingId: listing.id,
           ...(copy ? { agentId: copy.id } : {}),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
           receiptId: crypto.randomUUID(),
         },
         serverId,
