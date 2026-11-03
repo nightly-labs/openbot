@@ -238,7 +238,14 @@ import type {
   TestChannelRoutineInput,
   UpdateChannelRoutineInput,
 } from "./ipc-channel-routines";
-import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
+import type {
+  Channel,
+  ChannelCommand,
+  ChannelPage,
+  ChannelReadInput,
+  ChannelSummary,
+  SetChannelImageInput,
+} from "./ipc-chat-channels";
 import type {
   CancelMessageLinkInput,
   ConversationFileSearchPage,
@@ -1408,6 +1415,8 @@ export const IPC_ENDPOINTS = {
     readChannel: scopedRequest<ChannelReadInput, ChannelPage>()("agent:channels:read"),
     channelCommand: scopedRequest<ChannelCommand, Channel>()("agent:channels:command"),
     deleteChannel: scopedRequest<string, void>()("agent:channels:delete"),
+    // Only this computer keeps a channel image. A joined server has no route for it.
+    setChannelImage: scopedRequest<SetChannelImageInput, Channel>()("agent:channels:set-image"),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
     mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),
     // The user's own pinned chats. A joined server answers through `sidebar-pins-v1`.

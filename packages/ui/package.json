@@ -87,6 +87,7 @@
     "./features/channels/ChannelActivityIndicator": "./src/features/channels/ChannelActivityIndicator.tsx",
     "./features/channels/ChannelAvatar": "./src/features/channels/ChannelAvatar.tsx",
     "./features/channels/ChannelMemberRow": "./src/features/channels/ChannelMemberRow.tsx",
+    "./features/channels/ChannelPictureEditor": "./src/features/channels/ChannelPictureEditor.tsx",
     "./features/channels/ChannelStoppedTasks": "./src/features/channels/ChannelStoppedTasks.tsx",
     "./features/connectors/ConnectorDetailPanel": "./src/features/connectors/ConnectorDetailPanel.tsx",
     "./features/connectors/connector-catalog": "./src/features/connectors/connector-catalog.tsx",

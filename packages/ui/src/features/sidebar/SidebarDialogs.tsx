@@ -54,7 +54,15 @@ export function SidebarDialogs() {
             open
             pending={deleting()}
             error={deleteError()}
-            media={<ChannelAvatar members={channel().members} agents={props.agents} layout="cluster" />}
+            media={
+              <ChannelAvatar
+                members={channel().members}
+                agents={props.agents}
+                layout="cluster"
+                icon={channel().icon}
+                imageUrl={channel().imageUrl}
+              />
+            }
             title={t("sidebar.delete.title", { name: channel().name })}
             description={t("sidebar.delete.channelDescription")}
             onConfirm={confirmDelete}

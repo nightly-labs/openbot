@@ -60,6 +60,7 @@ export const messages = {
   "error.team.providersUnsupported": "Diese Verbindung unterstützt keine Anbietereinstellungen.",
   "error.team.providerNotManaged": "OpenBot verwaltet die CLI dieses Anbieters nicht.",
   "error.team.channelsUnsupported": "Diese Verbindung unterstützt keine Kanalchats.",
+  "error.team.channelPictureUnsupported": "Diese Verbindung unterstützt keine Kanalbilder.",
   "error.team.channelDeleteUnsupported": "Diese Verbindung unterstützt das Löschen von Kanälen nicht.",
   "error.team.channelTaskCancelUnsupported": "Diese Verbindung unterstützt das Abbrechen von Kanalaufgaben nicht.",
   "error.team.membersCannotDeleteChannels": "Mitglieder können keine Kanäle löschen.",

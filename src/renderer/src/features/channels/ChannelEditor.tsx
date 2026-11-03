@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { Channel, ChannelDraft } from "@openbot/contracts/ipc";
+import type { Channel, ChannelDraft, ChannelIcon } from "@openbot/contracts/ipc";
 import {
   Button,
   buttonVariants,
@@ -19,6 +19,7 @@ import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/c
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { InstructionsLimit, instructionsTooLong } from "@openbot/ui/features/agents/InstructionsLimit";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
+import { ChannelPictureEditor } from "@openbot/ui/features/channels/ChannelPictureEditor";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, For, onSettled, Show } from "solid-js";
@@ -270,8 +271,49 @@ export function ChannelEditor(props: ChannelEditorProps) {
     };
   }
 
+  /** The picture editor shows only where the channel picture is kept: on this computer. */
+  const pictureChannel = () => (channels.pictureSupported() ? channel() : undefined);
+
+  /**
+   * An icon replaces an uploaded image, as a face replaces an agent's photo. The icon is saved first,
+   * and the image shows over it until its removal: when a step fails, the image is not lost.
+   */
+  async function selectIcon(icon: ChannelIcon): Promise<void> {
+    const current = channel();
+    if (!current) return;
+    const saved = await commit((draft) => {
+      draft.icon = icon;
+    });
+    if (saved && current.imageUrl) await channels.setImage(current.id, null);
+  }
+
+  /** Removes the icon and the image, so the channel shows its member faces again. */
+  async function resetPicture(): Promise<void> {
+    const current = channel();
+    if (!current) return;
+    const saved =
+      !current.icon ||
+      (await commit((draft) => {
+        draft.icon = null;
+      }));
+    if (saved && current.imageUrl) await channels.setImage(current.id, null);
+  }
+
   return (
     <div class="channel-editor">
+      <Show when={pictureChannel()}>
+        {(current) => (
+          <ChannelPictureEditor
+            members={current().members}
+            agents={agentList()}
+            icon={current().icon}
+            imageUrl={current().imageUrl}
+            onSetImage={(image) => channels.setImage(current().id, image)}
+            onSelectIcon={selectIcon}
+            onReset={resetPicture}
+          />
+        )}
+      </Show>
       <SettingsField label={t("channel.form.nameShort")}>
         <Input
           aria-label={t("channel.form.name")}

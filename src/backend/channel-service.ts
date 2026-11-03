@@ -7,6 +7,7 @@ import {
   type AgentAccessLevel,
   type AgentEvent,
   type AgentSummary,
+  type AvatarImageInput,
   CHANNEL_ASSIGNMENT_LIMIT,
   CHANNEL_CHANGE_ITEM_TYPE,
   CHANNEL_PARALLEL_LIMIT,
@@ -35,6 +36,7 @@ import {
   isMemberThinking,
   sameRequest,
 } from "./channel-history";
+import type { ChannelImages } from "./channel-images";
 import {
   CHANNEL_MANAGEMENT_TOOLS,
   type ChannelChangeNote,
@@ -223,6 +225,7 @@ export class ChannelService {
   constructor(
     database: OpenBotDatabase,
     readonly mailbox: MailboxStore,
+    readonly images: ChannelImages,
     readonly hooks: ChannelHooks,
   ) {
     this.store = new ChannelStore(database);
@@ -340,6 +343,30 @@ export class ChannelService {
       ),
   );
 
+  /**
+   * Sets or removes the uploaded image of a channel. It is not a channel command: the image is a
+   * file on this computer, and the Team API does not carry it. The old file goes after the commit, so
+   * a failed commit leaves the stored URL on a file that still exists. A shutdown does not stop the
+   * work between the file and the commit, so no file is left that the channel does not name.
+   */
+  readonly setImage = Effect.fn("ChannelService.setImage")((channelId: string, image: AvatarImageInput | null) =>
+    this.#serialize(
+      channelId,
+      Effect.gen({ self: this }, function* () {
+        const images = this.images;
+        const channel = yield* channelSync(() => this.store.get(channelId));
+        const previous = images.resolve(channel);
+        const written = image ? yield* images.write(channelId, image) : null;
+        const result = yield* channelSync(() => this.store.update({ ...channel, imageUrl: written?.url ?? null })).pipe(
+          Effect.tapError(() => (written ? images.remove(written.path) : Effect.void)),
+        );
+        if (previous) yield* images.remove(previous.path);
+        this.publish(channelId);
+        return result;
+      }).pipe(Effect.uninterruptible),
+    ),
+  );
+
   readonly deleteChannel = Effect.fn("ChannelService.deleteChannel")((channelId: string) =>
     this.#serialize(
       channelId,
@@ -378,6 +405,7 @@ export class ChannelService {
           yield* this.mailbox.deleteChannelData(channelId, threadIds).pipe(Effect.mapError(channelFailure));
           for (const threadId of threadIds) yield* this.hooks.forgetThread?.(threadId) ?? Effect.void;
           yield* channelSync(() => this.store.delete(channelId));
+          yield* this.images.removeAll(channelId);
           this.#pumps.delete(channelId);
           this.#wakeAgain.delete(channelId);
           this.#waitingForAgents.delete(channelId);

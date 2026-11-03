@@ -57,6 +57,7 @@ export const messages = {
   "error.team.providersUnsupported": "この接続ではプロバイダーの設定を利用できません。",
   "error.team.providerNotManaged": "OpenBot はこのプロバイダーの CLI を管理していません。",
   "error.team.channelsUnsupported": "この接続ではチャンネルのチャットを利用できません。",
+  "error.team.channelPictureUnsupported": "この接続ではチャンネル画像を使用できません。",
   "error.team.channelDeleteUnsupported": "この接続ではチャンネルを削除できません。",
   "error.team.channelTaskCancelUnsupported": "この接続ではチャンネルのタスクを中止できません。",
   "error.team.membersCannotDeleteChannels": "メンバーはチャンネルを削除できません。",
