@@ -208,7 +208,7 @@ export const FALLBACK_MODELS: AgentModelOption[] = [
     name: "GPT-5.6 Terra",
     description: "Balanced speed and capability for involved tasks.",
     defaultReasoningEffort: "medium",
-    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max", "ultra"],
   },
   {
     provider: "codex",
@@ -216,7 +216,7 @@ export const FALLBACK_MODELS: AgentModelOption[] = [
     name: "GPT-5.6 Sol",
     description: "Most capable for complex, long-running work.",
     defaultReasoningEffort: "medium",
-    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max", "ultra"],
   },
   {
     provider: "claude",

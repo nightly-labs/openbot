@@ -3,6 +3,7 @@ import { AGENT_ACCESS_CAPABILITY, AGENT_ACCESS_ROUTES } from "@openbot/contracts
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
 import { agentAccessSnapshot } from "../agent-access-store";
+import { memberAuditName } from "../server-audit-store";
 import type { TeamApiAgentAccess, TeamApiAgents } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -37,7 +38,9 @@ export async function routeAgentAccess(
   } catch {
     throw new HttpError(400, "Invalid agent access change.");
   }
-  const saved = await Effect.runPromise(Effect.result(access.set(serverId, change, new Set(shown), new Set(existing))));
+  const saved = await Effect.runPromise(
+    Effect.result(access.set(serverId, change, new Set(shown), new Set(existing), memberAuditName(member))),
+  );
   if (Result.isFailure(saved)) {
     if (saved.failure._tag === "AgentAccessStale") throw new HttpError(409, sourceText("error.team.agentAccessStale"));
     throw saved.failure.cause;

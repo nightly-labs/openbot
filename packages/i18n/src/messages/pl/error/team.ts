@@ -65,8 +65,12 @@ export const messages = {
   "error.team.sharedDataUnsupported": "To połączenie nie obsługuje wspólnych danych.",
   "error.team.agentInstallUnsupported": "To połączenie nie obsługuje dodawania agentów.",
   "error.team.agentHideUnsupported": "To połączenie nie obsługuje ukrywania agentów.",
+  "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ten serwer nie może zapisać Twojego poziomu powiadomień dla każdego agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
+  "error.team.sidebarPinsUnsupported":
+    "Ten serwer nie może zapisać przypiętych czatów dla wszystkich Twoich urządzeń. Zaktualizuj OpenBot na komputerze, na którym działa.",
+  "error.team.agentInstructionsUnsupported": "To połączenie nie obsługuje edytowania instrukcji agentów.",
   "error.team.agentPublishUnsupported": "To połączenie nie obsługuje publikowania agentów.",
   "error.team.agentUpdateUnsupported": "To połączenie nie obsługuje aktualizowania agentów.",
   "error.team.contextResetUnsupported": "To połączenie nie obsługuje rozpoczynania nowego czatu.",
@@ -91,6 +95,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "To połączenie nie obsługuje aktualizacji hosta.",
   "error.team.hostTimezoneUnsupported": "To połączenie nie obsługuje strefy czasowej serwera.",
   "error.team.hostKeyRotationUnsupported": "To połączenie nie obsługuje zmiany klucza serwera.",
+  "error.team.localServersUnsupported": "To połączenie nie obsługuje serwerów na tym komputerze.",
   "error.team.routineResultsUnsupported": "To połączenie nie obsługuje miejsc docelowych rutyn.",
   "error.team.agentMemoryLimitUnsupported": "To połączenie nie obsługuje limitu wspomnień agentów.",
   "error.team.agentFoldersUnsupported": "To połączenie nie obsługuje folderów agentów.",

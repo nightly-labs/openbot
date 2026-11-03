@@ -28,6 +28,7 @@
 @import "@openbot/ui/features/servers/hosted-server-upsell.css";
 @import "@openbot/ui/features/servers/restart-server-dialog.css";
 @import "@openbot/ui/features/servers/server-roles.css";
+@import "@openbot/ui/features/servers/server-audit-log.css";
 @import "@openbot/ui/features/servers/server-update-dialog.css";
 @import "@openbot/ui/styles/settings-panel.css";
 @import "@openbot/ui/styles/provider-code-login.css";

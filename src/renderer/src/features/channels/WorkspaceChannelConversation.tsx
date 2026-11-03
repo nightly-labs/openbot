@@ -3,6 +3,7 @@ import { hasVisibleToasts } from "@openbot/ui";
 import { createMemo, Show } from "solid-js";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
+import { quitShortcutHintShown } from "../../quit-shortcut-hint";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
@@ -131,7 +132,8 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
         serverSettingsOpen() ||
         appSettingsOpen() ||
         skillsMarketplaceOpen() ||
-        hasVisibleToasts()
+        hasVisibleToasts() ||
+        quitShortcutHintShown()
       }
       settingsRequest={view.settingsRequest()}
       messageFocusRequest={messageFocusRequest()}

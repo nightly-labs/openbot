@@ -37,6 +37,8 @@ export const messages = {
   "settings.launchAtLogin.description": "登录这台电脑时自动打开应用。",
   "settings.keepRunning.title": "保持在后台运行",
   "settings.keepRunning.description": "关闭窗口后继续运行进行中的任务。",
+  "settings.menuBar.title": "在菜单栏中显示 OpenBot",
+  "settings.menuBar.description": "通过菜单栏图标打开或退出 OpenBot。",
   "settings.keepAwake.title": "保持这台电脑唤醒",
   "settings.keepAwake.description": "电脑接通电源时，自动化任务会准时运行。屏幕仍可关闭。",
   "settings.keepAwakeOnBattery.title": "使用电池时也保持",

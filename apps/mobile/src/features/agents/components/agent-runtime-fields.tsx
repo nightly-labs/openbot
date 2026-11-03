@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button, Typography } from "heroui-native";
 import { Platform } from "react-native";
 import { useUniwind } from "uniwind";
+import { AgentFastModeField, type AgentHostFieldsProps } from "@/features/agents/components/agent-host-fields";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
@@ -25,11 +26,14 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { useText } from "@/shared/lib/text";
 
 const EFFORT_LABELS = {
+  none: "mobile.agent.runtime.effort.none",
+  minimal: "mobile.agent.runtime.effort.minimal",
   low: "mobile.agent.runtime.effort.low",
   medium: "mobile.agent.runtime.effort.medium",
   high: "mobile.agent.runtime.effort.high",
   xhigh: "mobile.agent.runtime.effort.xhigh",
   max: "mobile.agent.runtime.effort.max",
+  ultra: "mobile.agent.runtime.effort.ultra",
 } as const satisfies Record<AgentReasoningEffort, MobileTextKey>;
 
 /**
@@ -94,6 +98,7 @@ export function AgentRuntimeFields({
   accountId = "",
   onChange,
   onAccountChange,
+  fastMode,
 }: {
   serverId: string;
   available: boolean;
@@ -114,6 +119,8 @@ export function AgentRuntimeFields({
   accountId?: string;
   onChange: (value: Pick<UpdateAgentInput, "provider" | "model" | "reasoningEffort">) => void;
   onAccountChange?: (accountId: string) => void;
+  /** An existing agent. Its Fast mode switch shows when the chosen model has a fast tier. */
+  fastMode?: AgentHostFieldsProps;
 }) {
   const { t } = useText();
   const accountName = useProviderAccountName();
@@ -274,6 +281,7 @@ export function AgentRuntimeFields({
           </SettingsRow>
         ) : null}
       </SettingsSection>
+      {fastMode && showsModel && selected?.fastServiceTier ? <AgentFastModeField {...fastMode} /> : null}
       {models.isError ? (
         <Button variant="ghost" onPress={() => void models.refetch()}>
           <Button.Label>{t("mobile.agent.runtime.retryModels")}</Button.Label>

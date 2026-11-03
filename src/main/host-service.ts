@@ -39,7 +39,12 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
-import { type AgentAccessLevel, conversationMessageSender, SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
+import {
+  type AgentAccessLevel,
+  conversationMessageSender,
+  type ServerAuditName,
+  SIGNED_OUT_CHANNEL_MEMBER_ID,
+} from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -63,7 +68,9 @@ import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifac
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { RemoteScreenGateway, type RemoteScreenGatewayCreateRuntime } from "./remote-screen-gateway";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
-import type { TeamApiAgentNotificationLevels } from "./team-api/dependencies";
+import { memberAuditChanges, memberAuditName, type ServerAuditStore } from "./server-audit-store";
+import { OWNER_PIN_KEY, type SidebarPinStore } from "./sidebar-pin-store";
+import type { TeamApiAgentNotificationLevels, TeamApiSidebarPins } from "./team-api/dependencies";
 import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -86,6 +93,12 @@ interface HostEvents {
  * changes at the call site - `index.ts` still passes the real services - but it lets an
  * account switch be tested without standing up a database and a browser host.
  */
+/** The admin who changed a member, or the member who left, and that member's ID. */
+interface MemberAuditActor {
+  actor: ServerAuditName | null;
+  memberId: string;
+}
+
 type ForwardedApiOptions = ConstructorParameters<typeof TeamApiServer>[0];
 
 interface HostServiceOptions {
@@ -113,7 +126,11 @@ interface HostServiceOptions {
   hiddenAgents?: ForwardedApiOptions["hiddenAgents"];
   /** The level that each person chose for each agent (`agent-notification-levels-v1`). */
   agentNotificationLevels?: AgentNotificationLevelStore;
+  /** The chats that each person pinned (`sidebar-pins-v1`). */
+  sidebarPins?: SidebarPinStore;
   agentAccess?: AgentAccessStore;
+  /** Records who joined, left, or got another server role. */
+  serverAudit?: Pick<ServerAuditStore, "read" | "record">;
   agentTasks?: ForwardedApiOptions["agentTasks"];
   browserProfiles?: ForwardedApiOptions["browserProfiles"];
   admin?: ForwardedApiOptions["admin"];
@@ -259,6 +276,14 @@ export class HostService extends EventEmitter<HostEvents> {
   #startOperation: Fiber.Fiber<HostStatus, RemoteWorkflowError> | null = null;
   /** A registration and a key rotation each read the host key, so only one of them runs at a time. */
   readonly #hostKeyLock = Semaphore.makeUnsafe(1);
+  /**
+   * One member read or change at a time, from the read of the member list to the audit entry. A
+   * list read before another change could otherwise apply an older list, and the audit of two
+   * changes at the same time would compare the same `before` list.
+   */
+  readonly #memberWrites = Semaphore.makeUnsafe(1);
+  /** A server on this computer: one publish or unpublish at a time, in the order the desktop app asked. */
+  readonly #localPublish = Semaphore.makeUnsafe(1);
   #webRtcOnline = false;
   /**
    * The home Signal of the last start that got a ticket but did not reach Signal. The next start names
@@ -431,7 +456,9 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.agentNotificationLevels === undefined
         ? {}
         : { agentNotificationLevels: this.#agentNotificationLevels(options.agentNotificationLevels) }),
+      ...(options.sidebarPins === undefined ? {} : { sidebarPins: this.#sidebarPins(options.sidebarPins) }),
       ...(options.agentAccess === undefined ? {} : { agentAccess: options.agentAccess }),
+      ...(options.serverAudit === undefined ? {} : { serverAudit: options.serverAudit }),
       ...(options.agentTasks === undefined ? {} : { agentTasks: options.agentTasks }),
       ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),
       // The identity route changes this host's name and logo through `updateIdentity`, so a change
@@ -457,8 +484,8 @@ export class HostService extends EventEmitter<HostEvents> {
       onDirectMessage: (event) => this.emit("directMessage", event),
       onDirectTyping: (event) => this.emit("directTyping", event),
       createInvite: (input) => this.createInvite(input),
-      updateMember: (input) => this.updateMember(input),
-      removeMember: (memberId) => this.removeMember(memberId),
+      updateMember: (input, actor) => this.updateMember(input, actor),
+      removeMember: (memberId, actor) => this.removeMember(memberId, actor),
       onSessionRevoked: (sessionId) => this.#revokeWebRtcSession(sessionId),
       ...(this.#liveActivityPush === undefined ? {} : { liveActivityPush: this.#liveActivityPush }),
       ...(this.#pushNotifications === undefined ? {} : { pushNotifications: this.#pushNotifications }),
@@ -947,8 +974,11 @@ export class HostService extends EventEmitter<HostEvents> {
       );
       if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       if (this.#usesAccountDirectory() && optionalListRemoteMembers) {
-        const members = yield* optionalListRemoteMembers(identity.serverId);
-        yield* this.#syncRemoteDirectory(identity.serverId, members);
+        yield* this.#memberWrites.withPermit(
+          Effect.flatMap(optionalListRemoteMembers(identity.serverId), (members) =>
+            this.#syncRemoteDirectory(identity.serverId, members),
+          ),
+        );
         if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       }
       // The host peer meets its devices on its home Signal machine. Chat apps and webhooks stay on
@@ -1021,6 +1051,59 @@ export class HostService extends EventEmitter<HostEvents> {
       return this.getStatus();
     },
     (operation) => this.#provide(operation),
+  ).bind(this);
+
+  /**
+   * A server on this computer, after the desktop app registered it for its account: devices meet it
+   * on Signal too. The Team API stays on loopback for the desktop app, and the status does not change,
+   * so the desktop app still reaches it there. The ticket comes with the machine token that the desktop
+   * app gave, so this process needs no account.
+   */
+  readonly publishLocalServer = Effect.fn("HostService.publishLocalServer")(
+    function* (this: HostService): Effect.fn.Return<void, RemoteWorkflowError> {
+      const gateway = this.#webrtcGateway;
+      const issueTicket = this.#options.issueRemoteHostTicket;
+      const identity = this.#options.store.getIdentity();
+      const apiPort = this.#api.port;
+      if (!gateway || !issueTicket || !identity || apiPort === null)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.webRtcNotConfigured")) });
+      if (this.#webRtcOnline) {
+        // A Signal recovery that failed for good leaves the gateway down; the next publish starts it again.
+        if (this.#status.phase !== "error") return;
+        this.#webRtcOnline = false;
+        yield* gateway.stop();
+      }
+      const failedSignalUrl = this.#unreachedSignalUrl;
+      const bootstrap = yield* issueTicket(identity.serverId, failedSignalUrl === null ? {} : { failedSignalUrl });
+      yield* gateway
+        .start({
+          hostId: identity.serverId,
+          signalUrl: bootstrap.signalUrl,
+          ticket: bootstrap.ticket,
+          localApiPort: apiPort,
+        })
+        .pipe(
+          Effect.tapError(() =>
+            Effect.sync(() => {
+              this.#unreachedSignalUrl = bootstrap.signalUrl;
+            }),
+          ),
+        );
+      this.#unreachedSignalUrl = null;
+      this.#webRtcOnline = true;
+      if (this.#status.phase === "error") this.#setStatus({ phase: "online", apiOnline: true, message: null });
+    },
+    (operation) => this.#localPublish.withPermit(operation),
+  ).bind(this);
+
+  /** The desktop app signed out: devices no longer meet this server. The desktop app still reaches it on loopback. */
+  readonly unpublishLocalServer = Effect.fn("HostService.unpublishLocalServer")(
+    function* (this: HostService): Effect.fn.Return<void, RemoteWorkflowError> {
+      if (!this.#webRtcOnline) return;
+      this.#webRtcOnline = false;
+      yield* this.#webrtcGateway?.stop() ?? Effect.void;
+    },
+    (operation) => this.#localPublish.withPermit(operation),
   ).bind(this);
 
   // Where this host's Team API listens on this machine, which is not what `#status.apiUrl` reports:
@@ -1137,6 +1220,7 @@ export class HostService extends EventEmitter<HostEvents> {
       }
       return this.#options.store.listMembers();
     },
+    (operation) => this.#memberWrites.withPermit(operation),
     (operation) => this.#provide(operation),
   ).bind(this);
 
@@ -1288,7 +1372,10 @@ export class HostService extends EventEmitter<HostEvents> {
     function* (
       this: HostService,
       input: UpdateTeamMemberInput,
+      // The admin who makes the change; the owner of this computer when not given.
+      requestedBy?: ServerAuditName,
     ): Effect.fn.Return<TeamMemberSummary, RemoteWorkflowError> {
+      const actor = requestedBy ?? this.#ownerActor();
       const optionalListRemoteMembers = this.#options.listRemoteMembers;
       const optionalUpdateRemoteMember = this.#options.updateRemoteMember;
       const optionalRemoveRemoteMember = this.#options.removeRemoteMember;
@@ -1317,7 +1404,7 @@ export class HostService extends EventEmitter<HostEvents> {
         const updated = members.find((member) => member.membershipId === input.memberId);
         if (!updated)
           return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.memberNotFound")) });
-        yield* this.#syncRemoteDirectory(hostId, members);
+        yield* this.#syncRemoteDirectory(hostId, members, { actor, memberId: input.memberId });
         // Recording the directory is a write too, so the switch can land inside it and the
         // member below would be the previous account's.
         yield* remoteDecode(() => this.#assertStillActiveHost(hostId));
@@ -1334,10 +1421,12 @@ export class HostService extends EventEmitter<HostEvents> {
           disabled: updated.status !== "active",
         };
       }
+      const before = this.#options.store.listStoredMembers();
       const member = yield* this.#options.store.updateMember(input.memberId, {
         ...(input.role ? { role: input.role } : {}),
         ...(input.disabled === undefined ? {} : { disabled: input.disabled }),
       });
+      if (hostId) yield* this.#auditMembers(hostId, before, { actor, memberId: input.memberId });
       if (member.disabled) {
         yield* this.#remoteScreen.revokeMember(member.id);
         this.#options.browser.releaseUserControlHeldBy({ kind: "member", memberId: member.id });
@@ -1347,11 +1436,18 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#api.refreshPresence();
       return member;
     },
+    (operation) => this.#memberWrites.withPermit(operation),
     (operation) => this.#provide(operation),
   ).bind(this);
 
   readonly removeMember = Effect.fn("HostService.removeMember")(
-    function* (this: HostService, memberId: string): Effect.fn.Return<void, RemoteWorkflowError> {
+    function* (
+      this: HostService,
+      memberId: string,
+      // The admin who removes the member, or the member who leaves; the owner of this computer when not given.
+      requestedBy?: ServerAuditName,
+    ): Effect.fn.Return<void, RemoteWorkflowError> {
+      const actor = requestedBy ?? this.#ownerActor();
       const optionalListRemoteMembers = this.#options.listRemoteMembers;
       const optionalRemoveRemoteMember = this.#options.removeRemoteMember;
       const hostId = this.#options.store.getIdentity()?.serverId;
@@ -1359,20 +1455,25 @@ export class HostService extends EventEmitter<HostEvents> {
         yield* optionalRemoveRemoteMember(hostId, memberId);
         if (optionalListRemoteMembers) {
           const members = yield* optionalListRemoteMembers(hostId);
-          yield* this.#syncRemoteDirectory(hostId, members);
+          yield* this.#syncRemoteDirectory(hostId, members, { actor, memberId });
         }
         yield* this.#revokeMemberSessions(memberId);
         yield* this.#forgetMemberRoles(hostId, memberId);
         yield* this.#forgetNotificationLevels(memberId);
+        yield* this.#forgetSidebarPins(memberId);
         return;
       }
+      const before = this.#options.store.listStoredMembers();
       yield* this.#options.store.removeMember(memberId);
+      if (hostId) yield* this.#auditMembers(hostId, before, { actor, memberId });
       if (hostId) yield* this.#forgetMemberRoles(hostId, memberId);
       yield* this.#forgetNotificationLevels(memberId);
+      yield* this.#forgetSidebarPins(memberId);
       yield* this.#remoteScreen.revokeMember(memberId);
       this.#options.browser.releaseUserControlHeldBy({ kind: "member", memberId });
       this.#api.refreshPresence();
     },
+    (operation) => this.#memberWrites.withPermit(operation),
     (operation) => this.#provide(operation),
   ).bind(this);
 
@@ -1398,6 +1499,38 @@ export class HostService extends EventEmitter<HostEvents> {
           if (memberId) listener(memberId);
         }),
     };
+  }
+
+  /** The key of a member's pins. The owner shares them with the desktop app of this computer. */
+  #sidebarPinKey(memberId: string): string {
+    return memberId === this.#options.store.getOwnerMemberId() ? OWNER_PIN_KEY : memberId;
+  }
+
+  #sidebarPins(store: SidebarPinStore): TeamApiSidebarPins {
+    return {
+      snapshot: (memberId, hidden) => store.snapshot(this.#sidebarPinKey(memberId), hidden),
+      set: (memberId, items, hidden) => store.set(this.#sidebarPinKey(memberId), items, hidden),
+      seed: (memberId, items, hidden) => store.seed(this.#sidebarPinKey(memberId), items, hidden),
+      subscribe: (listener) =>
+        store.subscribe((key) => {
+          // The owner's pins have one key for the desktop app of this computer and the owner's phones.
+          const memberId = key === OWNER_PIN_KEY ? this.#options.store.getOwnerMemberId() : key;
+          if (memberId) listener(memberId);
+        }),
+    };
+  }
+
+  /** A removed member keeps no pins. The member is gone either way, so a failed write only logs. */
+  #forgetSidebarPins(memberId: string): Effect.Effect<void> {
+    const store = this.#options.sidebarPins;
+    if (!store || memberId === this.#options.store.getOwnerMemberId()) return Effect.void;
+    return store
+      .removeMember(memberId)
+      .pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => logger.warn("The removed member's pinned chats did not save.", toLogValue(error))),
+        ),
+      );
   }
 
   /** A removed member keeps no levels. The member is gone either way, so a failed write only logs. */
@@ -1438,13 +1571,44 @@ export class HostService extends EventEmitter<HostEvents> {
     (operation) => this.#provide(operation),
   ).bind(this);
 
-  /** Records the directory, and closes the sessions that it no longer allows. */
+  /** The owner of this computer's host, who makes each change from this computer. */
+  #ownerActor(): ServerAuditName | null {
+    const owner = this.#options.store.listStoredMembers().find((member) => member.role === "owner");
+    return owner ? memberAuditName(owner) : null;
+  }
+
+  /**
+   * Records the member changes since `before`. `by` names the admin and the member that they changed:
+   * only the changes to that member are theirs, and other changes have no known actor. The change is
+   * made, so a failed write only logs.
+   */
+  #auditMembers(hostId: string, before: readonly TeamMemberSummary[], by?: MemberAuditActor): Effect.Effect<void> {
+    const audit = this.#options.serverAudit;
+    if (!audit) return Effect.void;
+    return Effect.suspend(() => {
+      const changes = memberAuditChanges(before, this.#options.store.listStoredMembers());
+      const isTheirs = ({ change }: (typeof changes)[number]) =>
+        "member" in change && change.member.id === by?.memberId;
+      const theirs = changes.filter(isTheirs);
+      const others = changes.filter((change) => !isTheirs(change));
+      return Effect.andThen(audit.record(hostId, null, others), audit.record(hostId, by?.actor ?? null, theirs));
+    });
+  }
+
+  /**
+   * Records the directory, and closes the sessions that it no longer allows. `by` names the admin
+   * and the member that they changed; see `#auditMembers`. The caller holds `#memberWrites` from
+   * the read of `members`.
+   */
   readonly #syncRemoteDirectory = Effect.fn("HostService.syncRemoteDirectory")(function* (
     this: HostService,
     hostId: string,
     members: RemoteDirectoryMember[],
+    by?: MemberAuditActor,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
+    const before = this.#options.store.listStoredMembers();
     const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members);
+    yield* this.#auditMembers(hostId, before, by);
     if (closed.length === 0) return;
     for (const sessionId of closed) yield* this.#closeLocalSession(sessionId);
     this.#api.refreshPresence();

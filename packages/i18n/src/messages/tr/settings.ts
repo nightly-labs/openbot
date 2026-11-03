@@ -35,6 +35,8 @@ export const messages = {
   "settings.launchAtLogin.description": "Bu bilgisayarda oturum açtığınızda uygulamayı açın.",
   "settings.keepRunning.title": "OpenBot'u arka planda çalışır durumda tut",
   "settings.keepRunning.description": "Pencereyi kapattıktan sonra etkin görevleri çalıştırmaya devam edin.",
+  "settings.menuBar.title": "OpenBot’u menü çubuğunda göster",
+  "settings.menuBar.description": "OpenBot’u menü çubuğundaki bir simgeden açın veya kapatın.",
   "settings.keepAwake.title": "Bilgisayarı uyanık tut",
   "settings.keepAwake.description":
     "Bilgisayar prize takılıyken rutinler zamanında çalışır. Ekran yine de kapanabilir.",

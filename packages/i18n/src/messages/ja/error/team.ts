@@ -65,8 +65,12 @@ export const messages = {
   "error.team.sharedDataUnsupported": "この接続では共有データを利用できません。",
   "error.team.agentInstallUnsupported": "この接続ではエージェントを追加できません。",
   "error.team.agentHideUnsupported": "この接続ではエージェントを非表示にできません。",
+  "error.team.sidebarFoldersUnsupported": "この接続ではフォルダー内のフォルダーを使用できません。",
   "error.team.agentNotificationLevelsUnsupported":
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot を更新してください。",
+  "error.team.sidebarPinsUnsupported":
+    "このサーバーは、ピン留めしたチャットをすべてのデバイスで共有できません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
+  "error.team.agentInstructionsUnsupported": "この接続ではエージェントの指示を編集できません。",
   "error.team.agentPublishUnsupported": "この接続ではエージェントを公開できません。",
   "error.team.agentUpdateUnsupported": "この接続ではエージェントを更新できません。",
   "error.team.contextResetUnsupported": "この接続では新しいチャットを始められません。",
@@ -91,6 +95,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "この接続ではホストをアップデートできません。",
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
   "error.team.hostKeyRotationUnsupported": "この接続はサーバーキーの変更に対応していません。",
+  "error.team.localServersUnsupported": "この接続はこのコンピュータ上のサーバーに対応していません。",
   "error.team.routineResultsUnsupported": "この接続はルーティンの送信先に対応していません。",
   "error.team.agentMemoryLimitUnsupported": "この接続はエージェントのメモリー上限に対応していません。",
   "error.team.agentFoldersUnsupported": "この接続はエージェントのフォルダーに対応していません。",

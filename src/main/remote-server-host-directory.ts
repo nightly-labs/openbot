@@ -87,7 +87,10 @@ export interface WebRtcHostReconciliationInput {
   readonly username: string;
   /** Development only: keep HTTPS servers that the account directory does not know about. */
   readonly keepOtherTransports: boolean;
-  /** The local servers of this computer. The account directory never lists them, and they stay. */
+  /**
+   * The servers on this computer, and deleted ones that the account can still list. The account
+   * directory lists one while the desktop app has it registered, but this app keeps its loopback entry.
+   */
   readonly isThisComputer?: (serverId: string) => boolean;
   readonly isConnected: (hostId: string) => boolean;
   /** Hosts whose advertised key a verified handover chain leads to, from `followedHostKeyHandovers`. */
@@ -156,7 +159,12 @@ export const hostKeyChangeTimes = Effect.fn("RemoteHostDirectory.hostKeyChangeTi
 export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebRtcHostReconciliation {
   const pinnedKeys: HostKeyPin[] = [];
   const listed = input.hosts
-    .filter((host) => host.hostId !== input.localHostId && !input.isHiddenHost(host.hostId))
+    .filter(
+      (host) =>
+        host.hostId !== input.localHostId &&
+        !input.isHiddenHost(host.hostId) &&
+        input.isThisComputer?.(host.hostId) !== true,
+    )
     .map<StoredRemoteServer>((host) => {
       const handedOver = input.followedHandovers?.has(host.hostId) === true;
       const existing = handedOver ? undefined : pinnedIdentity(input, host.hostId);

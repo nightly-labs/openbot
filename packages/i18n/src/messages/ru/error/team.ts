@@ -66,8 +66,12 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Это подключение не поддерживает общие данные.",
   "error.team.agentInstallUnsupported": "Это подключение не поддерживает добавление агентов.",
   "error.team.agentHideUnsupported": "Это подключение не поддерживает скрытие агентов.",
+  "error.team.sidebarFoldersUnsupported": "Это подключение не поддерживает папки в папках.",
   "error.team.agentNotificationLevelsUnsupported":
     "Этот сервер не может хранить ваш уровень уведомлений для каждого агента. Обновите OpenBot на компьютере, где он работает.",
+  "error.team.sidebarPinsUnsupported":
+    "Этот сервер не может хранить закреплённые чаты для всех ваших устройств. Обновите OpenBot на компьютере, на котором он работает.",
+  "error.team.agentInstructionsUnsupported": "Это подключение не поддерживает редактирование инструкций агентов.",
   "error.team.agentPublishUnsupported": "Это подключение не поддерживает публикацию агентов.",
   "error.team.agentUpdateUnsupported": "Это подключение не поддерживает обновление агентов.",
   "error.team.contextResetUnsupported": "Это подключение не поддерживает начало нового чата.",
@@ -92,6 +96,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Это подключение не поддерживает обновление хоста.",
   "error.team.hostTimezoneUnsupported": "Это подключение не поддерживает часовой пояс сервера.",
   "error.team.hostKeyRotationUnsupported": "Это подключение не поддерживает смену ключа сервера.",
+  "error.team.localServersUnsupported": "Это подключение не поддерживает серверы на этом компьютере.",
   "error.team.routineResultsUnsupported": "Это подключение не поддерживает места отправки рутин.",
   "error.team.agentMemoryLimitUnsupported": "Это подключение не поддерживает лимит памяти агентов.",
   "error.team.agentFoldersUnsupported": "Это подключение не поддерживает папки агентов.",

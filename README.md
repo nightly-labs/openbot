@@ -76,6 +76,41 @@ On the first start from an AppImage, OpenBot writes `~/.local/share/applications
 and `~/.local/share/icons/openbot.png`, which is what lets an `openbot://` link - an invitation, or
 a plugin listing - open the app and gives the launcher an icon that stays after the app exits. Delete the two files to undo it.
 
+#### Theme palette files
+
+OpenBot reads each `<name>.json` file in the `themes` folder of its data folder
+(`~/.config/OpenBot/themes/` on Linux) and lists it under Settings > General > Theme. Another
+program, such as an Omarchy theme script, can write the file. OpenBot follows each change to the
+file with no restart. Replace the file with a rename, so that OpenBot never reads half of it:
+
+```json
+{
+  "name": "Omarchy",
+  "appearance": "dark",
+  "colors": {
+    "canvas": "#1a1b26",
+    "frame": "#13141c",
+    "sidebar": "#13141c",
+    "surface": "#24283b",
+    "text": "#a9b1d6",
+    "textMuted": "#565f89",
+    "border": "#414868",
+    "accent": "#7aa2f7",
+    "accentForeground": "#1a1b26",
+    "success": "#9ece6a",
+    "warning": "#e0af68",
+    "danger": "#f7768e"
+  }
+}
+```
+
+The file name is the palette id: lowercase letters, digits and `-`. `appearance` is `light` or
+`dark`, and selects the base that the colors go over. In a dark palette, `surface` colors cards and
+controls. A light palette makes them lighter than `canvas`, as the light base does, because a light
+theme's `surface` is usually darker than its background. Each color is `#rrggbb` or `#rrggbbaa`.
+OpenBot ignores a file with a missing or different color, and then shows the saved light, dark or
+system choice. While no theme choice is saved, OpenBot shows the first palette.
+
 Remote desktop works on Linux x64 in an X11 session,
 such as Xorg or Xvfb. It does not work under Wayland, and the arm64 AppImage does not include it.
 

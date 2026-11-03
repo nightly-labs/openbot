@@ -7,7 +7,7 @@ export const messages = {
   "mobile.app.route.newChannel": "新建频道",
   "mobile.app.route.createAgent": "创建助手",
   "mobile.app.route.addSharedAgent": "添加共享助手",
-  "mobile.app.route.newSection": "新建分区",
+  "mobile.app.route.newSection": "新建文件夹",
   "mobile.app.route.settings": "设置",
   "mobile.app.route.profile": "个人资料",
   "mobile.app.route.accountSessions": "账号会话",

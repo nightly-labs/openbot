@@ -8,6 +8,7 @@ export const messages = defineMessages("error.provider", {
     "OpenBot could not register Computer Use in the Codex configuration. Check that your Codex config.toml is valid and writable, then restart OpenBot. You can turn off Computer Use in the teammate settings to continue without it.",
   "error.provider.codexUnresponsive": "Codex stopped answering, so OpenBot ended its process.",
   "error.provider.acpUnresponsive": "{provider} did not answer in time, so OpenBot ended its process.",
+  "error.provider.acpSignInLost": "{provider} lost its sign-in, so OpenBot ended its process. Send your message again.",
   "error.provider.acpMcpNotLoaded":
     "{provider} did not load OpenBot's tools, so this agent cannot use them or reach its teammates. A {provider} team policy can block local MCP servers. Ask your team admin to allow them, then try again.",
   "error.provider.endpointsReadOnly":
@@ -172,6 +173,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.noAuthenticatedAccount": "{provider} did not return an authenticated account.",
   "error.provider.signInExpired": "Your {provider} sign-in expired. Sign in again to continue.",
   "error.provider.cliActivateFailed": "OpenBot could not activate the managed CLI.",
+  "error.provider.noMainlandChinaSignIn": "{provider} has no sign-in for mainland China.",
   "error.provider.cliNewVersionNotStarted": "The new version did not start.",
   "error.provider.cliBusyReconnect": "The {provider} CLI is working on a turn. Wait for it to finish, then reconnect.",
   "error.provider.cliBusySignOut": "The {provider} CLI is working on a turn. Wait for it to finish, then disconnect.",

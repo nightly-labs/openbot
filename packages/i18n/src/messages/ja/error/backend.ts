@@ -259,6 +259,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "1 つのサーバーに置けるサイドバーのセクションは {limit} 個までです。",
   "error.backend.sectionNameRequired": "セクション名が必要です。",
   "error.backend.sectionNameTooLong": "セクション名が長すぎます。",
+  "error.backend.sidebarFolderTooDeep": "フォルダーは3階層までです。",
+  "error.backend.sidebarFolderMoveInvalid": "このフォルダーはそこへ移動できません。",
   "error.backend.sectionNameDuplicate": "セクション名は重複しないようにしてください。",
   "error.backend.directMessageRequired": "先にメッセージを入力してください。",
   "error.backend.directMessageTooLong": "ダイレクトメッセージは {limit} 文字までです。",
@@ -355,8 +357,8 @@ export const messages = {
   "error.backend.taskToolInvalid": "タスクには 120 文字以内のタイトルと、何をするかを説明する指示を付けてください。",
   "error.backend.taskOwnChatOnly":
     "タスクは自分のチャットからのみ開始してください。チャンネル、メッセージングの会話、別のタスクからは開始できません。",
-  "error.backend.taskOpenLimit":
-    "このエージェントにはすでに {count} 件の開いているタスクがあります。別のタスクを開始する前に、ユーザーがいずれかを閉じるまで待ってください。",
+  "error.backend.taskUnfinishedLimit":
+    "このエージェントにはすでに未完了のタスクが {count} 件あります。いずれかが終わってから、別のタスクを開始してください。",
   "error.backend.taskOpenLimitReached":
     "このエージェントには {count} 件の開いているタスクがあります。タスクを閉じてから、別のタスクを開始するか開いてください。",
   "error.backend.taskRemoteUnsupported": "タスクは、このコンピューター上のエージェントでのみ利用できます。",

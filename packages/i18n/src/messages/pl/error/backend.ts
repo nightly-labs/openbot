@@ -250,6 +250,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Serwer może mieć maksymalnie {limit} sekcji paska bocznego.",
   "error.backend.sectionNameRequired": "Nazwa sekcji jest wymagana.",
   "error.backend.sectionNameTooLong": "Nazwa sekcji jest za długa.",
+  "error.backend.sidebarFolderTooDeep": "Foldery mogą mieć tylko trzy poziomy.",
+  "error.backend.sidebarFolderMoveInvalid": "Tego folderu nie można tam przenieść.",
   "error.backend.sectionNameDuplicate": "Nazwy sekcji muszą być unikalne.",
   "error.backend.directMessageRequired": "Najpierw napisz wiadomość.",
   "error.backend.directMessageTooLong": "Wiadomość prywatna może mieć maksymalnie {limit} znaków.",
@@ -344,8 +346,8 @@ export const messages = {
     "Nadaj zadaniu tytuł o długości maksymalnie 120 znaków i opis, który mówi, co zrobić.",
   "error.backend.taskOwnChatOnly":
     "Zadanie możesz rozpocząć tylko z własnego czatu. Kanał, rozmowa w komunikatorze ani inne zadanie nie mogą go rozpocząć.",
-  "error.backend.taskOpenLimit":
-    "Liczba otwartych zadań tego agenta: {count}. Zanim rozpoczniesz kolejne zadanie, poczekaj, aż użytkownik zamknie jedno z nich.",
+  "error.backend.taskUnfinishedLimit":
+    "Liczba niezakończonych zadań tego agenta: {count}. Rozpocznij kolejne zadanie, gdy jedno z nich się zakończy.",
   "error.backend.taskOpenLimitReached":
     "Liczba otwartych zadań tego agenta: {count}. Zamknij zadanie, a potem rozpocznij lub otwórz inne.",
   "error.backend.taskRemoteUnsupported": "Zadania są dostępne tylko dla agentów na tym komputerze.",

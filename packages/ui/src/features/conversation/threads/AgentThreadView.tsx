@@ -16,7 +16,7 @@ import {
   AgentStepsDisclosure,
   type AgentStepsFacts,
 } from "@openbot/ui/features/conversation/AgentSteps";
-import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
+import type { AttachmentDownloads, AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
@@ -123,6 +123,8 @@ export interface AgentThreadViewProps {
   onRemoveAttachment?: ((attachment: DraftAttachment) => void) | undefined;
   /** Loads the images of a client that gets no `previewUrl`. */
   mediaSource?: AttachmentMediaSource | undefined;
+  /** The download state of attachments from a joined server. */
+  downloads?: AttachmentDownloads | undefined;
   onDraftChange: (text: string) => void;
   /** Receives pasted files. Without it, a file paste does nothing here. */
   onPasteFiles?:
@@ -408,6 +410,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                   onPreview={props.onPreview}
                   onAttachmentAction={props.onAttachmentAction}
                   mediaSource={props.mediaSource}
+                  downloads={props.downloads}
                   onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
                   macWindowControls={props.macWindowControls}
                   actions={messageActions(message())}

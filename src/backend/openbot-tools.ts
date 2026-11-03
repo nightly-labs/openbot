@@ -282,6 +282,13 @@ export const requestApiKeyToolSchema = z.strictObject({
 
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
+export const sendToChannelToolSchema = z.strictObject({
+  channelId: z.string().min(1).max(INPUT_LIMITS.identifier),
+  text: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
+  recipientAgentIds: z.array(z.string().min(1).max(INPUT_LIMITS.identifier)).max(INPUT_LIMITS.agents).optional(),
+  paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).max(INPUT_LIMITS.attachments).optional(),
+});
+
 /** The Marketplace apps that the chat draws a card for: the bundled catalog plugins and the connectors. */
 export const MARKETPLACE_APP_IDS: readonly string[] = [
   ...pluginCatalog.plugins.map((plugin) => plugin.slug),
@@ -441,6 +448,18 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "assign_agent_section",
     description: "Move an existing agent into a sidebar section. Pass null for sectionId to ungroup it.",
     shape: assignAgentSectionToolSchema.shape,
+  },
+  {
+    name: "list_channels",
+    description:
+      "List the open channels with their id, name, lead, and members. A sidebar section (folder) is not a channel.",
+    shape: {},
+  },
+  {
+    name: "send_to_channel",
+    description:
+      "Post a request into a channel when the user gives it work. Members do not see this conversation: write the whole brief. paths attaches local files. recipientAgentIds names members; without it, the lead chooses. No result comes back here. In a channel task, use channel_assign or channel_transfer.",
+    shape: sendToChannelToolSchema.shape,
   },
   {
     name: "list_agents",

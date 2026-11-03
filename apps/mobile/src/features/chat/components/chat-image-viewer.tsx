@@ -156,5 +156,5 @@ export function useChatImageSource(id: string | null, originRadius: number) {
     () => (id && register ? register(id, { origin, originRadius }) : undefined),
     [id, register, origin, originRadius],
   );
-  return { origin, hiddenStyle, open: viewer?.open };
+  return { origin, hiddenStyle, hiddenSource, open: viewer?.open };
 }

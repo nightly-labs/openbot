@@ -1,4 +1,3 @@
-import { Typography } from "heroui-native";
 import {
   createContext,
   memo,
@@ -9,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { TextStyle } from "react-native";
+import { Text, type TextStyle } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -22,8 +21,8 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 import { isAndroid } from "@/shared/lib/platform";
 import { createStreamRevealPool, streamRevealWindow } from "../model/stream-reveal-pool";
+import { CHAT_TEXT_STYLES, type ChatTextType } from "./chat-text-styles";
 
-const AnimatedTypography = Animated.createAnimatedComponent(Typography);
 const RevealContext = createContext<ReturnType<typeof createStreamRevealPool> | null>(null);
 const REVEAL_TIMING = {
   duration: 150,
@@ -42,7 +41,7 @@ export function StreamRevealProvider({ children }: PropsWithChildren) {
 
 interface TextProps {
   text: string;
-  type: "body" | "body-sm" | "h4" | "h5";
+  type: ChatTextType;
   style: TextStyle;
 }
 
@@ -66,11 +65,7 @@ function FadingWord({ text, type, style, onDone }: TextProps & { onDone: () => v
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 2 * (1 - progress.get()),
   }));
-  return (
-    <AnimatedTypography type={type} style={[style, revealStyle]}>
-      {text}
-    </AnimatedTypography>
-  );
+  return <Animated.Text style={[CHAT_TEXT_STYLES[type], style, revealStyle]}>{text}</Animated.Text>;
 }
 
 function useRevealSlot(enabled: boolean) {
@@ -109,11 +104,7 @@ const RevealedWord = memo(function RevealedWord({
   }, [phase, end, onSettled]);
   if (phase === "done") return props.text;
   if (phase === "waiting")
-    return (
-      <Typography type={props.type} style={[props.style, { color: "transparent" }]}>
-        {props.text}
-      </Typography>
-    );
+    return <Text style={[CHAT_TEXT_STYLES[props.type], props.style, { color: "transparent" }]}>{props.text}</Text>;
   return <FadingWord {...props} onDone={onDone} />;
 });
 

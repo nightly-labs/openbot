@@ -19,6 +19,7 @@ import {
   asksForSecret,
   BrowserSecretComposer,
   BrowserTakeoverCard,
+  QuestionSecretComposer,
 } from "@/features/chat/components/browser-secret-card";
 import { ChatAttachmentPanel } from "@/features/chat/components/chat-attachment-panel";
 import { ChatComposer, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
@@ -290,6 +291,8 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
   // As in the agent's chat: a password or a code is typed where the composer is.
   const showBrowserRequests = online && foregroundVisit && isFocused;
   const secretRequest = showBrowserRequests && !voiceOpen ? taskBrowserRequests.find(asksForSecret) : undefined;
+  // A private answer to a form question is typed there too, never in a second field beside the composer.
+  const secretQuestion = !secretRequest && !voiceOpen && questionForm.question?.isSecret ? questionForm : undefined;
   const dark = useColorScheme() === "dark";
   const palette = useMemo(
     () => voicePalette([getBloubAvatarColor(target.avatarSeed, target.avatarHue)], dark),
@@ -592,6 +595,18 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
               key={`${serverId}:${secretRequest.requestId}`}
               request={secretRequest}
               respond={(input) => respondToBrowserSecret(serverId, input)}
+              bottomInset={insets.bottom}
+              liquidGlassAvailable={liquidGlassAvailable}
+              fallbackBackground={fieldBackground}
+              foreground={foreground}
+              muted={muted}
+              action={action}
+              actionForeground={actionForeground}
+            />
+          ) : secretQuestion ? (
+            <QuestionSecretComposer
+              key={`${serverId}:${secretQuestion.messageId}:${secretQuestion.question?.id}`}
+              controller={secretQuestion}
               bottomInset={insets.bottom}
               liquidGlassAvailable={liquidGlassAvailable}
               fallbackBackground={fieldBackground}

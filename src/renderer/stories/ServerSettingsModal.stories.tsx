@@ -8,12 +8,14 @@ import {
   type McpSignInState,
   type McpTestResult,
   nextBrowserProfileHue,
+  type ServerAuditEntry,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createSignal, createStore } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import type { ServerBrowserProfilesOptions } from "../src/features/browser/ServerBrowserProfilesPanel";
+import type { ServerAuditOptions } from "../src/features/servers/ServerAuditSection";
 import type { McpPanelSignIn } from "../src/features/servers/ServerMcpPanel";
 import type { ServerAgentAccessOptions } from "../src/features/servers/ServerRolesSection";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "../src/features/servers/ServerSettingsModal";
@@ -23,6 +25,7 @@ import {
   STORY_HOSTED_SITES,
   STORY_MCP_SERVERS,
   STORY_PRESENCE,
+  STORY_SERVER_AUDIT_ENTRIES,
 } from "../src/preview/fixtures";
 import { createSignInHost } from "./mcp-sign-in-host";
 import {
@@ -554,6 +557,39 @@ function storyAgentAccess(): ServerAgentAccessOptions {
 /** Everyone, then the custom roles. A role page sets the level of each agent. */
 export const Roles: Story = {
   args: { initialSection: "roles", agentAccess: storyAgentAccess() },
+};
+
+function storyServerAudit(entries: ServerAuditEntry[]): ServerAuditOptions {
+  return {
+    calls: { getAuditLog: async () => ({ entries: structuredClone(entries) }) },
+    listAgents: async () => STORY_AGENT_SUMMARIES.slice(0, 3),
+  };
+}
+
+/**
+ * The changes to members, roles and agent access, newest first, with a filter and a search. The
+ * story passes plain settings, not the Storybook args store, so the member list reaches the dialog.
+ */
+export const AuditLog: Story = {
+  render: () => (
+    <ServerSettingsStory
+      settings={{
+        ...serverSettingsArgs(),
+        initialSection: "audit",
+        agentAccess: storyAgentAccess(),
+        serverAudit: storyServerAudit(STORY_SERVER_AUDIT_ENTRIES),
+      }}
+    />
+  ),
+};
+
+/** No change yet. */
+export const AuditLogEmpty: Story = {
+  render: () => (
+    <ServerSettingsStory
+      settings={{ ...serverSettingsArgs(), initialSection: "audit", serverAudit: storyServerAudit([]) }}
+    />
+  ),
 };
 
 /** The role menu of each member row holds the server role and the custom roles. */

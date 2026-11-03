@@ -2,8 +2,9 @@
 // file and without dropping the rows of other servers. The first cases call the real
 // `McpOAuthStore` directly. The sign-in cases run the real `McpOAuth` and the real SDK flow
 // (discovery, registration, browser, token exchange) against a local OAuth server on the loopback
-// address, so the store sees the writes in the order Connect makes them. The cipher is fake, so
-// this does not open Keychain or a browser.
+// address, so the store sees the writes in the order Connect makes them. The last case signs in to
+// two accounts of one server, with `#account-…` addresses, and checks that each keeps its own row.
+// The cipher is fake, so this does not open Keychain or a browser.
 //
 // `bun scripts/mcp-oauth-store-e2e.ts`. Writes .openbot-build/mcp-oauth-store-e2e/report.json.
 import assert from "node:assert/strict";
@@ -11,6 +12,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { mcpAccountUrl } from "@openbot/contracts/mcp-accounts";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -18,6 +20,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import {
   McpOAuth,
   type McpOAuthRecord,
+  mcpOAuthAccountKey,
   mcpOAuthRecordSchema,
   normalizeResource,
 } from "../src/backend/mcp-oauth-provider";
@@ -89,12 +92,15 @@ async function expectUnreadable(operation: Effect.Effect<void, { readonly cause:
 
 /** An authorization server and the protected-resource metadata of the MCP server at `/mcp`. */
 async function startAuthorizationServer() {
+  /** Each request line and body, so a case can check what left the computer. */
+  const seen: string[] = [];
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", base);
-    await readBody(request);
-    answer(url.pathname, request, response);
+    const body = await readBody(request);
+    seen.push(`${request.url ?? ""} ${body}`);
+    answer(url.pathname, request, response, body);
   });
-  function answer(path: string, request: IncomingMessage, response: ServerResponse) {
+  function answer(path: string, request: IncomingMessage, response: ServerResponse, body: string) {
     if (path === "/.well-known/oauth-authorization-server")
       return json(response, 200, {
         issuer: base,
@@ -113,20 +119,23 @@ async function startAuthorizationServer() {
         redirect_uris: [REDIRECT_URL],
         token_endpoint_auth_method: "none",
       });
-    if (path === "/token" && request.method === "POST")
+    if (path === "/token" && request.method === "POST") {
+      // The token names the code, so a case can tell the sign-ins apart.
+      const code = new URLSearchParams(body).get("code") ?? "";
       return json(response, 200, {
-        access_token: "access-signed-in",
+        access_token: `access-${code}`,
         token_type: "Bearer",
         expires_in: 3600,
-        refresh_token: "refresh-signed-in",
+        refresh_token: `refresh-${code}`,
       });
+    }
     json(response, 404, {});
   }
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
   const address = server.address();
   assert.ok(address && typeof address === "object");
   const base = `http://127.0.0.1:${address.port}`;
-  return { base, close: () => new Promise<void>((done) => server.close(() => done())) };
+  return { base, seen, close: () => new Promise<void>((done) => server.close(() => done())) };
 }
 
 function readBody(request: IncomingMessage): Promise<string> {
@@ -145,8 +154,16 @@ function json(response: ServerResponse, status: number, value: unknown) {
   response.end(JSON.stringify(value));
 }
 
-/** Runs one Connect on `store`: the browser page opens, and `finish` says whether the user signs in. */
-async function connect(store: McpOAuthStore, url: string, finish: "sign-in" | "cancel"): Promise<void> {
+/**
+ * Runs one Connect on `store`: the browser page opens, and `finish` says whether the user signs in.
+ * The server answers `code` with the access token `access-<code>`.
+ */
+async function connect(
+  store: McpOAuthStore,
+  url: string,
+  finish: "sign-in" | "cancel",
+  code = "signed-in",
+): Promise<void> {
   let state: string | null = null;
   const oauth = new McpOAuth({
     storage: store,
@@ -165,7 +182,7 @@ async function connect(store: McpOAuthStore, url: string, finish: "sign-in" | "c
       await assert.rejects(runCauseEffect(signIn.complete()));
       return;
     }
-    assert.equal(oauth.receiveAuthorizationCode(state, "code"), true);
+    assert.equal(oauth.receiveAuthorizationCode(state, code), true);
     await runCauseEffect(signIn.complete());
   } finally {
     await runCauseEffect(oauth.close());
@@ -307,6 +324,54 @@ try {
   assert.equal(afterMixedConnect.read(resource)?.tokens?.access_token, "access-signed-in");
   const mixedConnectRecovers = { ok: true, kept: NOTION, recovered: "local" };
 
+  // 9. Two accounts of one server, and the row from before accounts: each sign-in keeps its own row.
+  // A cancel and a removal of one account keep the others, and no address leaves with its fragment.
+  const work = mcpAccountUrl(mcpUrl, "work");
+  const personal = mcpAccountUrl(mcpUrl, "personal");
+  const workKey = mcpOAuthAccountKey(work);
+  const personalKey = mcpOAuthAccountKey(personal);
+  assert.ok(workKey && personalKey);
+  assert.equal(mcpOAuthAccountKey(mcpUrl), resource);
+  assert.equal(new Set([resource, workKey, personalKey]).size, 3);
+  const accountsPath = join(root, "accounts.json");
+  const accounts = new McpOAuthStore(accountsPath, current);
+  assert.equal(await Effect.runPromise(accounts.load()), null);
+  const sentBefore = auth.seen.length;
+  await connect(accounts, mcpUrl, "sign-in", "plain");
+  await connect(accounts, work, "sign-in", "work");
+  await connect(accounts, personal, "sign-in", "personal");
+  const signedIn = await servers(accountsPath);
+  // A third account that the user does not finish gets no token, and the other rows do not change.
+  // Its client registration stays, as for any server whose first sign-in was cancelled.
+  const third = mcpAccountUrl(mcpUrl, "third");
+  await connect(accounts, third, "cancel");
+  const afterCancel = await servers(accountsPath);
+  for (const [key, row] of Object.entries(signedIn)) assert.equal(afterCancel[key], row);
+  const thirdKey = mcpOAuthAccountKey(third);
+  assert.ok(thirdKey);
+  assert.equal(accounts.read(thirdKey)?.tokens, undefined);
+  const accountsRead = new McpOAuthStore(accountsPath, current);
+  assert.equal(await Effect.runPromise(accountsRead.load()), null);
+  assert.equal(accountsRead.read(resource)?.tokens?.access_token, "access-plain");
+  assert.equal(accountsRead.read(workKey)?.tokens?.access_token, "access-work");
+  assert.equal(accountsRead.read(personalKey)?.tokens?.access_token, "access-personal");
+  // Removing the Work account forgets only its row, as the gateway does when its server is removed.
+  await runCauseEffect(accountsRead.clear(workKey));
+  const afterRemove = new McpOAuthStore(accountsPath, current);
+  assert.equal(await Effect.runPromise(afterRemove.load()), null);
+  assert.equal(afterRemove.read(workKey), null);
+  assert.equal(afterRemove.read(resource)?.tokens?.access_token, "access-plain");
+  assert.equal(afterRemove.read(personalKey)?.tokens?.access_token, "access-personal");
+  const sent = auth.seen.slice(sentBefore);
+  assert.ok(sent.some((line) => line.startsWith("/token")));
+  assert.ok(sent.every((line) => !line.includes("account-") && !line.includes("%23")));
+  const accountsSeparate = {
+    ok: true,
+    rows: [resource, workKey, personalKey],
+    afterRemove: [resource, personalKey],
+    requests: sent.length,
+  };
+
   const cases = {
     registrationKeepsRows,
     completedSignInKeepsOthers,
@@ -316,6 +381,7 @@ try {
     refusedFile,
     connectRecovers,
     mixedConnectRecovers,
+    accountsSeparate,
   };
   await writeFile(join(OUT, "report.json"), `${JSON.stringify({ ok: true, cases }, null, 2)}\n`);
   process.stdout.write(`mcp-oauth-store-e2e: ${Object.keys(cases).length} cases passed\n`);

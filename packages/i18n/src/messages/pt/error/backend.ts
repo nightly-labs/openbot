@@ -256,6 +256,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Um servidor pode ter até {limit} seções na barra lateral.",
   "error.backend.sectionNameRequired": "É necessário informar o nome da seção.",
   "error.backend.sectionNameTooLong": "O nome da seção é muito longo.",
+  "error.backend.sidebarFolderTooDeep": "As pastas só podem ter três níveis.",
+  "error.backend.sidebarFolderMoveInvalid": "Esta pasta não pode ser movida para lá.",
   "error.backend.sectionNameDuplicate": "Os nomes das seções devem ser exclusivos.",
   "error.backend.directMessageRequired": "Escreva uma mensagem primeiro.",
   "error.backend.directMessageTooLong": "Uma mensagem direta pode ter até {limit} caracteres.",
@@ -355,8 +357,8 @@ export const messages = {
     "Dê à tarefa um título de no máximo 120 caracteres e uma instrução que diga o que fazer.",
   "error.backend.taskOwnChatOnly":
     "Inicie uma tarefa só a partir do seu próprio chat. Um canal, uma conversa de mensagens ou outra tarefa não pode iniciar uma.",
-  "error.backend.taskOpenLimit":
-    "Este agente já tem {count} tarefas abertas. Aguarde até o usuário fechar uma antes de iniciar outra tarefa.",
+  "error.backend.taskUnfinishedLimit":
+    "Este agente já tem {count} tarefas não concluídas. Inicie outra tarefa quando uma delas terminar.",
   "error.backend.taskOpenLimitReached":
     "Este agente tem {count} tarefas abertas. Feche uma tarefa e depois inicie ou abra outra.",
   "error.backend.taskRemoteUnsupported": "As tarefas só estão disponíveis para agentes neste computador.",

@@ -67,8 +67,9 @@ commands, and release checks.
 
 Browser chat pages, drafts, file bytes, and chat visibility preferences stay in memory. A protected
 cookie holds the account credential. Local storage holds account-scoped trusted host public keys,
-the shared file panel's width, and for each account and host the pinned item ids, collapsed section
-ids and selected channel id, not chat content. The channel UI takes a `ChannelsPort` runtime; its
+the shared file panel's width, and for each account and host the pinned item ids (a copy of the list
+that a host with `sidebar-pins-v1` keeps), collapsed section ids and selected channel id, not chat
+content. The channel UI takes a `ChannelsPort` runtime; its
 desktop default is the preload API. A Web Lock permits one live tab per account
 and host because the existing control plane reuses that credential's logical host session.
 Host switches discard the prior host's chat state. Temporary connection loss keeps drafts; a
@@ -386,6 +387,16 @@ A password can also go to the Vault of the server that runs the agent. The local
 `saveToVault` over IPC. A remote client sends the same submit on `browser-secret-vault-v1`, which
 only an owner or admin can use; the released route keeps its fields. The card shows the save box on
 every password request, and for a member or an older host it shows the box off with the reason.
+
+`openbot_browser.request_vault_item` asks the user to add a login, a card or contact info that the
+Vault does not have. The attention registry surfaces a `form` UI block with `uiBlock.vault.kind`.
+The agent can fill in the fields that are not secret; the password, card number and security code
+are secret form fields, so the stored block never holds them. The desktop card opens the Vault
+dialog with the agent's values. The host saves the answer through `VaultItems.addEntered` (owner or
+admin only) and answers the tool with only the item's id, kind and name. The `ui-blocks-v1` wire
+leaves out `vault`; `ui-block-vault-v1` (protocol 9) adds it back, and the mobile app then shows the
+same card, which opens its Vault item form with the agent's values and answers the prompt with the
+form's field ids. Another remote client shows the ordinary form. Messaging threads refuse the tool.
 
 The browser host owns the protection state and serializes entry behind existing browser work. CDP
 resolves fields before consent and checks the document and origin again before entry. The host

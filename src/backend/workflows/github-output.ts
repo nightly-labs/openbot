@@ -21,13 +21,16 @@ import { sourceText } from "@openbot/i18n/source";
 import { extractJsonObject, StructuredOutputError } from "../structured-output";
 import { EXTERNAL_EVENT_END, EXTERNAL_EVENT_START } from "../webhook-trigger";
 import { githubObjectKey, githubTriggerRepository } from "./github-matching";
-import type { WorkflowGitHubChange, WorkflowGitHubChangeResult } from "./workflow-github-api";
+import {
+  GITHUB_BODY_LIMIT,
+  type WorkflowGitHubChange,
+  type WorkflowGitHubChangeResult,
+  type WorkflowGitHubFiles,
+} from "./workflow-github-api";
 import { fieldText, inputText } from "./workflow-walk";
 
 /** GitHub refuses a longer issue title. */
 const TITLE_LIMIT = 256;
-/** GitHub refuses a longer comment, review or issue text. */
-const BODY_LIMIT = 65_536;
 
 /** What a model chooses for the output, when its fields say "Agent chooses". */
 export interface GitHubOutputChoice {
@@ -43,7 +46,8 @@ export type GitHubOutputPlan =
 
 /**
  * The change of an output step. `graph` and `runItem` are those of its run: the trigger's repository and
- * the item of the event that started it.
+ * the item of the event that started it. `files` are the files of the run's trigger, which a new issue
+ * or a comment links.
  */
 export function githubOutputPlan(
   node: WorkflowNode,
@@ -51,6 +55,7 @@ export function githubOutputPlan(
   graph: WorkflowGraph | null,
   triggerNodeId: string | null,
   runItem: WorkflowGitHubItem | null,
+  files: WorkflowGitHubFiles | null = null,
 ): GitHubOutputPlan {
   const action = node.fields.action;
   if (!isOneOf(WORKFLOW_GITHUB_ACTIONS, action))
@@ -70,7 +75,7 @@ export function githubOutputPlan(
   // The event of a trigger is data for an agent. GitHub does not get it as a comment, a review or an issue.
   const text = withoutEvents(input);
   const onlyEvent = text !== input && !text.trim();
-  const body = text.trim().slice(0, BODY_LIMIT);
+  const body = text.trim().slice(0, GITHUB_BODY_LIMIT);
   const textMissing = sourceText(onlyEvent ? "error.workflow.githubEventText" : "error.workflow.githubTextMissing");
   const chooseLabels = fieldText(node, "labelsFrom") === "agent";
   const labels = chooseLabels ? [] : workflowListField(node.fields.labels);
@@ -86,6 +91,7 @@ export function githubOutputPlan(
     labels,
     people: choosePerson || !person ? [] : [person],
     reason: isOneOf(WORKFLOW_GITHUB_CLOSE_REASONS, reason) ? reason : "completed",
+    files: null,
   };
   const choose: GitHubOutputChoice = { labels: false, person: false };
 
@@ -93,6 +99,7 @@ export function githubOutputPlan(
     case "comment":
       if (onlyEvent) return { kind: "failed", error: textMissing };
       if (!body) return { kind: "quiet" };
+      change.files = files;
       break;
     case "review.changes":
       // GitHub asks for the changes in the review text.
@@ -113,6 +120,7 @@ export function githubOutputPlan(
       const title = (fieldText(node, "title") || body.split("\n", 1)[0] || "").trim().slice(0, TITLE_LIMIT);
       if (!title) return { kind: "failed", error: textMissing };
       change.title = title;
+      change.files = files;
       choose.labels = chooseLabels;
       break;
     }
@@ -140,7 +148,7 @@ const INPUT_NAME = /(?<=^|\n)Input \d+:\n\n/gu;
  * The input without the framed events of triggers. A loop joins the event into the input of a later
  * pass, so the names of the joined inputs go with their events, and one text that stays keeps no name.
  */
-function withoutEvents(input: string): string {
+export function withoutEvents(input: string): string {
   let text = input;
   for (let start = text.indexOf(EXTERNAL_EVENT_START); start >= 0; start = text.indexOf(EXTERNAL_EVENT_START)) {
     // The event is one line of JSON, which keeps no line break, so a marker in a comment does not end it.

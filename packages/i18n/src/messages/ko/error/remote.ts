@@ -88,6 +88,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "WebRTC 파일 전송에 실패했어요.",
   "error.remote.fileResumeFailed": "WebRTC 파일 전송을 제한 시간 안에 재개할 수 없었어요.",
   "error.remote.fileTransportStopped": "WebRTC 파일 전송이 중지되었어요.",
+  "error.remote.downloadStopped": "다운로드를 중지했어요.",
   "error.remote.fileResumeExpired": "WebRTC 파일 전송 재개 제한 시간이 지났어요.",
   "error.remote.hostRequestFailed": "호스트가 요청을 완료할 수 없었어요.",
   "error.remote.responseTooLarge": "호스트의 응답이 너무 커서 이 기기로 보낼 수 없어요.",
@@ -193,4 +194,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "채널을 삭제하려면 이 데스크톱 서버를 업데이트해 주세요.",
   "error.remote.historyRefreshFailed": "메시지를 보냈지만 채팅 기록을 새로 고칠 수 없었어요.",
   "error.remote.taskHistoryRefreshFailed": "작업을 변경했지만 채팅 기록을 새로 고칠 수 없었어요.",
+  "error.remote.localServerAccountRemovalFailed":
+    "서버는 해당 컴퓨터에서 삭제되었지만 계정에는 아직 표시됩니다. 계정에서 제거하려면 다시 삭제하세요.",
 } as const satisfies PartialTranslation<typeof source>;

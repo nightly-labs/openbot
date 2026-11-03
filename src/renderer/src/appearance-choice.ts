@@ -1,13 +1,22 @@
 import {
-  type AppAppearance,
   type AppAppearancePreference,
+  type AppThemePalette,
   DEFAULT_APP_APPEARANCE,
   DEFAULT_TRANSPARENT_WINDOW,
   isAppAppearance,
+  isAppThemePalette,
+  sameThemePalettes,
+  selectedThemePalette,
 } from "@openbot/contracts/app-appearance";
+import {
+  type AppearanceSelectValue,
+  appearanceChangeOfSelectValue,
+  appearanceSelectValue,
+} from "@openbot/ui/features/settings/AppearanceSelect";
 import { createSignal, onSettled } from "solid-js";
 import { appPort } from "./app-port";
 import { syncColorScheme } from "./color-scheme";
+import { applyThemePalette } from "./theme-palette";
 
 /** One Settings control's value. Set optimistically, and reverted if main refuses the write. */
 function optimisticChoice<T extends string | boolean>(initial: T, save: (next: T) => Promise<T>) {
@@ -42,20 +51,24 @@ function optimisticChoice<T extends string | boolean>(initial: T, save: (next: T
   return { value, confirm, change };
 }
 
+function saveTheme(next: AppearanceSelectValue): Promise<AppearanceSelectValue> {
+  return appPort().setAppAppearancePreference(appearanceChangeOfSelectValue(next)).then(appearanceSelectValue);
+}
+
 /** The Settings control state of the theme and of the transparent window. */
 export function useAppearanceChoice() {
-  const appearance = optimisticChoice<AppAppearance>(DEFAULT_APP_APPEARANCE, (next) =>
-    appPort()
-      .setAppAppearancePreference({ appearance: next })
-      .then((preference) => preference.appearance),
-  );
+  const theme = optimisticChoice<AppearanceSelectValue>(DEFAULT_APP_APPEARANCE, saveTheme);
+  // Each event from main carries a new array. Kobalte rebuilds its list when the options change, and
+  // then reports the selected value again, so an equal list must keep the same array.
+  const [palettes, setPalettes] = createSignal<AppThemePalette[]>([], { equals: sameThemePalettes });
   const transparentWindow = optimisticChoice<boolean>(DEFAULT_TRANSPARENT_WINDOW, (next) =>
     appPort()
       .setAppAppearancePreference({ transparentWindow: next })
       .then((preference) => preference.transparentWindow),
   );
   const confirm = (preference: AppAppearancePreference) => {
-    appearance.confirm(preference.appearance);
+    setPalettes(() => preference.palettes);
+    theme.confirm(appearanceSelectValue(preference));
     transparentWindow.confirm(preference.transparentWindow);
   };
 
@@ -68,8 +81,9 @@ export function useAppearanceChoice() {
   });
 
   return {
-    appearance: appearance.value,
-    changeAppearance: appearance.change,
+    theme: theme.value,
+    changeTheme: theme.change,
+    palettes,
     transparentWindow: transparentWindow.value,
     changeTransparentWindow: transparentWindow.change,
   };
@@ -78,30 +92,65 @@ export function useAppearanceChoice() {
 /** This window's copy of the choice, so the first paint after a launch has the saved colors. */
 const CACHED_APPEARANCE_KEY = "openbot.appearance";
 const CACHED_TRANSPARENT_WINDOW_KEY = "openbot.transparentWindow";
+/** The selected palette whole, so the first paint has its colors before main answers. */
+const CACHED_THEME_PALETTE_KEY = "openbot.themePalette";
+
+function cachedPalette(): AppThemePalette | null {
+  const text = window.localStorage.getItem(CACHED_THEME_PALETTE_KEY);
+  if (text === null) return null;
+  try {
+    const palette = JSON.parse(text);
+    return isAppThemePalette(palette) ? palette : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Reading `window.localStorage` throws when the browser blocks storage, so it is read inside the guard. */
 function cachedPreference(): AppAppearancePreference {
   try {
     const appearance = window.localStorage.getItem(CACHED_APPEARANCE_KEY);
+    const palette = cachedPalette();
     return {
       appearance: isAppAppearance(appearance) ? appearance : DEFAULT_APP_APPEARANCE,
       transparentWindow: window.localStorage.getItem(CACHED_TRANSPARENT_WINDOW_KEY) === "true",
+      palette: palette === null ? null : palette.id,
+      palettes: palette === null ? [] : [palette],
     };
   } catch {
-    return { appearance: DEFAULT_APP_APPEARANCE, transparentWindow: DEFAULT_TRANSPARENT_WINDOW };
+    return {
+      appearance: DEFAULT_APP_APPEARANCE,
+      transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
+      palette: null,
+      palettes: [],
+    };
+  }
+}
+
+function cachePreference(preference: AppAppearancePreference): void {
+  try {
+    window.localStorage.setItem(CACHED_APPEARANCE_KEY, preference.appearance);
+    window.localStorage.setItem(CACHED_TRANSPARENT_WINDOW_KEY, String(preference.transparentWindow));
+    const palette = selectedThemePalette(preference);
+    if (palette === null) window.localStorage.removeItem(CACHED_THEME_PALETTE_KEY);
+    else window.localStorage.setItem(CACHED_THEME_PALETTE_KEY, JSON.stringify(palette));
+  } catch {
+    // Main's value still applies; only the next first paint can show the default.
   }
 }
 
 /**
  * Keeps a desktop window on the appearance that main keeps. The copy in browser storage gives the
  * first paint; main's value then replaces it. The Dynamic Island does not call this: it stays dark.
+ * A selected theme palette gives the light or dark base, and its colors go over that base.
  *
  * Only the main window passes `windowGlass`: main gives the macOS blur to that window alone, so in
  * another window a transparent page would show the desktop with no blur.
  */
 export function syncAppearance(options: { windowGlass?: boolean } = {}): void {
   let preference = cachedPreference();
-  const scheme = syncColorScheme(() => preference.appearance);
+  const scheme = syncColorScheme(() => selectedThemePalette(preference)?.scheme ?? preference.appearance);
+  applyThemePalette(selectedThemePalette(preference));
   const showGlass = () => {
     if (options.windowGlass)
       document.documentElement.toggleAttribute("data-openbot-window-glass", preference.transparentWindow);
@@ -109,13 +158,9 @@ export function syncAppearance(options: { windowGlass?: boolean } = {}): void {
   showGlass();
   const apply = (next: AppAppearancePreference) => {
     preference = next;
-    try {
-      window.localStorage.setItem(CACHED_APPEARANCE_KEY, next.appearance);
-      window.localStorage.setItem(CACHED_TRANSPARENT_WINDOW_KEY, String(next.transparentWindow));
-    } catch {
-      // Main's value still applies; only the next first paint can show the default.
-    }
+    cachePreference(next);
     scheme.refresh();
+    applyThemePalette(selectedThemePalette(next));
     showGlass();
   };
   void appPort()

@@ -253,6 +253,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sidebarSectionLimit": "A server can have up to {limit} sidebar sections.",
   "error.backend.sectionNameRequired": "Section name is required.",
   "error.backend.sectionNameTooLong": "Section name is too long.",
+  "error.backend.sidebarFolderTooDeep": "Folders can go only three levels deep.",
+  "error.backend.sidebarFolderMoveInvalid": "This folder cannot move there.",
   "error.backend.sectionNameDuplicate": "Section names must be unique.",
   "error.backend.directMessageRequired": "Write a message first.",
   "error.backend.directMessageTooLong": "A direct message can have up to {limit} characters.",
@@ -289,6 +291,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.apiKeySaveFailed": "OpenBot could not save the API key. Try again.",
   "error.backend.apiKeyNotAllowed": "Only the server owner or an admin can enter an API key.",
   "error.backend.apiKeySaving": "The API key is already being saved.",
+  "error.backend.vaultItemNotAllowed": "Only the server owner or an admin can add an item to the Vault.",
+  "error.backend.vaultItemSaving": "The Vault item is already being saved.",
   "error.backend.authRequestInactive": "This secure authentication request is no longer active.",
   "error.backend.secureAuthUnavailable": "Secure authentication is unavailable.",
   "error.backend.browserUrlRequired": "A browser URL is required.",
@@ -354,8 +358,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.taskToolInvalid": "Give the task a title of at most 120 characters and a brief that says what to do.",
   "error.backend.taskOwnChatOnly":
     "Start a task only from your own chat. A channel, a messaging conversation or another task cannot start one.",
-  "error.backend.taskOpenLimit":
-    "This agent already has {count} open tasks. Wait until the user closes one before you start another task.",
+  "error.backend.taskUnfinishedLimit":
+    "This agent already has {count} unfinished tasks. Start another task when one of them ends.",
   "error.backend.taskOpenLimitReached":
     "This agent has {count} open tasks. Close a task, then start or open another one.",
   "error.backend.taskRemoteUnsupported": "Tasks are only available for agents on this computer.",

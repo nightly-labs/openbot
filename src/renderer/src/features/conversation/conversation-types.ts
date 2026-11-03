@@ -297,6 +297,13 @@ export interface ConversationProps {
   onMarkRead: () => Promise<void>;
   /** Marks an agent message and the messages after it unread. Without it, the message menu has no such item. */
   onMarkUnread?: ((messageId: string) => Promise<void>) | undefined;
+  /**
+   * The open channels that a message of this agent chat can go to. Each one opens with the text in its
+   * composer. Without it, the message menu has no such item.
+   */
+  sendToChannel?:
+    | { channels: { id: string; name: string }[]; onSend: (channelId: string, text: string) => void }
+    | undefined;
   onLoadOlder?: (() => void) | undefined;
   onLoadLatest?: (() => Promise<void>) | undefined;
   onSearchMessages?: ((query: string) => Promise<{ messageIds: string[]; total: number }>) | undefined;
@@ -321,6 +328,10 @@ export interface ConversationProps {
   remoteTaskLimitLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's plan card setting: owners and admins only. */
   remotePlanCardLoaded?: boolean | undefined;
+  /** Whether a joined server's host answered with the agent's Computer Use setting: owners and admins only. */
+  remoteComputerUseLoaded?: boolean | undefined;
+  /** Whether a joined server's host answered with the agent's new chat setting: owners and admins only. */
+  remoteNewChatLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's busy-message mode: owners and admins only. */
   remoteBusyMessageModeLoaded?: boolean | undefined;
   /**

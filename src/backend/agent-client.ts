@@ -22,6 +22,12 @@ export interface AgentClient {
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
   readonly running: boolean;
   readonly readHistory?: ReadProviderHistory;
+  /**
+   * True when the user's MCP tools in this thread wait for the provider's own `tool_search`. OpenBot's
+   * tool search knows only the built-in tools, so it then sends the model to that tool. Optional,
+   * because the other providers declare the MCP tools or load them on their own.
+   */
+  readonly deferredMcpTools?: (externalThreadId: string) => boolean;
   /** False when stopping this client would lose a live provider session with no recovery path. */
   readonly canReleaseProcess?: () => boolean;
   start(): void;

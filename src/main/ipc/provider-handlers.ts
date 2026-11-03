@@ -2,7 +2,12 @@ import { Effect } from "effect";
 // Signing in to a provider, storing the optional provider API keys, and downloading the CLI
 // runtimes the providers need.
 
-import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import {
+  agentProviderDescriptor,
+  agentProviderName,
+  isManagedRuntimeProvider,
+  type ManagedProviderId,
+} from "@openbot/contracts/agent-providers";
 import {
   type AgentProviderId,
   type ConnectProviderAccountInput,
@@ -18,6 +23,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
+import type { SignInRegion } from "../../backend/kimi-region";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import { parseProviderId } from "./app-inputs";
@@ -41,20 +47,34 @@ export function providerIpcHandlers({
   credentials,
   openLink,
 }: ProviderIpcDependencies): Pick<IpcGroupHandlers, "providers" | "providerRuntimes"> {
+  async function connect(provider: AgentProviderId, region: SignInRegion) {
+    await runCauseEffect(providerRuntimes.ensureKeyProviderCli(provider));
+    return runCauseEffect(
+      service.connectProvider(
+        provider,
+        async (value) => {
+          const url = new URL(value);
+          if (url.protocol !== "https:") throw new Error(sourceText("error.provider.httpsSignInLinkOnly"));
+          await openLink(url.toString());
+        },
+        region,
+      ),
+    );
+  }
+
   return {
     providers: {
       setProviderOn: payloadHandler(parseProviderUseInput, ({ provider, on }) =>
         runCauseEffect(service.setProviderOn(provider, on)),
       ),
-      connectProvider: payloadHandler(parseProviderId, async (provider) => {
-        await runCauseEffect(providerRuntimes.ensureKeyProviderCli(provider));
-        return runCauseEffect(
-          service.connectProvider(provider, async (value) => {
-            const url = new URL(value);
-            if (url.protocol !== "https:") throw new Error(sourceText("error.provider.httpsSignInLinkOnly"));
-            await openLink(url.toString());
-          }),
-        );
+      connectProvider: payloadHandler(parseProviderId, (provider) => connect(provider, "global")),
+      connectProviderInMainlandChina: payloadHandler(parseProviderId, (provider) => {
+        if (!agentProviderDescriptor(provider).mainlandChinaSignInSite) {
+          throw new Error(
+            sourceText("error.provider.noMainlandChinaSignIn", { provider: agentProviderName(provider) }),
+          );
+        }
+        return connect(provider, "mainland-cn");
       }),
       cancelProviderSignIn: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(service.cancelProviderSignIn(provider)),

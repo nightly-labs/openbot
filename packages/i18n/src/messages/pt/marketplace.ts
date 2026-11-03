@@ -111,6 +111,7 @@ export const messages = {
   "marketplace.app.setup.account": "Entre com sua conta do {name} no navegador.",
   "marketplace.app.setup.key": "Precisa de uma chave de API da sua conta do {name}.",
   "marketplace.app.setup.keySaved": "{field} fica em {host}.",
+  "marketplace.app.account.removeDescription": "O OpenBot apaga o login desta conta em {host}.",
   "marketplace.app.setup.desktop": "Roda no app para desktop do {name} em {address}.",
   "marketplace.app.setup.desktopConnected": "Conectado a {address}.",
   "marketplace.app.setup.open": "Não precisa de login nem de chave.",

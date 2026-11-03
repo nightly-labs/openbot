@@ -65,8 +65,12 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Paylaşılan veriler bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentInstallUnsupported": "Ajan ekleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentHideUnsupported": "Ajan gizleme bu bağlantı tarafından desteklenmiyor.",
+  "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentNotificationLevelsUnsupported":
     "Bu sunucu her ajan için kendi bildirim düzeyinizi saklayamıyor. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
+  "error.team.sidebarPinsUnsupported":
+    "Bu sunucu sabitlenmiş sohbetlerinizi tüm cihazlarınız için saklayamaz. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
+  "error.team.agentInstructionsUnsupported": "Ajan talimatlarını düzenleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentPublishUnsupported": "Ajan yayımlama bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentUpdateUnsupported": "Ajan güncelleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.contextResetUnsupported": "Yeni bir sohbet başlatma bu bağlantı tarafından desteklenmiyor.",
@@ -91,6 +95,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Ana makine güncellemeleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostTimezoneUnsupported": "Bu bağlantı sunucunun saat dilimini desteklemiyor.",
   "error.team.hostKeyRotationUnsupported": "Bu bağlantı sunucu anahtarı değişikliğini desteklemiyor.",
+  "error.team.localServersUnsupported": "Bu bağlantı bu bilgisayardaki sunucuları desteklemiyor.",
   "error.team.routineResultsUnsupported": "Bu bağlantı rutin hedeflerini desteklemiyor.",
   "error.team.agentMemoryLimitUnsupported": "Bu bağlantı ajanların bellek sınırını desteklemiyor.",
   "error.team.agentFoldersUnsupported": "Bu bağlantı ajanların klasörlerini desteklemiyor.",

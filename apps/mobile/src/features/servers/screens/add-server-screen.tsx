@@ -16,6 +16,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AppState, Keyboard, Pressable, View } from "react-native";
 
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { LocalServerOptions, type LocalServerPathname } from "@/features/servers/components/local-server-options";
 import { SERVER_ROLE_KEYS } from "@/features/servers/model/server-role";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { useLiveServerRecovery } from "@/features/workspace/context/server-recovery-countdown";
@@ -54,6 +55,7 @@ export function AddServerScreen({
   onJoined,
   scanHref = "/add-server/scan",
   underHeader = false,
+  localServerPathname,
 }: {
   initialInvite?: string;
   onJoined?: () => void;
@@ -61,6 +63,8 @@ export function AddServerScreen({
   scanHref?: Href;
   /** An inner page under a native header: its back button replaces Cancel. */
   underHeader?: boolean;
+  /** The create page of a server on an owned computer, in this sheet. Without it, the page offers none. */
+  localServerPathname?: LocalServerPathname;
 } = {}) {
   const { t, format, errorDetails, sourceText } = useText();
   const [foreground, accentForeground, success] = useThemeColor(["foreground", "accent-foreground", "success"]);
@@ -269,6 +273,9 @@ export function AddServerScreen({
               <Button.Label className="font-sans font-semibold">{t("common.tryAgain")}</Button.Label>
             </Button>
           )}
+
+          {/* Another way to get a server: one more on a computer that runs OpenBot, while no link is typed. */}
+          {localServerPathname && !inviteLink.trim() ? <LocalServerOptions pathname={localServerPathname} /> : null}
 
           {underHeader ? null : (
             <Pressable

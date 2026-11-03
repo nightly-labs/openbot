@@ -5,6 +5,7 @@ import type { AgentAccessStore } from "../agent-access-store";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
 import type { AgentFolders } from "../agent-folders";
 import type { AgentHostSettingsService } from "../agent-host-settings";
+import type { AgentInstructionsFiles } from "../agent-instructions-files";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { AgentTemplateService } from "../agent-template-service";
@@ -24,6 +25,7 @@ import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { RequestedUpdate } from "../requested-update";
+import type { ServerAuditStore } from "../server-audit-store";
 import type { ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 // What `TeamApiServer` needs from the rest of the main process, and nothing else.
@@ -50,6 +52,8 @@ import type {
   SetAgentNotificationLevelInput,
   SetRoutineResultDestinationInput,
   SidebarLayoutSnapshot,
+  SidebarPin,
+  SidebarPinsSnapshot,
   TeamPresenceSnapshot,
   UpdateHostIdentityInput,
 } from "@openbot/contracts/ipc";
@@ -152,6 +156,8 @@ type TeamApiAgentMethods = Pick<
   | "reorderQueue"
   | "interrupt"
   | "clearAgentContext"
+  | "compactAgentContext"
+  | "compactTaskContext"
   | "agentIdForRequest"
   | "respondToPrompt"
   | "respondToApproval"
@@ -259,6 +265,26 @@ export interface TeamApiAgentNotificationLevels {
 }
 
 /**
+ * `sidebar-pins-v1`: the chats that each member pinned on this server, in their order. The host keeps
+ * the pins of the owner under one key, so its desktop app and its phones read the same pins.
+ */
+export interface TeamApiSidebarPins {
+  snapshot(memberId: string, hidden: ReadonlySet<string>): SidebarPinsSnapshot;
+  set(
+    memberId: string,
+    items: SidebarPin[],
+    hidden: ReadonlySet<string>,
+  ): Effect.Effect<SidebarPinsSnapshot, PreferenceFileFailure>;
+  seed(
+    memberId: string,
+    items: SidebarPin[],
+    hidden: ReadonlySet<string>,
+  ): Effect.Effect<SidebarPinsSnapshot, PreferenceFileFailure>;
+  /** Calls `listener` with the member after each change of their pins, from any of their devices. */
+  subscribe(listener: (memberId: string) => void): () => void;
+}
+
+/**
  * Its presence is what `#protocolSupport` advertises `agent-tasks-v1` and `agent-threads-v1` on. A member
  * who can send a message to the agent can use it. Moving a queued message into a task stays local.
  */
@@ -350,6 +376,19 @@ export interface ProviderDefaultSetting {
   model: AgentModelId | null;
 }
 
+/** A server on this computer, as `local-servers-v1` sends it. */
+interface TeamApiLocalServer {
+  serverId: string;
+  name: string;
+  /** Registered for the owner's account, so the owner's devices list it. */
+  published: boolean;
+}
+
+interface TeamApiLocalServerList {
+  servers: TeamApiLocalServer[];
+  limit: number;
+}
+
 /**
  * The admin routes, one member per optional capability. A member's presence is what
  * `#protocolSupport` advertises its capability on; every route behind it requires an owner or admin.
@@ -376,6 +415,8 @@ export interface TeamApiAdmin {
   agentHost?: AgentHostSettingsService;
   /** `agent-folders-v1`: the folders that one agent can change besides its workspace. */
   folders?: Omit<AgentFolders, "requireAgent">;
+  /** `agent-instructions-v1`: read and save the instruction file of one agent. */
+  instructions?: Pick<AgentInstructionsFiles, "listAgents" | "read" | "save">;
   sessionSettings?: Pick<
     AgentService,
     "readAgentSessionSettings" | "setAgentSessionSetting" | "resetAgentSessionSetting"
@@ -401,6 +442,16 @@ export interface TeamApiAdmin {
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
   /** `host-key-rotation-v1`: the owner changes this host's key. Resolves with the new public key. */
   hostKey?: { rotate(): Effect.Effect<{ publicKey: string }, RemoteWorkflowError> };
+  /**
+   * `local-servers-v1`: the servers that the desktop app runs on this computer. Only the desktop app's
+   * own server has it, not a server on this computer, a hosted server or a server mode host.
+   */
+  localServers?: {
+    list(): Effect.Effect<TeamApiLocalServerList, RemoteWorkflowError>;
+    create(name: string): Effect.Effect<TeamApiLocalServer, RemoteWorkflowError>;
+    /** Moves the server's data to the Trash and removes it from the account. */
+    delete(serverId: string): Effect.Effect<void, RemoteWorkflowError>;
+  };
   /** `agent-memory-limit-v1`: how many memories each agent of this computer can keep. */
   memoryLimit?: AgentMemoryLimitSetting;
   /** `memory-review-v1`: how often this computer's agents review their memories in the background. */
@@ -519,6 +570,7 @@ export type TeamApiBitwardenConnector = Pick<BitwardenConnectorService, "status"
 export type TeamApiVault = VaultService;
 
 export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "levels" | "set" | "subscribe">;
+export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
 
 export interface TeamApiOptions {
   /** `events-v1`: admin-only event source and routine management. */
@@ -546,8 +598,11 @@ export interface TeamApiOptions {
   workflows?: TeamApiWorkflows;
   hiddenAgents?: TeamApiHiddenAgents;
   agentNotificationLevels?: TeamApiAgentNotificationLevels;
+  sidebarPins?: TeamApiSidebarPins;
   /** `agent-access-v1`: the roles that limit what a member can do with each agent. */
   agentAccess?: TeamApiAgentAccess;
+  /** `server-audit-v1`: the changes to members, roles and agent access, for owners and admins. */
+  serverAudit?: TeamApiServerAudit;
   agentTasks?: TeamApiAgentTasks;
   browserProfiles?: TeamApiBrowserProfiles;
   admin?: TeamApiAdmin;

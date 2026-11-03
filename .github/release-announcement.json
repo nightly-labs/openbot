@@ -1,10 +1,10 @@
 {
-  "version": "0.58.0",
+  "version": "0.59.0",
   "highlights": [
-    "Start a workflow from a GitHub issue, comment, pull request or failed check, and let it comment, label or review on GitHub.",
-    "A joined server opens much faster: the agents and sidebar from your last visit show at once while the app connects.",
-    "On the web, a switch to another server takes about 1 second.",
-    "Marketplace has 17 new OpenBot agents, such as QA Tester, PR Shepherd and Chief of Staff.",
-    "You can move queued messages in a queue of more than 32 messages."
+    "Kimi is a new provider, and you can use Hermes Agent from Nous Research with your own memories and skills.",
+    "Start a workflow when someone mentions OpenBot in Discord, and send its result back to Discord.",
+    "Sidebar folders can now hold folders, up to three levels.",
+    "Pinned agents and channels stay the same on each device that connects to a server.",
+    "On a Mac, OpenBot has a menu bar icon and keeps your tasks running after you close the window. Hold ⌘Q or press it twice to quit."
   ]
 }

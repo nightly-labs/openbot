@@ -6,7 +6,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import Shuffle from "lucide-react-native/icons/shuffle";
 import { memo, type ReactNode, useCallback, useState } from "react";
 import { View } from "react-native";
-import { AgentColorGlow, useAgentColorTransition } from "@/features/agents/components/agent-color-glow";
+import { AgentColorGlow } from "@/features/agents/components/agent-color-glow";
 import { AvatarThumbnail, BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { createAvatarCandidates } from "@/features/agents/model/avatar-candidates";
 import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
@@ -65,7 +65,6 @@ export function AgentAppearancePicker({
   const [candidates, setCandidates] = useState(() => createAvatarCandidates(seed));
   const shuffle = useCallback(() => setCandidates((current) => createAvatarCandidates(seed, current)), [seed]);
   const targetColor = getBloubAvatarColor(seed, hue);
-  const color = useAgentColorTransition(targetColor);
 
   return (
     <View className="gap-4">
@@ -84,7 +83,7 @@ export function AgentAppearancePicker({
           seed={seed}
           hue={hue}
           size={PREVIEW_SIZE}
-          animatedColor={color}
+          transition="pop"
         />
       </View>
       {nameField}

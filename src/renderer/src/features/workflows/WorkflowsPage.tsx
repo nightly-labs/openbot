@@ -73,6 +73,9 @@ function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
     get places() {
       return workflows.places();
     },
+    get discord() {
+      return workflows.discord();
+    },
     imageModels: [],
     files: [],
     get self() {
@@ -80,16 +83,19 @@ function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
     },
   };
   // A channel output needs a messaging place. Without one, a new output posts a notification. Only an
-  // owner or admin adds a GitHub step, on a host that runs them.
+  // owner or admin adds a GitHub or Discord step, on a host that runs them. Only this computer has
+  // Discord servers.
   const features = createMemo<WorkflowFeatures>(() => {
     const github = props.admin && props.host.githubSupported();
+    const discord = props.admin && workflows.discord().length > 0;
     const outputs = WORKFLOW_FEATURES_V1.outputs.filter(
       (output) => output !== "channel" || workflows.places().length > 0,
     );
+    const added = [...(github ? (["github"] as const) : []), ...(discord ? (["discord"] as const) : [])];
     return {
       ...WORKFLOW_FEATURES_V1,
-      triggers: github ? [...WORKFLOW_FEATURES_V1.triggers, "github"] : WORKFLOW_FEATURES_V1.triggers,
-      outputs: github ? [...outputs, "github"] : outputs,
+      triggers: [...WORKFLOW_FEATURES_V1.triggers, ...added],
+      outputs: [...outputs, ...added],
     };
   });
   // The canvas is a direct child of the window page, which gives it the height of the pane.
