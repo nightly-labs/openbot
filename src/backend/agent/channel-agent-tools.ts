@@ -121,7 +121,7 @@ function channelIcon(icon: ChannelDraft["icon"]): Pick<ChannelDraft, "icon"> {
 }
 
 /** The draft of a new channel. The lead is the first member unless the call names one, as in the create dialog. */
-export function createdChannelDraft(args: CreateChannelArgs, agents: readonly AgentSummary[]): ChannelDraft {
+function createdChannelDraft(args: CreateChannelArgs, agents: readonly AgentSummary[]): ChannelDraft {
   for (const id of args.memberAgentIds) requireAvailable(agents, id);
   const leadAgentId = args.leadAgentId ?? args.memberAgentIds[0] ?? null;
   if (leadAgentId !== null && !args.memberAgentIds.includes(leadAgentId))
@@ -142,7 +142,7 @@ export function createdChannelDraft(args: CreateChannelArgs, agents: readonly Ag
  * a member that is already there, or removing one that is not, changes nothing, so a retried call
  * gives the same draft. A removed lead leaves no lead unless the call names a new one.
  */
-export function updatedChannelDraft(
+function updatedChannelDraft(
   stored: Channel | null,
   args: UpdateChannelArgs,
   agents: readonly AgentSummary[],
@@ -178,7 +178,7 @@ export function updatedChannelDraft(
  * The id of the channel that one `create_channel` call makes. It comes from the call's idempotency
  * key, so a retried call finds the channel that the first attempt made and does not make a second.
  */
-export function createdChannelId(params: { threadId: string; turnId: string; callId: string }): string {
+function createdChannelId(params: { threadId: string; turnId: string; callId: string }): string {
   const hex = createHash("sha256")
     .update(`create_channel:${toolCallIdempotencyKey(params)}`)
     .digest("hex");
