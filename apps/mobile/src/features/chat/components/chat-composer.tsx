@@ -34,6 +34,7 @@ import Animated, {
   LayoutAnimationConfig,
   ReduceMotion,
   type SharedValue,
+  useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -511,12 +512,48 @@ export const ChatComposer = memo(function ChatComposer({
       }),
     );
   }, [anchored, held, reducedMotion]);
+  // The reply row opens with the composer, on the keyboard's own progress, instead of popping in
+  // before it. The last target stays drawn while the row closes.
+  const [shownReply, setShownReply] = useState(replyTarget);
+  if (replyTarget && replyTarget !== shownReply) setShownReply(replyTarget);
+  const replyActive = replyTarget !== null;
+  const replyActiveValue = useSharedValue(replyActive);
+  const replyPresence = useSharedValue(replyActive ? 1 : 0);
+  const replyRowHeight = useSharedValue(0);
+  // Once the keyboard is fully up, a reply holds the composer open like a draft does, so a
+  // dismissal keeps the reply readable. Taken then and not on the press, so the opening still
+  // follows the keyboard.
+  const replyHold = useSharedValue(replyActive ? 1 : 0);
+  useEffect(() => {
+    replyActiveValue.set(replyActive);
+    const timing = { duration: shapeDuration, easing: SHAPE_EASING_FN, reduceMotion: ReduceMotion.System };
+    replyPresence.set(
+      withTiming(replyActive ? 1 : 0, timing, (finished) => {
+        if (finished && !replyActive) scheduleOnRN(setShownReply, null);
+      }),
+    );
+    if (!replyActive) replyHold.set(withTiming(0, timing));
+  }, [replyActive, replyActiveValue, replyPresence, replyHold, shapeDuration]);
+  useAnimatedReaction(
+    () => replyActiveValue.get() && keyboardProgress.get() >= 0.99,
+    (open) => {
+      if (open) replyHold.set(1);
+    },
+  );
   // The keyboard drives the shape frame by frame, so zeroing the other
   // durations leaves this one path moving. Reduced motion answers it by
   // dropping the resting shape altogether: the composer stays open, and the
   // keyboard changes nothing about it. Two discrete states would still jump
   // on every keyboard, which is the motion the setting asks us to remove.
-  const expansion = useDerivedValue(() => (resizes ? Math.max(Math.min(1, keyboardProgress.get()), held.get()) : 1));
+  const expansion = useDerivedValue(() =>
+    resizes ? Math.max(Math.min(1, keyboardProgress.get()), held.get(), replyHold.get()) : 1,
+  );
+  // The smaller of the two: from rest the row follows the keyboard, and with the composer already
+  // open it takes the shape's own timing.
+  const replyStyle = useAnimatedStyle(() => {
+    const progress = Math.min(replyPresence.get(), expansion.get());
+    return { height: replyRowHeight.get() * progress, opacity: progress };
+  });
   const cardStyle = useAnimatedStyle(() => {
     const voiced = morph.get();
     const width = interpolate(expansion.get(), [0, 1], [restWidthValue.get(), cardWidth]);
@@ -729,7 +766,7 @@ export const ChatComposer = memo(function ChatComposer({
   // plus and the composer around it both carry Reanimated transforms that
   // never reach it. `focused` and `hasDraft` are the React mirror of the two
   // things that open the composer, and both change once per interaction.
-  const restingPlus = resizes && !hasDraft && !focused;
+  const restingPlus = resizes && !hasDraft && !focused && !replyActive;
   const plusDrawn = CONTROL_SIZE * (restingPlus ? REST_CONTROL_SCALE : 1);
   const plusInset = (CONTROL_SIZE - plusDrawn) / 2;
   const attachmentAnchor = {
@@ -1130,25 +1167,32 @@ export const ChatComposer = memo(function ChatComposer({
               {`${displayText}​`}
             </NativeText>
             {/* The voice mode shows the reply above the spoken words instead. */}
-            {replyTarget && !voiceOpen ? (
-              <View className="flex-row items-center gap-2 pt-2 pl-4 pr-2">
-                <Reply color={String(muted)} size={16} />
-                <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-text-secondary">
-                  {mentionDraft(replyTarget.body).text || t("mobile.chat.reply.attachment")}
-                </Typography.Paragraph>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="ghost"
-                  accessibilityLabel={t("mobile.chat.composer.cancelReply")}
-                  onPress={() => {
-                    void haptics.selection();
-                    onCancelReply();
-                  }}
+            {shownReply && !voiceOpen ? (
+              <Animated.View style={[{ overflow: "hidden" }, replyStyle]}>
+                {/* Out of flow, so it keeps its natural height while the box opens over it. */}
+                <View
+                  className="flex-row items-center gap-2 pt-2 pl-4 pr-2"
+                  style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+                  onLayout={({ nativeEvent }) => replyRowHeight.set(nativeEvent.layout.height)}
                 >
-                  <X color={String(muted)} size={16} />
-                </Button>
-              </View>
+                  <Reply color={String(muted)} size={16} />
+                  <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-text-secondary">
+                    {mentionDraft(shownReply.body).text || t("mobile.chat.reply.attachment")}
+                  </Typography.Paragraph>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    accessibilityLabel={t("mobile.chat.composer.cancelReply")}
+                    onPress={() => {
+                      void haptics.selection();
+                      onCancelReply();
+                    }}
+                  >
+                    <X color={String(muted)} size={16} />
+                  </Button>
+                </View>
+              </Animated.View>
             ) : null}
             <Animated.View
               style={{
