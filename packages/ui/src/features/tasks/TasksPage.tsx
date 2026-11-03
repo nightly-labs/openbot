@@ -355,8 +355,8 @@ function TaskRow(props: {
   wait: AgentTaskWait;
   onOpen: () => void;
 }) {
-  const { t } = useText();
-  const status = () => agentTaskStatus(props.task, t, props.wait);
+  const { t, sourceText } = useText();
+  const status = () => agentTaskStatus(props.task, t, sourceText, props.wait);
   return (
     <Button
       type="button"

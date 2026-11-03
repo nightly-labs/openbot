@@ -125,7 +125,7 @@ function TimelineStep({
       <View className={step.kind === "thought" ? "min-w-0 flex-1 pb-5" : "min-w-0 flex-1 pb-4"}>
         {step.kind === "thought" ? (
           <ChatMarkdown
-            body={step.text}
+            body={sourceText(step.text)}
             color={foreground}
             streaming={step.streaming}
             finished={!step.streaming}

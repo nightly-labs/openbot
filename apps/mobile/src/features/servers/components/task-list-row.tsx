@@ -40,12 +40,12 @@ export function TaskListRow({
   /** The thread's actions, which a long press on the row opens. */
   menu?: { actions: MenuAction[]; onAction: (id: string) => void };
 }) {
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const { theme } = useUniwind();
   const menuRef = useRef<MenuComponentRef | null>(null);
   // The iOS menu host takes the size of its content, so the row gets the width of its slot.
   const [width, setWidth] = useState<number>();
-  const status = agentTaskStatus(task, t);
+  const status = agentTaskStatus(task, t, sourceText);
   const when = formatUpdatedAt(task.closedAt ?? task.updatedAt, format);
   const line = agent
     ? t("mobile.server.threads.rowMetaTime", { agent: agent.name, status: STATUS_MARK, when })

@@ -1315,7 +1315,7 @@ export const ChatMessageList = memo(function ChatMessageList({
                 ? t("mobile.chat.activity.waitingForBrowser")
                 : t("mobile.chat.activity.waitingOnDesktop")
           : thinkingDetail
-            ? thinkingDetail
+            ? sourceText(thinkingDetail)
             : activity?.phase === "responding"
               ? t("mobile.chat.activity.responding")
               : activity?.detail

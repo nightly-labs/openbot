@@ -84,7 +84,10 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     const activeTurnId = deps.props.activeTurnId;
     if (!activeTurnId) return null;
     const streamingMessage = streamingAgentMessage();
-    if (streamingMessage && streamingMessage.itemType !== "commentary") return null;
+    // The answer item opens and stays streaming before its first word. That empty item is not the
+    // answer yet. Treating it as one hid the sentence the agent was writing and put the generic
+    // tool status on the line, so the sentence looked stopped and the line jumped.
+    if (streamingMessage && streamingMessage.itemType !== "commentary" && streamingMessage.body.trim()) return null;
     for (let index = deps.props.messages.length - 1; index >= 0; index -= 1) {
       const message = deps.props.messages[index];
       if (message?.turnId !== activeTurnId || message.itemType !== "commentary") continue;
@@ -104,9 +107,14 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     const hold = heldByOwnChannelWork();
     if (hold) return currentText().t("chat.activity.workingIn", { channel: hold.channelName });
     const progress = deps.props.activityDetail?.trim();
-    // The agent's own commentary is shown as plain text, without its Markdown marks (#3425); the host's
-    // progress text is in the host's source English and is read here in the user's language.
-    return latestActiveCommentary() ?? (progress ? currentText().sourceText(progress) : null);
+    // Commentary is the model's words, without its Markdown marks (#3425). A host status that arrives
+    // as that text is source English, so both strings are read in the user's language. Text that is
+    // not a template stays the model's words and still hides the progress line.
+    const commentary = latestActiveCommentary();
+    return (
+      (commentary ? currentText().sourceText(commentary) : null) ??
+      (progress ? currentText().sourceText(progress) : null)
+    );
   });
   const agentActivity = createMemo<"Working" | null>(() => (activeActivityId() ? "Working" : null));
   /**
