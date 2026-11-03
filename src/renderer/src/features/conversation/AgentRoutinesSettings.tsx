@@ -727,6 +727,22 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     });
   }
 
+  /** Uses a secret that the sender made. Undefined when the host cannot do this. */
+  function senderSecret(): ((secret: string) => Promise<void>) | undefined {
+    const events = props.port.events;
+    const set = events?.api.setSecret;
+    if (!events || !set) return undefined;
+    return async (secret) => {
+      const id = draft()?.id;
+      if (!id) throw new Error(t("routine.webhook.senderSecretFailed"));
+      await set({ id, owner: events.owner, secret });
+      if (draft()?.id !== id) return;
+      setWebhook((state) => {
+        state.secret = null;
+      });
+    };
+  }
+
   /** The saved record of the open draft. Its trigger, not the draft, says whether a URL and a secret exist. */
   const savedRoutine = () => {
     const id = draft()?.id;
@@ -1007,6 +1023,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                       secret={webhook.secret}
                       onSecretDismiss={resetWebhookState}
                       onRegenerateSecret={regenerateSecret}
+                      onUseSenderSecret={senderSecret()}
                       onSave={() => void saveDraft()}
                       saving={saving()}
                       onSendTest={sendTestEvent()}

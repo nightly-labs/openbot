@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "OpenBot 데이터베이스가 무결성 검사에 실패했어요.",
   "error.backend.webhookRouteLimit": "호스트 하나에는 웹훅 루틴을 최대 {limit}개까지 둘 수 있어요.",
   "error.backend.webhookSettingsInvalid": "웹훅 설정을 확인한 후 다시 시도해 주세요.",
+  "error.backend.webhookSenderSecretInvalid":
+    "보낸 쪽의 서명 시크릿 전체를 붙여 넣으세요. 16~1024자이며 공백이 없습니다.",
   "error.backend.webhookRouteUnavailable":
     "공개 웹훅 경로가 아직 준비되지 않았어요. 호스트 연결을 확인한 후 다시 시도해 주세요.",
   "error.backend.webhookTestUnavailable":

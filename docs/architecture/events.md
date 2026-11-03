@@ -229,6 +229,15 @@ owner or admin changes a Slack node (`route-workflows.ts`).
   same verification and receipt path as a relayed request (`HostEventsService.sendTestEvent`). The
   answer names the event type, the receipt status and reason, and the run. The secret stays on the
   host. For a host without the capability, the editor leaves out the test step.
+- Remote hosts with `webhook-sender-secret-v1` (`WEBHOOK_SENDER_SECRET_ROUTES`) also set a routine's
+  secret to a value that the sender made (`HostEventsService.setSecret`). Standard Webhooks senders,
+  such as Composio and Svix, make their own secret. The host encrypts the value in the same column as
+  a secret that it made, so no migration is necessary. The answer is empty. For a host without the
+  capability, the editor and the chat card leave out the button.
+- Signal accepts the `X-OpenBot-*` headers, or the Standard Webhooks `webhook-*` or `svix-*`
+  headers. It relays a Standard Webhooks request only to an ingress socket whose hello lists
+  `standard-webhooks` in `webhookFormats`; for an older host it answers `401`. The host checks the
+  `v1` signature (`verifyStandardWebhookSignature`) and uses the complete body as `data`.
 - Released schedule-only routine views do not show webhook routines. Their delete and test routes
   answer "routine gone" for a webhook routine, because they have no administrator check. Only a
   schedule routine writes a conversation event.

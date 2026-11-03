@@ -310,6 +310,13 @@ export const messages = {
     "El secreto actual deja de funcionar de inmediato. Las solicitudes firmadas con él se rechazan hasta que el remitente use el nuevo secreto.",
   "routine.webhook.regenerateConfirm": "Regenerar",
   "routine.webhook.regenerateFailed": "No se pudo regenerar el secreto de firma.",
+  "routine.webhook.useSenderSecret": "Usar el secreto del remitente",
+  "routine.webhook.senderSecretTitle": "¿Usar el secreto de firma del remitente?",
+  "routine.webhook.senderSecretDescription":
+    "Algunos remitentes, como Composio y Svix, crean su propio secreto de firma. Pégalo aquí. El secreto actual deja de funcionar de inmediato.",
+  "routine.webhook.senderSecretLabel": "Secreto del remitente",
+  "routine.webhook.senderSecretConfirm": "Usar secreto",
+  "routine.webhook.senderSecretFailed": "No se pudo guardar el secreto del remitente.",
   "routine.webhook.statusFailed": "No se pudo comprobar si el host está conectado al servidor de retransmisión.",
   "routine.settings.instruction": "Instrucción",
   "routine.settings.instructionPlaceholderAgent": "Describe lo que debe hacer este agente.",
