@@ -349,6 +349,8 @@ export const messages = {
   "chat.menu.react": "Tepki ver",
   "chat.menu.branch": "Buradan dallandır",
   "chat.menu.markUnread": "Okunmadı olarak işaretle",
+  "chat.menu.sendToChannel": "Kanala gönder",
+  "chat.menu.chooseChannel": "Kanal seçin",
   "chat.voice.play": "Sesli mesajı oynat",
   "chat.voice.pause": "Sesli mesajı duraklat",
   "chat.voice.pauseReading": "Okumayı duraklat",

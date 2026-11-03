@@ -41,15 +41,16 @@ export function appendSkillCreationRequest(draft: ComposerDraft): ComposerDraft 
 }
 
 /**
- * A plugin's example question, written as the user would have typed it.
+ * Text that the user did not type, below what the user already typed: a plugin's example question,
+ * or a message sent on from another chat.
  *
- * It carries no reference marker, unlike a skill example: a marker names something the agent must
- * be pointed at, and a plugin's tools are already offered to every agent on this computer. So the
- * example is the question alone.
+ * A plugin example carries no reference marker, unlike a skill example: a marker names something the
+ * agent must be pointed at, and a plugin's tools are already offered to every agent on this computer.
+ * So the example is the question alone.
  */
-export function appendPluginPrompt(draft: ComposerDraft, prompt: string): ComposerDraft {
-  const text = prompt.trim();
-  return text ? appendDraftLine(draft, text) : draft;
+export function appendDraftText(draft: ComposerDraft, text: string): ComposerDraft {
+  const trimmed = text.trim();
+  return trimmed ? appendDraftLine(draft, trimmed) : draft;
 }
 
 /** One more line in the draft, so an added example never overwrites what the user already typed. */

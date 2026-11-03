@@ -297,6 +297,13 @@ export interface ConversationProps {
   onMarkRead: () => Promise<void>;
   /** Marks an agent message and the messages after it unread. Without it, the message menu has no such item. */
   onMarkUnread?: ((messageId: string) => Promise<void>) | undefined;
+  /**
+   * The open channels that a message of this agent chat can go to. Each one opens with the text in its
+   * composer. Without it, the message menu has no such item.
+   */
+  sendToChannel?:
+    | { channels: { id: string; name: string }[]; onSend: (channelId: string, text: string) => void }
+    | undefined;
   onLoadOlder?: (() => void) | undefined;
   onLoadLatest?: (() => Promise<void>) | undefined;
   onSearchMessages?: ((query: string) => Promise<{ messageIds: string[]; total: number }>) | undefined;
