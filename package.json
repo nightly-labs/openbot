@@ -70,7 +70,17 @@
       "solid-recharts": "1.0.1",
       "qrcode": "^1.5.4",
       "@tanstack/virtual-core": "3.19.7",
-      "effect": "4.0.6"
+      "effect": "4.0.6",
+      "@cacheable/node-cache": "1.7.6",
+      "@hapi/boom": "9.1.4",
+      "@noble/curves": "2.4.0",
+      "async-mutex": "0.5.0",
+      "long": "5.3.2",
+      "lru-cache": "11.5.3",
+      "music-metadata": "11.16.1",
+      "p-queue": "9.3.5",
+      "pino": "9.14.0",
+      "protobufjs": "7.6.6"
     }
   },
   "main": "./out/main/index.js",
@@ -414,6 +424,7 @@
     "@openbot/telemetry": "workspace:*",
     "@openbot/ui": "workspace:*",
     "@openbot/user-errors": "workspace:*",
+    "@openbot/whatsapp": "workspace:*",
     "@openpanel/web": "catalog:",
     "@paper-design/shaders": "catalog:",
     "@solidjs/web": "catalog:",

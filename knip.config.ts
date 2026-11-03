@@ -132,6 +132,26 @@ const config: KnipConfig = {
       entry: ["src/lazy-catalogs.ts", "src/mobile-catalogs.native.ts"],
       project: ["src/**/*.{ts,tsx,css}"],
     },
+    "packages/whatsapp": {
+      entry: ["src/*.ts", "scripts/*.ts"],
+      project: ["src/**/*.ts", "scripts/*.ts"],
+      // The vendored Baileys imports these. Knip does not read the vendor, which keeps upstream's code
+      // as it is (vendor/baileys/OPENBOT-PATCHES.md).
+      ignoreDependencies: [
+        "@cacheable/node-cache",
+        "@hapi/boom",
+        "async-mutex",
+        "long",
+        "lru-cache",
+        "music-metadata",
+        "p-queue",
+        "pino",
+        "protobufjs",
+        "ws",
+        // The vendor's own type check reads these types.
+        "@types/ws",
+      ],
+    },
     "packages/*": {
       project: ["src/**/*.{ts,tsx,css}"],
     },
