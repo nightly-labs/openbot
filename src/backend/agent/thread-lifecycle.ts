@@ -328,14 +328,21 @@ export class ThreadLifecycle {
    * remove a directory that a live process uses (`EBUSY`). A failed close is logged: the removal
    * that follows reports whether the files could go. Each session is also unloaded, so the next turn
    * of an agent whose deletion failed opens the session again.
+   *
+   * `recorded` are the agent's stored sessions with the client that can hold each one. They are
+   * closed too, because the conversation does not list every session that a client holds.
    */
 
   readonly releaseAgentSessions = Effect.fn("ThreadLifecycle.releaseAgentSessions")(function* (
     this: ThreadLifecycle,
     agentId: string,
+    recorded: ReadonlyArray<{ externalThreadId: string; client: AgentClient | null }>,
   ) {
+    const sessions = new Map(this.#conversation.openAgentThreads(agentId));
+    for (const { externalThreadId, client } of recorded)
+      if (client && !sessions.has(externalThreadId)) sessions.set(externalThreadId, client);
     yield* Effect.forEach(
-      this.#conversation.openAgentThreads(agentId),
+      sessions,
       ([externalThreadId, client]) =>
         Effect.gen({ self: this }, function* () {
           const releaseThread = client.releaseThread?.bind(client);
