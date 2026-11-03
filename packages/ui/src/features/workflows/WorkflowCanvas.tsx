@@ -2546,9 +2546,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const node = active instanceof HTMLElement ? active.closest<HTMLElement>("[data-node-id]") : null;
       const arrow = ARROWS[event.key];
       const action = (() => {
-        // A version and a read-only canvas take only the camera keys. Escape goes back to the live canvas.
+        // A version and a read-only canvas take only the camera keys. Escape stops a follow, then goes back
+        // to the live canvas.
         if (frozen()) {
           if (inMenu) return undefined;
+          if (event.key === "Escape" && following()) return stopFollow;
           if (event.key === "Escape") return previewing() ? closeVersion : undefined;
           if (event.shiftKey && event.code === "Digit1") return () => fitView(true);
           return mod && event.key !== "Enter" ? withMod[event.key] : undefined;
