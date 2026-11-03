@@ -501,9 +501,13 @@ export class ChannelService {
           const tasks = yield* channelSync(() => this.store.tasks(input.channelId));
           if (
             message.message.status === "streaming" ||
+            // A message of a running task, such as its plan or result, can still change.
             tasks.some(
               (task) =>
-                !terminal(task) && (task.requestMessageId === message.id || task.sourceMessageIds.includes(message.id)),
+                !terminal(task) &&
+                (task.id === message.taskId ||
+                  task.requestMessageId === message.id ||
+                  task.sourceMessageIds.includes(message.id)),
             )
           )
             return yield* new MessageDeleteRefused({ reason: "busy" });

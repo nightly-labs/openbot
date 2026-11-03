@@ -86,8 +86,9 @@ export class MailboxSync {
       : new Set<string>();
     const incomingMailboxMessages =
       deleted.size === 0 ? mailboxCopies : mailboxCopies.filter((message) => !deleted.has(message.id));
+    // A deleted message keeps its entry here, so its provider copy also leaves the chat.
     const incomingMessages = new Map(
-      incomingMailboxMessages.flatMap((message) =>
+      mailboxCopies.flatMap((message) =>
         message.exchange?.direction === "incoming" ? [[message.exchange.messageId, message] as const] : [],
       ),
     );

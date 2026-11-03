@@ -64,10 +64,18 @@ export class MessageDeletion {
     const mailbox = yield* this.#mailbox.deleteShownMessage(agentId, message.id);
     if (mailbox === "busy") return yield* new MessageDeleteRefused({ reason: "busy" });
     yield* storedSync(() => {
+      // A turn can start while the mailbox step waits, so the write keeps the current active turn.
+      // The read also loads the chat again when main evicted it, so the delete is published.
+      // When the agent moved to another chat during the wait, the stored row of this thread decides.
+      const current = taskId ? this.#tasks.read(agentId, taskId) : this.#conversation.ensureSnapshot(agentId, threadId);
+      const activeTurnId =
+        current.threadId === threadId
+          ? current.activeTurnId
+          : this.#store.database.readConversationPage(agentId, threadId, { type: "latest" }, 1).activeTurnId;
       const revision = this.#store.database.persistConversationChanges({
         agentId,
         threadId,
-        activeTurnId: snapshot.activeTurnId,
+        activeTurnId,
         changedMessages: [],
         deletedMessageIds: [message.id],
         eventType: MESSAGE_DELETED_EVENT,

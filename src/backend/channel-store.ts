@@ -451,8 +451,9 @@ export class ChannelStore {
   }
 
   /**
-   * Replaces one message with its deleted row. The earlier events of the channel get the same row,
-   * so the text leaves the event history too, and a rebuild gives the same projection.
+   * Replaces one message with its deleted row. The earlier `channel.changed` events of the channel get
+   * the same row, so the text leaves those events too, and a rebuild gives the same projection. A
+   * summary that an agent wrote before the delete keeps what it says.
    */
   deleteMessage(channel: Channel, entry: ChannelMessage): Channel {
     const deleted = deletedChannelMessage(entry);
