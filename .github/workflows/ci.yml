@@ -1100,6 +1100,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: ../../node_modules/.bin/wrangler deploy --config wrangler.jsonc --keep-vars
 
+      # The production Worker sends email through this Worker, so it must exist first.
+      - name: Deploy email relay Worker
+        working-directory: apps/auth-api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: ../../node_modules/.bin/wrangler deploy --config wrangler.email-relay.jsonc
+
       - name: Deploy production Worker
         working-directory: apps/auth-api
         env:
