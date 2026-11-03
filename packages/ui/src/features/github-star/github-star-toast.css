@@ -3,12 +3,13 @@
   width: var(--width);
 }
 
-/* The raised toast surface with the 1px ring only. */
+/* The raised toast surface with the 1px ring only. The bottom and end padding are smaller, so the
+   buttons sit nearer the corner. */
 .github-star-toast {
   position: relative;
   display: grid;
   gap: var(--openbot-space-2);
-  padding: var(--openbot-space-4);
+  padding: var(--openbot-space-4) var(--openbot-space-3) var(--openbot-space-3) var(--openbot-space-4);
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-surface-raised);
   box-shadow: 0 0 0 1px var(--openbot-border);
