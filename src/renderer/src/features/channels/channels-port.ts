@@ -25,7 +25,9 @@ export interface ChannelsPort {
   > &
     ChannelMemoriesApi &
     ChannelRoutinesApi &
-    Partial<Pick<OpenBotDesktopApi["agent"], "discardDraftAttachment" | "downloadAttachments">>;
+    Partial<Pick<OpenBotDesktopApi["agent"], "discardDraftAttachment" | "downloadAttachments">> &
+    /** Only the desktop has it: the Team API does not carry a channel picture. */
+    Partial<Pick<OpenBotDesktopApi["agent"], "setChannelImage">>;
   eventRoutines?: EventRoutinesApi | undefined;
   browser: Pick<OpenBotDesktopApi["browser"], "capturePreview">;
   openUrl: OpenBotDesktopApi["openUrl"];

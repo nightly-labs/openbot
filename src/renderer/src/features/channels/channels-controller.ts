@@ -1,4 +1,4 @@
-import type { ChannelCommand, ChannelPage, ChannelSummary } from "@openbot/contracts/ipc";
+import type { AvatarImageInput, ChannelCommand, ChannelPage, ChannelSummary } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import type { AgentProfile } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
@@ -55,6 +55,11 @@ export interface ChannelsEnvironment {
   deletionSupported: () => boolean;
   /** Whether the host takes `cancel` (`channel-task-cancel-v1`); `supported()` is checked as well. */
   taskCancelSupported: () => boolean;
+  /**
+   * Whether this reader can change the picture of a channel. Only this computer keeps a channel
+   * picture: the Team API does not carry it, so a joined server and the browser client cannot.
+   */
+  pictureSupported: () => boolean;
   /** Clears whatever else covers the workspace, because a channel is about to cover it. */
   beforeOpen: () => void;
   /** Whether a message that arrives now is in front of the reader. */
@@ -447,6 +452,14 @@ export function createChannelsController(env: ChannelsEnvironment) {
     supported,
     deletionSupported: () => supported() && env.deletionSupported(),
     taskCancelSupported: () => supported() && env.taskCancelSupported(),
+    pictureSupported: () => supported() && env.pictureSupported() && env.port().agent.setChannelImage !== undefined,
+    /** Saves or removes the uploaded image of a channel; a failure shows as the channel error. */
+    setImage: (channelId: string, image: AvatarImageInput | null) =>
+      perform(async () => {
+        const setChannelImage = env.port().agent.setChannelImage;
+        if (!setChannelImage) throw new Error(currentText().t("channel.error.update"));
+        await setChannelImage({ channelId, image });
+      }),
     refresh,
     retry: async (onAccepted?: (accepted: ChannelCommand) => void) => {
       const previous = failedCommand;
