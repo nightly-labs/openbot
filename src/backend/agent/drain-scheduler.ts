@@ -68,8 +68,6 @@ export interface DrainHooks {
    * back. `continueWork` keeps the assignment for a ready backup instead.
    */
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
-  /** Whether a ready automatic backup can take this agent's work after a usage limit. */
-  mayFailOver(agentId: string): boolean;
   /** Whether a ready backup in the agent's order continues work that a usage limit stopped after it started. */
   mayContinueOnBackup(agentId: string): boolean;
   /**
