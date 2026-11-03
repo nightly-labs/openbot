@@ -133,6 +133,13 @@ export const messages = {
       "В аккаунте может быть {count} платного сервера. Чтобы добавить сервер, сначала удалите один из существующих.",
   },
   "server.add.limit.manage": "Управление серверами",
+  "server.upgrade.title": "У ваших агентов заканчивается место",
+  "server.upgrade.description":
+    "На {server} осталось мало свободного места. Перейдите на старший план, чтобы агенты работали без перерывов.",
+  "server.upgrade.used": "Занято {used} из {total}",
+  "server.upgrade.current": "{plan} (сейчас)",
+  "server.upgrade.price": "Цена",
+  "server.upgrade.action": "Перейти на {plan}",
   "server.hosted.progressTitle": "Настройка {name}",
   "server.hosted.paymentTitle": "Завершите оплату в браузере",
   "server.hosted.paymentDescription": "Настройка начнётся, когда Stripe подтвердит оплату.",
