@@ -30,7 +30,8 @@ export interface DrawerWorkflows {
 
 /**
  * The value of the Workflows row and the pinned workflows, from the list that the host keeps current.
- * Until the host is online and sends the list, they are the ones of the last start.
+ * Until the host is online and sends the list, they are the ones of the last start. A failed read
+ * shows none, as it did before the phone kept them.
  */
 export function useDrawerWorkflows(serverId: string, open: boolean): DrawerWorkflows {
   const { t } = useText();
@@ -38,7 +39,7 @@ export function useDrawerWorkflows(serverId: string, open: boolean): DrawerWorkf
   const pinnedIds = useMobileWorkspaceSelector((current) => current.pinnedWorkflowIds[serverId] ?? NO_IDS);
   const cached = useDrawerSnapshot(serverId).workflows;
   // An online host has sent its capabilities.
-  const known = online && (!liveSupported || list.data !== undefined);
+  const known = online && (!liveSupported || list.data !== undefined || list.isError);
   const data = list.data;
   const live = useMemo(() => {
     const workflows = data ?? [];
@@ -51,8 +52,8 @@ export function useDrawerWorkflows(serverId: string, open: boolean): DrawerWorkf
   const shown = known ? (liveSupported ? live : null) : cached;
   const supported = known ? liveSupported : Boolean(cached);
   useEffect(() => {
-    if (known) rememberDrawerValues(serverId, { workflows: liveSupported ? live : null });
-  }, [serverId, known, liveSupported, live]);
+    if (known && !list.isError) rememberDrawerValues(serverId, { workflows: liveSupported ? live : null });
+  }, [serverId, known, list.isError, liveSupported, live]);
   const needsYou = shown?.needsYou ?? 0;
   const running = shown?.running ?? 0;
   return {

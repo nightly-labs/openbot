@@ -362,11 +362,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [],
   );
   useEffect(() => () => conversationStore.dispose(), [conversationStore]);
-  const workspaceCache = useMemo(
-    () => createWorkspaceCache(`${session.apiUrl}:${session.user.id}`),
-    [session.apiUrl, session.user.id],
-  );
-  // Before the cache read below, so the drawer values of another account do not show.
+  const workspaceCache = useMemo(() => {
+    // In render, before the effects of the drawer and the cache read below, so the drawer values of
+    // another account do not show and the first values of this one stay.
+    startDrawerSnapshots(`${session.apiUrl}:${session.user.id}`);
+    return createWorkspaceCache(`${session.apiUrl}:${session.user.id}`);
+  }, [session.apiUrl, session.user.id]);
   useEffect(() => {
     startDrawerSnapshots(`${session.apiUrl}:${session.user.id}`);
     return () => startDrawerSnapshots(null);

@@ -1,7 +1,7 @@
 import { isAgentTaskOpen } from "@openbot/team-client/agent-tasks";
 import { addCalendarDays, calendarDayOf } from "@openbot/team-client/routine-calendar-dates";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { lastUsageDays } from "@/features/agents/components/usage-range-picker";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useServerThreadReads } from "@/features/chat/components/use-agent-thread-reads";
@@ -80,7 +80,7 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
   const from = new Date(start).toISOString();
   const to = new Date(start + ROUTINE_LOOKAHEAD_DAYS * DAY).toISOString();
   const serverTasks = useServerTasks(serverId, { enabled });
-  const threadReads = useServerThreadReads(serverId, serverTasks.tasks);
+  const { reads: threadReads, ready: threadReadsReady } = useServerThreadReads(serverId, serverTasks.tasks);
   const routines = useQuery({
     queryKey: queryKeys.serverRoutines(queryScope, serverId, from, to),
     queryFn: () =>
@@ -98,26 +98,33 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
     staleTime: 60_000,
   });
 
-  const now = Date.now();
-  const timeZone = phoneTimeZone(now);
-  let routineRuns: string[] | undefined;
-  if (routines.data) {
+  const routineData = routines.data;
+  const routineRuns = useMemo(() => {
+    if (!routineData) return undefined;
     const active = new Set(
-      routines.data.routines.filter((routine) => routine.active && routine.owner.kind === "agent").map((r) => r.id),
+      routineData.routines.filter((routine) => routine.active && routine.owner.kind === "agent").map((r) => r.id),
     );
-    routineRuns = routines.data.runs
+    const readAt = Date.now();
+    return routineData.runs
       .filter(
         (run) =>
           (run.status === "scheduled" || run.status === "queued") &&
           active.has(run.routineId) &&
-          Date.parse(run.at) >= now,
+          Date.parse(run.at) >= readAt,
       )
       .map((run) => run.at)
       .sort((left, right) => Date.parse(left) - Date.parse(right))
       .slice(0, DRAWER_ROUTINE_RUNS);
-  }
+  }, [routineData]);
+
+  // Until the host answers, each value is the one of the last start. A failed read shows no value, as
+  // it did before the phone kept them.
+  const now = Date.now();
+  const timeZone = phoneTimeZone(now);
   let nextRoutine: string | null = null;
-  const next = (routineRuns ?? cached.routineRuns)?.find((at) => Date.parse(at) >= now);
+  const next = (routineRuns ?? (routines.isError ? undefined : cached.routineRuns))?.find(
+    (at) => Date.parse(at) >= now,
+  );
   if (next) {
     const at = new Date(next);
     const day = calendarDayOf(at, timeZone);
@@ -134,7 +141,7 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
             });
   }
   const usageUsd = usage.data ? (usage.data.totals.estimatedCostUsd ?? null) : undefined;
-  const cost = usageUsd === undefined ? (cached.usageUsd ?? null) : usageUsd;
+  const cost = usageUsd !== undefined ? usageUsd : usage.isError ? null : (cached.usageUsd ?? null);
   // A large amount drops its cents: the row has room for a short value.
   const digits = cost !== null && cost >= 100 ? 0 : 2;
   // The threads with agent messages that the person has not read, else the threads that run. The host
@@ -143,21 +150,21 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
     (task) => isAgentTaskOpen(task) && (threadReads?.get(task.id)?.unreadCount ?? 0) > 0,
   ).length;
   const working = serverTasks.tasks.filter((task) => isAgentTaskOpen(task) && task.state === "running").length;
-  // An online host has sent its capabilities. Until it is online and its lists are read, the drawer
-  // shows the counts of the last start.
-  const tasksKnown = online && (!serverTasks.supported || (enabled && serverTasks.ready));
-  const tasks = tasksKnown ? (serverTasks.supported ? { unread, working } : null) : cached.tasks;
+  // An online host has sent its capabilities. The counts of a failed list are not complete, so the
+  // phone does not keep them.
+  const tasksLoaded = online && (!serverTasks.supported || (enabled && serverTasks.ready && threadReadsReady));
+  const tasksKnown = tasksLoaded && !serverTasks.retry;
+  const tasks = tasksLoaded ? (serverTasks.supported ? { unread, working } : null) : cached.tasks;
 
-  const runsKey = routineRuns?.join("\n");
   const tasksSupported = serverTasks.supported;
   useEffect(() => {
     if (!serverId) return;
     rememberDrawerValues(serverId, {
-      ...(runsKey === undefined ? null : { routineRuns: runsKey ? runsKey.split("\n") : [] }),
+      ...(routineRuns ? { routineRuns } : null),
       ...(usageUsd === undefined ? null : { usageUsd }),
       ...(tasksKnown ? { tasks: tasksSupported ? { unread, working } : null } : null),
     });
-  }, [serverId, runsKey, usageUsd, tasksKnown, tasksSupported, unread, working]);
+  }, [serverId, routineRuns, usageUsd, tasksKnown, tasksSupported, unread, working]);
   return {
     tasks: tasks
       ? {
