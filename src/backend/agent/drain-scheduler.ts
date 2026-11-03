@@ -560,6 +560,7 @@ export class DrainScheduler {
           agent && publicThreadId && !this.#runsInOwnSession(context)
             ? this.#store.database.activeProviderSession(publicThreadId, agent.provider)
             : null;
+        if (session) this.#compaction.expectInput(session.externalSessionId, context.delivery.text.length);
         if (session && this.#compaction.reserve(agentId, session.externalSessionId)) {
           yield* this.#compaction.request(agentId, session.externalSessionId);
           return;

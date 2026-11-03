@@ -75,7 +75,7 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
   function updateDraft(key: string, update: (draft: ComposerDraft) => ComposerDraft): void {
     deps.setThreadDrafts((current) => {
       const next = update(current[key] ?? EMPTY_DRAFT);
-      if (next.text || next.attachments.length > 0) return { ...current, [key]: next };
+      if (next.text || next.attachments.length > 0 || next.replyToMessageId) return { ...current, [key]: next };
       if (!(key in current)) return current;
       const { [key]: _removed, ...rest } = current;
       return rest;
@@ -225,6 +225,11 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     if (key) updateDraft(key, (current) => ({ ...current, text }));
   }
 
+  /** The message of the thread that the draft replies to, or null for no reply. */
+  function setReply(key: string | undefined, replyToMessageId: string | null): void {
+    if (key) updateDraft(key, (current) => ({ ...current, replyToMessageId }));
+  }
+
   /**
    * Sends the draft with the files that it still names and the images of its row, after each import of
    * the draft ended. When the message went, the sent text leaves the draft and each file whose
@@ -250,11 +255,14 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     const target = currentConversationTarget(deps.props);
     const before = key ? draft(key).text : "";
     const attachments = key ? draft(key).attachments : [];
+    // A server that lost the reply route takes the message without its reply.
+    const replyToMessageId = key && deps.props.threads?.acceptsReplies ? draft(key).replyToMessageId : null;
     const referenced = attachmentReferenceIds(text);
     for (const image of images) referenced.add(image.id);
     const sent = await threads.onSend(
       text,
       attachments.filter((attachment) => referenced.has(attachment.id)).map((attachment) => attachment.id),
+      replyToMessageId,
     );
     if (!sent || !key) return sent;
     const known = new Set(attachments.map((attachment) => attachment.id));
@@ -263,6 +271,8 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
       // A file that came during the send put its reference after the sent text.
       text: current.text.startsWith(before) ? current.text.slice(before.length).trimStart() : "",
       attachments: current.attachments.filter((attachment) => !known.has(attachment.id)),
+      // A reply that the user chose during the send stays for the next message.
+      replyToMessageId: current.replyToMessageId === replyToMessageId ? null : current.replyToMessageId,
     }));
     if (target)
       discard(
@@ -284,6 +294,7 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     claimImport,
     releaseImport,
     setText,
+    setReply,
     send,
   };
 }

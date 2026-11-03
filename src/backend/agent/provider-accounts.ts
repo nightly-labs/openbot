@@ -16,7 +16,7 @@ import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/clau
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Cause, Effect, Fiber, Schema, type Scope } from "effect";
-import { startAcpAuthentication } from "./../acp-sign-in";
+import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import type { AgentClient } from "./../agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./../cli";
 import type { AccountReadResult } from "./../protocol";
@@ -228,7 +228,8 @@ export class ProviderAccounts {
       Effect.gen({ self: this }, function* () {
         if ("kind" in command) {
           // A Reconnect signs the account out first: its saved token would answer with no browser page.
-          // The server prints Google's page, which a host shows and this computer opens itself.
+          // The server prints Google's page, which a host shows and this computer opens itself, except
+          // at a Windows computer, where the server opens it (`googleSignInByOpenBot`).
           const login = yield* startAcpAuthentication({
             executable: cli.executable,
             argv: command.argv,
@@ -237,7 +238,7 @@ export class ProviderAccounts {
             timeoutMs: command.timeoutMs,
             ...(added ? {} : { logout: true }),
             privateTemp: this.#host.signInTemp(provider),
-            openGoogleSignIn: openExternal,
+            ...(googleSignInByOpenBot(onHost) ? { openGoogleSignIn: openExternal } : {}),
           });
           return yield* login.done;
         }

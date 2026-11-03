@@ -51,6 +51,7 @@ import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-relea
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
+import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provider-default-v1";
 import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
@@ -126,6 +127,7 @@ import {
   decodeProviderApiKeyStatus,
   decodeProviderCodeLoginStart,
   decodeProviderHostSignInStatus,
+  decodeProviderModelVisibility,
   decodeProviderRuntimeSnapshot,
   decodeProviderRuntimeSnapshotV8,
   decodeProviderUsageResetOutcome,
@@ -172,6 +174,8 @@ import {
   type PromptCacheTtlSetting,
   type ProviderCodeLoginStart,
   type ProviderHostSignInStatus,
+  type ProviderModelVisibility,
+  type ProviderModelVisibilityChange,
   type ProviderRuntimeSnapshot,
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
@@ -758,6 +762,28 @@ export function setHostPromptCacheTtl(
   ttl: PromptCacheTtl,
 ): Effect.Effect<PromptCacheTtlSetting, TeamAdminRequestError> {
   return adminCall(() => request("POST", PROMPT_CACHE_TTL_ROUTES.update, decodePromptCacheTtlSetting, { ttl }));
+}
+
+/** `model-visibility-v1`: every model of one provider of the host, and the ones its model picker shows. */
+export function getHostModelVisibility(
+  request: TeamApiRequest,
+  provider: AgentProviderRef,
+): Effect.Effect<ProviderModelVisibility, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MODEL_VISIBILITY_ROUTES.settings, decodeProviderModelVisibility, { provider }),
+  );
+}
+
+export function setHostModelVisibility(
+  request: TeamApiRequest,
+  change: ProviderModelVisibilityChange,
+): Effect.Effect<ProviderModelVisibility, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MODEL_VISIBILITY_ROUTES.update, decodeProviderModelVisibility, {
+      provider: change.provider,
+      shown: change.shown,
+    }),
+  );
 }
 
 /** `provider-default-v1`: the provider that a new agent of the host starts on. A newer host can name a provider this build does not know. */

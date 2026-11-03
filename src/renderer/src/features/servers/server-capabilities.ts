@@ -77,6 +77,7 @@ export function serverSupportsCapability(
       capability === "agent-memory-limit-v1" ||
       capability === "memory-review-v1" ||
       capability === "prompt-cache-ttl-v1" ||
+      capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
       capability === "agent-access-v1" ||
       capability === "sidebar-folders-v1" ||
@@ -94,6 +95,7 @@ export function serverSupportsCapability(
       capability === "agent-threads-v1" ||
       capability === "agent-thread-reads-v1" ||
       capability === "agent-thread-branches-v1" ||
+      capability === "agent-thread-replies-v1" ||
       capability === "channel-task-cancel-v1" ||
       capability === "side-question-v1" ||
       capability === "workflows-github-v1" ||

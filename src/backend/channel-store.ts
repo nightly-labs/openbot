@@ -18,6 +18,7 @@ import {
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { changesModelContent } from "./channel-history";
 import { deleteAggregateHistory, deleteThreadAttachments } from "./database/database-core";
 import {
   databaseRow,
@@ -416,7 +417,7 @@ export class ChannelStore {
       const existing = databaseRow(
         db
           .prepare(
-            "SELECT sequence, json_extract(message_json, '$.message.status') AS status FROM projection_channel_messages WHERE channel_id = ? AND message_id = ?",
+            "SELECT sequence, message_json, json_extract(message_json, '$.message.status') AS status FROM projection_channel_messages WHERE channel_id = ? AND message_id = ?",
           )
           .get(change.channel.id, message.id),
       );
@@ -435,7 +436,11 @@ export class ChannelStore {
       db.prepare(
         "INSERT INTO projection_channel_messages VALUES (?, ?, ?, ?) ON CONFLICT(channel_id, message_id) DO UPDATE SET message_json = excluded.message_json",
       ).run(change.channel.id, message.id, assigned, JSON.stringify({ ...message, sequence: assigned }));
-      if (existing) {
+      const before = existing ? JSON.parse(requiredStringColumn(existing, "message_json")) : null;
+      // Only a change to what a model reads makes a summary or a cursor that covers the message
+      // wrong. A continued task marks its earlier turn superseded, and in a long channel that reset
+      // the summary to the first message on almost every turn of the lead (#3761).
+      if (existing && (!isChannelMessage(before) || changesModelContent(before, message))) {
         // A streaming message changes on each part of its text; a packet already leaves it unread.
         if (existing.status !== "streaming")
           this.#completedMessageChanges.set(change.channel.id, this.completedMessageChanges(change.channel.id) + 1);

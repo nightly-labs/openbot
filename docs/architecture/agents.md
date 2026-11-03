@@ -385,6 +385,14 @@ and text that can be empty. The answers are the frozen `agent-tasks-v1` task and
 uses these routes only for a message with files, so a message without files still works on an older host.
 A joined desktop refuses files for a server without the capability with `error.backend.threadRemoteUnsupported`,
 and the phone shows the plus in the thread composer only on a server that has it. The optional
+`agent-thread-replies-v1` capability (`packages/contracts/src/team-protocol/agent-thread-replies-v1.ts`, host
+route `routeAgentThreadReplies` in `src/main/team-api/route-agent-threads.ts`) adds
+`POST /v1/agent-threads/send-reply`: a message to a side thread with `replyToMessageId`, text, and up to 10
+attachment drafts. The answer is the frozen `agent-tasks-v1` receipt. The host keeps the reply on the delivery,
+as for the main chat; the agent's prompt and the thread quote the message when the thread has it, and the host
+does not refuse an id that the thread does not have. The team client and a joined desktop use this route only for
+a reply. Desktop and the web show Reply on a side thread message only on this computer or on a server with the
+capability; the phone does not reply in a thread. The optional
 `agent-thread-branches-v1` capability (`packages/contracts/src/team-protocol/agent-thread-branches-v1.ts`, host
 route `routeAgentThreadBranches` in `src/main/team-api/route-agent-threads.ts`) adds
 `POST /v1/agent-threads/{branch,branches}`. `branch` takes `{agentId, taskId|null, messageId, requestId}`, needs

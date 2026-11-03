@@ -55,6 +55,8 @@ export function ChannelsProvider(props: ParentProps) {
     supported: () => activeServerSupportsCapability(CHANNEL_CHATS_CAPABILITY),
     deletionSupported: () => activeServer()?.kind !== "remote" || serverRoleCanAdminister(activeServer()),
     taskCancelSupported: () => activeServerSupportsCapability(CHANNEL_TASK_CANCEL_CAPABILITY),
+    // The picture is a file on this computer. Until the server is known, the editor stays hidden.
+    pictureSupported: () => activeServer()?.kind === "local",
     beforeOpen: () => {
       setAgentSetupOpen(false);
       // The channel covers the workspace, and a direct conversation left selected under it is read

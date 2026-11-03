@@ -34,6 +34,7 @@ import Animated, {
   LayoutAnimationConfig,
   ReduceMotion,
   type SharedValue,
+  useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -249,6 +250,8 @@ function VoiceSideGlyph({ icon, color }: { icon: ComposerVoice["trailing"]["icon
 /** How long a handoff focus keeps asking for the keyboard, and how often. */
 const FOCUS_RETRY_MS = 1500;
 const FOCUS_RETRY_INTERVAL_MS = 100;
+/** How long a reply waits for the software keyboard to start rising before it opens the composer. */
+const REPLY_KEYBOARD_WAIT_MS = 400;
 
 export const ChatComposer = memo(function ChatComposer({
   sendLabel,
@@ -511,12 +514,57 @@ export const ChatComposer = memo(function ChatComposer({
       }),
     );
   }, [anchored, held, reducedMotion]);
+  // The reply row opens with the composer, on the keyboard's own progress, instead of popping in
+  // before it. The last target stays drawn while the row closes.
+  const [shownReply, setShownReply] = useState(replyTarget);
+  if (replyTarget && replyTarget !== shownReply) setShownReply(replyTarget);
+  const replyActive = replyTarget !== null;
+  const replyActiveValue = useSharedValue(replyActive);
+  const replyPresence = useSharedValue(replyActive ? 1 : 0);
+  const replyRowHeight = useSharedValue(0);
+  // Once the keyboard is fully up, a reply holds the composer open like a draft does, so a
+  // dismissal keeps the reply readable. Taken then and not on the press, so the opening still
+  // follows the keyboard.
+  const replyHold = useSharedValue(replyActive ? 1 : 0);
+  useEffect(() => {
+    replyActiveValue.set(replyActive);
+    const timing = { duration: shapeDuration, easing: SHAPE_EASING_FN, reduceMotion: ReduceMotion.System };
+    replyPresence.set(
+      withTiming(replyActive ? 1 : 0, timing, (finished) => {
+        if (finished && !replyActive) scheduleOnRN(setShownReply, null);
+      }),
+    );
+    // A disabled composer takes no focus, so no keyboard comes to open it.
+    if (!replyActive || disabled) replyHold.set(withTiming(replyActive ? 1 : 0, timing));
+  }, [replyActive, replyActiveValue, replyPresence, replyHold, shapeDuration, disabled]);
+  useAnimatedReaction(
+    () => keyboardProgress.get(),
+    (progress, previous) => {
+      if (!replyActiveValue.get() || replyHold.get() > 0) return;
+      if (progress >= 0.99) replyHold.set(1);
+      // The keyboard closes before it is fully up: open the rest of the way from where it is.
+      else if (previous !== null && progress < previous) {
+        replyHold.set(progress);
+        replyHold.set(
+          withTiming(1, { duration: shapeDuration, easing: SHAPE_EASING_FN, reduceMotion: ReduceMotion.System }),
+        );
+      }
+    },
+  );
   // The keyboard drives the shape frame by frame, so zeroing the other
   // durations leaves this one path moving. Reduced motion answers it by
   // dropping the resting shape altogether: the composer stays open, and the
   // keyboard changes nothing about it. Two discrete states would still jump
   // on every keyboard, which is the motion the setting asks us to remove.
-  const expansion = useDerivedValue(() => (resizes ? Math.max(Math.min(1, keyboardProgress.get()), held.get()) : 1));
+  const expansion = useDerivedValue(() =>
+    resizes ? Math.max(Math.min(1, keyboardProgress.get()), held.get(), replyHold.get()) : 1,
+  );
+  // The smaller of the two: from rest the row follows the keyboard, and with the composer already
+  // open it takes the shape's own timing.
+  const replyStyle = useAnimatedStyle(() => {
+    const progress = Math.min(replyPresence.get(), expansion.get());
+    return { height: replyRowHeight.get() * progress, opacity: progress };
+  });
   const cardStyle = useAnimatedStyle(() => {
     const voiced = morph.get();
     const width = interpolate(expansion.get(), [0, 1], [restWidthValue.get(), cardWidth]);
@@ -672,6 +720,18 @@ export const ChatComposer = memo(function ChatComposer({
     ],
   }));
   const [focused, setFocused] = useState(false);
+  // A hardware keyboard gives focus with no software keyboard, so no progress comes to open the
+  // reply row. When the keyboard has not started to rise by then, open the composer on its own.
+  useEffect(() => {
+    if (!focused || !replyActive) return;
+    const timer = setTimeout(() => {
+      if (replyHold.get() > 0 || keyboardProgress.get() > 0) return;
+      replyHold.set(
+        withTiming(1, { duration: shapeDuration, easing: SHAPE_EASING_FN, reduceMotion: ReduceMotion.System }),
+      );
+    }, REPLY_KEYBOARD_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [focused, replyActive, replyHold, keyboardProgress, shapeDuration]);
 
   useLayoutEffect(() => {
     // Selecting a file is a draft edit even when TextInput never receives focus.
@@ -729,7 +789,7 @@ export const ChatComposer = memo(function ChatComposer({
   // plus and the composer around it both carry Reanimated transforms that
   // never reach it. `focused` and `hasDraft` are the React mirror of the two
   // things that open the composer, and both change once per interaction.
-  const restingPlus = resizes && !hasDraft && !focused;
+  const restingPlus = resizes && !hasDraft && !focused && !replyActive;
   const plusDrawn = CONTROL_SIZE * (restingPlus ? REST_CONTROL_SCALE : 1);
   const plusInset = (CONTROL_SIZE - plusDrawn) / 2;
   const attachmentAnchor = {
@@ -1130,25 +1190,32 @@ export const ChatComposer = memo(function ChatComposer({
               {`${displayText}​`}
             </NativeText>
             {/* The voice mode shows the reply above the spoken words instead. */}
-            {replyTarget && !voiceOpen ? (
-              <View className="flex-row items-center gap-2 pt-2 pl-4 pr-2">
-                <Reply color={String(muted)} size={16} />
-                <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-text-secondary">
-                  {mentionDraft(replyTarget.body).text || t("mobile.chat.reply.attachment")}
-                </Typography.Paragraph>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="ghost"
-                  accessibilityLabel={t("mobile.chat.composer.cancelReply")}
-                  onPress={() => {
-                    void haptics.selection();
-                    onCancelReply();
-                  }}
+            {shownReply && !voiceOpen ? (
+              <Animated.View style={[{ overflow: "hidden" }, replyStyle]}>
+                {/* Out of flow, so it keeps its natural height while the box opens over it. */}
+                <View
+                  className="flex-row items-center gap-2 pt-2 pl-4 pr-2"
+                  style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+                  onLayout={({ nativeEvent }) => replyRowHeight.set(nativeEvent.layout.height)}
                 >
-                  <X color={String(muted)} size={16} />
-                </Button>
-              </View>
+                  <Reply color={String(muted)} size={16} />
+                  <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-text-secondary">
+                    {mentionDraft(shownReply.body).text || t("mobile.chat.reply.attachment")}
+                  </Typography.Paragraph>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    accessibilityLabel={t("mobile.chat.composer.cancelReply")}
+                    onPress={() => {
+                      void haptics.selection();
+                      onCancelReply();
+                    }}
+                  >
+                    <X color={String(muted)} size={16} />
+                  </Button>
+                </View>
+              </Animated.View>
             ) : null}
             <Animated.View
               style={{

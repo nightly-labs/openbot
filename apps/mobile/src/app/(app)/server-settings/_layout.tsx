@@ -52,6 +52,8 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="sites" options={{ title: t("mobile.server.route.sites") }} />
       <Stack.Screen name="providers" options={{ title: t("mobile.server.route.providers") }} />
       <Stack.Screen name="provider" options={{ title: t("mobile.server.route.provider") }} />
+      {/* The page names its provider, or says Add account. */}
+      <Stack.Screen name="provider-sign-in" options={{ title: t("mobile.server.route.provider") }} />
       {/* The page names its account. */}
       <Stack.Screen name="provider-account" options={{ title: t("mobile.server.route.provider") }} />
       <Stack.Screen name="acp-registry" options={{ title: t("mobile.server.route.acpRegistry") }} />

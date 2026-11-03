@@ -95,7 +95,7 @@ import { uploadProgressAt } from "../model/upload-progress";
 import { type AttachmentTint, ChatAttachmentView } from "./chat-attachment";
 import { ChatImageGallery } from "./chat-image-gallery";
 import { ChatImageGeneration, imageGenerationStatus } from "./chat-image-generation";
-import { ChatImageViewerProvider, isViewableImage } from "./chat-image-viewer";
+import { ChatImageViewerProvider, isStackImage, isViewableImage } from "./chat-image-viewer";
 import { ChatMessageActionsButton, ChatMessageReactions, useMessageActions } from "./chat-message-actions";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
@@ -555,8 +555,11 @@ const MessageRow = memo(function MessageRow({
       ? ((message.imageGeneration ? message.attachments?.slice(1) : message.attachments) ?? [])
       : [];
   // Two or more images in one message show together, as on desktop. A message that is still
-  // uploading keeps one row for each file, with its progress.
-  const gallery = message.kind === "message" && !upload ? files.filter(isViewableImage) : [];
+  // sending shows the same stack at once, with the progress on each card, so it does not change
+  // its shape when the host's row replaces it.
+  const gallery = message.kind === "message" ? files.filter(isStackImage) : [];
+  const fileUpload = (attachment: AttachmentSummary) =>
+    upload ? uploadProgressAt(files.indexOf(attachment), upload.completed, upload.current) : undefined;
   const rendered =
     message.kind === "routine" ? (
       <RoutineMarkerRow key={message.id} message={message} muted={muted} />
@@ -623,23 +626,22 @@ const MessageRow = memo(function MessageRow({
         {gallery.length > 1 ? (
           <ChatImageGallery
             attachments={gallery}
+            uploads={upload ? gallery.map(fileUpload) : undefined}
             serverId={serverId}
             alignment={message.author === "user" ? "right" : "left"}
           />
         ) : null}
-        {(gallery.length > 1 ? files.filter((attachment) => !isViewableImage(attachment)) : files).map(
-          (attachment, index) => (
-            <ChatAttachmentView
-              key={attachment.id}
-              attachment={attachment}
-              serverId={serverId}
-              alignment={message.author === "user" ? "right" : "left"}
-              upload={upload ? uploadProgressAt(index, upload.completed, upload.current) : undefined}
-              tint={shared.attachmentTint}
-              visual={message.visual}
-            />
-          ),
-        )}
+        {(gallery.length > 1 ? files.filter((attachment) => !isStackImage(attachment)) : files).map((attachment) => (
+          <ChatAttachmentView
+            key={attachment.id}
+            attachment={attachment}
+            serverId={serverId}
+            alignment={message.author === "user" ? "right" : "left"}
+            upload={fileUpload(attachment)}
+            tint={shared.attachmentTint}
+            visual={message.visual}
+          />
+        ))}
         {upload && upload.completed < (message.attachments?.length ?? 0) ? (
           <Button variant="ghost" size="sm" className="self-end" isDisabled={upload.cancelling} onPress={upload.cancel}>
             <Button.Label>
