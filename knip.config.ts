@@ -52,6 +52,8 @@ const config: KnipConfig = {
     "browser-harness",
     // Reads the memory that programs can still use on macOS, for the machine part of Storage.
     "vm_stat",
+    // Makes the MP4 with its index at the end in the attachment video seek E2E script.
+    "ffmpeg",
   ],
   workspaces: {
     ".": {

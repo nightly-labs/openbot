@@ -51,8 +51,7 @@ export const fileResponse = Effect.fn("FileResponse.open")(function* (
         ) {
           const chunk = new Uint8Array(CHUNK_BYTES);
           const length = Math.min(CHUNK_BYTES, end + 1 - position);
-          const { bytesRead } =
-            length > 0 ? yield* remoteCall(() => file.read(chunk, 0, length, position)) : { bytesRead: 0 };
+          const { bytesRead } = yield* remoteCall(() => file.read(chunk, 0, length, position));
           if (bytesRead === 0) {
             controller.close();
             yield* close();

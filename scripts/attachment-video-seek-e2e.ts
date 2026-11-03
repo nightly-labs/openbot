@@ -16,6 +16,8 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT = join(ROOT, ".openbot-build", "attachment-video-seek-e2e");
+// A probe that does not end, for example a video that never loads, stops Electron after this time.
+const PROBE_TIMEOUT_MS = 60_000;
 const electronPath = join(
   ROOT,
   "node_modules",
@@ -81,8 +83,10 @@ try {
     [bundle, `--user-data=${join(root, "user-data")}`, `--video=${video}`, `--report=${reportPath}`],
     { env: withoutElectronRuntimeFlags(process.env), stdio: "inherit" },
   );
+  const timeout = setTimeout(() => child.kill(), PROBE_TIMEOUT_MS);
   const code = await new Promise<number | null>((done) => child.on("exit", done));
-  assert.equal(code, 0, `Electron exited with ${code}`);
+  clearTimeout(timeout);
+  assert.equal(code, 0, `Electron exited with ${code}, or did not end in ${PROBE_TIMEOUT_MS} ms`);
   const parsed: Probe = JSON.parse(await readFile(reportPath, "utf8"));
   probe = parsed;
   assert.equal(probe.error, undefined, probe.error);
@@ -114,6 +118,7 @@ try {
   );
   assert.equal(after?.status, 416, "a range after the end of the file");
   assert.equal(after?.contentRange, `bytes */${bytes.length}`);
+  assert.equal(after?.length, 0, "a 416 response has no body");
   assert.ok(probe.seekable >= probe.target, `seekable to ${probe.seekable}s, not to ${probe.target}s`);
   assert.ok(probe.seeked, "the video did not finish the seek");
   assert.ok(Math.abs(probe.currentTime - probe.target) < 1, `the video is at ${probe.currentTime}s`);
