@@ -114,6 +114,8 @@ export class AgentTasks implements TaskLanes {
   readonly #turnEndWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
   /** One branch is made at a time, so a retry that arrives during the first call finds its branch. */
   readonly #branches = Semaphore.makeUnsafe(1);
+  /** One `start_task` call runs at a time, so parallel calls in one turn cannot pass the task limits. */
+  readonly #starts = Semaphore.makeUnsafe(1);
 
   constructor(options: AgentTasksOptions) {
     this.#store = options.store;
@@ -457,6 +459,19 @@ export class AgentTasks implements TaskLanes {
     const parsed = startTaskToolSchema.safeParse(params.arguments);
     if (!parsed.success) return openBotToolFailure(sourceText("error.backend.taskToolInvalid"));
     if (caller.inExecutionThread) return openBotToolFailure(sourceText("error.backend.taskOwnChatOnly"));
+    return yield* this.#starts.withPermit(this.#start(params, caller, parsed.data));
+  });
+
+  /**
+   * Starts the task of one `start_task` call. Calls run one at a time, so the count of unfinished
+   * tasks includes the task of an earlier call, and a retry finds the task that the first call started.
+   */
+  readonly #start = Effect.fn("AgentTasks.start")(function* (
+    this: AgentTasks,
+    params: DynamicToolCallParams,
+    caller: AgentTaskCaller,
+    input: z.infer<typeof startTaskToolSchema>,
+  ): Effect.fn.Return<OpenBotToolResponse> {
     const idempotencyKey = `start-task:${createHash("sha256")
       .update(JSON.stringify([caller.agentId, params.turnId, params.callId]))
       .digest("hex")}`;
@@ -482,14 +497,14 @@ export class AgentTasks implements TaskLanes {
       return openBotToolFailure(sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks }));
     // All of them close before the first yield, so no turn starts between the check and the close.
     for (const task of archived) this.#closeQuietly(task);
-    const task = this.create(caller.agentId, parsed.data.title, "agent");
+    const task = this.create(caller.agentId, input.title, "agent");
     if (archived.length > 0) yield* this.#hooks.archived(caller.agentId, archived);
     const queued = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId: caller.agentId },
         taskId: task.taskId,
         recipientAgentIds: [caller.agentId],
-        text: parsed.data.brief,
+        text: input.brief,
         replyToMessageId: null,
         idempotencyKey,
       })
