@@ -1,5 +1,6 @@
 import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type DraftAttachment,
   isAttachmentSummary,
@@ -152,4 +153,19 @@ export function insertAtSelection(
   }
   const value = `${current.slice(0, selection.start)}${inserted}${current.slice(selection.end)}`;
   return { value, caret: selection.start + inserted.length };
+}
+
+/**
+ * Puts a pasted text in as `insertAtSelection` does. The end of the text that does not fit the message
+ * limit is cut, as for a text paste in the editor. Undefined when no part of the text fits.
+ */
+export function insertPastedText(
+  current: string,
+  text: string,
+  at: { before: string; selection: ComposerSelection } | undefined,
+): { value: string; caret: number } | undefined {
+  const result = insertAtSelection(current, text, at);
+  const over = result.value.length - INPUT_LIMITS.messageText;
+  if (over <= 0) return result;
+  return over < text.length ? insertAtSelection(current, text.slice(0, text.length - over), at) : undefined;
 }

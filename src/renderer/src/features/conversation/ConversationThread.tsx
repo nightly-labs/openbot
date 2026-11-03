@@ -260,7 +260,7 @@ export function ConversationThread() {
               threadComposer.removeAttachment(threadComposer.openDraftKey(), attachment.id)
             }
             onDraftChange={(text) => threadComposer.setText(threadComposer.openDraftKey(), text)}
-            onPasteFiles={(files, selection) => threadComposer.pasteFiles(files, selection)}
+            onPasteFiles={(files, selection, text) => threadComposer.pasteFiles(files, selection, undefined, text)}
             onOpenDraftAttachment={(attachment) =>
               canPreviewAttachment(attachment)
                 ? void previewAttachment(attachment)

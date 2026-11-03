@@ -673,7 +673,7 @@ export function ConversationComposer() {
               sendShortcut={deviceSendShortcut(props.platform)}
               onPickerOpenChange={setPickerOpen}
               dictation={{ text: voiceLiveText(), final: voicePhase() === "transcribing" }}
-              onPasteFiles={pasteFiles}
+              onPasteFiles={(files, selection, text) => pasteFiles(files, selection, undefined, text)}
               onCopyAttachments={(clipboard, text, attachments, remaining) => {
                 const copied = copyComposerSelection(clipboard, text, attachments, props.runtime?.previewAttachment);
                 if (remaining !== undefined) releaseCutAttachments(attachments, remaining, copied);
