@@ -629,6 +629,15 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  /**
+   * A server on this computer has no account. The desktop app registered it and gives its machine
+   * token, which this process keeps in memory only: it is not written with a session. Null forgets it.
+   */
+  useHostCredential(hostId: string, machineToken: string | null): void {
+    if (machineToken === null) this.#teamHostTokens.delete(hostId.toLowerCase());
+    else this.#teamHostTokens.set(hostId.toLowerCase(), machineToken);
+  }
+
   /** The machine token of a registered host, so a site request can prove the server. Never log it. */
   hostSiteCredential(hostId: string): { hostId: string; machineToken: string } | null {
     const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
@@ -2026,6 +2035,14 @@ export function readMobileConnectApiUrl(value: string | undefined, fallback: str
   const apiUrl = value ?? fallback;
   createMobileConnectUrl({ apiUrl, ticket: "x".repeat(32) });
   return new URL(apiUrl).origin;
+}
+
+/**
+ * The account service has no such host for this account: it does not exist (404), or another account
+ * owns it (403). A 401 is an expired or revoked session, not an answer about the host.
+ */
+export function isHostNotOnAccount(error: unknown): boolean {
+  return error instanceof AuthApiError && (error.status === 403 || error.status === 404);
 }
 
 /** A client error that the same request cannot change. A timeout and a rate limit can pass later. */

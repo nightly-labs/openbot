@@ -8,6 +8,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.drawer.editOrder": "Edit order",
   "mobile.server.drawer.leaveFailed": "Could not leave {name}",
   "mobile.server.drawer.removeFailed": "Could not remove {name}",
+  "mobile.server.drawer.deleteFailed": "Could not delete {name}",
   "mobile.server.drawer.actionFailed": "OpenBot could not complete this action. Try again.",
   "mobile.server.drawer.moveUp": "Move up",
   "mobile.server.drawer.moveDown": "Move down",
@@ -67,6 +68,29 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.hosted.speedFaster": "{factor}× faster",
   "mobile.server.hosted.joinHint": "Use an invitation from a server owner.",
   "mobile.server.hosted.join": "Join a server",
+  // A new server that the OpenBot desktop app runs on the computer of the server {name}, beside that server.
+  "mobile.server.local.option": "New local server on the computer",
+  "mobile.server.local.optionHint": "On the computer that runs {name}, with its own agents, chats and files.",
+  "mobile.server.local.title": "New server",
+  "mobile.server.local.description":
+    "The server runs on the computer that runs {name}, with its own agents, chats and files. It is available while OpenBot runs on that computer.",
+  "mobile.server.local.nameLabel": "Server name",
+  "mobile.server.local.nameTooShort": "Use at least {limit} characters.",
+  "mobile.server.local.create": "Create",
+  "mobile.server.local.creating": "Creating…",
+  "mobile.server.local.createFailed": "Could not create the server.",
+  "mobile.server.local.limitReached":
+    "The computer that runs {name} has the maximum of {limit} servers. Delete one on that computer to create another.",
+  "mobile.server.local.created": "Server created",
+  "mobile.server.local.createdOn": "{name} runs on the same computer as {computer}.",
+  "mobile.server.local.waiting": "Waiting for {name} to come online…",
+  "mobile.server.local.notPublished":
+    "{name} runs, but this phone cannot open it yet. Make sure that OpenBot on the computer that runs {computer} is signed in and online.",
+  "mobile.server.local.open": "Open server",
+  "mobile.server.local.ownerOnly": "Only the owner can create a server on this computer.",
+  "mobile.server.local.unsupported": "Update OpenBot on this computer to create a server here.",
+  "mobile.server.local.deleteOffline":
+    "Only the computer of this server can delete it. Open OpenBot on that computer, then try again.",
   "mobile.server.hosted.intro.title": "Your agents, always on",
   "mobile.server.hosted.intro.description":
     "A cloud server runs your agents and routines when your computer is off. OpenBot sets it up and keeps it running.",
@@ -236,6 +260,10 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.removeBody":
     "This removes the server from the account service for all members. Files and chats on its computer stay. To use it again, register it from that computer.",
   "mobile.server.settings.remove": "Remove server",
+  "mobile.server.settings.deleteTitle": "Delete {name}?",
+  "mobile.server.settings.deleteBody":
+    "OpenBot stops the server on its computer and moves its agents, chats and files to the Trash of that computer. The server leaves the server list on all your devices.",
+  "mobile.server.settings.delete": "Delete server",
   "mobile.server.settings.name": "Server name",
   "mobile.server.settings.nameLength": "Use {min} to {max} characters.",
   "mobile.server.settings.logo": "Server logo",

@@ -5,7 +5,8 @@
 // The check asserts that the result has the URL and the request format and no signing secret, that
 // the chat records the creation for the card, that the routine lists with the webhook routines, that
 // a duplicate name and a bad filter come back as tool failures, and that a request signed with the
-// secret the card makes starts the routine.
+// secret the card makes starts the routine, that test_routine refuses it with a message that names
+// Routines settings, and that delete_routine deletes it.
 // `bun scripts/agent-webhook-routine-e2e.ts`. Writes .openbot-build/agent-webhook-routine-e2e/report.json.
 import assert from "node:assert/strict";
 import { createHmac, randomUUID } from "node:crypto";
@@ -155,7 +156,7 @@ interface ToolLog {
 /** The arguments the fake passes to the tool. */
 /** The arguments the fake passes to the tool that `__tool` names (default `create_webhook_routine`). */
 interface WebhookToolArgs {
-  __tool?: "create_webhook_routine" | "update_webhook_routine" | "list_routines";
+  __tool?: "create_webhook_routine" | "update_webhook_routine" | "list_routines" | "delete_routine" | "test_routine";
   routineId?: string;
   name?: string;
   instruction?: string;
@@ -166,6 +167,7 @@ interface WebhookToolArgs {
 /** The fields of a tool result that the check reads. The router sends them as JSON text. */
 interface WebhookToolBody {
   error?: string;
+  deleted?: boolean;
   webhookRoutines?: { routineId: string; eventType: string | null; filters: unknown[] }[];
   eventType?: string | null;
   filters?: { pointer: string; value: string }[];
@@ -473,6 +475,26 @@ try {
   pass(
     "The same secret still signs, and a request outside the new filter is ignored",
     outside.status === 202 && latest[0]?.status === "ignored" && latest[0]?.reason === "filter",
+  );
+
+  // 8. test_routine does not test a webhook routine and names Routines settings. delete_routine
+  // deletes it as Routines settings do (#4509).
+  const refused = await callTool("test_routine", agent.id, { __tool: "test_routine", routineId: result.routineId });
+  pass(
+    "test_routine refuses the webhook routine and names Routines settings",
+    refused.entry.result?.success === false &&
+      refused.body?.error?.includes("webhook routine") === true &&
+      refused.body.error.includes("Routines settings"),
+    refused.text,
+  );
+  const deleted = await callTool("delete_routine", agent.id, { __tool: "delete_routine", routineId: result.routineId });
+  const afterDelete = await Effect.runPromise(events.listRoutines({ owner }));
+  pass(
+    "delete_routine deletes the webhook routine",
+    deleted.entry.result?.success === true &&
+      deleted.body?.deleted === true &&
+      !afterDelete.some((item) => item.id === result.routineId),
+    deleted.text,
   );
   report.passed = true;
 } catch (error) {

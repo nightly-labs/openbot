@@ -837,13 +837,6 @@
   display: none;
 }
 
-.agent-memories-row-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .agent-memories-reading {
   display: grid;
   gap: var(--openbot-space-3);

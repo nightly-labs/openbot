@@ -9,6 +9,7 @@ export const messages = {
   "mobile.server.drawer.editOrder": "Sırayı düzenle",
   "mobile.server.drawer.leaveFailed": "{name} sunucusundan ayrılınamadı",
   "mobile.server.drawer.removeFailed": "{name} kaldırılamadı",
+  "mobile.server.drawer.deleteFailed": "{name} silinemedi",
   "mobile.server.drawer.actionFailed": "OpenBot bu işlemi tamamlayamadı. Tekrar deneyin.",
   "mobile.server.drawer.moveUp": "Yukarı taşı",
   "mobile.server.drawer.moveDown": "Aşağı taşı",
@@ -68,6 +69,29 @@ export const messages = {
   "mobile.server.hosted.speedFaster": "{factor} kat daha hızlı",
   "mobile.server.hosted.joinHint": "Bir sunucu sahibinden gelen daveti kullanın.",
   "mobile.server.hosted.join": "Bir sunucuya katıl",
+  "mobile.server.local.option": "Bilgisayarda yeni yerel sunucu",
+  "mobile.server.local.optionHint":
+    "{name} sunucusunu çalıştıran bilgisayarda, kendi ajanları, sohbetleri ve dosyalarıyla.",
+  "mobile.server.local.title": "Yeni sunucu",
+  "mobile.server.local.description":
+    "Sunucu, {name} sunucusunu çalıştıran bilgisayarda kendi ajanları, sohbetleri ve dosyalarıyla çalışır. OpenBot o bilgisayarda çalıştığı sürece kullanılabilir.",
+  "mobile.server.local.nameLabel": "Sunucu adı",
+  "mobile.server.local.nameTooShort": "En az {limit} karakter kullanın.",
+  "mobile.server.local.create": "Oluştur",
+  "mobile.server.local.creating": "Oluşturuluyor…",
+  "mobile.server.local.createFailed": "Sunucu oluşturulamadı.",
+  "mobile.server.local.limitReached":
+    "{name} sunucusunu çalıştıran bilgisayar en fazla {limit} sunucu sınırına ulaştı. Başka bir sunucu oluşturmak için o bilgisayarda birini silin.",
+  "mobile.server.local.created": "Sunucu oluşturuldu",
+  "mobile.server.local.createdOn": "{name}, {computer} ile aynı bilgisayarda çalışıyor.",
+  "mobile.server.local.waiting": "{name} sunucusunun çevrimiçi olması bekleniyor…",
+  "mobile.server.local.notPublished":
+    "{name} çalışıyor ancak bu telefon onu henüz açamıyor. {computer} sunucusunu çalıştıran bilgisayardaki OpenBot'ta oturum açık olduğundan ve çevrimiçi olduğundan emin olun.",
+  "mobile.server.local.open": "Sunucuyu aç",
+  "mobile.server.local.ownerOnly": "Bu bilgisayarda yalnızca sahip sunucu oluşturabilir.",
+  "mobile.server.local.unsupported": "Burada sunucu oluşturmak için bu bilgisayardaki OpenBot'u güncelleyin.",
+  "mobile.server.local.deleteOffline":
+    "Bu sunucuyu yalnızca kendi bilgisayarı silebilir. O bilgisayarda OpenBot'u açın ve tekrar deneyin.",
   "mobile.server.hosted.intro.title": "Ajanlarınız her zaman açık",
   "mobile.server.hosted.intro.description":
     "Bulut sunucusu, bilgisayarınız kapalıyken ajanlarınızı ve rutinlerinizi çalıştırır. OpenBot onu kurar ve çalışır durumda tutar.",
@@ -238,6 +262,10 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Bu işlem sunucuyu tüm üyeler için hesap hizmetinden kaldırır. Bilgisayarındaki dosyalar ve sohbetler kalır. Yeniden kullanmak için o bilgisayardan kaydedin.",
   "mobile.server.settings.remove": "Sunucuyu kaldır",
+  "mobile.server.settings.deleteTitle": "{name} silinsin mi?",
+  "mobile.server.settings.deleteBody":
+    "OpenBot sunucuyu bilgisayarında durdurur ve ajanlarını, sohbetlerini ve dosyalarını o bilgisayarın çöp kutusuna taşır. Sunucu tüm cihazlarınızdaki sunucu listesinden çıkar.",
+  "mobile.server.settings.delete": "Sunucuyu sil",
   "mobile.server.settings.name": "Sunucu adı",
   "mobile.server.settings.nameLength": "{min} ile {max} karakter kullanın.",
   "mobile.server.settings.logo": "Sunucu logosu",

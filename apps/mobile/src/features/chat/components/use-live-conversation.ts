@@ -102,6 +102,8 @@ const CLOSED: LiveConversationState = {
 export interface LiveConversation extends LiveConversationState {
   /** The phone can listen and speak. */
   available: boolean;
+  /** The recognizer hears now. The phase can say "listening" while the microphone still opens. */
+  micOpen: boolean;
   /** The voice that is heard now, from 0 to 1: the user's while listening, a pulse while speaking. */
   level: SharedValue<number>;
   /** 0 with the chat, 1 with the conversation. */
@@ -190,6 +192,7 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
   return {
     ...state,
     available,
+    micOpen: dictation.phase === "listening",
     level: state.phase === "speaking" ? speechLevel : dictation.level,
     presence,
     start: controller.start,

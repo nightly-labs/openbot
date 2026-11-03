@@ -1,6 +1,7 @@
 import {
   AGENT_TASK_LIMIT_DEFAULT,
   AGENT_TASK_LIMIT_MAX,
+  type AgentFastModeSettings,
   type AgentHostSettings,
   type AgentNewChatSettings,
   type AgentPlanCardSettings,
@@ -9,6 +10,7 @@ import {
   agentProviderName,
   type BusyMessageMode,
   canAdministerServer,
+  type UpdateAgentFastModeInput,
   type UpdateAgentHostSettingsInput,
 } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
@@ -56,15 +58,16 @@ export interface AgentHostFieldsProps {
 
 /**
  * One agent setting that is read from and saved on the agent's host. Only an owner or admin sees
- * it, and only when the host serves its capability. The host checks the role again on every call.
- * A change saves at once, as on desktop, and does not wait for the sheet's Save action. The control
- * shows the new value during the save and goes back on a failure.
+ * it, unless `members` is set, and only when the host serves its capability. The host checks the
+ * role again on every call. A change saves at once, as on desktop, and does not wait for the sheet's
+ * Save action. The control shows the new value during the save and goes back on a failure.
  */
 export function useAgentHostRecord<Settings extends object, Input extends Partial<Settings>>(
   { agent, server, available }: AgentHostFieldsProps,
-  part: "host" | "task-limit" | "new-chat" | "plan-card" | "backup-models",
+  part: "host" | "task-limit" | "new-chat" | "plan-card" | "backup-models" | "fast-mode",
   load: (agentId: string, serverId: string) => Promise<Settings | null>,
   update: (input: Input & { agentId: string }, serverId: string) => Promise<Settings>,
+  members = false,
 ) {
   const { t, errorMessage } = useText();
   const queryScope = useQueryScope();
@@ -73,14 +76,14 @@ export function useAgentHostRecord<Settings extends object, Input extends Partia
   const [error, setError] = useState<string | null>(null);
   // A second tap can come before the render that disables the control, and it would save from the same value.
   const pending = useRef(false);
-  const canAdminister = canAdministerServer(server?.role);
+  const canRead = members || canAdministerServer(server?.role);
   // Under "agent-info" and ending in an `AGENT_SETTINGS_PARTS` part: the host's `agents-changed`
   // event reads it again, so a change made on another device shows here while the page is open.
   const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, part);
   const settings = useQuery({
     queryKey,
     queryFn: () => load(agent.id, agent.serverId),
-    enabled: available && canAdminister,
+    enabled: available && canRead,
     retry: false,
     // Another device can change these at any time, so a reopened page reads the host again.
     staleTime: 0,
@@ -112,7 +115,7 @@ export function useAgentHostRecord<Settings extends object, Input extends Partia
   }
 
   // A host without the capability answers null. A failed read keeps the controls hidden, as for a member.
-  const current = canAdminister ? (settings.data ?? null) : null;
+  const current = canRead ? (settings.data ?? null) : null;
   return {
     current,
     enabled: available && !saving,
@@ -336,6 +339,39 @@ export function AgentPlanCardField(props: AgentHostFieldsProps) {
             label={t("mobile.agent.planCard.label")}
             dark={theme === "dark"}
             onValueChange={(quickAcknowledgement) => void save(current, { quickAcknowledgement })}
+          />
+        </SettingsRow>
+      </SettingsSection>
+      <SaveError error={error} />
+    </>
+  );
+}
+
+/**
+ * Agent info > Model: whether the agent asks its provider for the fast service tier, from
+ * `agent-fast-mode-v1`. It shows only for a model with a fast tier, as on desktop. A member with
+ * view access reads it; the host saves a change only for a member with manage access. A change
+ * applies from the next turn.
+ */
+export function AgentFastModeField(props: AgentHostFieldsProps) {
+  const { t } = useText();
+  const { theme } = useUniwind();
+  const workspace = useMobileWorkspaceActions();
+  const { current, enabled, error, save } = useAgentHostRecord<
+    AgentFastModeSettings,
+    Omit<UpdateAgentFastModeInput, "agentId">
+  >(props, "fast-mode", workspace.loadAgentFastMode, workspace.updateAgentFastMode, true);
+  if (!current) return null;
+  return (
+    <>
+      <SettingsSection footer={t("mobile.agent.fastMode.footer")}>
+        <SettingsRow>
+          <SettingsSwitch
+            value={current.fastMode === true}
+            disabled={!enabled}
+            label={t("mobile.agent.fastMode.label")}
+            dark={theme === "dark"}
+            onValueChange={(fastMode) => void save(current, { fastMode })}
           />
         </SettingsRow>
       </SettingsSection>

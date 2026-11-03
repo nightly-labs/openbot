@@ -66,6 +66,7 @@ import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
+import { LOCAL_SERVERS_CAPABILITY } from "./local-servers-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "./machine-resources-v1";
 import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
@@ -214,6 +215,7 @@ export {
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
+  LOCAL_SERVERS_CAPABILITY,
   MACHINE_RESOURCES_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
   MCP_SIGN_IN_APP_CAPABILITY,
@@ -412,6 +414,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CONTEXT_COMPACT_CAPABILITY,
   AGENT_INSTRUCTIONS_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
+  LOCAL_SERVERS_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
 ] as const;
 
@@ -567,6 +570,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CONTEXT_COMPACT_CAPABILITY &&
     capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
     capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY &&
+    capability !== LOCAL_SERVERS_CAPABILITY &&
     capability !== MODEL_VISIBILITY_CAPABILITY,
 );
 /**
@@ -597,6 +601,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CONTEXT_COMPACT_CAPABILITY,
   AGENT_INSTRUCTIONS_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
+  LOCAL_SERVERS_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -711,6 +716,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CONTEXT_COMPACT_CAPABILITY &&
       capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
       capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY &&
+      capability !== LOCAL_SERVERS_CAPABILITY &&
       capability !== MODEL_VISIBILITY_CAPABILITY,
   );
 }

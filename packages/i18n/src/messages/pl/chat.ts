@@ -441,6 +441,8 @@ export const messages = {
   "chat.menu.react": "Zareaguj",
   "chat.menu.branch": "Odgałęź stąd",
   "chat.menu.markUnread": "Oznacz jako nieprzeczytane",
+  "chat.menu.sendToChannel": "Wyślij na kanał",
+  "chat.menu.chooseChannel": "Wybierz kanał",
   "chat.voice.play": "Odtwórz wiadomość głosową",
   "chat.voice.pause": "Wstrzymaj wiadomość głosową",
   "chat.voice.pauseReading": "Wstrzymaj czytanie",

@@ -1234,6 +1234,7 @@ export class MessagingService {
         authorName,
         authorRoleIds: message.authorRoleIds ?? [],
         text: named,
+        files: message.files,
         receivedAt: new Date().toISOString(),
       });
       if (workflows === "skipped")

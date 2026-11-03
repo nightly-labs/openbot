@@ -3,6 +3,7 @@ import { sourceText } from "@openbot/i18n/source";
 import type { Logger } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
 import type { AgentApiKeys } from "../agent-api-keys";
+import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
 import { causeHelpers } from "../effect-boundary";
@@ -27,6 +28,8 @@ export interface AgentRemovalHooks {
   cancelMemoryReview(agentId: string): Effect.Effect<void>;
   /** Stops the agent's own provider process, which runs in its workspace. */
   stopAgentProcess(agentId: string): Effect.Effect<void, AgentRemovalFailed>;
+  /** The provider's shared client, which can hold a session of the agent that the conversation does not list. */
+  currentClient(provider: AgentProvider): AgentClient | null;
   /** Whether a usage limit holds the agent's queue. */
   usageLimitHolds(agentId: string): boolean;
   /** Waits for a model move of the agent that already runs. A move that starts later sees the deletion. */
@@ -198,8 +201,16 @@ export class AgentRemoval {
     const providerSessions = yield* removalStep(() =>
       agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [],
     );
-    // Keep provider session records until their private files have been removed.
-    yield* this.#threads.releaseAgentSessions(agent.id);
+    // Keep provider session records until their private files have been removed. A shared client
+    // can still hold a recorded session that the conversation forgot, such as after another
+    // provider's exit or a history read (#4346).
+    yield* this.#threads.releaseAgentSessions(
+      agent.id,
+      providerSessions.map((session) => ({
+        externalThreadId: session.externalSessionId,
+        client: this.#hooks.currentClient(session.provider),
+      })),
+    );
     let stage = "provider-files";
     yield* Effect.gen({ self: this }, function* () {
       for (const session of providerSessions)

@@ -160,6 +160,7 @@ import {
   parseSearchConversationMessages,
   parseSendMessage,
   parseSetAgentAvatar,
+  parseSetChannelImage,
   parseSidebarFolderAction,
   parseStartAgentTask,
   parseSteerQueuedMessage,
@@ -480,6 +481,13 @@ export function agentIpcHandlers({
               body: { channelId },
             }),
           );
+        },
+      }),
+      setChannelImage: scopedHandler(parseSetChannelImage, {
+        local: (input) => runCauseEffect(service.channels.setImage(input.channelId, input.image)),
+        // The channel editor offers an image only for this computer, so only a programming error gets here.
+        remote: () => {
+          throw new Error(sourceText("error.team.channelPictureUnsupported"));
         },
       }),
       getSidebarLayout: scopedQueryHandler({

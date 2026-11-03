@@ -113,6 +113,8 @@ export interface ComposerActionsDeps {
   agentReady: () => boolean;
   /** True while a file import for the chat, the current one by default, waits. */
   attachmentBusy: (target?: ConversationTarget) => boolean;
+  /** A failed upload chip of the chat. A typed send waits for Retry or remove. */
+  uploadFailed: () => boolean;
   /** Reads the chats that wait for an import again from `attachmentImports`. */
   syncAttachmentImports: () => void;
   setPastePreviews: SetPastePreviews;
@@ -919,7 +921,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
   }
 
   function submitComposer(): void {
-    if (deps.attachmentBusy()) return;
+    if (deps.attachmentBusy() || deps.uploadFailed()) return;
     const phase = deps.voicePhase();
     // A recording for a side thread sends to that thread, not to this message box.
     if (phase === "recording" && deps.voiceThreadKey() === undefined) {
@@ -965,7 +967,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
    * that steers each message sent while it works does that itself, so a second steer is not asked.
    */
   function steerComposer(): void {
-    if (deps.attachmentBusy() || deps.voicePhase() !== "idle" || !deps.agentReady()) return;
+    if (deps.attachmentBusy() || deps.uploadFailed() || deps.voicePhase() !== "idle" || !deps.agentReady()) return;
     const hostSteers = (deps.props.agent?.busyMessageMode ?? deps.props.defaultBusyMessageMode) === "steer";
     void submitMessage(undefined, undefined, undefined, undefined, !hostSteers);
   }

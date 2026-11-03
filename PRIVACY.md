@@ -359,7 +359,10 @@ The service stores:
 - rate-limit keys as hashes, their fixed window start time, and the attempt count;
 - short-lived team authentication tickets with a ticket hash, account ID, team server ID, lifecycle
   times, and optional consumption time;
-- remote host records with the owner, name, optional logo, device public key, and authorization epoch;
+- remote host records with the owner, name, optional logo, device public key, and authorization epoch.
+  A server that the desktop app runs on the same computer as its own server gets its own record while
+  the desktop app is signed in, so the owner's phones and other computers can connect to it. Deleting
+  that server removes its record;
 - remote memberships and invitations with roles, states, hashed invitation tokens, and lifecycle times;
 - logical remote session records with the account, host, originating account-session hash, start,
   end, and expiration times;
@@ -487,14 +490,19 @@ Mobile hidden and pinned chat preferences are stored on the phone, separately pe
 Conversation read/unread changes are stored on the desktop host and shared with your other connected devices.
 
 The mobile app keeps a copy of what it shows for each server: the agent list, the hidden agents,
-the sections, and the latest page (up to 50 messages) of each chat that it loaded, up to 4 MB for
-each server. So after a start the app shows them at once, while it connects to the server. The copy
-is in the phone's system cache (`Library/Caches` on iOS), which is not in a device backup and which
-the system can delete when the phone is low on storage. Each file is encrypted with AES-256-GCM and
-bound to the account and the server. The key is in the phone's keychain, and it does not leave this
-device. The copy is never sent anywhere. The app replaces it with what the server sends, and deletes
-a server's copy when the account no longer has that server. Sign-out and an expired or disconnected
-session delete all copies and the key. Attachments and files are not in the copy.
+the sections, the server's capabilities, the latest page (up to 50 messages) of each chat that it
+loaded, and the last values of the drawer (the member count, the usage cost, the next routine runs,
+the thread and workflow counts, and the name and last run of each pinned workflow), up to 4 MB for
+each server. It also keeps the last server list that the account service gave: for each server its
+ID, name, logo version, public key and the time of its last key change, membership ID, role, member
+limit, and hosted status. So after a start the app connects and shows them at once, while the
+account service and the server answer. The copy is in the phone's system cache (`Library/Caches` on
+iOS), which is not in a device backup and which the system can delete when the phone is low on
+storage. Each file is encrypted with AES-256-GCM and bound to the account and the server, or to the
+server list. The key is in the phone's keychain, and it does not leave this device. The copy is
+never sent anywhere. The app replaces it with what the server and the account service send, and
+deletes a server's copy when the account no longer has that server. Sign-out and an expired or
+disconnected session delete all copies and the key. Attachments and files are not in the copy.
 
 The mobile app keeps a support log of up to 1,000 events in the phone's system cache: app version,
 system and device model, app state changes, connection steps with server IDs and error text, the
@@ -1017,6 +1025,17 @@ graph, or ID.
   the list. The computer keeps the newest 50 deliveries of each trigger, without the event body: the
   delivery ID, event name, item number, time, and whether it started a run. An event that arrives
   while the computer is offline is lost; the history shows the gap.
+- **Discord triggers** start a run from a mention of the OpenBot Discord app. The trigger's output, and
+  the run that keeps it, has the message text, the author, and the name, type, size and Discord
+  address of each file of the message and of the message that it replies to. These addresses expire
+  after about a day.
+- **GitHub outputs** make the change through the OpenBot GitHub App: a comment, a label, a person, a
+  review, a close or a new issue. The text goes to GitHub. When a Discord mention started the run, a
+  new issue or a comment also keeps those files: the computer downloads each file of up to 25 MB, and
+  up to 50 MB for each change, from Discord and commits it to the `openbot-attachments` branch of the target repository,
+  under `discord/<message ID>/`. The text links the files there. Everyone who can read the repository
+  can read them, also after the issue or the comment is deleted; delete that branch to delete
+  them. A file that the computer cannot copy is linked at its Discord address.
 
 Members of a joined server can read, change, and run a workflow when they can see and use each
 agent in it (`workflows-v1`). The graph and the step text then go to their computer. Only owners

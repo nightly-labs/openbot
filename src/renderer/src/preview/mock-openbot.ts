@@ -480,6 +480,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let appearancePreference: AppAppearancePreference = {
     appearance: DEFAULT_APP_APPEARANCE,
     transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
+    palette: null,
+    palettes: [],
   };
   const appearanceListeners = new Set<(preference: AppAppearancePreference) => void>();
   let interfaceSizePreference: AppInterfaceSizePreference = { percent: DEFAULT_APP_INTERFACE_SIZE };
@@ -1198,7 +1200,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     // The Storybook toolbar sets the colors of a story.
     getAppAppearancePreference: async () => clone(appearancePreference),
     setAppAppearancePreference: async (change) => {
-      appearancePreference = { ...appearancePreference, ...change };
+      const next = { ...appearancePreference, ...change };
+      // As main does, a palette id shows only while that palette is listed.
+      const listed = next.palettes.some((palette) => palette.id === next.palette);
+      appearancePreference = { ...next, palette: listed ? next.palette : null };
       for (const listener of appearanceListeners) listener(clone(appearancePreference));
       return clone(appearancePreference);
     },
@@ -2700,11 +2705,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         attachmentListeners.add(listener);
         return () => attachmentListeners.delete(listener);
       },
+      // The preview imports no files from a drop or a pick, so no import fails and waits for a retry.
+      retryAttachmentImport: () => undefined,
+      discardAttachmentImport: () => undefined,
       discardDraftAttachment: async () => undefined,
       downloadAttachments: async () => {
         throw new Error("ZIP downloads are available in the desktop app.");
       },
       openAttachment: async (_input: OpenAttachmentInput) => undefined,
+      // The preview has no joined server, so no download reports its bytes.
+      stopAttachmentDownload: async () => undefined,
+      onAttachmentDownload: () => () => undefined,
       openSharedFile: async (_input: OpenSharedFileInput) => undefined,
       openWorkspaceFile: async (_input: OpenWorkspaceFileInput) => undefined,
       previewSharedFile: async (input: OpenSharedFileInput) => mockFilePreview(input.path, "shared-file"),

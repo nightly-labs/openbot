@@ -28,6 +28,15 @@ export interface AppFormat {
   list: (items: readonly string[]) => string;
   /** Binary units, as the attachment cards show them: 512 B, 12 KB, 3.4 MB. */
   fileSize: (bytes: number) => string;
+  /** `bytes` in the unit that `fileSize` writes `total` in, without the unit: "148.0" of "412.0 MB". */
+  fileSizeAmount: (bytes: number, total: number) => string;
+}
+
+/** The unit that `fileSize` writes `bytes` in, as a power of 1024: 0 is bytes, 4 is terabytes. */
+function fileSizeExponent(bytes: number): number {
+  let exponent = 0;
+  while (exponent < 4 && bytes >= 1024 ** (exponent + 1)) exponent += 1;
+  return exponent;
 }
 
 const numberFormats = new Map<string, Intl.NumberFormat>();
@@ -97,6 +106,12 @@ export function createFormat(locale: TranslatedLocale, intlLocale: string | null
   const t = createTranslate({ source: en, translation, locale, sourceLocale: "en" });
   const oneDecimal = (value: number) =>
     numberFormat(tag, { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }).format(value);
+  // Bytes and kilobytes are whole numbers, written with no locale digits, as before.
+  const fileSizeAmount = (bytes: number, exponent: number) => {
+    if (exponent === 0) return String(bytes);
+    if (exponent === 1) return String(Math.round(bytes / 1024));
+    return oneDecimal(bytes / 1024 ** exponent);
+  };
 
   const format: AppFormat = {
     locale,
@@ -119,12 +134,15 @@ export function createFormat(locale: TranslatedLocale, intlLocale: string | null
       return t("format.list.last", { items: items.slice(0, -1).join(t("format.list.separator")), last });
     },
     fileSize: (bytes) => {
-      if (bytes < 1024) return t("format.fileSize.bytes", { size: String(bytes) });
-      if (bytes < 1024 ** 2) return t("format.fileSize.kilobytes", { size: String(Math.round(bytes / 1024)) });
-      if (bytes < 1024 ** 3) return t("format.fileSize.megabytes", { size: oneDecimal(bytes / 1024 ** 2) });
-      if (bytes < 1024 ** 4) return t("format.fileSize.gigabytes", { size: oneDecimal(bytes / 1024 ** 3) });
-      return t("format.fileSize.terabytes", { size: oneDecimal(bytes / 1024 ** 4) });
+      const exponent = fileSizeExponent(bytes);
+      const size = fileSizeAmount(bytes, exponent);
+      if (exponent === 0) return t("format.fileSize.bytes", { size });
+      if (exponent === 1) return t("format.fileSize.kilobytes", { size });
+      if (exponent === 2) return t("format.fileSize.megabytes", { size });
+      if (exponent === 3) return t("format.fileSize.gigabytes", { size });
+      return t("format.fileSize.terabytes", { size });
     },
+    fileSizeAmount: (bytes, total) => fileSizeAmount(bytes, fileSizeExponent(total)),
   };
   // A language that is not loaded yet formats with English words, and the next call after the load
   // makes the format again.

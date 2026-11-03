@@ -2,8 +2,8 @@ import { attachmentFileExtension } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import { useQuery } from "@tanstack/react-query";
-import { File, Paths } from "expo-file-system";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Directory, File, Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import * as Sharing from "expo-sharing";
 import { useThemeColor } from "heroui-native/hooks";
@@ -17,6 +17,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { createImageDimensionCache } from "../model/image-dimension-cache";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
+import { shareFilesNative } from "../model/share-files-native";
 import { mediaFile } from "./use-media-file";
 
 // Sizes outlive the downloaded file and the launch. A chat that scrolls an image back into view,
@@ -36,6 +37,19 @@ export function rememberImageDimensions(id: string, dimensions: ImageDimensions)
 /** The size of an image the phone has decoded or read before, or null. */
 export function knownImageDimensions(id: string): ImageDimensions | null {
   return dimensionCache.get(id);
+}
+
+/**
+ * A file the chat shows as a picture, as desktop does. An SVG is a `file` attachment, so the agent
+ * reads its text, but its preview is an image.
+ */
+export function showsAsImage(attachment: Pick<AttachmentSummary, "kind" | "previewKind">): boolean {
+  return attachment.kind === "image" || attachment.previewKind === "image";
+}
+
+/** A picture the photo library takes. The library takes raster images only, not an SVG. */
+export function savesToPhotos(attachment: Pick<AttachmentSummary, "kind">): boolean {
+  return attachment.kind === "image";
 }
 
 /** The short type a file card shows, such as PDF or CSV, from the name the user sees. */
@@ -117,6 +131,45 @@ async function fileBase64(data: RemoteFileUpload & { fileUri?: string }): Promis
   return new File(data.fileUri).base64();
 }
 
+type DownloadAttachment = ReturnType<typeof useMobileWorkspaceActions>["downloadAttachment"];
+
+/** The download of one host file. One file view and a whole gallery read the same cache entry. */
+function attachmentFileQuery(
+  serverId: string,
+  attachment: AttachmentSummary,
+  downloadAttachment: DownloadAttachment,
+  tooLarge: string,
+) {
+  return queryOptions({
+    queryKey: queryKeys.chatAttachment(serverId, attachment.id),
+    queryFn: async (): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
+      if (attachment.size > MOBILE_ATTACHMENT_BYTES) throw new Error(tooLarge);
+      const kept = keptImageFile(serverId, attachment);
+      if (kept) return kept;
+      const data = await downloadAttachment(serverId, attachment.id);
+      return {
+        ...data,
+        fileUri: data.mimeType.startsWith("image/") ? keepImageFile(serverId, attachment, data) : undefined,
+      };
+    },
+    retry: false,
+    staleTime: Infinity,
+    gcTime: 5 * 60 * 1000,
+  });
+}
+
+/** A copy of a downloaded file with an extension, in a folder the caller deletes. */
+async function writeCopy(folder: Directory, name: string, data: RemoteFileUpload & { fileUri?: string }) {
+  const file = new File(folder, name);
+  file.writeSync(await fileBase64(data), { encoding: "base64" });
+  return file;
+}
+
+/** The extension the photo library and the share targets read the type from. */
+function imageExtension(attachment: AttachmentSummary, mimeType: string) {
+  return attachmentFileExtension(attachment.name) ?? mimeType.split("/")[1] ?? "png";
+}
+
 /**
  * One host file: its image for a preview, and the share sheet for opening it. The query key is the
  * one the chat uses, so a file read in a message is not downloaded a second time for a queue row.
@@ -131,21 +184,8 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       ? attachment.previewUrl
       : null;
   const query = useQuery({
-    queryKey: queryKeys.chatAttachment(serverId, attachment.id),
-    queryFn: async (): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
-      if (attachment.size > MOBILE_ATTACHMENT_BYTES) throw new Error(t("mobile.chat.attachment.tooLargeForMobile"));
-      const kept = keptImageFile(serverId, attachment);
-      if (kept) return kept;
-      const data = await downloadAttachment(serverId, attachment.id);
-      return {
-        ...data,
-        fileUri: data.mimeType.startsWith("image/") ? keepImageFile(serverId, attachment, data) : undefined,
-      };
-    },
+    ...attachmentFileQuery(serverId, attachment, downloadAttachment, t("mobile.chat.attachment.tooLargeForMobile")),
     enabled: preview && !local && !pending,
-    retry: false,
-    staleTime: Infinity,
-    gcTime: 5 * 60 * 1000,
   });
   const data = query.data;
   const dimensions = useMemo(() => {
@@ -198,7 +238,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       if (result.error) throw result.error;
       if (!result.data) throw new Error(t("mobile.chat.attachment.imageUnavailable"));
       // The photo library reads the type from the extension, so the file keeps one.
-      const extension = attachmentFileExtension(attachment.name) ?? result.data.mimeType.split("/")[1] ?? "png";
+      const extension = imageExtension(attachment, result.data.mimeType);
       file = new File(Paths.cache, `${Date.now()}-download.${extension}`);
       file.writeSync(await fileBase64(result.data), { encoding: "base64" });
       await MediaLibrary.Asset.create(file.uri);
@@ -228,6 +268,81 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     busy: sharing || query.isFetching,
     share: () => void share(),
   };
+}
+
+/**
+ * The actions of a whole gallery: every image to the photo library, or every image to one share
+ * sheet. Each image comes from the cache the chat filled, and downloads only when it is not there.
+ */
+export function useAttachmentFiles(serverId: string, attachments: readonly AttachmentSummary[]) {
+  const { downloadAttachment } = useMobileWorkspaceActions();
+  const queryClient = useQueryClient();
+  const { t, sourceText } = useText();
+  const [busy, setBusy] = useState(false);
+  const load = (attachment: AttachmentSummary) =>
+    queryClient.fetchQuery(
+      attachmentFileQuery(serverId, attachment, downloadAttachment, t("mobile.chat.attachment.tooLargeForMobile")),
+    );
+  const fail = (error: unknown, title: string) => {
+    void haptics.notification("error");
+    showFailureAlert(
+      error,
+      "turn",
+      title,
+      error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
+    );
+  };
+
+  /** Saves every image that the photo library takes. It reports its own failure and returns whether all of them saved. */
+  async function saveAllToPhotos(): Promise<boolean> {
+    setBusy(true);
+    const folder = new Directory(Paths.cache, `gallery-save-${Date.now()}`);
+    try {
+      const MediaLibrary = await import("expo-media-library").catch(() => null);
+      if (!MediaLibrary) throw new Error(t("mobile.chat.attachment.photosNeedUpdate"));
+      if (!(await MediaLibrary.requestPermissionsAsync(true, ["photo"])).granted)
+        throw new Error(t("mobile.chat.imageGallery.photosPermission"));
+      folder.create({ intermediates: true, idempotent: true });
+      // One at a time, in chat order, so the library keeps the order of the message.
+      for (const [index, attachment] of attachments.filter(savesToPhotos).entries()) {
+        const data = await load(attachment);
+        const file = await writeCopy(folder, `${index}.${imageExtension(attachment, data.mimeType)}`, data);
+        await MediaLibrary.Asset.create(file.uri);
+      }
+      return true;
+    } catch (error) {
+      fail(error, t("mobile.chat.imageGallery.saveFailed"));
+      return false;
+    } finally {
+      if (folder.exists) folder.delete();
+      setBusy(false);
+    }
+  }
+
+  /** Opens one share sheet with every image. */
+  async function shareAll() {
+    setBusy(true);
+    try {
+      if (!shareFilesNative) throw new Error(t("mobile.chat.imageGallery.shareNeedsUpdate"));
+      const uris: string[] = [];
+      const types = new Set<string>();
+      for (const attachment of attachments) {
+        const data = await load(attachment);
+        // The chat media folder holds the file with a safe name, and the next launch clears it.
+        const uri = data.fileUri ?? keepImageFile(serverId, attachment, data);
+        if (!uri) throw new Error(t("mobile.chat.attachment.imageUnavailable"));
+        types.add(data.mimeType);
+        uris.push(uri);
+      }
+      await shareFilesNative.shareAsync(uris, types.size === 1 ? ([...types][0] ?? "image/*") : "image/*");
+    } catch (error) {
+      fail(error, t("mobile.chat.imageGallery.shareFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return { busy, saveAllToPhotos, shareAll: () => void shareAll() };
 }
 
 /**

@@ -332,6 +332,8 @@ export const messages = defineMessages("chat", {
   "chat.menu.react": "React",
   "chat.menu.branch": "Branch from here",
   "chat.menu.markUnread": "Mark unread",
+  "chat.menu.sendToChannel": "Send to channel",
+  "chat.menu.chooseChannel": "Choose a channel",
   "chat.voice.play": "Play voice message",
   "chat.voice.pause": "Pause voice message",
   "chat.voice.pauseReading": "Pause reading",

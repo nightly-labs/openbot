@@ -1,8 +1,10 @@
 import type {
   AccountSession,
+  AppAppearancePreference,
   AppInfo,
   ApprovalAutomationPreference,
   AppSetupState,
+  AppThemePalette,
   CentralAuthState,
   MobileConnectedDevice,
   NotificationOpenedEvent,
@@ -35,6 +37,26 @@ import {
   decodeVoiceServerProbe,
   decodeVoiceServerSettings,
 } from "./app-decoding";
+
+const omarchyPalette = {
+  id: "omarchy",
+  name: "Omarchy",
+  scheme: "dark",
+  colors: {
+    canvas: "#1a1b26",
+    frame: "#13141c",
+    sidebar: "#13141c",
+    surface: "#24283b",
+    text: "#a9b1d6",
+    textMuted: "#565f89",
+    border: "#414868",
+    accent: "#7aa2f7",
+    accentForeground: "#1a1b26",
+    success: "#9ece6a",
+    warning: "#e0af68",
+    danger: "#f7768e",
+  },
+} satisfies AppThemePalette;
 
 const updateStatus = {
   phase: "downloading",
@@ -128,7 +150,16 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     } satisfies ApprovalAutomationPreference,
   ],
   ["language preference", decodeAppLanguagePreference, { language: "fr" }],
-  ["appearance preference", decodeAppAppearancePreference, { appearance: "light", transparentWindow: true }],
+  [
+    "appearance preference",
+    decodeAppAppearancePreference,
+    { appearance: "light", transparentWindow: true, palette: null, palettes: [] } satisfies AppAppearancePreference,
+  ],
+  [
+    "appearance preference with a theme palette",
+    decodeAppAppearancePreference,
+    { appearance: "dark", transparentWindow: false, palette: "omarchy", palettes: [omarchyPalette] },
+  ],
   ["signed out", decodeCentralAuthState, { status: "signed_out" } satisfies CentralAuthState],
   ["code sent", decodeCentralAuthState, codeSent],
   [
@@ -254,6 +285,36 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     "appearance preference with a string transparent window",
     decodeAppAppearancePreference,
     { appearance: "dark", transparentWindow: "true" },
+  ],
+  [
+    "appearance preference with no theme palettes",
+    decodeAppAppearancePreference,
+    { appearance: "dark", transparentWindow: false, palette: null },
+  ],
+  [
+    "a theme palette id with a path",
+    decodeAppAppearancePreference,
+    { appearance: "dark", transparentWindow: false, palette: "../omarchy", palettes: [] },
+  ],
+  [
+    "a theme palette color that is not hex",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [{ ...omarchyPalette, colors: { ...omarchyPalette.colors, accent: "red; background: url(x)" } }],
+    },
+  ],
+  [
+    "a theme palette with a missing color",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [{ ...omarchyPalette, colors: { canvas: "#1a1b26" } }],
+    },
   ],
   ["an unknown account status", decodeCentralAuthState, { status: "banned" }],
   ["signed in without a user", decodeCentralAuthState, { status: "signed_in" }],

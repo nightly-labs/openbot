@@ -88,6 +88,7 @@ const mentionOf = (text: string): MessagingDiscordMention => {
     authorName: "Bob",
     authorRoleIds: [],
     text,
+    files: [],
     receivedAt: new Date().toISOString(),
   };
 };

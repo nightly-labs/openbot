@@ -25,7 +25,7 @@ import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { channelRecipient } from "@/features/channels/model/channel-draft";
 import type { ApprovalDecision } from "@/features/chat/components/chat-approval-card";
-import { ChatComposer, type MentionSkill, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
+import { ChatComposer, type MentionSkill } from "@/features/chat/components/chat-composer";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
@@ -85,11 +85,10 @@ import { ChatAttachmentPanel } from "./chat-attachment-panel";
 import type { OutboxRowStatus } from "./chat-outbox-status";
 import { ChatQueueButton } from "./chat-queue-button";
 import { ChatSelectionBar } from "./chat-selection-bar";
-import { type ComposerVoice, dictationVoice, liveVoice } from "./composer-voice";
+import { type ComposerVoice, liveVoice } from "./composer-voice";
 import type { ChatQueueController } from "./use-chat-queue";
+import { useComposerDictation } from "./use-composer-dictation";
 import { type LiveChannel, useLiveConversation } from "./use-live-conversation";
-import { useVoiceMode } from "./use-voice-mode";
-import { VoiceOverlay } from "./voice-overlay";
 
 export interface ChatViewProps {
   target: ChatTarget;
@@ -575,13 +574,13 @@ export function ChatView({
   const liquidGlassAvailable = isLiquidGlassAvailable() && !reducedTransparency;
   // A quiet return to the app counts as online: the chat keeps its look, and its requests wait.
   const serverOnline = showsOnline(server);
-  // Speech goes to the voice mode's own transcript, and only Send makes it a
-  // message. Leaving the chat or losing the server stops listening and keeps it.
-  const voice = useVoiceMode({
+  // A hold on the mic dictates into the draft, and only Send makes it a message. Leaving the chat or
+  // losing the server stops listening and keeps the words.
+  const dictation = useComposerDictation({
     enabled: isFocused && serverOnline && canSend && !readOnly && !notice,
     focused: isFocused,
-    sendable: serverOnline && canSend,
-    onSend: sendMessage,
+    draft,
+    onDraft: setDraft,
   });
   const writable = canSend && !readOnly && !notice;
   // Hands-free, as the voice pane on desktop: the agent hears a pause as the end of a turn, and its
@@ -606,28 +605,30 @@ export function ChatView({
   // Not gated on `appActive`. Notification Center and other system overlays make iOS report the app
   // inactive, and a request must stay with its typed value. It goes when the app leaves.
   const showBrowserRequests = serverOnline && foregroundVisit && isFocused && !readOnly;
-  // The mic of the composer: a live conversation in an agent chat, as on desktop. A channel has no
-  // one conversation to follow, so its mic dictates a message for review.
-  // With no voice ready, the mic opens Settings > Voice, where the user downloads Supertonic 3 or adds
+  // A tap on the mic of the composer: a live conversation in an agent chat, as on desktop. A channel
+  // has no one conversation to follow, so there a tap dictates hands-free. A hold always dictates.
+  // With no voice ready, the tap opens Settings > Voice, where the user downloads Supertonic 3 or adds
   // an ElevenLabs key.
-  const composerVoice: ComposerVoice =
+  const composerVoice: ComposerVoice | undefined =
     live.available || live.open
       ? {
           ...liveVoice(live, voiceAgent?.name ?? target.name, t),
           start: () => (replyVoiceReady() ? live.start() : router.push("/settings/voice")),
         }
-      : dictationVoice(voice, t);
-  const voiceOpen = voice.stage !== "closed" || live.open;
-  // Dictation covers the chat with its overlay. A live conversation keeps the chat in view and turns
-  // the composer into a call bar.
-  const dictating = voice.stage !== "closed";
+      : undefined;
+  // A live conversation keeps the chat in view and turns the composer into a call bar.
+  const voiceOpen = live.open;
+  const dictating = dictation.stage !== "idle";
   // A password or a code is typed where the composer is, so the screen has one field. The voice
-  // mode and the attachment card keep the composer until they close. Other secret requests wait.
+  // mode, dictation and the attachment card keep the composer until they close: replacing it would
+  // end a hold on the mic. Other secret requests wait.
   const secretRequest =
-    showBrowserRequests && !voiceOpen && !attachments.menuOpen ? chatBrowserRequests.find(asksForSecret) : undefined;
+    showBrowserRequests && !voiceOpen && !dictating && !attachments.menuOpen
+      ? chatBrowserRequests.find(asksForSecret)
+      : undefined;
   // A private answer to a form question is typed there too, never in a second field beside the composer.
   const secretQuestion =
-    !secretRequest && !voiceOpen && !attachments.menuOpen && questionForm?.question?.isSecret
+    !secretRequest && !voiceOpen && !dictating && !attachments.menuOpen && questionForm?.question?.isSecret
       ? questionForm
       : undefined;
   const dark = useColorScheme() === "dark";
@@ -681,15 +682,15 @@ export function ChatView({
   useEffect(() => {
     menuOpenValue.set(attachments.menuOpen);
   }, [attachments.menuOpen, menuOpenValue]);
-  // The same for the voice mode: the edge swipe stops or cancels it, as the
-  // back button does, instead of leaving the chat with the spoken text.
+  // The same for voice: the edge swipe ends a live conversation, or stops dictation and keeps the
+  // words, as the back button does, instead of leaving the chat.
   const voiceOpenValue = useSharedValue(false);
   useEffect(() => {
-    voiceOpenValue.set(voiceOpen);
-  }, [voiceOpen, voiceOpenValue]);
-  const voiceBack = useRef(voice.back);
+    voiceOpenValue.set(voiceOpen || dictating);
+  }, [voiceOpen, dictating, voiceOpenValue]);
+  const voiceBack = useRef(live.end);
   useEffect(() => {
-    voiceBack.current = live.open ? live.end : voice.back;
+    voiceBack.current = live.open ? live.end : dictation.finish;
   });
   const leaveVoiceMode = useCallback(() => voiceBack.current(), []);
   const edgeBackGesture = useMemo(
@@ -993,15 +994,11 @@ export function ChatView({
               topInset={insets.top}
               onBack={leaveConversation}
               threadMenu={threadMenu}
-              // The dictation overlay covers the chat. It blocks touches, and this
-              // keeps screen readers on the transcript and the voice controls.
-              accessibilityHidden={dictating}
             />
             <ChatMessageList
               agents={serverAgents}
               rowsShown={rowsShown}
               target={target}
-              accessibilityHidden={dictating}
               motion={motion}
               sending={Boolean(sendingMessage)}
               awaitingTurn={awaitingTurn}
@@ -1064,23 +1061,8 @@ export function ChatView({
               upload={listUpload}
               outboxStatuses={outboxStatuses}
             />
-            {dictating ? (
-              <VoiceOverlay
-                voice={voice}
-                hint={voice.phase === "listening" ? t("mobile.chat.voice.listening") : ""}
-                reply={replyTarget ? mentionDraft(replyTarget.body).text || t("mobile.chat.reply.attachment") : null}
-                muted={muted}
-                topInset={insets.top}
-                controlsHeight={Math.max(insets.bottom, 10) + VOICE_BUTTON_SIZE + 48}
-                reducedTransparency={reducedTransparency}
-              />
-            ) : null}
             <Animated.View
-              style={[
-                // Above the voice overlay, which covers the header, while the voice mode is open.
-                { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: voiceOpen ? 31 : undefined },
-                motion.composerStyle,
-              ]}
+              style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
               pointerEvents="box-none"
               onLayout={motion.onComposerLayout}
             >
@@ -1251,6 +1233,7 @@ export function ChatView({
                   menuProgress={menuProgress}
                   stopping={stopping}
                   voice={composerVoice}
+                  dictation={dictation}
                   // An agent's own colour; a channel keeps the default controls.
                   voiceAccent={target.kind === "agent" ? accent : undefined}
                   voicePalette={palette}

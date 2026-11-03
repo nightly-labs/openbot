@@ -332,6 +332,8 @@ export const messages = {
   "chat.menu.react": "반응",
   "chat.menu.branch": "여기서 분기",
   "chat.menu.markUnread": "읽지 않음으로 표시",
+  "chat.menu.sendToChannel": "채널로 보내기",
+  "chat.menu.chooseChannel": "채널 선택",
   "chat.voice.play": "음성 메시지 재생",
   "chat.voice.pause": "음성 메시지 일시 정지",
   "chat.voice.pauseReading": "읽기 일시 정지",

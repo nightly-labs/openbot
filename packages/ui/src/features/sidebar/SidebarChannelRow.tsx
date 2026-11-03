@@ -77,7 +77,13 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
         }}
       >
         <span class="agent-row-avatar">
-          <ChannelAvatar members={rowProps.channel.members} agents={props.agents} layout="cluster" />
+          <ChannelAvatar
+            members={rowProps.channel.members}
+            agents={props.agents}
+            layout="cluster"
+            icon={rowProps.channel.icon}
+            imageUrl={rowProps.channel.imageUrl}
+          />
           <Show
             when={channelWait()}
             fallback={

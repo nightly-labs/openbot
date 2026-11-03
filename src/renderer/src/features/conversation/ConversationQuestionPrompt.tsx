@@ -51,6 +51,7 @@ export function ConversationQuestionPrompt(props: {
                   sendShortcut={deviceSendShortcut(view.platform)}
                   onSubmit={answer}
                   onResolutionPresented={presentResolution}
+                  onOpenLink={(url) => void openExternalMessageUrl(url)}
                 />
               }
             >

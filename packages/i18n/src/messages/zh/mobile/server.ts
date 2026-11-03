@@ -9,6 +9,7 @@ export const messages = {
   "mobile.server.drawer.editOrder": "编辑顺序",
   "mobile.server.drawer.leaveFailed": "无法退出 {name}",
   "mobile.server.drawer.removeFailed": "无法移除 {name}",
+  "mobile.server.drawer.deleteFailed": "无法删除 {name}",
   "mobile.server.drawer.actionFailed": "OpenBot 无法完成该操作，请重试。",
   "mobile.server.drawer.moveUp": "上移",
   "mobile.server.drawer.moveDown": "下移",
@@ -68,6 +69,27 @@ export const messages = {
   "mobile.server.hosted.speedFaster": "快 {factor} 倍",
   "mobile.server.hosted.joinHint": "使用服务器所有者给你的邀请。",
   "mobile.server.hosted.join": "加入服务器",
+  "mobile.server.local.option": "在电脑上新建本地服务器",
+  "mobile.server.local.optionHint": "在运行 {name} 的电脑上，拥有独立的智能体、聊天和文件。",
+  "mobile.server.local.title": "新建服务器",
+  "mobile.server.local.description":
+    "服务器在运行 {name} 的电脑上运行，拥有独立的智能体、聊天和文件。只要 OpenBot 在该电脑上运行，即可使用。",
+  "mobile.server.local.nameLabel": "服务器名称",
+  "mobile.server.local.nameTooShort": "请至少使用 {limit} 个字符。",
+  "mobile.server.local.create": "创建",
+  "mobile.server.local.creating": "正在创建…",
+  "mobile.server.local.createFailed": "无法创建服务器。",
+  "mobile.server.local.limitReached":
+    "运行 {name} 的电脑上的服务器已达到上限 {limit} 个。请在该电脑上删除一个后再创建。",
+  "mobile.server.local.created": "服务器已创建",
+  "mobile.server.local.createdOn": "{name} 与 {computer} 在同一台电脑上运行。",
+  "mobile.server.local.waiting": "正在等待 {name} 上线…",
+  "mobile.server.local.notPublished":
+    "{name} 正在运行，但此手机暂时无法打开它。请确认运行 {computer} 的电脑上的 OpenBot 已登录且在线。",
+  "mobile.server.local.open": "打开服务器",
+  "mobile.server.local.ownerOnly": "只有所有者可以在此电脑上创建服务器。",
+  "mobile.server.local.unsupported": "请更新此电脑上的 OpenBot，以便在此创建服务器。",
+  "mobile.server.local.deleteOffline": "只有此服务器所在的电脑可以删除它。请在该电脑上打开 OpenBot，然后重试。",
   "mobile.server.hosted.intro.title": "你的助手，永不掉线",
   "mobile.server.hosted.intro.description":
     "即使你的电脑关机，云服务器也会运行你的助手和自动化任务。OpenBot 负责配置并保持它运行。",
@@ -232,6 +254,10 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "这会把该服务器从账号服务中移除，对所有成员生效。其电脑上的文件和对话会保留。如需再次使用，请在那台电脑上重新注册。",
   "mobile.server.settings.remove": "移除服务器",
+  "mobile.server.settings.deleteTitle": "删除 {name}？",
+  "mobile.server.settings.deleteBody":
+    "OpenBot 会在其电脑上停止该服务器，并将其智能体、聊天和文件移到该电脑的废纸篓。该服务器会从你所有设备的服务器列表中移除。",
+  "mobile.server.settings.delete": "删除服务器",
   "mobile.server.settings.name": "服务器名称",
   "mobile.server.settings.nameLength": "请使用 {min} 到 {max} 个字符。",
   "mobile.server.settings.logo": "服务器标志",
