@@ -198,6 +198,7 @@ const SHOWN_TARGET_LABEL = {
   file: "mobile.workflow.output.file",
   discord: "mobile.workflow.output.discord",
   telegram: "mobile.workflow.output.telegram",
+  slack: "mobile.workflow.output.slack",
 } as const satisfies Record<string, MobileTextKey>;
 
 /**
@@ -215,18 +216,20 @@ function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraf
   const githubSupported = useWorkflowGitHubSupported(draft.serverId);
   const target = text(node, "target");
   const shown =
-    target === "channel" || target === "file" || target === "discord" || target === "telegram" ? target : null;
+    target === "channel" || target === "file" || target === "discord" || target === "telegram" || target === "slack"
+      ? target
+      : null;
   const notify = shown === null && target !== "github";
   const check = (on: boolean) => (on ? <Check size={18} color={accent} strokeWidth={2} /> : null);
   const choose = (next: "notify" | "github") => {
     if (next === target || (next === "notify" && notify)) return;
     void haptics.selection();
-    // A Discord or Telegram output also keeps an `action`, so a change from it writes the GitHub defaults
+    // A Discord, Telegram or Slack output also keeps an `action`, so a change from it writes the GitHub defaults
     // again.
     if (next === "github")
       setFields(node.id, {
         target: "github",
-        ...(node.fields.action === undefined || target === "discord" || target === "telegram"
+        ...(node.fields.action === undefined || target === "discord" || target === "telegram" || target === "slack"
           ? GITHUB_OUTPUT_DEFAULTS
           : {}),
       });

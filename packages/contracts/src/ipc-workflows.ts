@@ -47,10 +47,11 @@ export const WORKFLOW_TRIGGER_TYPES = [
   "github",
   "discord",
   "telegram",
+  "slack",
 ] as const;
 export type WorkflowTriggerType = (typeof WORKFLOW_TRIGGER_TYPES)[number];
 
-export const WORKFLOW_OUTPUT_TARGETS = ["notify", "channel", "file", "github", "discord", "telegram"] as const;
+export const WORKFLOW_OUTPUT_TARGETS = ["notify", "channel", "file", "github", "discord", "telegram", "slack"] as const;
 export type WorkflowOutputTarget = (typeof WORKFLOW_OUTPUT_TARGETS)[number];
 
 /** A value that a node keeps: a text, a choice, a number or a switch. */
@@ -65,6 +66,9 @@ export type WorkflowFieldValue = string | number | boolean;
  *   `placeId` (a channel id, "" for any channel), `roles` (role ids, one a line, "" for anyone) and
  *   `text` (a text the message must contain, "" for any). For `telegram`: `connectionId` (the Telegram
  *   chat's messaging connection, "" for any linked chat), `event` (a `WorkflowTelegramEvent`) and `text`.
+ *   For `slack`: `connectionId` (the Slack workspace's messaging connection), `event` (a
+ *   `WorkflowSlackEvent`), `placeId` (a channel id, "" for any channel) and `text` (a text the message
+ *   must contain, "" for any).
  * - agent: `agentId`, `task`.
  * - llm: `provider`, `model`, `effort`, `prompt`, `system`.
  * - condition: `rule`, the yes-or-no question about its input.
@@ -76,7 +80,9 @@ export type WorkflowFieldValue = string | number | boolean;
  *   `discord`: `connectionId` ("trigger" for the trigger's server), `action` (a `WorkflowDiscordAction`),
  *   `placeId` (the channel of `post`) and `emoji` (the emoji of `react`). For `telegram`: `connectionId`
  *   ("trigger" for the trigger's chat), `action` (a `WorkflowTelegramAction`) and `emoji`. A chat is one
- *   connection, so a post needs no place.
+ *   connection, so a post needs no place. For `slack`: `connectionId` ("trigger" for the trigger's
+ *   workspace), `action` (a `WorkflowSlackAction`), `placeId` (the channel of `post`) and `emoji` (the
+ *   emoji of `react`).
  * - prompt: `text`.
  * Every other field is view state, such as a colour or a font, and the host keeps it as it is.
  */
@@ -262,7 +268,15 @@ export type WorkflowRunStatus = (typeof WORKFLOW_RUN_STATUSES)[number];
 export const WORKFLOW_STEP_STATUSES = ["running", "approval", "done", "failed", "stopped", "skipped"] as const;
 export type WorkflowStepStatus = (typeof WORKFLOW_STEP_STATUSES)[number];
 
-export const WORKFLOW_RUN_SOURCES = ["manual", "schedule", "webhook", "github", "discord", "telegram"] as const;
+export const WORKFLOW_RUN_SOURCES = [
+  "manual",
+  "schedule",
+  "webhook",
+  "github",
+  "discord",
+  "telegram",
+  "slack",
+] as const;
 export type WorkflowRunSource = (typeof WORKFLOW_RUN_SOURCES)[number];
 
 export const WORKFLOW_VERSION_KINDS = ["auto", "restore", "run"] as const;

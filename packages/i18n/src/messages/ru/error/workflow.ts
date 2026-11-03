@@ -28,6 +28,8 @@ export const messages = {
   "error.workflow.outputPlaceMissing": "Выберите место в мессенджере для этого вывода.",
   "error.workflow.discordNoMessage":
     "Этот вывод действует на сообщение Discord, которое запустило выполнение. Запустите его упоминанием в Discord или выберите «Опубликовать в канале».",
+  "error.workflow.slackNoMessage":
+    "Этот вывод действует на сообщение Slack, которое запустило выполнение. Запустите его упоминанием в Slack или выберите «Опубликовать в канале».",
   "error.workflow.telegramNoMessage":
     "Этот вывод действует на сообщение Telegram, которое запустило выполнение. Запустите его упоминанием в Telegram или выберите «Опубликовать в чате».",
   "error.workflow.outputConnectionOff":

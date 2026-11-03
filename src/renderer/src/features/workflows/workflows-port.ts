@@ -7,6 +7,7 @@ import {
 import type {
   WorkflowDiscordServer,
   WorkflowPlace,
+  WorkflowSlackWorkspace,
   WorkflowTelegramChat,
 } from "@openbot/ui/features/workflows/workflow-model";
 import {
@@ -45,6 +46,8 @@ export interface WorkflowHost {
   discordServers(): Promise<WorkflowDiscordServer[]>;
   /** Only this computer runs Telegram triggers and outputs; a joined server gives none. */
   telegramChats(): Promise<WorkflowTelegramChat[]>;
+  /** Only this computer runs Slack triggers and outputs; a joined server gives none. */
+  slackWorkspaces(): Promise<WorkflowSlackWorkspace[]>;
   /** The level of this account on each agent that it sees, or null when it manages all of them. */
   agentLevels(): Promise<AgentAccessLevels | null>;
   /**
@@ -157,6 +160,18 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       return options
         .filter((option) => option.platform === "telegram")
         .map((option) => ({ connectionId: option.connectionId, name: option.connectionName }));
+    },
+    async slackWorkspaces() {
+      if (!local()) return [];
+      const options = await window.openbot.routineResults.options();
+      return options
+        .filter((option) => option.platform === "slack")
+        .map((option) => ({
+          connectionId: option.connectionId,
+          name: option.connectionName,
+          // The rows show their own "#" icon.
+          channels: option.places.map((place) => ({ id: place.id, name: place.name.replace(/^#/u, "") })),
+        }));
     },
     async agentLevels() {
       if (local() || serverRoleCanAdminister(server())) return null;

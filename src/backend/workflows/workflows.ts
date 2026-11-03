@@ -73,6 +73,8 @@ import type {
   MessagingDiscordSend,
   MessagingMentionResult,
   MessagingPostFailure,
+  MessagingSlackMention,
+  MessagingSlackSend,
   MessagingTelegramMention,
   MessagingTelegramSend,
 } from "../messaging/messaging-threads";
@@ -103,6 +105,13 @@ import {
   githubOutputText,
   githubResultKeys,
 } from "./github-output";
+import {
+  type SlackOutputPlan,
+  slackOutputPlan,
+  slackTriggerMatches,
+  slackTriggerMessage,
+  workflowSlackPayload,
+} from "./slack-matching";
 import {
   type TelegramOutputPlan,
   telegramOutputPlan,
@@ -228,6 +237,11 @@ export interface WorkflowsDependencies {
     connectionId: string,
     send: MessagingTelegramSend,
   ) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
+  /** Replies, posts or reacts in a Slack workspace; absent where this host has no messaging. */
+  slackSend?: (
+    connectionId: string,
+    send: MessagingSlackSend,
+  ) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
   /** The workflow whose graph, title, versions or runs changed. */
   changed(workflowId: string): void;
   /**
@@ -318,6 +332,8 @@ interface WorkflowsShape {
   receiveDiscord(mention: MessagingDiscordMention): Effect.Effect<MessagingMentionResult, WorkflowFailed>;
   /** As `receiveDiscord`, for a new conversation in a Telegram group. */
   receiveTelegram(mention: MessagingTelegramMention): Effect.Effect<MessagingMentionResult, WorkflowFailed>;
+  /** As `receiveDiscord`, for the Slack triggers and a mention in a Slack channel. */
+  receiveSlack(mention: MessagingSlackMention): Effect.Effect<MessagingMentionResult, WorkflowFailed>;
   /** Records in each GitHub trigger's history that the host got no GitHub events from `from` to `to`. */
   githubOffline(from: Date, to: Date): Effect.Effect<void, WorkflowFailed>;
   githubHistory(workflowId: string): Effect.Effect<WorkflowGitHubHistory, WorkflowFailed>;
@@ -592,8 +608,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             : Effect.succeed({ failure: "not-running" as const });
 
         /**
-         * Keeps a chat output's reply, post or reaction, then sends it. Discord and Telegram differ only in the
-         * plan, the place of the post and the send function, so a fix here applies to both.
+         * Keeps a chat output's reply, post or reaction, then sends it. Discord, Telegram and Slack differ only in
+         * the plan, the place of the post and the send function, so a fix here applies to all three.
          */
         const sendChat = <Plan extends { connectionId: string; send: ChatOutputSend }>(
           step: StoredWorkflowStep,
@@ -642,6 +658,18 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
 
         const sendTelegram = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
           sendChat(step, telegramPlan(step, node, run), (plan) => plan.chatId, telegramPost);
+
+        /** As `discordPlan`, for a Slack output and a run that a Slack mention started. */
+        const slackPlan = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          slackOutputPlan(node, step.input, run?.source === "slack" ? slackTriggerMessage(run.payload) : null);
+
+        const slackPost = (plan: Extract<SlackOutputPlan, { send: unknown }>) =>
+          dependencies.slackSend
+            ? dependencies.slackSend(plan.connectionId, plan.send)
+            : Effect.succeed({ failure: "not-running" as const });
+
+        const sendSlack = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          sendChat(step, slackPlan(step, node, run), (plan) => plan.send.channelId, slackPost);
 
         /**
          * The key of a GitHub output's change: one for each pass of a node through a run, or one for a step
@@ -818,6 +846,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             if ("error" in plan) return settle(step, { status: "failed", error: plan.error });
             return yield* resumeOutput(step, telegramPost(plan));
           }
+          if (node && fieldText(node, "target") === "slack") {
+            const plan = slackPlan(step, node, run);
+            if ("error" in plan) return settle(step, { status: "failed", error: plan.error });
+            return yield* resumeOutput(step, slackPost(plan));
+          }
           if (!node || fieldText(node, "target") !== "github") return yield* resumeOutput(step);
           yield* sendGitHub(step, node, run);
           return runs.step(step.id)?.status !== "running";
@@ -873,6 +906,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               }
               if (fieldText(node, "target") === "telegram") {
                 yield* sendTelegram(step, node, run);
+                return;
+              }
+              if (fieldText(node, "target") === "slack") {
+                yield* sendSlack(step, node, run);
                 return;
               }
               dependencies.notify({
@@ -1290,8 +1327,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         });
 
         /**
-         * Starts a run for each chat trigger that a new conversation matches. Discord and Telegram differ only
-         * in these values, so a fix here applies to both.
+         * Starts a run for each chat trigger that a new conversation matches. Discord, Telegram and Slack differ
+         * only in these values, so a fix here applies to all three.
          */
         const receiveMention = (chat: {
           matches: (node: WorkflowNode) => boolean;
@@ -1361,6 +1398,23 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               payload: workflowTelegramPayload(node.id, mention),
             }),
             failure: "A Telegram message did not start a workflow run.",
+          });
+        });
+
+        const receiveSlack = Effect.fn("Workflows.receiveSlack")(function* (mention: MessagingSlackMention) {
+          // A Slack timestamp is unique only in its channel, so the channel is part of the match and of the key.
+          return yield* receiveMention({
+            matches: (node) => slackTriggerMatches(node, mention),
+            sameMessage: (run) => {
+              const message = run.source === "slack" ? slackTriggerMessage(run.payload) : null;
+              return message?.channelId === mention.channelId && message.messageId === mention.messageId;
+            },
+            origin: (node) => ({
+              source: "slack",
+              idempotencyKey: `slack:${node.id}:${mention.channelId}:${mention.messageId}`,
+              payload: workflowSlackPayload(node.id, mention),
+            }),
+            failure: "A Slack mention did not start a workflow run.",
           });
         });
 
@@ -1792,6 +1846,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           receiveGitHub,
           receiveDiscord,
           receiveTelegram,
+          receiveSlack,
           githubOffline,
           githubHistory,
           githubLastEvent,

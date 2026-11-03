@@ -523,6 +523,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   it, so each one is its own conversation. `MessagingThreads.event` takes that thread's conversation
   and turn events, so the public chat, the renderer and Team peers never see them. Approvals still
   reach the host.
+- **Workflows.** Before a channel mention that is not in a linked thread goes to the orchestrator,
+  `MessagingService` gives it to `Workflows.receiveSlack`. A matched Slack trigger takes the mention,
+  and no agent conversation starts. A Slack output replies, posts or reacts through
+  `MessagingThreads.slackSend`. See [Workflow Slack triggers](events.md#workflow-slack-triggers).
 - **Deliveries.** An external message is a mailbox message from `user` with a `messaging` origin
   (link, author, platform message). No new sender kind, so the frozen Team protocol codecs are
   unchanged. The queue and the public chat hide it like channel work. A request the agent sends from

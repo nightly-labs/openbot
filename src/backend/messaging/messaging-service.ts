@@ -51,6 +51,7 @@ import {
   type MessagingDiscordSend,
   type MessagingHistory,
   type MessagingHistoryScope,
+  type MessagingSlackSend,
   type MessagingTelegramSend,
   type MessagingThreads,
 } from "./messaging-threads";
@@ -308,6 +309,7 @@ export class MessagingService {
       post: (connectionId, target, markdown) => this.#outboundPost(connectionId, target, markdown),
       discord: (connectionId, send) => this.#outboundDiscord(connectionId, send),
       telegram: (connectionId, send) => this.#outboundTelegram(connectionId, send),
+      slack: (connectionId, send) => this.#outboundSlack(connectionId, send),
     });
     this.#ingress?.handle((workspaceId, delivery) => this.deliver(workspaceId, delivery));
     const records = this.#threads.store.connections();
@@ -1446,6 +1448,27 @@ export class MessagingService {
           .pipe(Effect.catch(() => Effect.void));
       if (workflows !== "none") return;
     }
+    // A new mention in a Slack channel goes to the workflows first, in the same way.
+    if (live.record.platform === "slack" && !message.isDirect && !existing) {
+      const workflows = yield* this.#threads.slackWorkflowMention({
+        connectionId: live.record.connectionId,
+        workspaceName: live.record.workspaceName,
+        channelId: message.platformChannelId,
+        channelName: place ?? message.platformChannelId,
+        messageId: message.platformMessageId,
+        threadId: message.threadKey,
+        authorId: message.authorId,
+        authorName,
+        text: named,
+        files: message.files,
+        receivedAt: new Date().toISOString(),
+      });
+      if (workflows === "skipped")
+        yield* adapter
+          .react(message.target, message.platformMessageId, "failed", true)
+          .pipe(Effect.catch(() => Effect.void));
+      if (workflows !== "none") return;
+    }
     // A conversation keeps its agent. A new one goes to the workspace's orchestrator, which asks its
     // teammates; without one, nothing answers.
     const agentId = existing?.agentId ?? this.#orchestrator(live.record);
@@ -1747,6 +1770,35 @@ export class MessagingService {
     const target = {
       platformChannelId: chatId,
       replyThreadId: send.action === "reply" ? `${send.threadKey}:${send.messageId}` : null,
+    };
+    const result = yield* this.#outboundPost(connectionId, target, send.text);
+    return "posted" in result ? { posted: true as const } : { failure: result.failure };
+  });
+
+  /** A reply in a thread, post or reaction of a workflow's Slack output. */
+  readonly #outboundSlack = Effect.fn("MessagingService.outboundSlack")(function* (
+    this: MessagingService,
+    connectionId: string,
+    send: MessagingSlackSend,
+  ) {
+    const live = this.#live.get(connectionId);
+    if (!live?.identity || live.record.platform !== "slack" || !live.adapter.addEmoji)
+      return { failure: "not-running" as const };
+    if (send.action === "react")
+      return yield* live.adapter
+        .addEmoji({ platformChannelId: send.channelId, replyThreadId: null }, send.messageId, send.emoji)
+        .pipe(
+          Effect.as({ posted: true as const }),
+          Effect.catch((failure) =>
+            Effect.sync(() => {
+              this.#warn(failure.cause);
+              return { failure: "refused" as const };
+            }),
+          ),
+        );
+    const target = {
+      platformChannelId: send.channelId,
+      replyThreadId: send.action === "reply" ? send.threadId : null,
     };
     const result = yield* this.#outboundPost(connectionId, target, send.text);
     return "posted" in result ? { posted: true as const } : { failure: result.failure };

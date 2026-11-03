@@ -79,6 +79,9 @@ function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
     get telegram() {
       return workflows.telegram();
     },
+    get slack() {
+      return workflows.slack();
+    },
     imageModels: [],
     files: [],
     get self() {
@@ -86,12 +89,13 @@ function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
     },
   };
   // A channel output needs a messaging place. Without one, a new output posts a notification. Only an
-  // owner or admin adds a GitHub, Discord or Telegram step, on a host that runs them. Only this computer
-  // has Discord servers and Telegram chats.
+  // owner or admin adds a GitHub, Discord, Telegram or Slack step, on a host that runs them. Only this
+  // computer has Discord servers, Telegram chats and Slack workspaces.
   const features = createMemo<WorkflowFeatures>(() => {
     const github = props.admin && props.host.githubSupported();
     const discord = props.admin && workflows.discord().length > 0;
     const telegram = props.admin && workflows.telegram().length > 0;
+    const slack = props.admin && workflows.slack().length > 0;
     const outputs = WORKFLOW_FEATURES_V1.outputs.filter(
       (output) => output !== "channel" || workflows.places().length > 0,
     );
@@ -99,6 +103,7 @@ function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
       ...(github ? (["github"] as const) : []),
       ...(discord ? (["discord"] as const) : []),
       ...(telegram ? (["telegram"] as const) : []),
+      ...(slack ? (["slack"] as const) : []),
     ];
     return {
       ...WORKFLOW_FEATURES_V1,

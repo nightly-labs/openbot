@@ -26,6 +26,8 @@ export const messages = {
   "error.workflow.outputPlaceMissing": "اختر مكان مراسلة لهذا المُخرَج.",
   "error.workflow.discordNoMessage":
     "يعمل هذا المُخرَج على رسالة Discord التي بدأت التشغيل. ابدأ التشغيل من إشارة في Discord، أو اختر «النشر في القناة».",
+  "error.workflow.slackNoMessage":
+    "يعمل هذا المُخرَج على رسالة Slack التي بدأت التشغيل. ابدأ التشغيل من إشارة في Slack، أو اختر «النشر في القناة».",
   "error.workflow.telegramNoMessage":
     "يعمل هذا المُخرَج على رسالة Telegram التي بدأت التشغيل. ابدأ التشغيل من إشارة في Telegram، أو اختر «نشر في الدردشة».",
   "error.workflow.outputConnectionOff": "اتصال المراسلة لهذا المُخرَج متوقف أو محذوف. اختر مكانًا مرة أخرى.",

@@ -72,6 +72,12 @@ const TELEGRAM_CHOICE: TriggerChoice = {
   description: "mobile.workflow.telegram.triggerComputerOnly",
 };
 
+const SLACK_CHOICE: TriggerChoice = {
+  type: "slack",
+  title: "mobile.workflow.trigger.slack",
+  description: "mobile.workflow.discord.triggerComputerOnly",
+};
+
 /** The editor sheet > Trigger: what starts the workflow, and its schedule or webhook. */
 export function WorkflowTriggerScreen() {
   const { t } = useText();
@@ -105,10 +111,11 @@ export function WorkflowTriggerScreen() {
   const choose = (next: WorkflowTriggerType) => {
     if (next === type) return;
     void haptics.selection();
-    // A new GitHub trigger stores the fields that its rows show, as on desktop. A Discord or Telegram
+    // A new GitHub trigger stores the fields that its rows show, as on desktop. A Discord, Telegram or Slack
     // trigger also keeps an `event`, so a change from it writes the defaults again.
     const githubDefaults =
-      next === "github" && (node.fields.event === undefined || type === "discord" || type === "telegram")
+      next === "github" &&
+      (node.fields.event === undefined || type === "discord" || type === "telegram" || type === "slack")
         ? GITHUB_TRIGGER_DEFAULTS
         : {};
     setFields(node.id, {
@@ -192,21 +199,28 @@ export function WorkflowTriggerScreen() {
           // Only an owner or admin adds a GitHub trigger, on a host that runs it, as on desktop.
           ...((admin && githubSupported) || type === "github" ? [GITHUB_CHOICE] : []),
           ...(type === "message" ? [MESSAGE_CHOICE] : []),
-          // Only the computer that runs OpenBot has the Discord servers and the Telegram chats.
+          // Only the computer that runs OpenBot has the Discord servers the Telegram chats and the Slack workspaces.
           ...(type === "discord" ? [DISCORD_CHOICE] : []),
           ...(type === "telegram" ? [TELEGRAM_CHOICE] : []),
+          ...(type === "slack" ? [SLACK_CHOICE] : []),
         ].map((choice) => (
           <SettingsRow
             key={choice.type}
             checked={choice.type === type}
             disclosure={false}
-            // A change to or from a GitHub, Discord or Telegram trigger needs an owner or admin.
+            // A change to or from a GitHub, Discord, Telegram or Slack trigger needs an owner or admin.
             disabled={
               !editable ||
               choice.type === "message" ||
               choice.type === "discord" ||
               choice.type === "telegram" ||
-              (!admin && (choice.type === "github" || type === "github" || type === "discord" || type === "telegram"))
+              choice.type === "slack" ||
+              (!admin &&
+                (choice.type === "github" ||
+                  type === "github" ||
+                  type === "discord" ||
+                  type === "telegram" ||
+                  type === "slack"))
             }
             supportingText={t(choice.description)}
             trailing={choice.type === type ? <Check size={18} color={accent} strokeWidth={2} /> : null}

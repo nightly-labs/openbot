@@ -19,9 +19,10 @@ import {
   useTextField,
 } from "./workflow-node-parts";
 import { InputRow, PlaceRow, SettingRow, SettingRows } from "./workflow-setting-rows";
+import { SLACK_OUTPUT_DEFAULTS, SlackIcon, SlackOutputRows } from "./workflow-slack-parts";
 import { TELEGRAM_OUTPUT_DEFAULTS, TelegramIcon, TelegramOutputRows } from "./workflow-telegram-parts";
 
-type OutputTarget = "channel" | "file" | "notify" | "github" | "discord" | "telegram";
+type OutputTarget = "channel" | "file" | "notify" | "github" | "discord" | "telegram" | "slack";
 
 const TARGETS = (t: AppTranslate): readonly Choice<OutputTarget>[] => [
   { value: "channel", label: t("workflow.node.place.channel"), icon: () => <Hash aria-hidden="true" /> },
@@ -30,22 +31,24 @@ const TARGETS = (t: AppTranslate): readonly Choice<OutputTarget>[] => [
   { value: "github", label: t("workflow.output.target.github"), icon: () => <GitHubIcon /> },
   { value: "discord", label: t("workflow.output.target.discord"), icon: () => <DiscordIcon /> },
   { value: "telegram", label: t("workflow.output.target.telegram"), icon: () => <TelegramIcon /> },
+  { value: "slack", label: t("workflow.output.target.slack"), icon: () => <SlackIcon /> },
 ];
 
-const TARGET_TYPES: readonly OutputTarget[] = ["channel", "file", "notify", "github", "discord", "telegram"];
+const TARGET_TYPES: readonly OutputTarget[] = ["channel", "file", "notify", "github", "discord", "telegram", "slack"];
 
 /** Targets that only an admin's host offers: they act as the host's GitHub App or messaging bot. */
-const HOST_TARGETS: readonly OutputTarget[] = ["github", "discord", "telegram"];
+const HOST_TARGETS: readonly OutputTarget[] = ["github", "discord", "telegram", "slack"];
 
 const TARGET_DEFAULTS: Partial<Record<OutputTarget, Record<string, string>>> = {
   github: GITHUB_OUTPUT_DEFAULTS,
   discord: DISCORD_OUTPUT_DEFAULTS,
   telegram: TELEGRAM_OUTPUT_DEFAULTS,
+  slack: SLACK_OUTPUT_DEFAULTS,
 };
 
 const OUTPUT_INPUTS: readonly WfnPortType[] = ["text", "image", "file"];
 
-/** A change on GitHub, Discord or Telegram is text: a comment, a review, the body of an issue, or a message. */
+/** A change on GitHub, Discord, Telegram or Slack is text: a comment, a review, the body of an issue, or a message. */
 const TEXT_INPUTS: readonly WfnPortType[] = ["text"];
 
 /**
@@ -69,7 +72,7 @@ export function OutputNode(props: {
     oneOf(TARGET_TYPES),
   );
   /**
-   * A new GitHub, Discord or Telegram output stores the fields that its rows show, so the host reads the
+   * A new GitHub, Discord, Telegram or Slack output stores the fields that its rows show, so the host reads the
    * same. Each keeps an `action`, so a change from one to another writes the defaults again.
    */
   const chooseTarget = (value: OutputTarget) => {
@@ -78,7 +81,7 @@ export function OutputNode(props: {
     if (!defaults || (board.field(props.id, "action") !== undefined && !fromOther)) return setTarget(value);
     board.setFields(props.id, { target: value, ...defaults });
   };
-  /** GitHub, Discord and Telegram need a host that can run them. Other targets show unless the host lists the targets it runs. */
+  /** GitHub, Discord, Telegram and Slack need a host that can run them. Other targets show unless the host lists the targets it runs. */
   const offered = (value: OutputTarget) => {
     const outputs = board.features()?.outputs;
     if (value === target()) return true;
@@ -164,6 +167,9 @@ export function OutputNode(props: {
         </Show>
         <Show when={target() === "telegram"}>
           <TelegramOutputRows id={props.id} locked={locked()} />
+        </Show>
+        <Show when={target() === "slack"}>
+          <SlackOutputRows id={props.id} locked={locked()} />
         </Show>
       </SettingRows>
       <Show
