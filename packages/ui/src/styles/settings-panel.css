@@ -357,11 +357,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Text that does not fit ends in an ellipsis. The line height keeps descenders out of the clip. */
+/* Truncated text clips at its line box; this line height keeps descenders inside it. */
 .settings-link-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   line-height: var(--openbot-leading-md);
 }
 
