@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "База данных OpenBot не прошла проверку целостности.",
   "error.backend.webhookRouteLimit": "На хосте может быть не более {limit} регулярных задач с вебхуком.",
   "error.backend.webhookSettingsInvalid": "Проверьте настройки вебхука и повторите попытку.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Вставьте полный секрет подписи отправителя. В нём от 16 до 1024 символов и нет пробелов.",
   "error.backend.webhookRouteUnavailable":
     "Публичный маршрут вебхука не готов. Проверьте подключение хоста и повторите попытку.",
   "error.backend.browserViewRemoteOnly": "Просмотр браузера в реальном времени доступен только для удалённого хоста.",

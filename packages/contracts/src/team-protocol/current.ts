@@ -119,6 +119,7 @@ import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } 
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
+import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
@@ -280,6 +281,7 @@ export {
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
+  WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
@@ -427,6 +429,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MODEL_VISIBILITY_CAPABILITY,
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
+  WEBHOOK_SENDER_SECRET_CAPABILITY,
   MESSAGE_DELETE_CAPABILITY,
 ] as const;
 
@@ -587,6 +590,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== MODEL_VISIBILITY_CAPABILITY &&
     capability !== AGENT_THREAD_REPLIES_CAPABILITY &&
     capability !== AGENT_COLORS_CAPABILITY &&
+    capability !== WEBHOOK_SENDER_SECRET_CAPABILITY &&
     capability !== MESSAGE_DELETE_CAPABILITY,
 );
 /**
@@ -622,6 +626,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MODEL_VISIBILITY_CAPABILITY,
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
+  WEBHOOK_SENDER_SECRET_CAPABILITY,
   MESSAGE_DELETE_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -741,6 +746,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== MODEL_VISIBILITY_CAPABILITY &&
       capability !== AGENT_THREAD_REPLIES_CAPABILITY &&
       capability !== AGENT_COLORS_CAPABILITY &&
+      capability !== WEBHOOK_SENDER_SECRET_CAPABILITY &&
       capability !== MESSAGE_DELETE_CAPABILITY,
   );
 }

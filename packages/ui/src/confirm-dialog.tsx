@@ -41,8 +41,8 @@ export interface ConfirmDialogProps {
   /** Marks the dialog pending in addition to a pending `onConfirm` promise. */
   pending?: boolean;
   error?: JSX.Element;
-  /** The button that gets focus when the dialog opens. */
-  initialFocus?: "confirm" | "cancel";
+  /** What gets focus when the dialog opens: a button, or the first field in `children`. */
+  initialFocus?: "confirm" | "cancel" | "field";
   /** Receives the confirm button, so that the caller can move focus to it after a change. */
   confirmRef?: (element: HTMLButtonElement) => void;
   /** Gets focus when the dialog closes, when the element that opened it closes with it, such as a menu item. */
@@ -57,6 +57,7 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
   const cancelDisabled = () => pending() && !props.dismissWhilePending;
   let confirmButton: HTMLButtonElement | undefined;
   let cancelButton: HTMLButtonElement | undefined;
+  let body: HTMLDivElement | undefined;
   // A controlled dialog has no Kobalte trigger, so it keeps the element that opened it itself.
   let restoreTarget: HTMLElement | undefined;
   let restoreFrame: number | undefined;
@@ -92,7 +93,9 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
               event.preventDefault();
               const opener = document.activeElement;
               restoreTarget = opener instanceof HTMLElement && opener !== document.body ? opener : undefined;
-              const target = props.initialFocus === "cancel" && !props.hideCancel ? cancelButton : confirmButton;
+              const field = props.initialFocus === "field" ? body?.querySelector<HTMLElement>("input, textarea") : null;
+              const target =
+                field ?? (props.initialFocus === "cancel" && !props.hideCancel ? cancelButton : confirmButton);
               target?.focus({ preventScroll: true });
             }}
             onCloseAutoFocus={(event) => {
@@ -129,7 +132,9 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
                   </AlertDialog.Description>
                 </Show>
                 <Show when={props.children}>
-                  <div class="ui-confirm-dialog-body">{props.children}</div>
+                  <div ref={body} class="ui-confirm-dialog-body">
+                    {props.children}
+                  </div>
                 </Show>
                 <Show when={props.error}>
                   <Alert tone="danger" report={false} role="alert" class="ui-confirm-dialog-error">

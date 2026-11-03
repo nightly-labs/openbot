@@ -49,6 +49,7 @@ import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { channelForThread } from "@openbot/team-client/channel-notifications";
@@ -770,6 +771,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     eventsEnabled() && workspace.state.capabilities.includes(ROUTINE_RECOVERY_CAPABILITY);
   // The same owner or admin asks such a host to send a test event to a webhook routine.
   const webhookTestsEnabled = () => eventsEnabled() && workspace.state.capabilities.includes(WEBHOOK_TESTS_CAPABILITY);
+  // The same owner or admin gives a webhook routine a secret that the sender made.
+  const webhookSenderSecretEnabled = () =>
+    eventsEnabled() && workspace.state.capabilities.includes(WEBHOOK_SENDER_SECRET_CAPABILITY);
   const providerAdmin = createWebProviderSettings({
     server: () => (workspace.runtime.admin ? server() : undefined),
     request: hostRequest,
@@ -820,6 +824,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => workspace.state.capabilities.includes(SIDE_QUESTION_CAPABILITY),
     webhookTestsEnabled,
     () => workspace.state.capabilities.includes(BROWSER_PROFILES_CAPABILITY),
+    webhookSenderSecretEnabled,
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
@@ -1338,6 +1343,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     eventsEnabled,
     routineRecoveryEnabled,
     webhookTestsEnabled,
+    webhookSenderSecretEnabled,
   );
   const channelsSupported = () =>
     workspace.state.status === "online" &&
@@ -1481,6 +1487,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     (...args) => hostRequest()(...args),
     routineRecoveryEnabled,
     webhookTestsEnabled,
+    webhookSenderSecretEnabled,
   );
   // Asks to move the connected host's routines after this device's time zone changed.
   createRoutineTimezonePrompt(() => {
@@ -2614,6 +2621,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         eventsServerId: () => undefined,
                         routineRecovery: () => false,
                         webhookTests: () => false,
+                        webhookSenderSecret: () => false,
                       },
                       approvals: () => workspace.state.approvals,
                       takeovers: () => workspace.state.takeovers,

@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "OpenBot のデータベースが整合性チェックに失敗しました。",
   "error.backend.webhookRouteLimit": "1 つのホストの Webhook ルーティンは最大 {limit} 個です。",
   "error.backend.webhookSettingsInvalid": "Webhook の設定を確認して、もう一度お試しください。",
+  "error.backend.webhookSenderSecretInvalid":
+    "送信元の署名シークレットをすべて貼り付けてください。16〜1024 文字で、空白は含みません。",
   "error.backend.webhookRouteUnavailable":
     "公開 Webhook ルートの準備ができていません。ホストの接続を確認して、もう一度お試しください。",
   "error.backend.browserViewRemoteOnly": "ライブブラウザービューはリモートホスト専用です。",

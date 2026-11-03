@@ -6,6 +6,7 @@ export const messages = {
   "error.backend.databaseIntegrity": "OpenBot 数据库未通过完整性校验。",
   "error.backend.webhookRouteLimit": "一台主机最多可有 {limit} 个 Webhook 自动化任务。",
   "error.backend.webhookSettingsInvalid": "请检查 Webhook 设置后重试。",
+  "error.backend.webhookSenderSecretInvalid": "请粘贴发送方提供的完整签名密钥。它包含 16 到 1024 个字符，且没有空格。",
   "error.backend.webhookRouteUnavailable": "公共 Webhook 路由尚未就绪。请检查主机连接后重试。",
   "error.backend.webhookTestUnavailable": "主机现在无法接收测试事件。请确认它已登录，然后重试。",
   "error.backend.webhookTestFailed": "测试事件没有送达该自动化任务，请重试。",

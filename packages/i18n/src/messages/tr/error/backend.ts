@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "OpenBot veritabanı bütünlük denetiminden geçemedi.",
   "error.backend.webhookRouteLimit": "Bir ana makinede en fazla {limit} webhook rutini olabilir.",
   "error.backend.webhookSettingsInvalid": "Webhook ayarlarını kontrol edin ve tekrar deneyin.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Gönderenin tam imza gizli anahtarını yapıştırın. 16 ile 1024 karakter arasıdır ve boşluk içermez.",
   "error.backend.webhookRouteUnavailable":
     "Herkese açık webhook yolu hazır değil. Ana makine bağlantısını kontrol edin ve tekrar deneyin.",
   // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
