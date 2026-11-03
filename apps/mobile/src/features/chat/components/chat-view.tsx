@@ -935,17 +935,6 @@ export function ChatView({
       setSelection((current) => (current && current.selected !== selected ? { ...current, selected } : current)),
     [],
   );
-  const selectNatively = useCallback(
-    (message: ChatBubbleMessage, selected: string) =>
-      setSelection((current) => {
-        if (selected) {
-          return current?.message.id === message.id && current.selected === selected ? current : { message, selected };
-        }
-        // An empty selection ends only the selection of its own message.
-        return current?.message.id === message.id ? null : current;
-      }),
-    [],
-  );
   const dismissSelection = useCallback(() => setSelection(null), []);
   const listUpload = useMemo(
     () =>
@@ -1045,7 +1034,6 @@ export function ChatView({
               selectingMessageId={selection?.message.id ?? null}
               onSelectText={selectText}
               onSelectionChange={changeSelection}
-              onNativeSelection={selectNatively}
               onDismissSelection={dismissSelection}
               muted={muted}
               raised={raised}

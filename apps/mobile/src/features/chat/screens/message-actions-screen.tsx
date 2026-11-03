@@ -8,7 +8,7 @@ import Reply from "lucide-react-native/icons/reply";
 import Square from "lucide-react-native/icons/square";
 import TextCursor from "lucide-react-native/icons/text-cursor";
 import Volume2 from "lucide-react-native/icons/volume-2";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { toggleReadAloud, useReadingAloud } from "@/features/voice/model/message-reading";
@@ -46,7 +46,17 @@ export function MessageActionsScreen() {
   const [moreEmoji, setMoreEmoji] = useState(false);
   const reading = useReadingAloud(request?.readAloudId ?? "");
   const { copy } = useCopyMessage(request?.copyText ?? "");
-  useEffect(() => () => releaseMessageActions(request), [request]);
+  // Runs when the sheet has closed. A selection that starts while the sheet is on screen ends when
+  // the sheet takes the focus with it.
+  const afterClose = useRef<(() => void) | undefined>(undefined);
+  useEffect(
+    () => () => {
+      releaseMessageActions(request);
+      afterClose.current?.();
+      afterClose.current = undefined;
+    },
+    [request],
+  );
 
   if (!request) return null;
   const run = (action: () => void) => {
@@ -147,7 +157,10 @@ export function MessageActionsScreen() {
             <SettingsRow
               leading={<TextCursor size={ICON_SIZE} color={icon} />}
               disclosure={false}
-              onPress={() => run(() => request.onSelectText?.())}
+              onPress={() => {
+                afterClose.current = request.onSelectText;
+                router.back();
+              }}
             >
               <Typography>{t("mobile.chat.message.selectText")}</Typography>
             </SettingsRow>

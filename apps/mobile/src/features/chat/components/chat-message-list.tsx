@@ -89,7 +89,6 @@ import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
-import { nativeTextSelection } from "../model/native-text-selection";
 import { isStreamingReply } from "../model/reply-reveal";
 import { uploadProgressAt } from "../model/upload-progress";
 import { type AttachmentTint, ChatAttachmentView } from "./chat-attachment";
@@ -296,8 +295,6 @@ interface ChatMessageListProps {
   onSelectText?: (message: ChatBubbleMessage) => void;
   /** The selected part of the message text, or an empty string. */
   onSelectionChange?: (selected: string) => void;
-  /** Native text views report the text selected in a message, or an empty string at its end. */
-  onNativeSelection?: (message: ChatBubbleMessage, selected: string) => void;
   /** A tap outside the selected text ends the selection. */
   onDismissSelection?: () => void;
   /** The message whose files are uploading, how many finished, and how to stop the rest. */
@@ -359,7 +356,6 @@ interface MessageRowShared {
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
     selectText: (message: ChatBubbleMessage) => void;
     selectionChange: (selected: string) => void;
-    nativeSelection: (message: ChatBubbleMessage, selected: string) => void;
     /** The row of the selected message. A tap outside it ends the selection. */
     selectionArea: (view: ViewInstance | null) => void;
   };
@@ -482,28 +478,12 @@ const MessageRow = memo(function MessageRow({
 }) {
   const { t } = useText();
   const [selectionHeight, setSelectionHeight] = useState(0);
-  // Native text views keep a selection until they draw again. When the chat ends the selection
-  // from outside, such as with a tap elsewhere, the next generation draws them without it.
-  const [selectionGeneration, setSelectionGeneration] = useState(0);
-  const wasSelecting = useRef(selecting);
-  useEffect(() => {
-    if (wasSelecting.current && !selecting) setSelectionGeneration((generation) => generation + 1);
-    wasSelecting.current = selecting;
-  }, [selecting]);
   const waiting = awaitingFirstWord(message, shared, arriving, revealed);
   // A message that the host does not have yet, or that still streams, has no host ID to act on:
-  // it has no actions and no native selection.
+  // it has no actions.
   const bubble = message.kind === "message" && !outbox && !message.streaming && !waiting ? message : null;
-  const nativeSelect = shared.actions.nativeSelection;
-  const nativeSelection = useMemo(
-    () =>
-      bubble && nativeTextSelection && shared.canSelectText && selecting
-        ? { generation: selectionGeneration, onSelect: (selected: string) => nativeSelect(bubble, selected) }
-        : undefined,
-    [bubble, nativeSelect, selectionGeneration, shared.canSelectText, selecting],
-  );
   // A touch and hold on the bubble opens the sheet with its actions, so the text selects only after
-  // Select text in that sheet: natively in place, or in the read-only field that covers it.
+  // Select text in that sheet, in a read-only field that covers it with all of its text selected.
   const selectable = Boolean(bubble?.body.trim()) && shared.canSelectText;
   const messageActions = useMessageActions(
     bubble
@@ -559,8 +539,6 @@ const MessageRow = memo(function MessageRow({
         : undefined,
     [eligible, message.id, complete, replySession.progress, enabled, markRevealed, replyHaptics],
   );
-  // Native text views select in place, so only the fallback covers the text with a field.
-  const overlaySelecting = selecting && !nativeTextSelection;
   // The author of a channel message: its agent, or a person.
   const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
   // Another person in an agent chat: a person's bubble in their own colour, seeded by the member id
@@ -694,13 +672,12 @@ const MessageRow = memo(function MessageRow({
             ]}
           >
             {/* The message text stays mounted while the reader selects, so it does not change size or
-                play its reveal again. Without native text views, the selectable text covers it at
-                the same place. */}
-            <View style={overlaySelecting ? { minHeight: selectionHeight } : undefined}>
+                play its reveal again. The selectable text covers it at the same place. */}
+            <View style={selecting ? { minHeight: selectionHeight } : undefined}>
               <View
-                style={overlaySelecting ? { opacity: 0 } : undefined}
-                accessibilityElementsHidden={overlaySelecting}
-                importantForAccessibility={overlaySelecting ? "no-hide-descendants" : "auto"}
+                style={selecting ? { opacity: 0 } : undefined}
+                accessibilityElementsHidden={selecting}
+                importantForAccessibility={selecting ? "no-hide-descendants" : "auto"}
               >
                 <ChatMarkdown
                   agents={agents}
@@ -710,10 +687,9 @@ const MessageRow = memo(function MessageRow({
                   color={textColor}
                   playback={playback}
                   animationEnabled={shared.animationActive && arriving}
-                  nativeSelection={nativeSelection}
                 />
               </View>
-              {overlaySelecting ? (
+              {selecting ? (
                 <ChatSelectableText
                   text={markdownPlainText(message.body)}
                   color={textColor}
@@ -995,7 +971,6 @@ export const ChatMessageList = memo(function ChatMessageList({
   selectingMessageId = null,
   onSelectText,
   onSelectionChange,
-  onNativeSelection,
   onDismissSelection,
   focusMessageId = null,
   onFocusPlaced,
@@ -1155,10 +1130,9 @@ export const ChatMessageList = memo(function ChatMessageList({
     onReact,
     onSelectText,
     onSelectionChange,
-    onNativeSelection,
     onSelectQuestion,
   });
-  actionHandlers.current = { onReply, onReact, onSelectText, onSelectionChange, onNativeSelection, onSelectQuestion };
+  actionHandlers.current = { onReply, onReact, onSelectText, onSelectionChange, onSelectQuestion };
   const actions = useMemo<MessageRowShared["actions"]>(
     () => ({
       reply: (message) => actionHandlers.current.onReply?.(message),
@@ -1166,7 +1140,6 @@ export const ChatMessageList = memo(function ChatMessageList({
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
       selectText: (message) => actionHandlers.current.onSelectText?.(message),
       selectionChange: (selected) => actionHandlers.current.onSelectionChange?.(selected),
-      nativeSelection: (message, selected) => actionHandlers.current.onNativeSelection?.(message, selected),
       selectionArea: (view) => {
         selectionArea.current = view;
       },
