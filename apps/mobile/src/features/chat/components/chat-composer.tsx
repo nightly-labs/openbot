@@ -24,6 +24,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { useKeyboardState } from "react-native-keyboard-controller";
 import Animated, {
   cubicBezier,
   Easing,
@@ -189,6 +190,12 @@ interface ChatComposerProps {
 
 const NO_FILES: ChatAttachments["items"] = [];
 const NO_SKILLS: readonly MentionSkill[] = [];
+
+const SUGGESTIONS_MAX_HEIGHT = 240;
+// One row stays in view, also when the draft and the keyboard leave no room.
+const SUGGESTIONS_MIN_HEIGHT = 48;
+// Below the top inset, as the chat list measures it.
+const CHAT_HEADER_HEIGHT = 84;
 
 /**
  * A skill or a connected app that the composer can name, as `@[name](skill:id)` or `@[name](mcp:id)`,
@@ -383,8 +390,15 @@ export const ChatComposer = memo(function ChatComposer({
     setSkillsOnly(true);
     inputRef.current?.focus();
   }, [skillPickerVersion, onChangeDraft]);
-  const { fontScale } = useWindowDimensions();
+  const { fontScale, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardState((state) => state.height);
+  const [barHeight, setBarHeight] = useState(0);
+  // The list grows up from the bar, so a long draft and the keyboard can push it under the header.
+  const suggestionsMaxHeight = Math.max(
+    SUGGESTIONS_MIN_HEIGHT,
+    Math.min(SUGGESTIONS_MAX_HEIGHT, windowHeight - keyboardHeight - barHeight - insets.top - CHAT_HEADER_HEIGHT),
+  );
   // The bar keeps clear of the side insets: the rail of iPhone Duo and the edges in landscape.
   const barWidth = useColumnWidth() - insets.left - insets.right;
   const lineHeight = 22 * fontScale;
@@ -770,7 +784,7 @@ export const ChatComposer = memo(function ChatComposer({
             marginLeft: insets.left + 16,
             marginRight: insets.right + 16,
             flexGrow: 0,
-            maxHeight: 240,
+            maxHeight: suggestionsMaxHeight,
             borderRadius: 24,
             borderCurve: "continuous",
             overflow: "hidden",
@@ -860,6 +874,11 @@ export const ChatComposer = memo(function ChatComposer({
       ) : null}
       <View
         pointerEvents="box-none"
+        onLayout={({ nativeEvent }) =>
+          setBarHeight((current) =>
+            Math.abs(current - nativeEvent.layout.height) < 1 ? current : nativeEvent.layout.height,
+          )
+        }
         style={{
           alignItems: "center",
           paddingLeft: insets.left + BAR_INSET,
