@@ -194,10 +194,12 @@ export function SettingsLinkRow(props: SettingsLinkRowProps): JSX.Element {
         <Show when={props.icon}>
           <span class="settings-link-icon">{props.icon}</span>
         </Show>
-        {props.label}
+        <span class="settings-link-text">{props.label}</span>
       </span>
       <span class="settings-link-value">
-        {props.value}
+        <Show when={props.value}>
+          <span class="settings-link-text">{props.value}</span>
+        </Show>
         <ChevronRight />
       </span>
     </Button>

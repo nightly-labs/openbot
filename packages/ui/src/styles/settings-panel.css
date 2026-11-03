@@ -304,7 +304,9 @@
   width: 100%;
   min-height: 42px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* Both sides can shrink, so a long value shares the row with the label and never covers it. */
+  grid-template-columns: minmax(0, auto) minmax(0, max-content);
+  justify-content: space-between;
   align-items: center;
   gap: var(--openbot-space-3);
   border: 0;
@@ -347,11 +349,20 @@
 
 .settings-link-value {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: var(--openbot-space-2);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
+}
+
+/* Text that does not fit ends in an ellipsis. The line height keeps descenders out of the clip. */
+.settings-link-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: var(--openbot-leading-md);
 }
 
 .settings-link-value svg {
