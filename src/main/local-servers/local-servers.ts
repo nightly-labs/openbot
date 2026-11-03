@@ -457,7 +457,7 @@ export class LocalServers {
         [...this.#options.command.args, `--user-data-dir=${paths.userData}`],
         {
           env: childEnvironment(entry, paths.agentRoot, this.#options.runtimeRoot, secret),
-          // Nothing is written to standard input. It stays open only so that it closes when OpenBot ends.
+          // Standard input carries only the account commands, and it closes when OpenBot ends.
           stdio: ["pipe", "pipe", "pipe"],
           windowsHide: true,
         },
@@ -474,6 +474,9 @@ export class LocalServers {
         if (value) Deferred.doneUnsafe(ready, Exit.succeed(value));
       });
     child.stderr?.resume();
+    // A command can reach a child that stopped before its exit event: the closed pipe then fails the
+    // write. The exit handler deals with the child, so the write error is dropped.
+    child.stdin?.on("error", () => undefined);
     child.once("error", (error: Error) => {
       Deferred.doneUnsafe(ready, Exit.fail(new LocalServerFailure({ cause: error })));
     });
