@@ -20,6 +20,7 @@ import {
   isKeyOnlyProvider,
   isLocalOnlyProvider,
   loopbackCallback,
+  MANAGED_RUNTIME_PROVIDERS,
   type ManagedProviderId,
   type ProviderApiKeyStatus,
   type ProviderCodeLoginStart,
@@ -116,8 +117,18 @@ type ProviderSignInMethod = "code" | "relay";
 function codeSignInProviders(capabilities: readonly string[]): readonly AgentProviderId[] {
   if (capabilities.includes(PROVIDERS_V4_CAPABILITY)) {
     const paste = capabilities.includes(PROVIDERS_SIGN_IN_V3_CAPABILITY);
-    return PROVIDERS_V4_SIGN_IN_PROVIDERS.filter(
+    const v4 = PROVIDERS_V4_SIGN_IN_PROVIDERS.filter(
       (provider) => paste || agentProviderDescriptor(provider).localCodeSignIn !== "paste",
+    );
+    if (!capabilities.includes(PROVIDERS_V8_CAPABILITY)) return v4;
+    // `providers-v8` also signs in the later providers that have a device code, such as Kimi and
+    // Hermes. A provider that the relay already signs in, such as Muse, keeps the relay.
+    return AGENT_PROVIDERS.filter(
+      (provider) =>
+        isOneOf(v4, provider) ||
+        (agentProviderDescriptor(provider).localCodeSignIn === "device" &&
+          !isOneOf(PROVIDERS_V4_SIGN_IN_PROVIDERS, provider) &&
+          !isOneOf(SIGN_IN_RELAY_PROVIDERS, provider)),
     );
   }
   if (capabilities.includes(PROVIDERS_SIGN_IN_V3_CAPABILITY)) return PROVIDERS_SIGN_IN_V3_PROVIDERS;
@@ -135,6 +146,9 @@ function providerSignInMethod(provider: AgentProviderId, capabilities: readonly 
 }
 
 function runtimeProviders(capabilities: readonly string[]): readonly ManagedProviderId[] {
+  // `providers-v8` lists every runtime of the host as a row; a row that a host before Kimi does not
+  // send reads as not downloaded, and the page lists that provider only when the host status names it.
+  if (capabilities.includes(PROVIDERS_V8_CAPABILITY)) return MANAGED_RUNTIME_PROVIDERS;
   if (capabilities.includes(PROVIDERS_V5_CAPABILITY)) return PROVIDERS_V5_RUNTIME_PROVIDERS;
   if (capabilities.includes(PROVIDERS_V4_CAPABILITY)) return PROVIDERS_V4_RUNTIME_PROVIDERS;
   if (capabilities.includes(PROVIDERS_RUNTIMES_V2_CAPABILITY)) return V2_RUNTIME_PROVIDERS;
@@ -278,25 +292,30 @@ export function relayPage(
 }
 
 /**
- * The Providers admin of one host (`providers-v1` to `providers-v5`, the `providers-v8` key routes,
+ * The Providers admin of one host (`providers-v1` to `providers-v5` and `providers-v8`,
  * `sign-in-relay-v1`, `provider-default-v1`, `custom-provider-harness-v1`, `provider-accounts-v1`,
  * the account relays, `acp-registry-v1` and `custom-agents-v1`), with the newest route set that the host serves. The
  * host checks the role on every route.
  */
 export function createProviderAdmin(request: TeamApiRequest, capabilities: readonly string[]) {
   const has = (capability: string) => capabilities.includes(capability);
-  const runtimeRoutes = has(PROVIDERS_V5_CAPABILITY)
-    ? PROVIDERS_V5_ROUTES
+  // As on the web client: `providers-v8` names a provider by any id, so it downloads and signs in Kimi.
+  const runtimeRoutes = has(PROVIDERS_V8_CAPABILITY)
+    ? PROVIDERS_V8_ROUTES
+    : has(PROVIDERS_V5_CAPABILITY)
+      ? PROVIDERS_V5_ROUTES
+      : has(PROVIDERS_V4_CAPABILITY)
+        ? PROVIDERS_V4_ROUTES
+        : has(PROVIDERS_RUNTIMES_V2_CAPABILITY)
+          ? PROVIDERS_RUNTIMES_V2_ROUTES
+          : PROVIDERS_ADMIN_ROUTES;
+  const signInRoutes = has(PROVIDERS_V8_CAPABILITY)
+    ? PROVIDERS_V8_ROUTES
     : has(PROVIDERS_V4_CAPABILITY)
       ? PROVIDERS_V4_ROUTES
-      : has(PROVIDERS_RUNTIMES_V2_CAPABILITY)
-        ? PROVIDERS_RUNTIMES_V2_ROUTES
+      : has(PROVIDERS_SIGN_IN_V3_CAPABILITY)
+        ? PROVIDERS_SIGN_IN_V3_ROUTES
         : PROVIDERS_ADMIN_ROUTES;
-  const signInRoutes = has(PROVIDERS_V4_CAPABILITY)
-    ? PROVIDERS_V4_ROUTES
-    : has(PROVIDERS_SIGN_IN_V3_CAPABILITY)
-      ? PROVIDERS_SIGN_IN_V3_ROUTES
-      : PROVIDERS_ADMIN_ROUTES;
   // As on the web client: `providers-v8` keeps every key that `providers-v5` keeps, and the key-only providers.
   const keyRoutes = has(PROVIDERS_V8_CAPABILITY)
     ? PROVIDERS_V8_ROUTES
@@ -327,7 +346,9 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
         submitProviderCodeLogin(
           request,
           { provider, code },
-          signInRoutes === PROVIDERS_V4_ROUTES ? signInRoutes : PROVIDERS_SIGN_IN_V3_ROUTES,
+          signInRoutes === PROVIDERS_V8_ROUTES || signInRoutes === PROVIDERS_V4_ROUTES
+            ? signInRoutes
+            : PROVIDERS_SIGN_IN_V3_ROUTES,
         ),
       ),
     cancelCodeSignIn: (provider: AgentProviderId): Promise<AgentStatus> =>
