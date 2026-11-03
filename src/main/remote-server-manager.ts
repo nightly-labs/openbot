@@ -211,7 +211,7 @@ interface RemoteServerManagerOptions {
   computerActivity?: ComputerActivityOptions;
 }
 
-export interface ComputerActivityOptions {
+interface ComputerActivityOptions {
   /** The time without input after which a host lets the member's phone notify. */
   awayAfterMs: number;
   /** Whole seconds since the last keyboard or mouse input on this computer. */
