@@ -80,7 +80,11 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
   const from = new Date(start).toISOString();
   const to = new Date(start + ROUTINE_LOOKAHEAD_DAYS * DAY).toISOString();
   const serverTasks = useServerTasks(serverId, { enabled });
-  const { reads: threadReads, ready: threadReadsReady } = useServerThreadReads(serverId, serverTasks.tasks);
+  const {
+    reads: threadReads,
+    ready: threadReadsReady,
+    failed: threadReadsFailed,
+  } = useServerThreadReads(serverId, serverTasks.tasks);
   const routines = useQuery({
     queryKey: queryKeys.serverRoutines(queryScope, serverId, from, to),
     queryFn: () =>
@@ -153,8 +157,10 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
   // An online host has sent its capabilities. The counts of a failed list are not complete, so the
   // phone does not keep them.
   const tasksLoaded = online && (!serverTasks.supported || (enabled && serverTasks.ready && threadReadsReady));
-  const tasksKnown = tasksLoaded && !serverTasks.retry;
-  const tasks = tasksLoaded ? (serverTasks.supported ? { unread, working } : null) : cached.tasks;
+  const tasksKnown = tasksLoaded && !serverTasks.retry && !threadReadsFailed;
+  // With no kept counts, the row shows from the capabilities, as before.
+  const tasks =
+    tasksLoaded || cached.tasks === undefined ? (serverTasks.supported ? { unread, working } : null) : cached.tasks;
 
   const tasksSupported = serverTasks.supported;
   useEffect(() => {

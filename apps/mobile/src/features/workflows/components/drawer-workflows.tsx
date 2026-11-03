@@ -49,8 +49,10 @@ export function useDrawerWorkflows(serverId: string, open: boolean): DrawerWorkf
       pinned: pinnedIds.flatMap((id) => workflows.find((workflow) => workflow.id === id) ?? []),
     };
   }, [data, pinnedIds]);
-  const shown = known ? (liveSupported ? live : null) : cached;
-  const supported = known ? liveSupported : Boolean(cached);
+  // With no kept values, the row shows from the capabilities, as before.
+  const fromHost = known || cached === undefined;
+  const shown = fromHost ? (liveSupported ? live : null) : cached;
+  const supported = fromHost ? liveSupported : Boolean(cached);
   useEffect(() => {
     if (known && !list.isError) rememberDrawerValues(serverId, { workflows: liveSupported ? live : null });
   }, [serverId, known, list.isError, liveSupported, live]);
