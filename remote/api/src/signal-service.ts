@@ -240,7 +240,7 @@ export interface WebhookDelivery {
   format?: WebhookSignatureFormat;
 }
 
-export interface WebhookDeliveryResponse {
+interface WebhookDeliveryResponse {
   status: WebhookDeliveryStatus;
 }
 
