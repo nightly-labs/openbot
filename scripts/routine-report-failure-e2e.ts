@@ -542,6 +542,23 @@ try {
       quietness.failedThenQuiet?.includes(FAILED_ANSWER) === true,
     quietness,
   );
+  // A run in a routine thread notifies through its own event, and a quiet run does not notify.
+  const routineTurns = (turnId: string | null) =>
+    events.filter((event) => event.type === "routine-thread-turn-completed" && event.turn.turnId === turnId);
+  const routineThread = (routineId: string) =>
+    agents.listTasks(checker.id).tasks.find((task) => task.routineId === routineId);
+  const failedTurns = routineTurns(quietFailedRun.delivery.turnId);
+  const failedThread = routineThread(quietFailed.id);
+  pass(
+    "A run in a routine thread sends one routine-thread-turn-completed, and a quiet run sends none",
+    failedTurns.length === 1 &&
+      failedTurns[0]?.type === "routine-thread-turn-completed" &&
+      failedTurns[0].taskId === failedThread?.id &&
+      failedTurns[0].turn.threadId === failedThread?.threadId &&
+      routineTurns(quietOkRun.delivery.turnId).length === 0 &&
+      !events.some((event) => event.type === "turn-completed" && event.turnId === quietFailedRun.delivery.turnId),
+    { failedTurns, failedThread },
+  );
   const scriptPrompt = fakeEntries().find(
     (entry) => entry.method === "turn/start" && entry.turnId === quietFailedRun.delivery.turnId,
   )?.text;

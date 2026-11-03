@@ -623,6 +623,10 @@ export class AgentTasks implements TaskLanes {
         const waiters = this.#turnEndWaiters.get(task.taskId);
         this.#turnEndWaiters.delete(task.taskId);
         for (const ended of waiters ?? []) Deferred.doneUnsafe(ended, Effect.void);
+        // A routine run in the agent's chat notified. In its own thread it notifies the same way, but
+        // through its own event, so the agent's chat keeps its turn state.
+        if (task.routineId !== null && !event.quiet && !event.continues)
+          this.#hooks.emit({ type: "routine-thread-turn-completed", taskId: task.taskId, turn: event });
         return true;
       }
       case "queue-changed":
