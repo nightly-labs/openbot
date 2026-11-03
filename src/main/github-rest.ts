@@ -54,8 +54,8 @@ const FILES_BRANCH = "openbot-attachments";
 const FILE_BYTES_LIMIT = 25 * 1024 * 1024;
 /** The most bytes that one output copies. The files after it keep their own links. */
 const FILES_BYTES_LIMIT = 50 * 1024 * 1024;
-/** The longest time that the download of one file can take. */
-const FILE_DOWNLOAD_TIMEOUT_MS = 2 * 60 * 1000;
+/** The longest time that the download or the upload of one file can take. */
+const FILE_TRANSFER_TIMEOUT_MS = 2 * 60 * 1000;
 /** The largest part of GitHub's limit that the links can use, so that the text stays. */
 const FILES_SECTION_LIMIT = GITHUB_BODY_LIMIT / 2;
 /** The longest file name in the branch. */
@@ -189,11 +189,12 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     path: string,
     body?: DynamicRecord,
     allowed: readonly number[] = [],
+    timeoutMs = GITHUB_REQUEST_TIMEOUT_MS,
   ): Effect.fn.Return<unknown, Failure> {
     const response = yield* githubCall((signal) =>
       options.fetch(`${API}${path}`, {
         method,
-        signal: AbortSignal.any([signal, AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS)]),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
         headers: {
           Accept: "application/vnd.github+json",
           Authorization: `Bearer ${token}`,
@@ -249,12 +250,17 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     for (const [index, file] of files.files.entries()) {
       const room = Math.min(FILE_BYTES_LIMIT, FILES_BYTES_LIMIT - total);
       if (file.size > room || !own[index]) continue;
-      const bytes = yield* download(file.url, room).pipe(Effect.timeout(FILE_DOWNLOAD_TIMEOUT_MS), Effect.option);
+      const bytes = yield* download(file.url, room).pipe(Effect.timeout(FILE_TRANSFER_TIMEOUT_MS), Effect.option);
       if (Option.isNone(bytes) || bytes.value.byteLength === 0 || bytes.value.byteLength > room) continue;
-      const blob = yield* call(token, "POST", `${repo}/git/blobs`, {
-        content: Buffer.from(bytes.value).toString("base64"),
-        encoding: "base64",
-      }).pipe(
+      // A file of 25 MB is about 33 MB of JSON, which a slow upload cannot send in the usual deadline.
+      const blob = yield* call(
+        token,
+        "POST",
+        `${repo}/git/blobs`,
+        { content: Buffer.from(bytes.value).toString("base64"), encoding: "base64" },
+        [],
+        FILE_TRANSFER_TIMEOUT_MS,
+      ).pipe(
         Effect.flatMap((answer) => parse(shaSchema, answer)),
         Effect.option,
       );
