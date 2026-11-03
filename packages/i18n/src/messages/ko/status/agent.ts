@@ -24,6 +24,9 @@ export const messages = {
   "status.agent.screenCaptureWindow": "창 {name}을(를) 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureRegion":
     "화면의 {x}, {y} 위치에서 {width} × {height} 포인트 영역을 캡처해서 이미지를 에이전트의 모델에 보내요.",
+  "status.agent.vaultCardFill":
+    "{site}에 저장된 카드 {card}을(를) 입력해요. 승인하면 이후에는 에이전트가 승인 없이 이 사이트에 이 카드를 입력할 수 있어요. 사이트는 서버 설정 > 보관함에서 제거하세요.",
+  "status.agent.vaultCardFillFrames": "카드 입력란은 {origins}의 프레임에 있어요.",
   "status.agent.screenCaptureProgress": "화면 캡처를 요청하는 중…",
   "status.agent.screenCaptureReviewing": "화면 캡처를 확인하는 중…",
   "status.agent.browserOpening": "웹 페이지를 여는 중…",
@@ -63,6 +66,9 @@ export const messages = {
   "status.agent.mcpServerDisable": "이 서버의 모든 에이전트에 MCP 서버 {name}을(를) 꺼요.",
   "status.agent.mcpServerRemove": "이 서버의 모든 에이전트에서 MCP 서버 {name}과(와) 로그인 정보를 제거해요.",
   "status.agent.mcpSignInRequested": "MCP 서버 {name}에 로그인이 필요해요. 서버 설정의 MCP에서 로그인해 주세요.",
+  "status.agent.vaultAdded": "보관함에 저장함: {name}",
+  "status.agent.vaultUpdated": "보관함에서 변경함: {name}",
+  "status.agent.vaultDeleted": "보관함에서 삭제함: {name}",
   "status.agent.nextStepContinues": "에이전트가 다음 단계 전에 멈췄어요. 계속해요 ({current}/{limit}).",
   "status.agent.planContinues": "계획에 남은 단계가 있어요. 에이전트가 계속해요 ({current}/{limit}).",
   "status.agent.branchTitle": "분기된 채팅",

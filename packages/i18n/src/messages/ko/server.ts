@@ -248,6 +248,8 @@ export const messages = {
   "server.role.owner": "소유자",
   "server.settings.generalTitle": "일반",
   "server.settings.generalDescription": "이 서버의 이름, 로고, 환경설정을 관리해요.",
+  "server.settings.vaultTitle": "보관함",
+  "server.settings.vaultDescription": "이 서버의 모든 에이전트가 입력할 수 있는 로그인, 카드, 연락처 정보를 저장해요.",
   "server.settings.membersTitle": "멤버",
   "server.settings.membersDescription": "이 서버를 게시하고, 사람을 초대하고, 접근 권한을 관리해요.",
   "server.settings.desktopTitle": "원격 데스크톱",
