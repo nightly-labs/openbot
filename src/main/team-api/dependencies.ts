@@ -19,6 +19,7 @@ import type { HostReleaseService } from "../host-release-service";
 import type { HostService } from "../host-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
+import type { ModelVisibility } from "../model-visibility";
 import type { PreferenceFileFailure } from "../preference-file";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
 import type { ProviderCredentialStore } from "../provider-credential-store";
@@ -435,6 +436,8 @@ export interface TeamApiAdmin {
   memoryReview?: MemoryReviewPreferenceStore;
   /** `prompt-cache-ttl-v1`: how long the provider keeps the prompt cache of this computer's agents. */
   promptCacheTtl?: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
+  /** `model-visibility-v1`: which models the model picker of this computer shows, for each provider. */
+  modelVisibility?: Pick<ModelVisibility, "settings" | "set" | "picker" | "listings">;
   /** `provider-default-v1`: the provider and model that a new agent of this computer starts on. */
   defaultProvider?: TeamApiDefaultProvider;
   /** `routine-results-v1`: the place where an agent routine sends its answers. */

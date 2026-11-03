@@ -509,6 +509,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
+| `model-visibility-v1` | Read every model of one provider of the host, and set which of them the model picker shows. Every member reads which models the picker folds under Older models or labels New. Protocol 9 only | `hostAdmin` |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
 | `agent-access-v1` | Read and set the roles that give members access to agents (see [Roles](#roles)) | `hostAdmin` |
 | `server-audit-v1` | Read the changes to the members, roles and agent access of the server (see [Audit log](#audit-log)). Protocol 9 only | `hostAdmin` |
@@ -638,6 +639,39 @@ in the Claude settings or `CLAUDE_CODE_PROMPT_CACHE_TTL` on the host still wins.
 the next Claude process, not to a running one; an idle thread starts a new process when it resumes.
 The Cache section of the Claude page in Server settings → Providers sets it for this computer and
 for a joined server.
+
+`model-visibility-v1` reads every model that one provider of the host lists, and sets which of them
+the model picker shows. The file `openbot-model-visibility-v1.json` keeps, for each provider, only the
+models that an admin turned on (`shown`) or off (`hidden`). Every other model follows the default
+below, so a new release shows after an admin edits the list too. `shown: null` on the update route
+resets a provider, and the settings route's `changed` tells the Models section to offer the reset. A
+choice for a model that the provider does not list now stays in the file.
+
+The default uses the models.dev copy in OpenCode's cache. When a provider lists 12 models or fewer,
+it hides only a model that the list has a newer model of the same family for, such as `claude-opus-5`
+next to `claude-opus-5-5`. A longer list shows, for each service, such as `anthropic` or
+`openrouter`, the newest model of each of the newest model families (12 families in total, and at
+least 4 for each service). A family more than 120 days older than the newest family of its service
+is a past generation and does not show. It skips deprecated models, models that do not write text,
+and models with no tool calls. OpenCode ids are models.dev keys (`openai/gpt-6.1-sol`); Hermes ids
+put a `:` after the service (`nous:openai/gpt-6.1-sol`). For a service that models.dev does not list,
+such as `nous` or `openai-codex`, the model name finds the release, with a dot read as a dash. A
+variant suffix, such as Kimi's `,thinking`, gets the release of its model. A model that models.dev
+does not have shows only when no model of its service is in models.dev, as with a custom endpoint.
+So a `-fast` or `-flex` service tier does not show.
+
+The model list that the host gives to this computer leaves out each model that an admin turned off,
+and gives each model that the default hides `listing: "older"`. The picker folds those models under
+an Older models row at the end of each provider's list; a search shows them too. A model in the main
+list that models.dev released less than 7 days ago gets `listing: "new"`, and the picker labels it
+New. The host keeps each model that an agent uses, goes back to, moves to next, or keeps as a backup
+in the main list, and never moves an agent to another model. Agents, tools, automations and the
+backup model switch still reach every model. The released model list of the Team API does not carry
+`listing`: it gives the main and older models in one list, as before. Every member reads the listing
+of each model from the `listing` route, and a joined client merges it, as it merges the fast tiers of
+`agent-fast-mode-v1`. The settings and update routes are for an owner or admin. The Models section of
+each provider page in Server settings → Providers sets the list for this computer and for a joined
+server. A change sends a `status` event, so each client reads the model list again.
 
 `provider-default-v1` reads and sets the provider, and the model beside it, that a new agent of the
 host starts on when its creator chooses none. It is the setup choice of the host (`openbot-setup`

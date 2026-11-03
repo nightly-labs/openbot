@@ -12,6 +12,10 @@ import {
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import {
+  MODEL_VISIBILITY_CAPABILITY,
+  MODEL_VISIBILITY_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-v1";
+import {
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
@@ -30,6 +34,7 @@ import {
   CHANNEL_DELETE_CAPABILITY,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   decodeAgentFastModels,
+  decodeAgentModelListings,
   decodeAgentProfileDraft,
   decodeChannel,
   decodeChannelPage,
@@ -56,6 +61,7 @@ import {
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
   withFastServiceTiers,
+  withModelListings,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -98,6 +104,7 @@ import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { HostService } from "../host-service";
 import { type MessageLinkRelay, openHttpLink } from "../message-link-relay";
+import type { ModelVisibility } from "../model-visibility";
 import {
   decodeAccountUsageFromHost,
   decodeAgentAnalyticsFromHost,
@@ -213,6 +220,8 @@ export interface AgentIpcDependencies {
   skills: SkillMarketplaceService;
   messageLinks: MessageLinkRelay;
   openExternal: (url: string) => Promise<void>;
+  /** The models that the model picker shows. Only the local list is filtered here; a host filters its own. */
+  modelVisibility: Pick<ModelVisibility, "picker">;
 }
 
 export function agentIpcHandlers({
@@ -224,6 +233,7 @@ export function agentIpcHandlers({
   skills,
   messageLinks,
   openExternal,
+  modelVisibility,
 }: AgentIpcDependencies): Pick<IpcGroupHandlers, "agent"> {
   const remoteTaskRequest = <T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: RemoteTaskBody) => {
     if (!remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY)) taskRemoteUnsupported();
@@ -314,25 +324,34 @@ export function agentIpcHandlers({
             : runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.usage, decodeAccountUsageFromHost)),
       }),
       listModels: scopedQueryHandler({
-        local: () => logRejectedModels(service.listModels(), "local"),
+        local: () => runCauseEffect(modelVisibility.picker(logRejectedModels(service.listModels(), "local"))),
         remote: (serverId) => {
           const models = remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
             decodeAgentModelOptions(logRejectedModels(value, "remote")),
           );
-          // The released model list drops the fast tier, so a host with `agent-fast-mode-v1` gives it
-          // on its own route, and the picker shows the Fast switch as for a local agent. The tiers are
-          // optional: when that route fails, the picker gets the models with no Fast switch.
-          if (!remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY)) return runCauseEffect(models);
+          // The released model list drops the fast tier and the picker listing, so a host with
+          // `agent-fast-mode-v1` or `model-visibility-v1` gives them on their own routes. Both are
+          // optional: when a route fails, the picker gets the models with no Fast switch or listing.
           return runCauseEffect(
             Effect.gen(function* () {
               const options = yield* models;
-              const fast = yield* remoteServers
-                .request(serverId, AGENT_FAST_MODE_ROUTES.models, decodeAgentFastModels, {
-                  method: "POST",
-                  body: {},
-                })
-                .pipe(Effect.orElseSucceed(() => []));
-              return withFastServiceTiers(options, fast);
+              const fast = remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY)
+                ? yield* remoteServers
+                    .request(serverId, AGENT_FAST_MODE_ROUTES.models, decodeAgentFastModels, {
+                      method: "POST",
+                      body: {},
+                    })
+                    .pipe(Effect.orElseSucceed(() => []))
+                : [];
+              const listings = remoteServers.supportsCapability(serverId, MODEL_VISIBILITY_CAPABILITY)
+                ? yield* remoteServers
+                    .request(serverId, MODEL_VISIBILITY_ROUTES.listing, decodeAgentModelListings, {
+                      method: "POST",
+                      body: {},
+                    })
+                    .pipe(Effect.orElseSucceed(() => []))
+                : [];
+              return withModelListings(withFastServiceTiers(options, fast), listings);
             }),
           );
         },

@@ -55,6 +55,7 @@ import { actionToast } from "../../action-toast";
 import { type ServerBrowserProfilesOptions, ServerBrowserProfilesPanel } from "../browser/ServerBrowserProfilesPanel";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
 import { type HostProviderSettings, HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
+import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../settings/provider-prompt-cache";
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
@@ -207,6 +208,11 @@ export interface ServerSettingsModalProps {
    */
   hostPromptCacheTtl?: HostPromptCacheTtlOptions | undefined;
   /**
+   * Each provider page shows its Models section only when a caller supplies this, and only for the
+   * local server or a remote host with `model-visibility-v1` that this member administers.
+   */
+  hostModelVisibility?: HostModelVisibilityOptions | undefined;
+  /**
    * The Roles section appears only when a caller supplies this, and only for the local server or a
    * remote host with `agent-access-v1` that this member administers.
    */
@@ -318,6 +324,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   function promptCacheSource(): ProviderPromptCacheSource | undefined {
     const options = props.hostPromptCacheTtl;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "prompt-cache-ttl-v1")) return undefined;
+    return { ...options, serverId: props.server.id };
+  }
+  function modelVisibilitySource(): ProviderModelVisibilitySource | undefined {
+    const options = props.hostModelVisibility;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "model-visibility-v1")) return undefined;
     return { ...options, serverId: props.server.id };
   }
   const availableInitialSection = (): Section | null =>
@@ -844,6 +855,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   selectMount={modalElement()}
                   onDetailChange={setProviderDetail}
                   promptCache={promptCacheSource()}
+                  modelVisibility={modelVisibilitySource()}
                 />
               )}
             </Show>

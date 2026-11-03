@@ -71,6 +71,7 @@ import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "./memory-review-v1";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
+import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
@@ -218,6 +219,7 @@ export {
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
   MEMORY_REVIEW_CAPABILITY,
+  MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
@@ -410,6 +412,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CONTEXT_COMPACT_CAPABILITY,
   AGENT_INSTRUCTIONS_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
+  MODEL_VISIBILITY_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -563,7 +566,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_FAST_MODE_CAPABILITY &&
     capability !== CONTEXT_COMPACT_CAPABILITY &&
     capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
-    capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY,
+    capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY &&
+    capability !== MODEL_VISIBILITY_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -593,6 +597,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CONTEXT_COMPACT_CAPABILITY,
   AGENT_INSTRUCTIONS_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
+  MODEL_VISIBILITY_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -705,6 +710,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_FAST_MODE_CAPABILITY &&
       capability !== CONTEXT_COMPACT_CAPABILITY &&
       capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
-      capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY,
+      capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY &&
+      capability !== MODEL_VISIBILITY_CAPABILITY,
   );
 }

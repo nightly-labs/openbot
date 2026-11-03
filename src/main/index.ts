@@ -616,6 +616,7 @@ function registerIpcHandlers({
   teamStore,
   serverTimezone,
   promptCacheTtl,
+  modelVisibility,
   remoteSessionReuse,
   externalLinkPreference,
   externalLinks,
@@ -817,6 +818,7 @@ function registerIpcHandlers({
       memoryReview,
       machineAlerts,
       promptCacheTtl,
+      modelVisibility,
       agentAccess,
       serverAudit,
       localServerId: () => teamStore.getIdentity()?.serverId,
@@ -883,6 +885,7 @@ function registerIpcHandlers({
         openUrl: (url) => openHttpLink(url, openLink),
       }),
       openExternal: openLink,
+      modelVisibility,
     }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView, localSignIn }),
   });

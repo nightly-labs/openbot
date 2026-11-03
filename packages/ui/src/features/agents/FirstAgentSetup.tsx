@@ -318,8 +318,13 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
     props.value.reasoningEffort ?? modelOption(props.value.provider, props.value.model)?.defaultReasoningEffort;
 
   /** A new model keeps the chosen level when it supports it, and else starts on its own default. */
-  function selectModel(model: AgentModelId, provider: AgentProviderId): void {
-    const kept = props.value.reasoningEffort;
+  function selectModel(
+    model: AgentModelId,
+    provider: AgentProviderId,
+    _accountId?: string | null,
+    effort?: AgentReasoningEffort,
+  ): void {
+    const kept = effort ?? props.value.reasoningEffort;
     updateDraft({
       model,
       provider,
