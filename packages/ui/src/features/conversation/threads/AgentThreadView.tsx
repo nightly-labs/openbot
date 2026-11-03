@@ -369,10 +369,23 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       />
     );
   }
-  /** The branch line shows after the last message that the branch copied. */
-  function branchDividerAfter(messageId: string): AgentThreadBranchSource | undefined {
+  /**
+   * The row that the branch line follows: the last message that the branch copied. That message can be
+   * one that the thread does not show as a row, such as a thought in the steps of a turn. Then the line
+   * follows the last shown message from before the branch was made: the copies keep their times.
+   */
+  const branchDividerId = createMemo(() => {
     const source = props.branchSource;
-    return source?.throughMessageId === messageId ? source : undefined;
+    if (!source) return undefined;
+    const shown = props.messages.filter(shownInThread);
+    if (shown.some((message) => message.id === source.throughMessageId)) return source.throughMessageId;
+    const branchedAt = props.task ? Date.parse(props.task.createdAt) : Number.NaN;
+    if (Number.isNaN(branchedAt)) return undefined;
+    return shown.findLast((message) => message.createdAt !== undefined && Date.parse(message.createdAt) < branchedAt)
+      ?.id;
+  });
+  function branchDividerAfter(messageId: string): AgentThreadBranchSource | undefined {
+    return branchDividerId() === messageId ? props.branchSource : undefined;
   }
   const failed = () => (props.task?.state === "idle" && props.task.outcome === "failed" ? props.task : undefined);
   const running = () =>

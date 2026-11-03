@@ -20,6 +20,8 @@ export interface MessageActionsInput {
   /** Unset where a reaction cannot be saved. `null` removes the reader's reaction. */
   onReact?: (emoji: string | null) => Promise<void>;
   onReply?: () => void;
+  /** Unset where the message has no branch: it is not the last answer of a finished turn. */
+  onBranch?: () => void;
   onSelectText?: () => void;
   /** The message that Read aloud reads. Unset where the app cannot read aloud. */
   readAloudId?: string;
@@ -66,6 +68,7 @@ export function useMessageActions(input: MessageActionsInput | null) {
           readAloudId: input.readAloudId,
           onReact: react,
           onReply: input.onReply,
+          onBranch: input.onBranch,
           onSelectText: input.onSelectText,
         })
     : undefined;

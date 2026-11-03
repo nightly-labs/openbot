@@ -117,6 +117,10 @@ export interface ChatViewProps {
   liveChannel?: LiveChannel | null;
   /** Absent for a chat that cannot stop a turn, such as a channel. */
   stopTurn?: (turnId: string) => Promise<void>;
+  /** The host messages that offer "Branch from here". */
+  branchPoints?: ReadonlySet<string>;
+  /** Copies the chat through a host message into a new thread. Absent for a chat that cannot branch. */
+  onBranch?: (messageId: string) => Promise<void>;
   questionForm?: QuestionPromptController;
   /** Opens the form of an open question, in a channel where several agents can ask. */
   onSelectQuestion?: (messageId: string) => void;
@@ -221,6 +225,8 @@ export function ChatView({
   conversation = null,
   liveChannel = null,
   stopTurn,
+  branchPoints,
+  onBranch,
   questionForm,
   onSelectQuestion,
   needsAction = false,
@@ -925,6 +931,10 @@ export function ChatView({
   );
   // The reaction route is an agent route. A channel message has no reaction.
   const canReact = target.kind === "agent";
+  const branchMessage = useCallback(
+    (message: ChatBubbleMessage) => void onBranch?.(hostMessageIds.get(message.id) ?? message.id),
+    [onBranch, hostMessageIds],
+  );
   // Select text starts the selection, and a second tap on it ends the selection.
   const selectText = useCallback((message: ChatBubbleMessage) => {
     Keyboard.dismiss();
@@ -1030,6 +1040,8 @@ export function ChatView({
               olderError={olderError}
               onLoadOlder={loadOlder}
               onReply={readOnly ? undefined : replyToMessage}
+              onBranch={onBranch && !readOnly ? branchMessage : undefined}
+              branchPoints={branchPoints}
               onReact={canReact && !readOnly ? react : undefined}
               selectingMessageId={selection?.message.id ?? null}
               onSelectText={selectText}
