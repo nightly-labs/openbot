@@ -36,6 +36,7 @@ import { createStorageUsage } from "../files/storage-usage";
 import { AgentMemoriesSettings } from "./AgentMemoriesSettings";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, type SkillDetail } from "./AgentSkillsModal";
+import { AgentVoiceSettings } from "./AgentVoiceSettings";
 import { conversationPort, type SharedTableCalls } from "./conversation-port";
 import type { AgentNotificationLevelCalls, ConversationRuntime } from "./conversation-runtime";
 import { agentMemoriesPort } from "./memories-port";
@@ -438,6 +439,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       detailOpen={draft.routines.open || draft.files.open || draft.memories.open || draft.instructions.open}
       links={
         <>
+          <Show when={!props.remoteClient}>
+            <AgentVoiceSettings agentId={props.agent.id} serverId={props.skillsServerId} />
+          </Show>
           <Show when={sessionSettings()}>
             {(api) => (
               <AgentSessionSettings

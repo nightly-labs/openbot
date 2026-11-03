@@ -161,3 +161,23 @@ agent-context exchange; neither shows transcript captions.
 The voice lists use the ported OpenClaw subscription profile at `6d172664c829`
 (`extensions/openai/realtime-quicksilver.ts`). Subscription voices and API Realtime voices are
 validated separately. Provider availability still depends on the connected account.
+
+## Agent voices and the server default
+
+Voice settings show only when the selected host reports a connected Codex provider. Reading these
+settings does not start a sign-in or request a subscription token. The host reports only this
+availability flag, not provider credentials or account details. A connected provider does not
+establish upstream voice entitlement; the existing authenticated call handshake still checks it.
+
+The Voice settings picker is the server default. Agent settings provide an independent voice or
+**Use server default**. Resetting an agent removes its override and follows later default changes.
+A different chat provider does not change the agent's voice. Choices apply to the next call and do
+not interrupt an active call. The host saves the default and agent-ID map together in the existing
+version-1 `realtime-voice.json`; enabled-only and default-only files remain valid. No SQLite schema
+or provider assignment changes. Back up the host preferences with the rest of its data.
+
+The additive protocol-9 `realtime-voice-agent-settings-v1` capability carries configuration reads
+and selections. Current chat access is required to read an agent choice; manage access is required
+to change it. Connector access restrictions remain part of that check. Only server owners/admins
+can change the default. Older wire routes retain their prior meaning and changing the legacy
+default does not erase agent overrides. Unsupported hosts keep the new settings section hidden.

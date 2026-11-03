@@ -127,3 +127,58 @@ export function parseRealtimeVoicePoll(value: unknown): RealtimeVoicePoll {
     throw new Error("Invalid live voice delegation.");
   return { active: value.active, delegation: { id: item.id, request: item.request } };
 }
+
+/** Optional agent overrides; the host default remains separate from the selected override. */
+export interface RealtimeVoiceTarget {
+  agentId: string | null;
+}
+export interface RealtimeVoiceSelection extends RealtimeVoiceTarget {
+  voice: string | null;
+}
+export interface RealtimeVoiceSettings {
+  configured: boolean;
+  canManage: boolean;
+  enabled: boolean;
+  model: string;
+  defaultVoice: string;
+  voice: string | null;
+}
+export function parseRealtimeVoiceTarget(value: unknown): RealtimeVoiceTarget {
+  if (!isDynamicRecord(value) || (value.agentId !== null && !isIdentifier(value.agentId)))
+    throw new Error("Invalid live voice target.");
+  return { agentId: value.agentId };
+}
+export function parseRealtimeVoiceSelection(value: unknown): RealtimeVoiceSelection {
+  const target = parseRealtimeVoiceTarget(value);
+  if (
+    !isDynamicRecord(value) ||
+    (value.voice !== null && (typeof value.voice !== "string" || !value.voice.length || value.voice.length > 128)) ||
+    (target.agentId === null && value.voice === null)
+  )
+    throw new Error("Invalid live voice selection.");
+  return { ...target, voice: value.voice };
+}
+export function parseRealtimeVoiceSettings(value: unknown): RealtimeVoiceSettings {
+  if (
+    !isDynamicRecord(value) ||
+    typeof value.configured !== "boolean" ||
+    typeof value.canManage !== "boolean" ||
+    typeof value.enabled !== "boolean" ||
+    typeof value.model !== "string" ||
+    !value.model.length ||
+    value.model.length > 128 ||
+    typeof value.defaultVoice !== "string" ||
+    !value.defaultVoice.length ||
+    value.defaultVoice.length > 128 ||
+    (value.voice !== null && (typeof value.voice !== "string" || !value.voice.length || value.voice.length > 128))
+  )
+    throw new Error("Invalid live voice settings.");
+  return {
+    configured: value.configured,
+    canManage: value.canManage,
+    enabled: value.enabled,
+    model: value.model,
+    defaultVoice: value.defaultVoice,
+    voice: value.voice,
+  };
+}

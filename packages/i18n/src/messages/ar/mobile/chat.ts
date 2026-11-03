@@ -161,7 +161,6 @@ export const messages = {
   "mobile.chat.liveVoice.phase.thinking": "يفكّر",
   "mobile.chat.liveVoice.phase.speaking": "يتحدث",
   "mobile.chat.liveVoice.phase.offline": "غير متصل",
-  "mobile.chat.liveVoice.speakNow": "تحدّث الآن",
   "mobile.chat.liveVoice.mute": "كتم الميكروفون",
   "mobile.chat.liveVoice.unmute": "إلغاء كتم الميكروفون",
   "mobile.chat.liveVoice.interrupt": "مقاطعة",

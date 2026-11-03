@@ -337,7 +337,7 @@ try {
   await Effect.runPromise(restoredPreferences.load());
   assert.deepEqual(
     restoredPreferences.get(),
-    { enabled: false, voice: "cove" },
+    { enabled: false, voice: "cove", agentVoices: {} },
     "Concurrent changes lost a saved preference.",
   );
   await Effect.runPromise(voice.setVoice("ember"));
@@ -346,8 +346,62 @@ try {
   await writeFile(legacyPath, JSON.stringify({ version: 1, enabled: false }));
   const legacyPreferences = createRealtimeVoicePreferenceStore(legacyPath);
   await Effect.runPromise(legacyPreferences.load());
-  assert.deepEqual(legacyPreferences.get(), { enabled: false, voice: null });
+  assert.deepEqual(legacyPreferences.get(), { enabled: false, voice: null, agentVoices: {} });
   checks.push("Concurrent preference changes retain both fields, and enabled-only preference files remain valid");
+  await Effect.runPromise(voice.setSelection({ agentId: "pam", voice: "arbor" }, () => true));
+  expectedVoice = "arbor";
+  const overrideCall = await Effect.runPromise(
+    voice.connect({ agentId: "pam", sdp: "v=0\r\n" }, "override-fixture", () => true),
+  );
+  assert.ok(overrideCall.sessionId);
+  await Effect.runPromise(voice.end({ agentId: "pam", sessionId: overrideCall.sessionId }, "override-fixture"));
+  assert.equal(voice.settings("cory").voice, null, "An agent inherited another agent's override.");
+  await Promise.all([
+    Effect.runPromise(voice.setVoice("maple")),
+    Effect.runPromise(voice.setSelection({ agentId: "cory", voice: "breeze" }, () => true)),
+  ]);
+  const beforeDenied = await readFile(join(root, "voice.json"), "utf8");
+  await assert.rejects(Effect.runPromise(voice.setSelection({ agentId: "pam", voice: "vale" }, () => false)));
+  assert.equal(
+    await readFile(join(root, "voice.json"), "utf8"),
+    beforeDenied,
+    "A denied mutation changed preferences.",
+  );
+  await Effect.runPromise(restoredPreferences.load());
+  const overrideReload = new RealtimeVoiceService({ preferences: restoredPreferences, mode: "subscription" });
+  assert.deepEqual(
+    [
+      overrideReload.settings("pam").voice,
+      overrideReload.settings("cory").voice,
+      overrideReload.settings(null).defaultVoice,
+    ],
+    ["arbor", "breeze", "maple"],
+  );
+  await Effect.runPromise(overrideReload.close());
+  await Effect.runPromise(voice.setSelection({ agentId: "pam", voice: null }, () => true));
+  assert.equal(
+    voice.settings("pam").voice ?? voice.settings("pam").defaultVoice,
+    "maple",
+    "Reset did not follow the new default.",
+  );
+  assert.equal(voice.settings("cory").voice, "breeze", "Reset changed another agent.");
+  await Effect.runPromise(voice.setEnabled(false));
+  await Effect.runPromise(voice.setEnabled(true));
+  assert.equal(voice.settings("cory").voice, "breeze", "Toggle lost an agent override.");
+  await Effect.runPromise(voice.setVoice("ember"));
+  let connectedCodex = false;
+  const availability = new RealtimeVoiceService({ configured: () => connectedCodex });
+  assert.equal(availability.settings(null).configured, false);
+  connectedCodex = true;
+  assert.equal(availability.settings(null).configured, true);
+  connectedCodex = false;
+  assert.equal(availability.settings(null).configured, false);
+  await Effect.runPromise(availability.close());
+  checks.push(
+    "Agent overrides reach provider offers, survive concurrent default changes and reload, and reset to the current default",
+  );
+  checks.push("Denied override writes leave saved settings unchanged; toggle and reset preserve other agents");
+  checks.push("Settings availability follows the connected Codex provider without starting authentication");
   expectedVoice = "ember";
   checks.push(
     "Voice selection survives host reload and toggle changes, and rejects the other authentication mode's voices",

@@ -160,7 +160,6 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.liveVoice.phase.thinking": "Thinking",
   "mobile.chat.liveVoice.phase.speaking": "Speaking",
   "mobile.chat.liveVoice.phase.offline": "Not connected",
-  "mobile.chat.liveVoice.speakNow": "Speak now",
   "mobile.chat.liveVoice.mute": "Mute the microphone",
   "mobile.chat.liveVoice.unmute": "Unmute the microphone",
   "mobile.chat.liveVoice.interrupt": "Interrupt",

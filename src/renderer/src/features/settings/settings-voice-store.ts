@@ -19,13 +19,19 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { serverRoleCanAdminister } from "../servers/server-capabilities";
-import { noteRealtimeVoiceStatus, refreshRealtimeVoiceStatus } from "../speech/realtime-voice-status";
+import { noteRealtimeVoiceStatus } from "../speech/realtime-voice-status";
 import { readAloud, stopSpeech } from "../speech/speech-playback";
 import { changeSpeechSpeed, speechSpeed, updateSpeechSettings } from "../speech/speech-speed";
 import { voicePort } from "./voice-port";
 
 interface SettingsVoiceState {
-  realtime: { status: RealtimeVoiceStatus | null; busy: boolean; canManage: boolean; hostName: string };
+  realtime: {
+    configured: boolean;
+    status: RealtimeVoiceStatus | null;
+    busy: boolean;
+    canManage: boolean;
+    hostName: string;
+  };
   /** One status for each model in `VOICE_MODELS`, or null before main answers. */
   statuses: Record<VoiceModelId, VoiceModelStatus | null>;
   settings: VoiceSettings | null;
@@ -63,7 +69,7 @@ export function createSettingsVoiceStore(
   selectedServer: () => ServerSummary | undefined = () => undefined,
 ) {
   const [state, setState] = createStore<SettingsVoiceState>({
-    realtime: { status: null, busy: false, canManage: false, hostName: "" },
+    realtime: { configured: false, status: null, busy: false, canManage: false, hostName: "" },
     statuses: { ...EMPTY_STATUSES },
     settings: null,
     speech: { status: null, settings: null, listening: false },
@@ -120,9 +126,12 @@ export function createSettingsVoiceStore(
       if (!active) return;
       const id = server?.id ?? "local";
       const supported =
-        !server || server.kind === "local" || server.compatibility?.capabilities.includes("realtime-voice-v1");
+        !server ||
+        server.kind === "local" ||
+        server.compatibility?.capabilities.includes("realtime-voice-agent-settings-v1");
       setState((draft) => {
         draft.realtime = {
+          configured: false,
           status: null,
           busy: false,
           canManage:
@@ -134,16 +143,19 @@ export function createSettingsVoiceStore(
       });
       if (!supported) return;
       let alive = true;
-      void refreshRealtimeVoiceStatus(id)
-        .then((status) => {
+      void voicePort()
+        .voice.getRealtimeSettings({ agentId: null }, id)
+        .then((settings) => {
+          const status = { enabled: settings.enabled, model: settings.model, voice: settings.defaultVoice };
+          noteRealtimeVoiceStatus(id, status);
           if (alive)
             setState((draft) => {
               draft.realtime.status = status;
+              draft.realtime.configured = settings.configured;
+              draft.realtime.canManage = draft.realtime.canManage && settings.canManage;
             });
         })
-        .catch((error: unknown) => {
-          if (alive) fail(error, "settings.voice.loadFailed");
-        });
+        .catch(() => {});
       return () => {
         alive = false;
       };
@@ -169,6 +181,31 @@ export function createSettingsVoiceStore(
       if ((selectedServer()?.id ?? "local") === id)
         setState((draft) => {
           draft.realtime.busy = false;
+        });
+    }
+  }
+
+  async function setRealtimeDefaultVoice(voice: string): Promise<void> {
+    if (!state.realtime.canManage || state.realtime.busy) return;
+    const id = selectedServer()?.id ?? "local";
+    setState((s) => {
+      s.realtime.busy = true;
+    });
+    try {
+      const settings = await voicePort().voice.setRealtimeVoice({ agentId: null, voice }, id);
+      const status = { enabled: settings.enabled, model: settings.model, voice: settings.defaultVoice };
+      noteRealtimeVoiceStatus(id, status);
+      if ((selectedServer()?.id ?? "local") === id)
+        setState((s) => {
+          s.realtime.status = status;
+          s.realtime.configured = settings.configured;
+        });
+    } catch (error) {
+      fail(error, "settings.voice.saveFailed");
+    } finally {
+      if ((selectedServer()?.id ?? "local") === id)
+        setState((s) => {
+          s.realtime.busy = false;
         });
     }
   }
@@ -366,6 +403,7 @@ export function createSettingsVoiceStore(
   return {
     state,
     setRealtimeEnabled,
+    setRealtimeDefaultVoice,
     download,
     cancel,
     remove,

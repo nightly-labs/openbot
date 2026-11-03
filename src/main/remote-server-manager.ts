@@ -38,6 +38,8 @@ import type {
   MarkDirectReadInput,
   RealtimeVoiceCall,
   RealtimeVoiceReply,
+  RealtimeVoiceSelection,
+  RealtimeVoiceTarget,
   RemoteDesktopSession,
   SendDirectMessageInput,
   ServerNotificationLevel,
@@ -81,7 +83,12 @@ import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { INSTANCE_TRANSFER_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
-import { REALTIME_VOICE_CAPABILITY, REALTIME_VOICE_ROUTES } from "@openbot/contracts/team-protocol/realtime-voice-v1";
+import {
+  REALTIME_VOICE_AGENT_SELECTION_ROUTE,
+  REALTIME_VOICE_CAPABILITY,
+  REALTIME_VOICE_CONFIGURATION_ROUTE,
+  REALTIME_VOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/realtime-voice-v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
@@ -102,6 +109,7 @@ import type { PreferenceFileFailure } from "./preference-file";
 import {
   decodeRealtimeVoiceAnswerFromHost,
   decodeRealtimeVoicePollFromHost,
+  decodeRealtimeVoiceSettingsFromHost,
   decodeRealtimeVoiceStatusFromHost,
 } from "./realtime-voice-decoding";
 import {
@@ -741,6 +749,18 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return snapshot;
   }).bind(this);
 
+  getRealtimeVoiceSettings(serverId: string, input: RealtimeVoiceTarget) {
+    return this.request(serverId, REALTIME_VOICE_CONFIGURATION_ROUTE, decodeRealtimeVoiceSettingsFromHost, {
+      method: "POST",
+      body: input,
+    });
+  }
+  setRealtimeVoiceSelection(serverId: string, input: RealtimeVoiceSelection) {
+    return this.request(serverId, REALTIME_VOICE_AGENT_SELECTION_ROUTE, decodeRealtimeVoiceSettingsFromHost, {
+      method: "POST",
+      body: input,
+    });
+  }
   readonly getRealtimeVoiceStatus = Effect.fn("RemoteManager.getRealtimeVoiceStatus")(function* (
     this: RemoteServerManager,
     serverId: string,

@@ -159,7 +159,6 @@ export const messages = {
   "mobile.chat.liveVoice.phase.thinking": "Düşünüyor",
   "mobile.chat.liveVoice.phase.speaking": "Konuşuyor",
   "mobile.chat.liveVoice.phase.offline": "Bağlı değil",
-  "mobile.chat.liveVoice.speakNow": "Şimdi konuş",
   "mobile.chat.liveVoice.mute": "Mikrofonu sessize al",
   "mobile.chat.liveVoice.unmute": "Mikrofonun sesini aç",
   "mobile.chat.liveVoice.interrupt": "Böl",

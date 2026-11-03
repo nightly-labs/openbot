@@ -159,7 +159,6 @@ export const messages = {
   "mobile.chat.liveVoice.phase.thinking": "考えています",
   "mobile.chat.liveVoice.phase.speaking": "話しています",
   "mobile.chat.liveVoice.phase.offline": "未接続",
-  "mobile.chat.liveVoice.speakNow": "話してください",
   "mobile.chat.liveVoice.mute": "マイクをミュート",
   "mobile.chat.liveVoice.unmute": "マイクのミュートを解除",
   "mobile.chat.liveVoice.interrupt": "中断",

@@ -1,13 +1,19 @@
 import {
+  canAdministerServer,
   parseRealtimeVoiceCall,
   parseRealtimeVoiceEnabled,
   parseRealtimeVoiceOffer,
   parseRealtimeVoiceReply,
+  parseRealtimeVoiceSelection,
+  parseRealtimeVoiceTarget,
   realtimeVoiceChoices,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import {
+  REALTIME_VOICE_AGENT_SELECTION_ROUTE,
+  REALTIME_VOICE_AGENT_SETTINGS_CAPABILITY,
   REALTIME_VOICE_CAPABILITY,
+  REALTIME_VOICE_CONFIGURATION_ROUTE,
   REALTIME_VOICE_ROUTES,
   REALTIME_VOICE_SELECTION_CAPABILITY,
   REALTIME_VOICE_SELECTION_ROUTE,
@@ -28,13 +34,53 @@ export async function routeRealtimeVoice(
   const { method, url, capabilities, request, json, member } = context;
   if (
     method !== "POST" ||
-    (url.pathname !== REALTIME_VOICE_SELECTION_ROUTE &&
+    (url.pathname !== REALTIME_VOICE_CONFIGURATION_ROUTE &&
+      url.pathname !== REALTIME_VOICE_AGENT_SELECTION_ROUTE &&
+      url.pathname !== REALTIME_VOICE_SELECTION_ROUTE &&
       !Object.values(REALTIME_VOICE_ROUTES).some((path) => path === url.pathname))
   )
     return "unmatched";
   if (!service || !capabilities.has(REALTIME_VOICE_CAPABILITY))
     throw new HttpError(400, sourceText("error.voice.realtime.disabled"));
   const body = await readJson(request);
+  if (url.pathname === REALTIME_VOICE_CONFIGURATION_ROUTE || url.pathname === REALTIME_VOICE_AGENT_SELECTION_ROUTE) {
+    if (!capabilities.has(REALTIME_VOICE_AGENT_SETTINGS_CAPABILITY))
+      throw new HttpError(400, sourceText("error.voice.realtime.disabled"));
+    let target: ReturnType<typeof parseRealtimeVoiceTarget>;
+    let selection: ReturnType<typeof parseRealtimeVoiceSelection> | undefined;
+    try {
+      target = parseRealtimeVoiceTarget(body);
+      if (url.pathname === REALTIME_VOICE_AGENT_SELECTION_ROUTE) selection = parseRealtimeVoiceSelection(body);
+    } catch {
+      throw new HttpError(400, sourceText("error.voice.realtime.invalid"));
+    }
+    const allowed = () =>
+      target.agentId === null ||
+      (agents.listAgents().some((a) => a.id === target.agentId) &&
+        ["chat", "manage"].includes(context.agentLevel(target.agentId)));
+    if (target.agentId !== null) requireAgentLevel(context, target.agentId, selection ? "manage" : "chat");
+    if (!allowed()) throw new HttpError(400, sourceText("error.voice.realtime.invalid"));
+    if (!selection)
+      return json(
+        200,
+        service.settings(
+          target.agentId,
+          target.agentId === null ? canAdministerServer(member.role) : context.agentLevel(target.agentId) === "manage",
+        ),
+      );
+    if (target.agentId === null) requireAdmin(member);
+    if (selection.voice !== null && !realtimeVoiceChoices(service.status().model).includes(selection.voice))
+      throw new HttpError(400, sourceText("error.voice.realtime.invalid"));
+    return json(
+      200,
+      await runCauseEffect(
+        service.setSelection(
+          selection,
+          () => allowed() && (target.agentId === null || context.agentLevel(target.agentId) === "manage"),
+        ),
+      ),
+    );
+  }
   if (url.pathname === REALTIME_VOICE_SELECTION_ROUTE) {
     requireAdmin(member);
     if (

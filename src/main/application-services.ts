@@ -2528,6 +2528,11 @@ export async function createApplicationServices({
   await runCauseEffect(realtimePreferences.load());
   const realtimeVoice = new RealtimeVoiceService({
     preferences: realtimePreferences,
+    configured: () =>
+      service
+        .getStatus()
+        .providers?.some((provider) => provider.id === "codex" && provider.state === "available" && !provider.off) ??
+      false,
     context: (agentId, principal) => service.voiceSessionContext(agentId, principal),
     mode: process.env.OPENBOT_REALTIME_AUTH === "api-key" ? "api-key" : "subscription",
     enabled: process.env.OPENBOT_REALTIME_ENABLED === "1",

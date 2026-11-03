@@ -1,7 +1,10 @@
 import { spawnSync } from "node:child_process";
 import { REALTIME_VOICE_SDP_LIMIT } from "@openbot/contracts/ipc";
 import {
+  REALTIME_VOICE_AGENT_SELECTION_ROUTE,
+  REALTIME_VOICE_AGENT_SETTINGS_CAPABILITY,
   REALTIME_VOICE_CAPABILITY,
+  REALTIME_VOICE_CONFIGURATION_ROUTE,
   REALTIME_VOICE_ROUTES,
   REALTIME_VOICE_SELECTION_CAPABILITY,
   REALTIME_VOICE_SELECTION_ROUTE,
@@ -760,7 +763,7 @@ try {
     ).id;
     const levels = current().access.get(current().team.getIdentity()?.serverId ?? "");
     let revision = levels.revision;
-    const setVoiceLevel = async (level: "chat" | "view" | "none") => {
+    const setVoiceLevel = async (level: "manage" | "chat" | "view" | "none") => {
       const saved = await setAccess(ownerToken, {
         revision,
         everyone: { ...levels.everyone, [voiceAgent]: level },
@@ -771,6 +774,42 @@ try {
     };
     const connect = (agentId: string, token = setup.memberToken, sdp = OFFER) =>
       call("POST", REALTIME_VOICE_ROUTES.connect, { token, protocol: TEAM_PROTOCOL_V9, body: { agentId, sdp } });
+    await setVoiceLevel("chat");
+    const voiceSettings = (
+      token: string,
+      agentId: string | null,
+      selected?: string | null,
+      capabilities?: readonly string[],
+    ) =>
+      call("POST", selected === undefined ? REALTIME_VOICE_CONFIGURATION_ROUTE : REALTIME_VOICE_AGENT_SELECTION_ROUTE, {
+        token,
+        protocol: TEAM_PROTOCOL_V9,
+        body: { agentId, ...(selected === undefined ? {} : { voice: selected }) },
+        capabilities,
+      });
+    const readable = await voiceSettings(setup.memberToken, voiceAgent);
+    assert.equal(readable.status, 200);
+    assert.equal(record(readable.body, "voice settings").canManage, false);
+    assert.equal((await voiceSettings(setup.memberToken, voiceAgent, "ash")).status, 403);
+    assert.equal((await voiceSettings(setup.memberToken, null, "cedar")).status, 403);
+    await setVoiceLevel("manage");
+    assert.equal((await voiceSettings(setup.memberToken, voiceAgent, "ash")).status, 200);
+    assert.equal(record((await voiceSettings(ownerToken, voiceAgent)).body, "override").voice, "ash");
+    assert.equal((await voiceSettings(ownerToken, voiceAgent, "cove")).status, 400);
+    assert.equal((await voiceSettings(ownerToken, voiceAgent, null)).status, 200);
+    assert.equal(
+      (
+        await voiceSettings(
+          ownerToken,
+          voiceAgent,
+          "ash",
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter((c) => c !== REALTIME_VOICE_AGENT_SETTINGS_CAPABILITY),
+        )
+      ).status,
+      400,
+    );
+    await setVoiceLevel("none");
+    assert.equal((await voiceSettings(setup.memberToken, voiceAgent)).status, 403);
     await setVoiceLevel("chat");
     const status = await call("POST", REALTIME_VOICE_ROUTES.status, {
       token: setup.memberToken,

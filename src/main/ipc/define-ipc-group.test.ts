@@ -7,6 +7,8 @@ import {
   parseRealtimeVoiceEnabled,
   parseRealtimeVoiceOffer,
   parseRealtimeVoiceReply,
+  parseRealtimeVoiceSelection,
+  parseRealtimeVoiceTarget,
   type SpeechModelStatus,
   type VoiceModelStatus,
   type VoiceSettings,
@@ -74,7 +76,17 @@ function registerVoice(
   transcribe: (input: VoiceTranscriptionInput, event?: IpcMainInvokeEvent) => VoiceTranscriptionResult,
   withEvent = false,
 ): void {
+  const voiceSettings = () => ({
+    configured: false,
+    canManage: false,
+    enabled: false,
+    model: "gpt-live-1-codex",
+    defaultVoice: "cove",
+    voice: null,
+  });
   registerIpcGroup("voice", {
+    getRealtimeSettings: scopedHandler(parseRealtimeVoiceTarget, { local: voiceSettings, remote: voiceSettings }),
+    setRealtimeVoice: scopedHandler(parseRealtimeVoiceSelection, { local: voiceSettings, remote: voiceSettings }),
     setRealtimeEnabled: scopedHandler(parseRealtimeVoiceEnabled, {
       local: () => ({ ...DISABLED_REALTIME_VOICE }),
       remote: () => ({ ...DISABLED_REALTIME_VOICE }),

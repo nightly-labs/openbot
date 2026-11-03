@@ -180,7 +180,11 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.voice.live.title": "Live voice calls",
   "mobile.settings.voice.live.enabled": "Enable live voice calls",
   "mobile.settings.voice.live.footer":
-    "Calls use {server} and the selected agent's context. The voice changes for the next call. These settings apply to everyone on this server.",
+    "Calls use the Codex provider on {server} and each agent’s context. This is the default voice; choose a different voice in an agent’s settings. Voice changes apply to the next call.",
+  "mobile.settings.voice.live.agentFooter":
+    "Choose this agent’s voice or use the server default. Changes apply to the next call.",
+  "mobile.settings.voice.live.useDefault": "Use server default ({voice})",
+  "mobile.settings.voice.live.defaultVoice": "Default voice",
   "mobile.settings.voice.live.admin": "A server owner or admin can change these settings.",
   "mobile.settings.voice.live.update": "Update this server to select a live-call voice.",
   "mobile.settings.voice.live.nativeRequired": "This app build does not include live voice calls.",

@@ -4,7 +4,12 @@ export const messages = defineMessages("settings", {
   "settings.voice.realtime.section": "Live voice calls",
   "settings.voice.realtime.title": "Enable live voice",
   "settings.voice.realtime.description":
-    "Use the ChatGPT sign-in on {server} for live voice calls. Turning this off ends active calls. A server administrator can change this setting.",
+    "Use the Codex provider on {server} for live voice calls. This is the default voice; choose a different voice in an agent’s settings. Voice changes apply to the next call. Turning this off ends active calls.",
+  "settings.voice.realtime.defaultVoice": "Default voice",
+  "settings.voice.realtime.agentVoice": "Voice",
+  "settings.voice.realtime.useDefault": "Use server default ({voice})",
+  "settings.voice.realtime.agentDescription":
+    "Choose this agent’s voice or use the server default. Changes apply to the next call.",
   "settings.voice.realtime.local": "this computer",
   // The language setting itself.
   "settings.language.title": "Language",

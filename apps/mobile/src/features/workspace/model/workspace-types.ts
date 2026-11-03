@@ -93,7 +93,10 @@ import type {
   RealtimeVoiceOffer,
   RealtimeVoicePoll,
   RealtimeVoiceReply,
+  RealtimeVoiceSelection,
+  RealtimeVoiceSettings,
   RealtimeVoiceStatus,
+  RealtimeVoiceTarget,
   RemoteAgentImportResult,
   RemoteInstanceTransferResult,
   RenameWorkflowInput,
@@ -280,6 +283,8 @@ type MobileBrowserTabAction =
 
 export interface MobileWorkspaceContextValue {
   /** A disabled status for hosts without the optional live voice capability. */
+  realtimeVoiceSettings: (input: RealtimeVoiceTarget, serverId: string) => Promise<RealtimeVoiceSettings>;
+  setRealtimeVoiceSelection: (input: RealtimeVoiceSelection, serverId: string) => Promise<RealtimeVoiceSettings>;
   realtimeVoiceStatus: (serverId: string) => Promise<RealtimeVoiceStatus>;
   setRealtimeVoiceEnabled: (serverId: string, enabled: boolean) => Promise<RealtimeVoiceStatus>;
   selectRealtimeVoice: (serverId: string, voice: string) => Promise<RealtimeVoiceStatus>;

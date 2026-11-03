@@ -265,6 +265,7 @@ import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import {
   decodeRealtimeVoiceAnswerFromMain,
   decodeRealtimeVoicePollFromMain,
+  decodeRealtimeVoiceSettingsFromMain,
   decodeRealtimeVoiceStatusFromMain,
 } from "./realtime-voice-decoding";
 import { decodeRoutineFlowCanvas, decodeRoutineFlowLink } from "./routine-flow-decoding";
@@ -864,6 +865,8 @@ const openbotApi: OpenBotDesktopApi = {
   }),
   voice: bridgeGroup(IPC_ENDPOINTS.voice, {
     getRealtimeStatus: decodeRealtimeVoiceStatusFromMain,
+    getRealtimeSettings: decodeRealtimeVoiceSettingsFromMain,
+    setRealtimeVoice: decodeRealtimeVoiceSettingsFromMain,
     setRealtimeEnabled: decodeRealtimeVoiceStatusFromMain,
     connectRealtime: decodeRealtimeVoiceAnswerFromMain,
     pollRealtime: decodeRealtimeVoicePollFromMain,

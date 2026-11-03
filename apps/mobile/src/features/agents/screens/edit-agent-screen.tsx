@@ -50,6 +50,7 @@ import { AgentTasksRow } from "@/features/agents/components/agent-tasks-row";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { LiveVoiceSettings } from "@/features/voice/components/live-voice-settings";
 import {
   type MobileAgent,
   type MobileServer,
@@ -483,6 +484,7 @@ function AgentForm({
           {error}
         </Typography.Paragraph>
       ) : null}
+      {page === "info" ? <LiveVoiceSettings agent={agent} /> : null}
       {page === "info" || page === "appearance" || page === "runtime" ? (
         <SheetSaveAction
           dirty={dirty}

@@ -1,11 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
+  isRealtimeVoiceIdentifier,
   REALTIME_VOICE_SDP_LIMIT,
   type RealtimeVoiceAnswer,
   type RealtimeVoiceCall,
   type RealtimeVoiceOffer,
   type RealtimeVoicePoll,
   type RealtimeVoiceReply,
+  type RealtimeVoiceSelection,
+  type RealtimeVoiceSettings,
   type RealtimeVoiceStatus,
   realtimeVoiceChoices,
 } from "@openbot/contracts/ipc";
@@ -22,13 +25,29 @@ import { PreferenceStore } from "./preference-file";
 
 const logger = createOpenBotLogger("realtime-voice");
 
+interface RealtimeVoicePreferences {
+  enabled: boolean | null;
+  voice: string | null;
+  agentVoices?: Record<string, string>;
+}
 export function createRealtimeVoicePreferenceStore(path: string) {
-  return new PreferenceStore<{ enabled: boolean | null; voice: string | null }>({
+  return new PreferenceStore<RealtimeVoicePreferences>({
     path,
     defaultValue: { enabled: null, voice: null },
     decode: (value) =>
       isDynamicRecord(value) && value.version === 1 && typeof value.enabled === "boolean"
-        ? { enabled: value.enabled, voice: typeof value.voice === "string" ? value.voice : null }
+        ? {
+            enabled: value.enabled,
+            voice: typeof value.voice === "string" ? value.voice : null,
+            agentVoices: isDynamicRecord(value.agentVoices)
+              ? Object.fromEntries(
+                  Object.entries(value.agentVoices).filter(
+                    (entry): entry is [string, string] =>
+                      isRealtimeVoiceIdentifier(entry[0]) && typeof entry[1] === "string" && entry[1].length <= 128,
+                  ),
+                )
+              : {},
+          }
         : null,
   });
 }
@@ -37,8 +56,9 @@ class RealtimeVoiceFailure extends Schema.TaggedError<RealtimeVoiceFailure>()("R
   cause: Schema.Defect(),
 }) {}
 interface RealtimeVoiceOptions {
-  preferences?: PreferenceStore<{ enabled: boolean | null; voice: string | null }>;
+  preferences?: PreferenceStore<RealtimeVoicePreferences>;
   context?: AgentService["voiceSessionContext"];
+  configured?: () => boolean;
   mode?: "subscription" | "api-key";
   enabled?: boolean;
   accountId?: string;
@@ -88,6 +108,8 @@ export class RealtimeVoiceService {
   readonly #key: string;
   readonly #model: string;
   #voice: string;
+  #agentVoices: Map<string, string>;
+  readonly #configured: () => boolean;
   readonly #settingsLock = Semaphore.makeUnsafe(1);
   readonly #fetch: typeof fetch;
   readonly #pending = new Map<string, AbortController>();
@@ -111,6 +133,8 @@ export class RealtimeVoiceService {
       (savedVoice && realtimeVoiceChoices(this.#model).includes(savedVoice) ? savedVoice : null) ||
       options.voice?.trim() ||
       (this.#mode === "subscription" ? "cove" : "marin");
+    this.#agentVoices = new Map(Object.entries(options.preferences?.get().agentVoices ?? {}));
+    this.#configured = options.configured ?? (() => Boolean(this.#subscriptionAuth));
     this.#fetch = options.fetch ?? fetch;
     if (this.#key) registerSecretValue(this.#key);
   }
@@ -124,6 +148,51 @@ export class RealtimeVoiceService {
     };
   }
 
+  settings(agentId: string | null, canManage = false): RealtimeVoiceSettings {
+    const selected = agentId === null ? null : this.#agentVoices.get(agentId);
+    return {
+      configured: this.#configured(),
+      canManage,
+      enabled: this.status().enabled,
+      model: this.#model,
+      defaultVoice: this.#voice,
+      voice: selected && realtimeVoiceChoices(this.#model).includes(selected) ? selected : null,
+    };
+  }
+
+  readonly setSelection = (selection: RealtimeVoiceSelection, allowed: () => boolean) =>
+    this.#settingsLock.withPermit(this.#setSelection(selection, allowed));
+
+  readonly #setSelection = Effect.fn("RealtimeVoice.setSelection")(function* (
+    this: RealtimeVoiceService,
+    selection: RealtimeVoiceSelection,
+    allowed: () => boolean,
+  ) {
+    if (
+      !allowed() ||
+      (selection.voice !== null && !realtimeVoiceChoices(this.#model).includes(selection.voice)) ||
+      (selection.agentId === null && selection.voice === null)
+    )
+      return yield* new RealtimeVoiceFailure({ cause: new Error(sourceText("error.voice.realtime.invalid")) });
+    const next = new Map(this.#agentVoices);
+    const voice = selection.agentId === null ? (selection.voice ?? this.#voice) : this.#voice;
+    if (selection.agentId !== null) {
+      if (selection.voice === null) next.delete(selection.agentId);
+      else next.set(selection.agentId, selection.voice);
+    }
+    if (this.#preferences)
+      yield* this.#preferences
+        .set({ enabled: this.#enabled, voice, agentVoices: Object.fromEntries(next) })
+        .pipe(
+          Effect.mapError(
+            () => new RealtimeVoiceFailure({ cause: new Error(sourceText("error.voice.realtime.failed")) }),
+          ),
+        );
+    this.#agentVoices = next;
+    this.#voice = voice;
+    return this.settings(selection.agentId, true);
+  }).bind(this);
+
   readonly setEnabled = (enabled: boolean) => this.#settingsLock.withPermit(this.#setEnabled(enabled));
 
   readonly #setEnabled = Effect.fn("RealtimeVoice.setEnabled")(function* (
@@ -132,7 +201,7 @@ export class RealtimeVoiceService {
   ) {
     if (this.#preferences)
       yield* this.#preferences
-        .set({ enabled, voice: this.#voice })
+        .set({ enabled, voice: this.#voice, agentVoices: Object.fromEntries(this.#agentVoices) })
         .pipe(
           Effect.mapError(
             () => new RealtimeVoiceFailure({ cause: new Error(sourceText("error.voice.realtime.failed")) }),
@@ -154,7 +223,7 @@ export class RealtimeVoiceService {
       return yield* new RealtimeVoiceFailure({ cause: new Error(sourceText("error.voice.realtime.invalid")) });
     if (this.#preferences)
       yield* this.#preferences
-        .set({ enabled: this.#enabled, voice })
+        .set({ enabled: this.#enabled, voice, agentVoices: Object.fromEntries(this.#agentVoices) })
         .pipe(
           Effect.mapError(
             () => new RealtimeVoiceFailure({ cause: new Error(sourceText("error.voice.realtime.failed")) }),
@@ -305,6 +374,7 @@ export class RealtimeVoiceService {
       return yield* new RealtimeVoiceFailure({ cause: new Error(sourceText("error.voice.realtime.disabled")) });
     if (!offer.sdp.startsWith("v=0") || Buffer.byteLength(offer.sdp) > REALTIME_VOICE_SDP_LIMIT)
       return yield* new RealtimeVoiceFailure({ cause: new Error(sourceText("error.voice.realtime.invalid")) });
+    const selectedVoice = this.settings(offer.agentId).voice ?? this.#voice;
     const now = Date.now();
     for (const [key, attempt] of this.#attempts) if (now - attempt.since >= 60_000) this.#attempts.delete(key);
     const attempt = this.#attempts.get(principal);
@@ -353,7 +423,7 @@ export class RealtimeVoiceService {
                     throw new Error("The selected subscription account changed.");
                   const bridge = await connectCodexLive({
                     sdp: offer.sdp,
-                    voice: service.#voice,
+                    voice: selectedVoice,
                     context: initialContext,
                     auth,
                     signal: call.controller.signal,
@@ -419,7 +489,7 @@ export class RealtimeVoiceService {
                   transcription: { model: "gpt-4o-mini-transcribe" },
                   turn_detection: { type: "semantic_vad", create_response: false, interrupt_response: true },
                 },
-                output: { voice: service.#voice },
+                output: { voice: selectedVoice },
               },
             }),
           );

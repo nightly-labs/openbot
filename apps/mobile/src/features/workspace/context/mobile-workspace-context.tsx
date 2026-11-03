@@ -8,6 +8,7 @@ import {
   MCP_SERVERS_CAPABILITY,
   parseRealtimeVoiceAnswer,
   parseRealtimeVoicePoll,
+  parseRealtimeVoiceSettings,
   parseRealtimeVoiceStatus,
   type RespondToApprovalInput,
   type SidebarLayoutSnapshot,
@@ -53,7 +54,10 @@ import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/pro
 import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notifications-android-v1";
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notifications-v1";
 import {
+  REALTIME_VOICE_AGENT_SELECTION_ROUTE,
+  REALTIME_VOICE_AGENT_SETTINGS_CAPABILITY,
   REALTIME_VOICE_CAPABILITY,
+  REALTIME_VOICE_CONFIGURATION_ROUTE,
   REALTIME_VOICE_ROUTES,
   REALTIME_VOICE_SELECTION_CAPABILITY,
   REALTIME_VOICE_SELECTION_ROUTE,
@@ -1882,6 +1886,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return host.hostId;
       },
       ...hostRequests.actions,
+      realtimeVoiceSettings: async (input, serverId) => {
+        await connectionWaits.whenConnected(serverId);
+        if (!hasCapability(serverCapabilities.current, serverId, REALTIME_VOICE_AGENT_SETTINGS_CAPABILITY))
+          throw new Error(sourceText("error.voice.realtime.disabled"));
+        return request("POST", REALTIME_VOICE_CONFIGURATION_ROUTE, parseRealtimeVoiceSettings, { ...input }, serverId);
+      },
+      setRealtimeVoiceSelection: (input, serverId) =>
+        request("POST", REALTIME_VOICE_AGENT_SELECTION_ROUTE, parseRealtimeVoiceSettings, { ...input }, serverId),
       realtimeVoiceStatus: async (serverId) => {
         // During quiet resume the UI is online before the peer's capabilities have arrived.
         await connectionWaits.whenConnected(serverId);

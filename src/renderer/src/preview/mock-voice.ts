@@ -132,7 +132,30 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
     });
 
   let realtimeEnabled = false;
+  let realtimeDefault = "cove";
+  const agentVoices = new Map<string, string>();
   const voice: OpenBotDesktopApi["voice"] = {
+    getRealtimeSettings: async ({ agentId }) => ({
+      configured: true,
+      canManage: true,
+      enabled: realtimeEnabled,
+      model: "gpt-live-1-codex",
+      defaultVoice: realtimeDefault,
+      voice: agentId ? (agentVoices.get(agentId) ?? null) : null,
+    }),
+    setRealtimeVoice: async ({ agentId, voice }) => {
+      if (agentId === null) realtimeDefault = voice ?? realtimeDefault;
+      else if (voice === null) agentVoices.delete(agentId);
+      else agentVoices.set(agentId, voice);
+      return {
+        configured: true,
+        canManage: true,
+        enabled: realtimeEnabled,
+        model: "gpt-live-1-codex",
+        defaultVoice: realtimeDefault,
+        voice: agentId ? (agentVoices.get(agentId) ?? null) : null,
+      };
+    },
     getRealtimeStatus: async () => ({ ...DISABLED_REALTIME_VOICE, enabled: realtimeEnabled }),
     setRealtimeEnabled: async ({ enabled }) => {
       realtimeEnabled = enabled;

@@ -153,7 +153,6 @@ export const messages = {
   "mobile.chat.liveVoice.phase.thinking": "正在思考",
   "mobile.chat.liveVoice.phase.speaking": "正在说话",
   "mobile.chat.liveVoice.phase.offline": "未连接",
-  "mobile.chat.liveVoice.speakNow": "现在可以说话",
   "mobile.chat.liveVoice.mute": "麦克风静音",
   "mobile.chat.liveVoice.unmute": "取消麦克风静音",
   "mobile.chat.liveVoice.interrupt": "打断",

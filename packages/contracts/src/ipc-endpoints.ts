@@ -17,7 +17,10 @@ import type {
   RealtimeVoiceOffer,
   RealtimeVoicePoll,
   RealtimeVoiceReply,
+  RealtimeVoiceSelection,
+  RealtimeVoiceSettings,
   RealtimeVoiceStatus,
+  RealtimeVoiceTarget,
 } from "./ipc-realtime-voice";
 import type { ServerAuditLog } from "./ipc-server-audit";
 // The one channel list. Each endpoint holds its wire value, the group it belongs to, and whether it
@@ -868,6 +871,8 @@ export const IPC_ENDPOINTS = {
     event: event<ProviderRuntimeSnapshot>()("provider-runtimes:event"),
   },
   voice: {
+    getRealtimeSettings: scopedRequest<RealtimeVoiceTarget, RealtimeVoiceSettings>()("voice:get-realtime-settings"),
+    setRealtimeVoice: scopedRequest<RealtimeVoiceSelection, RealtimeVoiceSettings>()("voice:set-realtime-voice"),
     getRealtimeStatus: scopedQuery<RealtimeVoiceStatus>()("voice:get-realtime-status"),
     setRealtimeEnabled: scopedRequest<RealtimeVoiceEnabled, RealtimeVoiceStatus>()("voice:set-realtime-enabled"),
     connectRealtime: scopedRequest<RealtimeVoiceOffer, RealtimeVoiceAnswer>()("voice:connect-realtime"),

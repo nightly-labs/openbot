@@ -1,4 +1,9 @@
-import { parseRealtimeVoiceEnabled, parseRealtimeVoiceOffer } from "@openbot/contracts/ipc";
+import {
+  parseRealtimeVoiceEnabled,
+  parseRealtimeVoiceOffer,
+  parseRealtimeVoiceSelection,
+  parseRealtimeVoiceTarget,
+} from "@openbot/contracts/ipc";
 import type { HostService } from "../host-service";
 import type { RealtimeVoiceService } from "../realtime-voice-service";
 import type { RemoteServerManager } from "../remote-server-manager";
@@ -64,6 +69,34 @@ export function voiceIpcHandlers({
 }: VoiceIpcDependencies): Pick<IpcGroupHandlers, "voice"> {
   return {
     voice: {
+      getRealtimeSettings: scopedHandler(parseRealtimeVoiceTarget, {
+        local: (input) => {
+          if (
+            input.agentId !== null &&
+            (!service.listAgents().some((a) => a.id === input.agentId) ||
+              !["chat", "manage"].includes(host.channelPersonAgentLevel(host.channelActor().id, input.agentId)))
+          )
+            throw new Error(sourceText("error.voice.realtime.invalid"));
+          return realtime.settings(
+            input.agentId,
+            input.agentId === null || host.channelPersonAgentLevel(host.channelActor().id, input.agentId) === "manage",
+          );
+        },
+        remote: (input, serverId) => runCauseEffect(remoteServers.getRealtimeVoiceSettings(serverId, input)),
+      }),
+      setRealtimeVoice: scopedHandler(parseRealtimeVoiceSelection, {
+        local: (input) =>
+          runCauseEffect(
+            realtime.setSelection(
+              input,
+              () =>
+                input.agentId === null ||
+                (service.listAgents().some((a) => a.id === input.agentId) &&
+                  host.channelPersonAgentLevel(host.channelActor().id, input.agentId) === "manage"),
+            ),
+          ),
+        remote: (input, serverId) => runCauseEffect(remoteServers.setRealtimeVoiceSelection(serverId, input)),
+      }),
       pollRealtime: scopedHandler(parseRealtimeVoiceCall, {
         local: (input) => {
           const actor = host.channelActor();

@@ -163,7 +163,6 @@ export const messages = {
   "mobile.chat.liveVoice.phase.thinking": "Réflexion",
   "mobile.chat.liveVoice.phase.speaking": "Parle",
   "mobile.chat.liveVoice.phase.offline": "Non connecté",
-  "mobile.chat.liveVoice.speakNow": "Parlez maintenant",
   "mobile.chat.liveVoice.mute": "Couper le micro",
   "mobile.chat.liveVoice.unmute": "Réactiver le micro",
   "mobile.chat.liveVoice.interrupt": "Interrompre",

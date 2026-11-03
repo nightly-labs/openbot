@@ -11,6 +11,9 @@ import {
   string,
 } from "./admin-wire";
 export const REALTIME_VOICE_CAPABILITY = "realtime-voice-v1";
+export const REALTIME_VOICE_AGENT_SETTINGS_CAPABILITY = "realtime-voice-agent-settings-v1";
+export const REALTIME_VOICE_CONFIGURATION_ROUTE = "/v1/realtime-voice/configuration";
+export const REALTIME_VOICE_AGENT_SELECTION_ROUTE = "/v1/realtime-voice/selection";
 export const REALTIME_VOICE_SELECTION_CAPABILITY = "realtime-voice-selection-v1";
 export const REALTIME_VOICE_SELECTION_ROUTE = "/v1/realtime-voice/voice";
 export const REALTIME_VOICE_ROUTES = {
@@ -21,7 +24,20 @@ export const REALTIME_VOICE_ROUTES = {
   reply: "/v1/realtime-voice/reply",
   end: "/v1/realtime-voice/end",
 } as const;
+const voiceSettings = fields({
+  configured: boolean,
+  canManage: boolean,
+  enabled: boolean,
+  model: string(128),
+  defaultVoice: string(128),
+  voice: nullable(string(128)),
+});
 export const REALTIME_VOICE_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
+  [REALTIME_VOICE_CONFIGURATION_ROUTE, adminRoute(fields({ agentId: nullable(identifier) }), voiceSettings)],
+  [
+    REALTIME_VOICE_AGENT_SELECTION_ROUTE,
+    adminRoute(fields({ agentId: nullable(identifier), voice: nullable(string(128)) }), voiceSettings),
+  ],
   [
     REALTIME_VOICE_SELECTION_ROUTE,
     adminRoute(fields({ voice: string(128) }), fields({ enabled: boolean, model: string(128), voice: string(128) })),

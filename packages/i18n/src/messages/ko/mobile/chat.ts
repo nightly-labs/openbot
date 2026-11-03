@@ -158,7 +158,6 @@ export const messages = {
   "mobile.chat.liveVoice.phase.thinking": "생각 중",
   "mobile.chat.liveVoice.phase.speaking": "말하는 중",
   "mobile.chat.liveVoice.phase.offline": "연결되지 않음",
-  "mobile.chat.liveVoice.speakNow": "지금 말씀하세요",
   "mobile.chat.liveVoice.mute": "마이크 음소거",
   "mobile.chat.liveVoice.unmute": "마이크 음소거 해제",
   "mobile.chat.liveVoice.interrupt": "끼어들기",
