@@ -476,8 +476,9 @@ does not count it. See [hosted servers](../hosted-servers.md) step 5.
 the last keyboard or mouse input on the computer of a desktop app, in any app. The host answers
 `{ phones }`: whether it sends notifications to a phone of the calling member. A host advertises it
 when it sends phone notifications (`pushNotifications` in `TeamApiOptions`), and the capability is v9
-only. `PushNotificationService.computerInput` keeps the input time of each session in memory, for the
-away time only, and a phone of the same member stays quiet until that time passes, as after a send
+only. `PushNotificationService.computerInput` keeps the input time of each session in memory and
+uses it for the away time only. It removes an old time at the next report and at the end of the
+session. A phone of the same member stays quiet until that time passes, as after a send
 from another session. The route is in `PASSIVE_ROUTES`: input on a computer does not keep a hosted
 server running.
 

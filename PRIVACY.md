@@ -1534,8 +1534,9 @@ memory the time of the last send, answer or typing of each session, and on its o
 whether the OpenBot window has focus and how long the computer has had no input. The desktop app also
 tells each joined server that shows its events on the desktop, after input, how many seconds ago the
 computer last had keyboard or mouse input, in any app. It sends only this number, not what you typed or
-which app you used. The host keeps the time in memory for 30 seconds and uses it only to keep your
-phones quiet. A host that sends notifications to none of your phones says so, and the desktop app then
+which app you used. The host keeps the time in memory only, uses it for 30 seconds only to keep your
+phones quiet, and removes it at the next report or when the session ends. A host that sends
+notifications to none of your phones says so, and the desktop app then
 does not tell it again for 5 minutes. While the phone shows the Live Activity of
 that host and the activity shows the event, the host sends no notification. With Play sound on, the
 Live Activity update lights up the screen and plays the sound instead. An event that comes while
