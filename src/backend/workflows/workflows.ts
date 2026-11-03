@@ -79,6 +79,7 @@ import type { ReceivedWebhookEvent } from "../routine-store";
 import {
   type DiscordOutputPlan,
   discordOutputPlan,
+  discordTriggerFiles,
   discordTriggerMatches,
   discordTriggerMessage,
   workflowDiscordPayload,
@@ -730,6 +731,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             run?.graph ?? null,
             run?.triggerNodeId ?? null,
             step.runId ? github.runItem(step.runId) : null,
+            run?.source === "discord" ? discordTriggerFiles(run.payload) : null,
           );
           if (plan.kind === "failed") {
             settle(step, { status: "failed", error: plan.error });

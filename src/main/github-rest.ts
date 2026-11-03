@@ -13,14 +13,17 @@ import { WORKFLOW_GITHUB_OPTION_LIMIT } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { z } from "zod";
-import type {
-  WorkflowGitHubApi,
-  WorkflowGitHubApiFailure,
-  WorkflowGitHubChange,
-  WorkflowGitHubChangeResult,
-  WorkflowGitHubRecentEvent,
+import {
+  GITHUB_BODY_LIMIT,
+  type WorkflowGitHubApi,
+  type WorkflowGitHubApiFailure,
+  type WorkflowGitHubChange,
+  type WorkflowGitHubChangeResult,
+  type WorkflowGitHubFile,
+  type WorkflowGitHubFiles,
+  type WorkflowGitHubRecentEvent,
 } from "../backend/workflows/workflow-github-api";
 import { WorkflowStoreError } from "../backend/workflows/workflow-store";
 import { GITHUB_REQUEST_TIMEOUT_MS, type GitHubFetch } from "./github-device-flow";
@@ -40,6 +43,69 @@ const GITHUB_STATE_REASONS: Record<WorkflowGitHubCloseReason, string> = {
   notPlanned: "not_planned",
 };
 
+/**
+ * The branch that keeps the files of GitHub outputs. GitHub has no API that attaches a file to an issue
+ * for an App, so the files go to this branch and the text links them. It has no history of the default
+ * branch, so it has no workflow files, and a push to it starts no GitHub Actions.
+ */
+const FILES_BRANCH = "openbot-attachments";
+/** The largest file that an output copies. A larger one keeps its own link, which expires. */
+const FILE_BYTES_LIMIT = 25 * 1024 * 1024;
+/** The longest file name in the branch. */
+const FILE_NAME_LIMIT = 100;
+/** `[skip ci]` stops other CI services too. */
+const FILES_COMMIT_MESSAGE = "Add files for an OpenBot workflow output [skip ci]";
+
+/** One linked file: on the branch, or at its own address when it could not be copied. */
+interface FileLink {
+  name: string;
+  url: string;
+  image: boolean;
+}
+
+/** The name of a file in the branch: its place in the list, then only characters that need no escape. */
+function branchFileName(name: string, index: number): string {
+  const safe = name
+    .replace(/[^A-Za-z0-9._-]+/gu, "-")
+    .replace(/^[.-]+/u, "")
+    .slice(-FILE_NAME_LIMIT);
+  return `${index + 1}-${safe || "file"}`;
+}
+
+/** The address of a file of the source, or null when it is not an `https` address. */
+function sourceUrl(file: WorkflowGitHubFile): string | null {
+  try {
+    const url = new URL(file.url);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The link of a file at its own address, or null when that is not an `https` address. */
+function ownLink(file: WorkflowGitHubFile): FileLink | null {
+  const url = sourceUrl(file);
+  return url ? { name: file.name, url, image: file.contentType.startsWith("image/") } : null;
+}
+
+/** The Markdown of the links: an image shows in the text, another file is a link. */
+function filesMarkdown(links: readonly FileLink[]): string {
+  return links
+    .map((link) => {
+      const name = link.name.replace(/[\\[\]\r\n]/gu, (character) => (character.trim() ? `\\${character}` : " "));
+      return `${link.image ? "!" : ""}[${name}](<${link.url}>)`;
+    })
+    .join("\n\n");
+}
+
+/** The text with the links of its files below it, in GitHub's limit. */
+function withFiles(body: string, links: readonly FileLink[]): string {
+  const section = filesMarkdown(links);
+  if (!section) return body;
+  const room = Math.max(0, GITHUB_BODY_LIMIT - section.length - 2);
+  return [body.slice(0, room).trimEnd(), section].filter(Boolean).join("\n\n").slice(0, GITHUB_BODY_LIMIT);
+}
+
 /** The tokens for one repository: the user's, and the app's where the user can push. */
 interface GitHubRepositoryTokens {
   user: string;
@@ -50,6 +116,11 @@ export interface GitHubRestOptions {
   fetch: GitHubFetch;
   /** Null while the GitHub connection is not active. */
   tokens: (repository: string) => Effect.Effect<GitHubRepositoryTokens | null, GitHubOperationError>;
+  /**
+   * The bytes of a file that a change links, such as a Discord attachment. Without it, or when it fails,
+   * the text links the file at its own address.
+   */
+  download?: (url: string, maxBytes: number) => Effect.Effect<Uint8Array, unknown>;
 }
 
 const createdSchema = z.object({ id: z.number(), html_url: z.string().nullish() });
@@ -57,6 +128,9 @@ const issueSchema = z.object({ number: z.number(), html_url: z.string().nullish(
 const labelsSchema = z.array(z.object({ name: z.string().min(1), color: z.string() }));
 const assigneesSchema = z.array(z.object({ login: z.string().min(1) }));
 const messageSchema = z.object({ message: z.string() });
+const shaSchema = z.object({ sha: z.string().min(1) });
+const refSchema = z.object({ object: shaSchema });
+const commitSchema = z.object({ sha: z.string().min(1), tree: shaSchema });
 
 type Failure = WorkflowGitHubApiFailure;
 
@@ -142,6 +216,85 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
         Effect.fail(failure("unreachable", sourceText("error.workflow.githubUnreachable")));
   };
 
+  /**
+   * Copies the files to the files branch in one commit, and answers their links. A file that is too
+   * large or that cannot be read keeps its own address; so does each file when the commit fails, such as
+   * in an empty repository or under a rule that protects every branch. Tries of one change commit the
+   * same paths, so a second try changes nothing.
+   */
+  const copyFiles = Effect.fn("GitHubRest.copyFiles")(function* (
+    token: string,
+    repository: string,
+    files: WorkflowGitHubFiles,
+  ): Effect.fn.Return<FileLink[], Failure> {
+    const repo = `/repos/${repository}`;
+    const own = files.files.map(ownLink);
+    const download = options.download;
+    if (!download) return own.filter((link) => link !== null);
+    const copied = new Map<number, string>();
+    const entries: { path: string; mode: "100644"; type: "blob"; sha: string }[] = [];
+    for (const [index, file] of files.files.entries()) {
+      if (file.size > FILE_BYTES_LIMIT || !own[index]) continue;
+      const bytes = yield* download(file.url, FILE_BYTES_LIMIT).pipe(Effect.option);
+      if (Option.isNone(bytes) || bytes.value.byteLength === 0) continue;
+      const blob = yield* call(token, "POST", `${repo}/git/blobs`, {
+        content: Buffer.from(bytes.value).toString("base64"),
+        encoding: "base64",
+      }).pipe(Effect.flatMap((answer) => parse(shaSchema, answer)));
+      const path = `${files.folder}/${branchFileName(file.name, index)}`;
+      entries.push({ path, mode: "100644", type: "blob", sha: blob.sha });
+      copied.set(index, path);
+    }
+    if (entries.length === 0) return own.filter((link) => link !== null);
+    // A run of another output can move the branch at the same time: the second try builds on its commit.
+    let commit: string | null = null;
+    for (let attempt = 0; attempt < 2 && !commit; attempt += 1) {
+      const head = refSchema.safeParse(
+        yield* call(token, "GET", `${repo}/git/ref/heads/${FILES_BRANCH}`, undefined, [404]),
+      );
+      const parent = head.success ? head.data.object.sha : null;
+      const base = parent
+        ? yield* call(token, "GET", `${repo}/git/commits/${parent}`).pipe(
+            Effect.flatMap((answer) => parse(commitSchema, answer)),
+          )
+        : null;
+      const tree = yield* call(token, "POST", `${repo}/git/trees`, {
+        ...(base ? { base_tree: base.tree.sha } : {}),
+        tree: entries,
+      }).pipe(Effect.flatMap((answer) => parse(shaSchema, answer)));
+      const made = yield* call(token, "POST", `${repo}/git/commits`, {
+        message: FILES_COMMIT_MESSAGE,
+        tree: tree.sha,
+        parents: parent ? [parent] : [],
+      }).pipe(Effect.flatMap((answer) => parse(shaSchema, answer)));
+      const moved = parent
+        ? yield* call(token, "PATCH", `${repo}/git/refs/heads/${FILES_BRANCH}`, { sha: made.sha, force: false }, [422])
+        : yield* call(token, "POST", `${repo}/git/refs`, { ref: `refs/heads/${FILES_BRANCH}`, sha: made.sha }, [422]);
+      if (refSchema.safeParse(moved).success) commit = made.sha;
+    }
+    if (!commit) return own.filter((link) => link !== null);
+    return own.flatMap((link, index) => {
+      if (!link) return [];
+      const path = copied.get(index);
+      if (!path) return [link];
+      const encoded = path.split("/").map(encodeURIComponent).join("/");
+      // `?raw=true` shows the file itself, also to a person who can read a private repository.
+      return [{ ...link, url: `https://github.com/${repository}/blob/${commit}/${encoded}?raw=true` }];
+    });
+  });
+
+  /** `copyFiles`; a file that cannot be copied does not stop the issue or the comment. */
+  const commitFiles = (token: string, repository: string, files: WorkflowGitHubFiles) =>
+    copyFiles(token, repository, files).pipe(
+      Effect.catch(() => Effect.succeed(files.files.flatMap((file) => ownLink(file) ?? []))),
+    );
+
+  /** The text of a change, with the links of its files. */
+  const changeBody = (token: string, change: WorkflowGitHubChange) =>
+    change.files && change.files.files.length > 0
+      ? commitFiles(token, change.repository, change.files).pipe(Effect.map((links) => withFiles(change.body, links)))
+      : Effect.succeed(change.body);
+
   const change = Effect.fn("GitHubRest.change")(function* (
     change: WorkflowGitHubChange,
   ): Effect.fn.Return<WorkflowGitHubChangeResult, Failure> {
@@ -157,7 +310,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
       case "comment": {
         const answer = yield* parse(
           createdSchema,
-          yield* call(token, "POST", `${item}/comments`, { body: change.body }),
+          yield* call(token, "POST", `${item}/comments`, { body: yield* changeBody(token, change) }),
         );
         return { created: { kind: "comment", id: answer.id }, url: answer.html_url ?? itemUrl };
       }
@@ -199,7 +352,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
           issueSchema,
           yield* call(token, "POST", `${repo}/issues`, {
             title: change.title,
-            body: change.body,
+            body: yield* changeBody(token, change),
             ...(change.labels.length > 0 ? { labels: change.labels } : {}),
           }),
         );

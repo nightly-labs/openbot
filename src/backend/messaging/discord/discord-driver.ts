@@ -599,13 +599,23 @@ const readAtMost = Effect.fnUntraced(function* (path: string, limit: number) {
   );
 });
 
-/** Downloads one attachment from Discord's CDN, and refuses a file larger than `maxBytes`. */
-const downloadAttachment = Effect.fnUntraced(function* (url: string, destination: string, maxBytes: number) {
+/**
+ * Follows Discord's CDN redirects to the body of one attachment and gives it to `consume`. Each address,
+ * the first one too, must be on Discord's CDN, and a file larger than `maxBytes` is refused.
+ */
+/** One response of the CDN: a redirect to follow, or the value of the body. */
+type CdnStep<A> = { redirect: string } | { value: A };
+
+const withCdnBody = Effect.fnUntraced(function* <A>(
+  url: string,
+  maxBytes: number,
+  consume: (body: ReadableStream<Uint8Array>) => Effect.Effect<A, MessagingAdapterError>,
+) {
   let current = url;
   for (let redirects = 0; ; redirects += 1) {
     if (!trustedCdnUrl(current))
       return yield* new MessagingAdapterError({ cause: new DiscordApiError("download", "untrusted_file_url") });
-    const next = yield* Effect.acquireUseRelease(
+    const next: CdnStep<A> = yield* Effect.acquireUseRelease(
       Effect.sync(() => new AbortController()),
       (controller) =>
         Effect.gen(function* () {
@@ -614,7 +624,7 @@ const downloadAttachment = Effect.fnUntraced(function* (url: string, destination
             const location = response.headers.get("location");
             if (!location || redirects >= REDIRECT_LIMIT)
               return yield* new MessagingAdapterError({ cause: new DiscordApiError("download", "redirect") });
-            return new URL(location, current).toString();
+            return { redirect: new URL(location, current).toString() } as const;
           }
           const body = response.body;
           if (!response.ok || !body)
@@ -623,14 +633,41 @@ const downloadAttachment = Effect.fnUntraced(function* (url: string, destination
             });
           if (Number(response.headers.get("content-length") ?? "0") > maxBytes)
             return yield* new MessagingAdapterError({ cause: new DiscordApiError("download", "too_large") });
-          yield* writeBody(body, destination, maxBytes);
-          return null;
+          return { value: yield* consume(body) } as const;
         }),
       (controller) => Effect.sync(() => controller.abort()),
     );
-    if (next === null) return;
-    current = next;
+    if ("value" in next) return next.value;
+    current = next.redirect;
   }
+});
+
+/** Downloads one attachment from Discord's CDN, and refuses a file larger than `maxBytes`. */
+const downloadAttachment = (url: string, destination: string, maxBytes: number) =>
+  withCdnBody(url, maxBytes, (body) => writeBody(body, destination, maxBytes));
+
+/**
+ * The bytes of one attachment on Discord's CDN, for a workflow output that copies it elsewhere. A
+ * signed CDN address needs no token. A file larger than `maxBytes` is refused.
+ */
+export const downloadDiscordAttachment = (url: string, maxBytes: number) =>
+  withCdnBody(url, maxBytes, (body) => readBody(body, maxBytes));
+
+/** The whole body in memory, up to `maxBytes`. */
+const readBody = Effect.fnUntraced(function* (body: ReadableStream<Uint8Array>, maxBytes: number) {
+  const reader = body.getReader();
+  return yield* Effect.gen(function* () {
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    for (;;) {
+      const { done, value } = yield* adapterIo(() => reader.read());
+      if (done) return Buffer.concat(chunks, received);
+      received += value.byteLength;
+      if (received > maxBytes)
+        return yield* new MessagingAdapterError({ cause: new DiscordApiError("download", "too_large") });
+      chunks.push(value);
+    }
+  }).pipe(Effect.ensuring(adapterIo(() => reader.cancel()).pipe(Effect.catch(() => Effect.void))));
 });
 
 const writeBody = Effect.fnUntraced(function* (
