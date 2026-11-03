@@ -531,6 +531,7 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Yanıtları sesli oku",
   "settings.voice.speech.readReplies.description":
     "Bir mesajı dikte ettiğinizde yanıt sesli okunur. Durdurmak için yeniden dikte edin.",
+  "settings.voice.speech.speed.title": "Hız",
   "settings.voice.speech.voice.title": "Ses",
   "settings.voice.speech.voice.female": "Kadın sesi {number}",
   "settings.voice.speech.voice.male": "Erkek sesi {number}",
