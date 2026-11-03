@@ -60,6 +60,7 @@ import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../se
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
+import { type CompanySignInCalls, createServerCompanySignInSection } from "./ServerCompanySignInSection";
 import { ServerDesktopPanel } from "./ServerDesktopPanel";
 import { createServerGeneralSection } from "./ServerGeneralSection";
 import { type ServerImportDetail, type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
@@ -101,6 +102,8 @@ export interface ServerSettingsModalProps {
    * Members section first asks to add a user to it. Absent on surfaces with no account license.
    */
   license?: Pick<LicenseCalls, "getState" | "setUsers" | "changePlan"> | undefined;
+  /** Company sign-in for the owner of a published server. Absent where the app cannot manage it. */
+  companySignIn?: CompanySignInCalls | undefined;
   /** Opens the contact page when a full license already has the most users that the app sells. */
   onContactUs?: () => void;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
@@ -381,6 +384,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
     roles,
   );
+  const companySignIn = createServerCompanySignInSection(
+    host,
+    () => props.companySignIn,
+    () => props.open && section() === "members",
+  );
   const hostedSites = createSettingsHostedSitesStore(
     {
       get open() {
@@ -436,6 +444,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         setSection(untrack(availableInitialSection) ?? "general");
         general.resetForServer();
         members.resetForServer();
+        companySignIn.resetForServer();
         roles.resetForServer();
         audit.resetForServer();
       }
@@ -762,6 +771,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         </Show>
         <Tabs.Content value="members" class="settings-modal-tab-panel server-settings-panel" data-tab="members">
           <members.Panel />
+          <companySignIn.Panel />
         </Tabs.Content>
         <Show when={roles.available()}>
           <Tabs.Content value="roles" class="settings-modal-tab-panel server-settings-panel" data-tab="roles">

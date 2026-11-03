@@ -198,6 +198,12 @@ GitHub Actions reads the remote-control secrets, `SKILLS_ADMIN_TOKEN`, `SITE_REP
 `SITE_OPERATIONS_ADMIN_TOKEN` and `SERVER_CLAIMS_ADMIN_TOKEN` from the `cloudflare-production` Environment. It includes
 them in Wrangler's temporary runtime secrets file.
 
+`COMPANY_SIGN_IN_SECRET` (at least 32 random bytes) turns on company sign-in (OpenID Connect and
+SCIM). It encrypts each company's client secret in D1, so never change or lose it: with another
+value, each company must enter its client secret again. Without it, company sign-in answers 503 and
+everyone signs in with an email code. GitHub Actions reads it from the `cloudflare-production`
+Environment; a local deployment reads it from the encrypted `.env.production`.
+
 `SERVER_CLAIMS_ADMIN_TOKEN` lets an operator sign a new server in for a user without an email code: see
 [server claims](../../docs/self-hosted-server.md#sign-in-with-a-server-claim). Without it, the endpoint answers 401.
 

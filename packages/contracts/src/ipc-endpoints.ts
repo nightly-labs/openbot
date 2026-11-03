@@ -153,6 +153,8 @@ import type {
   BackgroundProcess,
   CentralAuthState,
   ChatWindowTarget,
+  CompanySignInScimToken,
+  CompanySignInSettings,
   ComputerUseHighlightPlacement,
   ComputerUsePermissionApp,
   ComputerUseState,
@@ -167,6 +169,9 @@ import type {
   ProviderRuntimeSnapshot,
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
+  SetCompanySignInEnabledInput,
+  TestCompanySignInInput,
+  TestCompanySignInResult,
   UpdatePreference,
   UpdatePreferenceChange,
   UpdateRestartMode,
@@ -1397,6 +1402,18 @@ export const IPC_ENDPOINTS = {
     revokeAccountSession: request<string, void>()("auth:revoke-account-session"),
     revokeMobileConnectedDevice: request<string, void>()("auth:revoke-mobile-connected-device"),
     logout: request<undefined, CentralAuthState>()("auth:logout"),
+    // Company sign-in. `openCompanySignIn` opens the provider page again for the email in the state.
+    openCompanySignIn: request<undefined, CentralAuthState>()("auth:open-company-sign-in"),
+    // The setup of a server that the user owns, by server id. `testCompanySignIn` waits for the browser.
+    getCompanySignIn: request<string, CompanySignInSettings>()("auth:company-sign-in:get"),
+    testCompanySignIn: request<TestCompanySignInInput, TestCompanySignInResult>()("auth:company-sign-in:test"),
+    cancelCompanySignInTest: request<undefined, void>()("auth:company-sign-in:cancel-test"),
+    setCompanySignInEnabled: request<SetCompanySignInEnabledInput, CompanySignInSettings>()(
+      "auth:company-sign-in:set-enabled",
+    ),
+    removeCompanySignIn: request<string, CompanySignInSettings>()("auth:company-sign-in:remove"),
+    createCompanySignInScimToken: request<string, CompanySignInScimToken>()("auth:company-sign-in:create-scim-token"),
+    revokeCompanySignInScimToken: request<string, CompanySignInSettings>()("auth:company-sign-in:revoke-scim-token"),
     event: event<CentralAuthState>()("auth:event"),
   },
   update: {

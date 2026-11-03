@@ -831,6 +831,79 @@ over the Team API (`getHostAuditLog`) each time it opens, and keeps no copy.
 Known limits: a host with no account directory records no join from a local-store invite, and the log
 has no page or date filter.
 
+### Company sign-in
+
+Company sign-in connects one server to the company's OpenID Connect provider (Entra ID, Okta, Google
+Workspace or another one). The account service does all provider work
+(`apps/auth-api/src/server/company-sign-in.ts`); the host and the clients see only OpenBot sessions.
+Migration `0047_company_sign_in.sql` adds the tables. SAML is not supported.
+
+Setup is desktop only: Server settings → Members → Company sign-in (`ServerCompanySignInSection.tsx`),
+for the owner. The owner routes are `/v2/remote/hosts/:hostId/company-sign-in`, `.../test` and
+`.../scim-token`. The dialog sends the issuer, the client ID, the client secret and the domains, and
+starts a test sign-in at the provider. Only a test that passes saves the values. The rules:
+
+- A domain belongs to the first server whose test passes with it. Public mail domains (`gmail.com`
+  and others) are refused.
+- A production account service also needs the TXT record `_openbot.<domain>` with the value of the
+  server. A development API does not check DNS.
+- The issuer field also accepts the metadata URL (the issuer with `/.well-known/openid-configuration`)
+  and an Entra ID tenant domain. The discovery document can give an issuer on the same origin, such as
+  the tenant ID form; that issuer is saved and checked in tokens. Entra ID `common` and
+  `organizations` are refused, because their issuer is a placeholder that no token has.
+- All Google accounts have the issuer `https://accounts.google.com`. For it, the token must also have
+  an `hd` claim (the Workspace domain) that is one of the domains. A personal Google account with a
+  company email has no `hd`, and is refused.
+- The client secret is encrypted with `COMPANY_SIGN_IN_SECRET` (32 bytes or more). Never change this
+  value: it makes the saved secrets unreadable. Without it, the routes answer 503
+  `company_sign_in_not_configured`, and everyone signs in with an email code.
+- When the connection is on, an email code for its domains answers 409 `company_sign_in_required`,
+  and the client goes to company sign-in.
+
+Sign-in routes are `/v1/auth/company/start`, `/callback` and `/exchange`. The flow uses PKCE twice:
+once between the account service and the provider, and once between the app and the account service.
+
+- Desktop (`src/main/company-sign-in-browser.ts`): the main process opens a loopback listener on
+  `127.0.0.1`, opens the provider page in the user's browser, and gets a one-time code (2 minutes)
+  at the listener. It exchanges the code and its verifier for an account session.
+- Web `/app`: `POST /api/browser/company/start` keeps the state and the verifier in the HttpOnly
+  `__Host-openbot-company` cookie (10 minutes) and opens the provider in the same tab.
+  `GET /api/browser/company/return` exchanges the code, sets the `__Host-openbot-web` session cookie,
+  and answers 303 to `/app`. The cookie stops a login CSRF.
+
+The provider's subject is linked to an account (`company_sign_in_identities`). A first sign-in uses
+the account with the same email, or makes a new one. When the ID token has no `email`, the service
+uses `preferred_username` (Entra ID). A claim `email_verified: false` is refused.
+
+A person who finishes company sign-in joins the server as `member` with no invitation
+(`RemoteControlPlane.joinByCompanySignIn`). The join uses the same seat checks as an invitation: the
+member limit of the server and the license users of the owner. The rules:
+
+- A revoked membership (the owner removed the person, or the person left) stays revoked at sign-in.
+- With no free seat, the sign-in still gives a session, the join does not occur, and the Worker logs
+  a warning with the host ID.
+- A join ends the earlier remote sessions of the person on that server and sends
+  `account-servers-changed`, so the clients of the person show the server.
+
+SCIM 2.0 (`/scim/v2/Users`, `company-sign-in-scim.ts`) supports what Entra ID and Okta send: list
+with the filter `userName eq "…"`, create, read, and PATCH, PUT and DELETE of `active`. The bearer
+token starts with `obscim_`, shows once, and D1 keeps only its hash. Other attributes belong to the
+OpenBot account and do not change. `active` accepts the strings `"True"` and `"False"`. Off, and
+DELETE, end every session of the account, spend its open email and company sign-in codes, and revoke the membership. A
+create for a person who exists sets `active` as a PATCH does. Off → on joins the person again,
+also after that revocation. A repeated on does not change a membership that the owner revoked.
+
+The daily retention task removes flows after 10 minutes, and codes after they expire or are used.
+
+Known limits:
+
+- The local development host reads its members from its team file, not from D1, so the desktop
+  Members list in `bun run dev` does not show a company sign-in join. Check D1 or the
+  `/v2/remote/hosts` list of the person.
+- The mobile app has no company sign-in.
+- No full sign-in with a real Entra ID tenant has been made. Discovery, the authorize parameters and
+  the token request were checked against the live Microsoft endpoints with a fake application.
+
 ### Webhook routines
 
 A webhook belongs to its routine. The host keeps the trigger, the encrypted secret, and receipts in

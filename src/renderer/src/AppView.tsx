@@ -102,6 +102,7 @@ export function AppAccessGate() {
                     onRequestEmailCode={auth.requestEmailCode}
                     onVerifyEmailCode={auth.verifyEmailCode}
                     onReset={auth.logoutCentralAccount}
+                    onOpenCompanySignIn={auth.openCompanySignIn}
                     language={i18n.locale()}
                     onChangeLanguage={languageStep.reopen}
                   />

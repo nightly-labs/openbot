@@ -1,5 +1,5 @@
 import type { HostedServerIssue, HostedServerSleep, HostedServerStart } from "@openbot/contracts/ipc";
-import { createEffect, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { Button, IconButton } from "../../button";
 import { ErrorReference } from "../../error-reference";
 import { X } from "../../icons";
@@ -337,7 +337,9 @@ export interface ConversationLoadNoticeProps {
  */
 export function ConversationLoadNotice(props: ConversationLoadNoticeProps) {
   const { t } = useText();
-  const waiting = () => props.loading && !props.error;
+  // A memo, so that a read in the loading screen's `onSettled` does not run the caller's prop getter:
+  // a getter such as `a && b` makes a memo when it runs, and `onSettled` does not permit one.
+  const waiting = createMemo(() => props.loading && !props.error);
   // Each wait gets its own screen: a screen that started its exit cannot load again.
   const [screen, setScreen] = createSignal<number | null>(null);
   // The screen that started its exit. It stays ready, so a new wait does not stop its exit.
