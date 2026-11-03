@@ -546,6 +546,7 @@ export class HostService extends EventEmitter<HostEvents> {
               this.#pushNotifications?.reconnected(sessionId);
             }
           },
+          unknownMemberConnected: (membershipId) => this.#dispatch(this.#learnConnectedMember(membershipId)),
           ...(options.verifyRemoteSessionTicket ? { verifyClientTicket: options.verifyRemoteSessionTicket } : {}),
           ...(options.privateNetwork ? { privateNetwork: options.privateNetwork } : {}),
         })
@@ -1621,6 +1622,36 @@ export class HostService extends EventEmitter<HostEvents> {
     if (closed.length === 0) return;
     for (const sessionId of closed) yield* this.#closeLocalSession(sessionId);
     this.#api.refreshPresence();
+  });
+
+  /**
+   * A member who joined after this host read the account directory connects with no name here, so
+   * presence and the messages they write would show their account id. Read the directory once.
+   * A failed read only logs: the member stays connected, as before.
+   */
+  readonly #learnConnectedMember = Effect.fn("HostService.learnConnectedMember")(function* (
+    this: HostService,
+    membershipId: string,
+  ): Effect.fn.Return<void> {
+    const hostId = this.#options.store.getIdentity()?.serverId;
+    const listRemoteMembers = this.#options.listRemoteMembers;
+    if (!hostId || !listRemoteMembers || !this.#usesAccountDirectory()) return;
+    yield* this.#memberWrites
+      .withPermit(
+        Effect.gen({ self: this }, function* () {
+          // Another session of the same member can have read the directory while this one waited.
+          if (this.#options.store.getMember(membershipId)) return;
+          const members = yield* listRemoteMembers(hostId);
+          if (!this.#isActiveHost(hostId)) return;
+          yield* this.#syncRemoteDirectory(hostId, members);
+          this.#api.refreshPresence();
+        }),
+      )
+      .pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => logger.warn("The account directory did not load for a new member.", toLogValue(error))),
+        ),
+      );
   });
 
   /**
