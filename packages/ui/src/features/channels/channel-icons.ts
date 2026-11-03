@@ -80,7 +80,7 @@ export const CHANNEL_ICON_NAMES = [
 /** The colour of a new icon, before the reader chooses one. */
 export const DEFAULT_CHANNEL_ICON_HUE: AvatarHue = 215;
 
-export function isChannelIconName(name: string): name is ChannelIconName {
+function isChannelIconName(name: string): name is ChannelIconName {
   return Object.hasOwn(CHANNEL_ICONS, name);
 }
 

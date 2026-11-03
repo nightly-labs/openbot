@@ -268,7 +268,8 @@ export class ChannelService {
   /**
    * Sets or removes the uploaded image of a channel. It is not a channel command: the image is a
    * file on this computer, and the Team API does not carry it. The old file goes after the commit, so
-   * a failed commit leaves the stored URL on a file that still exists.
+   * a failed commit leaves the stored URL on a file that still exists. A shutdown does not stop the
+   * work between the file and the commit, so no file is left that the channel does not name.
    */
   readonly setImage = Effect.fn("ChannelService.setImage")((channelId: string, image: AvatarImageInput | null) =>
     this.#serialize(
@@ -285,7 +286,7 @@ export class ChannelService {
         if (previous) yield* images.remove(previous.path);
         this.publish(channelId);
         return result;
-      }),
+      }).pipe(Effect.uninterruptible),
     ),
   );
 

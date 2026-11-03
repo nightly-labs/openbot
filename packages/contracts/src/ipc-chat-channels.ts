@@ -201,6 +201,18 @@ export function normalizeChannelDraft(value: unknown): DynamicRecord | undefined
   return { title: "", instructions: isString(purpose) ? purpose : "", ...rest };
 }
 
+/**
+ * A saved channel, read back. An icon this version cannot read is left out, so a channel that a later
+ * version saved shows its member faces after a downgrade and does not become unreadable. A command
+ * with such an icon is still refused.
+ */
+function normalizeSavedChannel(value: unknown): DynamicRecord | undefined {
+  const channel = normalizeChannelDraft(value);
+  if (!channel || channel.icon === undefined || channel.icon === null || isChannelIcon(channel.icon)) return channel;
+  const { icon: _unreadable, ...rest } = channel;
+  return rest;
+}
+
 export function isChannelDraft(value: unknown): value is ChannelDraft {
   return (
     isDynamicRecord(value) &&
@@ -310,13 +322,13 @@ export function isChannelMessage(value: unknown): value is ChannelMessage {
 }
 
 export function decodeChannel(value: unknown): Channel {
-  const channel = normalizeChannelDraft(value);
+  const channel = normalizeSavedChannel(value);
   if (!isChannel(channel)) throw new Error("Invalid channel response.");
   return channel;
 }
 
 export function decodeChannelPage(value: unknown): ChannelPage {
-  const channel = isDynamicRecord(value) ? normalizeChannelDraft(value.channel) : undefined;
+  const channel = isDynamicRecord(value) ? normalizeSavedChannel(value.channel) : undefined;
   if (
     !isDynamicRecord(value) ||
     !isChannel(channel) ||
@@ -341,7 +353,7 @@ export function decodeChannelPage(value: unknown): ChannelPage {
 
 export function decodeChannelSummaries(value: unknown): ChannelSummary[] {
   if (!Array.isArray(value)) throw new Error("Invalid channel list response.");
-  const summaries: unknown[] = value.map(normalizeChannelDraft);
+  const summaries: unknown[] = value.map(normalizeSavedChannel);
   if (!summaries.every(isChannelSummary)) throw new Error("Invalid channel list response.");
   return summaries;
 }

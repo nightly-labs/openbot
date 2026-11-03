@@ -468,7 +468,7 @@ export function agentIpcHandlers({
         local: (input) => runCauseEffect(service.channels.setImage(input.channelId, input.image)),
         // The channel editor offers an image only for this computer, so only a programming error gets here.
         remote: () => {
-          throw new Error("A joined server does not keep channel images.");
+          throw new Error(sourceText("error.team.channelPictureUnsupported"));
         },
       }),
       getSidebarLayout: scopedQueryHandler({

@@ -275,27 +275,28 @@ export function ChannelEditor(props: ChannelEditorProps) {
   const pictureChannel = () => (channels.pictureSupported() ? channel() : undefined);
 
   /**
-   * An icon replaces an uploaded image, as a face replaces an agent's photo. The image goes first:
-   * when its removal fails, the icon stays as it was.
+   * An icon replaces an uploaded image, as a face replaces an agent's photo. The icon is saved first,
+   * and the image shows over it until its removal: when a step fails, the image is not lost.
    */
   async function selectIcon(icon: ChannelIcon): Promise<void> {
     const current = channel();
     if (!current) return;
-    if (current.imageUrl && !(await channels.setImage(current.id, null))) return;
-    await commit((draft) => {
+    const saved = await commit((draft) => {
       draft.icon = icon;
     });
+    if (saved && current.imageUrl) await channels.setImage(current.id, null);
   }
 
-  /** Removes the image and the icon, so the channel shows its member faces again. */
+  /** Removes the icon and the image, so the channel shows its member faces again. */
   async function resetPicture(): Promise<void> {
     const current = channel();
     if (!current) return;
-    if (current.imageUrl && !(await channels.setImage(current.id, null))) return;
-    if (current.icon)
-      await commit((draft) => {
+    const saved =
+      !current.icon ||
+      (await commit((draft) => {
         draft.icon = null;
-      });
+      }));
+    if (saved && current.imageUrl) await channels.setImage(current.id, null);
   }
 
   return (
