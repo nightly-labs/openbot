@@ -983,8 +983,8 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
   that `setThisComputerServers` names, so the desktop app keeps its loopback entry. Other computers
   and phones of the account list it as a WebRTC server.
 - **Delete from the account.** A delete records the server id in `removedHostIds` of the registry and
-  removes the host from the account (`removeOwnedRemoteHost`) when signed in. A final client error
-  counts as removed. The id stays until then, so a sign-in retries it, and the directory sync does not
+  removes the host from the account (`removeOwnedRemoteHost`) when signed in. A 403 or 404 counts as
+  removed; a 401 does not. The id stays until then, so a sign-in retries it, and the directory sync does not
   list it meanwhile. An earlier build ignores the field.
 - **From a phone.** `local-servers-v1` on the desktop app's own server lists the servers and creates
   one. The create does not change the server that the desktop app shows. It answers after the child

@@ -166,7 +166,7 @@ import { BrowserViewClient } from "./browser-view-client";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
 import {
   CentralAuthManager,
-  isFinalClientError,
+  isHostNotOnAccount,
   readCentralAuthApiUrl,
   readMobileConnectApiUrl,
 } from "./central-auth-manager";
@@ -2980,10 +2980,11 @@ export async function createApplicationServices({
             register: (input) => centralAuth.registerRemoteHost(input).pipe(Effect.asVoid, toRemoteWorkflowError),
             credential: (hostId) => centralAuth.hostSiteCredential(hostId)?.machineToken ?? null,
             // A host that the account service no longer has, or that another account owns, is not this
-            // account's to remove: either way it is gone from this account's list.
+            // account's to remove: either way it is gone from this account's list. Any other failure,
+            // such as an expired session, keeps the id for the next sign-in.
             remove: (hostId) =>
               centralAuth.removeOwnedRemoteHost(hostId).pipe(
-                Effect.catch((error) => (isFinalClientError(error.cause) ? Effect.void : Effect.fail(error))),
+                Effect.catch((error) => (isHostNotOnAccount(error.cause) ? Effect.void : Effect.fail(error))),
                 toRemoteWorkflowError,
               ),
           },

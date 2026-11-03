@@ -2038,7 +2038,15 @@ export function readMobileConnectApiUrl(value: string | undefined, fallback: str
 }
 
 /** A client error that the same request cannot change. A timeout and a rate limit can pass later. */
-export function isFinalClientError(error: unknown): boolean {
+/**
+ * The account service has no such host for this account: it does not exist (404), or another account
+ * owns it (403). A 401 is an expired or revoked session, not an answer about the host.
+ */
+export function isHostNotOnAccount(error: unknown): boolean {
+  return error instanceof AuthApiError && (error.status === 403 || error.status === 404);
+}
+
+function isFinalClientError(error: unknown): boolean {
   return (
     error instanceof AuthApiError &&
     error.status >= 400 &&
