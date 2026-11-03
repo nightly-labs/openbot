@@ -9,7 +9,7 @@ import { Button, LabelTooltipTrigger } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { avatarHeadColor } from "../../bloub-avatar";
 import { useText } from "../../text";
-import { TeamPersonAvatar, teamMemberName } from "../team/TeamPersonAvatar";
+import { TeamPersonAvatar, teamMemberName, teamMemberSeed } from "../team/TeamPersonAvatar";
 import { Hint, type WfnPoint } from "./workflow-board";
 
 /** Where another person is on the canvas, in world pixels. */
@@ -36,13 +36,11 @@ export interface WorkflowPeer {
 /** The presence feed sends about 20 updates a second. The cursor eases between two updates. */
 export const WORKFLOW_PRESENCE_FEED_INTERVAL = 50;
 
-const memberSeed = (member: TeamPresenceMember) => member.email ?? member.username ?? member.id;
-
 /** The other people who are online, each in the colour of their avatar. */
 export function peersOf(presence: Pick<WorkflowPresence, "self" | "members">): readonly WorkflowPeer[] {
   return presence.members
     .filter((member) => member.online && !member.disabled && member.id !== presence.self)
-    .map((member) => ({ member, name: teamMemberName(member), color: avatarHeadColor(memberSeed(member), null) }));
+    .map((member) => ({ member, name: teamMemberName(member), color: avatarHeadColor(teamMemberSeed(member), null) }));
 }
 
 /**
@@ -112,7 +110,7 @@ export function PresenceBar(props: {
         {(self) => (
           <span
             class="wfn-presence-person wfn-presence-self"
-            style={{ "--wfn-peer": avatarHeadColor(memberSeed(self()), null) }}
+            style={{ "--wfn-peer": avatarHeadColor(teamMemberSeed(self()), null) }}
             role="img"
             aria-label={t("workflow.canvas.presence.you", { name: teamMemberName(self()) })}
           >

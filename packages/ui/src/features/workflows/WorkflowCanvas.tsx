@@ -1177,6 +1177,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   /** A button, a key, a menu item or a jump moves the camera over some frames. */
   const glideTo = (next: Camera, motion: CameraMotion) => {
     stopGlide();
+    stopFollow();
     cameraMoved = true;
     const goal = { ...next, scale: clampScale(next.scale) };
     glide.goal = goal;
@@ -1525,7 +1526,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     let centring = false;
     let last = performance.now();
     const tick = (now: number) => {
-      const elapsed = now - last;
+      // The person left the canvas.
+      if (!followedPeer()) return stopFollow();
+      // The first frame can start before `follow` read the clock.
+      const elapsed = Math.max(0, now - last);
       last = now;
       followFrame = requestAnimationFrame(tick);
       const at = spots()[peer.member.id]?.at;
