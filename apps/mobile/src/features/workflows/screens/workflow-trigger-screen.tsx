@@ -24,6 +24,7 @@ import {
 } from "@/features/settings/components/settings-content";
 import { DiscordTriggerFields } from "@/features/workflows/components/workflow-discord-fields";
 import { GitHubTriggerFields } from "@/features/workflows/components/workflow-github-fields";
+import { TelegramTriggerFields } from "@/features/workflows/components/workflow-telegram-fields";
 import { useWorkflowDetail, useWorkflowGitHubSupported } from "@/features/workflows/model/use-workflows";
 import { useWorkflowDraft } from "@/features/workflows/model/workflow-draft";
 import { GITHUB_TRIGGER_DEFAULTS } from "@/features/workflows/model/workflow-github";
@@ -65,6 +66,11 @@ const DISCORD_CHOICE: TriggerChoice = {
   title: "mobile.workflow.trigger.discord",
   description: "mobile.workflow.discord.triggerComputerOnly",
 };
+const TELEGRAM_CHOICE: TriggerChoice = {
+  type: "telegram",
+  title: "mobile.workflow.trigger.telegram",
+  description: "mobile.workflow.telegram.triggerComputerOnly",
+};
 
 /** The editor sheet > Trigger: what starts the workflow, and its schedule or webhook. */
 export function WorkflowTriggerScreen() {
@@ -99,10 +105,12 @@ export function WorkflowTriggerScreen() {
   const choose = (next: WorkflowTriggerType) => {
     if (next === type) return;
     void haptics.selection();
-    // A new GitHub trigger stores the fields that its rows show, as on desktop. A Discord trigger also
-    // keeps an `event`, so a change from it writes the defaults again.
+    // A new GitHub trigger stores the fields that its rows show, as on desktop. A Discord or Telegram
+    // trigger also keeps an `event`, so a change from it writes the defaults again.
     const githubDefaults =
-      next === "github" && (node.fields.event === undefined || type === "discord") ? GITHUB_TRIGGER_DEFAULTS : {};
+      next === "github" && (node.fields.event === undefined || type === "discord" || type === "telegram")
+        ? GITHUB_TRIGGER_DEFAULTS
+        : {};
     setFields(node.id, {
       trigger: next,
       ...githubDefaults,
@@ -184,19 +192,21 @@ export function WorkflowTriggerScreen() {
           // Only an owner or admin adds a GitHub trigger, on a host that runs it, as on desktop.
           ...((admin && githubSupported) || type === "github" ? [GITHUB_CHOICE] : []),
           ...(type === "message" ? [MESSAGE_CHOICE] : []),
-          // Only the computer that runs OpenBot has the Discord servers.
+          // Only the computer that runs OpenBot has the Discord servers and the Telegram chats.
           ...(type === "discord" ? [DISCORD_CHOICE] : []),
+          ...(type === "telegram" ? [TELEGRAM_CHOICE] : []),
         ].map((choice) => (
           <SettingsRow
             key={choice.type}
             checked={choice.type === type}
             disclosure={false}
-            // A change to or from a GitHub or Discord trigger needs an owner or admin.
+            // A change to or from a GitHub, Discord or Telegram trigger needs an owner or admin.
             disabled={
               !editable ||
               choice.type === "message" ||
               choice.type === "discord" ||
-              (!admin && (choice.type === "github" || type === "github" || type === "discord"))
+              choice.type === "telegram" ||
+              (!admin && (choice.type === "github" || type === "github" || type === "discord" || type === "telegram"))
             }
             supportingText={t(choice.description)}
             trailing={choice.type === type ? <Check size={18} color={accent} strokeWidth={2} /> : null}
@@ -233,6 +243,7 @@ export function WorkflowTriggerScreen() {
       {type === "webhook" ? webhookSection : null}
       {type === "github" ? <GitHubTriggerFields node={node} draft={draft} /> : null}
       {type === "discord" ? <DiscordTriggerFields node={node} /> : null}
+      {type === "telegram" ? <TelegramTriggerFields node={node} /> : null}
     </SettingsContent>
   );
 }

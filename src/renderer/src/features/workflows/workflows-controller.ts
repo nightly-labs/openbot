@@ -19,7 +19,11 @@ import {
   githubItemUrl,
   type WorkflowGitHubCanvas,
 } from "@openbot/ui/features/workflows/workflow-github";
-import type { WorkflowDiscordServer, WorkflowPlace } from "@openbot/ui/features/workflows/workflow-model";
+import type {
+  WorkflowDiscordServer,
+  WorkflowPlace,
+  WorkflowTelegramChat,
+} from "@openbot/ui/features/workflows/workflow-model";
 import { EMPTY_WORKFLOW_RUN_VIEW, type WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
@@ -106,6 +110,7 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   const [summaries, setSummaries] = createSignal<readonly WorkflowSummary[]>([]);
   const [places, setPlaces] = createSignal<readonly WorkflowPlace[]>([]);
   const [discord, setDiscord] = createSignal<readonly WorkflowDiscordServer[]>([]);
+  const [telegram, setTelegram] = createSignal<readonly WorkflowTelegramChat[]>([]);
   /** Null while this account manages every agent of the host. */
   const [levels, setLevels] = createSignal<AgentAccessLevels | null>(null);
   const [preview, setPreview] = createSignal<{ versionId: string; graph: WorkflowGraph }>();
@@ -300,6 +305,9 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     }, report);
     host.discordServers().then((next) => {
       if (!disposed) setDiscord(next);
+    }, report);
+    host.telegramChats().then((next) => {
+      if (!disposed) setTelegram(next);
     }, report);
   };
 
@@ -519,5 +527,13 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     },
   };
 
-  return { detail: () => stored()?.detail, places, discord, readOnly: () => lock() !== undefined, github, props };
+  return {
+    detail: () => stored()?.detail,
+    places,
+    discord,
+    telegram,
+    readOnly: () => lock() !== undefined,
+    github,
+    props,
+  };
 }

@@ -27,6 +27,8 @@ export const messages = {
   "error.workflow.outputPlaceMissing": "Wybierz miejsce w komunikatorze dla tego wyjścia.",
   "error.workflow.discordNoMessage":
     "To wyjście działa na wiadomość z Discorda, która uruchomiła przepływ. Uruchom przepływ ze wzmianki na Discordzie albo wybierz Opublikuj na kanale.",
+  "error.workflow.telegramNoMessage":
+    "To wyjście działa na wiadomość z Telegrama, która uruchomiła przepływ. Uruchom przepływ ze wzmianki na Telegramie albo wybierz Opublikuj na czacie.",
   "error.workflow.outputConnectionOff":
     "Połączenie komunikatora tego wyjścia jest wyłączone lub usunięte. Wybierz miejsce ponownie.",
   "error.workflow.outputNotRunning": "Połączenie komunikatora teraz nie działa. Spróbuj ponownie, gdy zacznie działać.",

@@ -73,6 +73,8 @@ import type {
   MessagingDiscordSend,
   MessagingMentionResult,
   MessagingPostFailure,
+  MessagingTelegramMention,
+  MessagingTelegramSend,
 } from "../messaging/messaging-threads";
 import { resultText } from "../routine-results/routine-results";
 import type { ReceivedWebhookEvent } from "../routine-store";
@@ -101,6 +103,13 @@ import {
   githubOutputText,
   githubResultKeys,
 } from "./github-output";
+import {
+  type TelegramOutputPlan,
+  telegramOutputPlan,
+  telegramTriggerMatches,
+  telegramTriggerMessage,
+  workflowTelegramPayload,
+} from "./telegram-matching";
 import { REPEATABLE_GITHUB_ACTIONS, type WorkflowGitHubApi } from "./workflow-github-api";
 import type { WaitingGitHubDelivery, WorkflowGitHubStore } from "./workflow-github-store";
 import {
@@ -163,6 +172,9 @@ interface WorkflowTextRequest {
 }
 
 /** How a run began, and the key that makes a second start of the same run answer the first. */
+/** The part of a Discord or Telegram send that an output delivery keeps. */
+type ChatOutputSend = { action: "reply" | "post"; text: string } | { action: "react"; emoji: string };
+
 interface RunOrigin {
   source: WorkflowRunSource;
   scheduledFor: string | null;
@@ -210,6 +222,11 @@ export interface WorkflowsDependencies {
   discordSend?: (
     connectionId: string,
     send: MessagingDiscordSend,
+  ) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
+  /** Replies, posts or reacts in a Telegram chat; absent where this host has no messaging. */
+  telegramSend?: (
+    connectionId: string,
+    send: MessagingTelegramSend,
   ) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
   /** The workflow whose graph, title, versions or runs changed. */
   changed(workflowId: string): void;
@@ -299,6 +316,8 @@ interface WorkflowsShape {
    * when no trigger takes it, and `skipped` when each workflow that takes it is busy or cannot start.
    */
   receiveDiscord(mention: MessagingDiscordMention): Effect.Effect<MessagingMentionResult, WorkflowFailed>;
+  /** As `receiveDiscord`, for a new conversation in a Telegram group. */
+  receiveTelegram(mention: MessagingTelegramMention): Effect.Effect<MessagingMentionResult, WorkflowFailed>;
   /** Records in each GitHub trigger's history that the host got no GitHub events from `from` to `to`. */
   githubOffline(from: Date, to: Date): Effect.Effect<void, WorkflowFailed>;
   githubHistory(workflowId: string): Effect.Effect<WorkflowGitHubHistory, WorkflowFailed>;
@@ -572,15 +591,22 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             ? dependencies.discordSend(plan.connectionId, plan.send)
             : Effect.succeed({ failure: "not-running" as const });
 
-        /** Keeps a Discord output's reply, post or reaction, then sends it. */
-        const sendDiscord = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) => {
-          const plan = discordPlan(step, node, run);
+        /**
+         * Keeps a chat output's reply, post or reaction, then sends it. Discord and Telegram differ only in the
+         * plan, the place of the post and the send function, so a fix here applies to both.
+         */
+        const sendChat = <Plan extends { connectionId: string; send: ChatOutputSend }>(
+          step: StoredWorkflowStep,
+          plan: Plan | { error: string },
+          placeId: (plan: Plan) => string,
+          post: (plan: Plan) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>,
+        ) => {
           if ("error" in plan) {
             settle(step, { status: "failed", error: plan.error });
             return Effect.void;
           }
           const { send } = plan;
-          // Nothing to say: the server gets no post. A reaction needs no text.
+          // Nothing to say: the chat gets no post. A reaction needs no text.
           if (send.action !== "react" && !send.text.trim()) {
             settle(step, { status: "done", output: "" });
             return Effect.void;
@@ -593,14 +619,29 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             {
               stepId: step.id,
               connectionId: plan.connectionId,
-              placeId: send.channelId,
+              placeId: placeId(plan),
               text: send.action === "react" ? send.emoji : send.text,
             },
             now(),
           );
           const output = runs.output(step.id);
-          return output ? startPost(step, output, discordPost(plan)) : Effect.void;
+          return output ? startPost(step, output, post(plan)) : Effect.void;
         };
+
+        const sendDiscord = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          sendChat(step, discordPlan(step, node, run), (plan) => plan.send.channelId, discordPost);
+
+        /** The reply, post or reaction of a Telegram output. Only a run that a message started has its message. */
+        const telegramPlan = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          telegramOutputPlan(node, step.input, run?.source === "telegram" ? telegramTriggerMessage(run.payload) : null);
+
+        const telegramPost = (plan: Extract<TelegramOutputPlan, { send: unknown }>) =>
+          dependencies.telegramSend
+            ? dependencies.telegramSend(plan.connectionId, plan.send)
+            : Effect.succeed({ failure: "not-running" as const });
+
+        const sendTelegram = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          sendChat(step, telegramPlan(step, node, run), (plan) => plan.chatId, telegramPost);
 
         /**
          * The key of a GitHub output's change: one for each pass of a node through a run, or one for a step
@@ -772,6 +813,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             if ("error" in plan) return settle(step, { status: "failed", error: plan.error });
             return yield* resumeOutput(step, discordPost(plan));
           }
+          if (node && fieldText(node, "target") === "telegram") {
+            const plan = telegramPlan(step, node, run);
+            if ("error" in plan) return settle(step, { status: "failed", error: plan.error });
+            return yield* resumeOutput(step, telegramPost(plan));
+          }
           if (!node || fieldText(node, "target") !== "github") return yield* resumeOutput(step);
           yield* sendGitHub(step, node, run);
           return runs.step(step.id)?.status !== "running";
@@ -823,6 +869,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               }
               if (fieldText(node, "target") === "discord") {
                 yield* sendDiscord(step, node, run);
+                return;
+              }
+              if (fieldText(node, "target") === "telegram") {
+                yield* sendTelegram(step, node, run);
                 return;
               }
               dependencies.notify({
@@ -1239,25 +1289,28 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           );
         });
 
-        const receiveDiscord = Effect.fn("Workflows.receiveDiscord")(function* (mention: MessagingDiscordMention) {
-          return yield* locked(
+        /**
+         * Starts a run for each chat trigger that a new conversation matches. Discord and Telegram differ only
+         * in these values, so a fix here applies to both.
+         */
+        const receiveMention = (chat: {
+          matches: (node: WorkflowNode) => boolean;
+          /** True when an open run started from the same chat message. */
+          sameMessage: (run: StoredWorkflowRun) => boolean;
+          origin: (node: WorkflowNode) => Omit<RunOrigin, "scheduledFor">;
+          failure: string;
+        }) =>
+          locked(
             Effect.gen(function* (): Effect.fn.Return<MessagingMentionResult, WorkflowFailed> {
               const triggers = (yield* attempt(() => store.listWithGraphs())).flatMap(({ summary, graph }) =>
-                graph.nodes
-                  .filter((node) => discordTriggerMatches(node, mention))
-                  .map((node) => ({ workflowId: summary.id, node })),
+                graph.nodes.filter(chat.matches).map((node) => ({ workflowId: summary.id, node })),
               );
               if (triggers.length === 0) return "none";
               let started = false;
               for (const { workflowId, node } of triggers) {
                 const open = runs.openRuns().filter((run) => run.workflowId === workflowId);
                 // A mention that Signal gives again, after a restart, has its run already.
-                if (
-                  open.some(
-                    (run) =>
-                      run.source === "discord" && discordTriggerMessage(run.payload)?.messageId === mention.messageId,
-                  )
-                ) {
+                if (open.some(chat.sameMessage)) {
                   started = true;
                   continue;
                 }
@@ -1265,20 +1318,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 if (open.length > 0) continue;
                 const detail = yield* attempt(() => store.detail(workflowId));
                 if (!detail) continue;
-                const result = yield* begin(detail, node, {
-                  source: "discord",
-                  scheduledFor: null,
-                  idempotencyKey: `discord:${node.id}:${mention.messageId}`,
-                  payload: workflowDiscordPayload(node.id, mention),
-                }).pipe(Effect.result);
+                const result = yield* begin(detail, node, { ...chat.origin(node), scheduledFor: null }).pipe(
+                  Effect.result,
+                );
                 if (Result.isFailure(result)) {
                   // After a run started, the mention stays with the workflows: no agent answers it too.
                   if (!started && !(result.failure.cause instanceof WorkflowStoreError)) return yield* result.failure;
-                  logger.warn("A Discord mention did not start a workflow run.", {
-                    workflowId,
-                    nodeId: node.id,
-                    cause: String(result.failure.cause),
-                  });
+                  logger.warn(chat.failure, { workflowId, nodeId: node.id, cause: String(result.failure.cause) });
                   continue;
                 }
                 started = true;
@@ -1286,6 +1332,36 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               return started ? "started" : "skipped";
             }),
           );
+
+        const receiveDiscord = Effect.fn("Workflows.receiveDiscord")(function* (mention: MessagingDiscordMention) {
+          return yield* receiveMention({
+            matches: (node) => discordTriggerMatches(node, mention),
+            sameMessage: (run) =>
+              run.source === "discord" && discordTriggerMessage(run.payload)?.messageId === mention.messageId,
+            origin: (node) => ({
+              source: "discord",
+              idempotencyKey: `discord:${node.id}:${mention.messageId}`,
+              payload: workflowDiscordPayload(node.id, mention),
+            }),
+            failure: "A Discord mention did not start a workflow run.",
+          });
+        });
+
+        const receiveTelegram = Effect.fn("Workflows.receiveTelegram")(function* (mention: MessagingTelegramMention) {
+          // A Telegram message id is unique only in its chat, so the chat is part of the match and of the key.
+          return yield* receiveMention({
+            matches: (node) => telegramTriggerMatches(node, mention),
+            sameMessage: (run) => {
+              const message = run.source === "telegram" ? telegramTriggerMessage(run.payload) : null;
+              return message?.connectionId === mention.connectionId && message.messageId === mention.messageId;
+            },
+            origin: (node) => ({
+              source: "telegram",
+              idempotencyKey: `telegram:${node.id}:${mention.connectionId}:${mention.messageId}`,
+              payload: workflowTelegramPayload(node.id, mention),
+            }),
+            failure: "A Telegram message did not start a workflow run.",
+          });
         });
 
         // --- GitHub --------------------------------------------------------------------------------
@@ -1715,6 +1791,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           receiveWebhook,
           receiveGitHub,
           receiveDiscord,
+          receiveTelegram,
           githubOffline,
           githubHistory,
           githubLastEvent,

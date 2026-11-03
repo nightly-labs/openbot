@@ -57,6 +57,13 @@ export interface WorkflowDiscordServer {
   roles: readonly { id: string; name: string }[];
 }
 
+/** A Telegram chat that a Telegram trigger listens to or that a Telegram output acts on. */
+export interface WorkflowTelegramChat {
+  /** The messaging connection of the chat. One connection is one chat. */
+  connectionId: string;
+  name: string;
+}
+
 /** A model that an image step can draw with. */
 export interface WorkflowImageModel {
   id: string;
@@ -79,6 +86,8 @@ export interface WorkflowCatalogs {
   places: readonly WorkflowPlace[];
   /** The Discord servers of the host. Only the host that runs the workflow has them. */
   discord?: readonly WorkflowDiscordServer[] | undefined;
+  /** The Telegram chats linked to the host. Only the host that runs the workflow has them. */
+  telegram?: readonly WorkflowTelegramChat[] | undefined;
   imageModels: readonly WorkflowImageModel[];
   /** The workspace files that an asset node can take, and the images that image steps made. */
   files: readonly StoredFileRow[];

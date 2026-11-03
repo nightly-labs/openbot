@@ -260,6 +260,7 @@
     "test:antigravity-usage": "bun scripts/antigravity-usage-e2e.ts",
     "test:workflow-model-steps": "bun scripts/workflow-model-steps-e2e.ts",
     "test:workflow-discord": "bun scripts/workflow-discord-e2e.ts",
+    "test:workflow-telegram": "bun scripts/workflow-telegram-e2e.ts",
     "test:discord-github-files": "bun scripts/discord-github-files-e2e.ts",
     "test:antigravity-accounts": "bun scripts/antigravity-accounts-e2e.ts",
     "test:antigravity-usage-metering": "bun scripts/antigravity-usage-metering-e2e.ts",

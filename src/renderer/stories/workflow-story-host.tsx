@@ -151,6 +151,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     },
     places: async () => [...STORY_CATALOGS.places],
     discordServers: async () => [],
+    telegramChats: async () => [],
     agentLevels: async () => null,
     githubSupported: () => true,
     githubConnector: createMockGitHubConnector(),
