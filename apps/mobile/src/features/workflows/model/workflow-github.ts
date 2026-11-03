@@ -84,7 +84,7 @@ export const SAME_REPOSITORY = "trigger";
 export const AGENT_CHOOSES = "agent";
 
 export type GitHubOutputItem = "event" | "input";
-export type GitHubLabelsFrom = "agent" | "list";
+type GitHubLabelsFrom = "agent" | "list";
 
 const text = (node: WorkflowNode | undefined, name: string): string => {
   const value = node?.fields[name];
@@ -123,7 +123,7 @@ export function githubTrigger(node: WorkflowNode | undefined): GitHubTriggerSett
 }
 
 /** The GitHub triggers that lead to a node, nearest first. A GitHub output acts on their events. */
-export function githubTriggersBefore(graph: WorkflowGraph, nodeId: string): WorkflowNode[] {
+function githubTriggersBefore(graph: WorkflowGraph, nodeId: string): WorkflowNode[] {
   const byId = new Map(graph.nodes.map((node) => [node.id, node]));
   const found: WorkflowNode[] = [];
   const seen = new Set([nodeId]);

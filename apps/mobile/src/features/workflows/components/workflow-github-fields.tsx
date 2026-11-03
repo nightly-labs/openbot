@@ -40,7 +40,7 @@ const FILTER_LIMIT = 200;
 export type GitHubPickField = "repository" | "labels" | "person";
 
 /** Opens the list of repositories, labels or people of a GitHub step. */
-export function openGitHubPick(nodeId: string, field: GitHubPickField) {
+function openGitHubPick(nodeId: string, field: GitHubPickField) {
   router.push({ pathname: "/workflow-editor/github-pick", params: { nodeId, field } });
 }
 
