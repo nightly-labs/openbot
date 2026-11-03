@@ -133,6 +133,11 @@ export const messages = {
   "provider.picker.customEmpty":
     "添加一个兼容 OpenAI 的端点 —— 可以是这台电脑上的模型服务，也可以是任何提供 base URL 和密钥的服务。",
   "provider.picker.defaultModelLabel": "{name}，默认",
+  "provider.picker.usageLimit": "已达用量上限",
+  "provider.picker.usageLimitWindow": "{window}上限",
+  "provider.picker.usageLimitResets": "{limit} · {time} 重置",
+  "provider.picker.usageLimitLabel": "{name}，已达用量上限",
+  "provider.picker.usageLimitResetsLabel": "{name}，已达用量上限，{time} 重置",
   "provider.picker.effort": "强度",
   "provider.picker.effortLabel": "助手推理强度",
   "provider.picker.effortFixed": "{effort}（由 {provider} 固定）",

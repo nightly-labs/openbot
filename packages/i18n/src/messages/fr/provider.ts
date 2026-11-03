@@ -130,6 +130,11 @@ export const messages = {
   "provider.picker.customEmpty":
     "Ajoutez un point de terminaison compatible OpenAI : un serveur de modèles sur cet ordinateur, ou tout service avec une URL de base et une clé.",
   "provider.picker.defaultModelLabel": "{name}, par défaut",
+  "provider.picker.usageLimit": "Limite d’utilisation atteinte",
+  "provider.picker.usageLimitWindow": "Limite ({window})",
+  "provider.picker.usageLimitResets": "{limit} · Réinitialisation le {time}",
+  "provider.picker.usageLimitLabel": "{name}, limite d’utilisation atteinte",
+  "provider.picker.usageLimitResetsLabel": "{name}, limite d’utilisation atteinte, réinitialisation le {time}",
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Effort de raisonnement de l’agent",
   "provider.picker.effortFixed": "{effort}, fixé par {provider}",

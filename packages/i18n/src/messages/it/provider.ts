@@ -121,6 +121,11 @@ export const messages = {
   "provider.picker.customEmpty":
     "Aggiungi un endpoint compatibile con OpenAI: un server di modelli su questo computer, o qualsiasi servizio con un URL di base e una chiave.",
   "provider.picker.defaultModelLabel": "{name}, predefinito",
+  "provider.picker.usageLimit": "Limite di utilizzo raggiunto",
+  "provider.picker.usageLimitWindow": "Limite ({window})",
+  "provider.picker.usageLimitResets": "{limit} · Si azzera il {time}",
+  "provider.picker.usageLimitLabel": "{name}, limite di utilizzo raggiunto",
+  "provider.picker.usageLimitResetsLabel": "{name}, limite di utilizzo raggiunto, si azzera il {time}",
   "provider.picker.effort": "Impegno",
   "provider.picker.effortLabel": "Impegno di ragionamento dell'agente",
   "provider.picker.effortFixed": "{effort}, fissato da {provider}",

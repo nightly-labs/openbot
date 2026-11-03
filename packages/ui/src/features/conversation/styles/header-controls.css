@@ -564,6 +564,35 @@
   white-space: nowrap;
 }
 
+/* A spent plan window: the chip shares the first line with the provider name, and the version stays
+ * on the second. The chip shortens with an ellipsis, so the heading keeps its height. */
+.provider-model-heading-limited {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--openbot-space-1-5);
+}
+
+.provider-model-heading-limited > span {
+  grid-column: 1 / -1;
+}
+
+/* The shape of the row tags (default, Free, New), in the danger colors. */
+.provider-model-limit {
+  overflow: hidden;
+  justify-self: start;
+  max-width: 100%;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-danger-soft);
+  padding: 1px var(--openbot-space-1-5);
+  color: var(--openbot-danger-text);
+  font-size: var(--openbot-text-sm);
+  font-weight: 500;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* The runtime status: a filled block with no border, as the search field. */
 .provider-model-empty {
   display: grid;
