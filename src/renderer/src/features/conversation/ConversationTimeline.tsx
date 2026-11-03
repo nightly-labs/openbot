@@ -18,6 +18,7 @@ import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
@@ -570,7 +571,9 @@ export function ConversationTimeline() {
     <>
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {props.prompt
-          ? t("prompt.inputRequiredAnnouncement", { question: props.prompt.questions[0]?.question ?? "" })
+          ? t("prompt.inputRequiredAnnouncement", {
+              question: markdownPlainText(props.prompt.questions[0]?.question ?? ""),
+            })
           : ""}
       </span>
       <Show when={chatSearchOpen() && !sideThreadOpen()}>
@@ -1367,6 +1370,7 @@ export function ConversationTimeline() {
                                       questions={questionPrompt.questions}
                                       resolution={resolution}
                                       onSubmit={async () => false}
+                                      onOpenLink={(url) => void openExternalMessageUrl(url)}
                                     />
                                   </article>
                                 )}
