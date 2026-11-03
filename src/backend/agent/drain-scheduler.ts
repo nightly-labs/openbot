@@ -1067,15 +1067,10 @@ export class DrainScheduler {
   }, Effect.uninterruptible);
 
   /**
-   * Whether this delivery is a routine run in the agent's own chat. It runs in a provider session
-   * of its own, which closes when the run ends: the chat session does not grow with each run, and a
-   * run does not read that whole session again. A routine run for a channel, an external
-   * conversation or a task runs in that thread's session.
-   */
-  /**
    * Whether this delivery is a routine run with its own provider session: in the agent's own chat, or
-   * in the routine's side thread. A routine run in another task, a channel or a messaging thread
-   * runs in that thread's session.
+   * in the routine's side thread. The session closes when the run ends, so the thread session does
+   * not grow with each run. A routine run in another task, a channel or a messaging thread runs in
+   * that thread's session.
    */
   #runsInOwnSession(context: DeliveryContext): boolean {
     const id = context.delivery.id;
