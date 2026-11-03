@@ -29,6 +29,7 @@ import {
 import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { MarkdownInlineText } from "../features/conversation/MarkdownMessageText";
 import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "../features/conversation/send-shortcut";
 
 /** Lets the chat composer answer the open question with its text, as the custom answer field does. */
@@ -53,6 +54,11 @@ export interface QuestionPromptBubbleProps {
   sendShortcut?: SendShortcut | undefined;
   onSubmit: (answers: Record<string, string[]>) => Promise<boolean>;
   onResolutionPresented?: () => void;
+  /**
+   * Opens a link of the question title. The renderer passes its external-URL path. Without it, a
+   * link of the title does nothing.
+   */
+  onOpenLink?: ((url: string) => void) | undefined;
   /** Gives the composer answer of this form to the composer. The returned function takes it back. */
   registerComposerAnswer?: ((answer: QuestionPromptComposerAnswer) => () => void) | undefined;
 }
@@ -494,7 +500,14 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
             onSubmit={(event) => event.preventDefault()}
           >
             <header class="question-prompt-header conversation-interaction-header">
-              <Questionnaire.Title>{current().question}</Questionnaire.Title>
+              <Questionnaire.Title>
+                <MarkdownInlineText
+                  body={current().question}
+                  agents={[]}
+                  onSelectAgent={() => {}}
+                  onOpenLink={props.onOpenLink ?? (() => {})}
+                />
+              </Questionnaire.Title>
               <Badge variant="warning-light" class="conversation-interaction-status">
                 <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
                 {t("prompt.inputRequired")}
