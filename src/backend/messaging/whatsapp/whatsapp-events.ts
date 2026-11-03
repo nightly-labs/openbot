@@ -108,7 +108,6 @@ export async function whatsAppInbound(
     fromMe: Boolean(key.fromMe),
   });
   if (decision.type === "ignore") return null;
-  context.chats.allowChat(chatJid);
   const name = message.pushName?.trim() || authorNumber || "WhatsApp";
   if (decision.type === "pair") return authorNumber ? { type: "pairing", chatJid, senderId: authorNumber, name } : null;
 

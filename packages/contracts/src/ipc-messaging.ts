@@ -187,16 +187,14 @@ export interface HostAddMessagingOrchestratorInput extends HostMessagingPlatform
 }
 
 /** The host of each platform's connect page. A joined server names the page, so nothing else opens. */
-const MESSAGING_PAGE_HOSTS: Record<MessagingPlatform, string> = {
+const MESSAGING_PAGE_HOSTS: Record<ConnectorMessagingPlatform, string> = {
   slack: "slack.com",
   discord: "discord.com",
   telegram: "t.me",
-  // A WhatsApp number links from the phone that scans this computer's code; it opens no page.
-  whatsapp: "web.whatsapp.com",
 };
 
 /** The connect page that a joined server named, when it is the platform's own https page. */
-export function messagingPage(platform: MessagingPlatform, address: string | null): string | null {
+export function messagingPage(platform: ConnectorMessagingPlatform, address: string | null): string | null {
   const url = address === null ? null : URL.parse(address);
   return url?.protocol === "https:" && url.hostname === MESSAGING_PAGE_HOSTS[platform] && url.port === ""
     ? url.toString()

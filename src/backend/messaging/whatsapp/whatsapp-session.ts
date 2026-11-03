@@ -560,40 +560,16 @@ function parseVersion(text: string | undefined): WAVersion | null {
 /**
  * Baileys logs through this. It keeps only warnings and errors, and only their message text without
  * long numbers: the objects that Baileys passes can hold message content, phone numbers and keys.
- *
- * `OPENBOT_WHATSAPP_DEBUG=1` is for development only: it forwards every level with the error details
- * and the stanzas that Baileys logs, which can hold phone numbers and message text. Never set it for
- * a user.
  */
-const DEBUG = process.env.OPENBOT_WHATSAPP_DEBUG === "1";
-
-const baileysLogger: SocketConfig["logger"] = DEBUG
-  ? {
-      level: "trace",
-      child: () => baileysLogger,
-      trace: (object, message) => logger.info(`WhatsApp trace: ${debugText(object, message)}`),
-      debug: (object, message) => logger.info(`WhatsApp debug: ${debugText(object, message)}`),
-      info: (object, message) => logger.info(`WhatsApp info: ${debugText(object, message)}`),
-      warn: (object, message) => logger.warn(`WhatsApp warn: ${debugText(object, message)}`),
-      error: (object, message) => logger.error(`WhatsApp error: ${debugText(object, message)}`),
-    }
-  : {
-      level: "warn",
-      child: () => baileysLogger,
-      trace: () => undefined,
-      debug: () => undefined,
-      info: () => undefined,
-      warn: (object, message) => logger.warn(`WhatsApp: ${fixedText(object, message)}`),
-      error: (object, message) => logger.error(`WhatsApp: ${fixedText(object, message)}`),
-    };
-
-/** The message and the object, with each error as its name, message and stack. Development only. */
-function debugText(object: unknown, message?: string): string {
-  const details = JSON.stringify(object, (_key, value) =>
-    value instanceof Error ? { name: value.name, message: value.message, stack: value.stack } : value,
-  );
-  return `${message ?? ""} ${details ?? ""}`.slice(0, 4_000);
-}
+const baileysLogger: SocketConfig["logger"] = {
+  level: "warn",
+  child: () => baileysLogger,
+  trace: () => undefined,
+  debug: () => undefined,
+  info: () => undefined,
+  warn: (object, message) => logger.warn(`WhatsApp: ${fixedText(object, message)}`),
+  error: (object, message) => logger.error(`WhatsApp: ${fixedText(object, message)}`),
+};
 
 function fixedText(object: unknown, message?: string): string {
   const text = typeof message === "string" ? message : typeof object === "string" ? object : "event";

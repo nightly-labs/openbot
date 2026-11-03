@@ -40,7 +40,6 @@ export class WhatsAppChatState {
   readonly #menus = new Map<string, MenuPost>();
   readonly #keys = new Map<string, MessageKeyFacts>();
   readonly #media = new Map<string, WAMessage>();
-  readonly #allowedChats = new Set<string>();
 
   name(userId: string): string | null {
     return this.#names.get(userId) ?? null;
@@ -80,15 +79,6 @@ export class WhatsAppChatState {
       .filter((entry) => entry.chatJid === chatJid && (threadKey === null || entry.threadKey === threadKey))
       .slice(-limit)
       .map(contextEntry);
-  }
-
-  /** A chat whose message the sender rules let through, so OpenBot may answer in it. */
-  allowChat(chatJid: string): void {
-    this.#allowedChats.add(chatJid);
-  }
-
-  isAllowedChat(chatJid: string): boolean {
-    return this.#allowedChats.has(chatJid);
   }
 
   rememberKey(messageId: string, facts: MessageKeyFacts): void {

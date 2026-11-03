@@ -126,7 +126,14 @@ export class WhatsAppTransport implements MessagingTransport {
   });
 
   #enqueue(message: WAMessage, live: boolean): void {
-    this.#reading = this.#reading.then(() => this.#read(message, live));
+    this.#reading = this.#reading
+      .then(() => this.#read(message, live))
+      .catch((cause: unknown) => {
+        // A failed read must not stop the reads after it.
+        logger.warn("A WhatsApp message could not be read.", {
+          cause: cause instanceof Error ? cause.name : "unknown",
+        });
+      });
   }
 
   async #read(message: WAMessage, live: boolean): Promise<void> {

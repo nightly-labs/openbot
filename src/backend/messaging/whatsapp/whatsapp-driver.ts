@@ -392,11 +392,9 @@ class WhatsAppAdapter implements MessagingAdapter {
       if (!identity) return Effect.fail(new MessagingAdapterError({ cause: new Error("not_linked") }));
       const rules = this.#runtime.policy.rules(identity.number);
       const user = isJidGroup(chatJid) ? null : userPart(chatJid);
-      const allowed =
-        this.#handle.chats.isAllowedChat(chatJid) ||
-        (isJidGroup(chatJid)
-          ? rules.groups.has(chatJid)
-          : user === identity.number || (user !== null && rules.contacts.has(user)));
+      const allowed = isJidGroup(chatJid)
+        ? rules.groups.has(chatJid)
+        : user === identity.number || (user !== null && rules.contacts.has(user));
       return allowed ? Effect.void : Effect.fail(new MessagingAdapterError({ cause: new Error("place_not_allowed") }));
     });
   }

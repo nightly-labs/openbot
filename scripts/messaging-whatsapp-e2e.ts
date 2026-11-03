@@ -791,6 +791,13 @@ try {
         ),
       );
       assert.equal(refused._tag, "Failure", "A post to a chat that is not allowed went out.");
+      // A person who only got a pairing code is not allowed either.
+      const pending = await Effect.runPromise(
+        Effect.result(
+          adapter.postAnswer({ platformChannelId: "48600999901@s.whatsapp.net", replyThreadId: null }, "hi", null),
+        ),
+      );
+      assert.equal(pending._tag, "Failure", "A post to a person who only got a pairing code went out.");
       const before = phone.textsTo(OWNER_JID).length;
       await runCauseEffect(
         adapter.edit({ platformChannelId: OWNER_JID, replyThreadId: null }, "UNKNOWN-POST", { text: "Updated" }),
