@@ -164,6 +164,8 @@ interface AcpTurn {
   interruptedAnswer: string | null;
   /** A failure that the server sent as answer text and then ended the turn as a success. */
   providerError: string | null;
+  /** The agent's process lost its sign-in (`AcpFlavor.signInLostChunk`), and ends after this turn. */
+  signInLost: boolean;
   /**
    * Where the answer text stood when Antigravity logged that its SDK failed this prompt. The
    * server then sends the failure as answer text and ends the turn as a success.
@@ -2067,6 +2069,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       reasoned: false,
       interruptedAnswer: null,
       providerError: null,
+      signInLost: false,
       sdkFailureAt: null,
       answerOptional,
       messages: [],
@@ -2168,6 +2171,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         status,
         status === "failed" ? (turn.providerError ?? response.stopReason) : null,
       );
+      if (turn.signInLost) {
+        this.emit("exit", new Error(sourceText("error.provider.acpSignInLost", { provider: this.#label })));
+        // As for an unresponsive process: a warm generation client has no runtime that stops it,
+        // and the stop closes the scope of this fiber, so it runs detached.
+        yield* Effect.forkDetach(this.stop().pipe(Effect.ignore), { startImmediately: true });
+      }
     } catch (error) {
       // A session's own process that ended names how it ended, as the agent's process does.
       const transport = thread.transport;
@@ -2313,6 +2322,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
       // The agent's own transport error sent as answer text (Cursor, #3334).
       if (this.#flavor.noiseChunk?.test(update.content.text)) return;
+      if (this.#flavor.signInLostChunk?.test(update.content.text)) {
+        turn.receivedOutput = true;
+        turn.signInLost = true;
+        turn.providerError = sourceText("error.provider.acpSignInLost", { provider: this.#label });
+        return;
+      }
       // An exhausted quota sent as answer text, and a turn then ended as a success (Antigravity).
       const quota = this.#flavor.sdkHarness?.quota(update.content.text) ?? null;
       if (quota !== null) {

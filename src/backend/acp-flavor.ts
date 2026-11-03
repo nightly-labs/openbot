@@ -119,6 +119,11 @@ export interface AcpFlavor {
   contextCompaction?: "handoff";
   /** A whole answer chunk that is the agent's own transport error, not answer text. OpenBot drops it. */
   noiseChunk?: RegExp;
+  /**
+   * A whole answer chunk that tells that the agent's process lost its sign-in. OpenBot fails the
+   * turn and ends the process, so the next turn starts a process that reads the sign-in again.
+   */
+  signInLostChunk?: RegExp;
   /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
   sessionMeta?: NewSessionRequest["_meta"];
   /**
@@ -151,6 +156,12 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   // Cursor 2026.10.22-27dcf5f sends "\n\nError: RetriableError: WritableIterable is closed" as one
   // chunk after a turn that succeeded, and then ends the turn (#3334). Only the full chunk matches.
   noiseChunk: /^\s*Error: (?:[\w$]+: )?WritableIterable is closed\s*$/u,
+  // Cursor 2026.10.22-27dcf5f keeps its access token in memory for the life of the process, and
+  // refreshes it there only with an API key. When its server refuses the token, each turn of each
+  // session sends only one of these chunks until the process ends. A new process reads the Keychain
+  // again (#4614).
+  signInLostChunk:
+    /^\n\n(?:Please sign in to continue|Error: \[unauthenticated\] Backend rejected authentication\.[^\n]*)$/u,
   // Cursor 2026.10.22-27dcf5f asks its server for the model list on each model set, and reports a
   // failed request as "Invalid model value" (#3800). One set per change, not one per turn.
   processWideModel: true,
