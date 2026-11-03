@@ -2847,6 +2847,44 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
 
         return receipt;
       },
+      rewriteMessage: async (input) => {
+        const task = input.taskId ? findTask(input.agentId, input.taskId) : null;
+        const snapshot = task ? taskConversation(task) : getSnapshot(input.agentId);
+        if (snapshot.activeTurnId || (task && task.state !== "idle")) throw new Error("Thread is busy.");
+        const boundary = snapshot.messages.findIndex(
+          (message) => message.id === input.messageId && message.author === "user",
+        );
+        if (boundary < 0) throw new Error("Finished user message not found.");
+        const turnId = `mock-turn-${messageCounter++}`;
+        const deliveryId = `mock-delivery-${messageCounter++}`;
+        const updated = {
+          ...snapshot,
+          revision: snapshot.revision + 1,
+          messages: [
+            ...snapshot.messages.slice(0, boundary),
+            {
+              id: deliveryId,
+              turnId,
+              author: "user" as const,
+              source: "user" as const,
+              text: input.text,
+              createdAt: new Date().toISOString(),
+              status: "completed" as const,
+            },
+          ],
+        };
+        if (task) {
+          taskConversations.set(task.id, updated);
+          emitTasks(input.agentId);
+        } else
+          updateSnapshot(input.agentId, (current) => {
+            current.messages = updated.messages;
+          });
+        return {
+          messageId: deliveryId,
+          deliveries: [{ id: deliveryId, recipientAgentId: input.agentId, status: "queued", position: null }],
+        };
+      },
       setMessageReaction: async (input: SetMessageReactionInput) => {
         updateSnapshot(input.agentId, (snapshot) => {
           const message = snapshot.messages.find((candidate) => candidate.id === input.messageId);

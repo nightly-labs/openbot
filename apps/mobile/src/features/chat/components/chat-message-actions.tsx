@@ -4,6 +4,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import Copy from "lucide-react-native/icons/copy";
 import SmilePlus from "lucide-react-native/icons/face-slightly-smiling-plus";
+import Pencil from "lucide-react-native/icons/pencil";
 import Plus from "lucide-react-native/icons/plus";
 import Reply from "lucide-react-native/icons/reply";
 import Square from "lucide-react-native/icons/square";
@@ -105,6 +106,7 @@ export function ChatMessageActions({
   agentsById,
   onReact,
   onReply,
+  onEdit,
   onSelectText,
   selecting = false,
   readAloudId,
@@ -118,6 +120,7 @@ export function ChatMessageActions({
   /** Unset where a reaction cannot be saved. `null` removes the reader's reaction. */
   onReact?: (emoji: string | null) => Promise<void>;
   onReply?: () => void;
+  onEdit?: () => void;
   /** Starts the selection of the text in the bubble, or ends it while `selecting`. */
   onSelectText?: () => void;
   selecting?: boolean;
@@ -237,6 +240,11 @@ export function ChatMessageActions({
             }}
           >
             <Reply size={ICON_SIZE} color={muted} />
+          </ActionButton>
+        ) : null}
+        {onEdit ? (
+          <ActionButton accessibilityLabel={t("mobile.chat.message.edit")} onPress={onEdit}>
+            <Pencil size={ICON_SIZE} color={muted} />
           </ActionButton>
         ) : null}
         {onSelectText ? (

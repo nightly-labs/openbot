@@ -186,6 +186,16 @@ export interface SendMessageInput {
   voiceRecordingDraftId?: string;
 }
 
+/** Sends edited text after the active conversation is cut before a finished user message. */
+export interface RewriteMessageInput {
+  agentId: string;
+  taskId: string | null;
+  messageId: string;
+  text: string;
+  /** A retry from the same sender returns the first queued delivery. */
+  requestId: string;
+}
+
 export interface SetMessageReactionInput {
   agentId: string;
   messageId: string;

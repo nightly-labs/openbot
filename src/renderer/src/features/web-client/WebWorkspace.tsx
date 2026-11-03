@@ -131,6 +131,7 @@ import {
 import "katex/contrib/copy-tex";
 // Copying a selection gives clean HTML, as on desktop.
 import "../../selection-copy";
+import { AGENT_THREAD_REWRITE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-rewrite-v1";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { toAgentMessage } from "../../app-message-projection";
@@ -2674,6 +2675,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               <Show when={agentChatOpen()}>
                 <Conversation
                   runtime={runtime}
+                  rewriteAvailable={workspace.state.capabilities.includes(AGENT_THREAD_REWRITE_CAPABILITY)}
                   onOpenMarketplace={openMarketplace}
                   connectors={connectors}
                   onOpenMarketplaceApp={(request) => {

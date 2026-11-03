@@ -79,8 +79,10 @@ export class MailboxSync {
     const incomingMailboxMessages =
       mailboxMessages ??
       this.#mailbox.conversationMessages(snapshot.agentId, fromCreatedAt === undefined ? {} : { fromCreatedAt });
+    const rewoundIds = snapshot.threadId ? this.#database.rewoundMessageIds(snapshot.threadId) : new Set<string>();
+    const visibleMailboxMessages = incomingMailboxMessages.filter((message) => !rewoundIds.has(message.id));
     const incomingMessages = new Map(
-      incomingMailboxMessages.flatMap((message) =>
+      visibleMailboxMessages.flatMap((message) =>
         message.exchange?.direction === "incoming" ? [[message.exchange.messageId, message] as const] : [],
       ),
     );
@@ -89,7 +91,7 @@ export class MailboxSync {
       if (message && isMailboxMessageCopy(message, incomingMessages)) snapshot.messages.splice(index, 1);
     }
     const indexes = new Map(snapshot.messages.map((message, index) => [message.id, index]));
-    for (const mailboxMessage of incomingMailboxMessages) {
+    for (const mailboxMessage of visibleMailboxMessages) {
       const index = indexes.get(mailboxMessage.id);
       if (index !== undefined) snapshot.messages[index] = mailboxMessage;
       else {

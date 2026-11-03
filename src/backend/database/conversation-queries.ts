@@ -67,9 +67,40 @@ const ARCHIVED_SIDE_THREAD_EXCLUSION = `${CHANNEL_THREAD_EXCLUSION}
  */
 export class ConversationQueries {
   readonly #core: DatabaseCore;
+  readonly #rewindCache = new Map<string, { sequence: number | null; ids: ReadonlySet<string> }>();
 
   constructor(options: ConversationQueriesOptions) {
     this.#core = options.core;
+  }
+
+  /** Mailbox copies removed by a rewind must not return to the active chat after a restart. */
+  rewoundMessageIds(threadId: string): ReadonlySet<string> {
+    const latest = databaseRow(
+      this.#core.connection
+        .prepare(
+          "SELECT sequence FROM orchestration_events WHERE aggregate_type = 'thread' AND aggregate_id = ? AND event_type = 'thread.rewound' ORDER BY sequence DESC LIMIT 1",
+        )
+        .get(threadId),
+    );
+    const sequence = latest ? requiredNumberColumn(latest, "sequence") : null;
+    const cached = this.#rewindCache.get(threadId);
+    if (cached?.sequence === sequence) return cached.ids;
+    const rows = databaseRows(
+      this.#core.connection
+        .prepare(
+          "SELECT payload_json FROM orchestration_events WHERE aggregate_type = 'thread' AND aggregate_id = ? AND event_type = 'thread.rewound'",
+        )
+        .all(threadId),
+    );
+    const ids = new Set<string>();
+    for (const row of rows) {
+      const payload = JSON.parse(requiredStringColumn(row, "payload_json"));
+      const removed =
+        isDynamicRecord(payload) && isDynamicRecord(payload.detail) ? payload.detail.removedMessageIds : null;
+      if (Array.isArray(removed)) for (const id of removed) if (isString(id)) ids.add(id);
+    }
+    this.#rewindCache.set(threadId, { sequence, ids });
+    return ids;
   }
 
   readConversation(agentId: string, threadId: string | null): ConversationSnapshot {

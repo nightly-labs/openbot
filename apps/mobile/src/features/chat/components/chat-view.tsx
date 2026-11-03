@@ -1034,6 +1034,30 @@ export function ChatView({
               olderError={olderError}
               onLoadOlder={loadOlder}
               onReply={readOnly ? undefined : replyToMessage}
+              onRewrite={
+                !readOnly &&
+                target.kind === "agent" &&
+                serverOnline &&
+                canSend &&
+                workspace().canRewriteThreads(target.serverId) &&
+                !queue?.deliveries.some(
+                  (item) => item.status === "queued" || item.status === "starting" || item.status === "running",
+                )
+                  ? async (message, text, requestId) => {
+                      await workspace().rewriteMessage(
+                        {
+                          agentId: target.id,
+                          taskId: null,
+                          messageId: hostMessageIds.get(message.id) ?? message.id,
+                          text,
+                          requestId,
+                        },
+                        target.serverId,
+                      );
+                      fetchHistory();
+                    }
+                  : undefined
+              }
               onReact={canReact && !readOnly ? react : undefined}
               selectingMessageId={selection?.message.id ?? null}
               onSelectText={selectText}

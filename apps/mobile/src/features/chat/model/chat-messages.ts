@@ -72,6 +72,8 @@ export type ChatMessage =
       body: string;
       streaming: boolean;
       status?: ConversationMessage["status"];
+      /** False for an older message that cannot be attributed to a remote member. */
+      hasSenderMember?: boolean;
       replyToMessageId?: string | null;
       attachments?: AttachmentSummary[];
       /** A visual reply: its one attachment is an HTML page that the chat shows, at this height. */
@@ -401,6 +403,7 @@ export function projectChatMessages(
           body: message.exchange ? "" : message.text,
           streaming: message.status === "streaming",
           status: message.status,
+          hasSenderMember: Boolean(message.senderMember),
           attachments: message.attachments,
           ...visualReply(message),
           imageGeneration: message.imageGeneration,

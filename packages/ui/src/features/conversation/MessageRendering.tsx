@@ -14,6 +14,7 @@ import {
   DropdownMenu,
   Info,
   LoaderCircle,
+  Pencil,
 } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
@@ -839,6 +840,8 @@ export function MessageActions(props: {
    * finished turn has it.
    */
   onBranch?: (() => void) | undefined;
+  /** Opens a draft of this finished user message. */
+  onEdit?: (() => void) | undefined;
   /** A turn runs in the thread, so Branch shows but does nothing. */
   branchDisabled?: boolean | undefined;
 }) {
@@ -965,6 +968,19 @@ export function MessageActions(props: {
           </Button>
         )}
       </Show>
+      <Show when={props.onEdit}>
+        {(onEdit) => (
+          <Button
+            variant="ghost"
+            type="button"
+            class="message-action-button"
+            aria-label={t("chat.actions.edit")}
+            onClick={onEdit()}
+          >
+            <Pencil aria-hidden="true" />
+          </Button>
+        )}
+      </Show>
     </div>
   );
 }
@@ -987,6 +1003,7 @@ export function MessageMenu(props: {
   onMarkUnread?: (() => void) | undefined;
   /** Copies the thread through this message into a new thread. Without it, the menu has no such item. */
   onBranch?: (() => void) | undefined;
+  onEdit?: (() => void) | undefined;
   /** A turn runs in the thread, so "Branch from here" shows but does nothing. */
   branchDisabled?: boolean | undefined;
 }) {
@@ -1056,7 +1073,7 @@ export function MessageMenu(props: {
           </ContextMenu.Item>
         )}
       </Show>
-      <Show when={props.onBranch || props.onMarkUnread}>
+      <Show when={props.onBranch || props.onEdit || props.onMarkUnread}>
         <ContextMenu.Separator />
       </Show>
       <Show when={props.onBranch}>
@@ -1064,6 +1081,14 @@ export function MessageMenu(props: {
           <ContextMenu.Item disabled={props.branchDisabled === true} onSelectAfterClose={onBranch()}>
             <BranchIcon />
             <span>{t("chat.menu.branch")}</span>
+          </ContextMenu.Item>
+        )}
+      </Show>
+      <Show when={props.onEdit}>
+        {(onEdit) => (
+          <ContextMenu.Item onSelectAfterClose={onEdit()}>
+            <Pencil aria-hidden="true" />
+            <span>{t("chat.menu.edit")}</span>
           </ContextMenu.Item>
         )}
       </Show>

@@ -55,6 +55,7 @@ import {
   type RespondToApprovalInput,
   type RespondToBrowserTakeoverInput,
   type RespondToPromptInput,
+  type RewriteMessageInput,
   ROUTINE_LIMIT_POLICIES,
   ROUTINE_MISSED_POLICIES,
   type RoutineCalendarInput,
@@ -569,6 +570,27 @@ export function parseSendMessage(value: unknown): SendMessageInput {
     ...(taskId === undefined ? {} : { taskId }),
     ...(voiceRecordingDraftId === undefined ? {} : { voiceRecordingDraftId }),
   };
+}
+
+export function parseRewriteMessage(value: unknown): RewriteMessageInput {
+  if (!isObject(value)) throw new Error("Invalid rewrite message request.");
+  const agentId = requireString(value.agentId, "agentId");
+  const taskId = value.taskId;
+  const messageId = requireString(value.messageId, "messageId");
+  const requestId = requireString(value.requestId, "requestId");
+  const text = value.text;
+  if (
+    (taskId !== null && (!isString(taskId) || !taskId || taskId.length > INPUT_LIMITS.identifier)) ||
+    !messageId ||
+    messageId.length > INPUT_LIMITS.identifier ||
+    !requestId ||
+    requestId.length > INPUT_LIMITS.identifier ||
+    !isString(text) ||
+    text.length > INPUT_LIMITS.messageText ||
+    !text.trim()
+  )
+    throw new Error("Invalid rewrite message request.");
+  return { agentId, taskId, messageId, text, requestId };
 }
 
 export function parseStartAgentTask(value: unknown): StartAgentTaskInput {

@@ -1456,3 +1456,19 @@ button.chat-action-target:active,
   content: "·";
   margin-inline-end: var(--openbot-space-1);
 }
+
+.message-rewrite {
+  display: grid;
+  gap: var(--openbot-space-2);
+  width: 100%;
+}
+
+.message-rewrite textarea {
+  width: 100%;
+}
+
+.message-rewrite-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
+}

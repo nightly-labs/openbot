@@ -91,6 +91,7 @@ import type {
   RespondToApprovalInput,
   RespondToBrowserSecretInput,
   RespondToPromptInput,
+  RewriteMessageInput,
   Routine,
   RoutineCalendar,
   RoutineCalendarInput,
@@ -761,6 +762,7 @@ export interface MobileWorkspaceContextValue {
   searchFiles: (query: string, serverId: string, cursor?: string) => Promise<ConversationFileSearchPage>;
   /** True when the host advertises `agent-tasks-v1`. A member who can message an agent can use its tasks. */
   canUseTasks: (serverId: string) => boolean;
+  canRewriteThreads: (serverId: string) => boolean;
   /** True when the host advertises `agent-threads-v1`: a member who can message an agent can rename and delete its threads. */
   canEditThreads: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-reads-v1`: the host keeps the person's read mark of each thread. */
@@ -798,6 +800,7 @@ export interface MobileWorkspaceContextValue {
     input: AgentTaskInput & { text: string; attachmentDraftIds?: string[]; clientMessageId: string },
     serverId: string,
   ) => Promise<QueuedMessageReceipt>;
+  rewriteMessage: (input: RewriteMessageInput, serverId: string) => Promise<QueuedMessageReceipt>;
   /** Stops the running turn of a task, closes the task, or reopens it. */
   controlAgentTask: (action: "stop" | "close" | "reopen", input: AgentTaskInput, serverId: string) => Promise<void>;
   /** Renames a thread. The title then no longer follows its first message. */
@@ -883,6 +886,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canInstallAgentTemplate"
   | "canSearchFiles"
   | "canUseTasks"
+  | "canRewriteThreads"
   | "canEditThreads"
   | "canReadThreads"
   | "canAttachThreadFiles"

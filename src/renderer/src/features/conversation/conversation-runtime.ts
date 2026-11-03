@@ -24,6 +24,7 @@ export interface ConversationRuntime {
     | "importAttachmentData"
     | "downloadAttachments"
     | "editQueuedMessage"
+    | "rewriteMessage"
     | "listInstalledSkills"
     | "listMcpServers"
     | "listWorkspaceDirectory"

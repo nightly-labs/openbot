@@ -34,6 +34,7 @@ import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerS
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { MessageRewriteForm } from "@openbot/ui/features/conversation/MessageRewriteForm";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { type TextValue, useText } from "@openbot/ui/text";
@@ -176,6 +177,12 @@ export interface AgentThreadViewProps {
    * offers it. Missing where the host cannot branch.
    */
   onBranch?: ((messageId: string) => void) | undefined;
+  /** Sends edited text in this thread. Missing when the host cannot rewrite messages. */
+  onRewrite?: ((messageId: string, text: string, requestId: string) => Promise<void>) | undefined;
+  /** A remote member cannot claim an older message without a stamped sender. */
+  requireSenderForRewrite?: boolean | undefined;
+  /** Hides Edit on another member's user message. */
+  isOwnSender?: ((senderId: string) => boolean) | undefined;
   /** Where the thread came from, when it is a branch. A line shows after the copied messages. */
   branchSource?: AgentThreadBranchSource | undefined;
   /** A message to scroll to and mark once, when it shows. Each new request has a new nonce. */
@@ -192,6 +199,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   // Resolved once, so the card is built one time for the check and the row.
   const attention = children(() => props.attention);
   const [sending, setSending] = createSignal(false);
+  const [rewritingMessage, setRewritingMessage] = createSignal<AgentMessage | null>(null);
   const [addMenuOpen, setAddMenuOpen] = createSignal(false);
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
   let scroller: HTMLElement | undefined;
@@ -265,6 +273,25 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     if (!onBranch || !branchPoints().has(message.id)) return undefined;
     return () => onBranch(message.id);
   };
+  const rewriteAction = (message: AgentMessage) => {
+    if (
+      !props.onRewrite ||
+      props.task?.state !== "idle" ||
+      message.author !== "you" ||
+      message.streaming ||
+      message.status !== undefined ||
+      (props.requireSenderForRewrite && !message.senderMember) ||
+      (message.senderMember && !props.isOwnSender?.(message.senderMember.id))
+    )
+      return;
+    return () => setRewritingMessage(message);
+  };
+  const submitRewrite = async (text: string, requestId: string) => {
+    const message = rewritingMessage();
+    if (!message || !props.onRewrite) return;
+    await props.onRewrite(message.id, text, requestId);
+    setRewritingMessage(null);
+  };
   const title = () => props.task?.title ?? t("conversation.threads.new");
   const placeholder = () =>
     props.task
@@ -320,6 +347,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         onReact={() => undefined}
         onCopy={() => onCopy(message)}
         onBranch={branchAction(message)}
+        onEdit={rewriteAction(message)}
         branchDisabled={branchBusy()}
       />
     );
@@ -336,6 +364,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         onReact={() => undefined}
         onCopy={() => onCopy(message)}
         onBranch={branchAction(message)}
+        onEdit={rewriteAction(message)}
         branchDisabled={branchBusy()}
       />
     );
@@ -410,7 +439,15 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                   actions={messageActions(message())}
                   menu={messageMenu(message())}
                   data-chat-search-message={message().id}
-                />
+                >
+                  <Show when={rewritingMessage()?.id === message().id}>
+                    <MessageRewriteForm
+                      text={rewritingMessage()?.body ?? ""}
+                      onCancel={() => setRewritingMessage(null)}
+                      onSubmit={submitRewrite}
+                    />
+                  </Show>
+                </ChatMessageRow>
                 <Show when={branchDividerAfter(message().id)}>{(source) => <BranchDivider source={source()} />}</Show>
               </div>
             )}

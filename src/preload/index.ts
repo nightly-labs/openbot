@@ -550,6 +550,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   markConversationRead: decodeReadState,
   markConversationUnread: decodeReadState,
   sendMessage: decodeReceipt,
+  rewriteMessage: decodeReceipt,
   setMessageReaction: decodeVoid,
   listQueue: decodeQueue,
   listWaits: decodeWaits,

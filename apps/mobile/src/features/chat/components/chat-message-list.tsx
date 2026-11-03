@@ -5,6 +5,7 @@ import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references"
 import type { AttachmentSummary, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import { markdownPlainText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import * as Crypto from "expo-crypto";
 import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import type { LucideIcon } from "lucide-react-native";
@@ -37,6 +38,7 @@ import {
   type GestureResponderEvent,
   Pressable,
   StyleSheet,
+  TextInput,
   useWindowDimensions,
   View,
   type ViewInstance,
@@ -283,6 +285,8 @@ interface ChatMessageListProps {
   onSelectStarter: (value: string) => void;
   onRetryHistory: () => void;
   onReply?: (message: ChatBubbleMessage) => void;
+  /** Only provided for an idle agent thread on a host that supports rewrites. */
+  onRewrite?: (message: ChatBubbleMessage, text: string, requestId: string) => Promise<void>;
   /** Sets the reader's reaction on a message. `null` removes it. */
   onReact?: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
   /** The message whose text the reader selects in its bubble. */
@@ -340,6 +344,7 @@ interface MessageRowShared {
   markRevealed: (id: string) => void;
   replyHaptics: ReturnType<typeof useReplyHaptics>;
   canReply: boolean;
+  canRewrite: boolean;
   canReact: boolean;
   canSelectText: boolean;
   canSelectQuestion: boolean;
@@ -347,6 +352,7 @@ interface MessageRowShared {
   listWidth: number;
   actions: {
     reply: (message: ChatBubbleMessage) => void;
+    rewrite: (message: ChatBubbleMessage, text: string, requestId: string) => Promise<void>;
     selectQuestion: (messageId: string) => void;
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
     selectText: (message: ChatBubbleMessage) => void;
@@ -474,6 +480,11 @@ const MessageRow = memo(function MessageRow({
 }) {
   const { t } = useText();
   const [selectionHeight, setSelectionHeight] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState("");
+  const [editSending, setEditSending] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const editRequestId = useRef(Crypto.randomUUID());
   // Native text views keep a selection until they draw again. When the chat ends the selection
   // from outside, such as with a tap elsewhere, the next generation draws them without it.
   const [selectionGeneration, setSelectionGeneration] = useState(0);
@@ -766,9 +777,68 @@ const MessageRow = memo(function MessageRow({
           onReact={shared.canReact ? (emoji) => actions.react(message, emoji) : undefined}
           onReply={shared.canReply ? () => actions.reply(message) : undefined}
           onSelectText={selectable ? () => actions.selectText(message) : undefined}
+          onEdit={
+            shared.canRewrite &&
+            message.author === "user" &&
+            !message.sender &&
+            message.hasSenderMember &&
+            message.status === "completed" &&
+            !outbox
+              ? () => {
+                  setEditDraft(message.body);
+                  editRequestId.current = Crypto.randomUUID();
+                  setEditError(null);
+                  setEditing(true);
+                }
+              : undefined
+          }
           selecting={selecting}
           readAloudId={canReadAloud && message.author === "agent" ? message.id : undefined}
         />
+      ) : null}
+      {editing && message.kind === "message" ? (
+        <View className="w-full gap-2 rounded-2xl bg-control/60 p-3">
+          <TextInput
+            accessibilityLabel={t("mobile.chat.message.edit")}
+            multiline
+            autoFocus
+            value={editDraft}
+            onChangeText={setEditDraft}
+            className="min-h-20 text-foreground"
+          />
+          {editError ? (
+            <Typography.Paragraph type="body-xs" className="text-danger">
+              {editError}
+            </Typography.Paragraph>
+          ) : null}
+          <View className="flex-row justify-end gap-2">
+            <Button
+              variant="ghost"
+              onPress={() => {
+                setEditing(false);
+                setEditError(null);
+              }}
+              isDisabled={editSending}
+            >
+              {t("mobile.chat.message.cancelEdit")}
+            </Button>
+            <Button
+              isDisabled={editSending || !editDraft.trim()}
+              onPress={() => {
+                setEditSending(true);
+                actions
+                  .rewrite(message, editDraft.trim(), editRequestId.current)
+                  .then(() => setEditing(false))
+                  .catch((error: unknown) => {
+                    setEditError(error instanceof Error ? error.message : t("mobile.chat.message.editFailed"));
+                  })
+                  .finally(() => setEditSending(false));
+              }}
+            >
+              {t("mobile.chat.message.sendEdit")}
+            </Button>
+          </View>
+        </View>
       ) : null}
     </View>
   );
@@ -958,6 +1028,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   onSelectStarter,
   onRetryHistory,
   onReply,
+  onRewrite,
   onReact,
   selectingMessageId = null,
   onSelectText,
@@ -1119,16 +1190,28 @@ export const ChatMessageList = memo(function ChatMessageList({
   const selectionArea = useRef<ViewInstance | null>(null);
   const actionHandlers = useRef({
     onReply,
+    onRewrite,
     onReact,
     onSelectText,
     onSelectionChange,
     onNativeSelection,
     onSelectQuestion,
   });
-  actionHandlers.current = { onReply, onReact, onSelectText, onSelectionChange, onNativeSelection, onSelectQuestion };
+  actionHandlers.current = {
+    onReply,
+    onRewrite,
+    onReact,
+    onSelectText,
+    onSelectionChange,
+    onNativeSelection,
+    onSelectQuestion,
+  };
   const actions = useMemo<MessageRowShared["actions"]>(
     () => ({
       reply: (message) => actionHandlers.current.onReply?.(message),
+      rewrite: (message, text, requestId) =>
+        actionHandlers.current.onRewrite?.(message, text, requestId) ??
+        Promise.reject(new Error("Message rewrite is unavailable.")),
       selectQuestion: (messageId) => actionHandlers.current.onSelectQuestion?.(messageId),
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
       selectText: (message) => actionHandlers.current.onSelectText?.(message),
@@ -1170,6 +1253,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   // The parent passes new handler functions on each render. The rows call them through
   // `actionHandlers`, so only their presence keeps `shared`, and every row, from rendering again.
   const canReply = Boolean(onReply);
+  const canRewrite = Boolean(onRewrite) && !sending && !awaitingTurn && !activeTurnId;
   const canReact = Boolean(onReact);
   const canSelectText = Boolean(onSelectText);
   const canSelectQuestion = Boolean(onSelectQuestion);
@@ -1199,6 +1283,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       markRevealed,
       replyHaptics,
       canReply,
+      canRewrite,
       canReact,
       canSelectText,
       canSelectQuestion,
@@ -1226,6 +1311,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       markRevealed,
       replyHaptics,
       canReply,
+      canRewrite,
       canReact,
       canSelectText,
       canSelectQuestion,

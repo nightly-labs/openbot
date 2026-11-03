@@ -97,6 +97,8 @@ interface StoredMessage {
    * because `sender` is also the queue's and the transfer manifest's. Absent on older messages.
    */
   senderMember?: ConversationMessageSender;
+  /** An edited question waits for its source to leave the active thread before delivery starts. */
+  rewriteSource?: { threadId: string; messageId: string };
   text: string;
   attachments: StoredAttachment[];
   /**
@@ -192,6 +194,7 @@ interface EnqueueInput {
   senderTaskId?: string;
   sender: StoredMessage["sender"];
   senderMember?: ConversationMessageSender;
+  rewriteSource?: { threadId: string; messageId: string };
   recipientAgentIds: string[];
   text: string;
   replyToMessageId?: string | null;
@@ -201,6 +204,9 @@ interface EnqueueInput {
   /** An audio draft of what the user said. Kept with the message, not sent to the recipient. */
   voiceRecordingDraftId?: string;
   sourcePaths?: string[];
+  /** Existing attachments copied into a rewritten message, with references remapped to their new IDs. */
+  sourceAttachments?: Array<{ id: string; path: string }>;
+  voiceRecordingSource?: { path: string; mimeType: string };
   idempotencyKey?: string;
 }
 
@@ -544,7 +550,11 @@ export class MailboxStore {
         )
           throw new Error("Invalid voice recording draft.");
       }
-      const sourcePaths = [...drafts.map((draft) => draft.path), ...(input.sourcePaths ?? [])];
+      const sourcePaths = [
+        ...drafts.map((draft) => draft.path),
+        ...(input.sourcePaths ?? []),
+        ...(input.sourceAttachments ?? []).map((attachment) => attachment.path),
+      ];
       if (!text && sourcePaths.length === 0) throw new Error(sourceText("error.backend.messageEmpty"));
       if (sourcePaths.length > MAX_ATTACHMENTS) {
         throw new Error(sourceText("error.backend.attachLimit", { limit: MAX_ATTACHMENTS }));
@@ -572,7 +582,20 @@ export class MailboxStore {
               Effect.mapError(({ cause }) => new StoredStateFailure({ cause })),
               Effect.tapError(() => removeTransfers),
             )
-        : undefined;
+        : input.voiceRecordingSource
+          ? yield* this.#files
+              .commitMessageTransfer(voiceTransferId, input.sender, recipients, messageId, createdAt, [
+                input.voiceRecordingSource.path,
+              ])
+              .pipe(
+                Effect.map(
+                  ([committed]) =>
+                    committed && { ...committed, mimeType: input.voiceRecordingSource?.mimeType ?? committed.mimeType },
+                ),
+                Effect.mapError(({ cause }) => new StoredStateFailure({ cause })),
+                Effect.tapError(() => removeTransfers),
+              )
+          : undefined;
       try {
         validateRecipients();
       } catch (error) {
@@ -580,6 +603,12 @@ export class MailboxStore {
         throw error;
       }
       const committedByDraftId = new Map(drafts.map((draft, index) => [draft.id, attachments[index]] as const));
+      const committedBySourceId = new Map(
+        (input.sourceAttachments ?? []).map(
+          (attachment, index) =>
+            [attachment.id, attachments[drafts.length + (input.sourcePaths?.length ?? 0) + index]] as const,
+        ),
+      );
       const messaging = input.messaging ?? this.#answerReturn(input, recipients);
       const message: StoredMessage = {
         ...(input.channelId === undefined ? {} : { channelId: input.channelId }),
@@ -590,8 +619,10 @@ export class MailboxStore {
         id: messageId,
         sender: input.sender,
         ...(input.sender.kind === "user" && input.senderMember ? { senderMember: input.senderMember } : {}),
+        ...(input.rewriteSource ? { rewriteSource: input.rewriteSource } : {}),
         text: rewriteAttachmentReferences(text, (reference) => {
-          const attachment = committedByDraftId.get(reference.attachmentId);
+          const attachment =
+            committedByDraftId.get(reference.attachmentId) ?? committedBySourceId.get(reference.attachmentId);
           return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
         }),
         attachments,
@@ -1466,7 +1497,23 @@ export class MailboxStore {
   }
 
   #mayStart(delivery: StoredDelivery): boolean {
-    return !delivery.editId && !this.#queueUpdates.has(delivery.id);
+    const source = this.#state.messages.find((message) => message.id === delivery.messageId)?.rewriteSource;
+    return (
+      !delivery.editId &&
+      !this.#queueUpdates.has(delivery.id) &&
+      (!source ||
+        this.#database.readConversationMessages(delivery.recipientAgentId, source.threadId, [source.messageId])
+          .length === 0)
+    );
+  }
+
+  /** Queued rewrite intents survive a crash between storing the delivery and cutting the thread. */
+  pendingRewrites(): Array<{ agentId: string; threadId: string; messageId: string; deliveryId: string }> {
+    return this.#state.deliveries.flatMap((delivery) => {
+      if (delivery.status !== "queued") return [];
+      const source = this.#state.messages.find((message) => message.id === delivery.messageId)?.rewriteSource;
+      return source ? [{ agentId: delivery.recipientAgentId, ...source, deliveryId: delivery.id }] : [];
+    });
   }
 
   /**
@@ -3155,6 +3202,10 @@ function isStoredMessage(value: unknown): value is StoredMessage {
         isString(value.sender.routineName) &&
         isString(value.sender.scheduledFor))) &&
     (value.senderMember === undefined || isConversationMessageSender(value.senderMember)) &&
+    (value.rewriteSource === undefined ||
+      (isRecord(value.rewriteSource) &&
+        isString(value.rewriteSource.threadId) &&
+        isString(value.rewriteSource.messageId))) &&
     isString(value.text) &&
     Array.isArray(value.attachments) &&
     value.attachments.every(isStoredAttachment) &&

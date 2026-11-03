@@ -68,6 +68,7 @@ export function ConversationThread() {
     copyMessage,
     copiedMessageId,
     branchThread,
+    rewriteThreadMessage,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
   const [picker, setPicker] = createSignal<HTMLInputElement>();
@@ -283,6 +284,18 @@ export function ConversationThread() {
             onCopyMessage={(message) => void copyMessage(message)}
             copiedMessageId={copiedMessageId()}
             onBranch={branch(current().threads)}
+            onRewrite={
+              props.rewriteAvailable === false
+                ? undefined
+                : (messageId, text, requestId) => {
+                    const taskId = current().threads.open?.id;
+                    return taskId
+                      ? rewriteThreadMessage(taskId, messageId, text, requestId)
+                      : Promise.reject(new Error("Thread is unavailable."));
+                  }
+            }
+            isOwnSender={props.isOwnSender}
+            requireSenderForRewrite={Boolean(props.runtime)}
             branchSource={branchSource(current().threads, current().agent.name)}
             focusMessage={focusMessage(current().threads)}
           />

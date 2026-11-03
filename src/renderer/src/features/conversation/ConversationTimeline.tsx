@@ -20,6 +20,7 @@ import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { MessageRewriteForm } from "@openbot/ui/features/conversation/MessageRewriteForm";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
@@ -194,6 +195,35 @@ export function ConversationTimeline() {
     sideThreadOpen,
   } = useConversationViewScope();
   const { t, format, sourceText } = useText();
+  const [rewritingMessage, setRewritingMessage] = createSignal<AgentMessage | null>(null);
+  const rewriteAction = (message: AgentMessage) => {
+    if (
+      channel ||
+      !props.agent ||
+      props.rewriteAvailable === false ||
+      (props.runtime && !message.senderMember) ||
+      message.author !== "you" ||
+      message.streaming ||
+      message.status !== undefined ||
+      otherSender(message) ||
+      props.activeTurnId ||
+      props.queue?.deliveries.some(
+        (delivery) => delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running",
+      )
+    )
+      return;
+    return () => setRewritingMessage(message);
+  };
+  const submitRewrite = async (text: string, requestId: string) => {
+    const message = rewritingMessage();
+    const agent = props.agent;
+    if (!message || !agent) return;
+    await conversationRuntime(props).agent.rewriteMessage(
+      { agentId: agent.id, taskId: null, messageId: message.id, text, requestId },
+      props.server?.id ?? "local",
+    );
+    setRewritingMessage(null);
+  };
   // A named function, not a ternary in the prop: the compiler wraps a ternary prop in a memo, and
   // the avatar reads it in a tracked effect, where a new memo halts the reactive system.
   const waitingProviderName = () => {
@@ -1296,6 +1326,7 @@ export function ConversationTimeline() {
                                     {...messageActions}
                                     readAloud={messageReadAloud()}
                                     onBranch={branchAction(message() ?? initialMessage)}
+                                    onEdit={rewriteAction(message() ?? initialMessage)}
                                     branchDisabled={Boolean(props.activeTurnId)}
                                   />
                                 </Show>
@@ -1313,11 +1344,19 @@ export function ConversationTimeline() {
                                       readAloud={messageReadAloud()}
                                       onMarkUnread={markUnreadAction(message() ?? initialMessage)}
                                       onBranch={branchAction(message() ?? initialMessage)}
+                                      onEdit={rewriteAction(message() ?? initialMessage)}
                                       branchDisabled={Boolean(props.activeTurnId)}
                                     />
                                   )
                             }
                           >
+                            <Show when={rewritingMessage()?.id === message()?.id}>
+                              <MessageRewriteForm
+                                text={rewritingMessage()?.body ?? ""}
+                                onCancel={() => setRewritingMessage(null)}
+                                onSubmit={submitRewrite}
+                              />
+                            </Show>
                             <Show when={playerKind()}>
                               {(kind) => (
                                 <VoicePlayer

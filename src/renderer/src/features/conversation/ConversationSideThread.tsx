@@ -36,6 +36,7 @@ export function ConversationSideThread(props: { threadId: string }) {
     copyMessage,
     copiedMessageId,
     branchThread,
+    rewriteThreadMessage,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
   const failureToast = (fallback: AppTextKey) => ({
@@ -168,6 +169,13 @@ export function ConversationSideThread(props: { threadId: string }) {
             onCopyMessage={(message) => void copyMessage(message)}
             copiedMessageId={copiedMessageId()}
             onBranch={branch()}
+            onRewrite={
+              view.rewriteAvailable === false
+                ? undefined
+                : (messageId, text, requestId) => rewriteThreadMessage(props.threadId, messageId, text, requestId)
+            }
+            isOwnSender={view.isOwnSender}
+            requireSenderForRewrite={Boolean(view.runtime)}
             branchSource={branchSource(current().thread, current().agent.name)}
           />
         )}
