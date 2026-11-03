@@ -93,11 +93,16 @@ export function TextProvider(props: ParentProps<TextProviderProps>): JSX.Element
   );
   // Kobalte reads its layout direction from this locale, not from `<html dir>`. Without it, menus,
   // submenus, tabs and sliders keep the direction of `navigator.language` in the Arabic interface.
-  // The format locale has the language of the interface, so it has the same direction, and the
-  // numbers of sliders and progress bars agree with `format`.
+  // The format locale gives sliders and progress bars the numbers of `format`, but only when it has
+  // the language of the interface. "System" on a Hebrew computer shows English text with a `he-IL`
+  // format locale, and Kobalte would lay out from right to left in a left-to-right page.
+  const controlLocale = () => {
+    const format = formatLocale();
+    return format.split("-")[0]?.toLowerCase() === props.locale ? format : props.locale;
+  };
   return (
     <TextContext value={value}>
-      <ControlLocaleProvider locale={formatLocale()}>{props.children}</ControlLocaleProvider>
+      <ControlLocaleProvider locale={controlLocale()}>{props.children}</ControlLocaleProvider>
     </TextContext>
   );
 }
