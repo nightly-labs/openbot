@@ -153,6 +153,14 @@ const CLAUDE_NATIVE_SCHEDULING = [
  * background agent fleet. Their schemas cost about 1.9k tokens in each request.
  */
 const CLAUDE_DUPLICATE_TOOLS = ["ListAgents", "Workflow"];
+/**
+ * Names OpenBot to Claude. Without `CLAUDE_CODE_ENTRYPOINT` the SDK labels each request `sdk-ts`, and
+ * Claude's 5-hour window counts `sdk-*` requests about twice as heavily (anthropics/claude-code#97074).
+ */
+const OPENBOT_CLAUDE_CLIENT = {
+  CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0",
+  CLAUDE_CODE_ENTRYPOINT: "openbot",
+};
 
 interface ClientEvents {
   notification: [notification: AppServerNotification];
@@ -588,7 +596,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       env: {
         ...claudeEnvironment(this.#cli),
         ...this.#environment(this.#onApiKey),
-        CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0",
+        ...OPENBOT_CLAUDE_CLIENT,
       },
     };
   }
@@ -951,7 +959,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             // tools when Finder starts OpenBot. An `env.PATH` in the Claude settings still wins.
             ...(launchPath ? { PATH: launchPath } : {}),
             ...this.#environment(this.#onApiKey),
-            CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0",
+            ...OPENBOT_CLAUDE_CLIENT,
             // Without a terminal, the CLI gives the newer models no TodoWrite or task tools, so the
             // agent has no plan for OpenBot to show as a task list.
             CLAUDE_CODE_ENABLE_TODO_TOOLS: "1",
