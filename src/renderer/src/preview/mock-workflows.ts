@@ -402,6 +402,32 @@ export function mockWorkflows(
       emit(input.workflowId);
       return structuredClone(next);
     },
+    // The preview has no model: a draft is a manual trigger, a model step with the request, and a notification.
+    // A request that ends with "?" gets a question back, so the chat shows both replies.
+    draft: async (input) => {
+      const { detail } = record(input.workflowId);
+      if (detail.revision !== input.baseRevision) throw new Error(sourceText("error.workflow.draftChanged"));
+      if (input.request.endsWith("?")) return { reply: "Which agent should do the work?", detail: null };
+      addVersion(input.workflowId, "restore");
+      const graph: WorkflowGraph = {
+        nodes: [
+          { id: "draft-trigger", kind: "trigger", at: { x: 0, y: 0 }, fields: { trigger: "manual" } },
+          { id: "draft-llm", kind: "llm", at: { x: 380, y: 0 }, fields: { prompt: input.request } },
+          { id: "draft-output", kind: "output", at: { x: 760, y: 0 }, fields: { target: "notify" } },
+        ],
+        edges: [
+          { id: "draft-edge-1", from: "draft-trigger", to: "draft-llm", type: "text" },
+          { id: "draft-edge-2", from: "draft-llm", to: "draft-output", type: "text" },
+        ],
+        strokes: detail.graph.strokes,
+      };
+      const next = put(input.workflowId, detail.summary.title, graph, detail.revision + 1);
+      emit(input.workflowId);
+      return {
+        reply: "Added a manual trigger, a model step with your request, and a notification.",
+        detail: structuredClone(next),
+      };
+    },
     startRun: async (input) => beginRun(input, "manual"),
     runStep: async (input) => {
       const node = nodeOf(input.workflowId, input.nodeId);

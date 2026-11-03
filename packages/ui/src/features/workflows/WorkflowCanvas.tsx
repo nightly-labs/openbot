@@ -92,6 +92,7 @@ import {
 } from "./WorkflowCanvasHud";
 import { ConditionNode } from "./WorkflowConditionNode";
 import { showWorkflowDeleteToast } from "./WorkflowDeleteUndoToast";
+import { type DraftChatMessage, WorkflowBuildbotButton, WorkflowDraftChat } from "./WorkflowDraftChat";
 import { ImageNode } from "./WorkflowImageNode";
 import { LlmNode } from "./WorkflowLlmNode";
 import { minimapLayout, WorkflowMinimap } from "./WorkflowMinimap";
@@ -207,6 +208,15 @@ export interface WorkflowCanvasProps {
   onRotateWebhookSecret?: ((nodeId: string) => Promise<string>) | undefined;
   onLoadOlderRuns: () => void;
   onRestoreVersion: (versionId: string) => void;
+  /**
+   * Sends a chat message to the AI, which changes the workflow or asks a question. Without it, the bar
+   * has no Ask AI chat.
+   */
+  onDraft?: ((request: string) => void) | undefined;
+  /** The Ask AI chat of this workflow. */
+  draftChat?: readonly DraftChatMessage[] | undefined;
+  /** True while the AI works on the last chat message. */
+  drafting?: boolean | undefined;
   /** Shows a version, or the live canvas again with null. Without it, a version in the list restores at once. */
   onPreviewVersion?: ((versionId: string | null) => void) | undefined;
   onSelect: (workflowId: string) => void;
@@ -913,6 +923,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     minimap: boolean;
     hidden: boolean;
     search: boolean;
+    chat: boolean;
   }>({
     tool: "select",
     draw: "pen",
@@ -923,7 +934,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     minimap: false,
     hidden: false,
     search: false,
+    chat: false,
   });
+  const toggleChat = () =>
+    setUi((draft) => {
+      draft.chat = !draft.chat;
+    });
   /** The Draw tool and the tools that place an item act over the nodes, so they clear the selection. */
   const setTool = (tool: Tool) => {
     if (tool !== "select" && tool !== "pan") canvas.select([]);
@@ -2465,6 +2481,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           return mod && event.key !== "Enter" ? withMod[event.key] : undefined;
         }
         if (mod && key === "f") return openSearch;
+        if (mod && key === "j" && props.onDraft) return toggleChat;
         if (mod && key === "/") return toggleHud;
         if (mod && event.shiftKey && key === "l" && ids.length > 0)
           return () => canvas.lockAll(ids, !ids.every((id) => board.isLocked(id)));
@@ -3162,6 +3179,21 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
         <Show when={minimap()}>
           {(map) => <WorkflowMinimap map={map()} selected={board.selected()} onPan={panMinimap} />}
+        </Show>
+
+        <Show when={ui.chat && !frozen() ? props.onDraft : undefined}>
+          {(send) => (
+            <WorkflowDraftChat
+              messages={props.draftChat ?? []}
+              busy={props.drafting ?? false}
+              onSend={send()}
+              onClose={toggleChat}
+            />
+          )}
+        </Show>
+
+        <Show when={props.onDraft && !frozen()}>
+          <WorkflowBuildbotButton open={ui.chat} busy={props.drafting ?? false} onToggle={toggleChat} />
         </Show>
 
         <WorkflowZoomMenu

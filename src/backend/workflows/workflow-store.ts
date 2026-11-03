@@ -300,6 +300,27 @@ export class WorkflowStore {
   }
 
   /**
+   * Puts a drafted graph in place of the graph at `baseRevision`, or returns null when the graph
+   * changed since. The graph before it becomes a `restore` version, so the draft can be undone.
+   */
+  replaceGraph(
+    workflowId: string,
+    baseRevision: number,
+    graph: WorkflowGraph,
+    now = new Date(),
+  ): WorkflowDetail | null {
+    assertRunnable(graph);
+    return this.#transaction(() => {
+      const current = this.#requireDetail(workflowId);
+      if (current.revision !== baseRevision) return null;
+      this.#addVersion(workflowId, current.revision, "restore", current.graph, now);
+      this.#writeGraph(workflowId, graph, now);
+      this.#bumpRevision(workflowId, now);
+      return this.#requireDetail(workflowId);
+    });
+  }
+
+  /**
    * Keeps the graph a run starts from in the version history, when the newest version is of another
    * revision. Runs of a graph that does not change add one version only, so they do not push the
    * saved versions out of the history.

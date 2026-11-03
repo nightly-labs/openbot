@@ -36,6 +36,7 @@ import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import {
   parseCreateWorkflow,
   parseDecideWorkflowStep,
+  parseDraftWorkflow,
   parseRenameWorkflow,
   parseRetryWorkflowStep,
   parseRunWorkflowStep,
@@ -131,6 +132,13 @@ export function workflowIpcHandlers({
         local: (input) => runCauseEffect(workflows.restoreVersion(input)),
         remote: (input, serverId) =>
           remote(serverId, WORKFLOWS_ROUTES.restoreVersion, decodeRemoteWorkflowDetail, input),
+      }),
+      // A joined server has no draft route in `workflows-v1`, so only this computer drafts.
+      draft: scopedHandler(parseDraftWorkflow, {
+        local: (input) => runCauseEffect(workflows.draft(input)),
+        remote: () => {
+          throw new Error(sourceText("error.workflow.draftLocalOnly"));
+        },
       }),
       startRun: scopedHandler(parseStartWorkflowRun, {
         local: (input) => runCauseEffect(workflows.startRun(input)),

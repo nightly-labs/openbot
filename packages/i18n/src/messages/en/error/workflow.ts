@@ -4,6 +4,9 @@ import { defineMessages } from "../../../message";
 export const messages = defineMessages("error.workflow", {
   "error.workflow.missing": "This workflow no longer exists.",
   "error.workflow.versionMissing": "This version of the workflow no longer exists.",
+  "error.workflow.draftChanged": "The workflow changed while the AI worked on it. Try again.",
+  "error.workflow.draftFailed": "The AI could not build a workflow that can run. Try other words.",
+  "error.workflow.draftLocalOnly": "Only this computer can build a workflow with AI.",
   "error.workflow.annotation": "Text, notes and shapes cannot have connections.",
   "error.workflow.port": "A step cannot take this type of input.",
   "error.workflow.branch": "Only a condition can have yes and no connections.",

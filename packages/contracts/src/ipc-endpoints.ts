@@ -538,6 +538,8 @@ import type {
 import type {
   CreateWorkflowInput,
   DecideWorkflowStepInput,
+  DraftWorkflowInput,
+  DraftWorkflowResult,
   RenameWorkflowInput,
   RetryWorkflowStepInput,
   RunWorkflowStepInput,
@@ -1557,6 +1559,8 @@ export const IPC_ENDPOINTS = {
     versions: scopedRequest<string, WorkflowVersion[]>()("workflows:versions"),
     versionGraph: scopedRequest<WorkflowVersionInput, WorkflowGraph>()("workflows:version-graph"),
     restoreVersion: scopedRequest<WorkflowVersionInput, WorkflowDetail>()("workflows:restore-version"),
+    /** Drafts a graph from a chat request with AI and saves it, or asks a question. Only this computer's host drafts. */
+    draft: scopedRequest<DraftWorkflowInput, DraftWorkflowResult>()("workflows:draft"),
     startRun: scopedRequest<StartWorkflowRunInput, WorkflowRunDetail>()("workflows:start-run"),
     runStep: scopedRequest<RunWorkflowStepInput, WorkflowStep>()("workflows:run-step"),
     stopStep: scopedRequest<string, void>()("workflows:stop-step"),

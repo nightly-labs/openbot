@@ -359,6 +359,33 @@ export interface SaveWorkflowGraphInput {
   graph: WorkflowGraph;
 }
 
+/** One message of the Ask AI chat of a workflow. */
+export interface WorkflowChatMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
+/**
+ * A request in the user's words, and the chat before it. The host drafts a graph for it and puts the
+ * draft in place of the graph at `baseRevision`, or answers with a question and changes nothing.
+ */
+export interface DraftWorkflowInput {
+  workflowId: string;
+  baseRevision: number;
+  request: string;
+  /** The earlier messages of the chat, oldest first, at most `WORKFLOW_CHAT_HISTORY`. */
+  history: readonly WorkflowChatMessage[];
+}
+
+/** The AI's reply. `detail` is the saved draft, or null when the reply is a question. */
+export interface DraftWorkflowResult {
+  reply: string;
+  detail: WorkflowDetail | null;
+}
+
+/** The number of earlier chat messages that a draft sends to the model. */
+export const WORKFLOW_CHAT_HISTORY = 20;
+
 export type WorkflowSaveResult = { ok: true; revision: number } | { ok: false; conflict: WorkflowDetail };
 
 export interface WorkflowVersionInput {
@@ -645,6 +672,35 @@ export function isSaveWorkflowGraphInput(value: unknown): value is SaveWorkflowG
     isIdentifier(value.workflowId) &&
     isRevision(value.baseRevision) &&
     isWorkflowGraph(value.graph)
+  );
+}
+
+export function isDraftWorkflowInput(value: unknown): value is DraftWorkflowInput {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.workflowId) &&
+    isRevision(value.baseRevision) &&
+    isBoundedString(value.request, INPUT_LIMITS.workflowDraftRequest) &&
+    value.request.trim().length > 0 &&
+    Array.isArray(value.history) &&
+    value.history.length <= WORKFLOW_CHAT_HISTORY &&
+    value.history.every(isWorkflowChatMessage)
+  );
+}
+
+export function isWorkflowChatMessage(value: unknown): value is WorkflowChatMessage {
+  return (
+    isDynamicRecord(value) &&
+    (value.role === "user" || value.role === "assistant") &&
+    isBoundedString(value.text, INPUT_LIMITS.workflowDraftRequest)
+  );
+}
+
+export function isDraftWorkflowResult(value: unknown): value is DraftWorkflowResult {
+  return (
+    isDynamicRecord(value) &&
+    isBoundedString(value.reply, INPUT_LIMITS.workflowDraftRequest) &&
+    (value.detail === null || isWorkflowDetail(value.detail))
   );
 }
 
