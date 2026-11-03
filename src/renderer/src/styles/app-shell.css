@@ -2331,13 +2331,7 @@ textarea {
   border-color: var(--openbot-bg-control);
 }
 
-.agent-row-agent-status-working {
-  width: 24px;
-  height: 16px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-surface);
-  color: var(--openbot-text-secondary);
-}
+/* The working badge, with its felt balls, is in `@openbot/ui/features/sidebar/sidebar-working-badge.css`. */
 
 .agent-row-thinking-dots {
   display: inline-flex;
