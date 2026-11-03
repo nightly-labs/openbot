@@ -302,9 +302,6 @@ export const messages = {
   "connector.whatsapp.connect": "WhatsApp 연결",
   "connector.whatsapp.addAgent": "에이전트 추가",
   "connector.whatsapp.actionFailed": "WhatsApp이 변경 사항을 받아들이지 않았어요",
-  "connector.whatsapp.warningTitle": "WhatsApp은 자동화하는 번호를 차단할 수 있어요",
-  "connector.whatsapp.warningDescription":
-    "OpenBot은 이 컴퓨터를 비공식 연결된 기기로 연결해요. OpenBot 전용 번호를 따로 쓰는 편이 더 안전해요. 이 컴퓨터가 약 14일 동안 꺼져 있으면 WhatsApp이 기기를 삭제해요.",
   "connector.whatsapp.numbersTitle": "번호",
   "connector.whatsapp.linkNumber": "번호 연결",
   "connector.whatsapp.ownNumberNote": "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요.",

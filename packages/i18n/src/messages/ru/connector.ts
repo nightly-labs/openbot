@@ -379,9 +379,6 @@ export const messages = {
   "connector.whatsapp.connect": "Привязать WhatsApp",
   "connector.whatsapp.addAgent": "Добавить агента",
   "connector.whatsapp.actionFailed": "WhatsApp не принял изменение",
-  "connector.whatsapp.warningTitle": "WhatsApp может блокировать номера с автоматизацией",
-  "connector.whatsapp.warningDescription":
-    "OpenBot привязывает этот компьютер как неофициальное связанное устройство. Отдельный номер только для OpenBot безопаснее. WhatsApp удаляет устройство, если этот компьютер выключен около 14 дней.",
   "connector.whatsapp.numbersTitle": "Номера",
   "connector.whatsapp.linkNumber": "Привязать номер",
   "connector.whatsapp.ownNumberNote":

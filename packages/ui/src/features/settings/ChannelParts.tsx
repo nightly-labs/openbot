@@ -160,8 +160,6 @@ export function ChannelPage(
     onConnect: () => void;
     /** A step that no section holds, in the header after the page is set up. */
     headerAction?: JSX.Element;
-    /** An alert that the page always shows after its other alerts, such as a risk of the platform. */
-    notice?: JSX.Element;
     disconnectAllSummary: string;
     onDisconnectAll: () => void;
     /** The sections of a page that is set up. */
@@ -192,20 +190,17 @@ export function ChannelPage(
       readError={props.loadError}
       onRetry={props.onRetry}
       alert={
-        <>
-          <Show when={props.state.attention > 0}>
-            <Alert tone="warning" role="alert">
-              <AlertIcon>
-                <TriangleAlert />
-              </AlertIcon>
-              <AlertContent>
-                <AlertTitle>{t(props.text.attentionTitle, { count: props.state.attention })}</AlertTitle>
-                <AlertDescription>{t(props.text.attentionDescription)}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          </Show>
-          {props.notice}
-        </>
+        <Show when={props.state.attention > 0}>
+          <Alert tone="warning" role="alert">
+            <AlertIcon>
+              <TriangleAlert />
+            </AlertIcon>
+            <AlertContent>
+              <AlertTitle>{t(props.text.attentionTitle, { count: props.state.attention })}</AlertTitle>
+              <AlertDescription>{t(props.text.attentionDescription)}</AlertDescription>
+            </AlertContent>
+          </Alert>
+        </Show>
       }
       tagline={props.tagline}
       intro={props.intro}

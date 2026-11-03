@@ -355,9 +355,6 @@ export const messages = {
   "connector.whatsapp.connect": "Vincular WhatsApp",
   "connector.whatsapp.addAgent": "Añadir agente",
   "connector.whatsapp.actionFailed": "WhatsApp no aceptó el cambio",
-  "connector.whatsapp.warningTitle": "WhatsApp puede bloquear los números que automatizan",
-  "connector.whatsapp.warningDescription":
-    "OpenBot vincula este equipo como un dispositivo vinculado no oficial. Es más seguro usar un número aparte solo para OpenBot. WhatsApp quita el dispositivo si este equipo pasa unos 14 días apagado.",
   "connector.whatsapp.numbersTitle": "Números",
   "connector.whatsapp.linkNumber": "Vincular un número",
   "connector.whatsapp.ownNumberNote":

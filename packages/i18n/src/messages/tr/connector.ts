@@ -385,9 +385,6 @@ export const messages = {
   "connector.whatsapp.connect": "WhatsApp'ı bağla",
   "connector.whatsapp.addAgent": "Ajan ekle",
   "connector.whatsapp.actionFailed": "WhatsApp değişikliği kabul etmedi",
-  "connector.whatsapp.warningTitle": "WhatsApp otomasyon yapan numaraları engelleyebilir",
-  "connector.whatsapp.warningDescription":
-    "OpenBot bu bilgisayarı resmi olmayan bir bağlı cihaz olarak bağlar. Yalnızca OpenBot için ayrı bir numara daha güvenlidir. Bu bilgisayar yaklaşık 14 gün kapalı kalırsa WhatsApp cihazı kaldırır.",
   "connector.whatsapp.numbersTitle": "Numaralar",
   "connector.whatsapp.linkNumber": "Numara bağla",
   "connector.whatsapp.ownNumberNote": "“Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler OpenBot'a ulaşır.",

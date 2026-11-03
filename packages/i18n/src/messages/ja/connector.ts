@@ -346,9 +346,6 @@ export const messages = {
   "connector.whatsapp.connect": "WhatsApp をリンク",
   "connector.whatsapp.addAgent": "エージェントを追加",
   "connector.whatsapp.actionFailed": "WhatsApp は変更を受け付けませんでした",
-  "connector.whatsapp.warningTitle": "WhatsApp は自動化された番号をブロックすることがあります",
-  "connector.whatsapp.warningDescription":
-    "OpenBot はこのコンピューターを非公式のリンク済みデバイスとしてリンクします。OpenBot 専用の別の番号を使うほうが安全です。このコンピューターの電源が切れたまま約 14 日たつと、WhatsApp はデバイスを削除します。",
   "connector.whatsapp.numbersTitle": "番号",
   "connector.whatsapp.linkNumber": "番号をリンク",
   "connector.whatsapp.ownNumberNote": "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。",

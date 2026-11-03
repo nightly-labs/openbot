@@ -380,9 +380,6 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.connect": "Link WhatsApp",
   "connector.whatsapp.addAgent": "Add agent",
   "connector.whatsapp.actionFailed": "WhatsApp did not accept the change",
-  "connector.whatsapp.warningTitle": "WhatsApp can block numbers that automate",
-  "connector.whatsapp.warningDescription":
-    "OpenBot links this computer as an unofficial linked device. A separate number only for OpenBot is safer. WhatsApp removes the device after about 14 days with this computer off.",
   "connector.whatsapp.numbersTitle": "Numbers",
   "connector.whatsapp.linkNumber": "Link a number",
   "connector.whatsapp.ownNumberNote": "Your “Message yourself” chat and the people you allow reach OpenBot.",

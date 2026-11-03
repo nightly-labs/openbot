@@ -343,9 +343,6 @@ export const messages = {
   "connector.whatsapp.connect": "Koppel WhatsApp",
   "connector.whatsapp.addAgent": "Agent toevoegen",
   "connector.whatsapp.actionFailed": "WhatsApp heeft de wijziging niet geaccepteerd",
-  "connector.whatsapp.warningTitle": "WhatsApp kan geautomatiseerde nummers blokkeren",
-  "connector.whatsapp.warningDescription":
-    "OpenBot koppelt deze computer als onofficieel gekoppeld apparaat. Een apart nummer alleen voor OpenBot is veiliger. WhatsApp verwijdert het apparaat als deze computer ongeveer 14 dagen uit staat.",
   "connector.whatsapp.numbersTitle": "Nummers",
   "connector.whatsapp.linkNumber": "Koppel een nummer",
   "connector.whatsapp.ownNumberNote": "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot.",

@@ -350,9 +350,6 @@ export const messages = {
   "connector.whatsapp.connect": "Associer WhatsApp",
   "connector.whatsapp.addAgent": "Ajouter un agent",
   "connector.whatsapp.actionFailed": "WhatsApp n’a pas accepté la modification",
-  "connector.whatsapp.warningTitle": "WhatsApp peut bloquer les numéros automatisés",
-  "connector.whatsapp.warningDescription":
-    "OpenBot associe cet ordinateur comme appareil connecté non officiel. Un numéro distinct réservé à OpenBot est plus sûr. WhatsApp retire l’appareil après environ 14 jours si cet ordinateur reste éteint.",
   "connector.whatsapp.numbersTitle": "Numéros",
   "connector.whatsapp.linkNumber": "Associer un numéro",
   "connector.whatsapp.ownNumberNote":

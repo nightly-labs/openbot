@@ -357,9 +357,6 @@ export const messages = {
   "connector.whatsapp.connect": "WhatsApp verknüpfen",
   "connector.whatsapp.addAgent": "Agenten hinzufügen",
   "connector.whatsapp.actionFailed": "WhatsApp hat die Änderung nicht akzeptiert",
-  "connector.whatsapp.warningTitle": "WhatsApp kann automatisierte Nummern sperren",
-  "connector.whatsapp.warningDescription":
-    "OpenBot verknüpft diesen Computer als inoffizielles verknüpftes Gerät. Eine eigene Nummer nur für OpenBot ist sicherer. WhatsApp entfernt das Gerät, wenn dieser Computer etwa 14 Tage lang aus ist.",
   "connector.whatsapp.numbersTitle": "Nummern",
   "connector.whatsapp.linkNumber": "Nummer verknüpfen",
   "connector.whatsapp.ownNumberNote":

@@ -384,9 +384,6 @@ export const messages = {
   "connector.whatsapp.connect": "Połącz WhatsApp",
   "connector.whatsapp.addAgent": "Dodaj agenta",
   "connector.whatsapp.actionFailed": "WhatsApp nie przyjął zmiany",
-  "connector.whatsapp.warningTitle": "WhatsApp może blokować numery, które działają automatycznie",
-  "connector.whatsapp.warningDescription":
-    "OpenBot łączy ten komputer jako nieoficjalne połączone urządzenie. Osobny numer tylko dla OpenBot jest bezpieczniejszy. WhatsApp usuwa urządzenie, gdy ten komputer jest wyłączony przez około 14 dni.",
   "connector.whatsapp.numbersTitle": "Numery",
   "connector.whatsapp.linkNumber": "Połącz numer",
   "connector.whatsapp.ownNumberNote":

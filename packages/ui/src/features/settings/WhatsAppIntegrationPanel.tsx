@@ -34,7 +34,6 @@ import {
   Spinner,
   SwitchField,
   Text,
-  TriangleAlert,
   UserRound,
   UsersRound,
 } from "@openbot/ui";
@@ -277,17 +276,6 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
       loadError={props.loadError}
       onRetry={props.onRetry}
       onConnect={() => openDialog("number")}
-      notice={
-        <Alert tone="warning" report={false}>
-          <AlertIcon>
-            <TriangleAlert />
-          </AlertIcon>
-          <AlertContent>
-            <AlertTitle>{t("connector.whatsapp.warningTitle")}</AlertTitle>
-            <AlertDescription>{t("connector.whatsapp.warningDescription")}</AlertDescription>
-          </AlertContent>
-        </Alert>
-      }
       disconnectAllSummary={disconnectAllSummary()}
       onDisconnectAll={props.onDisconnectAll}
       tagline={props.tagline}

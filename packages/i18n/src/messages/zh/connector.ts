@@ -347,9 +347,6 @@ export const messages = {
   "connector.whatsapp.connect": "关联 WhatsApp",
   "connector.whatsapp.addAgent": "添加助手",
   "connector.whatsapp.actionFailed": "WhatsApp 没有接受该更改",
-  "connector.whatsapp.warningTitle": "WhatsApp 可能会封禁自动化的号码",
-  "connector.whatsapp.warningDescription":
-    "OpenBot 会把这台电脑关联为非官方的关联设备。使用一个 OpenBot 专用的号码更安全。如果这台电脑关机约 14 天，WhatsApp 会移除该设备。",
   "connector.whatsapp.numbersTitle": "号码",
   "connector.whatsapp.linkNumber": "关联号码",
   "connector.whatsapp.ownNumberNote": "你的“给自己发消息”聊天和你允许的人可以联系 OpenBot。",
