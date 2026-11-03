@@ -138,6 +138,13 @@ export const messages = {
   "server.upsell.offline": "Een OpenBot-server blijft 24/7 aan, dus routines blijven draaien.",
   "server.upsell.seePlans": "Bekijk abonnementen",
   "server.upsell.notNow": "Niet nu",
+  "server.upgrade.title": "Je agents hebben bijna geen ruimte meer",
+  "server.upgrade.description":
+    "{server} heeft weinig vrije ruimte over. Upgrade zodat je agents zonder onderbreking blijven werken.",
+  "server.upgrade.used": "{used} van {total} gebruikt",
+  "server.upgrade.current": "{plan} (nu)",
+  "server.upgrade.price": "Prijs",
+  "server.upgrade.action": "Upgraden naar {plan}",
   "server.hosted.progressTitle": "{name} instellen",
   "server.hosted.paymentTitle": "Rond de betaling af in je browser",
   "server.hosted.paymentDescription": "De installatie begint wanneer Stripe de betaling bevestigt.",

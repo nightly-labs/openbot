@@ -181,7 +181,7 @@ connection is one chat. `MessagingService` gives each new conversation in a grou
 mentions the bot or replies to it; not a direct chat, not a message of an existing conversation) to
 `Workflows.receiveTelegram` before it goes to the Telegram Orchestrator. The trigger matches the
 connection (empty: any linked chat) and a text filter (`telegram-matching.ts`). A matched message
-starts one run for each trigger, with source `telegram` (schema v51) and the idempotency key
+starts one run for each trigger, with source `telegram` (schema v52) and the idempotency key
 `telegram:<node>:<message>`, and does not start an agent conversation. A workflow with an open run
 skips the message; when all matched triggers skip it, OpenBot adds the failed reaction to it.
 

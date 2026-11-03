@@ -41,4 +41,18 @@ export const messages = {
     "OpenBot はこのチャットに接続されています。エージェントに依頼するには、{bot} をメンションするか、OpenBot のメッセージに返信してください。",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Telegram で回答し、チームに依頼します",
+  "status.messaging.whatsappNoAgent":
+    "ここで回答できるエージェントはまだいません。OpenBot で WhatsApp Orchestrator を追加してください。",
+  "status.messaging.whatsappApprovalMenu": "承認する場合は 1、拒否する場合は 2 と返信してください。",
+  "status.messaging.whatsappStopMenu": "停止するには「stop」と返信してください。",
+  "status.messaging.whatsappPairingCode":
+    "この番号は、所有者が許可した人にだけ回答します。所有者にこのコードを伝えてください: {code}",
+  "status.messaging.whatsappPairingApproved": "この番号にリクエストを送れるようになりました。",
+  "status.messaging.whatsappOwnChat": "自分にメッセージ",
+  "status.messaging.whatsappWelcomeOwn":
+    "👋 *OpenBot が接続しました*\n\nここに書いてエージェントに依頼できます。WhatsApp Orchestrator が答えるか、適切なエージェントに仕事を渡します。\n\n依頼を止めるには *stop* と送ってください。",
+  "status.messaging.whatsappWelcomeDedicated":
+    "👋 *OpenBot が接続しました*\n\nOpenBot で許可した人がこの番号に書けるようになりました。新しい人にはコードが届きます。OpenBot の「リクエスト」で承認してください。\n\n依頼を止めるには *stop* と送ってください。",
+  "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
+  "status.messaging.whatsappOrchestratorTitle": "WhatsApp で回答し、チームに依頼します",
 } as const satisfies PartialTranslation<typeof source>;

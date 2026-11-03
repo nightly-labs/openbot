@@ -125,6 +125,13 @@ export const messages = {
       "1 つのアカウントで持てる有料サーバーは {count} 台までです。サーバーを追加するには、先に 1 台削除してください。",
   },
   "server.add.limit.manage": "サーバーを管理",
+  "server.upgrade.title": "エージェントの空き容量が不足しています",
+  "server.upgrade.description":
+    "{server} の空き容量が残りわずかです。アップグレードすると、エージェントが中断なく動作し続けます。",
+  "server.upgrade.used": "{total} 中 {used} 使用",
+  "server.upgrade.current": "{plan}（現在）",
+  "server.upgrade.price": "価格",
+  "server.upgrade.action": "{plan} にアップグレード",
   "server.hosted.progressTitle": "{name} をセットアップしています",
   "server.hosted.paymentTitle": "ブラウザーで支払いを完了してください",
   "server.hosted.paymentDescription": "Stripe が支払いを確認するとセットアップが始まります。",
