@@ -125,7 +125,7 @@ function accountsHost(key: Pick<ProviderAccountsHost, "apiKey" | "defaultUsesApi
     ...key,
     scope: unused("scope"),
     cli: () => ({ executable, version: "2.1.310" }),
-    defaultEmail: () => null,
+    defaultLogin: () => null,
     signInTemp: () => undefined,
     authenticate: unused("authenticate"),
     stopClient: unused("stopClient"),

@@ -88,6 +88,8 @@ export interface AccountReadResult {
     type: string;
     email?: string | null | undefined;
     planType?: string | null | undefined;
+    /** The organization of the login, when the CLI gives one: one email can sign in to more than one. */
+    organizationId?: string | null | undefined;
   };
   requiresOpenaiAuth: boolean;
 }

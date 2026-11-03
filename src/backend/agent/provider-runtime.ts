@@ -562,7 +562,10 @@ export class ProviderRuntime implements ProviderPort {
           scope: () => this.#scope,
           cli: (provider) =>
             this.#clients.has(provider) || this.#released.has(provider) ? this.#cli.get(provider) : undefined,
-          defaultEmail: (provider) => this.#accounts.get(provider)?.email ?? null,
+          defaultLogin: (provider) => {
+            const account = this.#accounts.get(provider);
+            return account ? { email: account.email ?? null, organizationId: account.organizationId ?? null } : null;
+          },
           apiKey: (provider) => this.#credentials.apiKey(provider),
           defaultUsesApiKey: (provider) => this.ownSignInUsesKey(provider),
           signInTemp: (provider) => {
@@ -2973,6 +2976,7 @@ export class ProviderRuntime implements ProviderPort {
           previousAccount &&
           (previousAccount.type !== account.type ||
             previousAccount.email !== account.email ||
+            previousAccount.organizationId !== account.organizationId ||
             previousAccount.planType !== account.planType)
         )
           this.#forgetUsage(provider);
