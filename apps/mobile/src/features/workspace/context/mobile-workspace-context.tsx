@@ -384,6 +384,23 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const restoredServers = useRef(new Set<string>());
   /** Servers shown from the cache whose connection did not register yet. */
   const quietStarts = useRef(new Set<string>());
+  /**
+   * The capabilities that the phone kept from the last connection of each server, until this run
+   * checks them. Only the first workspace reads use them: the checks and the actions wait for the host.
+   */
+  const keptCapabilities = useRef(new Map<string, readonly string[]>());
+  /** The server list that the phone keeps, as the account service last gave it. */
+  const keptHosts = useRef<readonly RemoteTeamHost[] | null>(null);
+  /** The account service gave the server list in this run, so the phone's copy no longer applies. */
+  const directoryLoaded = useRef(false);
+  const keepHosts = useCallback(
+    (hosts: readonly RemoteTeamHost[]) => {
+      if (keptHosts.current && JSON.stringify(keptHosts.current) === JSON.stringify(hosts)) return;
+      keptHosts.current = hosts;
+      void workspaceCache?.writeHosts(hosts).catch(() => undefined);
+    },
+    [workspaceCache],
+  );
   const [liveState] = useState(() => new LiveWorkspaceStore());
   const preferenceStore = useMemo(
     () =>
@@ -471,6 +488,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         for (const id of serverAgentIds.current.get(serverId) ?? []) removedAgentIds.add(id);
         serverAgentIds.current.delete(serverId);
         cachedSummaries.current.delete(serverId);
+        keptCapabilities.current.delete(serverId);
         void workspaceCache?.remove(serverId).catch(() => undefined);
         presenceSignatures.current.delete(serverId);
         for (const queryKey of [
@@ -494,17 +512,28 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState.update("approvalRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserTabs", (current) => withoutKeys(current, serverIds));
+      // A server that the user left does not come back with the next start.
+      const kept = keptHosts.current;
+      if (kept?.some((host) => serverIds.has(host.hostId)))
+        keepHosts(kept.filter((host) => !serverIds.has(host.hostId)));
     },
-    [connectionWaits, readRefresh, queryClient, queryScope, conversationStore, liveState, workspaceCache],
+    [connectionWaits, readRefresh, queryClient, queryScope, conversationStore, liveState, workspaceCache, keepHosts],
   );
 
+  /**
+   * Shows the servers of a list. `confirmed` is false for the list that the phone kept: it only
+   * starts the connections early, and the list of the account service then drops and keeps.
+   */
   const installHosts = useCallback(
-    (hosts: RemoteTeamHost[]) => {
+    (hosts: readonly RemoteTeamHost[], confirmed = true) => {
       const available = new Set(hosts.map((host) => host.hostId));
-      dropServerState(new Set(serversRef.current.filter((server) => !available.has(server.id)).map(({ id }) => id)));
-      // Also the copies of servers that the account left while the app was closed.
-      void workspaceCache?.retain([...available]).catch(() => undefined);
-      for (const host of hosts) removedServers.current.delete(host.hostId);
+      if (confirmed) {
+        dropServerState(new Set(serversRef.current.filter((server) => !available.has(server.id)).map(({ id }) => id)));
+        // Also the copies of servers that the account left while the app was closed.
+        void workspaceCache?.retain([...available]).catch(() => undefined);
+        for (const host of hosts) removedServers.current.delete(host.hostId);
+        keepHosts(hosts);
+      }
       setServers((current) => {
         const previousServers = new Map(current.map((server) => [server.id, server]));
         return hosts.map((host) =>
@@ -517,7 +546,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           : (sortByPreference(hosts.map((host) => ({ id: host.hostId })))[0]?.id ?? null),
       );
     },
-    [dropServerState, session.host?.hostId, sortByPreference, workspaceCache],
+    [dropServerState, session.host?.hostId, sortByPreference, workspaceCache, keepHosts],
   );
 
   const directoryRefresh = useMemo(
@@ -540,12 +569,39 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             ),
           );
           if (generation !== directoryGeneration.current) return;
+          directoryLoaded.current = true;
           installHosts(hosts);
           setServerDirectoryState("ready");
         }),
       ),
     [directory, installHosts],
   );
+  // At a start, the servers that the phone kept connect while the account service answers. The
+  // account service still decides: its list drops a server that the account left, and each ticket
+  // checks the membership. Each key must be the key that this phone trusts for the server.
+  useEffect(() => {
+    if (!workspaceCache) return;
+    let current = true;
+    const hostKeys = trustedHostKeys(session.apiUrl, session.user.id);
+    void workspaceCache
+      .readHosts()
+      .then(async (cached) => {
+        if (!cached?.length) return;
+        const checked = await Promise.all(
+          cached.map(async (host) => ((await hostKeys.get(host.hostId)) === host.devicePublicKey ? host : null)),
+        );
+        if (!current || directoryLoaded.current || serversRef.current.length > 0) return;
+        keptHosts.current ??= cached;
+        const trusted = checked.filter(
+          (host): host is RemoteTeamHost => host !== null && !removedServers.current.has(host.hostId),
+        );
+        if (trusted.length > 0) installHosts(trusted, false);
+      })
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [workspaceCache, session.apiUrl, session.user.id, installHosts]);
   const refreshHosts = useCallback(() => runTeamEffect(directoryRefresh.refresh(true)), [directoryRefresh]);
   const refreshMemberships = useCallback(() => {
     directoryGeneration.current += 1;
@@ -834,6 +890,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           hidden: hostHiddenRef.current[serverId] ?? null,
           sidebar: sidebarByServerRef.current[serverId]?.layout ?? null,
           conversations: agents.flatMap((agent) => conversationStore.cachedPage(agent.id) ?? []),
+          capabilities: serverCapabilities.current.get(serverId) ?? keptCapabilities.current.get(serverId) ?? null,
           drawer: drawerSnapshot(serverId),
         })
         .catch(() => undefined);
@@ -851,6 +908,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         .read(id)
         .then((cached) => {
           if (!cached || removedServers.current.has(id)) return;
+          // A connection that checked its capabilities in this run uses its own.
+          if (cached.capabilities) keptCapabilities.current.set(id, cached.capabilities);
           if (cached.drawer) restoreDrawerSnapshot(id, cached.drawer);
           if (cachedSummaries.current.has(id)) return;
           if (cached.hidden)
@@ -962,11 +1021,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       if (!context.isCurrent()) return;
       context.stage = "compatibility";
       const compatibilityRead = client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV9);
-      // On a reconnect the capabilities of the last connection are known, so the workspace reads go
-      // out with the compatibility read and do not wait one more round trip. Their results apply only
-      // after the check. The read state applies when it arrives: it does not depend on the protocol,
-      // and its refresh must start now to keep its order with the event reads.
-      const known = serverCapabilities.current.get(serverId);
+      // On a reconnect the capabilities of the last connection are known, and at a start those that
+      // the phone kept, so the workspace reads go out with the compatibility read and do not wait one
+      // more round trip. Their results apply only after the check. The read state applies when it
+      // arrives: it does not depend on the protocol, and its refresh must start now to keep its order
+      // with the event reads.
+      const known = serverCapabilities.current.get(serverId) ?? keptCapabilities.current.get(serverId);
       const loadReads = () =>
         runTeamEffect(
           readRefresh.refresh(
@@ -1146,10 +1206,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   );
   /**
    * Set on background entry with the selected server. Until it clears, the other servers stay
-   * inactive. A new selection ends it, so the server that the user leaves keeps its attempt.
+   * inactive. A new selection ends it, so the server that the user leaves keeps its attempt. A
+   * selected server that cannot be online soon ends it too: the others do not wait for nothing.
    */
   const [hold, setHold] = useState<{ serverId: string | null } | null>(null);
   const othersHeld = hold !== null && hold.serverId === activeServerId;
+  const handleServerUnavailable = useCallback((hostId: string) => {
+    if (hostId === activeServerIdRef.current) setHold(null);
+  }, []);
   const wakeReconnect = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(wakeReconnect.current), []);
   /** The account server says that the hosted server starts, so the app connects to it again soon. */
@@ -2230,6 +2294,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               onStatus={handleConnectionStatus}
               onMembershipChanged={refreshMemberships}
               onTeamEvent={handleTeamEvent}
+              onUnavailable={handleServerUnavailable}
             />
           ))}
         </View>

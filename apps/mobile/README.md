@@ -193,12 +193,23 @@ When no agents have loaded and the selected server is connecting or offline, the
 `Waiting for connection`. The empty-server prompt appears only once the server is online; agents
 already loaded remain visible during reconnection.
 
-The phone keeps an encrypted copy of the agents, hidden agents, sections, latest chat pages and last
-drawer values (`drawer-snapshot.ts`) of each server (`workspace-cache.ts`), and writes it when a
-server load ends and when the app goes to the background. After a start, a server shows its copy at once, and its first connection attempt is
-quiet for 5 seconds, as a return to the app is. The UI does not mark the copy: a server that takes
-longer shows the usual reconnect status and faded avatars. Its own reads then replace the copy.
-Sign-out, an expired session and the removal of a server delete it.
+The phone keeps an encrypted copy of the agents, hidden agents, sections, latest chat pages,
+capabilities and last drawer values (`drawer-snapshot.ts`) of each server (`workspace-cache.ts`),
+and writes it when a server load ends and when the app goes to the background. It also keeps the
+last server list of the account service. After a start, the servers of that list connect at once,
+before the account service answers; a server whose key is not the key that the phone trusts waits
+for the account service. Its list then replaces the copy: it removes a server that the account
+left. A server shows its copy at once, and its first connection attempt is quiet for 5 seconds, as
+a return to the app is. The first workspace reads go out with the compatibility read when the copy
+has the capabilities. The UI does not mark the copy: a server that takes longer shows the usual
+reconnect status and faded avatars. Its own reads then replace the copy. Sign-out, an expired
+session and the removal of a server delete it.
+
+The first connect of each server asks the account service for its logical session while the hidden
+peer page loads (`remote-team-transport.tsx`). The account service gives the active session again, so
+the peer then asks only for its ticket. After a return to the app, the other servers wait for the
+selected server for up to 3 seconds. A failed attempt of the selected server, or its host that
+Signal reports offline, ends this wait.
 
 While a server is disconnected, its agent avatars and colored chat bubbles fade locally with the same
 280 ms transition. Voice controls and suggested prompts are disabled until the server is online. The
