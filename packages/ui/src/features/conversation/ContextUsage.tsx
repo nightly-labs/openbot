@@ -282,6 +282,41 @@ export function ContextUsageMeter(props: {
 }
 
 /**
+ * The New chat action of a composer whose thread has no context ring yet: providers report the fill
+ * only with a turn, so after a restart no ring shows until the agent's next turn (#4582).
+ */
+export function ComposerNewChatButton(props: {
+  agent: Pick<AgentProfile, "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
+  start: () => Promise<void>;
+}) {
+  const { t } = useText();
+  const [confirming, setConfirming] = createSignal(false);
+  const [trigger, setTrigger] = createSignal<HTMLElement>();
+  return (
+    <>
+      <Button
+        ref={setTrigger}
+        variant="ghost"
+        type="button"
+        class="composer-button"
+        aria-label={t("composer.newChat.action")}
+        aria-haspopup="dialog"
+        onClick={() => setConfirming(true)}
+      >
+        <MessageCirclePlus aria-hidden="true" />
+      </Button>
+      <AgentNewChatDialog
+        agent={props.agent}
+        open={confirming()}
+        onClose={() => setConfirming(false)}
+        start={props.start}
+        restoreFocusTarget={trigger()}
+      />
+    </>
+  );
+}
+
+/**
  * The used share, split by category when the provider gives one, then free space, with a tick where
  * the automatic compaction runs.
  */
