@@ -82,7 +82,6 @@ export const messages = {
   "sitePage.pricing.personal.title": "個人利用は無料",
   "sitePage.pricing.personal.body":
     "すべての機能を、自分のコンピューターで、すでに契約している AI プランで使えます。サーバーもライセンスも不要です。",
-  "sitePage.pricing.personal.download": "ダウンロード",
   "sitePage.pricing.enterprise.title": "エンタープライズ",
   "sitePage.pricing.enterprise.body":
     "より大きなサーバー、{count} 人を超えるメンバー、そのほかのご要望にも対応します。エンタープライズサポート付きです。",

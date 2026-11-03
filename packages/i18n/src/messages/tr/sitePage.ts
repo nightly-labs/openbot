@@ -83,7 +83,6 @@ export const messages = {
   "sitePage.pricing.personal.title": "Kişisel kullanım ücretsizdir",
   "sitePage.pricing.personal.body":
     "Tüm özellikler, kendi bilgisayarınızda, zaten ödediğiniz yapay zekâ planlarıyla. Sunucu ve lisans gerekmez.",
-  "sitePage.pricing.personal.download": "İndir",
   "sitePage.pricing.enterprise.title": "Kurumsal",
   "sitePage.pricing.enterprise.body":
     "Daha büyük sunucular, {count} üyeden fazlası veya ihtiyacınız olan her şey. Kurumsal destekle.",

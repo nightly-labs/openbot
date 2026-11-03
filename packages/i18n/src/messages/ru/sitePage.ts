@@ -84,7 +84,6 @@ export const messages = {
   "sitePage.pricing.personal.title": "Для личного использования бесплатно",
   "sitePage.pricing.personal.body":
     "Все функции, на своём компьютере, с подписками на ИИ, за которые вы уже платите. Без сервера и без лицензии.",
-  "sitePage.pricing.personal.download": "Скачать",
   "sitePage.pricing.enterprise.title": "Корпоративный",
   "sitePage.pricing.enterprise.body":
     "Более крупные серверы, участников больше {count} или всё остальное, что вам нужно. С корпоративной поддержкой.",

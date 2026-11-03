@@ -94,7 +94,6 @@ export const messages = defineMessages("sitePage", {
   "sitePage.pricing.personal.title": "Personal use is free",
   "sitePage.pricing.personal.body":
     "Every feature, on your own computer, with the AI plans you already pay for. No server and no license.",
-  "sitePage.pricing.personal.download": "Download",
   "sitePage.pricing.enterprise.title": "Enterprise",
   // {count} is the largest number of members that the page sells, such as 25.
   "sitePage.pricing.enterprise.body":

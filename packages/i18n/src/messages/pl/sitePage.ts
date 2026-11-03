@@ -82,7 +82,6 @@ export const messages = {
   "sitePage.pricing.personal.title": "Użytek osobisty jest darmowy",
   "sitePage.pricing.personal.body":
     "Wszystkie funkcje, na własnym komputerze, z planami AI, za które już płacisz. Bez serwera i bez licencji.",
-  "sitePage.pricing.personal.download": "Pobierz",
   "sitePage.pricing.enterprise.title": "Enterprise",
   "sitePage.pricing.enterprise.body":
     "Większe serwery, ponad {count} członków lub cokolwiek innego, czego potrzebujesz. Ze wsparciem dla firm.",

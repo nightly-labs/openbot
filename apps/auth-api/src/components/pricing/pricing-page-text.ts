@@ -18,7 +18,7 @@ export function pricingPageText(t: AppTranslate) {
     personal: {
       title: t("sitePage.pricing.personal.title"),
       body: t("sitePage.pricing.personal.body"),
-      download: t("sitePage.pricing.personal.download"),
+      download: t("billing.order.cta.download"),
     },
     enterprise: {
       title: t("sitePage.pricing.enterprise.title"),

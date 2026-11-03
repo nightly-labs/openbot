@@ -8,6 +8,6 @@
   are "Use free models" and "Use my AI subscription", so that "Start free" does not look like a
   trial of a paid app.
 - The answers to "Is OpenBot free?" on the home page and the download pages now say that it is
-  free for personal use, and that use at work needs a license.
+  free for personal and other noncommercial use, and that commercial use needs a license.
 - The "Help make OpenBot better" box of first run has a shorter text. Settings still has the full
   text.

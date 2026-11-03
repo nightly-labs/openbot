@@ -86,7 +86,6 @@ export const messages = {
   "sitePage.pricing.personal.title": "L’usage personnel est gratuit",
   "sitePage.pricing.personal.body":
     "Toutes les fonctionnalités, sur votre propre ordinateur, avec les forfaits d’IA que vous payez déjà. Sans serveur ni licence.",
-  "sitePage.pricing.personal.download": "Télécharger",
   "sitePage.pricing.enterprise.title": "Entreprise",
   "sitePage.pricing.enterprise.body":
     "Des serveurs plus grands, plus de {count} membres ou tout autre besoin. Avec un support entreprise.",
