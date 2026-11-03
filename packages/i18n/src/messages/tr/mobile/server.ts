@@ -390,6 +390,8 @@ export const messages = {
   "mobile.server.settings.aiSection": "Yapay zekâ ve araçlar",
   "mobile.server.settings.dataSection": "Veriler",
   "mobile.server.settings.maintenanceSection": "Bakım",
+  "mobile.server.settings.peopleSection": "Kişiler",
+  "mobile.server.settings.moveSection": "İçe aktarma ve aktarım",
   "mobile.server.settings.general": "Genel",
   "mobile.server.settings.timezone": "Saat dilimi",
   "mobile.server.settings.timezoneAutomatic": "Otomatik",

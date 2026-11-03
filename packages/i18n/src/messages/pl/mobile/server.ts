@@ -439,6 +439,8 @@ export const messages = {
   "mobile.server.settings.aiSection": "AI i narzędzia",
   "mobile.server.settings.dataSection": "Dane",
   "mobile.server.settings.maintenanceSection": "Konserwacja",
+  "mobile.server.settings.peopleSection": "Osoby",
+  "mobile.server.settings.moveSection": "Import i przeniesienie",
   "mobile.server.settings.general": "Ogólne",
   "mobile.server.settings.timezone": "Strefa czasowa",
   "mobile.server.settings.timezoneAutomatic": "Automatyczna",

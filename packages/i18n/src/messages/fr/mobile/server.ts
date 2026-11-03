@@ -388,6 +388,8 @@ export const messages = {
   "mobile.server.settings.aiSection": "IA et outils",
   "mobile.server.settings.dataSection": "Données",
   "mobile.server.settings.maintenanceSection": "Maintenance",
+  "mobile.server.settings.peopleSection": "Personnes",
+  "mobile.server.settings.moveSection": "Import et transfert",
   "mobile.server.settings.general": "Général",
   "mobile.server.settings.timezone": "Fuseau horaire",
   "mobile.server.settings.timezoneAutomatic": "Automatique",
