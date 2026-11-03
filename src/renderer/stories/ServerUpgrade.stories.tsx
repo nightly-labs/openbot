@@ -25,9 +25,8 @@ const GB = 1024 ** 3;
 
 const actions = { onUpgrade: fn(), onFreeUpSpace: fn(), onClose: fn() };
 
-/** A Starter server with 1 GB of its 12 GB disk free. The offer is Standard. */
-export const Low: Story = {
-  render: () => (
+function LowDialog() {
+  return (
     <ServerUpgradeDialog
       serverName="Acme HQ"
       level="low"
@@ -42,8 +41,11 @@ export const Low: Story = {
       error={null}
       {...actions}
     />
-  ),
-};
+  );
+}
+
+/** A Starter server with 1 GB of its 12 GB disk free. The offer is Standard. */
+export const Low: Story = { render: LowDialog };
 
 /** A Standard server on a yearly plan in dollars, with less than 1 GB free. The offer is Pro. */
 export const Full: Story = {
@@ -88,5 +90,5 @@ export const PortalFailed: Story = {
 /** The web client at phone width. */
 export const Narrow: Story = {
   globals: { viewport: { value: "upgradePhone", isRotated: false } },
-  render: Low.render,
+  render: LowDialog,
 };
