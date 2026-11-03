@@ -824,13 +824,13 @@ export const resolveDevinCli = (input?: {
   bundledExecutable?: string | null | undefined;
 }) => resolveNativeCli("devin", input);
 
-export function parsePiVersion(output: string): string {
+function parsePiVersion(output: string): string {
   const match = output.trim().match(/(?:^|\s)v?(\d+\.\d+\.\d+)(?:[-+][\w.-]+)?(?:\s|$)/u);
   if (!match?.[1])
     throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Pi" }), "invalid");
   return match[1];
 }
-export function parseMuseVersion(output: string): string {
+function parseMuseVersion(output: string): string {
   const match = output.match(/\b\d+\.\d+\.\d+-R\d+(?:\.\d+)?\b/u) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
   if (!match)
     throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Muse" }), "invalid");
@@ -838,7 +838,7 @@ export function parseMuseVersion(output: string): string {
 }
 
 /** Devin CLI 3000.11.234 prints `devin 3000.11.234 (92c83011d113)`. */
-export function parseDevinVersion(output: string): string {
+function parseDevinVersion(output: string): string {
   const match = output.match(/\bdevin[ \t]+v?(\d+\.\d+\.\d+)\b/iu) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
   if (!match)
     throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Devin" }), "invalid");
