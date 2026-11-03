@@ -11,5 +11,5 @@ export const messages = {
     "{provider} не может подключиться к своему серверу. Повтор {attempt} из {maxAttempts}.",
   "status.provider.retryServerError":
     "Сервер {provider} перегружен или вернул ошибку. Повтор {attempt} из {maxAttempts}.",
-  "status.provider.retryRecovered": "{provider} снова подключён к своему серверу.",
+  "status.provider.retryRecovered": "{provider} снова получает ответы от своего сервера.",
 } as const satisfies PartialTranslation<typeof source>;

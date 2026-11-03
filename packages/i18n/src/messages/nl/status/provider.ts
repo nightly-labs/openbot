@@ -11,5 +11,5 @@ export const messages = {
     "{provider} kan geen verbinding maken met zijn server. Poging {attempt} van {maxAttempts}.",
   "status.provider.retryServerError":
     "De server van {provider} is bezet of heeft een fout. Poging {attempt} van {maxAttempts}.",
-  "status.provider.retryRecovered": "{provider} is weer verbonden met zijn server.",
+  "status.provider.retryRecovered": "{provider} krijgt weer antwoorden van zijn server.",
 } as const satisfies PartialTranslation<typeof source>;

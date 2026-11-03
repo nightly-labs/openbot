@@ -10,5 +10,5 @@ export const messages = {
   "status.provider.confirmCancel": "取消",
   "status.provider.retryUnreachable": "{provider} 无法连接到其服务器。第 {attempt}/{maxAttempts} 次重试。",
   "status.provider.retryServerError": "{provider} 服务器繁忙或出错。第 {attempt}/{maxAttempts} 次重试。",
-  "status.provider.retryRecovered": "{provider} 已重新连接到其服务器。",
+  "status.provider.retryRecovered": "{provider} 已重新从其服务器收到响应。",
 } as const satisfies PartialTranslation<typeof source>;

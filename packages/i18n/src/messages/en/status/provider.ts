@@ -11,5 +11,5 @@ export const messages = defineMessages("status.provider", {
   "status.provider.retryUnreachable": "{provider} cannot connect to its server. Retry {attempt} of {maxAttempts}.",
   "status.provider.retryServerError":
     "The {provider} server is busy or has an error. Retry {attempt} of {maxAttempts}.",
-  "status.provider.retryRecovered": "{provider} is connected to its server again.",
+  "status.provider.retryRecovered": "{provider} gets answers from its server again.",
 });

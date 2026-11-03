@@ -11,5 +11,5 @@ export const messages = {
     "{provider} nie może połączyć się ze swoim serwerem. Ponowienie {attempt} z {maxAttempts}.",
   "status.provider.retryServerError":
     "Serwer {provider} jest zajęty lub zwrócił błąd. Ponowienie {attempt} z {maxAttempts}.",
-  "status.provider.retryRecovered": "{provider} znów jest połączony ze swoim serwerem.",
+  "status.provider.retryRecovered": "{provider} znów otrzymuje odpowiedzi ze swojego serwera.",
 } as const satisfies PartialTranslation<typeof source>;

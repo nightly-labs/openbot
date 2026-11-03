@@ -293,6 +293,8 @@ interface ClaudeStreamMessage {
   attempt?: unknown;
   max_retries?: unknown;
   error_status?: unknown;
+  /** `api_retry`: set when the server sent no headers in time, with a retry limit of its own. */
+  no_response?: unknown;
 }
 
 interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
@@ -1233,7 +1235,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         runtime,
         turn,
         sourceText(
-          message.error_status === null ? "status.provider.retryUnreachable" : "status.provider.retryServerError",
+          // A first-byte timeout (`no_response`) also has no status, but the server was reached.
+          message.error_status === null && !message.no_response
+            ? "status.provider.retryUnreachable"
+            : "status.provider.retryServerError",
           {
             provider: "Claude",
             attempt: message.attempt,
@@ -1243,9 +1248,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       );
       return;
     }
+    // A retry names no subagent, so a reply frame of any agent ends it. The CLI's own error frame
+    // after the last retry is not an answer.
     if (
       (message.type === "stream_event" || message.type === "assistant") &&
-      message.parent_tool_use_id === null &&
+      !message.error &&
       runtime.activeTurn?.retrying
     ) {
       runtime.activeTurn.retrying = false;
