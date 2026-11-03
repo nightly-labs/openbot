@@ -684,13 +684,13 @@ export function agentIpcHandlers({
           // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on
           // its own route first. That route also sets the nearest hue, so the profile change then leaves
           // the hue out: on the released route a hue removes the colour. A removed colour keeps the hue,
-          // which then sets the colour that the user chose. A removed colour with a hue needs only the
-          // released route, because the hue removes the colour. Without the capability, only the hue goes.
+          // which then sets the colour that the user chose. The released route removes the colour only
+          // when the hue changes, so a removed colour always goes on the colour route. Without the
+          // capability, only the hue goes.
           const colors = remoteServers.supportsCapability(serverId, AGENT_COLORS_CAPABILITY);
           const { avatarHue, ...rest } = fields;
           const update = colors && avatarColor ? rest : fields;
-          const colorRoute = colors && avatarColor !== undefined && !(avatarColor === null && avatarHue !== undefined);
-          if (colorRoute)
+          if (colors && avatarColor !== undefined)
             await runCauseEffect(remoteServers.setAgentColor(serverId, { agentId: input.agentId, color: avatarColor }));
           const patched = await runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
@@ -699,7 +699,7 @@ export function agentIpcHandlers({
             }),
           );
           // A hue alone removes the colour on the host. Read the colours again, so the answer has none.
-          if (colors && !colorRoute && avatarHue !== undefined)
+          if (colors && avatarColor === undefined && avatarHue !== undefined)
             await runCauseEffect(remoteServers.readAgentColors(serverId).pipe(Effect.catch(() => Effect.void)));
           const agent = remoteServers.agentWithColor(serverId, patched);
           if (providerAccountId === undefined) return agent;

@@ -51,8 +51,3 @@ export function parseSetAgentColorInput(value: unknown): SetAgentColorInput {
     throw new Error("Invalid agent color request.");
   return { agentId: value.agentId, color: value.color };
 }
-
-/** The colour of each agent in `colors`, by agent id. */
-export function agentColorMap(colors: AgentColors): Map<string, AvatarColor> {
-  return new Map(colors.agents.map((entry) => [entry.agentId, entry.color]));
-}

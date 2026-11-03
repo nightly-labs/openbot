@@ -347,7 +347,7 @@ export class RemoteEventRefresh {
 }
 
 /** The agent with `color`, or without a colour. The released list has none, so `avatarHue` is then the colour. */
-export function withAgentColor(agent: ClientAgentSummary, color: AvatarColor | undefined): ClientAgentSummary {
+function withAgentColor(agent: ClientAgentSummary, color: AvatarColor | undefined): ClientAgentSummary {
   const { avatarColor: _, ...rest } = agent;
   return color ? { ...rest, avatarColor: color } : rest;
 }
