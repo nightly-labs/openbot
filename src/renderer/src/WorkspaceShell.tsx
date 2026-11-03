@@ -223,7 +223,11 @@ export function WorkspaceShell(props: {
     connectionShown() &&
     !scope.connection.synced &&
     (connectionPhase() === "loading" || connectionPhase() === "connecting") &&
-    (!serversLoaded() || activeServer()?.state === "online" || activeServer()?.state === "connecting");
+    (!serversLoaded() ||
+      activeServer()?.state === "online" ||
+      activeServer()?.state === "connecting" ||
+      // Main reports a remote server as offline before its first connection; only a reported issue ends the cover.
+      (activeServer()?.state === "offline" && !activeServer()?.issue));
   // The full-window screen stays after the load ends, so its crew hop out before it goes. A new
   // first load after its exit mounts a new screen.
   const [loadingCover, setLoadingCover] = createSignal(false);

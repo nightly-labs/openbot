@@ -450,14 +450,14 @@ function squashTransform(pose: CrewPose): string {
 }
 
 /** A face change of plush `index`, at `at` seconds into its reel. */
-export interface CrewFaceCue {
+interface CrewFaceCue {
   at: number;
   index: number;
   face: CrewFace;
 }
 
 /** One part of the film: the keyframes of each plush and of its squash, and the face changes. */
-export interface CrewReel {
+interface CrewReel {
   /** In seconds. */
   length: number;
   plushes: Keyframe[][];

@@ -98,7 +98,10 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
   });
   // A server that failed once keeps its toast while it connects again.
   createEffect(urgent, (now) => {
-    if (now) setWaitedLong(true);
+    if (!now) return;
+    setWaitedLong(true);
+    // The pane screen has no controls, so a server that needs the user shows its toast again.
+    setToastClosed(false);
   });
   const retry = () => {
     setToastClosed(false);
@@ -221,15 +224,17 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
   // It opens after a long wait, so its Retry also starts the connection again while one is in progress.
   const toastCard = () => (
     <section class="server-connection-toast" aria-label={title()}>
-      <IconButton
-        class="server-connection-toast-close"
-        size="icon-xs"
-        variant="ghost"
-        label={t("common.close")}
-        onClick={() => setToastClosed(true)}
-      >
-        <X aria-hidden="true" />
-      </IconButton>
+      <Show when={!urgent()}>
+        <IconButton
+          class="server-connection-toast-close"
+          size="icon-xs"
+          variant="ghost"
+          label={t("common.close")}
+          onClick={() => setToastClosed(true)}
+        >
+          <X aria-hidden="true" />
+        </IconButton>
+      </Show>
       <strong class="server-connection-toast-title">{title()}</strong>
       <Show when={detail()}>{(text) => <p class="server-connection-toast-body">{text()}</p>}</Show>
       <ErrorReference reference={props.reference} />
@@ -245,7 +250,11 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
   );
   let toastShown = false;
   createEffect(
-    () => (props.initial && !props.ready && waitedLong() && !toastClosed() && !detailsOpen() ? title() : null),
+    // The card reads the title itself, so a new title or lock only raises the same toast again.
+    () =>
+      props.initial && !props.ready && waitedLong() && !toastClosed() && !detailsOpen()
+        ? { title: title(), locked: urgent() }
+        : null,
     (message) => {
       toastShown = message !== null;
       if (message === null) {
@@ -255,13 +264,14 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
         });
         return;
       }
-      // The card reads the title itself, so a new message only raises the same toast again.
       toast(toastCard, {
         id: toastId,
         duration: Number.POSITIVE_INFINITY,
         unstyled: true,
         closeButton: false,
         class: "server-connection-toast-host",
+        // The controls of a server that needs the user are only in this toast, so it cannot be swiped away.
+        dismissible: !message.locked,
         // A `toast.dismiss` call also calls this. Only a toast that is still wanted was closed by the user.
         onDismiss: () => {
           if (toastShown) setToastClosed(true);
