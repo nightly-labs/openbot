@@ -1,19 +1,10 @@
 import { type Directory, File } from "expo-file-system";
-import { PLUSH_STYLE, renderPlushPicture } from "@/features/agents/model/plush/plush-picture";
+import { nameHash, PLUSH_STYLE, renderPlushPicture } from "@/features/agents/model/plush/plush-picture";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { savedAgentAvatar } from "./agent-avatar-cache";
 import type { MobileAgent } from "./workspace-types";
 
 export type AvatarFileAgent = Pick<MobileAgent, "serverId" | "id" | "avatarUrl" | "avatarSeed" | "avatarHue">;
-
-/** FNV-1a, so that a file name changes when its picture changes. */
-function nameHash(value: string): string {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < value.length; index++) {
-    hash = Math.imul(hash ^ value.charCodeAt(index), 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
 
 interface AvatarFile {
   name: string;
