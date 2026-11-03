@@ -233,6 +233,17 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="image-gallery/[galleryId]"
+          options={{
+            animation: pushAnimation,
+            contentStyle: { backgroundColor: background },
+            fullScreenGestureEnabled: true,
+            gestureEnabled: true,
+            // The screen draws the app's glass header, as the chat does.
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
           name="browser/[agentId]"
           options={{
             animation: pushAnimation,

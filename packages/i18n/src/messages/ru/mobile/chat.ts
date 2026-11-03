@@ -227,6 +227,22 @@ export const messages = {
   "mobile.chat.imageViewer.saved": "Сохранено в «Фото»",
   "mobile.chat.imageViewer.save": "Сохранить «{name}» в «Фото»",
   "mobile.chat.imageViewer.position": "{current} из {total}",
+  "mobile.chat.imageGallery.count": {
+    one: "{count} изображение",
+    few: "{count} изображения",
+    many: "{count} изображений",
+    other: "{count} изображения",
+  },
+  "mobile.chat.imageGallery.options": "Параметры галереи",
+  "mobile.chat.imageGallery.saveAll": "Сохранить все",
+  "mobile.chat.imageGallery.saved": "Сохранено в «Фото»",
+  "mobile.chat.imageGallery.shareAll": "Поделиться всеми",
+  "mobile.chat.imageGallery.photosPermission":
+    "Разрешите OpenBot добавлять фото в Настройках, чтобы сохранить эти изображения.",
+  "mobile.chat.imageGallery.saveFailed": "Не удалось сохранить изображения",
+  "mobile.chat.imageGallery.shareFailed": "Не удалось поделиться изображениями",
+  "mobile.chat.imageGallery.shareNeedsUpdate":
+    "Чтобы поделиться несколькими изображениями, нужна последняя версия приложения.",
   "mobile.chat.video.play": "Воспроизвести: {name}",
   "mobile.chat.video.retry": "Повторить загрузку видео",
   "mobile.chat.video.share": "Поделиться: {name}",
