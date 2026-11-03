@@ -419,12 +419,6 @@ export class SkillMarketplaceService {
       const children = packChildren(detail.slug, files);
       const folders = skillFolders(detail.slug, files, children);
       for (const folder of folders.keys()) yield* assertSkillPaths(agent.workspacePath, folder);
-      // OpenBot writes its own skill to this folder in every workspace, so the install could never write it.
-      const managed = [...folders.keys()].find((folder) => MANAGED_SKILL_SLUGS.has(folder));
-      if (managed)
-        return yield* new SkillMarketplaceFailure({
-          cause: new Error(sourceText("error.skill.managedSlug", { slug: managed })),
-        });
       const lock = yield* readLock(agent.workspacePath);
       const existing = lock.skills[detail.id];
       if (
@@ -446,6 +440,11 @@ export class SkillMarketplaceService {
       const owned = new Set(Object.values(lock.skills).flatMap(entryFolders));
       for (const folder of folders.keys()) {
         if (owned.has(folder)) continue;
+        // OpenBot writes its own skill to this folder in every workspace, so only an older install can own it.
+        if (MANAGED_SKILL_SLUGS.has(folder))
+          return yield* new SkillMarketplaceFailure({
+            cause: new Error(sourceText("error.skill.managedSlug", { slug: folder })),
+          });
         for (const target of [
           ...targetDirectories(agent.workspacePath, folder),
           disabledDirectory(agent.workspacePath, folder),
