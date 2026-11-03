@@ -179,11 +179,20 @@ export class UsageLimitGate {
       accountId,
       model: turnModel,
       endsAt,
-      timer: setTimeout(
-        () => Effect.runFork(this.#releaseFailure(key).pipe(Effect.forkIn(this.#scope))),
-        Math.min(MAX_TIMER_MS, endsAt - Date.now()),
-      ),
+      timer: this.#armFailure(key, endsAt),
     });
+  }
+
+  /** Releases the failure at `endsAt`. A wait longer than `MAX_TIMER_MS` is armed again when it fires. */
+  #armFailure(key: string, endsAt: number): ReturnType<typeof setTimeout> {
+    return setTimeout(
+      () => {
+        const failure = this.#failures.get(key);
+        if (failure && failure.endsAt > Date.now()) failure.timer = this.#armFailure(key, failure.endsAt);
+        else Effect.runFork(this.#releaseFailure(key).pipe(Effect.forkIn(this.#scope)));
+      },
+      Math.min(MAX_TIMER_MS, endsAt - Date.now()),
+    );
   }
 
   /** The agents whose queue a limit holds, for the runtime snapshot. */
