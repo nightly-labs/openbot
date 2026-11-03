@@ -426,7 +426,7 @@ export const messages = {
   "server.roles.newRole": "Nowa rola",
   "server.roles.delete": "Usuń",
   "server.roles.deleteTitle": "Usunąć rolę „{name}”?",
-  "server.roles.deleteDescription": "Członkowie z tą rolą stracą dostęp do agentów, który im daje.",
+  "server.roles.deleteDescription": "Członkowie z tą rolą stracą dostęp do agentów, który daje im ta rola.",
   "server.roles.name": "Nazwa roli",
   "server.roles.agents": "Agenci",
   "server.roles.noAgents": "Ten serwer nie ma agentów.",
