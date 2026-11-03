@@ -397,6 +397,7 @@ The service stores:
   records, install counts, and the skill bundle and icon in R2.
 - reports about a hosted site: the hostname, the reason, the optional details text, a keyed hash of
   the source address (of its /64 for IPv6) for each day, the review state and the creation time.
+- company sign-in, when a server owner sets it up: see [Company sign-in](#company-sign-in).
 
 The service does not store plaintext one-time codes, account session tokens, or team authentication
 tickets in D1. It returns a new plaintext secret only to the client that requested it. The desktop
@@ -463,6 +464,8 @@ Cloudflare runs a maintenance task once each day. The task removes:
 - account sessions after they are revoked (older already-expired sessions are also removed);
 - team authentication tickets after they expire or are consumed;
 - rate-limit records after their 15-minute window ends.
+- company sign-in flows after their 10-minute life ends, and company sign-in codes after they
+  expire or are used.
 
 These technical records are normally removed within 24 hours after they become inactive. A failed
 maintenance run can keep them until a later successful run. The task logs only aggregate deletion
@@ -584,6 +587,50 @@ sent to the agent as a message. The phone then reads the agent's reply aloud wit
   or an analytics event. Remove key in **Settings → Voice** deletes it.
 
 The chosen voice settings are kept on the phone. OpenBot does not store the reply audio.
+
+## Company sign-in
+
+A server owner can connect the company's OpenID Connect provider, such as Microsoft Entra ID, Okta
+or Google Workspace, in Members → Company sign-in. Then people with an email at the company domains
+sign in at the company provider in place of an email code.
+
+The account service stores in D1:
+
+- the connection of the server: the issuer URL, the client ID, the client secret, the time of the
+  last passed test, whether it is on, the account of the owner who saved it, and creation and update
+  times. The client secret is encrypted with a key that only the account service has;
+- the company domains and the server that each domain belongs to;
+- for each person who signed in at the provider: the issuer, the provider's subject ID, the OpenBot
+  account and the link time. The service does not keep the provider's tokens or other claims;
+- the hash of the SCIM token, and its creation time. The token shows once;
+- for each person that the provider manages through SCIM: the server, the OpenBot account, the
+  provider's external ID, whether the person is on, and the update time;
+- sign-in flows in progress, for 10 minutes: the hash of the state, the values of the connection at
+  the start, the PKCE verifier, the nonce, the return address, and the app's challenge;
+- one-time codes as hashes, for 2 minutes, with the account and the session that they gave.
+
+During a sign-in or a test, the person's browser opens the provider's sign-in page with the client
+ID, the return address, the state, the nonce and the PKCE challenge. The provider receives what the
+person types there. The account service then connects to the provider: it reads the provider's
+discovery document and signing keys, and sends the code, the client ID and the client secret to the
+provider's token endpoint. From the ID token, it uses only the subject ID and the email address. On
+a production account service, a test also asks Cloudflare DNS over HTTPS (`cloudflare-dns.com`) for
+the TXT record `_openbot.<domain>` of each domain.
+
+A person who signs in this way gets an OpenBot account for the email address, or the account that
+already has it, and joins the server as a member with no invitation, while the server has a free
+seat. A person whom the owner removed, or who left, stays out.
+
+The web app at `/app` keeps the state and the verifier of a sign-in in an HttpOnly cookie
+(`__Host-openbot-company`) for 10 minutes. The return removes it.
+
+With SCIM, the company's provider sends the email address, the external ID and the on or off state of
+each person to `/scim/v2/Users`. The service does not store other SCIM attributes. Turning a person
+off, or deleting them, ends every session of their account and removes them from the server. Turning
+them on again adds them to the server again.
+
+Removing the connection removes its domains and its SCIM users, and stops SCIM. Deleting the server
+removes the connection. Deleting an account removes its provider links and SCIM records.
 
 ## Email delivery and infrastructure providers
 

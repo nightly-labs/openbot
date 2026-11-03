@@ -73,7 +73,7 @@ export type WorkflowAnalyticsAction = (typeof WORKFLOW_ACTIONS)[number];
 interface DesktopAnalyticsEvents {
   desktop_app_opened: { setup_completed: boolean; signed_in: boolean };
   app_updated: { from_version: string; to_version: string };
-  account_sign_in_started: { result: "code_sent" | "failed"; failure_code?: string };
+  account_sign_in_started: { result: "code_sent" | "company_sign_in" | "failed"; failure_code?: string };
   account_sign_in_completed: { result: AnalyticsResult; failure_code?: string };
   account_sign_out: { result: AnalyticsResult; failure_code?: string };
   onboarding_completed: { preferred_provider: AgentProviderId; path?: OnboardingPath; skipped?: boolean };
@@ -644,7 +644,7 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
 
 /** Enum values that differ by event. A key that is not here uses PROPERTY_ENUMS. */
 const EVENT_ENUMS: Partial<Record<AnalyticsEventName, Readonly<Record<string, readonly string[]>>>> = {
-  account_sign_in_started: { result: ["code_sent", "failed"] },
+  account_sign_in_started: { result: ["code_sent", "company_sign_in", "failed"] },
   agent_input_action: { kind: ["prompt", "approval"] },
   search_action: { scope: ["global", "agent"] },
   team_action: { entry_point: ["in_app", "invite_deep_link"] },
