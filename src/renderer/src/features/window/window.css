@@ -518,6 +518,9 @@
     > .settings-page
     > .settings-page-path-row
     > .settings-page-path {
+    /* Only the path text stops the drag, so the rest of the top row still moves the window. */
+    width: auto;
+    flex: 0 1 auto;
     max-width: none;
     margin-inline: 0;
     padding-inline: 0;
