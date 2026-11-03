@@ -57,7 +57,12 @@ import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
 import { type PlanContinuation, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
-import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
+import {
+  isBalanceDiagnostic,
+  isPlanLimitDiagnostic,
+  isUsageLimitDiagnostic,
+  providerResetDelayMs,
+} from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import { isNoUpdateAnswer, settleQuietRoutineTurn } from "./routine-quiet-runs";
 import {
@@ -1087,7 +1092,7 @@ export class TurnLifecycle {
           this.#failoverRetries.set(delivery.id, failed.add(failedKey));
         }
         yield* this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
-        this.#usageLimits.failed(agentId, model);
+        this.#usageLimits.failed(agentId, model, providerResetDelayMs(failover.message));
         this.#hooks.scheduleDrain(agentId);
         return;
       }

@@ -20,7 +20,8 @@ const RESET_GRACE_MS = 30_000;
 
 /**
  * How long a model that failed a turn with a provider error is passed over, so an agent on a backup
- * does not go back to a model that still fails at once. A provider error names no reset.
+ * does not go back to a model that still fails at once. An error that names a later reset, such as
+ * a spent Gemini quota, holds the model until that reset (#4583).
  */
 const PROVIDER_FAILURE_HOLD_MS = 10 * 60_000;
 
@@ -157,9 +158,9 @@ export class UsageLimitGate {
   /**
    * A provider error failed a turn of this agent on `model`, the agent's current model when null.
    * The model is passed over until the hold ends or a turn on it completes. Then the agents that
-   * left it go back.
+   * left it go back. `resetDelayMs` is the wait until the reset that the error names, when it names one.
    */
-  failed(agentId: string, model: string | null = null): void {
+  failed(agentId: string, model: string | null = null, resetDelayMs: number | null = null): void {
     const agent = this.#agent(agentId);
     if (!agent) return;
     const provider = providerForAgent(agent);
@@ -174,7 +175,7 @@ export class UsageLimitGate {
       model: turnModel,
       timer: setTimeout(
         () => Effect.runFork(this.#releaseFailure(key).pipe(Effect.forkIn(this.#scope))),
-        PROVIDER_FAILURE_HOLD_MS,
+        Math.min(MAX_TIMER_MS, Math.max(PROVIDER_FAILURE_HOLD_MS, (resetDelayMs ?? 0) + RESET_GRACE_MS)),
       ),
     });
   }
