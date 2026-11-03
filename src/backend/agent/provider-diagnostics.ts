@@ -155,6 +155,20 @@ export function isUsageReadDiagnostic(message: string): boolean {
 }
 
 /**
+ * Whether a provider diagnostic is Grok's own record of a `git` command that could not start.
+ *
+ * Grok's CLI runs `git` to read the repository state, and logs `ERROR git_cli: Command::output()
+ * FAILED (spawn error) error=program not found` on stderr when `git` is not on the PATH, as on a
+ * Windows computer without Git. Grok continues without the repository state. The user met the line
+ * as a "Grok error" toast with nothing failing (#4789). It belongs in the log.
+ *
+ * Only a spawn failure counts. A `git` command that ran and failed stays visible.
+ */
+export function isGitSpawnDiagnostic(message: string): boolean {
+  return /\bERROR\s+git_cli:\s+Command::output\(\) FAILED \(spawn error\)/.test(message);
+}
+
+/**
  * Whether a provider diagnostic is the ACP SDK's own copy of an error that the agent also answered.
  *
  * The TypeScript ACP SDK that a Node agent is built on writes `Error handling request`, the whole
