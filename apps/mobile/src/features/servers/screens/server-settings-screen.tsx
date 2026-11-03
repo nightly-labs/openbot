@@ -23,6 +23,7 @@ import {
   useOwnerHostedServerIds,
   useServerSettingsItems,
 } from "@/features/servers/model/server-settings-categories";
+import { useLockedAction } from "@/features/servers/model/use-locked-action";
 import { updateAvailable, useServerUpdate } from "@/features/servers/model/use-server-update";
 import {
   SettingsContent,
@@ -157,25 +158,7 @@ function ServerExitSection({
   const { t, errorMessage } = useText();
   const { leaveServer, removeServer, deleteLocalServer, localServerKind } = useMobileWorkspace();
   const serverId = server.id;
-  const locked = useRef(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  async function perform(operation: () => Promise<void>, failure?: (error: unknown) => string) {
-    if (locked.current) return;
-    locked.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      await operation();
-      void haptics.notification("success");
-    } catch (caught) {
-      setError(failure?.(caught) ?? t("mobile.server.settings.updateFailed"));
-      void haptics.notification("error");
-    } finally {
-      locked.current = false;
-      setBusy(false);
-    }
-  }
+  const { busy, error, perform } = useLockedAction();
   if (server.role !== "owner")
     return (
       <SettingsSection footer={error}>

@@ -1,9 +1,10 @@
 import type { MobileTextKey } from "@openbot/i18n/mobile";
-import { useEffect, useState } from "react";
-import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { skipToken, useQuery } from "@tanstack/react-query";
+import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
 import { useServerUpdate } from "@/features/servers/model/use-server-update";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { queryKeys } from "@/features/workspace/model/query-keys";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 
 export type ServerSettingsCategory = "general" | "people" | "ai" | "data" | "maintenance";
@@ -31,24 +32,21 @@ export const SERVER_SETTINGS_CATEGORY_TITLE_KEYS = {
  */
 export function useOwnerHostedServerIds(server: MobileServer | undefined): ReadonlySet<string> | null {
   const { session } = useMobileSession();
-  const owner = server?.role === "owner";
-  const [ids, setIds] = useState<ReadonlySet<string> | null>(null);
-  useEffect(() => {
-    if (!session || !owner) return;
-    let current = true;
-    hostedServerCalls(session)
-      .list()
-      .then(
-        (list) => {
-          if (current) setIds(new Set(list.servers.map((item) => item.serverId)));
-        },
-        () => undefined,
-      );
-    return () => {
-      current = false;
-    };
-  }, [session, owner]);
-  return ids;
+  const queryScope = useQueryScope();
+  // The first page reads the list when it opens. Maintenance, above it in the stack, reads the same
+  // result and does not ask again. The list goes with the first page.
+  const list = useQuery({
+    queryKey: queryKeys.ownerHostedServerIds(queryScope),
+    queryFn:
+      session && server?.role === "owner"
+        ? async (): Promise<ReadonlySet<string>> =>
+            new Set((await hostedServerCalls(session).list()).servers.map((item) => item.serverId))
+        : skipToken,
+    retry: false,
+    refetchOnMount: false,
+    gcTime: 0,
+  });
+  return list.data ?? null;
 }
 
 /** The same rule as the Restart item of the desktop server menu. */

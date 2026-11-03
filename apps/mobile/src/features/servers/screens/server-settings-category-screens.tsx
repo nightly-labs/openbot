@@ -14,6 +14,7 @@ import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
 import { canRestartServer, useOwnerHostedServerIds } from "@/features/servers/model/server-settings-categories";
 import { timeZoneLabel } from "@/features/servers/model/time-zones";
+import { useLockedAction } from "@/features/servers/model/use-locked-action";
 import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
 import { useMcpServerList } from "@/features/servers/model/use-server-mcp";
 import { useServerProviders } from "@/features/servers/model/use-server-providers";
@@ -243,27 +244,13 @@ function ServerMaintenance({ server }: { server: MobileServer }) {
   const { session } = useMobileSession();
   const update = useServerUpdate(serverId, { poll: false });
   const hostedServerIds = useOwnerHostedServerIds(server);
-  const locked = useRef(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const action = useLockedAction();
+  const { busy, error } = action;
   const [restarting, setRestarting] = useState(false);
   const [restarted, setRestarted] = useState<string | null>(null);
-  async function perform(operation: () => Promise<void>, failure?: (error: unknown) => string) {
-    if (locked.current) return;
-    locked.current = true;
-    setBusy(true);
-    setError(null);
+  function perform(operation: () => Promise<void>, failure?: (error: unknown) => string) {
     setRestarted(null);
-    try {
-      await operation();
-      void haptics.notification("success");
-    } catch (caught) {
-      setError(failure?.(caught) ?? t("mobile.server.settings.updateFailed"));
-      void haptics.notification("error");
-    } finally {
-      locked.current = false;
-      setBusy(false);
-    }
+    return action.perform(operation, failure);
   }
   return (
     <>
