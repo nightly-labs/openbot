@@ -301,15 +301,6 @@ export class ChannelService {
     const senderName =
       this.hooks.agents().find((agent) => agent.id === input.senderAgentId)?.name ?? input.senderAgentId;
     const channel = yield* channelSync(() => this.store.get(input.channelId));
-    if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
-    for (const agentId of input.recipientAgentIds)
-      yield* channelSync(() => this.requireAvailableMember(channel, agentId));
-    if (
-      !input.recipientAgentIds.length &&
-      !channel.leadAgentId &&
-      !this.#recipients(this.eligibleMembers(channel), input.text, null).length
-    )
-      return yield* channelFailure(new Error(sourceText("error.backend.channelLeadRequired")));
     const command: ChannelHandoffCommand = {
       type: "handoff",
       operationId: input.operationId,
@@ -824,6 +815,14 @@ export class ChannelService {
   ) {
     for (const agentId of command.recipientAgentIds)
       yield* channelSync(() => this.requireAvailableMember(channel, agentId));
+    // Checked in the queue: a save that removes the lead can run first. The agent then gets the
+    // refusal, not a "posted" result for a task that no member can take.
+    if (
+      !command.recipientAgentIds.length &&
+      !channel.leadAgentId &&
+      !this.#recipients(this.eligibleMembers(channel), command.text, null).length
+    )
+      return yield* channelFailure(new Error(sourceText("error.backend.channelLeadRequired")));
     const id = randomUUID();
     const committed = command.sourcePaths.length
       ? yield* this.mailbox
