@@ -38,7 +38,7 @@ export const messages = {
   "settings.keepRunning.title": "保持在后台运行",
   "settings.keepRunning.description": "关闭窗口后继续运行进行中的任务。",
   "settings.menuBar.title": "在菜单栏中显示 OpenBot",
-  "settings.menuBar.description": "关闭窗口后隐藏 Dock 图标。正在进行的任务会继续运行。",
+  "settings.menuBar.description": "通过菜单栏图标打开或退出 OpenBot。",
   "settings.keepAwake.title": "保持这台电脑唤醒",
   "settings.keepAwake.description": "电脑接通电源时，自动化任务会准时运行。屏幕仍可关闭。",
   "settings.keepAwakeOnBattery.title": "使用电池时也保持",

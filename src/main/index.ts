@@ -110,7 +110,6 @@ import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { configureLinuxGpu } from "./linux-gpu-mode";
 import { configureLinuxPasswordStore } from "./linux-password-store";
 import { takeLocalServerChildEnvironment } from "./local-server-child";
-import { hideMacDockWhenNoWindowShows, setDockIcon, showMacDock } from "./mac-dock";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   configureApplicationMenu,
@@ -497,7 +496,7 @@ function applyAppIconColor(color: AppLogoColor): void {
   );
   if (icon.isEmpty()) return;
   if (process.platform === "darwin") {
-    setDockIcon(icon);
+    app.dock?.setIcon(icon);
     return;
   }
   // A window takes `appIconPath` when it is created, so a window opened after the choice gets the
@@ -507,16 +506,6 @@ function applyAppIconColor(color: AppLogoColor): void {
   appIconColorImage = icon;
   for (const window of BrowserWindow.getAllWindows()) window.setIcon(icon);
   backgroundTray?.setIcon(icon);
-}
-
-/**
- * The menu bar setting changed. Turned off, it shows the Dock icon again. Turned on while the main
- * window is closed, it hides the Dock icon. Closing the window and showing it again do the rest.
- */
-function syncMacDock(menuBar: boolean): void {
-  if (process.platform !== "darwin" || localServerChild) return;
-  if (menuBar) hideMacDockWhenNoWindowShows();
-  else void showMacDock();
 }
 
 /**
@@ -1207,7 +1196,7 @@ if (!hasSingleInstanceLock) {
       performance.mark("openbot:when-ready");
       // Set the Dock icon before `dock.show()` below. A development build runs the stock Electron.app,
       // so until this call its Dock tile shows the Electron logo.
-      if (process.platform === "darwin" && !localServerChild) setDockIcon(appIconPath);
+      if (process.platform === "darwin" && !localServerChild) app.dock?.setIcon(appIconPath);
       if (!(await runCauseEffect(hostAllowsTenantLaunch()))) {
         app.quit();
         return;
@@ -1444,19 +1433,8 @@ if (!hasSingleInstanceLock) {
       });
       const tray = backgroundTray;
       tray.sync(appBehavior.keepRunningInBackground);
-      const unsubscribeBackgroundTray = appBehavior.subscribe(() => {
-        tray.sync(appBehavior.keepRunningInBackground);
-        syncMacDock(appBehavior.keepRunningInBackground);
-      });
-      // The main window hides the Dock icon when it closes, unless another window still shows. When
-      // that last window, such as a chat window, closes later, the Dock icon hides then.
-      const hideDockAfterWindow = (_event: Electron.Event, window: BrowserWindow) =>
-        window.once("closed", () => {
-          if (!isQuitting && appBehavior.keepRunningInBackground) syncMacDock(true);
-        });
-      app.on("browser-window-created", hideDockAfterWindow);
+      const unsubscribeBackgroundTray = appBehavior.subscribe(() => tray.sync(appBehavior.keepRunningInBackground));
       teardown.push(0, "background tray", () => {
-        app.off("browser-window-created", hideDockAfterWindow);
         unsubscribeBackgroundTray();
         tray.destroy();
       });

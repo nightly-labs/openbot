@@ -36,7 +36,7 @@ export const messages = {
   "settings.keepRunning.title": "OpenBot をバックグラウンドで実行し続ける",
   "settings.keepRunning.description": "ウィンドウを閉じたあとも実行中のタスクを続けます。",
   "settings.menuBar.title": "OpenBot をメニューバーに表示",
-  "settings.menuBar.description": "ウィンドウを閉じると Dock のアイコンを隠します。実行中のタスクは続きます。",
+  "settings.menuBar.description": "メニューバーのアイコンから OpenBot を開いたり終了したりします。",
   "settings.keepAwake.title": "このコンピュータをスリープさせない",
   "settings.keepAwake.description":
     "電源に接続している間、ルーティンが予定どおりに実行されます。ディスプレイはオフになることがあります。",
