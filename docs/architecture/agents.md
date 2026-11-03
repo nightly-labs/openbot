@@ -276,7 +276,9 @@ released actions, `parentId` on `create`, and `nest`. A peer with the capability
 `sidebar-folders-changed`; other peers get `sidebar-layout-changed`, and the released
 `/v1/sidebar-layout` routes leave out `parentId`. A peer without the capability shows each folder at
 the top level, and its changes keep the parents. The iPhone app shows nested folders as one list,
-with the path in each name. An instance transfer creates each folder at the top level, because its
+as the desktop does: "Parent / Name", a folder icon, and the unread count of a closed folder. A closed
+folder hides the folders in it. With the capability, its folder menu has "New folder inside" and
+"Move to" (`nest`). An instance transfer creates each folder at the top level, because its
 file has no field for the parent.
 
 ## Browser profile
