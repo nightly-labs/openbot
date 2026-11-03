@@ -162,6 +162,8 @@ export class WhatsAppSession {
   #socket: WhatsAppSocket | null = null;
   #state: WhatsAppSessionState = "stopped";
   #started = false;
+  /** The browser name that this device shows as. A link by pairing code needs a known browser. */
+  #browserName = "OpenBot";
   #attempt = 0;
   #restartedOnce = false;
   /** A QR code was shown in this session, so a 408 means that the codes ran out. */
@@ -223,9 +225,15 @@ export class WhatsAppSession {
     return () => this.#qrListeners.delete(listener);
   }
 
-  start(): void {
+  /**
+   * Opens the socket. A link by pairing code shows as Chrome: WhatsApp answered `bad-request` to the code
+   * request with the browser name OpenBot (November 2026), and the phone showed "Couldn't link device".
+   * A QR link keeps the name OpenBot, which WhatsApp accepts there.
+   */
+  start(options: { codeLink?: boolean } = {}): void {
     if (this.#started) return;
     this.#started = true;
+    this.#browserName = options.codeLink ? "Chrome" : "OpenBot";
     this.#attempt = 0;
     this.#setState("connecting");
     void this.#connect();
@@ -331,7 +339,7 @@ export class WhatsAppSession {
       makeSignalRepository: this.#makeSignalRepository,
       logger: baileysLogger,
       version,
-      browser: Browsers.macOS("OpenBot"),
+      browser: Browsers.macOS(this.#browserName),
       syncFullHistory: false,
       markOnlineOnConnect: false,
       // Own posts are not read back: in the owner's own chat they would look like the owner's requests.

@@ -129,7 +129,7 @@ export class WhatsAppConnect implements WhatsAppPolicy {
         else if (state === "stopped" && !link.finishing) this.#hooks.dispatch(this.#fail(link, "timeout"));
       }),
     );
-    handle.session.start();
+    handle.session.start({ codeLink: input.method === "code" });
     return this.#state;
   });
 

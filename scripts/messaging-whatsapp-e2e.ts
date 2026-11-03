@@ -536,6 +536,7 @@ try {
       assert.equal(started.status, "waiting");
       const waiting = await linkState(messaging, (state) => state.qr !== null, "a QR code");
       assert.match(waiting.qr ?? "", /^2@fake-qr-/u);
+      assert.equal(phone.current().config.browser?.[1], "OpenBot", "A QR link does not show as OpenBot.");
       // The phone's first message comes the moment the device opens, before the transport listens.
       const early = message({ chat: OWNER_JID, fromMe: true, text: "first message after the link" });
       phone.onOpen = early;
@@ -967,6 +968,8 @@ try {
         assert.equal(started.status, "waiting");
         const withCode = await linkState(messaging, (state) => state.code !== null, "a pairing code");
         assert.equal(withCode.code, PAIRING_CODE);
+        // WhatsApp answers `bad-request` to the code request of a browser name it does not know.
+        assert.equal(phone.current().config.browser?.[1], "Chrome", "A pairing-code link does not show as Chrome.");
         phone.current().scan();
         await linkState(messaging, (state) => state.status === "linked", "the second link");
         await until(() => connection(messaging)?.state === "connected", "connected after the second link");
