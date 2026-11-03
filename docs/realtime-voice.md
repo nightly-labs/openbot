@@ -13,9 +13,9 @@ request help are model behavior; this port does not promise that every spoken wo
 the agent. Do not treat speech alone as proof that an action completed.
 
 Delegated requests and agent answers remain ordinary chat messages. On the phone that made a
-subscription call, they appear under a collapsed **Voice call** row. **View details** restores the
+voice call, they appear under a collapsed **Voice call** row. **View details** restores the
 original messages. Questions, approvals, failures and unrelated typed messages stay visible; search
-opens matching call details. The phone keeps bounded encrypted call and delivery IDs, without
+opens matching call details. The phone keeps bounded encrypted local call and delivery IDs, without
 text or audio, scoped to its signed-in account. Sign-out removes those IDs. Other clients keep
 the normal chat view.
 

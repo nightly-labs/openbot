@@ -4,6 +4,7 @@ import { markdownPlainText } from "@openbot/contracts/markdown-preview-text";
 import { serializeSelectionInstruction } from "@openbot/contracts/selection-instruction";
 import { type CauseCode, classifyFailure, type FailureProperties } from "@openbot/telemetry";
 import { useQueryClient } from "@tanstack/react-query";
+import { randomUUID } from "expo-crypto";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { router, useIsFocused } from "expo-router";
 import type { NativeStackNavigationProp } from "expo-router/native-stack";
@@ -260,10 +261,9 @@ ${session.user.id}`
   const callTarget = JSON.stringify([target.serverId, target.id, threadId]);
   const callRecords = useSyncExternalStore(voiceCallHistory.subscribe, voiceCallHistory.snapshot);
   const activeCall = useRef<string | null>(null);
-  const callOwnerRef = useRef(callOwner);
-  callOwnerRef.current = callOwner;
   const [expandedCalls, setExpandedCalls] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => {
+    activeCall.current = null;
     void voiceCallHistory.selectOwner(callOwner);
   }, [callOwner]);
 
@@ -609,23 +609,13 @@ ${session.user.id}`
         ? {
             agentId: target.id,
             status: () => workspace().realtimeVoiceStatus(target.serverId),
-            connect: async (sdp: string) => {
-              const answer = await workspace().connectRealtimeVoice({ agentId: target.id, sdp }, target.serverId);
-              if (answer.sessionId && callOwnerRef.current === callOwner) {
-                activeCall.current = answer.sessionId;
-                voiceCallHistory.begin(callTarget, answer.sessionId);
-              }
-              return answer;
-            },
+            connect: (sdp: string) => workspace().connectRealtimeVoice({ agentId: target.id, sdp }, target.serverId),
             poll: (input) => workspace().pollRealtimeVoice(input, target.serverId),
             reply: (input) => workspace().replyRealtimeVoice(input, target.serverId),
-            end: (input) => {
-              if (activeCall.current === input.sessionId) activeCall.current = null;
-              return workspace().endRealtimeVoice(input, target.serverId);
-            },
+            end: (input) => workspace().endRealtimeVoice(input, target.serverId),
           }
         : null,
-    [target.kind, target.id, target.serverId, workspace, callTarget, callOwner],
+    [target.kind, target.id, target.serverId, workspace],
   );
   // Hands-free, as the voice pane on desktop: the agent hears a pause as the end of a turn, and its
   // reply is read aloud. In a channel the leader answers, or the member the words name.
@@ -646,6 +636,9 @@ ${session.user.id}`
       return message;
     },
   });
+  useEffect(() => {
+    if (!live.open) activeCall.current = null;
+  }, [live.open]);
   useEffect(() => {
     voiceCallHistory.resolve(
       callTarget,
@@ -704,7 +697,17 @@ ${session.user.id}`
     live.available || live.open
       ? {
           ...liveVoice(live, voiceAgent?.name ?? target.name, t),
-          start: () => (live.realtimeReady || replyVoiceReady() ? live.start() : router.push("/settings/voice")),
+          start: () => {
+            if (!live.realtimeReady && !replyVoiceReady()) {
+              router.push("/settings/voice");
+              return;
+            }
+            if (target.kind === "agent") {
+              activeCall.current = randomUUID();
+              voiceCallHistory.begin(callTarget, activeCall.current);
+            }
+            live.start();
+          },
         }
       : dictationVoice(voice, t);
   const voiceOpen = voice.stage !== "closed" || live.open;
