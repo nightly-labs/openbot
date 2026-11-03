@@ -124,6 +124,7 @@ export function createConversationViewScope(props: ConversationProps) {
     composerFocusRequest,
     setComposerFocusRequest,
     pendingSends,
+    attachmentUploads,
     showComposerActions,
     setShowComposerActions,
     importingDrafts,
@@ -374,10 +375,25 @@ export function createConversationViewScope(props: ConversationProps) {
     return entry?.message === message ? entry.run : null;
   });
   /** True while a file import for the chat waits. An import for another chat does not stop this one. */
-  const attachmentBusy = (target = currentTarget()) =>
+  const attachmentImporting = (target = currentTarget()) =>
     target !== undefined && importingDrafts().has(composerDraftKey(target));
+  /** No send while a file of the chat uploads or failed: the message would go without it. */
+  const attachmentBusy = (target = currentTarget()) =>
+    attachmentImporting(target) || (target !== undefined && attachmentUploads.hasFailed(composerDraftKey(target)));
   const syncAttachmentImports = () =>
     setImportingDrafts(new Set(Array.from(resources.importTargetAgents.values(), composerDraftKey)));
+  const currentUploads = createMemo(() => {
+    const target = currentTarget();
+    return target ? attachmentUploads.list(composerDraftKey(target)) : [];
+  });
+  /** The X of an upload chip. A file that still uploads lands nowhere: its draft attachment is discarded. */
+  const removeUpload = (requestId: string) => {
+    attachmentUploads.remove(requestId);
+    resources.importTargetAgents.delete(requestId);
+    syncAttachmentImports();
+    conversationRuntime(props).agent.discardAttachmentImport?.(requestId);
+  };
+  const retryUpload = (requestId: string) => conversationRuntime(props).agent.retryAttachmentImport?.(requestId);
   const currentPendingSends = createMemo(() => pendingSends.list(currentTarget()));
   // The host queues a message for a moment before it starts it. A send made while the agent was idle
   // stays in the chat for that moment, so it does not jump to the queue panel and back.
@@ -1060,18 +1076,26 @@ export function createConversationViewScope(props: ConversationProps) {
   onSettled(() => {
     const importSounds = createAttachmentImportSounds();
     const unsubscribeImport = conversationRuntime(props).agent.onAttachmentImport((event) => {
+      if (event.type === "progress") {
+        attachmentUploads.progress(event.requestId, event.sent);
+        return;
+      }
+      // A retry runs again in the chat of the failed import, also when a side thread is open now.
+      const retried = event.type === "started" ? attachmentUploads.get(event.requestId) : undefined;
       const threadKey = event.type === "started" ? undefined : threadComposer.releaseImport(event.requestId);
       if (event.type === "started") {
         // A side thread covers the agent's own chat, so a file dropped or picked there goes to the thread.
-        if (threadComposer.openDraftKey() !== undefined) {
+        if (!retried && threadComposer.openDraftKey() !== undefined) {
           if (threadComposer.claimImport(event.requestId, event.serverId)) importSounds.started(event.requestId);
           return;
         }
-        const target = currentTarget();
+        const target = retried?.target ?? currentTarget();
         if (target?.serverId === event.serverId) {
           resources.importTargetAgents.set(event.requestId, target);
           clearConversationError(target);
           importSounds.started(event.requestId);
+          // A set over the attachment limits names no files. Main refuses it whole, with a banner.
+          if (event.files.length > 0) attachmentUploads.start(event.requestId, target, event.files);
         }
         syncAttachmentImports();
         setScopedComposerError(null);
@@ -1091,11 +1115,17 @@ export function createConversationViewScope(props: ConversationProps) {
         syncAttachmentImports();
         if (target) {
           importSounds.finished(event.requestId, "error");
-          setConversationErrors((current) => ({
-            ...current,
-            [composerDraftKey(target)]: event.message,
-          }));
-        }
+          // The chip of the file shows the failure, with Retry. An import with no chip has the banner.
+          // Electron puts the IPC channel in front of the sentence; the chip shows only the sentence.
+          if (attachmentUploads.get(event.requestId)) {
+            const { t, errorMessage } = currentText();
+            attachmentUploads.fail(event.requestId, errorMessage(event.message, t("composer.upload.failed")));
+          } else
+            setConversationErrors((current) => ({
+              ...current,
+              [composerDraftKey(target)]: event.message,
+            }));
+        } else importSounds.cancel(event.requestId);
       } else {
         const target = resources.importTargetAgents.get(event.requestId);
         if (target) {
@@ -1104,9 +1134,12 @@ export function createConversationViewScope(props: ConversationProps) {
           else importSounds.cancel(event.requestId);
           void addAttachments(event.attachments, target).finally(() => {
             resources.importTargetAgents.delete(event.requestId);
+            attachmentUploads.remove(event.requestId);
             syncAttachmentImports();
           });
         } else {
+          // The user removed the chip while the file uploaded, so the file lands nowhere.
+          importSounds.cancel(event.requestId);
           syncAttachmentImports();
           for (const attachment of event.attachments) {
             void conversationRuntime(props).agent.discardDraftAttachment(attachment.id, event.serverId);
@@ -1980,6 +2013,10 @@ export function createConversationViewScope(props: ConversationProps) {
     attachmentAction,
     attachmentDownloads,
     attachmentBusy,
+    attachmentImporting,
+    currentUploads,
+    removeUpload,
+    retryUpload,
     browserAddress,
     browserSidebarOpen,
     browserExpandedOpen,

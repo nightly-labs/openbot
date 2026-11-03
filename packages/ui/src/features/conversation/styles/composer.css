@@ -982,3 +982,33 @@
   inset: 0;
   margin: auto;
 }
+
+/* A file on its way to the server. The dashed edge says that it is not there yet; the ring takes
+   the place of the extension badge. */
+.composer-attachment[data-upload="uploading"] {
+  border-style: dashed;
+}
+
+.composer-attachment[data-upload="failed"] {
+  border-color: var(--openbot-danger);
+}
+
+.composer-attachment[data-upload="failed"] .composer-attachment-copy small {
+  color: var(--openbot-danger-text);
+}
+
+.composer-upload-ring {
+  width: 28px;
+}
+
+.composer-upload-failed-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--openbot-danger-text);
+}
+
+.composer-upload-retry {
+  flex: none;
+  margin-right: -4px;
+  color: var(--openbot-danger-text);
+}

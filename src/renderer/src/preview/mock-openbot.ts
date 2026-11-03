@@ -2677,6 +2677,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         attachmentListeners.add(listener);
         return () => attachmentListeners.delete(listener);
       },
+      // The preview imports no files from a drop or a pick, so no import fails and waits for a retry.
+      retryAttachmentImport: () => undefined,
+      discardAttachmentImport: () => undefined,
       discardDraftAttachment: async () => undefined,
       downloadAttachments: async () => {
         throw new Error("ZIP downloads are available in the desktop app.");

@@ -7,6 +7,7 @@ import type {
   AgentEvent,
   AgentImportPreview,
   AttachmentDownloadProgress,
+  AttachmentImportProgress,
   AvatarImageInput,
   ClientAgentSummary,
   ConversationPage,
@@ -166,6 +167,7 @@ interface RemoteServerEvents {
   directTyping: [serverId: string, event: DirectTypingRealtimeEvent];
   machineAlert: [serverId: string, event: MachineAlertEvent];
   attachmentDownload: [progress: AttachmentDownloadProgress];
+  attachmentImportProgress: [progress: AttachmentImportProgress];
 }
 
 // The renderer redraws a progress ring; more than about ten updates a second show nothing more.
@@ -1920,18 +1922,28 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       mimeType: string,
       bytes: Uint8Array,
       serverId = this.#store.activeServerId,
+      // With it, the bytes that the host confirms go to the renderer as `attachmentImportProgress`.
+      requestId?: string,
     ): Effect.fn.Return<DraftAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const url = new URL(TEAM_API_ROUTES.attachments, server.apiUrl);
       url.searchParams.set("name", name);
       url.searchParams.set("mime", mimeType || "application/octet-stream");
-      const response = yield* this.#client.fetch(server, url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/octet-stream",
+      const response = yield* this.#client.fetch(
+        server,
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+          },
+          body: Buffer.from(bytes),
         },
-        body: Buffer.from(bytes),
-      });
+        true,
+        undefined,
+        undefined,
+        requestId === undefined ? undefined : this.#importProgress(serverId, requestId),
+      );
       const json = yield* remoteCall(() => response.json());
       return yield* remoteDecode(() =>
         addRemotePreviewUrls(
@@ -2167,6 +2179,16 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         ),
       );
     });
+  }
+
+  #importProgress(serverId: string, requestId: string): (sent: number, total: number) => void {
+    let reportedAt = 0;
+    return (sent, total) => {
+      const now = Date.now();
+      if (sent < total && now - reportedAt < ATTACHMENT_PROGRESS_INTERVAL_MS) return;
+      reportedAt = now;
+      this.emit("attachmentImportProgress", { serverId, requestId, sent, total });
+    };
   }
 
   #attachmentProgress(serverId: string, attachmentId: string, size: number): RemoteFileProgress {

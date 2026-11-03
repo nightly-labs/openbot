@@ -173,6 +173,50 @@ export function createWebConversationRuntime(
     await discard();
     return null;
   }
+  // The files of each failed import, for Retry, until the composer removes the chip.
+  const failedImports = new Map<string, readonly File[]>();
+  async function runImportFiles(requestId: string, files: readonly File[]) {
+    const serverId = hostId();
+    failedImports.delete(requestId);
+    // A set over the limit names no files: it has no chips, and the banner says why it failed.
+    const withinLimit = files.length <= INPUT_LIMITS.attachments;
+    // `started` names the chat on screen, so it comes before any wait.
+    emit({
+      type: "started",
+      serverId,
+      requestId,
+      files: withinLimit ? files.map((file) => ({ name: file.name, size: file.size })) : [],
+    });
+    if (importBusy) {
+      if (withinLimit) failedImports.set(requestId, files);
+      emit({ type: "error", serverId, requestId, message: currentText().t("error.remote.attachmentBusy") });
+      return;
+    }
+    await runImport(async () => {
+      const job = { cancelled: false, serverId };
+      importing = job;
+      try {
+        if (files.length > INPUT_LIMITS.attachments)
+          throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
+        const attachments = await uploadFiles(files, serverId, () => job.cancelled);
+        emit({ type: "completed", serverId, requestId, attachments: attachments ?? [] });
+      } catch (error) {
+        if (job.cancelled) {
+          emit({ type: "completed", serverId, requestId, attachments: [] });
+          return;
+        }
+        if (withinLimit) failedImports.set(requestId, files);
+        emit({
+          type: "error",
+          serverId,
+          requestId,
+          message: error instanceof Error ? error.message : currentText().t("webClient.error.fileTransfer"),
+        });
+      } finally {
+        importing = undefined;
+      }
+    });
+  }
   const unavailable = async (): Promise<never> => {
     throw new Error(currentText().t("webClient.error.desktopOnly"));
   };
@@ -240,6 +284,13 @@ export function createWebConversationRuntime(
           listeners.delete(listener);
         };
       },
+      retryAttachmentImport(requestId) {
+        const files = failedImports.get(requestId);
+        if (files) void runImportFiles(requestId, files);
+      },
+      discardAttachmentImport(requestId) {
+        failedImports.delete(requestId);
+      },
       openAttachment: ({ attachmentId }) => files.download(attachmentId),
       // The browser has no app to open a host file in, so it downloads.
       openSharedFile: ({ path }) => files.saveShared(path),
@@ -299,37 +350,7 @@ export function createWebConversationRuntime(
     visualPage: files.visualPage,
     async importFiles(files) {
       if (files.length === 0) return;
-      const serverId = hostId();
-      const requestId = crypto.randomUUID();
-      // `started` names the chat on screen, so it comes before any wait.
-      emit({ type: "started", serverId, requestId });
-      if (importBusy) {
-        emit({ type: "error", serverId, requestId, message: currentText().t("error.remote.attachmentBusy") });
-        return;
-      }
-      await runImport(async () => {
-        const job = { cancelled: false, serverId };
-        importing = job;
-        try {
-          if (files.length > INPUT_LIMITS.attachments)
-            throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
-          const attachments = await uploadFiles(files, serverId, () => job.cancelled);
-          emit({ type: "completed", serverId, requestId, attachments: attachments ?? [] });
-        } catch (error) {
-          if (job.cancelled) {
-            emit({ type: "completed", serverId, requestId, attachments: [] });
-            return;
-          }
-          emit({
-            type: "error",
-            serverId,
-            requestId,
-            message: error instanceof Error ? error.message : currentText().t("webClient.error.fileTransfer"),
-          });
-        } finally {
-          importing = undefined;
-        }
-      });
+      await runImportFiles(crypto.randomUUID(), files);
     },
     cancelImportFiles,
     // `request()` names the connected host at call time, so a host switch reaches the new host.

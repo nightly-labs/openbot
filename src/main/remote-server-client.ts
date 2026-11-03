@@ -81,6 +81,7 @@ export interface RemoteHostRequestTransport {
       preserveSemanticTags?: boolean | undefined;
       timeoutMs?: number | undefined;
       fileProgress?: RemoteFileProgress | undefined;
+      uploadProgress?: ((sent: number, total: number) => void) | undefined;
     },
   ) => Effect.Effect<
     {
@@ -216,6 +217,8 @@ export class RemoteServerClient {
     timeoutMs?: number,
     // Only the WebRTC arm reports here. An HTTP body arrives in parts, so its reader counts them.
     fileProgress?: RemoteFileProgress,
+    // Only the WebRTC arm reports here: the host confirms each part of the body. `fetch` does not.
+    uploadProgress?: (sent: number, total: number) => void,
   ): Effect.fn.Return<Response, RemoteWorkflowError> {
     return yield* Effect.gen({ self: this }, function* () {
       if (server.transport === "webrtc-v2") {
@@ -231,6 +234,7 @@ export class RemoteServerClient {
             ...(contentType === undefined ? {} : { contentType }),
             ...(timeoutMs === undefined ? {} : { timeoutMs }),
             ...(fileProgress === undefined ? {} : { fileProgress }),
+            ...(uploadProgress === undefined ? {} : { uploadProgress }),
             preserveSemanticTags: supportsTeamSemanticTags(compatibility.capabilities),
           });
           const headers = new Headers();
