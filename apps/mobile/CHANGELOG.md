@@ -91,11 +91,12 @@ the [root changelog](../../CHANGELOG.md).
 - Product analytics and error reports now go also when analytics is off, with a random install ID in place of your account ID and email. The ID changes after 13 months. Message contents and files are never sent. The setting in Settings → Privacy is now called "Link analytics to my account".
 - This update cannot read what the earlier versions kept in the iPhone keychain. You sign in again
   one time, and the app settings, such as appearance, language, haptics and voice, go back to their
-  defaults. App lock is off until you turn it on again. Share product analytics is on until you sign
-  in and the app loads your account's choice. If you turned it off only on this phone, it stays on.
+  defaults. App lock is off until you turn it on again. Link analytics to my account is on until you
+  sign in and the app loads your account's choice. If you turned it off only on this phone, it stays
+  on.
 - **Sign in again after you upgrade.**
 - **Turn on App lock again in Settings if you used it.**
-- **Check Share product analytics in Settings if you turned it off.**
+- **Check Link analytics to my account in Settings → Privacy if you turned it off.**
 - Chat messages have tighter lines and less space between paragraphs and list items, so a reply takes less of the screen.
 - A private answer to an agent's question, such as an API key, is typed in a masked field in the place of the message field, as a browser password is. The chat no longer shows a second field in the question card.
 - Chat list folders look and work as on the desktop. A folder shows a folder icon, and a folder in a
