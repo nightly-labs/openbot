@@ -1138,7 +1138,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             .run(client, (cancelled) =>
               generateTextWithoutTools(
                 client,
-                { ...model, defaultReasoningEffort: selected.reasoningEffort },
+                // A member's effort fits only the member's model, not the provider's smaller one.
+                model.id === selected.model ? { ...model, defaultReasoningEffort: selected.reasoningEffort } : model,
                 prompt,
                 cancelled,
               ),
@@ -1157,6 +1158,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             );
         }).pipe(toChannelOperationError),
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
+      spareGeneration: () => this.#profileClients.hasSpare(),
       awaitDrain: (agentId) => this.#drain.taskFor(agentId)?.pipe(toChannelOperationError),
       contextCharacters: (agentId, threadId) => {
         const agent = this.#store.list().find((item) => item.id === agentId);

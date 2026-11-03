@@ -42,6 +42,8 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.taskMoveRefused",
   // A channel task from v0.22.0 can keep this text as its stored error.
   "error.backend.channelHistoryArriving",
+  // A channel task from v0.59.0 can keep this text as its stored error.
+  "error.backend.channelHistoryLeadRequired",
 ]);
 
 const logger = createOpenBotLogger("i18n-check");

@@ -27,8 +27,7 @@ const PERSON_ONLY =
 export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: string; shape: z.ZodRawShape }[] = [
   {
     name: "channel_history",
-    description:
-      "Read earlier shared channel messages, newest first in pages of about 24,000 characters. Continue with beforeSequence set to olderCursor. A long message is cut: read the rest with its messageId and offset. This never starts another agent.",
+    description: "Read earlier shared channel messages. This never starts another agent.",
     shape: {
       beforeSequence: z.number().int().min(0).optional(),
       attachmentId: z.string().optional(),

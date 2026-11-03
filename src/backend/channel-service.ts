@@ -81,6 +81,8 @@ export interface ChannelHooks {
   /** Whether this agent switches without asking and has a backup model that is ready now. */
   usageLimitBackup?(agentId: string): boolean;
   contextCharacters?(agentId: string, threadId: string): number;
+  /** Whether a background generation may start and still leave one for the user's own. */
+  spareGeneration?(): boolean;
   /**
    * Whether the agent's provider reports each compaction, its own automatic ones too. Only then can a
    * packet leave out the messages that the session read: a compaction resets what it read.
@@ -2359,6 +2361,8 @@ export class ChannelService {
     const channel = this.store.exists(channelId) ? this.store.get(channelId) : null;
     const lead = channel ? this.hooks.agents().find((agent) => agent.id === channel.leadAgentId) : undefined;
     if (!channel || channel.archived || !lead || this.hooks.hidden?.(lead.id)) return;
+    // With no spare generation, the next packet makes the summary when it needs one.
+    if (this.hooks.spareGeneration?.() === false) return;
     const fallbacks = this.hooks
       .agents()
       .filter(

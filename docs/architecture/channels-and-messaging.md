@@ -341,7 +341,9 @@ posted a `channel_result`: the result is the answer of that turn.
   (`src/main/agent-import-manifest.ts`) has no field for it, so an imported channel starts with it off.
 - After a turn, a channel starts one background summary. `prepare` waits for it only when its own
   budget needs a summary (`ChannelHistory.needsSummary`), so a turn does not summarize the same
-  messages again. A deleted channel stops the summary.
+  messages again. A deleted channel stops the summary. It does not start when it would take the
+  last generation slot of `ProfileClients`: the next packet makes the summary. It uses the member's
+  reasoning effort only on the member's own model.
 - The log line "A channel packet was prepared." gives the size of each part (`packetParts`,
   `deltaParts`): assignment, memories, summary, referenced messages, transcript, and the count of
   kept and left-out messages. `otherCharacters` is the rest: the rules and the JSON facts. It never
