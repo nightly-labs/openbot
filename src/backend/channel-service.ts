@@ -202,9 +202,8 @@ export class ChannelService {
   constructor(
     database: OpenBotDatabase,
     readonly mailbox: MailboxStore,
+    readonly images: ChannelImages,
     readonly hooks: ChannelHooks,
-    /** Omitted, a channel takes no uploaded image. */
-    readonly images?: ChannelImages,
   ) {
     this.store = new ChannelStore(database);
     this.memories = new ChannelMemoryStore(database);
@@ -276,7 +275,6 @@ export class ChannelService {
       channelId,
       Effect.gen({ self: this }, function* () {
         const images = this.images;
-        if (!images) return yield* channelFailure(new Error("This host keeps no channel images."));
         const channel = yield* channelSync(() => this.store.get(channelId));
         const previous = images.resolve(channel);
         const written = image ? yield* images.write(channelId, image) : null;
@@ -328,7 +326,7 @@ export class ChannelService {
           yield* this.mailbox.deleteChannelData(channelId, threadIds).pipe(Effect.mapError(channelFailure));
           for (const threadId of threadIds) yield* this.hooks.forgetThread?.(threadId) ?? Effect.void;
           yield* channelSync(() => this.store.delete(channelId));
-          if (this.images) yield* this.images.removeAll(channelId);
+          yield* this.images.removeAll(channelId);
           this.#pumps.delete(channelId);
           this.#wakeAgain.delete(channelId);
           this.#waitingForAgents.delete(channelId);

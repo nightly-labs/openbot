@@ -1091,131 +1091,125 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         deliverySettled: (deliveryId, terminal) => this.messaging.deliverySettled(deliveryId, terminal),
       },
     });
-    this.channels = new ChannelService(
-      store.database,
-      mailbox,
-      {
-        agents: () => this.listAgents(),
-        hidden: (agentId) => this.#store.isHidden(agentId),
-        generate: (lead, prompt) =>
-          Effect.gen({ self: this }, function* () {
-            yield* this.#providers.ensureProvider(lead.provider);
-            const model = this.#endpoints
-              .available()
-              .find((item) => item.provider === lead.provider && item.id === lead.model);
-            if (!model)
-              return yield* new ProfileGenerationFailed({
-                cause: new Error(sourceText("error.backend.channelLeadModelUnavailable")),
-              });
-            const client = this.#providers.createProfileClient(lead.provider, lead.providerAccountId);
-            return yield* this.#profileClients
-              .run(client, (cancelled) =>
-                generateTextWithoutTools(
-                  client,
-                  { ...model, defaultReasoningEffort: lead.reasoningEffort },
-                  prompt,
-                  cancelled,
-                ),
-              )
-              .pipe(
-                // A routing turn can be the first one a spent plan refuses: in its completion, or as the
-                // error of the `turn/start` request. It holds the lead's model the way a refused member turn
-                // does, and the channel keeps the task queued for the reset.
-                Effect.tapError((failure) =>
-                  failure instanceof GenerationUsageLimitError
-                    ? this.#usageLimits.reached(lead.id, failure.resetsAt, lead.model)
-                    : failure.cause instanceof Error && isPlanLimitDiagnostic(failure.cause.message)
-                      ? this.#usageLimits.reached(lead.id, null, lead.model)
-                      : Effect.void,
-                ),
-              );
-          }).pipe(toChannelOperationError),
-        schedule: (agentId) => this.#drain.scheduleDrain(agentId),
-        awaitDrain: (agentId) => this.#drain.taskFor(agentId)?.pipe(toChannelOperationError),
-        contextCharacters: (agentId, threadId) => {
+    this.channels = new ChannelService(store.database, mailbox, new ChannelImages(store.channelImagesRoot), {
+      agents: () => this.listAgents(),
+      hidden: (agentId) => this.#store.isHidden(agentId),
+      generate: (lead, prompt) =>
+        Effect.gen({ self: this }, function* () {
+          yield* this.#providers.ensureProvider(lead.provider);
+          const model = this.#endpoints
+            .available()
+            .find((item) => item.provider === lead.provider && item.id === lead.model);
+          if (!model)
+            return yield* new ProfileGenerationFailed({
+              cause: new Error(sourceText("error.backend.channelLeadModelUnavailable")),
+            });
+          const client = this.#providers.createProfileClient(lead.provider, lead.providerAccountId);
+          return yield* this.#profileClients
+            .run(client, (cancelled) =>
+              generateTextWithoutTools(
+                client,
+                { ...model, defaultReasoningEffort: lead.reasoningEffort },
+                prompt,
+                cancelled,
+              ),
+            )
+            .pipe(
+              // A routing turn can be the first one a spent plan refuses: in its completion, or as the
+              // error of the `turn/start` request. It holds the lead's model the way a refused member turn
+              // does, and the channel keeps the task queued for the reset.
+              Effect.tapError((failure) =>
+                failure instanceof GenerationUsageLimitError
+                  ? this.#usageLimits.reached(lead.id, failure.resetsAt, lead.model)
+                  : failure.cause instanceof Error && isPlanLimitDiagnostic(failure.cause.message)
+                    ? this.#usageLimits.reached(lead.id, null, lead.model)
+                    : Effect.void,
+              ),
+            );
+        }).pipe(toChannelOperationError),
+      schedule: (agentId) => this.#drain.scheduleDrain(agentId),
+      awaitDrain: (agentId) => this.#drain.taskFor(agentId)?.pipe(toChannelOperationError),
+      contextCharacters: (agentId, threadId) => {
+        const agent = this.#store.list().find((item) => item.id === agentId);
+        const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
+        return session ? this.#compaction.contextInputCharacters(session.externalSessionId) : 120_000;
+      },
+      reportsCompactions: (agentId) => this.#reportsCompactions(agentId),
+      forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toChannelOperationError),
+      loadedSnapshot: (threadId) => this.#conversation.loadedExecutionSnapshot(threadId),
+      // A held agent gets no channel assignment: one that waited for the reset would hold its
+      // resources. A channel turn runs beside the agent's tasks, unless its provider runs one turn
+      // of the agent at a time.
+      busy: (agentId) =>
+        Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
+        (this.#tasks.oneTurnAtATime(agentId) &&
+          this.#conversation.workingTaskSnapshots(agentId).some((snapshot) => snapshot.activeTurnId)) ||
+        !this.#usageLimits.mayDrain(agentId),
+      usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
+      skipAtLimit: (task) => this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
+      usageLimitBackup: (agentId) => this.#usageLimitBackup(agentId) !== undefined,
+      steer: (agentId, threadId, turnId, messageId, text) =>
+        Effect.gen({ self: this }, function* () {
           const agent = this.#store.list().find((item) => item.id === agentId);
           const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
-          return session ? this.#compaction.contextInputCharacters(session.externalSessionId) : 120_000;
-        },
-        reportsCompactions: (agentId) => this.#reportsCompactions(agentId),
-        forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toChannelOperationError),
-        loadedSnapshot: (threadId) => this.#conversation.loadedExecutionSnapshot(threadId),
-        // A held agent gets no channel assignment: one that waited for the reset would hold its
-        // resources. A channel turn runs beside the agent's tasks, unless its provider runs one turn
-        // of the agent at a time.
-        busy: (agentId) =>
-          Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
-          (this.#tasks.oneTurnAtATime(agentId) &&
-            this.#conversation.workingTaskSnapshots(agentId).some((snapshot) => snapshot.activeTurnId)) ||
-          !this.#usageLimits.mayDrain(agentId),
-        usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
-        skipAtLimit: (task) => this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
-        usageLimitBackup: (agentId) => this.#usageLimitBackup(agentId) !== undefined,
-        steer: (agentId, threadId, turnId, messageId, text) =>
-          Effect.gen({ self: this }, function* () {
-            const agent = this.#store.list().find((item) => item.id === agentId);
-            const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
-            const client = agent ? this.#providers.clientForAgent(agent) : null;
-            if (!session || !client) return "rejected" as const;
-            return yield* client
-              .request(
-                "turn/steer",
-                {
-                  threadId: session.externalSessionId,
-                  expectedTurnId: turnId,
-                  clientUserMessageId: messageId,
-                  input: [{ type: "text", text }],
-                },
-                decodeRecordResponse,
-              )
-              .pipe(
-                Effect.match({
-                  onSuccess: () => "accepted" as const,
-                  onFailure: (failure) =>
-                    isRequestTimeout(failure.cause, "turn/steer") ? ("uncertain" as const) : ("rejected" as const),
-                }),
-              );
-          }),
-        interrupt: (agentId, turnId, threadId) =>
-          this.interrupt(agentId, turnId, threadId).pipe(toChannelOperationError),
+          const client = agent ? this.#providers.clientForAgent(agent) : null;
+          if (!session || !client) return "rejected" as const;
+          return yield* client
+            .request(
+              "turn/steer",
+              {
+                threadId: session.externalSessionId,
+                expectedTurnId: turnId,
+                clientUserMessageId: messageId,
+                input: [{ type: "text", text }],
+              },
+              decodeRecordResponse,
+            )
+            .pipe(
+              Effect.match({
+                onSuccess: () => "accepted" as const,
+                onFailure: (failure) =>
+                  isRequestTimeout(failure.cause, "turn/steer") ? ("uncertain" as const) : ("rejected" as const),
+              }),
+            );
+        }),
+      interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toChannelOperationError),
 
-        // Every channel state change ends in `publish`, so this is the complete trigger surface for
-        // reconciling a channel routine run. It does not depend on `turn-completed`, which never
-        // reaches the agent event forwarder for a channel thread.
-        changed: (channelId, revision) => {
-          this.#channelRoutines.reconcile(channelId);
-          this.#routineTimer.arm();
-          this.#emit({ type: "channels-changed", channelId, revision });
-        },
-        memoriesChanged: (channelId) => this.#emit({ type: "channel-memories-changed", channelId }),
-        ...(options.channelPersonAgentLevel ? { personAgentLevel: options.channelPersonAgentLevel } : {}),
-        ...(options.channelRemotePerson ? { remotePerson: options.channelRemotePerson } : {}),
-        routines: {
-          list: (channelId) => this.#channelRoutines.list(channelId),
-          create: (input) => this.#channelRoutines.create(input),
-          update: (input) => this.#channelRoutines.update(input),
-          delete: (input) => this.#channelRoutines.delete(input),
-          timezone: options.timezone ?? localTimezone,
-        },
-        // A held agent starts nothing, so its queue has no event of its own while the reservation
-        // moves. Without this its panel keeps naming the channel task that has already ended.
-        queueHoldChanged: () => {
-          for (const agent of this.#store.list())
-            if (this.#mailbox.queuedDeliveryIds(agent.id).length) this.#mailboxSync.emitQueue(agent.id);
-        },
-        error: (error) => this.#emitError("channel_coordination_failed", error),
-        routingFailed: ({ channelId, taskId, lead, error }) =>
-          routingLogger.warn("channel_coordination_failed", {
-            channelId,
-            taskId,
-            ...(lead ? { provider: lead.provider, model: lead.model, effort: lead.reasoningEffort } : {}),
-            // Redacted as the error event is: a provider text can quote a header or a key that only
-            // the MCP gateway knows. The logger redacts again and limits the length.
-            cause: failureMessages(error).map((message) => this.#mcp.redact(message)),
-          }),
+      // Every channel state change ends in `publish`, so this is the complete trigger surface for
+      // reconciling a channel routine run. It does not depend on `turn-completed`, which never
+      // reaches the agent event forwarder for a channel thread.
+      changed: (channelId, revision) => {
+        this.#channelRoutines.reconcile(channelId);
+        this.#routineTimer.arm();
+        this.#emit({ type: "channels-changed", channelId, revision });
       },
-      new ChannelImages(store.channelImagesRoot),
-    );
+      memoriesChanged: (channelId) => this.#emit({ type: "channel-memories-changed", channelId }),
+      ...(options.channelPersonAgentLevel ? { personAgentLevel: options.channelPersonAgentLevel } : {}),
+      ...(options.channelRemotePerson ? { remotePerson: options.channelRemotePerson } : {}),
+      routines: {
+        list: (channelId) => this.#channelRoutines.list(channelId),
+        create: (input) => this.#channelRoutines.create(input),
+        update: (input) => this.#channelRoutines.update(input),
+        delete: (input) => this.#channelRoutines.delete(input),
+        timezone: options.timezone ?? localTimezone,
+      },
+      // A held agent starts nothing, so its queue has no event of its own while the reservation
+      // moves. Without this its panel keeps naming the channel task that has already ended.
+      queueHoldChanged: () => {
+        for (const agent of this.#store.list())
+          if (this.#mailbox.queuedDeliveryIds(agent.id).length) this.#mailboxSync.emitQueue(agent.id);
+      },
+      error: (error) => this.#emitError("channel_coordination_failed", error),
+      routingFailed: ({ channelId, taskId, lead, error }) =>
+        routingLogger.warn("channel_coordination_failed", {
+          channelId,
+          taskId,
+          ...(lead ? { provider: lead.provider, model: lead.model, effort: lead.reasoningEffort } : {}),
+          // Redacted as the error event is: a provider text can quote a header or a key that only
+          // the MCP gateway knows. The logger redacts again and limits the length.
+          cause: failureMessages(error).map((message) => this.#mcp.redact(message)),
+        }),
+    });
     this.#channelRoutines = new ChannelRoutineScheduler({
       channels: this.channels,
       hooks: {
@@ -3424,7 +3418,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   resolveChannelImage(channelId: string): ChannelImageFile | null {
     if (!this.channels.store.exists(channelId)) return null;
-    return this.channels.images?.resolve(this.channels.store.get(channelId)) ?? null;
+    return this.channels.images.resolve(this.channels.store.get(channelId));
   }
 
   resolveAvatar(agentId: string): { path: string; mimeType: AvatarImageInput["mimeType"]; version: string } | null {
