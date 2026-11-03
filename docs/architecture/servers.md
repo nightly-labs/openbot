@@ -253,6 +253,13 @@ that a newer revision refused shows the conflict, and the person keeps the draft
 workflow. The pins of the mobile drawer stay on the phone, in the workspace preferences of the
 account and server (`pinnedWorkflows`); the host does not know them.
 
+The phone also uses the version, single-step and stop-step routes, and `workflows-github-v1`, as a
+joined desktop does. An owner or admin adds and changes a GitHub trigger or output there
+(`apps/mobile/src/features/workflows/model/workflow-github.ts` reads and writes the same fields as
+the desktop cards); a member reads them, the event history and the item of a run. Discord triggers
+and outputs show read-only on the phone, because only the computer that runs OpenBot has the Discord
+servers, channels and roles.
+
 ### History extent
 
 `history-extent-v1` lets the chat's scroll rail draw the history that is not loaded on a joined server.

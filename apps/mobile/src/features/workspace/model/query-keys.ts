@@ -202,13 +202,34 @@ export const queryKeys = {
   /** The workflows of a server. `workflows-changed` invalidates the list and the one workflow under it. */
   serverWorkflows: (scope: QueryScope, serverId: string) => ["server-workflows", ...scope, serverId],
   workflowList: (scope: QueryScope, serverId: string) => [...queryKeys.serverWorkflows(scope, serverId), "list"],
-  /** A workflow, its newest runs, all its runs page by page, and a run that is older than the first page. */
+  /**
+   * A workflow, its newest runs, all its runs page by page, a run that is older than the first page,
+   * its versions, the graph of one version, and the events of its GitHub triggers.
+   */
   workflow: (
     scope: QueryScope,
     serverId: string,
     workflowId: string,
-    ...part: [] | ["detail"] | ["runs"] | ["history"] | ["run", runId: string]
+    ...part:
+      | []
+      | ["detail"]
+      | ["runs"]
+      | ["history"]
+      | ["run", runId: string]
+      | ["versions"]
+      | ["version", versionId: string]
+      | ["github-history"]
   ) => [...queryKeys.serverWorkflows(scope, serverId), "workflow", workflowId, ...part],
+  /** The repositories of the host's GitHub connection, and the labels and people of one of them. */
+  workflowGitHubCatalog: (scope: QueryScope, serverId: string) => [
+    ...queryKeys.serverWorkflows(scope, serverId),
+    "github-catalog",
+  ],
+  workflowGitHubOptions: (scope: QueryScope, serverId: string, repository: string) => [
+    ...queryKeys.serverWorkflows(scope, serverId),
+    "github-options",
+    repository.toLowerCase(),
+  ],
   /** The query is the last part: a search that continues the typed query keeps its results on screen. */
   messageSearch: (scope: QueryScope, serverId: string, query: string) => ["message-search", ...scope, serverId, query],
   fileSearch: (scope: QueryScope, serverId: string, query: string) => ["file-search", ...scope, serverId, query],
