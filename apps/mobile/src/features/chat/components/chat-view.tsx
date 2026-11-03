@@ -574,8 +574,8 @@ export function ChatView({
   const liquidGlassAvailable = isLiquidGlassAvailable() && !reducedTransparency;
   // A quiet return to the app counts as online: the chat keeps its look, and its requests wait.
   const serverOnline = showsOnline(server);
-  // A hold on the mic dictates into the draft, and only Send makes it a message. Leaving the chat or
-  // losing the server stops listening and keeps the words.
+  // The mic beside the main control dictates into the draft, and only Send makes it a message.
+  // Leaving the chat or losing the server stops listening and keeps the words.
   const dictation = useComposerDictation({
     enabled: isFocused && serverOnline && canSend && !readOnly && !notice,
     focused: isFocused,
@@ -605,8 +605,8 @@ export function ChatView({
   // Not gated on `appActive`. Notification Center and other system overlays make iOS report the app
   // inactive, and a request must stay with its typed value. It goes when the app leaves.
   const showBrowserRequests = serverOnline && foregroundVisit && isFocused && !readOnly;
-  // A tap on the mic of the composer: a live conversation in an agent chat, as on desktop. A channel
-  // has no one conversation to follow, so there a tap dictates hands-free. A hold always dictates.
+  // The main control of an empty composer: a live conversation in an agent chat, as on desktop. A
+  // channel has no one conversation to follow, so there only the dictation mic beside it listens.
   // With no voice ready, the tap opens Settings > Voice, where the user downloads Supertonic 3 or adds
   // an ElevenLabs key.
   const composerVoice: ComposerVoice | undefined =
@@ -618,10 +618,10 @@ export function ChatView({
       : undefined;
   // A live conversation keeps the chat in view and turns the composer into a call bar.
   const voiceOpen = live.open;
-  const dictating = dictation.stage !== "idle";
+  const dictating = dictation.active;
   // A password or a code is typed where the composer is, so the screen has one field. The voice
   // mode, dictation and the attachment card keep the composer until they close: replacing it would
-  // end a hold on the mic. Other secret requests wait.
+  // end them. Other secret requests wait.
   const secretRequest =
     showBrowserRequests && !voiceOpen && !dictating && !attachments.menuOpen
       ? chatBrowserRequests.find(asksForSecret)
