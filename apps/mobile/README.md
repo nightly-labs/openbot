@@ -336,9 +336,10 @@ Cloud builds require the final `ios.bundleIdentifier` and `android.package` valu
 
 ### Local TestFlight build
 
-On a Mac with Xcode, CocoaPods, Fastlane, and this project's Node and Bun versions installed,
-sign in to Expo with `bunx eas-cli@latest login` from `apps/mobile`. An active Apple Developer
-membership is required for signing and TestFlight distribution.
+On a Mac with Xcode 27.1 or newer (see the iPhone Duo note below), CocoaPods, Fastlane, and this
+project's Node and Bun versions installed, sign in to Expo with `bunx eas-cli@latest login` from
+`apps/mobile`. An active Apple Developer membership is required for signing and TestFlight
+distribution.
 
 From the repository root, run:
 
@@ -363,9 +364,13 @@ it to a tester group. Upload is manual; the command does not run EAS Submit.
 ### GitHub Actions TestFlight release
 
 The `Release iOS to TestFlight` workflow builds the selected `main` commit on a GitHub-hosted
-`macos-26` runner with Xcode 26.6. Expo SDK 58 requires Xcode 26.4 or newer; the desktop release's
-`macos-14` runner is not suitable. EAS CLI 24.1.2 runs with `--local --non-interactive`, so compilation
-uses GitHub Actions compute. Fastlane uploads directly to Apple without EAS Submit.
+`xcode-27` runner (a GitHub preview image) with Xcode 27.1. Expo SDK 58 compiles with Xcode 26.4 or
+newer, but iOS decides the iPhone Duo layout from the SDK of the build: an iOS 26 SDK build shows in
+a small window in the middle of the open iPhone Duo, and only the iOS 27.1 SDK fills the screen and
+moves the bars into the vertical rail. Keep Xcode 27.1 or newer, and check `DTSDKName` in the IPA
+`Info.plist` after a runner change. The desktop release's `macos-14` runner is not suitable. EAS CLI
+24.1.2 runs with `--local --non-interactive`, so compilation uses GitHub Actions compute. Fastlane
+uploads directly to Apple without EAS Submit.
 
 One-time setup:
 
