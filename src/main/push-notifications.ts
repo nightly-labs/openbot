@@ -42,10 +42,11 @@ import { markerExclusionsForCapabilities } from "./team-api/request-helpers";
 /** The answer of a turn is among the last messages of the conversation. */
 const ANSWER_PAGE_SIZE = 20;
 /**
- * A member who did something in a desktop or web app this recently is at that app, which shows the
- * event itself, so the phone stays quiet. This includes the events that wait for the member: the
- * desktop app asks for them. The computer of this host counts the same idle time. It is short: a task
- * can end at any time after the member leaves the computer.
+ * A member who did something in a desktop or web app this recently, or who used the computer of a
+ * desktop app (`computer-activity-v1`), is at that app, which shows the event itself, so the phone
+ * stays quiet. This includes the events that wait for the member: the desktop app asks for them. The
+ * computer of this host counts the same idle time. It is short: a task can end at any time after the
+ * member leaves the computer. An unpackaged app can set another time (`OPENBOT_DEV_AWAY_SECONDS`).
  */
 export const DESKTOP_USE_MS = 30 * 1000;
 /**
@@ -85,6 +86,8 @@ interface PushNotificationOptions {
   memberActive(memberId: string): boolean;
   /** The last send, answer or typing of the member in a session other than this phone, or `null`. */
   lastUseElsewhere(memberId: string, sessionId: string): number | null;
+  /** How long after the last use of the member elsewhere the phone notifies. `DESKTOP_USE_MS` when not set. */
+  awayAfterMs?: number;
   /**
    * The levels that the member chose on this server for all of their devices
    * (`agent-notification-levels-v1`). The server level replaces the level of the phone's registration,
@@ -149,7 +152,7 @@ interface Registration {
  * the app is not on screen.
  * It decides as the desktop does (`notificationForAgentEvent`): the member's level, the agent's own
  * switch, and no notification for a quiet routine run. It sends nothing while the member uses a
- * desktop app, and no answer to a message while an iPhone shows the Live Activity, which shows the
+ * desktop app or the computer that it runs on, and no answer to a message while an iPhone shows the Live Activity, which shows the
  * answer. The agent name and the text are sealed for the phone, so the account service, Apple and
  * Google see the token, the time, and sealed bytes only.
  *
@@ -160,6 +163,9 @@ export class PushNotificationService {
   readonly #options: PushNotificationOptions;
   readonly #now: () => number;
   readonly #registrations = new Map<string, Registration>();
+  /** The last input on the computer of each desktop session (`computer-activity-v1`). Older entries go. */
+  readonly #computerInput = new Map<string, { memberId: string; at: number }>();
+  readonly #awayAfterMs: number;
   readonly #listener = (event: AgentEvent) => {
     this.#releaseAnswered(event);
     Effect.runFork(this.#deliver(event).pipe(Effect.forkIn(this.#scope, { startImmediately: true })));
@@ -174,6 +180,31 @@ export class PushNotificationService {
   constructor(options: PushNotificationOptions) {
     this.#options = options;
     this.#now = options.now ?? Date.now;
+    this.#awayAfterMs = options.awayAfterMs ?? DESKTOP_USE_MS;
+  }
+
+  /**
+   * The desktop app of a session says that its computer had input `idleSeconds` ago. Answers whether
+   * a phone of the member gets notifications from this host, so the app knows whether to tell more.
+   */
+  computerInput(sessionId: string, memberId: string, idleSeconds: number): boolean {
+    const now = this.#now();
+    for (const [other, input] of this.#computerInput) {
+      if (now - input.at >= this.#awayAfterMs) this.#computerInput.delete(other);
+    }
+    const at = now - idleSeconds * 1_000;
+    if (now - at < this.#awayAfterMs) this.#computerInput.set(sessionId, { memberId, at });
+    else this.#computerInput.delete(sessionId);
+    return [...this.#registrations.values()].some((registration) => registration.stored.memberId === memberId);
+  }
+
+  /** The last use of the member in a session other than `sessionId`: a send, an answer, typing or computer input. */
+  #lastUseElsewhere(memberId: string, sessionId: string): number | null {
+    let last = this.#options.lastUseElsewhere(memberId, sessionId);
+    for (const [other, input] of this.#computerInput) {
+      if (other !== sessionId && input.memberId === memberId && (last === null || input.at > last)) last = input.at;
+    }
+    return last;
   }
 
   /** Reads the saved phones when the host starts. They count as away until they connect again. */
@@ -227,6 +258,7 @@ export class PushNotificationService {
 
   /** The phone turned notifications off, signed out, or the session ended. */
   remove(sessionId: string): void {
+    this.#computerInput.delete(sessionId);
     const registration = this.#registrations.get(sessionId);
     if (!this.#running || !registration) return;
     this.#dropHeld(registration);
@@ -241,6 +273,7 @@ export class PushNotificationService {
     this.#listening = false;
     for (const registration of this.#registrations.values()) this.#dropHeld(registration);
     this.#registrations.clear();
+    this.#computerInput.clear();
     yield* Fiber.awaitAll([...this.#saves]);
     yield* Scope.close(this.#scope, Exit.void);
     this.#scope = Scope.makeUnsafe();
@@ -288,8 +321,8 @@ export class PushNotificationService {
       if (this.#options.hiddenAgentIds(protocol, registration.capabilities, memberId).has(subject.agentId))
         return false;
       // A member at a desktop app sees the event there, and the phone would only repeat it.
-      const used = this.#options.lastUseElsewhere(memberId, sessionId);
-      return !((used !== null && now - used < DESKTOP_USE_MS) || this.#options.atHostComputer(memberId, event));
+      const used = this.#lastUseElsewhere(memberId, sessionId);
+      return !((used !== null && now - used < this.#awayAfterMs) || this.#options.atHostComputer(memberId, event));
     });
     if (!targets.length) return;
     const agents = this.#options.agents.listAgents();

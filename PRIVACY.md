@@ -1572,9 +1572,15 @@ host.
 
 The iPhone app can show a notification when an agent finishes a task, stops with an error, or needs
 an answer, an approval, or a step in the browser, while the app is not on screen. The host does not
-send one while the member uses a desktop app. For this, it keeps in memory the time of the last
-send, answer or typing of each session, and on its own computer it reads whether the OpenBot window
-has focus and how long the computer has had no input. While the phone shows the Live Activity of
+send one while the member uses a desktop app or the computer that it runs on. For this, it keeps in
+memory the time of the last send, answer or typing of each session, and on its own computer it reads
+whether the OpenBot window has focus and how long the computer has had no input. The desktop app also
+tells each joined server that shows its events on the desktop, after input, how many seconds ago the
+computer last had keyboard or mouse input, in any app. It sends only this number, not what you typed or
+which app you used. The host keeps the time in memory only, uses it for 30 seconds only to keep your
+phones quiet, and removes it at the next report or when the session ends. A host that sends
+notifications to none of your phones says so, and the desktop app then
+does not tell it again for 5 minutes. While the phone shows the Live Activity of
 that host and the activity shows the event, the host sends no notification. With Play sound on, the
 Live Activity update lights up the screen and plays the sound instead. An event that comes while
 the app looks on screen stays in the memory of the host for at most 5 minutes, in case iOS suspended

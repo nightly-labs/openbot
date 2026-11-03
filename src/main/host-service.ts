@@ -212,6 +212,8 @@ interface HostServiceOptions {
   pushNotificationStore?: PushNotificationStore;
   /** Whether the owner uses the desktop app on this computer now and sees the event there, so the owner's phone stays quiet. */
   hostComputerInUse?: (event: AgentEvent) => boolean;
+  /** How long after the member's last use of another app or computer a phone notifies. `DESKTOP_USE_MS` when not set. */
+  awayAfterMs?: number;
   verifyRemoteSessionTicket?: (ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>;
   endRemoteSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   remoteControlPlaneUrl?: string;
@@ -408,6 +410,7 @@ export class HostService extends EventEmitter<HostEvents> {
               return member !== null && !member.disabled;
             },
             lastUseElsewhere: (memberId, sessionId) => this.#api.lastMemberUseElsewhere(memberId, sessionId),
+            ...(options.awayAfterMs === undefined ? {} : { awayAfterMs: options.awayAfterMs }),
             // The desktop app of this computer runs as the owner.
             atHostComputer: (memberId, event) =>
               memberId === options.store.getOwnerMemberId() && (options.hostComputerInUse?.(event) ?? false),

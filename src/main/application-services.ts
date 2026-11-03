@@ -266,6 +266,7 @@ import {
 import { McpOAuthStore } from "./mcp-oauth-store";
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
+import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
 import { OnePasswordConnectorStore } from "./onepassword-connector-store";
@@ -384,6 +385,7 @@ const AGENT_NOTIFICATION_LEVELS_FILE = "openbot-agent-notification-levels-v1.jso
 const SIDEBAR_PINS_FILE = "openbot-sidebar-pins-v1.json";
 const SERVER_TIMEZONE_PREFERENCE_FILE = "openbot-server-timezone-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
+const MODEL_VISIBILITY_PREFERENCE_FILE = "openbot-model-visibility-v1.json";
 const REMOTE_SESSION_REUSE_PREFERENCE_FILE = "openbot-remote-session-reuse-preference-v1.json";
 const EXTERNAL_LINK_PREFERENCE_FILE = "openbot-external-link-preference-v1.json";
 const REMOTE_NETWORK_ROUTE_PREFERENCE_FILE = "openbot-remote-network-route-v1.json";
@@ -618,6 +620,7 @@ export interface ApplicationServices {
   serverAudit: ServerAuditStore;
   serverTimezone: ServerTimezonePreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
+  modelVisibility: ModelVisibility;
   remoteSessionReuse: RemoteSessionReusePreferenceStore;
   externalLinkPreference: ExternalLinkPreferenceStore;
   externalLinks: ExternalLinkOpener;
@@ -1888,6 +1891,15 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => runCauseEffect(service.stop()));
   const agentMemoryLimitSetting = reloadingAgentMemoryLimit(agentMemoryLimit, service);
+  // The models that the model picker shows. Agents, tools and automations keep `service.listModels()`.
+  const modelVisibility = new ModelVisibility({
+    path: join(app.getPath("userData"), MODEL_VISIBILITY_PREFERENCE_FILE),
+    catalog: new ModelReleaseCatalog(),
+    listModels: () => service.listModels(),
+    listAgents: () => service.listAgents(),
+    modelsChanged: () => service.notifyModelsChanged(),
+  });
+  await runCauseEffect(modelVisibility.load());
   /** The answer an agent gave in one turn, for routine flows, routine results and local scripts. */
   const turnAnswer = (agentId: string, turnId: string): string | null => {
     const threadId = store.list().find((agent) => agent.id === agentId)?.threadId;
@@ -2484,6 +2496,9 @@ export async function createApplicationServices({
         ? Effect.succeed(localServersForTeam)
         : Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.team.localServersUnsupported")) })),
     );
+  // Development only: a shorter or longer time without input before a phone notifies, to test it.
+  const awaySeconds = app.isPackaged ? Number.NaN : Number(process.env.OPENBOT_DEV_AWAY_SECONDS);
+  const awayAfterMs = Number.isInteger(awaySeconds) && awaySeconds > 0 ? awaySeconds * 1_000 : DESKTOP_USE_MS;
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -2590,6 +2605,7 @@ export async function createApplicationServices({
       memoryLimit: agentMemoryLimitSetting,
       memoryReview,
       promptCacheTtl,
+      modelVisibility,
       // The local Settings save does the same two steps (`saveSetup`).
       defaultProvider: {
         // The provider that a new agent starts on now, also before a setup choice: `preferredProvider` above.
@@ -2671,13 +2687,14 @@ export async function createApplicationServices({
     sendLiveActivityPush: (hostId, push) => centralAuth.sendLiveActivityPush(hostId, push).pipe(toRemoteWorkflowError),
     sendPushNotification: (hostId, push) => centralAuth.sendPushNotification(hostId, push).pipe(toRemoteWorkflowError),
     pushNotificationStore,
+    awayAfterMs,
     // The owner is at this computer only with recent input, also when the window was left in focus.
     // Then the focused window shows the event, or the desktop notifies. When mute or the level of
     // this server keeps the desktop quiet about the event, the phone tells the owner.
     hostComputerInUse: (event) => {
       const window = windows.getMainWindow();
       if (!window || window.isDestroyed()) return false;
-      if (powerMonitor.getSystemIdleState(DESKTOP_USE_MS / 1_000) !== "active") return false;
+      if (powerMonitor.getSystemIdleState(awayAfterMs / 1_000) !== "active") return false;
       if (window.isFocused()) return true;
       // Without a notification service, as on Linux without a daemon, the desktop shows nothing.
       if (!Notification.isSupported()) return false;
@@ -2932,6 +2949,27 @@ export async function createApplicationServices({
           }),
       },
       accountReady: centralAuthInitialization,
+      // A joined host keeps the member's phones quiet while this computer has input and this desktop
+      // shows the events of that host: in a focused window, or as notifications.
+      ...(hostedServer || serverModeEnvironment || localServerChild
+        ? {}
+        : {
+            computerActivity: {
+              awayAfterMs,
+              idleSeconds: () => powerMonitor.getSystemIdleTime(),
+              showsEvents: (server) => {
+                const window = windows.getMainWindow();
+                if (!window || window.isDestroyed()) return false;
+                if (window.isFocused() || windows.getChatWindows().some((chat) => chat.isFocused())) return true;
+                return (
+                  Notification.isSupported() &&
+                  notificationPreference.get().desktopNotifications &&
+                  !server.notificationsMuted &&
+                  server.notificationLevel !== "nothing"
+                );
+              },
+            },
+          }),
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
       hostedServers: {
         unavailable: (serverId, wake) => hostedServers.unavailableHost(serverId, wake),
@@ -3508,6 +3546,7 @@ export async function createApplicationServices({
     serverAudit,
     serverTimezone,
     promptCacheTtl,
+    modelVisibility,
     remoteSessionReuse,
     externalLinkPreference,
     externalLinks,

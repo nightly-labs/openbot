@@ -58,6 +58,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine is niet klaar geworden.",
   "error.backend.sunshineNotReadyReason": "Sunshine is niet klaar geworden. {reason}",
   "error.backend.channelLeadModelUnavailable": "Het model van de kanaalleider is niet beschikbaar.",
+  "error.backend.contextCompactionIneffective":
+    "Comprimeren maakt deze chat niet kleiner: na twee keer comprimeren gebruikt hij nog {percent}% van het contextvenster van het model, dus OpenBot stopt met comprimeren. Tools en instructies gebruiken het grootste deel van het venster. Zet de MCP-servers of computerbediening uit die deze agent niet nodig heeft, of kies een model met een groter venster. Start daarna een nieuwe chat.",
+  "error.backend.providerRetrying":
+    "De provider kon dit verzoek {attempts} keer niet uitvoeren en probeert het opnieuw. Als de agent niet verdergaat, stop dan de beurt.",
+  "error.backend.providerRetryingLargeContext":
+    "De provider kon dit verzoek {attempts} keer niet uitvoeren en probeert het opnieuw. Deze chat gebruikt {percent}% van het contextvenster van het model. Als de agent niet verdergaat, stop dan de beurt: OpenBot comprimeert de chat dan voor het volgende bericht.",
   "error.backend.sharedDataUnavailable": "Gedeelde gegevens zijn niet beschikbaar.",
   "error.backend.shuttingDown": "OpenBot wordt afgesloten.",
   "error.backend.channelUnconfirmedStart":
@@ -109,8 +115,8 @@ export const messages = {
     "Je hebt {saved} van {limit} herinneringen. Maak ruimte: werk één herinnering bij via memoryId met de gecombineerde tekst van twee verwante herinneringen en vergeet dan de andere, of vergeet een herinnering die niet meer klopt. Probeer het daarna opnieuw.",
   "error.backend.agentMemoryLimitExceeded":
     "Je hebt {saved} herinneringen en de limiet is {limit}. De gebruiker heeft de limiet lager ingesteld dan het aantal opgeslagen herinneringen. Vergeet geen herinneringen om ruimte te maken. Vertel de gebruiker dat deze herinnering niet is opgeslagen.",
-  "error.backend.channelHistoryLeadRequired": "Kies een kanaalleider om de gedeelde geschiedenis voor te bereiden.",
   "error.backend.channelHistoryArriving": "Er komt nog een gedeeld bericht binnen. Ga verder als het compleet is.",
+  "error.backend.channelHistoryLeadRequired": "Kies een kanaalleider om de gedeelde geschiedenis voor te bereiden.",
   "error.backend.channelHistoryInvalid":
     "De samenvatting van de geschiedenis is ongeldig. Ga verder om het opnieuw te proberen.",
   "error.backend.channelContextTooLong":

@@ -57,6 +57,7 @@ import type {
 import {
   canAdministerServer,
   decodeAgentFastModels,
+  decodeAgentModelListings,
   decodeWorkspaceDirectory,
   isAccountUsage,
   isAgentStatus,
@@ -70,6 +71,7 @@ import {
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
   withFastServiceTiers,
+  withModelListings,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -96,6 +98,10 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
+import {
+  MODEL_VISIBILITY_CAPABILITY,
+  MODEL_VISIBILITY_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import {
@@ -1294,10 +1300,17 @@ export function createWebWorkspaceRuntime(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
-      if (!capabilities.includes(AGENT_FAST_MODE_CAPABILITY)) return models;
-      // The fast tiers are optional: when their route fails, the picker gets the models with no Fast switch.
-      const fast = await request("POST", AGENT_FAST_MODE_ROUTES.models, {}).then(decodeAgentFastModels, () => []);
-      return withFastServiceTiers(models, fast);
+      // The fast tiers and the picker listing are optional: when a route fails, the picker gets the
+      // models with no Fast switch or listing.
+      const [fast, listings] = await Promise.all([
+        capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
+          ? request("POST", AGENT_FAST_MODE_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
+          : [],
+        capabilities.includes(MODEL_VISIBILITY_CAPABILITY)
+          ? request("POST", MODEL_VISIBILITY_ROUTES.listing, {}).then(decodeAgentModelListings, () => [])
+          : [],
+      ]);
+      return withModelListings(withFastServiceTiers(models, fast), listings);
     },
     async status() {
       const value = await request("GET", TEAM_API_ROUTES.agents.status);
