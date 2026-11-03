@@ -3,6 +3,7 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { useText } from "@openbot/ui/text";
 import { createEffect, For, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
 import { MarketplaceAgentPage } from "./MarketplaceAgentPage";
+import { AgentGroupPage } from "./MarketplaceAgents";
 import { MarketplaceAppPage } from "./MarketplaceAppPage";
 import { createBrowseLists, MarketplaceBrowse } from "./MarketplaceBrowse";
 import { MarketplaceNav } from "./MarketplaceNav";
@@ -36,6 +37,8 @@ function viewTitle(scope: MarketplaceScope, view: MarketplaceView, fallback: str
     case "agent":
     case "skill":
       return view.listing.name;
+    case "agentGroup":
+      return t(CATEGORY_LABELS[view.category]);
     case "app":
       return scope.model.apps().find((app) => app.id === view.id)?.name ?? fallback;
     case "skillGroup":
@@ -102,7 +105,9 @@ function MarketplaceWindow(props: MarketplaceProps) {
       list: (query) => props.model.listAgents(query),
       homeCache: props.model.agentHomeCache,
       query: () => nav.state.query,
-      category: () => nav.state.agentCategory,
+      // The Agents tab shows each category, and a category page has its own listing.
+      category: () => null,
+      verified: () => sourceVerified(nav.state.agentSource),
     }),
     skills: createMarketplaceListing({
       list: (query) => props.model.listSkills(query),
@@ -195,8 +200,11 @@ function MarketplaceWindow(props: MarketplaceProps) {
                 <Match when={view.kind === "browse"}>
                   <MarketplaceBrowse scope={scope} lists={lists} />
                 </Match>
-                <Match when={view.kind === "agent" && view.listing} keyed>
-                  {(listing) => <MarketplaceAgentPage scope={scope} listing={listing} />}
+                <Match when={view.kind === "agent" && view} keyed>
+                  {(agent) => <MarketplaceAgentPage scope={scope} listing={agent.listing} detail={agent.detail} />}
+                </Match>
+                <Match when={view.kind === "agentGroup" && view.category} keyed>
+                  {(category) => <AgentGroupPage scope={scope} category={category} />}
                 </Match>
                 <Match when={view.kind === "skill" && view.listing} keyed>
                   {(listing) => <MarketplaceSkillPage scope={scope} listing={listing} />}

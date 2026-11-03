@@ -21,6 +21,7 @@ import {
   decodeHostUpdateStatus,
   decodeMachineAlertSettings,
   decodePromptCacheTtlSetting,
+  decodeServerAuditLog,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   hostAgentMemoryLimit,
@@ -30,6 +31,8 @@ import {
   type MachineAlertSettings,
   type PromptCacheTtl,
   parseAgentAccessChange,
+  type ServerAuditLog,
+  type ServerAuditName,
   type ServerSummary,
   UPDATE_RESTART_MODES,
   type UpdateHostIdentityInput,
@@ -54,6 +57,7 @@ import {
   PROMPT_CACHE_TTL_CAPABILITY,
   PROMPT_CACHE_TTL_ROUTES,
 } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import { SERVER_AUDIT_CAPABILITY, SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-store";
@@ -64,6 +68,7 @@ import type { MemoryReviewPreferenceStore } from "../memory-review-preference-st
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
 import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { ServerAuditStore } from "../server-audit-store";
 import { parseServerTimezone, type ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
 import { parseAgentMemoryLimitPreference, parseHostUpdateSettings, parseMemoryReviewPreference } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
@@ -92,9 +97,12 @@ interface HostAdminIpcDependencies {
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   agentAccess: Pick<AgentAccessStore, "levels" | "set">;
+  serverAudit: Pick<ServerAuditStore, "read">;
   /** The server ID of this computer's host, when it has one. Roles are stored by it. */
   localServerId: () => string | undefined;
   localAgentIds: () => string[];
+  /** The owner member of this computer's host, who makes each local change, for the audit log. */
+  localOwner: () => ServerAuditName | null;
 }
 
 // The user of this computer owns its server, so the roles give them every agent.
@@ -112,8 +120,10 @@ export function hostAdminIpcHandlers({
   machineAlerts,
   promptCacheTtl,
   agentAccess,
+  serverAudit,
   localServerId,
   localAgentIds,
+  localOwner,
 }: HostAdminIpcDependencies): Pick<IpcGroupHandlers, "hostAdmin"> {
   function remoteUpdate(serverId: string, route: string, body: HostUpdateBody): Promise<HostUpdateStatus> {
     const role = remoteServers.list().find((server) => server.id === serverId)?.role;
@@ -301,7 +311,9 @@ export function hostAdminIpcHandlers({
           const serverId = localAccessServerId();
           // The local owner sees every agent of this host.
           const shown = new Set(localAgentIds());
-          const saved = await Effect.runPromise(Effect.result(agentAccess.set(serverId, change, shown, shown)));
+          const saved = await Effect.runPromise(
+            Effect.result(agentAccess.set(serverId, change, shown, shown, localOwner())),
+          );
           if (Result.isFailure(saved)) {
             if (saved.failure._tag === "AgentAccessStale") throw new Error(sourceText("error.team.agentAccessStale"));
             throw saved.failure.cause;
@@ -309,6 +321,23 @@ export function hostAdminIpcHandlers({
           return agentAccessSnapshot(agentAccess.levels(serverId), LOCAL_OWNER, [...shown]);
         },
         remote: (change, serverId) => remoteAccess(serverId, AGENT_ACCESS_ROUTES.set, change),
+      }),
+      getAuditLog: scopedQueryHandler({
+        // A computer that does not host a server has no changes to show.
+        local: (): ServerAuditLog => {
+          const serverId = localServerId();
+          return serverId ? serverAudit.read(serverId) : { entries: [] };
+        },
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, SERVER_AUDIT_CAPABILITY))
+            throw new Error(sourceText("error.team.serverAuditUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, SERVER_AUDIT_ROUTES.read, decodeServerAuditLog, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
       }),
     },
   };

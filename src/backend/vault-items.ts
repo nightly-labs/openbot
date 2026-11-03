@@ -1,9 +1,16 @@
 // The cards, contact info and API keys of the Vault, as agents use them. The main process implements
 // this port with the encrypted Vault file. Agents read logins through the `PasswordVault` port instead
 // (`list_logins` / `submit_secret`). Agents can add and change contacts, change the fields of a login
-// or card that are not secret, and delete items; a password gets in only from the secure input.
+// or card that are not secret, and delete items; a password or a card number gets in only from the
+// secure input or from the form of `request_vault_item`, which the user fills in.
 
-import type { VaultCardBrand, VaultContactFields, VaultItemKind, VaultItemOrigin } from "@openbot/contracts/ipc";
+import type {
+  VaultCardBrand,
+  VaultContactFields,
+  VaultItemKind,
+  VaultItemOrigin,
+  VaultSaveInput,
+} from "@openbot/contracts/ipc";
 import type { Effect } from "effect";
 import type { PasswordVaultError } from "./password-vault";
 
@@ -76,6 +83,9 @@ export interface VaultTypedLogin {
   password: string;
 }
 
+/** A new login, card or contact that the user typed into the form of `request_vault_item`. */
+export type VaultEnteredItem = Exclude<VaultSaveInput, { kind: "apiKey" }> & { id: null };
+
 export interface VaultItems {
   /** Whether the Vault can be read and changed now. It cannot without OS encryption or with a damaged file. */
   ready(): boolean;
@@ -107,4 +117,9 @@ export interface VaultItems {
     login: VaultTypedLogin,
     addedBy: string | undefined,
   ): Effect.Effect<VaultAgentResult & { created: boolean; changed: boolean }, PasswordVaultError>;
+  /**
+   * Adds an item that the user typed. The values are checked as the Vault page checks them; a wrong
+   * value fails with text that the user reads.
+   */
+  addEntered(item: VaultEnteredItem, addedBy: string | undefined): Effect.Effect<VaultAgentResult, PasswordVaultError>;
 }

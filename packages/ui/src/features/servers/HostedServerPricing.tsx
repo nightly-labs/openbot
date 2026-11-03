@@ -1,4 +1,9 @@
-import type { BillingCurrency, BillingInterval, BillingPlanId } from "@openbot/contracts/billing";
+import {
+  type BillingCurrency,
+  type BillingInterval,
+  type BillingPlanId,
+  siteLimitForPlan,
+} from "@openbot/contracts/billing";
 import type { HostedServerCatalog } from "@openbot/contracts/hosted-servers";
 import {
   LICENSE_BUNDLE_DISCOUNT_PERCENT,
@@ -16,6 +21,7 @@ import {
   Button,
   Clock3,
   Gauge,
+  Globe2,
   HardDrive,
   IconButton,
   Minus,
@@ -70,6 +76,8 @@ export interface HostedServerPlan {
   diskGb: number;
   /** The most active members of the server, the owner included. */
   memberLimit: number;
+  /** The most active hosted sites. The catalog does not send it, so it comes from the plan. */
+  siteLimit: number;
   /** The speed compared with the smallest plan. 1 is the base speed. */
   relativeSpeed: number;
   /** No new server can take this plan. */
@@ -193,6 +201,7 @@ export function hostedServerPlansFromCatalog(catalog: HostedServerCatalog): Host
     yearlyPrice: amounts(plan.prices, "year"),
     diskGb: plan.diskGb,
     memberLimit: plan.memberLimit,
+    siteLimit: siteLimitForPlan(plan.id),
     relativeSpeed: plan.relativeSpeed,
     soldOut: plan.soldOut === true,
   }));
@@ -487,6 +496,10 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
                 <li>
                   <HardDrive aria-hidden="true" />
                   {t("settings.hostedServers.plan.disk", { count: plan.diskGb })}
+                </li>
+                <li>
+                  <Globe2 aria-hidden="true" />
+                  {t("settings.hostedServers.plan.sites", { count: plan.siteLimit })}
                 </li>
                 {/* For work, the summary already names the license of the order. An account with a license buys no license. */}
                 <Show when={props.people !== undefined && !work()}>

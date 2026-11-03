@@ -116,6 +116,7 @@ async function run() {
       return new Response(null, { status: 200 });
     },
     schedule: (send) => work.push(Effect.runPromise(send)),
+    database: sqliteD1(database),
   });
   const service = new HostedServerService(
     { DB: sqliteD1(database), HOSTED_SERVERS_ENABLED: "true", BOAT_API_KEY: "boat-key" },

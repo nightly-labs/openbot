@@ -66,6 +66,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Il messaggio del canale a cui si fa riferimento non è disponibile.",
   "error.backend.channelTaskNotFound": "Attività del canale non trovata.",
   "error.backend.channelTaskComplete": "Questa attività è già completata.",
+  "error.backend.channelTaskNotStopped": "Si può annullare solo un'attività interrotta o non riuscita.",
   "error.backend.channelSelectAgent": "Seleziona un agente.",
   "error.backend.channelLeadRequired":
     "Scegli un responsabile del canale disponibile o assegna questa attività a un membro.",
@@ -200,6 +201,8 @@ export const messages = {
     "Solo un'esecuzione di una delle tue routine risveglia un'attesa, e non hai routine. Creane una con openbot.create_routine, poi apri l'attesa.",
   "error.backend.agentWaitRemoteUnsupported":
     "Le attese aperte sono disponibili solo per gli agenti su questo computer.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Segnare un messaggio come non letto è disponibile solo per gli agenti su questo computer.",
   "error.backend.routineFlowHandoffFailed": "La routine non è riuscita a passare il lavoro a questo agente.",
   "error.backend.mcpServerLimit": "OpenBot conserva fino a {limit} server MCP.",
   "error.backend.mcpServerNameTaken": "Esiste già un server MCP chiamato {name}.",
@@ -255,6 +258,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Un server può avere fino a {limit} sezioni nella barra laterale.",
   "error.backend.sectionNameRequired": "Il nome della sezione è obbligatorio.",
   "error.backend.sectionNameTooLong": "Il nome della sezione è troppo lungo.",
+  "error.backend.sidebarFolderTooDeep": "Le cartelle possono avere solo tre livelli.",
+  "error.backend.sidebarFolderMoveInvalid": "Questa cartella non può essere spostata lì.",
   "error.backend.sectionNameDuplicate": "I nomi delle sezioni devono essere univoci.",
   "error.backend.directMessageRequired": "Scrivi prima un messaggio.",
   "error.backend.directMessageTooLong": "Un messaggio diretto può avere fino a {limit} caratteri.",
@@ -343,6 +348,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Questo agente ha {count} thread aperti. Archivia un thread, poi avviane o ripristinane un altro.",
   "error.backend.threadRemoteUnsupported": "I thread sono disponibili solo per gli agenti su questo computer.",
+  "error.backend.branchSourceBusy": "Interrompi il turno in corso prima di creare un ramo di questa chat.",
+  "error.backend.branchMessageNotFound": "Puoi creare un ramo solo da una risposta completata dell'agente.",
+  "error.backend.branchRemoteUnsupported": "I rami sono disponibili solo per gli agenti su questo computer.",
   "error.backend.threadMoveRefused":
     "Solo un messaggio che hai inviato soltanto a questo agente può essere eseguito in un nuovo thread.",
   "error.backend.taskTitleRequired": "Dai all'attività un titolo breve.",
@@ -350,8 +358,8 @@ export const messages = {
     "Dai all'attività un titolo di al massimo 120 caratteri e una descrizione che dica cosa fare.",
   "error.backend.taskOwnChatOnly":
     "Avvia un'attività solo dalla tua chat. Un canale, una conversazione di messaggistica o un'altra attività non possono avviarne una.",
-  "error.backend.taskOpenLimit":
-    "Questo agente ha già {count} attività aperte. Attendi che l'utente ne chiuda una prima di avviare un'altra attività.",
+  "error.backend.taskUnfinishedLimit":
+    "Questo agente ha già {count} attività non finite. Avvia un'altra attività quando una di esse finisce.",
   "error.backend.taskOpenLimitReached":
     "Questo agente ha {count} attività aperte. Chiudi un'attività, poi avviane o aprine un'altra.",
   "error.backend.taskRemoteUnsupported": "Le attività sono disponibili solo per gli agenti su questo computer.",

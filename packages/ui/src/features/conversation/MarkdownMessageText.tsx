@@ -972,6 +972,11 @@ function isEscapedMarkdownCharacter(value: string, index: number): boolean {
   return slashCount % 2 === 1;
 }
 
+/** The text of inline Markdown with no syntax, such as a link's label without its address. */
+export function markdownPlainText(body: string): string {
+  return markdownInlinePlainText(lexInlineTokens(body));
+}
+
 function markdownInlinePlainText(tokens: Token[]): string {
   return tokens
     .map((token) => {

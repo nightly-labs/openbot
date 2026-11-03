@@ -31,6 +31,7 @@ import {
   type CreateRoutineInput,
   type CustomAgentSummary,
   type CustomProviderSummary,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   type ExportInstanceInput,
   INSTANCE_TRANSFER_LIMITS,
   type InstanceExportResult,
@@ -40,6 +41,8 @@ import {
   type InstanceTransferSummary,
   isAgentImportKey,
   isCustomProviderContextWindow,
+  isCustomProviderHarness,
+  isCustomProviderMaxOutput,
   type McpServerConfig,
   type Routine,
   type RoutineFlowLink,
@@ -426,6 +429,9 @@ export class InstanceTransferService {
         baseUrl: redact.url(provider.name, provider.baseUrl),
         models: provider.models,
         needsApiKey: provider.hasApiKey,
+        ...(provider.harness && provider.harness !== DEFAULT_CUSTOM_PROVIDER_HARNESS
+          ? { harness: provider.harness }
+          : {}),
       })),
       customAgents: (yield* settings.customAgents().pipe(Effect.mapError(failure))).map((agent) => ({
         id: agent.id,
@@ -686,10 +692,14 @@ export class InstanceTransferService {
           name: provider.name,
           baseUrl: provider.baseUrl,
           apiKey: null,
-          models: provider.models.map(({ id, name, contextWindow }) =>
-            isCustomProviderContextWindow(contextWindow) ? { id, name, contextWindow } : { id, name },
-          ),
+          models: provider.models.map(({ id, name, contextWindow, maxOutput }) => ({
+            id,
+            name,
+            ...(isCustomProviderContextWindow(contextWindow) ? { contextWindow } : {}),
+            ...(isCustomProviderMaxOutput(maxOutput) ? { maxOutput } : {}),
+          })),
           headers: [],
+          ...(isCustomProviderHarness(provider.harness) ? { harness: provider.harness } : {}),
         }),
       );
       if (saved && provider.needsApiKey)

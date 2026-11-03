@@ -18,6 +18,17 @@ export interface ProviderAwareProfile {
   /** The charset and length of an agent summary `model`. It must not have the `g` or `y` flag. */
   readonly agentModel: RegExp;
   readonly maximumCapabilities?: number;
+  /**
+   * Agent `reasoningEffort` and model option effort values. Without it, the five levels that protocols
+   * 4 to 8 shipped with.
+   */
+  readonly reasoningEfforts?: readonly string[];
+}
+
+const PROVIDER_AWARE_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+
+function isProfileReasoningEffort(profile: ProviderAwareProfile, value: unknown): boolean {
+  return isProviderAwareOneOf(profile.reasoningEfforts ?? PROVIDER_AWARE_REASONING_EFFORTS, value);
 }
 
 /** Binds the codec entry points that read the profile; the other exports do not depend on it. */
@@ -470,7 +481,7 @@ function isProviderAwareBotSummary(
     isProfileProvider(profile.providers, value.provider) &&
     isString(value.model) &&
     profile.agentModel.test(value.model) &&
-    isProviderAwareOneOf(["low", "medium", "high", "xhigh", "max"], value.reasoningEffort) &&
+    isProfileReasoningEffort(profile, value.reasoningEffort) &&
     (value.threadId === null || isProviderAwareIdentifier(value.threadId)) &&
     isProviderAwareBoundedString(value.workspacePath, 4_096) &&
     isProviderAwareBoundedString(value.preview, 100_000) &&
@@ -2752,11 +2763,9 @@ function isProviderAwareAgentModelOption(profile: ProviderAwareProfile, value: u
     isProviderAwareBoundedString(value.id, 160) &&
     isProviderAwareLimitedString(value.name, 160) &&
     isProviderAwareBoundedString(value.description, 2_000) &&
-    isProviderAwareOneOf(["low", "medium", "high", "xhigh", "max"], value.defaultReasoningEffort) &&
+    isProfileReasoningEffort(profile, value.defaultReasoningEffort) &&
     Array.isArray(value.supportedReasoningEfforts) &&
-    value.supportedReasoningEfforts.every((effort) =>
-      isProviderAwareOneOf(["low", "medium", "high", "xhigh", "max"], effort),
-    )
+    value.supportedReasoningEfforts.every((effort) => isProfileReasoningEffort(profile, effort))
   );
 }
 
@@ -2901,8 +2910,7 @@ function isProviderAwareBotUpdate(profile: ProviderAwareProfile, value: TeamProt
     (value.notifications === undefined || isBoolean(value.notifications)) &&
     (value.provider === undefined || isProfileProvider(profile.providers, value.provider)) &&
     (value.model === undefined || isProviderAwareBoundedString(value.model, 160)) &&
-    (value.reasoningEffort === undefined ||
-      isProviderAwareOneOf(["low", "medium", "high", "xhigh", "max"], value.reasoningEffort)) &&
+    (value.reasoningEffort === undefined || isProfileReasoningEffort(profile, value.reasoningEffort)) &&
     (value.avatarSeed === undefined || isProviderAwareBoundedString(value.avatarSeed, 128)) &&
     (value.avatarHue === undefined ||
       value.avatarHue === null ||

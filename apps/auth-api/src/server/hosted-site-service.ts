@@ -33,7 +33,7 @@ import {
   sourceIpHash,
   uploadRequestHash,
 } from "./hosted-site-records";
-import { type HostedSiteScope, hostedSiteLimit, scopeServerId } from "./hosted-site-server";
+import { type HostedSiteScope, holdsSiteSlotSql, hostedSiteLimit, scopeServerId } from "./hosted-site-server";
 
 export interface HostedSiteUploadSession {
   uploadId: string;
@@ -199,9 +199,8 @@ export class HostedSiteService {
              created_at, updated_at
            )
            SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'uploading', ?, ?
-           WHERE (SELECT COUNT(*) FROM hosted_sites
-                  WHERE user_id = ? AND server_id IS ? AND status IN ('uploading', 'active', 'blocked')
-                    AND (expires_at IS NULL OR expires_at > ?)) < ?
+           WHERE (SELECT COUNT(*) FROM hosted_sites x
+                  WHERE x.user_id = ? AND x.server_id IS ? AND ${holdsSiteSlotSql("x")}) < ?
              AND (SELECT COUNT(*) FROM site_deployments
                   WHERE user_id = ? AND status = 'uploading' AND upload_expires_at > ?) < ?
              AND (SELECT COUNT(*) FROM site_creation_events WHERE user_id = ? AND created_at > ?) < ?
@@ -220,6 +219,7 @@ export class HostedSiteService {
             now,
             userId,
             serverId,
+            now,
             now,
             siteLimit,
             userId,
@@ -955,9 +955,8 @@ export class HostedSiteService {
              AND (
                -- An active site already holds its slot, so a replacement is allowed after a downgrade.
                status = 'active' OR (
-                 SELECT COUNT(*) FROM hosted_sites
-                 WHERE user_id = ? AND server_id IS ? AND id != ? AND status IN ('uploading', 'active', 'blocked')
-                   AND (expires_at IS NULL OR expires_at > ?)
+                 SELECT COUNT(*) FROM hosted_sites x
+                 WHERE x.user_id = ? AND x.server_id IS ? AND x.id != ? AND ${holdsSiteSlotSql("x")}
                ) < ?
              )
              AND current_deployment_id IS ?
@@ -977,6 +976,7 @@ export class HostedSiteService {
               userId,
               site.server_id,
               site.id,
+              now,
               now,
               siteLimit,
               previousDeployment,
@@ -1209,11 +1209,10 @@ export class HostedSiteService {
       const row = yield* siteCall(() =>
         database
           .prepare(
-            `SELECT COUNT(*) AS count FROM hosted_sites
-         WHERE user_id = ? AND server_id IS ? AND id IS NOT ? AND status IN ('uploading', 'active', 'blocked')
-           AND (expires_at IS NULL OR expires_at > ?)`,
+            `SELECT COUNT(*) AS count FROM hosted_sites x
+         WHERE x.user_id = ? AND x.server_id IS ? AND x.id IS NOT ? AND ${holdsSiteSlotSql("x")}`,
           )
-          .bind(userId, serverId, excludeSiteId, now)
+          .bind(userId, serverId, excludeSiteId, now, now)
           .first<{ count: number }>(),
       );
       return row?.count ?? 0;

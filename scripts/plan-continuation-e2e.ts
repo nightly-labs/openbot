@@ -1,14 +1,20 @@
 // Checks the automatic plan continuation: a turn of the agent's own chat or of a side thread that
-// ends with open steps in the agent's plan runs once more with a short note, up to 3 times for one
-// request. Runs the real agent service on a temporary profile with a fake Codex app-server. The
+// ends with open steps in the agent's plan runs once more with a short note, up to 8 times for one
+// request. A turn with no open step runs once more, at most 2 times, when its answer only asks whether
+// to continue or is short and ends on a next step that it did not do. Runs the real agent service on a temporary profile with a fake Codex app-server. The
 // current message names its turns in `<<PLAN[...]PLAN>>`: each element is one turn, with its plan
 // steps, its answer, its delay and its OpenBot tool calls. A continuation turn takes the next element
 // of its thread.
 // Checks:
 //   1. A turn with open steps continues once, and the request completes when the plan is done.
-//   2. A request continues at most 3 times.
+//   2. A request continues at most 8 times.
 //   3. A continuation that does not change the open steps stops the chain.
-//   4. An answer whose last line asks a question does not continue.
+//   4. An answer whose last line asks a question does not continue. A question about a named action
+//      does not continue either.
+//   4a. An answer that only asks whether to continue keeps a plan with open steps going. An
+//       approval question ("Proceed?"), a real question before it, or a wait does not continue.
+//   4b. A turn with no plan continues when its answer ends on a next step or asks whether to
+//       continue, at most 2 times for one request. A long report that ends on a next step does not.
 //   5. A turn that opens a wait does not continue.
 //   6. Stop during a continuation ends the chain. The next message works.
 //   7. A message that waits in the queue stops the continuation and runs next.
@@ -343,7 +349,7 @@ try {
     const note = turns[1]?.text ?? "";
     assert.ok(note.includes("[pending] Run the tests"), "The note names the open step.");
     assert.ok(!note.includes("Write the code"), "The note does not name the done step.");
-    assert.ok(note.includes("Automatic continuation 1 of 3."));
+    assert.ok(note.includes("Automatic continuation 1 of 8."));
     assert.equal(continuationLines(agent.id).length, 1, "One continuation line shows.");
     assert.equal(errorsFor(agent.id, since).length, 0, "No error shows.");
     const completions = current.events
@@ -373,25 +379,23 @@ try {
     return { turns: turns.length, line: continuationLines(agent.id)[0]?.id, shown };
   });
 
-  await check("a request continues at most 3 times", async () => {
+  await check("a request continues at most 8 times", async () => {
     const agent = await createAgent("Capped");
     const mark = loggedTurns().length;
+    const names = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
     const step = (done: number): FakeTurn => ({
-      steps: ["One", "Two", "Three", "Four", "Five"].map((text, index) => [
-        text,
-        index < done ? "completed" : "pending",
-      ]),
+      steps: names.map((text, index) => [text, index < done ? "completed" : "pending"]),
     });
-    const id = await send(agent.id, `Do five things. ${plan(step(0), step(1), step(2), step(3), step(4))}`);
+    const id = await send(agent.id, `Do ten things. ${plan(...names.map((_, done) => step(done)))}`);
     assert.equal(await settled(id), "completed");
     const turns = turnsSince(mark);
     assert.deepEqual(
       turns.map((turn) => turn.note),
-      [false, true, true, true],
-      "Three continuation turns run.",
+      [false, true, true, true, true, true, true, true, true],
+      "Eight continuation turns run.",
     );
-    assert.ok(turns[3]?.text.includes("Automatic continuation 3 of 3."));
-    assert.equal(continuationLines(agent.id).length, 3, "Three continuation lines show.");
+    assert.ok(turns[8]?.text.includes("Automatic continuation 8 of 8."));
+    assert.equal(continuationLines(agent.id).length, 8, "Eight continuation lines show.");
     return { turns: turns.length };
   });
 
@@ -425,6 +429,154 @@ try {
         answer: "**Which hotel do you want?** Tell me and I book it.",
       })}`,
     );
+    assert.equal(await settled(id), "completed");
+    assert.equal(turnsSince(mark).length, 1, "No continuation turn runs.");
+    assert.equal(continuationLines(agent.id).length, 0);
+    return { turns: 1 };
+  });
+
+  await check("a question about a named action does not continue", async () => {
+    const agent = await createAgent("Deployer");
+    const mark = loggedTurns().length;
+    const id = await send(
+      agent.id,
+      `Ship it. ${plan({
+        steps: [
+          ["Build", "completed"],
+          ["Deploy", "pending"],
+        ],
+        answer: "The build is ready. Should I proceed with the deploy?",
+      })}`,
+    );
+    assert.equal(await settled(id), "completed");
+    assert.equal(turnsSince(mark).length, 1, "No continuation turn runs.");
+    assert.equal(continuationLines(agent.id).length, 0);
+    return { turns: 1 };
+  });
+
+  await check("approval questions, hidden questions and waits do not continue", async () => {
+    const agent = await createAgent("Careful");
+    const answers = [
+      "This drops the users table in production. Proceed?",
+      "Should I go ahead?",
+      "Do you want Postgres or SQLite? Shall I continue?",
+      "Should I continue with the deploy?",
+      "I'll now wait for your approval.",
+      "Next, I would restart the production service.",
+    ];
+    // Each request opens a new step, so a step left open by an earlier answer does not hide the plan.
+    for (const [index, answer] of answers.slice(0, 5).entries()) {
+      const mark = loggedTurns().length;
+      const id = await send(
+        agent.id,
+        `Check it. ${plan({
+          steps: [
+            ["Prepare", "completed"],
+            [`Run part ${index + 1}`, "pending"],
+          ],
+          answer,
+        })}`,
+      );
+      assert.equal(await settled(id), "completed");
+      assert.equal(turnsSince(mark).length, 1, `No continuation turn runs after: ${answer}`);
+    }
+    for (const answer of answers.slice(4)) {
+      const mark = loggedTurns().length;
+      const id = await send(agent.id, `Check it again. ${plan({ steps: [], answer })}`);
+      assert.equal(await settled(id), "completed");
+      assert.equal(turnsSince(mark).length, 1, `No next-step turn runs after: ${answer}`);
+    }
+    const lines = continuationLines(agent.id);
+    assert.equal(lines.length, 0);
+    return { answers: answers.length };
+  });
+
+  await check("an answer that only asks whether to continue keeps the plan going", async () => {
+    const agent = await createAgent("Permission");
+    const mark = loggedTurns().length;
+    const id = await send(
+      agent.id,
+      `Migrate it. ${plan(
+        {
+          steps: [
+            ["Move the files", "completed"],
+            ["Fix the imports", "pending"],
+          ],
+          answer: "The files are moved.\n\n**Shall I continue with the next step?**",
+        },
+        {
+          steps: [
+            ["Move the files", "completed"],
+            ["Fix the imports", "completed"],
+          ],
+          answer: "The imports are fixed.",
+        },
+      )}`,
+    );
+    assert.equal(await settled(id), "completed");
+    const turns = turnsSince(mark);
+    assert.deepEqual(
+      turns.map((turn) => turn.note),
+      [false, true],
+      "One continuation turn runs.",
+    );
+    assert.ok(turns[1]?.text.includes("[pending] Fix the imports"), "The plan note names the open step.");
+    assert.ok(turns[1]?.text.includes("Do not ask whether to continue."));
+    return { turns: turns.length };
+  });
+
+  await check("a turn with no plan continues after it names a next step or asks to continue", async () => {
+    const agent = await createAgent("Announcer");
+    const mark = loggedTurns().length;
+    const since = current.events.length;
+    const id = await send(
+      agent.id,
+      `Fix the bug. ${plan(
+        { steps: [], answer: "I found the cause in the parser. I'll now write the fix." },
+        { steps: [], answer: "The fix is in. Do you want me to continue?" },
+        { steps: [], answer: "The fix is in and the tests pass." },
+      )}`,
+    );
+    assert.equal(await settled(id), "completed");
+    const turns = turnsSince(mark);
+    assert.deepEqual(
+      turns.map((turn) => turn.note),
+      [false, true, true],
+      "Two next-step continuation turns run.",
+    );
+    assert.ok(turns[1]?.text.includes("Your last turn ended before the next step"), "The next-step note is sent.");
+    assert.ok(turns[2]?.text.includes("Automatic continuation 2 of 2."), "The note counts next-step continuations.");
+    const lines = continuationLines(agent.id);
+    assert.equal(lines.length, 2, "Two continuation lines show.");
+    assert.ok(lines[0]?.text?.includes("stopped before its next step"), "The line names the next-step reason.");
+    assert.ok(lines[1]?.text?.includes("(2 of 2)"), "The line counts next-step continuations.");
+    assert.equal(errorsFor(agent.id, since).length, 0, "No error shows.");
+    assert.ok(
+      chatMessages(agent.id).some((message) => message.text === "The fix is in and the tests pass."),
+      "The last answer shows.",
+    );
+    return { turns: turns.length };
+  });
+
+  await check("a request with no plan continues at most 2 times for a next step", async () => {
+    const agent = await createAgent("Repeater");
+    const mark = loggedTurns().length;
+    const stalled: FakeTurn = { steps: [], answer: "Next, I'll run the tests." };
+    const id = await send(agent.id, `Test it. ${plan(stalled, stalled, stalled, stalled)}`);
+    assert.equal(await settled(id), "completed");
+    assert.deepEqual(
+      turnsSince(mark).map((turn) => turn.note),
+      [false, true, true],
+      "Two next-step continuation turns run.",
+    );
+    return { turns: turnsSince(mark).length };
+  });
+
+  await check("a long report that ends on a next step does not continue", async () => {
+    const agent = await createAgent("Reporter");
+    const mark = loggedTurns().length;
+    const report = `${"The parser reads each line and keeps the state of the open block. ".repeat(8)}I'll now wait for your review.`;
+    const id = await send(agent.id, `Explain it. ${plan({ steps: [], answer: report })}`);
     assert.equal(await settled(id), "completed");
     assert.equal(turnsSince(mark).length, 1, "No continuation turn runs.");
     assert.equal(continuationLines(agent.id).length, 0);

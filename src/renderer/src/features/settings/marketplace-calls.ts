@@ -7,8 +7,8 @@ import { type AgentSkillCalls, agentSkillCalls, type SkillsPort, skillsPort } fr
  * browser client reads the catalog on its own origin and changes its host over the Team API.
  */
 export interface MarketplaceCalls {
-  skills: Pick<SkillsPort["skills"], "get" | "list">;
-  agents: Pick<SkillsPort["marketplaceAgents"], "get" | "list">;
+  skills: Pick<SkillsPort["skills"], "get" | "getBySlug" | "list">;
+  agents: Pick<SkillsPort["marketplaceAgents"], "get" | "getListing" | "list">;
   agentSkills: (hostServerId?: string) => AgentSkillCalls;
   mcp: Pick<
     SkillsPort["agent"],
@@ -27,6 +27,11 @@ export interface MarketplaceCalls {
   signInRelay?: MarketplaceSignInRelay | undefined;
   /** Asks macOS on this computer for Automation access to Apple apps. Absent: this client cannot. */
   macAutomation?: SkillsPort["macAutomation"]["request"] | undefined;
+  /**
+   * The origin of a copied agent or skill link. Absent: `openbot.run`, as for a plugin link. The
+   * browser client gives the local Worker's origin while a developer runs it.
+   */
+  shareOrigin?: string | undefined;
 }
 
 /** The relayed sign-in of the app at `url` on the joined server `serverId`, while it waits. */

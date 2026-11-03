@@ -28,6 +28,7 @@ import { useConversation } from "../conversation/conversation-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useServerActions } from "../servers/server-actions";
 import { serverRoleCanAdminister } from "../servers/server-capabilities";
+import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { serverUpdateBadge, showServerUpdate } from "../servers/server-update-flow";
 import { useServers } from "../servers/servers-context";
@@ -58,6 +59,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const layout = useLayout();
   const platform = usePlatform();
   const channels = useChannels();
+  const serverScope = useServerScope();
   const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
   // The chats that main shows in a window of their own. Main sends the list on each change.
   const [chatWindows, setChatWindows] = createSignal<ChatWindowTarget[]>([]);
@@ -175,9 +177,17 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
    * sections beside the agents, so the sidebar has to be able to order and group them. The Routines
    * view lists only agents: a channel has no routine canvas. */
   const channelsListed = () => channels.supported() && layout.sidebarView() !== "routines";
-  const visibleChannels = createMemo(() =>
-    channelsListed() ? channels.state.channels.filter((channel) => !channel.archived) : [],
-  );
+  /* Until a joined server lists channels, the frame's rows hold their place, so the agents below stay. */
+  const sidebarChannels = () =>
+    !channels.state.listed &&
+    layout.sidebarView() !== "routines" &&
+    (!serverScope.loaded() || channels.supported()) &&
+    serverScope.frameChannels().length > 0
+      ? serverScope.frameChannels()
+      : channelsListed()
+        ? channels.state.channels
+        : [];
+  const visibleChannels = createMemo(() => sidebarChannels().filter((channel) => !channel.archived));
   /* A channel can open while the Routines view is on: from search, a notification, or a selection
    * restored at start. Its row must be in the list, so the list goes back to the agents view. */
   createEffect(
@@ -187,12 +197,23 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     },
   );
 
+  /* The turn events of a side thread reach only its thread list, so an agent that works in a side
+   * thread is found there. */
+  const workingTurns = createMemo(() => {
+    const turns = { ...activeTurns() };
+    for (const agent of agentList()) {
+      const running = agentTasks.snapshot(agent.id)?.tasks.find((task) => task.state === "running");
+      if (running && !turns[agent.id]) turns[agent.id] = running.activeTurnId ?? running.id;
+    }
+    return turns;
+  });
+
   /* The agent conversation shows only the waits of the agent's own thread. A wait in a channel
    * thread stays out of "Needs you", because selecting the row cannot answer it. */
   const sidebarAgentStates = createMemo(() =>
     computeSidebarAgentStates({
       agentIds: agentList().map((agent) => agent.id),
-      activeTurns: activeTurns(),
+      activeTurns: workingTurns(),
       queues: queues(),
       unreadReplies: unreadReplies(),
       recentReplies: recentReplies(),
@@ -219,7 +240,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const agentMoods = createMemo(() =>
     computeAgentAvatarMoods({
       agentIds: agentList().map((agent) => agent.id),
-      activeTurns: activeTurns(),
+      activeTurns: workingTurns(),
       queues: queues(),
       failedTurns: failedTurns(),
       pendingPrompts: attentionByAgent(pendingPrompts(), agentList()),
@@ -231,7 +252,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   return (
     <Sidebar
       channels={visibleChannels()}
-      deletedChannels={channelsListed() ? channels.state.channels.filter((channel) => channel.archived) : []}
+      deletedChannels={sidebarChannels().filter((channel) => channel.archived)}
       activeChannelId={channels.state.selectedId}
       onSelectChannel={(id) => void channels.open(id)}
       onEditChannel={(id) => void channels.editChannel(id)}
@@ -276,6 +297,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
               onAdd: serverActions.add,
               onCreateLocal: serverActions.addMenuCreateLocal(),
               addCreatesServer: serverActions.addCreatesServer(),
+              hiddenLocal: serverActions.hiddenLocal(),
               ...serverActions.callbacks,
             }
           : undefined
@@ -288,9 +310,11 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       activeDirectMemberId={activeDirectMemberId()}
       agentStates={sidebarAgentStates()}
       channelWaits={channelWaits()}
+      channelPreviewsPending={!channels.state.listed}
       agentMoods={agentMoods()}
       layout={sidebarLayout()}
       layoutMutable={activeServerSupportsCapability("sidebar-layout")}
+      foldersSupported={activeServerSupportsCapability("sidebar-folders-v1")}
       collapsedSectionIds={collapsedSidebarSectionIds()}
       onMutateLayout={mutateSidebarLayout}
       sectionDuplicateSupported={

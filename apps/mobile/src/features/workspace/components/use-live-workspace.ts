@@ -29,6 +29,13 @@ export function useUnreadAgentIds() {
   return useSyncExternalStore(liveState.subscribe, select);
 }
 
+/** The unread message count of each agent. `useUnreadAgentIds` decides which agents are unread. */
+export function useUnreadCounts() {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const select = useCallback(() => liveState.get().unreadCounts, [liveState]);
+  return useSyncExternalStore(liveState.subscribe, select);
+}
+
 /** The browser takeovers this server waits on. Re-renders only when that list changes. */
 export function useBrowserRequests(serverId: string) {
   const liveState = useMobileWorkspaceSelector(selectLiveState);

@@ -28,4 +28,12 @@ export const messages = {
   "error.site.fileType": "この種類のファイルは使用できません: {path}",
   "error.site.fileOutsideRoot": "サイトのファイルはソースのルート内にある必要があります: {path}",
   "error.site.fileTooLarge": "1 MB の上限を超えるファイルがあります: {path}",
+  "error.site.serverLimit": {
+    other:
+      "このサーバーは有効なサイトの上限（{count} 件）に達しています。別のサイトを公開するには、サイトを削除するか、サイト数の多いプランのクラウドサーバーを使ってください。",
+  },
+  "error.site.unlinkedLimit": {
+    other:
+      "このコンピューターはサーバーではなく、そのアカウントは有効なサイトの上限（{count} 件）に達しています。別のサイトを公開するには、サイトを削除するか、サイト数の多いプランのクラウドサーバーを使ってください。",
+  },
 } as const satisfies PartialTranslation<typeof source>;

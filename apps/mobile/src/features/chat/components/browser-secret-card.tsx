@@ -1,3 +1,4 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { BrowserTakeoverRequest, RespondToBrowserSecretInput } from "@openbot/contracts/ipc";
 import { GlassView } from "expo-glass-effect";
 import { Button, Spinner, Typography } from "heroui-native";
@@ -9,6 +10,7 @@ import X from "lucide-react-native/icons/x";
 import { type ReactNode, useState } from "react";
 import { Pressable, TextInput, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { haptics } from "@/shared/lib/haptics";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
@@ -173,16 +175,9 @@ export function BrowserSecretComposer({
   muted,
   action,
   actionForeground,
-}: {
+}: SecureComposerColors & {
   request: BrowserTakeoverRequest;
   respond: (input: RespondToBrowserSecretInput) => Promise<void>;
-  bottomInset: number;
-  liquidGlassAvailable: boolean;
-  fallbackBackground: ViewStyle["backgroundColor"];
-  foreground: ViewStyle["backgroundColor"];
-  muted: ViewStyle["backgroundColor"];
-  action: ViewStyle["backgroundColor"];
-  actionForeground: ViewStyle["backgroundColor"];
 }) {
   const { t } = useText();
   const [value, setValue] = useState("");
@@ -195,7 +190,6 @@ export function BrowserSecretComposer({
     : request.secret?.method === "authenticator"
       ? t("mobile.chat.browserSecret.authenticatorCode")
       : t("mobile.chat.browserSecret.oneTimeCode");
-  const insets = useSafeAreaInsets();
   const ready = !pending && (password ? Boolean(value) : value.length === digits);
   const send = async (decision: "submit" | "cancel" | "takeover") => {
     if (pending) return;
@@ -240,68 +234,170 @@ export function BrowserSecretComposer({
           </Typography.Paragraph>
         ) : null}
       </BrowserRequestCard>
-      <View
+      <SecureComposerBar
+        label={title}
+        value={value}
+        onChangeText={(text) => setValue(password ? text : text.replace(/[^0-9]/gu, "").slice(0, digits))}
+        ready={ready}
+        pending={pending}
+        onSubmit={() => void send("submit")}
+        keyboardType={password ? "default" : "number-pad"}
+        autoComplete={password ? "off" : "one-time-code"}
+        maxLength={password ? 4096 : digits}
+        bottomInset={bottomInset}
+        liquidGlassAvailable={liquidGlassAvailable}
+        fallbackBackground={fallbackBackground}
+        foreground={foreground}
+        muted={muted}
+        action={action}
+        actionForeground={actionForeground}
+      />
+    </View>
+  );
+}
+
+interface SecureComposerColors {
+  bottomInset: number;
+  liquidGlassAvailable: boolean;
+  fallbackBackground: ViewStyle["backgroundColor"];
+  foreground: ViewStyle["backgroundColor"];
+  muted: ViewStyle["backgroundColor"];
+  action: ViewStyle["backgroundColor"];
+  actionForeground: ViewStyle["backgroundColor"];
+}
+
+/**
+ * The masked field in the place of the composer, with the composer's inset, height and send button,
+ * so the screen has one field. Its value is the caller's: it never goes to the draft, the queue or
+ * the chat.
+ */
+function SecureComposerBar({
+  label,
+  placeholder,
+  value,
+  onChangeText,
+  ready,
+  pending,
+  onSubmit,
+  keyboardType,
+  autoComplete,
+  maxLength,
+  bottomInset,
+  liquidGlassAvailable,
+  fallbackBackground,
+  foreground,
+  muted,
+  action,
+  actionForeground,
+}: SecureComposerColors & {
+  label: string;
+  /** The text of the empty field, when it is not the label. */
+  placeholder?: string | undefined;
+  value: string;
+  onChangeText: (text: string) => void;
+  ready: boolean;
+  pending: boolean;
+  onSubmit: () => void;
+  keyboardType: "default" | "number-pad";
+  autoComplete: "off" | "one-time-code";
+  maxLength: number;
+}) {
+  const { t } = useText();
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      style={{
+        paddingLeft: insets.left + BAR_INSET,
+        paddingRight: insets.right + BAR_INSET,
+        paddingTop: 8,
+        paddingBottom: Math.max(bottomInset, 10),
+      }}
+    >
+      <GlassView
+        glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
         style={{
-          paddingLeft: insets.left + BAR_INSET,
-          paddingRight: insets.right + BAR_INSET,
-          paddingTop: 8,
-          paddingBottom: Math.max(bottomInset, 10),
+          backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
+          borderCurve: "continuous",
+          borderRadius: BAR_HEIGHT / 2,
+          height: BAR_HEIGHT,
+          overflow: "hidden",
+          flexDirection: "row",
+          alignItems: "center",
+          paddingLeft: 16,
+          paddingRight: 4,
         }}
       >
-        <GlassView
-          glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
-          style={{
-            backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
-            borderCurve: "continuous",
-            borderRadius: BAR_HEIGHT / 2,
-            height: BAR_HEIGHT,
-            overflow: "hidden",
-            flexDirection: "row",
-            alignItems: "center",
-            paddingLeft: 16,
-            paddingRight: 4,
+        <TextInput
+          // The composer's ID: the chat's keyboard gesture follows the one field that is shown.
+          nativeID="chat-composer-input"
+          accessibilityLabel={label}
+          placeholder={placeholder ?? label}
+          placeholderTextColor={String(muted)}
+          {...selectionColorProps(foreground)}
+          className="min-w-0 flex-1 font-sans text-foreground"
+          style={{ fontSize: 16 }}
+          secureTextEntry
+          autoCorrect={false}
+          autoCapitalize="none"
+          keyboardType={keyboardType}
+          autoComplete={autoComplete}
+          maxLength={maxLength}
+          value={value}
+          editable={!pending}
+          returnKeyType="send"
+          onSubmitEditing={() => {
+            if (ready) onSubmit();
           }}
+          onChangeText={onChangeText}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("mobile.chat.browserSecret.submit")}
+          accessibilityState={{ disabled: !ready, busy: pending }}
+          disabled={!ready}
+          className="size-10 items-center justify-center rounded-full"
+          style={{ backgroundColor: ready ? action : "transparent" }}
+          onPress={onSubmit}
         >
-          <TextInput
-            // The composer's ID: the chat's keyboard gesture follows the one field that is shown.
-            nativeID="chat-composer-input"
-            accessibilityLabel={title}
-            placeholder={title}
-            placeholderTextColor={String(muted)}
-            {...selectionColorProps(foreground)}
-            className="min-w-0 flex-1 font-sans text-foreground"
-            style={{ fontSize: 16 }}
-            secureTextEntry
-            autoCorrect={false}
-            autoCapitalize="none"
-            keyboardType={password ? "default" : "number-pad"}
-            autoComplete={password ? "off" : "one-time-code"}
-            maxLength={password ? 4096 : digits}
-            value={value}
-            editable={!pending}
-            returnKeyType="send"
-            onSubmitEditing={() => {
-              if (ready) void send("submit");
-            }}
-            onChangeText={(text) => setValue(password ? text : text.replace(/[^0-9]/gu, "").slice(0, digits))}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("mobile.chat.browserSecret.submit")}
-            accessibilityState={{ disabled: !ready, busy: pending }}
-            disabled={!ready}
-            className="size-10 items-center justify-center rounded-full"
-            style={{ backgroundColor: ready ? action : "transparent" }}
-            onPress={() => void send("submit")}
-          >
-            {pending ? (
-              <Spinner size="sm" color={String(foreground)} />
-            ) : (
-              <ArrowUp color={String(ready ? actionForeground : muted)} size={21} strokeWidth={2.2} />
-            )}
-          </Pressable>
-        </GlassView>
-      </View>
+          {pending ? (
+            <Spinner size="sm" color={String(foreground)} />
+          ) : (
+            <ArrowUp color={String(ready ? actionForeground : muted)} size={21} strokeWidth={2.2} />
+          )}
+        </Pressable>
+      </GlassView>
     </View>
+  );
+}
+
+/**
+ * Takes the place of the composer while the open question of a form asks for a private answer, such
+ * as an API key, a password or a card number. The question card above keeps the title, Skip and
+ * Cancel; this is its one field. The value is cleared when it is sent.
+ */
+export function QuestionSecretComposer({
+  controller,
+  ...colors
+}: SecureComposerColors & { controller: QuestionPromptController }) {
+  const { t } = useText();
+  const label = controller.question?.question ?? "";
+  const value = controller.draft;
+  const ready = !controller.disabled && Boolean(value.trim());
+  return (
+    <SecureComposerBar
+      label={label}
+      placeholder={t("mobile.chat.question.privatePlaceholder")}
+      value={value}
+      onChangeText={controller.setDraft}
+      ready={ready}
+      pending={controller.pending}
+      onSubmit={() => {
+        if (ready) controller.answer([value.trim()]);
+      }}
+      keyboardType="default"
+      autoComplete="off"
+      maxLength={INPUT_LIMITS.promptAnswerText}
+      {...colors}
+    />
   );
 }

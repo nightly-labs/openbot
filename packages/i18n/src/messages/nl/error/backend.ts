@@ -68,6 +68,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
   "error.backend.channelTaskNotFound": "Kanaaltaak niet gevonden.",
   "error.backend.channelTaskComplete": "Deze taak is al voltooid.",
+  "error.backend.channelTaskNotStopped": "Alleen een gestopte of mislukte taak kan worden geannuleerd.",
   "error.backend.channelSelectAgent": "Kies een agent.",
   "error.backend.channelLeadRequired": "Kies een beschikbare kanaalleider of wijs deze taak toe aan een lid.",
   "error.backend.channelRoutingTooLong":
@@ -141,8 +142,6 @@ export const messages = {
   "error.backend.recipientHidden": "Deze agent is verborgen. Herstel de agent om berichten te sturen.",
   "error.backend.attachBetween": "Voeg tussen 1 en {limit} bestanden toe.",
   "error.backend.attachmentNotFile": "Bijlage is geen bestand: {path}",
-  "error.backend.attachSvg":
-    "{name} is een SVG-bestand en kan niet worden bijgevoegd. Schrijf het absolute pad in je antwoord: de chat toont de afbeelding daar.",
   "error.backend.generatedImageTooLarge": "De gemaakte afbeelding is groter dan de limiet van 100 MB.",
   "error.backend.attachmentNotRegularFile": "Alleen gewone bestanden kunnen worden bijgevoegd: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot kon {name} niet kopiëren.",
@@ -200,6 +199,8 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "Alleen een run van een van je routines wekt een wachtpunt, en je hebt geen routine. Maak er een met openbot.create_routine en open dan het wachtpunt.",
   "error.backend.agentWaitRemoteUnsupported": "Open wachtpunten zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Een bericht als ongelezen markeren is alleen beschikbaar voor agents op deze computer.",
   "error.backend.routineFlowHandoffFailed": "De routine kon het werk niet aan deze agent doorgeven.",
   "error.backend.mcpServerLimit": "OpenBot bewaart maximaal {limit} MCP-servers.",
   "error.backend.mcpServerNameTaken": "Er bestaat al een MCP-server met de naam {name}.",
@@ -254,6 +255,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Een server kan maximaal {limit} zijbalksecties hebben.",
   "error.backend.sectionNameRequired": "Een naam voor de sectie is verplicht.",
   "error.backend.sectionNameTooLong": "De naam van de sectie is te lang.",
+  "error.backend.sidebarFolderTooDeep": "Mappen kunnen maar drie niveaus diep zijn.",
+  "error.backend.sidebarFolderMoveInvalid": "Deze map kan daar niet naartoe worden verplaatst.",
   "error.backend.sectionNameDuplicate": "Namen van secties moeten uniek zijn.",
   "error.backend.directMessageRequired": "Schrijf eerst een bericht.",
   "error.backend.directMessageTooLong": "Een direct bericht kan maximaal {limit} tekens hebben.",
@@ -290,6 +293,9 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
   "error.backend.apiKeyNotAllowed": "Alleen de eigenaar van de server of een beheerder kan een API-sleutel invoeren.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
+  "error.backend.vaultItemNotAllowed":
+    "Alleen de eigenaar van de server of een beheerder kan een item aan de Kluis toevoegen.",
+  "error.backend.vaultItemSaving": "Het Kluis-item wordt al opgeslagen.",
   "error.backend.authRequestInactive": "Dit beveiligde verificatieverzoek is niet meer actief.",
   "error.backend.secureAuthUnavailable": "Beveiligde verificatie is niet beschikbaar.",
   "error.backend.browserUrlRequired": "Een URL voor de browser is verplicht.",
@@ -346,6 +352,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Deze agent heeft {count} open threads. Archiveer een thread en start of herstel dan een andere.",
   "error.backend.threadRemoteUnsupported": "Threads zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.branchSourceBusy": "Stop de huidige beurt voordat je een aftakking van deze chat maakt.",
+  "error.backend.branchMessageNotFound": "Je kunt alleen aftakken vanaf een voltooid antwoord van de agent.",
+  "error.backend.branchRemoteUnsupported": "Aftakkingen zijn alleen beschikbaar voor agents op deze computer.",
   "error.backend.threadMoveRefused":
     "Alleen een bericht dat je alleen naar deze agent hebt gestuurd, kan in een nieuwe thread draaien.",
   "error.backend.taskTitleRequired": "Geef de taak een korte titel.",
@@ -353,8 +362,8 @@ export const messages = {
     "Geef de taak een titel van maximaal 120 tekens en een korte opdracht die zegt wat er moet gebeuren.",
   "error.backend.taskOwnChatOnly":
     "Start een taak alleen vanuit je eigen chat. Een kanaal, een berichtengesprek of een andere taak kan er geen starten.",
-  "error.backend.taskOpenLimit":
-    "Deze agent heeft al {count} open taken. Wacht tot de gebruiker er een sluit voordat je een nieuwe taak start.",
+  "error.backend.taskUnfinishedLimit":
+    "Deze agent heeft al {count} onvoltooide taken. Start een nieuwe taak wanneer er een klaar is.",
   "error.backend.taskOpenLimitReached":
     "Deze agent heeft {count} open taken. Sluit een taak en start of open dan een andere.",
   "error.backend.taskRemoteUnsupported": "Taken zijn alleen beschikbaar voor agents op deze computer.",

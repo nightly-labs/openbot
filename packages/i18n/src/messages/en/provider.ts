@@ -34,7 +34,7 @@ export const messages = defineMessages("provider", {
   "provider.status.checking": "Checking",
   "provider.status.off": "Off",
   "provider.gemini.hostSignIn":
-    "To connect Gemini, open OpenBot on the host and select Connect in Settings > Providers. Google sign-in needs a browser on that host. Remote sign-in is not supported.",
+    "To connect Gemini, open OpenBot on the host and select Connect in Server settings > Providers. Google sign-in needs a browser on that host. Remote sign-in is not supported.",
 
   // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
   // badge: a saved key leaves the runtime "Connected" to speak for the row.
@@ -55,6 +55,7 @@ export const messages = defineMessages("provider", {
   "provider.action.signIn": "Sign in",
   "provider.action.apiKey": "API key",
   "provider.action.signInWithCode": "Log in with code",
+  "provider.action.signInMainlandChina": "Sign in with {site} (China)",
   "provider.action.pasteAddress": "Paste the address",
   "provider.aria.download": "Download {name}",
   "provider.aria.cancel": "Cancel {name}",
@@ -132,6 +133,7 @@ export const messages = defineMessages("provider", {
   "provider.picker.defaultModelLabel": "{name}, default",
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Agent reasoning effort",
+  "provider.picker.effortFixed": "{effort}, set by {provider}",
   "provider.picker.fast": "Fast",
   "provider.picker.fastLabel": "Fast mode",
   "provider.picker.selectEffort": "Select effort",
@@ -140,11 +142,14 @@ export const messages = defineMessages("provider", {
   "provider.status.signInRequired": "Sign in required",
   "provider.model.free": "Free",
   "provider.model.default": "default",
+  "provider.effort.none": "None",
+  "provider.effort.minimal": "Minimal",
   "provider.effort.low": "Low",
   "provider.effort.medium": "Medium",
   "provider.effort.high": "High",
   "provider.effort.xhigh": "Extra high",
   "provider.effort.max": "Max",
+  "provider.effort.ultra": "Ultra",
 
   "provider.museKey.title": "Meta API key for Muse",
   "provider.museKey.description": "Save a Meta API key on the host, or use the Muse CLI to sign in.",
@@ -268,6 +273,8 @@ export const messages = defineMessages("provider", {
   "provider.settings.runtime": "Runtime",
   "provider.settings.version": "Version",
   "provider.settings.versionAvailable": "{installed} · {available} is available",
+  "provider.settings.versionInstalledByUser": "{version} · installed by you",
+  "provider.settings.versionDownloaded": "{version} · downloaded by OpenBot",
   "provider.settings.update": "Update",
   "provider.settings.downloadLabel": "Download of {name}",
   "provider.settings.diagnostics": "Diagnostics",

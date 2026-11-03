@@ -4,6 +4,7 @@ import { classifyFailure } from "@openbot/telemetry";
 import type { AgentMessage } from "@openbot/ui/data";
 import { contextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { AgentThreadView } from "@openbot/ui/features/conversation/threads/AgentThreadView";
+import type { AgentThreadBranchSource } from "@openbot/ui/features/conversation/threads/BranchDivider";
 import { TaskAnswerCard } from "@openbot/ui/features/tasks/TaskPanel";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createProjection, Show } from "solid-js";
@@ -27,11 +28,15 @@ export function ConversationSideThread(props: { threadId: string }) {
     openExternalMessageUrl,
     previewAttachment,
     attachmentAction,
+    attachmentDownloads,
     installedSkills,
     installedSkillsLoadFailed,
     mcpServers,
     threadComposer,
     movePanelThreadToChat,
+    copyMessage,
+    copiedMessageId,
+    branchThread,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
   const failureToast = (fallback: AppTextKey) => ({
@@ -73,6 +78,10 @@ export function ConversationSideThread(props: { threadId: string }) {
     },
   );
   const draftKey = () => threadComposer.sideDraftKey(props.threadId);
+  const rowImages = () => {
+    const key = draftKey();
+    return key ? threadComposer.rowImages(key) : [];
+  };
   const draft = () => {
     const key = draftKey();
     return key ? threadComposer.draft(key) : undefined;
@@ -91,6 +100,21 @@ export function ConversationSideThread(props: { threadId: string }) {
     waitsForAnswer() ? (
       <TaskAnswerCard agentName={view.agent?.name ?? ""} onAnswer={() => movePanelThreadToChat(props.threadId)} />
     ) : undefined;
+  /** Branches this thread through an answer. The branch opens as a chat tab. */
+  const branch = () => {
+    if (!view.threads?.onBranch) return undefined;
+    return (messageId: string) => void branchThread(props.threadId, messageId);
+  };
+  /** Where this thread came from, when it is a branch. The agent's own chat shows the agent's name. */
+  const branchSource = (side: SideThread, agentName: string): AgentThreadBranchSource | undefined => {
+    const source = view.threads?.branchSource(side.task);
+    if (!source) return undefined;
+    return {
+      throughMessageId: source.throughMessageId,
+      label: source.deleted ? null : (source.title ?? agentName),
+      onOpen: source.onOpen,
+    };
+  };
   const shown = () => {
     const agent = view.agent;
     const current = thread();
@@ -114,12 +138,18 @@ export function ConversationSideThread(props: { threadId: string }) {
             mcpServers={mcpServers()}
             draft={draft()?.text ?? ""}
             draftAttachments={draft()?.attachments}
+            rowAttachments={rowImages()}
+            pendingImages={threadComposer.pendingImages(draftKey())}
+            onRemoveAttachment={(attachment) => threadComposer.removeAttachment(draftKey(), attachment.id)}
+            onPasteFiles={(files, selection) => threadComposer.pasteFiles(files, selection, draftKey())}
             onDraftChange={(text) => threadComposer.setText(draftKey(), text)}
             onOpenDraftAttachment={(attachment) =>
               canPreviewAttachment(attachment)
                 ? void previewAttachment(attachment)
                 : attachmentAction(attachment, "open")
             }
+            mediaSource={view.runtime?.attachmentMedia}
+            downloads={attachmentDownloads}
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
@@ -137,6 +167,10 @@ export function ConversationSideThread(props: { threadId: string }) {
             factsAbove={turnSteps.factsAbove}
             activeSteps={turnSteps.activeSteps()}
             stepsOpenByDefault={showAgentSteps()}
+            onCopyMessage={(message) => void copyMessage(message)}
+            copiedMessageId={copiedMessageId()}
+            onBranch={branch()}
+            branchSource={branchSource(current().thread, current().agent.name)}
           />
         )}
       </Show>

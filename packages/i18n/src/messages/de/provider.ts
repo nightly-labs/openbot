@@ -40,7 +40,7 @@ export const messages = {
   "provider.status.checking": "Wird geprüft",
   "provider.status.off": "Aus",
   "provider.gemini.hostSignIn":
-    "Um Gemini zu verbinden, öffne OpenBot auf dem Host und wähle „Verbinden“ unter Einstellungen > Anbieter. Die Google-Anmeldung benötigt einen Browser auf diesem Host. Eine Remote-Anmeldung wird nicht unterstützt.",
+    "Um Gemini zu verbinden, öffne OpenBot auf dem Host und wähle „Verbinden“ unter Servereinstellungen > Anbieter. Die Google-Anmeldung benötigt einen Browser auf diesem Host. Eine Remote-Anmeldung wird nicht unterstützt.",
   "provider.key.free": "Kostenlos",
   "provider.action.connect": "Verbinden",
   "provider.action.reconnect": "Neu verbinden",
@@ -55,6 +55,7 @@ export const messages = {
   "provider.action.signIn": "Anmelden",
   "provider.action.apiKey": "API-Schlüssel",
   "provider.action.signInWithCode": "Mit Code anmelden",
+  "provider.action.signInMainlandChina": "Mit {site} anmelden (China)",
   "provider.action.pasteAddress": "Adresse einfügen",
   "provider.aria.download": "{name} herunterladen",
   "provider.aria.cancel": "{name} abbrechen",
@@ -124,6 +125,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, Standard",
   "provider.picker.effort": "Aufwand",
   "provider.picker.effortLabel": "Denkaufwand des Agenten",
+  "provider.picker.effortFixed": "{effort}, festgelegt von {provider}",
   "provider.picker.fast": "Schnell",
   "provider.picker.fastLabel": "Schnellmodus",
   "provider.picker.selectEffort": "Aufwand auswählen",
@@ -132,11 +134,14 @@ export const messages = {
   "provider.status.signInRequired": "Anmeldung erforderlich",
   "provider.model.free": "Kostenlos",
   "provider.model.default": "Standard",
+  "provider.effort.none": "Keine",
+  "provider.effort.minimal": "Minimal",
   "provider.effort.low": "Niedrig",
   "provider.effort.medium": "Mittel",
   "provider.effort.high": "Hoch",
   "provider.effort.xhigh": "Sehr hoch",
   "provider.effort.max": "Maximal",
+  "provider.effort.ultra": "Ultra",
   "provider.museKey.title": "Meta-API-Schlüssel für Muse",
   "provider.museKey.description":
     "Speichere einen Meta-API-Schlüssel auf dem Host oder melde dich mit der Muse CLI an.",
@@ -210,6 +215,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot meldet {provider} auf diesem Computer ab. Die {provider}-CLI in deinem Terminal wird auch abgemeldet.",
   "provider.settings.disconnectHost": "OpenBot meldet {provider} auf dem Server ab.",
+  "provider.settings.versionInstalledByUser": "{version} · von dir installiert",
+  "provider.settings.versionDownloaded": "{version} · von OpenBot geladen",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Prompt-Cache",
   "provider.settings.promptCacheDescription":

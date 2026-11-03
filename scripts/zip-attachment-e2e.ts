@@ -88,7 +88,7 @@ async function run() {
     assert.equal(isOpenableAttachmentName("output.zip"), false);
     assert.doesNotThrow(() => assertSupportedAttachmentName("output.zip"));
     // A remote host without the zip-attachments capability does not get archives.
-    const oldHost = { eml: true, media: true, zip: false, mp4: true };
+    const oldHost = { eml: true, media: true, zip: false, mp4: true, svg: true };
     assert.equal(supportedAttachmentExtensions(oldHost).includes("zip"), false);
     assert.equal(isSupportedAttachmentNameFor("input.zip", oldHost), false);
     assert.equal(isSupportedAttachmentNameFor("input.zip", { ...oldHost, zip: true }), true);

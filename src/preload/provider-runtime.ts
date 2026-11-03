@@ -25,6 +25,7 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
       antigravity: decodeProviderRuntimeStatus(providers.antigravity),
       cursor: decodeProviderRuntimeStatus(providers.cursor),
       cline: decodeProviderRuntimeStatus(providers.cline),
+      kimi: decodeProviderRuntimeStatus(providers.kimi),
       pi: decodeProviderRuntimeStatus(providers.pi),
       muse: decodeProviderRuntimeStatus(providers.muse),
     },

@@ -40,7 +40,7 @@ export const noProvidersConnectedAgentStatus: AgentStatus = {
   message: "Connect ChatGPT or Claude to create a local agent.",
 };
 
-/** A new computer: no provider is downloaded yet, Gemini, Cursor and Cline included. */
+/** A new computer: no provider is downloaded yet, Gemini, Cursor, Cline and Kimi included. */
 export const lazyProviders: AgentProviderStatus[] = [
   ...(noProvidersConnectedAgentStatus.providers ?? []).map(
     ({ connectionState: _connectionState, ...provider }): AgentProviderStatus => ({
@@ -52,6 +52,7 @@ export const lazyProviders: AgentProviderStatus[] = [
   { id: "antigravity", state: "not-installed", version: null, message: null },
   { id: "cursor", state: "not-installed", version: null, message: null },
   { id: "cline", state: "not-installed", version: null, message: null },
+  { id: "kimi", state: "not-installed", version: null, message: null },
 ];
 export const lazyProviderAgentStatus: AgentStatus = { ...noProvidersConnectedAgentStatus, providers: lazyProviders };
 
@@ -62,6 +63,7 @@ const initialRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeStat
   antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
   cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
   cline: { phase: "not-downloaded", progress: null, message: null, version: null },
+  kimi: { phase: "not-downloaded", progress: null, message: null, version: null },
   pi: { phase: "not-downloaded", progress: null, message: null, version: null },
   muse: { phase: "not-downloaded", progress: null, message: null, version: null },
   opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
@@ -71,7 +73,11 @@ const initialRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeStat
 const downloadedAgentStatus: AgentStatus = {
   ...lazyProviderAgentStatus,
   providers: lazyProviders.map((provider) =>
-    provider.id === "opencode" || provider.id === "antigravity" || provider.id === "cursor" || provider.id === "cline"
+    provider.id === "opencode" ||
+    provider.id === "antigravity" ||
+    provider.id === "cursor" ||
+    provider.id === "cline" ||
+    provider.id === "kimi"
       ? provider
       : { ...provider, state: "sign-in-required" },
   ),

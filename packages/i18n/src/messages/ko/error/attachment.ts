@@ -15,5 +15,7 @@ export const messages = {
     "이 서버는 ZIP 첨부 파일을 지원하지 않아요. 호스트에서 OpenBot을 업데이트한 후 다시 시도해 주세요.",
   "error.attachment.mp4Unsupported":
     "이 서버는 MP4 첨부 파일을 지원하지 않아요. 호스트에서 OpenBot을 업데이트한 후 다시 시도해 주세요.",
+  "error.attachment.svgUnsupported":
+    "이 서버는 SVG 첨부 파일을 지원하지 않아요. 호스트에서 OpenBot을 업데이트한 후 다시 시도해 주세요.",
   "error.attachment.previewTooLarge": "파일이 100 MB 제한을 넘어요.",
 } as const satisfies PartialTranslation<typeof source>;

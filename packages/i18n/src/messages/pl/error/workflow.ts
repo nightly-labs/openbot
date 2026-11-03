@@ -25,6 +25,8 @@ export const messages = {
   "error.workflow.notRetryable": "Ponownie można uruchomić tylko krok, który się nie powiódł lub został zatrzymany.",
   "error.workflow.noDecision": "Ten krok nie czeka na decyzję.",
   "error.workflow.outputPlaceMissing": "Wybierz miejsce w komunikatorze dla tego wyjścia.",
+  "error.workflow.discordNoMessage":
+    "To wyjście działa na wiadomość z Discorda, która uruchomiła przepływ. Uruchom przepływ ze wzmianki na Discordzie albo wybierz Opublikuj na kanale.",
   "error.workflow.outputConnectionOff":
     "Połączenie komunikatora tego wyjścia jest wyłączone lub usunięte. Wybierz miejsce ponownie.",
   "error.workflow.outputNotRunning": "Połączenie komunikatora teraz nie działa. Spróbuj ponownie, gdy zacznie działać.",
@@ -36,4 +38,25 @@ export const messages = {
   "error.workflow.tooLargeToSend":
     "Ten workflow jest za duży, aby wysłać go na inny komputer. Otwórz go na komputerze, na którym działa serwer.",
   "error.workflow.webhookMissing": "Ten krok nie jest wyzwalaczem webhook. Zapisz przepływ pracy i spróbuj ponownie.",
+  "error.workflow.githubActionMissing": "Wybierz, co to wyjście robi w GitHub.",
+  "error.workflow.githubRepositoryMissing": "Wybierz repozytorium dla tego wyjścia.",
+  "error.workflow.githubItemMissing":
+    "To wyjście nie ma zgłoszenia ani pull requestu. Uruchom przepływ ze zdarzenia GitHub albo wpisz numer na jego wejściu.",
+  "error.workflow.githubPullRequestOnly": "Ta akcja działa tylko dla pull requestów.",
+  "error.workflow.githubTextMissing": "To wyjście nie ma tekstu do wysłania. Połącz krok, który go pisze.",
+  "error.workflow.githubEventText":
+    "To wyjście nie może wysłać surowego zdarzenia wyzwalacza. Umieść agenta między wyzwalaczem a tym wyjściem.",
+  "error.workflow.githubChoiceMissing": "Wybierz etykiety lub osobę dla tego wyjścia.",
+  "error.workflow.githubChoseNothing": "Model nie wybrał żadnej etykiety ani osoby z tego repozytorium.",
+  "error.workflow.githubNotConnected": "Połącz GitHub na komputerze, na którym działa ten przepływ pracy.",
+  "error.workflow.githubNoAccess":
+    "OpenBot GitHub App nie widzi tego repozytorium ani elementu. Otwórz GitHub i daj jej dostęp.",
+  "error.workflow.githubNoWrite":
+    "OpenBot GitHub App nie może zmieniać tego repozytorium. Otwórz GitHub i daj jej dostęp.",
+  "error.workflow.githubLocked": "Ta rozmowa jest zablokowana w GitHub.",
+  "error.workflow.githubRefused": "GitHub odrzucił zmianę: {detail}",
+  "error.workflow.githubUnreachable": "OpenBot nie mógł połączyć się z GitHub. Uruchom krok ponownie.",
+  "error.workflow.githubUncertain":
+    "Zmiana zatrzymała się w drodze. Może już być w GitHub. Sprawdź tam, zanim ponownie uruchomisz krok.",
+  "error.workflow.githubNoEvent": "W GitHub nie ma zgłoszenia ani pull requestu, dla którego startuje ten wyzwalacz.",
 } as const satisfies PartialTranslation<typeof source>;

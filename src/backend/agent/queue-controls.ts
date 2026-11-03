@@ -236,7 +236,7 @@ export class QueueControls {
         throw new Error(sourceText("error.backend.steerQueuedOnly"));
       const turnId = snapshot.activeTurnId;
       // Steering uses the running turn's endpoint even when the saved model has changed.
-      if (!this.#endpoints.serves(this.#drain.modelForTurn(agent.id, turnId) ?? agent.model))
+      if (!this.#endpoints.serves(this.#drain.modelForTurn(agent.id, turnId) ?? agent.model, client.provider))
         throw new Error(REMOVED_ENDPOINT_MESSAGE);
       return { client, session, snapshot, context, turnId, taskThreadId };
     });

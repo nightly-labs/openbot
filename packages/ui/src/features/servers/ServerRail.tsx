@@ -1,6 +1,15 @@
 import type { HostedServerSleep, ServerConnectionState, ServerSummary } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
-import { BellOff, buttonVariants, ContextMenu, DropdownMenu, Plus, ServerGradientLogo, Tooltip } from "@openbot/ui";
+import {
+  BellOff,
+  buttonVariants,
+  ContextMenu,
+  DropdownMenu,
+  Eye,
+  Plus,
+  ServerGradientLogo,
+  Tooltip,
+} from "@openbot/ui";
 import { createEffect, createSignal, createStore, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
@@ -60,15 +69,24 @@ export function ServerSleepDot(props: { server: Pick<ServerSummary, "hostedSleep
   );
 }
 
+/** The server on this computer while the user hides it from the server list, and the action that shows it again. */
+export interface HiddenLocalServer {
+  name: string;
+  show: () => void;
+}
+
 interface ServerRailProps extends ServerActionCallbacks {
   servers: ServerSummary[];
   onSelect: (serverId: string) => void;
   onReorder: (serverIds: string[]) => void;
-  onAdd: () => void;
+  /** Without it, the rail has no add button. */
+  onAdd?: (() => void) | undefined;
   /** True when the plus button opens the hosted server plans, where the user can also join with an invite. */
   addCreatesServer?: boolean | undefined;
   /** Opens the dialog that creates a server on this computer. With it, the plus button opens a menu. */
   onCreateLocal?: (() => void) | undefined;
+  /** The server on this computer while the user hides it. With it, the plus button opens a menu. */
+  hiddenLocal?: HiddenLocalServer | undefined;
 }
 
 interface DragSlot {
@@ -280,8 +298,10 @@ export function ServerRail(props: ServerRailProps) {
               canRestart={props.canRestart}
               onRemove={props.onRemove}
               canRemove={props.canRemove}
+              onHide={props.onHide}
+              canHide={props.canHide}
               onSetMuted={props.onSetMuted}
-              onSetNotificationLevel={props.onSetNotificationLevel}
+              onOpenNotificationSettings={props.onOpenNotificationSettings}
             />
           )}
         </For>
@@ -332,8 +352,10 @@ export function ServerRail(props: ServerRailProps) {
                     canRestart={props.canRestart}
                     onRemove={props.onRemove}
                     canRemove={props.canRemove}
+                    onHide={props.onHide}
+                    canHide={props.canHide}
                     onSetMuted={props.onSetMuted}
-                    onSetNotificationLevel={props.onSetNotificationLevel}
+                    onOpenNotificationSettings={props.onOpenNotificationSettings}
                     onMove={(direction) => moveServer(server().id, direction)}
                   />
                 </li>
@@ -341,33 +363,40 @@ export function ServerRail(props: ServerRailProps) {
             </For>
           </ul>
         </Show>
-        <Show
-          when={props.onCreateLocal}
-          fallback={
-            <Tooltip.Root
-              placement="right"
-              gutter={10}
-              openDelay={SERVER_RAIL_TOOLTIP_OPEN_DELAY}
-              closeDelay={0}
-              skipDelayDuration={300}
-            >
-              <Tooltip.Trigger
-                type="button"
-                class={`${buttonVariants({ variant: "outline", size: "sm" })} server-rail-button server-rail-action`}
-                aria-label={t(addServerLabel(props))}
-                data-cuelume-open=""
-                data-cuelume-emphasis="subtle"
-                onClick={props.onAdd}
+        <Show when={props.onAdd}>
+          <Show
+            when={props.onCreateLocal || props.hiddenLocal}
+            fallback={
+              <Tooltip.Root
+                placement="right"
+                gutter={10}
+                openDelay={SERVER_RAIL_TOOLTIP_OPEN_DELAY}
+                closeDelay={0}
+                skipDelayDuration={300}
               >
-                <span class="server-rail-monogram">+</span>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Content class="server-rail-tooltip">{t(addServerLabel(props))}</Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-          }
-        >
-          {(onCreateLocal) => <ServerRailAddMenu onAdd={props.onAdd} onCreateLocal={onCreateLocal()} />}
+                <Tooltip.Trigger
+                  type="button"
+                  class={`${buttonVariants({ variant: "outline", size: "sm" })} server-rail-button server-rail-action`}
+                  aria-label={t(addServerLabel(props))}
+                  data-cuelume-open=""
+                  data-cuelume-emphasis="subtle"
+                  onClick={() => props.onAdd?.()}
+                >
+                  <span class="server-rail-monogram">+</span>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                  <Tooltip.Content class="server-rail-tooltip">{t(addServerLabel(props))}</Tooltip.Content>
+                </Tooltip.Portal>
+              </Tooltip.Root>
+            }
+          >
+            <ServerRailAddMenu
+              addLabel={addServerLabel(props)}
+              onAdd={() => props.onAdd?.()}
+              onCreateLocal={props.onCreateLocal}
+              hiddenLocal={props.hiddenLocal}
+            />
+          </Show>
         </Show>
         <span class="sr-only" aria-live="polite">
           {announcement()}
@@ -377,8 +406,16 @@ export function ServerRail(props: ServerRailProps) {
   );
 }
 
-/** The plus button when a server can also run on this computer: a menu with both ways to add one. */
-function ServerRailAddMenu(props: { onAdd: () => void; onCreateLocal: () => void }) {
+/**
+ * The plus button when a server can also run on this computer, or when the user hides the server on this
+ * computer: a menu with the ways to add a server, and the item that shows the hidden server again.
+ */
+function ServerRailAddMenu(props: {
+  addLabel: AppTextKey;
+  onAdd: () => void;
+  onCreateLocal?: (() => void) | undefined;
+  hiddenLocal?: HiddenLocalServer | undefined;
+}) {
   const { t } = useText();
   const [tooltipOpen, setTooltipOpen] = createSignal(false);
   const [menuOpen, setMenuOpen] = createSignal(false);
@@ -408,14 +445,28 @@ function ServerRailAddMenu(props: { onAdd: () => void; onCreateLocal: () => void
                 <span class="server-menu-add-circle" aria-hidden="true">
                   <Plus />
                 </span>
-                <span>{t("server.rail.addRemote")}</span>
+                <span>{t(props.addLabel)}</span>
               </DropdownMenu.Item>
-              <DropdownMenu.Item class="server-menu-add" onSelectAfterClose={props.onCreateLocal}>
-                <span class="server-menu-add-circle" aria-hidden="true">
-                  <Plus />
-                </span>
-                <span>{t("server.local.createTitle")}</span>
-              </DropdownMenu.Item>
+              <Show when={props.onCreateLocal}>
+                {(onCreateLocal) => (
+                  <DropdownMenu.Item class="server-menu-add" onSelectAfterClose={onCreateLocal()}>
+                    <span class="server-menu-add-circle" aria-hidden="true">
+                      <Plus />
+                    </span>
+                    <span>{t("server.local.createTitle")}</span>
+                  </DropdownMenu.Item>
+                )}
+              </Show>
+              <Show when={props.hiddenLocal}>
+                {(hiddenLocal) => (
+                  <DropdownMenu.Item class="server-menu-add" onSelectAfterClose={hiddenLocal().show}>
+                    <span class="server-menu-add-circle" aria-hidden="true">
+                      <Eye />
+                    </span>
+                    <span>{t("server.rail.showLocal", { name: hiddenLocal().name })}</span>
+                  </DropdownMenu.Item>
+                )}
+              </Show>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
@@ -522,7 +573,7 @@ function ServerRailButton(
                 server={props.server}
                 trigger={() => trigger}
                 onSetMuted={props.onSetMuted}
-                onSetNotificationLevel={props.onSetNotificationLevel}
+                onOpenNotificationSettings={props.onOpenNotificationSettings}
                 onOpenSettings={props.onOpenSettings}
                 onLeave={props.onLeave}
                 onDelete={props.onDelete}
@@ -531,6 +582,8 @@ function ServerRailButton(
                 canRestart={props.canRestart}
                 onRemove={props.onRemove}
                 canRemove={props.canRemove}
+                onHide={props.onHide}
+                canHide={props.canHide}
               />
             </ContextMenu.Content>
           </ContextMenu.Portal>
@@ -548,7 +601,7 @@ function ServerRailButton(
   );
 }
 
-export function ServerMark(props: { server: ServerSummary }) {
+export function ServerMark(props: { server: Pick<ServerSummary, "id" | "logoUrl"> }) {
   const [failed, setFailed] = createSignal(false);
   createEffect(
     () => props.server.logoUrl,

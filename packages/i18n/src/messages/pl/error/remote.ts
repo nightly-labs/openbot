@@ -90,6 +90,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "Przesyłanie pliku WebRTC nie powiodło się.",
   "error.remote.fileResumeFailed": "Nie udało się wznowić przesyłania pliku WebRTC przed upływem terminu.",
   "error.remote.fileTransportStopped": "Transport plików WebRTC zatrzymał się.",
+  "error.remote.downloadStopped": "Pobieranie zostało zatrzymane.",
   "error.remote.fileResumeExpired": "Termin wznowienia przesyłania pliku WebRTC upłynął.",
   "error.remote.hostRequestFailed": "Host nie mógł ukończyć żądania.",
   "error.remote.responseTooLarge": "Odpowiedź hosta jest za duża, aby wysłać ją na to urządzenie.",
@@ -123,7 +124,6 @@ export const messages = {
   "error.remote.serverDisconnected": "Serwer rozłączył się.",
   "error.remote.preferencesUnreadable": "Nie udało się odczytać zapisanych preferencji czatu.",
   "error.remote.accountAuthRequired": "Wymagane jest uwierzytelnienie konta.",
-  "error.remote.serverIdentityChanged": "Tożsamość serwera zmieniła się. Zaufany klucz hosta nie zostanie zastąpiony.",
   "error.remote.pairedIdentityChanged":
     "Tożsamość sparowanego komputera nie istnieje lub zmieniła się. Zeskanuj nowy kod z tego komputera.",
   "error.remote.permanentInviteNoEmail": "Stałych zaproszeń nie można wysyłać e-mailem.",
@@ -195,4 +195,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Zaktualizuj ten serwer desktopowy, aby usuwać kanały.",
   "error.remote.historyRefreshFailed": "Wiadomość została wysłana, ale nie udało się odświeżyć historii czatu.",
   "error.remote.taskHistoryRefreshFailed": "Zadanie zostało zmienione, ale nie udało się odświeżyć historii czatu.",
+  "error.remote.localServerAccountRemovalFailed":
+    "Serwer został usunięty na swoim komputerze, ale konto nadal go pokazuje. Usuń go ponownie, aby usunąć go z konta.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -79,9 +79,10 @@ export class DynamicIslandWindowController {
     this.#options = options;
   }
 
+  // Reads only the saved preference. The caller starts `reconcileWindow`, so the island page loads do
+  // not hold back the main window.
   readonly initialize = Effect.fn("DynamicIsland.initialize")(function* (this: DynamicIslandWindowController) {
     this.#preference = yield* readDynamicIslandPreference(this.#options.preferencePath);
-    yield* this.reconcileWindow();
   }).bind(this);
 
   get preference(): DynamicIslandPreference {

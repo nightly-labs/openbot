@@ -426,6 +426,18 @@ export class ContextCompaction {
     this.#clearTimer(threadId);
   }
 
+  /**
+   * The thread was deleted, so no turn of it ends its compaction or a refusal hold. Its hold stayed
+   * until a restart, and the agent's own chat, to which a deleted session maps, waited behind it.
+   */
+  endThread(threadId: string): void {
+    const compaction = this.#compacting.get(threadId);
+    this.#compacting.delete(threadId);
+    this.forgetThread(threadId);
+    this.#endRefusal(threadId);
+    if (compaction) this.#scheduleDrain(compaction.agentId);
+  }
+
   forgetAgent(agentId: string): void {
     for (const [threadId, compaction] of this.#compacting)
       if (compaction.agentId === agentId) this.#compacting.delete(threadId);

@@ -32,9 +32,11 @@ const rowCallbacks = {
 };
 const onReply = fn();
 const onCopy = fn();
+const onMarkUnread = fn();
+const onBranch = fn();
 
 /** A message row with the action row and the right-click menu, as the timeline draws it. */
-function MenuRow(props: { message: AgentMessage; channel?: boolean }) {
+function MenuRow(props: { message: AgentMessage; channel?: boolean; busy?: boolean }) {
   const [state, setState] = createStore<{
     reaction: MessageReaction | undefined;
     reading: boolean;
@@ -55,6 +57,8 @@ function MenuRow(props: { message: AgentMessage; channel?: boolean }) {
     onReply,
     onCopy,
   };
+  /** Only the last answer of a turn in an agent chat branches. */
+  const branch = () => (own() || props.channel ? undefined : onBranch);
   const readAloud = () =>
     own()
       ? undefined
@@ -87,10 +91,22 @@ function MenuRow(props: { message: AgentMessage; channel?: boolean }) {
           }
           onExpandEmoji={fn()}
           readAloud={readAloud()}
+          onBranch={branch()}
+          branchDisabled={props.busy}
           {...actions}
         />
       }
-      menu={() => <MessageMenu message={message()} reactions={!props.channel} readAloud={readAloud()} {...actions} />}
+      menu={() => (
+        <MessageMenu
+          message={message()}
+          reactions={!props.channel}
+          readAloud={readAloud()}
+          onMarkUnread={own() || props.channel ? undefined : onMarkUnread}
+          onBranch={branch()}
+          branchDisabled={props.busy}
+          {...actions}
+        />
+      )}
     />
   );
 }
@@ -103,7 +119,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Right-click a message, or press Shift+F10 in its action row. React opens a submenu. */
+/**
+ * Right-click a message, or press Shift+F10 in its action row. React opens a submenu. The last
+ * answer of a turn also has Branch from here, and an agent message has Mark unread.
+ */
 export const AgentChat: Story = {
   render: () => (
     <main class="foundation-story">
@@ -113,7 +132,16 @@ export const AgentChat: Story = {
   ),
 };
 
-/** A channel message has no reactions, so the menu leaves React out. */
+/** While a turn runs, Branch shows but is disabled. */
+export const TurnRuns: Story = {
+  render: () => (
+    <main class="foundation-story">
+      <MenuRow message={agentMessage} busy />
+    </main>
+  ),
+};
+
+/** A channel message has no reactions and no branch, so the menu leaves them out. */
 export const Channel: Story = {
   render: () => (
     <main class="foundation-story">

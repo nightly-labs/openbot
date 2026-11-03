@@ -13,6 +13,7 @@ import { isBoolean } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
+import { memberAuditName } from "../server-audit-store";
 import type { TeamStore } from "../team-store";
 import type { TeamApiBrowser, TeamApiBrowserView, TeamApiRemoteScreen } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -73,7 +74,8 @@ export async function routeTeam(
   }
 
   async function removeMember(memberId: string): Promise<void> {
-    if (removeHostMember && hostChanges(memberId)) return runCauseEffect(removeHostMember(memberId));
+    if (removeHostMember && hostChanges(memberId))
+      return runCauseEffect(removeHostMember(memberId, memberAuditName(member)));
     await runCauseEffect(store.removeMember(memberId));
     await (remoteScreen ? runCauseEffect(remoteScreen.revokeMember(memberId)) : undefined);
     browser?.releaseUserControlHeldBy({ kind: "member", memberId });
@@ -162,7 +164,7 @@ export async function routeTeam(
       ...(disabled === undefined ? {} : { disabled }),
     };
     if (updateMember && hostChanges(memberId))
-      return json(200, await runCauseEffect(updateMember({ memberId, ...patch })));
+      return json(200, await runCauseEffect(updateMember({ memberId, ...patch }, memberAuditName(member))));
     const updated = await runCauseEffect(store.updateMember(memberId, patch));
     if (updated.disabled) {
       await (remoteScreen ? runCauseEffect(remoteScreen.revokeMember(updated.id)) : undefined);

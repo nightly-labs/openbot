@@ -3,6 +3,7 @@
 
 import {
   CUSTOM_PROVIDER_LIMITS,
+  type CustomProviderHarness,
   type CustomProviderRestart,
   type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
@@ -35,6 +36,8 @@ export type DetectedProvider =
       keyStored?: boolean | undefined;
       /** For a saved endpoint: the names of its saved headers, whose values an empty field keeps. */
       savedHeaderNames?: readonly string[] | undefined;
+      /** For a saved endpoint: the provider that runs it, which Edit opens with. */
+      harness?: CustomProviderHarness | undefined;
     })
   | (DetectedBase & {
       kind: "agent";
@@ -92,9 +95,12 @@ export function detectedLocation(provider: DetectedProvider): string {
  */
 export function detectedModelsDraft(provider: Extract<DetectedProvider, { kind: "models" }>): CustomProviderDraft {
   const source = provider.added && provider.savedModels ? provider.savedModels : provider.models;
-  const models = source
-    .slice(0, CUSTOM_PROVIDER_LIMITS.models)
-    .map((model) => ({ id: model.id, name: model.name ?? "", contextWindow: model.contextWindow?.toString() ?? "" }));
+  const models = source.slice(0, CUSTOM_PROVIDER_LIMITS.models).map((model) => ({
+    id: model.id,
+    name: model.name ?? "",
+    contextWindow: model.contextWindow?.toString() ?? "",
+    maxOutput: model.maxOutput?.toString() ?? "",
+  }));
   return {
     providerId: provider.id,
     displayName: provider.name,
@@ -102,6 +108,7 @@ export function detectedModelsDraft(provider: Extract<DetectedProvider, { kind: 
     apiKey: "",
     models: models.length > 0 ? models : [{ id: "", name: "" }],
     headers: savedHeaderDrafts(provider.added ? provider.savedHeaderNames : undefined),
+    ...(provider.added && provider.harness ? { harness: provider.harness } : {}),
   };
 }
 

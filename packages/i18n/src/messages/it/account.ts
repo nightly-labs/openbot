@@ -101,4 +101,5 @@ export const messages = {
   "account.language.previous": "Lingua precedente",
   "account.language.next": "Lingua successiva",
   "account.language.continue": "Continua",
+  "account.language.change": "Cambia lingua",
 } as const satisfies PartialTranslation<typeof source>;

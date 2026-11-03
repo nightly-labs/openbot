@@ -346,10 +346,11 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
           query: new URLSearchParams({ after: request.after, limit: String(request.limit) }),
         }).pipe(Effect.flatMap((value) => decode(historySchema, value)));
         const botUserId = state.botUserId;
+        const botRoleId = state.botRoleId(request.guildId);
         return {
           messages: messages
             .map((message) => {
-              const body = messageBody(message, botUserId);
+              const body = messageBody(message, botUserId, botRoleId);
               return {
                 id: message.id,
                 authorId: message.author.id,

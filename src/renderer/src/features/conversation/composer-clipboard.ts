@@ -10,6 +10,7 @@ import { expandComposerMentions } from "@openbot/ui/features/conversation/Compos
 import { currentText } from "@openbot/ui/text";
 import { Option, Schema } from "effect";
 import { writeClipboardText } from "../../clipboard";
+import { keptSpaces } from "../../selection-copy";
 
 // Follows T3's context-fragment design: keep file bytes outside the clipboard payload and retain
 // the latest copy independently of the source draft. No source paths or URLs come from a paste.
@@ -96,11 +97,15 @@ export function copiedFileRead(id: string): Promise<void> {
 }
 
 // The async clipboard API writes no custom MIME type, so the copy ID is in the HTML for both copy paths.
+// A `div` with line breaks and kept spaces, not a `pre`, so that another app pastes normal text, not code.
 function fragmentHtml(copy: ComposerCopy, plainText: string): string {
-  const pre = document.createElement("pre");
-  pre.setAttribute(HTML_ATTRIBUTE, encodeURIComponent(JSON.stringify({ version: 1, copyId: copy.id })));
-  pre.textContent = plainText;
-  return pre.outerHTML;
+  const element = document.createElement("div");
+  element.setAttribute(HTML_ATTRIBUTE, encodeURIComponent(JSON.stringify({ version: 1, copyId: copy.id })));
+  plainText.split("\n").forEach((line, index) => {
+    if (index > 0) element.append(document.createElement("br"));
+    element.append(keptSpaces(line));
+  });
+  return element.outerHTML;
 }
 
 /**

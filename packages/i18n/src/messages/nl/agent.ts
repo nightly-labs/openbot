@@ -14,6 +14,8 @@ export const messages = {
   "agent.setup.name": "Naam",
   "agent.setup.purpose": "Waarmee moet deze agent helpen?",
   "agent.setup.purposePlaceholder": "Reizen plannen, opties vergelijken of helpen met dagelijks werk.",
+  "agent.description.tooLong":
+    "Kort de beschrijving in tot {limit} tekens. Een langere beschrijving wordt niet opgeslagen.",
   "agent.instructions.length": "{length} / {limit}",
   "agent.instructions.tooLong":
     "Kort de instructies in tot {limit} tekens. Langere instructies worden niet opgeslagen.",
@@ -63,7 +65,6 @@ export const messages = {
   "agent.error.adminOnly": "Alleen een serverbeheerder kan agentinstellingen wijzigen.",
   "agent.error.continueFailed": "De agent kan niet doorgaan. Probeer het opnieuw.",
   "agent.error.mcpNotStarted": "MCP-server niet gestart",
-  "agent.error.codexConfigIgnored": "Waarschuwing over Codex-configuratie",
   "agent.error.provider": "Fout bij aanbieder",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "Fout bij {provider}",

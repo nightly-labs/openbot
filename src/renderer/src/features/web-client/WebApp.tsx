@@ -2,10 +2,17 @@ import { agentTemplateIdFromWebAppSearch, WEB_APP_AGENT_TEMPLATE_PARAM } from "@
 import { type FirstTouch, readFirstTouch } from "@openbot/contracts/first-touch";
 import { inviteUrlFromWebAppSearch, WEB_APP_INVITE_FIELDS } from "@openbot/contracts/invite-links";
 import type { AppVariant, CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
+import {
+  type MarketplaceListingLink,
+  marketplaceListingFromWebAppSearch,
+  WEB_APP_MARKETPLACE_AGENT_PARAM,
+  WEB_APP_MARKETPLACE_SKILL_PARAM,
+} from "@openbot/contracts/marketplace-links";
 import { pluginSlugFromWebAppSearch, WEB_APP_PLUGIN_PARAM } from "@openbot/contracts/plugin-links";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
+import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { classifyFailure } from "@openbot/telemetry";
 import { NotificationObserver, Toaster, toast } from "@openbot/ui";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
@@ -14,9 +21,22 @@ import { currentText } from "@openbot/ui/text";
 import { Dynamic } from "@solidjs/web";
 import { createEffect, createSignal, createStore, onSettled, Show } from "solid-js";
 import type { DesktopAnalyticsProperties } from "../../analytics";
-import { configureWebReports, reportNotification } from "../../error-reports";
+import {
+  configureWebReports,
+  reportNotification,
+  setWebAccountPending,
+  setWebReportsEnabled,
+  webAccountPending,
+  webKeepsOff,
+  webReportsAgreed,
+  webReportsEnabled,
+} from "../../error-reports";
 import { StaticI18nProvider } from "../../i18n-context";
+import { AnalyticsConsentRow, ConsentNotice } from "../onboarding/AnalyticsConsent";
+import { createOnboardingTeam, onboardingSessionSeed } from "../onboarding/onboarding-avatars";
+import { deleteRemoteWorkspaceFrames } from "../servers/remote-workspace-frame";
 import type { WebWorkspace } from "./WebWorkspace";
+import { createWebAccountCalls } from "./web-account";
 import { createWebAppearancePreference } from "./web-appearance-preference";
 import { takeWebAppStart, WEB_APP_BILLING_PARAM, type WebAppStart } from "./web-billing";
 import type { WebRuntimeFactory } from "./web-client-context";
@@ -27,8 +47,8 @@ import { createWebLanguagePreference } from "./web-language-preference";
 export { loadSavedLanguage } from "./web-language-preference";
 
 /**
- * The workspace is its own chunk, so the sign-in screen does not wait for it. A signed-in account
- * loads it after the session check; the sign-in screen loads it after it shows. A failed import is
+ * The workspace is its own chunk, so the sign-in screen does not wait for it. Each session check
+ * starts it beside the session request; a signed-in account waits for both. A failed import is
  * tried again on the next check.
  */
 let workspaceImport: Promise<typeof WebWorkspace> | null = null;
@@ -80,6 +100,20 @@ function takePluginLink(): string | null {
   url.searchParams.delete(WEB_APP_PLUGIN_PARAM);
   window.history.replaceState(window.history.state, "", url);
   return slug;
+}
+
+/**
+ * The agent or skill a `/app?marketplaceAgent=<id>` or `/app?marketplaceSkill=<slug>` link names.
+ * The query is removed after it is read.
+ */
+function takeMarketplaceLink(): MarketplaceListingLink | null {
+  const url = new URL(window.location.href);
+  const params = [WEB_APP_MARKETPLACE_AGENT_PARAM, WEB_APP_MARKETPLACE_SKILL_PARAM];
+  if (!params.some((param) => url.searchParams.has(param))) return null;
+  const link = marketplaceListingFromWebAppSearch(url.search);
+  for (const param of params) url.searchParams.delete(param);
+  window.history.replaceState(window.history.state, "", url);
+  return link;
 }
 
 type BillingReturn = DesktopAnalyticsProperties<"billing_return_viewed">;
@@ -138,9 +172,22 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     },
   );
   // Kept here, not in the workspace, so each link waits through sign-in.
+  // Before a session check, so a signed-out browser gets the saved answer or its regional default.
+  // A browser that agreed once keeps its answer: the sign-in screen does not show the box again.
+  const [analyticsAgreed, setAnalyticsAgreed] = createSignal(webReportsAgreed());
+  const [analyticsChoice, setAnalyticsChoice] = createSignal(webReportsEnabled());
+  // Only a box that the user changed is a choice for the account; a regional default is not.
+  let analyticsTouched = false;
+  // After a sign-out, the sign-in screen starts again from the saved answer of this browser.
+  function resetAnalyticsBox() {
+    setAnalyticsAgreed(webReportsAgreed());
+    setAnalyticsChoice(webReportsEnabled());
+    analyticsTouched = false;
+  }
   const [agentTemplateId, setAgentTemplateId] = createSignal(takeAgentTemplateLink());
   const [inviteUrl, setInviteUrl] = createSignal(takeInviteLink());
   const [pluginSlug, setPluginSlug] = createSignal(takePluginLink());
+  const [marketplaceListing, setMarketplaceListing] = createSignal(takeMarketplaceLink());
   const [startLink, setStartLink] = createSignal(takeStartLink());
   const initialBillingReturn = takeBillingReturn();
   const initialHostingReturn = takeHostingReturn();
@@ -169,11 +216,14 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   let sessionEnded = false;
   function clearSession(ended = true) {
     sessionEnded = ended;
+    // The saved workspace frames name the agents of the account's servers.
+    if (ended) deleteRemoteWorkspaceFrames(null);
     sessionGeneration += 1;
     setState((draft) => {
       draft.account = null;
       draft.login = { status: "signed_out" };
     });
+    resetAnalyticsBox();
   }
   const accountFetch: typeof fetch = async (input, init) => {
     const generation = sessionGeneration;
@@ -190,6 +240,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     }
     return response;
   };
+  const accountCalls = createWebAccountCalls(accountFetch, checkSession);
   async function request(
     path: string,
     body?:
@@ -254,17 +305,37 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       email: value.user.email,
       name: isString(value.user.name) ? value.user.name : null,
       avatarUrl: isString(value.user.avatarUrl) ? value.user.avatarUrl : null,
+      analyticsEnabled: isBoolean(value.user.analyticsEnabled) ? value.user.analyticsEnabled : null,
     };
+  }
+  /**
+   * Keeps this browser and the account on the user's latest analytics answer. A choice that the
+   * account does not have yet goes to it; otherwise this browser follows the account's answer. An
+   * "off" from before the account kept answers does not follow an "on".
+   */
+  async function followAccountAnalytics(answer: boolean | null | undefined) {
+    const module = await import("./web-analytics");
+    if (webAccountPending()) return module.sendWebAnalyticsChoice(accountCalls);
+    if (answer === null || answer === undefined || answer === webReportsEnabled()) return;
+    if (answer && webKeepsOff()) return;
+    setWebReportsEnabled(answer);
+    module.followWebReportsPreference();
   }
   async function checkSession() {
     const generation = sessionGeneration;
+    // The workspace code loads beside the session check, not after it.
+    void loadWorkspace().catch(() => undefined);
     try {
-      const account = await showAccount(accountFrom(await request("session")));
+      const session = await request("session");
+      markRemoteSync("session");
+      const account = await showAccount(accountFrom(session));
+      markRemoteSync("workspace-code");
       if (!disposed && generation === sessionGeneration) {
         sessionEnded = false;
         setState((draft) => {
           draft.account = account;
         });
+        void followAccountAnalytics(account.analyticsEnabled).catch(() => undefined);
       }
     } catch (error) {
       if (!disposed && generation === sessionGeneration) {
@@ -291,6 +362,12 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   }
   async function start(email: string) {
     if (Date.now() < state.resendAt) throw new Error(text.t("webClient.login.wait"));
+    // A request for a code answers the analytics box and accepts the Terms of Service.
+    if (!analyticsAgreed()) {
+      setWebReportsEnabled(analyticsChoice());
+      if (analyticsTouched) setWebAccountPending(analyticsChoice());
+      import("./web-analytics").then((module) => module.followWebReportsPreference()).catch(() => undefined);
+    }
     const value = await signInRequest("email/start", { email });
     if (value === null) return;
     if (!isDynamicRecord(value) || !isString(value.challengeId) || typeof value.resendAt !== "number")
@@ -333,6 +410,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     setState((draft) => {
       draft.account = account;
     });
+    void followAccountAnalytics(account.analyticsEnabled).catch(() => undefined);
   }
   async function logout() {
     await request("logout", {});
@@ -359,6 +437,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     };
   });
   const variant: AppVariant = import.meta.env.DEV ? "dev" : "production";
+  const consentAgents = createOnboardingTeam(onboardingSessionSeed(), 3);
   const languagePreference = createWebLanguagePreference();
   const appearancePreference = createWebAppearancePreference();
   return (
@@ -386,6 +465,25 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
                       draft.resendAt = 0;
                     });
                   }}
+                  consent={
+                    <Show when={!analyticsAgreed()}>
+                      <AnalyticsConsentRow
+                        class="web-consent-row"
+                        checked={analyticsChoice()}
+                        agents={consentAgents}
+                        onChange={(checked) => {
+                          analyticsTouched = true;
+                          setAnalyticsChoice(checked);
+                        }}
+                      />
+                    </Show>
+                  }
+                  notice={
+                    <ConsentNotice
+                      onOpenTerms={() => window.open("/terms", "_blank", "noopener")}
+                      onOpenPrivacy={() => window.open("/privacy", "_blank", "noopener")}
+                    />
+                  }
                 />
               }
             >
@@ -407,6 +505,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
                   onInviteClose={() => setInviteUrl(null)}
                   pluginSlug={pluginSlug()}
                   onPluginSlugConsumed={() => setPluginSlug(null)}
+                  marketplaceListing={marketplaceListing()}
+                  onMarketplaceListingConsumed={() => setMarketplaceListing(null)}
                   start={startLink()}
                   onStartConsumed={() => setStartLink(null)}
                   billingReturn={billingReturn()}

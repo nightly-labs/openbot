@@ -49,6 +49,11 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const { format } = useText();
   const interfaceSizeLabel = (value: AppInterfaceSize | undefined) =>
     value === undefined ? "" : format.percent(value / 100);
+  /** macOS always keeps running after the window closes. There the switch moves OpenBot from the Dock to the menu bar. */
+  const backgroundRow = () =>
+    props.platform === "darwin"
+      ? ({ title: "settings.menuBar.title", description: "settings.menuBar.description" } as const)
+      : ({ title: "settings.keepRunning.title", description: "settings.keepRunning.description" } as const);
   return (
     <>
       <SettingsSection title={i18n.t("settings.appearance.title")}>
@@ -60,8 +65,9 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             </ItemContent>
             <ItemActions>
               <AppearanceSelect
-                value={appearance.appearance()}
-                onChange={appearance.changeAppearance}
+                value={appearance.theme()}
+                onChange={appearance.changeTheme}
+                palettes={appearance.palettes()}
                 mount={props.selectMount}
               />
             </ItemActions>
@@ -180,11 +186,11 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
           />
           <Show when={props.value.keepRunningInBackground !== null}>
             <SwitchField
-              data-settings-row="settings.keepRunning.title"
+              data-settings-row={backgroundRow().title}
               checked={props.value.keepRunningInBackground === true}
               onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
-              label={i18n.t("settings.keepRunning.title")}
-              description={i18n.t("settings.keepRunning.description")}
+              label={i18n.t(backgroundRow().title)}
+              description={i18n.t(backgroundRow().description)}
             />
           </Show>
           <Show when={props.value.keepAwake !== null}>

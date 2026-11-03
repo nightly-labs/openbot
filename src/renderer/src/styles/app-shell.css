@@ -338,7 +338,7 @@
 }
 
 .global-search-avatar.agent-avatar {
-  --agent-avatar-optical-offset: -1px;
+  --agent-avatar-optical-offset: calc(var(--openbot-icon-lg) * -0.14);
 
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
@@ -967,6 +967,8 @@ textarea {
   }
 
   .app-frame-edge .direct-conversation-person .person-avatar {
+    --agent-avatar-optical-offset: calc(26px * -0.14);
+
     width: 26px;
     height: 26px;
   }
@@ -1763,6 +1765,137 @@ textarea {
   min-height: 36px;
 }
 
+/* ---------------------------------------------------------------- folders */
+
+/* A custom section is a folder. Folders do not indent: a folder in a folder names its parent before
+   its own name. Folder headers stay at the top of the list while the chats under them scroll. */
+
+/* The header needs a solid fill so the rows do not show through it. It sticks 4px higher, over the
+   list's top padding, so no row shows above it. It keeps the 32px height of a section header. */
+.sidebar:not(.sidebar-compact) .sidebar-folder > header {
+  position: sticky;
+  top: -4px;
+  z-index: 2;
+  background: var(--openbot-bg-sidebar);
+}
+
+/* Each header sticks below the 32px headers of its parents. */
+.sidebar:not(.sidebar-compact) .sidebar-folder[data-depth="1"] > header {
+  top: calc(-4px + 32px);
+  z-index: 3;
+}
+
+.sidebar:not(.sidebar-compact) .sidebar-folder[data-depth="2"] > header {
+  top: calc(-4px + 64px);
+  z-index: 4;
+}
+
+/* The sticky header covers the top of the list, so the list keeps only its bottom fade. The top
+   fade would make the header partly transparent. */
+.agent-list.scroll-fade-top:has(.sidebar-folder):not(.scroll-fade-bottom) {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.agent-list.scroll-fade-top.scroll-fade-bottom:has(.sidebar-folder) {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) 0,
+    var(--openbot-text-primary) calc(100% - 18px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) 0,
+    var(--openbot-text-primary) calc(100% - 18px),
+    transparent 100%
+  );
+}
+
+/* The folder name starts in line with the avatars and the folder icon ends in line with the dates
+   (7px padding and the 1px button border). On hover, the header gets the fill of a row. */
+.sidebar-folder > header .sidebar-section-toggle {
+  padding-inline: calc(var(--openbot-space-2) - 1px);
+  color: var(--openbot-text-primary);
+}
+
+.sidebar-folder > header .sidebar-section-toggle:hover,
+.sidebar-folder > header .sidebar-section-toggle:focus-visible {
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-primary);
+}
+
+.sidebar-folder > header .sidebar-section-name {
+  font-weight: 600;
+}
+
+/* A folder in a folder has a lighter name, so the top folder stays the strongest line. */
+.sidebar-folder:not([data-depth="0"]) > header .sidebar-section-name {
+  font-weight: 500;
+}
+
+.sidebar-folder-parent {
+  color: var(--openbot-text-muted);
+  font-weight: 500;
+}
+
+.sidebar-folder-end {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.sidebar-folder-icon {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+}
+
+.sidebar-folder > header .sidebar-section-toggle:hover .sidebar-folder-icon {
+  color: var(--openbot-text-secondary);
+}
+
+.sidebar-folder-unread {
+  min-width: 18px;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The collapse grid has one column. Without a zero minimum, long names in a folder in a folder make
+   the column wider than the list. */
+.sidebar-folder > .sidebar-section-collapse {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* A folder body holds the chats of the folder first, then its folders. It clips instead of hiding
+   the overflow, so the headers of the folders in it can still stick. The spaces are those of a
+   section: 4px between rows, and 6px above a folder, as between sections. */
+.sidebar-folder > .sidebar-section-collapse > .sidebar-section-body {
+  min-width: 0;
+  overflow: clip;
+}
+
+.sidebar:not(.sidebar-compact) .sidebar-folder > .sidebar-section-collapse > .sidebar-section-body > .sidebar-folder {
+  margin-top: var(--openbot-space-1-5);
+}
+
+/* A folder that a drop goes into keeps the tint of a section drop target on its headers too: the
+   tint lies over their solid fill, so the rows under them still do not show. The outline lies over
+   the sticky headers. */
+.sidebar-folder.sidebar-section-agent-drop-target header {
+  background: linear-gradient(var(--openbot-accent-soft), var(--openbot-accent-soft)), var(--openbot-bg-sidebar);
+}
+
+.sidebar-folder.sidebar-section-agent-drop-target:not(.sidebar-section-drop-after)::after {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--openbot-accent-strong);
+  content: "";
+  pointer-events: none;
+}
+
 .sidebar-agent-drag-preview,
 .sidebar-person-drag-preview,
 .sidebar-section-drag-preview {
@@ -2425,12 +2558,22 @@ textarea {
   vector-effect: non-scaling-stroke;
 }
 
-/* A photo has no silhouette to stroke, so the same ring is an outline on its circle. */
+/* The plush body is a picture, not a path, so the same ring follows its edge as four offset shadows
+   in the surface colour. They sit on the whole drawing, in pixels, so the width matches the stroke. */
+.bloub-avatar-svg:has(> g > image) {
+  --agent-avatar-ring-color: var(--agent-avatar-outline, transparent);
+  --agent-avatar-ring-width: var(--agent-avatar-outline-width, 1.5px);
+
+  filter: drop-shadow(var(--agent-avatar-ring-width) 0 0 var(--agent-avatar-ring-color))
+    drop-shadow(calc(-1 * var(--agent-avatar-ring-width)) 0 0 var(--agent-avatar-ring-color))
+    drop-shadow(0 var(--agent-avatar-ring-width) 0 var(--agent-avatar-ring-color))
+    drop-shadow(0 calc(-1 * var(--agent-avatar-ring-width)) 0 var(--agent-avatar-ring-color));
+}
+
+/* A photo shows as the mobile app shows it: the image cropped to a circle, with no ring, border or
+   background added, so its edge and colours stay as the person chose them. */
 .agent-avatar-custom {
   overflow: hidden;
-  outline: var(--agent-avatar-outline-width, 1.5px) solid var(--agent-avatar-outline, transparent);
-  background: var(--openbot-hover);
-  box-shadow: inset 0 0 0 1px var(--openbot-border);
 }
 
 .agent-avatar-custom > img,
@@ -2441,21 +2584,9 @@ textarea {
   object-fit: cover;
 }
 
-/* A mood that flies rings. They sit outside the circle, so the parent stops
-   clipping and the image rounds itself instead. */
-.agent-avatar[data-avatar="image"]:is([data-mood="working"], [data-mood="connecting"]) {
-  position: relative;
-  overflow: visible;
-}
-
-.agent-avatar[data-avatar="image"]:is([data-mood="working"], [data-mood="connecting"]) > img {
-  border-radius: var(--openbot-radius-pill);
-}
-
-/* Breathing, as a scale on the whole avatar. It is deliberately not a silhouette
-   edit: the shape an agent is recognised by has to survive every mood, so the
-   only thing allowed to move here is the box the shape is drawn in. The amplitude
-   comes from the mood table, and 0 - every mood but `working` - holds still. */
+/* A photo has no face to move, so a busy agent's photo breathes: a slow scale of the whole circle.
+   The generated plush shows each mood on its own face and felt pieces, and gets none of this. The
+   custom property rides with the attribute, so a resting row starts no infinite animation. */
 .agent-avatar[data-breathe] {
   animation: agent-avatar-breathe 2.6s ease-in-out infinite;
 }
@@ -2471,23 +2602,8 @@ textarea {
   }
 }
 
-/* The mood glow. It reads before the face does at sidebar sizes, and it never
-   touches the Bloub's own colour, which is identity and comes from the seed. */
-.agent-avatar[data-mood="waiting"] {
-  filter: drop-shadow(0 0 3px var(--openbot-accent));
-}
-
-.agent-avatar[data-mood="failed"] {
-  filter: drop-shadow(0 0 3px var(--openbot-danger));
-}
-
-/* The glow would start outside the outline and leave a dark line round the face. A glowing face is
-   never in a group, so it has nothing to be cut out of. */
-.agent-avatar:is([data-mood="waiting"], [data-mood="failed"]) {
-  --agent-avatar-outline: transparent;
-}
-
-.agent-avatar[data-mood="asleep"] {
+/* A photo cannot close its eyes, so an asleep agent's photo fades instead. */
+.agent-avatar[data-avatar="image"][data-mood="asleep"] {
   opacity: 0.6;
 }
 
@@ -2497,20 +2613,8 @@ textarea {
   }
 }
 
-/* The rings reach 1.4 ball radii, which is the margin the Bloub viewBox carries
-   past its body: 316 units drawn over the 200 the image fills, so the layer is
-   158% of the avatar box and sits (158% - 100%) / 2 outside it on each side. */
-.agent-avatar > .agent-avatar-arcs {
-  position: absolute;
-  inset: -29%;
-  width: auto;
-  height: auto;
-  overflow: visible;
-  translate: none;
-}
-
 .agent-row .agent-avatar {
-  --agent-avatar-optical-offset: -5px;
+  --agent-avatar-optical-offset: calc(var(--agent-row-avatar-size) * -0.14);
 
   width: var(--agent-row-avatar-size);
   height: var(--agent-row-avatar-size);
@@ -2526,8 +2630,10 @@ textarea {
   z-index: var(--openbot-layer-popover);
   width: min(284px, calc(var(--settings-panel-width, 360px) - 30px));
   max-width: calc(100vw - 24px);
+  max-height: var(--kb-popper-content-available-height, none);
   margin: 0;
-  overflow: hidden;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-overlay);
@@ -2610,9 +2716,11 @@ textarea {
   opacity: 0.58;
 }
 
+/* The height follows the text: a hint that wraps to two lines must stay inside the padding. */
 .avatar-image-upload {
   display: grid;
   width: calc(100% - 20px);
+  height: auto;
   min-height: 64px;
   align-items: center;
   margin: 4px 10px 12px;
@@ -2682,10 +2790,12 @@ textarea {
   font-weight: 580;
 }
 
+/* Balanced, so the hint breaks into two even lines and no "·" is left alone at a line end. */
 .avatar-image-upload small {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 14px;
+  line-height: 15px;
+  text-wrap: balance;
 }
 
 .avatar-editor-actions button:active,
@@ -2700,8 +2810,13 @@ textarea {
   margin: 0;
   border: 0;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  padding: 7px 10px 12px;
+  gap: 4px;
+  padding: 4px 10px 12px;
+}
+
+/* Ten shapes fill two rows of five. */
+.avatar-shape-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .avatar-face-choice,
@@ -2719,7 +2834,7 @@ textarea {
 
 .avatar-face-choice {
   width: 100%;
-  height: 48px;
+  height: 44px;
 }
 
 .avatar-face-choice:hover,
@@ -2734,9 +2849,25 @@ textarea {
     0 1px 3px var(--openbot-shadow-popover-ambient);
 }
 
+/* The drawing keeps room above the body for the thinking dots, so the body sits low in its box.
+   The optical offset lifts it to the middle of the tile and of its selected outline. */
 .avatar-face-choice .agent-avatar {
-  width: 34px;
-  height: 34px;
+  --agent-avatar-optical-offset: calc(30px * -0.14);
+
+  width: 30px;
+  height: 30px;
+}
+
+/* The eyes are the only change in this grid, so its faces are larger. */
+.avatar-eyes-grid .avatar-face-choice {
+  height: 46px;
+}
+
+.avatar-eyes-grid .agent-avatar {
+  --agent-avatar-optical-offset: calc(38px * -0.14);
+
+  width: 38px;
+  height: 38px;
 }
 
 .avatar-color-grid {
@@ -2744,14 +2875,15 @@ textarea {
   min-width: 0;
   margin: 0;
   border: 0;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 5px;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 2px;
   padding: 4px 10px 12px;
 }
 
+/* Automatic and the eight colours fit one row. */
 .avatar-color-choice {
   width: 100%;
-  height: 40px;
+  height: 32px;
 }
 
 .avatar-color-swatch {
@@ -2770,7 +2902,8 @@ textarea {
   box-shadow: none;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
-  font-weight: 650;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .conversation-title .agent-avatar {

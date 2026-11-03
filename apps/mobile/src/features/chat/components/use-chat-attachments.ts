@@ -158,7 +158,8 @@ export function useChatAttachments(
     const current = itemsRef.current.find((item) => item.id === id);
     if (!current) return;
     let picked: { uri: string; name: string } | null = null;
-    if (current.mimeType.startsWith("image/")) {
+    // The photo library has no SVG files, so an SVG is replaced from the files.
+    if (current.mimeType.startsWith("image/") && current.mimeType !== "image/svg+xml") {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         quality: 1,

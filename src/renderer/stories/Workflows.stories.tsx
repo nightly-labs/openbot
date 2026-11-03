@@ -17,13 +17,17 @@ import { OutputNode } from "@openbot/ui/features/workflows/WorkflowOutputNode";
 import { PromptNode } from "@openbot/ui/features/workflows/WorkflowPromptNode";
 import { TextNode } from "@openbot/ui/features/workflows/WorkflowTextNode";
 import { TriggerNode } from "@openbot/ui/features/workflows/WorkflowTriggerNode";
+import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { NodeGallery } from "./workflow-node-gallery";
 import {
   AGENT_RESULT,
   competitorWatch,
+  githubTriage,
   LLM_RESULT,
   newCompetitorAlert,
+  STORY_CATALOGS,
+  STORY_GITHUB,
   STORY_IMAGES,
   STORY_SEED,
   storyWebhook,
@@ -34,6 +38,17 @@ import { STORY_ALL_FEATURES, WorkflowInAppStory, WorkflowStory } from "./workflo
 const TASK = "Check competitor sites, changelogs and launch posts since yesterday";
 const RESULT = AGENT_RESULT;
 const AGENT = STORY_SEED.agentId;
+
+/** The story catalogs with a ChatGPT sign-in that the user did not do. */
+const CHATGPT_NOT_CONNECTED: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  status: {
+    ...STORY_CATALOGS.status,
+    providers: (STORY_CATALOGS.status.providers ?? []).map((provider) =>
+      provider.id === "codex" ? { ...provider, state: "sign-in-required", version: null, email: null } : provider,
+    ),
+  },
+};
 
 const meta = {
   title: "Workflows",
@@ -78,6 +93,15 @@ export const RunWithFailedStep: Story = {
 export const BranchAndApproval: Story = {
   name: "Branch and approval",
   render: () => <WorkflowStory workflows={[newCompetitorAlert()]} />,
+};
+
+/**
+ * A GitHub trigger that answers new comments. Two runs are open, one for each issue, and a second
+ * comment on one issue waits. The run bar lists the open runs; the Events row lists what GitHub sent.
+ */
+export const GitHubRuns: Story = {
+  name: "GitHub runs",
+  render: () => <WorkflowStory workflows={[githubTriage()]} features={STORY_ALL_FEATURES} />,
 };
 
 export const EmptyCanvas: Story = {
@@ -142,6 +166,20 @@ export const Llm: Story = {
   ),
 };
 
+/**
+ * ChatGPT is not connected. A new LLM step takes a Claude model, and its list has no ChatGPT tab. The
+ * agent step keeps ChatGPT, because its agent runs on it.
+ */
+export const LlmChatGptNotConnected: Story = {
+  name: "LLM, ChatGPT not connected",
+  render: () => (
+    <NodeGallery catalogs={CHATGPT_NOT_CONNECTED}>
+      <LlmNode id="empty" />
+      <AgentNode id="chief" agentId="chief" />
+    </NodeGallery>
+  ),
+};
+
 export const ImageStory: Story = {
   name: "Image",
   render: () => (
@@ -169,11 +207,20 @@ export const Asset: Story = {
 
 export const Trigger: Story = {
   render: () => (
-    <NodeGallery selected="schedule">
+    <NodeGallery
+      selected="schedule"
+      github={STORY_GITHUB}
+      fields={{
+        github: { trigger: "github", repository: "openbot-preview/app", event: "issue.opened", filters: "notBot" },
+        "github-empty": { trigger: "github", event: "issue.opened", filters: "notBot" },
+      }}
+    >
       <TriggerNode id="schedule" nextRun={STORY_SEED.nextRun} />
       <TriggerNode id="manual" trigger="manual" />
       <TriggerNode id="webhook" trigger="webhook" webhookUrl={storyWebhook("webhook")} />
       <TriggerNode id="message" trigger="message" />
+      <TriggerNode id="github" trigger="github" />
+      <TriggerNode id="github-empty" trigger="github" />
     </NodeGallery>
   ),
 };
@@ -201,17 +248,36 @@ export const Output: Story = {
   render: () => (
     <NodeGallery
       selected="channel"
+      github={STORY_GITHUB}
       edges={[
         { id: "source>channel:text", from: "source", to: "channel", type: "text" },
         { id: "source>file:text", from: "source", to: "file", type: "text" },
         { id: "source>notify:text", from: "source", to: "notify", type: "text" },
+        { id: "issue>comment:text", from: "issue", to: "comment", type: "text" },
+        { id: "issue>label:text", from: "issue", to: "label", type: "text" },
+        { id: "docs>review:text", from: "docs", to: "review", type: "text" },
       ]}
-      results={{ channel: [{ id: "output-result", at: todayAt(9, 14), value: "Posted to #market at 09:14." }] }}
+      fields={{
+        issue: { trigger: "github", repository: "openbot-preview/app", event: "issue.opened", filters: "notBot" },
+        docs: { trigger: "github", repository: "openbot-preview/docs", event: "pr.opened", filters: "notBot" },
+        comment: { target: "github", action: "comment" },
+        label: { target: "github", action: "label.add", labelsFrom: "agent", labels: "bug\nenhancement" },
+        review: { target: "github", action: "review.approve" },
+      }}
+      results={{
+        channel: [{ id: "output-result", at: todayAt(9, 14), value: "Posted to #market at 09:14." }],
+        comment: [{ id: "github-result", at: todayAt(9, 15), value: "Commented on #42." }],
+      }}
     >
       <PromptNode id="source" text={RESULT} />
       <OutputNode id="channel" path={STORY_SEED.path} title={STORY_SEED.title} />
       <OutputNode id="file" target="file" path={STORY_SEED.path} title={STORY_SEED.title} />
       <OutputNode id="notify" target="notify" path={STORY_SEED.path} title={STORY_SEED.title} />
+      <TriggerNode id="issue" trigger="github" />
+      <OutputNode id="comment" target="github" />
+      <OutputNode id="label" target="github" />
+      <TriggerNode id="docs" trigger="github" />
+      <OutputNode id="review" target="github" />
     </NodeGallery>
   ),
 };

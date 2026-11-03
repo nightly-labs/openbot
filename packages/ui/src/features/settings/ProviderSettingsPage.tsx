@@ -7,7 +7,10 @@
 import { ProviderLogo } from "@openbot/brand";
 import {
   type AgentProviderId,
+  type AgentProviderStatus,
+  agentProviderName,
   type CustomProviderSummary,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   MAX_PROVIDER_ACCOUNTS,
   PROMPT_CACHE_TTLS,
@@ -17,7 +20,7 @@ import {
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
 } from "@openbot/contracts/ipc";
-import type { AppTextKey } from "@openbot/i18n";
+import type { AppFormat, AppMessages, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Badge,
   Button,
@@ -29,6 +32,7 @@ import {
   DropdownMenu,
   Ellipsis,
   Gauge,
+  Globe2,
   Input,
   Item,
   ItemActions,
@@ -131,6 +135,11 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
    * joined server's rows have no Edit.
    */
   onEditCustomProvider?: ((provider: CustomProviderSummary) => void) | undefined;
+  /**
+   * This computer runs an endpoint on OpenCode or Pi, and each row names its provider. A joined
+   * server's host runs every endpoint on OpenCode.
+   */
+  customProviderHarnesses?: boolean | undefined;
   /** Runs after the user accepts the removal question. */
   onRemoveCustomProvider?: ((provider: CustomProviderSummary) => void) | undefined;
   removingCustomProvider?: string | null | undefined;
@@ -395,14 +404,13 @@ interface DefaultChoice {
 /** The default provider as one select, so the rows need no radio. */
 function DefaultProviderRow(props: ProviderSettingsPageProps) {
   const { t } = useText();
-  const openCode = () => props.options.find((option) => option.id === "opencode");
   const choices = (): DefaultChoice[] => {
     const value = props.defaultProvider?.value ?? null;
     const providers = props.options
       .filter((option) => (option.state === "available" && !option.off) || option.id === value)
       .map((option) => ({ id: option.id, name: option.name }));
     const custom =
-      (props.customProviders?.length ?? 0) > 0 && servesCustomProvider(openCode()) && props.onAddCustomProvider;
+      (props.customProviders?.length ?? 0) > 0 && servesCustomEndpoints(props) && props.onAddCustomProvider;
     return custom || value === "custom" ? [...providers, { id: "custom", name: t("provider.custom.name") }] : providers;
   };
   const selected = () => choices().find((choice) => choice.id === props.defaultProvider?.value) ?? null;
@@ -538,27 +546,60 @@ function MenuTrigger(props: { label: string; disabled?: boolean | undefined }) {
   );
 }
 
-/** The second way in, from a ⋯ menu: a code, or the address that the browser shows at its end. */
+/**
+ * The other ways in, from a ⋯ menu: a code, or the address that the browser shows at its end, and
+ * the provider's mainland China site.
+ */
 function AlternativeItem(props: { row: ProviderRow }) {
   const { t } = useText();
   return (
-    <Show when={props.row.alternative()}>
-      {(kind) => (
-        <DropdownMenu.Item onSelect={props.row.signInAlternative}>
-          <Show when={kind() === "address"} fallback={<Smartphone aria-hidden="true" />}>
-            <Link aria-hidden="true" />
-          </Show>
-          {t(kind() === "address" ? "provider.action.pasteAddress" : "provider.action.signInWithCode")}
-        </DropdownMenu.Item>
-      )}
-    </Show>
+    <>
+      <Show when={props.row.alternative()}>
+        {(kind) => (
+          <DropdownMenu.Item onSelect={props.row.signInAlternative}>
+            <Show when={kind() === "address"} fallback={<Smartphone aria-hidden="true" />}>
+              <Link aria-hidden="true" />
+            </Show>
+            {t(kind() === "address" ? "provider.action.pasteAddress" : "provider.action.signInWithCode")}
+          </DropdownMenu.Item>
+        )}
+      </Show>
+      <Show when={props.row.mainlandChinaSite()}>
+        {(site) => (
+          <DropdownMenu.Item onSelect={props.row.connectInMainlandChina}>
+            <Globe2 aria-hidden="true" />
+            {t("provider.action.signInMainlandChina", { site: site() })}
+          </DropdownMenu.Item>
+        )}
+      </Show>
+    </>
   );
 }
 
 /* ---------------------------------------------- Accounts */
 
 /** The providers whose CLI signs its own sign-in out (`signOut` in `src/backend/provider-drivers.ts`). */
-const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set(["claude", "codex"]);
+const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set(["claude", "codex", "grok", "muse", "cursor"]);
+
+/** The confirmation text of a Disconnect of the provider's own sign-in. */
+function disconnectDescription(
+  t: AppTranslate,
+  format: AppFormat,
+  options: { provider: string; local: boolean; usedBy: readonly string[]; otherAccounts: boolean },
+): string {
+  const { provider, usedBy } = options;
+  return [
+    options.local
+      ? t("provider.settings.disconnectLocal", { provider })
+      : t("provider.settings.disconnectHost", { provider }),
+    usedBy.length > 0
+      ? t("provider.settings.accountBlocked", { agents: format.list(usedBy) })
+      : t("provider.settings.removeUnused"),
+    options.otherAccounts ? t("provider.settings.disconnectOthers", { provider }) : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 
 function AccountsSection(props: SectionProps) {
   const { t, format, errorMessage, sourceText } = useText();
@@ -633,22 +674,6 @@ function AccountsSection(props: SectionProps) {
         ? t("provider.settings.removeMoves", { agents: format.list(agents), name: firstName })
         : t("provider.settings.removeUnused");
     return `${move} ${t("provider.settings.removeCredentials")}`;
-  };
-  const disconnectDescription = (account: ProviderPickerAccount | null) => {
-    if (!account) return "";
-    const provider = props.option.name;
-    const agents = account.usedBy ?? [];
-    return [
-      props.accountActions?.local
-        ? t("provider.settings.disconnectLocal", { provider })
-        : t("provider.settings.disconnectHost", { provider }),
-      agents.length > 0
-        ? t("provider.settings.accountBlocked", { agents: format.list(agents) })
-        : t("provider.settings.removeUnused"),
-      accounts().length > 1 ? t("provider.settings.disconnectOthers", { provider }) : null,
-    ]
-      .filter(Boolean)
-      .join(" ");
   };
   return (
     <SettingsSection
@@ -737,7 +762,16 @@ function AccountsSection(props: SectionProps) {
         title={t("provider.settings.disconnectTitle", {
           name: disconnecting() ? providerAccountName(t, accounts(), disconnecting()?.id ?? "") : "",
         })}
-        description={disconnectDescription(disconnecting())}
+        description={
+          disconnecting()
+            ? disconnectDescription(t, format, {
+                provider: props.option.name,
+                local: Boolean(props.accountActions?.local),
+                usedBy: disconnecting()?.usedBy ?? [],
+                otherAccounts: accounts().length > 1,
+              })
+            : ""
+        }
         confirmLabel={t("provider.account.disconnect")}
         onCancel={() => setDisconnecting(null)}
         onConfirm={() => {
@@ -777,6 +811,12 @@ const ACCOUNT_STATE_TEXT = {
   "signed-out": "provider.status.signInRequired",
   error: "provider.account.failed",
 } as const satisfies Record<ProviderAccountState, AppTextKey>;
+
+/** The Version line names the CLI that runs: the one the user installed, or OpenBot's download. */
+const VERSION_SOURCE = {
+  system: "provider.settings.versionInstalledByUser",
+  managed: "provider.settings.versionDownloaded",
+} as const satisfies Record<NonNullable<AgentProviderStatus["cliSource"]>, keyof AppMessages>;
 
 /** One account. Its text says what is wrong; the right edge has at most one button, then the ⋯ menu. */
 function AccountRow(
@@ -1004,8 +1044,27 @@ function LowUsageBadge(props: { reading: AccountUsageProviderRow; name: string; 
 
 /** The provider's one sign-in: the same buttons that its onboarding row has, on a card. */
 function SignInSection(props: SectionProps & { keyShown: boolean }) {
-  const { t, format, sourceText } = useText();
+  const { t, format, sourceText, errorMessage } = useText();
   const row = () => props.row;
+  /**
+   * A saved OpenBot key keeps the provider connected; the key dialog removes it. Muse offers
+   * Disconnect only where its key status is known, on this computer.
+   */
+  const disconnectOffered = () =>
+    Boolean(props.accountActions?.signOut) &&
+    SIGN_OUT_PROVIDERS.has(props.option.id) &&
+    row().available() &&
+    !row().connecting() &&
+    (props.option.id === "muse" ? props.option.keyStatus === "missing" : props.option.keyStatus !== "saved");
+  const [disconnecting, setDisconnecting] = createSignal(false);
+  const [disconnectError, setDisconnectError] = createSignal<string | null>(null);
+  const disconnect = () => {
+    setDisconnecting(false);
+    setDisconnectError(null);
+    void Promise.resolve(props.accountActions?.signOut?.(props.option.id)).catch((failure: unknown) =>
+      setDisconnectError(errorMessage(failure, t("provider.account.actionFailed", { name: props.option.name }))),
+    );
+  };
   /** Download, its cancel and its retry are on the Version row. */
   const connectAction = () => {
     const action = row().runtimeAction();
@@ -1022,7 +1081,10 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
       row().hostSignInHint() ? t("provider.gemini.hostSignIn") : null,
       row().signingIn() ? t("provider.connecting.browserHint") : null,
     ].filter((text): text is string => Boolean(text));
-  const error = () => row().connectError() ?? (row().statusMessage() ? sourceText(row().statusMessage() ?? "") : null);
+  const error = () =>
+    row().connectError() ??
+    disconnectError() ??
+    (row().statusMessage() ? sourceText(row().statusMessage() ?? "") : null);
   return (
     <SettingsSection title={t("provider.settings.signIn")}>
       <ItemGroup class="settings-modal-card">
@@ -1036,6 +1098,7 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
                   class={{
                     "provider-settings-error":
                       Boolean(row().connectError()) ||
+                      Boolean(disconnectError()) ||
                       row().state() === "error" ||
                       row().runtimeStatus()?.phase === "download-error",
                   }}
@@ -1122,7 +1185,7 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
                 {t("provider.action.signIn")}
               </Button>
             </Show>
-            <Show when={row().alternative()}>
+            <Show when={row().alternative() || row().mainlandChinaSite() || disconnectOffered()}>
               <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
                 <MenuTrigger
                   label={t("provider.aria.moreActions", { name: props.option.name })}
@@ -1131,6 +1194,15 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
                 <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
                   <DropdownMenu.Content>
                     <AlternativeItem row={row()} />
+                    <Show when={disconnectOffered()}>
+                      <Show when={row().alternative() || row().mainlandChinaSite()}>
+                        <DropdownMenu.Separator />
+                      </Show>
+                      <DropdownMenu.Item onSelect={() => setDisconnecting(true)}>
+                        <LogOut aria-hidden="true" />
+                        {t("provider.account.disconnect")}
+                      </DropdownMenu.Item>
+                    </Show>
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
@@ -1138,6 +1210,20 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
           </ItemActions>
         </Item>
       </ItemGroup>
+      <ConfirmDialog
+        open={disconnecting()}
+        tone="destructive"
+        title={t("provider.settings.disconnectTitle", { name: props.option.email ?? props.option.name })}
+        description={disconnectDescription(t, format, {
+          provider: props.option.name,
+          local: Boolean(props.accountActions?.local),
+          usedBy: props.option.usedBy ?? [],
+          otherAccounts: false,
+        })}
+        confirmLabel={t("provider.account.disconnect")}
+        onCancel={() => setDisconnecting(false)}
+        onConfirm={disconnect}
+      />
     </SettingsSection>
   );
 }
@@ -1218,7 +1304,9 @@ function RuntimeSection(props: SectionProps) {
     if (row().updatable() && installed) {
       return t("provider.settings.versionAvailable", { installed, available: props.option.availableVersion ?? "" });
     }
-    return installed;
+    // Names the CLI that runs, so a failure of the user's own install does not read as OpenBot's (#4375).
+    const source = props.option.cliSource;
+    return installed && source ? t(VERSION_SOURCE[source], { version: installed }) : installed;
   };
   /** The sign-in card already shows a check error, so the same text does not show twice. */
   const lastError = () =>
@@ -1678,11 +1766,24 @@ function DownloadSection(props: SectionProps) {
 
 /* ------------------------------------------------------------------ Custom endpoints */
 
+/** OpenCode can run a custom endpoint, or Pi can where this computer offers it. */
+function servesCustomEndpoints(props: ProviderSettingsPageProps): boolean {
+  const option = (id: AgentProviderId) => props.options.find((candidate) => candidate.id === id);
+  return (
+    servesCustomProvider(option("opencode")) ||
+    Boolean(props.customProviderHarnesses && servesCustomProvider(option("pi")))
+  );
+}
+
 function CustomEndpointsPage(props: ProviderSettingsPageProps) {
   const { t, format } = useText();
   const endpoints = () => props.customProviders ?? [];
   const engine = () => props.options.find((option) => option.id === "opencode");
-  const ready = () => servesCustomProvider(engine());
+  const ready = () => servesCustomEndpoints(props);
+  const runsOn = (endpoint: CustomProviderSummary) =>
+    t("customProvider.list.runsOn", {
+      name: agentProviderName(endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS),
+    });
   const [confirming, setConfirming] = createSignal<CustomProviderSummary | null>(null);
   return (
     <>
@@ -1739,6 +1840,7 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
                         count: endpoint().models.length,
                       })}
                       {endpoint().hasApiKey ? ` · ${t("customProvider.list.apiKeySaved")}` : ""}
+                      {props.customProviderHarnesses ? ` · ${runsOn(endpoint())}` : ""}
                     </ItemDescription>
                   </ItemContent>
                   <Show when={props.onEditCustomProvider || props.onRemoveCustomProvider}>

@@ -1,4 +1,4 @@
-import type { AgentTask } from "@openbot/contracts/ipc";
+import type { AgentTask, DraftAttachment } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   plainTaskTitle,
@@ -25,7 +25,15 @@ import { SwapLabel, type SwapMotion } from "@openbot/ui/components/SwapLabel";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { AgentTaskMark, type AgentTaskWait, agentTaskStatus } from "@openbot/ui/features/conversation/AgentTasks";
-import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
+import {
+  ComposerAttachmentRow,
+  type ComposerPendingImage,
+} from "@openbot/ui/features/conversation/ComposerAttachmentRow";
+import {
+  ComposerEditor,
+  type ComposerPasteResult,
+  type ComposerSelection,
+} from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import {
@@ -77,6 +85,17 @@ interface TasksPageProps {
   onAgentChange: (agentId: string) => void;
   draft: string;
   onDraftChange: (text: string) => void;
+  /** The files of the next task. The text names each one where it was added. */
+  files?: readonly DraftAttachment[] | undefined;
+  /** The files in the thumbnail row: each image, and each other file that the text no longer names. */
+  rowFiles?: readonly DraftAttachment[] | undefined;
+  /** The pasted images that still import, with their local previews. */
+  pendingImages?: readonly ComposerPendingImage[] | undefined;
+  onRemoveFile?: ((attachment: DraftAttachment) => void) | undefined;
+  /** Receives pasted files. Without it, a file paste does nothing here. */
+  onPasteFiles?:
+    | ((files: File[], selection: ComposerSelection) => Promise<ComposerPasteResult | undefined>)
+    | undefined;
   /** Each change moves the focus to the composer. */
   focusRequest: number;
   /** The text of a start that failed. The draft is back in the composer. */
@@ -178,7 +197,11 @@ function TasksComposer(props: TasksPageProps) {
   const { t } = useText();
   const phase = (): VoicePhase => props.voice?.phase ?? "idle";
   const busy = () => phase() === "requesting" || phase() === "preparing" || phase() === "transcribing";
-  const canStart = () => phase() === "recording" || (phase() === "idle" && plainTaskTitle(props.draft) !== "");
+  const hasRow = () => (props.rowFiles?.length ?? 0) > 0 || (props.pendingImages?.length ?? 0) > 0;
+  // A start of files only names them, so it has a title too.
+  const canStart = () =>
+    phase() === "recording" ||
+    (phase() === "idle" && (plainTaskTitle(props.draft) !== "" || (props.files?.length ?? 0) > 0));
   const start = () => {
     if (canStart()) props.onStart();
   };
@@ -207,11 +230,18 @@ function TasksComposer(props: TasksPageProps) {
       </Show>
       <form
         class="composer"
+        data-has-attachments={hasRow() ? "" : undefined}
         onSubmit={(event) => {
           event.preventDefault();
           start();
         }}
       >
+        <ComposerAttachmentRow
+          attachments={props.rowFiles ?? []}
+          pending={props.pendingImages}
+          removeDisabled={phase() === "transcribing"}
+          onRemove={(attachment) => props.onRemoveFile?.(attachment)}
+        />
         <div class="composer-input-label">
           <ComposerEditor
             agentId={undefined}
@@ -225,6 +255,8 @@ function TasksComposer(props: TasksPageProps) {
             sendShortcut={props.sendShortcut}
             onSubmit={start}
             onValueChange={props.onDraftChange}
+            attachments={props.files ? [...props.files] : undefined}
+            onPasteFiles={props.onPasteFiles}
           />
         </div>
         <div class="composer-toolbar">

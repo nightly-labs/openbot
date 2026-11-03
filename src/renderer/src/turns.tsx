@@ -73,7 +73,7 @@ const Turns = createSimpleContext({
   init: () => {
     const { activeServerId } = useServers();
     const { dynamicIslandCoordinator } = useDynamicIsland();
-    const { activeAgent, activeAgentId, agentList, agentStatus, appendUiError } = useAgents();
+    const { activeAgent, activeAgentId, agentList, agentListSettled, agentStatus, appendUiError } = useAgents();
     const scopeIsCurrent = createScopeGuard();
 
     // The layer-2 seed: what this server was doing the last time it was open. The scope is keyed
@@ -207,13 +207,44 @@ const Turns = createSimpleContext({
       },
     );
 
+    /**
+     * Reads the queues of many agents and writes them at once. One write for each answer ran every
+     * sidebar row again for each agent: on a host with 50 agents, the first conversation waited
+     * seconds for those runs (`bun run perf:remote`).
+     */
+    function loadQueues(agentIds: string[]): void {
+      const reads = agentIds.map((agentId) => {
+        const queueRequest = (queueSnapshotRequests.get(agentId) ?? 0) + 1;
+        queueSnapshotRequests.set(agentId, queueRequest);
+        return turnsPort()
+          .agent.listQueue(agentId)
+          .then(
+            (queue) => ({ agentId, queueRequest, queue }),
+            // As in `loadQueue`: keep the last queue; the next load or queue-changed event updates it.
+            () => null,
+          );
+      });
+      void Promise.all(reads).then((results) => {
+        if (!scopeIsCurrent()) return;
+        const loaded = results.flatMap((result) =>
+          result && queueSnapshotRequests.get(result.agentId) === result.queueRequest
+            ? [[result.agentId, result.queue] as const]
+            : [],
+        );
+        if (loaded.length > 0) setQueues((current) => ({ ...current, ...Object.fromEntries(loaded) }));
+      });
+    }
+
     // The active-agent load above misses everyone else. A routine mark needs each agent's real
-    // queue sender, which a runtime snapshot does not carry.
+    // queue sender, which a runtime snapshot does not carry. The agents of a saved frame wait for the
+    // first read of the roster: the host is not connected yet.
     createEffect(
       () => ({
-        agentIds: agentList()
-          .map((agent) => agent.id)
-          .join("\0"),
+        agentIds: agentListSettled()
+          ? agentList()
+              .map((agent) => agent.id)
+              .join("\0")
+          : "",
         agentPhase: agentStatus().phase,
         serverId: activeServerId(),
       }),
@@ -227,7 +258,12 @@ const Turns = createSimpleContext({
           return;
         }
         if (!next.agentIds) return;
-        for (const agentId of next.agentIds.split("\0")) loadQueue(agentId);
+        // A new phase or server, or the first roster, also runs the active-agent load, so that agent is
+        // read only once.
+        const activeLoads =
+          !previous?.agentIds || next.agentPhase !== previous.agentPhase || next.serverId !== previous.serverId;
+        const active = activeLoads ? untrack(activeAgentId) : null;
+        loadQueues(next.agentIds.split("\0").filter((agentId) => agentId !== active));
       },
     );
 

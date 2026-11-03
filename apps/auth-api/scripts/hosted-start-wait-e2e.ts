@@ -26,7 +26,7 @@ const OUT = join(ROOT, ".openbot-build", "hosted-start-wait-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const SERVER_ID = "server-1";
 const SANDBOX_ID = "bx_1";
-const OWNER = { id: "owner", email: "owner@example.test", name: null, avatarUrl: null };
+const OWNER = { id: "owner", email: "owner@example.test", name: null, avatarUrl: null, analyticsEnabled: null };
 const SECOND = 1_000;
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];

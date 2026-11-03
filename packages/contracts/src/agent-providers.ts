@@ -1,4 +1,5 @@
 import type { AgentModelId } from "./ipc-agent-identity";
+import type { AgentInstructionFileName } from "./ipc-agent-instructions";
 import type { AccountUsageLimit, AgentAuthState } from "./ipc-agent-status";
 import type { ExternalDestination } from "./ipc-app-auth";
 import { isOneOf, isString } from "./runtime-values";
@@ -32,7 +33,9 @@ export const AGENT_PROVIDERS = [
   "inception",
   "deepseek",
   "openrouter",
+  "hermes",
   "acp",
+  "kimi",
 ] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
@@ -121,10 +124,16 @@ export interface AgentProviderDescriptor {
    */
   readonly signInPageEnd: "callback" | "page";
   /**
+   * The site of the provider's mainland China accounts, which the ⋯ menu of this computer signs in
+   * with. Connect signs in with the global site. Absent: the provider has one site for all accounts.
+   */
+  readonly mainlandChinaSignInSite?: string;
+  /**
    * The workspace skill folders the CLI reads by itself, in its own order. OpenBot writes only
    * `.agents/skills` and `.claude/skills`, so each list names at least one of them.
    * Sources: the Codex "build skills" guide, the Claude Code skills guide, the opencode skills guide
-   * and the skill paths in Google's Antigravity ACP server, in the Cursor CLI and in the Cline CLI.
+   * and the skill paths in Google's Antigravity ACP server, in the Cursor CLI, in the Cline CLI and in
+   * the Kimi Code CLI.
    */
   readonly skillFolders: readonly [string, ...string[]];
   /**
@@ -132,10 +141,16 @@ export interface AgentProviderDescriptor {
    * itself. `plugin`: OpenBot gives the folder to Claude as a session plugin
    * (`claudeHomeSkillPlugin`). `instructions`: the CLI does not read it, so the developer instructions
    * name each skill and its `SKILL.md`. Sources: the strings and docs of the installed Codex, Grok,
-   * OpenCode, Cursor, Cline and Pi CLIs; the Antigravity ACP server reads only `$GEMINI_HOME`; Muse
+   * OpenCode, Cursor, Cline, Kimi and Pi CLIs; the Antigravity ACP server reads only `$GEMINI_HOME`; Muse
    * and a custom ACP agent are not known to read it.
    */
   readonly homeSkills: "native" | "plugin" | "instructions";
+  /**
+   * The agent instruction files that the CLI reads by itself from its working directory, the agent's
+   * workspace. OpenBot adds the agent's file to the developer instructions only when its name is not
+   * in this list, so that the CLI does not read it twice.
+   */
+  readonly workspaceInstructionFiles: readonly AgentInstructionFileName[];
   /**
    * How a Workspace only agent is held to its folders. `tool-sandbox`: the client checks each tool
    * and asks before an edit. `command-sandbox`: the CLI runs each command in a sandbox.
@@ -198,6 +213,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "command-sandbox",
     steer: "native",
     concurrentTurns: true,
@@ -220,6 +236,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".claude/skills"],
     homeSkills: "plugin",
+    workspaceInstructionFiles: ["CLAUDE.md"],
     workspaceEnforcement: "tool-sandbox",
     steer: "native",
     concurrentTurns: true,
@@ -242,6 +259,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
@@ -266,6 +284,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".opencode/skills", ".agents/skills", ".claude/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
@@ -290,6 +309,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".gemini/skills", ".agents/skills"],
     homeSkills: "instructions",
+    workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
@@ -314,6 +334,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".cursor/skills", ".claude/skills", ".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
@@ -338,6 +359,34 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".cline/skills", ".clinerules/skills", ".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
+    workspaceEnforcement: "confined-process",
+    steer: "deferred",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
+  // The Kimi Code CLI (`kimi acp`). Sign-in is `kimi login`, a device code that the user confirms on
+  // Kimi's page. The sign-in writes the account's models into the CLI's own config. Global accounts
+  // are on kimi.ai, and mainland China accounts on kimi.com.
+  kimi: {
+    id: "kimi",
+    displayName: "Kimi",
+    cliName: "Kimi Code CLI",
+    onboardingDescription: "Kimi models with a Kimi Code account",
+    signInMessage: "Sign in with Kimi to use Kimi.",
+    installGuideLink: null,
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "kimi",
+    pickerOrder: 7,
+    localCodeSignIn: "device",
+    signInPageEnd: "page",
+    mainlandChinaSignInSite: "kimi.com",
+    skillFolders: [".kimi/skills", ".claude/skills", ".codex/skills", ".agents/skills"],
+    homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
@@ -355,11 +404,12 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "pi",
-    pickerOrder: 7,
+    pickerOrder: 8,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
@@ -377,11 +427,12 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "muse",
-    pickerOrder: 8,
+    pickerOrder: 9,
     localCodeSignIn: "device",
     signInPageEnd: "page",
     skillFolders: [".agents/skills"],
     homeSkills: "instructions",
+    workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
@@ -401,11 +452,12 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "mercury-3",
     legacyModelPrefix: null,
     authKind: "inception",
-    pickerOrder: 9,
+    pickerOrder: 10,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
@@ -425,11 +477,12 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "deepseek-v4-pro",
     legacyModelPrefix: null,
     authKind: "deepseek",
-    pickerOrder: 10,
+    pickerOrder: 11,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
@@ -449,13 +502,42 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "anthropic/claude-sonnet-5.5",
     legacyModelPrefix: null,
     authKind: "openrouter",
-    pickerOrder: 11,
+    pickerOrder: 12,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
+  // Hermes Agent (`hermes acp`) from Nous Research, which the user installs. It keeps its memories,
+  // skills and sign-ins in `~/.hermes`, as the user's own Hermes does. A Nous Portal subscription
+  // signs it in (`hermes auth add nous`); the models of every provider Hermes is signed in to are listed.
+  // Hermes reads `.agents/skills` only in a git project that `skills.trusted_project_dirs` names, and
+  // it reads `AGENTS.md` only when the workspace has no `.hermes.md`.
+  hermes: {
+    id: "hermes",
+    displayName: "Hermes",
+    cliName: "Hermes Agent",
+    onboardingDescription: "Nous Portal plan or your Hermes setup",
+    signInMessage: "Sign in with Nous Portal or run `hermes setup` to use Hermes.",
+    installGuideLink: "hermes-install",
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "hermes",
+    pickerOrder: 13,
+    localCodeSignIn: "device",
+    signInPageEnd: "page",
+    skillFolders: [".agents/skills"],
+    homeSkills: "instructions",
+    workspaceInstructionFiles: ["AGENTS.md"],
+    workspaceEnforcement: "confined-process",
+    steer: "deferred",
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
@@ -479,6 +561,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "instructions",
+    workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: false,
@@ -538,6 +621,7 @@ export const MANAGED_RUNTIME_PROVIDERS = [
   "antigravity",
   "cursor",
   "cline",
+  "kimi",
   "pi",
   "muse",
 ] as const satisfies readonly AgentProviderId[];
@@ -550,18 +634,20 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
 /**
  * The providers that only newer Team API protocols carry: Gemini and custom ACP agents from protocol
  * 5, Cursor and Cline from protocol 6, Pi and Muse from protocol 7, Inception, DeepSeek and OpenRouter
- * from protocol 8.
+ * from protocol 8, and Kimi and Hermes, which no frozen protocol names.
  * A joined server's settings list one only when the host's status names it.
  */
 export const LOCAL_ONLY_PROVIDERS = [
   "antigravity",
   "cursor",
   "cline",
+  "kimi",
   "pi",
   "muse",
   "inception",
   "deepseek",
   "openrouter",
+  "hermes",
   "acp",
 ] as const satisfies readonly AgentProviderId[];
 

@@ -201,6 +201,8 @@ export const messages = {
   "server.rail.restart": "Redémarrer le serveur",
   "server.rail.leave": "Quitter le serveur",
   "server.rail.delete": "Supprimer le serveur",
+  "server.rail.hide": "Masquer le serveur",
+  "server.rail.showLocal": "Afficher {name}",
   "server.select.failedTitle": "Impossible de sélectionner le serveur",
   "server.select.failedDescription": "Impossible de changer de serveur. Réessayez.",
   "server.select.openAgentFailed": "Impossible d’ouvrir {name}. Retrouvez-le dans la barre latérale.",
@@ -304,13 +306,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Affichez et contrôlez ce Mac depuis un autre ordinateur.",
   "server.settings.later": "Plus tard",
   "server.settings.setUp": "Configurer",
-  "server.settings.notifications": "Notifications",
-  "server.settings.muteNotifications": "Mettre les notifications en sourdine",
-  "server.settings.muteDescription":
-    "Arrêtez les notifications de bureau, les sons et les mises à jour de l’encoche du MacBook pour ce serveur.",
-  "server.settings.mutedUntilDescription": "{until}. Désactivez pour réactiver le son maintenant.",
-  "server.settings.notifyAbout": "Me notifier pour",
-  "server.settings.notifyAboutDescription": "Les événements d’agent qui affichent une notification de bureau.",
   "server.settings.agents": "Agents",
   "server.settings.timezone": "Fuseau horaire",
   "server.settings.timezoneDescription":
@@ -341,6 +336,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "La clé actuelle et la nouvelle clé signent une passation. Les apps des membres passent à la nouvelle clé à leur prochaine connexion. Faites-le si le fichier de clé a été copié ou exposé.",
   "server.settings.hostKeyRotated": "Clé du serveur changée",
+  "server.settings.hostKeyChanged": "Dernier changement",
+  "server.settings.hostKeyChangedDescription": "{date}. L’ancienne clé et la nouvelle clé ont signé ce changement.",
   "server.settings.hostKeyLocalOnly": "Ici, seul le serveur de cet ordinateur peut changer sa clé.",
   "server.settings.removeTitle": "Supprimer le serveur",
   "server.settings.removeDescription":

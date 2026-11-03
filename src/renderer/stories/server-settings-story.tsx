@@ -29,7 +29,6 @@ export const serverSettingsArgs = () =>
     onRetry: fn(async () => undefined),
     onSaveIdentity: fn(async () => undefined),
     onSetPublished: fn(async () => undefined),
-    onSetMuted: fn(async () => undefined),
     onCreateInvite: fn(async (input) => ({
       id: "invite-story",
       inviteUrl: "https://team.example.com/invite/story",

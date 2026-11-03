@@ -69,9 +69,6 @@ export const messages = {
   "mobile.settings.animations.footer":
     "애니메이션을 끄면 앱 전체의 움직임이 줄어들어요. 휴대전화 설정에서 동작 줄이기가 켜져 있으면 앱도 움직임을 줄여요. 그러면 아래 애니메이션은 꺼진 상태로 유지돼요.",
   "mobile.settings.animations.all": "애니메이션",
-  "mobile.settings.animations.chatZoom": "채팅 확대 전환",
-  "mobile.settings.animations.chatZoomFooter":
-    "채팅이 목록의 아바타에서 펼쳐지고 다시 그 안으로 닫혀요. 끄면 채팅이 옆에서 밀려 들어와요.",
   "mobile.settings.animations.agentFaces": "에이전트 얼굴 애니메이션",
   "mobile.settings.animations.agentFacesFooter":
     "에이전트가 작업하거나 쉬는 동안 아바타의 얼굴이 움직여요. 끄면 얼굴이 가만히 있어요.",
@@ -120,7 +117,6 @@ export const messages = {
     "알림과 실시간 현황이 이 소리를 재생해요. 실시간 현황은 화면도 켜요. OpenBot 소리는 작업이 끝났을 때 데스크톱 앱이 재생하는 소리예요. 그 뒤의 네 가지 소리는 데스크톱 소리 테마의 소리예요.",
   "mobile.settings.notifications.soundFooterAndroid":
     "알림이 이 소리를 재생해요. OpenBot 소리는 작업이 끝났을 때 데스크톱 앱이 재생하는 소리예요. 그 뒤의 네 가지 소리는 데스크톱 소리 테마의 소리예요.",
-  "mobile.settings.notifications.notifyAbout": "알림 받을 항목",
   "mobile.settings.notifications.level.all": "모든 활동",
   "mobile.settings.notifications.level.needsMe": "내 입력이 필요할 때만",
   "mobile.settings.notifications.level.nothing": "없음",
@@ -137,12 +133,29 @@ export const messages = {
     "이 휴대전화로 알림을 보내는 이 서버의 이벤트예요. 데스크톱 앱에는 별도의 설정이 있어요.",
   "mobile.settings.notifications.serverUnsupported":
     "이 서버는 알림을 보낼 수 없어요. 서버가 실행되는 컴퓨터에서 OpenBot을 업데이트해 주세요.",
+  "mobile.settings.notifications.thisPhone": "이 휴대전화",
+  "mobile.settings.notifications.whatYouHear": "알림 받을 내용",
+  "mobile.settings.notifications.wholeServer": "서버 전체",
+  "mobile.settings.notifications.levelShort.all": "모두",
+  "mobile.settings.notifications.levelShort.needsMe": "필요할 때",
+  "mobile.settings.notifications.levelShort.nothing": "끔",
+  "mobile.settings.notifications.thisPhoneOnly": "이 휴대전화만",
+  "mobile.settings.notifications.offForEveryone": "이 서버의 모든 사람에게 꺼짐",
+  "mobile.settings.notifications.turnOn": "켜기",
+  "mobile.settings.notifications.turnOnFor": "이 서버의 모든 사람에게 {name}의 알림 켜기",
+  "mobile.settings.notifications.chooseAgent": "에이전트별로 선택",
+  "mobile.settings.notifications.chooseAnotherAgent": "다른 에이전트 선택",
+  "mobile.settings.notifications.levelsFooter": "에이전트의 수준을 다시 탭하면 서버 설정을 따라요.",
+  "mobile.settings.notifications.agentsUnsupported": "에이전트별로 선택하려면 이 서버의 OpenBot을 업데이트하세요.",
+  "mobile.settings.notifications.agentsOffline": "이 서버가 온라인이면 에이전트가 표시돼요.",
+  "mobile.settings.notifications.scopeFooter":
+    "선택한 내용은 내 모든 기기에 적용돼요. 음소거는 이 휴대전화에만 적용돼요.",
   "mobile.settings.notifications.channel": "에이전트 알림 ({sound})",
   "mobile.settings.notifications.channelSilent": "에이전트 알림 (소리 없음)",
   "mobile.settings.privacy.title": "개인정보 보호",
   "mobile.settings.privacy.footer":
-    "이 휴대전화의 기능 사용 현황과 연결 결과를 공유해요. 메시지 내용과 파일은 전송하지 않아요.",
-  "mobile.settings.privacy.analytics": "제품 분석 공유",
+    "이 휴대전화의 기능 사용 현황과 연결 결과는 항상 OpenBot 분석 서비스로 전송돼요. 켜짐: 계정 ID 및 이메일과 함께. 꺼짐: 임의의 설치 ID만 함께. 메시지 내용과 파일은 전송하지 않아요.",
+  "mobile.settings.privacy.analytics": "분석 데이터를 내 계정에 연결",
   "mobile.settings.privacy.retry": "개인정보 설정 다시 저장",
   "mobile.settings.conversations.title": "대화",
   "mobile.settings.conversations.hiddenChats": "숨긴 채팅",

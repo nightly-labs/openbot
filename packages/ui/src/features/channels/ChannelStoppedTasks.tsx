@@ -8,6 +8,8 @@ export function ChannelStoppedTasks(props: {
   members: Pick<ChannelMember, "agentId">[];
   name: (agentId: string | null) => string;
   onResume: (taskId: string, recipientAgentId: string | null) => Promise<boolean>;
+  /** Ends the task and its run. A host without `channel-task-cancel-v1` gives none, and the card shows no Cancel. */
+  onCancel?: ((taskId: string) => Promise<boolean>) | undefined;
 }) {
   const { t, sourceText } = useText();
   return (
@@ -47,6 +49,13 @@ export function ChannelStoppedTasks(props: {
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
                 </DropdownMenu.Root>
+                <Show when={props.onCancel}>
+                  {(cancel) => (
+                    <Button variant="ghost" size="xs" onClick={() => void cancel()(task.id)}>
+                      {t("channel.stoppedTask.cancel")}
+                    </Button>
+                  )}
+                </Show>
               </div>
             </section>
           )}

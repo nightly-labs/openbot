@@ -1,6 +1,7 @@
 import { type Href, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { forgetIncomingLink, readIncomingLink } from "@/features/links/model/incoming-links";
+import type { LocalServerPathname } from "@/features/servers/components/local-server-options";
 import { AddServerScreen } from "./add-server-screen";
 
 interface SheetPlacement {
@@ -8,6 +9,8 @@ interface SheetPlacement {
   scanHref?: Href;
   /** An inner page under a native header. */
   underHeader?: boolean;
+  /** The create page of a server on an owned computer, in this sheet. Without it, the page offers none. */
+  localServerPathname?: LocalServerPathname;
 }
 
 export function AddServerLinkScreen(placement: SheetPlacement = {}) {

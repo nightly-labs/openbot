@@ -49,6 +49,15 @@ export function createBrowserProfilesStore(calls: () => BrowserProfileCalls) {
   return {
     state,
     refresh,
+    /**
+     * Lists again each time the host reports a change, also one made on another device, and then
+     * calls `onChange`. Returns the unsubscribe. A host that reports no changes lists on open only.
+     */
+    follow: (onChange?: () => void): (() => void) =>
+      calls().onChanged?.(() => {
+        void refreshAfterChange();
+        onChange?.();
+      }) ?? (() => undefined),
     /** Returns the id of the new profile. */
     create: async (name: string): Promise<string> => {
       const profile = await calls().create(name);

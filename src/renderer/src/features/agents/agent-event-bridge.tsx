@@ -101,7 +101,7 @@ export function AgentEventBridge() {
     refreshRoutineIds,
   } = useTurns();
   const { setBrowserControlState, applyBrowserChange } = useBrowserTabs();
-  const { setSidebarLayout } = useSidebar();
+  const { setSidebarLayout, receiveServerPins } = useSidebar();
   // As on web, mute and the notification level of the server decide the sounds too. Before the
   // server list arrives, the sounds play as they did.
   const soundLevel = () => {
@@ -137,6 +137,9 @@ export function AgentEventBridge() {
         return;
       case "sidebar-layout-changed":
         setSidebarLayout(event.layout);
+        return;
+      case "sidebar-pins-changed":
+        receiveServerPins(activeServerId(), { items: event.items, updatedAt: event.updatedAt });
         return;
       case "hidden-agents-changed":
         applyUserHiddenAgents(event.agents);
@@ -363,15 +366,6 @@ export function AgentEventBridge() {
         // one stays global. The message is already redacted in the main process.
         const toastKey = readableAgentError(event.message);
         if (claimErrorToast(toastKey)) {
-          // Codex ignored a setting and runs without it. The provider works, so this is a warning
-          // about the user's file, not a provider error.
-          if (event.code === "codex_config_ignored") {
-            toast.warning(currentText().t("agent.error.codexConfigIgnored"), {
-              ...{ description: toastKey },
-              report: { operation: "provider", source: "provider", cause_code: classifyFailure(event.message) },
-            });
-            return;
-          }
           // An MCP server left out at hand-off is not the provider failing, and calling it a
           // provider error sends the user to the wrong settings page.
           const { t } = currentText();

@@ -8,6 +8,7 @@ export interface ConversationPort {
   agent: Pick<
     OpenBotDesktopApi["agent"],
     | "readAgentSessionSettings"
+    | "listAgentNotificationLevels"
     | "askSideQuestion"
     | "setAgentSessionSetting"
     | "resetAgentSessionSetting"
@@ -17,6 +18,7 @@ export interface ConversationPort {
     | "listRoutines"
     | "listTables"
     | "markConversationRead"
+    | "markConversationUnread"
     | "readConversationPage"
     | "releaseFilePreview"
     | "searchConversationMessages"

@@ -42,7 +42,7 @@ export function ServerTasksScreen() {
   const { agents, tasks, online, supported, ready, retry } = useServerTasks(serverId, { agentId });
   const [showAllClosed, setShowAllClosed] = useState(false);
   const threadActions = useThreadActions(serverId);
-  const threadReads = useServerThreadReads(serverId, tasks);
+  const threadReads = useServerThreadReads(serverId, tasks).reads;
   const agent = agentId ? agents.find((item) => item.id === agentId) : undefined;
   const agentOf = (id: string) => agents.find((item) => item.id === id);
   const title = agent ? t("mobile.server.threads.agentTitle", { name: agent.name }) : t("mobile.app.route.threads");

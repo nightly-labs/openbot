@@ -65,6 +65,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Сообщение канала, на которое сделана ссылка, недоступно.",
   "error.backend.channelTaskNotFound": "Задача канала не найдена.",
   "error.backend.channelTaskComplete": "Эта задача уже выполнена.",
+  "error.backend.channelTaskNotStopped": "Отменить можно только остановленную или неудавшуюся задачу.",
   "error.backend.channelSelectAgent": "Выберите агента.",
   "error.backend.channelLeadRequired": "Выберите доступного ведущего канала или назначьте эту задачу участнику.",
   "error.backend.channelRoutingTooLong":
@@ -191,6 +192,8 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "Ожидание пробуждает только запуск одной из ваших регулярных задач, а у вас их нет. Создайте регулярную задачу с помощью openbot.create_routine, затем откройте ожидание.",
   "error.backend.agentWaitRemoteUnsupported": "Открытые ожидания доступны только для агентов на этом компьютере.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Отметить сообщение непрочитанным можно только для агентов на этом компьютере.",
   "error.backend.routineFlowHandoffFailed": "Регулярной задаче не удалось передать работу этому агенту.",
   "error.backend.mcpServerLimit": "OpenBot хранит не более {limit} серверов MCP.",
   "error.backend.mcpServerNameTaken": "Сервер MCP с именем {name} уже существует.",
@@ -243,6 +246,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "На сервере может быть не более {limit} разделов боковой панели.",
   "error.backend.sectionNameRequired": "Нужно название раздела.",
   "error.backend.sectionNameTooLong": "Название раздела слишком длинное.",
+  "error.backend.sidebarFolderTooDeep": "Папки могут иметь только три уровня вложенности.",
+  "error.backend.sidebarFolderMoveInvalid": "Эту папку нельзя туда переместить.",
   "error.backend.sectionNameDuplicate": "Названия разделов должны быть уникальными.",
   "error.backend.directMessageRequired": "Сначала напишите сообщение.",
   "error.backend.directMessageTooLong": "Личное сообщение может содержать не более {limit} символов.",
@@ -332,14 +337,17 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "У этого агента открыто веток: {count}. Архивируйте ветку, затем начните или восстановите другую.",
   "error.backend.threadRemoteUnsupported": "Ветки доступны только для агентов на этом компьютере.",
+  "error.backend.branchSourceBusy": "Остановите текущий ход, прежде чем создать ответвление этого чата.",
+  "error.backend.branchMessageNotFound": "Ответвление можно создать только от завершённого ответа агента.",
+  "error.backend.branchRemoteUnsupported": "Ответвления доступны только для агентов на этом компьютере.",
   "error.backend.threadMoveRefused":
     "В новой ветке можно запустить только сообщение, которое вы отправили одному этому агенту.",
   "error.backend.taskTitleRequired": "Дайте задаче короткое название.",
   "error.backend.taskToolInvalid": "Дайте задаче название не длиннее 120 символов и описание того, что нужно сделать.",
   "error.backend.taskOwnChatOnly":
     "Задачу можно начать только из своего чата. Канал, диалог в мессенджере или другая задача не может её начать.",
-  "error.backend.taskOpenLimit":
-    "У этого агента уже открыто задач: {count}. Дождитесь, пока пользователь закроет одну из них, прежде чем начинать новую.",
+  "error.backend.taskUnfinishedLimit":
+    "У этого агента уже есть незавершённые задачи: {count}. Начните новую задачу, когда одна из них завершится.",
   "error.backend.taskOpenLimitReached":
     "У этого агента открыто задач: {count}. Закройте задачу, затем начните или откройте другую.",
   "error.backend.taskRemoteUnsupported": "Задачи доступны только для агентов на этом компьютере.",

@@ -47,6 +47,7 @@ export function skillIpcHandlers({
       ),
       list: payloadHandler(nullishPayload(parseMarketplaceSkillQuery), (query) => runCauseEffect(skills.list(query))),
       get: payloadHandler(stringPayload("skillId"), (skillId) => runCauseEffect(skills.get(skillId))),
+      getBySlug: payloadHandler(stringPayload("slug"), (slug) => runCauseEffect(skills.getBySlug(slug))),
       listMine: handler(() => runCauseEffect(skills.listMine())),
       choosePackage: handler(async () => {
         const mainWindow = getMainWindow();

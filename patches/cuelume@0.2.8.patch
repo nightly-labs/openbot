@@ -1,0 +1,65 @@
+diff --git a/dist/audio/engine.d.ts b/dist/audio/engine.d.ts
+index 38311d6..0210366 100644
+--- a/dist/audio/engine.d.ts
++++ b/dist/audio/engine.d.ts
+@@ -45,6 +45,8 @@ export type PlayOptions = {
+     duration?: number;
+     /** The material for this play only; the active theme is unchanged. Unknown names play the active theme. */
+     theme?: ThemeName;
++    /** Plays while sounds are off and before a user action, for a sound that the app plays on its own. */
++    force?: boolean;
+ };
+ /**
+  * Plays a sound immediately. Safe to call from anywhere — lazily creates
+diff --git a/dist/audio/engine.js b/dist/audio/engine.js
+index c1efb7d..4c41779 100644
+--- a/dist/audio/engine.js
++++ b/dist/audio/engine.js
+@@ -136,9 +136,10 @@ export function release(sound = "tap") {
+  */
+ export function playInContext(sound, options, interaction, part = "both", gesture) {
+     const name = resolveSound(sound);
+-    if (!enabled || !name)
++    const force = options?.force === true;
++    if ((!enabled && !force) || !name)
+         return;
+-    if (isBlocked())
++    if (!force && isBlocked())
+         return;
+     const holding = gesture ? `${name}:${gesture}` : name;
+     let played;
+@@ -174,7 +175,7 @@ export function playInContext(sound, options, interaction, part = "both", gestur
+     else {
+         try {
+             void context.resume().then(() => {
+-                if (enabled && context.state === "running")
++                if ((enabled || force) && context.state === "running")
+                     renderRecipe(context, getBus, voices, name, played, part);
+             }, () => { });
+         }
+diff --git a/dist/audio/render.js b/dist/audio/render.js
+index 7b82d07e841ad7944a799caac2cdcf306f501626..b6a0393401407dd08778555432d95b9d4715f7f4 100644
+--- a/dist/audio/render.js
++++ b/dist/audio/render.js
+@@ -73,6 +73,8 @@ const HANDOFF_TIME = 0.08;
+ const NOTE_HANDOFF_TIME = 0.4;
+ /** The Artasaka press lets go 85–95 ms after it presses; a play with no real let-go waits this long. */
+ export const RELEASE_GAP = 0.09;
++/** The context time each cue's press and release last started. */
++const lastStarts = new Map();
+ /**
+  * A copy of `layer` bent by the play's context shape and its strike. A cue
+  * with `vary` also moves each layer's ring and tone a little on its own, so no
+@@ -125,6 +127,12 @@ export function renderRecipe(context, getBus, voices, sound, played, part) {
+     if (layers.length === 0)
+         return;
+     const now = context.currentTime;
++    // Plays queued while the context was not running, or made while its clock stood still, would all
++    // start at this one instant and add up to one very loud hit. Only the first of them plays.
++    const startKey = `${sound}:${part === "release" ? "release" : "press"}`;
++    if (now <= (lastStarts.get(startKey) ?? -Infinity))
++        return;
++    lastStarts.set(startKey, now);
+     const bus = getBus();
+     const { output, room } = bus;
+     const master = context.createGain();

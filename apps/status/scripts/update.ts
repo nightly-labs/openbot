@@ -113,7 +113,8 @@ const PROBES: Record<ServiceId, Probe> = {
   accounts: { origin: "api", paths: ["/health/ready"], healthy: (b) => jsonBody(b, isReady) },
   connections: {
     origin: "signal",
-    paths: ["/health/ready"],
+    // `/health/turn` allocates a relay: Signal stays ready while coturn refuses every allocation.
+    paths: ["/health/ready", "/health/turn"],
     healthy: (b) => jsonBody(b, isReady),
   },
   hosted: { origin: "api", paths: ["/health/hosting"], healthy: (b) => jsonBody(b, isHostingOk) },

@@ -10,6 +10,10 @@ import { Effect, Result } from "effect";
  * is built, and `startDevelopmentRemoteRole` after `remoteServers.initialize()`. The client half
  * polls for thirty seconds and then throws, deliberately: a dev client with no remote server is a
  * failure worth seeing at startup rather than an empty window.
+ *
+ * `OPENBOT_DEV_CLIENT_TRANSPORT=webrtc` signs the client in as the host's owner instead. The account
+ * directory then lists the host as a second device of that account, so the client reaches it over
+ * Signal and WebRTC, as a user does, and the HTTP connection file is not read.
  */
 
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -24,6 +28,14 @@ import { writeSetupState } from "./setup-store";
 import type { TeamStore } from "./team-store";
 
 export type DevelopmentRemoteRole = "host" | "client";
+export type DevelopmentClientTransport = "http" | "webrtc";
+
+const DEVELOPMENT_HOST_EMAIL = "openbot-dev-host@example.com";
+const DEVELOPMENT_CLIENT_EMAIL = "openbot-dev-client@example.com";
+
+export function readDevelopmentClientTransport(value: string | undefined): DevelopmentClientTransport {
+  return value === "webrtc" ? "webrtc" : "http";
+}
 
 const developmentRemoteServerConnectionSchema: z.ZodType<DevelopmentRemoteServerConnection> = z.object({
   serverId: z.string().min(1),
@@ -39,6 +51,7 @@ const developmentRemoteServerConnectionSchema: z.ZodType<DevelopmentRemoteServer
 export interface DevelopmentRemoteAccountOptions {
   role: DevelopmentRemoteRole;
   testClientEnabled: boolean;
+  clientTransport: DevelopmentClientTransport;
   centralAuth: CentralAuthManager;
   teamStore: TeamStore;
   setupFile: string;
@@ -48,13 +61,18 @@ export interface DevelopmentRemoteAccountOptions {
 export const applyDevelopmentRemoteAccount = Effect.fn("DevelopmentRemote.applyAccount")(function* ({
   role,
   testClientEnabled,
+  clientTransport,
   centralAuth,
   teamStore,
   setupFile,
   setupCompleted,
 }: DevelopmentRemoteAccountOptions) {
   const email =
-    role === "host" ? (teamStore.getOwnerEmail() ?? "openbot-dev-host@example.com") : "openbot-dev-client@example.com";
+    role === "host"
+      ? (teamStore.getOwnerEmail() ?? DEVELOPMENT_HOST_EMAIL)
+      : clientTransport === "webrtc"
+        ? DEVELOPMENT_HOST_EMAIL
+        : DEVELOPMENT_CLIENT_EMAIL;
   const user = yield* ensureDevelopmentAccount(centralAuth, email);
   yield* teamStore.activateAccount(user);
   if (role === "host" && !teamStore.configured) {
@@ -76,6 +94,7 @@ export const applyDevelopmentRemoteAccount = Effect.fn("DevelopmentRemote.applyA
 export interface DevelopmentRemoteRoleOptions {
   role: DevelopmentRemoteRole;
   testClientEnabled: boolean;
+  clientTransport: DevelopmentClientTransport;
   host: HostService;
   remoteServers: RemoteServerManager;
 }
@@ -83,6 +102,7 @@ export interface DevelopmentRemoteRoleOptions {
 export const startDevelopmentRemoteRole = Effect.fn("DevelopmentRemote.startRole")(function* ({
   role,
   testClientEnabled,
+  clientTransport,
   host,
   remoteServers,
 }: DevelopmentRemoteRoleOptions) {
@@ -93,6 +113,8 @@ export const startDevelopmentRemoteRole = Effect.fn("DevelopmentRemote.startRole
     if (testClientEnabled) yield* writeDevelopmentRemoteConnection(yield* host.createDevelopmentConnection());
     return;
   }
+  // The account directory, read before this runs, already added the host as a WebRTC server.
+  if (clientTransport === "webrtc") return;
   yield* connectDevelopmentRemoteServer(remoteServers);
 });
 

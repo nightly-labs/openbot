@@ -123,8 +123,9 @@
   margin-top: var(--openbot-space-4);
 }
 
-/* In the connect dialog, the body's gap spaces them. The open button keeps the width of its words. */
-.integration-wizard-body > :is(.mcp-sign-in-relay-open, .mcp-sign-in-relay-form) {
+/* In the connect and provider sign-in dialogs, the body's gap spaces them. In the connect dialog, the
+   open button keeps the width of its words. */
+:is(.integration-wizard-body, .provider-code-login-body) > :is(.mcp-sign-in-relay-open, .mcp-sign-in-relay-form) {
   margin-top: 0;
 }
 

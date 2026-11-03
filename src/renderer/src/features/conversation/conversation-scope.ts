@@ -7,6 +7,7 @@ import {
 } from "@openbot/contracts/chat-tag-references";
 import {
   customProviderOfModel,
+  isCustomProviderHarness,
   type McpSignInRelayPage,
   relayableSignInLink,
   type UpdateAgentInput,
@@ -123,10 +124,13 @@ export function createConversationViewScope(props: ConversationProps) {
     composerFocusRequest,
     setComposerFocusRequest,
     pendingSends,
+    attachmentUploads,
     showComposerActions,
     setShowComposerActions,
-    attachmentBusy,
-    setAttachmentBusy,
+    importingDrafts,
+    setImportingDrafts,
+    pastePreviews,
+    setPastePreviews,
     composerErrors,
     setComposerErrors,
     composerErrorReferences,
@@ -260,6 +264,8 @@ export function createConversationViewScope(props: ConversationProps) {
   const {
     skillSettingsRequest,
     openSkillSettings,
+    instructionsSettingsRequest,
+    openInstructionsSettings,
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,
@@ -283,11 +289,13 @@ export function createConversationViewScope(props: ConversationProps) {
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
+    attachmentDownloads,
     openSharedFile,
     openWorkspaceFile,
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
     previewQuoteId,
+    previewFileKey,
     previewWorkspaceAgentId,
     sidebarFileBack,
     openSidebarFileBack,
@@ -326,6 +334,7 @@ export function createConversationViewScope(props: ConversationProps) {
     editingServerId,
     editingDeliveryId,
     editingPendingSave,
+    pastePreviews,
     seenMessageIds: resources.seenMessageIds,
   });
   const {
@@ -336,6 +345,8 @@ export function createConversationViewScope(props: ConversationProps) {
     currentComposerError,
     currentChatError,
     unreferencedDraftAttachments,
+    rowDraftAttachments,
+    currentPastePreviews,
     composerHasContent,
     replyTarget,
     markMessageSeen,
@@ -363,6 +374,29 @@ export function createConversationViewScope(props: ConversationProps) {
     const entry = conversationErrorRuns()[composerDraftKey(target)];
     return entry?.message === message ? entry.run : null;
   });
+  /** True while a file import for the chat waits. An import for another chat does not stop this one. */
+  const attachmentBusy = (target = currentTarget()) =>
+    target !== undefined && importingDrafts().has(composerDraftKey(target));
+  /**
+   * A failed file of the chat stops a typed send until Retry or remove: the message would go
+   * without it. A voice conversation turn does not carry the draft files, so it still sends.
+   */
+  const uploadFailed = (target = currentTarget()) =>
+    target !== undefined && attachmentUploads.hasFailed(composerDraftKey(target));
+  const syncAttachmentImports = () =>
+    setImportingDrafts(new Set(Array.from(resources.importTargetAgents.values(), composerDraftKey)));
+  const currentUploads = createMemo(() => {
+    const target = currentTarget();
+    return target ? attachmentUploads.list(composerDraftKey(target)) : [];
+  });
+  /** The X of an upload chip. A file that still uploads lands nowhere: its draft attachment is discarded. */
+  const removeUpload = (requestId: string) => {
+    attachmentUploads.remove(requestId);
+    resources.importTargetAgents.delete(requestId);
+    syncAttachmentImports();
+    conversationRuntime(props).agent.discardAttachmentImport?.(requestId);
+  };
+  const retryUpload = (requestId: string) => conversationRuntime(props).agent.retryAttachmentImport?.(requestId);
   const currentPendingSends = createMemo(() => pendingSends.list(currentTarget()));
   // The host queues a message for a moment before it starts it. A send made while the agent was idle
   // stays in the chat for that moment, so it does not jump to the queue panel and back.
@@ -399,12 +433,13 @@ export function createConversationViewScope(props: ConversationProps) {
     providerSilentMinutes,
     providerOffline,
   } = activity;
-  /** The name of what the agent's turns wait for. OpenCode serves a custom endpoint, so it names the endpoint (#3234). */
+  /** The name of what the agent's turns wait for. OpenCode or Pi serves a custom endpoint, so it names the endpoint (#3234). */
   const agentProviderName = () => {
     const agent = props.agent;
     if (!agent) return undefined;
-    const endpoint =
-      agent.provider === "opencode" ? customProviderOfModel(agent.model, props.customProviders ?? []) : undefined;
+    const endpoint = isCustomProviderHarness(agent.provider)
+      ? customProviderOfModel(agent.model, props.customProviders ?? [])
+      : undefined;
     return endpoint?.name ?? providerDisplayName(agent.provider);
   };
   const browser = createBrowserStore({
@@ -695,6 +730,8 @@ export function createConversationViewScope(props: ConversationProps) {
     props,
     threadDrafts: controller.threadDrafts,
     setThreadDrafts: controller.setThreadDrafts,
+    pastePreviews,
+    setPastePreviews,
   });
   /** Moves the open thread's caret to the end of the dictated text. */
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
@@ -749,6 +786,17 @@ export function createConversationViewScope(props: ConversationProps) {
     },
   });
   const { startVoiceRecording, stopVoiceRecording, stopVoiceRecordingAndSend, cancelVoiceRecording } = voice;
+  /**
+   * Copies a conversation through an answer into a new thread. The branch opens in the chat, and its
+   * composer takes the focus, so the user can type the new direction at once.
+   */
+  const branchThread = async (sourceTaskId: string | null, messageId: string) => {
+    const onBranch = props.threads?.onBranch;
+    if (!onBranch || !(await onBranch(sourceTaskId, messageId))) return;
+    // The branch shows first, so that its editor takes the request.
+    flush();
+    setThreadFocusRequest((current) => current + 1);
+  };
   /** Dictates into the open side thread's draft. */
   const startThreadVoiceRecording = () => {
     const key = threadComposer.openDraftKey();
@@ -806,7 +854,9 @@ export function createConversationViewScope(props: ConversationProps) {
   const actions = createComposerActions({
     props,
     attachmentBusy,
-    setAttachmentBusy,
+    uploadFailed,
+    syncAttachmentImports,
+    setPastePreviews,
     attachmentImports: resources.importTargetAgents,
     agentReady: () => agentReady() && !providerUpdateRequired(),
     drafts,
@@ -932,7 +982,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setComposerError: setScopedComposerError,
     setComposerFocusRequest,
   });
-  const { replyToMessage, addPageText, setPageContext, reactToMessage, copyMessage, removeAttachment } = messageActions;
+  const { replyToMessage, addPageText, setPageContext, reactToMessage, copyMessage, messageText, removeAttachment } =
+    messageActions;
   const settings = createSettingsStore({
     props,
     runtimeSettingsAttempts: resources.runtimeSettingsAttempts,
@@ -1029,24 +1080,34 @@ export function createConversationViewScope(props: ConversationProps) {
   onSettled(() => {
     const importSounds = createAttachmentImportSounds();
     const unsubscribeImport = conversationRuntime(props).agent.onAttachmentImport((event) => {
+      if (event.type === "progress") {
+        attachmentUploads.progress(event.requestId, event.sent);
+        return;
+      }
+      // A retry runs again in the chat of the failed import, also when a side thread is open now.
+      const retried = event.type === "started" ? attachmentUploads.get(event.requestId) : undefined;
       const threadKey = event.type === "started" ? undefined : threadComposer.releaseImport(event.requestId);
       if (event.type === "started") {
         // A side thread covers the agent's own chat, so a file dropped or picked there goes to the thread.
-        if (threadComposer.openDraftKey() !== undefined) {
+        if (!retried && threadComposer.openDraftKey() !== undefined) {
           if (threadComposer.claimImport(event.requestId, event.serverId)) importSounds.started(event.requestId);
           return;
         }
-        const target = currentTarget();
+        const target = retried?.target ?? currentTarget();
         if (target?.serverId === event.serverId) {
           resources.importTargetAgents.set(event.requestId, target);
           clearConversationError(target);
           importSounds.started(event.requestId);
+          // A set over the attachment limits names no files. Main refuses it whole, with a banner.
+          if (event.files.length > 0) attachmentUploads.start(event.requestId, target, event.files);
         }
-        setAttachmentBusy(true);
+        syncAttachmentImports();
         setScopedComposerError(null);
       } else if (threadKey !== undefined) {
         if (event.type === "error") {
           importSounds.cancel(event.requestId);
+          // A side thread has no upload chip, so no Retry: the files are not kept for one.
+          conversationRuntime(props).agent.discardAttachmentImport?.(event.requestId);
           actionToast.error(event.message);
         } else {
           // A cancelled import completes with no attachments.
@@ -1057,14 +1118,23 @@ export function createConversationViewScope(props: ConversationProps) {
       } else if (event.type === "error") {
         const target = resources.importTargetAgents.get(event.requestId);
         resources.importTargetAgents.delete(event.requestId);
-        setAttachmentBusy(resources.importTargetAgents.size > 0);
+        syncAttachmentImports();
         if (target) {
           importSounds.finished(event.requestId, "error");
-          setConversationErrors((current) => ({
-            ...current,
-            [composerDraftKey(target)]: event.message,
-          }));
-        }
+          // The chip of the file shows the failure, with Retry. An import with no chip has the banner.
+          // Electron puts the IPC channel in front of the sentence; the chip shows only the sentence.
+          if (attachmentUploads.get(event.requestId)) {
+            const { t, errorMessage } = currentText();
+            attachmentUploads.fail(event.requestId, errorMessage(event.message, t("composer.upload.failed")));
+          } else
+            setConversationErrors((current) => ({
+              ...current,
+              [composerDraftKey(target)]: event.message,
+            }));
+        } else importSounds.cancel(event.requestId);
+        // Only a chip offers Retry, so the files of an import with none are not kept for one.
+        if (!attachmentUploads.get(event.requestId))
+          conversationRuntime(props).agent.discardAttachmentImport?.(event.requestId);
       } else {
         const target = resources.importTargetAgents.get(event.requestId);
         if (target) {
@@ -1073,10 +1143,13 @@ export function createConversationViewScope(props: ConversationProps) {
           else importSounds.cancel(event.requestId);
           void addAttachments(event.attachments, target).finally(() => {
             resources.importTargetAgents.delete(event.requestId);
-            setAttachmentBusy(resources.importTargetAgents.size > 0);
+            attachmentUploads.remove(event.requestId);
+            syncAttachmentImports();
           });
         } else {
-          setAttachmentBusy(resources.importTargetAgents.size > 0);
+          // The user removed the chip while the file uploaded, so the file lands nowhere.
+          importSounds.cancel(event.requestId);
+          syncAttachmentImports();
           for (const attachment of event.attachments) {
             void conversationRuntime(props).agent.discardDraftAttachment(attachment.id, event.serverId);
           }
@@ -1850,6 +1923,18 @@ export function createConversationViewScope(props: ConversationProps) {
   const setUnreadMessagesDividerElement = (element: HTMLDivElement) => {
     unreadMessagesDivider = element;
   };
+  // The NEW line animates in when it shows a place that the last line did not mark: a chat that
+  // opens at its unread messages, or Mark unread. The virtualizer draws a row again when it scrolls
+  // back into view, and that draw shows the line at once.
+  let animatedUnreadBoundary: string | undefined;
+  const unreadDividerArrives = (): boolean => {
+    const boundary = untrack(
+      () => `${props.server?.id ?? "local"}:${conversationOwnerId(props) ?? ""}:${unreadBoundaryMessageId() ?? ""}`,
+    );
+    if (boundary === animatedUnreadBoundary) return false;
+    animatedUnreadBoundary = boundary;
+    return true;
+  };
   const setAgentActivitySlotElement = (element: HTMLDivElement) => {
     agentActivitySlot = element;
     scrollResizeObserver?.observe(element);
@@ -1892,6 +1977,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setThreadScrollElement,
     threadComposer,
     threadFocusRequest,
+    branchThread,
     threadVoiceLiveText,
     threadVoiceOwned,
     replyJump,
@@ -1912,6 +1998,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setStickToLatest,
     followReaderScroll,
     setUnreadMessagesDividerElement,
+    unreadDividerArrives,
     setVirtualRootElement,
     activeBrowserControl,
     actingBrowserControl,
@@ -1933,7 +2020,12 @@ export function createConversationViewScope(props: ConversationProps) {
     showBrowserTabOf,
     browserTabOwner,
     attachmentAction,
+    attachmentDownloads,
     attachmentBusy,
+    uploadFailed,
+    currentUploads,
+    removeUpload,
+    retryUpload,
     browserAddress,
     browserSidebarOpen,
     browserExpandedOpen,
@@ -1967,6 +2059,7 @@ export function createConversationViewScope(props: ConversationProps) {
     composerHasContent,
     copiedMessageId,
     copyMessage,
+    messageText,
     pasteFiles,
     releaseCutAttachments,
     clearSubmittedDraft,
@@ -2034,6 +2127,7 @@ export function createConversationViewScope(props: ConversationProps) {
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
     previewQuoteId,
+    previewFileKey,
     previewWorkspaceAgentId,
     sidebarFileBack,
     openSidebarFileBack,
@@ -2063,6 +2157,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setPageContext,
     skillSettingsRequest,
     openSkillSettings,
+    instructionsSettingsRequest,
+    openInstructionsSettings,
     routineSettingsRequest,
     updateRuntimeSettings,
     scheduleUnreadDividerVisibilityUpdate,
@@ -2110,6 +2206,8 @@ export function createConversationViewScope(props: ConversationProps) {
     submitting,
     unreadDividerVisible,
     unreferencedDraftAttachments,
+    rowDraftAttachments,
+    currentPastePreviews,
     updateCurrentDraft,
     updateScrollFade,
     updateTeamTyping,

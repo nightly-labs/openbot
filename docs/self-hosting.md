@@ -69,6 +69,7 @@ Keep the private JWK secret. With it, a person can open each host that uses your
    - `r2_buckets`: set the bucket names, if you used other names.
    - `vars`:
      - `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USERNAME`, `EMAIL_FROM`: your SMTP account.
+     - `EMAIL_LICENSE_FROM`: the sender of license emails, or empty to use `EMAIL_FROM`.
      - `REMOTE_TICKET_KEY_ID`: the key ID from step 1.
      - `REMOTE_SIGNAL_URL`: `wss://signal.example.com/v1/signal`.
      - `REMOTE_AUTH_WEBHOOK_URL`: `https://signal.example.com/internal/auth-events`.
@@ -106,7 +107,8 @@ Keep the private JWK secret. With it, a person can open each host that uses your
    - `REMOTE_TICKET_JWKS_URL`: `https://api.example.com/.well-known/jwks.json`.
    - `REMOTE_CONTROL_PLANE_URL`: `https://api.example.com`.
    - The Signal secrets from step 1.
-   - Leave `SLACK_SIGNING_SECRET`, `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID` and the `TELEGRAM_*` values empty.
+   - Leave `SLACK_SIGNING_SECRET`, `GITHUB_WEBHOOK_SECRET`, `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID` and the
+     `TELEGRAM_*` values empty.
 
    If a reverse proxy already uses port 443, also set the values in
    [the reverse proxy notes](../remote/README.md#production-requirements).

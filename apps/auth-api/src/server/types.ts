@@ -3,7 +3,7 @@ import { isDynamicRecord, isFunction } from "@openbot/contracts/runtime-values";
 import type { Effect } from "effect";
 import type { AuthStoreError } from "./d1-auth-repository";
 import type { EmailDeliveryError } from "./email-delivery";
-import type { SmtpContactMessage, SmtpFailure, SmtpWelcomeMessage } from "./smtp-email-delivery";
+import type { SmtpContactMessage, SmtpFailure, SmtpLicenseMessage, SmtpWelcomeMessage } from "./smtp-email-delivery";
 
 export interface WorkerBindings {
   DB: D1Database;
@@ -23,6 +23,10 @@ export interface WorkerBindings {
   EMAIL_SMTP_USERNAME?: string;
   EMAIL_SMTP_PASSWORD?: string;
   EMAIL_FROM?: string;
+  /** The sender of license emails. Empty uses `EMAIL_FROM`. The SMTP account must be allowed to send as it. */
+  EMAIL_LICENSE_FROM?: string;
+  /** The email relay Worker. Without it, email leaves from this Worker's own socket. */
+  EMAIL_RELAY?: Fetcher;
   EMAIL_DELIVERY_WEBHOOK_URL?: string;
   EMAIL_DELIVERY_WEBHOOK_SECRET?: string;
   SKILLS_ADMIN_TOKEN?: string;
@@ -35,9 +39,24 @@ export interface WorkerBindings {
   REMOTE_TICKET_PRIVATE_JWK?: string;
   REMOTE_TICKET_PUBLIC_JWKS?: string;
   REMOTE_TICKET_KEY_ID?: string;
+  /** The entry Signal: released hosts, ingress, bots, and hosts with no home. */
   REMOTE_SIGNAL_URL?: string;
+  /**
+   * The Signal machines that a host can have as its home, as `id=url,id=url`. Empty = no homes, and
+   * each ticket names `REMOTE_SIGNAL_URL`.
+   */
+  REMOTE_SIGNAL_HOMES?: string;
   REMOTE_AUTH_WEBHOOK_URL?: string;
+  /** Each Signal that gets the auth events, as `url,url`. Empty = only `REMOTE_AUTH_WEBHOOK_URL`. */
+  REMOTE_AUTH_WEBHOOK_URLS?: string;
   REMOTE_AUTH_WEBHOOK_SECRET?: string;
+  /**
+   * The Cloudflare zone of the `REMOTE_SIGNAL_URL` name. With `SIGNAL_ENTRY_DNS_TOKEN` and two homes, the
+   * cron moves that name to a home that answers when its machine stops (`signal-entry-failover.ts`).
+   */
+  SIGNAL_ENTRY_ZONE_ID?: string;
+  /** A Cloudflare API token that can read and edit the DNS records of `SIGNAL_ENTRY_ZONE_ID` only. */
+  SIGNAL_ENTRY_DNS_TOKEN?: string;
   /** Signs Slack route tickets. Its public key must also be in `REMOTE_TICKET_PUBLIC_JWKS`. */
   SLACK_ROUTE_PRIVATE_JWK?: string;
   SLACK_ROUTE_KEY_ID?: string;
@@ -164,6 +183,8 @@ export interface AuthUser {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  /** The latest product analytics answer from any device. Null until the user answers. */
+  analyticsEnabled: boolean | null;
 }
 
 export interface MobileAuthDevice {
@@ -202,6 +223,10 @@ export interface TeamInviteEmailDelivery {
 
 export interface WelcomeEmailDelivery {
   send(message: SmtpWelcomeMessage): Effect.Effect<void, SmtpFailure>;
+}
+
+export interface LicenseEmailDelivery {
+  send(message: SmtpLicenseMessage): Effect.Effect<void, SmtpFailure>;
 }
 
 export interface ContactMessageDelivery {
@@ -263,6 +288,12 @@ export interface AuthRepository {
   revokeSession(sessionToken: string, now: number): Effect.Effect<void, AuthStoreError>;
   revokeMobileSession(sessionToken: string, now: number): Effect.Effect<boolean, AuthStoreError>;
   updateUserName(userId: string, name: string, now: number): Effect.Effect<AuthUser, AuthStoreError>;
+  updateUserAnalytics(
+    userId: string,
+    enabled: boolean,
+    answeredAt: number,
+    now: number,
+  ): Effect.Effect<AuthUser, AuthStoreError>;
   updateUserAvatar(
     userId: string,
     avatarUrl: string | null,

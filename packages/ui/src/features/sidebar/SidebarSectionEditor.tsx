@@ -67,3 +67,20 @@ export function SidebarSectionEditor() {
     </header>
   );
 }
+
+/** The name field of a folder that a create is making in `parentId` (null: at the top). */
+export function SidebarSectionDraft(draftProps: { parentId: string | null }) {
+  const { pending } = useSidebarScope();
+  const { t } = useText();
+  const here = () => {
+    const target = pending.sectionEditor?.target;
+    return target?.kind === "create" && (target.parentId ?? null) === draftProps.parentId;
+  };
+  return (
+    <Show when={here()}>
+      <section class="sidebar-chat-group sidebar-section sidebar-section-draft" aria-label={t("sidebar.new.section")}>
+        <SidebarSectionEditor />
+      </section>
+    </Show>
+  );
+}

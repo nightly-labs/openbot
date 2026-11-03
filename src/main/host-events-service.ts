@@ -581,6 +581,11 @@ export class HostEventsService implements HostEventsApi {
  * a new secret for the user.
  */
 export function agentWebhookRoutineWriter(events: HostEventsService): WebhookRoutineWriter {
+  const toolFailure = (failure: HostEventsFailure) => {
+    // A reason the model can correct, such as the route limit, comes back as a tool failure.
+    const message = hostEventsFailureMessage(failure);
+    return new RoutineOperationFailed({ cause: message === null ? failure : new RoutineInputError(message) });
+  };
   return {
     save: ({ routineId, agentId, eventType, filters, ...routine }) =>
       events
@@ -592,11 +597,9 @@ export function agentWebhookRoutineWriter(events: HostEventsService): WebhookRou
         })
         .pipe(
           Effect.map((saved) => saved.routine),
-          Effect.mapError((failure) => {
-            // A reason the model can correct, such as the route limit, comes back as a tool failure.
-            const message = hostEventsFailureMessage(failure);
-            return new RoutineOperationFailed({ cause: message === null ? failure : new RoutineInputError(message) });
-          }),
+          Effect.mapError(toolFailure),
         ),
+    delete: ({ agentId, routineId }) =>
+      events.deleteRoutine({ owner: { kind: "agent", id: agentId }, id: routineId }).pipe(Effect.mapError(toolFailure)),
   };
 }

@@ -9,6 +9,7 @@ import {
   ChevronsUpDown,
   ContextMenu,
   DropdownMenu,
+  Eye,
   Moon,
   PanelLeft,
   Plus,
@@ -17,7 +18,14 @@ import { SwapLabel } from "@openbot/ui/components/SwapLabel";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { type ServerActionCallbacks, ServerActionItems } from "./ServerActionItems";
-import { addServerLabel, ServerMark, ServerSleepDot, serverHostedSleep, serverStatusLabels } from "./ServerRail";
+import {
+  addServerLabel,
+  type HiddenLocalServer,
+  ServerMark,
+  ServerSleepDot,
+  serverHostedSleep,
+  serverStatusLabels,
+} from "./ServerRail";
 
 /** Where the desktop app lists servers: the rail beside the sidebar, or the menu on the server name. */
 export type ServerView = "rail" | "menu";
@@ -46,6 +54,8 @@ export interface ServerMenuProps extends ServerActionCallbacks {
   addCreatesServer?: boolean | undefined;
   /** Opens the dialog that creates a server on this computer. Without it, the menu does not show the item. */
   onCreateLocal?: (() => void) | undefined;
+  /** The server on this computer while the user hides it. Without it, the menu does not show the item. */
+  hiddenLocal?: HiddenLocalServer | undefined;
   /** The compact sidebar hides the server name. The rail stays visible then. */
   compact?: boolean;
 }
@@ -193,6 +203,8 @@ export function ServerMenu(props: ServerMenuProps) {
                       canRestart={props.canRestart}
                       onRemove={props.onRemove}
                       canRemove={props.canRemove}
+                      onHide={props.onHide}
+                      canHide={props.canHide}
                     />
                   )}
                 </Show>
@@ -237,7 +249,7 @@ export function ServerMenu(props: ServerMenuProps) {
                           server={server()}
                           trigger={() => trigger ?? null}
                           onSetMuted={props.onSetMuted}
-                          onSetNotificationLevel={props.onSetNotificationLevel}
+                          onOpenNotificationSettings={props.onOpenNotificationSettings}
                           onOpenSettings={props.onOpenSettings}
                           onLeave={props.onLeave}
                           onDelete={props.onDelete}
@@ -246,6 +258,8 @@ export function ServerMenu(props: ServerMenuProps) {
                           canRestart={props.canRestart}
                           onRemove={props.onRemove}
                           canRemove={props.canRemove}
+                          onHide={props.onHide}
+                          canHide={props.canHide}
                         />
                       </DropdownMenu.SubContent>
                     </DropdownMenu.Portal>
@@ -270,6 +284,16 @@ export function ServerMenu(props: ServerMenuProps) {
                   </DropdownMenu.Item>
                 )}
               </Show>
+              <Show when={props.hiddenLocal}>
+                {(hiddenLocal) => (
+                  <DropdownMenu.Item class="server-menu-add" onSelect={() => hiddenLocal().show()}>
+                    <span class="server-menu-add-circle" aria-hidden="true">
+                      <Eye />
+                    </span>
+                    <span>{t("server.rail.showLocal", { name: hiddenLocal().name })}</span>
+                  </DropdownMenu.Item>
+                )}
+              </Show>
               <Show when={activeServer()}>
                 {(server) => (
                   <>
@@ -288,6 +312,8 @@ export function ServerMenu(props: ServerMenuProps) {
                       canRestart={props.canRestart}
                       onRemove={props.onRemove}
                       canRemove={props.canRemove}
+                      onHide={props.onHide}
+                      canHide={props.canHide}
                     />
                   </>
                 )}
@@ -351,7 +377,7 @@ export function ServerMenu(props: ServerMenuProps) {
                   server={server()}
                   trigger={() => trigger ?? null}
                   onSetMuted={props.onSetMuted}
-                  onSetNotificationLevel={props.onSetNotificationLevel}
+                  onOpenNotificationSettings={props.onOpenNotificationSettings}
                   onOpenSettings={props.onOpenSettings}
                   onLeave={props.onLeave}
                   onDelete={props.onDelete}
@@ -360,6 +386,8 @@ export function ServerMenu(props: ServerMenuProps) {
                   canRestart={props.canRestart}
                   onRemove={props.onRemove}
                   canRemove={props.canRemove}
+                  onHide={props.onHide}
+                  canHide={props.canHide}
                 />
               )}
             </Show>

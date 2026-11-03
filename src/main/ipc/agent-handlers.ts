@@ -1,3 +1,7 @@
+import {
+  AGENT_FAST_MODE_CAPABILITY,
+  AGENT_FAST_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import {
   AGENT_SESSION_SETTINGS_CAPABILITY,
@@ -7,6 +11,11 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import {
+  SIDEBAR_FOLDERS_CAPABILITY,
+  SIDEBAR_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/sidebar-folders-v1";
+import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
 // Every one of these routes to the local service or to a remote server by the
@@ -20,6 +29,7 @@ import {
   BROWSER_SECRET_RESPONSE_PATH,
   CHANNEL_DELETE_CAPABILITY,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  decodeAgentFastModels,
   decodeAgentProfileDraft,
   decodeChannel,
   decodeChannelPage,
@@ -27,6 +37,7 @@ import {
   decodeSaveAgentProfileResult,
   hostAnalyticsQuery,
   isAgentModelOption,
+  LOCAL_SERVER_ID,
   parseAgentAnalyticsInput,
   parseAskSideQuestion,
   parseChannelCommand,
@@ -37,12 +48,23 @@ import {
   parseResetAgentSessionSetting,
   parseSaveAgentProfile,
   parseSetAgentHiddenInput,
+  parseSetAgentNotificationLevelInput,
   parseSetAgentSessionSetting,
+  parseSetSidebarPinsInput,
   remoteBrowserSecretResponse,
+  type SetSidebarPinsInput,
+  type SidebarLayoutAction,
+  type SidebarLayoutSnapshot,
+  withFastServiceTiers,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_TASKS_CAPABILITY, AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import {
+  AGENT_THREAD_BRANCHES_CAPABILITY,
+  AGENT_THREAD_BRANCHES_ROUTES,
+  withAgentThreadBranches,
+} from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import {
   AGENT_THREAD_FILES_CAPABILITY,
   AGENT_THREAD_FILES_ROUTES,
@@ -53,6 +75,10 @@ import {
 } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import {
+  CONTEXT_COMPACT_CAPABILITY,
+  CONTEXT_COMPACT_ROUTES,
+} from "@openbot/contracts/team-protocol/context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY, CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
@@ -65,6 +91,7 @@ import {
 } from "@openbot/contracts/team-protocol/side-question-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import { Effect } from "effect";
 import { duplicateAgentIntoLayout } from "../../backend/agent/duplication-gate";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -86,18 +113,22 @@ import {
   decodeQueueSnapshot,
   decodeRemoteAgentTask,
   decodeRemoteAgentTasks,
+  decodeRemoteAgentThreadBranches,
   decodeRemoteTaskConversation,
   decodeRemoteTaskReadState,
   decodeSidebarLayoutSnapshot,
+  decodeSidebarPinsFromHost,
 } from "../remote-agent-decoding";
 import { acceptEmpty, decodeVoid, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
+import { OWNER_PIN_KEY, type SidebarPinStore } from "../sidebar-pin-store";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
   parseAcknowledgeFailedTurn,
   parseAgentId,
   parseAgentTask,
   parseApprovalResponse,
+  parseBranchAgentTask,
   parseBrowserTakeoverResponse,
   parseCancelAgentWait,
   parseCancelMessageLink,
@@ -107,6 +138,7 @@ import {
   parseInterrupt,
   parseMarkAgentTaskRead,
   parseMarkConversationRead,
+  parseMarkConversationUnread,
   parseMessageReaction,
   parseOpenMessageLink,
   parseOptionalAgentId,
@@ -121,7 +153,7 @@ import {
   parseSearchConversationMessages,
   parseSendMessage,
   parseSetAgentAvatar,
-  parseSidebarLayoutAction,
+  parseSidebarFolderAction,
   parseStartAgentTask,
   parseSteerQueuedMessage,
   parseUpdateAgent,
@@ -175,6 +207,7 @@ function logRejectedModels<T>(models: T, source: "local" | "remote"): T {
 export interface AgentIpcDependencies {
   service: AgentService;
   sidebarLayout: SidebarLayoutStore;
+  sidebarPins: SidebarPinStore;
   host: HostService;
   remoteServers: RemoteServerManager;
   skills: SkillMarketplaceService;
@@ -185,6 +218,7 @@ export interface AgentIpcDependencies {
 export function agentIpcHandlers({
   service,
   sidebarLayout,
+  sidebarPins,
   host,
   remoteServers,
   skills,
@@ -198,10 +232,38 @@ export function agentIpcHandlers({
       taskRemoteUnsupported();
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   };
+  const saveRemoteSidebarPins = (serverId: string, path: string, body: SetSidebarPinsInput) => {
+    if (!remoteServers.supportsCapability(serverId, SIDEBAR_PINS_CAPABILITY))
+      throw new Error(sourceText("error.team.sidebarPinsUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decodeSidebarPinsFromHost, { method: "POST", body }));
+  };
+  // The context-compact-v1 codec has already checked the empty reply.
+  const remoteCompact = async (serverId: string, path: string, body: AgentTaskInput | { agentId: string }) => {
+    if (!remoteServers.supportsCapability(serverId, CONTEXT_COMPACT_CAPABILITY))
+      throw new Error(sourceText("error.team.contextCompactUnsupported"));
+    await runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
+  };
   const remoteThreadRequest = (serverId: string, path: string, body: AgentTaskInput & { title?: string }) => {
     if (!remoteServers.supportsCapability(serverId, AGENT_THREADS_CAPABILITY)) taskRemoteUnsupported();
     return runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
   };
+  // `sidebar-folders-v1` reads the layout with the parent of each folder. A released route answers it
+  // without them, so a result of one is read again: the renderer would show the folders flat.
+  const remoteFolderLayout = (serverId: string, body: SidebarLayoutAction | Record<string, never>) =>
+    runCauseEffect(
+      remoteServers.request(
+        serverId,
+        "type" in body ? SIDEBAR_FOLDERS_ROUTES.actions : SIDEBAR_FOLDERS_ROUTES.read,
+        decodeSidebarLayoutSnapshot,
+        { method: "POST", body },
+      ),
+    );
+  // The save or the copy is done when the second read starts. A failed read keeps the layout of the
+  // answer, so the caller does not try again and make a second agent; the next layout event has the parents.
+  const withRemoteFolders = async <T extends { layout: SidebarLayoutSnapshot }>(serverId: string, result: T) =>
+    remoteServers.supportsCapability(serverId, SIDEBAR_FOLDERS_CAPABILITY)
+      ? { ...result, layout: await remoteFolderLayout(serverId, {}).catch(() => result.layout) }
+      : result;
   return {
     agent: {
       getStatus: scopedQueryHandler({
@@ -253,12 +315,27 @@ export function agentIpcHandlers({
       }),
       listModels: scopedQueryHandler({
         local: () => logRejectedModels(service.listModels(), "local"),
-        remote: (serverId) =>
-          runCauseEffect(
-            remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
-              decodeAgentModelOptions(logRejectedModels(value, "remote")),
-            ),
-          ),
+        remote: (serverId) => {
+          const models = remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
+            decodeAgentModelOptions(logRejectedModels(value, "remote")),
+          );
+          // The released model list drops the fast tier, so a host with `agent-fast-mode-v1` gives it
+          // on its own route, and the picker shows the Fast switch as for a local agent. The tiers are
+          // optional: when that route fails, the picker gets the models with no Fast switch.
+          if (!remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY)) return runCauseEffect(models);
+          return runCauseEffect(
+            Effect.gen(function* () {
+              const options = yield* models;
+              const fast = yield* remoteServers
+                .request(serverId, AGENT_FAST_MODE_ROUTES.models, decodeAgentFastModels, {
+                  method: "POST",
+                  body: {},
+                })
+                .pipe(Effect.orElseSucceed(() => []));
+              return withFastServiceTiers(options, fast);
+            }),
+          );
+        },
       }),
       readAgentSessionSettings: scopedHandler(parseAgentId, {
         local: (agentId) => runCauseEffect(service.readAgentSessionSettings(agentId)),
@@ -325,6 +402,15 @@ export function agentIpcHandlers({
           );
         },
       }),
+      // The manager keeps the levels of each server, so the server list shows the level that they set.
+      listAgentNotificationLevels: scopedQueryHandler({
+        local: () => remoteServers.cachedNotificationLevels(LOCAL_SERVER_ID),
+        remote: (serverId) => runCauseEffect(remoteServers.notificationLevels(serverId)),
+      }),
+      setAgentNotificationLevel: scopedHandler(parseSetAgentNotificationLevelInput, {
+        local: (input) => runCauseEffect(remoteServers.setAgentNotificationLevel(LOCAL_SERVER_ID, input)),
+        remote: (input, serverId) => runCauseEffect(remoteServers.setAgentNotificationLevel(serverId, input)),
+      }),
       listAgents: scopedQueryHandler({
         local: () => service.listAgents(),
         remote: (serverId) =>
@@ -380,19 +466,49 @@ export function agentIpcHandlers({
       getSidebarLayout: scopedQueryHandler({
         local: () => sidebarLayout.getSnapshot(),
         remote: (serverId) =>
-          runCauseEffect(
-            remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayoutSnapshot),
-          ),
+          remoteServers.supportsCapability(serverId, SIDEBAR_FOLDERS_CAPABILITY)
+            ? remoteFolderLayout(serverId, {})
+            : runCauseEffect(
+                remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayoutSnapshot),
+              ),
       }),
-      mutateSidebarLayout: scopedHandler(parseSidebarLayoutAction, {
+      mutateSidebarLayout: scopedHandler(parseSidebarFolderAction, {
         local: (action) => runCauseEffect(sidebarLayout.mutate(action, service.sidebarChatIds())),
-        remote: (action, serverId) =>
-          runCauseEffect(
+        remote: (action, serverId) => {
+          if (remoteServers.supportsCapability(serverId, SIDEBAR_FOLDERS_CAPABILITY))
+            return remoteFolderLayout(serverId, action);
+          // The released route has every folder at the top: it refuses `nest`, and would drop a parent.
+          if (action.type === "nest" || (action.type === "create" && action.parentId !== undefined))
+            throw new Error(sourceText("error.team.sidebarFoldersUnsupported"));
+          return runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.actions, decodeSidebarLayoutSnapshot, {
               method: "POST",
               body: action,
             }),
-          ),
+          );
+        },
+      }),
+      // The owner of this computer shares the pins of this server with their phones.
+      getSidebarPins: scopedQueryHandler({
+        local: () => sidebarPins.snapshot(OWNER_PIN_KEY),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, SIDEBAR_PINS_CAPABILITY))
+            throw new Error(sourceText("error.team.sidebarPinsUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, SIDEBAR_PINS_ROUTES.read, decodeSidebarPinsFromHost, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
+      }),
+      setSidebarPins: scopedHandler(parseSetSidebarPinsInput, {
+        local: ({ items }) => runCauseEffect(sidebarPins.set(OWNER_PIN_KEY, items)),
+        remote: (input, serverId) => saveRemoteSidebarPins(serverId, SIDEBAR_PINS_ROUTES.set, input),
+      }),
+      seedSidebarPins: scopedHandler(parseSetSidebarPinsInput, {
+        local: ({ items }) => runCauseEffect(sidebarPins.seed(OWNER_PIN_KEY, items)),
+        remote: (input, serverId) => saveRemoteSidebarPins(serverId, SIDEBAR_PINS_ROUTES.seed, input),
       }),
       generateProfile: scopedHandler(parseGenerateAgentProfile, {
         local: (input) => runCauseEffect(service.generateProfile(input, sidebarLayout.getSnapshot().sections)),
@@ -426,12 +542,15 @@ export function agentIpcHandlers({
       }),
       saveProfile: scopedHandler(parseSaveAgentProfile, {
         local: (input) => runCauseEffect(service.saveProfile(input, sidebarLayout, host.conversationSender())),
-        remote: (input, serverId) =>
-          runCauseEffect(
-            remoteServers.request(serverId, TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
-              method: "POST",
-              body: input,
-            }),
+        remote: async (input, serverId) =>
+          withRemoteFolders(
+            serverId,
+            await runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
+                method: "POST",
+                body: input,
+              }),
+            ),
           ),
       }),
       createAgent: scopedHandler(parseCreateAgent, {
@@ -451,7 +570,8 @@ export function agentIpcHandlers({
               host.copyAgentAccess(agentId, copyId),
             ),
           ),
-        remote: (agentId, serverId) => runCauseEffect(remoteServers.duplicateAgent(agentId, serverId)),
+        remote: async (agentId, serverId) =>
+          withRemoteFolders(serverId, await runCauseEffect(remoteServers.duplicateAgent(agentId, serverId))),
       }),
       updateAgent: scopedHandler(parseUpdateAgent, {
         local: (input) => runCauseEffect(service.updateAgent(input)),
@@ -469,6 +589,7 @@ export function agentIpcHandlers({
           if (input.allowNewChat !== undefined) {
             throw new Error(sourceText("error.agent.newChatLocalOnly"));
           }
+          // The released agent route does not carry it; the renderer sends it on `agent-plan-card-v1`.
           if (input.quickAcknowledgement !== undefined) {
             throw new Error(sourceText("error.agent.quickAcknowledgementLocalOnly"));
           }
@@ -584,6 +705,12 @@ export function agentIpcHandlers({
         local: (parsed) => runCauseEffect(host.markAgentConversationRead(parsed)),
         remote: (parsed, serverId) => runCauseEffect(remoteServers.markAgentConversationRead(parsed, serverId)),
       }),
+      markConversationUnread: scopedHandler(parseMarkConversationUnread, {
+        local: (parsed) => runCauseEffect(host.markAgentConversationUnread(parsed)),
+        remote: () => {
+          throw new Error(sourceText("error.backend.markUnreadRemoteUnsupported"));
+        },
+      }),
       sendMessage: scopedHandler(parseSendMessage, {
         local: (input) => runCauseEffect(service.sendMessage(input, host.conversationSender())),
         remote: (input, serverId) => {
@@ -637,18 +764,31 @@ export function agentIpcHandlers({
           throw new Error(sourceText("error.backend.agentWaitRemoteUnsupported"));
         },
       }),
-      // A joined server has tasks through `agent-tasks-v1`. A server without it shows no task.
+      // A joined server has tasks through `agent-tasks-v1`. A server without it shows no task. A server
+      // with `agent-thread-branches-v1` also gives the branch links, read after the tasks so that each
+      // listed branch has its link.
       listTasks: scopedHandler(parseAgentId, {
         local: (agentId) => service.listTasks(agentId),
-        remote: (agentId, serverId) =>
-          remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY)
-            ? runCauseEffect(
-                remoteServers.request(serverId, AGENT_TASKS_ROUTES.list, decodeRemoteAgentTasks, {
-                  method: "POST",
-                  body: { agentId },
-                }),
-              )
-            : { agentId, tasks: [], limit: 1 },
+        remote: (agentId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY))
+            return { agentId, tasks: [], limit: 1 };
+          const init = { method: "POST", body: { agentId } } as const;
+          const tasks = remoteServers.request(serverId, AGENT_TASKS_ROUTES.list, decodeRemoteAgentTasks, init);
+          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_BRANCHES_CAPABILITY))
+            return runCauseEffect(tasks);
+          return runCauseEffect(
+            Effect.gen(function* () {
+              const snapshot = yield* tasks;
+              const links = yield* remoteServers.request(
+                serverId,
+                AGENT_THREAD_BRANCHES_ROUTES.list,
+                decodeRemoteAgentThreadBranches,
+                init,
+              );
+              return withAgentThreadBranches(snapshot, links.branches);
+            }),
+          );
+        },
       }),
       readTask: scopedHandler(parseAgentTask, {
         local: (parsed) => service.readTask(parsed.agentId, parsed.taskId),
@@ -676,6 +816,25 @@ export function agentIpcHandlers({
       runQueuedMessageAsTask: scopedHandler(parseRunQueuedMessageAsTask, {
         local: (parsed) => runCauseEffect(service.runQueuedMessageAsTask(parsed)),
         remote: taskRemoteUnsupported,
+      }),
+      // A joined server branches through `agent-thread-branches-v1`; an older one cannot branch.
+      branchTask: scopedHandler(parseBranchAgentTask, {
+        local: (parsed) => runCauseEffect(host.branchAgentTask(parsed)),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_BRANCHES_CAPABILITY))
+            throw new Error(sourceText("error.backend.branchRemoteUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_THREAD_BRANCHES_ROUTES.branch, decodeRemoteAgentTask, {
+              method: "POST",
+              body: {
+                agentId: parsed.agentId,
+                taskId: parsed.taskId,
+                messageId: parsed.messageId,
+                requestId: parsed.requestId,
+              },
+            }),
+          );
+        },
       }),
       stopTask: scopedHandler(parseAgentTask, {
         local: (parsed) => runCauseEffect(service.stopTask(parsed)),
@@ -809,18 +968,15 @@ export function agentIpcHandlers({
           );
         },
       }),
-      // Local only: the Team API has no route, and a joined server's agent shows no context ring.
+      // A joined server compacts with `context-compact-v1`.
       compactContext: scopedHandler(parseAgentId, {
         local: (agentId) => runCauseEffect(service.compactAgentContext(agentId)),
-        remote: () => {
-          throw new Error(sourceText("error.team.contextCompactUnsupported"));
-        },
+        remote: (agentId, serverId) => remoteCompact(serverId, CONTEXT_COMPACT_ROUTES.compact, { agentId }),
       }),
       compactTaskContext: scopedHandler(parseAgentTask, {
         local: (parsed) => runCauseEffect(service.compactTaskContext(parsed)),
-        remote: () => {
-          throw new Error(sourceText("error.team.contextCompactUnsupported"));
-        },
+        remote: ({ agentId, taskId }, serverId) =>
+          remoteCompact(serverId, CONTEXT_COMPACT_ROUTES.compactTask, { agentId, taskId }),
       }),
       respondToPrompt: scopedHandler(parsePromptResponse, {
         local: (parsed) => runCauseEffect(service.respondToPrompt(parsed)),

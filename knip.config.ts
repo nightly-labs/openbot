@@ -48,6 +48,8 @@ const config: KnipConfig = {
     "osascript",
     // Makes the FIFO whose opens never finish in the exit watchdog E2E script.
     "mkfifo",
+    // Runs variant D of the manual browser tools bench, only when the developer installed it.
+    "browser-harness",
     // Reads the memory that programs can still use on macOS, for the machine part of Storage.
     "vm_stat",
   ],
@@ -94,8 +96,9 @@ const config: KnipConfig = {
       ignoreUnresolved: ["scripts/.+\\.ts"],
     },
     "apps/auth-api": {
-      // The wrangler plugin of knip reads `main` (src/worker-entry.ts) from wrangler.jsonc.
-      entry: ["*.ts"],
+      // The wrangler plugin of knip reads `main` (src/worker-entry.ts) from wrangler.jsonc only. The
+      // email relay Worker's `main` is in wrangler.email-relay.jsonc.
+      entry: ["*.ts", "src/email-relay-entry.ts"],
       project: ["src/**/*.{ts,tsx,css}", "test/**/*.ts", "*.ts"],
       // `cloudflare:workers` is a runtime module of the Workers platform, not an npm package.
       ignoreDependencies: ["cloudflare"],
@@ -128,8 +131,10 @@ const config: KnipConfig = {
         "expo-symbols",
       ],
     },
-    // src/index.ts is a default entry of knip.
+    // src/index.ts is a default entry of knip. The capacity-report Compose service runs
+    // src/capacity-report.ts.
     "remote/api": {
+      entry: ["src/capacity-report.ts"],
       project: ["src/**/*.ts"],
     },
     "packages/i18n": {

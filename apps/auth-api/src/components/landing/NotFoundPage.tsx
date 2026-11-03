@@ -19,7 +19,7 @@ const SUGGESTIONS = [
   { to: "/guides", label: "Guides" },
   { to: "/news", label: "News" },
   { to: "/compare", label: "Compare" },
-  { to: "/plugins", label: "Plugins" },
+  { to: "/marketplace", label: "Marketplace" },
 ] as const;
 
 export function NotFoundPage() {

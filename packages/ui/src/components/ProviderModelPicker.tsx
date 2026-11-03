@@ -7,6 +7,7 @@ import type {
   AgentStatus,
   ClientAgentModelOption,
   CustomAgentSummary,
+  CustomProviderHarness,
   CustomProviderSummary,
   ForeignProviderId,
   ProviderAccountStatus,
@@ -16,9 +17,11 @@ import {
   agentProviderCliName,
   agentProviderName,
   customAgentIdOfModel,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   defaultProviderModel,
-  isCustomProviderModelId,
+  isCustomProviderHarness,
+  isReasoningEffort,
   PICKER_PROVIDERS,
   providerDisplayName,
 } from "@openbot/contracts/ipc";
@@ -52,10 +55,14 @@ import { providerAccountName } from "./provider-accounts";
 import {
   customProviderIds,
   groupPickerModels,
+  isCustomEndpointModel,
   isCustomModel,
   type PickerModel,
   type PickerModelGroup,
   pickerModels,
+  providerAvailability,
+  providerTurnedOff,
+  providerUsable,
 } from "./provider-model-options";
 import { SwapLabel, type SwapMotion } from "./SwapLabel";
 
@@ -140,11 +147,14 @@ const RUNTIME_ACTION_LABEL = {
 } as const satisfies Record<string, AppTextKey>;
 
 const REASONING_LABEL = {
+  none: "provider.effort.none",
+  minimal: "provider.effort.minimal",
   low: "provider.effort.low",
   medium: "provider.effort.medium",
   high: "provider.effort.high",
   xhigh: "provider.effort.xhigh",
   max: "provider.effort.max",
+  ultra: "provider.effort.ultra",
 } as const satisfies Record<AgentReasoningEffort, AppTextKey>;
 
 /**
@@ -178,9 +188,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   let popover: HTMLElement | undefined;
 
   const visibleProviders = createMemo(() =>
-    PROVIDERS.filter(
-      (provider) => !props.agentStatus?.providers?.some((status) => status.id === provider && status.off),
-    ),
+    PROVIDERS.filter((provider) => provider === CUSTOM_RAIL || !providerTurnedOff(props.agentStatus, provider)),
   );
   /** The accounts that get rail entries: only a provider's with more than one, and only on request. */
   const railAccounts = (rail: RailId): readonly ProviderAccountStatus[] => {
@@ -209,9 +217,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const selectedModel = createMemo(() =>
     props.modelOptions.find((option) => option.provider === props.provider && option.id === props.value),
   );
+  const selectedFixed = createMemo(() => fixedModelSettings(selectedModel()));
   /** The tab the current selection lives on: the Custom one for the user's endpoints and agents. */
   const activeProvider = (): RailId =>
-    props.provider === "acp" || (props.provider === "opencode" && isCustomProviderModelId(props.value, customIds()))
+    props.provider === "acp" || isCustomEndpointModel(props.provider, props.value, customIds())
       ? CUSTOM_RAIL
       : props.provider;
   const activeKey = (): RailKey => {
@@ -223,15 +232,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   /** The provider whose mark the trigger shows, so only a changed one springs in. */
   let shownProvider = untrack(activeProvider);
 
-  /** OpenCode and Custom tabs split one wire provider so each model appears once. */
+  /** The OpenCode, Pi and Custom tabs split one wire provider so each model appears once. */
   function railModelOptions(rail: RailId): ClientAgentModelOption[] {
     if (rail === CUSTOM_RAIL) return props.modelOptions.filter((option) => isCustomModel(option, customIds()));
-    if (rail === "opencode") {
-      return props.modelOptions.filter(
-        (option) => option.provider === "opencode" && !isCustomModel(option, customIds()),
-      );
-    }
-    return props.modelOptions.filter((option) => option.provider === rail);
+    return props.modelOptions.filter((option) => option.provider === rail && !isCustomModel(option, customIds()));
   }
 
   /**
@@ -259,13 +263,21 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
       agents: t("provider.customAgentCount", { count: agents }),
     });
   };
+  /** The status of the providers that run the saved endpoints: the first available one, or the first. */
+  const endpointStatus = (): AgentProviderStatus => {
+    const status = (harness: CustomProviderHarness) =>
+      providerAvailability(props.agentStatus, props.modelOptions, harness, t);
+    const harnesses = [...new Set(customIds().values())];
+    const available = harnesses.find((harness) => status(harness).state === "available");
+    return status(available ?? harnesses[0] ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
+  };
   /**
-   * One provider status per tab. The Custom tab stands for OpenCode, which serves the endpoints, and
-   * for `acp`, which runs the agents: it is available when either of the saved kinds is.
+   * One provider status per tab. The Custom tab stands for OpenCode or Pi, which serve the endpoints,
+   * and for `acp`, which runs the agents: it is available when either of the saved kinds is.
    */
   const railStatus = (rail: RailId): AgentProviderStatus => {
     if (rail !== CUSTOM_RAIL) return providerAvailability(props.agentStatus, props.modelOptions, rail, t);
-    const endpoints = providerAvailability(props.agentStatus, props.modelOptions, "opencode", t);
+    const endpoints = endpointStatus();
     if (agentCount() === 0) return endpoints;
     const agents = providerAvailability(props.agentStatus, props.modelOptions, "acp", t);
     if (!props.customProviders?.length) return agents;
@@ -311,14 +323,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
       return false;
     }
     const status = entryStatus(key);
-    const phase = props.runtimeStatuses?.[status.id]?.phase;
-    return (
-      status.state === "available" ||
-      status.state === "checking" ||
-      status.connectionState === "connecting" ||
-      phase === "downloading" ||
-      phase === "finishing"
-    );
+    return providerUsable(status, props.runtimeStatuses?.[status.id]);
   };
   /** The entries listed when the picker opened. An open rail does not drop a tab under the pointer. */
   const [openedKeys, setOpenedKeys] = createSignal<readonly RailKey[]>([]);
@@ -425,7 +430,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   /** Only an effort that the model can use. */
   const triggerEffort = () => {
     const effort = props.reasoningEffort;
-    if (props.foreignProvider !== undefined || !showsReasoningEffort() || !effort || selectedHasVariants()) return;
+    if (props.foreignProvider !== undefined || selectedHasVariants()) return;
+    // The effort that the model value fixes is part of the model, also where the effort is not a setting.
+    const fixed = selectedFixed()?.effort;
+    if (fixed) return reasoningLabel(fixed, t);
+    if (!showsReasoningEffort() || !effort) return;
     const model = selectedModel();
     if (!model?.supportedReasoningEfforts.includes(effort) || model.reasoningEffortConfigurable === false) return;
     return reasoningLabel(effort, t);
@@ -439,9 +448,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   /** Fast mode, only while the model has a fast tier: another model runs at standard speed. */
   const triggerFast = () =>
     props.foreignProvider === undefined &&
-    props.fastMode === true &&
-    props.onFastModeChange !== undefined &&
-    Boolean(selectedModel()?.fastServiceTier);
+    (selectedFixed()?.fast === true ||
+      (props.fastMode === true && props.onFastModeChange !== undefined && Boolean(selectedModel()?.fastServiceTier)));
   const triggerSummary = () =>
     [triggerModelName(), triggerEffort(), triggerFast() ? t("provider.picker.fast") : null, triggerAccount()]
       .filter(Boolean)
@@ -665,13 +673,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   const model = selected();
                   return model ? pickerModelKey(model) : props.value;
                 };
-                // OpenCode and Custom share the `opencode` wire id; the tab whose list holds it owns it.
+                // OpenCode or Pi and Custom share one wire id; the tab whose list holds it owns it.
                 const ownsSelection = () =>
                   provider === CUSTOM_RAIL
                     ? selected()?.provider === props.provider
                     : provider === props.provider &&
                       accountId() === currentAccount() &&
-                      (props.provider !== "opencode" || Boolean(selected()));
+                      (!isCustomProviderHarness(props.provider) || Boolean(selected()));
                 const effortOptions = createMemo(() => {
                   if (!ownsSelection()) return [];
                   if (selected()?.variants.length) return selected()?.variants ?? [];
@@ -868,6 +876,17 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           renderItem={(item) => {
                             const model = item.rawValue;
                             const isSelected = () => selectedKey() === pickerModelKey(model);
+                            const settings = () =>
+                              fixedModelSettingsText(
+                                fixedModelSettings(
+                                  props.modelOptions.find(
+                                    (option) => option.provider === model.provider && option.id === model.id,
+                                  ),
+                                ),
+                                t,
+                              );
+                            const label = () =>
+                              [displayModelName(model.name, model.id), settings()].filter(Boolean).join(", ");
                             return (
                               <Listbox.Item
                                 as="button"
@@ -876,10 +895,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 class={["provider-model-option", { "provider-model-option-selected": isSelected() }]}
                                 aria-label={
                                   model.id === railDefaultModel(provider)
-                                    ? t("provider.picker.defaultModelLabel", {
-                                        name: displayModelName(model.name, model.id),
-                                      })
-                                    : displayModelName(model.name, model.id)
+                                    ? t("provider.picker.defaultModelLabel", { name: label() })
+                                    : label()
                                 }
                                 disabled={!modelEnabled(model)}
                                 onClick={() => {
@@ -888,6 +905,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               >
                                 <span class="provider-model-option-name">
                                   <span>{displayModelName(model.name, model.id)}</span>
+                                  <Show when={settings()}>
+                                    {(text) => <span class="provider-model-option-settings">{text()}</span>}
+                                  </Show>
                                   <Show when={model.free}>
                                     <small>{t("provider.model.free")}</small>
                                   </Show>
@@ -948,6 +968,19 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         </Show>
                       </div>
                     </Show>
+                    <Show when={ownsSelection() && effortOptions().length === 0 && selectedFixed()?.effort}>
+                      {(effort) => (
+                        <div class="provider-model-effort">
+                          <span>{t("provider.picker.effort")}</span>
+                          <span>
+                            {t("provider.picker.effortFixed", {
+                              effort: reasoningLabel(effort(), t),
+                              provider: railName(provider, t),
+                            })}
+                          </span>
+                        </div>
+                      )}
+                    </Show>
                     <Show when={ownsSelection() && selectedModel()?.fastServiceTier && props.onFastModeChange}>
                       <div class="provider-model-effort">
                         <span>{t("provider.picker.fast")}</span>
@@ -998,27 +1031,6 @@ function railDefaultModel(rail: RailId): AgentModelId | null {
   return rail === CUSTOM_RAIL ? null : defaultProviderModel(rail);
 }
 
-function providerAvailability(
-  status: AgentStatus,
-  models: ClientAgentModelOption[],
-  rail: RailId,
-  t: AppTranslate,
-): AgentProviderStatus {
-  const provider = wireProvider(rail);
-  const explicit = status.providers?.find((item) => item.id === provider);
-  if (explicit) return explicit;
-  if (status.phase === "starting" || status.phase === "restarting") {
-    return { id: provider, state: "checking", version: null, message: null };
-  }
-  const available = models.some((model) => model.provider === provider);
-  return {
-    id: provider,
-    state: available ? "available" : "error",
-    version: null,
-    message: available ? null : t("provider.picker.unavailable", { name: agentProviderName(provider) }),
-  };
-}
-
 function providerSummary(provider: AgentProviderId, status: AgentProviderStatus, text: PickerText): string {
   if (status.state === "available") {
     return status.version
@@ -1043,6 +1055,47 @@ function providerStatusLabel(state: AgentProviderStatus["state"], t: AppTranslat
 
 function displayModelName(name: string | undefined, fallback: string): string {
   return name?.replace(/^[\s:–—-]+/, "") || fallback;
+}
+
+interface FixedModelSettings {
+  context: string | null;
+  /** Only when the model has no effort setting of its own. */
+  effort: AgentReasoningEffort | null;
+  fast: boolean;
+}
+
+/**
+ * The settings that a Cursor model value fixes, as in `grok-4.7[context=256k,reasoning=high,fast=true]`.
+ * Cursor ACP lists one value for each model and refuses the others, so these are not choices (#4411).
+ */
+function fixedModelSettings(model: ClientAgentModelOption | undefined): FixedModelSettings | null {
+  if (model?.provider !== "cursor") return null;
+  const params = /\[([^\]]*)\]$/u.exec(model.id)?.[1];
+  if (!params) return null;
+  const settings: FixedModelSettings = { context: null, effort: null, fast: false };
+  for (const pair of params.split(",")) {
+    const [key, value = ""] = pair.split("=");
+    if (key === "context" && /^\d+(?:\.\d+)?[km]$/iu.test(value)) settings.context = value;
+    else if (
+      (key === "reasoning" || key === "effort") &&
+      model.reasoningEffortConfigurable === false &&
+      isReasoningEffort(value)
+    )
+      settings.effort = value;
+    else if (key === "fast") settings.fast = value === "true";
+  }
+  return settings;
+}
+
+function fixedModelSettingsText(settings: FixedModelSettings | null, t: AppTranslate): string {
+  if (!settings) return "";
+  return [
+    settings.context,
+    settings.effort && reasoningLabel(settings.effort, t),
+    settings.fast && t("provider.picker.fast"),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 export function reasoningLabel(effort: AgentReasoningEffort, t: AppTranslate = currentText().t): string {
