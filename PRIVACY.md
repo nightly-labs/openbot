@@ -1426,12 +1426,20 @@ Moonshot AI: `api.kimi.ai` for a global account, or `api.kimi.com` for a mainlan
 Sign in runs `kimi login`, which opens Kimi's sign-in page in your browser: `auth.kimi.ai` for
 Connect, or `auth.kimi.com` when you select the kimi.com (China) item in the row's ⋯ menu. The CLI
 keeps its login, device ID, session files, and settings in `~/.kimi`, or in `$KIMI_SHARE_DIR`.
-OpenBot reads only the API address in `config.toml` on this computer, to start the CLI with the
+OpenBot reads the API address in `config.toml` on this computer, to start the CLI with the
 region of its login. OpenBot does not copy or upload these files. Unless you
 set `telemetry = false` in `~/.kimi/config.toml`, or set `KIMI_DISABLE_TELEMETRY=1` in the
 environment that starts OpenBot, the CLI sends anonymous usage events to
 `telemetry-logs.kimi.com`. OpenBot does not change this setting. Moonshot AI's terms for Kimi Code
 apply. Team members see the host's Kimi agents when their app supports Kimi.
+
+To show the Kimi Code plan usage in Usage, OpenBot reads the CLI's API address and the name of its
+token in `config.toml`, and the CLI's access token in `credentials`: in `~/.kimi` or
+`$KIMI_SHARE_DIR` for Kimi CLI 1.x, and in `~/.kimi-code` or `$KIMI_CODE_HOME` for Kimi Code 2.x.
+OpenBot sends the token only to Moonshot AI (`api.kimi.ai`, `api.kimi.com`, or `KIMI_CODE_BASE_URL`
+when you set it for the CLI), in the same usage request that the CLI's `/usage` command sends. The
+request contains no conversation, file, or model data. OpenBot does not store, log, or send the
+token or the usage to its maintainer.
 ### Hermes
 
 OpenBot does not download Hermes Agent. It starts the `hermes` that you installed, with `hermes acp`,

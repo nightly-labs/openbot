@@ -832,14 +832,16 @@ export class TurnLifecycle {
         // with nothing on screen; Gemini keeps the banner, because an API key sign-in, a runtime
         // before 1.4.1 and a Claude or GPT model have no reading. Cursor keeps it too: an on-demand
         // budget and a team limit are not in its reading. OpenCode keeps it because only a Go key
-        // has a reading, and the free models failed with nothing on screen. A plan window holds the
-        // queue until its reset for every provider.
+        // has a reading, and the free models failed with nothing on screen. Kimi keeps it because an
+        // account with no Kimi Code plan has no reading. A plan window holds the queue until its
+        // reset for every provider.
         if (
           error?.codexErrorInfo === "usageLimitExceeded" ||
           (isUsageLimitDiagnostic(message) &&
             ((source.provider !== "antigravity" &&
               source.provider !== "cursor" &&
               source.provider !== "opencode" &&
+              source.provider !== "kimi" &&
               agentProviderDescriptor(source.provider).reportsUsage) ||
               isPlanLimitDiagnostic(message))) ||
           (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))

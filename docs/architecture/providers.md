@@ -760,6 +760,21 @@ and the path in `data.details`. `AcpFlavor.modelSetUnsaved` reads that failure a
 that applied. A Full access Kimi agent saves the model, so it becomes the default model of each new
 Kimi session, also in a terminal.
 
+The CLI reports no usage over ACP. The driver's `readRateLimits` (`src/backend/kimi-usage.ts`)
+sends the request of the CLI's `/usage` command, `GET <base_url>/usages`, with the CLI's access
+token. The CLI's version selects the folder: `KIMI_SHARE_DIR` or `~/.kimi` for the Python CLI 1.x,
+`KIMI_CODE_HOME` or `~/.kimi-code` for Kimi Code 2.x. Both write `base_url` and the token key into
+`[providers."managed:kimi-code"]` of `config.toml`, and the token into `credentials/<key without
+"oauth/">.json`. `KIMI_CODE_BASE_URL` comes first, then `base_url`, then `https://api.kimi.com/coding/v1`.
+The reader accepts only an `https` address. The rolling 5-hour window (the shortest window of
+`limits[]`, else `usages.limit_5h`) fills the primary window, and the weekly quota (`usage`, else
+`usages.limit_7d`) the secondary one. No sign-in, a 401, 403 or 404, or an answer with no quota
+gives no reading. The token lasts 15 minutes, and the CLI refreshes it only during a turn, so an
+expired token fails the read and the dock keeps the last reading. An account with no Kimi Code plan
+has no reading, so a Kimi limit failure stays a turn error. The dock poll calls `readKimiUsage`
+directly, with the CLI that the last Kimi client ran on, so it does not start or wake the CLI for a
+reading. Before a Kimi client runs, the poll has no reading.
+
 No frozen Team API protocol knows `kimi`. The host hides Kimi agents, models, status, and sign-in
 state from peers below protocol 8, and `providers-v8` carries it.
 
