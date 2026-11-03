@@ -29,6 +29,7 @@ import {
 } from "electron";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
+import { watchAppArchive } from "./app-archive-watch";
 import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { type BackgroundTray, createBackgroundTray } from "./background-tray";
@@ -425,6 +426,8 @@ const {
   forwardTeamPresence,
   forwardDirectMessage,
   forwardDirectTyping,
+  forwardAttachmentDownload,
+  forwardAttachmentImportProgress,
 } = createRendererForwarders({
   getMainWindow: () => windowHolder.current,
   // A function: the window controller is made after the forwarders, and no event comes before it.
@@ -1235,6 +1238,10 @@ if (!hasSingleInstanceLock) {
       });
       services = built;
       performance.mark("openbot:services-built");
+      // A server has nobody to read the warning; a development build runs no `app.asar`.
+      if (app.isPackaged && !serverMode && !hostedServer && !localServerChild) {
+        teardown.push(0, "app archive watch", watchAppArchive(process.resourcesPath, built.language.translate));
+      }
       // `forwardCentralAuth` reaches the host, the remote servers and analytics only through
       // `services`, so every account change announced during construction was dropped.
       // `createApplicationServices` bound the local host to the one state it read and attributed the
@@ -1361,6 +1368,8 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("presence", forwardTeamPresence);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
+      remoteServers.on("attachmentDownload", forwardAttachmentDownload);
+      remoteServers.on("attachmentImportProgress", forwardAttachmentImportProgress);
       // Machine alerts are hidden for now: the check does not start, and no alert notification shows.
       // The selected server connects while the window loads. Its WebRTC setup takes seconds, and
       // the first screen waits for it. The other servers start after the load, below. The connection

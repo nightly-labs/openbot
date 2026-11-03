@@ -363,8 +363,8 @@ export const messages = {
   "error.backend.taskToolInvalid": "タスクには 120 文字以内のタイトルと、何をするかを説明する指示を付けてください。",
   "error.backend.taskOwnChatOnly":
     "タスクは自分のチャットからのみ開始してください。チャンネル、メッセージングの会話、別のタスクからは開始できません。",
-  "error.backend.taskOpenLimit":
-    "このエージェントにはすでに {count} 件の開いているタスクがあります。別のタスクを開始する前に、ユーザーがいずれかを閉じるまで待ってください。",
+  "error.backend.taskUnfinishedLimit":
+    "このエージェントにはすでに未完了のタスクが {count} 件あります。いずれかが終わってから、別のタスクを開始してください。",
   "error.backend.taskOpenLimitReached":
     "このエージェントには {count} 件の開いているタスクがあります。タスクを閉じてから、別のタスクを開始するか開いてください。",
   "error.backend.taskRemoteUnsupported": "タスクは、このコンピューター上のエージェントでのみ利用できます。",

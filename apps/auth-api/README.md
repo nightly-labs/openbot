@@ -165,6 +165,15 @@ make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAI
 
 `bun run env:set:smtp` encrypts the app password into `.env.production` only.
 
+Production does not open the SMTP socket itself. From some Cloudflare locations, such as FSD, a
+socket to the mail host fails at once (#4578). The production Worker sends each email through the
+`openbot-email-relay` Worker (`wrangler.email-relay.jsonc`) over the `EMAIL_RELAY` service binding.
+Cloudflare places that Worker near the mail host. The relay has no route and keeps no secret: the
+binding request carries the SMTP settings and the message. CI and `bun run api:deploy` deploy the
+relay before the production Worker. When you change `EMAIL_SMTP_HOST` or `EMAIL_SMTP_PORT`, also
+change `placement.host` in `wrangler.email-relay.jsonc`. The test Worker and local `vite dev` send
+from their own socket. To see where the relay runs, read the `colo` of its Workers Logs events.
+
 For a deployed Worker, `bun run api:deploy` decrypts `.env.production`. It sends
 `EMAIL_SMTP_PASSWORD`, `SKILLS_ADMIN_TOKEN`, `REMOTE_TICKET_PRIVATE_JWK`,
 `REMOTE_TICKET_PUBLIC_JWKS`, `REMOTE_AUTH_WEBHOOK_SECRET`, and `SITE_REPORT_HASH_SECRET` to

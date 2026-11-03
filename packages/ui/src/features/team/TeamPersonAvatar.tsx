@@ -7,7 +7,7 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 // keeps `"idle"`, where the avatar is the subject rather than one row of many and nothing
 // focusable surrounds it to bring the motion back.
 export function TeamPersonAvatar(props: { member: TeamPresenceMember; large?: boolean; motion?: AvatarMotion }) {
-  const avatarSeed = () => props.member.email ?? props.member.username ?? props.member.id;
+  const avatarSeed = () => teamMemberSeed(props.member);
 
   return (
     <span class={["person-avatar", { large: Boolean(props.large) }]} aria-hidden="true">
@@ -19,6 +19,11 @@ export function TeamPersonAvatar(props: { member: TeamPresenceMember; large?: bo
       />
     </span>
   );
+}
+
+/** The seed of a person's avatar, so other marks of the person can use the same colour. */
+export function teamMemberSeed(member: TeamPresenceMember): string {
+  return member.email ?? member.username ?? member.id;
 }
 
 export function teamMemberName(member: TeamPresenceMember): string {

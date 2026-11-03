@@ -57,7 +57,12 @@ import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
 import { type PlanContinuation, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
-import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
+import {
+  isBalanceDiagnostic,
+  isPlanLimitDiagnostic,
+  isUsageLimitDiagnostic,
+  providerResetDelayMs,
+} from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import { isNoUpdateAnswer, settleQuietRoutineTurn } from "./routine-quiet-runs";
 import {
@@ -107,6 +112,8 @@ const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
 interface HeldProviderError {
   message: string;
   context: FailureContext & { causeCode: CauseCode };
+  /** A spent balance or quota: the usage notice explains it, so a turn that does not move shows no banner. */
+  quiet?: boolean;
 }
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
@@ -501,6 +508,10 @@ export class TurnLifecycle {
 
   /** Shows a provider error that was held for a failover that did not happen, as it shows with no backup. */
   #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError): void {
+    if (failover.quiet) {
+      this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
+      return;
+    }
     const taskId = this.#taskForThread(agentId, threadId);
     if (taskId !== null) {
       this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
@@ -761,6 +772,15 @@ export class TurnLifecycle {
         this.#compaction.observeCompaction(threadId, status, "none");
         return;
       }
+      case "openbot/turn-progress": {
+        // A provider's own status for the running turn, such as a retry of a failed API request.
+        const turnId = getString(params, "turnId");
+        const detail = getString(params, "detail");
+        if (!threadId || !agentId || !turnId || !detail || !this.#runningTurns.has(turnId)) return;
+        if (this.#conversation.loadedClientFor(threadId) !== source) return;
+        this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, detail);
+        return;
+      }
       case "thread/archived": {
         if (threadId && this.#conversation.loadedClientFor(threadId) === source)
           this.#conversation.unloadThread(threadId);
@@ -831,16 +851,28 @@ export class TurnLifecycle {
           if (planLimit && notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
             this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? null);
           }
-          this.#hooks.emitFailure?.({
-            code: "agent_error",
-            ...(agentId !== undefined ? { agentId } : {}),
+          const context = {
             turnId: errorTurnId,
             provider: source.provider,
             model: agentId && errorTurnId ? this.#hooks.turnModel(agentId, errorTurnId) : null,
             causeCode: classifyFailure(error ?? message),
-            severity: notification.method === "warning" ? "warning" : "error",
-          });
+            severity: notification.method === "warning" ? ("warning" as const) : ("error" as const),
+          };
           yield* this.#providers.refreshUsageAfterLimit(source);
+          // A spent balance or quota that the gate does not hold moves to a backup model as a provider
+          // error does (#4616). The end of the turn reports it.
+          if (
+            notification.method === "error" &&
+            agentId &&
+            errorTurnId !== null &&
+            this.#runningTurns.has(errorTurnId) &&
+            !this.#limitedTurns.has(errorTurnId) &&
+            this.#hooks.mayFailOver(agentId)
+          ) {
+            this.#failoverTurns.set(errorTurnId, { message, context, quiet: true });
+            return;
+          }
+          this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId !== undefined ? { agentId } : {}), ...context });
           return;
         }
         const context = {
@@ -1118,7 +1150,7 @@ export class TurnLifecycle {
           this.#failoverRetries.set(delivery.id, failed.add(failedKey));
         }
         yield* this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
-        this.#usageLimits.failed(agentId, model);
+        this.#usageLimits.failed(agentId, model, providerResetDelayMs(failover.message));
         this.#hooks.scheduleDrain(agentId);
         return;
       }

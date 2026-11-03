@@ -364,8 +364,8 @@ export const messages = {
     "Dale a la tarea un título de 120 caracteres como máximo y una descripción que diga qué hay que hacer.",
   "error.backend.taskOwnChatOnly":
     "Inicia una tarea solo desde tu propio chat. Un canal, una conversación de mensajería u otra tarea no pueden iniciarla.",
-  "error.backend.taskOpenLimit":
-    "Este agente ya tiene {count} tareas abiertas. Espera a que el usuario cierre una antes de iniciar otra tarea.",
+  "error.backend.taskUnfinishedLimit":
+    "Este agente ya tiene {count} tareas sin terminar. Inicia otra tarea cuando una de ellas termine.",
   "error.backend.taskOpenLimitReached":
     "Este agente tiene {count} tareas abiertas. Cierra una tarea y después inicia o abre otra.",
   "error.backend.taskRemoteUnsupported": "Las tareas solo están disponibles para los agentes de este equipo.",

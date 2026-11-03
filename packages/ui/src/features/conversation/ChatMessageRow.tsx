@@ -16,7 +16,7 @@ import { avatarHeadColor } from "../../bloub-avatar";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import type { AttachmentMediaSource } from "./AttachmentCards";
+import type { AttachmentDownloads, AttachmentMediaSource } from "./AttachmentCards";
 import type { MessageImageFile } from "./MarkdownMessageText";
 import { conversationBubbleVariant, MessageBody } from "./MessageRendering";
 
@@ -78,6 +78,8 @@ export interface ChatMessageRowProps {
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   /** Loads the images and media of a client that gets no `previewUrl`. */
   mediaSource?: AttachmentMediaSource | undefined;
+  /** The download state of attachments from a joined server. */
+  downloads?: AttachmentDownloads | undefined;
   /** Reads an image file that an agent message names, for a preview under the text. */
   loadImageFile?: ((file: MessageImageFile) => Promise<string | null>) | undefined;
   onDownloadImageFile?: ((file: MessageImageFile) => void) | undefined;
@@ -184,6 +186,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       onOpenQuote={props.onOpenQuote}
       onDownload={props.onDownload}
       mediaSource={props.mediaSource}
+      downloads={props.downloads}
       loadImageFile={props.loadImageFile}
       onDownloadImageFile={props.onDownloadImageFile}
       macWindowControls={props.macWindowControls}

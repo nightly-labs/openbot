@@ -22,9 +22,21 @@ const nativeModuleShims = new Map([
   ["solid-js", path.resolve(__dirname, "src/shims/solid-js.ts")],
 ]);
 
+// The plush avatar pictures ship in the bloub package, which does not export its asset folder.
+// `@norbert_bodziony/bloub/assets/<file>` names a file in that folder.
+const BLOUB_ASSETS = "@norbert_bodziony/bloub/assets/";
+const bloubAssetFolder = path.join(path.dirname(require.resolve("@norbert_bodziony/bloub")), "assets");
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const shim = nativeModuleShims.get(moduleName);
   if (shim) return { filePath: shim, type: "sourceFile" };
+  if (moduleName.startsWith(BLOUB_ASSETS)) {
+    return context.resolveRequest(
+      context,
+      path.join(bloubAssetFolder, path.basename(moduleName.slice(BLOUB_ASSETS.length))),
+      platform,
+    );
+  }
   return context.resolveRequest(context, moduleName, platform);
 };
 

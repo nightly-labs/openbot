@@ -388,6 +388,10 @@
   min-width: 18px;
   height: 18px;
 }
+/* A square picture looks smaller than a round face of the same box, so it takes 20px. */
+.channel-title .channel-avatar-picture {
+  --channel-avatar-size: 20px;
+}
 .channel-title .agent-avatar {
   --agent-avatar-optical-offset: -2px;
 

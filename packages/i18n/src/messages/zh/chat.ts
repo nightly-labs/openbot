@@ -333,6 +333,8 @@ export const messages = {
   "chat.menu.react": "回应",
   "chat.menu.branch": "从这里分支",
   "chat.menu.markUnread": "标为未读",
+  "chat.menu.sendToChannel": "发送到频道",
+  "chat.menu.chooseChannel": "选择频道",
   "chat.voice.play": "播放语音消息",
   "chat.voice.pause": "暂停语音消息",
   "chat.voice.pauseReading": "暂停朗读",

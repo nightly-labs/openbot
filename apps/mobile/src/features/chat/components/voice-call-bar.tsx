@@ -8,9 +8,7 @@ import X from "lucide-react-native/icons/x";
 import { type ReactNode, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from "react-native-reanimated";
-import { useAgentColorTransition } from "@/features/agents/components/agent-color-glow";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { agentActivityMood } from "@/features/workspace/model/agent-activity";
 import type { VoicePalette } from "../model/voice-palette";
@@ -25,9 +23,9 @@ const BUTTON_SIZE = 40;
 const CONTENT_RISE = 6;
 
 /**
- * The agent of the call bar. It stays mounted when another channel member takes over, so the face
- * morphs into the new agent's shape and the colour eases to its own, as in the agent editor, instead
- * of one avatar replacing the other. Both run on the UI thread.
+ * The agent of the call bar. It stays mounted when another channel member takes over, so the plush
+ * of the old agent shrinks away and the new one pops out, as in the agent editor, instead of one
+ * avatar replacing the other. It runs on the UI thread.
  */
 export function VoiceAgentAvatar({
   agentId,
@@ -40,7 +38,6 @@ export function VoiceAgentAvatar({
   seed: string;
   hue: AvatarHue | null;
 }) {
-  const animatedColor = useAgentColorTransition(getBloubAvatarColor(seed, hue));
   const activity = useAgentActivity(agentId);
   return (
     <BloubAvatarPreview
@@ -50,7 +47,7 @@ export function VoiceAgentAvatar({
       hue={hue}
       size={VOICE_BAR_AVATAR_SIZE}
       mood={agentActivityMood(activity)}
-      animatedColor={animatedColor}
+      transition="pop"
     />
   );
 }

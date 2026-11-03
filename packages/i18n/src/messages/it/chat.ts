@@ -347,6 +347,8 @@ export const messages = {
   "chat.menu.react": "Reagisci",
   "chat.menu.branch": "Ramifica da qui",
   "chat.menu.markUnread": "Segna come non letto",
+  "chat.menu.sendToChannel": "Invia al canale",
+  "chat.menu.chooseChannel": "Scegli un canale",
   "chat.voice.play": "Riproduci messaggio vocale",
   "chat.voice.pause": "Metti in pausa il messaggio vocale",
   "chat.voice.pauseReading": "Metti in pausa la lettura",

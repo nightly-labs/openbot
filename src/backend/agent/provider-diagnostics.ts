@@ -256,6 +256,29 @@ export function isPlanLimitDiagnostic(message: string): boolean {
   );
 }
 
+const RESET_DELAY_UNIT = "(?:days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)(?![a-z])";
+const RESET_DELAY = new RegExp(
+  String.raw`\bresets? (?:in|after) ((?:\d+(?:\.\d+)?\s*${RESET_DELAY_UNIT}(?:,?\s*(?:and\s+)?))+)`,
+  "iu",
+);
+const RESET_DELAY_PART = new RegExp(String.raw`(\d+(?:\.\d+)?)\s*(${RESET_DELAY_UNIT})`, "giu");
+const RESET_DELAY_UNIT_MS: Record<string, number> = { d: 86_400_000, h: 3_600_000, m: 60_000, s: 1_000 };
+
+/**
+ * The wait until a limit resets that a provider error names, in milliseconds, or null. A spent
+ * Gemini quota reads "Your limit will reset in 2 days, 18 hours." (#4368), and an Antigravity
+ * capacity error "Your quota will reset after 18h31m10s".
+ */
+export function providerResetDelayMs(message: string): number | null {
+  const named = RESET_DELAY.exec(message)?.[1];
+  if (!named) return null;
+  let delay = 0;
+  for (const [, amount, unit] of named.matchAll(RESET_DELAY_PART)) {
+    delay += Number(amount) * (RESET_DELAY_UNIT_MS[unit?.[0]?.toLowerCase() ?? ""] ?? 0);
+  }
+  return delay > 0 ? delay : null;
+}
+
 /** Whether a provider's text names money or a quota, which no wait gives back. */
 export function isBalanceDiagnostic(message: string): boolean {
   return /\b(?:credits?|balance|quota|billing)\b/iu.test(message);

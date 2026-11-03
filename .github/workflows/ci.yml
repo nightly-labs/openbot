@@ -518,6 +518,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-discord
 
+      - name: Run the Discord files to GitHub E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:discord-github-files
+
       - name: Run the OpenCode usage metering E2E test
         if: ${{ !cancelled() }}
         run: bun run test:opencode-usage-metering
@@ -595,6 +599,7 @@ jobs:
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/workflow-discord-e2e/
+            .openbot-build/discord-github-files-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/
             .openbot-build/cursor-usage-e2e/
@@ -640,6 +645,10 @@ jobs:
       - name: Run the Antigravity MCP load failure E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-mcp-load-failure
+
+      - name: Run the Antigravity expired token E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-expired-token
 
       - name: Run the Antigravity tool filter E2E test
         if: ${{ !cancelled() }}
@@ -732,6 +741,7 @@ jobs:
             .openbot-build/codex-login-path-e2e/
             .openbot-build/antigravity-login-path-e2e/
             .openbot-build/antigravity-mcp-load-failure-e2e/
+            .openbot-build/antigravity-expired-token-e2e/
             .openbot-build/antigravity-tool-filter-e2e/
             .openbot-build/acp-additional-directories-e2e/
             .openbot-build/acp-flavor-e2e/
@@ -1099,6 +1109,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITE_ROUTER_DEPLOY_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: ../../node_modules/.bin/wrangler deploy --config wrangler.jsonc --keep-vars
+
+      # The production Worker sends email through this Worker, so it must exist first.
+      - name: Deploy email relay Worker
+        working-directory: apps/auth-api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: ../../node_modules/.bin/wrangler deploy --config wrangler.email-relay.jsonc
 
       - name: Deploy production Worker
         working-directory: apps/auth-api

@@ -277,7 +277,13 @@ const profileCompletion = Effect.fnUntraced(function* (
   observe?: GenerationObserver,
 ) {
   return yield* Effect.callback<string, ProfileGenerationFailed | GenerationUsageLimitError>((resume) => {
-    let text = "";
+    // The streamed text of each answer item. Reasoning comes in commentary message items: their
+    // phase shows on `item/started` (ACP and Claude thoughts), or only on `item/completed` (an ACP
+    // answer that a thought ended, Pi narration). It is not the answer, and it must not count
+    // against the size limit (#4558).
+    const answers = new Map<string, string>();
+    const commentary = new Set<string>();
+    const answer = () => [...answers.values()].join("");
     let limit: { resetsAt: number | null } | null = null;
     const finish = (effect: Effect.Effect<string, ProfileGenerationFailed | GenerationUsageLimitError>) => {
       cleanup();
@@ -309,15 +315,32 @@ const profileCompletion = Effect.fnUntraced(function* (
         )
           limit ??= { resetsAt: null };
       }
-      if (notification.method === "item/agentMessage/delta") text += getString(notification.params, "delta") ?? "";
+      if (notification.method === "item/started") {
+        const item = getRecord(params, "item");
+        const id = getString(item, "id");
+        if (id && getString(item, "phase") === "commentary") commentary.add(id);
+      }
+      if (notification.method === "item/agentMessage/delta") {
+        const id = getString(params, "itemId") ?? "";
+        if (!commentary.has(id)) answers.set(id, (answers.get(id) ?? "") + (getString(params, "delta") ?? ""));
+      }
       if (notification.method === "item/completed") {
-        const item = getRecord(notification.params, "item");
-        if (getString(item, "type") === "agentMessage") text = getString(item, "text") ?? text;
+        const item = getRecord(params, "item");
+        const id = getString(item, "id") ?? "";
+        if (getString(item, "type") === "agentMessage" && getString(item, "phase") === "commentary") {
+          commentary.add(id);
+          answers.delete(id);
+        } else if (getString(item, "type") === "agentMessage") {
+          // A completed answer replaces the text streamed before it.
+          const text = getString(item, "text") ?? answer();
+          answers.clear();
+          answers.set(id, text);
+        }
       }
       if (notification.method === "turn/completed") {
         const turn = getRecord(notification.params, "turn");
         provider.last = getString(getRecord(turn, "error"), "message") ?? provider.last;
-        if (getString(turn, "status") === "completed") finish(Effect.succeed(text));
+        if (getString(turn, "status") === "completed") finish(Effect.succeed(answer()));
         else if (limit)
           finish(
             Effect.fail(
@@ -329,7 +352,7 @@ const profileCompletion = Effect.fnUntraced(function* (
           );
         else reject(sourceText("error.agent.profileFailed"));
       }
-      if (text.length > 32_000) reject(sourceText("error.agent.profileTooLarge"));
+      if (answer().length > 32_000) reject(sourceText("error.agent.profileTooLarge"));
     };
     const cleanup = () => {
       client.off("exit", exit);

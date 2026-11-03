@@ -38,6 +38,11 @@ export interface GitHubEventFacts {
   actor: string;
   /** Whether the actor is a bot account. */
   actorIsBot: boolean;
+  /**
+   * Whether the author is a bot account. For a comment or a review, it is their author; for every other
+   * event, the item's author. A check suite names no author, so it is false there.
+   */
+  authorIsBot: boolean;
   /** Whether the actor is the OpenBot GitHub App's own bot. */
   causedByBot: boolean;
   /** GitHub's `author_association` of the comment, review or item. */
@@ -106,7 +111,7 @@ export function githubEventFacts(name: string, body: unknown, bot: string | null
   const base = {
     repository: fullName,
     actor,
-    actorIsBot: sender?.type === "Bot",
+    actorIsBot: isBotAccount(sender),
     causedByBot: botLogin !== null && actor.toLowerCase() === botLogin,
   };
   const mentions = (value: unknown) => bot !== null && isString(value) && mentionPattern(bot).test(value);
@@ -156,6 +161,7 @@ export function githubEventFacts(name: string, body: unknown, bot: string | null
       ...base,
       events,
       item,
+      authorIsBot: isBotAccount(subject.user),
       association: text(subject.author_association),
       labels: labelsOf(subject),
       label: action === "labeled" ? label : null,
@@ -184,6 +190,7 @@ export function githubEventFacts(name: string, body: unknown, bot: string | null
       ...base,
       events,
       item,
+      authorIsBot: isBotAccount(comment.user),
       association: text(comment.author_association),
       labels: labelsOf(issue),
       label: null,
@@ -214,6 +221,7 @@ export function githubEventFacts(name: string, body: unknown, bot: string | null
       ...base,
       events,
       item,
+      authorIsBot: isBotAccount(review.user),
       association: text(review.author_association),
       labels: labelsOf(pull),
       label: null,
@@ -245,6 +253,7 @@ export function githubEventFacts(name: string, body: unknown, bot: string | null
       ...base,
       events: ["pr.checksFailed"],
       item,
+      authorIsBot: false,
       association: null,
       labels: [],
       label: null,
@@ -268,8 +277,8 @@ export function githubFilterRefuses(node: WorkflowNode, facts: GitHubEventFacts)
   const event = node.fields.event;
   const filters = new Set(workflowListField(node.fields.filters));
   const labels = workflowListField(node.fields.labels).map((label) => label.toLowerCase());
-  // OpenBot's own bot passes "not a bot": the loop guard stops its chains instead.
-  if (filters.has("notBot") && facts.actorIsBot && !facts.causedByBot) return true;
+  // A bot that acts on a person's item is refused too, so that two bots cannot start runs on each other.
+  if (filters.has("notBot") && (facts.actorIsBot || facts.authorIsBot)) return true;
   if (filters.has("firstTime") && !isOneOf(FIRST_TIME_ASSOCIATIONS, facts.association)) return true;
   if (filters.has("title")) {
     const wanted = (isString(node.fields.titleText) ? node.fields.titleText : "").trim().toLowerCase();
@@ -352,6 +361,10 @@ function framedPayload(
 
 const FAILED_CHECKS = ["failure", "timed_out", "action_required", "startup_failure"] as const;
 const FIRST_TIME_ASSOCIATIONS = ["FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR"] as const;
+
+function isBotAccount(user: unknown): boolean {
+  return record(user)?.type === "Bot";
+}
 
 function mentionPattern(bot: string): RegExp {
   const escaped = bot.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");

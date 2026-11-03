@@ -352,8 +352,8 @@ export const messages = {
     "Nadaj zadaniu tytuł o długości maksymalnie 120 znaków i opis, który mówi, co zrobić.",
   "error.backend.taskOwnChatOnly":
     "Zadanie możesz rozpocząć tylko z własnego czatu. Kanał, rozmowa w komunikatorze ani inne zadanie nie mogą go rozpocząć.",
-  "error.backend.taskOpenLimit":
-    "Liczba otwartych zadań tego agenta: {count}. Zanim rozpoczniesz kolejne zadanie, poczekaj, aż użytkownik zamknie jedno z nich.",
+  "error.backend.taskUnfinishedLimit":
+    "Liczba niezakończonych zadań tego agenta: {count}. Rozpocznij kolejne zadanie, gdy jedno z nich się zakończy.",
   "error.backend.taskOpenLimitReached":
     "Liczba otwartych zadań tego agenta: {count}. Zamknij zadanie, a potem rozpocznij lub otwórz inne.",
   "error.backend.taskRemoteUnsupported": "Zadania są dostępne tylko dla agentów na tym komputerze.",

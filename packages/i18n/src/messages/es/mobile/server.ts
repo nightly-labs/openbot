@@ -9,6 +9,7 @@ export const messages = {
   "mobile.server.drawer.editOrder": "Editar orden",
   "mobile.server.drawer.leaveFailed": "No se pudo salir de {name}",
   "mobile.server.drawer.removeFailed": "No se pudo eliminar {name}",
+  "mobile.server.drawer.deleteFailed": "No se pudo eliminar {name}",
   "mobile.server.drawer.actionFailed": "OpenBot no pudo completar esta acción. Inténtalo de nuevo.",
   "mobile.server.drawer.moveUp": "Subir",
   "mobile.server.drawer.moveDown": "Bajar",
@@ -65,6 +66,28 @@ export const messages = {
   "mobile.server.hosted.speedFaster": "{factor}× más rápido",
   "mobile.server.hosted.joinHint": "Usa una invitación del propietario de un servidor.",
   "mobile.server.hosted.join": "Unirse a un servidor",
+  "mobile.server.local.option": "Nuevo servidor local en el ordenador",
+  "mobile.server.local.optionHint": "En el ordenador que ejecuta {name}, con sus propios agentes, chats y archivos.",
+  "mobile.server.local.title": "Nuevo servidor",
+  "mobile.server.local.description":
+    "El servidor se ejecuta en el ordenador que ejecuta {name}, con sus propios agentes, chats y archivos. Está disponible mientras OpenBot se ejecuta en ese ordenador.",
+  "mobile.server.local.nameLabel": "Nombre del servidor",
+  "mobile.server.local.nameTooShort": "Usa al menos {limit} caracteres.",
+  "mobile.server.local.create": "Crear",
+  "mobile.server.local.creating": "Creando…",
+  "mobile.server.local.createFailed": "No se pudo crear el servidor.",
+  "mobile.server.local.limitReached":
+    "El ordenador que ejecuta {name} tiene el máximo de {limit} servidores. Elimina uno en ese ordenador para crear otro.",
+  "mobile.server.local.created": "Servidor creado",
+  "mobile.server.local.createdOn": "{name} se ejecuta en el mismo ordenador que {computer}.",
+  "mobile.server.local.waiting": "Esperando a que {name} esté en línea…",
+  "mobile.server.local.notPublished":
+    "{name} se ejecuta, pero este teléfono aún no puede abrirlo. Comprueba que OpenBot en el ordenador que ejecuta {computer} tiene la sesión iniciada y está en línea.",
+  "mobile.server.local.open": "Abrir servidor",
+  "mobile.server.local.ownerOnly": "Solo el propietario puede crear un servidor en este ordenador.",
+  "mobile.server.local.unsupported": "Actualiza OpenBot en este ordenador para crear un servidor aquí.",
+  "mobile.server.local.deleteOffline":
+    "Solo el ordenador de este servidor puede eliminarlo. Abre OpenBot en ese ordenador e inténtalo de nuevo.",
   "mobile.server.hosted.intro.title": "Tus agentes, siempre activos",
   "mobile.server.hosted.intro.description":
     "Un servidor en la nube ejecuta tus agentes y rutinas cuando tu equipo está apagado. OpenBot lo configura y lo mantiene en marcha.",
@@ -235,6 +258,10 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Esto elimina el servidor del servicio de cuentas para todos los miembros. Los archivos y chats de su equipo se conservan. Para volver a usarlo, regístralo desde ese equipo.",
   "mobile.server.settings.remove": "Eliminar servidor",
+  "mobile.server.settings.deleteTitle": "¿Eliminar {name}?",
+  "mobile.server.settings.deleteBody":
+    "OpenBot detiene el servidor en su ordenador y mueve sus agentes, chats y archivos a la papelera de ese ordenador. El servidor sale de la lista de servidores en todos tus dispositivos.",
+  "mobile.server.settings.delete": "Eliminar servidor",
   "mobile.server.settings.name": "Nombre del servidor",
   "mobile.server.settings.nameLength": "Usa entre {min} y {max} caracteres.",
   "mobile.server.settings.logo": "Logotipo del servidor",

@@ -347,8 +347,8 @@ export const messages = {
     "Göreve en fazla 120 karakterlik bir başlık ve ne yapılacağını anlatan kısa bir talimat verin.",
   "error.backend.taskOwnChatOnly":
     "Görevi yalnızca kendi sohbetinizden başlatın. Bir kanal, bir mesajlaşma konuşması veya başka bir görev yeni bir görev başlatamaz.",
-  "error.backend.taskOpenLimit":
-    "Bu ajanın zaten {count} açık görevi var. Başka bir görev başlatmadan önce kullanıcının birini kapatmasını bekleyin.",
+  "error.backend.taskUnfinishedLimit":
+    "Bu ajanın zaten {count} bitmemiş görevi var. Bunlardan biri bittiğinde başka bir görev başlatın.",
   "error.backend.taskOpenLimitReached":
     "Bu ajanın {count} açık görevi var. Bir görevi kapatın, ardından başka bir görev başlatın veya açın.",
   "error.backend.taskRemoteUnsupported": "Görevler yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",

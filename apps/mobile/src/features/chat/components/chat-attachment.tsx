@@ -19,11 +19,11 @@ import { useText } from "@/shared/lib/text";
 import { attachmentFrame, FILL, FRAME_RADIUS, MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { storeCodePreview } from "../model/code-preview-store";
 import { type ImageDimensions, sameShape } from "../model/image-dimensions";
-import { attachmentTypeLabel, rememberImageDimensions, useAttachmentFile } from "./attachment-preview";
+import { attachmentTypeLabel, rememberImageDimensions, showsAsImage, useAttachmentFile } from "./attachment-preview";
 import { ChatCodePreview } from "./chat-code-preview";
 import { isViewableImage, useChatImageSource } from "./chat-image-viewer";
 import { HtmlPage } from "./html-page";
-import { UPLOAD_BLUR_RADIUS, UPLOAD_SETTLE_MS, UploadProgressCircle, useUploadRevealStyle } from "./upload-progress";
+import { UPLOAD_BLUR_RADIUS, UploadProgressCircle, useUploadReveal } from "./upload-progress";
 import { useAttachmentPreview } from "./use-attachment-preview";
 import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
@@ -158,23 +158,11 @@ function ChatFileAttachment({ attachment, serverId, alignment = "left", upload }
   const [decoded, setDecoded] = useState<ImageDimensions | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
-  // The send can finish before the upload view has settled. Hold it as complete for that long,
-  // so the photo finishes coming into focus instead of jumping to sharp in one frame.
-  const [lingering, setLingering] = useState(false);
-  useEffect(() => {
-    if (upload !== undefined) {
-      setLingering(true);
-      return;
-    }
-    const timer = setTimeout(() => setLingering(false), UPLOAD_SETTLE_MS);
-    return () => clearTimeout(timer);
-  }, [upload]);
-  const shownUpload = upload ?? (lingering ? 1 : undefined);
-  const revealStyle = useUploadRevealStyle(shownUpload ?? 1);
+  const { shownUpload, revealStyle } = useUploadReveal(upload);
   const { width } = useWindowDimensions();
   const tooLarge = attachment.size > MOBILE_ATTACHMENT_BYTES;
   // An image above the transfer limit cannot be shown here, so it is a file the user opens on desktop.
-  const image = attachment.kind === "image" && !tooLarge;
+  const image = showsAsImage(attachment) && !tooLarge;
   const { pending, localUri, uri, dimensions, query, sharing, share } = useAttachmentFile(serverId, attachment, image);
   // The conversation's viewer measures this copy and hides it on the UI thread while it holds the picture.
   const source = useChatImageSource(image && isViewableImage(attachment) ? attachment.id : null, FRAME_RADIUS);

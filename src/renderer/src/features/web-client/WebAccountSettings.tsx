@@ -1,4 +1,4 @@
-import type { AppAppearance } from "@openbot/contracts/app-appearance";
+import { type AppAppearance, isAppAppearance } from "@openbot/contracts/app-appearance";
 import type { AppLanguage } from "@openbot/contracts/app-language";
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -230,7 +230,10 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                 <ItemActions>
                   <AppearanceSelect
                     value={props.appearance}
-                    onChange={props.onChangeAppearance}
+                    onChange={(value) => {
+                      // The web client lists no palettes, so each value is an appearance.
+                      if (isAppAppearance(value)) props.onChangeAppearance(value);
+                    }}
                     {...(modalElement ? { mount: modalElement } : {})}
                   />
                 </ItemActions>

@@ -87,7 +87,14 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
       void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
   }
 
+  // Each file of a drop is its own import, and all of them start in one task: one toast is enough.
+  let refusedInTask = false;
   function refuseFiles(): void {
+    if (refusedInTask) return;
+    refusedInTask = true;
+    queueMicrotask(() => {
+      refusedInTask = false;
+    });
     actionToast.error(t("conversation.threads.error.files"));
   }
 
