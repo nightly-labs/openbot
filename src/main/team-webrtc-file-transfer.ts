@@ -106,6 +106,8 @@ export class TeamWebRtcFileTransfer {
     }
   >();
   #frames = Semaphore.makeUnsafe(1);
+  /** The last frame that `#onData` started. The next frame waits until it ends. */
+  #lastFrame: Deferred.Deferred<void> | null = null;
   readonly #connectedPeers = new Set<string>();
   readonly #stateWaiters = new Set<() => void>();
   #stopped = false;
@@ -447,12 +449,23 @@ export class TeamWebRtcFileTransfer {
   ): void => {
     if (channel !== "files" || !this.#connectedPeers.has(peerId) || !this.#acceptPeer(peerId)) return;
     const transferId = fileTransferId(data);
+    // The semaphore does not keep the order of its waiters: a frame that arrives when the permit is
+    // free goes before the frames that wait. Each frame waits for the one before it, so the chunks of
+    // parallel files stay in order.
+    const previous = this.#lastFrame;
+    const done = Deferred.makeUnsafe<void>();
+    this.#lastFrame = done;
     void Effect.runPromise(
       this.#owned(
-        this.#frames.withPermit(
-          this.#handleData(peerId, data).pipe(
-            Effect.catch((error) => this.#failFrame(peerId, transferId, error.cause)),
+        (previous ? Deferred.await(previous) : Effect.void).pipe(
+          Effect.andThen(
+            this.#frames.withPermit(
+              this.#handleData(peerId, data).pipe(
+                Effect.catch((error) => this.#failFrame(peerId, transferId, error.cause)),
+              ),
+            ),
           ),
+          Effect.ensuring(Deferred.succeed(done, undefined)),
         ),
       ),
     ).catch(() => undefined);
