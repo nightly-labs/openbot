@@ -96,7 +96,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Indisponível agora · ignorado",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} nunca troca depois de começar a escrever. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
+    "Quando um limite de uso para {name} depois de começar a trabalhar, {name} continua o mesmo trabalho no primeiro modelo disponível da ordem. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
   "agentSettings.groups.brain": "Cérebro",
   "agentSettings.groups.knows": "Sabe",
   "agentSettings.groups.does": "Faz",

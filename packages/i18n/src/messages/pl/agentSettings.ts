@@ -117,7 +117,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Chwilowo niedostępny · pominięto",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} nigdy się nie przełącza po tym, jak zacznie pisać. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
+    "Gdy limit użycia zatrzyma agenta {name} po rozpoczęciu pracy, {name} kontynuuje tę samą pracę na pierwszym dostępnym modelu z kolejności. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
   "agentSettings.groups.brain": "Mózg",
   "agentSettings.groups.knows": "Wie",
   "agentSettings.groups.does": "Robi",

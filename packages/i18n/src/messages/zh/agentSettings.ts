@@ -88,7 +88,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "当前不可用 · 已跳过",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} 在开始输出后不会切换。额度重置后会回到 {model}；出现服务商错误时，则在 10 分钟后回到 {model}。",
+    "{name} 开始工作后若因用量上限停止，会用顺序中第一个可用的模型继续同一项工作。额度重置后会回到 {model}；出现服务商错误时，则在 10 分钟后回到 {model}。",
   "agentSettings.groups.brain": "核心",
   "agentSettings.groups.knows": "已知",
   "agentSettings.groups.does": "行为",
