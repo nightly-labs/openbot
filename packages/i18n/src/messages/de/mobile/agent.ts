@@ -301,6 +301,7 @@ export const messages = {
   "mobile.agent.runtime.effort.xhigh": "Sehr hoch",
   "mobile.agent.runtime.effort.max": "Maximal",
   "mobile.agent.runtime.effort.ultra": "Ultra",
+  "mobile.agent.runtime.fast": "Schnell",
   "mobile.agent.runtime.retryModels": "Modelle erneut laden",
   "mobile.agent.runtime.loadingModels": "Modelle werden geladen…",
   "mobile.agent.runtime.noModels": "Für diesen Anbieter sind keine Modelle verfügbar.",

@@ -293,6 +293,7 @@ export const messages = {
   "mobile.agent.runtime.effort.xhigh": "Molto alto",
   "mobile.agent.runtime.effort.max": "Massimo",
   "mobile.agent.runtime.effort.ultra": "Ultra",
+  "mobile.agent.runtime.fast": "Veloce",
   "mobile.agent.runtime.retryModels": "Riprova a caricare i modelli",
   "mobile.agent.runtime.loadingModels": "Caricamento dei modelli…",
   "mobile.agent.runtime.noModels": "Nessun modello disponibile per questo provider.",

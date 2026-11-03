@@ -296,6 +296,7 @@ export const messages = {
   "mobile.agent.runtime.effort.xhigh": "最高",
   "mobile.agent.runtime.effort.max": "最大",
   "mobile.agent.runtime.effort.ultra": "ウルトラ",
+  "mobile.agent.runtime.fast": "高速",
   "mobile.agent.runtime.retryModels": "モデルを再読み込み",
   "mobile.agent.runtime.loadingModels": "モデルを読み込んでいます…",
   "mobile.agent.runtime.noModels": "このプロバイダーで利用できるモデルはありません。",
