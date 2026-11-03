@@ -57,6 +57,8 @@ export interface UsageLimitKey {
 }
 
 interface ProviderFailure extends UsageLimitKey {
+  /** Epoch milliseconds when the hold ends. */
+  endsAt: number;
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -169,13 +171,17 @@ export class UsageLimitGate {
     const key = limitKey(provider, accountId, turnModel);
     const previous = this.#failures.get(key);
     if (previous) clearTimeout(previous.timer);
+    // A later error with no reset, such as from another agent on the same model, keeps the named reset.
+    const hold = Math.max(PROVIDER_FAILURE_HOLD_MS, (resetDelayMs ?? 0) + RESET_GRACE_MS);
+    const endsAt = Math.max(previous?.endsAt ?? 0, Date.now() + hold);
     this.#failures.set(key, {
       provider,
       accountId,
       model: turnModel,
+      endsAt,
       timer: setTimeout(
         () => Effect.runFork(this.#releaseFailure(key).pipe(Effect.forkIn(this.#scope))),
-        Math.min(MAX_TIMER_MS, Math.max(PROVIDER_FAILURE_HOLD_MS, (resetDelayMs ?? 0) + RESET_GRACE_MS)),
+        Math.min(MAX_TIMER_MS, endsAt - Date.now()),
       ),
     });
   }
