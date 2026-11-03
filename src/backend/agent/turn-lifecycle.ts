@@ -88,6 +88,8 @@ import { collectProviderUsage } from "./usage-collection";
 import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
 
 const logger = createOpenBotLogger("turn-lifecycle");
+/** The retry of one turn after which the user gets a notice. A single retry is a normal network error. */
+const RETRY_NOTICE_ATTEMPTS = 3;
 const ENDED_TURN_LIMIT = 256;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
@@ -266,6 +268,8 @@ export class TurnLifecycle {
    * reason once the banner that showed it is gone.
    */
   readonly #turnErrors = new Map<string, string>();
+  /** How many times the provider retried a request of each running turn. */
+  readonly #turnRetries = new Map<string, number>();
   /**
    * The client, provider thread and start time of each running turn, from its `turn/started`.
    * `produced` is set by the first item or delta: a refused turn is run again only without one.
@@ -382,6 +386,7 @@ export class TurnLifecycle {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
+    this.#turnRetries.clear();
     this.#limitedTurns.clear();
     this.#failoverTurns.clear();
     this.#failoverRetries.clear();
@@ -744,7 +749,7 @@ export class TurnLifecycle {
       case "thread/tokenUsage/updated": {
         if (!threadId || !agentId) return;
         if (this.#conversation.loadedClientFor(threadId) !== source) return;
-        this.#compaction.updateBudget(threadId, params);
+        this.#compaction.updateBudget(threadId, params, agentId);
         const usage = getRecord(params, "tokenUsage");
         const last = getRecord(usage, "last");
         if (typeof last?.totalTokens === "number" && typeof usage?.modelContextWindow === "number")
@@ -765,6 +770,15 @@ export class TurnLifecycle {
         if (status !== "running" && status !== "completed" && status !== "failed") return;
         // Native Claude compaction does not report comparable full-context counts.
         this.#compaction.observeCompaction(threadId, status, "none");
+        return;
+      }
+      case "openbot/turn-progress": {
+        // A provider's own status for the running turn, such as a retry of a failed API request.
+        const turnId = getString(params, "turnId");
+        const detail = getString(params, "detail");
+        if (!threadId || !agentId || !turnId || !detail || !this.#runningTurns.has(turnId)) return;
+        if (this.#conversation.loadedClientFor(threadId) !== source) return;
+        this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, detail);
         return;
       }
       case "thread/archived": {
@@ -802,7 +816,10 @@ export class TurnLifecycle {
           return;
         }
         // Codex retries on its own and reports the final failure again without `willRetry`.
-        if (isRecord(params) && params.willRetry === true) return;
+        if (isRecord(params) && params.willRetry === true) {
+          this.#providerRetried(agentId, threadId, getString(params, "turnId"), source.provider);
+          return;
+        }
         // A usage limit shows no banner, but the failed delivery still keeps it as the reason.
         const errorTurnId = getString(params, "turnId");
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
@@ -889,6 +906,46 @@ export class TurnLifecycle {
   }).bind(this);
 
   /**
+   * Codex sent a request of a running turn again. A turn that retries again and again looked like
+   * work: Codex sent the same large request for 11 minutes, and the agent showed as working (#4374).
+   * The user gets one notice per turn. A large session also compacts before its next turn.
+   */
+  #providerRetried(
+    agentId: string | null | undefined,
+    threadId: string | null | undefined,
+    turnId: string | null,
+    provider: AgentClient["provider"],
+  ): void {
+    if (!agentId || !threadId || !turnId || !this.#runningTurns.has(turnId)) return;
+    const attempts = (this.#turnRetries.get(turnId) ?? 0) + 1;
+    this.#turnRetries.set(turnId, attempts);
+    logger.info("A provider retries a request.", {
+      provider,
+      attempts,
+      usedPercent: this.#compaction.usedPercent(threadId),
+    });
+    if (attempts !== RETRY_NOTICE_ATTEMPTS) return;
+    const compacts = this.#compaction.retrying(threadId);
+    const percent = this.#compaction.usedPercent(threadId);
+    this.#hooks.emitError(
+      "agent_warning",
+      compacts && percent !== null
+        ? sourceText("error.backend.providerRetryingLargeContext", {
+            attempts: String(attempts),
+            percent: String(percent),
+          })
+        : sourceText("error.backend.providerRetrying", { attempts: String(attempts) }),
+      agentId,
+      {
+        provider,
+        model: this.#hooks.turnModel(agentId, turnId),
+        turnId,
+        severity: "warning",
+      },
+    );
+  }
+
+  /**
    * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs, so
    * its completion keeps the text answers as quiet answers; `shown` when a person waits for the answer, as in a Test
    * run; null when no routine run started the turn. The completion decides again, because a message
@@ -951,6 +1008,7 @@ export class TurnLifecycle {
       }
       const reportedError = this.#turnErrors.get(turnId);
       this.#turnErrors.delete(turnId);
+      this.#turnRetries.delete(turnId);
       // The error is kept only while the turn runs, so a refused turn always has its entry.
       const refusedFailure =
         running !== undefined && status === "failed" && reportedError !== undefined

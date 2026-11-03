@@ -64,6 +64,7 @@ import {
   BROWSER_SIGN_IN_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
+  COMPUTER_ACTIVITY_CAPABILITY,
   CONNECTORS_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
@@ -85,6 +86,7 @@ import {
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
   MEMORY_REVIEW_CAPABILITY,
+  MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
@@ -250,6 +252,7 @@ import { routeBitwardenConnector } from "./team-api/route-bitwarden-connector";
 import { routeBrowser } from "./team-api/route-browser";
 import { routeBrowserProfiles } from "./team-api/route-browser-profiles";
 import { routeChannels } from "./team-api/route-channels";
+import { routeComputerActivity } from "./team-api/route-computer-activity";
 import { routeConnectors } from "./team-api/route-connectors";
 import { routeContextCompact } from "./team-api/route-context-compact";
 import { routeContextReset } from "./team-api/route-context-reset";
@@ -273,6 +276,7 @@ import { routeMcpServers } from "./team-api/route-mcp";
 import { routeMcpSignIn } from "./team-api/route-mcp-sign-in";
 import { routeMcpSignInApp } from "./team-api/route-mcp-sign-in-app";
 import { routeMemoryReview } from "./team-api/route-memory-review";
+import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
 import { routeProviderAccounts } from "./team-api/route-provider-accounts";
@@ -1060,6 +1064,7 @@ export class TeamApiServer {
       if ((await routeAgentMemoryLimit(context, this.#options.admin)) === "handled") return;
       if ((await routeMemoryReview(context, this.#options.admin)) === "handled") return;
       if ((await routePromptCacheTtl(context, this.#options.admin)) === "handled") return;
+      if ((await routeModelVisibility(context, this.#options.admin)) === "handled") return;
       if ((await routeProviderDefault(context, this.#options.admin)) === "handled") return;
       if (
         (await routeAgentAccess(
@@ -1096,6 +1101,7 @@ export class TeamApiServer {
       )
         return;
       if ((await routePushNotifications(context, this.#options.pushNotifications)) === "handled") return;
+      if ((await routeComputerActivity(context, this.#options.pushNotifications)) === "handled") return;
       if (
         (await routeFocusUse(context, this.#options.focusUse ? (id) => this.#recordFocusUse(id) : undefined)) ===
         "handled"
@@ -1191,6 +1197,7 @@ export class TeamApiServer {
       skills: this.#options.skills,
       sidebarLayout: this.#options.sidebarLayout,
       duplicateAgent: (agentId, operationId) => this.#duplicateAgent(agentId, operationId),
+      ...(this.#options.admin?.modelVisibility ? { visibleModels: this.#options.admin.modelVisibility } : {}),
     });
   }
 
@@ -2211,6 +2218,7 @@ export class TeamApiServer {
           if (capability === AGENT_MEMORY_LIMIT_CAPABILITY) return this.#options.admin?.memoryLimit !== undefined;
           if (capability === MEMORY_REVIEW_CAPABILITY) return this.#options.admin?.memoryReview !== undefined;
           if (capability === PROMPT_CACHE_TTL_CAPABILITY) return this.#options.admin?.promptCacheTtl !== undefined;
+          if (capability === MODEL_VISIBILITY_CAPABILITY) return this.#options.admin?.modelVisibility !== undefined;
           if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;
           if (capability === AGENT_ACCESS_CAPABILITY) return this.#options.agentAccess !== undefined;
           if (capability === SERVER_AUDIT_CAPABILITY) return this.#options.serverAudit !== undefined;
@@ -2226,7 +2234,11 @@ export class TeamApiServer {
           if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
           if (capability === WORKFLOWS_GITHUB_CAPABILITY) return this.#options.workflows?.github !== undefined;
-          if (capability === PUSH_NOTIFICATIONS_CAPABILITY || capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY)
+          if (
+            capability === PUSH_NOTIFICATIONS_CAPABILITY ||
+            capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY ||
+            capability === COMPUTER_ACTIVITY_CAPABILITY
+          )
             return this.#options.pushNotifications !== undefined;
           if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;
           if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
