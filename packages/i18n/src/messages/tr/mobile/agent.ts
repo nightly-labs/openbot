@@ -322,6 +322,7 @@ export const messages = {
   "mobile.agent.runtime.effort.xhigh": "Ekstra yüksek",
   "mobile.agent.runtime.effort.max": "Maksimum",
   "mobile.agent.runtime.effort.ultra": "Ultra",
+  "mobile.agent.runtime.fast": "Hızlı",
   "mobile.agent.runtime.retryModels": "Modelleri tekrar dene",
   "mobile.agent.runtime.loadingModels": "Modeller yükleniyor…",
   "mobile.agent.runtime.noModels": "Bu sağlayıcı için kullanılabilir model yok.",
