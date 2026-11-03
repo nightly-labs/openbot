@@ -118,6 +118,8 @@ export const messages = {
     "Vous avez {saved} souvenirs sur {limit}. Pour faire de la place, mettez à jour un souvenir par son memoryId avec le texte combiné de deux souvenirs liés, puis oubliez l’autre, ou oubliez un souvenir qui n’est plus vrai. Puis réessayez.",
   "error.backend.agentMemoryLimitExceeded":
     "Vous avez {saved} souvenirs, et la limite est de {limit}. L’utilisateur a fixé la limite sous le nombre de souvenirs enregistrés. N’oubliez aucun souvenir pour faire de la place. Dites à l’utilisateur que ce souvenir n’a pas été enregistré.",
+  "error.backend.channelHistoryArriving":
+    "Un message partagé est encore en cours de réception. Reprenez quand il sera complet.",
   "error.backend.channelHistoryLeadRequired": "Choisissez un responsable de canal pour préparer l’historique partagé.",
   "error.backend.channelHistoryInvalid": "Le résumé de l’historique n’est pas valide. Reprenez pour réessayer.",
   "error.backend.channelContextTooLong":

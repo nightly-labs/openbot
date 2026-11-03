@@ -104,6 +104,7 @@ export const messages = {
     "你已保存 {saved} 条记忆，上限为 {limit} 条。要腾出空间，可用 memoryId 把两条相关记忆合并更新为一条，再忘掉另一条；或忘掉一条已不再正确的记忆，然后重试。",
   "error.backend.agentMemoryLimitExceeded":
     "你已保存 {saved} 条记忆，上限为 {limit} 条。用户把上限设在了已保存数量以下。不要为了腾空间而忘掉记忆，请告诉用户这条记忆未被保存。",
+  "error.backend.channelHistoryArriving": "仍有一条共享消息在传输中，请等它完整后再继续。",
   "error.backend.channelHistoryLeadRequired": "请选择一个频道主责来整理共享历史。",
   "error.backend.channelHistoryInvalid": "历史摘要无效，请继续以重试。",
   "error.backend.channelContextTooLong": "该派活超出共享上下文限制。请发送更短的请求或重新派活。",

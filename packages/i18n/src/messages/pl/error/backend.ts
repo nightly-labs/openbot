@@ -114,6 +114,7 @@ export const messages = {
     "Masz {saved} z {limit} wspomnień. Aby zrobić miejsce, zaktualizuj jedno wspomnienie przez memoryId, łącząc tekst dwóch powiązanych wspomnień, a następnie zapomnij drugie lub zapomnij wspomnienie, które nie jest już prawdziwe. Potem spróbuj ponownie.",
   "error.backend.agentMemoryLimitExceeded":
     "Liczba zapisanych wspomnień: {saved}. Limit: {limit}. Użytkownik ustawił limit poniżej liczby zapisanych wspomnień. Nie zapominaj wspomnień, aby zrobić miejsce. Powiedz użytkownikowi, że to wspomnienie nie zostało zapisane.",
+  "error.backend.channelHistoryArriving": "Wspólna wiadomość wciąż napływa. Wznów, gdy będzie kompletna.",
   "error.backend.channelHistoryLeadRequired": "Wybierz lidera kanału, aby przygotować wspólną historię.",
   "error.backend.channelHistoryInvalid": "Podsumowanie historii jest nieprawidłowe. Wznów, aby spróbować ponownie.",
   "error.backend.channelContextTooLong":

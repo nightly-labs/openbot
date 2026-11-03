@@ -118,6 +118,8 @@ export const messages = {
     "Du hast {saved} von {limit} Erinnerungen. Um Platz zu schaffen, aktualisiere eine Erinnerung über ihre memoryId mit dem kombinierten Text zweier verwandter Erinnerungen und vergiss dann die andere, oder vergiss eine Erinnerung, die nicht mehr stimmt. Versuche es dann erneut.",
   "error.backend.agentMemoryLimitExceeded":
     "Du hast {saved} Erinnerungen, und das Limit ist {limit}. Der Benutzer hat das Limit unter die Zahl der gespeicherten Erinnerungen gesetzt. Vergiss keine Erinnerungen, um Platz zu schaffen. Sag dem Benutzer, dass diese Erinnerung nicht gespeichert wurde.",
+  "error.backend.channelHistoryArriving":
+    "Eine geteilte Nachricht wird noch empfangen. Setze fort, wenn sie vollständig ist.",
   "error.backend.channelHistoryLeadRequired": "Wähle eine Kanalleitung, um den geteilten Verlauf vorzubereiten.",
   "error.backend.channelHistoryInvalid":
     "Die Zusammenfassung des Verlaufs ist ungültig. Setze fort, um es erneut zu versuchen.",

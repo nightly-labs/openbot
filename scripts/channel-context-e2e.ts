@@ -17,8 +17,8 @@
 //   7. A provider that retries a request three times gives one notice, and a session at 60% of its
 //      window then compacts before its next turn (#4374).
 //   8. A channel_history page stays near 24,000 characters. It cuts a long message, and a read by
-//      messageId and offset gives the rest of it. A long request is in the packet once, and a long
-//      handoff of an agent is cut with a pointer to the rest.
+//      messageId and offset gives the rest of it. It cuts a long task instruction. A long request is
+//      in the packet once, and a long handoff of an agent is cut with a pointer to the rest.
 //   9. A session at 60% of its window compacts before a turn whose input fills it over 80% (#4374).
 //  10. In an isolated channel, openbot.remember saves a channel memory and the agent keeps none of
 //      it. The packet says when isolation is on and when it is off (#4332).
@@ -758,6 +758,16 @@ try {
     pass(
       "The page gives only the tasks that its messages name",
       page.tasks.every((task) => page.messages.some((message) => message.taskId === task.id)),
+    );
+    const longTask = channels()
+      .store.tasks(channelId)
+      .find((task) => task.instruction === long);
+    const pageTask = page.tasks.find((task) => task.id === longTask?.id);
+    pass(
+      "The page cuts the long instruction of a task",
+      pageTask !== undefined &&
+        page.tasks.every((task) => task.instruction.length <= 2_001 && task.expectedResult.length <= 2_001),
+      String(pageTask?.instruction.length),
     );
     const older = await history({ beforeSequence: page.olderCursor ?? 0 });
     assert.ok(isPage(older), "channel_history gave no older page.");

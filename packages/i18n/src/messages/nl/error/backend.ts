@@ -115,6 +115,7 @@ export const messages = {
     "Je hebt {saved} van {limit} herinneringen. Maak ruimte: werk één herinnering bij via memoryId met de gecombineerde tekst van twee verwante herinneringen en vergeet dan de andere, of vergeet een herinnering die niet meer klopt. Probeer het daarna opnieuw.",
   "error.backend.agentMemoryLimitExceeded":
     "Je hebt {saved} herinneringen en de limiet is {limit}. De gebruiker heeft de limiet lager ingesteld dan het aantal opgeslagen herinneringen. Vergeet geen herinneringen om ruimte te maken. Vertel de gebruiker dat deze herinnering niet is opgeslagen.",
+  "error.backend.channelHistoryArriving": "Er komt nog een gedeeld bericht binnen. Ga verder als het compleet is.",
   "error.backend.channelHistoryLeadRequired": "Kies een kanaalleider om de gedeelde geschiedenis voor te bereiden.",
   "error.backend.channelHistoryInvalid":
     "De samenvatting van de geschiedenis is ongeldig. Ga verder om het opnieuw te proberen.",

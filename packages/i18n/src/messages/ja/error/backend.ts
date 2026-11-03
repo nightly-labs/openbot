@@ -118,6 +118,7 @@ export const messages = {
     "メモリーは {limit} 個中 {saved} 個です。空きを作るには、関連する 2 つのメモリーをまとめた文で一方を memoryId で更新してからもう一方を削除するか、もう正しくないメモリーを削除してください。そのあと、もう一度試してください。",
   "error.backend.agentMemoryLimitExceeded":
     "メモリーは {saved} 個あり、上限は {limit} 個です。ユーザーが保存済みの数より低い上限を設定しました。空きを作るためにメモリーを削除しないでください。このメモリーは保存されなかったとユーザーに伝えてください。",
+  "error.backend.channelHistoryArriving": "共有メッセージをまだ受信中です。完了してから再開してください。",
   "error.backend.channelHistoryLeadRequired": "共有履歴を準備するには、チャンネルリードを選択してください。",
   "error.backend.channelHistoryInvalid": "履歴の要約が無効です。再開してもう一度お試しください。",
   "error.backend.channelContextTooLong":

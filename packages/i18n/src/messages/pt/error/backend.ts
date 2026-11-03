@@ -118,6 +118,8 @@ export const messages = {
     "Você tem {saved} de {limit} memórias. Para abrir espaço, atualize uma memória pelo memoryId com o texto combinado de duas memórias relacionadas e esqueça a outra, ou esqueça uma memória que não é mais verdadeira. Depois tente de novo.",
   "error.backend.agentMemoryLimitExceeded":
     "Você tem {saved} memórias, e o limite é {limit}. O usuário definiu o limite abaixo do número de memórias salvas. Não esqueça memórias para abrir espaço. Diga ao usuário que esta memória não foi salva.",
+  "error.backend.channelHistoryArriving":
+    "Uma mensagem compartilhada ainda está chegando. Retome quando ela estiver completa.",
   "error.backend.channelHistoryLeadRequired": "Escolha um líder de canal para preparar o histórico compartilhado.",
   "error.backend.channelHistoryInvalid": "O resumo do histórico é inválido. Retome para tentar novamente.",
   "error.backend.channelContextTooLong":

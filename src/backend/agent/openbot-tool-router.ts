@@ -1006,7 +1006,12 @@ export class OpenBotToolRouter {
     // An isolated channel keeps what its members learn in it (#4332). The fact becomes a channel
     // memory, which only the packets of this channel show, so the agent's own chats do not get it.
     // Its other memory tools still change its own memories, which reach every chat.
-    if (params.tool === "remember" && channelId && this.#channels.store.get(channelId).isolated) {
+    if (
+      params.tool === "remember" &&
+      channelId &&
+      this.#channels.store.exists(channelId) &&
+      this.#channels.store.get(channelId).isolated
+    ) {
       const args = isRecord(params.arguments) ? params.arguments : {};
       if (args.memoryId !== undefined)
         return openBotToolFailure(

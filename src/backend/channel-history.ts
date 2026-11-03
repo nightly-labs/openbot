@@ -61,6 +61,8 @@ const AHEAD_SHARE = 0.75;
 const HISTORY_PAGE_CHARACTERS = 24_000;
 /** A message over this length is cut in a page, and one read by its ID gives this much of it. */
 const HISTORY_MESSAGE_CHARACTERS = 16_000;
+/** The most of a task instruction or expected result that one history page shows. */
+const HISTORY_TASK_CHARACTERS = 2_000;
 const HISTORY_HEAD_SHARE = 0.75;
 
 const logger = createOpenBotLogger("channel-history");
@@ -194,7 +196,8 @@ export function boundedHistoryPage(page: ChannelHistoryPage): ChannelHistoryPage
   return {
     channel: page.channel,
     messages: kept,
-    tasks: page.tasks.filter((task) => taskIds.has(task.id)),
+    // A task can hold a long instruction or result, and the page limit does not count it.
+    tasks: page.tasks.filter((task) => taskIds.has(task.id)).map(cutTask),
     olderCursor: kept.length < page.messages.length ? (kept[0]?.sequence ?? page.olderCursor) : page.olderCursor,
     throughSequence: page.throughSequence,
     cutMessages,
@@ -246,6 +249,14 @@ export function isMemberThinking({ message }: ChannelMessage): boolean {
  * member answered an older request from its own history instead. A new child task inherits its
  * parent's request, so a child task has a follow-up only when the request is a message to that task.
  */
+function cutText(text: string): string {
+  return text.length > HISTORY_TASK_CHARACTERS ? `${text.slice(0, HISTORY_TASK_CHARACTERS)}…` : text;
+}
+
+function cutTask(task: ChannelTask): ChannelTask {
+  return { ...task, instruction: cutText(task.instruction), expectedResult: cutText(task.expectedResult) };
+}
+
 export function assignmentText(task: ChannelTask, request: ChannelMessage | null | undefined): string {
   const followUp =
     task.sourceMessageIds[0] !== task.requestMessageId && (task.parentTaskId === null || request?.taskId === task.id);
@@ -371,6 +382,17 @@ export class ChannelHistory {
   }
 
   /**
+   * Whether `prepare` with this budget summarizes first. Only then does it wait for the summary
+   * after a turn: that summary starts below this limit, and a turn under it has no need of it.
+   */
+  needsSummary(channelId: string, requestedBudget = CONTEXT_CHARACTERS): boolean {
+    const limit = Math.floor(Math.min(CONTEXT_CHARACTERS, requestedBudget) * TRANSCRIPT_SHARE);
+    const throughSequence = this.store.summary(channelId).throughSequence;
+    const recent = conversation(this.store.messages(channelId)).filter((message) => message.sequence > throughSequence);
+    return render(recent).length > limit && recent.length > 1;
+  }
+
+  /**
    * Summarizes the channel ahead of its next packet, so that packet does not wait for the model. It
    * starts below the packet threshold: a summary at the threshold left the next message to cross it again.
    */
@@ -400,10 +422,11 @@ export class ChannelHistory {
       const dependencies = yield* ChannelHistoryDependencies;
       const characterBudget = Math.min(CONTEXT_CHARACTERS, requestedBudget);
       const channel = yield* channelSync(() => dependencies.store.get(task.channelId));
-      // The member's own model can summarize when the lead's model is not available.
+      // The member's own model can summarize when the lead's model is not available, and in a
+      // channel with no lead.
       const summarized = yield* summarize(
         channel.id,
-        lead,
+        lead ?? agent,
         lead && agent.id !== lead.id ? [agent] : [],
         characterBudget,
       );
@@ -477,9 +500,11 @@ export class ChannelHistory {
       // The message that holds a long instruction: the person's request, or the handoff message of
       // an agent ("Name: instruction"). Its row refers to the assignment, so the packet does not
       // give the same text twice.
+      // The request first, then the newest message with the text: an older message can quote it.
+      const holds = (message: ChannelMessage) => message.message.text.includes(task.instruction);
       const holder =
         task.instruction.length > REPEATED_ASSIGNMENT_CHARACTERS
-          ? messages.find((message) => message.message.text.includes(task.instruction))
+          ? [request, ...[...messages].reverse()].find((message) => message !== undefined && holds(message))
           : undefined;
       const instruction =
         holder?.author.kind === "agent" && task.instruction.length > HANDOFF_INSTRUCTION_CHARACTERS

@@ -297,8 +297,10 @@ posted a `channel_result`: the result is the answer of that turn.
 - `channel_history` gives a page of about 24,000 characters at most. A message over 16,000 characters
   is cut in the page and named in `cutMessages`; a read with its `messageId` and `offset` gives the
   next part.
-- Before a turn, the drain gives `ContextCompaction.expectInput` the size of the input (4 characters a
-  token). When the last usage and that input are over 80% of the window, the session compacts first.
+- Before a turn, the drain gives `ContextCompaction.expectInput` the size of the message text (4
+  characters a token). Attachments and images are not in this estimate. When the last usage and that
+  text are over 80% of the window, the session compacts first.
+- A channel with no lead summarizes with the model of the member that gets the packet.
 - A change to `supersededAt` only does not reset the summary or the contexts. A text edit resets them
   (#3761).
 - The summary uses the lead's provider. `backgroundModel` (`src/backend/agent/background-model.ts`)
@@ -312,8 +314,9 @@ posted a `channel_result`: the result is the answer of that turn.
   channel facts with a rule line, and a line when a person turns it off. A save without the field
   keeps the stored value, so a client from before it does not turn it off. The agent import archive
   (`src/main/agent-import-manifest.ts`) has no field for it, so an imported channel starts with it off.
-- After a turn, a channel starts one background summary. `prepare` waits for it, so a turn does not
-  summarize the same messages again.
+- After a turn, a channel starts one background summary. `prepare` waits for it only when its own
+  budget needs a summary (`ChannelHistory.needsSummary`), so a turn does not summarize the same
+  messages again. A deleted channel stops the summary.
 - The log line "A channel packet was prepared." gives the size of each part (`packetParts`,
   `deltaParts`): assignment, memories, summary, referenced messages, transcript, and the count of
   kept and left-out messages. `otherCharacters` is the rest: the rules and the JSON facts. It never

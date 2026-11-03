@@ -109,6 +109,7 @@ export const messages = {
     "메모리가 {limit}개 중 {saved}개예요. 공간을 만들려면 관련된 메모리 두 개의 내용을 합쳐 memoryId로 메모리 하나를 업데이트한 후 나머지 하나를 삭제하거나, 더 이상 사실이 아닌 메모리를 삭제하세요. 그런 다음 다시 시도해 주세요.",
   "error.backend.agentMemoryLimitExceeded":
     "메모리가 {saved}개인데 한도는 {limit}개예요. 사용자가 한도를 저장된 메모리 수보다 낮게 설정했어요. 공간을 만들려고 메모리를 삭제하지 마세요. 사용자에게 이 메모리가 저장되지 않았다고 알리세요.",
+  "error.backend.channelHistoryArriving": "공유 메시지가 아직 도착하는 중이에요. 완료되면 재개하세요.",
   "error.backend.channelHistoryLeadRequired": "공유 기록을 준비하려면 채널 리더를 선택하세요.",
   "error.backend.channelHistoryInvalid": "기록 요약이 올바르지 않아요. 재개해서 다시 시도해 주세요.",
   "error.backend.channelContextTooLong":

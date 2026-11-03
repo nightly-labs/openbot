@@ -115,6 +115,7 @@ export const messages = {
     "Tienes {saved} de {limit} recuerdos. Para hacer sitio, actualiza un recuerdo por su memoryId con el texto combinado de dos recuerdos relacionados y olvida el otro, u olvida un recuerdo que ya no sea cierto. Luego vuelve a intentarlo.",
   "error.backend.agentMemoryLimitExceeded":
     "Tienes {saved} recuerdos y el límite es {limit}. El usuario fijó el límite por debajo del número de recuerdos guardados. No olvides recuerdos para hacer sitio. Dile al usuario que este recuerdo no se guardó.",
+  "error.backend.channelHistoryArriving": "Aún se está recibiendo un mensaje compartido. Reanuda cuando esté completo.",
   "error.backend.channelHistoryLeadRequired": "Elige un coordinador de canal para preparar el historial compartido.",
   "error.backend.channelHistoryInvalid": "El resumen del historial no es válido. Reanuda para intentarlo de nuevo.",
   "error.backend.channelContextTooLong":

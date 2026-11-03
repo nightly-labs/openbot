@@ -109,6 +109,7 @@ export const messages = defineMessages("error.backend", {
     "You have {saved} of {limit} memories. To make room, update one memory by memoryId with the combined text of two related memories, then forget the other one, or forget a memory that is no longer true. Then try again.",
   "error.backend.agentMemoryLimitExceeded":
     "You have {saved} memories, and the limit is {limit}. The user set the limit below the number of saved memories. Do not forget memories to make room. Tell the user that this memory was not saved.",
+  "error.backend.channelHistoryArriving": "A shared message is still arriving. Resume when it is complete.",
   "error.backend.channelHistoryLeadRequired": "Choose a channel lead to prepare the shared history.",
   "error.backend.channelHistoryInvalid": "The history summary is invalid. Resume to try again.",
   "error.backend.channelContextTooLong":

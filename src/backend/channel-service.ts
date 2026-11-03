@@ -282,6 +282,9 @@ export class ChannelService {
         const channel = yield* channelSync(() => this.store.get(channelId));
         const pump = this.#pumps.get(channelId);
         this.#deletedChannels.add(channelId);
+        // A summary that runs after a turn would write to the deleted rows.
+        const summary = this.#summaries.get(channelId);
+        if (summary) yield* Fiber.interrupt(summary);
         yield* Effect.gen({ self: this }, function* () {
           yield* this.interruptTasks(
             channelId,
@@ -1959,14 +1962,15 @@ export class ChannelService {
     const context = yield* channelSync(() => this.store.context(channel.id, agent.id));
     this.#preparedChanges.set(delivery.delivery.id, this.store.completedMessageChanges(channel.id));
     const delivered = this.#deliveredContext(channel.id, context, agent);
-    yield* this.#awaitSummary(channel.id);
+    const budget = this.hooks.contextCharacters?.(agent.id, context.threadId);
+    yield* this.#awaitSummary(channel.id, budget);
     const history = yield* this.#history.prepare(
       task,
       agent,
       this.hooks.agents().find((item) => item.id === channel.leadAgentId),
       delivered,
       this.#peers(tasks, task),
-      this.hooks.contextCharacters?.(agent.id, context.threadId),
+      budget,
     );
     if (delivered && history.delta !== null)
       this.#deltas.set(delivery.delivery.id, { sessionId: delivered.sessionId, text: history.delta });
@@ -2207,10 +2211,16 @@ export class ChannelService {
     });
   }
 
-  /** Waits for the summary that runs after a turn, so a packet does not ask the model for it twice. */
-  #awaitSummary(channelId: string): Effect.Effect<void> {
+  /**
+   * Waits for the summary that runs after a turn, so a packet does not ask the model for it twice.
+   * A packet that fits without a new summary does not wait for it.
+   */
+  #awaitSummary(channelId: string, budget: number | undefined): Effect.Effect<void, ChannelOperationError> {
     const fiber = this.#summaries.get(channelId);
-    return fiber ? Fiber.await(fiber).pipe(Effect.asVoid) : Effect.void;
+    if (!fiber) return Effect.void;
+    return channelSync(() => this.#history.needsSummary(channelId, budget)).pipe(
+      Effect.flatMap((needed) => (needed ? Fiber.await(fiber).pipe(Effect.asVoid) : Effect.void)),
+    );
   }
 
   /** Native event callbacks and synchronous hooks own this work; stop drains it before closing the scope. */
@@ -2749,7 +2759,8 @@ export class ChannelService {
     const prepared = this.store.completedMessageChanges(channelId);
     const tasks = yield* channelSync(() => this.store.tasks(channelId));
     let history: Effect.Success<ReturnType<ChannelHistory["prepare"]>>;
-    yield* this.#awaitSummary(channelId);
+    const budget = this.hooks.contextCharacters?.(agent.id, threadId);
+    yield* this.#awaitSummary(channelId, budget);
     try {
       history = channelResult(
         yield* Effect.result(
@@ -2759,7 +2770,7 @@ export class ChannelService {
             this.hooks.agents().find((item) => item.id === this.store.get(channelId).leadAgentId),
             this.#deliveredContext(channelId, context, agent),
             this.#peers(tasks, task),
-            this.hooks.contextCharacters?.(agent.id, threadId),
+            budget,
           ),
         ),
       );
