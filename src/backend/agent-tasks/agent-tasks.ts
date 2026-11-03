@@ -35,8 +35,17 @@ import { storedSync } from "../stored-state-effects";
 
 const logger = createOpenBotLogger("agent-tasks");
 
-/** The most open tasks that an agent can have when it starts one more itself. The user can have up to `INPUT_LIMITS.agentTasks`. */
-const AGENT_STARTED_OPEN_TASKS = 8;
+/**
+ * The most unfinished tasks that an agent can have when it starts one more itself. A finished task does
+ * not count. The user can have up to `INPUT_LIMITS.agentTasks` open tasks.
+ */
+const AGENT_STARTED_UNFINISHED_TASKS = 8;
+
+/**
+ * The finished tasks that the agent started and that stay open when it starts one more. The older ones
+ * are archived, so a routine that starts a task each run does not fill the task list.
+ */
+const AGENT_STARTED_FINISHED_KEPT = 8;
 
 export const START_TASK_TOOL = "start_task";
 
@@ -53,6 +62,8 @@ export interface AgentTasksHooks {
   hold(agentId: string, taskId: string): string | null;
   /** A message is queued in a task: the queue and the drain take it. */
   queued(agentId: string): void;
+  /** OpenBot archived a finished task: its memory review starts, and a waiting task lane can start. */
+  archived(task: AgentThreadRecord): Effect.Effect<void>;
 }
 
 /** Where `start_task` was called, as the tool router knows it. */
@@ -446,9 +457,26 @@ export class AgentTasks implements TaskLanes {
     const startedTaskId = started ? this.#mailbox.taskIdForDelivery(started.delivery.id) : null;
     const startedTask = startedTaskId ? this.#store.task(startedTaskId) : null;
     if (startedTask) return startedTaskResult(startedTask);
-    const open = this.#store.openTaskIds(caller.agentId).length;
-    if (open >= AGENT_STARTED_OPEN_TASKS)
-      return openBotToolFailure(sourceText("error.backend.taskOpenLimit", { count: AGENT_STARTED_OPEN_TASKS }));
+    const open = this.#store.openTaskIds(caller.agentId).flatMap((taskId) => this.#store.task(taskId) ?? []);
+    const finished = open.filter((task) => this.#finished(task));
+    if (open.length - finished.length >= AGENT_STARTED_UNFINISHED_TASKS)
+      return openBotToolFailure(
+        sourceText("error.backend.taskUnfinishedLimit", { count: AGENT_STARTED_UNFINISHED_TASKS }),
+      );
+    // The newest finished tasks that the agent started stay open, when the task list has a place for them
+    // and for the new task. The person's own tasks and branches stay open.
+    const finishedByAgent = finished
+      .filter((task) => task.origin === "agent" && task.branch === null)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const others = open.length - finishedByAgent.length;
+    const kept = Math.max(0, Math.min(AGENT_STARTED_FINISHED_KEPT, INPUT_LIMITS.agentTasks - 1 - others));
+    const archived = finishedByAgent.slice(kept);
+    if (open.length - archived.length >= INPUT_LIMITS.agentTasks)
+      return openBotToolFailure(sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks }));
+    for (const task of archived) {
+      this.close(task);
+      yield* this.#hooks.archived(task);
+    }
     const task = this.create(caller.agentId, parsed.data.title, "agent");
     const queued = yield* this.#mailbox
       .enqueue({
@@ -538,6 +566,14 @@ export class AgentTasks implements TaskLanes {
       default:
         return false;
     }
+  }
+
+  /** No turn runs in the task, and no message is queued for it. */
+  #finished(task: AgentThreadRecord): boolean {
+    return (
+      !this.#conversation.loadedExecutionSnapshot(task.threadId)?.activeTurnId &&
+      !this.#mailbox.taskBusy(task.agentId, task.taskId)
+    );
   }
 
   #taskOf(threadId: string | null): AgentThreadRecord | null {

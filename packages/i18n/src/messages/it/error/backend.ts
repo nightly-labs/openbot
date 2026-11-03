@@ -358,8 +358,8 @@ export const messages = {
     "Dai all'attività un titolo di al massimo 120 caratteri e una descrizione che dica cosa fare.",
   "error.backend.taskOwnChatOnly":
     "Avvia un'attività solo dalla tua chat. Un canale, una conversazione di messaggistica o un'altra attività non possono avviarne una.",
-  "error.backend.taskOpenLimit":
-    "Questo agente ha già {count} attività aperte. Attendi che l'utente ne chiuda una prima di avviare un'altra attività.",
+  "error.backend.taskUnfinishedLimit":
+    "Questo agente ha già {count} attività non finite. Avvia un'altra attività quando una di esse finisce.",
   "error.backend.taskOpenLimitReached":
     "Questo agente ha {count} attività aperte. Chiudi un'attività, poi avviane o aprine un'altra.",
   "error.backend.taskRemoteUnsupported": "Le attività sono disponibili solo per gli agenti su questo computer.",

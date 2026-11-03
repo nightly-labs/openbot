@@ -581,6 +581,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#mailboxSync.emitQueue(agentId);
           this.#drain.scheduleDrain(agentId);
         },
+        archived: (task) =>
+          this.#memoryReview
+            .threadClosed(task.agentId, task.threadId)
+            .pipe(Effect.andThen(Effect.sync(() => this.#drain.scheduleDrain(task.agentId)))),
       },
     });
     this.#tables = options.tables ?? null;

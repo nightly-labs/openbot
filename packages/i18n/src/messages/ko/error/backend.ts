@@ -333,8 +333,8 @@ export const messages = {
   "error.backend.taskToolInvalid": "작업에 120자 이하의 제목과 할 일을 설명하는 지시문을 지정하세요.",
   "error.backend.taskOwnChatOnly":
     "작업은 자신의 채팅에서만 시작할 수 있어요. 채널, 메시징 대화, 다른 작업에서는 시작할 수 없어요.",
-  "error.backend.taskOpenLimit":
-    "이 에이전트에는 이미 열린 작업이 {count}개 있어요. 다른 작업을 시작하기 전에 사용자가 작업 하나를 닫을 때까지 기다리세요.",
+  "error.backend.taskUnfinishedLimit":
+    "이 에이전트에는 이미 끝나지 않은 작업이 {count}개 있어요. 그중 하나가 끝나면 다른 작업을 시작하세요.",
   "error.backend.taskOpenLimitReached":
     "이 에이전트에는 열린 작업이 {count}개 있어요. 작업 하나를 닫은 후 다른 작업을 시작하거나 여세요.",
   "error.backend.taskRemoteUnsupported": "작업은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
