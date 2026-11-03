@@ -1,4 +1,5 @@
 import type {
+  AgentModelListing,
   AgentProviderId,
   AgentProviderStatus,
   AgentStatus,
@@ -38,6 +39,8 @@ export interface PickerModel {
   service: string;
   free: boolean;
   variants: { id: string; name: string }[];
+  /** From the host: `older` folds the model under Older models, and `new` labels a recent release. */
+  listing?: AgentModelListing;
 }
 
 export interface PickerModelGroup {
@@ -181,6 +184,7 @@ export function pickerModels(options: ClientAgentModelOption[]): PickerModel[] {
         variants: variants.has(model.id)
           ? [{ id: model.id, name: t("app.modelVariant.default") }, ...(variants.get(model.id) ?? [])]
           : [],
+        ...(model.listing ? { listing: model.listing } : {}),
       };
     });
 }

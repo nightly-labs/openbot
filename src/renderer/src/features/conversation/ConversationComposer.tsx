@@ -29,15 +29,15 @@ import {
   ComposerUpdateNotice,
   ComposerUsageLimitNotice,
 } from "@openbot/ui/features/conversation/ComposerNotice";
+import { ComposerReplyPreview } from "@openbot/ui/features/conversation/ComposerReplyPreview";
 import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
 import {
   ComposerCompactionNotice,
+  ComposerNewChatButton,
   ContextUsageMeter,
   contextUsageView,
 } from "@openbot/ui/features/conversation/ContextUsage";
-import { CloseIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { type OpenWaitItem, OpenWaits } from "@openbot/ui/features/conversation/OpenWaits";
-import { ReplyQuote } from "@openbot/ui/features/conversation/ReplyQuote";
 import { SpeakingBar } from "@openbot/ui/features/conversation/SpeakingBar";
 import { ComposerVoiceControls } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
@@ -62,6 +62,10 @@ export function ConversationComposer() {
     providerUpdateRequired,
     attachmentAction,
     attachmentBusy,
+    uploadFailed,
+    currentUploads,
+    removeUpload,
+    retryUpload,
     awaitingReplies,
     dismissAwaitingReplies,
     composerFocusRequest,
@@ -151,7 +155,21 @@ export function ConversationComposer() {
   const openVoiceConversation = () => (voiceConversationAvailable() ? () => openSidePanelPane("voice") : undefined);
   // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
-  const composerAttachmentRow = () => rowDraftAttachments().length > 0 || currentPastePreviews().length > 0;
+  // One chip for each file of each import. Only a single-file import knows the bytes of its file.
+  const uploadFiles = createMemo(() =>
+    currentUploads().flatMap((upload) =>
+      upload.files.map((file, index) => ({
+        key: `${upload.requestId}:${index}`,
+        uploadId: upload.requestId,
+        name: file.name,
+        size: file.size,
+        sent: upload.files.length === 1 ? upload.sent : null,
+        error: upload.error,
+      })),
+    ),
+  );
+  const composerAttachmentRow = () =>
+    rowDraftAttachments().length > 0 || currentPastePreviews().length > 0 || uploadFiles().length > 0;
   // A provider start, restart or server reconnect is short. Keys typed in it must not drop, so only a
   // lasting stop locks the text. Sending still waits for the agent. Without an agent, no draft keeps the text.
   const editorLocked = () =>
@@ -186,6 +204,8 @@ export function ConversationComposer() {
     props.contextState?.agentId === props.agent?.id && props.contextState?.threadId === props.agent?.threadId
       ? props.contextState
       : undefined;
+  const newChat = () =>
+    props.agent && props.onClearAgentContext ? { agent: props.agent, start: props.onClearAgentContext } : undefined;
   const compaction = () => {
     const value = context()?.compaction;
     return value && value.id !== dismissedCompactions()[currentChatConversationKey() ?? ""] ? value : null;
@@ -227,6 +247,7 @@ export function ConversationComposer() {
     voicePhase() === "idle" &&
     agentReady() &&
     !attachmentBusy() &&
+    !uploadFailed() &&
     !submitting()
       ? steerComposer
       : undefined;
@@ -363,6 +384,7 @@ export function ConversationComposer() {
       title={sendTitle()}
       disabled={
         attachmentBusy() ||
+        uploadFailed() ||
         submitting() ||
         !agentReady() ||
         Boolean(providerUpdateRequired()) ||
@@ -485,27 +507,13 @@ export function ConversationComposer() {
           </Show>
           <Show when={replyTarget()}>
             {(message) => (
-              <div class="composer-reply-preview">
-                <div>
-                  <span>{t(message().author === "you" ? "composer.reply.toYou" : "composer.reply.toAgent")}</span>
-                  <ReplyQuote
-                    body={message().body || t("composer.reply.attachment")}
-                    agents={props.agents}
-                    skills={installedSkills()}
-                    attachments={message().attachments}
-                    citations={message().citations}
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  aria-label={t("composer.reply.cancel")}
-                  disabled={voicePhase() === "transcribing"}
-                  onClick={() => updateCurrentDraft({ replyToMessageId: null })}
-                >
-                  <CloseIcon />
-                </Button>
-              </div>
+              <ComposerReplyPreview
+                message={message()}
+                agents={props.agents}
+                skills={installedSkills()}
+                disabled={voicePhase() === "transcribing"}
+                onCancel={() => updateCurrentDraft({ replyToMessageId: null })}
+              />
             )}
           </Show>
           <Show when={providerUpdateRequired()}>
@@ -631,6 +639,9 @@ export function ConversationComposer() {
           <ComposerAttachmentRow
             attachments={rowDraftAttachments()}
             pending={currentPastePreviews()}
+            uploads={uploadFiles()}
+            onRemoveUpload={removeUpload}
+            onRetryUpload={retryUpload}
             removeDisabled={voicePhase() === "transcribing" || savePending()}
             onRemove={(attachment) => removeAttachment(attachment.id)}
           />
@@ -721,17 +732,22 @@ export function ConversationComposer() {
               onVoice={openVoiceConversation()}
             />
             <div class="composer-primary-actions">
-              <Show when={contextUsageView(context())}>
+              <Show
+                when={contextUsageView(context())}
+                fallback={
+                  <Show when={newChat()}>
+                    {(action) => (
+                      <ComposerNewChatButton
+                        agent={action().agent}
+                        start={action().start}
+                        disabled={context()?.compaction?.status === "running"}
+                      />
+                    )}
+                  </Show>
+                }
+              >
                 {(usage) => (
-                  <ContextUsageMeter
-                    newChat={
-                      props.agent && props.onClearAgentContext
-                        ? { agent: props.agent, start: props.onClearAgentContext }
-                        : undefined
-                    }
-                    compact={props.onCompactAgentContext}
-                    usage={usage()}
-                  />
+                  <ContextUsageMeter newChat={newChat()} compact={props.onCompactAgentContext} usage={usage()} />
                 )}
               </Show>
               <Show when={attachmentBusy() && props.runtime?.cancelImportFiles} keyed>

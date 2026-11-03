@@ -6,11 +6,12 @@ import {
   type WorkflowDiscordAction,
   type WorkflowNode,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import type { MessagingDiscordMention, MessagingDiscordSend } from "../messaging/messaging-threads";
 import { EXTERNAL_EVENT_END, EXTERNAL_EVENT_START } from "../webhook-trigger";
 import { withoutEvents } from "./github-output";
+import type { WorkflowGitHubFile, WorkflowGitHubFiles } from "./workflow-github-api";
 
 /** The message of a Discord trigger, as the run payload keeps it. */
 interface DiscordTriggerMessage {
@@ -68,14 +69,22 @@ export function workflowDiscordPayload(nodeId: string, mention: MessagingDiscord
         authorId: mention.authorId,
         author: mention.authorName,
         text: mention.text,
+        // Signed addresses on Discord's CDN, which expire after about a day. An agent step can read
+        // them; a GitHub output copies them to the repository.
+        attachments: mention.files.map((file) => ({
+          name: file.name,
+          contentType: file.mimeType,
+          size: file.size,
+          url: file.url,
+        })),
       },
     }),
     EXTERNAL_EVENT_END,
   ].join("\n");
 }
 
-/** The message that started a run, from its payload, or null when a Discord mention did not start it. */
-export function discordTriggerMessage(payload: string | null): DiscordTriggerMessage | null {
+/** The data of the Discord mention in a run payload, or null when a Discord mention did not start the run. */
+function discordEventData(payload: string | null): DynamicRecord | null {
   if (!payload?.startsWith(EXTERNAL_EVENT_START)) return null;
   const [, , json] = payload.split("\n");
   let event: unknown;
@@ -84,11 +93,43 @@ export function discordTriggerMessage(payload: string | null): DiscordTriggerMes
   } catch {
     return null;
   }
-  if (!isDynamicRecord(event) || event.type !== "discord.mention" || !isDynamicRecord(event.data)) return null;
-  const { connectionId, channelId, messageId } = event.data;
+  return isDynamicRecord(event) && event.type === "discord.mention" && isDynamicRecord(event.data) ? event.data : null;
+}
+
+/** The message that started a run, from its payload, or null when a Discord mention did not start it. */
+export function discordTriggerMessage(payload: string | null): DiscordTriggerMessage | null {
+  const data = discordEventData(payload);
+  if (!data) return null;
+  const { connectionId, channelId, messageId } = data;
   return isString(connectionId) && isString(channelId) && isString(messageId)
     ? { connectionId, channelId, messageId }
     : null;
+}
+
+function isFile(value: unknown): value is WorkflowGitHubFile {
+  return (
+    isDynamicRecord(value) &&
+    isString(value.name) &&
+    value.name.length > 0 &&
+    isString(value.contentType) &&
+    typeof value.size === "number" &&
+    isString(value.url)
+  );
+}
+
+/**
+ * The files of the mention that started a run, and the folder that a GitHub output copies them to. Null
+ * when the run has none: a payload of an older version keeps no files.
+ */
+export function discordTriggerFiles(payload: string | null): WorkflowGitHubFiles | null {
+  const data = discordEventData(payload);
+  if (!data || !isString(data.messageId) || !/^\d{1,32}$/u.test(data.messageId)) return null;
+  const files = Array.isArray(data.attachments) ? data.attachments.filter(isFile) : [];
+  if (files.length === 0) return null;
+  return {
+    folder: `discord/${data.messageId}`,
+    files: files.map(({ name, contentType, size, url }) => ({ name, contentType, size, url })),
+  };
 }
 
 /** What a Discord output sends, or the error text of a node that cannot send. */

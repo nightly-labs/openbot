@@ -29,6 +29,7 @@ import {
   type AppLogoColorPreference,
   type ApprovalAutomationPreference,
   type AppSetupState,
+  type AppThemePalette,
   type BitwardenConnectorStatus,
   type BusyMessageModePreference,
   type CentralAuthIssue,
@@ -67,6 +68,8 @@ import {
   isAppLanguage,
   isAppLogoColor,
   isApprovalAutomationPreference,
+  isAppThemePalette,
+  isAppThemePaletteId,
   isBusyMessageMode,
   isCustomAgentCheckResult,
   isCustomAgentResult,
@@ -212,11 +215,24 @@ export function decodeAppLogoColorPreference(value: unknown): AppLogoColorPrefer
   return { color: preference.color };
 }
 
+/** Only a hex color passes: each one becomes a CSS property value in the page. */
+function decodeThemePalette(palette: DynamicRecord): AppThemePalette {
+  if (!isAppThemePalette(palette)) throw new Error("Invalid theme palette.");
+  return { id: palette.id, name: palette.name, scheme: palette.scheme, colors: { ...palette.colors } };
+}
+
 export function decodeAppAppearancePreference(value: unknown): AppAppearancePreference {
   const preference = decodeRecord(value, "appearance preference");
   if (!isAppAppearance(preference.appearance)) throw new Error("Invalid appearance.");
   if (typeof preference.transparentWindow !== "boolean") throw new Error("Invalid transparent window.");
-  return { appearance: preference.appearance, transparentWindow: preference.transparentWindow };
+  if (preference.palette !== null && !isAppThemePaletteId(preference.palette))
+    throw new Error("Invalid theme palette.");
+  return {
+    appearance: preference.appearance,
+    transparentWindow: preference.transparentWindow,
+    palette: preference.palette,
+    palettes: decodeList(preference.palettes, "theme palettes", decodeThemePalette),
+  };
 }
 
 export function decodeAppInterfaceSizePreference(value: unknown): AppInterfaceSizePreference {

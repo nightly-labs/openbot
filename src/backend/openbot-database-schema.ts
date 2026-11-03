@@ -18,6 +18,7 @@ import { PROVIDER_HISTORY_SCHEMA_SQL } from "./database/provider-history-schema"
 import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
 import {
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL,
+  MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL,
   MESSAGING_MEMORY_SCHEMA_SQL,
   MESSAGING_SCHEMA_SQL,
 } from "./messaging/messaging-schema";
@@ -614,7 +615,8 @@ const LATEST_SCHEMA_SQL =
   BROWSER_PROFILE_SCHEMA_SQL +
   substituteOnce(WORKFLOW_SCHEMA_SQL, V46_WORKFLOW_RUN_SOURCE_SQL, V50_WORKFLOW_RUN_SOURCE_SQL) +
   AGENT_THREAD_SCHEMA_SQL +
-  WORKFLOW_GITHUB_SCHEMA_SQL;
+  WORKFLOW_GITHUB_SCHEMA_SQL +
+  MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL;
 
 /** The end of the thread message table with the migration 40 columns before its PRIMARY KEY constraint. */
 function withThreadMessageOrderColumns(tableEnd: string): string {
@@ -904,6 +906,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // pause and run ids do not change. Few rows, so no vacuum. No table is added.
     disableForeignKeys: true,
     up: addDiscordWorkflows,
+  },
+  {
+    version: 51,
+    // Only creates a table, so no foreign-key pause and no vacuum. No WhatsApp connection exists before
+    // it, so no connection loses senders.
+    up: (db) => db.exec(MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL),
   },
 ];
 

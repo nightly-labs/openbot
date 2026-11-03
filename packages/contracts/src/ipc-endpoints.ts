@@ -27,7 +27,7 @@ import type { ServerAuditLog } from "./ipc-server-audit";
 // change on one side is a type error on the other. The types are phantom members: they exist only
 // for the checker, and the runtime value is still `{ kind, channel }`.
 
-import type { ManagedProviderId } from "./agent-providers";
+import type { AgentProviderRef, ManagedProviderId } from "./agent-providers";
 import type { AppAppearancePreference, SetAppAppearancePreferenceInput } from "./app-appearance";
 import type { AppInterfaceSizePreference, SetAppInterfaceSizePreferenceInput } from "./app-interface-size";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
@@ -181,6 +181,8 @@ import type {
 } from "./ipc-approvals";
 import type {
   AttachmentDataInput,
+  AttachmentDownloadProgress,
+  AttachmentImportProgress,
   ChooseAttachmentsInput,
   DownloadAttachmentsInput,
   DraftAttachment,
@@ -236,7 +238,14 @@ import type {
   TestChannelRoutineInput,
   UpdateChannelRoutineInput,
 } from "./ipc-channel-routines";
-import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
+import type {
+  Channel,
+  ChannelCommand,
+  ChannelPage,
+  ChannelReadInput,
+  ChannelSummary,
+  SetChannelImageInput,
+} from "./ipc-chat-channels";
 import type {
   CancelMessageLinkInput,
   ConversationFileSearchPage,
@@ -356,6 +365,8 @@ import type {
   AddSlackOrchestratorInput,
   AddSlackOrchestratorResult,
   AddTelegramOrchestratorInput,
+  AddWhatsAppOrchestratorInput,
+  AnswerWhatsAppRequestInput,
   ConnectTelegramChatInput,
   DiscordAccess,
   DiscordRoleList,
@@ -368,15 +379,23 @@ import type {
   HostSetMessagingEnabledInput,
   MessagingOverview,
   MessagingWorkspaceInput,
+  RemoveWhatsAppSenderInput,
   SetDiscordAccessInput,
   SetMessagingEnabledInput,
   SetSlackEnabledInput,
   SetTelegramEnabledInput,
+  SetWhatsAppOwnNumberInput,
   SlackOverview,
   SlackWorkspaceInput,
+  StartWhatsAppLinkInput,
   TelegramChatInput,
   TelegramOverview,
+  WhatsAppGroupList,
+  WhatsAppLinkState,
+  WhatsAppOverview,
+  WhatsAppSenderInput,
 } from "./ipc-messaging";
+import type { ProviderModelVisibility, ProviderModelVisibilityChange } from "./ipc-model-visibility";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type {
   OnePasswordConnectInput,
@@ -755,6 +774,11 @@ export const IPC_ENDPOINTS = {
   providers: {
     setProviderOn: request<{ provider: AgentProviderId; on: boolean }, AgentStatus>()("app:set-provider-on"),
     connectProvider: request<AgentProviderId, AgentStatus>()("app:connect-provider"),
+    /**
+     * Connects a provider whose descriptor has `mainlandChinaSignInSite`, with an account of that
+     * site. `connectProvider` signs in with the global site.
+     */
+    connectProviderInMainlandChina: request<AgentProviderId, AgentStatus>()("app:connect-provider-mainland-china"),
     /** Ends the sign-in that `connectProvider` started and that still waits for the browser. */
     cancelProviderSignIn: request<AgentProviderId, AgentStatus>()("app:cancel-provider-sign-in"),
     /**
@@ -1112,6 +1136,24 @@ export const IPC_ENDPOINTS = {
     addTelegramOrchestrator: request<AddTelegramOrchestratorInput, AddMessagingOrchestratorResult>()(
       "messaging:add-telegram-orchestrator",
     ),
+    // The WhatsApp numbers linked as a device of this computer. A link shows a QR code or a pairing
+    // code that the phone uses; the page reads the link state while its dialog is open. No Signal and
+    // no account service: this computer holds the session.
+    getWhatsAppOverview: request<undefined, WhatsAppOverview>()("messaging:get-whatsapp-overview"),
+    startWhatsAppLink: request<StartWhatsAppLinkInput, WhatsAppLinkState>()("messaging:start-whatsapp-link"),
+    getWhatsAppLinkState: request<undefined, WhatsAppLinkState>()("messaging:get-whatsapp-link-state"),
+    cancelWhatsAppLink: request<undefined, void>()("messaging:cancel-whatsapp-link"),
+    disconnectWhatsAppNumber: request<MessagingWorkspaceInput, void>()("messaging:disconnect-whatsapp-number"),
+    reconnectWhatsAppNumber: request<MessagingWorkspaceInput, void>()("messaging:reconnect-whatsapp-number"),
+    setWhatsAppEnabled: request<SetMessagingEnabledInput, void>()("messaging:set-whatsapp-enabled"),
+    addWhatsAppOrchestrator: request<AddWhatsAppOrchestratorInput, AddMessagingOrchestratorResult>()(
+      "messaging:add-whatsapp-orchestrator",
+    ),
+    listWhatsAppGroups: request<MessagingWorkspaceInput, WhatsAppGroupList>()("messaging:list-whatsapp-groups"),
+    addWhatsAppSender: request<WhatsAppSenderInput, void>()("messaging:add-whatsapp-sender"),
+    removeWhatsAppSender: request<RemoveWhatsAppSenderInput, void>()("messaging:remove-whatsapp-sender"),
+    answerWhatsAppRequest: request<AnswerWhatsAppRequestInput, void>()("messaging:answer-whatsapp-request"),
+    setWhatsAppOwnNumber: request<SetWhatsAppOwnNumberInput, void>()("messaging:set-whatsapp-own-number"),
     // The same for a joined server with `connectors-v1`, which an owner or admin manages from here.
     // The host opens no page: main opens it in this computer's browser. A Slack or Discord install
     // returns to this computer's `openbot://` link, and main sends the sealed grant on to the host.
@@ -1166,6 +1208,13 @@ export const IPC_ENDPOINTS = {
     getPromptCacheTtl: scopedQuery<PromptCacheTtlSetting, "required">()("host-admin:get-prompt-cache-ttl"),
     setPromptCacheTtl: scopedRequest<PromptCacheTtl, PromptCacheTtlSetting, "required">()(
       "host-admin:set-prompt-cache-ttl",
+    ),
+    // The models that the model picker of the server shows for one provider. An owner or admin sets them.
+    getModelVisibility: scopedRequest<AgentProviderRef, ProviderModelVisibility, "required">()(
+      "host-admin:get-model-visibility",
+    ),
+    setModelVisibility: scopedRequest<ProviderModelVisibilityChange, ProviderModelVisibility, "required">()(
+      "host-admin:set-model-visibility",
     ),
     // The roles of the server and the level each gives for each agent. A member reads only `mine`.
     getAgentAccess: scopedQuery<AgentAccessSnapshot, "required">()("host-admin:get-agent-access"),
@@ -1401,6 +1450,8 @@ export const IPC_ENDPOINTS = {
     readChannel: scopedRequest<ChannelReadInput, ChannelPage>()("agent:channels:read"),
     channelCommand: scopedRequest<ChannelCommand, Channel>()("agent:channels:command"),
     deleteChannel: scopedRequest<string, void>()("agent:channels:delete"),
+    // Only this computer keeps a channel image. A joined server has no route for it.
+    setChannelImage: scopedRequest<SetChannelImageInput, Channel>()("agent:channels:set-image"),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
     mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),
     // The user's own pinned chats. A joined server answers through `sidebar-pins-v1`.
@@ -1602,6 +1653,9 @@ export const IPC_ENDPOINTS = {
     discardDraftAttachment: scopedRequest<string, void>()("agent:discard-draft-attachment"),
     downloadAttachments: scopedRequest<DownloadAttachmentsInput, void>()("agent:download-attachments"),
     openAttachment: scopedRequest<OpenAttachmentInput, void>()("agent:open-attachment"),
+    /** Stops the download of an attachment. Its open or save then answers without a file. */
+    stopAttachmentDownload: scopedRequest<string, void>()("agent:stop-attachment-download"),
+    attachmentDownload: event<AttachmentDownloadProgress>()("agent:attachment-download"),
     openSharedFile: scopedRequest<OpenSharedFileInput, void>()("agent:open-shared-file"),
     openWorkspaceFile: scopedRequest<OpenWorkspaceFileInput, void>()("agent:open-workspace-file"),
     previewSharedFile: scopedRequest<PreviewSharedFileInput, FilePreview>()("agent:preview-shared-file"),
@@ -1644,6 +1698,7 @@ export const IPC_ENDPOINTS = {
   // renderer must never name a path to import. So this group is never bridged to the renderer.
   attachmentImports: {
     importAttachments: scopedRequest<ImportAttachmentsInput, DraftAttachment[]>()("agent:import-attachments"),
+    importProgress: event<AttachmentImportProgress>()("agent:attachment-import-progress"),
   },
   browser: {
     open: request<BrowserOpenInput, BrowserTab>()("browser:open"),

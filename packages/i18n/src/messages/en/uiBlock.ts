@@ -28,6 +28,7 @@ export const messages = defineMessages("uiBlock", {
   "uiBlock.form.choose": "Choose an option",
   "uiBlock.form.notSet": "Not set",
   "uiBlock.form.invalid": "Some answers are not correct. Check them and try again.",
+  "uiBlock.form.hiddenValue": "Hidden",
   "uiBlock.skip": "Skip",
   "uiBlock.error.answerFailed": "Could not send your answer. Try again.",
 });

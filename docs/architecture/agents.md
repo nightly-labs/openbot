@@ -225,7 +225,11 @@ changed, on this computer and on a joined host.
   workflow. A GitHub output (`github-output.ts`) changes GitHub as the App's bot through
   `src/main/github-rest.ts`, with 10 actions. "Agent chooses" asks a model to choose labels or a
   person from the repository's own lists, and drops other values. `workflow_github_actions` keeps
-  each change, so a restart does not post a comment, review or issue again.
+  each change, so a restart does not post a comment, review or issue again. When a Discord mention
+  started the run, a new issue or a comment links the files of the mention and of the message that it
+  replies to (`discordTriggerFiles` in `discord-matching.ts`). GitHub has no attachment API for an App
+  token, so `attachFiles` in `github-rest.ts` commits them, before the change is recorded as sent, with the Git Data API to the orphan `openbot-attachments` branch, which has no workflow files
+  and so starts no Actions. A file that it cannot copy keeps its Discord link, which expires.
 - A restart keeps approvals and agent steps, because their state is in the database and the
   mailbox. The first pass fails a model step that was running, and ends a run that was stopping. An
   agent step fails with `agentMissing` when its agent is deleted. A post that did not start is sent; a
@@ -276,7 +280,9 @@ released actions, `parentId` on `create`, and `nest`. A peer with the capability
 `sidebar-folders-changed`; other peers get `sidebar-layout-changed`, and the released
 `/v1/sidebar-layout` routes leave out `parentId`. A peer without the capability shows each folder at
 the top level, and its changes keep the parents. The iPhone app shows nested folders as one list,
-with the path in each name. An instance transfer creates each folder at the top level, because its
+as the desktop does: "Parent / Name", a folder icon, and the unread count of a closed folder. A closed
+folder hides the folders in it. With the capability, its folder menu has "New folder inside" and
+"Move to" (`nest`). An instance transfer creates each folder at the top level, because its
 file has no field for the parent.
 
 ## Browser profile
@@ -379,6 +385,14 @@ and text that can be empty. The answers are the frozen `agent-tasks-v1` task and
 uses these routes only for a message with files, so a message without files still works on an older host.
 A joined desktop refuses files for a server without the capability with `error.backend.threadRemoteUnsupported`,
 and the phone shows the plus in the thread composer only on a server that has it. The optional
+`agent-thread-replies-v1` capability (`packages/contracts/src/team-protocol/agent-thread-replies-v1.ts`, host
+route `routeAgentThreadReplies` in `src/main/team-api/route-agent-threads.ts`) adds
+`POST /v1/agent-threads/send-reply`: a message to a side thread with `replyToMessageId`, text, and up to 10
+attachment drafts. The answer is the frozen `agent-tasks-v1` receipt. The host keeps the reply on the delivery,
+as for the main chat; the agent's prompt and the thread quote the message when the thread has it, and the host
+does not refuse an id that the thread does not have. The team client and a joined desktop use this route only for
+a reply. Desktop and the web show Reply on a side thread message only on this computer or on a server with the
+capability; the phone does not reply in a thread. The optional
 `agent-thread-branches-v1` capability (`packages/contracts/src/team-protocol/agent-thread-branches-v1.ts`, host
 route `routeAgentThreadBranches` in `src/main/team-api/route-agent-threads.ts`) adds
 `POST /v1/agent-threads/{branch,branches}`. `branch` takes `{agentId, taskId|null, messageId, requestId}`, needs

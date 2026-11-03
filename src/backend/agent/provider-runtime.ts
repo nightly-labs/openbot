@@ -33,7 +33,7 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { isOpenCodeInternalFailure } from "./../acp-flavor-opencode";
-import { startAcpAuthentication } from "./../acp-sign-in";
+import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import {
@@ -46,6 +46,7 @@ import {
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
 import { causeHelpers } from "../effect-boundary";
+import type { SignInRegion } from "../kimi-region";
 import { McpHandoffLog } from "./../mcp-handoff-log";
 import { providerMcpServerName } from "./../mcp-provider-shapes";
 import { customProvidersOn, openCodeSignInMessage } from "./../opencode-config";
@@ -1439,16 +1440,21 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     provider: AgentProvider,
     openExternal: (url: string) => Promise<void>,
+    region: SignInRegion = "global",
   ) {
-    return yield* this.#connectProvider(provider, openExternal, false);
+    return yield* this.#connectProvider(provider, openExternal, false, region);
   }).bind(this);
 
-  /** `onHost`: the user is not at this computer, so the CLI's page goes to `openExternal`, never to a browser here. */
+  /**
+   * `onHost`: the user is not at this computer, so the CLI's page goes to `openExternal`, never to a
+   * browser here. `region`: the site of the account, for a provider that has more than one.
+   */
   readonly #connectProvider = Effect.fn("ProviderRuntime.connectProvider")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
     openExternal: (url: string) => Promise<void>,
     onHost: boolean,
+    region: SignInRegion = "global",
   ) {
     this.#startFailures.delete(provider);
     const start = this.#providerStarts.get(provider);
@@ -1459,7 +1465,7 @@ export class ProviderRuntime implements ProviderPort {
     }
     const signIn = requireProviderDriver(provider).signIn;
     return yield* this.#runProviderConnectionCommand(provider, () =>
-      this.#signIn(provider, signIn, openExternal, onHost),
+      this.#signIn(provider, signIn, openExternal, onHost, region),
     );
   });
 
@@ -1469,6 +1475,7 @@ export class ProviderRuntime implements ProviderPort {
     signIn: ReturnType<typeof requireProviderDriver>["signIn"],
     openExternal: (url: string) => Promise<void>,
     onHost: boolean,
+    region: SignInRegion,
   ) {
     switch (signIn.kind) {
       case "browser":
@@ -1481,13 +1488,17 @@ export class ProviderRuntime implements ProviderPort {
           .start(provider, (cli) =>
             Effect.gen(function* () {
               const browser = onHost ? yield* captureBrowser(openExternal) : {};
-              const target = cliSpawnTarget(cli.executable, signIn.command.argv);
+              const { argv } = signIn.command;
+              const target = cliSpawnTarget(
+                cli.executable,
+                typeof argv === "function" ? yield* argv(cli, region) : argv,
+              );
               const child = yield* Effect.acquireRelease(
                 Effect.try({
                   try: () =>
                     spawn(target.command, target.args, {
                       cwd: process.cwd(),
-                      env: { ...process.env, ...signIn.command.env(cli), ...browser },
+                      env: { ...process.env, ...signIn.command.env(cli, region), ...browser },
                       stdio: "ignore",
                       shell: false,
                       windowsHide: process.platform === "win32",
@@ -1537,7 +1548,9 @@ export class ProviderRuntime implements ProviderPort {
                   }
                 : {}),
               privateTemp: temp && { ...temp, provider: providerLabel(provider) },
-              ...(provider === "antigravity" ? { openGoogleSignIn: openExternal } : {}),
+              ...(provider === "antigravity" && googleSignInByOpenBot(onHost)
+                ? { openGoogleSignIn: openExternal }
+                : {}),
             }).pipe(
               // A sign-in that stops after the sign-out leaves no account behind it.
               Effect.map((login) => ({
@@ -1813,13 +1826,16 @@ export class ProviderRuntime implements ProviderPort {
       .startCode(
         provider,
         (cli) =>
-          startCliCodeLogin({
-            flow,
-            executable: cli.executable,
-            argv: command.argv,
-            env: { ...cliPathEnvironment(cli), ...command.env(cli) },
-            timeoutMs: command.timeoutMs,
-            ...(command.closeInput ? { closeInput: true } : {}),
+          Effect.gen(function* () {
+            const argv = typeof command.argv === "function" ? yield* command.argv(cli, "global") : command.argv;
+            return yield* startCliCodeLogin({
+              flow,
+              executable: cli.executable,
+              argv,
+              env: { ...cliPathEnvironment(cli), ...command.env(cli, "global") },
+              timeoutMs: command.timeoutMs,
+              ...(command.closeInput ? { closeInput: true } : {}),
+            });
           }),
         command.timeoutMs,
       )

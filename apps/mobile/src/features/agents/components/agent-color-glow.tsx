@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import { StyleSheet, useWindowDimensions, View } from "react-native";
-import Animated, {
-  Easing,
-  ReduceMotion,
-  type SharedValue,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { scheduleOnRN } from "react-native-worklets";
 
@@ -24,20 +17,6 @@ const GLOW_FALLOFF = [
   [0.7, 0.16],
   [1, 0],
 ] as const;
-
-/**
- * The agent colour, eased on the UI runtime when it changes. Reduced motion keeps the fade: it
- * moves nothing, and it shows which colour replaced which.
- */
-export function useAgentColorTransition(color: string): SharedValue<string> {
-  const animated = useSharedValue(color);
-  useEffect(() => {
-    animated.set(
-      withTiming(color, { duration: COLOR_DURATION_MS, easing: COLOR_EASING, reduceMotion: ReduceMotion.Never }),
-    );
-  }, [animated, color]);
-  return animated;
-}
 
 /**
  * A soft glow in the agent colour, centred `centerY` points below the top of its parent. It fades to

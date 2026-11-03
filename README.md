@@ -76,6 +76,41 @@ On the first start from an AppImage, OpenBot writes `~/.local/share/applications
 and `~/.local/share/icons/openbot.png`, which is what lets an `openbot://` link - an invitation, or
 a plugin listing - open the app and gives the launcher an icon that stays after the app exits. Delete the two files to undo it.
 
+#### Theme palette files
+
+OpenBot reads each `<name>.json` file in the `themes` folder of its data folder
+(`~/.config/OpenBot/themes/` on Linux) and lists it under Settings > General > Theme. Another
+program, such as an Omarchy theme script, can write the file. OpenBot follows each change to the
+file with no restart. Replace the file with a rename, so that OpenBot never reads half of it:
+
+```json
+{
+  "name": "Omarchy",
+  "appearance": "dark",
+  "colors": {
+    "canvas": "#1a1b26",
+    "frame": "#13141c",
+    "sidebar": "#13141c",
+    "surface": "#24283b",
+    "text": "#a9b1d6",
+    "textMuted": "#565f89",
+    "border": "#414868",
+    "accent": "#7aa2f7",
+    "accentForeground": "#1a1b26",
+    "success": "#9ece6a",
+    "warning": "#e0af68",
+    "danger": "#f7768e"
+  }
+}
+```
+
+The file name is the palette id: lowercase letters, digits and `-`. `appearance` is `light` or
+`dark`, and selects the base that the colors go over. In a dark palette, `surface` colors cards and
+controls. A light palette makes them lighter than `canvas`, as the light base does, because a light
+theme's `surface` is usually darker than its background. Each color is `#rrggbb` or `#rrggbbaa`.
+OpenBot ignores a file with a missing or different color, and then shows the saved light, dark or
+system choice. While no theme choice is saved, OpenBot shows the first palette.
+
 Remote desktop works on Linux x64 in an X11 session,
 such as Xorg or Xvfb. It does not work under Wayland, and the arm64 AppImage does not include it.
 
@@ -469,6 +504,9 @@ Set `OPENBOT_DEV_ICE_TRANSPORT_POLICY=relay` before this command to force Team A
 coturn. This test option works only with the development renderer. Production always starts with `all`.
 Set `OPENBOT_DEV_SYNC_PROFILE=1` as well to let `bun run perf:remote` read the host requests of the
 desktop client.
+Set `OPENBOT_DEV_AWAY_SECONDS=<seconds>` to change the time without input on the computer after which
+a phone gets the notifications of a host (30 seconds by default), for example `5` to test it. The host
+and the desktop client of the stack both read it. A packaged app ignores it.
 
 The normal `check` command is offline and uses a fake App Server. Manual smoke scripts may use the
 signed-in subscription and must not run in CI.

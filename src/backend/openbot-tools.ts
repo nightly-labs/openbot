@@ -282,6 +282,13 @@ export const requestApiKeyToolSchema = z.strictObject({
 
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
+export const sendToChannelToolSchema = z.strictObject({
+  channelId: z.string().min(1).max(INPUT_LIMITS.identifier),
+  text: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
+  recipientAgentIds: z.array(z.string().min(1).max(INPUT_LIMITS.identifier)).max(INPUT_LIMITS.agents).optional(),
+  paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).max(INPUT_LIMITS.attachments).optional(),
+});
+
 /** The Marketplace apps that the chat draws a card for: the bundled catalog plugins and the connectors. */
 export const MARKETPLACE_APP_IDS: readonly string[] = [
   ...pluginCatalog.plugins.map((plugin) => plugin.slug),
@@ -385,6 +392,18 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "assign_agent_section",
     description: "Move an existing agent into a sidebar section. Pass null for sectionId to ungroup it.",
     shape: assignAgentSectionToolSchema.shape,
+  },
+  {
+    name: "list_channels",
+    description:
+      "List the open channels with their id, name, lead, and members. A sidebar section (folder) is not a channel.",
+    shape: {},
+  },
+  {
+    name: "send_to_channel",
+    description:
+      "Post a request into a channel when the user gives it work. Members do not see this conversation: write the whole brief. paths attaches local files. recipientAgentIds names members; without it, the lead chooses. No result comes back here. In a channel task, use channel_assign or channel_transfer.",
+    shape: sendToChannelToolSchema.shape,
   },
   {
     name: "list_agents",
@@ -620,7 +639,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       "The card has your start button, an optional alternative and a cancel button. When nobody answers in 10 s, OpenBot presses start.",
       'The result is JSON {"status":"answered","actionId":…}: "start" means do the plan; "alternative" means do only the alternative; "cancel" means do not start and ask in one sentence what the user wants;',
       '"_text" with "text" means follow the user\'s words. {"status":"skipped"} or {"status":"expired"} means do not start; answer briefly.',
-      "Write in the user's language. It works only when the user turned it on in your settings, and not in a Slack, Discord or Telegram chat. In a channel, each member who reads the channel sees it.",
+      "Write in the user's language. It works only when the user turned it on in your settings, and not in an external chat. In a channel, each member who reads the channel sees it.",
     ].join(" "),
     shape: acknowledgeRequestToolSchema.shape,
   },
@@ -647,7 +666,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       "The user enters it in a secure form in this conversation. OpenBot saves it in a private file outside your workspace for later turns; you never get the value.",
       'The result is JSON: {"status":"saved","name","path"} when the user saved it; {"status":"skipped"} when the user closed the form; or {"status":"expired"} when the turn ended first.',
       "Use the key only by reading the file in your command, and quote the path, which can hold spaces: OPENAI_API_KEY=\"$(cat '<path>')\" python script.py. Never print, echo, log or copy the value, and never write it into the workspace.",
-      "Call list_api_keys first: do not ask again for a key that is saved. A new answer replaces the saved key. Only the server owner or an admin can answer. It does not work in a Slack, Discord or Telegram chat.",
+      "Call list_api_keys first: do not ask again for a key that is saved. A new answer replaces the saved key. Only the server owner or an admin can answer. It does not work in an external chat.",
     ].join(" "),
     shape: requestApiKeyToolSchema.shape,
   },

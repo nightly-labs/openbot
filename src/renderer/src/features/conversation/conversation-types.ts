@@ -297,6 +297,13 @@ export interface ConversationProps {
   onMarkRead: () => Promise<void>;
   /** Marks an agent message and the messages after it unread. Without it, the message menu has no such item. */
   onMarkUnread?: ((messageId: string) => Promise<void>) | undefined;
+  /**
+   * The open channels that a message of this agent chat can go to. Each one opens with the text in its
+   * composer. Without it, the message menu has no such item.
+   */
+  sendToChannel?:
+    | { channels: { id: string; name: string }[]; onSend: (channelId: string, text: string) => void }
+    | undefined;
   onLoadOlder?: (() => void) | undefined;
   onLoadLatest?: (() => Promise<void>) | undefined;
   onSearchMessages?: ((query: string) => Promise<{ messageIds: string[]; total: number }>) | undefined;
@@ -432,8 +439,13 @@ export interface ConversationThreads {
   approval: AgentApproval | undefined;
   /** The thread takes files. Only this computer sends them: `agent-tasks-v1` carries text only. */
   acceptsFiles: boolean;
-  /** `attachmentDraftIds` are the files that the text names. */
-  onSend: (text: string, attachmentDraftIds: string[]) => Promise<boolean>;
+  /** A message of a side thread can reply to another message of it: this computer, or `agent-thread-replies-v1`. */
+  acceptsReplies: boolean;
+  /**
+   * `attachmentDraftIds` are the files that the text names. `replyToMessageId` is the message of the open
+   * thread that the message replies to; a new thread has no message to reply to.
+   */
+  onSend: (text: string, attachmentDraftIds: string[], replyToMessageId?: string | null) => Promise<boolean>;
   onStop: () => void;
   /** The person sees the open side thread through this message. */
   onRead: (messageId: string) => void;
@@ -485,7 +497,7 @@ export interface SideThread {
   task: AgentTask;
   conversation: ConversationSnapshot | undefined;
   approval: AgentApproval | undefined;
-  onSend: (text: string, attachmentDraftIds: string[]) => Promise<boolean>;
+  onSend: (text: string, attachmentDraftIds: string[], replyToMessageId?: string | null) => Promise<boolean>;
   onStop: () => void;
   onRead: (messageId: string) => void;
   onRespondApproval: (decision: "accept" | "decline", options?: PromptAnswerOptions) => Promise<boolean>;

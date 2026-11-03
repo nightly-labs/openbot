@@ -623,6 +623,17 @@ export function createRendererForwarders({
     sendToRenderer(window, IPC_ENDPOINTS.servers.scopedDirectTyping, { serverId, event });
   }
 
+  // Every window can show the chat that holds the attachment.
+  function forwardAttachmentDownload(progress: import("@openbot/contracts/ipc").AttachmentDownloadProgress): void {
+    for (const target of appWindows())
+      sendToRenderer(target, IPC_ENDPOINTS.agentAttachments.attachmentDownload, progress);
+  }
+
+  // The preload of the window that started the import knows its request id; the others drop it.
+  function forwardAttachmentImportProgress(progress: import("@openbot/contracts/ipc").AttachmentImportProgress): void {
+    for (const target of appWindows()) sendToRenderer(target, IPC_ENDPOINTS.attachmentImports.importProgress, progress);
+  }
+
   return {
     forwardAgentEvent,
     forwardWorkflowNotice,
@@ -646,5 +657,7 @@ export function createRendererForwarders({
     forwardTeamPresence,
     forwardDirectMessage,
     forwardDirectTyping,
+    forwardAttachmentDownload,
+    forwardAttachmentImportProgress,
   };
 }

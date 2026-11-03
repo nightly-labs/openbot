@@ -25,6 +25,7 @@ import { AGENT_TASKS_CODECS } from "./agent-tasks-v1";
 import { AGENT_THREAD_BRANCHES_CODECS } from "./agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CODECS } from "./agent-thread-files-v1";
 import { AGENT_THREAD_READS_CODECS } from "./agent-thread-reads-v1";
+import { AGENT_THREAD_REPLIES_CODECS } from "./agent-thread-replies-v1";
 import { AGENT_THREADS_CODECS } from "./agent-threads-v1";
 import { AGENT_UPDATE_CODECS } from "./agent-update-v1";
 import { BITWARDEN_CONNECTOR_CODECS } from "./bitwarden-connector-v1";
@@ -33,6 +34,7 @@ import { BROWSER_PROFILES_CODECS } from "./browser-profiles-v1";
 import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
 import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
+import { COMPUTER_ACTIVITY_CODECS } from "./computer-activity-v1";
 import { CONNECTORS_CODECS } from "./connectors-v1";
 import { CONTEXT_COMPACT_CODECS } from "./context-compact-v1";
 import { CONTEXT_RESET_CODECS } from "./context-reset-v1";
@@ -51,10 +53,12 @@ import { HOST_UPDATE_CODECS } from "./host-update-v1";
 import { HOSTED_SITES_CODECS } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CODECS } from "./instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CODECS } from "./live-activity-push-v1";
+import { LOCAL_SERVERS_CODECS } from "./local-servers-v1";
 import { MACHINE_RESOURCES_CODECS } from "./machine-resources-v1";
 import { MCP_SIGN_IN_APP_CODECS } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CODECS } from "./mcp-sign-in-v1";
 import { MEMORY_REVIEW_CODECS } from "./memory-review-v1";
+import { MODEL_VISIBILITY_CODECS } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CODECS } from "./onepassword-connector-v1";
 import { PROMPT_CACHE_TTL_CODECS } from "./prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_RELAY_CODECS } from "./provider-account-relay-v1";
@@ -114,9 +118,11 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...HOST_UPDATE_CODECS,
   ...HOST_TIMEZONE_CODECS,
   ...HOST_KEY_ROTATION_CODECS,
+  ...LOCAL_SERVERS_CODECS,
   ...AGENT_MEMORY_LIMIT_CODECS,
   ...MEMORY_REVIEW_CODECS,
   ...PROMPT_CACHE_TTL_CODECS,
+  ...MODEL_VISIBILITY_CODECS,
   ...SERVER_AUDIT_CODECS,
   ...PROVIDER_DEFAULT_CODECS,
   ...DISCORD_ACCESS_CODECS,
@@ -145,6 +151,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...MCP_SIGN_IN_APP_CODECS,
   ...SIGN_IN_RELAY_CODECS,
   ...FOCUS_USE_CODECS,
+  ...COMPUTER_ACTIVITY_CODECS,
   ...CONNECTORS_CODECS,
   ...CONVERSATION_FILE_SEARCH_CODECS,
   ...ROUTINE_FLOWS_CODECS,
@@ -172,6 +179,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_THREADS_CODECS,
   ...AGENT_THREAD_READS_CODECS,
   ...AGENT_THREAD_FILES_CODECS,
+  ...AGENT_THREAD_REPLIES_CODECS,
   ...AGENT_THREAD_BRANCHES_CODECS,
   ...SIDE_QUESTION_CODECS,
   ...BROWSER_PROFILES_CODECS,

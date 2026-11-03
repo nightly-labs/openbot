@@ -56,6 +56,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine hazır hale gelmedi.",
   "error.backend.sunshineNotReadyReason": "Sunshine hazır hale gelmedi. {reason}",
   "error.backend.channelLeadModelUnavailable": "Kanal lideri modeli kullanılamıyor.",
+  "error.backend.contextCompactionIneffective":
+    "Sıkıştırma bu sohbeti küçültmüyor: iki sıkıştırmadan sonra hâlâ modelin bağlam penceresinin %{percent} kadarını kullanıyor, bu yüzden OpenBot sıkıştırmayı durduruyor. Pencerenin çoğunu araçlar ve talimatlar kullanıyor. Bu ajanın ihtiyaç duymadığı MCP sunucularını veya bilgisayar kullanımını kapatın ya da daha büyük pencereli bir model seçin. Ardından yeni bir sohbet başlatın.",
+  "error.backend.providerRetrying":
+    "Sağlayıcı bu isteği {attempts} kez tamamlayamadı ve yeniden deniyor. Ajan devam etmezse turu durdurun.",
+  "error.backend.providerRetryingLargeContext":
+    "Sağlayıcı bu isteği {attempts} kez tamamlayamadı ve yeniden deniyor. Bu sohbet modelin bağlam penceresinin %{percent} kadarını kullanıyor. Ajan devam etmezse turu durdurun: OpenBot sohbeti sonraki mesajdan önce sıkıştırır.",
   "error.backend.sharedDataUnavailable": "Paylaşılan veriler kullanılamıyor.",
   "error.backend.shuttingDown": "OpenBot kapanıyor.",
   "error.backend.channelUnconfirmedStart":
@@ -105,8 +111,8 @@ export const messages = {
     "{limit} bellekten {saved} tanesi kayıtlı. Yer açmak için ilgili iki belleğin birleşik metniyle bir belleği memoryId ile güncelleyin ve diğerini silin ya da artık doğru olmayan bir belleği silin. Sonra tekrar deneyin.",
   "error.backend.agentMemoryLimitExceeded":
     "{saved} belleğiniz var ve sınır {limit}. Kullanıcı sınırı kayıtlı bellek sayısının altına ayarladı. Yer açmak için bellek silmeyin. Kullanıcıya bu belleğin kaydedilmediğini söyleyin.",
-  "error.backend.channelHistoryLeadRequired": "Paylaşılan geçmişi hazırlamak için bir kanal lideri seçin.",
   "error.backend.channelHistoryArriving": "Paylaşılan bir mesaj hâlâ geliyor. Tamamlandığında devam edin.",
+  "error.backend.channelHistoryLeadRequired": "Paylaşılan geçmişi hazırlamak için bir kanal lideri seçin.",
   "error.backend.channelHistoryInvalid": "Geçmiş özeti geçersiz. Tekrar denemek için devam edin.",
   "error.backend.channelContextTooLong":
     "Bu atama paylaşılan bağlam sınırını aşıyor. Daha kısa bir istek gönderin veya yeniden atayın.",
@@ -341,8 +347,8 @@ export const messages = {
     "Göreve en fazla 120 karakterlik bir başlık ve ne yapılacağını anlatan kısa bir talimat verin.",
   "error.backend.taskOwnChatOnly":
     "Görevi yalnızca kendi sohbetinizden başlatın. Bir kanal, bir mesajlaşma konuşması veya başka bir görev yeni bir görev başlatamaz.",
-  "error.backend.taskOpenLimit":
-    "Bu ajanın zaten {count} açık görevi var. Başka bir görev başlatmadan önce kullanıcının birini kapatmasını bekleyin.",
+  "error.backend.taskUnfinishedLimit":
+    "Bu ajanın zaten {count} bitmemiş görevi var. Bunlardan biri bittiğinde başka bir görev başlatın.",
   "error.backend.taskOpenLimitReached":
     "Bu ajanın {count} açık görevi var. Bir görevi kapatın, ardından başka bir görev başlatın veya açın.",
   "error.backend.taskRemoteUnsupported": "Görevler yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",

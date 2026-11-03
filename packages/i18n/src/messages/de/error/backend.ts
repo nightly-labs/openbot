@@ -58,6 +58,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine wurde nicht bereit.",
   "error.backend.sunshineNotReadyReason": "Sunshine wurde nicht bereit. {reason}",
   "error.backend.channelLeadModelUnavailable": "Das Modell der Kanalleitung ist nicht verfügbar.",
+  "error.backend.contextCompactionIneffective":
+    "Die Komprimierung macht diesen Chat nicht kleiner: Nach zwei Komprimierungen nutzt er noch {percent}% des Kontextfensters des Modells, daher komprimiert OpenBot ihn nicht mehr. Tools und Anweisungen nutzen den größten Teil des Fensters. Schalte die MCP-Server oder die Computersteuerung aus, die dieser Agent nicht braucht, oder wähle ein Modell mit größerem Fenster. Starte dann einen neuen Chat.",
+  "error.backend.providerRetrying":
+    "Der Anbieter hat diese Anfrage {attempts}-mal nicht ausgeführt und versucht es erneut. Wenn der Agent nicht weitermacht, stoppe den Durchlauf.",
+  "error.backend.providerRetryingLargeContext":
+    "Der Anbieter hat diese Anfrage {attempts}-mal nicht ausgeführt und versucht es erneut. Dieser Chat nutzt {percent}% des Kontextfensters des Modells. Wenn der Agent nicht weitermacht, stoppe den Durchlauf: OpenBot komprimiert den Chat dann vor der nächsten Nachricht.",
   "error.backend.sharedDataUnavailable": "Geteilte Daten sind nicht verfügbar.",
   "error.backend.shuttingDown": "OpenBot wird beendet.",
   "error.backend.channelUnconfirmedStart":
@@ -112,9 +118,9 @@ export const messages = {
     "Du hast {saved} von {limit} Erinnerungen. Um Platz zu schaffen, aktualisiere eine Erinnerung über ihre memoryId mit dem kombinierten Text zweier verwandter Erinnerungen und vergiss dann die andere, oder vergiss eine Erinnerung, die nicht mehr stimmt. Versuche es dann erneut.",
   "error.backend.agentMemoryLimitExceeded":
     "Du hast {saved} Erinnerungen, und das Limit ist {limit}. Der Benutzer hat das Limit unter die Zahl der gespeicherten Erinnerungen gesetzt. Vergiss keine Erinnerungen, um Platz zu schaffen. Sag dem Benutzer, dass diese Erinnerung nicht gespeichert wurde.",
-  "error.backend.channelHistoryLeadRequired": "Wähle eine Kanalleitung, um den geteilten Verlauf vorzubereiten.",
   "error.backend.channelHistoryArriving":
     "Eine geteilte Nachricht wird noch empfangen. Setze fort, wenn sie vollständig ist.",
+  "error.backend.channelHistoryLeadRequired": "Wähle eine Kanalleitung, um den geteilten Verlauf vorzubereiten.",
   "error.backend.channelHistoryInvalid":
     "Die Zusammenfassung des Verlaufs ist ungültig. Setze fort, um es erneut zu versuchen.",
   "error.backend.channelContextTooLong":
@@ -373,8 +379,8 @@ export const messages = {
     "Gib der Aufgabe einen Titel mit höchstens 120 Zeichen und eine kurze Beschreibung, was zu tun ist.",
   "error.backend.taskOwnChatOnly":
     "Starte eine Aufgabe nur aus deinem eigenen Chat. Ein Kanal, eine Messaging-Unterhaltung oder eine andere Aufgabe kann keine starten.",
-  "error.backend.taskOpenLimit":
-    "Dieser Agent hat bereits {count} offene Aufgaben. Warte, bis der Benutzer eine schließt, bevor du eine weitere Aufgabe startest.",
+  "error.backend.taskUnfinishedLimit":
+    "Dieser Agent hat bereits {count} unfertige Aufgaben. Starte eine weitere Aufgabe, wenn eine davon endet.",
   "error.backend.taskOpenLimitReached":
     "Dieser Agent hat {count} offene Aufgaben. Schließe eine Aufgabe und starte oder öffne dann eine andere.",
   "error.backend.taskRemoteUnsupported": "Aufgaben sind nur für Agenten auf diesem Computer verfügbar.",

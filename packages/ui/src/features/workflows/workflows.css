@@ -1290,6 +1290,12 @@
   background: var(--openbot-bg-frame);
 }
 
+/* The follow frame holds the card, not the top row. */
+.wfn-canvas[data-frame="window"] .wfn-follow-frame {
+  top: var(--left-header-height);
+  border-radius: var(--wfn-card-inner-radius);
+}
+
 /* The workflow page does not need the Marketplace button that the sidebar keeps in the top row. */
 .wfn-app .sidebar-marketplace-button {
   display: none;

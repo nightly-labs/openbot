@@ -95,6 +95,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "A transferência de arquivos WebRTC falhou.",
   "error.remote.fileResumeFailed": "A transferência de arquivos WebRTC não conseguiu retomar dentro do prazo.",
   "error.remote.fileTransportStopped": "O transporte de arquivos WebRTC parou.",
+  "error.remote.downloadStopped": "O download foi interrompido.",
   "error.remote.fileResumeExpired": "O prazo para retomar a transferência de arquivos WebRTC expirou.",
   "error.remote.hostRequestFailed": "O computador anfitrião não conseguiu concluir a solicitação.",
   "error.remote.responseTooLarge":
@@ -204,4 +205,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Atualize este servidor no computador para excluir canais.",
   "error.remote.historyRefreshFailed": "A mensagem foi enviada, mas não foi possível atualizar o histórico do chat.",
   "error.remote.taskHistoryRefreshFailed": "A tarefa foi alterada, mas não foi possível atualizar o histórico do chat.",
+  "error.remote.localServerAccountRemovalFailed":
+    "O servidor foi excluído no computador dele, mas a conta ainda o mostra. Exclua de novo para removê-lo da conta.",
 } as const satisfies PartialTranslation<typeof source>;

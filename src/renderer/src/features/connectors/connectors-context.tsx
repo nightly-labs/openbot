@@ -23,6 +23,7 @@ import { githubConnectorPort, hostGitHubConnectorPort } from "./github-connector
 import { hostMessagingApi } from "./host-messaging-port";
 import { localMessagingApi, type MessagingApi, type MessagingConnectorOptions } from "./messaging-connector";
 import { hostOnePasswordConnectorPort } from "./onepassword-connector-port";
+import { whatsappPort } from "./whatsapp-connector";
 
 const context = createSimpleContext({
   name: "ConnectorsProvider",
@@ -34,7 +35,7 @@ const context = createSimpleContext({
     const endpoints = useCustomProviders();
     const localAgents = useCustomAgents();
     const { collapseSidebarSection } = useSidebar();
-    // The Slack, Discord and Telegram Orchestrators of this computer run here, so their pickers list
+    // The Slack, Discord, Telegram and WhatsApp Orchestrators of this computer run here, so their pickers list
     // this computer's models: none while a joined server is on screen, and then they start on a new
     // agent's default.
     const models = () => {
@@ -76,7 +77,8 @@ const context = createSimpleContext({
       },
     };
     const computer = createConnectorSet(
-      { github: githubConnectorPort, ...LOCAL_CONNECTOR_TRANSPORTS, messaging },
+      // WhatsApp does not go through Signal, so it does not publish the server first.
+      { github: githubConnectorPort, ...LOCAL_CONNECTOR_TRANSPORTS, messaging, whatsapp: whatsappPort },
       {
         agents: agentList,
         models,

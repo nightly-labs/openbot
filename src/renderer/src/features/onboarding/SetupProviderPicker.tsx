@@ -491,13 +491,25 @@ export function createSetupProviders(
   }
 
   /** Resolves `false` when the request failed; the error then says why. */
-  async function connectProvider(provider: AgentProviderId): Promise<boolean> {
+  function connectProvider(provider: AgentProviderId): Promise<boolean> {
+    return followSignIn(provider, (connection) => connection.connect(provider));
+  }
+
+  /** Signs in on the provider's mainland China site, as `connectProvider` does on its default site. */
+  function connectProviderInMainlandChina(provider: AgentProviderId): Promise<boolean> {
+    return followSignIn(provider, (connection) => connection.connectInMainlandChina?.(provider) ?? Promise.resolve());
+  }
+
+  async function followSignIn(
+    provider: AgentProviderId,
+    start: (connection: ProviderConnectionApi) => Promise<void>,
+  ): Promise<boolean> {
     const connection = props.connection;
     const kind = connection?.connectKind(provider);
     if (!connection || !kind || props.refreshingProviders) return true;
     // A dialog sign-in reports itself in its dialog. The browser sign-in reports in the row.
     if (kind === "dialog") {
-      await connection.connect(provider);
+      await start(connection);
       return true;
     }
     keepProviderRows();
@@ -510,7 +522,7 @@ export function createSetupProviders(
       props.agentStatus.providers?.find((candidate) => candidate.id === provider)?.message ?? null,
     );
     try {
-      await connection.connect(provider);
+      await start(connection);
       return true;
     } catch (cause) {
       providersAwaitingFocusRefresh.delete(provider);
@@ -593,6 +605,7 @@ export function createSetupProviders(
     selectCustomProvider,
     signInProvider,
     connectProvider,
+    connectProviderInMainlandChina,
     downloadProvider,
     /** Forgets the user's choice, so the step chooses again from the rows it shows. */
     clearChoice: () => {
@@ -637,6 +650,14 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
           connect: async (provider) => {
             await props.providers.connectProvider(provider);
           },
+          ...(api.mainlandChinaSite && api.connectInMainlandChina
+            ? {
+                mainlandChinaSite: api.mainlandChinaSite,
+                connectInMainlandChina: async (provider) => {
+                  await props.providers.connectProviderInMainlandChina(provider);
+                },
+              }
+            : {}),
         }
       : undefined;
   });

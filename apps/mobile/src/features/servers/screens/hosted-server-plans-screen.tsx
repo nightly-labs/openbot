@@ -15,6 +15,7 @@ import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
+import { LocalServerOptions } from "@/features/servers/components/local-server-options";
 import { rememberHostedServer, useHostedServerAvailability } from "@/features/servers/model/hosted-server-availability";
 import { hostedServerInSetup } from "@/features/servers/model/hosted-server-plans";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -142,6 +143,7 @@ function PlansReady({
 
       {showPlans ? <ComputerSteps /> : null}
 
+      <LocalServerOptions pathname="/hosted-server/local" />
       <OtherOptions />
     </>
   );

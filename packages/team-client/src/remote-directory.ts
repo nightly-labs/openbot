@@ -407,16 +407,26 @@ export class RemoteTeamDirectoryClient {
         );
         if (existing) return existing;
       }
-      const value = yield* this.#request("/v2/remote/sessions/", { method: "POST", body: { hostId } });
-      const session = yield* directoryDecode(() => decodeRemoteSession(value));
-      return yield* this.#ticket(session.sessionId, clientPublicKey).pipe(
+      const sessionId = yield* this.startSession(hostId);
+      return yield* this.#ticket(sessionId, clientPublicKey).pipe(
         Effect.catch((error) =>
-          this.endSession(session.sessionId).pipe(
+          this.endSession(sessionId).pipe(
             Effect.catch(() => Effect.void),
             Effect.andThen(Effect.fail(error)),
           ),
         ),
       );
+    });
+  }
+
+  /**
+   * The logical session of this account session on a host. The account service gives the active one
+   * again while it has not ended, so a client can ask before it has the key for the ticket.
+   */
+  startSession(hostId: string): Effect.Effect<string, DirectoryFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<string, DirectoryFailure> {
+      const value = yield* this.#request("/v2/remote/sessions/", { method: "POST", body: { hostId } });
+      return (yield* directoryDecode(() => decodeRemoteSession(value))).sessionId;
     });
   }
 

@@ -188,6 +188,8 @@ export class AgentStore {
   readonly #sharedRoot: string;
   readonly #downloadsRoot: string;
   readonly #avatarsRoot: string;
+  /** Uploaded channel images. They live beside the agent avatars, but `ChannelService` owns them. */
+  readonly channelImagesRoot: string;
   readonly #duplicationsRoot: string;
   readonly #automationRoot: string;
   readonly #profileCreationRecovery: ProfileCreationRecovery;
@@ -212,6 +214,7 @@ export class AgentStore {
     this.#sharedRoot = join(openbotRoot, "Shared");
     this.#downloadsRoot = join(openbotRoot, "Downloads");
     this.#avatarsRoot = join(userDataPath, "avatars", "agents");
+    this.channelImagesRoot = join(userDataPath, "avatars", "channels");
     this.#duplicationsRoot = join(userDataPath, "agent-duplications");
     this.#automationRoot = automationRoot(userDataPath);
     this.#database = database;

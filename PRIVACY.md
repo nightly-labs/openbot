@@ -359,7 +359,10 @@ The service stores:
 - rate-limit keys as hashes, their fixed window start time, and the attempt count;
 - short-lived team authentication tickets with a ticket hash, account ID, team server ID, lifecycle
   times, and optional consumption time;
-- remote host records with the owner, name, optional logo, device public key, and authorization epoch;
+- remote host records with the owner, name, optional logo, device public key, and authorization epoch.
+  A server that the desktop app runs on the same computer as its own server gets its own record while
+  the desktop app is signed in, so the owner's phones and other computers can connect to it. Deleting
+  that server removes its record;
 - remote memberships and invitations with roles, states, hashed invitation tokens, and lifecycle times;
 - logical remote session records with the account, host, originating account-session hash, start,
   end, and expiration times;
@@ -487,14 +490,19 @@ Mobile hidden and pinned chat preferences are stored on the phone, separately pe
 Conversation read/unread changes are stored on the desktop host and shared with your other connected devices.
 
 The mobile app keeps a copy of what it shows for each server: the agent list, the hidden agents,
-the sections, and the latest page (up to 50 messages) of each chat that it loaded, up to 4 MB for
-each server. So after a start the app shows them at once, while it connects to the server. The copy
-is in the phone's system cache (`Library/Caches` on iOS), which is not in a device backup and which
-the system can delete when the phone is low on storage. Each file is encrypted with AES-256-GCM and
-bound to the account and the server. The key is in the phone's keychain, and it does not leave this
-device. The copy is never sent anywhere. The app replaces it with what the server sends, and deletes
-a server's copy when the account no longer has that server. Sign-out and an expired or disconnected
-session delete all copies and the key. Attachments and files are not in the copy.
+the sections, the server's capabilities, the latest page (up to 50 messages) of each chat that it
+loaded, and the last values of the drawer (the member count, the usage cost, the next routine runs,
+the thread and workflow counts, and the name and last run of each pinned workflow), up to 4 MB for
+each server. It also keeps the last server list that the account service gave: for each server its
+ID, name, logo version, public key and the time of its last key change, membership ID, role, member
+limit, and hosted status. So after a start the app connects and shows them at once, while the
+account service and the server answer. The copy is in the phone's system cache (`Library/Caches` on
+iOS), which is not in a device backup and which the system can delete when the phone is low on
+storage. Each file is encrypted with AES-256-GCM and bound to the account and the server, or to the
+server list. The key is in the phone's keychain, and it does not leave this device. The copy is
+never sent anywhere. The app replaces it with what the server and the account service send, and
+deletes a server's copy when the account no longer has that server. Sign-out and an expired or
+disconnected session delete all copies and the key. Attachments and files are not in the copy.
 
 The mobile app keeps a support log of up to 1,000 events in the phone's system cache: app version,
 system and device model, app state changes, connection steps with server IDs and error text, the
@@ -959,7 +967,8 @@ Network traffic can also occur when:
 - a user opens an explicitly labeled external support or setup link;
 - a Slack workspace is connected. See [Slack connections](#slack-connections);
 - a Discord server is connected. See [Discord connections](#discord-connections);
-- a Telegram chat is connected. See [Telegram connections](#telegram-connections).
+- a Telegram chat is connected. See [Telegram connections](#telegram-connections);
+- a WhatsApp number is linked. See [WhatsApp connections](#whatsapp-connections).
 
 ## Webhook routines
 
@@ -1017,6 +1026,17 @@ graph, or ID.
   the list. The computer keeps the newest 50 deliveries of each trigger, without the event body: the
   delivery ID, event name, item number, time, and whether it started a run. An event that arrives
   while the computer is offline is lost; the history shows the gap.
+- **Discord triggers** start a run from a mention of the OpenBot Discord app. The trigger's output, and
+  the run that keeps it, has the message text, the author, and the name, type, size and Discord
+  address of each file of the message and of the message that it replies to. These addresses expire
+  after about a day.
+- **GitHub outputs** make the change through the OpenBot GitHub App: a comment, a label, a person, a
+  review, a close or a new issue. The text goes to GitHub. When a Discord mention started the run, a
+  new issue or a comment also keeps those files: the computer downloads each file of up to 25 MB, and
+  up to 50 MB for each change, from Discord and commits it to the `openbot-attachments` branch of the target repository,
+  under `discord/<message ID>/`. The text links the files there. Everyone who can read the repository
+  can read them, also after the issue or the comment is deleted; delete that branch to delete
+  them. A file that the computer cannot copy is linked at its Discord address.
 
 Members of a joined server can read, change, and run a workflow when they can see and use each
 agent in it (`workflows-v1`). The graph and the step text then go to their computer. Only owners
@@ -1175,6 +1195,48 @@ plugin page does not connect your browser to the plugin developer's servers.
 
 Account usage shown in OpenBot is requested through the local Codex App Server. OpenBot does not send
 that usage to its maintainer.
+
+## WhatsApp connections
+
+A WhatsApp number links as a device of the computer that runs the agents, as WhatsApp Web does. The
+computer connects directly to WhatsApp's servers. No OpenBot service takes part: the account service
+and Signal do not know the number, the link or any message, and Meta gets no OpenBot business account.
+To link, the user scans a QR code that OpenBot shows, or types a pairing code on the phone. Before each
+connection, OpenBot asks `web.whatsapp.com` for the current WhatsApp Web version, as a browser does.
+OpenBot uses an unofficial client (a modified copy of the open-source Baileys library), so WhatsApp can
+restrict or block a number that it sees as automated.
+
+- **Stored on the host.** The device's keys, its Signal sessions, the messages that OpenBot sent in the
+  last day (WhatsApp asks for them again when a phone could not decrypt one), the last 30 minutes of
+  received messages that the agents took (so a crash does not lose them), and the reply chains of the
+  last 7 days are in `<userData>/whatsapp/`. Every value is encrypted with a random key that the
+  operating system's secret storage keeps, and the file is readable only by the user. The database
+  holds the number, a masked name, which agent is the WhatsApp Orchestrator, the contacts and groups
+  that the owner allowed, and one row per conversation that an agent answers. The messages of that
+  conversation are kept as a conversation of that agent, and files people send are kept with the
+  agent's attachments. Names and the last messages of allowed chats are kept in memory until OpenBot
+  quits. Pairing requests are kept in memory for at most an hour. Disconnect logs the device out (when
+  OpenBot is connected), deletes its keys and keeps the conversations, the workspace memories and the
+  allowed senders.
+- **Read from WhatsApp.** WhatsApp gives a linked device every message of the account. OpenBot reads
+  only the owner's own "Message yourself" chat, direct messages of the contacts the owner allowed, and
+  the groups the owner allowed, where a request starts only from a mention of the number or a reply in
+  a conversation that an agent answers. Every other chat is dropped when it arrives and is not stored.
+  When a device links, WhatsApp sends it a first part of the account's history; OpenBot keeps from it
+  only contact names and the phone forms of contacts, in memory, and drops the messages. It does not
+  ask WhatsApp for the full or recent history.
+- **Given to the WhatsApp Orchestrator.** Every new WhatsApp request goes first to the orchestrator
+  agent, which runs on its provider like any other agent and passes the work to a teammate with the
+  facts it needs.
+- **Sent to WhatsApp.** The agents' answers and the files they attach, short status posts, reactions,
+  and approval requests with the command, folder and reason the provider gave, redacted. On a number
+  used only by OpenBot, a person whom the owner did not allow gets one message with a pairing code.
+  On the owner's personal number, OpenBot never writes to anyone else first. Any agent can post
+  redacted text to the allowed chats.
+
+Anyone whom the owner allowed can give the agents work. The agents run on the host with the access
+the user gave them. A hosted server that sleeps does not start for a WhatsApp message; WhatsApp keeps
+the message until the server connects again.
 
 ## Agent access
 
@@ -1347,9 +1409,12 @@ for the other providers, when their app supports Cline.
 OpenBot downloads the Kimi Code CLI from `github.com` (GitHub release assets), and its license file
 from `github.com`, when you select Download on the Kimi row. OpenBot starts the CLI as a local
 process. Prompts, attachments, and tool results go to that process, and the CLI sends them to
-Moonshot AI (`api.kimi.com`). Sign in runs `kimi login`, which opens Kimi's sign-in page
-(`auth.kimi.com`) in your browser. The CLI keeps its login, device ID, session files, and settings
-in `~/.kimi`, or in `$KIMI_SHARE_DIR`. OpenBot does not read, copy, or upload these files. Unless you
+Moonshot AI: `api.kimi.ai` for a global account, or `api.kimi.com` for a mainland China account.
+Sign in runs `kimi login`, which opens Kimi's sign-in page in your browser: `auth.kimi.ai` for
+Connect, or `auth.kimi.com` when you select the kimi.com (China) item in the row's ⋯ menu. The CLI
+keeps its login, device ID, session files, and settings in `~/.kimi`, or in `$KIMI_SHARE_DIR`.
+OpenBot reads only the API address in `config.toml` on this computer, to start the CLI with the
+region of its login. OpenBot does not copy or upload these files. Unless you
 set `telemetry = false` in `~/.kimi/config.toml`, or set `KIMI_DISABLE_TELEMETRY=1` in the
 environment that starts OpenBot, the CLI sends anonymous usage events to
 `telemetry-logs.kimi.com`. OpenBot does not change this setting. Moonshot AI's terms for Kimi Code
@@ -1507,9 +1572,15 @@ host.
 
 The iPhone app can show a notification when an agent finishes a task, stops with an error, or needs
 an answer, an approval, or a step in the browser, while the app is not on screen. The host does not
-send one while the member uses a desktop app. For this, it keeps in memory the time of the last
-send, answer or typing of each session, and on its own computer it reads whether the OpenBot window
-has focus and how long the computer has had no input. While the phone shows the Live Activity of
+send one while the member uses a desktop app or the computer that it runs on. For this, it keeps in
+memory the time of the last send, answer or typing of each session, and on its own computer it reads
+whether the OpenBot window has focus and how long the computer has had no input. The desktop app also
+tells each joined server that shows its events on the desktop, after input, how many seconds ago the
+computer last had keyboard or mouse input, in any app. It sends only this number, not what you typed or
+which app you used. The host keeps the time in memory only, uses it for 30 seconds only to keep your
+phones quiet, and removes it at the next report or when the session ends. A host that sends
+notifications to none of your phones says so, and the desktop app then
+does not tell it again for 5 minutes. While the phone shows the Live Activity of
 that host and the activity shows the event, the host sends no notification. With Play sound on, the
 Live Activity update lights up the screen and plays the sound instead. An event that comes while
 the app looks on screen stays in the memory of the host for at most 5 minutes, in case iOS suspended

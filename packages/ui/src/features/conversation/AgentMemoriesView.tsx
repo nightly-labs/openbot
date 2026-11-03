@@ -255,7 +255,7 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
                                 // The id is the key of the row, so it never changes.
                                 rows.set(untrack(memory).id, element);
                               }}
-                              label={<span class="agent-memories-row-title">{splitMemory(memory().text).title}</span>}
+                              label={splitMemory(memory().text).title}
                               onClick={() => openMemory(memory())}
                             />
                           )}
