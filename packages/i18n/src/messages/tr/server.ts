@@ -135,6 +135,13 @@ export const messages = {
   },
   // Kullanıcının birini silebileceği, hesabın barındırılan sunucular listesini açar.
   "server.add.limit.manage": "Sunucuları yönet",
+  "server.upgrade.title": "Ajanlarınızın alanı tükeniyor",
+  "server.upgrade.description":
+    "{server} üzerinde az boş alan kaldı. Ajanlarınızın kesintisiz çalışmaya devam etmesi için planınızı yükseltin.",
+  "server.upgrade.used": "{total} alanın {used} kadarı kullanılıyor",
+  "server.upgrade.current": "{plan} (şu anki)",
+  "server.upgrade.price": "Fiyat",
+  "server.upgrade.action": "{plan} planına yükselt",
   "server.hosted.progressTitle": "{name} kuruluyor",
   // Kurulum tarayıcıdaki Stripe sayfasında ilk ödemeyi bekler.
   "server.hosted.paymentTitle": "Ödemeyi tarayıcınızda tamamlayın",

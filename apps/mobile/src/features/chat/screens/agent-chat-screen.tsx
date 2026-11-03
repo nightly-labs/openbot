@@ -37,7 +37,8 @@ export function AgentChatScreen() {
   if (agent) {
     return (
       <MobileChatView
-        key={`${agent.serverId}:${agent.id}`}
+        // A new message, such as the source of a branch, opens the chat again at that message.
+        key={`${agent.serverId}:${agent.id}:${resolvedMessageId ?? ""}`}
         agent={agent}
         focusMessageId={resolvedMessageId || undefined}
         onLeave={leaveChat}

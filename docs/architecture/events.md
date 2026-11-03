@@ -180,7 +180,7 @@ of its own. The only event is `app_mention` in a channel. `MessagingService` giv
 channel (not a direct message, not a reply in an existing conversation) to `Workflows.receiveSlack`
 before it goes to an agent. The trigger matches the connection, the channel (empty: any) and a text
 filter (`slack-matching.ts`). Slack has no people filter: the host has no catalog of Slack people. A
-matched mention starts one run for each trigger, with source `slack` (schema v51) and the idempotency
+matched mention starts one run for each trigger, with source `slack` (schema v52) and the idempotency
 key `slack:<node>:<channel>:<message timestamp>`, because a Slack timestamp is unique only in its
 channel. A workflow with an open run skips the mention; when all matched triggers skip it, OpenBot
 adds the failed reaction to the message.

@@ -118,6 +118,11 @@ interface AgentAvatarProps {
    * a mark beside the avatar already shows the work, such as the sidebar badge.
    */
   workingFaces?: boolean;
+  /**
+   * Makes the eyes and the space between them larger. A small avatar, 24-40px, shows its face better
+   * with larger eyes. 1 is the default size. A photo avatar ignores it.
+   */
+  eyeScale?: number;
   class?: string;
   style?: Record<string, string>;
 }
@@ -159,6 +164,7 @@ export function AgentAvatar(props: AgentAvatarProps) {
           transition={props.transition ?? "pop"}
           followPointer={props.followPointer === true}
           workingFaces={props.workingFaces === true}
+          eyeScale={props.eyeScale}
           class={className()}
           style={props.style}
         />
@@ -193,6 +199,7 @@ function GeneratedAvatar(props: {
   transition: PlushTransition;
   followPointer: boolean;
   workingFaces: boolean;
+  eyeScale?: number | undefined;
   class: string;
   style?: Record<string, string> | undefined;
 }) {
@@ -312,6 +319,7 @@ function GeneratedAvatar(props: {
       autoPause
       initialPhase={props.animationOffset ?? avatarAnimationPhase(props.seed)}
       follow={props.followPointer}
+      eyeScale={props.eyeScale ?? 1}
       ariaLabel=""
       class="bloub-avatar-svg"
       style={PLUSH_BODY_STYLE}
@@ -344,6 +352,7 @@ function GeneratedAvatar(props: {
                 expression={frozen.expression}
                 state={frozen.state}
                 frozenAt={frozenPose(frozen.state)}
+                eyeScale={props.eyeScale ?? 1}
                 ariaLabel=""
                 class="bloub-avatar-svg"
                 style={PLUSH_BODY_STYLE}

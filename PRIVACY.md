@@ -967,7 +967,8 @@ Network traffic can also occur when:
 - a user opens an explicitly labeled external support or setup link;
 - a Slack workspace is connected. See [Slack connections](#slack-connections);
 - a Discord server is connected. See [Discord connections](#discord-connections);
-- a Telegram chat is connected. See [Telegram connections](#telegram-connections).
+- a Telegram chat is connected. See [Telegram connections](#telegram-connections);
+- a WhatsApp number is linked. See [WhatsApp connections](#whatsapp-connections).
 
 ## Webhook routines
 
@@ -1111,14 +1112,14 @@ holds it. Unlike Slack, both directions go through Signal:
   passes on only the messages that mention OpenBot or OpenBot's own role in the server, and the
   presses of OpenBot's buttons: the message
   text, the author's ID, name and role IDs in the server, the channel, the addresses of its files, and
-  the message it replies to when a person wrote it (with its author, time, and the text and file
-  addresses that Discord gave). The computer downloads the files from Discord directly.
+  the message it replies to when OpenBot did not write it (with its author, time, and the text, embed
+  text and file addresses that Discord gave). The computer downloads the files from Discord directly.
 - **From the computer.** The computer sends its posts, edits, reactions, files and name lookups to
   Signal, which makes each call to Discord for it, only in the Discord servers linked to that
   computer. To give context, the computer asks Signal for the earlier messages of a channel after the
   first message of a conversation, for the messages of the 15 minutes before a new conversation,
   and, when an agent asks for them, for the newest messages of the channel it answers in. These
-  earlier messages have the addresses of their files, and the computer downloads those files from
+  earlier messages have their embed text and the addresses of their files, and the computer downloads those files from
   Discord directly. With the Message Content intent, these earlier messages have their text and files
   also when they do not mention OpenBot. It also asks for the names of the people that a message
   mentions, and, when the user chooses who can use OpenBot, for the names of the server's roles.
@@ -1200,6 +1201,48 @@ plugin page does not connect your browser to the plugin developer's servers.
 
 Account usage shown in OpenBot is requested through the local Codex App Server. OpenBot does not send
 that usage to its maintainer.
+
+## WhatsApp connections
+
+A WhatsApp number links as a device of the computer that runs the agents, as WhatsApp Web does. The
+computer connects directly to WhatsApp's servers. No OpenBot service takes part: the account service
+and Signal do not know the number, the link or any message, and Meta gets no OpenBot business account.
+To link, the user scans a QR code that OpenBot shows, or types a pairing code on the phone. Before each
+connection, OpenBot asks `web.whatsapp.com` for the current WhatsApp Web version, as a browser does.
+OpenBot uses an unofficial client (a modified copy of the open-source Baileys library), so WhatsApp can
+restrict or block a number that it sees as automated.
+
+- **Stored on the host.** The device's keys, its Signal sessions, the messages that OpenBot sent in the
+  last day (WhatsApp asks for them again when a phone could not decrypt one), the last 30 minutes of
+  received messages that the agents took (so a crash does not lose them), and the reply chains of the
+  last 7 days are in `<userData>/whatsapp/`. Every value is encrypted with a random key that the
+  operating system's secret storage keeps, and the file is readable only by the user. The database
+  holds the number, a masked name, which agent is the WhatsApp Orchestrator, the contacts and groups
+  that the owner allowed, and one row per conversation that an agent answers. The messages of that
+  conversation are kept as a conversation of that agent, and files people send are kept with the
+  agent's attachments. Names and the last messages of allowed chats are kept in memory until OpenBot
+  quits. Pairing requests are kept in memory for at most an hour. Disconnect logs the device out (when
+  OpenBot is connected), deletes its keys and keeps the conversations, the workspace memories and the
+  allowed senders.
+- **Read from WhatsApp.** WhatsApp gives a linked device every message of the account. OpenBot reads
+  only the owner's own "Message yourself" chat, direct messages of the contacts the owner allowed, and
+  the groups the owner allowed, where a request starts only from a mention of the number or a reply in
+  a conversation that an agent answers. Every other chat is dropped when it arrives and is not stored.
+  When a device links, WhatsApp sends it a first part of the account's history; OpenBot keeps from it
+  only contact names and the phone forms of contacts, in memory, and drops the messages. It does not
+  ask WhatsApp for the full or recent history.
+- **Given to the WhatsApp Orchestrator.** Every new WhatsApp request goes first to the orchestrator
+  agent, which runs on its provider like any other agent and passes the work to a teammate with the
+  facts it needs.
+- **Sent to WhatsApp.** The agents' answers and the files they attach, short status posts, reactions,
+  and approval requests with the command, folder and reason the provider gave, redacted. On a number
+  used only by OpenBot, a person whom the owner did not allow gets one message with a pairing code.
+  On the owner's personal number, OpenBot never writes to anyone else first. Any agent can post
+  redacted text to the allowed chats.
+
+Anyone whom the owner allowed can give the agents work. The agents run on the host with the access
+the user gave them. A hosted server that sleeps does not start for a WhatsApp message; WhatsApp keeps
+the message until the server connects again.
 
 ## Agent access
 

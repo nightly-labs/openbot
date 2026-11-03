@@ -18,6 +18,8 @@ export interface MessageActionsRequest {
   /** Unset where a reaction cannot be saved. `null` removes the reader's reaction. */
   onReact?: (emoji: string | null) => void;
   onReply?: () => void;
+  /** Copies the conversation through this answer into a new thread. Unset where the message has no branch. */
+  onBranch?: () => void;
   onSelectText?: () => void;
 }
 

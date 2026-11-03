@@ -4,6 +4,7 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Copy from "lucide-react-native/icons/copy";
 import SmilePlus from "lucide-react-native/icons/face-slightly-smiling-plus";
+import GitFork from "lucide-react-native/icons/git-fork";
 import Reply from "lucide-react-native/icons/reply";
 import Square from "lucide-react-native/icons/square";
 import TextCursor from "lucide-react-native/icons/text-cursor";
@@ -36,7 +37,7 @@ function emojiRows(all: boolean): string[][] {
 }
 
 /**
- * The sheet that a touch and hold on a message opens: the reactions on top, then Reply, then the
+ * The sheet that a touch and hold on a message opens: the reactions on top, then Reply and Branch, then the
  * actions on the text. Each action closes the sheet.
  */
 export function MessageActionsScreen() {
@@ -119,15 +120,26 @@ export function MessageActionsScreen() {
         </View>
       ) : null}
 
-      {request.onReply ? (
+      {request.onReply || request.onBranch ? (
         <SettingsSection>
-          <SettingsRow
-            leading={<Reply size={ICON_SIZE} color={icon} />}
-            disclosure={false}
-            onPress={() => run(() => request.onReply?.())}
-          >
-            <Typography>{t("mobile.chat.message.reply")}</Typography>
-          </SettingsRow>
+          {request.onReply ? (
+            <SettingsRow
+              leading={<Reply size={ICON_SIZE} color={icon} />}
+              disclosure={false}
+              onPress={() => run(() => request.onReply?.())}
+            >
+              <Typography>{t("mobile.chat.message.reply")}</Typography>
+            </SettingsRow>
+          ) : null}
+          {request.onBranch ? (
+            <SettingsRow
+              leading={<GitFork size={ICON_SIZE} color={icon} />}
+              disclosure={false}
+              onPress={() => run(() => request.onBranch?.())}
+            >
+              <Typography>{t("mobile.chat.message.branch")}</Typography>
+            </SettingsRow>
+          ) : null}
         </SettingsSection>
       ) : null}
 

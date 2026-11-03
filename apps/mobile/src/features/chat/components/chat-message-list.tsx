@@ -16,6 +16,7 @@ import CirclePause from "lucide-react-native/icons/circle-pause";
 import CircleX from "lucide-react-native/icons/circle-x";
 import Clock3 from "lucide-react-native/icons/clock-3";
 import CornerUpRight from "lucide-react-native/icons/corner-up-right";
+import GitFork from "lucide-react-native/icons/git-fork";
 import LoaderCircle from "lucide-react-native/icons/loader-circle";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import X from "lucide-react-native/icons/x";
@@ -288,6 +289,17 @@ interface ChatMessageListProps {
   onSelectStarter: (value: string) => void;
   onRetryHistory: () => void;
   onReply?: (message: ChatBubbleMessage) => void;
+  /** Copies the conversation through a message of `branchPoints` into a new thread. */
+  onBranch?: (message: ChatBubbleMessage) => void;
+  /** The messages that offer a branch. Keep the set stable while its ids stay the same. */
+  branchPoints?: ReadonlySet<string>;
+  /**
+   * In a branch thread, the row that the "Branched from" line follows, and the source's title. A null
+   * title is a deleted source. Keep the object stable while its values stay the same.
+   */
+  branchDivider?: { afterId: string; label: string | null } | null;
+  /** Opens the source of the branch. Absent where the source cannot open. */
+  onOpenBranchSource?: () => void;
   /** Sets the reader's reaction on a message. `null` removes it. */
   onReact?: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
   /** The message whose text the reader selects in its bubble. */
@@ -348,10 +360,13 @@ interface MessageRowShared {
   canReact: boolean;
   canSelectText: boolean;
   canSelectQuestion: boolean;
+  /** The messages that offer a branch. Empty where the chat cannot branch. */
+  branchPoints: ReadonlySet<string>;
   /** The width inside the list padding. The iOS menu of a queued message does not limit its width. */
   listWidth: number;
   actions: {
     reply: (message: ChatBubbleMessage) => void;
+    branch: (message: ChatBubbleMessage) => void;
     selectQuestion: (messageId: string) => void;
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
     selectText: (message: ChatBubbleMessage) => void;
@@ -418,6 +433,56 @@ function ContextResetMarkerRow({ muted }: { muted: ViewStyle["backgroundColor"] 
       </Typography.Paragraph>
       <View className="h-px flex-1" style={{ backgroundColor: muted, opacity: 0.35 }} />
     </View>
+  );
+}
+
+/**
+ * The line after the messages that a branch copied, as on desktop. A tap opens the source, unless
+ * the source was deleted.
+ */
+function BranchDividerRow({
+  label,
+  onOpen,
+  muted,
+}: {
+  label: string | null;
+  onOpen: (() => void) | undefined;
+  muted: ViewStyle["backgroundColor"];
+}) {
+  const { t } = useText();
+  const text =
+    label === null
+      ? t("mobile.chat.threads.branchedFromDeleted")
+      : t("mobile.chat.threads.branchedFrom", { title: label });
+  const content = (
+    <>
+      <View className="h-px flex-1" style={{ backgroundColor: muted, opacity: 0.35 }} />
+      <GitFork size={14} color={String(muted)} />
+      <Typography.Paragraph type="body-sm" numberOfLines={1} className="shrink" style={{ color: muted }}>
+        {text}
+      </Typography.Paragraph>
+      <View className="h-px flex-1" style={{ backgroundColor: muted, opacity: 0.35 }} />
+    </>
+  );
+  if (label === null || !onOpen)
+    return (
+      <View accessible accessibilityLabel={text} className="flex-row items-center gap-2 pt-4 pb-2">
+        {content}
+      </View>
+    );
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={text}
+      onPress={() => {
+        void haptics.selection();
+        onOpen();
+      }}
+      className="flex-row items-center gap-2 pt-4 pb-2"
+      style={({ pressed }) => (pressed ? { opacity: 0.6 } : undefined)}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -494,6 +559,7 @@ const MessageRow = memo(function MessageRow({
           reactions: bubble.reactions,
           onReact: shared.canReact ? (emoji) => shared.actions.react(bubble, emoji) : undefined,
           onReply: shared.canReply ? () => shared.actions.reply(bubble) : undefined,
+          onBranch: shared.branchPoints.has(bubble.id) ? () => shared.actions.branch(bubble) : undefined,
           onSelectText: selectable ? () => shared.actions.selectText(bubble) : undefined,
           readAloudId: canReadAloud && bubble.author === "agent" ? bubble.id : undefined,
         }
@@ -807,6 +873,8 @@ interface RowContextValue {
   onOpenTurn: ((turnId: string) => void) | undefined;
   /** The day and time above each message that opens a day. */
   dayLabels: ReadonlyMap<string, string>;
+  /** The "Branched from" line and the row that it follows. */
+  branchDivider: { rowId: string; label: string | null; onOpen: (() => void) | undefined } | null;
 }
 
 const RowContext = createContext<RowContextValue | null>(null);
@@ -848,6 +916,9 @@ function ChatRow({ message }: { message: VisibleMessage }) {
         revealed={row.revealedIds.has(message.id)}
         shared={row.shared}
       />
+      {row.branchDivider?.rowId === message.id ? (
+        <BranchDividerRow label={row.branchDivider.label} onOpen={row.branchDivider.onOpen} muted={row.shared.muted} />
+      ) : null}
     </Animated.View>
   );
 }
@@ -977,6 +1048,10 @@ export const ChatMessageList = memo(function ChatMessageList({
   onSelectStarter,
   onRetryHistory,
   onReply,
+  onBranch,
+  branchPoints = NO_IDS,
+  branchDivider = null,
+  onOpenBranchSource,
   onReact,
   selectingMessageId = null,
   onSelectText,
@@ -1139,15 +1214,17 @@ export const ChatMessageList = memo(function ChatMessageList({
   const selectionArea = useRef<ViewInstance | null>(null);
   const actionHandlers = useRef({
     onReply,
+    onBranch,
     onReact,
     onSelectText,
     onSelectionChange,
     onSelectQuestion,
   });
-  actionHandlers.current = { onReply, onReact, onSelectText, onSelectionChange, onSelectQuestion };
+  actionHandlers.current = { onReply, onBranch, onReact, onSelectText, onSelectionChange, onSelectQuestion };
   const actions = useMemo<MessageRowShared["actions"]>(
     () => ({
       reply: (message) => actionHandlers.current.onReply?.(message),
+      branch: (message) => actionHandlers.current.onBranch?.(message),
       selectQuestion: (messageId) => actionHandlers.current.onSelectQuestion?.(messageId),
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
       selectText: (message) => actionHandlers.current.onSelectText?.(message),
@@ -1191,6 +1268,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   const canReact = Boolean(onReact);
   const canSelectText = Boolean(onSelectText);
   const canSelectQuestion = Boolean(onSelectQuestion);
+  const shownBranchPoints = onBranch ? branchPoints : NO_IDS;
   // The rows keep clear of the side insets: the rail of iPhone Duo and the edges in landscape.
   const listWidth = columnWidth - insets.left - insets.right - LIST_PADDING * 2;
   const shared = useMemo<MessageRowShared>(
@@ -1221,6 +1299,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       canReact,
       canSelectText,
       canSelectQuestion,
+      branchPoints: shownBranchPoints,
       listWidth,
       actions,
     }),
@@ -1248,6 +1327,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       canReact,
       canSelectText,
       canSelectQuestion,
+      shownBranchPoints,
       listWidth,
       actions,
     ],
@@ -1262,6 +1342,31 @@ export const ChatMessageList = memo(function ChatMessageList({
   const responseIds = useMemo(() => new Set(rows.slice(tailIndex + 1).map((row) => row.id)), [rows, tailIndex]);
   // The opening rows do not start at the first message of the chat.
   const firstUserId = rowsShown && tailIndex === 0 && !hasOlder ? (rows[0]?.id ?? null) : null;
+  // The line follows its row, or the row of the exchange group that holds it.
+  const openBranchSource = useRef(onOpenBranchSource);
+  openBranchSource.current = onOpenBranchSource;
+  const canOpenBranchSource = Boolean(onOpenBranchSource);
+  const dividerRowId = useMemo(() => {
+    const afterId = branchDivider?.afterId;
+    if (!afterId) return null;
+    const row = visibleMessages.find(
+      (message) =>
+        message.id === afterId ||
+        (message.kind === "exchange-group" && message.exchanges.some((exchange) => exchange.id === afterId)),
+    );
+    return row?.id ?? null;
+  }, [branchDivider?.afterId, visibleMessages]);
+  const rowBranchDivider = useMemo<RowContextValue["branchDivider"]>(
+    () =>
+      dividerRowId && branchDivider
+        ? {
+            rowId: dividerRowId,
+            label: branchDivider.label,
+            onOpen: canOpenBranchSource ? () => openBranchSource.current?.() : undefined,
+          }
+        : null,
+    [dividerRowId, branchDivider, canOpenBranchSource],
+  );
   const rowContext = useMemo<RowContextValue>(
     () => ({
       shared,
@@ -1279,6 +1384,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       turnSummaries,
       onOpenTurn,
       dayLabels,
+      branchDivider: rowBranchDivider,
     }),
     [
       shared,
@@ -1296,6 +1402,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       turnSummaries,
       onOpenTurn,
       dayLabels,
+      rowBranchDivider,
     ],
   );
   const activitySpec = (activity?: MobileAgentActivity): ChatActivitySpec | null => {

@@ -43,6 +43,39 @@ function writeDismissed(serverId: string, dismissed: boolean): void {
 }
 
 /**
+ * The highest level at which the upgrade dialog showed for each server, on this computer. The dialog
+ * shows once at "low" and once more at "full". When space comes back, the record is cleared.
+ */
+const UPGRADE_OFFERED_KEY_PREFIX = "openbot:server-upgrade-offered:";
+
+export function readUpgradeOffered(serverId: string): SidebarStorageLevel | null {
+  try {
+    const value = window.localStorage.getItem(UPGRADE_OFFERED_KEY_PREFIX + serverId);
+    return value === "low" || value === "full" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** False when browser storage is unavailable. The dialog then does not show, so it cannot repeat. */
+export function writeUpgradeOffered(serverId: string, level: SidebarStorageLevel): boolean {
+  try {
+    window.localStorage.setItem(UPGRADE_OFFERED_KEY_PREFIX + serverId, level);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearUpgradeOffered(serverId: string): void {
+  try {
+    window.localStorage.removeItem(UPGRADE_OFFERED_KEY_PREFIX + serverId);
+  } catch {
+    // The record stays, and the dialog shows again only at a higher level.
+  }
+}
+
+/**
  * The disk of the selected server, for the sidebar storage card. Only an owner or admin sees it,
  * because only they can free up space. A remote host without `storage-disk-v1` shows no card.
  */
@@ -65,8 +98,11 @@ export function createStorageCard(server: () => ServerSummary | undefined) {
           // An answer for a server that is no longer selected is dropped.
           if (untrack(target) !== serverId) return;
           setDisk(answer ? { serverId, disk: answer } : null);
-          // Space came back, so the next "low" shows the card again.
-          if (answer && storageLevel(answer) === null) writeDismissed(serverId, false);
+          // Space came back, so the next "low" shows the card and offers the upgrade again.
+          if (answer && storageLevel(answer) === null) {
+            writeDismissed(serverId, false);
+            clearUpgradeOffered(serverId);
+          }
         },
         // A failed read shows no card. The next poll asks again.
         () => {
