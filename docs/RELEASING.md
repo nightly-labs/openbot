@@ -304,8 +304,9 @@ links in the archive. Set `licenseSha256` to the SHA-256 of `LICENSE` at the ver
 `native-runtime.lock.json` pins the Devin CLI by hand. Read `version` from
 `https://static.devin.ai/cli/current/manifest.json` and set `version`. For each target, download
 `devin-<version>-<triple>.tar.gz` (`.zip` on Windows) from `https://static.devin.ai/cli/<version>/`,
-and check its SHA-256 against the manifest `sha256`. Set `url`, `assetSha256`, `downloadBytes`, `installedBytes` above the size of the extracted `bin/` folder, and the
-SHA-256 of `bin/devin` (`bin/devin.exe` on Windows). Staging removes `share/`, so it is not in
+and check its SHA-256 against the manifest `sha256`. Set `url`, `assetSha256`, `downloadBytes`,
+`installedBytes` (the size of the extracted `bin/` and `share/` folders), and the SHA-256 of
+`bin/devin` (`bin/devin.exe` on Windows). `share/` holds only documentation, so it is not in
 `files`.
 
 ## Pin the OpenCode CLI

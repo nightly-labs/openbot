@@ -1,8 +1,8 @@
-import { chmod, copyFile, mkdir, rename, rm } from "node:fs/promises";
+import { chmod, copyFile, mkdir, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
-import { parseDevinVersion, parseMuseVersion, parsePiVersion } from "../backend/cli";
+import { NATIVE_VERSION_PARSERS } from "../backend/cli";
 import { sha256File } from "../backend/file-hash";
 import { assertSafeArchive, extractArchive, extractZipTree, rejectNonRegularFiles } from "./provider-runtime-archive";
 import type { ProviderRuntimeDescriptor, ProviderStageContext } from "./provider-runtime-descriptors";
@@ -34,13 +34,15 @@ export function nativeProviderRuntime(runtime: "pi" | "muse" | "devin"): Provide
         yield* runtimeIO(() => mkdir(join(staging, "bin"), { recursive: true }));
         yield* runtimeIO(() => copyFile(downloadedPath, join(staging, "bin", spec.executableName)));
       } else if (runtime === "devin") {
-        // Devin's archives hold only `bin/` and `share/`. OpenBot runs only `bin/devin`.
-        if (spec.target === "win32-x64") yield* extractZipTree(downloadedPath, staging, "bin", message);
-        else {
+        // Devin's archives hold only `bin/` and `share/`. Devin CLI 3000.11.234 has a skill that reads
+        // its documentation in `share/devin/docs`, so staging keeps both folders.
+        if (spec.target === "win32-x64") {
+          yield* extractZipTree(downloadedPath, staging, "bin", message);
+          yield* extractZipTree(downloadedPath, staging, "share", message);
+        } else {
           yield* assertSafeArchive(downloadedPath, ["bin", "share"], message);
           yield* extractArchive(downloadedPath, staging);
-          yield* runtimeIO(() => rm(join(staging, "share"), { recursive: true, force: true }));
-          yield* rejectNonRegularFiles(join(staging, "bin"));
+          yield* rejectNonRegularFiles(staging);
         }
       } else {
         if (spec.target === "win32-x64") {
@@ -66,6 +68,6 @@ export function nativeProviderRuntime(runtime: "pi" | "muse" | "devin"): Provide
           return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.nativeChecksum")) });
       }
     }),
-    parseVersion: { pi: parsePiVersion, muse: parseMuseVersion, devin: parseDevinVersion }[runtime],
+    parseVersion: NATIVE_VERSION_PARSERS[runtime],
   };
 }

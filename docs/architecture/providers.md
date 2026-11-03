@@ -736,9 +736,10 @@ from peers on those versions, as for Cursor. Team API v6 and `providers-v4` carr
 The Devin provider (id `devin`) starts Cognition's Devin CLI with `devin acp`. The runtime manager
 reads `static.devin.ai/cli/current/manifest.json` and downloads
 `devin-<version>-<triple>.tar.gz` (`.zip` on Windows) from `static.devin.ai/cli/<version>/`. The
-archives hold only `bin/` and `share/`. Staging keeps `bin/`, removes `share/`, and refuses links
-and other special files. The manifest gives a SHA-256 for each target and no size, so a HEAD request
-gives the download size. `OPENBOT_DEVIN_PATH` selects another executable.
+archives hold only `bin/` and `share/`. Staging keeps both, because Devin CLI 3000.11.234 has a
+skill that reads its documentation in `share/devin/docs`, and refuses links and other special files.
+The manifest gives a SHA-256 for each target and no size, so a `GET` with `Range: bytes=0-0` gives
+the download size. `OPENBOT_DEVIN_PATH` selects another executable.
 
 Sign in calls the ACP `authenticate` method `devin-browser`, which opens Devin's page in the system
 browser. Devin CLI 3000.11.234 keeps the sign-in in `credentials.toml` of its XDG data folder

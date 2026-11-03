@@ -90,6 +90,7 @@ import {
   OPENCODE_CONFINED_ENV,
   openCodeStatePaths,
   type ProcessConfinement,
+  type ProviderStatePaths,
   piAgentDirectory,
   piStatePaths,
   type SpawnTarget,
@@ -386,35 +387,22 @@ function kimiProcessEnv(
 }
 
 /**
- * The sandbox lets a Kimi process write in `~/.kimi`, not create it, so OpenBot makes it. The
- * agent's own environment can move that folder with `KIMI_SHARE_DIR`.
+ * The sandbox lets a process write in its state folders, not create them, so OpenBot makes them.
+ * The agent's own environment can move them: `KIMI_SHARE_DIR` for Kimi, the XDG variables for Devin.
  */
-function confineKimiTarget(
+function confineWithState(
   target: SpawnTarget,
   confinement: ProcessConfinement,
+  statePaths: (env: NodeJS.ProcessEnv) => ProviderStatePaths,
   agentEnvironment: Readonly<Record<string, string>> | undefined,
 ): SpawnTarget {
-  const state = kimiStatePaths({ ...process.env, ...agentEnvironment });
+  const state = statePaths({ ...process.env, ...agentEnvironment });
   for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
   return confineSpawnTarget(target, confinement, state);
 }
 
 /** `devin acp` serves the Agent Client Protocol on stdio. */
 const DEVIN_ARGV: readonly string[] = ["acp"];
-
-/**
- * The sandbox lets a Devin process write in its state folders, not create them, so OpenBot makes
- * them. The agent's own environment can move them with the XDG variables.
- */
-function confineDevinTarget(
-  target: SpawnTarget,
-  confinement: ProcessConfinement,
-  agentEnvironment: Readonly<Record<string, string>> | undefined,
-): SpawnTarget {
-  const state = devinStatePaths({ ...process.env, ...agentEnvironment });
-  for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
-  return confineSpawnTarget(target, confinement, state);
-}
 
 /**
  * What a client needs from the app at spawn, beyond its own CLI: the stored secrets, and the user's
@@ -1157,7 +1145,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: ["acp"],
         env: { ...KIMI_ENV },
         ...(confinement
-          ? { confine: (target) => confineKimiTarget(target, confinement, context.agentEnvironment?.()) }
+          ? { confine: (target) => confineWithState(target, confinement, kimiStatePaths, context.agentEnvironment?.()) }
           : {}),
         extraEnv: () => kimiProcessEnv(cli, context.agentEnvironment?.()),
         signInMessage: sourceText("error.provider.kimiSignIn"),
@@ -1198,7 +1186,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: DEVIN_ARGV,
         env: {},
         ...(confinement
-          ? { confine: (target) => confineDevinTarget(target, confinement, context.agentEnvironment?.()) }
+          ? {
+              confine: (target) => confineWithState(target, confinement, devinStatePaths, context.agentEnvironment?.()),
+            }
           : {}),
         extraEnv: () => ({ ...context.agentEnvironment?.() }),
         signInMessage: sourceText("error.provider.devinSignIn"),

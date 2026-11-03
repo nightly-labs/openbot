@@ -789,12 +789,7 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
     const attempt = yield* Effect.result(
       Effect.gen(function* () {
         const { stdout, launch } = yield* readCliVersion(candidate, provider);
-        const version =
-          provider === "pi"
-            ? parsePiVersion(stdout)
-            : provider === "muse"
-              ? parseMuseVersion(stdout)
-              : parseDevinVersion(stdout);
+        const version = NATIVE_VERSION_PARSERS[provider](stdout);
         if (provider === "pi" && !isMinimumVersion(version, [1, 1, 0]))
           throw new CodexCliError(sourceText("error.provider.piOutdated", { version }), "outdated");
         return { executable: candidate.executable, version, source: candidate.source, ...launch };
@@ -849,6 +844,13 @@ export function parseDevinVersion(output: string): string {
     throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Devin" }), "invalid");
   return match[1] ?? match[0];
 }
+
+/** The version parser of each native provider CLI. */
+export const NATIVE_VERSION_PARSERS: Readonly<Record<"pi" | "muse" | "devin", (output: string) => string>> = {
+  pi: parsePiVersion,
+  muse: parseMuseVersion,
+  devin: parseDevinVersion,
+};
 
 export function isVersion(value: string): boolean {
   return /^\d+\.\d+\.\d+(?:(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40})?$/u.test(value);
