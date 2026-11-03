@@ -9,13 +9,13 @@ import {
   useSharedValue,
 } from "react-native-reanimated";
 import { haptics } from "@/shared/lib/haptics";
-import { useAttachmentFile } from "./attachment-preview";
+import { savesToPhotos, showsAsImage, useAttachmentFile } from "./attachment-preview";
 import { ImageViewer, type ImageViewerPage } from "./image-viewer";
 
 /** An image the chat can show itself: one that is on the host and small enough to download. */
 export function isViewableImage(attachment: AttachmentSummary) {
   return (
-    attachment.kind === "image" &&
+    showsAsImage(attachment) &&
     attachment.size <= MOBILE_ATTACHMENT_BYTES &&
     !attachment.id.startsWith("mobile-draft-attachment-")
   );
@@ -124,7 +124,7 @@ function ConversationImageViewer({
       hiddenSource={hiddenSource}
       busy={file.busy}
       onShare={file.share}
-      onSave={file.saveToPhotos}
+      onSave={page && savesToPhotos(page.attachment) ? file.saveToPhotos : undefined}
       onIndexChange={setIndex}
       onDismissed={onDismissed}
     />

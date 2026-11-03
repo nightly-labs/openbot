@@ -19,7 +19,12 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-import { AttachmentThumbnail, localAttachmentPreview, useAttachmentFile } from "../components/attachment-preview";
+import {
+  AttachmentThumbnail,
+  localAttachmentPreview,
+  showsAsImage,
+  useAttachmentFile,
+} from "../components/attachment-preview";
 import { useChatAttachments } from "../components/use-chat-attachments";
 import type { ChatQueueController } from "../components/use-chat-queue";
 import { useQueuedChat } from "../context/queued-messages-context";
@@ -340,7 +345,7 @@ function KeptAttachmentRow({
   onRemove: () => void;
 }) {
   const { t } = useText();
-  const image = attachment.kind === "image";
+  const image = showsAsImage(attachment);
   const file = useAttachmentFile(serverId, attachment, image);
   return (
     <SettingsRow

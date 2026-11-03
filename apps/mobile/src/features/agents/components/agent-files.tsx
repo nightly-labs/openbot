@@ -6,7 +6,7 @@ import Trash2 from "lucide-react-native/icons/trash";
 import { useState } from "react";
 import { Alert, Pressable } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
-import { AttachmentThumbnail, useAttachmentFile } from "@/features/chat/components/attachment-preview";
+import { AttachmentThumbnail, showsAsImage, useAttachmentFile } from "@/features/chat/components/attachment-preview";
 import { useAttachmentPreview } from "@/features/chat/components/use-attachment-preview";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
@@ -105,7 +105,7 @@ export function StoredFile({
   const { deleteStoredFile } = useMobileWorkspaceActions();
   const danger = useThemeColor("danger");
   const [deleting, setDeleting] = useState(false);
-  const image = file.kind === "image";
+  const image = showsAsImage(file);
   const missing = file.status === "missing";
   const attachment = useAttachmentFile(serverId, file, image && !missing);
   const preview = useAttachmentPreview(serverId, file);

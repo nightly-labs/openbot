@@ -39,6 +39,19 @@ export function knownImageDimensions(id: string): ImageDimensions | null {
   return dimensionCache.get(id);
 }
 
+/**
+ * A file the chat shows as a picture, as desktop does. An SVG is a `file` attachment, so the agent
+ * reads its text, but its preview is an image.
+ */
+export function showsAsImage(attachment: Pick<AttachmentSummary, "kind" | "previewKind">): boolean {
+  return attachment.kind === "image" || attachment.previewKind === "image";
+}
+
+/** A picture the photo library takes. The library takes raster images only, not an SVG. */
+export function savesToPhotos(attachment: Pick<AttachmentSummary, "kind">): boolean {
+  return attachment.kind === "image";
+}
+
 /** The short type a file card shows, such as PDF or CSV, from the name the user sees. */
 export function attachmentTypeLabel(name: string, mimeType: string, t: MobileTranslate): string {
   const extension = attachmentFileExtension(name);
@@ -280,7 +293,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
     );
   };
 
-  /** Saves every image. It reports its own failure and returns whether all of them saved. */
+  /** Saves every image that the photo library takes. It reports its own failure and returns whether all of them saved. */
   async function saveAllToPhotos(): Promise<boolean> {
     setBusy(true);
     const folder = new Directory(Paths.cache, `gallery-save-${Date.now()}`);
@@ -291,7 +304,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
         throw new Error(t("mobile.chat.imageGallery.photosPermission"));
       folder.create({ intermediates: true, idempotent: true });
       // One at a time, in chat order, so the library keeps the order of the message.
-      for (const [index, attachment] of attachments.entries()) {
+      for (const [index, attachment] of attachments.filter(savesToPhotos).entries()) {
         const data = await load(attachment);
         const file = await writeCopy(folder, `${index}.${imageExtension(attachment, data.mimeType)}`, data);
         await MediaLibrary.Asset.create(file.uri);
