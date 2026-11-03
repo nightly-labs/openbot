@@ -577,7 +577,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         mcp,
         extension,
         keyExtension,
-        deferredMcp: Object.keys(handoff.servers).length > 0,
+        deferredMcp: !this.options.profileGeneration && Object.keys(handoff.servers).length > 0,
         turn: null,
         closed: false,
         gate: Semaphore.makeUnsafe(1),
