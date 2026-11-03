@@ -13,13 +13,13 @@
  * would take.
  */
 
-import type { AvatarHue, ChannelIcon, ChannelMember } from "@openbot/contracts/ipc";
+import type { AvatarHue, ChannelIcon, ChannelIconName, ChannelMember } from "@openbot/contracts/ipc";
 import { UsersRound } from "@openbot/ui";
 import { avatarHueSwatch } from "@openbot/ui/bloub-avatar";
 import { createSignal, For, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import { CHANNEL_ICONS, type ChannelIconName, knownChannelIcon } from "./channel-icons";
+import { CHANNEL_ICONS, knownChannelIcon } from "./channel-icons";
 
 const ROW_LIMIT = 3;
 const CLUSTER_CELLS = 4;

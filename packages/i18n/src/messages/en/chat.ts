@@ -140,6 +140,8 @@ export const messages = defineMessages("chat", {
   "chat.marker.unavailableAgent": "Unavailable agent",
   "chat.marker.openChat": "Open chat with {name}",
   "chat.marker.openRoutine": "Open routine {name}",
+  "chat.marker.openRoutineThread": "Open thread",
+  "chat.marker.openRoutineThreadOf": "Open the thread of {name}",
   "chat.marker.unavailable": "Unavailable",
   "chat.marker.contextReset": "New chat started",
   "chat.marker.instructionsView": "View",

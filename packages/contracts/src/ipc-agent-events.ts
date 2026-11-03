@@ -39,6 +39,28 @@ function isAgentTurnOrigin(value: unknown): value is AgentTurnOrigin {
   return value === "user" || value === "routine" || value === "agent" || value === "unknown";
 }
 
+/** The end of a turn. */
+export interface AgentTurnCompletedEvent {
+  type: "turn-completed";
+  agentId: string;
+  threadId: string;
+  turnId: string;
+  status: string;
+  origin?: AgentTurnOrigin;
+  /**
+   * A routine run that had nothing to report and posted no message. It is not news, so it shows
+   * no notification. The Team API carries it through the optional `quiet-turn-v1` capability.
+   * Peers without that capability receive the released completion event.
+   */
+  quiet?: true;
+  /**
+   * The turn ended with open plan steps, and OpenBot continues the request with one more turn.
+   * The request is not done, so this completion shows no notification, plays no sound, and is
+   * not read aloud. Only local listeners receive it; the Team API adapters leave it out.
+   */
+  continues?: true;
+}
+
 export type AgentEvent =
   | { type: "channels-changed"; channelId: string; revision: number }
   | { type: "status"; status: AgentStatus }
@@ -113,26 +135,14 @@ export type AgentEvent =
     }
   | { type: "turn-progress"; agentId: string; threadId: string; turnId: string; detail: string }
   | { type: "turn-started"; agentId: string; threadId: string; turnId: string; origin?: AgentTurnOrigin }
-  | {
-      type: "turn-completed";
-      agentId: string;
-      threadId: string;
-      turnId: string;
-      status: string;
-      origin?: AgentTurnOrigin;
-      /**
-       * A routine run that had nothing to report and posted no message. It is not news, so it shows
-       * no notification. The Team API carries it through the optional `quiet-turn-v1` capability.
-       * Peers without that capability receive the released completion event.
-       */
-      quiet?: true;
-      /**
-       * The turn ended with open plan steps, and OpenBot continues the request with one more turn.
-       * The request is not done, so this completion shows no notification, plays no sound, and is
-       * not read aloud. Only local listeners receive it; the Team API adapters leave it out.
-       */
-      continues?: true;
-    }
+  | AgentTurnCompletedEvent
+  /**
+   * A non-quiet turn in a routine thread ended. `AgentTasks` keeps the turn's own `turn-completed`, so
+   * the state of the agent's chat does not change. The desktop notification, the phone notification and
+   * the completion sound read `turn` from this event, and a click opens the routine thread. Local only:
+   * the released Team API event adapters do not carry it.
+   */
+  | { type: "routine-thread-turn-completed"; taskId: string; turn: AgentTurnCompletedEvent }
   | {
       type: "prompt";
       requestId: string | number;
@@ -290,6 +300,13 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.detail) &&
         value.detail.length > 0 &&
         value.detail.length <= INPUT_LIMITS.promptQuestion
+      );
+    case "routine-thread-turn-completed":
+      return (
+        isIdentifier(value.taskId) &&
+        isDynamicRecord(value.turn) &&
+        value.turn.type === "turn-completed" &&
+        isAgentEvent(value.turn)
       );
     case "turn-started":
     case "turn-completed":

@@ -66,6 +66,12 @@ import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry } from "./attention-registry";
 import { loadAvatarFile } from "./avatar-file";
 import type { BrowserUploads } from "./browser-uploads";
+import {
+  CHANNEL_AGENT_TOOL_NAMES,
+  channelAgentToolInChannelTask,
+  handleChannelAgentTool,
+  listChannelsToolSchema,
+} from "./channel-agent-tools";
 import type { ChatVisualPreviewHost } from "./chat-visual-preview";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { handleDataTool } from "./data-tools";
@@ -526,7 +532,11 @@ export class OpenBotToolRouter {
                 if (!(error instanceof z.ZodError)) logger.warn("An OpenBot tool failed.", { tool, error: message });
                 return openBotToolFailure(message);
               });
-            const correctable = PROFILE_TOOL_NAMES.has(tool) || tool === "attach_files_to_response";
+            const correctable =
+              PROFILE_TOOL_NAMES.has(tool) ||
+              CHANNEL_AGENT_TOOL_NAMES.has(tool) ||
+              tool === "list_channels" ||
+              tool === "attach_files_to_response";
             const response = this.#handleOpenBotTool(toolRequest.params).pipe(
               Effect.catch((failure) => (correctable ? correctableFailure(failure.cause) : Effect.fail(failure))),
               Effect.catchDefect((defect) => (correctable ? correctableFailure(defect) : Effect.die(defect))),
@@ -859,7 +869,33 @@ export class OpenBotToolRouter {
       };
     }
 
-    if (params.tool === "list_channels") return openBotToolResult({ channels: this.#channels.handoffTargets() });
+    if (params.tool === "list_channels") {
+      const args = listChannelsToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+      return openBotToolResult({ channels: this.#channels.handoffTargets(args.archived === true) });
+    }
+    if (CHANNEL_AGENT_TOOL_NAMES.has(params.tool)) {
+      if (channelId) return channelAgentToolInChannelTask();
+      // As for webhook routines: an external chat, a routine run or an agent message can carry text
+      // from outside, such as a webhook body. A message steered into a run shares the run's turn. A
+      // team member's message is refused too: the Team API checks that member's agent access.
+      const deliveries = this.#mailbox.findDeliveriesByTurn(senderAgentId, params.turnId);
+      const remote = (messageId: string) => {
+        const member = this.#mailbox.senderMember(messageId);
+        return member !== undefined && (this.#channels.hooks.remotePerson?.(member.id) ?? false);
+      };
+      const requested =
+        deliveries.length > 0 &&
+        deliveries.every(({ delivery }) => delivery.sender.kind === "user" && !remote(delivery.messageId)) &&
+        !this.#conversation.isExecutionThread(executionThreadId);
+      if (!requested)
+        return openBotToolFailure(
+          "Only a person's message in your own OpenBot chat can create or change a channel. Ask the user to request it there.",
+        );
+      return yield* handleChannelAgentTool(params, senderAgentId, {
+        channels: this.#channels,
+        listAgents: () => this.#hooks.listAgents(),
+      });
+    }
     if (params.tool === "send_to_channel") {
       if (channelId) return openBotToolFailure("Use channel_assign or channel_transfer for channel work.");
       const args = sendToChannelToolSchema.parse(params.arguments, { reportInput: true });
@@ -1063,11 +1099,15 @@ export class OpenBotToolRouter {
     const memoryResult = this.#memories.handleTool(params, senderAgentId, this.#hooks.redactMcp);
     if (memoryResult) return memoryResult;
 
+    // A routine thread takes the runs that the agent's own chat took before, so its runs keep the
+    // tools of the chat: they wait for events and start tasks.
+    const callerThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+    const callerTaskId = this.#tasks.taskForThread(callerThreadId);
     const caller = {
       agentId: senderAgentId,
-      inExecutionThread: this.#conversation.isExecutionThread(
-        this.#conversation.publicThreadId(senderAgentId, params.threadId),
-      ),
+      inExecutionThread:
+        this.#conversation.isExecutionThread(callerThreadId) &&
+        !(callerTaskId !== null && this.#tasks.isRoutineThread(callerTaskId)),
     };
     const waitResult = this.#waits.handleTool(params, caller);
     if (waitResult) return waitResult;
