@@ -73,6 +73,7 @@ import { registerIpcGroups } from "./ipc/define-ipc-group";
 import { dynamicIslandIpcHandlers } from "./ipc/dynamic-island-handlers";
 import { eventsIpcHandlers } from "./ipc/events-handlers";
 import { githubConnectorIpcHandlers } from "./ipc/github-connector-handlers";
+import { googleConnectionsIpcHandlers } from "./ipc/google-connections-handlers";
 import { hostAdminIpcHandlers } from "./ipc/host-admin-handlers";
 import { hostedServerIpcHandlers } from "./ipc/hosted-server-handlers";
 import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
@@ -590,6 +591,7 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
 function registerIpcHandlers({
   service,
   signInRelayClient,
+  googleConnections,
   relayedMessagingInstalls,
   providerRuntimes,
   providerCredentials,
@@ -856,6 +858,12 @@ function registerIpcHandlers({
       remoteServers,
       relayedInstalls: relayedMessagingInstalls,
       openExternal: openLink,
+    }),
+    ...googleConnectionsIpcHandlers({
+      service: googleConnections,
+      team: teamStore,
+      remoteServers,
+      relay: signInRelayClient,
     }),
     ...mcpServerIpcHandlers({
       service,

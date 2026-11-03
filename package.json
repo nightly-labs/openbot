@@ -206,6 +206,7 @@
     "test:codex": "bun scripts/codex-doctor.ts --strict",
     "test:acp-directories": "bun scripts/acp-additional-directories-e2e.ts",
     "test:acp-flavors": "bun scripts/acp-flavor-e2e.ts",
+    "test:google-connections": "bun scripts/google-connections-e2e.ts",
     "test:sign-in-relay-paste": "bun scripts/sign-in-relay-paste-e2e.ts",
     "test:sign-in-relay-replay": "bun scripts/sign-in-relay-replay-e2e.ts",
     "test:acp-mcp-names": "bun scripts/acp-mcp-server-names-e2e.ts",

@@ -243,6 +243,7 @@ import {
   decodeDynamicIslandPreference,
   decodeDynamicIslandPresentation,
 } from "./dynamic-island-decoding";
+import { decodeGoogleConnectionsFromMain } from "./google-decoding";
 import { decodeHostReleaseStatusFromMain } from "./host-release-decoding";
 import { decodeMacAutomationResults } from "./mac-automation-decoding";
 import {
@@ -1120,6 +1121,17 @@ const openbotApi: OpenBotDesktopApi = {
     install: decodeAgentInstallation,
     takePendingLink: decodePendingAgentTemplate,
     openLink: dropInvalid(decodePendingAgentTemplate),
+  }),
+  googleConnections: bridgeGroup(IPC_ENDPOINTS.googleConnections, {
+    state: decodeGoogleConnectionsFromMain,
+    configure: decodeGoogleConnectionsFromMain,
+    signIn: decodeGoogleConnectionsFromMain,
+    assign: decodeGoogleConnectionsFromMain,
+    disconnect: decodeGoogleConnectionsFromMain,
+    cancel: decodeVoid,
+    page: decodeMcpSignInRelayPage,
+    open: decodeVoid,
+    paste: decodeVoid,
   }),
   agent: {
     ...agentGroup,

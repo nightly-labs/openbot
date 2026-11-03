@@ -1,6 +1,41 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("server", {
+  "server.google.title": "Google",
+  "server.google.description": "Connect your Gmail and Calendar to one existing teammate.",
+  "server.google.failed": "The Google connection could not be updated.",
+  "server.google.loading": "Loading your Google connections…",
+  "server.google.setupTitle": "Enable Google sign-in",
+  "server.google.setupAdmin":
+    "Select the installed personal Google connector. Its account and access rules will be preserved.",
+  "server.google.setupMember": "Ask a server owner or admin to enable Google sign-in first.",
+  "server.google.chooseConnector": "Choose Google connector",
+  "server.google.enable": "Enable sign-in",
+  "server.google.accounts": "Your Google accounts",
+  "server.google.connectTitle": "Gmail and Calendar",
+  "server.google.connectDescription":
+    "Read Gmail, send email, and manage calendar events. Google consent opens in your browser. Only you can manage this connection.",
+  "server.google.connect": "Connect Google",
+  "server.google.pendingAccount": "New Google account",
+  "server.google.waiting": "Waiting for Google sign-in…",
+  "server.google.assigned": "Assigned to {name}",
+  "server.google.chooseAgent": "Choose an existing teammate",
+  "server.google.disconnected": "Disconnected. Saved history remains protected.",
+  "server.google.reconnect": "Sign in again",
+  "server.google.disconnect": "Disconnect",
+  "server.google.assignmentPrivacy":
+    "Assignment restricts this teammate and its saved history to your connection's role, plus server owners and admins. One Google account can have one active teammate. Moving it keeps previous history protected.",
+  "server.google.noAgents":
+    "No eligible teammates. You need manage access to a teammate that is outside shared channels and workflows and has no other personal connection.",
+  "server.google.assign": "Assign account",
+  "server.google.browser": "Finish sign-in in your browser",
+  "server.google.cancel": "Cancel sign-in",
+  "server.google.callbackHelp":
+    "If the browser does not return automatically, paste its final localhost address here. This address is private.",
+  "server.google.callbackLabel": "Private callback address",
+  "server.google.openBrowser": "Open Google sign-in",
+  "server.google.finish": "Finish sign-in",
+
   "server.roles.connectors": "Connectors",
   "server.roles.connectorScope":
     "A protected connector is available only to its assigned agents. Members need Use for every protected connector of an agent to see that agent and its history. Owners and admins always have access. Saving connector permissions interrupts running agent work and closes provider sessions across this server.",

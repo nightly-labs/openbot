@@ -1,6 +1,7 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("status.host", {
+  "status.host.personalGoogleRole": "Personal Google",
   // Status lines of the WebRTC host.
   "status.host.registered": "Registered this OpenBot for WebRTC access.",
   "status.host.keyRotated": "Server key changed. Paired devices stay paired.",

@@ -61,6 +61,7 @@ import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
 import { ServerDesktopPanel } from "./ServerDesktopPanel";
 import { createServerGeneralSection } from "./ServerGeneralSection";
+import { type ServerGoogleOptions, ServerGooglePanel } from "./ServerGooglePanel";
 import { type ServerImportDetail, type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
 import { type McpPanelDetail, type McpPanelSignIn, ServerMcpPanel } from "./ServerMcpPanel";
 import { createServerMembersSection } from "./ServerMembersSection";
@@ -211,6 +212,7 @@ export interface ServerSettingsModalProps {
    * remote host with `agent-access-v1` that this member administers.
    */
   agentAccess?: ServerAgentAccessOptions | undefined;
+  google?: ServerGoogleOptions | undefined;
   /**
    * The Audit log section appears only when a caller supplies this, and only for the local server or
    * a remote host with `server-audit-v1` that this member administers.
@@ -252,6 +254,7 @@ export type ServerSettingsSection =
   | "audit"
   | "desktop"
   | "mcp"
+  | "google"
   | "storage"
   | "sites"
   | "providers"
@@ -269,6 +272,7 @@ const sections = {
   roles: { title: "server.settings.rolesTitle", description: "server.settings.rolesDescription" },
   audit: { title: "server.settings.auditTitle", description: "server.settings.auditDescription" },
   desktop: { title: "server.settings.desktopTitle", description: "server.settings.desktopDescription" },
+  google: { title: "server.google.title", description: "server.google.description" },
   mcp: { title: "server.settings.mcpTitle", description: "server.settings.mcpDescription" },
   storage: { title: "server.settings.storageTitle", description: "server.settings.storageDescription" },
   sites: { title: "server.settings.hostedSitesTitle", description: "server.settings.hostedSitesDescription" },
@@ -497,6 +501,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         value === "audit" ||
         value === "desktop" ||
         value === "mcp" ||
+        value === "google" ||
         value === "storage" ||
         value === "sites" ||
         value === "providers" ||
@@ -682,6 +687,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <span>{t(sections.desktop.title)}</span>
               </Tabs.Trigger>
             </Show>
+            <Show when={props.google}>
+              <Tabs.Trigger class="settings-modal-nav-item" value="google">
+                <CalendarClock aria-hidden="true" />
+                <span>{t(sections.google.title)}</span>
+              </Tabs.Trigger>
+            </Show>
             <Show when={props.mcpServers}>
               <Tabs.Trigger class="settings-modal-nav-item" value="mcp">
                 <Blocks aria-hidden="true" />
@@ -766,6 +777,18 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           <Tabs.Content value="desktop" class="settings-modal-tab-panel server-settings-panel" data-tab="desktop">
             <ServerDesktopPanel server={props.server} platform={props.platform} hostStatus={props.hostStatus} />
           </Tabs.Content>
+        </Show>
+        <Show when={props.google}>
+          {(options) => (
+            <Tabs.Content value="google" class="settings-modal-tab-panel server-settings-panel" data-tab="google">
+              <ServerGooglePanel
+                {...options()}
+                serverId={props.server.id}
+                active={props.open && section() === "google"}
+                menuMount={modalElement()}
+              />
+            </Tabs.Content>
+          )}
         </Show>
         <Show when={props.mcpServers}>
           {(servers) => (

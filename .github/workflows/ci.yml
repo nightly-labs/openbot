@@ -330,6 +330,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:team-session-revoke
 
+      - name: Run member-owned Google connections E2E
+        if: ${{ !cancelled() }}
+        run: bun run test:google-connections
+
       - name: Run the sign-in relay paste E2E test
         if: ${{ !cancelled() }}
         run: bun run test:sign-in-relay-paste
@@ -550,6 +554,7 @@ jobs:
           path: |
             .openbot-build/team-api-legacy-clients-e2e/
             .openbot-build/team-session-revoke-e2e/
+            .openbot-build/google-connections-e2e/
             .openbot-build/sign-in-relay-paste-e2e/
             .openbot-build/sign-in-relay-replay-e2e/
             .openbot-build/server-mute-e2e/

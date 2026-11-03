@@ -1,0 +1,23 @@
+{
+  "configured": true,
+  "canConfigure": false,
+  "profiles": [
+    {
+      "id": "google-fixture",
+      "email": "member@example.com",
+      "connected": true,
+      "signingIn": false,
+      "agentId": "agent-existing",
+      "agentName": "Personal assistant",
+      "eligibleAgentIds": ["agent-existing"],
+      "error": null
+    }
+  ],
+  "eligibleAgents": [
+    {
+      "id": "agent-existing",
+      "name": "Personal assistant"
+    }
+  ],
+  "templates": []
+}

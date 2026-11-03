@@ -130,6 +130,7 @@ import {
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { FOCUS_USE_INTERVAL_MS } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { GOOGLE_CONNECTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/google-connections-v1";
 import {
   HOST_RESTART_EVENT,
   type HostRestartEvent,
@@ -257,6 +258,7 @@ import { routeDiscordAccess } from "./team-api/route-discord-access";
 import { routeEvents } from "./team-api/route-events";
 import { routeFiles } from "./team-api/route-files";
 import { routeFocusUse } from "./team-api/route-focus-use";
+import { routeGoogleConnections } from "./team-api/route-google-connections";
 import { routeHostAdmin } from "./team-api/route-host-admin";
 import { routeHostKeyRotation } from "./team-api/route-host-key-rotation";
 import { routeHostTimezone } from "./team-api/route-host-timezone";
@@ -992,6 +994,14 @@ export class TeamApiServer {
       if (
         (await routeMcpServers(context, this.#options.mcpServers, this.#options.mcpToolRuntimePreparation)) ===
         "handled"
+      )
+        return;
+      if (
+        (await routeGoogleConnections(
+          context,
+          this.#options.googleConnections,
+          this.#options.store.getIdentity()?.serverId,
+        )) === "handled"
       )
         return;
       if ((await routeMcpSignIn(context, this.#options.mcpServers && this.#options.mcpSignIns)) === "handled") return;
@@ -2214,6 +2224,7 @@ export class TeamApiServer {
           if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;
           if (capability === CONNECTOR_ACCESS_CAPABILITY)
             return this.#options.connectorAccess !== undefined && this.#options.connectorMcp !== undefined;
+          if (capability === GOOGLE_CONNECTIONS_CAPABILITY) return this.#options.googleConnections !== undefined;
           if (capability === AGENT_ACCESS_CAPABILITY) return this.#options.agentAccess !== undefined;
           if (capability === SERVER_AUDIT_CAPABILITY) return this.#options.serverAudit !== undefined;
           if (capability === HOST_UPDATE_CAPABILITY || capability === HOST_MEMBER_UPDATE_CAPABILITY)

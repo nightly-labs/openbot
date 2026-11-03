@@ -29,6 +29,8 @@ import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
 import { type BrowserProfileService, createBrowserProfileService } from "./browser-profile-service";
 import { CONNECTOR_ACCESS_FILE, ConnectorAccessStore } from "./connector-access-store";
+import { GoogleConnectionsService } from "./google-connections-service";
+import { GOOGLE_CONNECTIONS_FILE, GoogleConnectionsStore } from "./google-connections-store";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import {
   CONTAINER_UPDATE_PATHS,
@@ -443,6 +445,7 @@ const TEARDOWN_ORDER = {
   providerAccountsHost: 27,
   providerHostSignIns: 28,
   mcpHostSignIns: 29,
+  googleConnections: 29.5,
   browser: 30,
   browserPictureInPicture: 40,
   localSignIn: 41,
@@ -554,6 +557,7 @@ export interface ApplicationServices {
   /** Reached by the entry point for one thing only: handing a returning grant to its sign-in. */
   mcpOAuth: McpOAuth;
   /** The sign-ins of joined servers that wait in this computer's browser, and the callbacks they take. */
+  googleConnections: GoogleConnectionsService;
   signInRelayClient: SignInRelayClient;
   /** The Slack and Discord installs that this computer opened for a joined server. */
   relayedMessagingInstalls: RelayedMessagingInstalls;
@@ -2488,6 +2492,21 @@ export async function createApplicationServices({
         Date.now(),
       ),
   });
+  const googleConnectionStore = new GoogleConnectionsStore(
+    join(app.getPath("userData"), GOOGLE_CONNECTIONS_FILE),
+    secretCipher,
+  );
+  await runCauseEffect(googleConnectionStore.load());
+  const googleConnections = new GoogleConnectionsService({
+    store: googleConnectionStore,
+    agents: service,
+    roles: agentAccess,
+    connectors: connectorAccess,
+    relay: signInRelayHost,
+  });
+  teardown.push(TEARDOWN_ORDER.googleConnections, "Google account sign-ins", () =>
+    Effect.runPromise(googleConnections.close()),
+  );
   teardown.push(TEARDOWN_ORDER.mcpHostSignIns, "MCP sign-ins of joined servers", () =>
     Effect.runPromise(mcpHostSignIns.close()),
   );
@@ -2521,6 +2540,7 @@ export async function createApplicationServices({
     mcpSignIns: mcpHostSignIns,
     // Present, so the host advertises `sign-in-relay-v1`. The routes are admin-only.
     signInRelay: signInRelayHost,
+    googleConnections,
     // Present, so the host advertises `connectors-v1`. GitHub answers `available: false` when this
     // build has no GitHub App. The routes are admin-only.
     connectors: { github: githubConnector, messaging },
@@ -3404,6 +3424,7 @@ export async function createApplicationServices({
     teamWebRtcBridge,
     mcpOAuth,
     signInRelayClient,
+    googleConnections,
     relayedMessagingInstalls: new RelayedMessagingInstalls(remoteServers),
     githubConnector,
     linkAccount,

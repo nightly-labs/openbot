@@ -11,6 +11,12 @@ import type {
   SetAgentSessionSettingInput,
 } from "./ipc-agent-session-settings";
 import type { ConnectorAccessChange, ConnectorAccessSnapshot } from "./ipc-connector-access";
+import type {
+  GoogleConnectionAssignInput,
+  GoogleConnectionConfigureInput,
+  GoogleConnectionProfileInput,
+  GoogleConnectionsSnapshot,
+} from "./ipc-google-connections";
 import type { ServerAuditLog } from "./ipc-server-audit";
 // The one channel list. Each endpoint holds its wire value, the group it belongs to, and whether it
 // is a request the renderer invokes or an event the main process sends. That is what lets a
@@ -1795,6 +1801,25 @@ export const IPC_ENDPOINTS = {
   },
   // A separate group, not part of `servers`: a group is what one registrar covers in full, and
   // `servers` is bound against `RemoteServerManager` while these are bound against `AgentService`.
+  googleConnections: {
+    state: scopedQuery<GoogleConnectionsSnapshot, "required">()("google-connections:state"),
+    configure: scopedRequest<GoogleConnectionConfigureInput, GoogleConnectionsSnapshot, "required">()(
+      "google-connections:configure",
+    ),
+    signIn: scopedRequest<GoogleConnectionProfileInput, GoogleConnectionsSnapshot, "required">()(
+      "google-connections:sign-in",
+    ),
+    assign: scopedRequest<GoogleConnectionAssignInput, GoogleConnectionsSnapshot, "required">()(
+      "google-connections:assign",
+    ),
+    disconnect: scopedRequest<GoogleConnectionProfileInput, GoogleConnectionsSnapshot, "required">()(
+      "google-connections:disconnect",
+    ),
+    cancel: scopedQuery<void, "required">()("google-connections:cancel"),
+    page: scopedQuery<McpSignInRelayPage | null, "required">()("google-connections:page"),
+    open: scopedQuery<void, "required">()("google-connections:open"),
+    paste: scopedRequest<{ address: string }, void, "required">()("google-connections:paste"),
+  },
   mcpServers: {
     // Every MCP method names its server, because the settings modal can be open for a server the user
     // has not switched to. Each mutation answers with the whole list, so the panel never merges.
@@ -2008,6 +2033,7 @@ export const IPC_GROUP_PATHS = {
   browserInput: "browser",
   servers: "servers",
   agentAdmin: "agent",
+  googleConnections: "googleConnections",
   mcpServers: "agent",
   storage: "storage",
   agentImport: "agentImport",

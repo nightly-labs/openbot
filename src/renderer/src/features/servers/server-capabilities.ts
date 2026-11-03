@@ -39,6 +39,7 @@ export function serverSupportsCapability(
       capability === "mcp-sign-in-app-v1" ||
       capability === "mcp-accounts-v1" ||
       capability === "sign-in-relay-v1" ||
+      capability === "google-connections-v1" ||
       capability === "connectors-v1" ||
       capability === "onepassword-connector-v1" ||
       capability === "bitwarden-connector-v1" ||

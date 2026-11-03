@@ -43,6 +43,7 @@ import { CUSTOM_PROVIDER_HARNESS_CODECS } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CODECS } from "./discord-access-v1";
 import { EVENTS_CODECS } from "./events-v1";
 import { FOCUS_USE_CODECS } from "./focus-use-v1";
+import { GOOGLE_CONNECTIONS_CODECS } from "./google-connections-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
 import { HOST_KEY_ROTATION_CODECS } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CODECS } from "./host-member-update-v1";
@@ -163,6 +164,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...BITWARDEN_CONNECTOR_CODECS,
   ...AGENT_ACCESS_CODECS,
   ...CONNECTOR_ACCESS_CODECS,
+  ...GOOGLE_CONNECTIONS_CODECS,
   ...AGENT_HIDDEN_CODECS,
   ...AGENT_NOTIFICATION_LEVELS_CODECS,
   ...SIDEBAR_PINS_CODECS,

@@ -1,6 +1,9 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.team", {
+  "error.team.googleConnectionUnavailable":
+    "This Google connection is unavailable. Check your connection and agent permissions, then try again.",
+  "error.team.googleSignInEnded": "Google sign-in ended. Try again and use the same Google account when reconnecting.",
   "error.team.connectorCreateUnavailable":
     "An agent with protected connector history cannot create another agent. Create it in settings.",
   "error.team.connectorPublishUnavailable":

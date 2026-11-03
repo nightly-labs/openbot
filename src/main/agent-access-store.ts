@@ -10,9 +10,10 @@ import {
   type TeamMemberSummary,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
-import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
+import { PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
 export const AGENT_ACCESS_FILE = "openbot-agent-access-v1.json";
 
@@ -21,6 +22,8 @@ export interface AgentAccessState {
   revision: number;
   everyone: AgentAccessLevels;
   roles: AgentAccessRole[];
+  /** Durable role identities prevent member enrollment from undoing an admin deletion. */
+  personalConnectorRoleIds?: string[];
 }
 
 /** Records a replace that an owner or admin made, with the roles before and after it. */
@@ -114,6 +117,7 @@ function onlyAgents(state: AgentAccessState, agents: ReadonlySet<string>): Agent
 function copyState(state: AgentAccessState): AgentAccessState {
   return {
     revision: state.revision,
+    ...(state.personalConnectorRoleIds ? { personalConnectorRoleIds: [...state.personalConnectorRoleIds] } : {}),
     everyone: { ...state.everyone },
     roles: state.roles.map((role) => ({ ...role, agents: { ...role.agents }, memberIds: [...role.memberIds] })),
   };
@@ -129,7 +133,20 @@ function decodeServers(parsed: unknown): Map<string, AgentAccessState> | null {
       everyone: value.everyone,
       roles: value.roles,
     });
-    servers.set(serverId, { revision: value.revision, everyone, roles });
+    const personal = value.personalConnectorRoleIds;
+    if (
+      personal !== undefined &&
+      (!Array.isArray(personal) ||
+        personal.length > 1000 ||
+        !personal.every((id) => typeof id === "string" && id.length <= 128))
+    )
+      return null;
+    servers.set(serverId, {
+      revision: value.revision,
+      everyone,
+      roles,
+      ...(personal === undefined ? {} : { personalConnectorRoleIds: [...personal] }),
+    });
   }
   return servers;
 }
@@ -209,6 +226,73 @@ export class AgentAccessStore {
     return saved;
   }).bind(this);
 
+  personalConnectorRoleAvailable(
+    serverId: string,
+    member: Pick<TeamMemberSummary, "id" | "role">,
+    roleId: string,
+  ): boolean {
+    const state = this.levels(serverId);
+    if (state === "closed") return false;
+    const role = state.roles.find((r) => r.id === roleId);
+    if (member.role !== "member") return !!role || state.roles.length < 100;
+    return role
+      ? role.memberIds.includes(member.id)
+      : !state.personalConnectorRoleIds?.includes(roleId) && state.roles.length < 100;
+  }
+
+  /** Records an adopted role identity without changing its permissions or membership. */
+  readonly registerPersonalConnectorRole = Effect.fn("AgentAccessStore.registerPersonalConnectorRole")(function* (
+    this: AgentAccessStore,
+    serverId: string,
+    roleId: string,
+  ) {
+    return yield* this.#replace(serverId, (state) => {
+      if (this.#closed || !state.roles.some((r) => r.id === roleId))
+        throw new Error(sourceText("error.team.googleConnectionUnavailable"));
+      if (state.personalConnectorRoleIds?.includes(roleId)) return "unchanged";
+      return { ...state, personalConnectorRoleIds: [...(state.personalConnectorRoleIds ?? []), roleId] };
+    });
+  }).bind(this);
+
+  /** A personal connector can create only its own role and close its selected bot to Everyone.
+   * Existing membership is preserved: a member cannot undo an administrator's revocation.
+   */
+  readonly grantPersonalConnector = Effect.fn("AgentAccessStore.grantPersonalConnector")(function* (
+    this: AgentAccessStore,
+    serverId: string,
+    member: Pick<TeamMemberSummary, "id" | "role">,
+    roleId: string,
+    agentId: string,
+  ) {
+    return yield* this.#replace(serverId, (state) => {
+      if (this.#closed) throw new Error("Agent access is unavailable.");
+      const memberId = member.id;
+      if (agentAccessLevel(state, member, agentId) !== "manage") throw new Error("Agent manage access was revoked.");
+      const existing = state.roles.find((role) => role.id === roleId);
+      if (
+        member.role === "member" &&
+        ((!existing && state.personalConnectorRoleIds?.includes(roleId)) ||
+          (existing && !existing.memberIds.includes(memberId)))
+      )
+        throw new Error("Personal connector access was revoked.");
+      if (!existing && state.roles.length >= 100) throw new Error("The server has reached its role limit.");
+      const personal = existing ?? {
+        id: roleId,
+        name: sourceText("status.host.personalGoogleRole"),
+        agents: {},
+        memberIds: [memberId],
+      };
+      return {
+        personalConnectorRoleIds: [...new Set([...(state.personalConnectorRoleIds ?? []), roleId])],
+        everyone: { ...state.everyone, [agentId]: "none" },
+        roles: [
+          ...state.roles.filter((role) => role.id !== roleId),
+          { ...personal, agents: { ...personal.agents, [agentId]: "manage" } },
+        ],
+      };
+    });
+  }).bind(this);
+
   /** Takes a removed member out of each role. */
   readonly removeMember = Effect.fn("AgentAccessStore.removeMember")(function* (
     this: AgentAccessStore,
@@ -267,10 +351,17 @@ export class AgentAccessStore {
       Effect.uninterruptible(
         Effect.gen({ self: this }, function* () {
           const current = this.#closed ? EMPTY : (this.#servers.get(serverId) ?? EMPTY);
-          const replacement = next(current);
+          const replacement = yield* Effect.try({
+            try: () => next(current),
+            catch: (cause) => new PreferenceFileFailure({ cause }),
+          });
           if (!replacement) return yield* new AgentAccessStale();
           if (replacement === "unchanged") return copyState(current);
-          const saved = copyState({ ...replacement, revision: current.revision + 1 });
+          const saved = copyState({
+            ...replacement,
+            personalConnectorRoleIds: replacement.personalConnectorRoleIds ?? current.personalConnectorRoleIds,
+            revision: current.revision + 1,
+          });
           const servers = new Map(this.#closed ? [] : this.#servers);
           servers.set(serverId, saved);
           yield* writePreferenceFile(this.#path, { version: 1, servers: Object.fromEntries(servers) });

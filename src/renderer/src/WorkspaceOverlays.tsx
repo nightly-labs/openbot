@@ -739,6 +739,7 @@ function ServerSettings() {
           onRemoveServer={hostedServersLoaded() && !hostedServerIds().has(server().id) ? leaveServer : undefined}
           onOpenScreenRecordingSettings={() => appPort().openExternal("mac-screen-recording")}
           onRecheckScreenRecording={recheckScreenRecording}
+          google={serverSupportsCapability(server(), "google-connections-v1") ? {} : undefined}
           mcpServers={serverSettingsMcp()}
           // Only for the computer whose runtimes this window holds: another host starts its servers
           // with its own runtime, which this window has not read.

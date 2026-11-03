@@ -14,6 +14,7 @@ import type { ConnectorAccessStore } from "../connector-access-store";
 import type { CustomAgentChanges } from "../custom-agent-changes";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { WorkflowGitHubDirectory } from "../github-rest";
+import type { GoogleConnectionsService } from "../google-connections-service";
 import type { HostEventsApi } from "../host-events-api";
 import type { HostEventsService } from "../host-events-service";
 import type { HostReleaseService } from "../host-release-service";
@@ -551,6 +552,7 @@ export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "l
 export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
 
 export interface TeamApiOptions {
+  googleConnections?: GoogleConnectionsService;
   connectorAccess?: ConnectorAccessStore;
   connectorMcp?: Pick<AgentService, "listMcpServers" | "revokeConnectorSessions">;
   /** `events-v1`: admin-only event source and routine management. */

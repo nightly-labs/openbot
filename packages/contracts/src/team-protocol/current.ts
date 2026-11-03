@@ -57,6 +57,7 @@ import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
 import { FOCUS_USE_CAPABILITY } from "./focus-use-v1";
+import { GOOGLE_CONNECTIONS_CAPABILITY } from "./google-connections-v1";
 import { TEAM_HISTORY_EXTENT_CAPABILITY } from "./history-extent-v1";
 import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
 import { HOST_KEY_ROTATION_CAPABILITY } from "./host-key-rotation-v1";
@@ -275,6 +276,7 @@ export {
 
 export const TEAM_CURRENT_CAPABILITIES = [
   CONNECTOR_ACCESS_CAPABILITY,
+  GOOGLE_CONNECTIONS_CAPABILITY,
   BROWSER_SECRET_CAPABILITY,
   ...TEAM_PROTOCOL_V9_CAPABILITIES,
   "remote-desktop-setup",
@@ -570,6 +572,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
  */
 export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<TeamCurrentCapability>([
   CONNECTOR_ACCESS_CAPABILITY,
+  GOOGLE_CONNECTIONS_CAPABILITY,
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NEW_CHAT_CAPABILITY,
