@@ -207,10 +207,8 @@ export class AgentTasks implements TaskLanes {
     }
     if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks) return null;
     if (existing) {
-      this.#store.reopen(existing.taskId);
-      this.#conversation.registerTaskThread(agentId, existing.threadId);
+      this.reopen(existing);
       const reopened = this.#store.task(existing.taskId);
-      this.changed(agentId);
       return reopened ? this.#followRoutineName(reopened, title) : null;
     }
     if (!title) return null;

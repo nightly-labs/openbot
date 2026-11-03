@@ -338,7 +338,7 @@ of a side thread is `legacy_task_id ?? thread_id`, so a stored mailbox message a
 that name the task still find it. A mailbox message with a `taskId` belongs to that side thread, and `DrainScheduler` drains each task as its own lane. The main chat
 lane does not count toward the task limit. At most `limit` task turns of one agent run at the same
 time. `agentTaskLimit` gives the limit: the agent's local `taskLimit` setting (1 to
-`AGENT_TASK_LIMIT_MAX`, in `agent_json`), else `AGENT_TASK_LIMIT_DEFAULT` (2). An owner or admin of
+`AGENT_TASK_LIMIT_MAX`, in `agent_json`), else `AGENT_TASK_LIMIT_DEFAULT` (4). An owner or admin of
 a joined server reads and sets it on `agent-task-limit-v1`. A provider whose
 descriptor has `concurrentTurns: false` (custom ACP agents) gets 1, and its chat and tasks run one
 turn at a time. Other task messages wait with a `hold` reason: `task-limit`, `agent-restarting`,
