@@ -190,7 +190,12 @@ export function createServerRolesSection(host: ServerSettingsSectionHost, visibl
         everyoneUse,
         roleIds: [...roleIds],
       }));
-    rules.push(rule);
+    rules.push({
+      mcpServerId: rule.mcpServerId,
+      agentIds: [...rule.agentIds],
+      everyoneUse: rule.everyoneUse,
+      roleIds: [...rule.roleIds],
+    });
     const current = generation;
     const serverId = props.server.id;
     void run("roles", async () => {
