@@ -132,6 +132,7 @@ export function BrowserIslandFace(props: BrowserIslandFaceProps) {
                   questions={current().questions}
                   sendShortcut={props.sendShortcut}
                   onSubmit={(answers) => props.onAnswerPrompt(current().requestId, answers)}
+                  onOpenLink={props.onOpenLink}
                 />
               )}
             </Show>

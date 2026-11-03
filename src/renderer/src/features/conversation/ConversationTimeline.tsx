@@ -1367,6 +1367,7 @@ export function ConversationTimeline() {
                                       questions={questionPrompt.questions}
                                       resolution={resolution}
                                       onSubmit={async () => false}
+                                      onOpenLink={(url) => void openExternalMessageUrl(url)}
                                     />
                                   </article>
                                 )}
