@@ -189,10 +189,10 @@
   overflow-wrap: anywhere;
 }
 
-/* A long draft stops at a fixed height and does not scroll. "Show all" under it opens the rest. */
+/* A long draft stops at a fixed height. "Show all" under it opens the rest. */
 .ui-block-preview {
   max-height: 16em;
-  overflow: hidden;
+  overflow-y: auto;
   padding: var(--openbot-space-3);
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);
@@ -206,9 +206,22 @@
   max-height: none;
 }
 
-/* The fade shows that the draft goes on below the box. */
+/* A cut-off draft does not scroll, so the chat is the only part that scrolls. `clip` also stops
+   focus, find and selection from scrolling the box to a place that the user cannot scroll back from. */
 .ui-block-preview[data-clamped="true"] {
-  mask-image: linear-gradient(to bottom, var(--openbot-text-primary) 60%, transparent);
+  position: relative;
+  overflow: clip;
+}
+
+/* The fade over the last line shows that the draft goes on. The border stays. */
+.ui-block-preview[data-clamped="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2.5em;
+  background: linear-gradient(to bottom, transparent, var(--openbot-bg-surface-raised));
+  pointer-events: none;
 }
 
 /* The control that opens the rest of a long draft sits under it, at the start of the line. */
