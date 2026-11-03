@@ -59,10 +59,10 @@ export interface ServerConnectionNoticeProps {
   /** The OpenBot version that the server restarts into, while it updates. */
   updateVersion?: string | null;
   /** The first load ended: the full-window screen hops its crew out. Remove the notice in `onExited`. */
-  ready?: boolean;
-  onExited?: () => void;
+  ready?: boolean | undefined;
+  onExited?: (() => void) | undefined;
   /** The full-window screen still covers the window, and heavy views can mount before its crew hop out. */
-  onMountViews?: () => void;
+  onMountViews?: (() => void) | undefined;
   /** False when another loading screen already covers the window: the first load then shows only its toast. */
   screen?: boolean;
   /** Removes Details, for a notice that is not about the server connection. */

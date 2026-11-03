@@ -134,14 +134,14 @@ type Phase = "loading" | "fade" | "exit";
 
 export interface AppLoadingScreenProps {
   /** The app is ready: the crew hop out and the screen fades. Remove the screen in `onExited`. */
-  ready?: boolean;
-  onExited?: () => void;
+  ready?: boolean | undefined;
+  onExited?: (() => void) | undefined;
   /**
    * Heavy views can mount now. The screen still covers the window, and the compositor keeps the crew
    * moving while the views mount. The crew hop out on the first frame after. A screen without the hop
    * calls this when its fade starts: the compositor runs the fade.
    */
-  onMountViews?: () => void;
+  onMountViews?: (() => void) | undefined;
   /** `pile` is the crew pile-up. `thinking` is the lilac plush with its three balls. */
   scene?: "pile" | "thinking";
   /** The same seed always makes the same crew, for a story. The default is a new crew each run. */
