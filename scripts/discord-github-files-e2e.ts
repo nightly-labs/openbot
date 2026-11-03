@@ -4,8 +4,8 @@
 // The trigger step gives agents the files; a new issue links the files that the client copied to the
 // `openbot-attachments` branch (an orphan commit with `[skip ci]`), and a file that is too large or that
 // does not download keeps its Discord link; a second mention builds on the branch and tries once more
-// when another output moved it; when GitHub refuses the copy, the issue is still made with the Discord
-// links; a mention with no files makes no Git call.
+// when another output moved it; a file that GitHub refuses keeps its Discord link, the other files still
+// copy, and the issue is still made; a mention with no files makes no Git call.
 //
 // Run: bun scripts/discord-github-files-e2e.ts
 // Writes .openbot-build/discord-github-files-e2e/report.json and exits non-zero on a failure.
@@ -19,7 +19,7 @@ import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-
 import { Effect } from "effect";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { MessagingDiscordMention } from "../src/backend/messaging/messaging-threads";
-import type { InboundFile } from "../src/backend/messaging/messaging-types";
+import { type InboundFile, MessagingAdapterError } from "../src/backend/messaging/messaging-types";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { WorkflowGitHubStore } from "../src/backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../src/backend/workflows/workflow-run-store";
@@ -75,7 +75,8 @@ let nextSha = 0;
 /** The next branch update is refused, as when another output moved the branch first. */
 let refuseNextUpdate = false;
 /** Blobs are refused, as when the app lost access to the repository's contents. */
-let refuseBlobs = false;
+/** The number of next blobs that GitHub refuses. */
+let refuseBlobs = 0;
 let issueNumber = 0;
 
 const sha = (kind: string) => {
@@ -106,7 +107,10 @@ function answer(method: string, path: string, body: DynamicRecord | null): Respo
     return commit ? json(200, { sha: commitSha, tree: { sha: commit.tree } }) : json(404, {});
   }
   if (route === "POST /git/blobs") {
-    if (refuseBlobs) return json(500, { message: "Server Error" });
+    if (refuseBlobs > 0) {
+      refuseBlobs -= 1;
+      return json(500, { message: "Server Error" });
+    }
     const blobSha = sha("blob");
     blobs.set(blobSha, String(body?.content));
     return json(201, { sha: blobSha });
@@ -153,8 +157,9 @@ const githubApi = createGitHubRest({
   download: (url, maxBytes) =>
     Effect.suspend(() => {
       const bytes = cdnFiles.get(url);
-      if (!bytes) return Effect.fail(new Error("The file is gone."));
-      if (bytes.byteLength > maxBytes) return Effect.fail(new Error("The file is too large."));
+      if (!bytes) return Effect.fail(new MessagingAdapterError({ cause: new Error("The file is gone.") }));
+      if (bytes.byteLength > maxBytes)
+        return Effect.fail(new MessagingAdapterError({ cause: new Error("The file is too large.") }));
       return Effect.succeed(bytes);
     }),
 });
@@ -360,21 +365,27 @@ try {
     report.issues[1],
   );
 
-  // 3. GitHub refuses the copy: the issue is still made, with the Discord links.
-  refuseBlobs = true;
-  const head = branchHead;
-  const fallback = cdnFile("photo.jpg", "image/jpeg", new Uint8Array([0xff, 0xd8, 0xff]));
-  const third = mentionOf("bug: refused copy", [fallback]);
+  // 3. GitHub refuses one file: that file keeps its Discord link, and the other file still copies.
+  refuseBlobs = 1;
+  const refused = cdnFile("photo.jpg", "image/jpeg", new Uint8Array([0xff, 0xd8, 0xff]));
+  const kept = cdnFile("steps.txt", "text/plain", new TextEncoder().encode("steps"));
+  const third = mentionOf("bug: refused copy", [refused, kept]);
   check("a third mention starts a run", (await runCauseEffect(workflows.receiveDiscord(third))) === "started");
   const thirdRun = await runEnded(workflows, workflowId, secondRun.run.id);
+  const thirdCommit = branchHead ?? "";
   check(
-    "a refused copy does not stop the issue, which links the file on Discord",
+    "a refused file does not stop the issue or the other files: it keeps its Discord link",
     stepOf(thirdRun, "out")?.status === "done" &&
-      branchHead === head &&
-      Boolean(report.issues[2]?.body.endsWith(`![photo.jpg](<${fallback.url}>)`)),
+      thirdCommit !== secondCommit &&
+      Boolean(report.issues[2]?.body.includes(`![photo.jpg](<${refused.url}>)`)) &&
+      Boolean(
+        report.issues[2]?.body.includes(
+          `[steps.txt](<${branchLink(thirdCommit, `discord/${third.messageId}/2-steps.txt`)}>)`,
+        ),
+      ),
     { steps: thirdRun.steps, issue: report.issues[2] },
   );
-  refuseBlobs = false;
+  refuseBlobs = 0;
 
   // 4. A mention with no files makes no Git call.
   const before = calls.length;

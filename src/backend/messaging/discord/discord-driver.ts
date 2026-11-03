@@ -599,13 +599,13 @@ const readAtMost = Effect.fnUntraced(function* (path: string, limit: number) {
   );
 });
 
+/** One response of the CDN: a redirect to follow, or the value of the body. */
+type CdnStep<A> = { redirect: string } | { value: A };
+
 /**
  * Follows Discord's CDN redirects to the body of one attachment and gives it to `consume`. Each address,
  * the first one too, must be on Discord's CDN, and a file larger than `maxBytes` is refused.
  */
-/** One response of the CDN: a redirect to follow, or the value of the body. */
-type CdnStep<A> = { redirect: string } | { value: A };
-
 const withCdnBody = Effect.fnUntraced(function* <A>(
   url: string,
   maxBytes: number,

@@ -1019,11 +1019,12 @@ graph, or ID.
   while the computer is offline is lost; the history shows the gap.
 - **Discord triggers** start a run from a mention of the OpenBot Discord app. The trigger's output, and
   the run that keeps it, has the message text, the author, and the name, type, size and Discord
-  address of each file of the message. These addresses expire after about a day.
+  address of each file of the message and of the message that it replies to. These addresses expire
+  after about a day.
 - **GitHub outputs** make the change through the OpenBot GitHub App: a comment, a label, a person, a
   review, a close or a new issue. The text goes to GitHub. When a Discord mention started the run, a
-  new issue or a comment also keeps the files of that message: the computer downloads each file of up
-  to 25 MB from Discord and commits it to the `openbot-attachments` branch of the target repository,
+  new issue or a comment also keeps those files: the computer downloads each file of up to 25 MB, and
+  up to 50 MB for each change, from Discord and commits it to the `openbot-attachments` branch of the target repository,
   under `discord/<message ID>/`. The text links the files there. Everyone who can read the repository
   can read them, also after the issue or the comment is deleted; delete that branch to delete
   them. A file that the computer cannot copy is linked at its Discord address.

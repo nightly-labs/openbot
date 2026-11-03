@@ -646,6 +646,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 people: plan.choose.person ? chosen.people : change.people,
               };
             }
+            // The files go to GitHub before the change is recorded as sent: a restart during the copy
+            // starts the step again, and it does not show the change as uncertain.
+            change = yield* api.attachFiles(change);
             github.startAction(
               {
                 actionKey: key,

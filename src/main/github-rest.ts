@@ -15,6 +15,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { Effect, Option } from "effect";
 import { z } from "zod";
+import type { MessagingAdapterError } from "../backend/messaging/messaging-types";
 import {
   GITHUB_BODY_LIMIT,
   type WorkflowGitHubApi,
@@ -51,6 +52,12 @@ const GITHUB_STATE_REASONS: Record<WorkflowGitHubCloseReason, string> = {
 const FILES_BRANCH = "openbot-attachments";
 /** The largest file that an output copies. A larger one keeps its own link, which expires. */
 const FILE_BYTES_LIMIT = 25 * 1024 * 1024;
+/** The most bytes that one output copies. The files after it keep their own links. */
+const FILES_BYTES_LIMIT = 50 * 1024 * 1024;
+/** The longest time that the download of one file can take. */
+const FILE_DOWNLOAD_TIMEOUT_MS = 2 * 60 * 1000;
+/** The largest part of GitHub's limit that the links can use, so that the text stays. */
+const FILES_SECTION_LIMIT = GITHUB_BODY_LIMIT / 2;
 /** The longest file name in the branch. */
 const FILE_NAME_LIMIT = 100;
 /** `[skip ci]` stops other CI services too. */
@@ -98,9 +105,14 @@ function filesMarkdown(links: readonly FileLink[]): string {
     .join("\n\n");
 }
 
-/** The text with the links of its files below it, in GitHub's limit. */
+/**
+ * The text with the links of its files below it, in GitHub's limit. When the links are too long, the
+ * last links go, not a part of a link.
+ */
 function withFiles(body: string, links: readonly FileLink[]): string {
-  const section = filesMarkdown(links);
+  let kept = links.length;
+  while (kept > 0 && filesMarkdown(links.slice(0, kept)).length > FILES_SECTION_LIMIT) kept -= 1;
+  const section = filesMarkdown(links.slice(0, kept));
   if (!section) return body;
   const room = Math.max(0, GITHUB_BODY_LIMIT - section.length - 2);
   return [body.slice(0, room).trimEnd(), section].filter(Boolean).join("\n\n").slice(0, GITHUB_BODY_LIMIT);
@@ -120,7 +132,7 @@ export interface GitHubRestOptions {
    * The bytes of a file that a change links, such as a Discord attachment. Without it, or when it fails,
    * the text links the file at its own address.
    */
-  download?: (url: string, maxBytes: number) => Effect.Effect<Uint8Array, unknown>;
+  download?: (url: string, maxBytes: number) => Effect.Effect<Uint8Array, MessagingAdapterError>;
 }
 
 const createdSchema = z.object({ id: z.number(), html_url: z.string().nullish() });
@@ -218,9 +230,9 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
 
   /**
    * Copies the files to the files branch in one commit, and answers their links. A file that is too
-   * large or that cannot be read keeps its own address; so does each file when the commit fails, such as
-   * in an empty repository or under a rule that protects every branch. Tries of one change commit the
-   * same paths, so a second try changes nothing.
+   * large, that cannot be read or that GitHub refuses keeps its own address; so does each file when the
+   * commit fails, such as in an empty repository or under a rule that protects every branch. A second
+   * try of one change writes the same paths again in a new commit, and the links of each try stay.
    */
   const copyFiles = Effect.fn("GitHubRest.copyFiles")(function* (
     token: string,
@@ -233,16 +245,23 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     if (!download) return own.filter((link) => link !== null);
     const copied = new Map<number, string>();
     const entries: { path: string; mode: "100644"; type: "blob"; sha: string }[] = [];
+    let total = 0;
     for (const [index, file] of files.files.entries()) {
-      if (file.size > FILE_BYTES_LIMIT || !own[index]) continue;
-      const bytes = yield* download(file.url, FILE_BYTES_LIMIT).pipe(Effect.option);
-      if (Option.isNone(bytes) || bytes.value.byteLength === 0) continue;
+      const room = Math.min(FILE_BYTES_LIMIT, FILES_BYTES_LIMIT - total);
+      if (file.size > room || !own[index]) continue;
+      const bytes = yield* download(file.url, room).pipe(Effect.timeout(FILE_DOWNLOAD_TIMEOUT_MS), Effect.option);
+      if (Option.isNone(bytes) || bytes.value.byteLength === 0 || bytes.value.byteLength > room) continue;
       const blob = yield* call(token, "POST", `${repo}/git/blobs`, {
         content: Buffer.from(bytes.value).toString("base64"),
         encoding: "base64",
-      }).pipe(Effect.flatMap((answer) => parse(shaSchema, answer)));
+      }).pipe(
+        Effect.flatMap((answer) => parse(shaSchema, answer)),
+        Effect.option,
+      );
+      if (Option.isNone(blob)) continue;
+      total += bytes.value.byteLength;
       const path = `${files.folder}/${branchFileName(file.name, index)}`;
-      entries.push({ path, mode: "100644", type: "blob", sha: blob.sha });
+      entries.push({ path, mode: "100644", type: "blob", sha: blob.value.sha });
       copied.set(index, path);
     }
     if (entries.length === 0) return own.filter((link) => link !== null);
@@ -283,17 +302,26 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     });
   });
 
-  /** `copyFiles`; a file that cannot be copied does not stop the issue or the comment. */
-  const commitFiles = (token: string, repository: string, files: WorkflowGitHubFiles) =>
-    copyFiles(token, repository, files).pipe(
-      Effect.catch(() => Effect.succeed(files.files.flatMap((file) => ownLink(file) ?? []))),
-    );
-
-  /** The text of a change, with the links of its files. */
-  const changeBody = (token: string, change: WorkflowGitHubChange) =>
-    change.files && change.files.files.length > 0
-      ? commitFiles(token, change.repository, change.files).pipe(Effect.map((links) => withFiles(change.body, links)))
-      : Effect.succeed(change.body);
+  /**
+   * The change with the links of its files in its text, and no files. A file that cannot be copied does
+   * not stop the issue or the comment: it keeps its own link.
+   */
+  const attachFiles = (change: WorkflowGitHubChange): Effect.Effect<WorkflowGitHubChange> => {
+    const files = change.files;
+    if (!files) return Effect.succeed(change);
+    const links =
+      files.files.length === 0
+        ? Effect.succeed<FileLink[]>([])
+        : tokens(change.repository).pipe(
+            Effect.flatMap((found) =>
+              found.bot
+                ? copyFiles(found.bot, change.repository, files)
+                : Effect.fail(failure("noWrite", sourceText("error.workflow.githubNoWrite"))),
+            ),
+            Effect.catch(() => Effect.succeed(files.files.flatMap((file) => ownLink(file) ?? []))),
+          );
+    return links.pipe(Effect.map((found) => ({ ...change, body: withFiles(change.body, found), files: null })));
+  };
 
   const change = Effect.fn("GitHubRest.change")(function* (
     change: WorkflowGitHubChange,
@@ -310,7 +338,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
       case "comment": {
         const answer = yield* parse(
           createdSchema,
-          yield* call(token, "POST", `${item}/comments`, { body: yield* changeBody(token, change) }),
+          yield* call(token, "POST", `${item}/comments`, { body: change.body }),
         );
         return { created: { kind: "comment", id: answer.id }, url: answer.html_url ?? itemUrl };
       }
@@ -352,7 +380,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
           issueSchema,
           yield* call(token, "POST", `${repo}/issues`, {
             title: change.title,
-            body: yield* changeBody(token, change),
+            body: change.body,
             ...(change.labels.length > 0 ? { labels: change.labels } : {}),
           }),
         );
@@ -523,7 +551,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     }
   });
 
-  return { change, options: repositoryOptions, recentEvents };
+  return { attachFiles, change, options: repositoryOptions, recentEvents };
 }
 
 /**

@@ -84,6 +84,12 @@ export interface WorkflowGitHubRecentEvent {
 }
 
 export interface WorkflowGitHubApi {
+  /**
+   * The change with the links of its files in its text, and no files. It copies the files first, so the
+   * workflow calls it before it records the change as sent. A file that cannot be copied keeps its own
+   * link.
+   */
+  attachFiles(change: WorkflowGitHubChange): Effect.Effect<WorkflowGitHubChange>;
   change(change: WorkflowGitHubChange): Effect.Effect<WorkflowGitHubChangeResult, WorkflowGitHubApiFailure>;
   options(repository: string): Effect.Effect<WorkflowGitHubRepositoryOptions, WorkflowGitHubApiFailure>;
   /** The newest events of the repository that can be `event`, newest first. */
