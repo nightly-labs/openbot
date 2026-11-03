@@ -6,7 +6,7 @@
  */
 
 import type { AvatarHue, AvatarImageInput, ChannelIcon, ChannelMember } from "@openbot/contracts/ipc";
-import { Button, IconButton, Input, Pencil, Popover, RotateCcw, toast } from "@openbot/ui";
+import { Button, IconButton, Input, Pencil, Plus, Popover, RotateCcw, toast } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import { AVATAR_HUE_CHOICES, avatarHueSwatch } from "@openbot/ui/bloub-avatar";
 import { useText } from "@openbot/ui/text";
@@ -128,14 +128,7 @@ export function ChannelPictureEditor(props: ChannelPictureEditorProps) {
               onClick={() => fileInput?.click()}
             >
               <span class="avatar-image-upload-preview">
-                <Show
-                  when={props.imageUrl}
-                  fallback={
-                    <svg aria-hidden="true" viewBox="0 0 24 24">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  }
-                >
+                <Show when={props.imageUrl} fallback={<Plus aria-hidden="true" />}>
                   {(url) => <img class="channel-picture channel-picture-image" src={url()} alt="" draggable={false} />}
                 </Show>
               </span>
