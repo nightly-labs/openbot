@@ -629,6 +629,11 @@ export function createRendererForwarders({
       sendToRenderer(target, IPC_ENDPOINTS.agentAttachments.attachmentDownload, progress);
   }
 
+  // The preload of the window that started the import knows its request id; the others drop it.
+  function forwardAttachmentImportProgress(progress: import("@openbot/contracts/ipc").AttachmentImportProgress): void {
+    for (const target of appWindows()) sendToRenderer(target, IPC_ENDPOINTS.attachmentImports.importProgress, progress);
+  }
+
   return {
     forwardAgentEvent,
     forwardWorkflowNotice,
@@ -653,5 +658,6 @@ export function createRendererForwarders({
     forwardDirectMessage,
     forwardDirectTyping,
     forwardAttachmentDownload,
+    forwardAttachmentImportProgress,
   };
 }

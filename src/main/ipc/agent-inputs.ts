@@ -793,7 +793,13 @@ export function parseImportAttachments(value: unknown): ImportAttachmentsInput {
     }
     return { name: item.name, mimeType: item.mimeType, bytes: item.bytes };
   });
-  return { paths: value.paths, data };
+  return {
+    paths: value.paths,
+    data,
+    ...(value.requestId === undefined
+      ? {}
+      : { requestId: requireString(value.requestId, "requestId", INPUT_LIMITS.identifier) }),
+  };
 }
 
 /** A renderer can provide file bytes, but it cannot ask main to read a disk path. */

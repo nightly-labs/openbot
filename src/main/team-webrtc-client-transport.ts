@@ -460,6 +460,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       agentCreateModel?: boolean | undefined;
       timeoutMs?: number | undefined;
       fileProgress?: RemoteFileProgress | undefined;
+      /** Gets the bytes of a binary body that the host confirmed. */
+      uploadProgress?: ((sent: number, total: number) => void) | undefined;
     } = {},
   ): Effect.fn.Return<
     {
@@ -495,6 +497,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
               name: "upload",
               mimeType: init.contentType ?? "application/octet-stream",
               bytes: binary,
+              onProgress: init.uploadProgress,
             })
           : null;
         const requestId = crypto.randomUUID();

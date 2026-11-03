@@ -182,6 +182,7 @@ import type {
 import type {
   AttachmentDataInput,
   AttachmentDownloadProgress,
+  AttachmentImportProgress,
   ChooseAttachmentsInput,
   DownloadAttachmentsInput,
   DraftAttachment,
@@ -1653,6 +1654,7 @@ export const IPC_ENDPOINTS = {
   // renderer must never name a path to import. So this group is never bridged to the renderer.
   attachmentImports: {
     importAttachments: scopedRequest<ImportAttachmentsInput, DraftAttachment[]>()("agent:import-attachments"),
+    importProgress: event<AttachmentImportProgress>()("agent:attachment-import-progress"),
   },
   browser: {
     open: request<BrowserOpenInput, BrowserTab>()("browser:open"),

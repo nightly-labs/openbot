@@ -63,6 +63,10 @@ export function ConversationComposer() {
     providerUpdateRequired,
     attachmentAction,
     attachmentBusy,
+    uploadFailed,
+    currentUploads,
+    removeUpload,
+    retryUpload,
     awaitingReplies,
     dismissAwaitingReplies,
     composerFocusRequest,
@@ -152,7 +156,21 @@ export function ConversationComposer() {
   const openVoiceConversation = () => (voiceConversationAvailable() ? () => openSidePanelPane("voice") : undefined);
   // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
-  const composerAttachmentRow = () => rowDraftAttachments().length > 0 || currentPastePreviews().length > 0;
+  // One chip for each file of each import. Only a single-file import knows the bytes of its file.
+  const uploadFiles = createMemo(() =>
+    currentUploads().flatMap((upload) =>
+      upload.files.map((file, index) => ({
+        key: `${upload.requestId}:${index}`,
+        uploadId: upload.requestId,
+        name: file.name,
+        size: file.size,
+        sent: upload.files.length === 1 ? upload.sent : null,
+        error: upload.error,
+      })),
+    ),
+  );
+  const composerAttachmentRow = () =>
+    rowDraftAttachments().length > 0 || currentPastePreviews().length > 0 || uploadFiles().length > 0;
   // A provider start, restart or server reconnect is short. Keys typed in it must not drop, so only a
   // lasting stop locks the text. Sending still waits for the agent. Without an agent, no draft keeps the text.
   const editorLocked = () =>
@@ -230,6 +248,7 @@ export function ConversationComposer() {
     voicePhase() === "idle" &&
     agentReady() &&
     !attachmentBusy() &&
+    !uploadFailed() &&
     !submitting()
       ? steerComposer
       : undefined;
@@ -366,6 +385,7 @@ export function ConversationComposer() {
       title={sendTitle()}
       disabled={
         attachmentBusy() ||
+        uploadFailed() ||
         submitting() ||
         !agentReady() ||
         Boolean(providerUpdateRequired()) ||
@@ -634,6 +654,9 @@ export function ConversationComposer() {
           <ComposerAttachmentRow
             attachments={rowDraftAttachments()}
             pending={currentPastePreviews()}
+            uploads={uploadFiles()}
+            onRemoveUpload={removeUpload}
+            onRetryUpload={retryUpload}
             removeDisabled={voicePhase() === "transcribing" || savePending()}
             onRemove={(attachment) => removeAttachment(attachment.id)}
           />

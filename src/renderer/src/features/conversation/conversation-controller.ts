@@ -33,6 +33,7 @@ import type {
   VoiceLiveTranscript,
 } from "./conversation-types";
 import type { TurnRuntime } from "./stores/activity-store";
+import { createAttachmentUploadStore } from "./stores/attachment-upload-store";
 import type { PastePreview } from "./stores/composer-actions";
 import type { SidePanelsState } from "./stores/panels-store";
 import { createPendingSendStore } from "./stores/pending-send-store";
@@ -150,6 +151,8 @@ export function createStableConversationState(
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
   // A send in flight belongs to the server it was sent to, so it outlives a server switch.
   const pendingSends = createPendingSendStore();
+  // A file import belongs to the chat it was started in, so it outlives a server switch, as a send does.
+  const attachmentUploads = createAttachmentUploadStore();
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
   /** The provider and model of the run behind each conversation error, keyed like `conversationErrors`. */
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
@@ -342,6 +345,7 @@ export function createStableConversationState(
     composerFocusRequest,
     setComposerFocusRequest,
     pendingSends,
+    attachmentUploads,
     conversationErrors,
     setConversationErrors,
     conversationErrorRuns,
