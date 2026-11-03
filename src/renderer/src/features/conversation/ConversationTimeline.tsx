@@ -401,6 +401,9 @@ export function ConversationTimeline() {
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
+            onOpenSharedFile={openSharedFile}
+            // A workspace path is in the workspace of the agent that wrote it, as in a channel.
+            onOpenWorkspaceFile={(path) => openWorkspaceFile(path, undefined, current().exchange?.senderAgentId)}
             onOpenQuote={openQuote}
             macWindowControls={props.platform === "darwin"}
           />
