@@ -174,6 +174,8 @@ export interface TurnHooks {
   quietRoutineDelivery(deliveryId: string): boolean;
   /** The task whose thread this is, or null for any other thread. */
   taskForThread(threadId: string): string | null;
+  /** Whether this public thread is the side thread of a routine, which takes that routine's runs. */
+  isRoutineThread(threadId: string): boolean;
   /** Whether this task's thread exists and is not archived. */
   taskOpen(taskId: string): boolean;
   /** The error of a task turn. It shows in the task's panel, not in the agent's own chat. */
@@ -959,7 +961,7 @@ export class TurnLifecycle {
     this.#noUpdateTurns.add(turnId);
     // A failed run is never quiet, so its answer must still be written.
     if (this.#reportedFailures.has(turnId)) return "shown";
-    return this.#quietRoutineTurn(threadId, deliveries) ? "quiet" : "shown";
+    return this.#quietRoutineTurn(agentId, threadId, deliveries) ? "quiet" : "shown";
   }
 
   /**
@@ -973,11 +975,16 @@ export class TurnLifecycle {
     return true;
   }
 
-  /** Only a turn that runs nothing but quiet routine runs, outside a channel or messaging thread. */
-  #quietRoutineTurn(threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
+  /**
+   * Only a turn that runs nothing but quiet routine runs, in the agent's own chat or in a routine's
+   * side thread: not in a channel, a messaging thread or another task.
+   */
+  #quietRoutineTurn(agentId: string, threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
+    const publicThreadId = threadId === null ? null : this.#conversation.publicThreadId(agentId, threadId);
     return (
       deliveries.length > 0 &&
-      !this.#conversation.isExecutionThread(threadId) &&
+      (!this.#conversation.isExecutionThread(publicThreadId) ||
+        (publicThreadId !== null && this.#hooks.isRoutineThread(publicThreadId))) &&
       deliveries.every(
         ({ delivery }) => delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id),
       )
@@ -1189,7 +1196,7 @@ export class TurnLifecycle {
       const quiet =
         outcome === "completed" &&
         reportedFailure === undefined &&
-        this.#quietRoutineTurn(snapshot.threadId, deliveries) &&
+        this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries) &&
         settleQuietRoutineTurn(snapshot, turnId, noUpdateCalled);
       const latestAssistant = latestTurnAnswer(snapshot.messages, turnId);
       // A routine run that answered only the no-update marker, also a Test run that shows it in the
@@ -1198,8 +1205,9 @@ export class TurnLifecycle {
         latestAssistant !== undefined &&
         deliveries.some(({ delivery }) => delivery.sender.kind === "routine") &&
         isNoUpdateAnswer(latestAssistant.text);
-      // Before the deliveries end: until then they hold the chat's lane, so no turn of the chat
-      // starts before the digest is in its handoff.
+      // Before the deliveries end: until then they hold their lane, so no later turn of that lane
+      // starts before the digest is in its handoff. A chat turn that starts at the same time keeps
+      // the digest for its next turn (see `ThreadLifecycle.deletePendingHandoff`).
       const routineDelivery = deliveries[0]?.delivery.id;
       if (routineSession && routineDelivery && outcome === "completed" && !quiet && !markerAnswer && latestAssistant)
         yield* this.#hooks.routineAnswered(agentId, routineDelivery, latestAssistant.text);

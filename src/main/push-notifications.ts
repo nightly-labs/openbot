@@ -1,6 +1,8 @@
 import {
   type AgentEvent,
   type AgentSummary,
+  type AgentTurnCompletedEvent,
+  type ConversationMessage,
   latestTurnAnswer,
   type ServerNotificationLevel,
 } from "@openbot/contracts/ipc";
@@ -35,6 +37,7 @@ import {
 } from "@openbot/team-client/push-notification-seal";
 import { Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { isNoUpdateAnswer } from "../backend/agent/routine-quiet-runs";
+import type { AgentService } from "../backend/agent-service";
 import type { PushNotificationStore, PushTarget, StoredPushRegistration } from "./push-notification-store";
 import type { TeamApiAgents } from "./team-api/dependencies";
 import { markerExclusionsForCapabilities } from "./team-api/request-helpers";
@@ -73,7 +76,8 @@ export type NotificationRelayRequest =
 type PushNotificationAgents = Pick<
   TeamApiAgents,
   "on" | "off" | "listAgents" | "readConversationPageFor" | "getRuntimeSnapshot" | "listConversationReads"
->;
+> &
+  Pick<AgentService, "readTask">;
 
 interface PushNotificationOptions {
   agents: PushNotificationAgents;
@@ -300,9 +304,12 @@ export class PushNotificationService {
    */
   #deliver = Effect.fn("PushNotifications.deliver")(function* (
     this: PushNotificationService,
-    event: AgentEvent,
+    received: AgentEvent,
     only?: Registration,
   ) {
+    // A routine thread's turn notifies as a turn of the chat does. Its answer is in the routine thread.
+    const routineTaskId = received.type === "routine-thread-turn-completed" ? received.taskId : null;
+    const event = received.type === "routine-thread-turn-completed" ? received.turn : received;
     const subject = eventSubject(event);
     if (!subject) return;
     const now = this.#now();
@@ -310,7 +317,7 @@ export class PushNotificationService {
       const { value, memberId, protocol, sessionId } = registration.stored;
       // While the app is on screen, it shows the event itself.
       if (!value.away && registration.connected) {
-        if (!only) this.#hold(registration, event, now);
+        if (!only) this.#hold(registration, received, now);
         return false;
       }
       if (value.mutedUntil !== null && value.mutedUntil * 1_000 > now) return false;
@@ -357,7 +364,7 @@ export class PushNotificationService {
         if (stored.value.token === null) continue;
       }
       if (value.preview && subject.kind === "reply" && event.type === "turn-completed" && answer === undefined) {
-        answer = yield* this.#answer(event, memberId, agents);
+        answer = yield* this.#answer(event, memberId, agents, routineTaskId);
       }
       // The desktop builds the same preview: the answer, the question, or the action to approve,
       // with its secrets redacted.
@@ -385,18 +392,27 @@ export class PushNotificationService {
     }
   });
 
-  /** The answer of a turn in the agent's own chat, or `null` when it has none. */
+  /** The answer of a turn in the agent's own chat or in a routine thread, or `null` when it has none. */
   #answer = Effect.fn("PushNotifications.answer")(function* (
     this: PushNotificationService,
-    event: Extract<AgentEvent, { type: "turn-completed" }>,
+    event: AgentTurnCompletedEvent,
     memberId: string,
     agents: readonly AgentSummary[],
+    routineTaskId: string | null,
   ) {
-    if (agents.find((agent) => agent.id === event.agentId)?.threadId !== event.threadId) return null;
-    const page = yield* this.#options.agents
-      .readConversationPageFor(event.agentId, memberId, undefined, ANSWER_PAGE_SIZE)
-      .pipe(Effect.catch(() => Effect.succeed(null)));
-    const text = page ? latestTurnAnswer(page.messages, event.turnId)?.text : undefined;
+    let messages: ConversationMessage[] | null = null;
+    if (routineTaskId) {
+      messages = yield* Effect.try(() => this.#options.agents.readTask(event.agentId, routineTaskId).messages).pipe(
+        // The routine and its thread were deleted after the turn.
+        Effect.catch(() => Effect.succeed(null)),
+      );
+    } else if (agents.find((agent) => agent.id === event.agentId)?.threadId === event.threadId) {
+      const page = yield* this.#options.agents
+        .readConversationPageFor(event.agentId, memberId, undefined, ANSWER_PAGE_SIZE)
+        .pipe(Effect.catch(() => Effect.succeed(null)));
+      messages = page?.messages ?? null;
+    }
+    const text = messages ? latestTurnAnswer(messages, event.turnId)?.text : undefined;
     // A routine Test run shows the no-update marker in the chat, but it is not news.
     return text && !isNoUpdateAnswer(text) ? text : null;
   });
@@ -558,7 +574,8 @@ function heldEventUnseen(
   reads: ReturnType<PushNotificationAgents["listConversationReads"]>,
   agents: readonly AgentSummary[],
 ): boolean | null {
-  if (event.type === "error") return null;
+  // As for a reply in another thread of the chat below.
+  if (event.type === "error" || event.type === "routine-thread-turn-completed") return null;
   if (event.type !== "turn-completed") return true;
   if (event.status !== "completed") {
     return snapshot.failedTurns.some((failed) => failed.agentId === event.agentId && failed.turnId === event.turnId);

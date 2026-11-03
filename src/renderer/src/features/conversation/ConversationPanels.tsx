@@ -339,6 +339,12 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     activeRightPanel() === "side-panel" || (activeRightPanel() === "thread" && shownPanelThreadId() === null);
   /** The file that shows, and whose tab is selected. */
   const shownFile = () => (filePreviewOpen() ? sidePanel().file : null);
+  /** Opens the routine's side thread in the chat, and closes the settings that cover it. */
+  const openRoutineThread = async (routineId: string): Promise<boolean> => {
+    const opened = (await props.threads?.onOpenRoutineThread(routineId)) ?? false;
+    if (opened) setActiveRightPanel("none");
+    return opened;
+  };
   const sideThreadTabs = () => props.threads?.side.tabs ?? [];
   const moveSideThread = (id: string, index: number) => props.threads?.side.onMove(id, index);
   return (
@@ -655,6 +661,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               }
               onRoutineSelectionRequestHandled={handleRoutineSettingsRequest}
               onOpenRoutineRun={props.onOpenSearchMessage ? openRoutineRunMessage : undefined}
+              onOpenRoutineThread={props.threads ? openRoutineThread : undefined}
               files={agentFiles(props.server, agent().id)}
               eventRoutines={desktopChatEventRoutinesApi(props.server, props.runtime)}
               routines={props.runtime?.routines}
