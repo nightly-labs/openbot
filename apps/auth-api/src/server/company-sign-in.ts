@@ -254,11 +254,15 @@ export class CompanySignInService {
     this.#joinServer = options.joinServer ?? (() => Effect.succeed("member"));
   }
 
-  /** True when the email is at a domain whose connection is on. Then email codes are refused. */
+  /**
+   * True when the email is at a domain whose connection is on. Then email codes are refused. With no
+   * secret, company sign-in cannot start, so everyone signs in with an email code.
+   */
   readonly usesCompanySignIn = Effect.fn("CompanySignIn.usesCompanySignIn")(function* (
     this: CompanySignInService,
     email: string,
   ) {
+    if (!this.#secret) return false;
     const row = yield* storeCall(() =>
       this.#database
         .prepare(
