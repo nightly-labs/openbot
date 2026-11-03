@@ -1,6 +1,5 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
-  type AgentInstructionsFile,
   assertStorageUsageScope,
   CHANNEL_CHATS_CAPABILITY,
   canAdministerServer,
@@ -9,6 +8,7 @@ import {
   decodeAgentFastModels,
   decodeAgentFastModeSettings,
   decodeAgentHostSettings,
+  decodeAgentInstructionsFileFromMain,
   decodeAgentNewChatSettings,
   decodeAgentPlanCardSettings,
   decodeAgentTaskLimitSettings,
@@ -18,7 +18,6 @@ import {
   decodeInstalledSkills,
   decodeStorageUsage,
   type HiddenAgent,
-  isAgentInstructionsFile,
   isAgentMemory,
   isClientAgentModelOption,
   isKnownAgentProvider,
@@ -261,12 +260,6 @@ import type {
   MobileWorkspaceState,
   ServerUpdateAccess,
 } from "@/features/workspace/model/workspace-types";
-
-/** The `agent-instructions-v1` reply. The route codec has checked the shape, so this only narrows the type. */
-function decodeAgentInstructionsFile(value: unknown): AgentInstructionsFile {
-  if (!isAgentInstructionsFile(value)) throw new Error("The host returned invalid agent instructions.");
-  return { fileName: value.fileName, exists: value.exists, text: value.text };
-}
 
 /** Sends one Team API request to a server; without a server ID it uses the active server. */
 export type WorkspaceRequest = <T>(
@@ -1033,7 +1026,13 @@ export function createHostRequestActions({
         AGENT_INSTRUCTIONS_CAPABILITY,
         "mobile.agent.instructionsFile.unsupported",
       );
-      return request("POST", AGENT_INSTRUCTIONS_ROUTES.read, decodeAgentInstructionsFile, { agentId }, serverId);
+      return request(
+        "POST",
+        AGENT_INSTRUCTIONS_ROUTES.read,
+        decodeAgentInstructionsFileFromMain,
+        { agentId },
+        serverId,
+      );
     },
     saveAgentInstructions: async (input, serverId) => {
       requireCapability(
@@ -1042,7 +1041,13 @@ export function createHostRequestActions({
         AGENT_INSTRUCTIONS_CAPABILITY,
         "mobile.agent.instructionsFile.unsupported",
       );
-      return request("POST", AGENT_INSTRUCTIONS_ROUTES.save, decodeAgentInstructionsFile, { ...input }, serverId);
+      return request(
+        "POST",
+        AGENT_INSTRUCTIONS_ROUTES.save,
+        decodeAgentInstructionsFileFromMain,
+        { ...input },
+        serverId,
+      );
     },
     loadProviderAccounts: async (serverId) =>
       has(serverId, PROVIDER_ACCOUNTS_CAPABILITY) ? runTeamRequest(listProviderAccounts(teamApi(serverId))) : null,
