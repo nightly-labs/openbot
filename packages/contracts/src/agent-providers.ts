@@ -767,6 +767,33 @@ export function accountUsageCoversModel(provider: AgentProviderId, model: string
 }
 
 /**
+ * Auto, Composer and other Cursor models draw the included pool (`autoPercentUsed`). Every other
+ * id draws the API pool. A Cursor model id may carry options after `[`.
+ */
+export function isCursorOwnModel(model: string): boolean {
+  const bare = model.trim().toLowerCase();
+  const bracket = bare.indexOf("[");
+  const id = bracket >= 0 ? bare.slice(0, bracket) : bare;
+  return id === "auto" || id === "default" || id.startsWith("composer") || id.startsWith("cursor-");
+}
+
+/**
+ * The windows that can stop this model. Cursor reports two windows of one billing cycle: the
+ * primary is Cursor's own models and the secondary is every other model. A spent API window does
+ * not stop a Cursor model, and a spent Cursor window does not stop an API model. A plan with one
+ * window keeps both slots; the caller skips the empty one.
+ */
+export function usageWindowsForModel(
+  provider: AgentProviderId,
+  model: string | null | undefined,
+  quota: { primary: unknown; secondary: unknown },
+): readonly ("primary" | "secondary")[] {
+  if (provider === "cursor" && model && quota.primary != null && quota.secondary != null)
+    return [isCursorOwnModel(model) ? "primary" : "secondary"];
+  return ["primary", "secondary"];
+}
+
+/**
  * The windows that limit the model: the quota group that lists it when the reading lists the models
  * of its groups, or else the reading itself. Undefined when no group lists the model.
  */

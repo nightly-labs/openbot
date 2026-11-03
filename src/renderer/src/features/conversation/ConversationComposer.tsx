@@ -8,6 +8,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type QueueSnapshot,
   usageQuotaForModel,
+  usageWindowsForModel,
 } from "@openbot/contracts/ipc";
 import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
@@ -269,7 +270,7 @@ export function ConversationComposer() {
       const model = props.agent?.model;
       const quota = usageQuotaForModel(limit, model);
       if (!quota) continue;
-      for (const window of ["primary", "secondary"] as const) {
+      for (const window of usageWindowsForModel(provider, model, quota)) {
         const plan = quota[window];
         if (!plan || plan.usedPercent < 100) continue;
         if (plan.resetsAt !== null && plan.resetsAt * 1_000 <= now()) continue;
