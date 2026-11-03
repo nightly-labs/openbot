@@ -378,8 +378,8 @@ export function AgentStep({
                   leaving={leaving}
                   onPress={() => moveTo(index)}
                 >
-                  {/* Each SVG frame of a face redraws a mask and a filter, so only the
-                    character in the middle animates. The others hold their face. */}
+                  {/* Each frame of a moving face is drawn again, so only the character in
+                    the middle animates. The others hold their face. */}
                   <BloubAvatarPreview
                     seed={item.avatarSeed}
                     hue={item.avatarHue}
