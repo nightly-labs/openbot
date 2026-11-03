@@ -85,7 +85,7 @@ export function ChatVaultRequest({
 
   return (
     <View
-      className="w-full max-w-[92%] self-start gap-3 rounded-[30px] bg-control/60 px-4 py-3"
+      className="w-full max-w-[92%] self-start gap-3 rounded-[20px] bg-control/60 px-4 py-3"
       style={{ borderCurve: "circular" }}
       accessibilityLabel={t("mobile.chat.question.form")}
     >

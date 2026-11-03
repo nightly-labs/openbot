@@ -96,7 +96,7 @@ import { type AttachmentTint, ChatAttachmentView } from "./chat-attachment";
 import { ChatImageGallery } from "./chat-image-gallery";
 import { ChatImageGeneration, imageGenerationStatus } from "./chat-image-generation";
 import { ChatImageViewerProvider, isViewableImage } from "./chat-image-viewer";
-import { ChatMessageActions } from "./chat-message-actions";
+import { ChatMessageActionsButton, ChatMessageReactions, useMessageActions } from "./chat-message-actions";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
 import { ChatSelectableText } from "./chat-selectable-text";
@@ -222,7 +222,7 @@ function ChatBubble({
           // A new view when the setting changes, so a filled background keeps no animated size.
           key={sized ? "sized" : "filled"}
           pointerEvents="none"
-          className="absolute left-0 top-0 rounded-[30px] bg-control/60"
+          className="absolute left-0 top-0 rounded-[20px] bg-control/60"
           style={[{ borderCurve: "circular" }, sized ? null : StyleSheet.absoluteFill, background]}
         />
       ) : null}
@@ -334,6 +334,8 @@ interface MessageRowShared {
   animationActive: boolean;
   /** Arriving replies also play back word by word: motion and screen reader settings allow it. */
   playbackActive: boolean;
+  /** A screen reader cannot touch and hold, so each message gets a button for its actions. */
+  screenReaderEnabled: boolean;
   /** Replies animate as they arrive: Settings and reduced motion allow it. */
   textReveal: boolean;
   replySession: { progress: Map<string, number>; revealed: Set<string> };
@@ -489,10 +491,27 @@ const MessageRow = memo(function MessageRow({
   const nativeSelect = shared.actions.nativeSelection;
   const nativeSelection = useMemo(
     () =>
-      bubble && nativeTextSelection && shared.canSelectText
+      bubble && nativeTextSelection && shared.canSelectText && selecting
         ? { generation: selectionGeneration, onSelect: (selected: string) => nativeSelect(bubble, selected) }
         : undefined,
-    [bubble, nativeSelect, selectionGeneration, shared.canSelectText],
+    [bubble, nativeSelect, selectionGeneration, shared.canSelectText, selecting],
+  );
+  // A touch and hold on the bubble opens the sheet with its actions, so the text selects only after
+  // Select text in that sheet: natively in place, or in the read-only field that covers it.
+  const selectable = Boolean(bubble?.body.trim()) && shared.canSelectText;
+  const messageActions = useMessageActions(
+    bubble
+      ? {
+          messageId: bubble.id,
+          copyText: messageCopyText(bubble),
+          createdAt: bubble.createdAt,
+          reactions: bubble.reactions,
+          onReact: shared.canReact ? (emoji) => shared.actions.react(bubble, emoji) : undefined,
+          onReply: shared.canReply ? () => shared.actions.reply(bubble) : undefined,
+          onSelectText: selectable ? () => shared.actions.selectText(bubble) : undefined,
+          readAloudId: canReadAloud && bubble.author === "agent" ? bubble.id : undefined,
+        }
+      : null,
   );
   const {
     agents,
@@ -656,8 +675,8 @@ const MessageRow = memo(function MessageRow({
             animateSize={shared.textReveal}
             className={
               message.author === "user"
-                ? `self-end rounded-[30px] px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[92%]" : "max-w-full"}`
-                : `max-w-full self-start rounded-[30px] ${waiting ? "" : "px-4 py-3"}`
+                ? `self-end rounded-[20px] px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[92%]" : "max-w-full"}`
+                : `max-w-full self-start rounded-[20px] ${waiting ? "" : "px-4 py-3"}`
             }
             style={[
               { borderCurve: "circular", overflow: "hidden" },
@@ -681,7 +700,7 @@ const MessageRow = memo(function MessageRow({
                   agents={agents}
                   body={message.body}
                   finished={!isStreamingReply(message)}
-                  selectable={message.author === "user"}
+                  selectable={message.author === "user" && !bubble}
                   color={textColor}
                   playback={playback}
                   animationEnabled={shared.animationActive && arriving}
@@ -702,9 +721,22 @@ const MessageRow = memo(function MessageRow({
       </Animated.View>
     );
   if (message.kind !== "message") return rendered;
-  // The fallback selection starts from Select text or a touch and hold. Native text views select
-  // the word under the finger on their own, so they need neither.
-  const selectable = shared.canSelectText && !nativeTextSelection && Boolean(message.body.trim());
+  // The reaction pill hangs below the bubble and moves with it on a swipe, so it is inside the
+  // gesture, with room kept under the bubble.
+  const withReactions =
+    messageActions.open && messageActions.shown.length > 0 ? (
+      <View className="mb-5">
+        {rendered}
+        <ChatMessageReactions
+          align={message.author === "user" ? "end" : "start"}
+          reactions={messageActions.shown}
+          agentsById={agentsById}
+          onReact={messageActions.react}
+        />
+      </View>
+    ) : (
+      rendered
+    );
   const replyPreview =
     source?.kind === "message"
       ? mentionDraft(source.body).text || t("mobile.chat.reply.attachment")
@@ -712,8 +744,7 @@ const MessageRow = memo(function MessageRow({
   return (
     <View
       key={message.id}
-      // The selected text and its action row: a tap here does not end the selection, so the Select
-      // text button can end it on its own.
+      // The selected text: a tap here does not end the selection.
       ref={selecting ? actions.selectionArea : undefined}
       className={
         message.author === "agent"
@@ -740,9 +771,9 @@ const MessageRow = memo(function MessageRow({
         <ChatMessageGesture
           selecting={selecting}
           onReply={shared.canReply ? () => actions.reply(message) : undefined}
-          onSelectText={selectable ? () => actions.selectText(message) : undefined}
+          onHold={messageActions.open}
         >
-          {rendered}
+          {withReactions}
         </ChatMessageGesture>
       ) : outbox ? (
         <OutboxMessageMenu
@@ -752,30 +783,19 @@ const MessageRow = memo(function MessageRow({
           {rendered}
         </OutboxMessageMenu>
       ) : (
-        // The text of a user message selects natively, so the bubble has no touch and hold.
         <ChatMessageGesture
           align="end"
           selecting={selecting}
           onReply={shared.canReply ? () => actions.reply(message) : undefined}
+          onHold={messageActions.open}
         >
-          {rendered}
+          {withReactions}
         </ChatMessageGesture>
       )}
       {message.author === "user" && message.status === "failed" ? <TurnFailure reason={message.failureReason} /> : null}
       {outbox ? <ChatOutboxStatus status={outbox} /> : null}
-      {bubble ? (
-        <ChatMessageActions
-          align={message.author === "user" ? "end" : "start"}
-          copyText={messageCopyText(message)}
-          createdAt={message.createdAt}
-          reactions={message.reactions}
-          agentsById={agentsById}
-          onReact={shared.canReact ? (emoji) => actions.react(message, emoji) : undefined}
-          onReply={shared.canReply ? () => actions.reply(message) : undefined}
-          onSelectText={selectable ? () => actions.selectText(message) : undefined}
-          selecting={selecting}
-          readAloudId={canReadAloud && message.author === "agent" ? message.id : undefined}
-        />
+      {messageActions.open && shared.screenReaderEnabled ? (
+        <ChatMessageActionsButton align={message.author === "user" ? "end" : "start"} onOpen={messageActions.open} />
       ) : null}
     </View>
   );
@@ -1201,6 +1221,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       firstMessageStyle: motion.firstMessageStyle,
       animationActive,
       playbackActive: animationActive && textReveal && !screenReaderEnabled,
+      screenReaderEnabled,
       textReveal,
       replySession,
       markRevealed,

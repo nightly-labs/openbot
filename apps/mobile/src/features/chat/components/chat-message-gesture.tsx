@@ -9,22 +9,23 @@ import { haptics } from "@/shared/lib/haptics";
 
 /**
  * A swipe away from the bubble's side of the chat replies: to the right for a bubble at the start,
- * to the left for a bubble at the end. A touch and hold selects text in the bubble. The action row
- * under the message has the same actions, so a screen reader uses that row.
+ * to the left for a bubble at the end. A touch and hold opens the sheet with the message actions. A
+ * screen reader cannot use these gestures, so it gets a button for that sheet under the message.
  */
 export function ChatMessageGesture({
   children,
   align = "start",
   selecting,
   onReply,
-  onSelectText,
+  onHold,
 }: PropsWithChildren<{
   /** The side of the chat the bubble sits on. */
   align?: "start" | "end";
   /** The text is selected in the bubble: the handles get the touches, not the swipe. */
   selecting: boolean;
   onReply?: () => void;
-  onSelectText?: () => void;
+  /** Opens the message actions. */
+  onHold?: () => void;
 }>) {
   const muted = useThemeColor("muted");
   // The swipe distance toward the middle of the chat, in points. A bubble at the end moves left.
@@ -35,10 +36,10 @@ export function ChatMessageGesture({
   // The reply icon behind the bubble mounts with the first swipe, not with each row of the chat.
   // It is clear until the bubble has moved, so it shows in time.
   const [iconShown, setIconShown] = useState(false);
-  const handlers = useRef({ onReply, onSelectText });
-  handlers.current = { onReply, onSelectText };
+  const handlers = useRef({ onReply, onHold });
+  handlers.current = { onReply, onHold };
   const canReply = Boolean(onReply) && !selecting;
-  const canSelect = Boolean(onSelectText) && !selecting;
+  const canHold = Boolean(onHold) && !selecting;
   // Build the gestures once per row. A streaming reply re-renders its row for each chunk, and a new
   // gesture would reconfigure the native handler each time.
   const gesture = useMemo(() => {
@@ -46,9 +47,9 @@ export function ChatMessageGesture({
       void haptics.impact();
       handlers.current.onReply?.();
     };
-    const selectText = () => {
-      void haptics.impact();
-      handlers.current.onSelectText?.();
+    const hold = () => {
+      void haptics.longPress();
+      handlers.current.onHold?.();
     };
     const swipe = Gesture.Pan()
       .enabled(canReply)
@@ -67,11 +68,11 @@ export function ChatMessageGesture({
       .onFinalize(() => {
         offset.set(withSpring(0, { duration: 400, dampingRatio: 1, reduceMotion: ReduceMotion.System }));
       });
-    const hold = Gesture.LongPress()
-      .enabled(canSelect)
-      .onStart(() => scheduleOnRN(selectText));
-    return Gesture.Race(swipe, hold);
-  }, [canReply, canSelect, direction, offset]);
+    const press = Gesture.LongPress()
+      .enabled(canHold)
+      .onStart(() => scheduleOnRN(hold));
+    return Gesture.Race(swipe, press);
+  }, [canReply, canHold, direction, offset]);
 
   return (
     <View className={align === "end" ? "max-w-full self-end" : "max-w-[92%] self-start"}>
