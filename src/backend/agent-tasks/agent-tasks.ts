@@ -62,8 +62,10 @@ export interface AgentTasksHooks {
   hold(agentId: string, taskId: string): string | null;
   /** A message is queued in a task: the queue and the drain take it. */
   queued(agentId: string): void;
-  /** OpenBot archived a finished task: its memory review starts, and a waiting task lane can start. */
-  archived(task: AgentThreadRecord): Effect.Effect<void>;
+  /** The stored active turn of a thread, also when its conversation is not loaded. */
+  turnActive(agentId: string, threadId: string): boolean;
+  /** OpenBot archived finished tasks of one agent: their memory reviews start, and a waiting task lane can start. */
+  archived(agentId: string, tasks: readonly AgentThreadRecord[]): Effect.Effect<void>;
 }
 
 /** Where `start_task` was called, as the tool router knows it. */
@@ -331,10 +333,15 @@ export class AgentTasks implements TaskLanes {
   }
 
   close(task: AgentThreadRecord): void {
+    this.#closeQuietly(task);
+    this.changed(task.agentId);
+  }
+
+  /** Closes the task and sends no event, so a caller that closes many sends one. */
+  #closeQuietly(task: AgentThreadRecord): void {
     this.#store.close(task.taskId);
     this.#progress.delete(task.taskId);
     this.#stoppedTurns.delete(task.taskId);
-    this.changed(task.agentId);
   }
 
   reopen(task: AgentThreadRecord): void {
@@ -473,11 +480,10 @@ export class AgentTasks implements TaskLanes {
     const archived = finishedByAgent.slice(kept);
     if (open.length - archived.length >= INPUT_LIMITS.agentTasks)
       return openBotToolFailure(sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks }));
-    for (const task of archived) {
-      this.close(task);
-      yield* this.#hooks.archived(task);
-    }
+    // All of them close before the first yield, so no turn starts between the check and the close.
+    for (const task of archived) this.#closeQuietly(task);
     const task = this.create(caller.agentId, parsed.data.title, "agent");
+    if (archived.length > 0) yield* this.#hooks.archived(caller.agentId, archived);
     const queued = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId: caller.agentId },
@@ -498,6 +504,7 @@ export class AgentTasks implements TaskLanes {
       );
     if (!queued) {
       this.discard(task);
+      if (archived.length > 0) this.changed(caller.agentId);
       return openBotToolFailure(sourceText("error.backend.taskStartFailed"));
     }
     this.changed(caller.agentId);
@@ -572,6 +579,7 @@ export class AgentTasks implements TaskLanes {
   #finished(task: AgentThreadRecord): boolean {
     return (
       !this.#conversation.loadedExecutionSnapshot(task.threadId)?.activeTurnId &&
+      !this.#hooks.turnActive(task.agentId, task.threadId) &&
       !this.#mailbox.taskBusy(task.agentId, task.taskId)
     );
   }
