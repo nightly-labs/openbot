@@ -685,6 +685,7 @@ try {
     assert.ok(updated.includes(RULE), "The turn carries the rule.");
     await send(learner.id, "Fix the lexer too.");
     assert.ok(!logged("turn").at(-1)?.text.includes("<openbot_instructions_update>"), "The next turn has no update.");
+    assert.equal(logged("thread").length, threads, "The session stays after the update.");
     // Undo: the rule leaves the file and the line is open again. Accept again for the checks below.
     const accepted = readFileSync(join(workspace, file.fileName), "utf8");
     await Effect.runPromise(saveAgentInstructionsFile(workspace, withoutLearnedRule(accepted, RULE), accepted));
@@ -692,6 +693,12 @@ try {
     assert.equal(ruleLines(learner.id)[0]?.ruleProposal?.status, "proposed", "Undo opens the line again.");
     assert.deepEqual(learnedRules(readFileSync(join(workspace, file.fileName), "utf8")), [], "Undo removes the rule.");
     assert.throws(() => service.decideRuleProposal({ ...decision, decision: "proposed" }), /already answered/);
+    // A second change reaches the same session too.
+    await send(learner.id, "Fix the printer.");
+    const removed = logged("turn").at(-1)?.text ?? "";
+    assert.equal(logged("thread").length, threads, "A second change starts no new session.");
+    assert.ok(removed.includes("<openbot_instructions_update>"), "The turn says that the file changed again.");
+    assert.ok(!removed.includes(RULE), "The update has no rule now.");
     const undone = readFileSync(join(workspace, file.fileName), "utf8");
     await Effect.runPromise(saveAgentInstructionsFile(workspace, withLearnedRule(undone, RULE), undone));
     service.decideRuleProposal({ ...decision, decision: "accepted" });

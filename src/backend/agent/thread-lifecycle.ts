@@ -751,7 +751,8 @@ export class ThreadLifecycle {
               environment,
               section,
               proxy,
-              instructionsFile,
+              // The session gets a later change of the text as an update block, so the text stays out.
+              { fileName: instructionsFile.fileName, found: null },
             ),
             approvals,
           );
@@ -1148,19 +1149,31 @@ export class ThreadLifecycle {
     const environment = this.#agentEnvironment();
     const section = this.#sectionTeammates(agent.id);
     const approvals = this.#toolApprovals(configs, own);
-    // The text that the session read, not the file now: a change reaches the session as an update
-    // block (`instructionsUpdate`), so it does not start a new session. A session from before has
-    // no saved text and keeps the file now, as it did.
+    // A session with a seen record gets a change of the text as an update block (`instructionsUpdate`),
+    // so its fingerprint has no text and a change does not start a new session. A session from before
+    // has the text it read in its fingerprint. When that text is still the file, the session moves to
+    // a seen record and a fingerprint without the text, so the upgrade does not replace it.
     const current = yield* this.#instructionsFile(agent, client);
     const seen = yield* this.#instructionsSeen(sessionId);
-    const instructionsFile =
-      seen === null ? current : { ...current, found: seen ? { fileName: current.fileName, text: seen } : null };
+    const textless = { fileName: current.fileName, found: null };
+    const instructionsFile = seen === null ? current : textless;
+    const moveToRecord = Effect.gen({ self: this }, function* () {
+      if (seen !== null) return;
+      const fingerprint = yield* threadStep(() =>
+        this.toolFingerprint(agent, configs, own, approvals, toolRuntimes, environment, section, proxy, textless),
+      );
+      yield* this.#writeToolManifest(sessionId, fingerprint, approvals);
+      yield* this.#writeInstructionsSeen(sessionId, current.found?.text ?? "");
+    });
     const newline = stored.success.indexOf("\n");
     const storedFingerprint = newline < 0 ? stored.success : stored.success.slice(0, newline);
     const fingerprint = yield* threadStep(() =>
       this.toolFingerprint(agent, configs, own, approvals, toolRuntimes, environment, section, proxy, instructionsFile),
     );
-    if (storedFingerprint === fingerprint) return true;
+    if (storedFingerprint === fingerprint) {
+      yield* moveToRecord;
+      return true;
+    }
     if (newline < 0) return false;
     // An approval given since the start is in the loaded session already: Codex saved it from that
     // session's answer. Only a revoked one needs a new session. The manifest takes the new approvals,
@@ -1184,6 +1197,7 @@ export class ThreadLifecycle {
     );
     if (storedFingerprint !== sessionFingerprint) return false;
     yield* this.#writeToolManifest(sessionId, fingerprint, approvals);
+    yield* moveToRecord;
     return true;
   });
 
