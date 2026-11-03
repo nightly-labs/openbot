@@ -45,6 +45,13 @@ const INEFFECTIVE_COMPACTION_LIMIT = 2;
 const RETRY_COMPACTION_SHARE = 0.5;
 /** About four characters of text make one token. Only the compaction estimate uses it. */
 const CHARACTERS_PER_TOKEN = 4;
+/**
+ * A session that grew by less than this share of its window since the last compaction compacts again
+ * for nothing: the next compaction removes about the same fixed part (#3905).
+ */
+function minimumGrowth(contextWindow: number): number {
+  return Math.max(1_024, Math.floor(contextWindow * 0.05));
+}
 const CONTEXT_COMPACTION_TIMEOUT_MS = 120_000;
 /**
  * A started compaction of a long thread can take minutes (#3466). Its deadline is this many times
@@ -325,8 +332,7 @@ export class ContextCompaction {
       return;
     }
 
-    const minimumGrowth = Math.max(1_024, Math.floor(contextWindow * 0.05));
-    if (budget.lastCompactedTokens !== null && usedTokens < budget.lastCompactedTokens + minimumGrowth) {
+    if (budget.lastCompactedTokens !== null && usedTokens < budget.lastCompactedTokens + minimumGrowth(contextWindow)) {
       return;
     }
     budget.pending = true;
@@ -362,12 +368,20 @@ export class ContextCompaction {
       budget.pending ||
       budget.phase !== "idle" ||
       budget.contextWindow <= 1 ||
-      budget.ineffectiveCompactions >= INEFFECTIVE_COMPACTION_LIMIT ||
-      // The usage is from before the last compaction: the provider reports the new size later.
-      (budget.lastCompactedTokens !== null && budget.usedTokens <= budget.lastCompactedTokens)
+      budget.ineffectiveCompactions >= INEFFECTIVE_COMPACTION_LIMIT
     )
       return;
     const estimated = budget.usedTokens + Math.ceil(characters / CHARACTERS_PER_TOKEN);
+    // A compaction that just ended cannot remove anything until the session grows past the growth
+    // rule, and it would compact again at the same fill. Usage from before the compaction counts as
+    // that fill: the provider reports the new size later. Only an input that would not fit the
+    // window at all still compacts first, so that the provider does not refuse the request.
+    if (
+      budget.lastCompactedTokens !== null &&
+      budget.usedTokens < budget.lastCompactedTokens + minimumGrowth(budget.contextWindow) &&
+      estimated <= budget.contextWindow
+    )
+      return;
     if (estimated / budget.contextWindow < CONTEXT_COMPACTION_THRESHOLD) return;
     budget.pending = true;
     logger.info("The next input fills the session, so it compacts first.", {
