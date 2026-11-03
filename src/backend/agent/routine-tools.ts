@@ -115,3 +115,8 @@ export function openBotToolFailure(message: string): OpenBotToolResponse {
     contentItems: [{ type: "inputText", text: JSON.stringify({ error: message }) }],
   };
 }
+
+/** A refusal the model can correct: it names the tool that lists valid agent ids. */
+export function unknownAgentFailure(agentId: string): OpenBotToolResponse {
+  return openBotToolFailure(`Unknown OpenBot agent: ${agentId}. Call openbot.list_agents and use an ID from it.`);
+}
