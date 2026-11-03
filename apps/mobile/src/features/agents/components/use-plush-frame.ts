@@ -41,6 +41,8 @@ export function usePlushFrame(geometry: PlushGeometry, animate: boolean) {
     loop: false,
   });
   const onEnd = useRef<(() => void) | null>(null);
+  /** Each shown sequence has a number, so the end of an older one cannot end the next. */
+  const shownCount = useSharedValue(0);
   const [playing, setPlaying] = useState(false);
   // Android: the drawer and its scrim cover the avatars of home. The face holds its frame until the
   // drawer has closed. The gate is on the UI thread, so the drawer does not render every avatar again.
@@ -49,18 +51,23 @@ export function usePlushFrame(geometry: PlushGeometry, animate: boolean) {
   const show = useCallback(
     (shownGeometry: PlushGeometry, sequence: PlushSequence, start: number, loop: boolean) => {
       shown.current = { geometry: shownGeometry, sequence, loop };
+      shownCount.set(shownCount.get() + 1);
       elapsed.set(0);
       cursor.set(start);
       playback.set({ frames: sequence.frames, index: start, loopStart: loop ? 0 : null });
       setPlaying(sequence.frames.length > 1);
     },
-    [cursor, elapsed, playback],
+    [cursor, elapsed, playback, shownCount],
   );
-  const ended = useCallback(() => {
-    const next = onEnd.current;
-    onEnd.current = null;
-    next?.();
-  }, []);
+  const ended = useCallback(
+    (count: number) => {
+      if (count !== shownCount.get()) return;
+      const next = onEnd.current;
+      onEnd.current = null;
+      next?.();
+    },
+    [shownCount],
+  );
 
   const clock = useFrameCallback(({ timeSincePreviousFrame }) => {
     if (isAndroid && drawerShown.get()) return;
@@ -80,7 +87,7 @@ export function usePlushFrame(geometry: PlushGeometry, animate: boolean) {
       return value;
     });
     cursor.set(index);
-    if (current.loopStart === null && index >= last) scheduleOnRN(ended);
+    if (current.loopStart === null && index >= last) scheduleOnRN(ended, shownCount.get());
   }, false);
 
   useEffect(() => {

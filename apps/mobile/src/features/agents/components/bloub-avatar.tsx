@@ -266,7 +266,8 @@ function PlushCanvas({
 }) {
   const geometry = useMemo(() => plushGeometry(seed, mood), [seed, mood]);
   const art = usePlushArt(seed, hue, pixels);
-  const frame = usePlushFrame(geometry, animate);
+  // The frames are sampled only when there is a plush to draw them on.
+  const frame = usePlushFrame(geometry, animate && art !== null);
   const picture = useDerivedValue(
     () =>
       createPicture(

@@ -18,6 +18,8 @@ export const PLUSH_STYLE = "plush-1";
  */
 const FOLDER = "plush-avatars-v1";
 const MAX_FILES = 400;
+/** The folder is checked against `MAX_FILES` at the first picture of a launch and after this many. */
+const EVICT_EVERY = 50;
 
 export interface PlushPictureSpec {
   seed: string;
@@ -59,11 +61,11 @@ const folder = () => new Directory(Paths.cache, FOLDER);
 const saved = new Map<string, string>();
 const pending = new Map<string, Promise<string | null>>();
 let queue: Promise<unknown> = Promise.resolve();
-let evicted = false;
+let writtenSinceEvict: number | null = null;
 
 /** The oldest pictures go when the folder holds more than `MAX_FILES`. */
 function evict(directory: Directory) {
-  evicted = true;
+  writtenSinceEvict = 0;
   const files = directory
     .list()
     .flatMap((entry) => (entry instanceof File ? [entry] : []))
@@ -107,7 +109,8 @@ export function loadPlushPicture(spec: PlushPictureSpec): Promise<string | null>
       const data = await renderPlushPicture(spec);
       const directory = folder();
       directory.create({ intermediates: true, idempotent: true });
-      if (!evicted) evict(directory);
+      if (writtenSinceEvict === null || writtenSinceEvict >= EVICT_EVERY) evict(directory);
+      writtenSinceEvict = (writtenSinceEvict ?? 0) + 1;
       const file = new File(directory, name);
       file.writeSync(data, { encoding: "base64" });
       saved.set(name, file.uri);
