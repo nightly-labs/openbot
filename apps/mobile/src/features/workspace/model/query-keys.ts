@@ -131,6 +131,8 @@ export const queryKeys = {
   serverMembers: (scope: QueryScope, serverId: string) => ["server-members", ...scope, serverId],
   serverInvites: (scope: QueryScope, serverId: string) => ["server-invites", ...scope, serverId],
   serverTimezone: (scope: QueryScope, serverId: string) => ["server-timezone", ...scope, serverId],
+  /** The servers that the desktop app of `serverId` runs on its computer (`local-servers-v1`). */
+  localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
   serverRoles: (scope: QueryScope, serverId: string) => ["server-roles", ...scope, serverId],
   serverAudit: (scope: QueryScope, serverId: string) => ["server-audit", ...scope, serverId],

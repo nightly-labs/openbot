@@ -196,4 +196,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Обновите этот сервер на компьютере, чтобы удалять каналы.",
   "error.remote.historyRefreshFailed": "Сообщение отправлено, но историю чата обновить не удалось.",
   "error.remote.taskHistoryRefreshFailed": "Задача изменена, но историю чата обновить не удалось.",
+  "error.remote.localServerAccountRemovalFailed":
+    "Сервер удалён на своём компьютере, но в аккаунте он ещё есть. Удалите его ещё раз, чтобы убрать из аккаунта.",
 } as const satisfies PartialTranslation<typeof source>;

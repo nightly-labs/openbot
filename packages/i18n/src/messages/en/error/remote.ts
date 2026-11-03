@@ -198,6 +198,8 @@ export const messages = defineMessages("error.remote", {
   // Servers that the desktop app starts on this computer.
   "error.remote.localServerStartFailed": "The server on this computer did not start.",
   "error.remote.localServerNotFound": "This server is not on this computer.",
+  "error.remote.localServerAccountRemovalFailed":
+    "The server is deleted on its computer, but the account still lists it. Delete it again to remove it from the account.",
   "error.remote.localServerLimit":
     "You can have at most {limit} servers on this computer. Delete one to create another.",
   "error.remote.localServersReadOnly":

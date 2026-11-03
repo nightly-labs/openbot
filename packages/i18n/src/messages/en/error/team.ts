@@ -94,6 +94,7 @@ export const messages = defineMessages("error.team", {
   "error.team.hostUpdateUnsupported": "Host updates are not supported by this connection.",
   "error.team.hostTimezoneUnsupported": "The server timezone is not supported by this connection.",
   "error.team.hostKeyRotationUnsupported": "Server key changes are not supported by this connection.",
+  "error.team.localServersUnsupported": "Servers on this computer are not supported by this connection.",
   "error.team.routineResultsUnsupported": "Routine destinations are not supported by this connection.",
   "error.team.agentMemoryLimitUnsupported": "The agent memory limit is not supported by this connection.",
   "error.team.agentFoldersUnsupported": "The agent folders are not supported by this connection.",

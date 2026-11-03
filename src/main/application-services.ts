@@ -68,6 +68,7 @@ import { existsSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { createInterface } from "node:readline";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   AgentStatus,
@@ -92,7 +93,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { installRemoteSyncProfileSink } from "@openbot/team-client/sync-profile";
 import {
@@ -163,7 +164,12 @@ import { BrowserDockOverlay } from "./browser-dock-overlay";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
-import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
+import {
+  CentralAuthManager,
+  isHostNotOnAccount,
+  readCentralAuthApiUrl,
+  readMobileConnectApiUrl,
+} from "./central-auth-manager";
 import { ChatVisualPreviewer } from "./chat-visual-preview";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
 import { applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
@@ -2458,6 +2464,14 @@ export async function createApplicationServices({
   const providerHostSignIns = process.platform === "linux" ? providerSignIns : undefined;
   const pushNotificationStore = new PushNotificationStore(join(app.getPath("userData"), PUSH_NOTIFICATION_FILE));
   await runCauseEffect(pushNotificationStore.load());
+  // Set once the servers on this computer exist, which is after this host: they attach through the remote servers.
+  let localServersForTeam: LocalServers | null = null;
+  const availableLocalServers = () =>
+    Effect.suspend(() =>
+      localServersForTeam
+        ? Effect.succeed(localServersForTeam)
+        : Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.team.localServersUnsupported")) })),
+    );
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -2591,6 +2605,38 @@ export async function createApplicationServices({
           ),
       },
       routineResults: routineResultRuntime,
+      // The desktop app's own server only. The servers are made below, after this host.
+      ...(localServerChild || serverModeEnvironment || hostedServer
+        ? {}
+        : {
+            localServers: {
+              list: () => Effect.suspend(() => availableLocalServers().pipe(Effect.map((servers) => servers.list()))),
+              create: (name: string) =>
+                availableLocalServers().pipe(
+                  Effect.flatMap((servers) =>
+                    servers.create(name, "device").pipe(
+                      Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })),
+                      Effect.map(
+                        (summary) =>
+                          servers.list().servers.find((server) => server.serverId === summary.id) ?? {
+                            serverId: summary.id,
+                            name: summary.name,
+                            published: false,
+                          },
+                      ),
+                    ),
+                  ),
+                ),
+              delete: (serverId: string) =>
+                availableLocalServers().pipe(
+                  Effect.flatMap((servers) =>
+                    servers
+                      .delete(serverId, "device")
+                      .pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause }))),
+                  ),
+                ),
+            },
+          }),
     },
     // The host's Team API routes share the IPC handlers' runtime preparation: a first server
     // saved, enabled, or tested remotely must start and await the managed download like a local one.
@@ -2926,6 +2972,22 @@ export async function createApplicationServices({
           remoteServers,
           command: { executable: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] },
           trash: (path) => shell.trashItem(path),
+          account: {
+            accountId: () => {
+              const state = centralAuth.getState();
+              return state.status === "signed_in" ? state.user.id : null;
+            },
+            register: (input) => centralAuth.registerRemoteHost(input).pipe(Effect.asVoid, toRemoteWorkflowError),
+            credential: (hostId) => centralAuth.hostSiteCredential(hostId)?.machineToken ?? null,
+            // A host that the account service no longer has, or that another account owns, is not this
+            // account's to remove: either way it is gone from this account's list. Any other failure,
+            // such as an expired session, keeps the id for the next sign-in.
+            remove: (hostId) =>
+              centralAuth.removeOwnedRemoteHost(hostId).pipe(
+                Effect.catch((error) => (isHostNotOnAccount(error.cause) ? Effect.void : Effect.fail(error))),
+                toRemoteWorkflowError,
+              ),
+          },
           log: {
             info: (message) => logger.info(message),
             warn: (message, detail) => logger.warn(message, detail === undefined ? "" : toLogValue(detail)),
@@ -2933,9 +2995,14 @@ export async function createApplicationServices({
           platform: process.platform,
         });
   if (localServers) {
+    localServersForTeam = localServers;
     teardown.push(TEARDOWN_ORDER.localServers, "the servers on this computer", () =>
       Effect.runPromise(localServers.stop()),
     );
+    // A sign-in registers each running server for the account, and a sign-out stops its Signal half.
+    centralAuth.on("changed", () => {
+      Effect.runFork(localServers.accountChanged());
+    });
     // Before `remoteServers.initialize()`: the account's directory sync keeps only the entries of the
     // servers on this computer that it knows.
     await Effect.runPromise(localServers.load());
@@ -2958,7 +3025,11 @@ export async function createApplicationServices({
       }),
     );
   }
-  if (localServers) await Effect.runPromise(localServers.initialize());
+  if (localServers) {
+    await Effect.runPromise(localServers.initialize());
+    // Removes the servers deleted while signed out. Each start registers its own server.
+    Effect.runFork(localServers.accountChanged());
+  }
   if (localServerChild) {
     await runCauseEffect(
       startLocalServerChild({
@@ -2966,6 +3037,34 @@ export async function createApplicationServices({
         teamStore,
         host,
         writeReady: (line) => process.stdout.write(line),
+        readCommands: (onLine) => {
+          createInterface({ input: process.stdin }).on("line", onLine);
+        },
+        // The desktop app registered this server for its account. Its machine token gets the Signal
+        // tickets and sends the notifications; this process has no account of its own.
+        publisher: {
+          publish: (machineToken) =>
+            Effect.suspend(() => {
+              const serverId = teamStore.getIdentity()?.serverId;
+              if (!serverId)
+                return Effect.fail(
+                  new RemoteWorkflowError({ cause: new Error(sourceText("error.app.remoteIdentityUnavailable")) }),
+                );
+              registerSecretValue(machineToken);
+              centralAuth.useHostCredential(serverId, machineToken);
+              return host.publishLocalServer();
+            }),
+          unpublish: () =>
+            host.unpublishLocalServer().pipe(
+              Effect.ensuring(
+                Effect.sync(() => {
+                  const serverId = teamStore.getIdentity()?.serverId;
+                  if (serverId) centralAuth.useHostCredential(serverId, null);
+                }),
+              ),
+            ),
+        },
+        warn: (message, cause) => logger.warn(message, toLogValue(cause)),
       }),
     );
   }

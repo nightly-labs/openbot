@@ -96,6 +96,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Esta conexión no admite actualizaciones del host.",
   "error.team.hostTimezoneUnsupported": "Esta conexión no admite la zona horaria del servidor.",
   "error.team.hostKeyRotationUnsupported": "Esta conexión no admite cambiar la clave del servidor.",
+  "error.team.localServersUnsupported": "Esta conexión no admite servidores en este ordenador.",
   "error.team.routineResultsUnsupported": "Esta conexión no admite destinos de rutinas.",
   "error.team.agentMemoryLimitUnsupported": "Esta conexión no admite el límite de recuerdos de los agentes.",
   "error.team.agentFoldersUnsupported": "Esta conexión no admite las carpetas de los agentes.",

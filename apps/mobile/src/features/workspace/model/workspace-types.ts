@@ -161,7 +161,11 @@ import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-ed
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import type { MessagingConnectorPage } from "@openbot/team-client/team-admin-requests";
+import type {
+  HostLocalServer,
+  HostLocalServerList,
+  MessagingConnectorPage,
+} from "@openbot/team-client/team-admin-requests";
 import type { MobileBrowserTab } from "@/features/browser/model/browser-tabs";
 import type { BrowserViewBridgeEvent, RemoteBrowserViewSession } from "@/features/browser/model/browser-view-bridge";
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
@@ -391,6 +395,26 @@ export interface MobileWorkspaceContextValue {
   rotateServerKey: (serverId: string) => Promise<{ publicKey: string }>;
   /** Reads the server list again, with its signed key changes. It does not connect again. */
   reloadServerList: () => Promise<void>;
+  /**
+   * The owner of an online host that serves `local-servers-v1`: a desktop app that can run more
+   * servers on its computer. The host checks the role again.
+   */
+  canCreateLocalServers: (serverId: string) => boolean;
+  /** The servers that the desktop app of `serverId` runs on its computer, and how many it can run. */
+  listLocalServers: (serverId: string) => Promise<HostLocalServerList>;
+  /**
+   * Makes a server on the computer of `serverId`, then reads the server list again, so the new server
+   * is in it when the computer registered it for the account.
+   */
+  createLocalServer: (serverId: string, name: string) => Promise<HostLocalServer>;
+  /**
+   * `computer`: the own server of an OpenBot desktop app, which the account cannot remove. `onComputer`:
+   * a server that such an app runs beside its own server, which only that app deletes. Known after the
+   * computer server was online in this session.
+   */
+  localServerKind: (serverId: string) => "computer" | "onComputer" | null;
+  /** Deletes a server on a computer through the computer's own server, which must be online. */
+  deleteLocalServer: (serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `host-timezone-v1`. The host checks the role again. */
   canManageServerTimezone: (serverId: string) => boolean;
   /** The zone of a routine that an agent creates with no zone. Owners and admins only. */
@@ -970,6 +994,8 @@ type MobileWorkspaceStateKey =
   | "canUnhideAgent"
   | "canEditServerIdentity"
   | "canRotateServerKey"
+  | "canCreateLocalServers"
+  | "localServerKind"
   | "canManageServerTimezone"
   | "canManageAgentMemoryLimit"
   | "canManageServerRoles"

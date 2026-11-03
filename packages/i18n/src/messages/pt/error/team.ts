@@ -98,6 +98,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Esta conexão não oferece suporte a atualizações do computador anfitrião.",
   "error.team.hostTimezoneUnsupported": "Esta conexão não oferece suporte ao fuso horário do servidor.",
   "error.team.hostKeyRotationUnsupported": "Esta conexão não oferece suporte à alteração da chave do servidor.",
+  "error.team.localServersUnsupported": "Esta conexão não oferece suporte a servidores neste computador.",
   "error.team.routineResultsUnsupported": "Esta conexão não oferece suporte a destinos de rotinas.",
   "error.team.agentMemoryLimitUnsupported": "Esta conexão não oferece suporte ao limite de memórias dos agentes.",
   "error.team.agentFoldersUnsupported": "Esta conexão não oferece suporte às pastas dos agentes.",

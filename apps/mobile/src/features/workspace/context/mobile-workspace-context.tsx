@@ -40,6 +40,7 @@ import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-up
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
+import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
@@ -82,6 +83,10 @@ import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import {
+  createHostLocalServer,
+  deleteHostLocalServer,
+  type HostLocalServerList,
+  listHostLocalServers,
   readSidebarPins,
   rotateHostKey,
   seedSidebarPins,
@@ -628,6 +633,48 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         request(method, path, decode, body, serverId, upload, onUploadProgress),
     [request],
   );
+
+  /**
+   * The desktop apps' own servers (`local-servers-v1`), and the computer server of each server that one
+   * of them runs beside it. Read while the computer server is online; kept for the session, so a server
+   * whose computer went offline keeps its delete action and does not get the account's remove action.
+   */
+  const [localServerLinks, setLocalServerLinks] = useState<{
+    computers: ReadonlySet<string>;
+    parents: ReadonlyMap<string, string>;
+  }>(() => ({ computers: new Set(), parents: new Map() }));
+  const localServerLinksRef = useRef(localServerLinks);
+  localServerLinksRef.current = localServerLinks;
+  const linkLocalServers = useCallback((computerId: string, list: HostLocalServerList) => {
+    setLocalServerLinks((current) => {
+      const parents = new Map([...current.parents].filter(([, parentId]) => parentId !== computerId));
+      for (const server of list.servers) parents.set(server.serverId, computerId);
+      return { computers: new Set([...current.computers, computerId]), parents };
+    });
+  }, []);
+  const onlineComputerIds = servers
+    .filter(
+      (server) =>
+        server.role === "owner" &&
+        showsOnline(server) &&
+        hasCapability(serverCapabilities.current, server.id, LOCAL_SERVERS_CAPABILITY),
+    )
+    .map((server) => server.id)
+    .join("\n");
+  useEffect(() => {
+    if (!onlineComputerIds) return;
+    let active = true;
+    for (const computerId of onlineComputerIds.split("\n"))
+      void runTeamRequest(listHostLocalServers(teamApi(computerId))).then(
+        (list) => {
+          if (active) linkLocalServers(computerId, list);
+        },
+        () => undefined,
+      );
+    return () => {
+      active = false;
+    };
+  }, [onlineComputerIds, teamApi, linkLocalServers]);
 
   /** The open channels of each server that the routine calendar last read its owners from. */
   const calendarChannels = useRef(new Map<string, string>());
@@ -1630,6 +1677,51 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return rotated;
       },
       reloadServerList: () => refreshHosts(),
+      listLocalServers: async (serverId) => {
+        requireCapability(
+          serverCapabilities.current,
+          serverId,
+          LOCAL_SERVERS_CAPABILITY,
+          "mobile.server.local.unsupported",
+        );
+        const list = await runTeamRequest(listHostLocalServers(teamApi(serverId)));
+        linkLocalServers(serverId, list);
+        return list;
+      },
+      createLocalServer: async (serverId, name) => {
+        const server = serversRef.current.find((candidate) => candidate.id === serverId);
+        if (server?.role !== "owner") throw new Error(currentText().t("mobile.server.local.ownerOnly"));
+        requireCapability(
+          serverCapabilities.current,
+          serverId,
+          LOCAL_SERVERS_CAPABILITY,
+          "mobile.server.local.unsupported",
+        );
+        const created = await runTeamRequest(createHostLocalServer(teamApi(serverId), name));
+        setLocalServerLinks((current) => ({
+          computers: current.computers,
+          parents: new Map(current.parents).set(created.serverId, serverId),
+        }));
+        // The computer registered the server before it answered. The server exists, so a failed read
+        // must not report a failure: the next read lists it.
+        await refreshMemberships().catch(() => undefined);
+        return created;
+      },
+      deleteLocalServer: async (serverId) => {
+        const computerId = localServerLinksRef.current.parents.get(serverId);
+        const computer = serversRef.current.find((candidate) => candidate.id === computerId);
+        // The server runs as a part of OpenBot on its computer, so only that computer can delete it.
+        if (!computerId || !computer || !showsOnline(computer))
+          throw new Error(currentText().t("mobile.server.local.deleteOffline"));
+        await runTeamRequest(deleteHostLocalServer(teamApi(computerId), serverId));
+        setLocalServerLinks((current) => {
+          const parents = new Map(current.parents);
+          parents.delete(serverId);
+          return { computers: current.computers, parents };
+        });
+        forgetServer(serverId);
+        await refreshMemberships().catch(() => undefined);
+      },
       refreshServers: async () => {
         for (const connection of connections.current.values()) connection.refresh();
         await refreshHosts();
@@ -1919,6 +2011,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       pinnedAgentIds: currentPinnedAgentIds(),
     }));
   }, [
+    linkLocalServers,
     browser,
     workflows,
     hostRequests,
@@ -2002,6 +2095,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canRotateServerKey: (serverId) =>
         servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
         administers(serverId, HOST_KEY_ROTATION_CAPABILITY),
+      localServerKind: (serverId) =>
+        localServerLinks.computers.has(serverId)
+          ? "computer"
+          : localServerLinks.parents.has(serverId)
+            ? "onComputer"
+            : null,
+      canCreateLocalServers: (serverId) =>
+        servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
+        administers(serverId, LOCAL_SERVERS_CAPABILITY),
       canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
       canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
       canManageServerRoles: (serverId) => administers(serverId, AGENT_ACCESS_CAPABILITY),
@@ -2071,6 +2173,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageProviderAccounts: (serverId) => administers(serverId, PROVIDER_ACCOUNTS_CAPABILITY),
     };
   }, [
+    localServerLinks,
     hostRequests,
     browser,
     sidebarByServer,

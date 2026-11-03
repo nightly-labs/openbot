@@ -9,6 +9,7 @@ export const messages = {
   "mobile.server.drawer.editOrder": "Volgorde wijzigen",
   "mobile.server.drawer.leaveFailed": "Kan {name} niet verlaten",
   "mobile.server.drawer.removeFailed": "Kan {name} niet verwijderen",
+  "mobile.server.drawer.deleteFailed": "Kan {name} niet verwijderen",
   "mobile.server.drawer.actionFailed": "OpenBot kan deze actie niet voltooien. Probeer het opnieuw.",
   "mobile.server.drawer.moveUp": "Omhoog",
   "mobile.server.drawer.moveDown": "Omlaag",
@@ -65,6 +66,28 @@ export const messages = {
   "mobile.server.hosted.speedFaster": "{factor}× sneller",
   "mobile.server.hosted.joinHint": "Gebruik een uitnodiging van een servereigenaar.",
   "mobile.server.hosted.join": "Word lid van een server",
+  "mobile.server.local.option": "Nieuwe lokale server op de computer",
+  "mobile.server.local.optionHint": "Op de computer waarop {name} draait, met eigen agents, chats en bestanden.",
+  "mobile.server.local.title": "Nieuwe server",
+  "mobile.server.local.description":
+    "De server draait op de computer waarop {name} draait, met eigen agents, chats en bestanden. Hij is beschikbaar zolang OpenBot op die computer draait.",
+  "mobile.server.local.nameLabel": "Servernaam",
+  "mobile.server.local.nameTooShort": "Gebruik minstens {limit} tekens.",
+  "mobile.server.local.create": "Maken",
+  "mobile.server.local.creating": "Bezig met maken…",
+  "mobile.server.local.createFailed": "Kan de server niet maken.",
+  "mobile.server.local.limitReached":
+    "De computer waarop {name} draait, heeft het maximum van {limit} servers. Verwijder er een op die computer om een andere te maken.",
+  "mobile.server.local.created": "Server gemaakt",
+  "mobile.server.local.createdOn": "{name} draait op dezelfde computer als {computer}.",
+  "mobile.server.local.waiting": "Wachten tot {name} online is…",
+  "mobile.server.local.notPublished":
+    "{name} draait, maar deze telefoon kan hem nog niet openen. Controleer of OpenBot op de computer waarop {computer} draait, is aangemeld en online is.",
+  "mobile.server.local.open": "Server openen",
+  "mobile.server.local.ownerOnly": "Alleen de eigenaar kan een server op deze computer maken.",
+  "mobile.server.local.unsupported": "Werk OpenBot op deze computer bij om hier een server te maken.",
+  "mobile.server.local.deleteOffline":
+    "Alleen de computer van deze server kan hem verwijderen. Open OpenBot op die computer en probeer het opnieuw.",
   "mobile.server.hosted.intro.title": "Je agents, altijd aan",
   "mobile.server.hosted.intro.description":
     "Een cloudserver voert je agents en routines uit als je computer uit staat. OpenBot zet hem op en houdt hem draaiende.",
@@ -234,6 +257,10 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Hiermee verwijder je de server uit de accountdienst voor alle leden. Bestanden en chats op de computer blijven bewaard. Registreer de server vanaf die computer om hem weer te gebruiken.",
   "mobile.server.settings.remove": "Server verwijderen",
+  "mobile.server.settings.deleteTitle": "{name} verwijderen?",
+  "mobile.server.settings.deleteBody":
+    "OpenBot stopt de server op zijn computer en verplaatst de agents, chats en bestanden naar de prullenbak van die computer. De server verdwijnt uit de serverlijst op al je apparaten.",
+  "mobile.server.settings.delete": "Server verwijderen",
   "mobile.server.settings.name": "Servernaam",
   "mobile.server.settings.nameLength": "Gebruik {min} tot {max} tekens.",
   "mobile.server.settings.logo": "Serverlogo",

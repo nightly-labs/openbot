@@ -510,6 +510,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
+| `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
@@ -975,6 +976,30 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
   with `shell.trashItem`. It never deletes them.
 - **Rename.** The `host-admin` identity route, as on any joined server that the user owns.
+- **Account.** While the desktop app is signed in, `LocalServers` registers each running server for
+  the account (`centralAuth.registerRemoteHost`), with the child's key, its name, and its owner member
+  as the owner membership. The ready line carries that member id. The desktop app keeps the machine
+  token with its session and writes it to the child's standard input, one JSON line
+  (`local-server-child.ts`). The child keeps it in memory only (`CentralAuthManager.useHostCredential`)
+  and calls `HostService.publishLocalServer`: it gets Signal tickets, meets devices, and sends push
+  notifications and Live Activity updates with that token, as a published host does. Its Team API
+  stays on loopback for the desktop app. A device ticket names the child's owner member, so the
+  owner's phone acts as the owner. A sign-out or another account sends `unpublish`. A sign-in, and
+  each start, registers again. A start on this computer does not wait for the account service.
+- **Directory.** The account then lists the server. `reconcileWebRtcHosts` leaves out every server
+  that `setThisComputerServers` names, so the desktop app keeps its loopback entry. Other computers
+  and phones of the account list it as a WebRTC server.
+- **Delete from the account.** A delete records the server id in `removedHostIds` of the registry and
+  removes the host from the account (`removeOwnedRemoteHost`) when signed in. A 403 or 404 counts as
+  removed; a 401 does not. The id stays until then, so a sign-in retries it, and the directory sync does not
+  list it meanwhile. An earlier build ignores the field.
+- **From a phone.** `local-servers-v1` on the desktop app's own server lists the servers and creates
+  one. The create does not change the server that the desktop app shows. It answers after the child
+  started and was registered, so the phone reads its server list again and finds the new server.
+  A delete from the phone runs the desktop delete and answers after the account removal. The phone
+  shows Delete server for such a server, through its computer's server, which must be online. It shows
+  no Remove server for the desktop app's own server, which the app registers again at each start.
+  The phone knows both kinds after the computer's server was online in that session.
 
 Limits:
 
@@ -984,8 +1009,12 @@ Limits:
   they type a name.
 - A child server is reached as a joined server. Features behind `kind === "local"`, such as
   Computer Use, voice and the local browser dock, work only as far as the Team API carries them.
-- Only this computer can connect. The child does not publish to the account service and has no
-  WebRTC, so phones, the web client and other members cannot join it.
+- While the desktop app is signed out, only this computer can connect.
+- Only the owner connects from other devices. The account service accepts invitations for the
+  server, but the child does not sync members from the account directory. Not confirmed: how a
+  member that joins with an invitation is shown.
+- The child has no account session, so an owner that ends a device's session from the child's Server
+  settings does not end it on the account service. The account has the name of the child's last start.
 - The provider CLI sign-ins in the home folder (`~/.codex`, `~/.claude`) and `~/.agents/skills` are
   shared with the other servers.
 - Not confirmed: the memory of each child, the agent browser in a child with no window, and which
