@@ -1274,7 +1274,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   // The parent passes new handler functions on each render. The rows call them through
   // `actionHandlers`, so only their presence keeps `shared`, and every row, from rendering again.
   const canReply = Boolean(onReply);
-  const canRewrite = Boolean(onRewrite) && !sending && !awaitingTurn && !activeTurnId;
+  const canRewrite = Boolean(onRewrite) && !sending && !awaitingTurn && !activity && !activeTurnId;
   const canReact = Boolean(onReact);
   const canSelectText = Boolean(onSelectText);
   const canSelectQuestion = Boolean(onSelectQuestion);
