@@ -193,16 +193,17 @@ When no agents have loaded and the selected server is connecting or offline, the
 `Waiting for connection`. The empty-server prompt appears only once the server is online; agents
 already loaded remain visible during reconnection.
 
-The phone keeps an encrypted copy of the agents, hidden agents, sections, latest chat pages and
-capabilities of each server (`workspace-cache.ts`), and writes it when a server load ends and when
-the app goes to the background. It also keeps the last server list of the account service. After a
-start, the servers of that list connect at once, before the account service answers; a server whose
-key is not the key that the phone trusts waits for the account service. Its list then replaces the
-copy: it removes a server that the account left. A server shows its copy at once, and its first
-connection attempt is quiet for 5 seconds, as a return to the app is. The first workspace reads go
-out with the compatibility read when the copy has the capabilities. The UI does not mark the copy: a
-server that takes longer shows the usual reconnect status and faded avatars. Its own reads then
-replace the copy. Sign-out, an expired session and the removal of a server delete it.
+The phone keeps an encrypted copy of the agents, hidden agents, sections, latest chat pages,
+capabilities and last drawer values (`drawer-snapshot.ts`) of each server (`workspace-cache.ts`),
+and writes it when a server load ends and when the app goes to the background. It also keeps the
+last server list of the account service. After a start, the servers of that list connect at once,
+before the account service answers; a server whose key is not the key that the phone trusts waits
+for the account service. Its list then replaces the copy: it removes a server that the account
+left. A server shows its copy at once, and its first connection attempt is quiet for 5 seconds, as
+a return to the app is. The first workspace reads go out with the compatibility read when the copy
+has the capabilities. The UI does not mark the copy: a server that takes longer shows the usual
+reconnect status and faded avatars. Its own reads then replace the copy. Sign-out, an expired
+session and the removal of a server delete it.
 
 The first connect of each server asks the account service for its logical session while the hidden
 peer page loads (`remote-team-transport.tsx`). The account service gives the active session again, so
@@ -346,9 +347,10 @@ Cloud builds require the final `ios.bundleIdentifier` and `android.package` valu
 
 ### Local TestFlight build
 
-On a Mac with Xcode, CocoaPods, Fastlane, and this project's Node and Bun versions installed,
-sign in to Expo with `bunx eas-cli@latest login` from `apps/mobile`. An active Apple Developer
-membership is required for signing and TestFlight distribution.
+On a Mac with Xcode 27.1 or newer (see the iPhone Duo note below), CocoaPods, Fastlane, and this
+project's Node and Bun versions installed, sign in to Expo with `bunx eas-cli@latest login` from
+`apps/mobile`. An active Apple Developer membership is required for signing and TestFlight
+distribution.
 
 From the repository root, run:
 
@@ -373,9 +375,13 @@ it to a tester group. Upload is manual; the command does not run EAS Submit.
 ### GitHub Actions TestFlight release
 
 The `Release iOS to TestFlight` workflow builds the selected `main` commit on a GitHub-hosted
-`macos-26` runner with Xcode 26.6. Expo SDK 58 requires Xcode 26.4 or newer; the desktop release's
-`macos-14` runner is not suitable. EAS CLI 24.1.2 runs with `--local --non-interactive`, so compilation
-uses GitHub Actions compute. Fastlane uploads directly to Apple without EAS Submit.
+`xcode-27` runner (a GitHub preview image) with Xcode 27.1. Expo SDK 58 compiles with Xcode 26.4 or
+newer, but iOS decides the iPhone Duo layout from the SDK of the build: an iOS 26 SDK build shows in
+a small window in the middle of the open iPhone Duo, and only the iOS 27.1 SDK fills the screen and
+moves the bars into the vertical rail. Keep Xcode 27.1 or newer, and check `DTSDKName` in the IPA
+`Info.plist` after a runner change. The desktop release's `macos-14` runner is not suitable. EAS CLI
+24.1.2 runs with `--local --non-interactive`, so compilation uses GitHub Actions compute. Fastlane
+uploads directly to Apple without EAS Submit.
 
 One-time setup:
 

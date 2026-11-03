@@ -643,4 +643,24 @@ export const messages = {
   "mobile.agent.folders.locateHere": "使用",
   "mobile.agent.folders.notAddedTitle": "フォルダを追加できません",
   "mobile.agent.folders.notExcludedTitle": "フォルダを除外できません",
+  "mobile.agent.fastMode.label": "高速モード",
+  "mobile.agent.fastMode.footer":
+    "エージェントはプロバイダーに高速な応答を求めます。変更は次のターンから適用されます。",
+  "mobile.agent.compact.title": "コンテキストを圧縮",
+  "mobile.agent.compact.compacting": "圧縮を開始しています…",
+  "mobile.agent.compact.footer": "プロバイダーがこのチャットのコンテキストを短くします。メッセージは残ります。",
+  "mobile.agent.compact.started": "圧縮を開始しました。プロバイダーがホストでコンテキストを短くします。",
+  "mobile.agent.compact.failed": "コンテキストを圧縮できません",
+  "mobile.agent.compact.failedBody": "ホストがコンテキストを圧縮できませんでした。",
+  "mobile.agent.compact.unsupported": "このホストでは、リモートデバイスからコンテキストを圧縮できません。",
+  "mobile.agent.instructionsFile.title": "指示ファイル",
+  "mobile.agent.instructionsFile.placeholder": "このエージェントが常に従うルール",
+  "mobile.agent.instructionsFile.footer":
+    "エージェントはセッションごとにこのファイルを読みます。エージェントが変更することもあります。",
+  "mobile.agent.instructionsFile.changed":
+    "編集中にエージェントが指示を変更しました。もう一度保存すると、エージェントの版を置き換えます。",
+  "mobile.agent.instructionsFile.saveFailed": "指示ファイルを保存できませんでした。",
+  "mobile.agent.instructionsFile.readFailed": "指示ファイルを読み込めませんでした。",
+  "mobile.agent.instructionsFile.loading": "指示ファイルを読み込んでいます…",
+  "mobile.agent.instructionsFile.unsupported": "このホストでは、リモートデバイスから指示ファイルを編集できません。",
 } as const satisfies PartialTranslation<typeof source>;

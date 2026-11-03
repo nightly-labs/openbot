@@ -32,6 +32,7 @@ import {
 import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
 import {
   ComposerCompactionNotice,
+  ComposerNewChatButton,
   ContextUsageMeter,
   contextUsageView,
 } from "@openbot/ui/features/conversation/ContextUsage";
@@ -186,6 +187,8 @@ export function ConversationComposer() {
     props.contextState?.agentId === props.agent?.id && props.contextState?.threadId === props.agent?.threadId
       ? props.contextState
       : undefined;
+  const newChat = () =>
+    props.agent && props.onClearAgentContext ? { agent: props.agent, start: props.onClearAgentContext } : undefined;
   const compaction = () => {
     const value = context()?.compaction;
     return value && value.id !== dismissedCompactions()[currentChatConversationKey() ?? ""] ? value : null;
@@ -721,17 +724,22 @@ export function ConversationComposer() {
               onVoice={openVoiceConversation()}
             />
             <div class="composer-primary-actions">
-              <Show when={contextUsageView(context())}>
+              <Show
+                when={contextUsageView(context())}
+                fallback={
+                  <Show when={newChat()}>
+                    {(action) => (
+                      <ComposerNewChatButton
+                        agent={action().agent}
+                        start={action().start}
+                        disabled={context()?.compaction?.status === "running"}
+                      />
+                    )}
+                  </Show>
+                }
+              >
                 {(usage) => (
-                  <ContextUsageMeter
-                    newChat={
-                      props.agent && props.onClearAgentContext
-                        ? { agent: props.agent, start: props.onClearAgentContext }
-                        : undefined
-                    }
-                    compact={props.onCompactAgentContext}
-                    usage={usage()}
-                  />
+                  <ContextUsageMeter newChat={newChat()} compact={props.onCompactAgentContext} usage={usage()} />
                 )}
               </Show>
               <Show when={attachmentBusy() && props.runtime?.cancelImportFiles} keyed>

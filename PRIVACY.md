@@ -487,18 +487,19 @@ Mobile hidden and pinned chat preferences are stored on the phone, separately pe
 Conversation read/unread changes are stored on the desktop host and shared with your other connected devices.
 
 The mobile app keeps a copy of what it shows for each server: the agent list, the hidden agents,
-the sections, the server's capabilities, and the latest page (up to 50 messages) of each chat that
-it loaded, up to 4 MB for each server. It also keeps the last server list that the account service
-gave: for each server its ID, name, logo version, public key and the time of its last key change,
-membership ID, role, member limit, and hosted status. So after a start the app connects and shows
-them at once, while the account service and the server answer. The copy is in the phone's system
-cache (`Library/Caches` on iOS), which is not in a device backup and which the system can delete
-when the phone is low on storage. Each file is encrypted with AES-256-GCM and bound to the account
-and the server, or to the server list. The key is in the phone's keychain, and it does not leave
-this device. The copy is never sent anywhere. The app replaces it with what the server and the
-account service send, and deletes a server's copy when the account no longer has that server.
-Sign-out and an expired or disconnected session delete all copies and the key. Attachments and
-files are not in the copy.
+the sections, the server's capabilities, the latest page (up to 50 messages) of each chat that it
+loaded, and the last values of the drawer (the member count, the usage cost, the next routine runs,
+the thread and workflow counts, and the name and last run of each pinned workflow), up to 4 MB for
+each server. It also keeps the last server list that the account service gave: for each server its
+ID, name, logo version, public key and the time of its last key change, membership ID, role, member
+limit, and hosted status. So after a start the app connects and shows them at once, while the
+account service and the server answer. The copy is in the phone's system cache (`Library/Caches` on
+iOS), which is not in a device backup and which the system can delete when the phone is low on
+storage. Each file is encrypted with AES-256-GCM and bound to the account and the server, or to the
+server list. The key is in the phone's keychain, and it does not leave this device. The copy is
+never sent anywhere. The app replaces it with what the server and the account service send, and
+deletes a server's copy when the account no longer has that server. Sign-out and an expired or
+disconnected session delete all copies and the key. Attachments and files are not in the copy.
 
 The mobile app keeps a support log of up to 1,000 events in the phone's system cache: app version,
 system and device model, app state changes, connection steps with server IDs and error text, the

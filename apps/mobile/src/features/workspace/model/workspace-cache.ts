@@ -5,6 +5,7 @@ import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system/legacy";
 import * as LockedKeychain from "@/shared/lib/locked-keychain";
 import { decodeConversationPage } from "./conversation";
+import { type DrawerSnapshot, decodeDrawerSnapshot } from "./drawer-snapshot";
 import { decodeAgentSummaries, decodeSidebarLayout, type RemoteAgent } from "./workspace-records";
 
 /** What the phone shows for one server before its connection is back. The host stays the source of truth. */
@@ -19,6 +20,8 @@ interface CachedServer {
    * workspace with its compatibility check. Null in a file from before them.
    */
   capabilities: readonly string[] | null;
+  /** The last values of the drawer. A file of an older build has none. */
+  drawer: DrawerSnapshot | null;
 }
 
 export interface WorkspaceCache {
@@ -114,6 +117,7 @@ function decodeCachedServer(value: unknown): CachedServer {
     conversations: value.conversations.map(decodeConversationPage),
     // A bad list drops only the early reads: the first connection then waits for its check.
     capabilities: Array.isArray(capabilities) && capabilities.every(isString) ? capabilities : null,
+    drawer: decodeDrawerSnapshot(value.drawer),
   };
 }
 

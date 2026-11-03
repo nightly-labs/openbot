@@ -18,6 +18,7 @@ import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
+import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
@@ -158,6 +159,13 @@ import {
 import { ConnectionWaits } from "@/features/workspace/model/connection-waits";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
+import {
+  drawerSnapshot,
+  forgetDrawerSnapshots,
+  rememberDrawerValues,
+  restoreDrawerSnapshot,
+  startDrawerSnapshots,
+} from "@/features/workspace/model/drawer-snapshot";
 import { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
 import {
   dropApproval,
@@ -355,10 +363,16 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [],
   );
   useEffect(() => () => conversationStore.dispose(), [conversationStore]);
-  const workspaceCache = useMemo(
-    () => createWorkspaceCache(`${session.apiUrl}:${session.user.id}`),
-    [session.apiUrl, session.user.id],
-  );
+  const workspaceCache = useMemo(() => {
+    // In render, before the effects of the drawer and the cache read below, so the drawer values of
+    // another account do not show and the first values of this one stay.
+    startDrawerSnapshots(`${session.apiUrl}:${session.user.id}`);
+    return createWorkspaceCache(`${session.apiUrl}:${session.user.id}`);
+  }, [session.apiUrl, session.user.id]);
+  useEffect(() => {
+    startDrawerSnapshots(`${session.apiUrl}:${session.user.id}`);
+    return () => startDrawerSnapshots(null);
+  }, [session.apiUrl, session.user.id]);
   /** The last agent list of each server, as the host sent it, for the phone's cache. */
   const cachedSummaries = useRef(new Map<string, RemoteAgent[]>());
   /** Servers whose cache this run read, once each. */
@@ -481,6 +495,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         ])
           queryClient.removeQueries({ queryKey });
       }
+      forgetDrawerSnapshots(serverIds);
       setSidebarByServer((current) => withoutKeys(current, serverIds));
       setHostHidden((current) => withoutKeys(current, serverIds));
       setAgents((current) => current.filter((agent) => !serverIds.has(agent.serverId)));
@@ -829,6 +844,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           sidebar: sidebarByServerRef.current[serverId]?.layout ?? null,
           conversations: agents.flatMap((agent) => conversationStore.cachedPage(agent.id) ?? []),
           capabilities: serverCapabilities.current.get(serverId) ?? keptCapabilities.current.get(serverId) ?? null,
+          drawer: drawerSnapshot(serverId),
         })
         .catch(() => undefined);
     },
@@ -847,6 +863,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           if (!cached || removedServers.current.has(id)) return;
           // A connection that checked its capabilities in this run uses its own.
           if (cached.capabilities) keptCapabilities.current.set(id, cached.capabilities);
+          if (cached.drawer) restoreDrawerSnapshot(id, cached.drawer);
           if (cachedSummaries.current.has(id)) return;
           if (cached.hidden)
             applyHostHidden(
@@ -1329,6 +1346,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           setMemberCountByServer((current) =>
             current[serverId] === members ? current : { ...current, [serverId]: members },
           );
+          rememberDrawerValues(serverId, { memberCount: members });
           void queryClient.invalidateQueries({ queryKey: queryKeys.serverMembers(queryScope, serverId) });
           void queryClient.invalidateQueries({ queryKey: queryKeys.serverInvites(queryScope, serverId) });
         }
@@ -2112,6 +2130,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageAgentTaskLimit: (serverId) => administers(serverId, AGENT_TASK_LIMIT_CAPABILITY),
       canManageAgentNewChat: (serverId) => administers(serverId, AGENT_NEW_CHAT_CAPABILITY),
       canManageAgentPlanCard: (serverId) => administers(serverId, AGENT_PLAN_CARD_CAPABILITY),
+      canManageAgentInstructions: (serverId) => administers(serverId, AGENT_INSTRUCTIONS_CAPABILITY),
       canPublishAgent: (serverId) => administers(serverId, AGENT_PUBLISH_CAPABILITY),
       canManageProviderAccounts: (serverId) => administers(serverId, PROVIDER_ACCOUNTS_CAPABILITY),
     };
