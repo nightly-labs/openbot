@@ -615,7 +615,7 @@ export const kimiLoginArgs = Effect.fn("Cli.kimiLoginArgs")(function* (
   options: { code: boolean; region: SignInRegion },
 ): Effect.fn.Return<readonly string[], ProviderClientOperationError> {
   const target = cliSpawnTarget(cli.executable, ["login", "--help"]);
-  const output = yield* Effect.tryPromise({
+  const probe = Effect.tryPromise({
     try: (signal) =>
       execFileAsync(target.command, target.args, {
         signal,
@@ -637,11 +637,14 @@ export const kimiLoginArgs = Effect.fn("Cli.kimiLoginArgs")(function* (
       );
     },
   });
+  // A browser sign-in needs no option, so a probe that fails keeps the plain `kimi login`.
+  const output = options.code ? yield* probe : yield* Effect.orElseSucceed(probe, () => ({ stdout: "", stderr: "" }));
   const help = stripVTControlCharacters(`${output.stdout}\n${output.stderr}`);
   if (/\bkimi\b/i.test(help)) {
     if (/--json(?:\s|[,=]|$)/u.test(help)) return options.code ? ["login", "--json"] : ["login"];
     if (/--region\b/u.test(help) && /device-code/u.test(help)) return ["login", "--region", options.region];
   }
+  if (!options.code) return ["login"];
   return yield* providerFailure(
     new CodexCliError(sourceText("error.provider.noCodeSignIn", { provider: agentProviderName("kimi") }), "invalid"),
   );

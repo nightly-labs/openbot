@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { kimiHomeDirectory } from "./process-confinement";
 
 /**
  * The site of a Kimi account. `global`: kimi.ai. `mainland-cn`: kimi.com, for mainland China.
@@ -36,10 +37,9 @@ export function kimiPythonSavedRegionEnv(
   env: NodeJS.ProcessEnv = process.env,
   home = homedir(),
 ): Record<string, string> {
-  const kimiHome = env.KIMI_SHARE_DIR?.trim() || join(home, ".kimi");
   let config: string;
   try {
-    config = readFileSync(join(kimiHome, "config.toml"), "utf8");
+    config = readFileSync(join(kimiHomeDirectory(env, home), "config.toml"), "utf8");
   } catch {
     return {};
   }

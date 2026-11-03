@@ -173,16 +173,20 @@ const Providers = createSimpleContext({
      * entry point calls this - the composer notice, the model picker, onboarding and settings - so
      * none of them leaves the user to read a documentation page and sign in in a terminal.
      */
-    async function connectProvider(
-      provider: AgentProviderId,
-      region: "global" | "mainland-cn" = "global",
-    ): Promise<void> {
+    function connectProvider(provider: AgentProviderId): Promise<void> {
+      return startBrowserSignIn(provider, () => providersPort().connectProvider(provider));
+    }
+
+    /** Signs in on the provider's mainland China site, such as kimi.com, from the row's ⋯ menu. */
+    function connectProviderInMainlandChina(provider: AgentProviderId): Promise<void> {
+      return startBrowserSignIn(provider, () => providersPort().connectProviderInMainlandChina(provider));
+    }
+
+    async function startBrowserSignIn(provider: AgentProviderId, start: () => Promise<AgentStatus>): Promise<void> {
       if (refreshingProviders()) return;
       const analytics = beginProviderConnection(provider, "browser");
       try {
-        const status = await (region === "global"
-          ? providersPort().connectProvider(provider)
-          : providersPort().connectProviderInMainlandChina(provider));
+        const status = await start();
         flush(() => applyAgentStatus(status));
       } catch (error) {
         endFailedProviderConnection(provider, analytics, "browser");
@@ -491,8 +495,8 @@ const Providers = createSimpleContext({
           : activeServer()?.kind === "remote"
             ? null
             : { kind: "computer", platform: appInfo()?.platform },
-      connectInBrowser: (provider) => connectProvider(provider),
-      connectInMainlandChina: (provider) => connectProvider(provider, "mainland-cn"),
+      connectInBrowser: connectProvider,
+      connectInMainlandChina: connectProviderInMainlandChina,
       openVerificationUrl: (url) => void appPort().openUrl(url),
       analytics: {
         begin: (provider) => {
