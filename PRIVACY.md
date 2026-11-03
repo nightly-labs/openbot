@@ -1289,6 +1289,12 @@ restrict or block a number that it sees as automated.
 - **Given to the WhatsApp Orchestrator.** Every new WhatsApp request goes first to the orchestrator
   agent, which runs on its provider like any other agent and passes the work to a teammate with the
   facts it needs.
+- **Managed from another computer.** An owner or admin of a joined server can link and manage the
+  host's numbers from their own computer or the browser client. The host sends that client the QR code
+  or pairing code of a link, the numbers and their names, the allowed contacts and groups, the pairing
+  requests that wait, and the list of the number's groups, over the encrypted connection of the
+  server. The QR code holds the one-use secret of that link. The stored keys of the device do not
+  leave the host.
 - **Sent to WhatsApp.** The agents' answers and the files they attach, short status posts, reactions,
   and approval requests with the command, folder and reason the provider gave, redacted. On a number
   used only by OpenBot, a person whom the owner did not allow gets one message with a pairing code.

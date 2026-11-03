@@ -33,7 +33,7 @@ export async function routeConnectors(
   const { github, messaging } = connectors;
   const status = (current: ReturnType<typeof github.status>) => ({ ...current, ...github.pages() });
   // The codec allows only these values; a GitHub route has no platform.
-  // WhatsApp is not one of them: a number is managed only on its host.
+  // WhatsApp is not one of them: it has its own routes (`whatsapp-connector-v1`).
   const platform = CONNECTOR_MESSAGING_PLATFORMS.find((id) => id === body.platform) ?? "telegram";
   const workspaceId = () => stringField(body, "workspaceId", false, 128);
   switch (url.pathname) {

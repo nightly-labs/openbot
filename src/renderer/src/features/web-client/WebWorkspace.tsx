@@ -49,6 +49,7 @@ import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
+import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { channelForThread } from "@openbot/team-client/channel-notifications";
 import {
@@ -169,6 +170,7 @@ import { createChannelsController } from "../channels/channels-controller";
 import { globalSearchChannels } from "../channels/global-search-channels";
 import { createConnectorRegistry, createConnectorSet } from "../connectors/connector-registry";
 import { hostMessagingApi } from "../connectors/host-messaging-port";
+import { hostWhatsAppPort } from "../connectors/whatsapp-connector";
 import { Conversation, createConversationController } from "../conversation/Conversation";
 import { clearStoredQueueEdit } from "../conversation/composer-draft";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
@@ -249,6 +251,7 @@ import { createWebServerSettings } from "./web-server-settings";
 import { webTasksSource } from "./web-tasks";
 import { createWebUsagePort } from "./web-usage-port";
 import { webVaultCalls } from "./web-vault";
+import { webHostWhatsApp } from "./web-whatsapp-connector";
 
 const CONNECTING_STATUS: AgentStatus = {
   phase: "starting",
@@ -1005,6 +1008,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.capabilities.includes(DISCORD_ACCESS_CAPABILITY),
   );
   onCleanup(webMessaging.dispose);
+  const webWhatsApp = webHostWhatsApp(hostRequest);
+  const whatsappPort = hostWhatsAppPort(
+    () => remoteAdminServer(server(), WHATSAPP_CONNECTOR_CAPABILITY)?.id,
+    () => webWhatsApp,
+  );
   const connectors = createConnectorRegistry(server, {
     computer: {},
     server: createConnectorSet(
@@ -1016,6 +1024,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           () => connectorTarget()?.id,
           () => webMessaging.api,
         ),
+        whatsapp: () => whatsappPort,
       },
       { agents: workspace.profiles, hostName: () => server()?.name },
     ),
