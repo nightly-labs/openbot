@@ -95,11 +95,11 @@ import { contentDispositionFileName } from "./content-disposition";
 import type { HostedServerDesktopService } from "./hosted-server-service";
 import type { PreferenceFileFailure } from "./preference-file";
 import {
-  decodeAgentColorsFromHost,
   decodeAgentNotificationLevelsFromHost,
   decodeAgentSummary,
   decodeDraftAttachment,
   decodeDuplicateAgentResultFromHost,
+  decodeRemoteAgentColors,
 } from "./remote-agent-decoding";
 import { AttachmentDownloadStopped, type RemoteAttachment, RemoteAttachmentCache } from "./remote-attachment-cache";
 import type { RemoteConnectTrace } from "./remote-connect-trace";
@@ -747,7 +747,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     serverId: string,
   ) {
     if (!this.supportsCapability(serverId, AGENT_COLORS_CAPABILITY)) return;
-    const colors = yield* this.request(serverId, AGENT_COLORS_ROUTES.read, decodeAgentColorsFromHost, {
+    const colors = yield* this.request(serverId, AGENT_COLORS_ROUTES.read, decodeRemoteAgentColors, {
       method: "POST",
       body: {},
     });
@@ -760,7 +760,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     serverId: string,
     input: SetAgentColorInput,
   ) {
-    const colors = yield* this.request(serverId, AGENT_COLORS_ROUTES.set, decodeAgentColorsFromHost, {
+    const colors = yield* this.request(serverId, AGENT_COLORS_ROUTES.set, decodeRemoteAgentColors, {
       method: "POST",
       body: { agentId: input.agentId, color: input.color },
     });
