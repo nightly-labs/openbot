@@ -31,6 +31,11 @@ import { useVoiceDictation, type VoiceDictation } from "./use-voice-dictation";
 /** The pause after the last recognized words that ends the user's turn. */
 const TURN_END_SILENCE_MS = 1_300;
 /**
+ * Loud sound holds the turn open only this long after the last new words. A noisy room or the street
+ * keeps the microphone loud with no words, and the turn must still end.
+ */
+const SPEECH_WITHOUT_WORDS_MS = 4_000;
+/**
  * The agent's turn ended, or has not shown as running yet, and its answer is not in the
  * conversation: the read that the end starts brings it. After this long the conversation listens again.
  */
@@ -233,6 +238,8 @@ function createController({
   /** Each turn, interruption and the end make the work of the turn before them stale. */
   let generation = 0;
   let pauseTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When the words heard in this turn last changed. */
+  let wordsAt = 0;
   let graceTimer: ReturnType<typeof setTimeout> | null = null;
   /** The recognizer reached `listening` in this session: an end after that is not a failed start. */
   let sessionListened = false;
@@ -506,18 +513,23 @@ function createController({
     hear(text: string): void {
       // The final text of the turn can come after the pause ended it, while `finish` waits for it.
       if (!open || (phase !== "listening" && phase !== "sending")) return;
+      // In noise a recognizer can send the same words again and again. Only new words hold the turn.
+      const changed = text.trim() !== heard.trim();
       heard = text;
       update({ caption: text });
-      if (phase === "sending") return;
+      if (phase === "sending" || !changed) return;
+      wordsAt = performance.now();
       if (pauseTimer) clearTimeout(pauseTimer);
       pauseTimer = text.trim() ? setTimeout(endTurn, TURN_END_SILENCE_MS) : null;
     },
     /**
      * The user speaks now. Parakeet and ElevenLabs send text a while after the words, so the pause
-     * that ends the turn counts from the last speech, not from the last text.
+     * that ends the turn counts from the last speech, not from the last text. Loud sound with no new
+     * words for a while is noise: it no longer holds the turn, and the pause already counting ends it.
      */
     speaking(): void {
       if (!open || phase !== "listening" || !heard.trim()) return;
+      if (performance.now() - wordsAt > SPEECH_WITHOUT_WORDS_MS) return;
       if (pauseTimer) clearTimeout(pauseTimer);
       pauseTimer = setTimeout(endTurn, TURN_END_SILENCE_MS);
     },

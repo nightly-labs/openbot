@@ -26,7 +26,7 @@
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-regular);
   line-height: var(--openbot-leading-md);
-  text-align: left;
+  text-align: start;
 }
 
 .hosted-sites-link-label {

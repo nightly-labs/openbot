@@ -15,6 +15,11 @@ export function pricingPageText(t: AppTranslate) {
     title: t("sitePage.pricing.title"),
     description: t("sitePage.pricing.description"),
     heading: t("sitePage.pricing.heading"),
+    personal: {
+      title: t("sitePage.pricing.personal.title"),
+      body: t("sitePage.pricing.personal.body"),
+      download: t("billing.order.cta.download"),
+    },
     enterprise: {
       title: t("sitePage.pricing.enterprise.title"),
       body: t("sitePage.pricing.enterprise.body", { count: PRICING_MAX_MEMBERS }),

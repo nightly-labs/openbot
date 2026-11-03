@@ -81,7 +81,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     browserExpandedOpen,
     hideBrowserPanel,
     browserTabs,
-    closeSidebarFilePreview,
+    closeShownSidePanelFile,
     closeBrowserTab,
     downloadSidebarFile,
     revealSidebarFile,
@@ -126,6 +126,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     openSidePanelPane,
     toggleSidePanel,
     closeSidePanelPane,
+    openSidePanelFile,
+    closeSidePanelFile,
+    moveSidePanelFile,
     sideQuestion,
     setSideQuestionDraft,
     askSideQuestion,
@@ -331,6 +334,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   /** With no side thread to show, the side panel lists the panes. */
   const launcherShown = () =>
     activeRightPanel() === "side-panel" || (activeRightPanel() === "thread" && shownPanelThreadId() === null);
+  /** The file that shows, and whose tab is selected. */
+  const shownFile = () => (filePreviewOpen() ? sidePanel().file : null);
   const sideThreadTabs = () => props.threads?.side.tabs ?? [];
   const moveSideThread = (id: string, index: number) => props.threads?.side.onMove(id, index);
   return (
@@ -352,6 +357,13 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             onClose: closePanelThread,
             onMove: moveSideThread,
             onToChat: movePanelThreadToChat,
+          }}
+          files={{
+            items: sidePanel().files,
+            selectedKey: shownFile(),
+            onSelect: openSidePanelFile,
+            onClose: closeSidePanelFile,
+            onMove: moveSidePanelFile,
           }}
           onToggleMaximized={() => setSidePanelMaximized(!sidePanel().maximized)}
           onCollapse={toggleSidePanel}
@@ -396,7 +408,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 }
                 onWidthChange={setBrowserPanelWidth}
                 onOpenLink={(url) => void openExternalMessageUrl(url)}
-                onOpenSharedFile={openSharedFile}
+                onOpenSharedFile={(path) => openSharedFile(path, "here")}
                 onOpenWorkspaceFile={previewWorkspaceAgentId() ? openWorkspaceFolderEntry : undefined}
                 onOpenWorkspaceFolder={openWorkspaceFolder}
                 onBack={sidebarFileBack() === null ? undefined : openSidebarFileBack}
@@ -409,7 +421,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 onDownload={downloadSidebarFile}
                 /* A browser cannot show a file in the file manager. */
                 onReveal={props.runtime ? undefined : revealSidebarFile}
-                onClose={closeSidebarFilePreview}
+                onClose={closeShownSidePanelFile}
               />
             </Loading>
           );

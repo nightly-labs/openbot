@@ -30,6 +30,11 @@ export default function ServerSettingsLayout() {
       })}
     >
       <Stack.Screen name="index" options={{ title: t("mobile.server.route.settings") }} />
+      <Stack.Screen name="general" options={{ title: t("mobile.server.settings.general") }} />
+      <Stack.Screen name="people" options={{ title: t("mobile.server.settings.peopleSection") }} />
+      <Stack.Screen name="ai" options={{ title: t("mobile.server.settings.aiSection") }} />
+      <Stack.Screen name="data" options={{ title: t("mobile.server.settings.dataSection") }} />
+      <Stack.Screen name="maintenance" options={{ title: t("mobile.server.settings.maintenanceSection") }} />
       <Stack.Screen name="members" options={{ title: t("mobile.app.route.members") }} />
       <Stack.Screen name="invite" options={{ title: t("mobile.server.route.invite") }} />
       <Stack.Screen name="member" options={{ title: t("mobile.server.route.member") }} />

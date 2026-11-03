@@ -18,18 +18,21 @@ import { PROVIDER_HISTORY_SCHEMA_SQL } from "./database/provider-history-schema"
 import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
 import {
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL,
+  MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL,
   MESSAGING_MEMORY_SCHEMA_SQL,
   MESSAGING_SCHEMA_SQL,
 } from "./messaging/messaging-schema";
 import { ROUTINE_FLOW_SCHEMA_SQL } from "./routine-flows/routine-flow-schema";
 import { ROUTINE_RESULT_SCHEMA_SQL } from "./routine-results/routine-result-schema";
-import { addDiscordWorkflows, V50_WORKFLOW_RUN_SOURCE_SQL } from "./workflows/workflow-discord-schema";
+import { addDiscordWorkflows } from "./workflows/workflow-discord-schema";
 import {
   addGitHubWorkflows,
   V46_WORKFLOW_RUN_SOURCE_SQL,
   WORKFLOW_GITHUB_SCHEMA_SQL,
 } from "./workflows/workflow-github-schema";
 import { WORKFLOW_SCHEMA_SQL } from "./workflows/workflow-schema";
+import { addSlackWorkflows, V53_WORKFLOW_RUN_SOURCE_SQL } from "./workflows/workflow-slack-schema";
+import { addTelegramWorkflows } from "./workflows/workflow-telegram-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
 
@@ -612,9 +615,10 @@ const LATEST_SCHEMA_SQL =
   V43_THREAD_EVENT_TYPE_INDEX_SQL +
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL +
   BROWSER_PROFILE_SCHEMA_SQL +
-  substituteOnce(WORKFLOW_SCHEMA_SQL, V46_WORKFLOW_RUN_SOURCE_SQL, V50_WORKFLOW_RUN_SOURCE_SQL) +
+  substituteOnce(WORKFLOW_SCHEMA_SQL, V46_WORKFLOW_RUN_SOURCE_SQL, V53_WORKFLOW_RUN_SOURCE_SQL) +
   AGENT_THREAD_SCHEMA_SQL +
-  WORKFLOW_GITHUB_SCHEMA_SQL;
+  WORKFLOW_GITHUB_SCHEMA_SQL +
+  MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL;
 
 /** The end of the thread message table with the migration 40 columns before its PRIMARY KEY constraint. */
 function withThreadMessageOrderColumns(tableEnd: string): string {
@@ -904,6 +908,26 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // pause and run ids do not change. Few rows, so no vacuum. No table is added.
     disableForeignKeys: true,
     up: addDiscordWorkflows,
+  },
+  {
+    version: 51,
+    // Only creates a table, so no foreign-key pause and no vacuum. No WhatsApp connection exists before
+    // it, so no connection loses senders.
+    up: (db) => db.exec(MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL),
+  },
+  {
+    version: 52,
+    // Rebuilds the run table again to add the Telegram run source, as migration 50 did, so foreign keys
+    // pause and run ids do not change. Few rows, so no vacuum. No table is added.
+    disableForeignKeys: true,
+    up: addTelegramWorkflows,
+  },
+  {
+    version: 53,
+    // Rebuilds the run table again to add the Slack run source, as migrations 50 and 52 did, so foreign
+    // keys pause and run ids do not change. Few rows, so no vacuum. No table is added.
+    disableForeignKeys: true,
+    up: addSlackWorkflows,
   },
 ];
 

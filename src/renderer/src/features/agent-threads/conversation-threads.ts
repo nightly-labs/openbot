@@ -87,7 +87,8 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       task,
       conversation: tasks.conversation(task.id),
       approval: sideApproval,
-      onSend: (text, attachmentDraftIds) => tabs.send(agentId, task.id, text, attachmentDraftIds),
+      onSend: (text, attachmentDraftIds, replyToMessageId) =>
+        tabs.send(agentId, task.id, text, attachmentDraftIds, replyToMessageId),
       onStop: () => tasks.stopTask(agentId, task.id),
       onRead: (messageId) => tasks.markTaskRead(agentId, task.id, messageId),
       onRespondApproval: (decision, options) =>
@@ -155,8 +156,11 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     conversation: open ? tasks.conversation(open.id) : undefined,
     approval,
     acceptsFiles: tasks.filesAccepted(),
-    onSend: (text, attachmentDraftIds) =>
-      open ? tabs.send(agentId, open.id, text, attachmentDraftIds) : tabs.sendDraft(agentId, text, attachmentDraftIds),
+    acceptsReplies: tasks.repliable(),
+    onSend: (text, attachmentDraftIds, replyToMessageId) =>
+      open
+        ? tabs.send(agentId, open.id, text, attachmentDraftIds, replyToMessageId)
+        : tabs.sendDraft(agentId, text, attachmentDraftIds),
     onStop: () => {
       if (open) tasks.stopTask(agentId, open.id);
     },

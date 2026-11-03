@@ -383,6 +383,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.aiSection": "AI and tools",
   "mobile.server.settings.dataSection": "Data",
   "mobile.server.settings.maintenanceSection": "Maintenance",
+  "mobile.server.settings.peopleSection": "People",
+  "mobile.server.settings.moveSection": "Import and transfer",
   "mobile.server.settings.general": "General",
   "mobile.server.settings.timezone": "Timezone",
   "mobile.server.settings.timezoneAutomatic": "Automatic",

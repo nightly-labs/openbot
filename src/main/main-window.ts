@@ -19,7 +19,7 @@ import {
   LOCAL_SERVER_ID,
   type MacPermissionId,
 } from "@openbot/contracts/ipc";
-import type { AppTextKey, AppTranslate } from "@openbot/i18n";
+import type { AppTextKey, AppTranslate, LayoutDirection } from "@openbot/i18n";
 import {
   app,
   BrowserWindow,
@@ -65,6 +65,7 @@ import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
 import { followAppearance, followWindowGlass, windowBackgroundColor } from "./window-appearance";
+import { followWindowButtonSide, WINDOW_BUTTON_INSET } from "./window-buttons";
 
 /** The dark background of the main and setup windows, under the page's own canvas. */
 const MAIN_WINDOW_DARK_BACKGROUND = "#0b0d0e";
@@ -146,6 +147,8 @@ export interface MainWindowContext {
   getServices: () => MainWindowApplicationServices | null;
   /** A function, not a value: the saved language is read after the first window opens. */
   getTranslate: () => AppTranslate;
+  /** A function, not a value: the user can change the language while the window is open. */
+  getLayoutDirection: () => LayoutDirection;
   /** A renderer load or committed document navigation resets delivery of queued links. */
   onRendererLoadStarted: () => void;
   /** Main must release resources when a renderer can no longer run its own cleanup. */
@@ -187,6 +190,7 @@ export function createMainWindowController({
   keepRunningInBackground,
   getServices,
   getTranslate,
+  getLayoutDirection,
   onRendererLoadStarted,
   onRendererGone,
   onMainWindowCreated,
@@ -234,9 +238,10 @@ export function createMainWindowController({
       // detail. macOS spaces the three 13px dots 23px apart, so the group is 59px wide: x 12 leaves
       // it 11px clear of the 82px where the top row's first control starts, in the app frame and in
       // the full-bleed browser header alike, and y 13 puts its centre line within half a pixel of
-      // both of those rows. The setup window below uses the same offsets.
+      // both of those rows. The setup window below uses the same offsets. In a right-to-left language
+      // the group is at the top right with the same offsets (`window-buttons.ts`).
       ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 12, y: 13 } }
+        ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
         : {}),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
@@ -317,6 +322,7 @@ export function createMainWindowController({
       });
     });
     attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: true, quitShortcut });
+    followWindowButtonSide(window, getLayoutDirection);
     window.webContents.on("will-navigate", (event, targetUrl) => {
       if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
     });
@@ -363,7 +369,7 @@ export function createMainWindowController({
       title: getTranslate()("window.localHostTitle"),
       icon: appIconPath,
       ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 12, y: 13 } }
+        ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
         : {}),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
@@ -395,6 +401,7 @@ export function createMainWindowController({
       if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
     });
     attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: false, quitShortcut });
+    followWindowButtonSide(window, getLayoutDirection);
     announceChatWindows();
     const url = appRendererUrl(process.env.ELECTRON_RENDERER_URL);
     url.searchParams.set("window", "chat");
@@ -700,7 +707,10 @@ export function createComputerUseHighlightWindow(bounds: Rectangle): BrowserWind
  * sandboxed, context-isolated, no window may be opened from it, and no navigation away from the
  * renderer's own origin.
  */
-export function createComputerUsePermissionHelpWindow(translate: AppTranslate): BrowserWindow {
+export function createComputerUsePermissionHelpWindow(
+  translate: AppTranslate,
+  getLayoutDirection: () => LayoutDirection,
+): BrowserWindow {
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   const width = 340;
   // The card the user drags out of it, the two steps, and nothing else: a window taller than its
@@ -721,7 +731,7 @@ export function createComputerUsePermissionHelpWindow(translate: AppTranslate): 
     backgroundColor: windowBackgroundColor(MAIN_WINDOW_DARK_BACKGROUND),
     title: translate("window.computerUsePermissionTitle"),
     ...(process.platform === "darwin"
-      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 12, y: 13 } }
+      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
       : {}),
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -736,6 +746,7 @@ export function createComputerUsePermissionHelpWindow(translate: AppTranslate): 
   // the steps to nobody.
   window.setAlwaysOnTop(true, "floating");
   followAppearance(window, MAIN_WINDOW_DARK_BACKGROUND);
+  followWindowButtonSide(window, getLayoutDirection);
   // The fixed height fits the contents only at 100%; the main window zoom would clip the steps.
   window.webContents.setZoomMode("isolated");
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

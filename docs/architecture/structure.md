@@ -20,6 +20,7 @@ packages/
   telemetry/         Safe error reports, bounded retry queue, and local storage/HTTP adapters
   team-client/       Shared team connection, recovery, WebRTC framing, Dynamic Island state, and routine schedules
   user-errors/       Shared user-facing error messages for desktop and mobile
+  whatsapp/          WhatsApp client: vendored Baileys without its copyleft parts, clean-room Signal code, device store
 remote/
   api/               Bun Signal service for SDP, ICE, ticket checks, TURN credentials, and the Slack, Discord, Telegram and webhook relays
   scripts/           Bun checks and update commands for Signal and coturn

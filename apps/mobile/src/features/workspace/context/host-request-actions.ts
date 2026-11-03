@@ -70,6 +70,10 @@ import {
   AGENT_TASK_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import {
+  AGENT_THREAD_BRANCHES_CAPABILITY,
+  withAgentThreadBranches,
+} from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
@@ -221,12 +225,14 @@ import {
   agentTaskControl,
   applyAgentImport,
   applyInstanceTransfer,
+  branchAgentThread,
   clearAgentContext,
   deleteAgentThread,
   discardAgentImport,
   discardInstanceTransfer,
   downloadInstanceTransfer,
   listAgentTasks,
+  listAgentThreadBranches,
   listAgentThreadReads,
   loadInstanceTransferSummary,
   markAgentThreadRead,
@@ -311,6 +317,7 @@ type HostRequestActions = Pick<
   | "controlAgentTask"
   | "renameAgentThread"
   | "deleteAgentThread"
+  | "branchAgentThread"
   | "loadAgentThreadReads"
   | "markAgentThreadRead"
   | "respondToTaskPrompt"
@@ -522,6 +529,9 @@ export function createHostRequestActions({
   /** The read marks of the threads are an optional route set beside the tasks. */
   const threadReadsApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_THREAD_READS_CAPABILITY, "mobile.chat.threads.unsupported");
+  /** The branches of a chat are an optional route set beside the tasks. */
+  const threadBranchesApi = (serverId: string) =>
+    capabilityApi(serverId, AGENT_THREAD_BRANCHES_CAPABILITY, "mobile.chat.threads.unsupported");
   /** The server timezone and the agent memory limit are optional admin route sets. */
   const timezoneAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
@@ -585,6 +595,7 @@ export function createHostRequestActions({
     canEditThreads: (serverId) => has(serverId, AGENT_THREADS_CAPABILITY),
     canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
     canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
+    canBranchThreads: (serverId) => has(serverId, AGENT_THREAD_BRANCHES_CAPABILITY),
     canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
     canUseWorkflowGitHub: (serverId) =>
       has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_GITHUB_CAPABILITY),
@@ -905,7 +916,14 @@ export function createHostRequestActions({
       );
     },
     // Async, so a host without the capability rejects the promise and does not throw at the call.
-    loadAgentTasks: async (agentId, serverId) => runTeamRequest(listAgentTasks(tasksApi(serverId), agentId)),
+    // A host with `agent-thread-branches-v1` also gives the branch links, read after the tasks so that
+    // each listed branch has its link, as on desktop.
+    loadAgentTasks: async (agentId, serverId) => {
+      const snapshot = await runTeamRequest(listAgentTasks(tasksApi(serverId), agentId));
+      if (!has(serverId, AGENT_THREAD_BRANCHES_CAPABILITY)) return snapshot;
+      const links = await runTeamRequest(listAgentThreadBranches(threadBranchesApi(serverId), agentId));
+      return withAgentThreadBranches(snapshot, links);
+    },
     loadAgentTaskConversation: async (input, serverId) => runTeamRequest(readAgentTask(tasksApi(serverId), input)),
     startAgentTask: async (input, serverId) =>
       runTeamRequest(startAgentTask(threadMessageApi(serverId, input.attachmentDraftIds), input)),
@@ -915,6 +933,7 @@ export function createHostRequestActions({
       runTeamRequest(agentTaskControl(tasksApi(serverId), action, input)),
     renameAgentThread: async (input, serverId) => runTeamRequest(renameAgentThread(threadsApi(serverId), input)),
     deleteAgentThread: async (input, serverId) => runTeamRequest(deleteAgentThread(threadsApi(serverId), input)),
+    branchAgentThread: async (input, serverId) => runTeamRequest(branchAgentThread(threadBranchesApi(serverId), input)),
     loadAgentThreadReads: async (agentId, serverId) =>
       runTeamRequest(listAgentThreadReads(threadReadsApi(serverId), agentId)),
     markAgentThreadRead: async (input, serverId) =>

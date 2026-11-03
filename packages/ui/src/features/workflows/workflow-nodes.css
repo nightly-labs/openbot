@@ -867,7 +867,8 @@ fieldset.wfn-picker-group {
   height: auto;
   min-height: calc(var(--openbot-control-md) + var(--openbot-space-2));
   gap: calc(var(--openbot-space-2) + var(--openbot-space-0-5));
-  padding: var(--openbot-space-1) var(--openbot-space-2) var(--openbot-space-1) var(--openbot-space-1);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-1) var(--openbot-space-2);
   border-radius: var(--wfn-radius-row);
   white-space: normal;
 }
@@ -1070,7 +1071,7 @@ fieldset.wfn-picker-group {
 .wfn-picker.ui-action-menu .wfn-picker-row > svg.wfn-picker-check {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
-  margin-left: auto;
+  margin-inline-start: auto;
   color: var(--openbot-text-primary);
 }
 
@@ -1104,7 +1105,7 @@ fieldset.wfn-picker-group {
   align-items: center;
   gap: var(--openbot-space-1);
   padding: var(--openbot-space-2);
-  border-right: 1px solid var(--wfn-ring-strong);
+  border-inline-end: 1px solid var(--wfn-ring-strong);
 }
 
 .wfn-model-tab-hint {
@@ -1187,7 +1188,8 @@ fieldset.wfn-picker-group {
   gap: var(--openbot-space-2);
   min-height: calc(var(--openbot-control-md) + var(--openbot-space-2));
   /* With the list padding, the name starts on the line of the heading and the search icon. */
-  padding: var(--openbot-space-1) var(--openbot-space-2) var(--openbot-space-1) var(--openbot-space-1-5);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
   border-radius: var(--wfn-radius-row);
   outline: 0;
   color: var(--openbot-text-primary);
@@ -1368,7 +1370,7 @@ fieldset.wfn-picker-group {
   height: auto;
   padding: var(--openbot-space-1);
   border-radius: var(--openbot-radius-md);
-  text-align: left;
+  text-align: start;
 }
 
 .wfn-popover .wfn-library-tile[aria-pressed="true"] {
@@ -1890,8 +1892,8 @@ fieldset.wfn-picker-group {
 }
 
 .wfn-menu :is([role="menuitem"], [role="menuitemcheckbox"]) .wfn-keys {
-  margin-left: auto;
-  padding-left: var(--openbot-space-4);
+  margin-inline-start: auto;
+  padding-inline-start: var(--openbot-space-4);
 }
 
 /* ------------------------------------------------------------ Minimap */
@@ -1927,7 +1929,7 @@ fieldset.wfn-picker-group {
 }
 
 .ui-tooltip.wfn-tooltip:has(.wfn-keys) {
-  padding-right: var(--openbot-space-1-5);
+  padding-inline-end: var(--openbot-space-1-5);
 }
 
 /* The results of the selected step, oldest first, under its card, as on the Higgsfield canvas. The
@@ -3090,7 +3092,7 @@ svg.wfn-shape-surface {
   }
 }
 
-/* The emoji of a Discord reaction, in the place of an icon. */
+/* The emoji of a Discord or Telegram reaction, in the place of an icon. */
 .wfn-emoji {
   display: inline-flex;
   flex: none;

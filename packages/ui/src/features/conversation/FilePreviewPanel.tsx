@@ -284,7 +284,13 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             </HeaderButton>
           )}
         </Show>
-        <HeaderButton label={t("preview.panel.close")} data-cuelume-tap="close" onClick={props.onClose}>
+        {/* In the side panel, the file tab closes the file, so this button hides there. */}
+        <HeaderButton
+          label={t("preview.panel.close")}
+          class="side-panel-pane-close"
+          data-cuelume-tap="close"
+          onClick={props.onClose}
+        >
           <X class="browser-toolbar-icon" />
         </HeaderButton>
       </header>
@@ -405,6 +411,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
 /** An icon-only header button. Its label names it for a screen reader and in a tooltip. */
 function HeaderButton(props: {
   label: string;
+  class?: string;
   pressed?: boolean;
   onClick: () => void;
   "data-cuelume-tap"?: string;
@@ -417,7 +424,7 @@ function HeaderButton(props: {
         as={Button}
         variant="ghost"
         type="button"
-        class="browser-toolbar-button"
+        class={["browser-toolbar-button", props.class]}
         aria-label={props.label}
         aria-pressed={pressed()}
         data-cuelume-tap={props["data-cuelume-tap"]}

@@ -41,7 +41,14 @@ const DEFAULT_SWAP: SwapMotion = {
  * digits up or down; any other change slides the old text out and the new text in, with a blur.
  * `from` is the text that a new label animates from, when it replaces an old one.
  */
-export function SwapLabel(props: { text: string; from?: string | undefined; class?: string; motion?: SwapMotion }) {
+export function SwapLabel(props: {
+  text: string;
+  from?: string | undefined;
+  class?: string;
+  motion?: SwapMotion;
+  /** `auto` for a name the user wrote, so it keeps its own direction in a mirrored layout. */
+  dir?: "auto";
+}) {
   let box: HTMLSpanElement | undefined;
   let shown: HTMLSpanElement | undefined;
   let previous = untrack(() => props.from ?? props.text);
@@ -96,7 +103,7 @@ export function SwapLabel(props: { text: string; from?: string | undefined; clas
     },
   );
   return (
-    <span ref={box} class={props.class ? `ui-swap ${props.class}` : "ui-swap"}>
+    <span ref={box} class={props.class ? `ui-swap ${props.class}` : "ui-swap"} dir={props.dir}>
       <span
         ref={(element) => {
           shown = element;

@@ -146,7 +146,8 @@
   border-radius: var(--openbot-radius-sm);
   background: var(--openbot-surface-light);
   box-shadow: 0 1px 2px var(--openbot-shadow-popover-ambient);
-  padding: 0 var(--openbot-space-3) 0 var(--openbot-space-2);
+  padding-block: 0;
+  padding-inline: var(--openbot-space-2) var(--openbot-space-3);
   color: var(--openbot-text-on-light);
   transition:
     box-shadow var(--openbot-duration-normal) var(--openbot-ease-out),
@@ -180,13 +181,15 @@
   min-width: calc(var(--openbot-control-xl) + var(--openbot-space-3));
   color: var(--openbot-text-on-light);
   font-weight: var(--openbot-weight-semibold);
-  text-align: left;
+  text-align: start;
 }
 
 .account-update-island__progress-value {
   display: inline-grid;
   align-items: baseline;
   grid-template-columns: 3ch max-content;
+  /* "45%" in every page direction, as the percent of the locale. */
+  direction: ltr;
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
@@ -333,5 +336,6 @@
   min-height: 0;
   margin: var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
   border-radius: var(--openbot-radius-lg);
-  padding: var(--openbot-space-1-5) var(--openbot-space-1-5) var(--openbot-space-1-5) var(--openbot-space-3);
+  padding-block: var(--openbot-space-1-5);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-1-5);
 }

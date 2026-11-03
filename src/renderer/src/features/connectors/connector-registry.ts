@@ -10,6 +10,7 @@ import type { GitHubConnectorPort } from "./github-connector-port";
 import { createMessagingConnector, type MessagingApi, type MessagingConnectorOptions } from "./messaging-connector";
 import { createOnePasswordConnector } from "./onepassword-connector";
 import { type OnePasswordConnectorPort, onePasswordConnectorPort } from "./onepassword-connector-port";
+import { createWhatsAppConnector, type WhatsAppPort } from "./whatsapp-connector";
 
 /** The connectors of one place. A connector that the place cannot reach has no controller. */
 export type ConnectorSet = Partial<Record<ConnectorId, ConnectorController>>;
@@ -20,6 +21,8 @@ export interface ConnectorTransports {
   onePassword?: () => OnePasswordConnectorPort;
   bitwarden?: () => BitwardenConnectorPort;
   messaging?: MessagingApi;
+  /** Only this computer has it: a number links by a code on its screen. */
+  whatsapp?: () => WhatsAppPort;
 }
 
 /** This computer's transports, through main. */
@@ -40,6 +43,7 @@ export function createConnectorSet(transports: ConnectorTransports, options: Mes
     set.discord = createMessagingConnector("discord", messaging, options);
     set.telegram = createMessagingConnector("telegram", messaging, options);
   }
+  if (transports.whatsapp) set.whatsapp = createWhatsAppConnector(transports.whatsapp, options);
   if (transports.github) set.github = createGitHubConnector(transports.github, options.hostName);
   if (transports.onePassword) set.onepassword = createOnePasswordConnector(transports.onePassword, options.hostName);
   if (transports.bitwarden) set.bitwarden = createBitwardenConnector(transports.bitwarden, options.hostName);

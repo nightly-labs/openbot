@@ -2800,6 +2800,12 @@ export class ChannelService {
     }
     if (tool !== "channel_assign" && tool !== "channel_transfer")
       return yield* channelFailure(new Error("Unknown channel tool."));
+    // The agent can correct these arguments, so it gets the reason as a result. Codex replaces a
+    // failed tool request with "dynamic tool request failed" (#4728).
+    const refuse = (reason: string) => {
+      logger.warn("A channel handoff was refused.", { channelId, agentId, tool, reason });
+      return { accepted: false, reason };
+    };
     if (
       !isString(args.recipientAgentId) ||
       !isString(args.task) ||
@@ -2812,15 +2818,21 @@ export class ChannelService {
       !args.sourceMessageIds.length ||
       !args.sourceMessageIds.every(isString)
     )
-      return yield* channelFailure(
-        new Error("A handoff needs a recipient, task, expected result, and source messages."),
+      return refuse(
+        "A handoff needs recipientAgentId, task, expectedResult, and sourceMessageIds: the ids of one or more shared channel messages that the task comes from.",
       );
     const recipientAgentId = args.recipientAgentId;
-    yield* channelSync(() => this.requireAvailableMember(channel, recipientAgentId));
-    if (args.recipientAgentId === agentId) return yield* channelFailure(new Error("Choose another channel member."));
+    const recipient = yield* Effect.result(channelSync(() => this.requireAvailableMember(channel, recipientAgentId)));
+    if (Result.isFailure(recipient))
+      return refuse(
+        this.hooks.hidden?.(recipientAgentId)
+          ? "This member is hidden and takes no new work. Choose another channel member."
+          : "Set recipientAgentId to the agent id of an available channel member.",
+      );
+    if (args.recipientAgentId === agentId) return refuse("Choose another channel member.");
     const sourceMessageIds = args.sourceMessageIds;
     if (sourceMessageIds.some((id) => !this.store.message(channelId, id)))
-      return yield* channelFailure(new Error("A source message is unavailable."));
+      return refuse("A source message is unavailable. Use the ids of shared channel messages.");
     const root = tasks.find((item) => item.id === task.rootTaskId);
     if (!root) return yield* channelFailure(new Error("The root task is unavailable."));
     if (root.assignmentCount >= CHANNEL_ASSIGNMENT_LIMIT) {
@@ -2845,20 +2857,22 @@ export class ChannelService {
     const resources = Array.isArray(args.resources) && args.resources.every(isString) ? args.resources : [];
     // Reject an oversized list before the loop. The loop runs a blocking `realpathSync` per
     // workspace entry on the Electron main thread.
-    if (resources.length > 64) return yield* channelFailure(new Error("Invalid task resources."));
+    if (resources.length > 64) return refuse("Give at most 64 task resources.");
     for (let i = 0; i < resources.length; i++) {
       const resource = resources[i] ?? "none";
       if (resource.startsWith("workspace:") && isAbsolute(resource.slice(10)))
         resources[i] = `workspace:${canonicalWorkspace(resource.slice(10))}`;
       else if (resource !== "host" && resource !== "browser" && resource !== "none")
-        return yield* channelFailure(new Error("Use browser, none, or workspace:<absolute path> for task resources."));
+        return refuse("Use browser, none, or workspace:<absolute path> for task resources.");
     }
     // Measure each resource after canonicalization.
     if (resources.some((resource) => resource.length > 4096))
-      return yield* channelFailure(new Error("Invalid task resources."));
+      return refuse("A task resource path is longer than 4096 characters.");
     const dependencies = Array.isArray(args.dependencies) && args.dependencies.every(isString) ? args.dependencies : [];
     if (dependencies.some((id) => dependsOn(tasks, id, task.id) || !tasks.some((item) => item.id === id)))
-      return yield* channelFailure(new Error("Invalid task dependencies."));
+      return refuse(
+        "Each dependency must be the id of another task in this channel that does not depend on this task.",
+      );
     const next =
       tool === "channel_transfer"
         ? {

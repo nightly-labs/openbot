@@ -384,6 +384,8 @@ export const messages = {
   "mobile.server.settings.aiSection": "AI en tools",
   "mobile.server.settings.dataSection": "Gegevens",
   "mobile.server.settings.maintenanceSection": "Onderhoud",
+  "mobile.server.settings.peopleSection": "Personen",
+  "mobile.server.settings.moveSection": "Importeren en overdracht",
   "mobile.server.settings.general": "Algemeen",
   "mobile.server.settings.timezone": "Tijdzone",
   "mobile.server.settings.timezoneAutomatic": "Automatisch",

@@ -1,0 +1,50 @@
+import { router } from "expo-router";
+import { useSyncExternalStore } from "react";
+
+/**
+ * What the message sheet shows and does. The chat stays open under the sheet and owns the message
+ * row, so the sheet acts through the row: a reaction shows at once in the row, and Reply focuses the
+ * composer when the chat is on screen again.
+ */
+export interface MessageActionsRequest {
+  messageId: string;
+  /** The text that Copy puts on the clipboard. Empty for a message of files only. */
+  copyText: string;
+  createdAt?: string;
+  /** The reader's reaction on the message. */
+  ownReaction: string | null;
+  /** The message that Read aloud reads. Unset where the app cannot read aloud. */
+  readAloudId?: string;
+  /** Unset where a reaction cannot be saved. `null` removes the reader's reaction. */
+  onReact?: (emoji: string | null) => void;
+  onReply?: () => void;
+  /** Copies the conversation through this answer into a new thread. Unset where the message has no branch. */
+  onBranch?: () => void;
+  onSelectText?: () => void;
+}
+
+let current: MessageActionsRequest | null = null;
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+/** Opens the sheet of one message. */
+export function openMessageActions(request: MessageActionsRequest) {
+  current = request;
+  for (const listener of listeners) listener();
+  router.push("/message-actions");
+}
+
+/** Forgets the request when its sheet closes, unless a newer sheet replaced it. */
+export function releaseMessageActions(request: MessageActionsRequest | null) {
+  if (current !== request) return;
+  current = null;
+  for (const listener of listeners) listener();
+}
+
+export function useMessageActionsRequest(): MessageActionsRequest | null {
+  return useSyncExternalStore(subscribe, () => current);
+}

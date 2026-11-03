@@ -164,7 +164,8 @@
   display: flex;
   gap: var(--openbot-space-3);
   align-items: center;
-  padding: var(--openbot-space-4) var(--openbot-space-4) 0 var(--openbot-space-6);
+  padding-block: var(--openbot-space-4) 0;
+  padding-inline: var(--openbot-space-6) var(--openbot-space-4);
 }
 
 .vault-dialog-title {

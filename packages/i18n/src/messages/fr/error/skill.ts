@@ -50,6 +50,8 @@ export const messages = {
     "{name} a été installée avant le suivi exact des versions. Mettez-la à jour ou réparez-la avant la publication.",
   "error.skill.tooManySkills": "Un agent peut avoir jusqu’à {limit} compétences.",
   "error.skill.unmanagedExists": "Une compétence non gérée existe déjà à l’emplacement {path}.",
+  "error.skill.managedSlug":
+    "OpenBot donne à chaque agent sa propre compétence {slug}. Donnez un autre nom à cette compétence.",
   "error.skill.templateMarkdownTooLarge": "{name} : SKILL.md dépasse 64 Ko. Raccourcissez-le avant la publication.",
   "error.skill.localNoRevisions": "La compétence locale n’a aucune révision publiée.",
   "error.skill.localNameTaken": "Une compétence locale porte déjà ce nom. Révisez-la plutôt.",
