@@ -18,6 +18,8 @@ type AgentRecordPart =
   | "task-limit"
   | "new-chat"
   | "plan-card"
+  | "fast-mode"
+  | "instructions"
   | "publish"
   | "browser-profile"
   | "folders";
@@ -33,6 +35,7 @@ export const AGENT_SETTINGS_PARTS: readonly string[] = [
   "task-limit",
   "new-chat",
   "plan-card",
+  "fast-mode",
   "session-settings",
   "provider-accounts",
   "browser-profile",

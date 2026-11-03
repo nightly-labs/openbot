@@ -711,4 +711,24 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Выбрать",
   "mobile.agent.folders.notAddedTitle": "Папка не добавлена",
   "mobile.agent.folders.notExcludedTitle": "Папка не исключена",
+  "mobile.agent.fastMode.label": "Быстрый режим",
+  "mobile.agent.fastMode.footer":
+    "Агент запрашивает у провайдера более быстрые ответы. Изменение действует со следующего хода.",
+  "mobile.agent.compact.title": "Сжать контекст",
+  "mobile.agent.compact.compacting": "Запуск сжатия…",
+  "mobile.agent.compact.footer": "Провайдер сокращает контекст этого чата. Сообщения остаются.",
+  "mobile.agent.compact.started": "Сжатие запущено. Провайдер сокращает контекст на хосте.",
+  "mobile.agent.compact.failed": "Не удалось сжать контекст",
+  "mobile.agent.compact.failedBody": "Хост не смог сжать контекст.",
+  "mobile.agent.compact.unsupported": "Этот хост не может сжимать контекст с удалённого устройства.",
+  "mobile.agent.instructionsFile.title": "Файл инструкций",
+  "mobile.agent.instructionsFile.placeholder": "Правила, которым этот агент всегда следует",
+  "mobile.agent.instructionsFile.footer": "Агент читает этот файл в каждой сессии. Агент также может его изменить.",
+  "mobile.agent.instructionsFile.changed":
+    "Агент изменил свои инструкции, пока вы их редактировали. Сохраните ещё раз, чтобы заменить его версию.",
+  "mobile.agent.instructionsFile.saveFailed": "Не удалось сохранить файл инструкций.",
+  "mobile.agent.instructionsFile.readFailed": "Не удалось прочитать файл инструкций.",
+  "mobile.agent.instructionsFile.loading": "Загрузка файла инструкций…",
+  "mobile.agent.instructionsFile.unsupported":
+    "Этот хост не может редактировать файл инструкций с удалённого устройства.",
 } as const satisfies PartialTranslation<typeof source>;
