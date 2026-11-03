@@ -23,7 +23,7 @@ export interface ComposerDictation {
   /** 0 with the composer at rest, 1 while dictation listens. Drives the composer on the UI thread. */
   presence: SharedValue<number>;
   /** Listens and writes the speech after the draft. False when the recognizer cannot start. */
-  start: (mode: "hold" | "locked") => boolean;
+  start: (mode: "hold" | "locked", origin: "empty" | "draft") => boolean;
   /** The finger left the mic: stop, and keep the text. */
   release: () => void;
   /** The finger slid to the lock: listen on without it. */
@@ -82,9 +82,9 @@ export function useComposerDictation({
   );
 
   const start = useCallback(
-    (mode: "hold" | "locked") => {
+    (mode: "hold" | "locked", from: "empty" | "draft") => {
       if (stageRef.current !== "idle" || !listen(draftRef.current)) return false;
-      setOrigin(draftRef.current.trim() ? "draft" : "empty");
+      setOrigin(from);
       moveTo(mode === "hold" ? "holding" : "locked");
       return true;
     },

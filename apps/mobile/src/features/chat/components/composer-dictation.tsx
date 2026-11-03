@@ -31,7 +31,7 @@ import type { ComposerDictationStage } from "./use-composer-dictation";
 /** A press longer than this is a hold: it dictates. A shorter one is a tap. */
 const HOLD_MS = 250;
 /** How far the finger slides up to lock dictation, and left to cancel it. */
-export const LOCK_DISTANCE = 72;
+const LOCK_DISTANCE = 72;
 const CANCEL_DISTANCE = 96;
 const PRESS_IN = { duration: 100, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.System };
 // A finger moved these, so they settle on springs that keep its velocity.

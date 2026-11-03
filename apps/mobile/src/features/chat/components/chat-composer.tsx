@@ -765,10 +765,12 @@ export const ChatComposer = memo(function ChatComposer({
     editAfterDictation.current = false;
     inputRef.current?.focus();
   }, [dictationBusy]);
+  // The origin is the mic that was pressed, not the draft: a draft of files only has no text, but its
+  // mic is the one next to Send, and that mic must stay under the finger.
   const dictate = useCallback(
-    (mode: "hold" | "locked") => {
+    (mode: "hold" | "locked", origin: "empty" | "draft") => {
       if (!dictation) return;
-      dictation.start(mode);
+      dictation.start(mode, origin);
     },
     [dictation],
   );
@@ -785,31 +787,37 @@ export const ChatComposer = memo(function ChatComposer({
     },
     [dictation],
   );
-  const startHold = useCallback(() => {
-    // The finger can lift now: the mic listens until it does.
-    void haptics.longPress();
-    dictate("hold");
-  }, [dictate]);
+  const startHold = useCallback(
+    (origin: "empty" | "draft") => {
+      // The finger can lift now: the mic listens until it does.
+      void haptics.longPress();
+      dictate("hold", origin);
+    },
+    [dictate],
+  );
+  const startMicHold = useCallback(() => startHold("empty"), [startHold]);
+  const startDraftMicHold = useCallback(() => startHold("draft"), [startHold]);
   // The empty composer's mic: a tap starts the live conversation, or dictates hands-free where the
   // chat has none, such as a channel.
   const tapMic = useCallback(() => {
     if (voice?.available) {
       inputRef.current?.blur();
       voice.start();
-    } else dictate("locked");
+    } else dictate("locked", "empty");
   }, [voice, dictate]);
-  const lockedDictation = useCallback(() => dictate("locked"), [dictate]);
+  const lockedDictation = useCallback(() => dictate("locked", "empty"), [dictate]);
+  const lockedDraftDictation = useCallback(() => dictate("locked", "draft"), [dictate]);
   const micHold = useHoldToDictate({
     // Only what stays the same for a whole hold: a new value rebuilds the gesture, which ends it.
     enabled: holdMic && !disabled,
     onTap: tapMic,
-    onHoldStart: startHold,
+    onHoldStart: startMicHold,
     onHoldEnd: endHold,
   });
   const draftMicHold = useHoldToDictate({
     enabled: draftMic && !disabled,
-    onTap: lockedDictation,
-    onHoldStart: startHold,
+    onTap: lockedDraftDictation,
+    onHoldStart: startDraftMicHold,
     onHoldEnd: endHold,
   });
   const dictationMotion = dictation?.origin === "draft" ? draftMicHold.motion : micHold.motion;
@@ -1384,8 +1392,8 @@ export const ChatComposer = memo(function ChatComposer({
                       dictateLabel={t("mobile.chat.composer.dictate")}
                       fill={accentFill}
                       glyph={dictation ? <DictationLevel level={dictation.level} color={accentGlyph} /> : null}
-                      onTap={lockedDictation}
-                      onDictate={lockedDictation}
+                      onTap={lockedDraftDictation}
+                      onDictate={lockedDraftDictation}
                     >
                       <Mic color={String(foreground)} size={21} strokeWidth={1.8} />
                     </HoldMic>
