@@ -265,28 +265,44 @@ for (const locale of TRANSLATED_LOCALES.filter((locale) => locale !== "en")) {
 // A key that a locale does not translate must be in GAPS for that locale, so new text does not ship
 // in English. `--fix` removes the keys that are now translated; it never adds one. `--accept=<tag>`
 // adds all keys that the locale does not translate, for a new language.
-const known: Record<string, string[] | undefined> = JSON.parse(readFileSync(GAPS, "utf8"));
+const gapsFile = relative(ROOT, GAPS);
+const known = JSON.parse(readFileSync(GAPS, "utf8"));
+const listed = new Map<string, readonly unknown[]>();
+if (isDynamicRecord(known)) {
+  for (const [key, locales] of Object.entries(known)) {
+    if (Array.isArray(locales)) listed.set(key, locales);
+    else failures.push(`${gapsFile}: ${key} must have a list of locale tags.`);
+  }
+} else {
+  failures.push(`${gapsFile} must be an object of keys and locale tags.`);
+}
 const accept = process.argv.find((arg) => arg.startsWith("--accept="))?.slice("--accept=".length);
-const gaps: Record<string, string[]> = {};
+if (accept !== undefined && !(accept in untranslated)) failures.push(`--accept=${accept} is not a translated locale.`);
+const gaps = new Map<string, string[]>();
 const missing = Object.entries(untranslated).map(([locale, keys]) => [locale, new Set(keys)] as const);
-for (const [key, name] of owner) {
+// Sorted, so the file does not depend on the order in which the file system lists the modules.
+for (const key of [...owner.keys()].sort()) {
   const locales: string[] = [];
   for (const [locale, keys] of missing) {
     if (!keys.has(key)) continue;
-    if (known[key]?.includes(locale) || locale === accept) locales.push(locale);
-    else failures.push(`${locale}/${name}.ts: ${key} is not translated. Translate it; see docs/i18n.md.`);
+    if (listed.get(key)?.includes(locale) || locale === accept) locales.push(locale);
+    else failures.push(`${locale}/${owner.get(key)}.ts: ${key} is not translated. Translate it; see docs/i18n.md.`);
   }
-  if (locales.length > 0) gaps[key] = locales;
+  if (locales.length > 0) gaps.set(key, locales);
 }
 if (fix || accept) {
-  const lines = Object.entries(gaps).map(([key, locales]) => {
+  const entries = [...gaps];
+  const lines = entries.map(([key, locales], index) => {
     const line = `  ${JSON.stringify(key)}: [${locales.map((locale) => JSON.stringify(locale)).join(", ")}]`;
-    if (line.length < 120) return line;
+    // Biome's line width is 120, with the comma that follows each entry but the last.
+    if (line.length + (index < entries.length - 1 ? 1 : 0) <= 120) return line;
     return `  ${JSON.stringify(key)}: [\n${locales.map((locale) => `    ${JSON.stringify(locale)}`).join(",\n")}\n  ]`;
   });
   writeFileSync(GAPS, `{\n${lines.join(",\n")}\n}\n`);
-} else if (JSON.stringify(gaps) !== JSON.stringify(known)) {
-  failures.push(`${relative(ROOT, GAPS)} lists keys that are translated or removed. Run \`bun run i18n:check --fix\`.`);
+} else if (
+  [...listed].some(([key, locales]) => locales.some((locale) => !gaps.get(key)?.some((tag) => tag === locale)))
+) {
+  failures.push(`${gapsFile} lists keys that are translated or removed. Run \`bun run i18n:check --fix\`.`);
 }
 
 // Each source template, with a number for {count} and its own placeholder text for the rest, must

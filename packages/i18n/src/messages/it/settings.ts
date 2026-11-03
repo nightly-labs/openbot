@@ -76,7 +76,7 @@ export const messages = {
   "settings.agentDefaults.on": "Attivato",
   "settings.agentDefaults.off": "Disattivato",
   "settings.agentDefaults.followDefault": "Predefinito ({value})",
-  "settings.agentDefaults.count": "{on} di {total} attivi",
+  "settings.agentDefaults.count": "Attivo per {on} su {total}",
   "settings.agentDefaults.open": "Apri {name}",
   "settings.agentDefaults.agentList": "Attivo per {names}",
   "settings.agentDefaults.defaultTitle": "Predefinito",

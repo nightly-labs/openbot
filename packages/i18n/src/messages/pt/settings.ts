@@ -75,7 +75,7 @@ export const messages = {
   "settings.agentDefaults.on": "Ligado",
   "settings.agentDefaults.off": "Desligado",
   "settings.agentDefaults.followDefault": "Padrão ({value})",
-  "settings.agentDefaults.count": "{on} de {total} ligados",
+  "settings.agentDefaults.count": "Ligado para {on} de {total}",
   "settings.agentDefaults.open": "Abrir {name}",
   "settings.agentDefaults.agentList": "Ligado para {names}",
   "settings.agentDefaults.defaultTitle": "Padrão",
