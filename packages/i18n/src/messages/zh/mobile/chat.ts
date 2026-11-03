@@ -195,7 +195,7 @@ export const messages = {
   "mobile.chat.message.reply": "回复",
   "mobile.chat.message.edit": "编辑问题",
   "mobile.chat.message.cancelEdit": "取消",
-  "mobile.chat.message.sendEdit": "发送修改后的问题",
+  "mobile.chat.message.sendEdit": "发送",
   "mobile.chat.message.editFailed": "无法编辑问题",
   "mobile.chat.message.editUnsupported": "请更新主机后再编辑问题。",
   "mobile.chat.message.actions": "消息操作",

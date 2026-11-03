@@ -335,7 +335,7 @@ export const messages = {
   "chat.menu.branch": "从这里分支",
   "chat.menu.edit": "编辑并重新提问",
   "chat.rewrite.draft": "修改后的问题",
-  "chat.rewrite.send": "重新提问",
+  "chat.rewrite.send": "发送",
   "chat.rewrite.failed": "无法重新提问。",
   "chat.menu.markUnread": "标为未读",
   "chat.voice.play": "播放语音消息",

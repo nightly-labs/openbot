@@ -172,6 +172,7 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "Kan link niet openen",
   "mobile.chat.markdown.linkFailedMessage": "Je kunt de link selecteren en kopiëren.",
   "mobile.chat.message.reply": "Antwoorden",
+  "mobile.chat.message.sendEdit": "Versturen",
   "mobile.chat.message.actions": "Berichtacties",
   "mobile.chat.message.copy": "Kopieer bericht",
   "mobile.chat.message.copied": "Bericht gekopieerd",

@@ -200,6 +200,7 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "リンクを開けませんでした",
   "mobile.chat.markdown.linkFailedMessage": "代わりにリンクを選択してコピーできます。",
   "mobile.chat.message.reply": "返信",
+  "mobile.chat.message.sendEdit": "送信",
   "mobile.chat.message.actions": "メッセージの操作",
   "mobile.chat.message.copy": "メッセージをコピー",
   "mobile.chat.message.copied": "メッセージをコピーしました",

@@ -200,7 +200,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.message.reply": "Reply",
   "mobile.chat.message.edit": "Edit question",
   "mobile.chat.message.cancelEdit": "Cancel",
-  "mobile.chat.message.sendEdit": "Send edited question",
+  "mobile.chat.message.sendEdit": "Send",
   "mobile.chat.message.editFailed": "Could not edit the question",
   "mobile.chat.message.editUnsupported": "Update the host to edit a question.",
   "mobile.chat.message.actions": "Message actions",

@@ -334,7 +334,7 @@ export const messages = defineMessages("chat", {
   "chat.menu.branch": "Branch from here",
   "chat.menu.edit": "Edit and resend",
   "chat.rewrite.draft": "Edited message",
-  "chat.rewrite.send": "Resend",
+  "chat.rewrite.send": "Send",
   "chat.rewrite.failed": "Could not resend this message.",
   "chat.menu.markUnread": "Mark unread",
   "chat.voice.play": "Play voice message",

@@ -324,6 +324,7 @@ export const messages = {
   "chat.menu.copy": "メッセージをコピー",
   "chat.menu.react": "リアクション",
   "chat.menu.branch": "ここから分岐",
+  "chat.rewrite.send": "送信",
   "chat.menu.markUnread": "未読にする",
   "chat.voice.play": "音声メッセージを再生",
   "chat.voice.pause": "音声メッセージを一時停止",

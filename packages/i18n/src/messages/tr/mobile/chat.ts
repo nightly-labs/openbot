@@ -200,6 +200,7 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "Bağlantı açılamadı",
   "mobile.chat.markdown.linkFailedMessage": "Bunun yerine bağlantıyı seçip kopyalayabilirsiniz.",
   "mobile.chat.message.reply": "Yanıtla",
+  "mobile.chat.message.sendEdit": "Gönder",
   "mobile.chat.message.actions": "Mesaj eylemleri",
   "mobile.chat.message.copy": "Mesajı kopyala",
   "mobile.chat.message.copied": "Mesaj kopyalandı",

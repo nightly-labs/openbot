@@ -201,6 +201,7 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "No se pudo abrir el enlace",
   "mobile.chat.markdown.linkFailedMessage": "En su lugar, puedes seleccionar y copiar el enlace.",
   "mobile.chat.message.reply": "Responder",
+  "mobile.chat.message.sendEdit": "Enviar",
   "mobile.chat.message.actions": "Acciones del mensaje",
   "mobile.chat.message.copy": "Copiar mensaje",
   "mobile.chat.message.copied": "Mensaje copiado",

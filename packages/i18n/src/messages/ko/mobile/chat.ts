@@ -198,6 +198,7 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "링크를 열 수 없어요",
   "mobile.chat.markdown.linkFailedMessage": "대신 링크를 선택해서 복사할 수 있어요.",
   "mobile.chat.message.reply": "답장",
+  "mobile.chat.message.sendEdit": "보내기",
   "mobile.chat.message.actions": "메시지 작업",
   "mobile.chat.message.copy": "메시지 복사",
   "mobile.chat.message.copied": "메시지를 복사했어요",
