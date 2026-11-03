@@ -26,10 +26,9 @@ import {
   isReasoningEffort,
   PICKER_PROVIDERS,
   providerDisplayName,
-  spentUsageWindow,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
-import { planLimitWindowKind } from "@openbot/team-client/plan-limits";
+import { planLimitWindowKind, spentUsageWindow } from "@openbot/team-client/plan-limits";
 import {
   Badge,
   Button,

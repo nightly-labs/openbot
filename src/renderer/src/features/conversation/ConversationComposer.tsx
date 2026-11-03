@@ -6,7 +6,6 @@ import {
   canPreviewAttachment,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type QueueSnapshot,
-  spentUsageWindow,
 } from "@openbot/contracts/ipc";
 import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
@@ -16,6 +15,7 @@ import {
   TEAM_ZIP_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
+import { spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { Button, Input } from "@openbot/ui";
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
