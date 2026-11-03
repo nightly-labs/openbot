@@ -16,6 +16,7 @@ import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { ClaudeAgentClient } from "../src/backend/claude-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
+import { ProviderClientOperationError } from "../src/backend/provider-client-effects";
 import { BUILT_IN_PROVIDER_DRIVERS, NO_PROVIDER_CREDENTIALS } from "../src/backend/provider-drivers";
 
 export async function checkProviderAccountReload(): Promise<void> {
@@ -43,6 +44,7 @@ if (process.argv.includes("--version")) {
   process.exit(0);
 }
 const folder = claude ? process.env.CLAUDE_CONFIG_DIR : process.env.CODEX_HOME;
+if (!claude) fs.writeFileSync(path.join(folder, "fixture-pid"), String(process.pid));
 const account = () => JSON.parse(fs.readFileSync(path.join(folder, "fixture-account.json"), "utf8"));
 if (claude) {
   if (process.argv.slice(2).join(" ") !== "auth status --json") process.exit(2);
@@ -276,6 +278,38 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
     await waitForAccounts(runtime, "error");
     assert.equal(await readFile(accountsPath, "utf8"), savedList);
     results.push({ name: "failed secondary checks show errors and keep the primary accounts connected", passed: true });
+    // The real Codex app-server adapter owns a local fixture CLI process here. A failed stop must
+    // not be acknowledged as revocation or forgotten: retry must still close that actual process.
+    const credentialClient = runtime.clientFor("codex");
+    assert.ok(credentialClient?.running, "The fixture provider process is not running.");
+    const fixturePid = Number(await readFile(join(defaultHome("codex"), "fixture-pid"), "utf8"));
+    process.kill(fixturePid, 0);
+    const actualStop = credentialClient.stop.bind(credentialClient);
+    let stopRefused = true;
+    credentialClient.stop = () =>
+      stopRefused
+        ? Effect.fail(new ProviderClientOperationError({ cause: new Error("Fixture shutdown refused") }))
+        : actualStop();
+    await assert.rejects(runCauseEffect(runtime.revokeMcpSessions()));
+    assert.equal(credentialClient.running, true, "The failure case did not hold the fixture process alive.");
+    assert.equal(
+      runtime.clientFor("codex"),
+      null,
+      "A stale credential-bearing client stayed available for new requests.",
+    );
+    stopRefused = false;
+    await runCauseEffect(runtime.revokeMcpSessions());
+    assert.equal(credentialClient.running, false, "Revocation completed before the fixture CLI process stopped.");
+    assert.throws(
+      () => process.kill(fixturePid, 0),
+      (error: NodeJS.ErrnoException) => error.code === "ESRCH",
+      "The fixture OS process still exists after revocation.",
+    );
+    for (const provider of providersToCheck) assert.equal(runtime.clientFor(provider), null);
+    results.push({
+      name: "connector revocation failure stays pending, and retry stops the real fixture provider process before acknowledgement",
+      passed: true,
+    });
     passed = true;
   } finally {
     if (runtime) await stop(runtime);

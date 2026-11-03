@@ -644,8 +644,10 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       { id: "agent-research", name: "Research Bot" },
       { id: "chief", name: "Ops\u0007\n\u202eBot" },
     ];
+    const deniedAgents = new Set<string>();
     const startGateway = () => {
       const gateway = new McpGateway({
+        allowsConnector: (_mcpServerId, agentId) => !deniedAgents.has(agentId ?? ""),
         servers,
         credentials: {
           ...NO_PROVIDER_CREDENTIALS,
@@ -746,6 +748,33 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.notEqual(researchRoute.url, directRoute.url);
     assert.equal(await titleOf(researchRoute), "Research Bot (OpenBot)");
     assert.equal(await titleOf(chiefRoute), "Ops Bot (OpenBot)");
+    // A route already held by a provider is checked again after a connector grant is revoked.
+    deniedAgents.add("agent-research");
+    const beforeRevoked = resource.hits.length;
+    const revoked = await fetch(researchRoute.url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${researchRoute.bearer}`,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 91, method: "tools/list", params: {} }),
+    });
+    assert.equal(revoked.status, 403);
+    await revoked.arrayBuffer();
+    assert.equal(resource.hits.length, beforeRevoked, "A revoked route reached the upstream MCP server.");
+    assert.ok(!gateway.enabled("agent-research").some((config) => config.id === direct.id));
+    assert.ok("error" in (await runCauseEffect(gateway.endpoint(direct, "agent-research"))));
+    assert.equal(
+      textOf(
+        await (await connect(chiefRoute.url, chiefRoute.bearer)).callTool({
+          name: "echo",
+          arguments: { text: "still allowed" },
+        }),
+      ),
+      "still allowed",
+    );
+    deniedAgents.clear();
     const research = agents[0];
     assert.ok(research);
     research.name = "Renamed Bot";

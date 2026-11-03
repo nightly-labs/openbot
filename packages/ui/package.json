@@ -468,7 +468,8 @@
     "./features/transfer/instance-transfer.css": "./src/features/transfer/instance-transfer.css",
     "./features/conversation/AgentSessionSettings": "./src/features/conversation/AgentSessionSettings.tsx",
     "./features/conversation/AgentSettingsPanel": "./src/features/conversation/AgentSettingsPanel.tsx",
-    "./features/conversation/ConversationHeader": "./src/features/conversation/ConversationHeader.tsx"
+    "./features/conversation/ConversationHeader": "./src/features/conversation/ConversationHeader.tsx",
+    "./features/servers/ConnectorAccessPanel": "./src/features/servers/ConnectorAccessPanel.tsx"
   },
   "dependencies": {
     "@openbot/contracts": "workspace:*",

@@ -1,0 +1,17 @@
+{
+  "status": 200,
+  "body": {
+    "revision": 1,
+    "closed": false,
+    "rules": [
+      {
+        "mcpServerId": "mail",
+        "agentIds": ["private-agent"],
+        "audienceAgentIds": ["private-agent"],
+        "everyoneUse": false,
+        "roleIds": ["personal"]
+      }
+    ],
+    "connectors": [{ "id": "mail", "name": "Personal mail" }]
+  }
+}

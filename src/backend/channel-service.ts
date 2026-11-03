@@ -53,6 +53,7 @@ import type { OpenBotDatabase } from "./openbot-database";
 import { extractJsonObject, StructuredOutputError } from "./structured-output";
 
 export interface ChannelHooks {
+  connectorAllowed?(agentId: string): boolean;
   agents(): AgentSummary[];
   /**
    * Whether the user hid this agent. A hidden member keeps its membership, but the channel gives it
@@ -316,6 +317,11 @@ export class ChannelService {
     /** Messages a save writes with the change, in the same commit. */
     notes: ChannelMessage[] = [],
   ): Effect.fn.Return<Channel, ChannelOperationError> {
+    if (
+      command.type === "save" &&
+      command.draft.members.some((member) => this.hooks.connectorAllowed?.(member.agentId) === false)
+    )
+      return yield* channelFailure(new Error(sourceText("error.team.connectorChannelUnavailable")));
     const operationId = `${actor.id}:${command.operationId}`;
     const receipt = yield* channelSync(() => this.store.database.commandResult(`channels:${operationId}`));
     if (receipt !== undefined) {
@@ -1925,6 +1931,8 @@ export class ChannelService {
   ): Effect.fn.Return<{ threadId: string; text: string } | null, ChannelOperationError> {
     const assignment = yield* channelSync(() => this.store.assignmentForDelivery(delivery.delivery.id));
     if (!assignment) return null;
+    if (this.hooks.connectorAllowed?.(assignment.agentId) === false)
+      return yield* channelFailure(new Error(sourceText("error.team.connectorChannelUnavailable")));
     const channel = yield* channelSync(() => this.store.get(assignment.channelId));
     if (this.#deletedChannels.has(channel.id)) return null;
     const tasks = yield* channelSync(() => this.store.tasks(channel.id));

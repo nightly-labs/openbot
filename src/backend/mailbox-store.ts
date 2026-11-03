@@ -814,6 +814,14 @@ export class MailboxStore {
     return new Map(this.#state.messages.map((message) => [message.id, message]));
   }
 
+  /** The host-stamped person of a user delivery. Never taken from model or request arguments. */
+  memberIdForDelivery(deliveryId: string): string | null {
+    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId);
+    return delivery
+      ? (this.#state.messages.find((item) => item.id === delivery.messageId)?.senderMember?.id ?? null)
+      : null;
+  }
+
   /** The task a delivery runs in, or null for the agent's own chat. */
   taskIdForDelivery(deliveryId: string): string | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);

@@ -343,6 +343,7 @@ const INITIAL_STATUS: AgentStatus = {
  * ProviderPort above is what those five places get now.
  */
 export class ProviderRuntime implements ProviderPort {
+  readonly #mcpRevocationClients = new Set<AgentClient>();
   readonly #conversation: ConversationRuntime;
   readonly #hooks: ProviderHooks;
   readonly #emit: (event: AgentEvent) => void;
@@ -2018,9 +2019,11 @@ export class ProviderRuntime implements ProviderPort {
   readonly #stopProviderClient = Effect.fn("ProviderRuntime.stopProviderClient")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
+    strict = false,
   ) {
     const client = this.#clients.get(provider);
     if (client) {
+      if (strict) this.#mcpRevocationClients.add(client);
       // Remove ownership first so a process exit cannot start a replacement.
       yield* providerStep(() => {
         this.#clients.delete(provider);
@@ -2028,12 +2031,15 @@ export class ProviderRuntime implements ProviderPort {
         this.#accounts.delete(provider);
         this.#conversation.unloadClientThreads(client);
       });
-      yield* client.stop().pipe(Effect.catch(() => Effect.void));
+      yield* strict
+        ? client.stop().pipe(toProviderOperationFailed)
+        : client.stop().pipe(Effect.catch(() => Effect.void));
+      this.#mcpRevocationClients.delete(client);
       yield* this.#hooks.onClientStopped(client);
     }
     yield* Effect.forEach(
       [...this.#confined].filter(([, confined]) => confined.client.provider === provider),
-      ([agentId, confined]) => this.#stopConfined(agentId, confined),
+      ([agentId, confined]) => this.#stopConfined(agentId, confined, strict),
       { concurrency: "unbounded", discard: true },
     );
   }, Effect.uninterruptible);
@@ -2431,12 +2437,17 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     agentId: string,
     confined: ConfinedClient,
+    strict = false,
   ) {
+    if (strict) this.#mcpRevocationClients.add(confined.client);
     yield* providerStep(() => {
       if (this.#confined.get(agentId) === confined) this.#confined.delete(agentId);
       this.#conversation.unloadClientThreads(confined.client);
     });
-    yield* confined.client.stop().pipe(Effect.catch(() => Effect.void));
+    yield* strict
+      ? confined.client.stop().pipe(toProviderOperationFailed)
+      : confined.client.stop().pipe(Effect.catch(() => Effect.void));
+    this.#mcpRevocationClients.delete(confined.client);
     yield* this.#hooks.onClientStopped(confined.client);
   }, Effect.uninterruptible);
 
@@ -2633,6 +2644,41 @@ export class ProviderRuntime implements ProviderPort {
     );
   }).bind(this);
 
+  /** Ends current shared and confined MCP sessions. A failure is not a successful revocation. */
+  readonly revokeMcpSessions = Effect.fn("ProviderRuntime.revokeMcpSessions")(function* (this: ProviderRuntime) {
+    const providers = new Set(
+      [...this.#mcpRevocationClients]
+        .map((client) => client.provider)
+        .concat([
+          ...this.#clients.keys(),
+          ...this.#providerStarts.keys(),
+          ...[...this.#confined.values()].map((item) => item.client.provider),
+        ]),
+    );
+    for (const provider of providers) this.#replacingCli.add(provider);
+    yield* Effect.gen({ self: this }, function* () {
+      for (const client of this.#mcpRevocationClients) {
+        yield* client.stop().pipe(toProviderOperationFailed);
+        this.#mcpRevocationClients.delete(client);
+        yield* this.#hooks.onClientStopped(client);
+      }
+      for (const pending of this.#providerStarts.values()) yield* Deferred.await(pending).pipe(Effect.ignore);
+      for (const pending of this.#confinedStarts.values()) yield* Deferred.await(pending).pipe(Effect.ignore);
+      for (const provider of providers)
+        yield* this.#runProviderConnectionCommand(provider, () => this.#stopProviderClient(provider, true), false);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          for (const provider of providers) {
+            if ([...this.#mcpRevocationClients].some((client) => client.provider === provider)) continue;
+            this.#replacingCli.delete(provider);
+            this.#hooks.onProviderResumed(provider);
+          }
+        }),
+      ),
+    );
+  }, Effect.uninterruptible).bind(this);
+
   /**
    * The provider half of stop(). Returns the clients the caller still has to await, because
    * stop() interleaves that wait with the mailbox and image-generation teardown.
@@ -2654,12 +2700,14 @@ export class ProviderRuntime implements ProviderPort {
     this.#providerConnectionCommands.clear();
     yield* stopCliLogins;
     const clients = [
+      ...this.#mcpRevocationClients,
       ...this.#clients.values(),
       ...[...this.#confined.values()].map((confined) => confined.client),
       ...(loginClient ? [loginClient] : []),
     ];
     this.#clients.clear();
     this.#confined.clear();
+    this.#mcpRevocationClients.clear();
     yield* Scope.close(this.#scope, Exit.void);
     return clients;
   }, Effect.uninterruptible).bind(this);

@@ -161,7 +161,10 @@ export interface OpenBotToolRouterHooks {
   updateAgent(input: UpdateAgentInput, initiatingAgentId: string): Effect.Effect<AgentSummary, ToolOperationFailed>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Effect.Effect<AgentSummary, ToolOperationFailed>;
   /** The MCP servers of this computer that are turned on, before the Computer Use setting of one agent. */
-  enabledMcpServers(): McpServerConfig[];
+  enabledMcpServers(agentId?: string): McpServerConfig[];
+  connectorProtection?(): boolean;
+  sameConnectorAudience?(left: string, right: string): boolean;
+  protectedAgent?(agentId: string): boolean;
   emitError(code: string, error: unknown, agentId?: string): void;
   /** Masks the MCP secret values and handoff values that `redactText` does not know. */
   redactMcp(text: string): string;
@@ -300,6 +303,7 @@ export class OpenBotToolRouter {
       drain: options.drain,
       hooks: {
         listAgents: () => options.hooks.listAgents(),
+        sameConnectorAudience: options.hooks.sameConnectorAudience,
         interrupt: (agentId, turnId, mayStop) => options.hooks.interrupt(agentId, turnId, mayStop),
       },
     });
@@ -487,6 +491,14 @@ export class OpenBotToolRouter {
               return;
             }
             if (isHostedSiteMutationTool(toolRequest.params.tool)) {
+              const agentId = this.#conversation.agentForThread(toolRequest.params.threadId);
+              if (!agentId || this.#hooks.protectedAgent?.(agentId)) {
+                client.respond(
+                  toolRequest.id,
+                  openBotToolFailure(sourceText("error.team.connectorPublishUnavailable")),
+                );
+                return;
+              }
               yield* this.#attention.surfaceHostedSiteApproval(
                 client,
                 toolRequest,
@@ -744,7 +756,7 @@ export class OpenBotToolRouter {
         schedule: routine.trigger.schedule,
         nextRunAt: routine.trigger.nextRunAt,
       })),
-      mcpServers: agentMcpServers(this.#hooks.enabledMcpServers(), computerUse).map((server) => ({
+      mcpServers: agentMcpServers(this.#hooks.enabledMcpServers(agent.id), computerUse).map((server) => ({
         name: server.name,
         transport: server.transport,
       })),
@@ -757,6 +769,26 @@ export class OpenBotToolRouter {
   ) {
     const senderAgentId = this.#conversation.agentForThread(params.threadId);
     if (!senderAgentId) throw new Error("The sending OpenBot agent is unknown.");
+    if (this.#hooks.connectorProtection?.()) {
+      if (
+        this.#hooks.protectedAgent?.(senderAgentId) &&
+        (params.tool === "create_skill" || params.tool === "revise_skill")
+      )
+        return openBotToolFailure(sourceText("error.team.connectorPublishUnavailable"));
+      if (
+        ["list_sections", "create_section", "update_section", "delete_section", "assign_agent_section"].includes(
+          params.tool,
+        )
+      )
+        return openBotToolFailure(sourceText("error.team.connectorManageInSettings"));
+      if (
+        this.#hooks.protectedAgent?.(senderAgentId) &&
+        (params.tool.startsWith("channel_") ||
+          params.tool.startsWith("messaging_") ||
+          MESSAGING_OUTBOUND_TOOLS.has(params.tool))
+      )
+        return openBotToolFailure(sourceText("error.team.connectorChannelUnavailable"));
+    }
 
     if (LOCAL_SKILL_TOOL_DEFINITIONS.some((tool) => tool.name === params.tool)) {
       const reportFailure = (error: unknown) =>
@@ -776,7 +808,11 @@ export class OpenBotToolRouter {
             senderAgentId,
             params.tool,
             params.arguments,
-            (agentId) => this.#requireAgent(agentId ?? senderAgentId).id,
+            (agentId) => {
+              const target = this.#requireAgent(agentId ?? senderAgentId);
+              this.#requireConnectorAudience(senderAgentId, target.id);
+              return target.id;
+            },
             (event) => {
               const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
               const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
@@ -890,7 +926,10 @@ export class OpenBotToolRouter {
       // A hidden agent takes no new messages, so the list leaves it out.
       const agents = this.#hooks
         .listAgents()
-        .filter((agent) => agent.hiddenAt === undefined)
+        .filter(
+          (agent) =>
+            agent.hiddenAt === undefined && this.#hooks.sameConnectorAudience?.(senderAgentId, agent.id) !== false,
+        )
         .map((agent) => {
           const deliveries = this.#mailbox.listQueue(agent.id).deliveries;
           const queuedMessages = deliveries.filter((delivery) => delivery.status === "queued").length;
@@ -941,7 +980,10 @@ export class OpenBotToolRouter {
 
     if (params.tool === "read_agent") {
       const args = readAgentToolSchema.parse(params.arguments ?? {});
-      const payload = yield* this.#readAgent(args.agentId ?? senderAgentId);
+      const targetId = args.agentId ?? senderAgentId;
+      this.#requireConnectorAudience(senderAgentId, targetId);
+      const payload = yield* this.#readAgent(targetId);
+      this.#requireConnectorAudience(senderAgentId, targetId);
       return { success: true, contentItems: [{ type: "inputText", text: redactText(JSON.stringify(payload)) }] };
     }
 
@@ -991,7 +1033,9 @@ export class OpenBotToolRouter {
     );
     if (sidebarResult) return sidebarResult;
 
-    const routineResult = yield* this.#routines.handleTool(params, senderAgentId);
+    const routineResult = yield* this.#routines.handleTool(params, senderAgentId, (targetId) =>
+      this.#requireConnectorAudience(senderAgentId, targetId),
+    );
     if (routineResult) return routineResult;
 
     const flowResult = yield* handleRoutineFlowTool(
@@ -999,7 +1043,15 @@ export class OpenBotToolRouter {
       params.arguments,
       senderAgentId,
       this.#routineFlowTools?.() ?? null,
-      new Set(this.#hooks.listAgents().map((agent) => agent.id)),
+      new Set(
+        this.#hooks
+          .listAgents()
+          .filter((agent) => this.#hooks.sameConnectorAudience?.(senderAgentId, agent.id) !== false)
+          .map((agent) => agent.id),
+      ),
+      this.#hooks.connectorProtection?.()
+        ? (agentId) => this.#hooks.sameConnectorAudience?.(senderAgentId, agentId) !== false
+        : undefined,
     );
     if (flowResult) return flowResult;
 
@@ -1008,6 +1060,7 @@ export class OpenBotToolRouter {
 
     const caller = {
       agentId: senderAgentId,
+      mayAccessAgent: (targetId: string) => this.#hooks.sameConnectorAudience?.(senderAgentId, targetId) !== false,
       inExecutionThread: this.#conversation.isExecutionThread(
         this.#conversation.publicThreadId(senderAgentId, params.threadId),
       ),
@@ -1032,6 +1085,8 @@ export class OpenBotToolRouter {
           next: "Marketplace has no app with this name. Call this again only with a listed name for the same service, such as brave-search for Brave. Otherwise say that Marketplace has no app for it, and do not mention a card or an install.",
         });
       }
+      if (this.#hooks.connectorProtection?.())
+        return openBotToolFailure(sourceText("error.team.connectorManageInSettings"));
       const installed = this.#marketplaceAppServer(args.app);
       if (installed && this.#mcpServers)
         return yield* marketplaceAppStatus(this.#mcpServers, installed, (config) =>
@@ -1262,6 +1317,8 @@ export class OpenBotToolRouter {
     const servers = this.#mcpServers;
     if (!agentId || !servers || !isMcpServerTool(params.tool))
       return openBotToolFailure(sourceText("error.agent.toolRequestInvalid"));
+    if (this.#hooks.connectorProtection?.())
+      return openBotToolFailure(sourceText("error.team.connectorManageInSettings"));
     const threadId = this.#conversation.publicThreadId(agentId, params.threadId);
     return yield* handleMcpServerTool(servers, {
       tool: params.tool,
@@ -1299,7 +1356,8 @@ export class OpenBotToolRouter {
   ) {
     const servers = this.#mcpServers;
     if (!servers || params.tool !== "tool_search") return [];
-    const configs = servers.list();
+    const permitted = new Set(this.#hooks.enabledMcpServers(agentId).map((config) => config.id));
+    const configs = servers.list().filter((config) => permitted.has(config.id));
     const names = new Set(
       namesInSearch(
         params,
@@ -1463,6 +1521,8 @@ export class OpenBotToolRouter {
       params: DynamicToolCallParams,
       senderAgentId: string,
     ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
+      if (this.#hooks.protectedAgent?.(senderAgentId))
+        return openBotToolFailure(sourceText("error.team.connectorCreateUnavailable"));
       const args = createAgentToolSchema.parse(params.arguments, { reportInput: true });
       const hue = args.avatarHue ?? null;
       const caller = this.#requireAgent(senderAgentId);
@@ -1555,6 +1615,7 @@ export class OpenBotToolRouter {
       senderAgentId: string,
     ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
       const args = updateProfileToolSchema.parse(params.arguments, { reportInput: true });
+      this.#requireConnectorAudience(senderAgentId, args.agentId);
       const {
         agentId,
         avatarHue,
@@ -1628,12 +1689,16 @@ export class OpenBotToolRouter {
         ...restrictionInput(access, computerUse),
         ...(avatarHue === undefined ? {} : { avatarHue }),
       };
+      this.#requireConnectorAudience(senderAgentId, agentId);
       let updated = yield* this.#hooks.updateAgent(input, senderAgentId).pipe(toToolOperationFailed);
       if (image !== undefined) {
+        this.#requireConnectorAudience(senderAgentId, agentId);
         updated = yield* this.#hooks.setAvatar(agentId, image).pipe(toToolOperationFailed);
       } else if (args.avatarSeed !== undefined || args.avatarHue !== undefined) {
+        this.#requireConnectorAudience(senderAgentId, agentId);
         updated = yield* this.#hooks.setAvatar(agentId, null).pipe(toToolOperationFailed);
       }
+      this.#requireConnectorAudience(senderAgentId, agentId);
       return {
         success: true,
         contentItems: [
@@ -1664,6 +1729,11 @@ export class OpenBotToolRouter {
     Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause }))),
     Effect.uninterruptible,
   );
+
+  #requireConnectorAudience(senderAgentId: string, targetAgentId: string): void {
+    if (this.#hooks.sameConnectorAudience?.(senderAgentId, targetAgentId) === false)
+      throw new Error(sourceText("error.team.connectorAudienceMismatch"));
+  }
 
   readonly #react = Effect.fn("OpenBotToolRouter.react")(
     function* (
@@ -1712,6 +1782,8 @@ export class OpenBotToolRouter {
       if (recipientValues.includes(senderAgentId)) throw new Error("An agent cannot message itself.");
       const known = new Map(this.#hooks.listAgents().map((agent) => [agent.id, agent]));
       for (const recipient of recipientValues) {
+        if (this.#hooks.sameConnectorAudience?.(senderAgentId, recipient) === false)
+          return openBotToolFailure(sourceText("error.team.connectorAudienceMismatch"));
         const agent = known.get(recipient);
         if (!agent) throw new Error(`Unknown OpenBot agent: ${recipient}`);
         // A hidden agent receives no new messages until the user restores it.

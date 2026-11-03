@@ -1,9 +1,15 @@
+import { decodeConnectorAccessSnapshot, parseConnectorAccessChange } from "@openbot/contracts/ipc";
+import {
+  CONNECTOR_ACCESS_CAPABILITY,
+  CONNECTOR_ACCESS_ROUTES,
+} from "@openbot/contracts/team-protocol/connector-access-v1";
 import {
   HOST_MEMBER_UPDATE_CAPABILITY,
   memberUpdateRoute,
 } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import { Effect, Result } from "effect";
+import type { ConnectorAccessStore } from "../connector-access-store";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 // The server name, logo, timezone, agent memory limit, memory review, prompt cache time and app
 // update of one server's host. On a joined server the request goes to the host. Identity, timezone,
@@ -97,6 +103,9 @@ interface HostAdminIpcDependencies {
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   agentAccess: Pick<AgentAccessStore, "levels" | "set">;
+  connectorAccess: ConnectorAccessStore;
+  localMcpServers: () => { id: string; name: string }[];
+  revokeConnectorSessions: () => Effect.Effect<void, unknown>;
   serverAudit: Pick<ServerAuditStore, "read">;
   /** The server ID of this computer's host, when it has one. Roles are stored by it. */
   localServerId: () => string | undefined;
@@ -120,6 +129,9 @@ export function hostAdminIpcHandlers({
   machineAlerts,
   promptCacheTtl,
   agentAccess,
+  connectorAccess,
+  localMcpServers,
+  revokeConnectorSessions,
   serverAudit,
   localServerId,
   localAgentIds,
@@ -298,6 +310,35 @@ export function hostAdminIpcHandlers({
       setPromptCacheTtl: scopedHandler(parsePromptCacheTtl, {
         local: (ttl) => runCauseEffect(promptCacheTtl.set(ttl)),
         remote: (ttl, serverId) => remotePromptCacheTtl(serverId, PROMPT_CACHE_TTL_ROUTES.update, { ttl }),
+      }),
+      getConnectorAccess: scopedQueryHandler({
+        local: () => connectorAccess.snapshot(localMcpServers()),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, CONNECTOR_ACCESS_CAPABILITY))
+            throw new Error(sourceText("error.team.connectorAccessUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, CONNECTOR_ACCESS_ROUTES.read, decodeConnectorAccessSnapshot, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
+      }),
+      setConnectorAccess: scopedHandler(parseConnectorAccessChange, {
+        local: async (change) => {
+          await Effect.runPromise(connectorAccess.set(change, revokeConnectorSessions));
+          return connectorAccess.snapshot(localMcpServers());
+        },
+        remote: (change, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, CONNECTOR_ACCESS_CAPABILITY))
+            throw new Error(sourceText("error.team.connectorAccessUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, CONNECTOR_ACCESS_ROUTES.set, decodeConnectorAccessSnapshot, {
+              method: "POST",
+              body: change,
+            }),
+          );
+        },
       }),
       getAgentAccess: scopedQueryHandler({
         local: () => {

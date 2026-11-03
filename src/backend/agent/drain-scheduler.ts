@@ -122,6 +122,8 @@ function laneOf(key: string): Lane {
 const mainLane = (agentId: string): Lane => ({ agentId, taskId: null });
 
 export interface DrainSchedulerOptions {
+  personMayUseAgent?(personId: string, agentId: string): boolean;
+  connectorAccess?: { audience(agentId: string): string[]; sameAudience(left: string, right: string): boolean };
   store: AgentStore;
   mailbox: MailboxStore;
   mailboxSync: MailboxSync;
@@ -174,6 +176,8 @@ export class DrainScheduler {
   readonly #slotWaiters = new Set<string>();
   #wakingSlotWaiters = false;
   readonly #hooks: DrainHooks;
+  readonly #connectorAccess: DrainSchedulerOptions["connectorAccess"];
+  readonly #personMayUseAgent: DrainSchedulerOptions["personMayUseAgent"];
   readonly #channels: ChannelService | undefined;
   readonly #messaging: MessagingThreads | undefined;
   readonly #drainingLanes = new Set<string>();
@@ -203,6 +207,8 @@ export class DrainScheduler {
   readonly #drainTasks = new Map<string, Deferred.Deferred<void, DeliveryStartFailed>>();
 
   constructor(options: DrainSchedulerOptions) {
+    this.#connectorAccess = options.connectorAccess;
+    this.#personMayUseAgent = options.personMayUseAgent;
     this.#store = options.store;
     this.#mailbox = options.mailbox;
     this.#mailboxSync = options.mailboxSync;
@@ -685,6 +691,23 @@ export class DrainScheduler {
         this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       }
       const agent = yield* this.#store.getOrCreate(delivery.recipientAgentId).pipe(toDeliveryStartFailed);
+      if (
+        batch.some((item) => {
+          const memberId = this.#mailbox.memberIdForDelivery(item.delivery.id);
+          return memberId !== null && this.#personMayUseAgent?.(memberId, agent.id) === false;
+        })
+      )
+        throw new Error(sourceText("error.team.connectorAudienceMismatch"));
+      if ((channelDelivery || messagingDelivery) && (this.#connectorAccess?.audience(agent.id).length ?? 0) > 0)
+        throw new Error(sourceText("error.team.connectorChannelUnavailable"));
+      if (
+        batch.some(
+          (item) =>
+            item.delivery.sender.kind === "agent" &&
+            this.#connectorAccess?.sameAudience(item.delivery.sender.agentId, agent.id) === false,
+        )
+      )
+        throw new Error(sourceText("error.team.connectorAudienceMismatch"));
       // Once for the turn: its process, its session and its sandbox roots read the result.
       yield* checkAgentFolders(agent);
       requestedModel = agent.model;

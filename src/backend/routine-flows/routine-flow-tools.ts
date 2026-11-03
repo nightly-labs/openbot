@@ -5,6 +5,7 @@
  */
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
 import { openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
@@ -55,16 +56,25 @@ export const handleRoutineFlowTool = Effect.fn("RoutineFlowTools.handle")(functi
   senderAgentId: string,
   flows: RoutineFlowTools | null,
   agentIds: ReadonlySet<string>,
+  mayAccessAgent?: (agentId: string) => boolean,
 ) {
   if (!NAMES.has(tool)) return null;
   if (!flows) return yield* new ToolOperationFailed({ cause: new Error("Routine flows are unavailable.") });
-  const unknownAgent = (ids: readonly string[]) => ids.find((id) => !agentIds.has(id));
+  const allowed = (agentId: string) => agentIds.has(agentId) && mayAccessAgent?.(agentId) !== false;
+  const unknownAgent = (ids: readonly string[]) => ids.find((id) => !allowed(id));
   const operation = Effect.gen(function* () {
     if (tool === "list_routine_flows") {
       const input = yield* toolStep(() => listSchema.parse(args ?? {}));
       const agentId = input.agentId ?? senderAgentId;
       if (unknownAgent([agentId])) return openBotToolFailure(`Unknown agent: ${agentId}.`);
       const canvas = yield* flows.canvas(agentId);
+      if (
+        mayAccessAgent &&
+        (!allowed(agentId) ||
+          canvas.routines.some(({ routine }) => !allowed(routine.agentId)) ||
+          canvas.links.some((link) => !allowed(link.fromAgentId) || !allowed(link.toAgentId)))
+      )
+        return openBotToolFailure(sourceText("error.team.connectorAudienceMismatch"));
       return openBotToolResult({
         routines: canvas.routines.map(({ routine }) => ({
           routineId: routine.id,
@@ -85,6 +95,16 @@ export const handleRoutineFlowTool = Effect.fn("RoutineFlowTools.handle")(functi
       const input = yield* toolStep(() => connectSchema.parse(args));
       const unknown = unknownAgent([input.fromAgentId, input.toAgentId]);
       if (unknown) return openBotToolFailure(`Unknown agent: ${unknown}.`);
+      if (mayAccessAgent) {
+        const canvas = yield* flows.canvas(input.fromAgentId);
+        if (
+          !allowed(input.fromAgentId) ||
+          !allowed(input.toAgentId) ||
+          canvas.routines.some(({ routine }) => !allowed(routine.agentId)) ||
+          canvas.links.some((link) => !allowed(link.fromAgentId) || !allowed(link.toAgentId))
+        )
+          return openBotToolFailure(sourceText("error.team.connectorAudienceMismatch"));
+      }
       const link = yield* flows.connect({
         routineId: input.routineId,
         fromAgentId: input.fromAgentId,
@@ -94,6 +114,17 @@ export const handleRoutineFlowTool = Effect.fn("RoutineFlowTools.handle")(functi
       return openBotToolResult({ linkId: link.id });
     }
     const input = yield* toolStep(() => disconnectSchema.parse(args));
+    if (mayAccessAgent) {
+      const canvas = yield* flows.canvas(senderAgentId);
+      const link = canvas.links.find((item) => item.id === input.linkId);
+      if (
+        !link ||
+        !allowed(senderAgentId) ||
+        canvas.routines.some(({ routine }) => !allowed(routine.agentId)) ||
+        canvas.links.some((item) => !allowed(item.fromAgentId) || !allowed(item.toAgentId))
+      )
+        return openBotToolFailure(sourceText("error.team.connectorAudienceMismatch"));
+    }
     yield* flows.disconnect(input);
     return openBotToolResult({ removed: input.linkId });
   });

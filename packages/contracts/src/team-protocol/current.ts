@@ -46,6 +46,7 @@ import {
 } from "./browser-view-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
+import { CONNECTOR_ACCESS_CAPABILITY } from "./connector-access-v1";
 import { CONNECTORS_CAPABILITY } from "./connectors-v1";
 import { CONTEXT_COMPACT_CAPABILITY } from "./context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY } from "./context-reset-v1";
@@ -273,6 +274,7 @@ export {
 };
 
 export const TEAM_CURRENT_CAPABILITIES = [
+  CONNECTOR_ACCESS_CAPABILITY,
   BROWSER_SECRET_CAPABILITY,
   ...TEAM_PROTOCOL_V9_CAPABILITIES,
   "remote-desktop-setup",
@@ -567,6 +569,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
  * leaves these out of the compatibility list of an older peer (`teamCapabilitiesVisibleToProtocol`).
  */
 export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<TeamCurrentCapability>([
+  CONNECTOR_ACCESS_CAPABILITY,
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NEW_CHAT_CAPABILITY,

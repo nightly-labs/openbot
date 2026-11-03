@@ -125,6 +125,7 @@ async function startRun(workflows: WorkflowsHandle, title: string, agentId: stri
 try {
   let { workflows, runs } = await open();
 
+  check("an unknown agent has no historic workflow binding", !runs.referencesAgent("never-used"));
   // 1. A deleted agent fails the step that it was answering.
   const research = await startRun(workflows, "Competitor watch", "agent-research");
   await runUntil(workflows, research.runId, answering);
@@ -149,6 +150,11 @@ try {
     afterDelete.revision > research.revision &&
       afterDelete.graph.nodes.some((node) => node.id === "agent" && node.fields.agentId === undefined),
     { revision: afterDelete.revision, nodes: afterDelete.graph.nodes },
+  );
+
+  check(
+    "historic workflow graph retains its private-agent binding after the live node loses its agent",
+    runs.referencesAgent("agent-research"),
   );
 
   // 2. A restart cut a stop off: the run is stopping and its step still runs.

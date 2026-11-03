@@ -57,6 +57,7 @@ import type { AgentAccessStore } from "./agent-access-store";
 import { type AgentNotificationLevelStore, OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { BrowserViewGateway } from "./browser-view-gateway";
 import type { RemoteHostTicketHome, VerifiedRemoteSessionTicket } from "./central-auth-manager";
+import type { ConnectorAccessStore } from "./connector-access-store";
 import { LiveActivityPushService, LiveActivitySendFailure } from "./live-activity-push";
 import type { PushNotificationStore } from "./push-notification-store";
 import {
@@ -129,6 +130,8 @@ interface HostServiceOptions {
   /** The chats that each person pinned (`sidebar-pins-v1`). */
   sidebarPins?: SidebarPinStore;
   agentAccess?: AgentAccessStore;
+  connectorAccess?: ConnectorAccessStore;
+  connectorMcp?: ForwardedApiOptions["connectorMcp"];
   /** Records who joined, left, or got another server role. */
   serverAudit?: Pick<ServerAuditStore, "read" | "record">;
   agentTasks?: ForwardedApiOptions["agentTasks"];
@@ -456,6 +459,8 @@ export class HostService extends EventEmitter<HostEvents> {
         : { agentNotificationLevels: this.#agentNotificationLevels(options.agentNotificationLevels) }),
       ...(options.sidebarPins === undefined ? {} : { sidebarPins: this.#sidebarPins(options.sidebarPins) }),
       ...(options.agentAccess === undefined ? {} : { agentAccess: options.agentAccess }),
+      ...(options.connectorAccess === undefined ? {} : { connectorAccess: options.connectorAccess }),
+      ...(options.connectorMcp === undefined ? {} : { connectorMcp: options.connectorMcp }),
       ...(options.serverAudit === undefined ? {} : { serverAudit: options.serverAudit }),
       ...(options.agentTasks === undefined ? {} : { agentTasks: options.agentTasks }),
       ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),

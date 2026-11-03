@@ -21,7 +21,7 @@ import { getRecord } from "./protocol";
 const execFileAsync = promisify(execFile);
 
 /** Where a provider client reads the enabled configurations at spawn. */
-export type McpServerSource = () => readonly McpServerConfig[];
+export type McpServerSource = (agentId?: string | null) => readonly McpServerConfig[];
 
 /**
  * What OpenBot can lend a machine that does not have it: the `bin` directories of the tool runtimes

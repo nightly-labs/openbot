@@ -58,6 +58,9 @@ const sent: NotificationRelayRequest[] = [];
 const activityPushes: LiveActivityRelayPush[] = [];
 const waiters = new Set<() => void>();
 let failNextSend = false;
+let revokeOnFailure = false;
+const blockedAgents = new Set<string>();
+let observedBlocked: (() => void) | undefined;
 
 function agentSummary(id: string): AgentSummary {
   return {
@@ -143,13 +146,17 @@ const phones = new PushNotificationService({
     Effect.suspend(() => {
       if (failNextSend) {
         failNextSend = false;
+        if (revokeOnFailure) blockedAgents.add(AGENT_A);
         return Effect.fail(new PushNotificationSendFailure({ cause: new Error("Relay unavailable.") }));
       }
       sent.push(request);
       for (const wake of waiters) wake();
       return Effect.succeed("sent" as const);
     }),
-  hiddenAgentIds: () => new Set(),
+  hiddenAgentIds: () => {
+    if (blockedAgents.has(AGENT_A)) observedBlocked?.();
+    return new Set(blockedAgents);
+  },
   memberActive: (memberId) => memberId === MEMBER,
   lastUseElsewhere: () => null,
   atHostComputer: () => false,
@@ -333,6 +340,32 @@ try {
     assert.equal(failNextSend, false);
     assert.deepEqual(said, [`input ${AGENT_A}`]);
     return { said };
+  });
+
+  await step("a retry cannot send an agent preview after connector access is revoked", async () => {
+    const from = sent.length;
+    const observed = new Promise<void>((resolveObserved, reject) => {
+      const deadline = setTimeout(
+        () => reject(new Error("The retry did not recheck current connector access.")),
+        STEP_DEADLINE_MS,
+      );
+      observedBlocked = () => {
+        clearTimeout(deadline);
+        resolveObserved();
+      };
+    });
+    failNextSend = true;
+    revokeOnFailure = true;
+    events.emit("event", prompt(10));
+    try {
+      await observed;
+      assert.equal(sent.length, from, "A notification was sent after access was revoked.");
+    } finally {
+      observedBlocked = undefined;
+      revokeOnFailure = false;
+      blockedAgents.clear();
+    }
+    return { revokedRetrySuppressed: true };
   });
 
   await step("a Live Activity replaces the notification only of an event that it shows", async () => {

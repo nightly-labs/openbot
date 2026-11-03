@@ -10,6 +10,8 @@ import {
   type AgentNotificationLevelsSnapshot,
   type AgentSessionSettings,
   type BrowseAgentFoldersInput,
+  type ConnectorAccessChange,
+  type ConnectorAccessSnapshot,
   type DiscordAccess,
   type DiscordRoleList,
   decodeAgentAccessSnapshot,
@@ -17,6 +19,7 @@ import {
   decodeAgentFolderBrowse,
   decodeAgentFolderChangeFromMain,
   decodeAgentFolderListFromMain,
+  decodeConnectorAccessSnapshot,
   decodeServerAuditLog,
   type HiddenAgentsSnapshot,
   type HostDiscordAccessInput,
@@ -42,6 +45,7 @@ import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidd
 import { AGENT_MEMORY_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NOTIFICATION_LEVELS_ROUTES } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_SESSION_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import { CONNECTOR_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/connector-access-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import type { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
@@ -658,6 +662,28 @@ export function setHostMemoryReview(
   interval: number,
 ): Effect.Effect<HostMemoryReview, TeamAdminRequestError> {
   return adminCall(() => request("POST", MEMORY_REVIEW_ROUTES.update, decodeHostMemoryReview, { interval }));
+}
+
+export function getHostConnectorAccess(
+  request: TeamApiRequest,
+): Effect.Effect<ConnectorAccessSnapshot, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CONNECTOR_ACCESS_ROUTES.read, decodeConnectorAccessSnapshot, {}));
+}
+export function setHostConnectorAccess(
+  request: TeamApiRequest,
+  change: ConnectorAccessChange,
+): Effect.Effect<ConnectorAccessSnapshot, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CONNECTOR_ACCESS_ROUTES.set, decodeConnectorAccessSnapshot, {
+      revision: change.revision,
+      rules: change.rules.map(({ mcpServerId, agentIds, everyoneUse, roleIds }) => ({
+        mcpServerId,
+        agentIds: [...agentIds],
+        everyoneUse,
+        roleIds: [...roleIds],
+      })),
+    }),
+  );
 }
 
 /** The roles of the host (`agent-access-v1`). A member reads only `mine`. */

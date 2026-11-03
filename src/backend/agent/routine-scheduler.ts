@@ -541,8 +541,9 @@ export class RoutineScheduler implements RoutineDueSource {
   handleTool(
     params: DynamicToolCallParams,
     senderAgentId: string,
+    requireAgentAccess: (agentId: string) => void = () => {},
   ): Effect.Effect<OpenBotToolResponse | null, RoutineOperationFailed> {
-    return this.#handleTool(params, senderAgentId).pipe(
+    return this.#handleTool(params, senderAgentId, requireAgentAccess).pipe(
       Effect.catchDefect((cause) => Effect.fail(new RoutineOperationFailed({ cause }))),
       Effect.catch((failure) =>
         failure.cause instanceof RoutineInputError
@@ -565,10 +566,11 @@ export class RoutineScheduler implements RoutineDueSource {
       : { turnId: params.turnId };
   }
 
-  #toolAgentId(args: DynamicRecord, senderAgentId: string): string {
+  #toolAgentId(args: DynamicRecord, senderAgentId: string, requireAgentAccess: (agentId: string) => void): string {
     const agentId = routineToolAgentId(args, senderAgentId);
     try {
-      this.#conversation.requireKnownAgent(agentId);
+      const target = this.#conversation.requireKnownAgent(agentId);
+      requireAgentAccess(target.id);
     } catch (error) {
       throw new RoutineInputError(error instanceof Error ? error.message : String(error));
     }
@@ -579,10 +581,11 @@ export class RoutineScheduler implements RoutineDueSource {
     this: RoutineScheduler,
     params: DynamicToolCallParams,
     senderAgentId: string,
+    requireAgentAccess: (agentId: string) => void,
   ) {
     if (params.tool === "list_routines") {
       const args = routineToolArguments(params.arguments, ["agentId"]);
-      const agentId = this.#toolAgentId(args, senderAgentId);
+      const agentId = this.#toolAgentId(args, senderAgentId, requireAgentAccess);
       return openBotToolResult({
         routines: this.list(agentId),
         webhookRoutines: this.#routines
@@ -604,7 +607,7 @@ export class RoutineScheduler implements RoutineDueSource {
         "limitPolicy",
         "missedPolicy",
       ]);
-      const agentId = this.#toolAgentId(args, senderAgentId);
+      const agentId = this.#toolAgentId(args, senderAgentId, requireAgentAccess);
       const active = args.active === undefined ? true : args.active;
       if (!isBoolean(active)) throw new RoutineInputError("active must be a boolean.");
       const timezone =
@@ -641,7 +644,7 @@ export class RoutineScheduler implements RoutineDueSource {
 
     if (params.tool === CREATE_WEBHOOK_ROUTINE_TOOL) {
       const args = routineToolArguments(params.arguments, CREATE_WEBHOOK_ROUTINE_ARGUMENTS);
-      const agentId = this.#toolAgentId(args, senderAgentId);
+      const agentId = this.#toolAgentId(args, senderAgentId, requireAgentAccess);
       const webhooks = this.#webhookTool(senderAgentId, params.threadId, params.turnId);
       const active = args.active === undefined ? true : args.active;
       if (!isBoolean(active)) throw new RoutineInputError("active must be a boolean.");
@@ -673,7 +676,7 @@ export class RoutineScheduler implements RoutineDueSource {
 
     if (params.tool === UPDATE_WEBHOOK_ROUTINE_TOOL) {
       const args = routineToolArguments(params.arguments, UPDATE_WEBHOOK_ROUTINE_ARGUMENTS);
-      const agentId = this.#toolAgentId(args, senderAgentId);
+      const agentId = this.#toolAgentId(args, senderAgentId, requireAgentAccess);
       const webhooks = this.#webhookTool(senderAgentId, params.threadId, params.turnId);
       const routineId = routineToolString(
         args.routineId,
@@ -732,7 +735,7 @@ export class RoutineScheduler implements RoutineDueSource {
       ]);
       const policies = routineToolPolicies(args);
       const input: UpdateRoutineInput = {
-        agentId: this.#toolAgentId(args, senderAgentId),
+        agentId: this.#toolAgentId(args, senderAgentId, requireAgentAccess),
         routineId: routineToolString(args.routineId, "routineId", INPUT_LIMITS.identifier, "routineId is required."),
         ...policies,
       };
@@ -765,7 +768,7 @@ export class RoutineScheduler implements RoutineDueSource {
 
     if (params.tool === "delete_routine") {
       const args = routineToolArguments(params.arguments, ["agentId", "routineId"]);
-      const agentId = this.#toolAgentId(args, senderAgentId);
+      const agentId = this.#toolAgentId(args, senderAgentId, requireAgentAccess);
       const routineId = routineToolString(
         args.routineId,
         "routineId",
@@ -778,7 +781,7 @@ export class RoutineScheduler implements RoutineDueSource {
 
     if (params.tool === "test_routine") {
       const args = routineToolArguments(params.arguments, ["agentId", "routineId"]);
-      const agentId = this.#toolAgentId(args, senderAgentId);
+      const agentId = this.#toolAgentId(args, senderAgentId, requireAgentAccess);
       const routineId = routineToolString(
         args.routineId,
         "routineId",

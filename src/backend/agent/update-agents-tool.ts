@@ -44,7 +44,10 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
   function* (
     params: DynamicToolCallParams,
     senderAgentId: string,
-    hooks: Pick<OpenBotToolRouterHooks, "listAgents" | "listModels" | "updateAgent" | "redactMcp">,
+    hooks: Pick<
+      OpenBotToolRouterHooks,
+      "listAgents" | "listModels" | "updateAgent" | "redactMcp" | "sameConnectorAudience"
+    >,
   ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
     const { agentIds, provider, model, reasoningEffort, access, computerUse, notifications } =
       updateAgentsToolSchema.parse(params.arguments, { reportInput: true });
@@ -69,12 +72,16 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
 
     const results = yield* Effect.forEach(agentIds, (agentId) =>
       Effect.gen(function* () {
+        if (hooks.sameConnectorAudience?.(senderAgentId, agentId) === false)
+          return failed(agentId, sourceText("error.team.connectorAudienceMismatch"));
         const target = hooks.listAgents().find((agent) => agent.id === agentId);
         if (!target) return failed(agentId, sourceText("error.agent.unknown", { id: agentId }));
         if (widensAgentSettings(target, access, computerUse)) {
           return failed(agentId, sourceText("error.agent.onlyUserWidensSettings"));
         }
         const runtime = yield* toolStep(() => requestedRuntime(target, runtimeRequest, models));
+        if (hooks.sameConnectorAudience?.(senderAgentId, agentId) === false)
+          return failed(agentId, sourceText("error.team.connectorAudienceMismatch"));
         const updated = yield* hooks.updateAgent(
           {
             agentId,

@@ -282,6 +282,12 @@ interface AgentServiceEvents {
 }
 
 export interface AgentServiceOptions {
+  connectorAccess?: {
+    allows(mcpServerId: string, agentId: string | null | undefined): boolean;
+    protected(): boolean;
+    audience(agentId: string): string[];
+    sameAudience(left: string, right: string): boolean;
+  };
   store: AgentStore;
   mailbox: MailboxStore;
   browser: AgentBrowserHost;
@@ -424,6 +430,7 @@ export type AgentUpdate = UpdateAgentInput & {
 };
 
 export class AgentService extends EventEmitter<AgentServiceEvents> {
+  readonly #connectorAccess: AgentServiceOptions["connectorAccess"];
   readonly channels: ChannelService;
   readonly messaging: MessagingThreads;
   readonly #profileSave: ProfileSave;
@@ -493,6 +500,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   constructor(options: AgentServiceOptions) {
     super();
+    this.#connectorAccess = options.connectorAccess;
     const {
       store,
       mailbox,
@@ -523,6 +531,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // given that callback.
     this.#mcp = new McpGateway({
       servers: new McpServerStore(store.database),
+      allowsConnector: options.connectorAccess?.allows.bind(options.connectorAccess),
       credentials,
       computerUseMcpServer,
       githubConnector,
@@ -859,7 +868,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         // Every MCP set that leaves for a provider is remembered, so its secrets stay redactable
         // after the user edits them. This is the second of the two ways one leaves; the other is
         // `enabledMcpServers`, which the Codex thread configuration reads.
-        mcpServers: () => this.#mcp.record(credentials.mcpServers()),
+        mcpServers: (agentId) =>
+          this.#mcp.record(
+            credentials
+              .mcpServers(agentId)
+              .filter((config) => options.connectorAccess?.allows(config.id, agentId) ?? true),
+          ),
         reportMcpDrops: (provider, drops) => this.#mcp.reportDrops(provider, drops),
         mcpEndpoint: (config, agentId) => this.#mcp.endpoint(config, agentId).pipe(toMcpOperationError),
       },
@@ -937,6 +951,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       memories: this.#memories,
       routines: this.#routines,
       hooks: {
+        assertCopyAllowed: (agentId) => {
+          if ((this.#connectorAccess?.audience(agentId).length ?? 0) > 0)
+            throw new Error(sourceText("error.team.connectorCopyUnavailable"));
+        },
         emit: (event) => this.#emit(event),
         listAgents: () => this.listAgents(),
         deleteAgentData: (agent) => this.#removal.deleteData(agent).pipe(toAgentDuplicationFailed),
@@ -1027,7 +1045,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       memories: this.#memories,
       compaction: this.#compaction,
-      mcpServers: () => this.#mcp.enabled(),
+      mcpServers: (agentId) => this.#mcp.enabled(agentId),
       mcpToolRuntimes: () => this.#mcp.toolRuntimes(),
       mcpEndpoint: (config, agentId) => this.#mcp.endpoint(config, agentId).pipe(toMcpOperationError),
       mcpProxyFingerprint: (configs) => this.#mcp.proxyFingerprint(configs).pipe(toMcpOperationError),
@@ -1076,6 +1094,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
     });
     this.channels = new ChannelService(store.database, mailbox, {
+      connectorAllowed: (agentId) => (options.connectorAccess?.audience(agentId).length ?? 0) === 0,
       agents: () => this.listAgents(),
       hidden: (agentId) => this.#store.isHidden(agentId),
       generate: (lead, prompt) =>
@@ -1283,6 +1302,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
     });
     this.#drain = new DrainScheduler({
+      connectorAccess: options.connectorAccess,
+      personMayUseAgent: (personId, agentId) =>
+        ["chat", "manage"].includes(options.channelPersonAgentLevel?.(personId, agentId) ?? "manage"),
       channels: this.channels,
       messaging: this.messaging,
       store,
@@ -1539,7 +1561,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         updateAgent: (input, initiatingAgentId) =>
           this.updateAgent(input, initiatingAgentId).pipe(toToolOperationFailed),
         setAvatar: (agentId, image) => this.setAvatar(agentId, image).pipe(toToolOperationFailed),
-        enabledMcpServers: () => this.enabledMcpServers(),
+        enabledMcpServers: (agentId) => this.enabledMcpServers(agentId),
+        connectorProtection: () => options.connectorAccess?.protected() ?? false,
+        sameConnectorAudience: (left, right) => options.connectorAccess?.sameAudience(left, right) ?? true,
+        protectedAgent: (agentId) => (options.connectorAccess?.audience(agentId).length ?? 0) > 0,
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
         runsTurn: (agentId) => this.#runsTurn(agentId),
@@ -2091,9 +2116,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  enabledMcpServers(): McpServerConfig[] {
-    return this.#mcp.enabled();
+  enabledMcpServers(agentId?: string | null): McpServerConfig[] {
+    return this.#mcp.enabled(agentId);
   }
+
+  /** A policy save ends every loaded credential-bearing session before it acknowledges revocation. */
+  readonly revokeConnectorSessions = Effect.fn("AgentService.revokeConnectorSessions")(function* (this: AgentService) {
+    yield* this.#providers
+      .revokeMcpSessions()
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "revoke connector sessions", cause: failure.cause }),
+        ),
+      );
+    yield* this.#threads.refreshAllAgentRuntimes();
+  }).bind(this);
 
   /**
    * The Computer Use capability, as the main process alone can know it.
@@ -2558,10 +2595,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#store.committedAgentDuplication(operationId, sourceAgentId);
   }
 
+  connectorProtectionAvailable(agentId: string): boolean {
+    return !this.#duplication.sourceCopyPending(agentId);
+  }
+
   duplicateAgent(
     sourceAgentId: string,
     operationId: string = randomUUID(),
   ): Effect.Effect<AgentSummary, AgentLifecycleFailed> {
+    if ((this.#connectorAccess?.audience(sourceAgentId).length ?? 0) > 0)
+      return Effect.fail(
+        new AgentLifecycleFailed({
+          operation: "duplicateAgent",
+          cause: new Error(sourceText("error.team.connectorCopyUnavailable")),
+        }),
+      );
     return this.#duplication
       .duplicate(sourceAgentId, operationId)
       .pipe(
@@ -2715,6 +2763,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     move: ModelMove | null = null,
     queueWhileBusy = false,
   ) {
+    if (initiatingAgentId && this.#connectorAccess?.sameAudience(initiatingAgentId, input.agentId) === false)
+      throw new AgentSettingsRefused(sourceText("error.team.connectorAudienceMismatch"));
     const returning = move === "return";
     const failingOver = move === "provider-error";
     const handedOverThreads = (previous: AgentSummary) => [

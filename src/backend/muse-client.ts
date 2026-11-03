@@ -513,7 +513,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     const setup = Effect.gen({ self: this }, function* () {
       const resolved = yield* usableMcpServers(
         agentMcpServers(
-          this.#options.profileGeneration ? [] : (this.#options.mcpServers?.() ?? []),
+          this.#options.profileGeneration ? [] : (this.#options.mcpServers?.(mcpAgentParam(params)) ?? []),
           computerUseParam(params),
         ),
         this.#options.mcpToolRuntimes?.(),

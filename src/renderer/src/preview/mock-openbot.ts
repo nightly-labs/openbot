@@ -3223,6 +3223,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(promptCacheTtl);
       },
       // Preview has one host, and its user owns it, so `mine` gives every agent.
+      getConnectorAccess: async () => ({ revision: 0, closed: false, rules: [], connectors: [] }),
+      setConnectorAccess: async (input) => ({
+        ...input,
+        closed: false,
+        rules: input.rules.map((rule) => ({ ...rule, audienceAgentIds: [...rule.agentIds] })),
+        connectors: [],
+      }),
       getAgentAccess: async () => ({
         ...clone(agentAccess),
         mine: Object.fromEntries(agents.map((agent) => [agent.id, "manage" as const])),

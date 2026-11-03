@@ -211,7 +211,8 @@
     "./team-protocol/v8-base-adapter": "./src/team-protocol/v8-base-adapter.ts",
     "./team-protocol/v8-webrtc-adapter": "./src/team-protocol/v8-webrtc-adapter.ts",
     "./team-protocol/v9": "./src/team-protocol/v9.ts",
-    "./team-protocol/v9-webrtc-adapter": "./src/team-protocol/v9-webrtc-adapter.ts"
+    "./team-protocol/v9-webrtc-adapter": "./src/team-protocol/v9-webrtc-adapter.ts",
+    "./team-protocol/connector-access-v1": "./src/team-protocol/connector-access-v1.ts"
   },
   "scripts": {
     "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json"

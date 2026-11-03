@@ -1,3 +1,6 @@
+import type { ConnectorAccessRule } from "@openbot/contracts/ipc";
+import { CONNECTOR_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/connector-access-v1";
+import { CONNECTOR_ACCESS_FILE, ConnectorAccessStore } from "../src/main/connector-access-store";
 // Checks member access to agents through the agent-access-v1 Team API contract. A real
 // `TeamApiServer` runs on loopback with the real team, agent, mailbox, sidebar and roles stores on a
 // temporary profile. The owner sets roles; a member signs in as a current desktop client does. The
@@ -205,6 +208,7 @@ interface Host {
   server: InstanceType<typeof TeamApiServer>;
   team: InstanceType<typeof TeamStore>;
   access: InstanceType<typeof AgentAccessStore>;
+  connectors: ConnectorAccessStore;
   audit: InstanceType<typeof ServerAuditStore>;
   port: number;
 }
@@ -235,7 +239,18 @@ async function startHost(): Promise<Host> {
   await runCauseEffect(team.initialize());
   assert.equal(await runCauseEffect(access.load()), true, "The roles file did not load.");
   if (!team.getIdentity()) await runCauseEffect(team.configure("E2E Host", OWNER.username, OWNER.password));
-  const agents = new AgentService({ store: agentStore, mailbox, browser: agentBrowser, sidebarLayout: sidebar });
+  const connectors = new ConnectorAccessStore(join(userData, CONNECTOR_ACCESS_FILE), (change) => {
+    if (change.rules.some((rule) => rule.agentIds.some((id) => !agents.connectorProtectionAvailable(id))))
+      throw new Error("Finish the pending copy first.");
+  });
+  assert.equal(await Effect.runPromise(connectors.load()), true);
+  const agents = new AgentService({
+    store: agentStore,
+    mailbox,
+    browser: agentBrowser,
+    sidebarLayout: sidebar,
+    connectorAccess: connectors,
+  });
   const server = new TeamApiServer({
     store: team,
     agents,
@@ -245,10 +260,12 @@ async function startHost(): Promise<Host> {
     appVersion: HOST_VERSION,
     hiddenAgents: agents,
     agentAccess: access,
+    connectorAccess: connectors,
+    connectorMcp: agents,
     serverAudit: audit,
   });
   const port = await Effect.runPromise(server.start());
-  return { database, agents, server, team, access, audit, port };
+  return { database, agents, server, team, access, connectors, audit, port };
 }
 
 async function stopHost(): Promise<void> {
@@ -694,6 +711,60 @@ try {
     assert.ok(!(await listedIds(setup.memberToken)).includes(copy), "The member sees the copy.");
     return { copy: stored.everyone[copy], role: stored.roles[0]?.agents[copy] };
   });
+
+  await step(
+    "connector: native role grants protect the whole agent, preserve history after unassignment and reject stale changes",
+    async () => {
+      const connectorCall = (token: string, path: string, body: unknown) =>
+        call("POST", path, { token, body, protocol: TEAM_PROTOCOL_V9 });
+      const rule: ConnectorAccessRule = {
+        mcpServerId: "private-google",
+        agentIds: [general],
+        everyoneUse: false,
+        roleIds: [],
+      };
+      const deniedSave = await connectorCall(setup.memberToken, CONNECTOR_ACCESS_ROUTES.set, {
+        revision: 0,
+        rules: [rule],
+      });
+      assert.equal(deniedSave.status, 403);
+      const pendingCopy = await runCauseEffect(current().agents.duplicateAgent(general));
+      const copyingSave = await connectorCall(ownerToken, CONNECTOR_ACCESS_ROUTES.set, { revision: 0, rules: [rule] });
+      assert.equal(copyingSave.status, 400, "Protection activated while a source copy could still publish.");
+      await runCauseEffect(current().agents.deleteAgent(pendingCopy.id));
+      const saved = await connectorCall(ownerToken, CONNECTOR_ACCESS_ROUTES.set, { revision: 0, rules: [rule] });
+      assert.equal(saved.status, 200, JSON.stringify(saved.body));
+      assert.ok(!(await listedIds(setup.memberToken)).includes(general));
+      assert.equal(
+        (await call("GET", TEAM_API_ROUTES.agent.conversation(general), { token: setup.memberToken })).status,
+        404,
+      );
+      assert.ok((await listedIds(ownerToken)).includes(general));
+      const granted = await connectorCall(ownerToken, CONNECTOR_ACCESS_ROUTES.set, {
+        revision: 1,
+        rules: [{ ...rule, everyoneUse: true }],
+      });
+      assert.equal(granted.status, 200);
+      assert.ok((await listedIds(setup.memberToken)).includes(general));
+      const stale = await connectorCall(ownerToken, CONNECTOR_ACCESS_ROUTES.set, { revision: 1, rules: [] });
+      assert.equal(stale.status, 409);
+      const revoked = await connectorCall(ownerToken, CONNECTOR_ACCESS_ROUTES.set, {
+        revision: 2,
+        rules: [{ ...rule, agentIds: [] }],
+      });
+      assert.equal(revoked.status, 200);
+      assert.equal(current().connectors.allows(rule.mcpServerId, general), false);
+      assert.ok(
+        !(await listedIds(setup.memberToken)).includes(general),
+        "Removing execution assignment exposed the agent's old history.",
+      );
+      await assert.rejects(runCauseEffect(current().agents.duplicateAgent(general)));
+      const restored = new ConnectorAccessStore(join(userData, CONNECTOR_ACCESS_FILE));
+      assert.equal(await Effect.runPromise(restored.load()), true);
+      assert.deepEqual(restored.audience(general), [rule.mcpServerId]);
+      return { memberSave: deniedSave.status, stale: stale.status, historyStillProtected: true };
+    },
+  );
 
   report.passed = true;
 } finally {

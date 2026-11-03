@@ -1,0 +1,9 @@
+{
+  "capability": "connector-access-v1",
+  "method": "POST",
+  "path": "/v1/connector-access/set",
+  "body": {
+    "revision": 0,
+    "rules": [{ "mcpServerId": "mail", "agentIds": ["private-agent"], "everyoneUse": false, "roleIds": ["personal"] }]
+  }
+}

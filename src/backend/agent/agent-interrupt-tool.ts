@@ -21,6 +21,7 @@ export const interruptAgentToolSchema = z.strictObject({
 
 export interface AgentInterruptHooks {
   listAgents(): AgentSummary[];
+  sameConnectorAudience?(left: string, right: string): boolean;
   /**
    * `mayStop` is asked again right before the stop is sent. `false` when the turn no longer runs or
    * `mayStop` refuses, so no stop was sent.
@@ -72,6 +73,8 @@ export class AgentInterruptTool {
     callerAgentId: string,
   ) {
     const { agentId, reason } = yield* toolStep(() => interruptAgentToolSchema.parse(params.arguments));
+    const permitted = () => this.#hooks.sameConnectorAudience?.(callerAgentId, agentId) !== false;
+    if (!permitted()) return openBotToolFailure(sourceText("error.team.connectorAudienceMismatch"));
     if (agentId === callerAgentId) return openBotToolFailure(sourceText("error.backend.interruptSelf"));
     if (!this.#hooks.listAgents().some((agent) => agent.id === agentId)) {
       return yield* new ToolOperationFailed({ cause: new Error(`Unknown OpenBot agent: ${agentId}`) });
@@ -108,12 +111,13 @@ export class AgentInterruptTool {
 
     // Before the interrupt: the interrupted turn schedules the next drain as it completes, and that
     // drain would start the next of these messages.
+    if (!permitted()) return openBotToolFailure(sourceText("error.team.connectorAudienceMismatch"));
     const cancelledMessages = yield* toolStep(() => this.#cancelQueuedFrom(agentId, callerAgentId));
     if (!turnId) return openBotToolResult({ interruptedTurnId: null, cancelledMessages });
 
     // The turn can end, or the user can steer a message into it, while the stop is on its way. The
     // check then runs again on the deliveries the turn has at that moment. No stop, no notice.
-    const mayStop = () => ownedBy(this.#mailbox.findDeliveriesByTurn(agentId, turnId), callerAgentId);
+    const mayStop = () => permitted() && ownedBy(this.#mailbox.findDeliveriesByTurn(agentId, turnId), callerAgentId);
     if (!(yield* this.#hooks.interrupt(agentId, turnId, mayStop).pipe(toToolOperationFailed))) {
       return openBotToolResult({ interruptedTurnId: null, cancelledMessages });
     }

@@ -1,6 +1,18 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("server", {
+  "server.roles.connectors": "Connectors",
+  "server.roles.connectorScope":
+    "A protected connector is available only to its assigned agents. Members need Use for every protected connector of an agent to see that agent and its history. Owners and admins always have access. Saving connector permissions interrupts running agent work and closes provider sessions across this server.",
+  "server.roles.protectConnector": "Protect connector",
+  "server.roles.useConnector": "Use this connector",
+  "server.roles.connectorAgents": "Agents that can use this connector",
+  "server.roles.connectorHistory":
+    "Removing an agent stops connector use. Its history stays protected. Protection cannot be removed here. Protected agents cannot work in channels or external chats, or be copied or exported.",
+  "server.roles.connectorRecover": "Recover with all access denied",
+  "server.roles.connectorClosed":
+    "Connector access is closed. Resolve the policy or session shutdown error before use.",
+
   "server.connection.planEnded": "The plan for {name} has ended",
   "server.connection.wakeFailed": "Could not start {name}",
   "server.connection.startTimeout": "{name} did not start in time",

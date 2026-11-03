@@ -12,6 +12,7 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
 
 export interface DuplicationHooks {
+  assertCopyAllowed?(agentId: string): void;
   emit(event: AgentEvent): void;
   listAgents(): AgentSummary[];
   /** Removes a half-written copy: its workspace, mailbox rows and provider sessions. */
@@ -88,6 +89,13 @@ export class DuplicationGate {
 
   pendingAgents(): ReadonlySet<string> {
     return this.#pendingAgents;
+  }
+
+  sourceCopyPending(agentId: string): boolean {
+    return (
+      this.#duplicatingAgents.has(agentId) ||
+      [...this.#pendingOperations.values()].some((operation) => operation.sourceAgentId === agentId)
+    );
   }
 
   visibleAgents(agents: AgentSummary[]): AgentSummary[] {
@@ -185,6 +193,7 @@ export class DuplicationGate {
       if (!this.#pendingAgents.has(agentId)) throw new Error("This agent duplication is not pending.");
       const operation = this.#pendingOperations.get(agentId);
       if (!operation) throw new Error("This agent duplication operation is unavailable.");
+      this.#hooks.assertCopyAllowed?.(operation.sourceAgentId);
       return operation;
     });
     const releaseDuplication = this.#pendingReleases.get(agentId);
@@ -274,6 +283,7 @@ export class DuplicationGate {
    * means — otherwise narrowing one of them just moves the identical error message one frame out.
    */
   #sourceSignature(agentId: string): string {
+    this.#hooks.assertCopyAllowed?.(agentId);
     return JSON.stringify({
       agent: duplicationProfileSignature(this.#conversation.requireKnownAgent(agentId)),
       memories: this.#memories.listFor(agentId),

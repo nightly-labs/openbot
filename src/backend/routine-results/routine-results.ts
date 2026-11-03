@@ -47,6 +47,7 @@ class RoutineResultFailed extends Schema.TaggedError<RoutineResultFailed>()("Rou
 export class RoutineResultError extends Error {}
 
 export interface RoutineResultsDependencies {
+  allowedAgent?(agentId: string): boolean;
   store: RoutineResultStore;
   /** The turn that answered a run's delivery, or null when the delivery is gone. */
   delivery(deliveryId: string): { turnId: string | null } | null;
@@ -158,6 +159,11 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
         const recordAnswers = (since: string, at: string): Set<string> => {
           const changed = new Set<string>();
           for (const run of store.runsWithoutDelivery(since)) {
+            if (dependencies.allowedAgent?.(run.agentId) === false) {
+              store.createDelivery(run, null, at);
+              changed.add(run.agentId);
+              continue;
+            }
             const delivery = run.deliveryId ? dependencies.delivery(run.deliveryId) : null;
             const output = delivery?.turnId ? dependencies.turnAnswer(run.agentId, delivery.turnId) : null;
             // A Test run keeps the no-update marker in its chat; the place gets nothing for it.
@@ -171,6 +177,10 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
         /** Posts one delivery and records what became of it. */
         const send = Effect.fn("RoutineResults.send")(function* (item: RoutineResultOutgoing) {
           const startedAt = now();
+          if (dependencies.allowedAgent?.(item.agentId) === false) {
+            store.end(item.runId, "failed", "send-failed", startedAt.toISOString());
+            return;
+          }
           if (item.expiresAt <= startedAt.toISOString()) {
             store.end(item.runId, "failed", "expired", startedAt.toISOString());
             return;

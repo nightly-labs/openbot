@@ -226,6 +226,17 @@ export class WorkflowRunStore {
     });
   }
 
+  /** History can contain outputs of nodes no longer present in the current graph. */
+  referencesAgent(agentId: string): boolean {
+    return Boolean(
+      this.#database.connection
+        .prepare(
+          "SELECT 1 FROM workflow_runs, json_each(workflow_runs.graph_json, '$.nodes') AS node WHERE json_extract(node.value, '$.kind') = 'agent' AND json_extract(node.value, '$.fields.agentId') = ? LIMIT 1",
+        )
+        .get(agentId),
+    );
+  }
+
   run(runId: string): StoredWorkflowRun | null {
     const row = databaseRow(this.#database.connection.prepare(`${RUN_SELECT} WHERE run_id = ?`).get(runId));
     return row ? toRun(row) : null;

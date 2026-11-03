@@ -52,6 +52,7 @@ export interface AgentWaitsOptions {
 /** Where a wait was opened, as the tool router knows it. */
 export interface AgentWaitCaller {
   agentId: string;
+  mayAccessAgent?(agentId: string): boolean;
   /** A channel or messaging turn: its messages are not in the agent's own chat. */
   inExecutionThread: boolean;
 }
@@ -212,6 +213,8 @@ export class AgentWaits {
 
   /** The agent whose waits a tool call reads or closes. An unknown agent is a request the model can correct. */
   #waitOwner(agentId: string | undefined, caller: AgentWaitCaller): string {
+    if (caller.mayAccessAgent?.(agentId ?? caller.agentId) === false)
+      throw new AgentWaitError(sourceText("error.team.connectorAudienceMismatch"));
     if (agentId === undefined || agentId === caller.agentId) return caller.agentId;
     try {
       this.#hooks.requireKnownAgent(agentId);

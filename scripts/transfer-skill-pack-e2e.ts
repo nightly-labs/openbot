@@ -15,6 +15,7 @@ import { Effect, Schema } from "effect";
 import { zipSync } from "fflate";
 import { CentralAuthOperationError } from "../src/main/central-auth-effects";
 import { CentralAuthManager } from "../src/main/central-auth-manager";
+import { ConnectorAccessStore } from "../src/main/connector-access-store";
 import { type InstanceTransferOptions, InstanceTransferService } from "../src/main/instance-transfer-service";
 import { LocalSkillLibrary } from "../src/main/local-skill-library";
 import { SkillMarketplaceService } from "../src/main/skill-marketplace-service";
@@ -36,6 +37,7 @@ interface Report {
   importedLock?: Array<{ slug: string; folders: number }>;
   skillFiles?: { source: number; imported: number };
   reason?: string;
+  connectorExportBoundary?: boolean;
 }
 const report: Report = { status: "running" };
 
@@ -160,9 +162,22 @@ try {
   await mkdir(join(source.workspacePath, ".agents/skills/notes"), { recursive: true });
   await writeFile(join(source.workspacePath, ".agents/skills/notes/SKILL.md"), skillMarkdown("notes"));
 
+  let activation: Promise<boolean> | undefined;
+  const policy = new ConnectorAccessStore(join(root, "connector-policy.json"), (change) => {
+    if (change.rules.some((rule) => rule.agentIds.some((id) => transfer.exportingAgent(id))))
+      throw new Error("An export is still reading this workspace.");
+  });
+  const protectedRule = { mcpServerId: "private-google", agentIds: [source.id], everyoneUse: false, roleIds: [] };
   const transferAgents: InstanceTransferOptions["agents"] = {
     listAgents: () => agents,
-    listRoutines: () => [],
+    listRoutines: () => {
+      if (transfer.exportingAgent(source.id))
+        activation ??= run(policy.set({ revision: 0, rules: [protectedRule] }, () => Effect.void)).then(
+          () => false,
+          () => true,
+        );
+      return [];
+    },
     listMemories: () => [],
     getMemorySelection: () => ({ selections: [] }),
     setMemoryInclusion: () => undefined,
@@ -193,6 +208,7 @@ try {
     deleteAgent: () => Effect.die("A successful import deletes no agent."),
   };
   const transfer = new InstanceTransferService({
+    protectedAgent: (id) => policy.audience(id).length > 0,
     agents: transferAgents,
     skills: { library: () => library, installLocal: (input) => skills.installLocal(input) },
     settings: {
@@ -225,6 +241,19 @@ try {
   );
   report.exportWarnings = exported.warnings;
   assert.deepEqual(exported.warnings, [], "The export keeps every skill.");
+  assert.equal(await activation, true, "Connector protection activated while export still owned a source workspace.");
+  await run(policy.set({ revision: 0, rules: [protectedRule] }, () => Effect.void));
+  await assert.rejects(
+    run(
+      transfer.exportTo(join(root, "protected.zip"), {
+        agentIds: [source.id],
+        includeFiles: false,
+        includeSettings: false,
+      }),
+    ),
+  );
+  assert.ok(!(await readdir(root)).includes("protected.zip"), "A protected export wrote an archive.");
+  report.connectorExportBoundary = true;
 
   const preview = await run(transfer.stage(file));
   const imported = await run(

@@ -21,6 +21,7 @@ import type { z } from "zod";
 import type {
   createAgentToolSchema,
   listModelsToolSchema,
+  updateAgentsToolSchema,
   updateProfileToolSchema,
 } from "../src/backend/agent/profile-tools";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
@@ -29,6 +30,7 @@ import { isProcessAlive } from "./dev-automation/registry-files";
 /** The arguments the fake passes to a profile tool; read_agent takes a subset. */
 type ProfileToolArgs = z.input<typeof updateProfileToolSchema> &
   Pick<z.input<typeof createAgentToolSchema>, "initialMessage"> &
+  Pick<z.input<typeof updateAgentsToolSchema>, "agentIds"> &
   z.input<typeof listModelsToolSchema>;
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/agent-profile-accounts-e2e");
@@ -51,6 +53,7 @@ const { ProviderAccountStore } = await import("../src/backend/agent/provider-acc
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { ConnectorAccessStore } = await import("../src/main/connector-access-store");
 
 const CALL_MARK = "PROFILE-CALL";
 const MODEL = "gpt-6-luna";
@@ -105,6 +108,7 @@ const answer = (message) => {
     case "thread/start": return write({ id: message.id, result: { thread: { id: "thread-" + process.pid + "-" + (++threads), turns: [] } } });
     case "thread/resume": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
     case "thread/unsubscribe": return write({ id: message.id, result: { status: "Unsubscribed" } });
+    case "thread/archive": return write({ id: message.id, result: {} });
     case "thread/turns/list":
     case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
     case "thread/read": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
@@ -113,7 +117,8 @@ const answer = (message) => {
       const text = (params.input || []).map((item) => item.text || "").join("\\n");
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
-      const match = text.includes(${JSON.stringify(CALL_MARK)}) ? /<<ARGS([\\s\\S]*?)ARGS>>/.exec(text) : null;
+      // A retired session replays earlier prompts. The last marked request is the current one.
+      const match = text.includes(${JSON.stringify(CALL_MARK)}) ? [...text.matchAll(/<<ARGS([\\s\\S]*?)ARGS>>/g)].at(-1) : null;
       if (!match) return setTimeout(() => finish(params.threadId, turnId), 20);
       const id = "tool-" + turnId;
       waiting.set(id, { threadId: params.threadId, turnId });
@@ -175,6 +180,8 @@ interface ChoiceBody {
 
 /** The fields of a tool result that the check reads. The router sends them as JSON text. */
 interface ProfileToolBody {
+  updated?: number;
+  failed?: number;
   providers?: {
     provider: string;
     models?: { id: string }[];
@@ -253,9 +260,11 @@ await runCauseEffect(accounts.rename("codex", second.id, "Team B"));
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
+const connectorAccess = new ConnectorAccessStore(join(userData, "connector-policy.json"));
 const agents = new AgentService({
   store,
   mailbox,
+  connectorAccess,
   browser,
   providerAccounts: accounts,
   preferredProvider: "codex",
@@ -493,6 +502,113 @@ try {
     providerAccountId: second.id,
   });
   pass("update_profile sets the account again", reassigned.success, reassigned.text);
+
+  // Exercise native calls through the real service/router and the fixture provider. Protection
+  // changes no tool arguments: only the host binds the coordinator to its private audience.
+  const privateText = "PRIVATE_CONNECTOR_RESULT";
+  await runCauseEffect(agents.updateAgent({ agentId: coordinator.id, description: privateText }));
+  await Effect.runPromise(
+    connectorAccess.set(
+      {
+        revision: 0,
+        rules: [{ mcpServerId: "private-connector", agentIds: [coordinator.id], roleIds: [], everyoneUse: false }],
+      },
+      () => agents.revokeConnectorSessions(),
+    ),
+  );
+  const beforeCreate = store
+    .list()
+    .map((agent) => agent.id)
+    .sort();
+  const refusedCreate = await callTool("protected creation", coordinator.id, "create_agent", {
+    name: "Public copy of private result",
+    description: privateText,
+    initialMessage: privateText,
+  });
+  pass("A protected native caller cannot create a public profile or initial conversation", !refusedCreate.success);
+  assert.deepEqual(
+    store
+      .list()
+      .map((agent) => agent.id)
+      .sort(),
+    beforeCreate,
+  );
+
+  const benignUpdate = await callTool("agent id as ordinary text", worker.id, "update_profile", {
+    agentId: worker.id,
+    description: coordinator.id,
+  });
+  pass(
+    "An agent id in profile text is not treated as an authorization target",
+    benignUpdate.success,
+    benignUpdate.text,
+  );
+  const publicDescription = storedAgent(worker.id).description;
+  const publicNotifications = storedAgent(worker.id).notifications;
+  const privateNotifications = storedAgent(coordinator.id).notifications;
+  for (const padded of [false, true]) {
+    const target = (id: string) => (padded ? ` \t${id}\n ` : id);
+    const deniedRead = await callTool(`protected read padded=${padded}`, worker.id, "read_agent", {
+      agentId: target(coordinator.id),
+    });
+    pass(
+      `A public caller cannot read a private profile with padded=${padded}`,
+      !deniedRead.success && !deniedRead.text.includes(privateText),
+      deniedRead.text,
+    );
+    for (const [caller, destination, description] of [
+      [coordinator.id, worker.id, privateText],
+      [worker.id, coordinator.id, "Public overwrite"],
+    ] as const) {
+      const deniedWrite = await callTool(
+        `cross-audience profile padded=${padded} caller=${caller}`,
+        caller,
+        "update_profile",
+        { agentId: target(destination), description },
+      );
+      pass(
+        `Cross-audience profile writes are refused with padded=${padded} caller=${caller}`,
+        !deniedWrite.success,
+        deniedWrite.text,
+      );
+      const deniedBulk = await callTool(
+        `cross-audience bulk padded=${padded} caller=${caller}`,
+        caller,
+        "update_agents",
+        { agentIds: [target(destination)], notifications: false },
+      );
+      pass(
+        `Bulk updates check resolved targets with padded=${padded} caller=${caller}`,
+        deniedBulk.body?.updated === 0 && deniedBulk.body.failed === 1,
+        deniedBulk.text,
+      );
+    }
+    assert.equal(storedAgent(worker.id).description, publicDescription);
+    assert.equal(storedAgent(coordinator.id).description, privateText);
+    assert.equal(storedAgent(worker.id).notifications, publicNotifications);
+    assert.equal(storedAgent(coordinator.id).notifications, privateNotifications);
+    const deniedWaits = await callTool(`protected waits padded=${padded}`, worker.id, "list_waits", {
+      agentId: target(coordinator.id),
+    });
+    pass(`Wait tools authorize parsed target ids with padded=${padded}`, !deniedWaits.success, deniedWaits.text);
+    const deniedInterrupt = await callTool(`protected interrupt padded=${padded}`, worker.id, "interrupt_agent", {
+      agentId: target(coordinator.id),
+    });
+    pass(
+      `Interrupt tools authorize parsed target ids with padded=${padded}`,
+      !deniedInterrupt.success,
+      deniedInterrupt.text,
+    );
+  }
+  const ownRead = await callTool("private self read", coordinator.id, "read_agent", {});
+  pass(
+    "The protected caller retains its own private setup",
+    ownRead.success && ownRead.text.includes(privateText),
+    ownRead.text,
+  );
+  const ownRoutines = await callTool("private self routines", coordinator.id, "list_routines", {});
+  pass("A protected caller can still list its own routines", ownRoutines.success, ownRoutines.text);
+
   const receipt = await runCauseEffect(agents.sendMessage({ agentId: worker.id, text: "Hello again." }));
   const deliveryId = receipt.deliveries[0]?.id;
   assert.ok(deliveryId, "own process turn: no delivery");

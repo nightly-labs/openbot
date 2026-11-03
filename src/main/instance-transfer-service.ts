@@ -162,6 +162,7 @@ interface InstanceTransferSettings {
 }
 
 export interface InstanceTransferOptions {
+  protectedAgent?(agentId: string): boolean;
   agents: InstanceTransferAgents;
   skills: AgentImportSkills;
   settings: InstanceTransferSettings;
@@ -196,6 +197,7 @@ interface StagedTransfer {
 
 export class InstanceTransferService {
   readonly #staged = new Map<string, StagedTransfer>();
+  readonly #exports = new Map<symbol, ReadonlySet<string>>();
   readonly #timezone: () => string;
   readonly #now: () => Date;
   #uploadDirectoryReady: Deferred.Deferred<void, ArchiveOperationError> | null = null;
@@ -232,13 +234,37 @@ export class InstanceTransferService {
     return { agents };
   }).bind(this);
 
-  /** Writes the export to `path`. The file appears only when it is complete. */
+  exportingAgent(agentId: string): boolean {
+    return [...this.#exports.values()].some((agents) => agents.has(agentId));
+  }
+
+  /** Holds assignment activation out until every selected workspace has finished exporting. */
   readonly exportTo = Effect.fn("InstanceTransfer.export")(function* (
     this: InstanceTransferService,
     path: string,
     input: ExportInstanceInput,
     limits: ArchiveLimits = ARCHIVE,
   ): Effect.fn.Return<InstanceExportResult, ArchiveOperationError> {
+    const operation = Symbol();
+    this.#exports.set(operation, new Set(input.agentIds));
+    return yield* this.#exportTo(path, input, limits).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#exports.delete(operation);
+        }),
+      ),
+    );
+  }).bind(this);
+
+  /** Writes the export to `path`. The file appears only when it is complete. */
+  readonly #exportTo = Effect.fn("InstanceTransfer.writeExport")(function* (
+    this: InstanceTransferService,
+    path: string,
+    input: ExportInstanceInput,
+    limits: ArchiveLimits = ARCHIVE,
+  ): Effect.fn.Return<InstanceExportResult, ArchiveOperationError> {
+    if (input.agentIds.some((id) => this.options.protectedAgent?.(id)))
+      return yield* archiveFailure(new Error(sourceText("error.team.connectorCopyUnavailable")));
     const all = this.options.agents.listAgents();
     const selected = input.agentIds.map((id) => all.find((agent) => agent.id === id));
     if (selected.some((agent) => !agent))

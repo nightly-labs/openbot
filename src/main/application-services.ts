@@ -28,6 +28,7 @@ import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
 import { type BrowserProfileService, createBrowserProfileService } from "./browser-profile-service";
+import { CONNECTOR_ACCESS_FILE, ConnectorAccessStore } from "./connector-access-store";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import {
   CONTAINER_UPDATE_PATHS,
@@ -603,6 +604,7 @@ export interface ApplicationServices {
   agentNotificationLevels: AgentNotificationLevelStore;
   sidebarPins: SidebarPinStore;
   agentAccess: AgentAccessStore;
+  connectorAccess: ConnectorAccessStore;
   serverAudit: ServerAuditStore;
   serverTimezone: ServerTimezonePreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
@@ -1233,6 +1235,36 @@ export async function createApplicationServices({
   await runCauseEffect(memoryReview.load());
   const serverAudit = new ServerAuditStore(join(app.getPath("userData"), SERVER_AUDIT_FILE));
   await runCauseEffect(serverAudit.load());
+  const connectorAccess = new ConnectorAccessStore(
+    join(app.getPath("userData"), CONNECTOR_ACCESS_FILE),
+    (change) => {
+      const assigned = new Set(change.rules.flatMap((rule) => rule.agentIds));
+      if (
+        [...assigned].some(
+          (agentId) => !service.connectorProtectionAvailable(agentId) || instanceTransfer.exportingAgent(agentId),
+        )
+      )
+        throw new Error(sourceText("error.team.connectorCopyBusy"));
+      if (
+        service.channels.store
+          .list("local-owner", true)
+          .some((channel) => channel.members.some((member) => assigned.has(member.agentId)))
+      )
+        throw new Error(sourceText("error.team.connectorChannelUnavailable"));
+      if (
+        [...assigned].some(
+          (agentId) => workflowStore.workflowsOfAgent(agentId).length > 0 || workflowRuns.referencesAgent(agentId),
+        )
+      )
+        throw new Error(sourceText("error.team.connectorWorkflowUnavailable"));
+    },
+    () => ({
+      agentIds: store.list().map((agent) => agent.id),
+      connectorIds: service.listMcpServers().map((config) => config.id),
+    }),
+  );
+  if (!(await runCauseEffect(connectorAccess.load())))
+    logger.warn("Connector policy did not load. Protected access is closed.");
   const agentAccess = new AgentAccessStore(join(app.getPath("userData"), AGENT_ACCESS_FILE), {
     // Called only on a save, after `service` and `teamStore` exist.
     audit: (serverId, before, after, actor) =>
@@ -1724,6 +1756,7 @@ export async function createApplicationServices({
     ),
   );
   const service: AgentService = new AgentService({
+    connectorAccess,
     store,
     mailbox,
     browser,
@@ -1793,7 +1826,7 @@ export async function createApplicationServices({
       customAgents: () => customAgents.configs(),
       // The enabled MCP servers, read at each spawn. The service owns the store, so this reads back
       // into the object being constructed; nothing calls it before the constructor returns.
-      mcpServers: () => service.enabledMcpServers(),
+      mcpServers: (agentId) => service.enabledMcpServers(agentId),
       // The floor under those servers: the `bin` of every managed tool runtime, appended after the
       // user's own `PATH`, so a machine with no Node can still start `npx some-server` and a machine
       // that has one keeps the build it installed.
@@ -1897,9 +1930,19 @@ export async function createApplicationServices({
         const found = mailbox.getDelivery(deliveryId)?.delivery;
         return found ? { status: found.status, turnId: found.turnId, error: found.error } : null;
       },
-      turnAnswer,
+      turnAnswer: (agentId, turnId) =>
+        connectorAccess.audience(agentId).length > 0 ? null : turnAnswer(agentId, turnId),
       agentName: (agentId) => store.list().find((agent) => agent.id === agentId)?.name ?? agentId,
-      sendHandoff: (input) => service.enqueueRoutineHandoff(input),
+      sendHandoff: (input) =>
+        !connectorAccess.sameAudience(input.run.agentId, input.agentId) ||
+        connectorAccess.audience(input.agentId).length > 0
+          ? Effect.fail(
+              new AgentLifecycleFailed({
+                operation: "routine flow connector access",
+                cause: new Error(sourceText("error.team.connectorAudienceMismatch")),
+              }),
+            )
+          : service.enqueueRoutineHandoff(input),
       // An agent event, so this window, joined clients and the web app hear it the same way.
       changed: (agentIds) => {
         for (const agentId of agentIds) service.notifyRoutineFlowsChanged(agentId);
@@ -1918,10 +1961,11 @@ export async function createApplicationServices({
     tokens: (repository) => githubConnector.repositoryTokens(repository),
   });
   const workflowGitHub = workflowGitHubDirectory(() => githubConnector.workflowCatalog(), githubRest);
+  const workflowRuns = new WorkflowRunStore({ database: store.database });
   const workflowRuntime = await Effect.runPromise(
     createWorkflows({
       store: workflowStore,
-      runs: new WorkflowRunStore({ database: store.database }),
+      runs: workflowRuns,
       github: new WorkflowGitHubStore({ database: store.database }),
       githubApp: () => githubAppConfig()?.slug ?? null,
       // The relay is made with the ingress socket, below; a graph changes only after start.
@@ -1933,7 +1977,15 @@ export async function createApplicationServices({
       },
       turnAnswer,
       // A workflow step is a routine handoff whose routine is the workflow.
-      sendHandoff: (input) => service.enqueueRoutineHandoff(input),
+      sendHandoff: (input) =>
+        connectorAccess.audience(input.agentId).length > 0
+          ? Effect.fail(
+              new AgentLifecycleFailed({
+                operation: "workflow connector access",
+                cause: new Error(sourceText("error.team.connectorAudienceMismatch")),
+              }),
+            )
+          : service.enqueueRoutineHandoff(input),
       stopDelivery: (agentId, deliveryId) => {
         const found = mailbox.getDelivery(deliveryId)?.delivery;
         if (!found) return Effect.void;
@@ -1988,6 +2040,7 @@ export async function createApplicationServices({
   // An agent routine's answer sent on to a messaging place; see `routine-results.ts`.
   const routineResultRuntime = await Effect.runPromise(
     createRoutineResults({
+      allowedAgent: (agentId) => connectorAccess.audience(agentId).length === 0,
       store: new RoutineResultStore(store.database),
       delivery: (deliveryId) => {
         const found = mailbox.getDelivery(deliveryId)?.delivery;
@@ -2393,6 +2446,7 @@ export async function createApplicationServices({
   );
   // The same owners the Settings screens write through, so an import has their checks and restarts.
   const instanceTransfer = new InstanceTransferService({
+    protectedAgent: (agentId) => connectorAccess.audience(agentId).length > 0,
     agents: service,
     skills: { library: () => skills.requireLocalLibrary(), installLocal: (input) => skills.installLocal(input) },
     sharedRoot: store.sharedRoot,
@@ -2512,6 +2566,8 @@ export async function createApplicationServices({
     sidebarPins,
     // Present, so the host advertises `agent-access-v1`. Only owners and admins change the roles.
     agentAccess,
+    connectorAccess,
+    connectorMcp: service,
     // Present, so the host advertises `server-audit-v1`. Only owners and admins read the log.
     serverAudit,
     // Present, so the host advertises `agent-tasks-v1`. Any member who can send a message to the agent.
@@ -3384,6 +3440,7 @@ export async function createApplicationServices({
     agentNotificationLevels,
     sidebarPins,
     agentAccess,
+    connectorAccess,
     serverAudit,
     serverTimezone,
     promptCacheTtl,

@@ -1,6 +1,21 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.team", {
+  "error.team.connectorCreateUnavailable":
+    "An agent with protected connector history cannot create another agent. Create it in settings.",
+  "error.team.connectorPublishUnavailable":
+    "An agent with protected connector history cannot publish to a shared library or site.",
+  "error.team.connectorManageInSettings": "Connector permissions are active. Manage connections in Server settings.",
+  "error.team.connectorAudienceMismatch":
+    "These agents have different connector permissions. This action is not allowed.",
+  "error.team.connectorAccessUnsupported": "This host does not support connector permissions.",
+  "error.team.connectorAccessStale": "Connector permissions changed. Reload them before saving.",
+  "error.team.connectorWorkflowUnavailable":
+    "Remove this agent from workflows and workflow run history before protecting its connector.",
+  "error.team.connectorChannelUnavailable":
+    "An agent with protected connectors cannot work in channels or external chats.",
+  "error.team.connectorCopyUnavailable": "An agent with protected connector history cannot be copied or exported.",
+  "error.team.connectorCopyBusy": "Finish or cancel this agent's copy or export before protecting its connector.",
   // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "This host is not linked to an OpenBot owner account.",
   "error.team.ownerEmailRequired": "Sign in with the OpenBot email that created this host.",

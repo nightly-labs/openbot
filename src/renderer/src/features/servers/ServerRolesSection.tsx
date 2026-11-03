@@ -2,10 +2,14 @@ import type {
   AgentAccessChange,
   AgentAccessRole,
   AgentAccessSnapshot,
+  ConnectorAccessRule,
+  ConnectorAccessSnapshot,
   OpenBotDesktopApi,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
+import { CONNECTOR_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/connector-access-v1";
 import { Alert, AlertContent, AlertDescription } from "@openbot/ui";
+import { ConnectorAccessPanel } from "@openbot/ui/features/servers/ConnectorAccessPanel";
 import { type RoleAgent, type ServerRolePage, ServerRolesPanel } from "@openbot/ui/features/servers/ServerRoles";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
@@ -14,7 +18,8 @@ import { serverCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
 /** The role calls of one server's host. The desktop reaches them through main. */
-export type HostAgentAccessCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getAgentAccess" | "setAgentAccess">;
+export type HostAgentAccessCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getAgentAccess" | "setAgentAccess"> &
+  Partial<Pick<OpenBotDesktopApi["hostAdmin"], "getConnectorAccess" | "setConnectorAccess">>;
 
 export interface ServerAgentAccessOptions {
   /** The calls of a client with no `window.openbot`, such as the web client. */
@@ -26,6 +31,7 @@ export interface ServerAgentAccessOptions {
 interface RolesState {
   /** The roles as an owner or admin reads them, or null before they load. */
   snapshot: AgentAccessSnapshot | null;
+  connectors: ConnectorAccessSnapshot | null;
   agents: readonly RoleAgent[];
   loadError: string | null;
   page: ServerRolePage;
@@ -66,6 +72,7 @@ export function createServerRolesSection(host: ServerSettingsSectionHost, visibl
   const calls = (): HostAgentAccessCalls => props.agentAccess?.calls ?? window.openbot.hostAdmin;
   const [state, setState] = createStore<RolesState>({
     snapshot: null,
+    connectors: null,
     agents: [],
     loadError: null,
     page: { kind: "list" },
@@ -83,11 +90,18 @@ export function createServerRolesSection(host: ServerSettingsSectionHost, visibl
     const options = props.agentAccess;
     if (!options) return;
     const current = ++generation;
-    Promise.all([calls().getAgentAccess(serverId), options.listAgents()]).then(
-      ([snapshot, agents]) => {
+    Promise.all([
+      calls().getAgentAccess(serverId),
+      options.listAgents(),
+      serverCanAdminister(props.server, CONNECTOR_ACCESS_CAPABILITY)
+        ? (calls().getConnectorAccess?.(serverId) ?? null)
+        : null,
+    ]).then(
+      ([snapshot, agents, connectors]) => {
         if (current !== generation) return;
         setState((draft) => {
           draft.snapshot = snapshot;
+          draft.connectors = connectors;
           draft.agents = [...agents];
           draft.loadError = null;
         });
@@ -142,6 +156,54 @@ export function createServerRolesSection(host: ServerSettingsSectionHost, visibl
     save((change) => {
       const role = change.roles.find((item) => item.id === roleId);
       if (role) edit(role);
+    });
+  }
+
+  function recoverConnectors(): void {
+    const snapshot = state.connectors;
+    const set = calls().setConnectorAccess;
+    if (!snapshot || !set) return;
+    const current = generation;
+    const serverId = props.server.id;
+    void run("roles", async () => {
+      try {
+        const next = await set({ revision: snapshot.revision, rules: [] }, serverId);
+        if (current === generation)
+          setState((draft) => {
+            draft.connectors = next;
+          });
+      } catch (error) {
+        if (current === generation) load(serverId);
+        throw error;
+      }
+    });
+  }
+  function saveConnector(rule: ConnectorAccessRule): void {
+    const snapshot = state.connectors;
+    const set = calls().setConnectorAccess;
+    if (!snapshot || !set) return;
+    const rules = snapshot.rules
+      .filter((item) => item.mcpServerId !== rule.mcpServerId)
+      .map(({ mcpServerId, agentIds, everyoneUse, roleIds }) => ({
+        mcpServerId,
+        agentIds: [...agentIds],
+        everyoneUse,
+        roleIds: [...roleIds],
+      }));
+    rules.push(rule);
+    const current = generation;
+    const serverId = props.server.id;
+    void run("roles", async () => {
+      try {
+        const next = await set({ revision: snapshot.revision, rules }, serverId);
+        if (current === generation)
+          setState((draft) => {
+            draft.connectors = next;
+          });
+      } catch (error) {
+        if (current === generation) load(serverId);
+        throw error;
+      }
     });
   }
 
@@ -202,6 +264,18 @@ export function createServerRolesSection(host: ServerSettingsSectionHost, visibl
             />
           )}
         </Show>
+        <Show when={state.connectors}>
+          {(snapshot) => (
+            <ConnectorAccessPanel
+              snapshot={snapshot()}
+              agents={state.agents}
+              page={state.page}
+              disabled={Boolean(busy())}
+              onChange={saveConnector}
+              onRecover={recoverConnectors}
+            />
+          )}
+        </Show>
       </>
     );
   }
@@ -229,6 +303,7 @@ export function createServerRolesSection(host: ServerSettingsSectionHost, visibl
       generation++;
       setState((draft) => {
         draft.snapshot = null;
+        draft.connectors = null;
         draft.agents = [];
         draft.loadError = null;
         draft.page = { kind: "list" };

@@ -50,6 +50,7 @@ import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "@openbot/contracts/team-prot
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { CONNECTOR_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/connector-access-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
@@ -245,6 +246,7 @@ import { routeBitwardenConnector } from "./team-api/route-bitwarden-connector";
 import { routeBrowser } from "./team-api/route-browser";
 import { routeBrowserProfiles } from "./team-api/route-browser-profiles";
 import { routeChannels } from "./team-api/route-channels";
+import { routeConnectorAccess } from "./team-api/route-connector-access";
 import { routeConnectors } from "./team-api/route-connectors";
 import { routeContextCompact } from "./team-api/route-context-compact";
 import { routeContextReset } from "./team-api/route-context-reset";
@@ -493,7 +495,12 @@ export class TeamApiServer {
     this.#sidebarLayoutListener = (layout) => this.#broadcastAgentEvent({ type: "sidebar-layout-changed", layout });
     this.#options.sidebarLayout.on("changed", this.#sidebarLayoutListener);
     // A change from Settings on this computer and one from a joined admin both arrive here.
-    this.#stopAgentAccessListener = this.#options.agentAccess?.subscribe(() => this.agentAccessChanged()) ?? null;
+    const stopRoles = this.#options.agentAccess?.subscribe(() => this.agentAccessChanged());
+    const stopConnectors = this.#options.connectorAccess?.subscribe(() => this.agentAccessChanged());
+    this.#stopAgentAccessListener = () => {
+      stopRoles?.();
+      stopConnectors?.();
+    };
     this.#stopMachineAlertListener =
       this.#options.machine?.subscribe((memberId, event) => {
         if (memberId) this.#sendMachineAlert(memberId, event);
@@ -1054,6 +1061,10 @@ export class TeamApiServer {
       if ((await routeMemoryReview(context, this.#options.admin)) === "handled") return;
       if ((await routePromptCacheTtl(context, this.#options.admin)) === "handled") return;
       if ((await routeProviderDefault(context, this.#options.admin)) === "handled") return;
+      if (
+        (await routeConnectorAccess(context, this.#options.connectorAccess, this.#options.connectorMcp)) === "handled"
+      )
+        return;
       if (
         (await routeAgentAccess(
           context,
@@ -2047,7 +2058,10 @@ export class TeamApiServer {
     const access = this.#options.agentAccess;
     const serverId = this.#options.store.getIdentity()?.serverId;
     if (!access || !serverId) return "manage";
-    return agentAccessLevel(access.levels(serverId), this.#accessMember(member), agentId);
+    const resolved = this.#accessMember(member);
+    if (this.#options.connectorAccess?.memberMaySeeAgent(resolved, agentId, access.levels(serverId)) === false)
+      return "none";
+    return agentAccessLevel(access.levels(serverId), resolved, agentId);
   }
 
   /** The agents at `none` for `member`. */
@@ -2057,9 +2071,8 @@ export class TeamApiServer {
     const access = this.#options.agentAccess;
     const serverId = this.#options.store.getIdentity()?.serverId;
     if (!access || !serverId || canAdministerServer(resolved.role)) return blocked;
-    const levels = access.levels(serverId);
     for (const agent of this.#options.agents.listAgents())
-      if (agentAccessLevel(levels, resolved, agent.id) === "none") blocked.add(agent.id);
+      if (this.agentLevel(resolved, agent.id) === "none") blocked.add(agent.id);
     return blocked;
   }
 
@@ -2199,6 +2212,8 @@ export class TeamApiServer {
           if (capability === MEMORY_REVIEW_CAPABILITY) return this.#options.admin?.memoryReview !== undefined;
           if (capability === PROMPT_CACHE_TTL_CAPABILITY) return this.#options.admin?.promptCacheTtl !== undefined;
           if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;
+          if (capability === CONNECTOR_ACCESS_CAPABILITY)
+            return this.#options.connectorAccess !== undefined && this.#options.connectorMcp !== undefined;
           if (capability === AGENT_ACCESS_CAPABILITY) return this.#options.agentAccess !== undefined;
           if (capability === SERVER_AUDIT_CAPABILITY) return this.#options.serverAudit !== undefined;
           if (capability === HOST_UPDATE_CAPABILITY || capability === HOST_MEMBER_UPDATE_CAPABILITY)

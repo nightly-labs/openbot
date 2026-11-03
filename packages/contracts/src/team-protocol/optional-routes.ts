@@ -33,6 +33,7 @@ import { BROWSER_PROFILES_CODECS } from "./browser-profiles-v1";
 import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
 import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
+import { CONNECTOR_ACCESS_CODECS } from "./connector-access-v1";
 import { CONNECTORS_CODECS } from "./connectors-v1";
 import { CONTEXT_COMPACT_CODECS } from "./context-compact-v1";
 import { CONTEXT_RESET_CODECS } from "./context-reset-v1";
@@ -161,6 +162,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...ONEPASSWORD_CONNECTOR_CODECS,
   ...BITWARDEN_CONNECTOR_CODECS,
   ...AGENT_ACCESS_CODECS,
+  ...CONNECTOR_ACCESS_CODECS,
   ...AGENT_HIDDEN_CODECS,
   ...AGENT_NOTIFICATION_LEVELS_CODECS,
   ...SIDEBAR_PINS_CODECS,

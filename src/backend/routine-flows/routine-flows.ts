@@ -73,7 +73,7 @@ export interface RoutineFlowsDependencies {
   turnAnswer(agentId: string, turnId: string): string | null;
   agentName(agentId: string): string;
   sendHandoff(input: {
-    run: Pick<RoutineFlowRun, "id" | "routineId" | "routineName" | "scheduledFor">;
+    run: Pick<RoutineFlowRun, "id" | "agentId" | "routineId" | "routineName" | "scheduledFor">;
     agentId: string;
     text: string;
     idempotencyKey: string;

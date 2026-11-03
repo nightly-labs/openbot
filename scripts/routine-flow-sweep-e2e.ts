@@ -17,7 +17,9 @@ import { Effect } from "effect";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { RoutineFlowStore } from "../src/backend/routine-flows/routine-flow-store";
+import { handleRoutineFlowTool } from "../src/backend/routine-flows/routine-flow-tools";
 import { createRoutineFlows } from "../src/backend/routine-flows/routine-flows";
+import { ConnectorAccessStore } from "../src/main/connector-access-store";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/routine-flow-sweep-e2e");
 const QUARTER_HOUR_MS = 15 * 60 * 1000;
@@ -206,6 +208,51 @@ try {
       totalMs: Math.round(totalMs),
       perSweepMs: Number((totalMs / TIMED_SWEEPS).toFixed(2)),
     };
+    const policy = new ConnectorAccessStore(join(root, "connector-policy.json"));
+    const known = new Set(["solo", "chief", "editor"]);
+    const mayAccess = (agentId: string) => policy.sameAudience("solo", agentId);
+    const revokedDuringRead = await Effect.runPromise(
+      handleRoutineFlowTool(
+        "list_routine_flows",
+        { agentId: "chief" },
+        "solo",
+        {
+          ...flows,
+          canvas: (agentId) =>
+            flows.canvas(agentId).pipe(
+              Effect.tap(() =>
+                policy
+                  .set(
+                    {
+                      revision: 0,
+                      rules: [
+                        { mcpServerId: "private-connector", agentIds: ["chief"], everyoneUse: false, roleIds: [] },
+                      ],
+                    },
+                    () => Effect.void,
+                  )
+                  .pipe(Effect.orDie),
+              ),
+            ),
+        },
+        known,
+        mayAccess,
+      ),
+    );
+    assert.equal(revokedDuringRead?.success, false, "A canvas read returned after the target became protected.");
+    const linkCount = count(database, "SELECT COUNT(*) AS count FROM routine_flow_links");
+    const unlink = await Effect.runPromise(
+      handleRoutineFlowTool("disconnect_routine_agents", { linkId: "link-1" }, "solo", flows, known, mayAccess),
+    );
+    assert.equal(unlink?.success, false, "A caller disconnected a private flow by its indirect link ID.");
+    assert.equal(count(database, "SELECT COUNT(*) AS count FROM routine_flow_links"), linkCount);
+    const ownCanvas = await Effect.runPromise(
+      handleRoutineFlowTool("list_routine_flows", {}, "solo", flows, known, mayAccess),
+    );
+    assert.equal(ownCanvas?.success, true);
+    report.checks.push(
+      "native flow tools recheck live target permissions after reads and refuse indirect private-link mutation",
+    );
     report.passed = true;
   } finally {
     await Effect.runPromise(flows.close());

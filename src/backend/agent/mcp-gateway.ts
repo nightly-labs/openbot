@@ -70,6 +70,7 @@ export interface GitHubConnectorSource {
 }
 
 export interface McpGatewayOptions {
+  allowsConnector?: (mcpServerId: string, agentId: string | null | undefined) => boolean;
   servers: McpServerStore;
   /** The main process's knowledge of this machine: the tool runtimes and the http sign-ins. */
   credentials: ProviderClientContext;
@@ -91,6 +92,7 @@ export interface McpGatewayOptions {
  */
 export class McpGateway {
   readonly #servers: McpServerStore;
+  readonly #allowsConnector: (mcpServerId: string, agentId: string | null | undefined) => boolean;
   readonly #computerUseMcpServer: () => McpServerConfig | null;
   readonly #githubConnector: GitHubConnectorSource | null;
   /**
@@ -124,6 +126,7 @@ export class McpGateway {
   constructor(options: McpGatewayOptions) {
     const { credentials } = options;
     this.#servers = options.servers;
+    this.#allowsConnector = options.allowsConnector ?? (() => true);
     this.#computerUseMcpServer = options.computerUseMcpServer;
     this.#githubConnector = options.githubConnector ?? null;
     this.#toolRuntimes = () => credentials.mcpToolRuntimes?.() ?? NO_MCP_TOOL_RUNTIMES;
@@ -134,7 +137,7 @@ export class McpGateway {
     const agents = options.agents;
     this.#proxy = new McpOAuthProxy({
       settings: credentials.mcpOAuthProxySettings ?? null,
-      target: (route) => this.#proxyTarget(route),
+      target: (route, agentKey) => this.#proxyTarget(route, agentKey, agents),
       refresh: (url, rejected) => (oauth ? oauth.refreshAccessToken(url, rejected) : Effect.succeed(null)),
       ...(credentials.appVersion
         ? {
@@ -176,6 +179,8 @@ export class McpGateway {
     config: McpServerConfig,
     agentId: string | null = null,
   ): Effect.fn.Return<McpEndpoint | McpEndpointRefusal, McpGatewayFailed> {
+    if (!this.#allowsConnector(config.id, agentId))
+      return { error: sourceText("error.team.connectorAudienceMismatch") };
     if (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID) {
       const github = this.#githubConnector;
       const token = github ? yield* github.mcpAuthorization().pipe(toMcpGatewayFailed) : null;
@@ -241,12 +246,18 @@ export class McpGateway {
    * The upstream of one proxy route, read for each request: an enabled row that still goes through
    * the proxy, and its token now. A removed, turned-off, edited or signed-out row has no route.
    */
-  #proxyTarget(route: string): Effect.Effect<McpOAuthProxyTarget | null, McpOperationError> {
+  #proxyTarget(
+    route: string,
+    agentKey: string | null,
+    agents: McpGatewayOptions["agents"],
+  ): Effect.Effect<McpOAuthProxyTarget | "denied" | null, McpOperationError> {
     const oauth = this.#oauth;
     const config = this.#servers
       .listEnabled()
       .find((row) => this.#proxied(row) && mcpOAuthProxyRoute(row.id, row.url) === route);
+    const agentId = agentKey ? agents?.().find((agent) => mcpOAuthProxyAgentKey(agent.id) === agentKey)?.id : null;
     if (!config || !oauth) return Effect.succeed(null);
+    if (!this.#allowsConnector(config.id, agentId)) return Effect.succeed("denied" as const);
     return oauth.accessToken(config.url).pipe(
       // The row address with its account: a refresh after a refusal reads the sign-in of this row.
       Effect.map((token) => (token ? { url: config.url, headers: config.headers, token } : null)),
@@ -521,14 +532,16 @@ export class McpGateway {
    * name: a server the user added keeps working as they set it up, and two entries with one name
    * would collide in every provider's configuration.
    */
-  enabled(): McpServerConfig[] {
+  enabled(agentId?: string | null): McpServerConfig[] {
     const configured = this.#servers.listEnabled();
     const builtIn: McpServerConfig[] = [];
     const computerUse = this.#computerUseMcpServer();
     if (computerUse) builtIn.push(computerUse);
     const github = this.#githubConnector?.mcpServer() ?? null;
     if (github && !configured.some((config) => config.name === github.name)) builtIn.push(github);
-    return this.#handoff.record([...configured, ...builtIn]);
+    return this.#handoff.record(
+      [...configured, ...builtIn].filter((config) => this.#allowsConnector(config.id, agentId)),
+    );
   }
 
   /**

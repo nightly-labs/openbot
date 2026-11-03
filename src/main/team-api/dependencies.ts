@@ -10,6 +10,7 @@ import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { AgentTemplateService } from "../agent-template-service";
 import type { BrowserProfileService } from "../browser-profile-service";
+import type { ConnectorAccessStore } from "../connector-access-store";
 import type { CustomAgentChanges } from "../custom-agent-changes";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { WorkflowGitHubDirectory } from "../github-rest";
@@ -550,6 +551,8 @@ export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "l
 export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
 
 export interface TeamApiOptions {
+  connectorAccess?: ConnectorAccessStore;
+  connectorMcp?: Pick<AgentService, "listMcpServers" | "revokeConnectorSessions">;
   /** `events-v1`: admin-only event source and routine management. */
   events?: HostEventsApi | undefined;
   channels?: ChannelService | undefined;

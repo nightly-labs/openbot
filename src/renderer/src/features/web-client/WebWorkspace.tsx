@@ -61,6 +61,7 @@ import {
   getHostAgentAccess,
   getHostAgentMemoryLimit,
   getHostAuditLog,
+  getHostConnectorAccess,
   getHostMemoryReview,
   getHostPromptCacheTtl,
   getHostReleaseStatus,
@@ -70,6 +71,7 @@ import {
   listHostedSites,
   setHostAgentAccess,
   setHostAgentMemoryLimit,
+  setHostConnectorAccess,
   setHostMemoryReview,
   setHostPromptCacheTtl,
   setHostTimezone,
@@ -1179,6 +1181,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(setHostPromptCacheTtl(hostRequest(serverId), ttl).pipe(Effect.mapError((error) => error.cause))),
   };
   const hostAgentAccessCalls: HostAgentAccessCalls = {
+    getConnectorAccess: async (serverId) =>
+      runTeamEffect(getHostConnectorAccess(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setConnectorAccess: async (change, serverId) =>
+      runTeamEffect(
+        setHostConnectorAccess(hostRequest(serverId), change).pipe(Effect.mapError((error) => error.cause)),
+      ),
     getAgentAccess: async (serverId) =>
       runTeamEffect(getHostAgentAccess(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setAgentAccess: async (change, serverId) =>

@@ -385,6 +385,14 @@ export class PushNotificationService {
     if (!request) return;
     // A Mac that wakes before its network, or a short fault at Apple or Google, refuses one send.
     for (let attempt = 0; ; attempt += 1) {
+      // Answer previews and retries can wait while role or connector access is revoked.
+      if (
+        this.#registrations.get(stored.sessionId) !== registration ||
+        !this.#options.memberActive(stored.memberId) ||
+        this.#options.hiddenAgentIds(stored.protocol, registration.capabilities, stored.memberId).has(content.agentId)
+      )
+        return;
+
       const result = yield* Effect.result(this.#options.send(request));
       if (Result.isSuccess(result)) {
         // The session ended, the app was removed, or Apple or Google refused the token.

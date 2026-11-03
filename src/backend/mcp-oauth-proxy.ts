@@ -60,7 +60,10 @@ export interface McpOAuthProxyOptions {
    * or this machine holds no token for it. A removed, turned-off or signed-out server is refused
    * at once, with no list of routes to keep current.
    */
-  target: (route: string) => Effect.Effect<McpOAuthProxyTarget | null, McpOperationError>;
+  target: (
+    route: string,
+    agentKey: string | null,
+  ) => Effect.Effect<McpOAuthProxyTarget | "denied" | null, McpOperationError>;
   /** A new token after the server refused `rejected`, or `null`. See `McpOAuth.refreshAccessToken`. */
   refresh: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
   /** What the proxy tells a server about the client. Without it, the provider's own `clientInfo` goes through. */
@@ -238,7 +241,8 @@ export class McpOAuthProxy {
     }
     const read = method === "POST" ? yield* readBody(request) : null;
     if (read === "too-large") return refuse(response, 413);
-    const target = yield* this.#options.target(route);
+    const target = yield* this.#options.target(route, agentKey ?? null);
+    if (target === "denied") return refuse(response, 403);
     if (!target) return signInNeeded(response, method, read);
     const client = this.#options.client;
     const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey ?? null)) : read;
