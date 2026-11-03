@@ -189,13 +189,15 @@ function attachmentsOf(list: DiscordAttachmentData[]): DiscordInboundAttachment[
 }
 
 /**
- * The text of each embed, up to Discord's limit: one part on each line, and the links of its
+ * The text of each embed, up to Discord's limits: one part on each line, and the links of its
  * images. An embed without text or links is left out. Colors, icons, timestamps and the provider
  * name are left out, and so are the components of a message, such as buttons.
  */
 function embedsOf(list: DiscordEmbedData[]): string[] {
   const embeds: string[] = [];
+  let remaining = DISCORD_EMBED_TEXT_LIMIT;
   for (const embed of list.slice(0, DISCORD_EMBEDS_LIMIT)) {
+    if (remaining <= 0) break;
     const fields = (embed.fields ?? []).map((field) =>
       [embedPart(field.name), embedPart(field.value)].filter(Boolean).join(": "),
     );
@@ -212,7 +214,9 @@ function embedsOf(list: DiscordEmbedData[]): string[] {
     ]
       .filter(Boolean)
       .join("\n");
-    if (text) embeds.push(text.slice(0, DISCORD_EMBED_TEXT_LIMIT));
+    if (!text) continue;
+    embeds.push(text.slice(0, remaining));
+    remaining -= text.length;
   }
   return embeds;
 }

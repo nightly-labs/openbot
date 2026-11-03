@@ -43,7 +43,7 @@ export function discordInboundMessage(message: DiscordInboundMessage): InboundMe
           authorName: quote.authorName,
           // Names its files, so that the agent knows which of the message's files are the replied-to ones.
           text: discordContextText(discordPlainText(quote.content), quote.attachments, quote.embeds, quote.forwarded),
-          mentionedUserIds: discordMentionIds(quote.content),
+          mentionedUserIds: discordMentionIds([quote.content, ...quote.embeds].join("\n")),
           sentAt: quote.sentAt,
         }
       : null,
@@ -68,7 +68,8 @@ export function discordContextText(
     : text || files || embeds.length
       ? "(Forwarded message)"
       : "(Forwarded message: Discord did not give its text or files)";
-  return [forward, text, ...embedTexts, files].filter(Boolean).join("\n");
+  // The files come before the embeds, so that a cut of long text keeps their names.
+  return [forward, text, files, ...embedTexts].filter(Boolean).join("\n");
 }
 
 export function inboundFile(attachment: DiscordInboundAttachment): InboundFile {

@@ -215,7 +215,8 @@ const historyAttachmentsSchema = z
     }),
   )
   .optional();
-// Each part is optional: Discord leaves out the parts that an embed does not have.
+// Each part is optional: Discord leaves out the parts that an embed does not have. Embeds of an
+// unexpected shape are left out, so that they do not fail the whole page of messages.
 const historyEmbedsSchema = z
   .array(
     z.object({
@@ -230,7 +231,8 @@ const historyEmbedsSchema = z
       video: z.object({ url: z.string().optional() }).optional(),
     }),
   )
-  .optional();
+  .optional()
+  .catch(undefined);
 const historySchema = z
   .array(
     z.object({

@@ -406,18 +406,16 @@ class DiscordAdapter implements MessagingAdapter {
   /** Discord messages as context, with each user mention named. A bot's post names the bot. */
   readonly #entries = Effect.fnUntraced(function* (this: DiscordAdapter, messages: DiscordHistoryMessage[]) {
     const names = yield* mentionNames(
-      messages.flatMap((message) => discordMentionIds(message.content)),
+      messages.flatMap((message) => discordMentionIds([message.content, ...message.embeds].join("\n"))),
       (userId) => this.authorName(userId),
     );
     return messages.map(
       (message): ContextEntry => ({
         id: message.id,
         authorName: message.authorIsBot ? `${message.authorName} (bot)` : message.authorName,
-        text: discordContextText(
-          withMentionNames(discordPlainText(message.content), names),
-          message.attachments,
-          message.embeds,
-          message.forwarded,
+        text: withMentionNames(
+          discordContextText(discordPlainText(message.content), message.attachments, message.embeds, message.forwarded),
+          names,
         ),
         sentAt: message.sentAt,
         ...(message.attachments.length ? { files: message.attachments.map(inboundFile) } : {}),

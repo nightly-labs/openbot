@@ -38,8 +38,11 @@ const QUOTE_DECODE_LIMIT = 8_000;
 /** The most embeds Signal passes on with one message. Discord's own limit. */
 export const DISCORD_EMBEDS_LIMIT = 10;
 
-/** The longest text of one embed that Signal passes on. Discord's limit is 6,000 for all embeds of a message, without links. */
-export const DISCORD_EMBED_TEXT_LIMIT = 8_000;
+/**
+ * The longest text of all embeds of one message that Signal passes on, links included. Discord's
+ * own limit for the text of all embeds of a message, without links.
+ */
+export const DISCORD_EMBED_TEXT_LIMIT = 6_000;
 
 /** The longest embed text a host accepts: a later Signal can pass more without breaking a host. */
 const EMBED_DECODE_LIMIT = 16_000;
