@@ -113,7 +113,7 @@ export function auditLine(entry: ServerAuditEntry, t: MobileText["t"]): AuditPar
     .map((piece, id) => ({ ...piece, id }));
 }
 
-/** The line as plain text, for the search and for a screen reader. */
+/** The line as plain text, for the search. */
 export function auditLineText(parts: readonly AuditPart[]): string {
   return parts.map((part) => (part.kind === "to" ? ` ${part.text} ` : part.text)).join("");
 }

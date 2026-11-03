@@ -177,6 +177,7 @@ export function ServerAuditScreen() {
           : {})}
         onChangeText={(event) => setSearch(event.nativeEvent.text)}
         onCancelButtonPress={() => setSearch("")}
+        onClose={() => setSearch("")}
       />
       <SettingsNote>{t("mobile.server.audit.description")}</SettingsNote>
       <SettingsSection>
