@@ -16,7 +16,12 @@ export interface AgentTasksPort
   > {
   /** Steers the thread's running turn, or queues the message in the thread. */
   sendToTask(
-    input: AgentTaskInput & { text: string; attachmentDraftIds?: string[]; clientMessageId: string },
+    input: AgentTaskInput & {
+      text: string;
+      attachmentDraftIds?: string[];
+      replyToMessageId?: string;
+      clientMessageId: string;
+    },
   ): Promise<unknown>;
   /** Missing where the server cannot move a queued message of the agent's own chat to a new thread. */
   runQueuedMessageAsTask?: OpenBotDesktopApi["agent"]["runQueuedMessageAsTask"];

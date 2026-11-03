@@ -79,6 +79,10 @@ import {
   AGENT_THREAD_READS_CAPABILITY,
   AGENT_THREAD_READS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import {
+  AGENT_THREAD_REPLIES_CAPABILITY,
+  AGENT_THREAD_REPLIES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import {
@@ -180,13 +184,15 @@ function taskRemoteUnsupported(): never {
 
 /**
  * The body of an `agent-tasks-v1` request: the agent, with the task, the text of a start or message, or
- * both. Only the `agent-thread-files-v1` routes carry `attachmentDraftIds`.
+ * both. Only the `agent-thread-files-v1` and `agent-thread-replies-v1` routes carry `attachmentDraftIds`,
+ * and only `agent-thread-replies-v1` carries `replyToMessageId`.
  */
 interface RemoteTaskBody {
   agentId: string;
   taskId?: string;
   text?: string;
   attachmentDraftIds?: string[];
+  replyToMessageId?: string;
   clientMessageId?: string;
 }
 
@@ -240,6 +246,8 @@ export function agentIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY)) taskRemoteUnsupported();
     // `agent-tasks-v1` carries text only; a host with `agent-thread-files-v1` takes files on its own routes.
     if (body.attachmentDraftIds?.length && !remoteServers.supportsCapability(serverId, AGENT_THREAD_FILES_CAPABILITY))
+      taskRemoteUnsupported();
+    if (body.replyToMessageId && !remoteServers.supportsCapability(serverId, AGENT_THREAD_REPLIES_CAPABILITY))
       taskRemoteUnsupported();
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   };
@@ -745,6 +753,16 @@ export function agentIpcHandlers({
         local: (input) => runCauseEffect(service.sendMessage(input, host.conversationSender())),
         remote: (input, serverId) => {
           if (input.taskId) {
+            const replyToMessageId = input.replyToMessageId;
+            if (replyToMessageId)
+              return remoteTaskRequest(serverId, AGENT_THREAD_REPLIES_ROUTES.send, decodeQueuedMessageReceipt, {
+                agentId: input.agentId,
+                taskId: input.taskId,
+                text: input.text,
+                attachmentDraftIds: input.attachmentDraftIds ?? [],
+                replyToMessageId,
+                ...(input.clientMessageId === undefined ? {} : { clientMessageId: input.clientMessageId }),
+              });
             const files = input.attachmentDraftIds?.length ? { attachmentDraftIds: input.attachmentDraftIds } : null;
             return remoteTaskRequest(
               serverId,
