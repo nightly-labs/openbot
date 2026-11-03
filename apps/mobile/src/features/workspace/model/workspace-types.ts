@@ -716,6 +716,8 @@ export interface MobileWorkspaceContextValue {
   resetAgentSessionSetting: (input: ResetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
   /** An owner or admin of an online host that serves `agent-folders-v1`. The host checks the role again. */
   canManageAgentFolders: (serverId: string) => boolean;
+  /** True when the host advertises `sidebar-folders-v1`: a chat list folder can hold folders. */
+  canNestSidebarFolders: (serverId: string) => boolean;
   /** The folders that the agent can change besides its workspace. Owners and admins only. */
   loadAgentFolders: (agentId: string, serverId: string) => Promise<AgentFolderList>;
   /** With `replace`, the folder takes the place of a folder that was moved. */
@@ -945,6 +947,7 @@ type MobileWorkspaceStateKey =
   | "canManageProviderAccounts"
   | "canManageSharedTables"
   | "canManageAgentFolders"
+  | "canNestSidebarFolders"
   | "canPublishAgent";
 
 /**

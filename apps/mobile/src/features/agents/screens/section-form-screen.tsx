@@ -16,10 +16,18 @@ import { useText } from "@/shared/lib/text";
 
 export function SectionFormScreen() {
   const { t, errorMessage } = useText();
-  const { serverId, sectionId } = useLocalSearchParams<{ serverId: string; sectionId?: string }>();
+  // A new folder goes in `parentId` when the folder menu opens the form, and takes the chat
+  // `agentId` when a chat menu opens it.
+  const { serverId, sectionId, parentId, agentId } = useLocalSearchParams<{
+    serverId: string;
+    sectionId?: string;
+    parentId?: string;
+    agentId?: string;
+  }>();
   const { servers, sidebarByServer, mutateSidebarLayout } = useMobileWorkspace();
   const layout = sidebarByServer[serverId]?.layout;
   const section = layout?.sections.find((item) => item.id === sectionId);
+  const parentKnown = !parentId || Boolean(layout?.sections.some((item) => item.id === parentId));
   const [initialName] = useState(section?.name ?? "");
   const [name, setName] = useState(initialName);
   const [saving, setSaving] = useState(false);
@@ -30,7 +38,8 @@ export function SectionFormScreen() {
   const available =
     Boolean(layout) &&
     servers.some((server) => server.id === serverId && showsOnline(server)) &&
-    (!sectionId || Boolean(section));
+    (!sectionId || Boolean(section)) &&
+    parentKnown;
   const valid = name.trim().length > 0 && name.trim().length <= 40;
   // Discard turns prevention off before it repeats the action, so the hook does not warn.
   const [discarding, setDiscarding] = useState(false);
@@ -59,7 +68,14 @@ export function SectionFormScreen() {
     try {
       await mutateSidebarLayout(
         serverId,
-        sectionId ? { type: "rename", sectionId, name: name.trim() } : { type: "create", name: name.trim() },
+        sectionId
+          ? { type: "rename", sectionId, name: name.trim() }
+          : {
+              type: "create",
+              name: name.trim(),
+              ...(parentId ? { parentId } : {}),
+              ...(agentId ? { agentId } : {}),
+            },
       );
       void haptics.notification("success");
       setFinished(true);

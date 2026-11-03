@@ -2037,6 +2037,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageAgentSkills: (serverId) => administers(serverId, SKILLS_ADMIN_CAPABILITY),
       canManageSharedTables: (serverId) => administers(serverId, SHARED_TABLES_CAPABILITY),
       canManageAgentFolders: (serverId) => administers(serverId, AGENT_FOLDERS_CAPABILITY),
+      canNestSidebarFolders: (serverId) =>
+        hasCapability(serverCapabilities.current, serverId, SIDEBAR_FOLDERS_CAPABILITY),
       canManageAgentAccess: (serverId) => administers(serverId, AGENT_ADMIN_CAPABILITY),
       canManageAgentHostSettings: (serverId) => administers(serverId, AGENT_HOST_SETTINGS_CAPABILITY),
       canManageAgentBackupModels: (serverId) => administers(serverId, AGENT_BACKUP_MODELS_CAPABILITY),
