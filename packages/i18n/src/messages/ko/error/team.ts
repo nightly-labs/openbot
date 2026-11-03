@@ -94,6 +94,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "이 연결에서는 호스트 업데이트를 지원하지 않아요.",
   "error.team.hostTimezoneUnsupported": "이 연결에서는 서버 시간대를 지원하지 않아요.",
   "error.team.hostKeyRotationUnsupported": "이 연결에서는 서버 키 변경을 지원하지 않아요.",
+  "error.team.localServersUnsupported": "이 연결은 이 컴퓨터의 서버를 지원하지 않습니다.",
   "error.team.routineResultsUnsupported": "이 연결에서는 루틴 결과 전송 위치를 지원하지 않아요.",
   "error.team.agentMemoryLimitUnsupported": "이 연결에서는 에이전트 메모리 한도를 지원하지 않아요.",
   "error.team.agentFoldersUnsupported": "이 연결에서는 에이전트 폴더를 지원하지 않아요.",

@@ -49,6 +49,7 @@ import { HOST_KEY_ROTATION_ROUTES } from "@openbot/contracts/team-protocol/host-
 import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provider-default-v1";
@@ -605,6 +606,64 @@ export function rotateHostKey(request: TeamApiRequest): Effect.Effect<{ publicKe
       {},
     ),
   );
+}
+
+/** `local-servers-v1`: a server that the desktop app runs on the host's computer. */
+export interface HostLocalServer {
+  serverId: string;
+  name: string;
+  /** Registered for the owner's account, so the owner's devices list it. */
+  published: boolean;
+}
+
+export interface HostLocalServerList {
+  servers: HostLocalServer[];
+  /** How many the computer can run in addition to its own server. */
+  limit: number;
+}
+
+function decodeHostLocalServer(value: unknown): HostLocalServer {
+  const record = decodeRecord(value, "local server");
+  return {
+    serverId: requiredString(record, "serverId"),
+    name: requiredString(record, "name"),
+    published: requiredBoolean(record, "published"),
+  };
+}
+
+function decodeHostLocalServerList(value: unknown): HostLocalServerList {
+  const record = decodeRecord(value, "local servers");
+  const { servers, limit } = record;
+  if (!Array.isArray(servers)) throw new Error("Invalid local server list.");
+  if (typeof limit !== "number" || !Number.isSafeInteger(limit) || limit < 0)
+    throw new Error("Invalid local server limit.");
+  return { servers: servers.map(decodeHostLocalServer), limit };
+}
+
+/** The servers that the desktop app runs on the host's computer. Only the owner can read them. */
+export function listHostLocalServers(
+  request: TeamApiRequest,
+): Effect.Effect<HostLocalServerList, TeamAdminRequestError> {
+  return adminCall(() => request("POST", LOCAL_SERVERS_ROUTES.list, decodeHostLocalServerList, {}));
+}
+
+/**
+ * Makes a server on the host's computer. Resolves after it runs; while the computer is signed in, it
+ * is then also registered for the owner's account, so the server list has it.
+ */
+export function createHostLocalServer(
+  request: TeamApiRequest,
+  name: string,
+): Effect.Effect<HostLocalServer, TeamAdminRequestError> {
+  return adminCall(() => request("POST", LOCAL_SERVERS_ROUTES.create, decodeHostLocalServer, { name }));
+}
+
+/** Deletes a server on the host's computer: its data goes to that computer's Trash, and it leaves the account. */
+export function deleteHostLocalServer(
+  request: TeamApiRequest,
+  serverId: string,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", LOCAL_SERVERS_ROUTES.delete, () => undefined, { serverId }));
 }
 
 /** The host's enabled messaging connections with their places. Only a host with `routine-results-v1` answers it. */

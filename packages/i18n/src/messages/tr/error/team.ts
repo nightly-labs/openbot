@@ -95,6 +95,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Ana makine güncellemeleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostTimezoneUnsupported": "Bu bağlantı sunucunun saat dilimini desteklemiyor.",
   "error.team.hostKeyRotationUnsupported": "Bu bağlantı sunucu anahtarı değişikliğini desteklemiyor.",
+  "error.team.localServersUnsupported": "Bu bağlantı bu bilgisayardaki sunucuları desteklemiyor.",
   "error.team.routineResultsUnsupported": "Bu bağlantı rutin hedeflerini desteklemiyor.",
   "error.team.agentMemoryLimitUnsupported": "Bu bağlantı ajanların bellek sınırını desteklemiyor.",
   "error.team.agentFoldersUnsupported": "Bu bağlantı ajanların klasörlerini desteklemiyor.",

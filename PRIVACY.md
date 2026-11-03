@@ -359,7 +359,10 @@ The service stores:
 - rate-limit keys as hashes, their fixed window start time, and the attempt count;
 - short-lived team authentication tickets with a ticket hash, account ID, team server ID, lifecycle
   times, and optional consumption time;
-- remote host records with the owner, name, optional logo, device public key, and authorization epoch;
+- remote host records with the owner, name, optional logo, device public key, and authorization epoch.
+  A server that the desktop app runs on the same computer as its own server gets its own record while
+  the desktop app is signed in, so the owner's phones and other computers can connect to it. Deleting
+  that server removes its record;
 - remote memberships and invitations with roles, states, hashed invitation tokens, and lifecycle times;
 - logical remote session records with the account, host, originating account-session hash, start,
   end, and expiration times;

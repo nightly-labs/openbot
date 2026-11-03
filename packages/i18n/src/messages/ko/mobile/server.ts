@@ -9,6 +9,7 @@ export const messages = {
   "mobile.server.drawer.editOrder": "순서 편집",
   "mobile.server.drawer.leaveFailed": "{name}에서 나가지 못했어요",
   "mobile.server.drawer.removeFailed": "{name}을(를) 삭제하지 못했어요",
+  "mobile.server.drawer.deleteFailed": "{name}을(를) 삭제할 수 없습니다",
   "mobile.server.drawer.actionFailed": "OpenBot에서 이 작업을 완료하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.drawer.moveUp": "위로 이동",
   "mobile.server.drawer.moveDown": "아래로 이동",
@@ -65,6 +66,28 @@ export const messages = {
   "mobile.server.hosted.speedFaster": "{factor}배 빠름",
   "mobile.server.hosted.joinHint": "서버 소유자에게 받은 초대를 사용하세요.",
   "mobile.server.hosted.join": "서버 참여",
+  "mobile.server.local.option": "컴퓨터에 새 로컬 서버",
+  "mobile.server.local.optionHint": "{name}을(를) 실행하는 컴퓨터에서 자체 에이전트, 채팅, 파일을 사용합니다.",
+  "mobile.server.local.title": "새 서버",
+  "mobile.server.local.description":
+    "서버는 {name}을(를) 실행하는 컴퓨터에서 실행되며 자체 에이전트, 채팅, 파일을 가집니다. 해당 컴퓨터에서 OpenBot이 실행되는 동안 사용할 수 있습니다.",
+  "mobile.server.local.nameLabel": "서버 이름",
+  "mobile.server.local.nameTooShort": "{limit}자 이상 입력하세요.",
+  "mobile.server.local.create": "만들기",
+  "mobile.server.local.creating": "만드는 중…",
+  "mobile.server.local.createFailed": "서버를 만들 수 없습니다.",
+  "mobile.server.local.limitReached":
+    "{name}을(를) 실행하는 컴퓨터의 서버 수가 최대 {limit}개입니다. 다른 서버를 만들려면 해당 컴퓨터에서 하나를 삭제하세요.",
+  "mobile.server.local.created": "서버를 만들었습니다",
+  "mobile.server.local.createdOn": "{name}이(가) {computer}과(와) 같은 컴퓨터에서 실행 중입니다.",
+  "mobile.server.local.waiting": "{name}이(가) 온라인 상태가 되기를 기다리는 중…",
+  "mobile.server.local.notPublished":
+    "{name}이(가) 실행 중이지만 이 휴대폰에서 아직 열 수 없습니다. {computer}을(를) 실행하는 컴퓨터의 OpenBot이 로그인되어 있고 온라인인지 확인하세요.",
+  "mobile.server.local.open": "서버 열기",
+  "mobile.server.local.ownerOnly": "이 컴퓨터에 서버를 만들 수 있는 사람은 소유자뿐입니다.",
+  "mobile.server.local.unsupported": "여기에서 서버를 만들려면 이 컴퓨터의 OpenBot을 업데이트하세요.",
+  "mobile.server.local.deleteOffline":
+    "이 서버는 해당 컴퓨터에서만 삭제할 수 있습니다. 그 컴퓨터에서 OpenBot을 연 다음 다시 시도하세요.",
   "mobile.server.hosted.intro.title": "에이전트가 항상 켜져 있어요",
   "mobile.server.hosted.intro.description":
     "컴퓨터가 꺼져 있어도 클라우드 서버가 에이전트와 루틴을 실행해요. OpenBot이 설정하고 계속 실행 상태를 유지해요.",
@@ -228,6 +251,10 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "모든 멤버의 계정 서비스에서 이 서버가 삭제돼요. 해당 컴퓨터의 파일과 채팅은 그대로 유지돼요. 다시 사용하려면 그 컴퓨터에서 서버를 등록하세요.",
   "mobile.server.settings.remove": "서버 삭제",
+  "mobile.server.settings.deleteTitle": "{name}을(를) 삭제할까요?",
+  "mobile.server.settings.deleteBody":
+    "OpenBot이 해당 컴퓨터에서 서버를 중지하고 에이전트, 채팅, 파일을 그 컴퓨터의 휴지통으로 옮깁니다. 서버는 모든 기기의 서버 목록에서 사라집니다.",
+  "mobile.server.settings.delete": "서버 삭제",
   "mobile.server.settings.name": "서버 이름",
   "mobile.server.settings.nameLength": "{min}~{max}자로 입력해 주세요.",
   "mobile.server.settings.logo": "서버 로고",

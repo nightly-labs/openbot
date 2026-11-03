@@ -91,6 +91,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "当前连接不支持主机更新。",
   "error.team.hostTimezoneUnsupported": "当前连接不支持服务器时区。",
   "error.team.hostKeyRotationUnsupported": "当前连接不支持更改服务器密钥。",
+  "error.team.localServersUnsupported": "当前连接不支持此电脑上的服务器。",
   "error.team.routineResultsUnsupported": "当前连接不支持自动化任务的结果去向。",
   "error.team.agentMemoryLimitUnsupported": "当前连接不支持助手记忆上限。",
   "error.team.agentFoldersUnsupported": "当前连接不支持助手的文件夹。",

@@ -376,6 +376,19 @@ export interface ProviderDefaultSetting {
   model: AgentModelId | null;
 }
 
+/** A server on this computer, as `local-servers-v1` sends it. */
+export interface TeamApiLocalServer {
+  serverId: string;
+  name: string;
+  /** Registered for the owner's account, so the owner's devices list it. */
+  published: boolean;
+}
+
+export interface TeamApiLocalServerList {
+  servers: TeamApiLocalServer[];
+  limit: number;
+}
+
 /**
  * The admin routes, one member per optional capability. A member's presence is what
  * `#protocolSupport` advertises its capability on; every route behind it requires an owner or admin.
@@ -429,6 +442,16 @@ export interface TeamApiAdmin {
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
   /** `host-key-rotation-v1`: the owner changes this host's key. Resolves with the new public key. */
   hostKey?: { rotate(): Effect.Effect<{ publicKey: string }, RemoteWorkflowError> };
+  /**
+   * `local-servers-v1`: the servers that the desktop app runs on this computer. Only the desktop app's
+   * own server has it, not a server on this computer, a hosted server or a server mode host.
+   */
+  localServers?: {
+    list(): Effect.Effect<TeamApiLocalServerList, RemoteWorkflowError>;
+    create(name: string): Effect.Effect<TeamApiLocalServer, RemoteWorkflowError>;
+    /** Moves the server's data to the Trash and removes it from the account. */
+    delete(serverId: string): Effect.Effect<void, RemoteWorkflowError>;
+  };
   /** `agent-memory-limit-v1`: how many memories each agent of this computer can keep. */
   memoryLimit?: AgentMemoryLimitSetting;
   /** `memory-review-v1`: how often this computer's agents review their memories in the background. */

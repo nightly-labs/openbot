@@ -96,6 +96,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Deze verbinding ondersteunt geen updates van de host.",
   "error.team.hostTimezoneUnsupported": "Deze verbinding ondersteunt de tijdzone van de server niet.",
   "error.team.hostKeyRotationUnsupported": "Deze verbinding ondersteunt het wijzigen van de serversleutel niet.",
+  "error.team.localServersUnsupported": "Deze verbinding ondersteunt geen servers op deze computer.",
   "error.team.routineResultsUnsupported": "Deze verbinding ondersteunt geen bestemmingen voor routines.",
   "error.team.agentMemoryLimitUnsupported": "Deze verbinding ondersteunt de geheugenlimiet van agents niet.",
   "error.team.agentFoldersUnsupported": "Deze verbinding ondersteunt de mappen van agents niet.",

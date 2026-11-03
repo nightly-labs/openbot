@@ -26,6 +26,7 @@ import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-time
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { LIVE_ACTIVITY_PUSH_ROUTES } from "@openbot/contracts/team-protocol/live-activity-push-v1";
+import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
@@ -68,6 +69,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   MEMORY_REVIEW_ROUTES.settings,
   PROMPT_CACHE_TTL_ROUTES.settings,
   PROVIDER_DEFAULT_ROUTES.settings,
+  LOCAL_SERVERS_ROUTES.list,
   DISCORD_ACCESS_ROUTES.access,
   LIVE_ACTIVITY_PUSH_ROUTES.register,
   LIVE_ACTIVITY_PUSH_ROUTES.remove,
