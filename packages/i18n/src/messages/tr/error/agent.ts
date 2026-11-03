@@ -20,7 +20,15 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Bir mesaj veya ek gereklidir.",
   "error.agent.promptAnswersTooLong": "İstem yanıtları çok uzun.",
   "error.agent.gone": "Bu ajan artık mevcut değil.",
+  "error.agent.instructionsTooLarge":
+    "Talimat dosyası burada açılamayacak kadar büyük. Bir metin düzenleyicide kısaltın.",
+  "error.agent.instructionsOutside":
+    "Talimat dosyası ajanın çalışma alanı dışındaki bir yeri gösteriyor, bu yüzden OpenBot onu açmıyor.",
+  "error.agent.instructionsReadFailed": "Talimat dosyası okunamadı.",
+  "error.agent.instructionsSaveFailed": "Talimat dosyası kaydedilemedi.",
   "error.agent.profileGenerationBusy": "Profil oluşturma meşgul. Kısa bir süre sonra tekrar deneyin.",
+  "error.agent.instructionsChanged":
+    "Ajan talimat dosyasını değiştirdi. Son değişikliğiniz kaydedilmedi. Lütfen tekrar yapın.",
   "error.agent.initialMessageRequired": "İlk mesaj gereklidir.",
   "error.agent.initialMessageTooLong": "İlk mesaj çok uzun.",
   "error.agent.setupCleanupFailed": "Ajan kurulumu başarısız oldu ve tamamlanmamış ajan kaldırılamadı.",
@@ -32,6 +40,8 @@ export const messages = {
     'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} hiç model listelemedi.',
   "error.agent.modelNotInProviderList":
     'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} bu modeli listelemiyor.',
+  "error.agent.modelVariantNotListed":
+    'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} bu modeli listelemiyor. {provider} bu model için şu değerleri listeliyor: {models}.',
   "error.agent.modelProviderMismatch": "Seçilen model o sağlayıcıya ait değil.",
   "error.agent.modelNotListed": '"{model}" modeli mevcut değil. Kullanılabilir modeller: {models}.',
   "error.agent.providerNotListed":
@@ -113,6 +123,8 @@ export const messages = {
     "Bu sunucunun belleği azaldı. Mesajınız kuyrukta bekler ve bellek boşaldığında başlar.",
   "error.agent.workspaceOnlyToolMissing":
     "“Yalnızca çalışma alanı” seçeneği, OpenBot'un bulamadığı {tool} aracına ihtiyaç duyar. Aracı yükleyin veya ajan ayarlarından Tam erişim'i seçin.",
+  "error.agent.claudeSandboxUnavailable":
+    "“Yalnızca çalışma alanı” Claude korumalı alanına ihtiyaç duyar, ancak Claude bu bilgisayarda onu başlatamıyor: {reason}. Ajan ayarlarından Tam erişim'i veya başka bir sağlayıcıyı seçin.",
   "error.agent.screenCaptureOff":
     "Bu ajan için ekran yakalama kapalı. Kullanıcı, ajan ayarlarında Bilgisayar Kullanımı'nı açabilir.",
   "error.agent.screenCaptureUnavailable": "Ekran yakalama bu bilgisayarda kullanılamıyor.",

@@ -1,8 +1,8 @@
-import type { CustomProviderRestart } from "@openbot/contracts/ipc";
+import type { CustomProviderHarness, CustomProviderRestart } from "@openbot/contracts/ipc";
 import { createEffect, createSignal } from "solid-js";
 import { useText } from "../../text";
 import { CustomAcpAgentDialog } from "./CustomAcpAgentDialog";
-import { CustomProviderDialog } from "./CustomProviderDialog";
+import { CustomProviderDialog, type CustomProviderHarnessChoice } from "./CustomProviderDialog";
 import type { AcpAgentCheck, CustomAcpAgentDraft } from "./custom-acp-agent-form";
 import type { CustomProviderEndpoint, ModelDiscovery } from "./custom-provider-form";
 import {
@@ -19,6 +19,12 @@ interface DetectedProviderSetupProps {
   api: DetectedProviderApi;
   takenProviderIds?: readonly string[] | undefined;
   takenAgentIds?: readonly string[] | undefined;
+  /** The providers that can run an endpoint, for the "Runs on" field. Without it, OpenCode runs it. */
+  harnesses?: readonly CustomProviderHarnessChoice[] | undefined;
+  /** Downloads a provider of "Runs on" that is not ready. */
+  onDownloadHarness?: ((harness: CustomProviderHarness) => void) | undefined;
+  /** Why the last download of "Runs on" failed. */
+  harnessError?: string | undefined;
   onClose: () => void;
   /** After a save, so the host can say when the new models appear. */
   onSaved?: ((kind: DetectedProvider["kind"], restart: CustomProviderRestart | undefined) => void) | undefined;
@@ -119,6 +125,9 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
         providerIdLocked={Boolean(models()?.added)}
         apiKeyKept={Boolean(models()?.added && models()?.keyStored)}
         contextWindows
+        harnesses={props.harnesses}
+        onDownloadHarness={props.onDownloadHarness}
+        harnessError={props.harnessError}
         onSubmit={(value) => void save({ kind: "models", value })}
         onCancel={props.onClose}
       />

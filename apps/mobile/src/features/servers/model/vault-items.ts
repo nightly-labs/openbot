@@ -53,6 +53,99 @@ const COUNTRY_NAMES = {
   US: "mobile.server.vault.countryName.US",
 } as const satisfies Record<VaultCountryCode, MobileTextKey>;
 
+/** Example values of an address, in the format of one country. */
+export interface VaultAddressExample {
+  address: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  phone: string;
+}
+
+/**
+ * The placeholders of the contact form: a real place in the format of the chosen country, so the
+ * user sees how to write each value. An address is written the same in each app language.
+ */
+const ADDRESS_EXAMPLES = {
+  AT: { address: "Stephansplatz 1", city: "Wien", region: "Wien", postalCode: "1010", phone: "+43 1 234 5678" },
+  AU: { address: "1 Martin Place", city: "Sydney", region: "NSW", postalCode: "2000", phone: "+61 2 9876 5432" },
+  BE: {
+    address: "Rue de la Loi 16",
+    city: "Bruxelles",
+    region: "Bruxelles-Capitale",
+    postalCode: "1000",
+    phone: "+32 2 123 45 67",
+  },
+  CA: { address: "111 Wellington St", city: "Ottawa", region: "ON", postalCode: "K1A 0A9", phone: "+1 613 555 0100" },
+  CH: { address: "Bahnhofstrasse 1", city: "Zürich", region: "ZH", postalCode: "8001", phone: "+41 44 123 45 67" },
+  DE: { address: "Unter den Linden 1", city: "Berlin", region: "Berlin", postalCode: "10117", phone: "+49 30 1234567" },
+  DK: {
+    address: "Rådhuspladsen 1",
+    city: "København",
+    region: "Hovedstaden",
+    postalCode: "1550",
+    phone: "+45 12 34 56 78",
+  },
+  ES: { address: "Calle Mayor 1", city: "Madrid", region: "Madrid", postalCode: "28013", phone: "+34 912 345 678" },
+  FR: {
+    address: "1 rue de Rivoli",
+    city: "Paris",
+    region: "Île-de-France",
+    postalCode: "75001",
+    phone: "+33 1 23 45 67 89",
+  },
+  GB: {
+    address: "221B Baker Street",
+    city: "London",
+    region: "Greater London",
+    postalCode: "NW1 6XE",
+    phone: "+44 20 7946 0000",
+  },
+  IE: {
+    address: "1 O'Connell Street",
+    city: "Dublin",
+    region: "Dublin",
+    postalCode: "D01 F5P2",
+    phone: "+353 1 234 5678",
+  },
+  IT: { address: "Via del Corso 1", city: "Roma", region: "RM", postalCode: "00186", phone: "+39 06 1234 5678" },
+  JP: { address: "1-1 Chiyoda", city: "Chiyoda-ku", region: "Tokyo", postalCode: "100-0001", phone: "+81 3 1234 5678" },
+  NL: {
+    address: "Damrak 1",
+    city: "Amsterdam",
+    region: "Noord-Holland",
+    postalCode: "1012 LG",
+    phone: "+31 20 123 4567",
+  },
+  PL: {
+    address: "ul. Marszałkowska 1",
+    city: "Warszawa",
+    region: "mazowieckie",
+    postalCode: "00-624",
+    phone: "+48 22 123 45 67",
+  },
+  SE: {
+    address: "Drottninggatan 1",
+    city: "Stockholm",
+    region: "Stockholms län",
+    postalCode: "111 51",
+    phone: "+46 8 123 456 78",
+  },
+  US: {
+    address: "1 Market Street",
+    city: "San Francisco",
+    region: "CA",
+    postalCode: "94105",
+    phone: "+1 415 555 0100",
+  },
+} as const satisfies Record<VaultCountryCode, VaultAddressExample>;
+
+/** The address placeholders for `country`. With no country, or one outside the list, a US address. */
+export function vaultAddressExample(country: string): VaultAddressExample {
+  const code = VAULT_COUNTRY_CODES.find((candidate) => candidate === country.toUpperCase());
+  return ADDRESS_EXAMPLES[code ?? "US"];
+}
+
 /**
  * The country choices of the contact form, as the desktop form offers them, sorted by name. A saved
  * country outside the list, such as one that an agent saved, stays a choice under its code.

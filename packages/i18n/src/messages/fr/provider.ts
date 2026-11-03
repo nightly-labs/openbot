@@ -39,7 +39,7 @@ export const messages = {
 
   "provider.status.off": "Désactivé",
   "provider.gemini.hostSignIn":
-    "Pour connecter Gemini, ouvrez OpenBot sur l’hôte et sélectionnez « Connecter » dans Réglages > Fournisseurs. La connexion Google nécessite un navigateur sur cet hôte. La connexion à distance n’est pas prise en charge.",
+    "Pour connecter Gemini, ouvrez OpenBot sur l’hôte et sélectionnez « Connecter » dans Réglages du serveur > Fournisseurs. La connexion Google nécessite un navigateur sur cet hôte. La connexion à distance n’est pas prise en charge.",
   // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
   // badge: a saved key leaves the runtime "Connected" to speak for the row.
   "provider.key.free": "Gratuit",
@@ -59,6 +59,7 @@ export const messages = {
   "provider.action.signIn": "Se connecter",
   "provider.action.apiKey": "Clé d’API",
   "provider.action.signInWithCode": "Connexion par code",
+  "provider.action.signInMainlandChina": "Connexion via {site} (Chine)",
   "provider.action.pasteAddress": "Coller l’adresse",
   "provider.aria.download": "Télécharger {name}",
   "provider.aria.cancel": "Annuler {name}",
@@ -129,6 +130,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, par défaut",
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Effort de raisonnement de l’agent",
+  "provider.picker.effortFixed": "{effort}, fixé par {provider}",
   "provider.picker.fast": "Rapide",
   "provider.picker.fastLabel": "Mode rapide",
   "provider.picker.selectEffort": "Choisir l’effort",
@@ -137,11 +139,14 @@ export const messages = {
   "provider.status.signInRequired": "Connexion requise",
   "provider.model.free": "Gratuit",
   "provider.model.default": "par défaut",
+  "provider.effort.none": "Aucun",
+  "provider.effort.minimal": "Minimal",
   "provider.effort.low": "Faible",
   "provider.effort.medium": "Moyen",
   "provider.effort.high": "Élevé",
   "provider.effort.xhigh": "Très élevé",
   "provider.effort.max": "Max",
+  "provider.effort.ultra": "Ultra",
 
   "provider.museKey.title": "Clé d’API Meta pour Muse",
   "provider.museKey.description":
@@ -214,6 +219,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot déconnecte {provider} sur cet ordinateur. La CLI {provider} de votre terminal est aussi déconnectée.",
   "provider.settings.disconnectHost": "OpenBot déconnecte {provider} sur le serveur.",
+  "provider.settings.versionInstalledByUser": "{version} · installée par vous",
+  "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompt",
   "provider.settings.promptCacheDescription":

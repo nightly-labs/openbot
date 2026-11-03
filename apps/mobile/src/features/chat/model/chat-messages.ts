@@ -23,6 +23,7 @@ import {
   routineConversationEvent,
   routineRunConversationEvent,
 } from "@openbot/contracts/ipc";
+import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 
 export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStatus;
@@ -52,7 +53,14 @@ export type ChatMessage =
   | { id: string; kind: "context-reset" }
   /** A routine created, changed, deleted, or run by the agent. The label matches the desktop marker. */
   | { id: string; kind: "routine"; event: RoutineMarkerEvent; label: MobileTextKey; routineName: string }
-  | { id: string; kind: "question"; turnId: string | undefined; prompt: ConversationQuestionPrompt }
+  | {
+      id: string;
+      kind: "question";
+      turnId: string | undefined;
+      prompt: ConversationQuestionPrompt;
+      /** The block that the prompt is the fallback of, when the host sends it. */
+      uiBlock?: ConversationUiBlock | undefined;
+    }
   | {
       id: string;
       kind: "message";
@@ -357,6 +365,7 @@ export function projectChatMessages(
           kind: "question",
           turnId: message.turnId,
           prompt,
+          uiBlock: message.uiBlock,
         })),
       );
       continue;
@@ -532,6 +541,7 @@ function projectChannelMessage(
       id: entry.id,
       kind: "question",
       turnId: entry.message.turnId,
+      uiBlock: entry.message.uiBlock,
       prompt:
         entry.superseded && !entry.message.questionPrompt.resolution
           ? { ...entry.message.questionPrompt, resolution: { status: "expired" } }

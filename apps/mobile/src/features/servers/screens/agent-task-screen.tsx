@@ -7,7 +7,7 @@ import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Keyboard, Pressable, useColorScheme, View } from "react-native";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
@@ -19,6 +19,7 @@ import {
   asksForSecret,
   BrowserSecretComposer,
   BrowserTakeoverCard,
+  QuestionSecretComposer,
 } from "@/features/chat/components/browser-secret-card";
 import { ChatAttachmentPanel } from "@/features/chat/components/chat-attachment-panel";
 import { ChatComposer, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
@@ -36,11 +37,13 @@ import { VoiceOverlay } from "@/features/chat/components/voice-overlay";
 import { mentionDraft } from "@/features/chat/model/chat-mentions";
 import { latestReadableMessage, projectChatMessages } from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
+import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { uploadChatAttachments } from "@/features/chat/model/upload-chat-attachments";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
+import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
@@ -162,6 +165,19 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
     [conversation.data],
   );
   const activeTurnId = task?.activeTurnId ?? null;
+  // As in the agent's chat: the steps row of a finished turn and the activity row open the thinking sheet.
+  const turnLines = useTurnStepLines(serverId);
+  const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
+  const turnSummaries = useMemo(() => {
+    lastTurnSummaries.current = conversation.data
+      ? finishedTurnSummaries(conversation.data.messages, activeTurnId, turnLines, lastTurnSummaries.current)
+      : undefined;
+    return lastTurnSummaries.current;
+  }, [conversation.data, activeTurnId, turnLines]);
+  const openTurn = useCallback(
+    (turnId: string) => router.push({ pathname: "/turn-thinking", params: { agentId, serverId, taskId, turnId } }),
+    [agentId, serverId, taskId],
+  );
   // As in the agent's chat: the open question of the running turn has the form; earlier ones show their result.
   const activePrompt = messages.findLast(
     (row) => row.kind === "question" && !row.prompt.resolution && activeTurnId !== null && row.turnId === activeTurnId,
@@ -275,6 +291,8 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
   // As in the agent's chat: a password or a code is typed where the composer is.
   const showBrowserRequests = online && foregroundVisit && isFocused;
   const secretRequest = showBrowserRequests && !voiceOpen ? taskBrowserRequests.find(asksForSecret) : undefined;
+  // A private answer to a form question is typed there too, never in a second field beside the composer.
+  const secretQuestion = !secretRequest && !voiceOpen && questionForm.question?.isSecret ? questionForm : undefined;
   const dark = useColorScheme() === "dark";
   const palette = useMemo(
     () => voicePalette([getBloubAvatarColor(target.avatarSeed, target.avatarHue)], dark),
@@ -409,7 +427,7 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
           {task.queuedMessages.map((queued) => (
             <View
               key={queued.deliveryId}
-              className="max-w-[88%] self-end rounded-[30px] bg-control/40 px-4 py-3"
+              className="max-w-[92%] self-end rounded-[30px] bg-control/40 px-4 py-3"
               style={{ borderCurve: "circular" }}
             >
               <Typography.Paragraph numberOfLines={3} className="text-text-secondary">
@@ -489,6 +507,8 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
           fieldBackground={fieldBackground}
           foreground={foreground}
           messages={messages}
+          turnSummaries={turnSummaries}
+          onOpenTurn={isDraft ? undefined : openTurn}
           messageAliases={NO_ALIASES}
           referenceMessages={NO_MESSAGES}
           hasOlder={false}
@@ -575,6 +595,18 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
               key={`${serverId}:${secretRequest.requestId}`}
               request={secretRequest}
               respond={(input) => respondToBrowserSecret(serverId, input)}
+              bottomInset={insets.bottom}
+              liquidGlassAvailable={liquidGlassAvailable}
+              fallbackBackground={fieldBackground}
+              foreground={foreground}
+              muted={muted}
+              action={action}
+              actionForeground={actionForeground}
+            />
+          ) : secretQuestion ? (
+            <QuestionSecretComposer
+              key={`${serverId}:${secretQuestion.messageId}:${secretQuestion.question?.id}`}
+              controller={secretQuestion}
               bottomInset={insets.bottom}
               liquidGlassAvailable={liquidGlassAvailable}
               fallbackBackground={fieldBackground}

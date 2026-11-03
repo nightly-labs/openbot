@@ -106,61 +106,61 @@
   "opencode": {
     "registry": "https://registry.npmjs.org",
     "repository": "https://github.com/anomalyco/opencode",
-    "version": "2.1.1",
+    "version": "2.2.5",
     "license": "MIT",
     "licensePackage": {
       "name": "opencode-ai",
-      "version": "1.19.3"
+      "version": "1.19.5"
     },
     "licenseSha256": "625f0f619133f89bbbb2abe37369613dfa1885eba1e50d02170deb62bb42cb6b",
     "artifacts": {
       "darwin-arm64": {
         "package": "@opencode/cli-darwin-arm64",
-        "asset": "cli-darwin-arm64-2.1.1.tgz",
-        "assetSha256": "967d7d61c2afd1afa73b37d0cb6928e33324665aa3a013affc5002f9f0828a6b",
-        "binarySha256": "2f6fe5c3cf1e7827a93b14c7b07117ef0cde776c32613b0aae70c15e4780f271",
-        "downloadBytes": 85869579,
-        "installedBytes": 200000000,
+        "asset": "cli-darwin-arm64-2.2.5.tgz",
+        "assetSha256": "dfd827de3281b4c3ca2b0bfc8f4beb103fa660c419d148a1a515c4344f9e9c02",
+        "binarySha256": "abe4d88594bffb12b364375b8a6732d2d1f7a977195ed1a35c5c76f8e89c9e0e",
+        "downloadBytes": 105814595,
+        "installedBytes": 240000000,
         "executable": "opencode",
         "platformDirectory": "mac"
       },
       "darwin-x64": {
         "package": "@opencode/cli-darwin-x64",
-        "asset": "cli-darwin-x64-2.1.1.tgz",
-        "assetSha256": "05c05d120e3c54b36a3449b5a130fe1a49c5be6d9ca0089bc34d9d76c73762a2",
-        "binarySha256": "dba3cd24177abd9bb9c5dceedd4996ccd2fef36cab9a63d5be76e532e918a430",
-        "downloadBytes": 90916949,
-        "installedBytes": 220000000,
+        "asset": "cli-darwin-x64-2.2.5.tgz",
+        "assetSha256": "304f4666e7e37eac338de258f763b7f5b8987ab1bde2341dc1a613a8205c0010",
+        "binarySha256": "5e0cf9c94ee0fd4a4635807534e9ca4bf51ffe1c83260ada3510bf60e7333173",
+        "downloadBytes": 111044366,
+        "installedBytes": 260000000,
         "executable": "opencode",
         "platformDirectory": "mac"
       },
       "linux-x64": {
         "package": "@opencode/cli-linux-x64",
-        "asset": "cli-linux-x64-2.1.1.tgz",
-        "assetSha256": "64591057ea593e9a11374d4630c2249930d8f33598af0b3e02137493860ab17b",
-        "binarySha256": "0e81c77fcc27b263708b133bbf9880cd641060c20e22d3dec8a79b9a8db90450",
-        "downloadBytes": 98936640,
-        "installedBytes": 230000000,
+        "asset": "cli-linux-x64-2.2.5.tgz",
+        "assetSha256": "92690eee07a680d3cb760ca02ba43878de9eab1b4e5d5dfae8795518c53628f4",
+        "binarySha256": "8d060e1d2fbb9bb44cf09ae6ed1f3f6a7cff070b5227e2f90970132b23a92050",
+        "downloadBytes": 118637290,
+        "installedBytes": 270000000,
         "executable": "opencode",
         "platformDirectory": "linux"
       },
       "linux-arm64": {
         "package": "@opencode/cli-linux-arm64",
-        "asset": "cli-linux-arm64-2.1.1.tgz",
-        "assetSha256": "cfa3ae6363fc3082f03072297069d81f53559a761371fdb4b56fe6bfa01ca066",
-        "binarySha256": "137140e3b4d6cbc0e82683de9741de06fe185cd2435981977738eb2a71c31c38",
-        "downloadBytes": 97694833,
-        "installedBytes": 220000000,
+        "asset": "cli-linux-arm64-2.2.5.tgz",
+        "assetSha256": "f8c5a82075fede9b5b044ed6c8a6d13ad807a7e62caea1cd0a878adef49eb053",
+        "binarySha256": "dcc7e6f4ac1672e1884dcb8d26ab333e55ffc3f080e01a7a60177aa05f54935f",
+        "downloadBytes": 117223869,
+        "installedBytes": 270000000,
         "executable": "opencode",
         "platformDirectory": "linux"
       },
       "win32-x64": {
         "package": "@opencode/cli-windows-x64",
-        "asset": "cli-windows-x64-2.1.1.tgz",
-        "assetSha256": "3343e8140dde91e45bee24ee6dbabc16aa0cae5b1e1a0184b580b1c8b0530e12",
-        "binarySha256": "39b9df25675050b1162e30d09326231bde84bf6db9c63605d1a68221bd091517",
-        "downloadBytes": 101966282,
-        "installedBytes": 230000000,
+        "asset": "cli-windows-x64-2.2.5.tgz",
+        "assetSha256": "7a9e1dbe80965b75ace78d512c91ce4e6c9e4683fa5a5a25b00ff0b736f1c15c",
+        "binarySha256": "0c346fdaf519d2f23a31d3b6cb9d65e369a72d77cac6f027b5e0a06376ec3a43",
+        "downloadBytes": 121997426,
+        "installedBytes": 280000000,
         "executable": "opencode.exe",
         "platformDirectory": "win"
       }
@@ -1825,6 +1825,75 @@
         "executable": "muse.exe",
         "files": {
           "bin/muse.exe": "5caacb02eea2734405786e50cb42aeea3eeb46b4fa9801cfa666cda225101749"
+        }
+      }
+    }
+  },
+  "kimi": {
+    "repository": "https://github.com/MoonshotAI/kimi-cli",
+    "version": "1.52.0",
+    "tag": "1.52.0",
+    "license": "Apache-2.0",
+    "licenseSha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+    "artifacts": {
+      "darwin-arm64": {
+        "asset": "kimi-1.52.0-aarch64-apple-darwin-onedir.tar.gz",
+        "assetSha256": "1d87d0c6d39e30593e44571ce6f78b20345735e6e836c1b175283ddabf5b9028",
+        "downloadBytes": 67577902,
+        "installedBytes": 150000000,
+        "executable": "kimi",
+        "files": {
+          "kimi": "52fe62da5118ccadbbc26fe195751f7050e8c65fc42dc9486d743bc6473f2be2",
+          "_internal/base_library.zip": "c9565951309b343eac33428623548a1611e875d7a5bd54a3c6a7a8ce8ca79cc2",
+          "_internal/Python.framework/Versions/3.14/Python": "9c4bb24d772ea86352166776dae56223042f1a89c04a256d9a7d9744f92ff7e4"
+        }
+      },
+      "darwin-x64": {
+        "asset": "kimi-1.52.0-x86_64-apple-darwin-onedir.tar.gz",
+        "assetSha256": "5b0977d6823cc36c0011707521d7b5f111d488b4680e697e94c801ca9d9778c7",
+        "downloadBytes": 69427316,
+        "installedBytes": 155000000,
+        "executable": "kimi",
+        "files": {
+          "kimi": "9b308f6c3376f4ce930709ac1498f06edda578fb25ce878b68fcf5123793168e",
+          "_internal/base_library.zip": "86ecffe17abeca77ecb8bb0e19e0f22ae7b9c84523507629f5fa9f8ce03c3f02",
+          "_internal/Python.framework/Versions/3.14/Python": "f0361be4d20d3b473e3a00a6b0f569fe5a10884b1b5dc4f15e576c756fda8af7"
+        }
+      },
+      "linux-x64": {
+        "asset": "kimi-1.52.0-x86_64-unknown-linux-gnu-onedir.tar.gz",
+        "assetSha256": "23d11d2cbe5211beb7d7cc7552e92fa2268021eaca58a7482852e60b16fc148f",
+        "downloadBytes": 95685385,
+        "installedBytes": 230000000,
+        "executable": "kimi",
+        "files": {
+          "kimi": "aa0d3f28e5a92775b2b3e9c85910debd2b3d6daa4b2bf5184f86f5abac037756",
+          "_internal/base_library.zip": "b0e68e532df7eb30c61d6950291c79e7354fa4123be1be65f987f17edc6cb539",
+          "_internal/libpython3.14.so.1.0": "4131f23ceebb53864abe82c8da4cd512f98e4d939e40e51de8f5536a944decad"
+        }
+      },
+      "linux-arm64": {
+        "asset": "kimi-1.52.0-aarch64-unknown-linux-gnu-onedir.tar.gz",
+        "assetSha256": "61c49cd8d3aa92d91939f2b72b8fc448d59565ed769e6a9ff8afc64a899f2bf0",
+        "downloadBytes": 92945609,
+        "installedBytes": 230000000,
+        "executable": "kimi",
+        "files": {
+          "kimi": "ee420d7fbb295843bac0de36fe6f794f4aecbf606aa5ec9f2a7686593a42859b",
+          "_internal/base_library.zip": "8e38fbea715db949ebf5e0ada7ee81e468390dca60c027f48d880680642b09bc",
+          "_internal/libpython3.14.so.1.0": "0c9a7e987d3c7607cf0b3d2371796df60eb64bd6a316751b2c6943db55a3e50c"
+        }
+      },
+      "win32-x64": {
+        "asset": "kimi-1.52.0-x86_64-pc-windows-msvc-onedir.zip",
+        "assetSha256": "7c424b7ce9a2918091c1d37738c90b410d766107de7e46039922e7ffd5c3d09a",
+        "downloadBytes": 73776124,
+        "installedBytes": 150000000,
+        "executable": "kimi.exe",
+        "files": {
+          "kimi.exe": "4a2aff3980d941ce90ac6d7a8062a255059929d011418c63952bfb2680699e99",
+          "_internal/base_library.zip": "308de2cc818eeb94415a4534a2bcfb3391c8b231197935405a1baa9405dcfd01",
+          "_internal/python314.dll": "0f9857ffdfe010fe6b99328d58c2e3c7472ce75f336bf9c2ad9bd5bca3bce700"
         }
       }
     }

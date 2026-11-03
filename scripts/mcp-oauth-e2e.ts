@@ -806,6 +806,32 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.equal(resource.hits.at(-1)?.authorization, "Bearer access-rotated");
     const midSessionRefresh = { refreshes: 1, text: "renewed" };
 
+    // An added account on the same address: a refused token refreshes the sign-in of that account,
+    // not the sign-in of the plain row, whose token the server still takes.
+    const account = row("Resource Work", "/mcp#account-e2e-work");
+    const accountRecord = freshRecord(auth.base, account.url);
+    records.set(
+      account.url,
+      mcpOAuthRecordSchema.parse({
+        ...accountRecord,
+        tokens: { ...accountRecord.tokens, access_token: "access-work", refresh_token: "refresh-work" },
+      }),
+    );
+    const accountRoute = await endpointOf(gateway, account);
+    assert.notEqual(accountRoute.url, directRoute.url);
+    auth.reset();
+    const accountClient = await connect(accountRoute.url, accountRoute.bearer);
+    assert.equal(textOf(await accountClient.callTool({ name: "echo", arguments: { text: "work" } })), "work");
+    assert.equal(
+      auth.hits.filter((hit) => hit.path === "/token").length,
+      1,
+      "The account did not refresh its own sign-in.",
+    );
+    assert.equal(records.get(account.url)?.tokens?.access_token, "access-rotated");
+    assert.equal(records.get(direct.url)?.tokens?.access_token, "access-rotated");
+    assert.ok(!resource.hits.some((hit) => hit.path.includes("account")), "The account fragment went upstream.");
+    const accountRefresh = { ownSignInRefreshed: true, fragmentUpstream: false };
+
     // After a sign-out the call gets a JSON-RPC error, never a 401 that would start a sign-in.
     await runCauseEffect(gateway.signOut({ mcpServerId: direct.id }));
     const hitsAtSignOut = resource.hits.length;
@@ -882,6 +908,7 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       clientIdentity,
       refused,
       midSessionRefresh,
+      accountRefresh,
       signedOut,
       expiredWithoutRefresh,
       restart,

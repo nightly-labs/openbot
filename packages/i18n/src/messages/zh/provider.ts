@@ -35,7 +35,7 @@ export const messages = {
   "provider.status.checking": "检查中",
   "provider.status.off": "已关闭",
   "provider.gemini.hostSignIn":
-    "要连接 Gemini，请在主机上打开 OpenBot，然后在“设置 > 服务商”中选择“连接”。Google 登录需要该主机上有浏览器，不支持远程登录。",
+    "要连接 Gemini，请在主机上打开 OpenBot，然后在“服务器设置 > 服务商”中选择“连接”。Google 登录需要该主机上有浏览器，不支持远程登录。",
 
   // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
   // badge: a saved key leaves the runtime "Connected" to speak for the row.
@@ -56,6 +56,7 @@ export const messages = {
   "provider.action.signIn": "登录",
   "provider.action.apiKey": "API 密钥",
   "provider.action.signInWithCode": "用验证码登录",
+  "provider.action.signInMainlandChina": "用 {site} 登录（中国大陆）",
   "provider.action.pasteAddress": "粘贴地址",
   "provider.aria.download": "下载 {name}",
   "provider.aria.cancel": "取消 {name}",
@@ -132,6 +133,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}，默认",
   "provider.picker.effort": "强度",
   "provider.picker.effortLabel": "助手推理强度",
+  "provider.picker.effortFixed": "{effort}（由 {provider} 固定）",
   "provider.picker.fast": "快速",
   "provider.picker.fastLabel": "快速模式",
   "provider.picker.selectEffort": "选择强度",
@@ -140,11 +142,14 @@ export const messages = {
   "provider.status.signInRequired": "需要登录",
   "provider.model.free": "免费",
   "provider.model.default": "默认",
+  "provider.effort.none": "无",
+  "provider.effort.minimal": "最低",
   "provider.effort.low": "低",
   "provider.effort.medium": "中",
   "provider.effort.high": "高",
   "provider.effort.xhigh": "极高",
   "provider.effort.max": "最高",
+  "provider.effort.ultra": "超高",
 
   "provider.museKey.title": "Muse 的 Meta API 密钥",
   "provider.museKey.description": "在主机上保存 Meta API 密钥，或使用 Muse CLI 登录。",
@@ -248,6 +253,8 @@ export const messages = {
   "provider.settings.runtime": "运行时",
   "provider.settings.version": "版本",
   "provider.settings.versionAvailable": "{installed} · 有 {available} 可用",
+  "provider.settings.versionInstalledByUser": "{version} · 你自己安装的",
+  "provider.settings.versionDownloaded": "{version} · 由 OpenBot 下载",
   "provider.settings.update": "更新",
   "provider.settings.downloadLabel": "{name} 的下载",
   "provider.settings.diagnostics": "诊断",

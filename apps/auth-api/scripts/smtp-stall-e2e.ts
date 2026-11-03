@@ -6,15 +6,21 @@
 // - a stall after `354`: the result is unknown and there is no second connection;
 // - a normal relay: one connection, one message;
 // - a relay that never answers: the last error is a timeout inside the delivery budget.
+// The relay cases send through the `EMAIL_RELAY` path of production (#4578): the real relay Worker
+// handler takes the request and sends over the same fake relay. A stall after `354` stays unknown
+// across the binding. A relay Worker that cannot be reached, or that crashes, is unknown too: it can
+// fail after the mail host took the message.
 // `bun run test:smtp-stall`. Writes .openbot-build/smtp-stall-e2e.json.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type Server, type Socket, connect as tcpConnect } from "node:net";
 import { resolve } from "node:path";
 import { Effect, Result } from "effect";
+import { createEmailRelayHandler } from "../src/server/email-relay-handler";
 import {
   EMAIL_CODE_DELIVERY_BUDGET_MS,
   type SmtpConnector,
+  type SmtpEmailConfig,
   sendPrivateEmailCode,
 } from "../src/server/smtp-email-delivery";
 
@@ -28,6 +34,8 @@ const CONFIG = {
 };
 
 type Behavior = "normal" | "silent" | "stall_after_data";
+/** `direct` opens the socket in the caller; `relay` sends through the relay Worker handler. */
+type Route = "direct" | "relay" | "relay_unreachable" | "relay_crashed";
 
 interface CaseReport {
   name: string;
@@ -131,16 +139,34 @@ function serveSmtp(socket: Socket, behavior: Exclude<Behavior, "silent">, stats:
   });
 }
 
-async function runCase(name: string, behaviors: Behavior[]): Promise<CaseReport> {
+function relayWorker(route: Route, connector: SmtpConnector): SmtpEmailConfig["relay"] {
+  if (route === "direct") return undefined;
+  if (route === "relay_unreachable") return { fetch: () => Promise.reject(new Error("relay unreachable")) };
+  // A thrown exception in a Worker answers 500 with an HTML page.
+  if (route === "relay_crashed") return { fetch: async () => new Response("<html>error</html>", { status: 500 }) };
+  const handler = createEmailRelayHandler(connector);
+  return {
+    fetch: async (request) => {
+      // The binding carries the SMTP settings, and never the binding itself.
+      const body = await request.clone().text();
+      assert(body.includes(`"password":"${CONFIG.password}"`), "the relay request must carry the SMTP settings");
+      assert(!body.includes('"relay":'), "the relay request must not carry the binding");
+      return handler.fetch(request);
+    },
+  };
+}
+
+async function runCase(name: string, behaviors: Behavior[], route: Route = "direct"): Promise<CaseReport> {
   const relay = await startRelay(behaviors);
+  const worker = relayWorker(route, relay.connector);
   const startedAt = Date.now();
   try {
     const result = await Effect.runPromise(
       Effect.result(
         sendPrivateEmailCode(
-          CONFIG,
+          worker ? { ...CONFIG, relay: worker } : CONFIG,
           { email: "user@example.com", code: "ABCD-EFGH", expiresAt: Date.now() + 10 * 60_000 },
-          relay.connector,
+          worker ? undefined : relay.connector,
         ),
       ),
     );
@@ -182,6 +208,33 @@ try {
   assert.equal(silent.result, "smtp_timeout");
   assert.equal(silent.connections, 3);
   assert(silent.elapsedMs < EMAIL_CODE_DELIVERY_BUDGET_MS, "the attempts must end inside the delivery budget");
+
+  const relayed = await runCase("relay_normal", ["normal"], "relay");
+  report.cases.push(relayed);
+  assert.equal(relayed.result, "sent");
+  assert.equal(relayed.connections, 1);
+  assert.equal(relayed.messages, 1);
+
+  const relayedUnknown = await runCase("relay_stall_after_data", ["stall_after_data", "normal"], "relay");
+  report.cases.push(relayedUnknown);
+  assert.equal(relayedUnknown.result, "smtp_delivery_unknown");
+  assert.equal(relayedUnknown.connections, 1);
+
+  // The relay's own timeout must reach the caller: the code was not sent, so the user can ask again.
+  const relayedSilent = await runCase("relay_always_silent", ["silent"], "relay");
+  report.cases.push(relayedSilent);
+  assert.equal(relayedSilent.result, "smtp_timeout");
+  assert.equal(relayedSilent.connections, 3);
+
+  const unreachable = await runCase("relay_unreachable", ["normal"], "relay_unreachable");
+  report.cases.push(unreachable);
+  assert.equal(unreachable.result, "smtp_delivery_unknown");
+  assert.equal(unreachable.connections, 0);
+
+  const crashed = await runCase("relay_crashed", ["normal"], "relay_crashed");
+  report.cases.push(crashed);
+  assert.equal(crashed.result, "smtp_delivery_unknown");
+  assert.equal(crashed.connections, 0);
 
   report.passed = true;
 } catch (error) {

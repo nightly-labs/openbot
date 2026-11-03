@@ -33,7 +33,7 @@ export const messages = {
   "provider.status.checking": "確認中",
   "provider.status.off": "オフ",
   "provider.gemini.hostSignIn":
-    "Gemini を接続するには、ホストで OpenBot を開き、「設定」>「プロバイダー」で「接続」を選択してください。Google へのサインインには、そのホストのブラウザーが必要です。リモートでのサインインには対応していません。",
+    "Gemini を接続するには、ホストで OpenBot を開き、「サーバーの設定」>「プロバイダー」で「接続」を選択してください。Google へのサインインには、そのホストのブラウザーが必要です。リモートでのサインインには対応していません。",
 
   "provider.key.free": "無料",
 
@@ -50,6 +50,7 @@ export const messages = {
   "provider.action.signIn": "サインイン",
   "provider.action.apiKey": "API キー",
   "provider.action.signInWithCode": "コードでログイン",
+  "provider.action.signInMainlandChina": "{site} でログイン (中国)",
   "provider.action.pasteAddress": "アドレスを貼り付け",
   "provider.aria.download": "{name} をダウンロード",
   "provider.aria.cancel": "{name} をキャンセル",
@@ -123,6 +124,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}、デフォルト",
   "provider.picker.effort": "推論の強さ",
   "provider.picker.effortLabel": "エージェントの推論の強さ",
+  "provider.picker.effortFixed": "{effort}（{provider} が固定）",
   "provider.picker.fast": "高速",
   "provider.picker.fastLabel": "高速モード",
   "provider.picker.selectEffort": "推論の強さを選択",
@@ -131,11 +133,14 @@ export const messages = {
   "provider.status.signInRequired": "サインインが必要",
   "provider.model.free": "無料",
   "provider.model.default": "デフォルト",
+  "provider.effort.none": "なし",
+  "provider.effort.minimal": "最小",
   "provider.effort.low": "低",
   "provider.effort.medium": "中",
   "provider.effort.high": "高",
   "provider.effort.xhigh": "最高",
   "provider.effort.max": "最大",
+  "provider.effort.ultra": "ウルトラ",
   "provider.museKey.title": "Muse 用の Meta API キー",
   "provider.museKey.description": "ホストに Meta API キーを保存するか、Muse CLI を使ってサインインしてください。",
   "provider.museKey.label": "Meta API キー",
@@ -205,6 +210,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI もサインアウトします。",
   "provider.settings.disconnectHost": "OpenBot はサーバーで {provider} からサインアウトします。",
+  "provider.settings.versionInstalledByUser": "{version} · 自分でインストール",
+  "provider.settings.versionDownloaded": "{version} · OpenBot がダウンロード",
   "provider.settings.cache": "キャッシュ",
   "provider.settings.promptCache": "プロンプトキャッシュ",
   "provider.settings.promptCacheDescription":

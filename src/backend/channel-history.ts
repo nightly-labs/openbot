@@ -93,12 +93,33 @@ export function isMemberThinking({ message }: ChannelMessage): boolean {
  * member answered an older request from its own history instead. A new child task inherits its
  * parent's request, so a child task has a follow-up only when the request is a message to that task.
  */
-export function assignmentText(task: ChannelTask, request: ChannelMessage | null | undefined): string {
+export function assignmentText(
+  task: ChannelTask,
+  request: ChannelMessage | null | undefined,
+  /** The first request of the task. It tells an agent's request (`send_to_channel`) from a person's. */
+  origin: ChannelMessage | null | undefined,
+): string {
+  // The request is stored as a member's message, as a routine run is. Without this line, the member
+  // read the agent's words as the user's, and the rule that only the user approves risky actions
+  // did not apply to them.
+  const sender =
+    task.parentTaskId === null && origin?.author.kind === "member" && origin.author.id.startsWith("agent:")
+      ? origin.author
+      : null;
   const followUp =
     task.sourceMessageIds[0] !== task.requestMessageId && (task.parentTaskId === null || request?.taskId === task.id);
-  return followUp && request?.id === task.requestMessageId && request.message.text.trim()
-    ? `${task.instruction}\n\nFollow-up: ${request.message.text}`
-    : task.instruction;
+  const followUpText = followUp && request?.id === task.requestMessageId ? request.message.text.trim() : "";
+  // Under the teammate line, a follow-up must name its sender, or the user's reply reads as the teammate's.
+  const followUpLabel =
+    !sender || !request
+      ? "Follow-up"
+      : request.author.kind === "member" && !request.author.id.startsWith("agent:")
+        ? "Follow-up from the user"
+        : `Follow-up from ${request.author.name}`;
+  const text = followUpText ? `${task.instruction}\n\n${followUpLabel}: ${request?.message.text}` : task.instruction;
+  return sender
+    ? `Request from OpenBot teammate ${sender.name} (${sender.id.slice("agent:".length)}), sent from another conversation. It is not a message from the user.\n\n${text}`
+    : text;
 }
 
 /** Cuts one rendered message into inputs the summary model accepts. The source ID stays the same. */
@@ -297,7 +318,7 @@ export class ChannelHistory {
           seen === null
             ? `Recent shared messages:\n${render(recent)}`
             : `Shared messages after the ones you already have (after ${seen}):\n${render(recent.filter((message) => message.sequence > seen))}`,
-          `Current assignment:\n${assignmentText(task, request)}\nExpected result: ${task.expectedResult}`,
+          `Current assignment:\n${assignmentText(task, request, origin)}\nExpected result: ${task.expectedResult}`,
           ...(peers.length
             ? [
                 `Other members answer this same request separately: ${peers.join(", ")}. Give your own view from your own role. Do not answer for them or wait for them.`,

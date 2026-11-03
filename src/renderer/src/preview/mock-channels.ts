@@ -94,6 +94,16 @@ export function createMockChannels(
         for (const task of work) {
           if (task.state !== "completed" && task.state !== "cancelled") task.state = "paused";
         }
+      if (input.type === "cancel") {
+        const task = work.find((item) => item.id === input.taskId);
+        if (!task) throw new Error("Channel task not found.");
+        for (const item of work)
+          if (item.rootTaskId === task.rootTaskId && item.state !== "completed" && item.state !== "cancelled") {
+            item.state = "cancelled";
+            item.error = null;
+            item.revision += 1;
+          }
+      }
       if (input.type === "stop" || input.type === "resume" || input.type === "reassign") {
         const task = work.find((item) => item.id === input.taskId);
         if (!task) throw new Error("Channel task not found.");

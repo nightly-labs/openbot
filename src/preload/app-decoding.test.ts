@@ -1,8 +1,10 @@
 import type {
   AccountSession,
+  AppAppearancePreference,
   AppInfo,
   ApprovalAutomationPreference,
   AppSetupState,
+  AppThemePalette,
   CentralAuthState,
   MobileConnectedDevice,
   NotificationOpenedEvent,
@@ -28,12 +30,33 @@ import {
   decodeMobileConnectTicket,
   decodeNotificationOpenedEvent,
   decodeNotificationPreference,
+  decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
   decodeUpdatePreference,
   decodeUpdateStatus,
   decodeVoiceServerProbe,
   decodeVoiceServerSettings,
 } from "./app-decoding";
+
+const omarchyPalette = {
+  id: "omarchy",
+  name: "Omarchy",
+  scheme: "dark",
+  colors: {
+    canvas: "#1a1b26",
+    frame: "#13141c",
+    sidebar: "#13141c",
+    surface: "#24283b",
+    text: "#a9b1d6",
+    textMuted: "#565f89",
+    border: "#414868",
+    accent: "#7aa2f7",
+    accentForeground: "#1a1b26",
+    success: "#9ece6a",
+    warning: "#e0af68",
+    danger: "#f7768e",
+  },
+} satisfies AppThemePalette;
 
 const updateStatus = {
   phase: "downloading",
@@ -102,6 +125,17 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     { name: "OpenBot", version: "1.0.0", platform: "darwin", variant: "dev" } satisfies AppInfo,
   ],
   [
+    "app info with an install ID",
+    decodeAppInfo,
+    {
+      name: "OpenBot",
+      version: "1.0.0",
+      platform: "darwin",
+      variant: "production",
+      analyticsInstallId: "install-0b5c7c9e-8d55-4a3f-9d0e-2f7c1a6b4e21",
+    } satisfies AppInfo,
+  ],
+  [
     "setup state",
     decodeAppSetupState,
     { completed: true, preferredProvider: "codex", preferredModel: null } satisfies AppSetupState,
@@ -116,7 +150,16 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     } satisfies ApprovalAutomationPreference,
   ],
   ["language preference", decodeAppLanguagePreference, { language: "fr" }],
-  ["appearance preference", decodeAppAppearancePreference, { appearance: "light", transparentWindow: true }],
+  [
+    "appearance preference",
+    decodeAppAppearancePreference,
+    { appearance: "light", transparentWindow: true, palette: null, palettes: [] } satisfies AppAppearancePreference,
+  ],
+  [
+    "appearance preference with a theme palette",
+    decodeAppAppearancePreference,
+    { appearance: "dark", transparentWindow: false, palette: "omarchy", palettes: [omarchyPalette] },
+  ],
   ["signed out", decodeCentralAuthState, { status: "signed_out" } satisfies CentralAuthState],
   ["code sent", decodeCentralAuthState, codeSent],
   [
@@ -134,6 +177,14 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     {
       status: "signed_in",
       user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null },
+    } satisfies CentralAuthState,
+  ],
+  [
+    "signed in with an analytics answer",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, analyticsEnabled: true },
     } satisfies CentralAuthState,
   ],
   [
@@ -193,6 +244,11 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
 ];
 
 const malformed: [string, (value: unknown) => unknown, unknown][] = [
+  [
+    "app info with an install ID that is not text",
+    decodeAppInfo,
+    { name: "OpenBot", version: "1.0.0", platform: "darwin", variant: "production", analyticsInstallId: 1 },
+  ],
   // The key never comes back to the renderer, so a record that carries one fails closed.
   ["a voice server with its key", decodeVoiceServerSettings, { ...voiceServer, apiKey: "sk-secret" }],
   [
@@ -230,6 +286,36 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     decodeAppAppearancePreference,
     { appearance: "dark", transparentWindow: "true" },
   ],
+  [
+    "appearance preference with no theme palettes",
+    decodeAppAppearancePreference,
+    { appearance: "dark", transparentWindow: false, palette: null },
+  ],
+  [
+    "a theme palette id with a path",
+    decodeAppAppearancePreference,
+    { appearance: "dark", transparentWindow: false, palette: "../omarchy", palettes: [] },
+  ],
+  [
+    "a theme palette color that is not hex",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [{ ...omarchyPalette, colors: { ...omarchyPalette.colors, accent: "red; background: url(x)" } }],
+    },
+  ],
+  [
+    "a theme palette with a missing color",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [{ ...omarchyPalette, colors: { canvas: "#1a1b26" } }],
+    },
+  ],
   ["an unknown account status", decodeCentralAuthState, { status: "banned" }],
   ["signed in without a user", decodeCentralAuthState, { status: "signed_in" }],
   ["code sent with a text expiry", decodeCentralAuthState, { ...codeSent, expiresAt: "soon" }],
@@ -258,6 +344,14 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   ["a custom agent with a two-line usage prompt", decodeCustomAgents, [{ ...customAgent, usagePrompt: "/usage\nrm" }]],
   ["custom agent usage of an invalid id", decodeCustomAgentUsage, [{ id: "Not An Id", text: "42%" }]],
   ["custom agent usage with no text", decodeCustomAgentUsage, [{ id: "devin", text: null }]],
+  [
+    "an account analytics answer that is not a yes or a no",
+    decodeCentralAuthState,
+    {
+      status: "signed_in",
+      user: { id: "user-1", email: "user@example.com", name: null, avatarUrl: null, analyticsEnabled: "yes" },
+    },
+  ],
   ["a model list with an empty id", decodeDiscoverModelsResult, { models: [{ id: "" }] }],
   [
     "detection settings without a switch",
@@ -273,5 +367,40 @@ describe("app decoding", () => {
 
   it.each(malformed)("rejects %s", (_name, decode, value) => {
     expect(() => decode(value)).toThrow(/^Invalid /);
+  });
+});
+
+const AGENT_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
+
+// A Marketplace link began in a URL a web page chose. Only an agent id or a skill slug of the right
+// form reaches the renderer, with no other field; anything else is no link at all.
+describe("pending Marketplace listing", () => {
+  it.each([
+    ["an agent", { kind: "agent", id: AGENT_ID }],
+    ["a skill", { kind: "skill", id: "release-notes" }],
+  ])("keeps %s", (_name, value) => {
+    expect(decodePendingMarketplaceListing(value)).toEqual(value);
+  });
+
+  it("drops a field main did not name", () => {
+    expect(decodePendingMarketplaceListing({ kind: "skill", id: "release-notes", install: true })).toEqual({
+      kind: "skill",
+      id: "release-notes",
+    });
+  });
+
+  it.each([
+    ["no link", null],
+    ["a bare slug", "release-notes"],
+    ["an unknown kind", { kind: "plugin", id: "release-notes" }],
+    ["an agent with a slug", { kind: "agent", id: "release-notes" }],
+    ["an agent id in upper case", { kind: "agent", id: AGENT_ID.toUpperCase() }],
+    ["a skill with a path", { kind: "skill", id: "../account" }],
+    ["a skill with a dot", { kind: "skill", id: "notes.md" }],
+    ["a skill slug over 64 characters", { kind: "skill", id: "a".repeat(65) }],
+    ["an empty id", { kind: "skill", id: "" }],
+    ["an id that is not text", { kind: "agent", id: 42 }],
+  ])("refuses %s", (_name, value) => {
+    expect(decodePendingMarketplaceListing(value)).toBeNull();
   });
 });

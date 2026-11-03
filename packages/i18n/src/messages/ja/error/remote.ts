@@ -94,6 +94,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "WebRTC ファイル転送に失敗しました。",
   "error.remote.fileResumeFailed": "WebRTC ファイル転送を期限までに再開できませんでした。",
   "error.remote.fileTransportStopped": "WebRTC ファイル転送が停止しました。",
+  "error.remote.downloadStopped": "ダウンロードを停止しました。",
   "error.remote.fileResumeExpired": "WebRTC ファイル転送の再開期限が切れました。",
   "error.remote.hostRequestFailed": "ホストがリクエストを完了できませんでした。",
   "error.remote.responseTooLarge": "ホストからの応答が大きすぎるため、このデバイスに送信できません。",
@@ -127,7 +128,6 @@ export const messages = {
   "error.remote.serverDisconnected": "サーバーの接続が切れました。",
   "error.remote.preferencesUnreadable": "保存したチャットの設定を読み取れませんでした。",
   "error.remote.accountAuthRequired": "アカウントの認証が必要です。",
-  "error.remote.serverIdentityChanged": "サーバーの ID が変わりました。信頼済みのホストキーは置き換えません。",
   "error.remote.pairedIdentityChanged":
     "ペアリングしたデスクトップの ID がないか、変わっています。そのデスクトップで新しいコードをスキャンしてください。",
   "error.remote.permanentInviteNoEmail": "永続的な招待はメールで送信できません。",
@@ -201,4 +201,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "チャンネルを削除するには、このデスクトップサーバーを更新してください。",
   "error.remote.historyRefreshFailed": "メッセージは送信されましたが、チャット履歴を更新できませんでした。",
   "error.remote.taskHistoryRefreshFailed": "タスクは変更されましたが、チャット履歴を更新できませんでした。",
+  "error.remote.localServerAccountRemovalFailed":
+    "サーバーはそのコンピュータで削除されましたが、アカウントにはまだ表示されています。アカウントから外すには、もう一度削除してください。",
 } as const satisfies PartialTranslation<typeof source>;

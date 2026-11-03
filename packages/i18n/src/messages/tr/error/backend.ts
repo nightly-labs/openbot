@@ -66,6 +66,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Referans verilen kanal mesajı kullanılamıyor.",
   "error.backend.channelTaskNotFound": "Kanal görevi bulunamadı.",
   "error.backend.channelTaskComplete": "Bu görev zaten tamamlandı.",
+  "error.backend.channelTaskNotStopped": "Yalnızca durdurulmuş veya başarısız bir görev iptal edilebilir.",
   "error.backend.channelSelectAgent": "Bir ajan seçin.",
   "error.backend.channelLeadRequired": "Kullanılabilir bir kanal lideri seçin veya bu görevi bir üyeye atayın.",
   "error.backend.channelRoutingTooLong":
@@ -186,6 +187,8 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "Bir beklemeyi yalnızca rutinlerinizden birinin çalıştırılması uyandırır ve hiç rutininiz yok. openbot.create_routine ile bir rutin oluşturun, ardından beklemeyi açın.",
   "error.backend.agentWaitRemoteUnsupported": "Açık beklemeler yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Bir mesajı okunmadı olarak işaretleme yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
   "error.backend.routineFlowHandoffFailed": "Rutin işi bu ajana aktaramadı.",
   "error.backend.mcpServerLimit": "OpenBot en fazla {limit} MCP sunucusu tutar.",
   "error.backend.mcpServerNameTaken": "{name} adında bir MCP sunucusu zaten mevcut.",
@@ -240,6 +243,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Bir sunucu en fazla {limit} kenar çubuğu bölümüne sahip olabilir.",
   "error.backend.sectionNameRequired": "Bölüm adı gereklidir.",
   "error.backend.sectionNameTooLong": "Bölüm adı çok uzun.",
+  "error.backend.sidebarFolderTooDeep": "Klasörler en fazla üç seviye derinliğinde olabilir.",
+  "error.backend.sidebarFolderMoveInvalid": "Bu klasör oraya taşınamaz.",
   "error.backend.sectionNameDuplicate": "Bölüm adları benzersiz olmalıdır.",
   "error.backend.directMessageRequired": "Önce bir mesaj yazın.",
   "error.backend.directMessageTooLong": "Doğrudan mesaj en fazla {limit} karakter içerebilir.",
@@ -326,6 +331,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Bu ajanın {count} açık mesaj dizisi var. Bir mesaj dizisini arşivleyin, ardından başka birini başlatın veya geri yükleyin.",
   "error.backend.threadRemoteUnsupported": "Mesaj dizileri yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
+  "error.backend.branchSourceBusy": "Bu sohbeti dallandırmadan önce geçerli turu durdurun.",
+  "error.backend.branchMessageNotFound": "Yalnızca ajanın tamamlanmış bir yanıtından dallandırabilirsiniz.",
+  "error.backend.branchRemoteUnsupported": "Dallar yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
   "error.backend.threadMoveRefused":
     "Yeni bir mesaj dizisinde yalnızca, doğrudan ve tek başına bu ajana gönderdiğiniz bir mesaj çalışabilir.",
   "error.backend.taskTitleRequired": "Göreve kısa bir başlık verin.",
@@ -333,8 +341,8 @@ export const messages = {
     "Göreve en fazla 120 karakterlik bir başlık ve ne yapılacağını anlatan kısa bir talimat verin.",
   "error.backend.taskOwnChatOnly":
     "Görevi yalnızca kendi sohbetinizden başlatın. Bir kanal, bir mesajlaşma konuşması veya başka bir görev yeni bir görev başlatamaz.",
-  "error.backend.taskOpenLimit":
-    "Bu ajanın zaten {count} açık görevi var. Başka bir görev başlatmadan önce kullanıcının birini kapatmasını bekleyin.",
+  "error.backend.taskUnfinishedLimit":
+    "Bu ajanın zaten {count} bitmemiş görevi var. Bunlardan biri bittiğinde başka bir görev başlatın.",
   "error.backend.taskOpenLimitReached":
     "Bu ajanın {count} açık görevi var. Bir görevi kapatın, ardından başka bir görev başlatın veya açın.",
   "error.backend.taskRemoteUnsupported": "Görevler yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",

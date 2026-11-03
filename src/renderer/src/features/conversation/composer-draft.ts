@@ -1,8 +1,15 @@
+import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
-import { isAttachmentSummary, type MarketplaceSkillDetail, SKILL_CREATION_REQUEST } from "@openbot/contracts/ipc";
+import {
+  type DraftAttachment,
+  isAttachmentSummary,
+  type MarketplaceSkillDetail,
+  SKILL_CREATION_REQUEST,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { decodeQueueEditRequest, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { skillExamplePrompt } from "@openbot/ui/components/SkillPreview";
+import type { ComposerSelection } from "@openbot/ui/features/conversation/ComposerEditor";
 import type { ComposerDraft } from "./conversation-types";
 
 export const EMPTY_DRAFT: ComposerDraft = {
@@ -34,15 +41,16 @@ export function appendSkillCreationRequest(draft: ComposerDraft): ComposerDraft 
 }
 
 /**
- * A plugin's example question, written as the user would have typed it.
+ * Text that the user did not type, below what the user already typed: a plugin's example question,
+ * or a message sent on from another chat.
  *
- * It carries no reference marker, unlike a skill example: a marker names something the agent must
- * be pointed at, and a plugin's tools are already offered to every agent on this computer. So the
- * example is the question alone.
+ * A plugin example carries no reference marker, unlike a skill example: a marker names something the
+ * agent must be pointed at, and a plugin's tools are already offered to every agent on this computer.
+ * So the example is the question alone.
  */
-export function appendPluginPrompt(draft: ComposerDraft, prompt: string): ComposerDraft {
-  const text = prompt.trim();
-  return text ? appendDraftLine(draft, text) : draft;
+export function appendDraftText(draft: ComposerDraft, text: string): ComposerDraft {
+  const trimmed = text.trim();
+  return trimmed ? appendDraftLine(draft, trimmed) : draft;
 }
 
 /** One more line in the draft, so an added example never overwrites what the user already typed. */
@@ -120,4 +128,28 @@ function decodeStoredQueueEdit(value: unknown): StoredQueueEdit | null {
     backup: value.backup,
     ...(pendingSave ? { pendingSave } : {}),
   };
+}
+
+/** The thumbnail row of a message box: each image, also one that the text names, and each other file that the text does not name. */
+export function rowAttachments(text: string, attachments: readonly DraftAttachment[]): DraftAttachment[] {
+  const referencedIds = attachmentReferenceIds(text);
+  return attachments.filter((attachment) => attachment.kind === "image" || !referencedIds.has(attachment.id));
+}
+
+/**
+ * Puts `inserted` at the selection when the text is still `before`, else at the end. Returns the text
+ * and the caret after the inserted text.
+ */
+export function insertAtSelection(
+  current: string,
+  inserted: string,
+  at: { before: string; selection: ComposerSelection } | undefined,
+): { value: string; caret: number } {
+  const selection = at && current === at.before ? at.selection : undefined;
+  if (!selection) {
+    const value = [current, inserted].filter(Boolean).join(" ");
+    return { value, caret: value.length };
+  }
+  const value = `${current.slice(0, selection.start)}${inserted}${current.slice(selection.end)}`;
+  return { value, caret: selection.start + inserted.length };
 }

@@ -6,7 +6,11 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { AGENT_MEMORY_SELECTION_SCHEMA_SQL, migrateAgentMemorySelection } from "./agent-memory-selection";
 import { AGENT_TASK_SCHEMA_SQL } from "./agent-tasks/agent-task-schema";
-import { AGENT_THREAD_MIGRATION_SQL, AGENT_THREAD_SCHEMA_SQL } from "./agent-threads/agent-thread-schema";
+import {
+  AGENT_THREAD_MIGRATION_SQL,
+  AGENT_THREAD_SCHEMA_SQL,
+  V48_AGENT_THREAD_BRANCH_COLUMNS_SQL,
+} from "./agent-threads/agent-thread-schema";
 import { AGENT_WAIT_SCHEMA_SQL } from "./agent-waits/agent-wait-schema";
 import { BROWSER_PROFILE_SCHEMA_SQL } from "./browser-profiles/browser-profile-schema";
 import { CHANNEL_SCHEMA_SQL, CHANNEL_SETTINGS_SCHEMA_SQL } from "./channel-schema";
@@ -20,6 +24,12 @@ import {
 } from "./messaging/messaging-schema";
 import { ROUTINE_FLOW_SCHEMA_SQL } from "./routine-flows/routine-flow-schema";
 import { ROUTINE_RESULT_SCHEMA_SQL } from "./routine-results/routine-result-schema";
+import { addDiscordWorkflows, V50_WORKFLOW_RUN_SOURCE_SQL } from "./workflows/workflow-discord-schema";
+import {
+  addGitHubWorkflows,
+  V46_WORKFLOW_RUN_SOURCE_SQL,
+  WORKFLOW_GITHUB_SCHEMA_SQL,
+} from "./workflows/workflow-github-schema";
 import { WORKFLOW_SCHEMA_SQL } from "./workflows/workflow-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
@@ -603,8 +613,9 @@ const LATEST_SCHEMA_SQL =
   V43_THREAD_EVENT_TYPE_INDEX_SQL +
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL +
   BROWSER_PROFILE_SCHEMA_SQL +
-  WORKFLOW_SCHEMA_SQL +
+  substituteOnce(WORKFLOW_SCHEMA_SQL, V46_WORKFLOW_RUN_SOURCE_SQL, V50_WORKFLOW_RUN_SOURCE_SQL) +
   AGENT_THREAD_SCHEMA_SQL +
+  WORKFLOW_GITHUB_SCHEMA_SQL +
   MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL;
 
 /** The end of the thread message table with the migration 40 columns before its PRIMARY KEY constraint. */
@@ -877,6 +888,27 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
   },
   {
     version: 48,
+    // Adds three columns with no default: no rebuild, so no foreign-key pause and no vacuum. Every existing
+    // thread gets null, which is a thread that is not a branch, as it was before.
+    up: addAgentThreadBranch,
+  },
+  {
+    version: 49,
+    // Rebuilds the run table to add the GitHub run source, so foreign keys pause while steps point to
+    // runs that move to the new table. Run ids do not change, so every step keeps its run. Few rows, so
+    // no vacuum. The GitHub tables start empty.
+    disableForeignKeys: true,
+    up: addGitHubWorkflows,
+  },
+  {
+    version: 50,
+    // Rebuilds the run table again to add the Discord run source, as migration 49 did, so foreign keys
+    // pause and run ids do not change. Few rows, so no vacuum. No table is added.
+    disableForeignKeys: true,
+    up: addDiscordWorkflows,
+  },
+  {
+    version: 51,
     // Only creates a table, so no foreign-key pause and no vacuum. No WhatsApp connection exists before
     // it, so no connection loses senders.
     up: (db) => db.exec(MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL),
@@ -1259,6 +1291,17 @@ function addThreadMessageOrder(db: DatabaseSync): void {
   // The index is built once, after the keys, rather than updated row by row.
   db.exec(V40_THREAD_MESSAGE_ORDER_BACKFILL_SQL);
   db.exec(V40_THREAD_MESSAGE_ORDER_INDEX_SQL);
+}
+
+// Migration 48 links a branch to the thread and message it was copied from.
+function addAgentThreadBranch(db: DatabaseSync): void {
+  // A development profile that ran this version before it shipped has the columns already.
+  const columns = db.prepare("PRAGMA table_info(projection_agent_threads)").all();
+  for (const column of V48_AGENT_THREAD_BRANCH_COLUMNS_SQL) {
+    const name = column.slice(0, column.indexOf(" "));
+    if (columns.some((existing) => isDynamicRecord(existing) && existing.name === name)) continue;
+    db.exec(`ALTER TABLE projection_agent_threads ADD COLUMN ${column}`);
+  }
 }
 
 // Migration 28 removes the provider CHECK. It rebuilds the table with no guard: every shipped table has the

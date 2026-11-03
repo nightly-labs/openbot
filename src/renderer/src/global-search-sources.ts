@@ -1,4 +1,4 @@
-import { BookMarked, Bot, CalendarClock, Hash, Server, Store, UsersRound } from "@openbot/ui";
+import { BookMarked, Bot, CalendarClock, Hash, Server, Sparkles, Store, UsersRound } from "@openbot/ui";
 import type {
   GlobalSearchAction,
   GlobalSearchFile,
@@ -12,7 +12,7 @@ import { appPort } from "./app-port";
 import { useAgents } from "./features/agents/agents-context";
 import { useChannels } from "./features/channels/channels-context";
 import { globalSearchChannels } from "./features/channels/global-search-channels";
-import { serverCanAdminister } from "./features/servers/server-capabilities";
+import { activeServerHasProviderSettings, serverCanAdminister } from "./features/servers/server-capabilities";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServers } from "./features/servers/servers-context";
 import { useSettings } from "./features/settings/settings-context";
@@ -201,6 +201,16 @@ export function useGlobalSearchSources(open: () => boolean) {
             group: "settings",
             icon: BookMarked,
             run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
+          });
+        }
+        if (activeServerHasProviderSettings(server)) {
+          list.push({
+            id: "server:providers",
+            label: t("server.settings.providersTitle"),
+            detail: server.name,
+            group: "settings",
+            icon: Sparkles,
+            run: () => openServerSettings(server.id, globalSearchOpener(), "providers"),
           });
         }
       }

@@ -32,7 +32,7 @@ export const messages = {
   "provider.status.checking": "Controllo",
   "provider.status.off": "Disattivato",
   "provider.gemini.hostSignIn":
-    "Per connettere Gemini, apri OpenBot sull'host e seleziona «Connetti» in Impostazioni > Provider. L'accesso a Google richiede un browser su quell'host. L'accesso remoto non è supportato.",
+    "Per connettere Gemini, apri OpenBot sull'host e seleziona «Connetti» in Impostazioni server > Provider. L'accesso a Google richiede un browser su quell'host. L'accesso remoto non è supportato.",
 
   "provider.key.free": "Gratuito",
 
@@ -49,6 +49,7 @@ export const messages = {
   "provider.action.signIn": "Accedi",
   "provider.action.apiKey": "Chiave API",
   "provider.action.signInWithCode": "Accedi con un codice",
+  "provider.action.signInMainlandChina": "Accedi con {site} (Cina)",
   "provider.action.pasteAddress": "Incolla l'indirizzo",
   "provider.aria.download": "Scarica {name}",
   "provider.aria.cancel": "Annulla {name}",
@@ -120,6 +121,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, predefinito",
   "provider.picker.effort": "Impegno",
   "provider.picker.effortLabel": "Impegno di ragionamento dell'agente",
+  "provider.picker.effortFixed": "{effort}, fissato da {provider}",
   "provider.picker.fast": "Veloce",
   "provider.picker.fastLabel": "Modalità veloce",
   "provider.picker.selectEffort": "Seleziona l'impegno",
@@ -128,11 +130,14 @@ export const messages = {
   "provider.status.signInRequired": "Accesso richiesto",
   "provider.model.free": "Gratuito",
   "provider.model.default": "predefinito",
+  "provider.effort.none": "Nessuno",
+  "provider.effort.minimal": "Minimo",
   "provider.effort.low": "Basso",
   "provider.effort.medium": "Medio",
   "provider.effort.high": "Alto",
   "provider.effort.xhigh": "Molto alto",
   "provider.effort.max": "Massimo",
+  "provider.effort.ultra": "Ultra",
 
   "provider.museKey.title": "Chiave API Meta per Muse",
   "provider.museKey.description": "Salva una chiave API Meta sull'host, oppure accedi con la CLI di Muse.",
@@ -205,6 +210,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot disconnette {provider} su questo computer. Anche la CLI {provider} nel terminale viene disconnessa.",
   "provider.settings.disconnectHost": "OpenBot disconnette {provider} sul server.",
+  "provider.settings.versionInstalledByUser": "{version} · installata da te",
+  "provider.settings.versionDownloaded": "{version} · scaricata da OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache dei prompt",
   "provider.settings.promptCacheDescription":

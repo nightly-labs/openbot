@@ -61,6 +61,13 @@ await Promise.all([
   access(executablePath),
   access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/package.json")),
   access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/dist/index.js")),
+  // The Dynamic Island loads this FFI addon to stop its panel from activating the app (#3497).
+  access(
+    resolve(
+      resourcesPath,
+      `app.asar.unpacked/node_modules/@koromix/koffi-darwin-${architecture}/darwin_${architecture}/koffi.node`,
+    ),
+  ),
   access(resolve(resourcesPath, "app.asar")),
   access(packagedIconPath),
   access(sourceIconPath),

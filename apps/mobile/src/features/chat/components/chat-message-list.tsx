@@ -77,6 +77,7 @@ import {
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { useAgentColorMessages } from "@/features/settings/model/message-color";
+import { canReadAloud, stopReadAloud } from "@/features/voice/model/message-reading";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
@@ -121,8 +122,8 @@ const OPENING_ROWS_TO_USER = 12;
 const ROW_STYLE = { paddingBottom: CHAT_ROW_GAP };
 /** The side padding of the list. */
 const LIST_PADDING = 16;
-/** A user's message is at most this part of the list width, as `max-w-[88%]` on its row. */
-const USER_BUBBLE_WIDTH = 0.88;
+/** A user's message is at most this part of the list width, as `max-w-[92%]` on its row. */
+const USER_BUBBLE_WIDTH = 0.92;
 
 /** The list keeps the sizes it measured by message, so rows that stay keep their place when the data changes. */
 function rowKey(message: VisibleMessage): string {
@@ -550,9 +551,9 @@ const MessageRow = memo(function MessageRow({
     message.kind === "message"
       ? ((message.imageGeneration ? message.attachments?.slice(1) : message.attachments) ?? [])
       : [];
-  // Two or more images in an agent's reply show together, as on desktop.
-  const gallery =
-    message.kind === "message" && message.author === "agent" && !upload ? files.filter(isViewableImage) : [];
+  // Two or more images in one message show together, as on desktop. A message that is still
+  // uploading keeps one row for each file, with its progress.
+  const gallery = message.kind === "message" && !upload ? files.filter(isViewableImage) : [];
   const rendered =
     message.kind === "routine" ? (
       <RoutineMarkerRow key={message.id} message={message} muted={muted} />
@@ -567,7 +568,9 @@ const MessageRow = memo(function MessageRow({
     ) : message.kind === "question" ? (
       <ChatQuestionPrompt
         key={message.id}
+        serverId={serverId}
         prompt={message.prompt}
+        uiBlock={message.uiBlock}
         controller={questionForm}
         canSend={canSend}
         onActivate={shared.canSelectQuestion ? () => actions.selectQuestion(message.id) : undefined}
@@ -614,7 +617,13 @@ const MessageRow = memo(function MessageRow({
             serverId={serverId}
           />
         ) : null}
-        {gallery.length > 1 ? <ChatImageGallery attachments={gallery} serverId={serverId} /> : null}
+        {gallery.length > 1 ? (
+          <ChatImageGallery
+            attachments={gallery}
+            serverId={serverId}
+            alignment={message.author === "user" ? "right" : "left"}
+          />
+        ) : null}
         {(gallery.length > 1 ? files.filter((attachment) => !isViewableImage(attachment)) : files).map(
           (attachment, index) => (
             <ChatAttachmentView
@@ -647,7 +656,7 @@ const MessageRow = memo(function MessageRow({
             animateSize={shared.textReveal}
             className={
               message.author === "user"
-                ? `self-end rounded-[30px] px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
+                ? `self-end rounded-[30px] px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[92%]" : "max-w-full"}`
                 : `max-w-full self-start rounded-[30px] ${waiting ? "" : "px-4 py-3"}`
             }
             style={[
@@ -711,7 +720,7 @@ const MessageRow = memo(function MessageRow({
           ? "max-w-full self-start gap-1"
           : message.attachments?.length
             ? "max-w-full self-end gap-1"
-            : "max-w-[88%] self-end gap-1"
+            : "max-w-[92%] self-end gap-1"
       }
     >
       {message.replyToMessageId ? (
@@ -743,7 +752,14 @@ const MessageRow = memo(function MessageRow({
           {rendered}
         </OutboxMessageMenu>
       ) : (
-        rendered
+        // The text of a user message selects natively, so the bubble has no touch and hold.
+        <ChatMessageGesture
+          align="end"
+          selecting={selecting}
+          onReply={shared.canReply ? () => actions.reply(message) : undefined}
+        >
+          {rendered}
+        </ChatMessageGesture>
       )}
       {message.author === "user" && message.status === "failed" ? <TurnFailure reason={message.failureReason} /> : null}
       {outbox ? <ChatOutboxStatus status={outbox} /> : null}
@@ -758,6 +774,7 @@ const MessageRow = memo(function MessageRow({
           onReply={shared.canReply ? () => actions.reply(message) : undefined}
           onSelectText={selectable ? () => actions.selectText(message) : undefined}
           selecting={selecting}
+          readAloudId={canReadAloud && message.author === "agent" ? message.id : undefined}
         />
       ) : null}
     </View>
@@ -965,6 +982,8 @@ export const ChatMessageList = memo(function ChatMessageList({
     [messages, messageAliases, referenceMessages],
   );
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
+  // A message that reads aloud stops when its chat closes.
+  useEffect(() => stopReadAloud, []);
   useEffect(() => {
     let active = true;
     void AccessibilityInfo.isScreenReaderEnabled().then((enabled) => {

@@ -18,8 +18,8 @@ import {
   ItemGroup,
   ItemTitle,
   Plus,
+  PlushLoader,
   SettingsSection,
-  Spinner,
   Text,
   Trash2,
 } from "@openbot/ui";
@@ -116,7 +116,7 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
             fallback={
               <Show when={!state().error}>
                 <div class="hosted-servers-loading">
-                  <Spinner label={t("settings.hostedServers.loading")} />
+                  <PlushLoader size={48} label={t("settings.hostedServers.loading")} />
                 </div>
               </Show>
             }

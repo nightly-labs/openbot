@@ -207,6 +207,8 @@ export const messages = {
   "server.rail.restart": "Sunucuyu yeniden başlat",
   "server.rail.leave": "Sunucudan ayrıl",
   "server.rail.delete": "Sunucuyu sil",
+  "server.rail.hide": "Sunucuyu gizle",
+  "server.rail.showLocal": "{name} sunucusunu göster",
   "server.select.failedTitle": "Sunucu seçilemedi",
   "server.select.failedDescription": "Sunucular arasında geçiş yapılamadı. Tekrar deneyin.",
   "server.select.openAgentFailed": "{name} açılamadı. Onu kenar çubuğunda bulun.",
@@ -306,13 +308,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Bu Mac'i başka bir bilgisayardan görüntüleyin ve kontrol edin.",
   "server.settings.later": "Daha sonra",
   "server.settings.setUp": "Ayarla",
-  "server.settings.notifications": "Bildirimler",
-  "server.settings.muteNotifications": "Bildirimleri sessize al",
-  "server.settings.muteDescription":
-    "Bu sunucudan gelen masaüstü bildirimlerini, sesleri ve MacBook çentik güncellemelerini durdurun.",
-  "server.settings.mutedUntilDescription": "{until}. Şimdi sesi açmak için kapatın.",
-  "server.settings.notifyAbout": "Şunun hakkında bildir",
-  "server.settings.notifyAboutDescription": "Hangi ajan olaylarının bir masaüstü bildirimi göstereceği.",
   "server.settings.agents": "Ajanlar",
   "server.settings.timezone": "Saat dilimi",
   "server.settings.timezoneDescription":
@@ -343,6 +338,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "Mevcut anahtar ve yeni anahtar bir devri birlikte imzalar. Üyelerin uygulamaları yeniden bağlandığında yeni anahtara geçer. Anahtar dosyası kopyalandıysa veya açığa çıktıysa bunu yapın.",
   "server.settings.hostKeyRotated": "Sunucu anahtarı değiştirildi",
+  "server.settings.hostKeyChanged": "Son değişiklik",
+  "server.settings.hostKeyChangedDescription": "{date}. Önceki anahtar ve yeni anahtar bu değişikliği imzaladı.",
   "server.settings.hostKeyLocalOnly": "Burada yalnızca bu bilgisayardaki sunucu anahtarını değiştirebilir.",
   "server.settings.removeTitle": "Sunucuyu kaldır",
   "server.settings.removeDescription":

@@ -97,7 +97,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
         }}
       >
         <span class="agent-row-avatar">
-          <AgentAvatar agent={rowProps.agent} motion="idle" mood={mood()} />
+          <AgentAvatar agent={rowProps.agent} motion="idle" mood={mood()} workingFaces />
           <SidebarAgentIndicator state={state} />
         </span>
         <span class="agent-row-copy">

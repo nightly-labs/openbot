@@ -124,6 +124,24 @@ export class SkillMarketplaceService {
     });
   }
 
+  /** The skill a shared link names, by its slug. Only a link reads this; it never adds the skill. */
+  getBySlug(slug: string): Effect.Effect<MarketplaceSkillDetail, SkillMarketplaceFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceSkillDetail, SkillMarketplaceFailure> {
+      const detail = yield* this.auth
+        .requestAuthorized(
+          `/v1/skills/slug/${encodeURIComponent(slug)}`,
+          { method: "GET" },
+          decodeMarketplaceSkillDetail,
+        )
+        .pipe(toSkillMarketplaceFailure);
+      return {
+        ...detail,
+        iconUrl: this.absoluteUrl(detail.iconUrl),
+        creatorAvatarUrl: this.absoluteUrl(detail.creatorAvatarUrl ?? null),
+      };
+    });
+  }
+
   listMine(): Effect.Effect<SkillSubmission[], SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<SkillSubmission[], SkillMarketplaceFailure> {
       const submissions = yield* this.auth

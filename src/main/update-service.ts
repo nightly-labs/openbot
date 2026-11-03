@@ -123,6 +123,13 @@ const MAX_LOG_BYTES = 1024 * 1024;
 const MAX_DIAGNOSTIC_EVENTS = 20;
 
 /**
+ * Shutdown preparation plus the handover to the installer. Generous because on macOS quitAndInstall
+ * asks Squirrel to stage the ZIP and only quits when that finishes, which is disk bound on an artifact
+ * of a few hundred megabytes. Firing early here would report a failure over a working install.
+ */
+export const UPDATE_INSTALL_TIMEOUT_MS = 300_000;
+
+/**
  * Every busy phase needs a deadline, and typing this as a total record over `UpdateBusyPhase` is what
  * enforces it: adding a phase to `UPDATE_BUSY_PHASES` without a timeout here fails to compile. A busy
  * phase with no bound is exactly how "Preparing update..." became a state the UI could never leave.
@@ -140,13 +147,7 @@ const DEFAULT_PHASE_TIMEOUTS: Record<UpdateBusyPhase, number> = {
    * hundreds of megabytes, so a slow link must stay supported while a dead socket must not.
    */
   downloading: 120_000,
-  /**
-   * Shutdown preparation plus the handover to the installer. Generous because on macOS
-   * quitAndInstall asks Squirrel to stage the ZIP and only quits when that finishes, which is disk
-   * bound on an artifact of a few hundred megabytes. Firing early here would report a failure over a
-   * working install.
-   */
-  installing: 300_000,
+  installing: UPDATE_INSTALL_TIMEOUT_MS,
 };
 
 /**

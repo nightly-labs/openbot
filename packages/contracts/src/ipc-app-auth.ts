@@ -14,6 +14,8 @@ export interface AppInfo {
   variant: AppVariant;
   /** Set only in an unpackaged build that a local analytics capture server reads. */
   analyticsCaptureUrl?: string;
+  /** The random analytics ID of this install, for events that do not go with the account. */
+  analyticsInstallId?: string;
 }
 
 /** The phase list is the source of truth: `UpdatePhase` is derived from it. */
@@ -198,6 +200,8 @@ export interface AnalyticsPreference {
 
 export interface SetAnalyticsPreferenceInput {
   enabled: boolean;
+  /** True when the user chose this value. Only a choice is sent to the account; a default is not. */
+  chosen?: boolean;
 }
 
 export interface CentralAuthUser {
@@ -205,6 +209,11 @@ export interface CentralAuthUser {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  /**
+   * The latest product analytics answer of the account, from any device. Null or missing: the user
+   * never answered, or the account service is older.
+   */
+  analyticsEnabled?: boolean | null;
 }
 
 export interface CentralAuthIssue {
@@ -410,6 +419,7 @@ export type ExternalDestination =
   | "opencode-auth"
   | "agent-setup"
   | "claude-install"
+  | "hermes-install"
   | "feedback"
   | "message"
   // The release notes, the guides and the Discord community of OpenBot, from the Help menu of the window rail.
@@ -417,6 +427,8 @@ export type ExternalDestination =
   | "changelog"
   | "guides"
   | "discord"
+  // The OpenBot repository, from the toast that asks for a GitHub star.
+  | "github"
   // The OpenBot account on X, from the community card of the sidebar.
   | "x"
   // The x.ai marketplace listing of the Grok Bot agent that exports agents for OpenBot.

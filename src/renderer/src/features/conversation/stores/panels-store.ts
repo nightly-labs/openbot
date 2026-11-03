@@ -3,12 +3,14 @@ import {
   type BrowserBounds,
   canPreviewAttachment,
   type FileAction,
+  type FilePreview,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { currentText } from "@openbot/ui/text";
-import { createMemo, createSignal, type Store, type StoreSetter, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
+import { createAttachmentDownloads } from "../attachment-downloads";
 import { attachmentFilePreview } from "../attachment-preview";
 import { releaseFilePreviewPage } from "../conversation-port";
 import { conversationRuntime } from "../conversation-runtime";
@@ -48,6 +50,14 @@ export interface SidePanelsState {
   subagents: Record<string, string>;
   threads: Record<string, string>;
 }
+
+/** While the agent's turn runs, the shown file is read again at most this often. */
+const FILE_PREVIEW_REFRESH_MS = 750;
+/**
+ * A larger file is not read again while the turn runs: a turn seldom changes a video or a large PDF,
+ * and each read can download all of it from a remote host.
+ */
+const FILE_PREVIEW_REFRESH_BYTES = 8 * 1024 * 1024;
 
 const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, maximized: false };
 
@@ -101,6 +111,13 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const agentId = deps.props.agent?.id;
     if (!agentId || agentSkillsMode(deps.props.server, deps.props.runtime) === "hidden") return;
     setSkillSettingsRequest({ agentId, skillId: skill.skillId });
+    setActiveRightPanel("settings", agentId);
+  }
+  const [instructionsSettingsRequest, setInstructionsSettingsRequest] = createSignal<{ agentId: string } | null>(null);
+  /** Opens Settings > Instructions of the chat's agent. A new object opens the page again. */
+  function openInstructionsSettings(agentId: string): void {
+    if (deps.props.agent?.id !== agentId) return;
+    setInstructionsSettingsRequest({ agentId });
     setActiveRightPanel("settings", agentId);
   }
   const [routineSettingsRequest, setRoutineSettingsRequest] = createSignal<RoutineSettingsRequest | null>(null);
@@ -160,6 +177,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (!agentId) return;
     if (mode !== "settings") {
       setSkillSettingsRequest(null);
+      setInstructionsSettingsRequest(null);
       setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
@@ -264,17 +282,32 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     }
   }
 
+  const attachmentFiles = createAttachmentDownloads({
+    serverId: () => deps.props.server?.id ?? "local",
+    calls: () => {
+      const agent = conversationRuntime(deps.props).agent;
+      const stop = agent.stopAttachmentDownload;
+      return {
+        open: (input) => agent.openAttachment(input),
+        stop: stop && ((attachmentId) => stop(attachmentId)),
+        subscribe: agent.onAttachmentDownload,
+      };
+    },
+    target: () => {
+      const agentId = conversationOwnerId(deps.props);
+      return agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
+    },
+    onError: (error, target) => deps.setComposerError(errorMessage(error, t("attachment.error.open")), target),
+  });
+  const attachmentDownloads = attachmentFiles.downloads;
+
   function attachmentAction(attachment: AttachmentSummary, action: FileAction) {
     // A runtime has no app to open a file in, so a file it can preview opens in the panel.
     if (action === "open" && deps.props.runtime && canPreviewAttachment(attachment)) {
       void previewAttachment(attachment);
       return;
     }
-    const agentId = conversationOwnerId(deps.props);
-    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
-    void conversationRuntime(deps.props)
-      .agent.openAttachment({ attachmentId: attachment.id, action })
-      .catch((error) => deps.setComposerError(errorMessage(error, t("attachment.error.open")), target));
+    attachmentFiles.open(attachment, action);
   }
 
   function openSharedFile(path: string) {
@@ -403,6 +436,91 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openWorkspaceFile(path, file?.directory?.path, previewWorkspaceAgentId());
   }
 
+  /**
+   * An agent changes files in the steps of its turn. While the panel is open, each new step of the
+   * running turn, and the end of the turn, reads the shown file or folder again. Text that the turn
+   * writes is not a step. A memo, because an effect runs again on an equal value: opening another
+   * file, or a read that shows a change, must not start a read.
+   */
+  const turnStep = createMemo(() => {
+    if (!filePreviewOpen()) return undefined;
+    const turnId = deps.props.activeTurnId;
+    if (!turnId) return null;
+    return [turnId, deps.props.activityDetail, deps.props.turnStepLines?.[turnId]?.at(-1)?.id].join("\u0000");
+  });
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  createEffect(turnStep, (step, previous) => {
+    // Opening the panel just read the file.
+    if (step === undefined || previous === undefined || refreshTimer !== undefined) return;
+    refreshTimer = setTimeout(() => {
+      refreshTimer = undefined;
+      refreshSidebarFilePreview();
+    }, FILE_PREVIEW_REFRESH_MS);
+  });
+  onCleanup(() => clearTimeout(refreshTimer));
+
+  let refreshRequest = 0;
+  /**
+   * Reads the shown file or folder again, and shows the result only when it changed. A file that the
+   * user opened since, or a newer read, wins. A failed read keeps what the panel shows: a turn can
+   * move or delete the file, and the open file stays readable until the user closes it.
+   */
+  function refreshSidebarFilePreview() {
+    const file = deps.sidebarFilePreview();
+    if (!file || !filePreviewOpen() || file.source.kind === "attachment") return;
+    const { ownerAgentId, source } = file;
+    const generation = deps.currentFilePreviewGeneration();
+    const request = ++refreshRequest;
+    const current = () =>
+      scopeActive() &&
+      request === refreshRequest &&
+      generation === deps.currentFilePreviewGeneration() &&
+      deps.sidebarFilePreview()?.source === source;
+    const agent = conversationRuntime(deps.props).agent;
+    if (source.kind === "workspace-folder") {
+      void agent.listWorkspaceDirectory({ agentId: source.agentId, path: source.path }).then(
+        (directory) => {
+          if (!current() || JSON.stringify(directory) === JSON.stringify(file.directory)) return;
+          deps.setSidebarFilePreview({ ownerAgentId, source, preview: null, directory });
+        },
+        () => undefined,
+      );
+      return;
+    }
+    const read =
+      source.kind === "shared"
+        ? agent.previewSharedFile({ path: source.path, maxBytes: FILE_PREVIEW_REFRESH_BYTES })
+        : agent.previewWorkspaceFile({
+            agentId: source.agentId,
+            path: source.path,
+            maxBytes: FILE_PREVIEW_REFRESH_BYTES,
+          });
+    void read.then(
+      (preview) => {
+        // No bytes from a file that showed bytes: the file is over the limit, so keep what shows.
+        const overLimit = preview.bytes === null && file.preview?.bytes;
+        if (!current() || overLimit || (file.preview && samePreview(preview, file.preview))) {
+          releaseFilePreviewPage(preview.pageUrl);
+          return;
+        }
+        deps.setSidebarFilePreview({ ownerAgentId, source, preview });
+      },
+      () => undefined,
+    );
+  }
+
+  /**
+   * Names the file or folder that the side panel shows. A preview read again keeps the key, so the
+   * panel keeps the source view of the file.
+   */
+  function previewFileKey(): string | undefined {
+    const source = deps.sidebarFilePreview()?.source;
+    if (!source) return undefined;
+    if (source.kind === "attachment") return `attachment\u0000${source.attachment.id}`;
+    if (source.kind === "shared") return `shared\u0000${source.path}`;
+    return `${source.kind}\u0000${source.agentId}\u0000${source.path}`;
+  }
+
   /** The quote id of the file that the side panel shows. See `filePreviewQuoteId`. */
   function previewQuoteId(): string | undefined {
     const file = deps.sidebarFilePreview();
@@ -479,6 +597,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   return {
     skillSettingsRequest,
     openSkillSettings,
+    instructionsSettingsRequest,
+    openInstructionsSettings,
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,
@@ -502,11 +622,13 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
+    attachmentDownloads,
     openSharedFile,
     openWorkspaceFile,
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
     previewQuoteId,
+    previewFileKey,
     previewWorkspaceAgentId,
     sidebarFileBack,
     openSidebarFileBack,
@@ -530,4 +652,21 @@ function filePreviewError(error: unknown, path: string): string {
     return t("attachment.error.fileNotFound", { name });
   }
   return errorMessage(error, t("attachment.error.previewFile", { name }));
+}
+
+/** The same file content, so a read again need not replace the shown one. */
+function samePreview(next: FilePreview, shown: FilePreview): boolean {
+  if (
+    next.name !== shown.name ||
+    next.size !== shown.size ||
+    next.mimeType !== shown.mimeType ||
+    next.previewKind !== shown.previewKind
+  )
+    return false;
+  if (!next.bytes || !shown.bytes) return next.bytes === shown.bytes;
+  if (next.bytes.length !== shown.bytes.length) return false;
+  for (let index = 0; index < next.bytes.length; index += 1) {
+    if (next.bytes[index] !== shown.bytes[index]) return false;
+  }
+  return true;
 }

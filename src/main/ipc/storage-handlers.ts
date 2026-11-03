@@ -53,7 +53,7 @@ interface StorageRemoteServers extends Pick<OpenAttachmentDependencies["remoteSe
 export interface StorageIpcDependencies extends Omit<OpenAttachmentDependencies, "remoteServers"> {
   storage: Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk">;
   machine: Pick<MachineAlertMonitor, "metrics">;
-  providerRuntimes: Pick<ProviderRuntimeManager, "oldVersions" | "removeOldVersions">;
+  providerRuntimes: Pick<ProviderRuntimeManager, "removableRuntimes" | "removeRemovableRuntimes">;
   remoteServers: StorageRemoteServers;
   agents: () => StorageAgent[];
   openPath: (path: string) => Promise<string>;
@@ -147,8 +147,8 @@ export function storageIpcHandlers({
         const error = await openPath(agent.workspacePath);
         if (error) throw new Error(error);
       }),
-      getOldRuntimeVersions: handler(() => runCauseEffect(providerRuntimes.oldVersions())),
-      removeOldRuntimeVersions: handler(() => runCauseEffect(providerRuntimes.removeOldVersions())),
+      getRemovableRuntimes: handler(() => runCauseEffect(providerRuntimes.removableRuntimes())),
+      removeRemovableRuntimes: handler(() => runCauseEffect(providerRuntimes.removeRemovableRuntimes())),
     },
   };
 }

@@ -593,6 +593,8 @@
 
 .provider-model-list {
   display: grid;
+  /* A long model name must not widen its row past the panel. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
 }
 
@@ -808,10 +810,10 @@
   gap: 7px;
 }
 
+/* A long name, such as a Fusion model of Devin, goes to a second line so that it shows in full. */
 .provider-model-option-name > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
   font-size: var(--openbot-text-md);
   line-height: 18px;
 }
@@ -825,6 +827,14 @@
   font-size: var(--openbot-text-sm);
   font-weight: 500;
   line-height: 15px;
+}
+
+/* The settings that a Cursor model value fixes, such as "256k · High · Fast". */
+.provider-model-option-name > .provider-model-option-settings {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
 }
 
 /* The tick sits in the filled circle, cut out of it in the panel color. */

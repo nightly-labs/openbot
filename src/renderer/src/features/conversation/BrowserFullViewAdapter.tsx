@@ -145,7 +145,10 @@ export default function BrowserFullViewAdapter() {
       onStop={(tabId) => void stopBrowserTab(tabId)}
       onNavigate={(tabId, direction) => void navigateBrowserTab(tabId, direction)}
       onOpenAddress={(url, tabId) => void openBrowserAddress(url, tabId === undefined)}
-      canEnterPip={!props.runtime}
+      // A host's tab can show in Picture in Picture only through the live view.
+      canEnterPip={
+        !props.runtime && (props.server?.kind !== "remote" || serverSupportsCapability(props.server, "browser-view"))
+      }
       onSurface={setBrowserSurfaceElement}
       liveViewTabId={
         props.server?.kind === "remote" && serverSupportsCapability(props.server, "browser-view")

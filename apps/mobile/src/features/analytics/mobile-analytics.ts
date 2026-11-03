@@ -17,9 +17,12 @@ const metadata = {
 
 // RN's SDK adds Android install referrers and paths itself. Replace its final
 // properties so those additions cannot expose campaign URLs or route identifiers.
+// With tracking off, only events go, each with the install ID and no account.
 function filterMobilePayload(event: TrackHandlerPayload): boolean {
-  if (!mobileAnalytics.isEnabled()) return false;
+  if (!mobileAnalytics.isSending()) return false;
+  const installId = mobileAnalytics.anonymousProfileId();
   if (event.type === "identify") {
+    if (installId) return false;
     event.payload = { profileId: event.payload.profileId, email: event.payload.email, properties: metadata };
     return true;
   }
@@ -28,6 +31,7 @@ function filterMobilePayload(event: TrackHandlerPayload): boolean {
     (candidate): candidate is MobileEventName => candidate === event.payload.name,
   );
   if (!name) return false;
+  if (installId) event.payload.profileId = installId;
   const timestamp = event.payload.properties?.__timestamp;
   event.payload.properties = {
     ...sanitizeMobileEvent(name, event.payload.properties ?? {}),
@@ -65,8 +69,12 @@ export const mobileAnalytics = new MobileAnalytics(() => {
   const send = client.api.fetch.bind(client.api);
   client.api.fetch = (path, data, options) => send(path, data, { ...options, signal: transport.signal });
   return {
-    track: (name, properties, timestamp) =>
-      client.track(name, { ...properties, ...(timestamp ? { __timestamp: timestamp } : {}) }),
+    track: (name, properties, timestamp, profileId) =>
+      client.track(name, {
+        ...properties,
+        ...(timestamp ? { __timestamp: timestamp } : {}),
+        ...(profileId ? { profileId } : {}),
+      }),
     identify: (user) => client.identify(user),
     clear: () => {
       transport.abort();

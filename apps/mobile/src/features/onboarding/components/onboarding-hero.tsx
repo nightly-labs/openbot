@@ -14,7 +14,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { useAgentColorTransition } from "@/features/agents/components/agent-color-glow";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import type { OnboardingMotion } from "@/features/onboarding/components/onboarding-motion";
@@ -119,7 +118,7 @@ export function OnboardingHero({
   const hop = useSharedValue(0);
   const placed = useRef(false);
   // Hidden, the hero draws nothing: a picker swipe changes its look and colour, and an unseen
-  // filtered SVG must not be drawn again for each one. It keeps drawing, with a live face, from the
+  // plush must not be drawn again for each one. It keeps drawing, with a live face, from the
   // render that hides it until its fade-out is over: drawn again, it would start blank and with a
   // new face.
   const [drawn, setDrawn] = useState(visible);
@@ -129,7 +128,6 @@ export function OnboardingHero({
     const timer = setTimeout(() => setDrawn(false), HIDE_LINGER_MS);
     return () => clearTimeout(timer);
   }, [visible]);
-  const color = useAgentColorTransition(getBloubAvatarColor(seed, hue));
 
   useLayoutEffect(() => {
     if (!slot) return;
@@ -224,14 +222,7 @@ export function OnboardingHero({
       />
       {/* Only the hero animates its face while it shows; hidden, it is not drawn at all. */}
       {drawn ? (
-        <BloubAvatarPreview
-          seed={seed}
-          hue={hue}
-          size={HERO_SIZE}
-          mood={mood}
-          animateIdle={full}
-          animatedColor={color}
-        />
+        <BloubAvatarPreview seed={seed} hue={hue} size={HERO_SIZE} mood={mood} animateIdle={full} transition="pop" />
       ) : null}
     </Animated.View>
   );

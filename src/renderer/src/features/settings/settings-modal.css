@@ -1,8 +1,8 @@
 /*
  * Settings modal rules for markup that only the renderer draws: the server settings detail crumbs,
- * the provider section, the Dynamic Island tab, the voice key row and the sound theme row. The
- * shared modal frame and its panels are in `@openbot/ui/features/settings/settings-modal.css`,
- * which `styles.css` imports immediately before this file.
+ * the provider section, the Dynamic Island tab and the voice key row. The shared modal frame and
+ * its panels are in `@openbot/ui/features/settings/settings-modal.css`, which `styles.css` imports
+ * immediately before this file.
  */
 
 /*
@@ -139,15 +139,6 @@
 .settings-voice-key > .ui-input {
   flex: 1;
   min-width: 0;
-}
-
-/* The sound theme cards are too wide to sit beside the text, so they wrap below it. */
-.settings-sound-theme-row {
-  flex-wrap: wrap;
-}
-
-.settings-sound-theme-row > .sound-theme-picker {
-  flex-basis: 100%;
 }
 
 /* The voice server dialog is wider than the provider dialog, so each route fits on one line. */

@@ -30,6 +30,7 @@ const args: FirstRunFlowProps = {
   agentStatus: lazyProviderAgentStatus,
   platform: "darwin",
   onSave: fn(async (_provider: AgentProviderId) => undefined),
+  onAnalyticsChoice: fn(),
   onAddCustomProvider: fn(async () => "restarted" as const),
   customProviders: [],
 };

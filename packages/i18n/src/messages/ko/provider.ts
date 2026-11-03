@@ -32,7 +32,7 @@ export const messages = {
   "provider.status.checking": "확인 중",
   "provider.status.off": "꺼짐",
   "provider.gemini.hostSignIn":
-    "Gemini를 연결하려면 호스트에서 OpenBot을 열고 설정 > 제공자에서 연결을 선택하세요. Google 로그인에는 해당 호스트의 브라우저가 필요해요. 원격 로그인은 지원하지 않아요.",
+    "Gemini를 연결하려면 호스트에서 OpenBot을 열고 서버 설정 > 제공자에서 연결을 선택하세요. Google 로그인에는 해당 호스트의 브라우저가 필요해요. 원격 로그인은 지원하지 않아요.",
 
   "provider.key.free": "무료",
 
@@ -49,6 +49,7 @@ export const messages = {
   "provider.action.signIn": "로그인",
   "provider.action.apiKey": "API 키",
   "provider.action.signInWithCode": "코드로 로그인",
+  "provider.action.signInMainlandChina": "{site}로 로그인 (중국)",
   "provider.action.pasteAddress": "주소 붙여넣기",
   "provider.aria.download": "{name} 다운로드",
   "provider.aria.cancel": "{name} 취소",
@@ -121,6 +122,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, 기본",
   "provider.picker.effort": "강도",
   "provider.picker.effortLabel": "에이전트 추론 강도",
+  "provider.picker.effortFixed": "{effort} ({provider}에서 고정)",
   "provider.picker.fast": "빠르게",
   "provider.picker.fastLabel": "빠른 모드",
   "provider.picker.selectEffort": "강도 선택",
@@ -129,11 +131,14 @@ export const messages = {
   "provider.status.signInRequired": "로그인 필요",
   "provider.model.free": "무료",
   "provider.model.default": "기본",
+  "provider.effort.none": "없음",
+  "provider.effort.minimal": "최소",
   "provider.effort.low": "낮음",
   "provider.effort.medium": "보통",
   "provider.effort.high": "높음",
   "provider.effort.xhigh": "매우 높음",
   "provider.effort.max": "최대",
+  "provider.effort.ultra": "울트라",
 
   "provider.museKey.title": "Muse용 Meta API 키",
   "provider.museKey.description": "호스트에 Meta API 키를 저장하거나 Muse CLI로 로그인하세요.",
@@ -247,6 +252,8 @@ export const messages = {
   "provider.settings.runtime": "런타임",
   "provider.settings.version": "버전",
   "provider.settings.versionAvailable": "{installed} · {available} 사용 가능",
+  "provider.settings.versionInstalledByUser": "{version} · 직접 설치함",
+  "provider.settings.versionDownloaded": "{version} · OpenBot이 다운로드함",
   "provider.settings.update": "업데이트",
   "provider.settings.downloadLabel": "{name} 다운로드",
   "provider.settings.diagnostics": "진단",

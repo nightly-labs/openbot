@@ -1,0 +1,65 @@
+diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
+index 5da11964f5932cb44e1131c44a2480803c0a62b5..a04b4678830bb5ea16984486072eacadd1430adf 100644
+--- a/ios/RNSScreenStack.mm
++++ b/ios/RNSScreenStack.mm
+@@ -1247,10 +1247,48 @@ RNS_IGNORE_SUPER_CALL_END
+   return NO;
+ }
+ 
++// The full screen swipe back starts anywhere in the screen, so a pan of react-native-gesture-handler
++// inside the top screen, such as a swipe on a list row, gets the touch first.
++- (BOOL)isFullScreenSwipeGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
++{
++  if ([gestureRecognizer isKindOfClass:[RNSPanGestureRecognizer class]]) {
++    return YES;
++  }
+ #if RNS_IPHONE_OS_VERSION_AVAILABLE(26_0)
++  if (@available(iOS 26, *)) {
++    return gestureRecognizer == _controller.interactiveContentPopGestureRecognizer;
++  }
++#endif // check for iOS >= 26
++  return NO;
++}
++
++- (BOOL)isGestureHandlerPanInTopScreen:(UIGestureRecognizer *)gestureRecognizer
++{
++  static Class gestureHandlerPanClass;
++  static dispatch_once_t onceToken;
++  dispatch_once(&onceToken, ^{
++    gestureHandlerPanClass = NSClassFromString(@"RNBetterPanGestureRecognizer");
++  });
++  // A preloaded screen can be above the screen that shows, as in shouldReceivePressOrTouchEvent.
++  RNSScreenView *topScreen = _reactSubviews.lastObject;
++  for (RNSScreenView *screen in _reactSubviews.reverseObjectEnumerator) {
++    if (screen.activityState == RNSActivityStateOnTop) {
++      topScreen = screen;
++      break;
++    }
++  }
++  return gestureHandlerPanClass != nil && topScreen != nil && gestureRecognizer.isEnabled &&
++      [gestureRecognizer isKindOfClass:gestureHandlerPanClass] && [gestureRecognizer.view isDescendantOfView:topScreen];
++}
++
+ - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+     shouldRequireFailureOfGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
+ {
++  if ([self isFullScreenSwipeGestureRecognizer:gestureRecognizer] &&
++      [self isGestureHandlerPanInTopScreen:otherGestureRecognizer]) {
++    return YES;
++  }
++#if RNS_IPHONE_OS_VERSION_AVAILABLE(26_0)
+   if (@available(iOS 26, *)) {
+     if (gestureRecognizer == _controller.interactiveContentPopGestureRecognizer &&
+         [self isScrollViewPanGestureRecognizer:otherGestureRecognizer]) {
+@@ -1260,10 +1298,10 @@ RNS_IGNORE_SUPER_CALL_END
+       return [self scrollViewHasHorizontalPart:static_cast<UIScrollView *>(otherGestureRecognizer.view)];
+     }
+   }
++#endif // check for iOS >= 26
+ 
+   return NO;
+ }
+-#endif // check for iOS >= 26
+ 
+ - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+     shouldBeRequiredToFailByGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer

@@ -26,6 +26,7 @@ export const messages = {
   "mobile.channel.task.paused": "Wstrzymane",
   "mobile.channel.task.resume": "Wznów",
   "mobile.channel.task.reassign": "Przydziel ponownie",
+  "mobile.channel.task.cancel": "Anuluj zadanie",
   "mobile.channel.loadFailed": "Nie udało się wczytać kanałów. Spróbuj ponownie.",
   "mobile.channel.actions.historyStale": "Zadanie zmieniono, ale nie udało się odświeżyć historii czatu.",
   "mobile.channel.actions.refreshFailed": "Nie udało się odświeżyć historii zadania. Spróbuj ponownie.",

@@ -53,6 +53,7 @@ function createTextValue(locale: () => TranslatedLocale, formatLocale: () => str
       },
       list: (items) => current().list(items),
       fileSize: (bytes) => current().fileSize(bytes),
+      fileSizeAmount: (bytes, total) => current().fileSizeAmount(bytes, total),
     },
     errorMessage: (error, fallback) => userErrorMessage(error, fallback, locale()),
     errorDetails: (error, fallback) => userErrorDetails(error, fallback, locale()),

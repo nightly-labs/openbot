@@ -32,7 +32,7 @@ export const OPENBOT_LINKS = {
   download: "#download",
   news: "/news",
   guides: "/guides",
-  plugins: "/plugins",
+  marketplace: "/marketplace",
   changelog: "/changelog",
   releases: "https://github.com/nightly-labs/openbot/releases",
   repository: "https://github.com/nightly-labs/openbot",
@@ -43,6 +43,8 @@ export const OPENBOT_LINKS = {
   /** GitHub Pages hosts the status page, so it stays up when Cloudflare does not. */
   status: "https://status.openbot.run",
   selfHostedServer: "https://github.com/nightly-labs/openbot/blob/main/docs/self-hosted-server.md",
+  dockerDocumentation: "https://github.com/nightly-labs/openbot/blob/main/docs/docker.md",
+  dockerInstallUbuntu: "https://docs.docker.com/engine/install/ubuntu/",
   architecture: "https://github.com/nightly-labs/openbot#architecture",
   contributing: "https://github.com/nightly-labs/openbot/blob/main/CONTRIBUTING.md",
   codex: "https://learn.chatgpt.com/docs/app-server",
@@ -66,7 +68,7 @@ export type FooterLink =
         | "/download"
         | "/news"
         | "/guides"
-        | "/plugins"
+        | "/marketplace"
         | "/changelog"
         | "/compare"
         | "/providers"
@@ -99,7 +101,7 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: "Download", external: false, to: "/download" },
       { label: "News", external: false, to: "/news" },
       { label: "Guides", external: false, to: "/guides" },
-      { label: "Plugins", external: false, to: "/plugins" },
+      { label: "Marketplace", external: false, to: "/marketplace" },
       { label: "Changelog", external: false, to: "/changelog" },
       { label: "Teams", external: false, to: "/teams" },
       { label: "Pricing", external: false, to: "/pricing" },

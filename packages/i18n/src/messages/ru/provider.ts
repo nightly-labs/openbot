@@ -47,7 +47,7 @@ export const messages = {
   "provider.status.checking": "Проверка",
   "provider.status.off": "Выключено",
   "provider.gemini.hostSignIn":
-    "Чтобы подключить Gemini, откройте OpenBot на хосте и нажмите «Подключить» в разделе «Настройки» > «Провайдеры». Для входа в Google на этом хосте нужен браузер. Удалённый вход не поддерживается.",
+    "Чтобы подключить Gemini, откройте OpenBot на хосте и нажмите «Подключить» в разделе «Настройки сервера» > «Провайдеры». Для входа в Google на этом хосте нужен браузер. Удалённый вход не поддерживается.",
 
   "provider.key.free": "Бесплатно",
 
@@ -64,6 +64,7 @@ export const messages = {
   "provider.action.signIn": "Войти",
   "provider.action.apiKey": "Ключ API",
   "provider.action.signInWithCode": "Войти по коду",
+  "provider.action.signInMainlandChina": "Войти через {site} (Китай)",
   "provider.action.pasteAddress": "Вставить адрес",
   "provider.aria.download": "Скачать: {name}",
   "provider.aria.cancel": "Отменить: {name}",
@@ -137,6 +138,7 @@ export const messages = {
   "provider.picker.defaultModelLabel": "{name}, по умолчанию",
   "provider.picker.effort": "Усилие",
   "provider.picker.effortLabel": "Уровень усилий агента",
+  "provider.picker.effortFixed": "{effort}, задаёт {provider}",
   "provider.picker.fast": "Быстро",
   "provider.picker.fastLabel": "Быстрый режим",
   "provider.picker.selectEffort": "Выбрать уровень усилий",
@@ -145,11 +147,14 @@ export const messages = {
   "provider.status.signInRequired": "Нужно войти",
   "provider.model.free": "Бесплатно",
   "provider.model.default": "по умолчанию",
+  "provider.effort.none": "Нет",
+  "provider.effort.minimal": "Минимальное",
   "provider.effort.low": "Низкое",
   "provider.effort.medium": "Среднее",
   "provider.effort.high": "Высокое",
   "provider.effort.xhigh": "Очень высокое",
   "provider.effort.max": "Максимальное",
+  "provider.effort.ultra": "Ультра",
   "provider.museKey.title": "Ключ API Meta для Muse",
   "provider.museKey.description": "Сохраните ключ API Meta на хосте или войдите через CLI Muse.",
   "provider.museKey.label": "Ключ API Meta",
@@ -227,6 +232,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot выйдет из {provider} на этом компьютере. CLI {provider} в терминале тоже выйдет из аккаунта.",
   "provider.settings.disconnectHost": "OpenBot выйдет из {provider} на сервере.",
+  "provider.settings.versionInstalledByUser": "{version} · установлена вами",
+  "provider.settings.versionDownloaded": "{version} · загружена OpenBot",
   "provider.settings.cache": "Кэш",
   "provider.settings.promptCache": "Кэш промптов",
   "provider.settings.promptCacheDescription": "Как долго Claude хранит контекст агента в кэше между ходами.",

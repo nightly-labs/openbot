@@ -1,4 +1,5 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import { SETTINGS_PANEL_DEFAULT, SETTINGS_PANEL_MAX } from "@openbot/ui/components/SettingsPanel";
@@ -10,7 +11,7 @@ import { VoicePanel } from "@openbot/ui/features/conversation/VoicePanel";
 import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
-import { agentTemplatesPort } from "../agent-templates/agent-templates-port";
+import { type AgentTemplatePublishCalls, agentTemplatesPort } from "../agent-templates/agent-templates-port";
 import { createPublishAgent } from "../agent-templates/PublishAgent";
 import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
@@ -19,7 +20,7 @@ import { serverCanAdminister, serverSupportsCapability } from "../servers/server
 import { ConversationSideThread } from "./ConversationSideThread";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
-import { conversationRuntime } from "./conversation-runtime";
+import { type AgentNotificationLevelCalls, conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import { agentSkillsMode } from "./installed-skills-source";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
@@ -30,9 +31,16 @@ const BROWSER_PANEL_MAX = 1600;
 const CONVERSATION_PANEL_MIN = 96;
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
+import { type HostFolderPick, HostFolderPicker } from "@openbot/ui/features/conversation/HostFolderPicker";
 import { Portal } from "@solidjs/web";
-import { createEffect, createMemo, Loading, lazy, onSettled, Show, untrack } from "solid-js";
-import { agentFolderCalls } from "./agent-folders-port";
+import { createEffect, createMemo, createSignal, Loading, lazy, onSettled, Show, untrack } from "solid-js";
+import {
+  agentFolderCalls,
+  agentInstructionsCalls,
+  browseHostFolders,
+  type HostFolderPickFn,
+  remoteAgentFolderCalls,
+} from "./agent-folders-port";
 import { conversationPort } from "./conversation-port";
 
 /** The voice conversation with the agent that is open when the pane opens. */
@@ -89,6 +97,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
     previewQuoteId,
+    previewFileKey,
     previewWorkspaceAgentId,
     sidebarFileBack,
     openSidebarFileBack,
@@ -100,6 +109,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     sidebarFilePreview,
     settingsOpen,
     skillSettingsRequest,
+    instructionsSettingsRequest,
     routineSettingsRequest,
     settingsModel,
     settingsProvider,
@@ -131,21 +141,78 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     channel,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
-  const publishAgent = createPublishAgent(
-    (url) => void conversationRuntime(props).openUrl(url),
-    () => props.runtime?.admin?.agentTemplates ?? agentTemplatesPort().agentTemplates,
-  );
+  /** The web client asks the host. Desktop asks main, which asks a joined server's host. */
+  const publishCalls = (): AgentTemplatePublishCalls => {
+    if (props.runtime?.admin) return props.runtime.admin.agentTemplates;
+    const server = props.server;
+    if (server?.kind !== "remote") return agentTemplatesPort().agentTemplates;
+    const { agent } = agentTemplatesPort();
+    return {
+      preview: (agentId) => agent.previewAgentTemplate(agentId, server.id),
+      publish: (input) => agent.publishAgentTemplate(input, server.id),
+      unpublish: (agentId) => agent.unpublishAgentTemplate(agentId, server.id),
+    };
+  };
+  const publishAgent = createPublishAgent((url) => void conversationRuntime(props).openUrl(url), publishCalls);
   // This computer reads the skills of its own agents from the workspace. A joined host publishes its
   // own agents, for an owner or admin, when it serves `agent-publish-v1`.
   // A remote agent's host resolves its settings, so the account defaults of this computer do not apply.
   const localAgentDefaults = () => (props.server?.kind === "local" ? props.agentDefaults : undefined);
-  const folderCalls = agentFolderCalls();
-  /** An agent's folders are on the computer that runs it, and the Team API does not carry them. */
-  const localFolderCalls = () => (props.server?.kind === "local" && !props.runtime ? folderCalls : undefined);
+  const localFolderCalls = agentFolderCalls();
+  // An agent's folders are on the computer that runs it. A joined server serves them through
+  // `agent-folders-v1` for an owner or admin, and the folder browser lists the folders of the host.
+  const [folderPick, setFolderPick] = createSignal<
+    (HostFolderPick & { serverId: string; agentId: string; done: (path: string | null) => void }) | null
+  >(null);
+  const finishFolderPick = (path: string | null) => {
+    const pick = folderPick();
+    setFolderPick(null);
+    pick?.done(path);
+  };
+  const folderServerId = createMemo(() =>
+    props.server?.kind === "remote" && serverCanAdminister(props.server, "agent-folders-v1")
+      ? props.server.id
+      : undefined,
+  );
+  const folderCalls = createMemo(() => {
+    if (props.runtime) return undefined;
+    if (props.server?.kind === "local") return localFolderCalls;
+    const serverId = folderServerId();
+    if (serverId === undefined) return undefined;
+    const pick: HostFolderPickFn = (agentId, mode, start) =>
+      new Promise((done) => {
+        // A pick that is still open closes as a cancel.
+        folderPick()?.done(null);
+        const agentName = props.agent?.id === agentId ? props.agent.name : "";
+        setFolderPick({ mode, agentName, start, serverId, agentId, done });
+      });
+    return remoteAgentFolderCalls(serverId, pick);
+  });
+  const browsePickFolders = (path: string | null) => {
+    const pick = folderPick();
+    if (!pick) return Promise.reject(new Error(t("agentSettings.folders.browse.failed")));
+    return browseHostFolders(pick.serverId, pick.agentId, path);
+  };
+  const openInstructionsLink = (url: string) => void openExternalMessageUrl(url);
+  const localInstructions = { ...agentInstructionsCalls(), openLink: openInstructionsLink };
+  // The file on this computer, or on a joined server that lets an owner or admin edit it. The calls
+  // follow the server id, so a new summary of the same server keeps the open page.
+  const instructionsServerId = createMemo(() =>
+    props.server?.kind === "remote" && serverCanAdminister(props.server, "agent-instructions-v1")
+      ? props.server.id
+      : undefined,
+  );
+  const instructionsCalls = createMemo(() => {
+    if (props.runtime) return undefined;
+    if (props.server?.kind === "local") return localInstructions;
+    const serverId = instructionsServerId();
+    return serverId === undefined ? undefined : { ...agentInstructionsCalls(serverId), openLink: openInstructionsLink };
+  });
   const canPublish = () =>
     props.runtime
       ? props.runtime.admin !== undefined && serverCanAdminister(props.server, "agent-publish-v1")
-      : props.server?.kind === "local";
+      : props.server?.kind === "local" ||
+        (props.server?.kind === "remote" && serverCanAdminister(props.server, "agent-publish-v1"));
   // The web client asks the host directly; desktop goes through main for this computer and for a joined server.
   // The calls follow the server id, so a new summary of the same server keeps the loaded profiles.
   const browserProfileServerId = createMemo(() =>
@@ -156,6 +223,34 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     const serverId = browserProfileServerId();
     return serverId === undefined ? undefined : desktopBrowserProfileCalls(serverId);
   });
+  // Any member keeps an own level for each agent. The calls follow the server id, as above, and a
+  // new server gets new calls, so its panel does not show the levels of the server before.
+  const notificationLevelServerId = createMemo(() =>
+    props.server && serverSupportsCapability(props.server, AGENT_NOTIFICATION_LEVELS_CAPABILITY)
+      ? props.server.id
+      : undefined,
+  );
+  const notificationLevelCalls = createMemo((): AgentNotificationLevelCalls | undefined => {
+    const serverId = notificationLevelServerId();
+    if (serverId === undefined) return undefined;
+    const remote = props.runtime;
+    if (remote) {
+      const calls = remote.agentNotificationLevels;
+      return calls ? { list: () => calls.list() } : undefined;
+    }
+    return {
+      list: () => conversationPort().agent.listAgentNotificationLevels(serverId),
+      subscribe: (listener) =>
+        conversationPort().agent.onScopedEvent((scoped) => {
+          if (scoped.serverId === serverId && scoped.event.type === "agent-notification-levels-changed")
+            listener({ server: scoped.event.server, agents: scoped.event.agents });
+        }),
+    };
+  });
+  const openNotificationSettings = (trigger: HTMLElement) => {
+    const serverId = props.server?.id;
+    if (serverId) props.onOpenNotificationSettings?.(serverId, trigger);
+  };
   let browserPreviewTrigger: HTMLButtonElement | undefined;
   /** The panes this chat can open. The web client has no Files pane, and a chat without a thread has no files. */
   const sidePanelPanes = createMemo((): SidePanelPane[] => [
@@ -240,6 +335,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   const moveSideThread = (id: string, index: number) => props.threads?.side.onMove(id, index);
   return (
     <>
+      <HostFolderPicker request={folderPick()} browse={browsePickFolders} onDone={finishFolderPick} />
       <Show when={sidePanelOpen()}>
         <SidePanelHeader
           panes={sidePanel().panes}
@@ -307,6 +403,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 sourceUrl={attached()?.previewUrl ?? null}
                 pageUrl={htmlAttachmentPageUrl(attached()) ?? file().preview?.pageUrl}
                 pageHtml={props.runtime?.visualPage ? htmlAttachmentPageHtml(attached(), file().preview) : undefined}
+                fileKey={previewFileKey()}
                 selectionQuoteId={previewQuoteId()}
                 onOpenExternally={openSidebarFileExternally}
                 onDownload={downloadSidebarFile}
@@ -437,7 +534,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             <AgentSettingsPanel
               remoteClient={Boolean(props.runtime)}
               localHost={props.server?.kind === "local"}
-              folders={localFolderCalls()}
+              folders={folderCalls()}
+              instructionsFile={instructionsCalls()}
               sessionSettingsEditable={serverCanAdminister(props.server, "agent-session-settings-v1")}
               adminCalls={props.runtime?.admin}
               skillsMarketplaceOpen={props.skillsMarketplaceOpen}
@@ -456,15 +554,15 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               }
               autoApprove={props.agentAutoApproves}
               onUpdatePermissions={props.onUpdateAgentPermissions}
-              computerUseEditable={props.server?.kind === "local"}
+              computerUseEditable={props.server?.kind === "local" || props.remoteComputerUseLoaded === true}
               automationEditable={
                 props.server?.kind === "local" ||
                 (serverCanAdminister(props.server, "agent-host-settings-v1") && agent().allowAutomation !== undefined)
               }
               busyMessageModeEditable={props.server?.kind === "local" || props.remoteBusyMessageModeLoaded === true}
               busyMessageDefaultIsHost={props.server?.kind === "remote"}
-              newChatEditable={props.server?.kind === "local"}
-              quickAcknowledgementEditable={props.server?.kind === "local"}
+              newChatEditable={props.server?.kind === "local" || props.remoteNewChatLoaded === true}
+              quickAcknowledgementEditable={props.server?.kind === "local" || props.remotePlanCardLoaded === true}
               taskLimitEditable={props.server?.kind === "local" || props.remoteTaskLimitLoaded === true}
               backupModelsEditable={props.server?.kind === "local" || props.remoteBackupModelsLoaded === true}
               usageLimited={props.usageLimited}
@@ -520,6 +618,11 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 serverCanAdminister(props.server, BROWSER_PROFILES_CAPABILITY) ? browserProfileCalls() : undefined
               }
               onManageBrowserProfiles={props.onManageBrowserProfiles}
+              notificationLevelCalls={notificationLevelCalls()}
+              serverNotificationLevel={props.server?.notificationLevel}
+              onOpenNotificationSettings={
+                props.onOpenNotificationSettings && props.server ? openNotificationSettings : undefined
+              }
               modelOptions={props.modelOptions}
               working={agentActivity() === "Working"}
               maxWidth={settingsMaxWidth}
@@ -529,6 +632,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               onUpdateRuntimeSettings={updateRuntimeSettings}
               onSetAgentAvatar={props.onSetAgentAvatar}
               skillSelectionRequest={skillSettingsRequest()?.agentId === agent().id ? skillSettingsRequest() : null}
+              instructionsRequest={
+                instructionsSettingsRequest()?.agentId === agent().id ? instructionsSettingsRequest() : null
+              }
               routineSelectionRequest={
                 routineSettingsRequest()?.agentId === agent().id ? routineSettingsRequest() : null
               }

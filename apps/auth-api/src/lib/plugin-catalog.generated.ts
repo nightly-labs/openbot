@@ -198,6 +198,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       featured: false,
       detailSha256: "fae1384d23b374e5b0e08c0c220b3bd72cf0b4f880231eeb2565747f3549655f",
     },
+    {
+      slug: "clickup",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "5014d267e7627c50d84ea1823d04e4d6c6f18e7096319f3e1351972e656c4449",
+    },
   ],
 };
 
@@ -1402,6 +1408,43 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://composio.dev",
     privacyPolicyUrl: "https://composio.dev/privacy-policy",
     termsUrl: "https://composio.dev/terms-of-service",
+    skills: [],
+  },
+  clickup: {
+    slug: "clickup",
+    name: "ClickUp",
+    tagline: "Tasks, docs and team updates",
+    description:
+      "ClickUp lets agents search tasks, docs, comments and chat, create and update tasks, lists and docs, post comments, send chat messages and track time. Each user signs in to their own ClickUp account through the browser. Agents get the same permissions as the user. They can move tasks to the trash and delete comments.",
+    category: "productivity",
+    creatorName: "ClickUp",
+    iconUrl: "https://clickup.com/favicons/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-find-tasks", text: "Find my open ClickUp tasks due this week." },
+      { id: "prompt-create-task", text: "Create a ClickUp task for these action items and assign it to me." },
+      {
+        id: "prompt-summarize-doc",
+        text: "Find the latest project update in ClickUp and summarize the open questions.",
+      },
+    ],
+    apps: [
+      {
+        id: "app-clickup-mcp",
+        name: "ClickUp",
+        description: "Tasks, docs, comments, chat and time tracking, over ClickUp's MCP server with browser sign-in.",
+        iconUrl: "https://clickup.com/favicons/apple-touch-icon.png",
+        server: {
+          name: "clickup",
+          transport: "http",
+          url: "https://mcp.clickup.com/mcp",
+          auth: [{ id: "clickup-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://clickup.com",
+    privacyPolicyUrl: "https://clickup.com/terms/privacy",
+    termsUrl: "https://clickup.com/terms",
     skills: [],
   },
 };

@@ -108,13 +108,13 @@ jobs:
             https://openbot.run/.well-known/apple-app-site-association)"
           test "$association_status" = "200"
           tr -d '\r' < "$verification_dir/association.headers" | grep -Eiq '^content-type: application/json'
-          jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]},{"appID":"ZTRDTUL87R.run.openbot.mobile","paths":["/join","/agents/*"]}]' \
+          jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]},{"appID":"ZTRDTUL87R.run.openbot.mobile","paths":["/join","/agents/*"]},{"appID":"8A47NKRZSJ.run.openbot.mobile","paths":["/join","/agents/*"]}]' \
             "$verification_dir/association.json" >/dev/null
 
   host-signing:
     name: Check Host signing keychain
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'host-signing'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 20
     environment: release
     permissions:
@@ -259,7 +259,7 @@ jobs:
         include:
           - arch: arm64
             label: ARM64
-            os: macos-14
+            os: macos-15
             app_dir: mac-arm64
             suffix: macos
           - arch: x64

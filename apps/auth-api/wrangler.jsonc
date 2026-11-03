@@ -20,7 +20,8 @@
   // and the webhooks do the first attempt. A run each minute only repeated empty reads. An idle server
   // stops 15 to 20 minutes after its last use.
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    // The second cron runs only the Signal entry check (`signal-entry-failover.ts`), each minute.
+    "crons": ["*/5 * * * *", "*/1 * * * *"]
   },
   "routes": [
     {
@@ -53,9 +54,17 @@
     "EMAIL_SMTP_PORT": "465",
     "EMAIL_SMTP_USERNAME": "hello@openbot.run",
     "EMAIL_FROM": "hello@openbot.run",
+    "EMAIL_LICENSE_FROM": "licenses@openbot.run",
     "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
     "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
+    // Two active Signal machines (docs/remote-session-deployment.md): a is sui-alexandria, b is signal2.
+    // Set both lists together, so that a revoke reaches each home. An empty REMOTE_SIGNAL_HOMES rolls back.
+    "REMOTE_SIGNAL_HOMES": "a=wss://signal1.openbot.run/v1/signal,b=wss://signal2.openbot.run/v1/signal",
     "REMOTE_AUTH_WEBHOOK_URL": "https://signal.openbot.run/internal/auth-events",
+    "REMOTE_AUTH_WEBHOOK_URLS": "https://signal1.openbot.run/internal/auth-events,https://signal2.openbot.run/internal/auth-events",
+    // The zone of signal.openbot.run. The entry check stays off until the secret SIGNAL_ENTRY_DNS_TOKEN
+    // is set and REMOTE_SIGNAL_HOMES names two machines.
+    "SIGNAL_ENTRY_ZONE_ID": "bac5e044ba951c390229f0e93673ebd3",
     // Creates stay off until the boat and Stripe secrets and the template are set. "false" stops new
     // servers only.
     "HOSTED_SERVERS_ENABLED": "true",
@@ -67,9 +76,18 @@
     // The public Client ID of the OpenBotGit GitHub App. Its private key is the optional secret
     // GITHUB_APP_PRIVATE_KEY (PKCS #8). Without the key, agents act on GitHub as the signed-in user.
     "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
-    "APNS_TEAM_ID": "ZTRDTUL87R",
+    "APNS_TEAM_ID": "8A47NKRZSJ",
     "APNS_TOPIC": "run.openbot.mobile"
   },
+  // Email leaves through the relay Worker (`wrangler.email-relay.jsonc`), which runs near the mail
+  // host. Only production has it: the preview and test Workers and `vite dev` send from their own
+  // socket. Deploy the relay before this Worker.
+  "services": [
+    {
+      "binding": "EMAIL_RELAY",
+      "service": "openbot-email-relay"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -145,11 +163,15 @@
         "EMAIL_SMTP_PORT": "465",
         "EMAIL_SMTP_USERNAME": "hello@openbot.run",
         "EMAIL_FROM": "hello@openbot.run",
+        "EMAIL_LICENSE_FROM": "licenses@openbot.run",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
         "REMOTE_SIGNAL_URL": "ws://127.0.0.1:8081/v1/signal",
-        "REMOTE_AUTH_WEBHOOK_URL": "http://127.0.0.1:8081/internal/auth-events"
+        "REMOTE_SIGNAL_HOMES": "",
+        "REMOTE_AUTH_WEBHOOK_URL": "http://127.0.0.1:8081/internal/auth-events",
+        "REMOTE_AUTH_WEBHOOK_URLS": "",
+        "SIGNAL_ENTRY_ZONE_ID": ""
       },
       "d1_databases": [
         {
@@ -236,14 +258,19 @@
         "EMAIL_SMTP_PORT": "465",
         "EMAIL_SMTP_USERNAME": "hello@openbot.run",
         "EMAIL_FROM": "hello@openbot.run",
+        "EMAIL_LICENSE_FROM": "licenses@openbot.run",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
         "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
+        "REMOTE_SIGNAL_HOMES": "",
         "REMOTE_AUTH_WEBHOOK_URL": "https://signal.openbot.run/internal/auth-events",
+        "REMOTE_AUTH_WEBHOOK_URLS": "",
+        // The test Worker never moves the production entry name.
+        "SIGNAL_ENTRY_ZONE_ID": "",
         "HOSTED_SERVERS_ENABLED": "true",
         "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
-        "APNS_TEAM_ID": "ZTRDTUL87R",
+        "APNS_TEAM_ID": "8A47NKRZSJ",
         "APNS_TOPIC": "run.openbot.mobile"
       },
       "d1_databases": [

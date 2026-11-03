@@ -73,12 +73,19 @@ export interface SidebarProps {
   agentStates: Record<string, SidebarAgentState>;
   /** The wait of each channel that waits for the user, from `sidebarChannelWaits`. A missing entry does not wait. */
   channelWaits?: Record<string, SidebarChannelWait> | undefined;
+  /** The channel rows come from a saved frame, which holds no last message. A row with none shows no preview and no time. */
+  channelPreviewsPending?: boolean | undefined;
   /** The face each agent wears, from `computeAgentAvatarMoods`. A missing entry rests. */
   agentMoods: Record<string, AvatarMood>;
   layout: SidebarLayoutSnapshot;
   layoutMutable?: boolean | undefined;
   collapsedSectionIds: string[];
   onMutateLayout: (action: SidebarLayoutAction) => Promise<void>;
+  /**
+   * Whether this server keeps folders in folders (`sidebar-folders-v1`). Without it, a folder cannot go
+   * into another folder, and the menu has no items to put it there.
+   */
+  foldersSupported?: boolean | undefined;
   /** Whether this server can copy a section with its agents. Without it, the section menu has no duplicate item. */
   sectionDuplicateSupported?: boolean | undefined;
   duplicatingSectionIds?: ReadonlySet<string> | undefined;

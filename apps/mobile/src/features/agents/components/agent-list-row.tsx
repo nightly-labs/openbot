@@ -23,15 +23,14 @@ import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-r
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { AGENT_WAIT_STATE, AgentWaitBadge, AgentWaitChip } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import { AgentDragPreview, useChatDrag, useHoldMenu } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
-import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
 import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
 import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
-import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
@@ -109,6 +108,13 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   const { toggleAgentPinAnimated, transition } = useAgentPinTransition();
   // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
+  const drag = useChatDrag("row", () => ({
+    chat: { kind: "agent", id: agent.id },
+    pinned: false,
+    name: agent.name,
+    preview: <AgentDragPreview agent={agent} />,
+  }));
+  const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const agentChatPreview = useAgentChatPreview(agent);
   // An agent that waits in a channel says so, as its last message in its own chat is not the wait.
   const waitingChannel = useWaitingChannel(agent.id, agent.serverId);
@@ -132,12 +138,10 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   );
   const waitBadge = waitReason ? <AgentWaitBadge reason={waitReason} /> : null;
   const avatar = (
-    <ChatZoomSource>
-      <AgentPinAvatar agentId={agent.id} location="row" size={54}>
-        {bloub}
-        {waitBadge}
-      </AgentPinAvatar>
-    </ChatZoomSource>
+    <AgentPinAvatar agentId={agent.id} location="row" size={54}>
+      {bloub}
+      {waitBadge}
+    </AgentPinAvatar>
   );
   const openLabel = agent.title.trim()
     ? t("mobile.agent.list.openWithTitle", { name: agent.name, title: agent.title.trim() })
@@ -159,10 +163,8 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       className="w-full"
       onPressIn={agentChatPreview.onPressIn}
       delayLongPress={longPressDelay}
-      onLongPress={() => {
-        void haptics.longPress();
-        if (isAndroid) setMenuKey((key) => key + 1);
-      }}
+      onLongPress={holdMenu.onLongPress}
+      onPressOut={holdMenu.onPressOut}
     >
       {({ pressed }) => (
         <View
@@ -214,6 +216,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       agentName={agent.name}
       pinBlocked={pinBlocked}
       onPin={(withHaptic) => toggleAgentPinAnimated(agent.id, { haptic: withHaptic })}
+      drag={drag}
     >
       {isAndroid ? (
         <View>

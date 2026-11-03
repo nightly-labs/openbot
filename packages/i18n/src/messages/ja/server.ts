@@ -194,6 +194,8 @@ export const messages = {
   "server.rail.restart": "サーバーを再起動",
   "server.rail.leave": "サーバーから退出",
   "server.rail.delete": "サーバーを削除",
+  "server.rail.hide": "サーバーを非表示",
+  "server.rail.showLocal": "{name} を表示",
   "server.select.failedTitle": "サーバーを選択できませんでした",
   "server.select.failedDescription": "サーバーを切り替えられませんでした。もう一度お試しください。",
   "server.select.openAgentFailed": "{name} を開けませんでした。サイドバーで探してください。",
@@ -294,13 +296,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "別のコンピューターからこの Mac を表示して操作します。",
   "server.settings.later": "後で",
   "server.settings.setUp": "設定",
-  "server.settings.notifications": "通知",
-  "server.settings.muteNotifications": "通知をミュート",
-  "server.settings.muteDescription":
-    "このサーバーからのデスクトップ通知、サウンド、MacBook のノッチの更新を停止します。",
-  "server.settings.mutedUntilDescription": "{until}。今すぐミュートを解除するにはオフにしてください。",
-  "server.settings.notifyAbout": "通知する内容",
-  "server.settings.notifyAboutDescription": "デスクトップ通知を表示するエージェントのイベントです。",
   "server.settings.agents": "エージェント",
   "server.settings.timezone": "タイムゾーン",
   "server.settings.timezoneDescription":
@@ -331,6 +326,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "現在のキーと新しいキーの両方が引き継ぎに署名します。メンバーのアプリは次回の接続時に新しいキーに切り替わります。キーファイルがコピーまたは漏えいした場合に実行してください。",
   "server.settings.hostKeyRotated": "サーバーキーを変更しました",
+  "server.settings.hostKeyChanged": "最終変更",
+  "server.settings.hostKeyChangedDescription": "{date}。以前のキーと新しいキーの両方がこの変更に署名しました。",
   "server.settings.hostKeyLocalOnly": "ここでキーを変更できるのは、このコンピューターのサーバーだけです。",
   "server.settings.removeTitle": "サーバーを削除",
   "server.settings.removeDescription":

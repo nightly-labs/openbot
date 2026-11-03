@@ -2,9 +2,11 @@ import { isAgentProvider, providerDisplayName } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
+import Plus from "lucide-react-native/icons/plus";
+import Server from "lucide-react-native/icons/server";
 import { useState } from "react";
 import { View } from "react-native";
-import { useUniwind } from "uniwind";
+import { useCSSVariable, useUniwind } from "uniwind";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { ProviderMark } from "@/features/servers/components/provider-mark";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
@@ -14,7 +16,11 @@ import {
   providerRows,
   providerStatusText,
 } from "@/features/servers/model/provider-admin";
-import { useServerProviders } from "@/features/servers/model/use-server-providers";
+import {
+  useServerCustomAgents,
+  useServerCustomProviders,
+  useServerProviders,
+} from "@/features/servers/model/use-server-providers";
 import {
   SettingsContent,
   SettingsNote,
@@ -98,6 +104,8 @@ export function ServerProvidersScreen() {
           ))}
         </SettingsSection>
       ))}
+      {admin ? <CustomProvidersSection serverId={serverId} admin={admin} /> : null}
+      {admin && (admin.registry || admin.customAgents) ? <AgentsSection serverId={serverId} admin={admin} /> : null}
       {/* Only a host that downloads runtimes has updates to check. */}
       {runtimes.data && admin ? (
         <SettingsSection footer={checkResult ?? undefined}>
@@ -135,6 +143,144 @@ export function ServerProvidersScreen() {
         </SettingsSection>
       ) : null}
     </SettingsContent>
+  );
+}
+
+/**
+ * The OpenAI-compatible endpoints of the host, as the Custom providers list of the desktop Providers
+ * tab. A tap opens an endpoint; the last row adds one.
+ */
+function CustomProvidersSection({ serverId, admin }: { serverId: string; admin: ProviderAdmin }) {
+  const { t, errorMessage } = useText();
+  const [muted, accent] = useCSSVariable(["--openbot-text-grouped-secondary", "--openbot-accent"]);
+  const { list } = useServerCustomProviders(serverId, admin);
+  const open = (customProviderId?: string) =>
+    router.push({
+      pathname: "/server-settings/custom-provider",
+      params: customProviderId ? { serverId, customProviderId } : { serverId },
+    });
+  return (
+    <SettingsSection
+      title={t("mobile.server.customProviders.title")}
+      footer={
+        list.isError
+          ? errorMessage(list.error, t("mobile.server.customProviders.loadFailed"))
+          : t("mobile.server.customProviders.description")
+      }
+    >
+      {list.isPending && !list.isError ? (
+        <SettingsRow disclosure={false}>
+          <Typography.Paragraph className="text-grouped-secondary">
+            {t("mobile.server.customProviders.loading")}
+          </Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+      {list.data?.map((provider) => (
+        <SettingsRow
+          key={provider.id}
+          supportingText={provider.baseUrl}
+          leading={
+            <View className="py-1.5 pr-1">
+              <Server size={22} color={String(muted)} strokeWidth={1.5} />
+            </View>
+          }
+          trailing={
+            <TrailingValue value={t("mobile.server.customProviders.modelCount", { count: provider.models.length })} />
+          }
+          onPress={() => open(provider.id)}
+        >
+          <Typography.Paragraph numberOfLines={1}>{provider.name}</Typography.Paragraph>
+        </SettingsRow>
+      ))}
+      {list.isError ? (
+        <SettingsRow disclosure={false} disabled={list.isFetching} onPress={() => void list.refetch()}>
+          <Typography.Paragraph className="text-accent">{t("mobile.server.providers.retry")}</Typography.Paragraph>
+        </SettingsRow>
+      ) : (
+        <SettingsRow
+          disclosure={false}
+          leading={
+            <View className="py-1.5 pr-1">
+              <Plus size={22} color={String(accent)} strokeWidth={1.5} />
+            </View>
+          }
+          onPress={() => open()}
+        >
+          <Typography.Paragraph className="text-accent">{t("mobile.server.customProviders.add")}</Typography.Paragraph>
+        </SettingsRow>
+      )}
+    </SettingsSection>
+  );
+}
+
+/**
+ * The ACP agents of the host: its custom agents (`custom-agents-v1`) and the ACP registry
+ * (`acp-registry-v1`), as the Agents part of the desktop Providers tab.
+ */
+function AgentsSection({ serverId, admin }: { serverId: string; admin: ProviderAdmin }) {
+  const { t, errorMessage } = useText();
+  const accent = useCSSVariable("--openbot-accent");
+  const { list } = useServerCustomAgents(serverId, admin);
+  return (
+    <SettingsSection
+      title={t("mobile.server.customProviders.agents")}
+      footer={
+        list.isError
+          ? errorMessage(list.error, t("mobile.server.customAgents.loadFailed"))
+          : t(
+              admin.customAgents
+                ? "mobile.server.customProviders.agentsCustomHint"
+                : "mobile.server.customProviders.agentsRegistryHint",
+            )
+      }
+    >
+      {admin.customAgents && list.isPending && !list.isError ? (
+        <SettingsRow disclosure={false}>
+          <Typography.Paragraph className="text-grouped-secondary">
+            {t("mobile.server.customAgents.loading")}
+          </Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+      {list.isError ? (
+        <SettingsRow disclosure={false} disabled={list.isFetching} onPress={() => void list.refetch()}>
+          <Typography.Paragraph className="text-accent">{t("mobile.server.providers.retry")}</Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+      {list.data?.map((agent) => (
+        <SettingsRow
+          key={agent.id}
+          supportingText={[agent.command, ...agent.args].join(" ")}
+          onPress={() =>
+            router.push({ pathname: "/server-settings/custom-agent", params: { serverId, customAgentId: agent.id } })
+          }
+        >
+          <Typography.Paragraph numberOfLines={1}>{agent.name}</Typography.Paragraph>
+        </SettingsRow>
+      ))}
+      {admin.registry ? (
+        <SettingsRow
+          supportingText={t("mobile.server.acpRegistry.rowDescription")}
+          onPress={() => router.push({ pathname: "/server-settings/acp-registry", params: { serverId } })}
+        >
+          <Typography.Paragraph numberOfLines={1}>{t("mobile.server.route.acpRegistry")}</Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+      {admin.customAgents ? (
+        <SettingsRow
+          disclosure={false}
+          leading={
+            <View className="py-1.5 pr-1">
+              <Plus size={22} color={String(accent)} strokeWidth={1.5} />
+            </View>
+          }
+          onPress={() => router.push({ pathname: "/server-settings/custom-agent", params: { serverId } })}
+        >
+          <Typography.Paragraph className="text-accent">
+            {t("mobile.server.customAgents.addTitle")}
+          </Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+    </SettingsSection>
   );
 }
 

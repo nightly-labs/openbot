@@ -204,6 +204,8 @@ export const messages = {
   "server.rail.restart": "Uruchom ponownie serwer",
   "server.rail.leave": "Opuść serwer",
   "server.rail.delete": "Skasuj serwer",
+  "server.rail.hide": "Ukryj serwer",
+  "server.rail.showLocal": "Pokaż {name}",
   "server.select.failedTitle": "Nie udało się wybrać serwera",
   "server.select.failedDescription": "Nie udało się przełączyć serwera. Spróbuj ponownie.",
   "server.select.openAgentFailed": "Nie udało się otworzyć agenta {name}. Znajdź go na pasku bocznym.",
@@ -301,13 +303,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Wyświetlaj i kontroluj tego Maca z innego komputera.",
   "server.settings.later": "Później",
   "server.settings.setUp": "Skonfiguruj",
-  "server.settings.notifications": "Powiadomienia",
-  "server.settings.muteNotifications": "Wycisz powiadomienia",
-  "server.settings.muteDescription":
-    "Zatrzymaj powiadomienia na pulpicie, dźwięki i aktualizacje w wycięciu MacBooka z tego serwera.",
-  "server.settings.mutedUntilDescription": "{until}. Wyłącz, aby od razu przywrócić dźwięk.",
-  "server.settings.notifyAbout": "Powiadamiaj mnie o",
-  "server.settings.notifyAboutDescription": "Które zdarzenia agentów pokazują powiadomienie na pulpicie.",
   "server.settings.agents": "Agenci",
   "server.settings.timezone": "Strefa czasowa",
   "server.settings.timezoneDescription":
@@ -343,6 +338,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "Obecny i nowy klucz podpisują przekazanie. Aplikacje członków przełączą się na nowy klucz przy następnym połączeniu. Zrób to, jeśli plik klucza został skopiowany lub ujawniony.",
   "server.settings.hostKeyRotated": "Zmieniono klucz serwera",
+  "server.settings.hostKeyChanged": "Ostatnia zmiana",
+  "server.settings.hostKeyChangedDescription": "{date}. Poprzedni i nowy klucz podpisały tę zmianę.",
   "server.settings.hostKeyLocalOnly": "Tutaj klucz może zmienić tylko serwer na tym komputerze.",
   "server.settings.removeTitle": "Usuń serwer",
   "server.settings.removeDescription":

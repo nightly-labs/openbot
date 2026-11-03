@@ -7,7 +7,7 @@ export const messages = {
   "mobile.app.route.newChannel": "Yeni kanal",
   "mobile.app.route.createAgent": "Ajan oluştur",
   "mobile.app.route.addSharedAgent": "Paylaşılan bir ajan ekle",
-  "mobile.app.route.newSection": "Yeni bölüm",
+  "mobile.app.route.newSection": "Yeni klasör",
   "mobile.app.route.settings": "Ayarlar",
   "mobile.app.route.profile": "Profil",
   "mobile.app.route.accountSessions": "Hesap oturumları",

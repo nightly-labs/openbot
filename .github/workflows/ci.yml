@@ -182,6 +182,15 @@ jobs:
       - name: Run the agent browser session E2E
         run: xvfb-run -a bun run test:browser-agent-session
 
+      - name: Run the browser steps E2E
+        run: xvfb-run -a bun run test:browser-steps
+
+      - name: Run the browser dialogs E2E
+        run: xvfb-run -a bun run test:browser-dialogs
+
+      - name: Run the browser ambiguous targets E2E
+        run: xvfb-run -a bun run test:browser-ambiguous-targets
+
   tests-desktop:
     # ubuntu-latest gives 4 vCPUs, so vitest runs 3 workers and the job is
     # CPU-bound. The suite is split across shards that run as their own
@@ -337,6 +346,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:desktop-notifications
 
+      - name: Run the phone notification away and Live Activity E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:push-notification-away
+
+      - name: Run the notification summary E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:notification-summary
+
       - name: Run the routine pause and resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:routine-pause-resume
@@ -461,6 +478,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:mp4-attachments
 
+      - name: Run the SVG attachment E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:svg-attachments
+
       - name: Run the agent MCP server tools E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-mcp-tools
@@ -492,6 +513,14 @@ jobs:
       - name: Run the workflow model steps E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-model-steps
+
+      - name: Run the workflow Discord E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-discord
+
+      - name: Run the Discord files to GitHub E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:discord-github-files
 
       - name: Run the OpenCode usage metering E2E test
         if: ${{ !cancelled() }}
@@ -529,6 +558,8 @@ jobs:
             .openbot-build/sign-in-relay-replay-e2e/
             .openbot-build/server-mute-e2e/
             .openbot-build/desktop-notifications-e2e/
+            .openbot-build/push-notification-away-e2e/
+            .openbot-build/notification-summary-e2e/
             .openbot-build/routine-pause-resume-e2e/
             .openbot-build/routine-timezone-move-e2e/
             .openbot-build/routine-overnight-window-e2e/
@@ -559,6 +590,7 @@ jobs:
             .openbot-build/backup-model-failover-e2e/
             .openbot-build/zip-attachment-e2e/
             .openbot-build/mp4-attachment-e2e/
+            .openbot-build/svg-attachment-e2e/
             .openbot-build/agent-mcp-tools-e2e/
             .openbot-build/mcp-server-unreadable-row-e2e/
             .openbot-build/agent-update-agents-e2e/
@@ -566,6 +598,8 @@ jobs:
             .openbot-build/antigravity-accounts-e2e/
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/workflow-model-steps-e2e/
+            .openbot-build/workflow-discord-e2e/
+            .openbot-build/discord-github-files-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/
             .openbot-build/cursor-usage-e2e/
@@ -612,6 +646,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-mcp-load-failure
 
+      - name: Run the Antigravity expired token E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-expired-token
+
+      - name: Run the Antigravity tool filter E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-tool-filter
+
       - name: Run the ACP additional directories E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-directories
@@ -631,6 +673,10 @@ jobs:
       - name: Run the ACP instructions once E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-instructions-once
+
+      - name: Run the ACP audio input E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:acp-audio-input
 
       - name: Run the Grok steer E2E test
         if: ${{ !cancelled() }}
@@ -695,11 +741,14 @@ jobs:
             .openbot-build/codex-login-path-e2e/
             .openbot-build/antigravity-login-path-e2e/
             .openbot-build/antigravity-mcp-load-failure-e2e/
+            .openbot-build/antigravity-expired-token-e2e/
+            .openbot-build/antigravity-tool-filter-e2e/
             .openbot-build/acp-additional-directories-e2e/
             .openbot-build/acp-flavor-e2e/
             .openbot-build/acp-mcp-server-names-e2e/
             .openbot-build/acp-turn-stall-e2e/
             .openbot-build/acp-instructions-once-e2e/
+            .openbot-build/acp-audio-input-e2e/
             .openbot-build/grok-steer-e2e/
             .openbot-build/pi-steer-e2e/
             .openbot-build/muse-instructions-once-e2e/
@@ -941,6 +990,10 @@ jobs:
       - name: Build production Worker
         run: bun run api:build
 
+      # A deploy replaces every file under /assets/. Open tabs keep loading the files of their build.
+      - name: Keep the code files of earlier builds
+        run: bun apps/auth-api/scripts/keep-previous-assets.ts
+
       - name: Prepare runtime secrets
         id: runtime-secrets
         shell: bash
@@ -1057,6 +1110,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: ../../node_modules/.bin/wrangler deploy --config wrangler.jsonc --keep-vars
 
+      # The production Worker sends email through this Worker, so it must exist first.
+      - name: Deploy email relay Worker
+        working-directory: apps/auth-api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: ../../node_modules/.bin/wrangler deploy --config wrangler.email-relay.jsonc
+
       - name: Deploy production Worker
         working-directory: apps/auth-api
         env:
@@ -1108,7 +1169,7 @@ jobs:
             "$association_url")"
           require_status "$association_status" 200 "$association_url"
           require_header "$verification_dir/association.headers" '^content-type: application/json' "$association_url"
-          if ! jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]},{"appID":"ZTRDTUL87R.run.openbot.mobile","paths":["/join","/agents/*"]}]' \
+          if ! jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]},{"appID":"ZTRDTUL87R.run.openbot.mobile","paths":["/join","/agents/*"]},{"appID":"8A47NKRZSJ.run.openbot.mobile","paths":["/join","/agents/*"]}]' \
             "$verification_dir/association.json" >/dev/null; then
             echo "Response headers of $association_url:"
             tr -d '\r' < "$verification_dir/association.headers"

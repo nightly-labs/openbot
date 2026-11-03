@@ -1,4 +1,10 @@
-import type { AgentEvent, AgentTasksSnapshot, ConversationSnapshot, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import type {
+  AgentEvent,
+  AgentTasksSnapshot,
+  ConversationMessage,
+  ConversationSnapshot,
+  TeamRealtimeEvent,
+} from "@openbot/contracts/ipc";
 import type { QueryClient } from "@tanstack/react-query";
 import { type QueryScope, queryKeys } from "./query-keys";
 
@@ -104,4 +110,25 @@ export function withoutTaskTurns(
     default:
       return event;
   }
+}
+
+/**
+ * The cached messages of the task that runs on `threadId`, or undefined when the thread is not a
+ * task the phone knows. A progress line of a task turn goes after the newest thought of the task.
+ */
+export function taskThreadMessages(
+  queryClient: QueryClient,
+  scope: QueryScope,
+  serverId: string,
+  agentId: string,
+  threadId: string,
+): readonly ConversationMessage[] | undefined {
+  const task = queryClient
+    .getQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(scope, serverId, agentId))
+    ?.tasks.find((entry) => entry.threadId === threadId);
+  if (!task) return undefined;
+  return (
+    queryClient.getQueryData<ConversationSnapshot>(queryKeys.agentTaskConversation(scope, serverId, task.id))
+      ?.messages ?? []
+  );
 }

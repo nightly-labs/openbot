@@ -65,6 +65,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "참조한 채널 메시지를 사용할 수 없어요.",
   "error.backend.channelTaskNotFound": "채널 작업을 찾을 수 없어요.",
   "error.backend.channelTaskComplete": "이 작업은 이미 완료되었어요.",
+  "error.backend.channelTaskNotStopped": "중지되었거나 실패한 작업만 취소할 수 있어요.",
   "error.backend.channelSelectAgent": "에이전트를 선택하세요.",
   "error.backend.channelLeadRequired": "사용 가능한 채널 리더를 선택하거나 이 작업을 멤버에게 배정하세요.",
   "error.backend.channelRoutingTooLong":
@@ -184,6 +185,8 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "대기를 깨우는 것은 내 루틴의 실행뿐인데, 루틴이 없어요. openbot.create_routine으로 루틴을 만든 후 대기를 여세요.",
   "error.backend.agentWaitRemoteUnsupported": "열린 대기는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "메시지를 읽지 않음으로 표시하는 기능은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.routineFlowHandoffFailed": "루틴이 이 에이전트에게 작업을 넘기지 못했어요.",
   "error.backend.mcpServerLimit": "OpenBot은 MCP 서버를 최대 {limit}개까지 유지해요.",
   "error.backend.mcpServerNameTaken": "{name}(이)라는 MCP 서버가 이미 있어요.",
@@ -235,6 +238,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "서버 하나에는 사이드바 섹션을 최대 {limit}개까지 둘 수 있어요.",
   "error.backend.sectionNameRequired": "섹션 이름이 필요해요.",
   "error.backend.sectionNameTooLong": "섹션 이름이 너무 길어요.",
+  "error.backend.sidebarFolderTooDeep": "폴더는 3단계까지만 만들 수 있습니다.",
+  "error.backend.sidebarFolderMoveInvalid": "이 폴더는 그곳으로 옮길 수 없습니다.",
   "error.backend.sectionNameDuplicate": "섹션 이름은 고유해야 해요.",
   "error.backend.directMessageRequired": "먼저 메시지를 작성하세요.",
   "error.backend.directMessageTooLong": "다이렉트 메시지는 최대 {limit}자까지 쓸 수 있어요.",
@@ -320,13 +325,16 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "이 에이전트에는 열린 스레드가 {count}개 있어요. 스레드 하나를 보관한 후 다른 스레드를 시작하거나 복원하세요.",
   "error.backend.threadRemoteUnsupported": "스레드는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.branchSourceBusy": "이 채팅을 분기하기 전에 현재 턴을 중지하세요.",
+  "error.backend.branchMessageNotFound": "에이전트의 완료된 답변에서만 분기할 수 있어요.",
+  "error.backend.branchRemoteUnsupported": "분기는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.threadMoveRefused": "이 에이전트에게만 보낸 메시지만 새 스레드에서 실행할 수 있어요.",
   "error.backend.taskTitleRequired": "작업에 짧은 제목을 지정하세요.",
   "error.backend.taskToolInvalid": "작업에 120자 이하의 제목과 할 일을 설명하는 지시문을 지정하세요.",
   "error.backend.taskOwnChatOnly":
     "작업은 자신의 채팅에서만 시작할 수 있어요. 채널, 메시징 대화, 다른 작업에서는 시작할 수 없어요.",
-  "error.backend.taskOpenLimit":
-    "이 에이전트에는 이미 열린 작업이 {count}개 있어요. 다른 작업을 시작하기 전에 사용자가 작업 하나를 닫을 때까지 기다리세요.",
+  "error.backend.taskUnfinishedLimit":
+    "이 에이전트에는 이미 끝나지 않은 작업이 {count}개 있어요. 그중 하나가 끝나면 다른 작업을 시작하세요.",
   "error.backend.taskOpenLimitReached":
     "이 에이전트에는 열린 작업이 {count}개 있어요. 작업 하나를 닫은 후 다른 작업을 시작하거나 여세요.",
   "error.backend.taskRemoteUnsupported": "작업은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",

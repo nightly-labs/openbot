@@ -35,14 +35,25 @@ export default function AgentInfoLayout() {
       <Stack.Screen name="memories" options={{ title: t("mobile.agent.info.memories.title") }} />
       <Stack.Screen name="skills" options={{ title: t("mobile.agent.info.skills.title") }} />
       <Stack.Screen name="files" options={{ title: t("mobile.agent.info.files.title") }} />
+      <Stack.Screen name="instructions" options={{ title: t("mobile.agent.instructionsFile.title") }} />
       <Stack.Screen name="routines" options={{ title: t("mobile.agent.info.routines.title") }} />
       <Stack.Screen name="tables" options={{ title: t("mobile.agent.tables.title") }} />
       <Stack.Screen name="publish" options={{ title: t("mobile.agent.publish.title") }} />
       <Stack.Screen name="memory" options={{ title: t("mobile.agent.record.memory") }} />
       <Stack.Screen name="routine" options={{ title: t("mobile.agent.record.routine") }} />
       <Stack.Screen name="runtime" options={{ title: t("mobile.agent.runtime.model") }} />
+      <Stack.Screen name="backup-models" options={{ title: t("mobile.agent.backupModels.title") }} />
+      <Stack.Screen name="backup-model-picker" options={{ title: t("mobile.agent.backupModels.add") }} />
       <Stack.Screen name="permissions" options={{ title: t("mobile.agent.permissions.title") }} />
+      <Stack.Screen name="folders" options={{ title: t("mobile.agent.folders.title") }} />
+      <Stack.Screen name="folder-browser" options={{ title: t("mobile.agent.folders.browseTitle") }} />
       <Stack.Screen name="advanced" options={{ title: t("mobile.agent.advanced.title") }} />
+      <Stack.Screen name="browser-profile" options={{ title: t("mobile.agent.browserProfile.label") }} />
+      <Stack.Screen name="browser-profiles" options={{ title: t("mobile.server.route.browserProfiles") }} />
+      {/* The page names its profile. */}
+      <Stack.Screen name="browser-profile-edit" options={{ title: t("mobile.server.route.browserProfiles") }} />
+      <Stack.Screen name="browser-profile-agents" options={{ title: t("mobile.server.browserProfiles.agentsTitle") }} />
+      <Stack.Screen name="notifications" options={{ title: t("mobile.settings.notifications.title") }} />
       <Stack.Screen name="crop-photo" options={{ title: t("mobile.agent.route.cropPhoto") }} />
     </Stack>
   );

@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import type { AgentPromptQuestion, ConversationMessageSender } from "./ipc-conversation-messages";
+import { VAULT_CARD_BRANDS, VAULT_TEXT_LIMIT, type VaultCardBrand } from "./ipc-vault";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 /**
@@ -268,6 +269,46 @@ export interface UiBlockState {
   autoAnswer?: UiBlockAutoAnswer;
 }
 
+/** The Vault items that `request_vault_item` asks the user for. */
+export type UiVaultRequestKind = "login" | "card" | "contact";
+export const UI_VAULT_REQUEST_KINDS = ["login", "card", "contact"] as const satisfies readonly UiVaultRequestKind[];
+
+/**
+ * The form field ids of a Vault request, for each kind. The host builds the form with these ids, and
+ * the app gives the values of its Vault dialog under them. `expiry` is MM/YY. `country` is an ISO
+ * 3166-1 alpha-2 code.
+ */
+export const UI_VAULT_REQUEST_FIELDS = {
+  login: ["website", "username", "password"],
+  card: ["label", "nameOnCard", "number", "expiry", "securityCode"],
+  contact: ["label", "fullName", "address", "address2", "city", "region", "postalCode", "country", "phone", "email"],
+} as const satisfies Record<UiVaultRequestKind, readonly string[]>;
+
+export type UiVaultRequestField<Kind extends UiVaultRequestKind = UiVaultRequestKind> =
+  (typeof UI_VAULT_REQUEST_FIELDS)[Kind][number];
+
+/** The fields that only the user types: an agent cannot fill them in, and the stored block drops them. */
+export const UI_VAULT_SECRET_FIELDS: readonly UiVaultRequestField[] = ["password", "number", "securityCode"];
+
+/** The item that the user saved from a Vault request. It holds no secret: a card gives its last four digits only. */
+export interface UiVaultSavedItem {
+  id: string;
+  /** The name that the user knows the item by, as the Vault gives it. */
+  name: string;
+  brand?: VaultCardBrand;
+  last4?: string;
+}
+
+/**
+ * The block is the form of `request_vault_item`: the app draws a Vault card in its place, which opens
+ * the Vault dialog. The form fields stay the fallback of a client that does not know this key.
+ */
+export interface UiBlockVaultRequest {
+  kind: UiVaultRequestKind;
+  /** Set when the user saved the item. */
+  saved?: UiVaultSavedItem;
+}
+
 /** The `uiBlock` field of a `ConversationMessage`. */
 export interface ConversationUiBlock {
   version: typeof UI_BLOCK_VERSION;
@@ -275,6 +316,11 @@ export interface ConversationUiBlock {
   blockId: string;
   spec: UiBlockSpec;
   state: UiBlockState;
+  /**
+   * Only the host sets it. Not on the `ui-blocks-v1` wire: a remote client shows the form of the
+   * block.
+   */
+  vault?: UiBlockVaultRequest;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -745,11 +791,35 @@ function readState(spec: UiBlockSpec, value: unknown): UiBlockState {
   return state;
 }
 
+function readVaultRequest(spec: UiBlockSpec, value: unknown): UiBlockVaultRequest {
+  const record = readRecord(value);
+  check(spec.type === "form");
+  const request: UiBlockVaultRequest = { kind: readOneOf(UI_VAULT_REQUEST_KINDS, record.kind) };
+  if (record.saved === undefined) return request;
+  const saved = readRecord(record.saved);
+  check(isIdentifier(saved.id));
+  const item: UiVaultSavedItem = { id: saved.id, name: readString(saved.name, VAULT_TEXT_LIMIT, false) };
+  if (saved.brand !== undefined) item.brand = readOneOf(VAULT_CARD_BRANDS, saved.brand);
+  if (saved.last4 !== undefined) {
+    check(isString(saved.last4) && /^\d{4}$/u.test(saved.last4));
+    item.last4 = saved.last4;
+  }
+  request.saved = item;
+  return request;
+}
+
 function readConversationUiBlock(value: unknown): ConversationUiBlock {
   const record = readRecord(value);
   check(record.version === UI_BLOCK_VERSION);
   const spec = readSpec(record.spec);
-  return { version: UI_BLOCK_VERSION, blockId: readId(record.blockId), spec, state: readState(spec, record.state) };
+  const block: ConversationUiBlock = {
+    version: UI_BLOCK_VERSION,
+    blockId: readId(record.blockId),
+    spec,
+    state: readState(spec, record.state),
+  };
+  if (record.vault !== undefined) block.vault = readVaultRequest(spec, record.vault);
+  return block;
 }
 
 /**

@@ -69,6 +69,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Die referenzierte Kanalnachricht ist nicht verfügbar.",
   "error.backend.channelTaskNotFound": "Kanalaufgabe nicht gefunden.",
   "error.backend.channelTaskComplete": "Diese Aufgabe ist bereits abgeschlossen.",
+  "error.backend.channelTaskNotStopped": "Nur eine gestoppte oder fehlgeschlagene Aufgabe kann abgebrochen werden.",
   "error.backend.channelSelectAgent": "Wähle einen Agenten.",
   "error.backend.channelLeadRequired": "Wähle eine verfügbare Kanalleitung oder weise diese Aufgabe einem Mitglied zu.",
   "error.backend.channelRoutingTooLong":
@@ -209,6 +210,8 @@ export const messages = {
     "Nur eine Ausführung einer deiner Routinen weckt einen Wartevorgang, und du hast keine Routine. Erstelle eine mit openbot.create_routine und öffne dann den Wartevorgang.",
   "error.backend.agentWaitRemoteUnsupported":
     "Offene Wartevorgänge sind nur für Agenten auf diesem Computer verfügbar.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Eine Nachricht als ungelesen markieren ist nur für Agenten auf diesem Computer verfügbar.",
   "error.backend.routineFlowHandoffFailed": "Die Routine konnte die Arbeit nicht an diesen Agenten übergeben.",
   "error.backend.mcpServerLimit": "OpenBot verwaltet bis zu {limit} MCP-Server.",
   "error.backend.mcpServerNameTaken": "Ein MCP-Server mit dem Namen {name} existiert bereits.",
@@ -265,6 +268,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Ein Server kann bis zu {limit} Seitenleistenabschnitte haben.",
   "error.backend.sectionNameRequired": "Ein Abschnittsname ist erforderlich.",
   "error.backend.sectionNameTooLong": "Der Abschnittsname ist zu lang.",
+  "error.backend.sidebarFolderTooDeep": "Ordner können nur drei Ebenen tief sein.",
+  "error.backend.sidebarFolderMoveInvalid": "Dieser Ordner kann nicht dorthin verschoben werden.",
   "error.backend.sectionNameDuplicate": "Abschnittsnamen müssen eindeutig sein.",
   "error.backend.directMessageRequired": "Schreibe zuerst eine Nachricht.",
   "error.backend.directMessageTooLong": "Eine Direktnachricht kann bis zu {limit} Zeichen haben.",
@@ -358,6 +363,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Dieser Agent hat {count} offene Threads. Archiviere einen Thread und starte dann einen anderen oder stelle einen wieder her.",
   "error.backend.threadRemoteUnsupported": "Threads sind nur für Agenten auf diesem Computer verfügbar.",
+  "error.backend.branchSourceBusy": "Stoppe die laufende Runde, bevor du diesen Chat abzweigst.",
+  "error.backend.branchMessageNotFound": "Du kannst nur von einer fertigen Antwort des Agenten abzweigen.",
+  "error.backend.branchRemoteUnsupported": "Abzweigungen sind nur für Agenten auf diesem Computer verfügbar.",
   "error.backend.threadMoveRefused":
     "Nur eine Nachricht, die du allein an diesen Agenten gesendet hast, kann in einem neuen Thread laufen.",
   "error.backend.taskTitleRequired": "Gib der Aufgabe einen kurzen Titel.",
@@ -365,8 +373,8 @@ export const messages = {
     "Gib der Aufgabe einen Titel mit höchstens 120 Zeichen und eine kurze Beschreibung, was zu tun ist.",
   "error.backend.taskOwnChatOnly":
     "Starte eine Aufgabe nur aus deinem eigenen Chat. Ein Kanal, eine Messaging-Unterhaltung oder eine andere Aufgabe kann keine starten.",
-  "error.backend.taskOpenLimit":
-    "Dieser Agent hat bereits {count} offene Aufgaben. Warte, bis der Benutzer eine schließt, bevor du eine weitere Aufgabe startest.",
+  "error.backend.taskUnfinishedLimit":
+    "Dieser Agent hat bereits {count} unfertige Aufgaben. Starte eine weitere Aufgabe, wenn eine davon endet.",
   "error.backend.taskOpenLimitReached":
     "Dieser Agent hat {count} offene Aufgaben. Schließe eine Aufgabe und starte oder öffne dann eine andere.",
   "error.backend.taskRemoteUnsupported": "Aufgaben sind nur für Agenten auf diesem Computer verfügbar.",

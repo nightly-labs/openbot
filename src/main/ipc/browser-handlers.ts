@@ -17,9 +17,14 @@ import {
   BROWSER_USER_CONTROL_ROUTES,
   decodeBrowserUserControlSnapshot,
 } from "@openbot/contracts/team-protocol/browser-user-control-v1";
-import { decodeBrowserViewInputValue } from "@openbot/contracts/team-protocol/browser-view-v1";
+import {
+  decodeBrowserViewInputValue,
+  TEAM_BROWSER_VIEW_CAPABILITY,
+  TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
+} from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
+import type { WebContents } from "electron";
 import type { BrowserHost } from "../../backend/browser-host";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { BrowserPictureInPicture } from "../browser-picture-in-picture";
@@ -43,7 +48,7 @@ import {
   parseLocalSignInFinish,
   parseVisibility,
 } from "./browser-inputs";
-import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import { eventHandler, eventPayloadHandler, handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
 import { optionalPayload, stringPayload } from "./validation";
 
@@ -82,6 +87,13 @@ export function browserIpcHandlers({
   browserView,
   localSignIn,
 }: BrowserIpcDependencies): Pick<IpcGroupHandlers, "browser" | "browserInput"> {
+  // A window that closes cannot stop its live view any more, so the view stops when the window goes.
+  const liveViewOwners = new WeakSet<WebContents>();
+  const watchLiveViewOwner = (owner: WebContents) => {
+    if (liveViewOwners.has(owner)) return;
+    liveViewOwners.add(owner);
+    owner.once("destroyed", () => void runCauseEffect(browserView.stop(owner.id)).catch(() => undefined));
+  };
   // The frozen tab list has no field for a person's control or the history state, so a host that
   // can tell answers on its own routes, and its list marks the tabs here.
   const withUserControl = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> => {
@@ -348,10 +360,26 @@ export function browserIpcHandlers({
         if (remoteServers.activeServerId === LOCAL_SERVER_ID) await runCauseEffect(browser.setVisible(parsed));
       }),
       // A local tab is a native view on this screen already; only a host's tab needs its pixels sent.
-      startLiveView: payloadHandler(stringPayload("tabId"), (tabId) => runCauseEffect(browserView.start(tabId))),
-      stopLiveView: handler(() => runCauseEffect(browserView.stop())),
+      // The window that asks owns the view: the main window and Picture in Picture can both show one.
+      startLiveView: eventPayloadHandler(stringPayload("tabId"), (event, tabId) => {
+        watchLiveViewOwner(event.sender);
+        return runCauseEffect(browserView.start(tabId, event.sender.id));
+      }),
+      stopLiveView: eventHandler((event) => runCauseEffect(browserView.stop(event.sender.id))),
+      // A host's tab is not a native view on this screen, so the window draws it from the live view.
       openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
-        runCauseEffect(browserPictureInPicture.open(bounds)),
+        routeToServer(remoteServers.activeServerId, {
+          local: () => runCauseEffect(browserPictureInPicture.open(bounds)),
+          remote: (serverId) =>
+            runCauseEffect(
+              browserPictureInPicture.open(
+                bounds,
+                remoteServers.supportsCapability(serverId, TEAM_BROWSER_VIEW_CAPABILITY)
+                  ? { clipboard: remoteServers.supportsCapability(serverId, TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY) }
+                  : undefined,
+              ),
+            ),
+        }),
       ),
       closePictureInPicture: handler(() => browserPictureInPicture.close()),
       dockPictureInPicture: handler(() => browserPictureInPicture.dock()),

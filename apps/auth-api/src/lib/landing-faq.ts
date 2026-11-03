@@ -16,9 +16,9 @@ export const LANDING_FAQ: readonly LandingQuestion[] = [
       "Yes. OpenBot costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have.",
   },
   {
-    question: "Is OpenBot open source?",
+    question: "Is OpenBot's source code open?",
     answer:
-      "All of the source code is public on GitHub, so you can check what OpenBot does. You can change and run it for free for noncommercial use, such as personal projects, study or research. Commercial use needs a separate license. The license is PolyForm Noncommercial 1.0.0.",
+      "Yes. All of the source code is open on GitHub, so you can check what OpenBot does. You can change and run it for free for noncommercial use, such as personal projects, study or research. Commercial use needs a separate license. The license is PolyForm Noncommercial 1.0.0.",
     link: { label: "See the source code on GitHub", href: "https://github.com/nightly-labs/openbot" },
   },
   {

@@ -5,6 +5,7 @@ export const messages = {
   "status.agent.claudeWriteOutside":
     "Gravar em {path}, fora do espaço de trabalho do agente, da pasta compartilhada e das pastas temporárias.",
   "status.agent.contextCleared": "Contexto limpo. Um novo chat começa aqui.",
+  "status.agent.instructionsChanged": "Atualizou suas instruções",
   "status.agent.modelSwitchedForLimit": "Limite de uso atingido. O modelo mudou para {model}.",
   "status.agent.modelReturnedAfterLimit": "O limite de uso terminou. O modelo voltou para {model}.",
   "status.agent.modelSwitchedForError": "Erro do provedor. O modelo mudou para {model}.",
@@ -39,8 +40,24 @@ export const messages = {
   "status.agent.memoriesUpdating": "Atualizando suas memórias…",
   "status.agent.skillUsing": "Usando a habilidade {name}…",
   "status.agent.skillReading": "Lendo uma habilidade…",
+  "status.agent.toolStepFailed":
+    "Uma etapa da ferramenta falhou; revisando o resultado e decidindo o que tentar em seguida…",
+  "status.agent.toolResultReviewing": "Revisando o último resultado da ferramenta…",
+  "status.agent.sourcesSearching": "Pesquisando informações atualizadas…",
+  "status.agent.sourcesReviewing": "Revisando as fontes e as informações que encontrei…",
+  "status.agent.informationGathering": "Reunindo as informações relevantes…",
+  "status.agent.informationReviewing": "Revisando as informações que reuni…",
+  "status.agent.workChecking": "Verificando o trabalho…",
+  "status.agent.workReviewing": "Revisando os resultados da verificação…",
+  "status.agent.changesMaking": "Fazendo as alterações solicitadas…",
+  "status.agent.changesReviewing": "Revisando as alterações que fiz…",
+  "status.agent.agentCoordinating": "Coordenando com outro agente…",
+  "status.agent.agentResponseReviewing": "Revisando a resposta do outro agente…",
+  "status.agent.toolStepWorking": "Processando a próxima etapa assistida por ferramentas…",
   "status.agent.memoryChanges": "Memórias: {saved} salvas, {updated} atualizadas, {forgotten} esquecidas.",
   "status.agent.memoryChangesWithConflicts":
     "Memórias: {saved} salvas, {updated} atualizadas, {forgotten} esquecidas, {notChanged} não alteradas porque outro tópico as alterou antes.",
+  "status.agent.nextStepContinues": "O agente parou antes da próxima etapa. Ele continua ({current} de {limit}).",
   "status.agent.planContinues": "O plano tem etapas abertas. O agente continua ({current} de {limit}).",
+  "status.agent.branchTitle": "Chat ramificado",
 } as const satisfies PartialTranslation<typeof source>;

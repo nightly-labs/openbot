@@ -27,7 +27,7 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** A Telegram connection, the row that migration 48 must keep, from schema 25 on. */
+/** A Telegram connection, the row that migration 51 must keep, from schema 25 on. */
 function seedConnection(db: DatabaseSync): void {
   db.prepare(`INSERT INTO projection_messaging_connections
     (connection_id, platform, workspace_id, workspace_name, enabled, bot_user_id, app_id, orchestrator_agent_id,
@@ -74,20 +74,20 @@ function senderTables(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 48 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 51 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
 }
 
 describe("messaging allowed senders migration", () => {
-  it.each(Array.from({ length: 40 }, (_, index) => index + 8))(
+  it.each(Array.from({ length: 43 }, (_, index) => index + 8))(
     "preserves every row from released schema %i",
     (version) => {
       const db = databaseAt(version);
       seed(db, version);
-      // The earlier migrations run first; the rows after them are what v48 must keep.
-      if (version < 47) migrateUpTo(db, 47);
+      // The earlier migrations run first; the rows after them are what v51 must keep.
+      if (version < 50) migrateUpTo(db, 50);
       if (version < 25) seedConnection(db);
       const before = contents(db);
       migrateOpenBotDatabase(db);
@@ -97,15 +97,15 @@ describe("messaging allowed senders migration", () => {
   );
 
   it("rolls back the table and the marker after a late failure, then retries", () => {
-    const db = databaseAt(47);
-    seed(db, 47);
+    const db = databaseAt(50);
+    seed(db, 50);
     const before = contents(db);
-    db.exec(`CREATE TEMP TRIGGER fail_marker BEFORE INSERT ON schema_migrations WHEN new.version=48
+    db.exec(`CREATE TEMP TRIGGER fail_marker BEFORE INSERT ON schema_migrations WHEN new.version=51
       BEGIN SELECT RAISE(ABORT, 'late failure'); END;`);
-    expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 48 failed");
+    expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 51 failed");
     expect(contents(db)).toEqual(before);
     expect(senderTables(db)).toEqual([]);
-    expect(db.prepare("SELECT version FROM schema_migrations WHERE version=48").all()).toEqual([]);
+    expect(db.prepare("SELECT version FROM schema_migrations WHERE version=51").all()).toEqual([]);
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
@@ -114,20 +114,20 @@ describe("messaging allowed senders migration", () => {
   });
 
   it("rejects newer and incomplete migration histories before it creates the table", () => {
-    const db = databaseAt(47);
-    seed(db, 47);
+    const db = databaseAt(50);
+    seed(db, 50);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(49,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(52,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=49; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=52; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(senderTables(db)).toEqual([]);
   });
 
   it("refuses a sender of no connection or of another kind, and keeps a connection that has senders", () => {
-    const db = databaseAt(47);
-    seed(db, 47);
+    const db = databaseAt(50);
+    seed(db, 50);
     migrateOpenBotDatabase(db);
     const insert = db.prepare(`INSERT INTO projection_messaging_allowed_senders
       (connection_id, sender_id, kind, name, created_at) VALUES (?, '48600100200', ?, 'Ana', '2026-01-04')`);

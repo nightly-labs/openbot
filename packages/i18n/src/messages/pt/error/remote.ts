@@ -95,6 +95,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "A transferência de arquivos WebRTC falhou.",
   "error.remote.fileResumeFailed": "A transferência de arquivos WebRTC não conseguiu retomar dentro do prazo.",
   "error.remote.fileTransportStopped": "O transporte de arquivos WebRTC parou.",
+  "error.remote.downloadStopped": "O download foi interrompido.",
   "error.remote.fileResumeExpired": "O prazo para retomar a transferência de arquivos WebRTC expirou.",
   "error.remote.hostRequestFailed": "O computador anfitrião não conseguiu concluir a solicitação.",
   "error.remote.responseTooLarge":
@@ -129,8 +130,6 @@ export const messages = {
   "error.remote.serverDisconnected": "O servidor se desconectou.",
   "error.remote.preferencesUnreadable": "Não foi possível ler as preferências salvas do chat.",
   "error.remote.accountAuthRequired": "É necessário autenticar a conta.",
-  "error.remote.serverIdentityChanged":
-    "A identidade do servidor mudou. A chave confiável do computador anfitrião não será substituída.",
   "error.remote.pairedIdentityChanged":
     "A identidade do computador pareado está ausente ou mudou. Leia um novo código desse computador.",
   "error.remote.permanentInviteNoEmail": "Convites permanentes não podem ser enviados por e-mail.",
@@ -206,4 +205,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Atualize este servidor no computador para excluir canais.",
   "error.remote.historyRefreshFailed": "A mensagem foi enviada, mas não foi possível atualizar o histórico do chat.",
   "error.remote.taskHistoryRefreshFailed": "A tarefa foi alterada, mas não foi possível atualizar o histórico do chat.",
+  "error.remote.localServerAccountRemovalFailed":
+    "O servidor foi excluído no computador dele, mas a conta ainda o mostra. Exclua de novo para removê-lo da conta.",
 } as const satisfies PartialTranslation<typeof source>;

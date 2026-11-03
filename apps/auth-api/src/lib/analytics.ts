@@ -22,6 +22,7 @@ import {
   OPENBOT_DOWNLOAD_PAGE_LINKS,
   OPENBOT_LINKS,
 } from "./landing-links";
+import { MARKETPLACE_TAB_ROUTES } from "./marketplace-routes";
 import { MOBILE_APPS } from "./mobile-apps";
 import { PRICING_ROUTE } from "./pricing-page";
 import { PRIVACY_POLICY_ROUTE } from "./privacy-policy";
@@ -123,6 +124,7 @@ type LandingDestination =
 
 type CollectionIndexRoute = ContentCollection["indexRoute"];
 type DownloadPagePath = (typeof OPENBOT_DOWNLOAD_PAGE_LINKS)[keyof typeof OPENBOT_DOWNLOAD_PAGE_LINKS];
+type MarketplaceTabPath = (typeof MARKETPLACE_TAB_ROUTES)[keyof typeof MARKETPLACE_TAB_ROUTES];
 /**
  * The screens a report may name. Article paths carry the slug so one article can be told from
  * another, and `safeScreenPath` keeps the set closed at runtime as well as in the type.
@@ -140,6 +142,7 @@ export type LandingScreenPath =
   | typeof COMMERCIAL_LICENSE_ROUTE
   | typeof DPA_ROUTE
   | DownloadPagePath
+  | MarketplaceTabPath
   | CollectionIndexRoute
   | `${CollectionIndexRoute}/${string}`;
 
@@ -155,6 +158,7 @@ const FIXED_SCREEN_PATHS = [
   COMMERCIAL_LICENSE_ROUTE,
   DPA_ROUTE,
   ...Object.values(OPENBOT_DOWNLOAD_PAGE_LINKS),
+  ...Object.values(MARKETPLACE_TAB_ROUTES),
   "/news",
   "/guides",
   "/compare",

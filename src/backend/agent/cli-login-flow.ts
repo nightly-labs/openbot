@@ -141,6 +141,7 @@ export class CliLoginFlow {
     if (!code) return yield* new CliLoginFailed({ cause: new Error(sourceText("error.provider.codeLoginNoLink")) });
     const expiresAt = Date.now() + timeoutMs;
     const prompt = yield* code.prompt.pipe(toCliLoginFailed);
+    if (prompt === null) return { kind: "connected" };
     if (prompt.flow === "link") return { kind: "link", verificationUrl: prompt.verificationUrl, expiresAt };
     return prompt.flow === "paste"
       ? { kind: "paste", verificationUrl: prompt.verificationUrl, expiresAt }

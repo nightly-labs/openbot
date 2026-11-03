@@ -76,6 +76,14 @@ export function eventHandler<Handler extends (event: IpcMainInvokeEvent) => unkn
   return (channel) => handleTrustedWithEvent(channel, implementation);
 }
 
+/** Takes a payload and needs the invoke event, to know which frame's `sender` asked. */
+export function eventPayloadHandler<Payload, Result>(
+  decode: PayloadDecoder<Payload>,
+  implementation: (event: IpcMainInvokeEvent, payload: Payload) => Result,
+): BoundHandler<Payload, Awaited<Result>> {
+  return (channel) => handleTrustedWithEvent(channel, decode, implementation);
+}
+
 /**
  * Runs a sender-identity check the trusted-URL gate cannot make, before anything is decoded. Every
  * window of the app shares one origin, so a channel only some of them may use needs this.

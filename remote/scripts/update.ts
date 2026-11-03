@@ -4,8 +4,8 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dir, "../..");
 const compose = ["compose", "-f", "remote/compose.yaml"];
 
-await run("docker", [...compose, "build", "remote-api", "coturn"], root);
-await run("docker", [...compose, "up", "-d", "--no-build", "--no-deps", "remote-api"], root);
+await run("docker", [...compose, "build", "remote-api", "capacity-report", "coturn"], root);
+await run("docker", [...compose, "up", "-d", "--no-build", "--no-deps", "remote-api", "capacity-report"], root);
 
 const coturnExists = (await capture("docker", ["inspect", "openbot-coturn"], root)).code === 0;
 if (coturnExists) {

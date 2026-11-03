@@ -16,6 +16,7 @@ import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnosti
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import { RestartServerDialog } from "@openbot/ui/features/servers/RestartServerDialog";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
+import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, Loading, Show, untrack } from "solid-js";
 import { actionToast } from "./action-toast";
@@ -50,9 +51,11 @@ import { useServers } from "./features/servers/servers-context";
 import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
 import { useSettings } from "./features/settings/settings-context";
 import { settingsPort } from "./features/settings/settings-port";
+import { useSidebar } from "./features/sidebar/sidebar-context";
 import { useUpdates } from "./features/updates/updates-context";
 import { useWhatsNew } from "./features/updates/whats-new-context";
 import { usePlanLimitRows } from "./features/usage/plan-limit-rows";
+import { createLinkAccountStore } from "./features/vault/stores/link-account-store";
 import { createVaultStore } from "./features/vault/stores/vault-store";
 import { desktopVaultCalls, hostVaultCalls } from "./features/vault/vault-port";
 import { useWindowPage } from "./features/window/window-page-context";
@@ -135,6 +138,8 @@ export function SkillsMarketplace() {
     setPendingPluginSlug,
     pendingPluginConnect,
     setPendingPluginConnect,
+    pendingMarketplaceListing,
+    setPendingMarketplaceListing,
   } = useSettings();
   const { agentList, activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
   const { selectAgent } = useNavigation();
@@ -166,6 +171,8 @@ export function SkillsMarketplace() {
         setPendingPluginSlug(null);
         setPendingPluginConnect(false);
       }}
+      marketplaceListing={pendingMarketplaceListing()}
+      onMarketplaceListingConsumed={() => setPendingMarketplaceListing(null)}
       connectors={connectors.active}
       macOS={platform.appInfo()?.platform === "darwin"}
       onAddServer={(serverId) => {
@@ -375,7 +382,7 @@ function ServerSettings() {
   const windowPage = useWindowPage();
   const usageRows = usePlanLimitRows();
   const platform = usePlatform();
-  const { hostStatus, setServerMuted, setServerNotificationLevel, hostedServerIds, hostedServersLoaded } = useServers();
+  const { hostStatus, hostedServerIds, hostedServersAvailable, hostedServersLoaded, setAddServerOpen } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
@@ -504,6 +511,8 @@ function ServerSettings() {
     return {
       store: createVaultStore(local ? desktopVaultCalls() : hostVaultCalls(serverId)),
       apiKeys: vaultApiKeys(),
+      // Link signs in on this computer only: a joined server's host has no Link account.
+      link: local ? createLinkAccountStore() : undefined,
     };
   });
   // The workspace belongs to the selected server. For another server, the switch comes first and
@@ -673,6 +682,21 @@ function ServerSettings() {
     );
   };
 
+  /** A server at its site limit offers the server plans, which have more sites, to its owner. */
+  function canOfferServerPlans(server: ServerSummary): boolean {
+    return (
+      !platform.landingPreview &&
+      hostedServersAvailable() &&
+      hostedServersLoaded() &&
+      (server.kind === "local" || server.role === "owner") &&
+      server.hosted !== true
+    );
+  }
+  function openServerPlans(): void {
+    setServerSettingsOpen(false);
+    setAddServerOpen(true, "upsell");
+  }
+
   const storageOptions = (server: ServerSummary): Omit<ServerStorageOptions, "canManage"> => ({
     hostName:
       server.kind === "local"
@@ -704,8 +728,6 @@ function ServerSettings() {
           onSaveIdentity={saveServerIdentity}
           onSetPublished={setServerPublished}
           onRotateHostKey={server().kind === "local" ? rotateHostKey : undefined}
-          onSetMuted={(muted) => setServerMuted(server().id, muted)}
-          onSetNotificationLevel={(level) => setServerNotificationLevel(server().id, level)}
           onCreateInvite={createServerInvite}
           license={appPort().license}
           onContactUs={() => void appPort().openExternal("hosted-server-contact")}
@@ -778,6 +800,7 @@ function ServerSettings() {
                   api: appPort().hostedSites,
                   onOpenSite: (url) => void appPort().openUrl(url),
                   trackDelete: trackHostedSiteDelete,
+                  onSeePlans: canOfferServerPlans(server()) ? openServerPlans : undefined,
                 }
               : undefined
           }
@@ -787,6 +810,7 @@ function ServerSettings() {
           memoryReview={{}}
           hostPromptCacheTtl={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
+          serverAudit={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}
           // Any member imports into this computer or a remote host with `agent-import-v1`.
           agentImport={
@@ -845,9 +869,10 @@ function AppSettings(props: AccountProps) {
   const auth = useAuth();
   const updates = useUpdates();
   const whatsNew = useWhatsNew();
-  const { servers, setAddServerOpen } = useServers();
+  const { servers, setAddServerOpen, setServerMuted, setServerNotificationLevel } = useServers();
   const {
     appSettingsOpen,
+    notificationFocusRequest,
     setAppSettingsOpen,
     appSettingsTab,
     hostedServerDeleteRequest,
@@ -912,6 +937,9 @@ function AppSettings(props: AccountProps) {
         }}
         onTestNotification={sendTestNotification}
         onOpenNotificationSettings={openNotificationSettings}
+        onSetServerNotificationLevel={setServerNotificationLevel}
+        onSetServerMuted={setServerMuted}
+        notificationFocusRequest={notificationFocusRequest()}
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
         hostedServerDeleteRequest={hostedServerDeleteRequest()}
@@ -922,7 +950,16 @@ function AppSettings(props: AccountProps) {
 
 /** Search across the agents, channels, conversations, routines and commands of the active server. */
 function GlobalMessageSearch() {
-  const { agentList } = useAgents();
+  const { agentList, userHiddenAgentIds } = useAgents();
+  const { sidebarLayout, pinnedSidebarItems } = useSidebar();
+  // In sidebar order, so that ⌘1-9 opens the agents the user put at the top.
+  const agents = createMemo(() =>
+    sidebarAgentOrder(agentList(), {
+      layout: sidebarLayout(),
+      pinnedItems: pinnedSidebarItems(),
+      hiddenAgentIds: userHiddenAgentIds(),
+    }),
+  );
   const { globalSearchOpen, searchGlobalMessages, setGlobalSearchVisibility, selectAgent, selectGlobalSearchMessage } =
     useNavigation();
   const sources = useGlobalSearchSources(globalSearchOpen);
@@ -930,7 +967,7 @@ function GlobalMessageSearch() {
   return (
     <GlobalSearchOverlay
       open={globalSearchOpen()}
-      agents={agentList()}
+      agents={agents()}
       channels={sources.channels()}
       routines={sources.routines()}
       routinesLoading={sources.routinesLoading()}

@@ -17,6 +17,8 @@ import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 
 const INK = "rgba(0, 0, 0, 0.72)";
+/** The squircle's corner radius as a part of its side. */
+export const SERVER_AVATAR_CORNER_RATIO = 0.32;
 const DOT = 12;
 const DOT_OVERHANG = 2;
 // The ring cut out of the squircle around the dot, so the dot works on any background.
@@ -90,7 +92,7 @@ export function ServerAvatar({
       style={{
         backgroundColor: thumbnailColor(getBloubAvatarColor(server.id, null), muted),
         borderCurve: "continuous",
-        borderRadius: size * 0.32,
+        borderRadius: size * SERVER_AVATAR_CORNER_RATIO,
         height: size,
         opacity: muted ? DISCONNECTED_APPEARANCE.opacity : 1,
         overflow: "hidden",

@@ -55,6 +55,7 @@ import {
   isAppInterfaceSize,
   isAppLanguage,
   isAppLogoColor,
+  isAppThemePaletteId,
   isBrowserDockAction,
   isBrowserDockFrame,
   isBrowserDockPresentation,
@@ -98,7 +99,8 @@ export function parseProviderId(input: unknown): AgentProviderId {
 
 export function parseAnalyticsPreference(input: unknown): SetAnalyticsPreferenceInput {
   if (!isDynamicRecord(input) || !isBoolean(input.enabled)) throw new Error("Analytics preference is required.");
-  return { enabled: input.enabled };
+  if (input.chosen !== undefined && !isBoolean(input.chosen)) throw new Error("Analytics choice is not valid.");
+  return { enabled: input.enabled, ...(input.chosen ? { chosen: true } : {}) };
 }
 
 export function parseBusyMessageModePreference(input: unknown): BusyMessageModePreference {
@@ -160,14 +162,18 @@ export function parseAppLogoColorPreference(input: unknown): SetAppLogoColorPref
 
 export function parseAppAppearancePreference(input: unknown): SetAppAppearancePreferenceInput {
   if (!isDynamicRecord(input)) throw new Error("Appearance is required.");
-  const { appearance, transparentWindow } = input;
+  const { appearance, transparentWindow, palette } = input;
   if (appearance !== undefined && !isAppAppearance(appearance)) throw new Error("Appearance is invalid.");
   if (transparentWindow !== undefined && typeof transparentWindow !== "boolean")
     throw new Error("Transparent window must be true or false.");
-  if (appearance === undefined && transparentWindow === undefined) throw new Error("Appearance is required.");
+  if (palette !== undefined && palette !== null && !isAppThemePaletteId(palette))
+    throw new Error("Theme palette is invalid.");
+  if (appearance === undefined && transparentWindow === undefined && palette === undefined)
+    throw new Error("Appearance is required.");
   return {
     ...(appearance === undefined ? {} : { appearance }),
     ...(transparentWindow === undefined ? {} : { transparentWindow }),
+    ...(palette === undefined ? {} : { palette }),
   };
 }
 
@@ -281,6 +287,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
   if (
     input !== "agent-setup" &&
     input !== "claude-install" &&
+    input !== "hermes-install" &&
     input !== "opencode-install" &&
     input !== "opencode-auth" &&
     input !== "feedback" &&
@@ -288,6 +295,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "changelog" &&
     input !== "guides" &&
     input !== "discord" &&
+    input !== "github" &&
     input !== "x" &&
     input !== "grok-bot-export" &&
     input !== "hosted-server-contact" &&
@@ -351,10 +359,13 @@ export function parseMarketplaceAgentQuery(input: unknown): MarketplaceAgentQuer
   if (!isObject(input)) throw new Error("Invalid agent marketplace query.");
   const category = input.category;
   if (category !== undefined && !isSkillCategory(category)) throw new Error("Unknown agent category.");
+  const verified = input.verified;
+  if (verified !== undefined && !isBoolean(verified)) throw new Error("Invalid agent source filter.");
   return {
     ...parseMarketplaceQueryFields(input),
     ...parseMarketplaceSort(input.sort, ["installs"] as const, "Unknown agent sort order."),
     ...(category ? { category } : {}),
+    ...(verified === undefined ? {} : { verified }),
   };
 }
 

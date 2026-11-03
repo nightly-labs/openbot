@@ -17,8 +17,12 @@ one `query` string, because models often send one string. Up to three strong res
 queries that contain each word of the tool name without its namespace, include the original schema and guidance, so the agent can call them
 without a describe step. Each model step sends the full context again, so one step less saves more
 input than the added schema costs. A query word that is only in the namespace, or one shared verb
-such as "read", does not make a result strong. The other results have a short description only. `tool_describe`
-returns the original schemas for up to ten qualified names, plus guidance from
+such as "read", does not make a result strong. The other results have a short description only. When a
+strong result is an `openbot_browser` tool, the results also include `openbot_browser.run_script` with its
+schema. Agents search for the single actions that they know, such as click, and otherwise do not find the
+multi-step tool (see [Browser](browser.md)). The instructions
+tell the agent to describe a tool only when no search result gave its schema. `tool_describe` accepts `names`, or
+one `name` string, and returns the original schemas for up to ten qualified names, plus guidance from
 `agent/tool-guidance.ts`. Identical guidance appears once per response. The initial catalog lists
 names without schemas.
 
@@ -166,12 +170,12 @@ adds its rule there, not in the catalog.
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
-`releases/latest` for Codex and Pi, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
+`releases/latest` for Codex, Pi and Kimi, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
 for Grok, the `muse-stable` channel for Muse, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex and Pi, the manifest `checksum` for Muse, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
+Codex, Pi and Kimi, the manifest `checksum` for Muse, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
 so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
 `dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
 the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
@@ -201,7 +205,11 @@ artifact and preserves the old runtime, so a release that does not start leaves 
 in use. Download status stays `finishing` until activation succeeds.
 
 CLI resolution prefers an explicit `OPENBOT_*_PATH`, then the installed managed copy, then an
-automatically discovered system CLI. Updates never run the system CLI's updater. An explicit path
+automatically discovered system CLI. When the managed copy wins, `resolveInstalledFirst` in
+`src/backend/cli.ts` also resolves with no managed copy, at the same time, and a system CLI of the same or a newer
+version runs instead: the user's CLI on `PATH` replaces a copy that is not newer. A version that
+cannot be compared, such as two Cursor builds of one date, keeps the managed copy. Antigravity has
+no `PATH` discovery, so it always runs the managed copy. Updates never run the system CLI's updater. An explicit path
 suppresses managed update offers. Startup uses the same selection and reads the executable's version.
 On macOS and Linux, discovery looks in the folders of the login-shell `PATH` (`loginSearchPath` in
 `src/backend/cli.ts`, shared with ACP and custom agents and cached for 60 s), then in fixed user
@@ -264,7 +272,10 @@ agent service has to be given the executable either way. Staging directories car
 random suffix and are swept by age, never by name, so a sibling's install is not collected while it
 runs. The manager stamps each version it takes into use -- the pinned one it verified, and the older
 one it falls back to until the pinned one arrives -- and collection keeps anything stamped within two
-days. When the computer has been awake for one check interval (one hour), the update check keeps
+days. Once the version it runs is `ready`, the manager keeps no older version to fall back on and stops
+stamping the one it replaced, so that version goes when its last stamp leaves the window. Before
+this, the store kept the last working older version of each CLI for good, and every update left two
+copies on disk. When the computer has been awake for one check interval (one hour), the update check keeps
 only what was stamped within three hours. So a version another instance or another
 worktree's pin still runs is not removed; a collection that fails, as it does on Windows for an open
 binary, never stops startup.
@@ -284,6 +295,15 @@ stamps the version it activates, so an install it made in the same session is it
 provider that is off is not stamped, a sibling can collect its version; turning the provider on
 reads the store again when that version is gone. Turning the provider on later downloads the CLI as
 on first use.
+
+Server settings > Storage shows the same downloads in its "Provider runtimes" cleanup row, for this
+computer only. `removableRuntimes` answers the old versions and the download of each provider that is
+off, counts a directory that is both once, and names those providers; a provider whose download runs
+is left out. A provider that is on keeps its copy unless main reported a system version for it
+(`setSystemVersion`): it then runs the user's CLI, so its copy runs nothing and counts as removable.
+The row never moves a running provider to another CLI. `removeRemovableRuntimes` collects the old versions, then calls `removeDownload`
+for each named provider at once, so each follows the rules above. A failure does not stop the
+others; the error names the providers that failed, and the page measures again.
 
 ### Managed provider updates
 
@@ -319,8 +339,10 @@ Each provider status row reports `cliSource`, and main passes the version of a `
 it compares a managed installation. The row and the notification therefore use the one update offer,
 the one Update button, and one entry point in the runtime store, `startProviderUpdate`. One path
 runs behind it, whoever owns the CLI: the download installs the managed copy and
-`updateProviderCli` activates it, and CLI resolution then prefers that copy to the system install,
-which is left where it is. OpenBot never runs the CLI's own updater, so no version it offers depends
+`updateProviderCli` activates it with `preferInstalled: false`, so it starts the copy it downloaded.
+Later resolutions keep that copy while it is newer than the system install, which is left where it
+is; when the user's CLI catches up, the user's CLI runs again. When the user's CLI goes away, main calls
+`providerUseChanged`, which stamps the copy again, or reads the store when a sibling collected it. OpenBot never runs the CLI's own updater, so no version it offers depends
 on another release channel. An explicit `OPENBOT_*_PATH` suppresses the offer, because that path
 names the binary to run and the managed copy is not it. The owner comes from the last resolution of
 the binary, not from the client that runs it, so a provider that is signed out still reports its own
@@ -511,7 +533,7 @@ callback uses `127.0.0.1` on the host, so complete sign-in in a desktop session 
 VM. A browser on another computer cannot complete this loopback callback. A server with no
 desktop can install and start Gemini, but cannot complete the interactive Google sign-in.
 
-The local Settings > Providers screen offers Connect for both a managed runtime and an
+The local Server settings > Providers screen offers Connect for both a managed runtime and an
 external runtime. Gemini has no device-code flow, so a remote host signs it in on a page in its
 own browser. A Linux host advertises `provider-host-sign-in-v1` (Team API v7 only). Connect sends
 `start` to the host. The host runs the same sign-in as its own Connect, and opens the Google link
@@ -709,6 +731,38 @@ adds `cline` to `projection_provider_sessions`.
 Team API v1–v5 do not know `cline`. The host hides Cline agents, models, status, and sign-in state
 from peers on those versions, as for Cursor. Team API v6 and `providers-v4` carry it, as for Cursor.
 
+### Kimi
+
+The Kimi provider (id `kimi`) starts the Kimi Code CLI with `kimi acp`. The runtime manager
+downloads the PyInstaller onedir archive `kimi-<version>-<triple>-onedir.tar.gz` (`.zip` on Windows)
+from the GitHub release and renames its `kimi` folder to `bin`. The macOS and Linux archives hold
+relative symbolic links in `kimi/_internal`, and a copy of a link breaks the signature of the macOS
+Python framework. So `assertSafeArchive` and `rejectNonRegularFiles` accept a link when
+`isSafeLinkTarget` accepts its target: relative, with no `..` part, no backslash, no NUL and no drive.
+The install record keeps each link as `link:<target>`, and every start compares it. The archives
+have no license file, so staging downloads `LICENSE` from the version tag and checks the pinned
+hash. `resolveKimiCli` refuses a CLI older than 1.52.0.
+
+Every Kimi process gets `KIMI_CLI_NO_AUTO_UPDATE=1` (`KIMI_ENV` in `provider-drivers.ts`). The ACP
+`authenticate` call of Kimi only checks the stored token, so Sign in runs `kimi login` and the code
+sign-in runs `kimi login --json`, which prints the device code as JSON lines (`deviceCodeEvent` in
+`cli-code-login.ts`). On macOS and Linux the code sign-in gets `BROWSER=true`, so the CLI does not
+open a browser on the host. On Windows the page can open on the host. Sign out runs `kimi logout`. `kimiStatePaths` lets a confined process write
+`KIMI_SHARE_DIR` (`~/.kimi`) and protects `config.toml`, `config.json`, `mcp.json`, `plugins`,
+`skills` and `bin` there, because every other Kimi process loads them. Kimi answers a lost session
+with `-32602` and `{ session_id: "Session not found" }`, which `KIMI_ACP_FLAVOR` reads as a missing
+session.
+
+Kimi CLI 1.52.0 has no ACP configuration options, so OpenBot changes the model with
+`session/set_model`. Kimi moves the session to the model, and then saves the model as its default in
+`config.toml`. A Workspace only Kimi process cannot write that file, and the save fails with `-32603`
+and the path in `data.details`. `AcpFlavor.modelSetUnsaved` reads that failure as a model change
+that applied. A Full access Kimi agent saves the model, so it becomes the default model of each new
+Kimi session, also in a terminal.
+
+No frozen Team API protocol knows `kimi`. The host hides Kimi agents, models, status, and sign-in
+state from peers below protocol 8, and `providers-v8` carries it.
+
 Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
 with their released provider vocabulary. The host filters OpenCode agents, models, status,
 sidebar references, and runtime events before encoding an older client's response. Requests for
@@ -753,6 +807,35 @@ provider and model pickers show the agent disabled, with "Update OpenBot to use 
 neutral `unknown` logo. They do not reset the agent. The model picker and the backup models leave
 out the models of that provider. Host types (`AgentProviderId`, the database, the drivers) stay
 closed.
+
+### Hermes
+
+The Hermes provider (id `hermes`) starts the user's own Hermes Agent with `hermes acp`. OpenBot has
+no managed runtime for it: a newer Hermes moves `state.db` and `config.yaml` in `~/.hermes` forward,
+and the user's own older Hermes then cannot read them. `resolveHermesCli` looks for `hermes` on
+`PATH` and in `~/.local/bin`, and reads the version from `Hermes Agent vX.Y.Z` in `hermes --version`.
+A missing CLI is `not-installed`, and the row opens the `hermes-install` guide. The process keeps
+the user's `HERMES_HOME` (or `~/.hermes`, `%LOCALAPPDATA%\hermes` on Windows), so the user's memories,
+skills, sign-ins and `SOUL.md` apply. `hermesStatePaths` lets a confined process write that folder
+and protects the Hermes code, `config.yaml`, `.env`, `SOUL.md`, skills, hooks, cron, plugins and
+profiles in it.
+
+Sign in runs `hermes auth add nous --type oauth`, the Nous Portal device-code login. Its first
+question imports shared Nous credentials, and EOF answers yes, so the code sign-in closes the CLI's
+input (`closeInput`). `parseCliCodePrompt` takes the `Open:` URL, not the `Portal:` URL that Hermes
+prints first. `signInFile` watches the change time of `auth.json`, so a `hermes setup` or `hermes
+auth` in a terminal ends a `sign-in-required` state. Models are `provider:model` ids with the name
+`<Provider> · <model>`; the picker groups them by provider. A `nous:` model counts as a
+subscription in analytics.
+
+Hermes 0.21.5 advertises `session/resume`, but a resume of a missing session makes a new session
+and the reply does not carry its id: each later prompt to the saved id would end as "refusal".
+`HERMES_ACP_FLAVOR.loadInsteadOfResume` restores with `session/load`, whose reply for a missing
+session is null, which the SDK gives as `{}`; a reply with no `modes` is a missing session.
+Hermes reads only one project context file: `.hermes.md` or `HERMES.md` before `AGENTS.md`. It
+reads project skills only in a git root that `skills.trusted_project_dirs` names. A turn that fails
+with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API
+protocols below 8 hide Hermes; protocol 8 and newer carry it as any other provider id.
 
 ### Custom agents
 
@@ -902,9 +985,13 @@ uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](ser
 
 ### Disconnect the own sign-in
 
-Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude and
-Codex (issue #3487). These drivers have an `accounts.signOut` command (`claude auth logout`,
-`codex logout`). `ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a
+Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude,
+Codex, Grok, Muse and Cursor (issue #3487). Claude and Codex have an `accounts.signOut` command
+(`claude auth logout`, `codex logout`), which also signs out an account folder before its removal.
+Grok, Muse and Cursor have a driver `signOut` (`grok logout`, `muse logout`, `cursor-agent logout`)
+for the own sign-in only. Muse offers it only on this computer with no OpenBot key saved
+(`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
+`ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a
 sign-in, and runs that command with no home variable, so it signs out the user's own home folder.
 On this computer a terminal CLI shares that folder and the macOS keychain item, so it signs out too;
 the confirmation says so. Then OpenBot stops the client and reports the provider signed out, as a
@@ -1027,8 +1114,10 @@ remain valid; the names are reserved only for new custom-agent creation.
 
 Optional `providers-v5` routes include the new runtimes and write-only provider keys.
 `agent-session-settings-v1` adds read, set, reset, and an agent-ID-only invalidation event.
-`acp-registry-v1` adds registry administration. Each administrative route checks the host role;
-clients hide unsupported controls. MCP-over-ACP transport is outside this change.
+`acp-registry-v1` adds registry administration. `custom-agents-v1` lists, adds, replaces and removes
+the host's custom agents with the parsers and change service of the local Settings; the trial start
+and the usage answers stay local. Each administrative route checks the host role; clients hide
+unsupported controls. MCP-over-ACP transport is outside this change.
 
 ## Local context indication
 

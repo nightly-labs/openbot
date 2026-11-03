@@ -6,6 +6,9 @@
 // server. The child's own identity is pinned at its first start: a later start that names another
 // key is refused, as for a joined server.
 //
+// `removedHostIds` names deleted servers that the account service can still list, because the
+// desktop app was signed out or offline when they were deleted. An earlier build ignores the field.
+//
 // Electron-free, with the cipher injected.
 
 import { readFile } from "node:fs/promises";
@@ -39,6 +42,7 @@ const storedLocalServerSchema = Schema.Struct({
 const registryFileSchema = Schema.Struct({
   version: Schema.Literal(1),
   servers: Schema.Array(storedLocalServerSchema),
+  removedHostIds: Schema.optional(Schema.Array(Schema.String)),
 });
 
 export type StoredLocalServer = typeof storedLocalServerSchema.Type;
@@ -53,6 +57,7 @@ const decodeRegistryFile = Schema.decodeUnknownSync(registryFileSchema);
 export class LocalServerRegistry {
   readonly #path: string;
   #servers: readonly StoredLocalServer[] = [];
+  #removedHostIds: readonly string[] = [];
   /** Set when the file exists and this build cannot read it. Every write is then refused. */
   #readOnly = false;
   readonly #writes = Semaphore.makeUnsafe(1);
@@ -63,6 +68,11 @@ export class LocalServerRegistry {
 
   get servers(): readonly StoredLocalServer[] {
     return this.#servers;
+  }
+
+  /** Deleted servers that the account service can still list. */
+  get removedHostIds(): readonly string[] {
+    return this.#removedHostIds;
   }
 
   get readOnly(): boolean {
@@ -90,6 +100,7 @@ export class LocalServerRegistry {
       catch: (cause) => new LocalServerRegistryError({ cause }),
     }).pipe(Effect.tapError(() => Effect.sync(() => (this.#readOnly = true))));
     this.#servers = file.servers;
+    this.#removedHostIds = file.removedHostIds ?? [];
   });
 
   find(id: string): StoredLocalServer | undefined {
@@ -113,12 +124,25 @@ export class LocalServerRegistry {
     return this.#write((servers) => servers.map((server) => (server.id === id ? { ...server, ...change } : server)));
   }
 
-  remove(id: string): Effect.Effect<void, LocalServerRegistryError> {
-    return this.#write((servers) => servers.filter((server) => server.id !== id));
+  /** `removedHostId` stays listed until the account service no longer has the server. */
+  remove(id: string, removedHostId: string | null = null): Effect.Effect<void, LocalServerRegistryError> {
+    return this.#write(
+      (servers) => servers.filter((server) => server.id !== id),
+      (removed) => (removedHostId === null || removed.includes(removedHostId) ? removed : [...removed, removedHostId]),
+    );
+  }
+
+  /** The account service no longer lists the server. */
+  forgetRemovedHost(hostId: string): Effect.Effect<void, LocalServerRegistryError> {
+    return this.#write(
+      (servers) => servers,
+      (removed) => removed.filter((candidate) => candidate !== hostId),
+    );
   }
 
   #write(
     change: (servers: readonly StoredLocalServer[]) => readonly StoredLocalServer[] | LocalServerRegistryError,
+    changeRemoved: (removedHostIds: readonly string[]) => readonly string[] = (removedHostIds) => removedHostIds,
   ): Effect.Effect<void, LocalServerRegistryError> {
     return this.#writes.withPermit(
       Effect.suspend(() => {
@@ -128,9 +152,17 @@ export class LocalServerRegistry {
           );
         const servers = change(this.#servers);
         if (servers instanceof LocalServerRegistryError) return Effect.fail(servers);
-        return writeJsonFileAtomically(this.#path, { version: 1, servers }, { createDirectory: true }).pipe(
+        const removedHostIds = changeRemoved(this.#removedHostIds);
+        // An empty list is left out, so a file with no deleted server stays as an earlier build writes it.
+        const file = removedHostIds.length ? { version: 1, servers, removedHostIds } : { version: 1, servers };
+        return writeJsonFileAtomically(this.#path, file, { createDirectory: true }).pipe(
           Effect.mapError(({ cause }) => new LocalServerRegistryError({ cause })),
-          Effect.tap(() => Effect.sync(() => (this.#servers = servers))),
+          Effect.tap(() =>
+            Effect.sync(() => {
+              this.#servers = servers;
+              this.#removedHostIds = removedHostIds;
+            }),
+          ),
         );
       }),
     );

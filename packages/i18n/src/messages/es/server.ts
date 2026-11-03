@@ -200,6 +200,8 @@ export const messages = {
   "server.rail.restart": "Reiniciar servidor",
   "server.rail.leave": "Abandonar servidor",
   "server.rail.delete": "Eliminar servidor",
+  "server.rail.hide": "Ocultar servidor",
+  "server.rail.showLocal": "Mostrar {name}",
   "server.select.failedTitle": "No se pudo seleccionar el servidor",
   "server.select.failedDescription": "No se pudo cambiar de servidor. Inténtalo de nuevo.",
   "server.select.openAgentFailed": "No se pudo abrir {name}. Búscalo en la barra lateral.",
@@ -301,13 +303,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Ve y controla este Mac desde otro equipo.",
   "server.settings.later": "Más tarde",
   "server.settings.setUp": "Configurar",
-  "server.settings.notifications": "Notificaciones",
-  "server.settings.muteNotifications": "Silenciar notificaciones",
-  "server.settings.muteDescription":
-    "Detén las notificaciones de escritorio, los sonidos y las actualizaciones en la muesca del MacBook de este servidor.",
-  "server.settings.mutedUntilDescription": "{until}. Desactiva para volver a recibir notificaciones ahora.",
-  "server.settings.notifyAbout": "Notificarme sobre",
-  "server.settings.notifyAboutDescription": "Qué eventos de los agentes muestran una notificación de escritorio.",
   "server.settings.agents": "Agentes",
   "server.settings.timezone": "Zona horaria",
   "server.settings.timezoneDescription":
@@ -338,6 +333,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "La clave actual y la nueva firman un traspaso. Las apps de los miembros cambian a la nueva clave cuando se vuelven a conectar. Hazlo si el archivo de la clave se copió o quedó expuesto.",
   "server.settings.hostKeyRotated": "Clave del servidor cambiada",
+  "server.settings.hostKeyChanged": "Último cambio",
+  "server.settings.hostKeyChangedDescription": "{date}. La clave anterior y la clave nueva firmaron este cambio.",
   "server.settings.hostKeyLocalOnly": "Aquí solo el servidor de este ordenador puede cambiar su clave.",
   "server.settings.removeTitle": "Eliminar servidor",
   "server.settings.removeDescription":

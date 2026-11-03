@@ -20,7 +20,8 @@ const RESET_GRACE_MS = 30_000;
 
 /**
  * How long a model that failed a turn with a provider error is passed over, so an agent on a backup
- * does not go back to a model that still fails at once. A provider error names no reset.
+ * does not go back to a model that still fails at once. An error that names a later reset, such as
+ * a spent Gemini quota, holds the model until that reset (#4583).
  */
 const PROVIDER_FAILURE_HOLD_MS = 10 * 60_000;
 
@@ -56,6 +57,8 @@ export interface UsageLimitKey {
 }
 
 interface ProviderFailure extends UsageLimitKey {
+  /** Epoch milliseconds when the hold ends. */
+  endsAt: number;
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -80,7 +83,9 @@ interface UsageLimit extends UsageLimitKey {
  *
  * The entry ends at the reported reset, after a usage read that finds no spent window, or when a
  * turn on that provider and model completes. It is kept in memory only: after a restart the first
- * refused turn closes the gate again.
+ * refused turn closes the gate again. A message from the user lets its agent try one turn before
+ * that: the user can have signed the provider in to another account, or bought more usage, and no
+ * reading shows that before the reset.
  *
  * It also owns the models that failed a turn with a provider error. They hold no queue: they only
  * move agents set to switch without asking to a backup, and keep them there for a while.
@@ -94,6 +99,8 @@ export class UsageLimitGate {
   /** Providers the user was told about in this limit, so a limit that closes again is not announced twice. */
   readonly #announced = new Set<AgentProvider>();
   readonly #failures = new Map<string, ProviderFailure>();
+  /** The agents that may start one turn while their limit holds, with that limit's key. */
+  readonly #tries = new Map<string, string>();
 
   constructor(options: UsageLimitGateOptions) {
     this.#store = options.store;
@@ -103,6 +110,32 @@ export class UsageLimitGate {
   mayDrain(agentId: string): boolean {
     const agent = this.#agent(agentId);
     return !agent || !this.#limits.has(limitKey(providerForAgent(agent), accountOf(agent), agent.model));
+  }
+
+  /**
+   * The user sent this agent a message while a limit holds it, so the agent may start one turn. The
+   * try ends when that turn starts: a refused turn queues its messages again, and a completed one
+   * ends the limit.
+   */
+  retry(agentId: string): void {
+    const agent = this.#agent(agentId);
+    if (!agent) return;
+    const key = limitKey(providerForAgent(agent), accountOf(agent), agent.model);
+    if (this.#limits.has(key)) this.#tries.set(agentId, key);
+  }
+
+  /** Whether the agent may start a turn that its limit holds, because the user sent it a message. */
+  mayTry(agentId: string): boolean {
+    const agent = this.#agent(agentId);
+    return (
+      agent !== undefined &&
+      this.#tries.get(agentId) === limitKey(providerForAgent(agent), accountOf(agent), agent.model)
+    );
+  }
+
+  /** A turn of this agent starts, so a try that let it start ends. */
+  tryStarted(agentId: string): void {
+    this.#tries.delete(agentId);
   }
 
   /** Whether a limit holds this provider account and model. */
@@ -127,9 +160,9 @@ export class UsageLimitGate {
   /**
    * A provider error failed a turn of this agent on `model`, the agent's current model when null.
    * The model is passed over until the hold ends or a turn on it completes. Then the agents that
-   * left it go back.
+   * left it go back. `resetDelayMs` is the wait until the reset that the error names, when it names one.
    */
-  failed(agentId: string, model: string | null = null): void {
+  failed(agentId: string, model: string | null = null, resetDelayMs: number | null = null): void {
     const agent = this.#agent(agentId);
     if (!agent) return;
     const provider = providerForAgent(agent);
@@ -138,15 +171,28 @@ export class UsageLimitGate {
     const key = limitKey(provider, accountId, turnModel);
     const previous = this.#failures.get(key);
     if (previous) clearTimeout(previous.timer);
+    // A later error with no reset, such as from another agent on the same model, keeps the named reset.
+    const hold = Math.max(PROVIDER_FAILURE_HOLD_MS, (resetDelayMs ?? 0) + RESET_GRACE_MS);
+    const endsAt = Math.max(previous?.endsAt ?? 0, Date.now() + hold);
     this.#failures.set(key, {
       provider,
       accountId,
       model: turnModel,
-      timer: setTimeout(
-        () => Effect.runFork(this.#releaseFailure(key).pipe(Effect.forkIn(this.#scope))),
-        PROVIDER_FAILURE_HOLD_MS,
-      ),
+      endsAt,
+      timer: this.#armFailure(key, endsAt),
     });
+  }
+
+  /** Releases the failure at `endsAt`. A wait longer than `MAX_TIMER_MS` is armed again when it fires. */
+  #armFailure(key: string, endsAt: number): ReturnType<typeof setTimeout> {
+    return setTimeout(
+      () => {
+        const failure = this.#failures.get(key);
+        if (failure && failure.endsAt > Date.now()) failure.timer = this.#armFailure(key, failure.endsAt);
+        else Effect.runFork(this.#releaseFailure(key).pipe(Effect.forkIn(this.#scope)));
+      },
+      Math.min(MAX_TIMER_MS, endsAt - Date.now()),
+    );
   }
 
   /** The agents whose queue a limit holds, for the runtime snapshot. */
@@ -247,6 +293,7 @@ export class UsageLimitGate {
     this.#limits.clear();
     for (const failure of this.#failures.values()) clearTimeout(failure.timer);
     this.#failures.clear();
+    this.#tries.clear();
     this.#announced.clear();
     yield* Scope.close(this.#scope, Exit.void);
     this.#scope = Scope.makeUnsafe();
@@ -336,6 +383,7 @@ export class UsageLimitGate {
     if (!limit) return;
     if (limit.timer) clearTimeout(limit.timer);
     this.#limits.delete(key);
+    for (const [agentId, tryKey] of this.#tries) if (tryKey === key) this.#tries.delete(agentId);
     if (reset && ![...this.#limits.values()].some((other) => other.provider === limit.provider))
       this.#announced.delete(limit.provider);
     this.#hooks.emitRuntimeSnapshot();

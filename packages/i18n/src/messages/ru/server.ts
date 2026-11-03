@@ -204,6 +204,8 @@ export const messages = {
   "server.rail.restart": "Перезапустить сервер",
   "server.rail.leave": "Покинуть сервер",
   "server.rail.delete": "Удалить сервер",
+  "server.rail.hide": "Скрыть сервер",
+  "server.rail.showLocal": "Показать {name}",
   "server.select.failedTitle": "Не удалось выбрать сервер",
   "server.select.failedDescription": "Не удалось переключить сервер. Повторите попытку.",
   "server.select.openAgentFailed": "Не удалось открыть {name}. Найдите его на боковой панели.",
@@ -305,13 +307,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Просматривайте этот Mac и управляйте им с другого компьютера.",
   "server.settings.later": "Позже",
   "server.settings.setUp": "Настроить",
-  "server.settings.notifications": "Уведомления",
-  "server.settings.muteNotifications": "Отключить уведомления",
-  "server.settings.muteDescription":
-    "Прекратить уведомления на рабочем столе, звуки и обновления в вырезе MacBook от этого сервера.",
-  "server.settings.mutedUntilDescription": "{until}. Выключите, чтобы включить уведомления сейчас.",
-  "server.settings.notifyAbout": "Уведомлять о",
-  "server.settings.notifyAboutDescription": "Какие события агентов показывают уведомление на рабочем столе.",
   "server.settings.agents": "Агенты",
   "server.settings.timezone": "Часовой пояс",
   "server.settings.timezoneDescription":
@@ -347,6 +342,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "Текущий и новый ключи подписывают передачу. Приложения участников перейдут на новый ключ при следующем подключении. Сделайте это, если файл ключа был скопирован или раскрыт.",
   "server.settings.hostKeyRotated": "Ключ сервера изменён",
+  "server.settings.hostKeyChanged": "Последнее изменение",
+  "server.settings.hostKeyChangedDescription": "{date}. Предыдущий и новый ключи подписали это изменение.",
   "server.settings.hostKeyLocalOnly": "Здесь ключ может сменить только сервер на этом компьютере.",
   "server.settings.removeTitle": "Удалить сервер",
   "server.settings.removeDescription":

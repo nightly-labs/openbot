@@ -1,4 +1,4 @@
-import type { BillingPlanId } from "@openbot/contracts/billing";
+import { type BillingPlanId, siteLimitForPlan } from "@openbot/contracts/billing";
 import type { HostedServerCatalogPlan, HostedServerList, HostedServerSummary } from "@openbot/contracts/hosted-servers";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { skipToken, useQuery } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
+import { LocalServerOptions } from "@/features/servers/components/local-server-options";
 import { rememberHostedServer, useHostedServerAvailability } from "@/features/servers/model/hosted-server-availability";
 import { hostedServerInSetup } from "@/features/servers/model/hosted-server-plans";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -142,6 +143,7 @@ function PlansReady({
 
       {showPlans ? <ComputerSteps /> : null}
 
+      <LocalServerOptions pathname="/hosted-server/local" />
       <OtherOptions />
     </>
   );
@@ -331,6 +333,8 @@ function PlanRow({ plan, current }: { plan: HostedServerCatalogPlan; current: bo
   const facts = t("mobile.server.hosted.planFacts", {
     members: t("mobile.server.hosted.members", { count: plan.memberLimit }),
     storage: t("mobile.server.hosted.storage", { count: plan.diskGb }),
+    // The catalog does not send the site limit, so it comes from the plan.
+    sites: t("mobile.server.hosted.sites", { count: siteLimitForPlan(plan.id) }),
     speed:
       plan.relativeSpeed === 1
         ? t("mobile.server.hosted.speedBase")

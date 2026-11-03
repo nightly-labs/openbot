@@ -19,14 +19,15 @@ import {
   type TeamProtocolV2RpcFrame,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol/v2";
-import { decodeTeamProtocolSupportV7Base } from "@openbot/contracts/team-protocol/v7-base";
 import {
   decodeTeamProtocolV8CurrentEvent,
-  decodeTeamProtocolV8WebRtcHttpResponse,
   encodeTeamProtocolV8WebRtcHttpRequest,
 } from "@openbot/contracts/team-protocol/v8-webrtc-adapter";
+import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
+import { decodeTeamProtocolV9WebRtcHttpResponse } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
+import { type RemoteRequestProfile, startRemoteRequest } from "@openbot/team-client/sync-profile";
 import { Context, Deferred, Effect, Fiber, Layer, Result, Schema } from "effect";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 import type { RemoteConnectionBootstrap } from "./central-auth-manager";
@@ -38,7 +39,12 @@ import type {
 } from "./central-auth-records";
 import type { RemoteConnectTrace } from "./remote-connect-trace";
 import { transportFailure } from "./remote-server-connection-status";
-import { RemoteWorkflowError, remoteDecode, toRemoteWorkflowError } from "./remote-service-effects";
+import {
+  type RemoteFileProgress,
+  RemoteWorkflowError,
+  remoteDecode,
+  toRemoteWorkflowError,
+} from "./remote-service-effects";
 import type { RemoteSessionCache } from "./remote-session-cache";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
@@ -108,6 +114,12 @@ interface TeamWebRtcClientTransportOptions {
    * `stop` leaves the sessions open for that start instead of ending them.
    */
   sessionCache?: RemoteSessionCache;
+  /**
+   * Development only (`OPENBOT_DEV_RTT_MS`, 0 in a packaged app): an added network round trip, to
+   * measure a connect on a real network. Each data-channel message waits half of it in each
+   * direction, and each account service read waits all of it. The Signal socket does not wait.
+   */
+  developmentRoundTripMs?: number;
 }
 
 interface ActiveHost {
@@ -183,6 +195,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       resolve: (value: TeamProtocolV2Json) => void;
       reject: (error: Error) => void;
       timer: ReturnType<typeof setTimeout>;
+      profile: RemoteRequestProfile | null;
     }
   >();
   readonly #lastEventSequence = new Map<string, number>();
@@ -194,13 +207,23 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
 
   constructor(options: TeamWebRtcClientTransportOptions) {
     super();
-    this.#options = options;
+    const roundTrip = options.developmentRoundTripMs ?? 0;
+    const half = roundTrip / 2;
+    this.#options =
+      roundTrip > 0
+        ? {
+            ...options,
+            listHosts: () => Effect.delay(options.listHosts(), roundTrip),
+            startSession: (hostId) => Effect.delay(options.startSession(hostId), roundTrip),
+            issueTicket: (sessionId, key) => Effect.delay(options.issueTicket(sessionId, key), roundTrip),
+          }
+        : options;
     this.#platform = Layer.succeed(
       TeamClientBridge,
       TeamClientBridge.of({
         start: () => options.bridge.start(),
         prepareSignal: (peerId, signalUrl) => options.bridge.prepareSignal(peerId, signalUrl),
-        send: (...args) => options.bridge.send(...args),
+        send: (...args) => (half > 0 ? Effect.delay(options.bridge.send(...args), half) : options.bridge.send(...args)),
         connect: (...args) => options.bridge.connect(...args),
         disconnect: (hostId) => options.bridge.disconnect(hostId),
       }),
@@ -213,7 +236,10 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     );
     options.bridge.on("connected", this.#onConnected);
     options.bridge.on("disconnected", this.#onDisconnected);
-    options.bridge.on("data", this.#onData);
+    options.bridge.on(
+      "data",
+      half > 0 ? (...args) => void setTimeout(() => this.#onData(...args), half) : this.#onData,
+    );
     options.bridge.on("path", this.#onPath);
     options.bridge.on("error", this.#onError);
     options.bridge.on("signalReady", this.#onSignalReady);
@@ -433,6 +459,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       preserveSemanticTags?: boolean | undefined;
       agentCreateModel?: boolean | undefined;
       timeoutMs?: number | undefined;
+      fileProgress?: RemoteFileProgress | undefined;
+      /** Gets the bytes of a binary body that the host confirmed. */
+      uploadProgress?: ((sent: number, total: number) => void) | undefined;
     } = {},
   ): Effect.fn.Return<
     {
@@ -442,6 +471,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     },
     RemoteWorkflowError
   > {
+    // Set once the frame exists; `bun run perf:remote` reads it. Null when nothing records.
+    let profile: RemoteRequestProfile | null = null;
     return yield* this.#owned(
       Effect.gen({ self: this }, function* () {
         yield* this.#ensureConnected(hostId);
@@ -466,6 +497,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
               name: "upload",
               mimeType: init.contentType ?? "application/octet-stream",
               bytes: binary,
+              onProgress: init.uploadProgress,
             })
           : null;
         const requestId = crypto.randomUUID();
@@ -503,17 +535,29 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         // that the host closed. Connect again and send the same frame once. An upload stays on the
         // connection that carried its body. Only the connection that refused the frame is marked
         // lost: a request that fails late must not drop the connection another request just made.
+        profile = startRemoteRequest(method, path, frame);
         const refusedBy = this.#active.get(hostId);
-        const envelope = yield* this.#exchange(hostId, requestId, frame, remainingMs).pipe(
+        // The host sends the file before the answer that names it. A stopped request refuses the file.
+        const progress = init.fileProgress;
+        const watch = progress ? this.#files.watchIncoming(hostId, progress.size, progress.onProgress) : null;
+        const envelope = yield* this.#exchange(hostId, requestId, frame, profile, remainingMs).pipe(
           Effect.catchIf(
             (error) => !bodyTransferId && isClosedChannelError(error.cause),
             () =>
               Effect.gen({ self: this }, function* () {
                 if (refusedBy?.connected && this.#active.get(hostId) === refusedBy) this.#onDisconnected(hostId);
                 yield* this.#ensureConnected(hostId);
-                return yield* this.#exchange(hostId, requestId, frame, timeoutMs);
+                return yield* this.#exchange(hostId, requestId, frame, profile, timeoutMs);
               }),
           ),
+          Effect.onInterrupt(() => watch?.stop ?? Effect.void),
+          Effect.onError(() => Effect.sync(() => watch?.end(null))),
+        );
+        // The answer names the file of this request. The watch removes the other files that it took.
+        watch?.end(
+          isDynamicRecord(envelope) && isDynamicRecord(envelope.file) && isString(envelope.file.transferId)
+            ? envelope.file.transferId
+            : null,
         );
         if (!isDynamicRecord(envelope) || !isNumber(envelope.status) || !Object.hasOwn(envelope, "body")) {
           return yield* new RemoteWorkflowError({
@@ -537,7 +581,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     channelAttention: true,
                     agentTaskUiBlocks: true,
                   })
-                : decodeTeamProtocolV8WebRtcHttpResponse(method, path, status, envelope.body),
+                : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body),
             ).pipe(
               Effect.mapError(
                 () =>
@@ -551,11 +595,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
               ),
             );
         if (method === "GET" && path === "/v1/compatibility" && status === 200) {
-          const support = yield* remoteDecode(() => decodeTeamProtocolSupportV7Base(body));
+          const support = yield* remoteDecode(() => decodeTeamProtocolSupportV9(body));
           this.#hostProtocols.set(hostId, support.protocol.maximum);
         }
         return { status: envelope.status, body, ...(file ? { file } : {}) };
-      }),
+      }).pipe(Effect.onExit((exit) => Effect.sync(() => profile?.end(exit)))),
     );
   }).bind(this);
 
@@ -592,6 +636,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     hostId: string,
     requestId: string,
     frame: string,
+    profile: RemoteRequestProfile | null,
     timeoutMs = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS,
   ): Effect.fn.Return<TeamProtocolV2Json, RemoteWorkflowError, TeamClientBridge> {
     const result = Deferred.makeUnsafe<TeamProtocolV2Json, RemoteWorkflowError>();
@@ -606,7 +651,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         this.#pending.delete(requestId);
         reject(new TeamWebRtcRequestError(504, "remote_timeout", sourceText("error.remote.requestTimeout")));
       }, timeoutMs);
-      this.#pending.set(requestId, { hostId, resolve, reject, timer });
+      this.#pending.set(requestId, { hostId, resolve, reject, timer, profile });
     }
     // The cleanup covers the send too: an interrupted send must not leave the entry and its timer.
     return yield* Effect.gen({ self: this }, function* () {
@@ -1320,6 +1365,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     }
     const pending = this.#pending.get(frame.requestId);
     if (!pending || pending.hostId !== hostId) return;
+    pending.profile?.responded(data);
     clearTimeout(pending.timer);
     this.#pending.delete(frame.requestId);
     if ("error" in frame) {

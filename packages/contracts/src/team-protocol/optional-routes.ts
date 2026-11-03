@@ -6,16 +6,23 @@ import type { OptionalRouteCodec } from "./admin-wire";
 import { AGENT_ACCESS_CODECS } from "./agent-access-v1";
 import { AGENT_ADMIN_CODECS } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CODECS } from "./agent-backup-models-v1";
+import { AGENT_FAST_MODE_CODECS } from "./agent-fast-mode-v1";
+import { AGENT_FOLDERS_CODECS } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CODECS } from "./agent-hidden-v1";
 import { AGENT_HOST_SETTINGS_CODECS } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_CODECS } from "./agent-import-v1";
 import { AGENT_INSTALL_CODECS } from "./agent-install-v1";
+import { AGENT_INSTRUCTIONS_CODECS } from "./agent-instructions-v1";
 import { AGENT_MEMORIES_CODECS } from "./agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CODECS } from "./agent-memory-limit-v1";
+import { AGENT_NEW_CHAT_CODECS } from "./agent-new-chat-v1";
+import { AGENT_NOTIFICATION_LEVELS_CODECS } from "./agent-notification-levels-v1";
+import { AGENT_PLAN_CARD_CODECS } from "./agent-plan-card-v1";
 import { AGENT_PUBLISH_CODECS } from "./agent-publish-v1";
 import { AGENT_SESSION_SETTINGS_CODECS } from "./agent-session-settings-v1";
 import { AGENT_TASK_LIMIT_CODECS } from "./agent-task-limit-v1";
 import { AGENT_TASKS_CODECS } from "./agent-tasks-v1";
+import { AGENT_THREAD_BRANCHES_CODECS } from "./agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CODECS } from "./agent-thread-files-v1";
 import { AGENT_THREAD_READS_CODECS } from "./agent-thread-reads-v1";
 import { AGENT_THREADS_CODECS } from "./agent-threads-v1";
@@ -27,12 +34,16 @@ import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
 import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
 import { CONNECTORS_CODECS } from "./connectors-v1";
+import { CONTEXT_COMPACT_CODECS } from "./context-compact-v1";
 import { CONTEXT_RESET_CODECS } from "./context-reset-v1";
 import { CONVERSATION_FILE_SEARCH_CODECS } from "./conversation-file-search-v1";
+import { CUSTOM_AGENTS_CODECS } from "./custom-agents-v1";
+import { CUSTOM_PROVIDER_HARNESS_CODECS } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CODECS } from "./discord-access-v1";
 import { EVENTS_CODECS } from "./events-v1";
 import { FOCUS_USE_CODECS } from "./focus-use-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
+import { HOST_KEY_ROTATION_CODECS } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CODECS } from "./host-member-update-v1";
 import { HOST_RELEASE_CODECS } from "./host-release-v1";
 import { HOST_TIMEZONE_CODECS } from "./host-timezone-v1";
@@ -40,6 +51,7 @@ import { HOST_UPDATE_CODECS } from "./host-update-v1";
 import { HOSTED_SITES_CODECS } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CODECS } from "./instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CODECS } from "./live-activity-push-v1";
+import { LOCAL_SERVERS_CODECS } from "./local-servers-v1";
 import { MACHINE_RESOURCES_CODECS } from "./machine-resources-v1";
 import { MCP_SIGN_IN_APP_CODECS } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CODECS } from "./mcp-sign-in-v1";
@@ -64,8 +76,11 @@ import { PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-v1";
 import { ROUTINE_FLOWS_CODECS } from "./routine-flows-v1";
 import { ROUTINE_RECOVERY_CODECS } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CODECS } from "./routine-results-v1";
+import { SERVER_AUDIT_CODECS } from "./server-audit-v1";
 import { SHARED_TABLES_CODECS } from "./shared-tables-v1";
 import { SIDE_QUESTION_CODECS } from "./side-question-v1";
+import { SIDEBAR_FOLDERS_CODECS } from "./sidebar-folders-v1";
+import { SIDEBAR_PINS_CODECS } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_CODECS } from "./sign-in-relay-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
 import { STORAGE_DISK_CODECS } from "./storage-disk-v1";
@@ -73,6 +88,7 @@ import { VAULT_IMPORT_CODECS } from "./vault-import-v1";
 import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
 import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
+import { WORKFLOWS_GITHUB_CODECS } from "./workflows-github-v1";
 import { WORKFLOWS_CODECS } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CODECS } from "./workspace-directory-v1";
 
@@ -91,14 +107,19 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDERS_V4_CODECS,
   ...PROVIDERS_V5_CODECS,
   ...PROVIDERS_V8_CODECS,
+  ...CUSTOM_PROVIDER_HARNESS_CODECS,
+  ...CUSTOM_AGENTS_CODECS,
   ...AGENT_SESSION_SETTINGS_CODECS,
   ...ACP_REGISTRY_CODECS,
   ...HOST_ADMIN_CODECS,
   ...HOST_UPDATE_CODECS,
   ...HOST_TIMEZONE_CODECS,
+  ...HOST_KEY_ROTATION_CODECS,
+  ...LOCAL_SERVERS_CODECS,
   ...AGENT_MEMORY_LIMIT_CODECS,
   ...MEMORY_REVIEW_CODECS,
   ...PROMPT_CACHE_TTL_CODECS,
+  ...SERVER_AUDIT_CODECS,
   ...PROVIDER_DEFAULT_CODECS,
   ...DISCORD_ACCESS_CODECS,
   ...HOST_RELEASE_CODECS,
@@ -116,6 +137,11 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_HOST_SETTINGS_CODECS,
   ...AGENT_BACKUP_MODELS_CODECS,
   ...AGENT_TASK_LIMIT_CODECS,
+  ...AGENT_NEW_CHAT_CODECS,
+  ...AGENT_FOLDERS_CODECS,
+  ...AGENT_FAST_MODE_CODECS,
+  ...CONTEXT_COMPACT_CODECS,
+  ...AGENT_INSTRUCTIONS_CODECS,
   ...MCP_SIGN_IN_CODECS,
   ...PROVIDER_HOST_SIGN_IN_CODECS,
   ...MCP_SIGN_IN_APP_CODECS,
@@ -138,6 +164,9 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...BITWARDEN_CONNECTOR_CODECS,
   ...AGENT_ACCESS_CODECS,
   ...AGENT_HIDDEN_CODECS,
+  ...AGENT_NOTIFICATION_LEVELS_CODECS,
+  ...SIDEBAR_PINS_CODECS,
+  ...AGENT_PLAN_CARD_CODECS,
   ...BROWSER_USER_CONTROL_CODECS,
   ...BROWSER_PAGE_STATE_CODECS,
   ...BROWSER_SIGN_IN_CODECS,
@@ -145,9 +174,12 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_THREADS_CODECS,
   ...AGENT_THREAD_READS_CODECS,
   ...AGENT_THREAD_FILES_CODECS,
+  ...AGENT_THREAD_BRANCHES_CODECS,
   ...SIDE_QUESTION_CODECS,
   ...BROWSER_PROFILES_CODECS,
   ...WORKFLOWS_CODECS,
+  ...WORKFLOWS_GITHUB_CODECS,
+  ...SIDEBAR_FOLDERS_CODECS,
   ...VAULT_CODECS,
   ...BROWSER_SECRET_VAULT_CODECS,
   ...VAULT_IMPORT_CODECS,

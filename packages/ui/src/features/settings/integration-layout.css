@@ -74,6 +74,13 @@
   align-items: center;
 }
 
+/* A mark after the name, such as a shield, sits on the name's centre line. */
+.integration-detail-name {
+  display: inline-flex;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+}
+
 .integration-detail-actions {
   display: flex;
   flex: none;

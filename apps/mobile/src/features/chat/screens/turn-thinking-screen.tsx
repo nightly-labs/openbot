@@ -1,10 +1,13 @@
+import type { AgentTasksSnapshot, ConversationSnapshot } from "@openbot/contracts/ipc";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
+import { HeaderHeightContext } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
 import Puzzle from "lucide-react-native/icons/puzzle";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { type NativeScrollEvent, type NativeSyntheticEvent, View } from "react-native";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, View } from "react-native";
 import type { KeyboardAwareScrollViewRef } from "react-native-keyboard-controller";
 import Animated, {
   Easing,
@@ -15,10 +18,13 @@ import Animated, {
   withDelay,
   withTiming,
 } from "react-native-reanimated";
+import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { useReducedMotion } from "@/shared/lib/motion";
+import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { ChatMarkdown } from "../components/chat-markdown";
 import { turnDuration } from "../components/chat-turn-steps-row";
@@ -138,17 +144,11 @@ function TimelineStep({
 }
 
 /**
- * Each thought of one turn in full, with the progress lines between them, in the order they came.
- * While the turn runs, the sheet shows new text as it comes and keeps the newest text in view,
- * until the reader scrolls up. "Latest" then goes back to it.
+ * The messages and the running turn of the agent's chat, or of one thread with `taskId`. The thread
+ * screen under the sheet loads the thread and keeps it current, so the sheet only reads its cache.
  */
-export function TurnThinkingScreen() {
-  const text = useText();
-  const { t } = text;
-  const params = useLocalSearchParams<{ agentId: string; turnId: string }>();
-  const agentId = firstParam(params.agentId) ?? "";
-  const turnId = firstParam(params.turnId) ?? "";
-  const agent = useMobileWorkspaceSelector((current) => current.agents.find((candidate) => candidate.id === agentId));
+function useTurnConversation(agentId: string, serverId: string, taskId: string | undefined) {
+  const queryScope = useQueryScope();
   const conversationStore = useMobileWorkspaceSelector((current) => current.conversationStore);
   const subscribe = useCallback(
     (notify: () => void) => conversationStore.subscribe(agentId, notify),
@@ -158,11 +158,46 @@ export function TurnThinkingScreen() {
     subscribe,
     useCallback(() => conversationStore.get(agentId), [agentId, conversationStore]),
   );
-  const messages = conversation?.messages ?? NO_MESSAGES;
-  const lines = useTurnStepLines(agent?.serverId ?? "")[turnId];
+  const taskConversation = useQuery<ConversationSnapshot>({
+    queryKey: queryKeys.agentTaskConversation(queryScope, serverId, taskId ?? ""),
+    queryFn: skipToken,
+  });
+  const tasks = useQuery<AgentTasksSnapshot>({
+    queryKey: queryKeys.agentTasks(queryScope, serverId, agentId),
+    queryFn: skipToken,
+  });
+  if (taskId === undefined)
+    return { messages: conversation?.messages ?? NO_MESSAGES, activeTurnId: conversation?.activeTurnId ?? null };
+  return {
+    messages: taskConversation.data?.messages ?? NO_MESSAGES,
+    activeTurnId: tasks.data?.tasks.find((task) => task.id === taskId)?.activeTurnId ?? null,
+  };
+}
+
+/**
+ * Each thought of one turn in full, with the progress lines between them, in the order they came.
+ * While the turn runs, the sheet shows new text as it comes and keeps the newest text in view,
+ * until the reader scrolls up. "Latest" then goes back to it.
+ */
+export function TurnThinkingScreen() {
+  const text = useText();
+  const { t } = text;
+  const params = useLocalSearchParams<{ agentId: string; turnId: string; serverId?: string; taskId?: string }>();
+  const agentId = firstParam(params.agentId) ?? "";
+  const turnId = firstParam(params.turnId) ?? "";
+  const taskId = firstParam(params.taskId);
+  const serverParam = firstParam(params.serverId);
+  const agent = useMobileWorkspaceSelector((current) =>
+    current.agents.find(
+      (candidate) => candidate.id === agentId && (serverParam === undefined || candidate.serverId === serverParam),
+    ),
+  );
+  const serverId = serverParam ?? agent?.serverId ?? "";
+  const { messages, activeTurnId } = useTurnConversation(agentId, serverId, taskId);
+  const lines = useTurnStepLines(serverId)[turnId];
   const steps = useMemo(() => turnThinkingSteps(messages, turnId, lines), [messages, turnId, lines]);
   const times = useMemo(() => turnTimes(messages, turnId), [messages, turnId]);
-  const running = conversation?.activeTurnId === turnId;
+  const running = activeTurnId === turnId;
   const elapsed = useElapsedSeconds(times?.startedAt ?? null, running);
   const seconds = running ? elapsed : times ? Math.round((times.endedAt - times.startedAt) / 1000) : null;
   const reducedMotion = useReducedMotion();
@@ -177,19 +212,44 @@ export function TurnThinkingScreen() {
     following.current = atEnd;
     if (atEnd) setBehind(false);
   }, []);
+  // iOS `scrollToEnd` sets an offset of 0 when the content is shorter than the sheet, and that puts
+  // the content under the transparent header. Content that fits below the header stays where the
+  // inset puts it. The sheet and the content can measure in either order, so both run the same check.
+  const headerHeight = useContext(HeaderHeightContext) ?? 0;
+  // iOS: the transparent header covers the top of the sheet. Android: the header is above the sheet.
+  const coveredTop = isIOS ? headerHeight : 0;
+  const viewportHeight = useRef(0);
+  const contentHeight = useRef(0);
   // A finished turn opens at its first thought. A running turn opens at its newest text.
   const opened = useRef(false);
-  const onContentSizeChange = useCallback(() => {
-    const first = !opened.current;
-    if (first) {
-      opened.current = true;
-      following.current = running;
-    }
-    if (!running) return;
-    // The first scroll puts the sheet at the end at once. After it, a new step slides into view.
+  const placed = useRef(false);
+  const follow = useCallback(() => {
+    if (!running || viewportHeight.current === 0 || contentHeight.current === 0) return;
+    // The first measured pass puts the sheet at the end at once. After it, a new step slides into view.
+    const first = !placed.current;
+    placed.current = true;
+    if (contentHeight.current <= viewportHeight.current - coveredTop) return;
     if (following.current) scroll.current?.scrollToEnd({ animated: !first && !reducedMotion });
     else setBehind(true);
-  }, [running, reducedMotion]);
+  }, [running, reducedMotion, coveredTop]);
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      viewportHeight.current = event.nativeEvent.layout.height;
+      if (following.current) follow();
+    },
+    [follow],
+  );
+  const onContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      contentHeight.current = height;
+      if (!opened.current) {
+        opened.current = true;
+        following.current = running;
+      }
+      follow();
+    },
+    [running, follow],
+  );
   const toLatest = useCallback(() => {
     following.current = true;
     setBehind(false);
@@ -210,7 +270,7 @@ export function TurnThinkingScreen() {
     : stepCount;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} onLayout={onLayout}>
       <Stack.Screen options={{ title }} />
       <SheetScrollView
         scrollRef={scroll}

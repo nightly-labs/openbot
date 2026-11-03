@@ -1,3 +1,4 @@
+import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { ConfirmDialog } from "@openbot/ui";
 import { Marketplace } from "@openbot/ui/features/marketplace/Marketplace";
 import type { MarketplaceApp } from "@openbot/ui/features/marketplace/marketplace-model";
@@ -30,6 +31,13 @@ export interface MarketplaceModalProps extends MarketplaceControllerProps {
    * a second link to the same listing reads as a new request instead of no change.
    */
   onInitialPluginSlugConsumed?: (() => void) | undefined;
+  /**
+   * The agent or skill a Marketplace link names. The page opens on its listing when the catalog has
+   * it; a link never adds, so the user still decides on the page.
+   */
+  initialListing?: MarketplaceListingLink | undefined;
+  /** Runs after the modal consumes `initialListing`, as `onInitialPluginSlugConsumed` does. */
+  onInitialListingConsumed?: (() => void) | undefined;
 }
 
 /** The Marketplace on this computer's or a joined server's data, with the dialogs it opens. */
@@ -82,6 +90,32 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
     },
   );
 
+  /* A newer link, or a close, drops the answer to an older one. */
+  let listingRequest = 0;
+  createEffect(
+    () => (props.open ? props.initialListing : undefined),
+    (link) => {
+      // The owner clears the link when it is consumed, and that run must keep the answer it waits for.
+      if (!link) return;
+      listingRequest += 1;
+      const request = listingRequest;
+      // A link replaces the page on screen, as a plugin link does.
+      nav.reset();
+      untrack(() => props.onInitialListingConsumed)?.();
+      void controller.readListing(link).then((listing) => {
+        if (request !== listingRequest) return;
+        if (listing?.kind === "agent")
+          nav.show("agents", { kind: "agent", listing: listing.detail, detail: listing.detail });
+        else if (listing?.kind === "skill") nav.show("skills", { kind: "skill", listing: listing.skill });
+        else
+          nav.set((draft) => {
+            draft.tab = link.kind === "agent" ? "agents" : "skills";
+            draft.missingListing = link.kind;
+          });
+      });
+    },
+  );
+
   /* GitHub joins the apps only when its status read ends. A link that came first opens its page then. */
   createEffect(
     () => {
@@ -125,7 +159,9 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
   createEffect(
     () => props.open,
     (open) => {
-      if (!open) setConnectWhenReady(null);
+      if (open) return;
+      setConnectWhenReady(null);
+      listingRequest += 1;
     },
   );
 

@@ -5,7 +5,8 @@
 // Four cases: a compaction that ends by itself, one that runs past the start deadline and ends by
 // itself (#3466), one that the run deadline stops, and one that does not stop, so that OpenBot sends
 // a turn that Codex refuses. Then a side thread: the runtime snapshot carries its context, and
-// `compactTaskContext` compacts its session and not the agent's own chat (#3503). Last, a usage
+// `compactTaskContext` compacts its session and not the agent's own chat (#3503), and a side thread
+// deleted while it compacts does not hold the agent's own chat. Last, a usage
 // report that Codex sends while the stop ends it does not reach the closed database (#3808).
 // `bun scripts/codex-compaction-queue-e2e.ts`. Writes .openbot-build/codex-compaction-queue-e2e/report.json.
 import assert from "node:assert/strict";
@@ -413,6 +414,32 @@ try {
   assert.deepEqual(sideThread.threadCompactions, ["completed", "completed"], "side thread: compactions");
   assert.equal(sideThread.mainCompactStarts, 0, "side thread: the agent's own chat compacted");
   assert.ok(sideThread.mainContextUnchanged, "side thread: the agent's own context changed");
+
+  // A side thread deleted while Codex compacts its session. No turn of the deleted session ends the
+  // compaction for OpenBot, so its hold stayed, and the agent's own chat waited until a restart.
+  await writeFile(controlPath, JSON.stringify({ compactionMs: 5_000, ignoreInterrupt: false }));
+  const deleted = await runCauseEffect(agents.startTask({ agentId: owner.id, text: "Thread message." }));
+  const deletedSession = await waitFor(
+    "the deleted thread's session",
+    () => store.database.activeProviderSession(deleted.threadId, "codex")?.externalSessionId,
+  );
+  await waitFor("the deleted thread's compaction", () =>
+    protocol().some((line) => line.method === "thread/compact/start" && line.threadId === deletedSession),
+  );
+  await runCauseEffect(agents.deleteTask({ agentId: owner.id, taskId: deleted.id }));
+  const ownReceipt = await runCauseEffect(agents.sendMessage({ agentId: owner.id, text: "Own chat message." }));
+  const ownDeliveryId = ownReceipt.deliveries[0]?.id;
+  assert.ok(ownDeliveryId, "deleted thread: no delivery");
+  const ownStatus = () => mailbox.getDelivery(ownDeliveryId)?.delivery.status ?? "missing";
+  const deletedThread = {
+    ownChatStatus: await waitFor(
+      "the own chat message after the delete",
+      () => (["completed", "failed", "interrupted"].includes(ownStatus()) ? ownStatus() : null),
+      30_000,
+    ).catch(() => ownStatus()),
+  };
+  Object.assign(report, { deletedThread });
+  assert.equal(deletedThread.ownChatStatus, "completed", "deleted thread: the agent's own chat stayed held");
 
   // Codex reports usage while the stop ends it. The quit closes the database next, and a late
   // usage snapshot then failed with "OpenBot database is not initialized." (#3808).

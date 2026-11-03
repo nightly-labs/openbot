@@ -482,6 +482,12 @@
    * rail is the way back, so these titles have no Back button and no server name. */
   .app-frame-edge[data-window-page-kind="settings"] > .window-page {
     top: var(--left-header-height);
+    -webkit-app-region: no-drag;
+  }
+
+  /* The hidden chat header no longer moves the window, so the empty top row of the settings page does. */
+  .app-frame-edge[data-window-page-kind="settings"] {
+    -webkit-app-region: drag;
   }
 
   .app-frame-edge[data-window-page-kind="titled"] > .window-page {
@@ -791,4 +797,43 @@
 
 .app-frame-chat-window.app-frame-platform-darwin .conversation-header {
   padding-left: 76px;
+}
+
+/* The hint that one press of Cmd + Q does not quit. The window behind it is dimmed and blurred, as
+ * behind a dialog, so the hint is clear on every page. It is over every page and dialog of the page.
+ * A browser tab is a native view, so the conversation hides it while the hint shows. A click goes
+ * through the hint to the page below. */
+.quit-shortcut-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--openbot-layer-tooltip);
+  display: grid;
+  place-items: center;
+  background: var(--openbot-dialog-overlay);
+  backdrop-filter: blur(var(--openbot-space-2));
+  pointer-events: none;
+  animation: quit-shortcut-in var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.quit-shortcut-hint {
+  padding: var(--openbot-space-3) var(--openbot-space-6);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@keyframes quit-shortcut-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quit-shortcut-backdrop {
+    animation: none;
+  }
 }

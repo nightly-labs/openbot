@@ -1,6 +1,7 @@
 // Drives the agent MCP tools of issue #2673 on the real modules: the MCP tools, McpGateway, the
 // SQLite MCP store and the probe, against local MCP servers. The approval and the sign-in card are
-// recorded where the router would show them. No provider or account is used.
+// recorded where the router would show them. No provider or account is used. It also checks what
+// suggest_marketplace_app answers for a Marketplace app that is already installed.
 // bun scripts/agent-mcp-tools-e2e.ts. Writes .openbot-build/agent-mcp-tools-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -11,7 +12,13 @@ import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { McpGateway } from "../src/backend/agent/mcp-gateway";
-import { handleMcpServerTool, type McpServerToolName, mcpServersFromGateway } from "../src/backend/agent/mcp-tools";
+import {
+  handleMcpServerTool,
+  type MarketplaceAppServer,
+  type McpServerToolName,
+  marketplaceAppStatus,
+  mcpServersFromGateway,
+} from "../src/backend/agent/mcp-tools";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { McpServerStore } from "../src/backend/mcp-server-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -98,11 +105,13 @@ interface ToolAnswer {
   servers?: Array<{ name: string; headerNames?: string[] }>;
   enabled?: boolean;
   removed?: boolean;
+  setupSteps?: string[];
+  next?: string;
 }
 
 interface Call {
   name: string;
-  tool: McpServerToolName;
+  tool: McpServerToolName | "suggest_marketplace_app";
   arguments: unknown;
   approved: boolean;
   success: boolean;
@@ -172,6 +181,30 @@ try {
       success: response.success,
       result: JSON.parse(text),
       approvals,
+      signInCards,
+    };
+    calls.push(entry);
+    return entry;
+  };
+  /** suggest_marketplace_app for an app whose server is saved, after the router finds that server. */
+  const appStatus = async (name: string, appId: string, app: MarketplaceAppServer) => {
+    const signInCards: string[] = [];
+    const response = await runCauseEffect(
+      marketplaceAppStatus(tools, app, (config) =>
+        Effect.sync(() => {
+          signInCards.push(config.id);
+        }),
+      ),
+    );
+    const text = response.contentItems[0]?.type === "inputText" ? response.contentItems[0].text : "{}";
+    const entry: Call = {
+      name,
+      tool: "suggest_marketplace_app",
+      arguments: { app: appId },
+      approved: true,
+      success: response.success,
+      result: JSON.parse(text),
+      approvals: [],
       signInCards,
     };
     calls.push(entry);
@@ -281,6 +314,37 @@ try {
   const tested = await call("test a saved server", "test_mcp_server", { name: "docs" });
   assert.equal(tested.result.status, "ready");
   assert.equal(tested.approvals.length, 0);
+
+  const setupSteps = ["Open the desktop app.", "Turn on its MCP server."];
+  const disabledApp = row("docs");
+  assert.ok(disabledApp);
+  const disabled = await appStatus("an installed app that is off", "notion", { config: disabledApp, setupSteps: [] });
+  assert.equal(disabled.result.status, "disabled");
+  assert.equal(disabled.signInCards.length, 0);
+
+  const calendar = row("calendar");
+  assert.ok(calendar);
+  const appSignIn = await appStatus("an installed app that needs a sign-in", "atlassian", {
+    config: calendar,
+    setupSteps: [],
+  });
+  assert.equal(appSignIn.result.status, "needs_sign_in");
+  assert.deepEqual(appSignIn.signInCards, [calendar.id]);
+
+  const localApp = store.save({ ...calendar, id: "", name: "figma-desktop", url: await closedUrl() });
+  const notRunning = await appStatus("an installed local app that is not running", "figma", {
+    config: localApp,
+    setupSteps,
+  });
+  assert.equal(notRunning.result.status, "not_running");
+  assert.deepEqual(notRunning.result.setupSteps, setupSteps);
+  assert.equal(notRunning.signInCards.length, 0);
+
+  const readyApp = store.save({ ...calendar, id: "", name: "wiki", url: servers.open.url });
+  const ready = await appStatus("an installed app that answers", "linear", { config: readyApp, setupSteps });
+  assert.equal(ready.result.status, "ready");
+  assert.deepEqual(ready.result.tools, ["search", "read_page", "create_page"]);
+  assert.equal(ready.result.setupSteps, undefined);
 
   const unknown = await call("an unknown name", "test_mcp_server", { name: "nothing" });
   assert.equal(unknown.success, false);

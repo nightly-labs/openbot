@@ -33,12 +33,15 @@ message or a routine run (`error` with the code `delivery_start_failed`), or wai
 approval, or a step in the browser (`browser-takeover-requested`, also for a password or a code).
 The desktop and the web client notify about the same events (`agentEventCanNotify`), and all three
 decide as one: `notificationForAgentEvent` in `@openbot/team-client` applies the level of the server
-(`all`, or `needs-me` for the events that wait for the user), the switch of the agent, and the quiet
+(`all`, or `needs-me` for the events that wait for the user), or the member's own level of the agent
+(`agent-notification-levels-v1`, see [servers](servers.md)), the switch of the agent, and the quiet
 routine runs. The desktop and the web client close the notification of a request when an
 `agent-input-resolved` or `browser-takeover-resolved` event comes, also for an answer from another
 device. The title is the agent name. When the phone shows previews, the text is the
-preview of a desktop notification: the start of the answer of that turn, the question, or the action
-to approve, with secrets redacted. Otherwise it is the fixed desktop text, such as "Finished working.".
+preview of a desktop notification: the lead of the answer of that turn, the question, or the action
+to approve, with secrets redacted. The lead (`messageSummary` in `packages/team-client`) is the first
+sentences of the message, without code blocks, tables, headings or mail headers, with tool names as
+words and redaction marks as `•••`. The Live Activity shows the same lead. Otherwise it is the fixed desktop text, such as "Finished working.".
 
 Channels are an exception. The desktop and the web client notify an agent reply in a channel from
 the channel list (`channelReplyNotifications`), because the channel service consumes the
@@ -68,7 +71,13 @@ when nothing is left for that host or the user signs out. A level of
 "Nothing" and a mute with no end remove it too. `PushNotificationService` in `src/main` keeps the
 registrations in `openbot-push-notifications-v1.json` in the user data folder, readable only by the
 user, so a phone that does not connect after the host restarts still gets notifications. It sends
-only while the phone is away or its connection is closed. No event goes while the member uses a
+only while the phone is away or its connection is closed. iOS can suspend the app before it says
+that it goes away, and the host sees the lost path about 30 seconds later. So an event that comes
+while the phone looks on screen is kept in memory for 5 minutes (`HELD_EVENT_MS`). When the phone
+says that it is away, or its path fails, and does not come back within 3 seconds, the host sends
+each kept event that the member has not seen: a reply that is still unread in the agent's own chat,
+a failed turn that still shows as failed, or a request that nobody answered. A send that the
+account service, Apple or Google does not take goes again after 10 and 60 seconds. No event goes while the member uses a
 desktop app, which shows the event and asks for input, an approval, or a browser step itself: that
 computer had input in the last 30 seconds (`powerMonitor.getSystemIdleState`), and
 the window of the host's own desktop app has focus or shows the event as a desktop notification, for
@@ -77,8 +86,10 @@ computer's server let the event through); or the member sent, answered, or typed
 seconds (`TeamApiServer.lastMemberUseElsewhere`, kept in memory). The time is short because a task
 can end at any time after the member leaves the computer. While the phone shows a Live Activity of
 this host that iOS still updates (8 hours from its start, which the phone gives because a host that
-restarted does not know it), the host sends no notification
-(`LiveActivityPushService.showsEvent`). With a sound (Settings > Notifications > Sound), the next
+restarted does not know it), and the next view of the activity shows the event, the host sends no
+notification (`LiveActivityPushService.showsEvent`). The view shows one item, so a reply while
+another agent works, or a failure while another agent waits, still notifies. An activity whose last
+update did not go out does not replace notifications. With a sound (Settings > Notifications > Sound), the next
 update of the activity alerts at once, so iOS lights up the screen, shows the activity, and plays
 that sound; with Play sound off, the activity updates silently. iOS does not tell the host when
 the user removes the activity, so until the app runs again such an event shows nowhere.
@@ -196,12 +207,27 @@ Only assignments and awaited results start turns. Completed child results are co
 owner returns. The limit is eight automatic assignments per root request and two active assignments
 per channel (`CHANNEL_PARALLEL_LIMIT`).
 
+An agent can also give work to a channel from another conversation, such as its direct chat with
+the user. `list_channels` lists the open channels with their lead and members.
+`send_to_channel` posts one request (`ChannelService.handoff`): a complete brief, optional
+recipient agents, and optional file paths that the channel copies as attachments. The message has
+the sending agent as a member author with the id `agent:<agentId>`. The assignment of a root task
+from it starts with "Request from OpenBot teammate <name> (<agentId>)" (`assignmentText`), so the
+member does not read the agent's words as the user's. A follow-up under that line names its
+sender, such as "Follow-up from the user". Routing is the same as for a person's request: each named recipient and each opening @mention gets a root task, and with none the
+lead routes it. A channel without a lead refuses a request that names nobody
+(`channelLeadRequired`). The command does not go through `parseChannelCommand`, so no client can
+post as an agent. The tool call id gives the operation id, so a retried call posts no second
+message. Inside a channel task, `send_to_channel` is refused; use `channel_assign` or
+`channel_transfer`. On desktop, a person can do the same by hand: "Send to channel" on a message of
+an agent chat opens the channel with the message text in its composer. Attachments stay behind.
+
 A member can also change its channel when a person asks: `channel_add_member`,
 `channel_remove_member`, `channel_set_instructions`, and `channel_list_routines`,
 `channel_create_routine`, `channel_update_routine`, `channel_delete_routine` for the schedule
 routines. They act only on the channel of the running task (`channel-management.ts`). The request
-message of the root task must have a person as author. A routine run (author id `routine:<id>`)
-and a request that only an agent wrote are refused, so untrusted run input cannot change the
+message of the root task must have a person as author. A routine run (author id `routine:<id>`),
+an agent handoff (author id `agent:<agentId>`) and a request that only an agent wrote are refused, so untrusted run input cannot change the
 channel. A member change is a `save` through the command queue, with the draft read from the stored
 channel when its turn comes. The caller cannot remove itself or an owner of a task above its own,
 and removing the lead clears the lead. An agent that a person adds must be one that person can chat
@@ -264,7 +290,12 @@ interrupts active work, and sets the reason `channelTaskStopped`. The clients sh
 Reassign for a paused task that has a reason. A turn that ends interrupted gets the same reason. An
 archive pauses work with no reason; a restore gives those tasks the stop reason. Startup gives the
 stop reason to a paused task with no reason in a channel that is not archived: older versions stopped
-with no reason. Reassign waits for the old assignment to finish stopping. Restart
+with no reason. Reassign waits for the old assignment to finish stopping. Cancel ends a stopped or
+failed task: it sets every open task of the same root to `cancelled`, interrupts active work, and
+keeps the messages. A parent waits for each task that it delegated, so a cancel always ends the whole
+run, and a cancelled routine run records `cancelled`. The host refuses Cancel for a task that is not
+stopped or failed. The clients show Cancel without a confirmation, once for each run, and only on a
+host that advertises `channel-task-cancel-v1`; a host rejects `cancel` from a peer without it. Restart
 recovery checks accepted provider work before retrying. Unknown outcomes require attention.
 Command, assignment, and result IDs prevent duplicate dispatch and visible results; external side
 effects do not have an exactly-once guarantee.
@@ -275,7 +306,7 @@ the capability only when its channel service is connected. When a host does not 
 `channel-chats-v1`, the renderer hides the channel controls in the sidebar, search and schedule. The account API and Signal service add no channel storage or routing.
 
 Mobile shows channels only on a host that advertises `channel-chats-v1`, and Delete and Restore only
-with `channel-delete-v1`. It uses the same host channel IDs and commands. The host database stores
+with `channel-delete-v1`, and Cancel task only with `channel-task-cancel-v1`. It uses the same host channel IDs and commands. The host database stores
 channel settings, members, messages, memories, routines, and read positions. Mobile keeps only an
 in-memory view. Reconnect loads the host list again. `channels-changed` events refresh the list and
 open channel history, with one request sequence per host and one pending refresh for an event burst.
@@ -285,7 +316,8 @@ responses. The mobile chat list and message history use virtualized lists. Chann
 uses static avatar thumbnails without activity subscriptions or animation timers. Channels appear
 next to agents in the same list, with up to four static member avatars that fade when the host
 is offline. Channel pins share the existing pinned grid and 16-chat limit; local preferences
-preserve agent pins and channel pins separately. Hide removes a channel from the home list and
+preserve agent pins and channel pins separately. A host with `sidebar-pins-v1` keeps both in one list
+for all devices of the user (see [servers](servers.md)). Hide removes a channel from the home list and
 unpins it; the shared Hidden chats sheet restores it. Channel and agent pinning use the same
 measured overlay movement, with static folder artwork for channels. Agent and channel screens
 use the same mobile `ChatView`, header, message list, reply gestures, composer, camera, and keyboard
@@ -446,7 +478,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   `/invite`.
 - **Deduplication.** An in-memory set drops a redelivered event at once; the mailbox idempotency key
   covers a restart, and a kept event that Signal sends again. Events that arrive while no socket is
-  open are lost after Slack's retries, except for a hosted server that starts.
+  open are lost after Slack's retries, except for a hosted server that starts. A message that does
+  not address OpenBot gets 200 from Signal and is lost at once; other events get 503. Slack turns
+  off events for the whole app when more than 95% of deliveries fail for 60 minutes, and a computer
+  that is off would otherwise fail every channel message of its workspace.
 - **Screen.** **Marketplace → Apps → Slack** on the computer that runs the agents shows
   each workspace and its orchestrator, and a two-step dialog connects the workspace and adds the
   orchestrator on the model the user picks (`messaging:*`). A remote server shows no Slack page,
@@ -469,9 +504,12 @@ the token and does the platform work for the hosts:
   Another account gets `discord_guild_taken`.
 - **Events.** Signal keeps one Gateway connection (`@discordjs/ws`) with the guilds, guild messages
   and direct messages intents, and no privileged intent. It passes on only a guild message that
-  mentions the bot, and a press of an OpenBot button, which it acknowledges to Discord at once. It
-  normalizes each into `DiscordDelivery` (`@openbot/contracts/signal-protocol/discord-api`), takes the
-  bot's own mention out, and sends a `discord-delivery` frame to the `ingress` socket that holds a
+  mentions the bot or the bot's own role, and a press of an OpenBot button, which it acknowledges to
+  Discord at once. Discord makes that role, with the bot's name, when the bot joins a guild, and its
+  autocomplete can choose it instead of the bot. Signal finds the role by its `tags.bot_id` in the
+  guild and role events, and keeps only its ID in memory. It normalizes each message into
+  `DiscordDelivery` (`@openbot/contracts/signal-protocol/discord-api`), takes the bot's own mention
+  and role mention out, and sends a `discord-delivery` frame to the `ingress` socket that holds a
   Discord route ticket for the guild. The ticket mirrors the Slack one (audience
   `openbot-discord-route`, `/v2/remote/hosts/:id/discord-route`, `discord-route-revoked`,
   `/v2/remote/discord-route/validate`). The socket asks for a route only for the platforms whose
