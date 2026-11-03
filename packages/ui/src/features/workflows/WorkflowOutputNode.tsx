@@ -19,8 +19,9 @@ import {
   useTextField,
 } from "./workflow-node-parts";
 import { InputRow, PlaceRow, SettingRow, SettingRows } from "./workflow-setting-rows";
+import { SLACK_OUTPUT_DEFAULTS, SlackIcon, SlackOutputRows } from "./workflow-slack-parts";
 
-type OutputTarget = "channel" | "file" | "notify" | "github" | "discord";
+type OutputTarget = "channel" | "file" | "notify" | "github" | "discord" | "slack";
 
 const TARGETS = (t: AppTranslate): readonly Choice<OutputTarget>[] => [
   { value: "channel", label: t("workflow.node.place.channel"), icon: () => <Hash aria-hidden="true" /> },
@@ -28,13 +29,22 @@ const TARGETS = (t: AppTranslate): readonly Choice<OutputTarget>[] => [
   { value: "notify", label: t("workflow.output.target.notify"), icon: () => <Bell aria-hidden="true" /> },
   { value: "github", label: t("workflow.output.target.github"), icon: () => <GitHubIcon /> },
   { value: "discord", label: t("workflow.output.target.discord"), icon: () => <DiscordIcon /> },
+  { value: "slack", label: t("workflow.output.target.slack"), icon: () => <SlackIcon /> },
 ];
 
-const TARGET_TYPES: readonly OutputTarget[] = ["channel", "file", "notify", "github", "discord"];
+const TARGET_TYPES: readonly OutputTarget[] = ["channel", "file", "notify", "github", "discord", "slack"];
+
+/** The targets that a host must run, and whose `action` field means a different thing on each. */
+const HOSTED_TARGETS: readonly OutputTarget[] = ["github", "discord", "slack"];
+const OUTPUT_DEFAULTS: Partial<Record<OutputTarget, Readonly<Record<string, string>>>> = {
+  github: GITHUB_OUTPUT_DEFAULTS,
+  discord: DISCORD_OUTPUT_DEFAULTS,
+  slack: SLACK_OUTPUT_DEFAULTS,
+};
 
 const OUTPUT_INPUTS: readonly WfnPortType[] = ["text", "image", "file"];
 
-/** A change on GitHub or Discord is text: a comment, a review, the body of an issue, or a message. */
+/** A change on GitHub, Discord or Slack is text: a comment, a review, the body of an issue, or a message. */
 const TEXT_INPUTS: readonly WfnPortType[] = ["text"];
 
 /**
@@ -58,23 +68,20 @@ export function OutputNode(props: {
     oneOf(TARGET_TYPES),
   );
   /**
-   * A new GitHub or Discord output stores the fields that its rows show, so the host reads the same. Both
-   * keep an `action`, so a change from one to the other writes the defaults again.
+   * A new GitHub, Discord or Slack output stores the fields that its rows show, so the host reads the
+   * same. Each keeps an `action`, so a change from one to another writes the defaults again.
    */
   const chooseTarget = (value: OutputTarget) => {
-    const defaults =
-      value === "github" ? GITHUB_OUTPUT_DEFAULTS : value === "discord" ? DISCORD_OUTPUT_DEFAULTS : undefined;
-    const fromOther = target() !== value && (target() === "github" || target() === "discord");
+    const defaults = OUTPUT_DEFAULTS[value];
+    const fromOther = target() !== value && HOSTED_TARGETS.includes(target());
     if (!defaults || (board.field(props.id, "action") !== undefined && !fromOther)) return setTarget(value);
     board.setFields(props.id, { target: value, ...defaults });
   };
-  /** GitHub and Discord need a host that can run them. Other targets show unless the host lists the targets it runs. */
+  /** GitHub, Discord and Slack need a host that can run them. Other targets show unless the host lists the targets it runs. */
   const offered = (value: OutputTarget) => {
     const outputs = board.features()?.outputs;
     if (value === target()) return true;
-    return value === "github" || value === "discord"
-      ? outputs?.includes(value) === true
-      : (outputs?.includes(value) ?? true);
+    return HOSTED_TARGETS.includes(value) ? outputs?.includes(value) === true : (outputs?.includes(value) ?? true);
   };
   const [path, setPath] = useTextField(
     () => props.id,
@@ -90,7 +97,7 @@ export function OutputNode(props: {
   const run = useStepRun(untrack(() => props.id));
   const githubReady = useGitHubOutputReady(() => props.id);
   const isGitHub = () => target() === "github";
-  const inputs = () => (isGitHub() || target() === "discord" ? TEXT_INPUTS : OUTPUT_INPUTS);
+  const inputs = () => (HOSTED_TARGETS.includes(target()) ? TEXT_INPUTS : OUTPUT_INPUTS);
   const runDisabled = () =>
     locked() || !inputs().some((type) => board.connected(props.id, "in", type)) || (isGitHub() && !githubReady());
   const shown = () => resultValue(board.shown(props.id));
@@ -153,6 +160,9 @@ export function OutputNode(props: {
         </Show>
         <Show when={target() === "discord"}>
           <DiscordOutputRows id={props.id} locked={locked()} />
+        </Show>
+        <Show when={target() === "slack"}>
+          <SlackOutputRows id={props.id} locked={locked()} />
         </Show>
       </SettingRows>
       <Show

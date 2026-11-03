@@ -27,6 +27,8 @@ export const messages = {
   "error.workflow.outputPlaceMissing": "Scegli un luogo di messaggistica per questo output.",
   "error.workflow.discordNoMessage":
     "Questo output agisce sul messaggio Discord che ha avviato l’esecuzione. Avvia l’esecuzione da una menzione su Discord o scegli Pubblica nel canale.",
+  "error.workflow.slackNoMessage":
+    "Questo output agisce sul messaggio Slack che ha avviato l’esecuzione. Avvia l’esecuzione da una menzione su Slack o scegli Pubblica nel canale.",
   "error.workflow.outputConnectionOff":
     "La connessione di messaggistica di questo output è disattivata o rimossa. Scegli di nuovo un luogo.",
   "error.workflow.outputNotRunning": "La connessione di messaggistica non è attiva ora. Riprova quando è attiva.",

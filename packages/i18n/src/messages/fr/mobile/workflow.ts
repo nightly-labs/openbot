@@ -74,6 +74,8 @@ export const messages = {
   "mobile.workflow.trigger.githubHint": "S’exécute quand il se passe quelque chose dans un dépôt GitHub.",
   "mobile.workflow.trigger.discord": "Discord",
   "mobile.workflow.trigger.discordHint": "S’exécute quand quelqu’un mentionne OpenBot sur un serveur Discord.",
+  "mobile.workflow.trigger.slack": "Slack",
+  "mobile.workflow.trigger.slackHint": "S’exécute quand quelqu’un mentionne OpenBot dans un canal Slack.",
   "mobile.workflow.trigger.startsWhen": "Démarre",
   "mobile.workflow.trigger.timezone": "Fuseau horaire : {zone}",
   "mobile.workflow.trigger.serverZone": "La planification utilise le fuseau horaire du serveur.",
@@ -214,6 +216,7 @@ export const messages = {
   "mobile.workflow.output.github": "GitHub",
   "mobile.workflow.output.githubHint": "Fait une modification sur GitHub, comme un commentaire ou un label.",
   "mobile.workflow.output.discord": "Discord",
+  "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.run.stopStep": "Arrêter l’étape",
   "mobile.workflow.run.stopStepFailed": "Impossible d’arrêter l’étape",
   "mobile.workflow.version.history": "Historique des versions",
@@ -352,4 +355,6 @@ export const messages = {
   "mobile.workflow.discord.action.post": "Publier dans un salon",
   "mobile.workflow.discord.action.react": "Ajouter une réaction",
   "mobile.workflow.discord.emoji": "Emoji",
+  "mobile.workflow.slack.outputSummary": "Slack · {action}",
+  "mobile.workflow.slack.action.reply": "Répondre dans le fil",
 } as const satisfies PartialTranslation<typeof source>;

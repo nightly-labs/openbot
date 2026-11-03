@@ -1029,6 +1029,12 @@ graph, or ID.
   the run that keeps it, has the message text, the author, and the name, type, size and Discord
   address of each file of the message and of the message that it replies to. These addresses expire
   after about a day.
+- **Slack triggers** start a run from a mention of the OpenBot Slack app in a channel. The trigger's
+  output, and the run that keeps it, has the message text, the author, the workspace and channel
+  names, and the name, type and size of each file of the message. It does not keep the Slack address
+  of a file, and a GitHub output does not copy Slack files.
+- **Slack outputs** reply in the mention's thread, post in a chosen channel, or add a reaction,
+  through the workspace's Slack connection. The text goes to Slack.
 - **GitHub outputs** make the change through the OpenBot GitHub App: a comment, a label, a person, a
   review, a close or a new issue. The text goes to GitHub. When a Discord mention started the run, a
   new issue or a comment also keeps those files: the computer downloads each file of up to 25 MB, and

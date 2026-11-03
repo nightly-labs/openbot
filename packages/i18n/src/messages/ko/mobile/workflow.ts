@@ -72,6 +72,8 @@ export const messages = {
   "mobile.workflow.trigger.githubHint": "GitHub 저장소에서 일이 생기면 실행돼요.",
   "mobile.workflow.trigger.discord": "Discord",
   "mobile.workflow.trigger.discordHint": "누군가 Discord 서버에서 OpenBot을 멘션하면 실행됩니다.",
+  "mobile.workflow.trigger.slack": "Slack",
+  "mobile.workflow.trigger.slackHint": "누군가 Slack 채널에서 OpenBot을 멘션하면 실행됩니다.",
   "mobile.workflow.trigger.startsWhen": "시작 조건",
   "mobile.workflow.trigger.timezone": "시간대: {zone}",
   "mobile.workflow.trigger.serverZone": "일정은 서버의 시간대를 사용해요.",
@@ -205,6 +207,7 @@ export const messages = {
   "mobile.workflow.output.github": "GitHub",
   "mobile.workflow.output.githubHint": "댓글이나 라벨처럼 GitHub에서 한 가지를 변경해요.",
   "mobile.workflow.output.discord": "Discord",
+  "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.run.stopStep": "단계 중지",
   "mobile.workflow.run.stopStepFailed": "단계를 중지할 수 없어요",
   "mobile.workflow.version.history": "버전 기록",
@@ -340,4 +343,6 @@ export const messages = {
   "mobile.workflow.discord.action.post": "채널에 게시",
   "mobile.workflow.discord.action.react": "반응 추가",
   "mobile.workflow.discord.emoji": "이모지",
+  "mobile.workflow.slack.outputSummary": "Slack · {action}",
+  "mobile.workflow.slack.action.reply": "스레드에 답글",
 } as const satisfies PartialTranslation<typeof source>;

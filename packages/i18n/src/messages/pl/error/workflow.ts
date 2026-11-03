@@ -27,6 +27,8 @@ export const messages = {
   "error.workflow.outputPlaceMissing": "Wybierz miejsce w komunikatorze dla tego wyjścia.",
   "error.workflow.discordNoMessage":
     "To wyjście działa na wiadomość z Discorda, która uruchomiła przepływ. Uruchom przepływ ze wzmianki na Discordzie albo wybierz Opublikuj na kanale.",
+  "error.workflow.slackNoMessage":
+    "To wyjście działa na wiadomość ze Slacka, która uruchomiła przepływ. Uruchom przepływ ze wzmianki na Slacku albo wybierz Opublikuj na kanale.",
   "error.workflow.outputConnectionOff":
     "Połączenie komunikatora tego wyjścia jest wyłączone lub usunięte. Wybierz miejsce ponownie.",
   "error.workflow.outputNotRunning": "Połączenie komunikatora teraz nie działa. Spróbuj ponownie, gdy zacznie działać.",

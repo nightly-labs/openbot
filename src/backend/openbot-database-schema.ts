@@ -23,13 +23,14 @@ import {
 } from "./messaging/messaging-schema";
 import { ROUTINE_FLOW_SCHEMA_SQL } from "./routine-flows/routine-flow-schema";
 import { ROUTINE_RESULT_SCHEMA_SQL } from "./routine-results/routine-result-schema";
-import { addDiscordWorkflows, V50_WORKFLOW_RUN_SOURCE_SQL } from "./workflows/workflow-discord-schema";
+import { addDiscordWorkflows } from "./workflows/workflow-discord-schema";
 import {
   addGitHubWorkflows,
   V46_WORKFLOW_RUN_SOURCE_SQL,
   WORKFLOW_GITHUB_SCHEMA_SQL,
 } from "./workflows/workflow-github-schema";
 import { WORKFLOW_SCHEMA_SQL } from "./workflows/workflow-schema";
+import { addSlackWorkflows, V51_WORKFLOW_RUN_SOURCE_SQL } from "./workflows/workflow-slack-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
 
@@ -612,7 +613,7 @@ const LATEST_SCHEMA_SQL =
   V43_THREAD_EVENT_TYPE_INDEX_SQL +
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL +
   BROWSER_PROFILE_SCHEMA_SQL +
-  substituteOnce(WORKFLOW_SCHEMA_SQL, V46_WORKFLOW_RUN_SOURCE_SQL, V50_WORKFLOW_RUN_SOURCE_SQL) +
+  substituteOnce(WORKFLOW_SCHEMA_SQL, V46_WORKFLOW_RUN_SOURCE_SQL, V51_WORKFLOW_RUN_SOURCE_SQL) +
   AGENT_THREAD_SCHEMA_SQL +
   WORKFLOW_GITHUB_SCHEMA_SQL;
 
@@ -904,6 +905,13 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // pause and run ids do not change. Few rows, so no vacuum. No table is added.
     disableForeignKeys: true,
     up: addDiscordWorkflows,
+  },
+  {
+    version: 51,
+    // Rebuilds the run table again to add the Slack run source, as migration 50 did, so foreign keys
+    // pause and run ids do not change. Few rows, so no vacuum. No table is added.
+    disableForeignKeys: true,
+    up: addSlackWorkflows,
   },
 ];
 

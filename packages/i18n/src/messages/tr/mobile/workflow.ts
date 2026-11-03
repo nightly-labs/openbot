@@ -73,6 +73,8 @@ export const messages = {
   "mobile.workflow.trigger.githubHint": "Bir GitHub deposunda bir şey olduğunda çalışır.",
   "mobile.workflow.trigger.discord": "Discord",
   "mobile.workflow.trigger.discordHint": "Biri bir Discord sunucusunda OpenBot'u andığında çalışır.",
+  "mobile.workflow.trigger.slack": "Slack",
+  "mobile.workflow.trigger.slackHint": "Biri bir Slack kanalında OpenBot'u andığında çalışır.",
   "mobile.workflow.trigger.startsWhen": "Başlangıç",
   "mobile.workflow.trigger.timezone": "Saat dilimi: {zone}",
   "mobile.workflow.trigger.serverZone": "Zamanlama sunucunun saat dilimini kullanır.",
@@ -207,6 +209,7 @@ export const messages = {
   "mobile.workflow.output.github": "GitHub",
   "mobile.workflow.output.githubHint": "GitHub'da yorum veya etiket gibi tek bir değişiklik yapar.",
   "mobile.workflow.output.discord": "Discord",
+  "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.run.stopStep": "Adımı durdur",
   "mobile.workflow.run.stopStepFailed": "Adım durdurulamadı",
   "mobile.workflow.version.history": "Sürüm geçmişi",
@@ -348,4 +351,6 @@ export const messages = {
   "mobile.workflow.discord.action.post": "Kanala gönder",
   "mobile.workflow.discord.action.react": "Tepki ekle",
   "mobile.workflow.discord.emoji": "Emoji",
+  "mobile.workflow.slack.outputSummary": "Slack · {action}",
+  "mobile.workflow.slack.action.reply": "Zincirde yanıtla",
 } as const satisfies PartialTranslation<typeof source>;

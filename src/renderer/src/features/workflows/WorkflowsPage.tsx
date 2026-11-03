@@ -76,6 +76,9 @@ function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
     get discord() {
       return workflows.discord();
     },
+    get slack() {
+      return workflows.slack();
+    },
     imageModels: [],
     files: [],
     get self() {
@@ -83,15 +86,20 @@ function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
     },
   };
   // A channel output needs a messaging place. Without one, a new output posts a notification. Only an
-  // owner or admin adds a GitHub or Discord step, on a host that runs them. Only this computer has
-  // Discord servers.
+  // owner or admin adds a GitHub, Discord or Slack step, on a host that runs them. Only this computer has
+  // Discord servers and Slack workspaces.
   const features = createMemo<WorkflowFeatures>(() => {
     const github = props.admin && props.host.githubSupported();
     const discord = props.admin && workflows.discord().length > 0;
+    const slack = props.admin && workflows.slack().length > 0;
     const outputs = WORKFLOW_FEATURES_V1.outputs.filter(
       (output) => output !== "channel" || workflows.places().length > 0,
     );
-    const added = [...(github ? (["github"] as const) : []), ...(discord ? (["discord"] as const) : [])];
+    const added = [
+      ...(github ? (["github"] as const) : []),
+      ...(discord ? (["discord"] as const) : []),
+      ...(slack ? (["slack"] as const) : []),
+    ];
     return {
       ...WORKFLOW_FEATURES_V1,
       triggers: [...WORKFLOW_FEATURES_V1.triggers, ...added],

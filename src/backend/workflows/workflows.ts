@@ -73,6 +73,8 @@ import type {
   MessagingDiscordSend,
   MessagingMentionResult,
   MessagingPostFailure,
+  MessagingSlackMention,
+  MessagingSlackSend,
 } from "../messaging/messaging-threads";
 import { resultText } from "../routine-results/routine-results";
 import type { ReceivedWebhookEvent } from "../routine-store";
@@ -101,6 +103,13 @@ import {
   githubOutputText,
   githubResultKeys,
 } from "./github-output";
+import {
+  type SlackOutputPlan,
+  slackOutputPlan,
+  slackTriggerMatches,
+  slackTriggerMessage,
+  workflowSlackPayload,
+} from "./slack-matching";
 import { REPEATABLE_GITHUB_ACTIONS, type WorkflowGitHubApi } from "./workflow-github-api";
 import type { WaitingGitHubDelivery, WorkflowGitHubStore } from "./workflow-github-store";
 import {
@@ -211,6 +220,11 @@ export interface WorkflowsDependencies {
     connectionId: string,
     send: MessagingDiscordSend,
   ) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
+  /** Replies, posts or reacts in a Slack workspace; absent where this host has no messaging. */
+  slackSend?: (
+    connectionId: string,
+    send: MessagingSlackSend,
+  ) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
   /** The workflow whose graph, title, versions or runs changed. */
   changed(workflowId: string): void;
   /**
@@ -299,6 +313,8 @@ interface WorkflowsShape {
    * when no trigger takes it, and `skipped` when each workflow that takes it is busy or cannot start.
    */
   receiveDiscord(mention: MessagingDiscordMention): Effect.Effect<MessagingMentionResult, WorkflowFailed>;
+  /** As `receiveDiscord`, for the Slack triggers and a mention in a Slack channel. */
+  receiveSlack(mention: MessagingSlackMention): Effect.Effect<MessagingMentionResult, WorkflowFailed>;
   /** Records in each GitHub trigger's history that the host got no GitHub events from `from` to `to`. */
   githubOffline(from: Date, to: Date): Effect.Effect<void, WorkflowFailed>;
   githubHistory(workflowId: string): Effect.Effect<WorkflowGitHubHistory, WorkflowFailed>;
@@ -602,6 +618,45 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return output ? startPost(step, output, discordPost(plan)) : Effect.void;
         };
 
+        /** As `discordPlan`, for a Slack output and a run that a Slack mention started. */
+        const slackPlan = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          slackOutputPlan(node, step.input, run?.source === "slack" ? slackTriggerMessage(run.payload) : null);
+
+        const slackPost = (plan: Extract<SlackOutputPlan, { send: unknown }>) =>
+          dependencies.slackSend
+            ? dependencies.slackSend(plan.connectionId, plan.send)
+            : Effect.succeed({ failure: "not-running" as const });
+
+        /** Keeps a Slack output's reply, post or reaction, then sends it. */
+        const sendSlack = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) => {
+          const plan = slackPlan(step, node, run);
+          if ("error" in plan) {
+            settle(step, { status: "failed", error: plan.error });
+            return Effect.void;
+          }
+          const { send } = plan;
+          // Nothing to say: the workspace gets no post. A reaction needs no text.
+          if (send.action !== "react" && !send.text.trim()) {
+            settle(step, { status: "done", output: "" });
+            return Effect.void;
+          }
+          if (!dependencies.connectionOn(plan.connectionId)) {
+            settle(step, { status: "failed", error: outputError("gone") });
+            return Effect.void;
+          }
+          runs.addOutput(
+            {
+              stepId: step.id,
+              connectionId: plan.connectionId,
+              placeId: send.channelId,
+              text: send.action === "react" ? `:${send.emoji}:` : send.text,
+            },
+            now(),
+          );
+          const output = runs.output(step.id);
+          return output ? startPost(step, output, slackPost(plan)) : Effect.void;
+        };
+
         /**
          * The key of a GitHub output's change: one for each pass of a node through a run, or one for a step
          * that runs alone. A loop brings the node back after a done step, so that pass gets a new key; a
@@ -772,6 +827,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             if ("error" in plan) return settle(step, { status: "failed", error: plan.error });
             return yield* resumeOutput(step, discordPost(plan));
           }
+          if (node && fieldText(node, "target") === "slack") {
+            const plan = slackPlan(step, node, run);
+            if ("error" in plan) return settle(step, { status: "failed", error: plan.error });
+            return yield* resumeOutput(step, slackPost(plan));
+          }
           if (!node || fieldText(node, "target") !== "github") return yield* resumeOutput(step);
           yield* sendGitHub(step, node, run);
           return runs.step(step.id)?.status !== "running";
@@ -823,6 +883,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               }
               if (fieldText(node, "target") === "discord") {
                 yield* sendDiscord(step, node, run);
+                return;
+              }
+              if (fieldText(node, "target") === "slack") {
+                yield* sendSlack(step, node, run);
                 return;
               }
               dependencies.notify({
@@ -1288,6 +1352,58 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           );
         });
 
+        const receiveSlack = Effect.fn("Workflows.receiveSlack")(function* (mention: MessagingSlackMention) {
+          return yield* locked(
+            Effect.gen(function* (): Effect.fn.Return<MessagingMentionResult, WorkflowFailed> {
+              const triggers = (yield* attempt(() => store.listWithGraphs())).flatMap(({ summary, graph }) =>
+                graph.nodes
+                  .filter((node) => slackTriggerMatches(node, mention))
+                  .map((node) => ({ workflowId: summary.id, node })),
+              );
+              if (triggers.length === 0) return "none";
+              let started = false;
+              for (const { workflowId, node } of triggers) {
+                const open = runs.openRuns().filter((run) => run.workflowId === workflowId);
+                // A mention that Signal gives again, after a restart, has its run already.
+                if (
+                  open.some(
+                    (run) =>
+                      run.source === "slack" &&
+                      slackTriggerMessage(run.payload)?.messageId === mention.messageId &&
+                      slackTriggerMessage(run.payload)?.channelId === mention.channelId,
+                  )
+                ) {
+                  started = true;
+                  continue;
+                }
+                // A busy workflow skips the mention, as a schedule skips an occurrence.
+                if (open.length > 0) continue;
+                const detail = yield* attempt(() => store.detail(workflowId));
+                if (!detail) continue;
+                const result = yield* begin(detail, node, {
+                  source: "slack",
+                  scheduledFor: null,
+                  // A Slack timestamp is unique only in its channel.
+                  idempotencyKey: `slack:${node.id}:${mention.channelId}:${mention.messageId}`,
+                  payload: workflowSlackPayload(node.id, mention),
+                }).pipe(Effect.result);
+                if (Result.isFailure(result)) {
+                  // After a run started, the mention stays with the workflows: no agent answers it too.
+                  if (!started && !(result.failure.cause instanceof WorkflowStoreError)) return yield* result.failure;
+                  logger.warn("A Slack mention did not start a workflow run.", {
+                    workflowId,
+                    nodeId: node.id,
+                    cause: String(result.failure.cause),
+                  });
+                  continue;
+                }
+                started = true;
+              }
+              return started ? "started" : "skipped";
+            }),
+          );
+        });
+
         // --- GitHub --------------------------------------------------------------------------------
 
         /** The GitHub triggers of every workflow that name a repository and an event. */
@@ -1715,6 +1831,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           receiveWebhook,
           receiveGitHub,
           receiveDiscord,
+          receiveSlack,
           githubOffline,
           githubHistory,
           githubLastEvent,

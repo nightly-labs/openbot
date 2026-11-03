@@ -71,6 +71,8 @@ export const messages = {
   "mobile.workflow.trigger.githubHint": "在 GitHub 仓库中发生事件时运行。",
   "mobile.workflow.trigger.discord": "Discord",
   "mobile.workflow.trigger.discordHint": "有人在 Discord 服务器中提及 OpenBot 时运行。",
+  "mobile.workflow.trigger.slack": "Slack",
+  "mobile.workflow.trigger.slackHint": "有人在 Slack 频道中提及 OpenBot 时运行。",
   "mobile.workflow.trigger.startsWhen": "启动方式",
   "mobile.workflow.trigger.timezone": "时区：{zone}",
   "mobile.workflow.trigger.serverZone": "定时使用服务器的时区。",
@@ -199,6 +201,7 @@ export const messages = {
   "mobile.workflow.output.github": "GitHub",
   "mobile.workflow.output.githubHint": "在 GitHub 上做一项更改，例如评论或标签。",
   "mobile.workflow.output.discord": "Discord",
+  "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.run.stopStep": "停止步骤",
   "mobile.workflow.run.stopStepFailed": "无法停止该步骤",
   "mobile.workflow.version.history": "版本历史",
@@ -331,4 +334,6 @@ export const messages = {
   "mobile.workflow.discord.action.post": "在频道中发布",
   "mobile.workflow.discord.action.react": "添加反应",
   "mobile.workflow.discord.emoji": "表情",
+  "mobile.workflow.slack.outputSummary": "Slack · {action}",
+  "mobile.workflow.slack.action.reply": "在消息列中回复",
 } as const satisfies PartialTranslation<typeof source>;

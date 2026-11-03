@@ -27,6 +27,8 @@ export const messages = {
   "error.workflow.outputPlaceMissing": "Bu çıktı için bir mesajlaşma yeri seçin.",
   "error.workflow.discordNoMessage":
     "Bu çıktı, çalıştırmayı başlatan Discord mesajı üzerinde çalışır. Çalıştırmayı bir Discord anmasından başlatın veya Kanala gönder'i seçin.",
+  "error.workflow.slackNoMessage":
+    "Bu çıktı, çalıştırmayı başlatan Slack mesajı üzerinde çalışır. Çalıştırmayı bir Slack anmasından başlatın veya Kanala gönder'i seçin.",
   "error.workflow.outputConnectionOff":
     "Bu çıktının mesajlaşma bağlantısı kapalı ya da kaldırılmış. Yeniden bir yer seçin.",
   "error.workflow.outputNotRunning": "Mesajlaşma bağlantısı şu anda çalışmıyor. Çalıştığında yeniden deneyin.",

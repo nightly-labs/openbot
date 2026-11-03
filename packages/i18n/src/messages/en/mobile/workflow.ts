@@ -71,6 +71,8 @@ export const messages = defineMessages("mobile.workflow", {
   "mobile.workflow.trigger.githubHint": "Runs when something happens in a GitHub repository.",
   "mobile.workflow.trigger.discord": "Discord",
   "mobile.workflow.trigger.discordHint": "Runs when a person mentions OpenBot in a Discord server.",
+  "mobile.workflow.trigger.slack": "Slack",
+  "mobile.workflow.trigger.slackHint": "Runs when a person mentions OpenBot in a Slack channel.",
   "mobile.workflow.trigger.startsWhen": "Starts",
   "mobile.workflow.trigger.timezone": "Time zone: {zone}",
   "mobile.workflow.trigger.serverZone": "The schedule uses the time zone of the server.",
@@ -205,6 +207,7 @@ export const messages = defineMessages("mobile.workflow", {
   "mobile.workflow.output.github": "GitHub",
   "mobile.workflow.output.githubHint": "Makes one change on GitHub, such as a comment or a label.",
   "mobile.workflow.output.discord": "Discord",
+  "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.run.stopStep": "Stop step",
   "mobile.workflow.run.stopStepFailed": "Could not stop the step",
   "mobile.workflow.version.history": "Version history",
@@ -341,4 +344,6 @@ export const messages = defineMessages("mobile.workflow", {
   "mobile.workflow.discord.action.post": "Post in channel",
   "mobile.workflow.discord.action.react": "Add a reaction",
   "mobile.workflow.discord.emoji": "Emoji",
+  "mobile.workflow.slack.outputSummary": "Slack · {action}",
+  "mobile.workflow.slack.action.reply": "Reply in thread",
 });

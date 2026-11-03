@@ -153,6 +153,7 @@ export const messages = {
   "workflow.trigger.webhook.creating": "Создание эндпоинта",
   "workflow.trigger.type.github": "GitHub",
   "workflow.trigger.type.discord": "Discord",
+  "workflow.trigger.type.slack": "Slack",
   "workflow.trigger.type": "Тип",
   "workflow.trigger.runLastEvent": "По последнему событию",
   "workflow.trigger.webhook.address": "Адрес",
@@ -172,6 +173,7 @@ export const messages = {
   "workflow.output.sendTo": "Куда отправить",
   "workflow.output.target.github": "GitHub",
   "workflow.output.target.discord": "Discord",
+  "workflow.output.target.slack": "Slack",
   "workflow.output.notifyTitleRow": "Заголовок",
 
   "workflow.discord.server": "Сервер",
@@ -195,6 +197,9 @@ export const messages = {
   "workflow.discord.emoji.eyes": "Глаза",
   "workflow.discord.emoji.party": "Хлопушка",
   "workflow.discord.emoji.cross": "Крестик",
+  "workflow.slack.workspace": "Рабочее пространство",
+  "workflow.slack.chooseWorkspace": "Выбрать пространство",
+  "workflow.slack.action.reply": "Ответить в треде",
   "workflow.row.agentPicksFrom": {
     one: "Агент выбирает из {count}",
     few: "Агент выбирает из {count}",

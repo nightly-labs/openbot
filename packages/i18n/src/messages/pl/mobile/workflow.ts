@@ -88,6 +88,8 @@ export const messages = {
   "mobile.workflow.trigger.githubHint": "Działa, gdy coś się stanie w repozytorium GitHub.",
   "mobile.workflow.trigger.discord": "Discord",
   "mobile.workflow.trigger.discordHint": "Działa, gdy ktoś wspomni OpenBot na serwerze Discord.",
+  "mobile.workflow.trigger.slack": "Slack",
+  "mobile.workflow.trigger.slackHint": "Działa, gdy ktoś wspomni OpenBot na kanale Slack.",
   "mobile.workflow.trigger.startsWhen": "Start",
   "mobile.workflow.trigger.timezone": "Strefa czasowa: {zone}",
   "mobile.workflow.trigger.serverZone": "Harmonogram używa strefy czasowej serwera.",
@@ -230,6 +232,7 @@ export const messages = {
   "mobile.workflow.output.github": "GitHub",
   "mobile.workflow.output.githubHint": "Wprowadza jedną zmianę w GitHubie, na przykład komentarz lub etykietę.",
   "mobile.workflow.output.discord": "Discord",
+  "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.run.stopStep": "Zatrzymaj krok",
   "mobile.workflow.run.stopStepFailed": "Nie udało się zatrzymać kroku",
   "mobile.workflow.version.history": "Historia wersji",
@@ -373,4 +376,6 @@ export const messages = {
   "mobile.workflow.discord.action.post": "Opublikuj na kanale",
   "mobile.workflow.discord.action.react": "Dodaj reakcję",
   "mobile.workflow.discord.emoji": "Emoji",
+  "mobile.workflow.slack.outputSummary": "Slack · {action}",
+  "mobile.workflow.slack.action.reply": "Odpowiedz w wątku",
 } as const satisfies PartialTranslation<typeof source>;

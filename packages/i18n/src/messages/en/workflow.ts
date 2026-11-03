@@ -147,6 +147,7 @@ export const messages = defineMessages("workflow", {
   "workflow.trigger.webhook.creating": "Creating the address",
   "workflow.trigger.type.github": "GitHub",
   "workflow.trigger.type.discord": "Discord",
+  "workflow.trigger.type.slack": "Slack",
   "workflow.trigger.type": "Type",
   "workflow.trigger.runLastEvent": "Run with last event",
   "workflow.trigger.webhook.address": "Address",
@@ -166,6 +167,7 @@ export const messages = defineMessages("workflow", {
   "workflow.output.sendTo": "Send to",
   "workflow.output.target.github": "GitHub",
   "workflow.output.target.discord": "Discord",
+  "workflow.output.target.slack": "Slack",
   "workflow.output.notifyTitleRow": "Title",
 
   "workflow.discord.server": "Server",
@@ -189,6 +191,9 @@ export const messages = defineMessages("workflow", {
   "workflow.discord.emoji.eyes": "Eyes",
   "workflow.discord.emoji.party": "Party popper",
   "workflow.discord.emoji.cross": "Cross mark",
+  "workflow.slack.workspace": "Workspace",
+  "workflow.slack.chooseWorkspace": "Choose workspace",
+  "workflow.slack.action.reply": "Reply in thread",
 
   "workflow.row.agentPicksFrom": { one: "Agent picks from {count}", other: "Agent picks from {count}" },
   "workflow.row.agentChooses": "Agent chooses",
