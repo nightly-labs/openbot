@@ -447,7 +447,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const avatarFace = createMemo(() => bloubAvatarProfile(draft.avatar.seed, null));
   /** Plush or flat. The saved seed says which, so every app that knows styles draws the same one. */
   const avatarStyle = createMemo(() => avatarStyleForSeed(draft.avatar.seed));
-  const avatarResetSeed = () => avatarDefaultSeed(props.agent.id, avatarStyle());
+  const avatarResetSeed = createMemo(() => avatarDefaultSeed(props.agent.id, avatarStyle()));
   const avatarColorSelected = (choice: AvatarColorChoice) =>
     isAvatarColorChoice(choice, draft.avatar.hue, draft.avatar.color);
   const automaticColorSelected = () => draft.avatar.hue === null && draft.avatar.color === null;
@@ -745,17 +745,26 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
 
   /**
    * Saves a generated face. The automatic colour comes from the seed, so a face on the automatic colour
-   * that the new seed would colour differently keeps `color` as a chosen one.
+   * that the new seed would colour differently keeps `color` as a chosen one. Back on the agent's own
+   * seed, a hue that only kept the colour of that seed is automatic again.
    */
   async function selectGeneratedAvatar(seed: string, color: string): Promise<void> {
-    const keptHue =
-      automaticColorSelected() && bloubAvatarProfile(seed, null).color !== color ? avatarHueForColor(color) : null;
+    const seedColor = bloubAvatarProfile(seed, null).color;
+    let hue: AvatarHue | null | undefined;
+    if (automaticColorSelected() && seedColor !== color) hue = avatarHueForColor(color) ?? undefined;
+    else if (
+      seed === props.agent.id &&
+      draft.avatar.color === null &&
+      draft.avatar.hue === avatarHueForColor(seedColor)
+    ) {
+      hue = null;
+    }
     if (avatarUrl() && !(await setCustomAvatar(null))) return;
     setDraft((state) => {
       state.avatar.seed = seed;
-      if (keptHue !== null) state.avatar.hue = keptHue;
+      if (hue !== undefined) state.avatar.hue = hue;
     });
-    await saveAgentPatch(keptHue === null ? { avatarSeed: seed } : { avatarSeed: seed, avatarHue: keptHue });
+    await saveAgentPatch(hue === undefined ? { avatarSeed: seed } : { avatarSeed: seed, avatarHue: hue });
   }
 
   /** Draws the chosen shape, eyes or style, and keeps the rest of the face. */
@@ -765,11 +774,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     style?: AvatarStyle;
   }): Promise<void> {
     const current = avatarFace();
-    const seed = avatarSeedForFace(
-      props.agent.id,
-      { shape: change.shape ?? current.shape, expression: change.expression ?? current.expression },
-      change.style ?? avatarStyle(),
-    );
+    const face = { shape: change.shape ?? current.shape, expression: change.expression ?? current.expression };
+    const style = change.style ?? avatarStyle();
+    // The agent's own plush face is its ID, so Plush after Flat saves the seed that the agent had.
+    const own = bloubAvatarProfile(props.agent.id, null);
+    const seed =
+      style === "plush" && own.shape === face.shape && own.expression === face.expression
+        ? props.agent.id
+        : avatarSeedForFace(props.agent.id, face, style);
     await selectGeneratedAvatar(seed, current.color);
   }
 

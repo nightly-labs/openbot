@@ -243,7 +243,8 @@ function GeneratedAvatar(props: {
     };
   });
   // A seed that `avatarSeedForFace` made for the flat style draws the Bloub that agents had before the
-  // plush. It shows each mood with the flat faces, and a busy one breathes, as it did then.
+  // plush. It shows each mood with the flat faces, and a busy one breathes. It has no orbit rings, as
+  // the plush has none.
   const flat = createMemo(() => avatarStyleForSeed(props.seed) === "flat");
   const flatAppearance = createMemo(() => {
     const presentation = avatarMoodPresentation(props.mood);
