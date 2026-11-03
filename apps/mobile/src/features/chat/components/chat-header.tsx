@@ -116,6 +116,7 @@ export function ChatHeader({
             agentId={target.id}
             serverId={target.serverId}
             hue={target.avatarHue}
+            color={target.avatarColor}
             seed={target.avatarSeed}
             size={28}
           />

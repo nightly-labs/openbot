@@ -973,11 +973,15 @@ function markerLabel(
 }
 
 function agentTargetStyle(agent: AgentProfile | undefined): string | undefined {
-  return agent ? `--chat-action-agent-color: ${avatarHeadColor(agent.avatarSeed, agent.avatarHue)}` : undefined;
+  return agent
+    ? `--chat-action-agent-color: ${avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor ?? null)}`
+    : undefined;
 }
 
 function agentTargetsStyle(agents: Array<AgentProfile | undefined>): string | undefined {
-  const colors = agents.flatMap((agent) => (agent ? [avatarHeadColor(agent.avatarSeed, agent.avatarHue)] : []));
+  const colors = agents.flatMap((agent) =>
+    agent ? [avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor ?? null)] : [],
+  );
   const mixedColor = colors.reduce<string | undefined>((mix, color, index) => {
     if (!mix) return color;
     const previousColorsWeight = Math.round((index / (index + 1)) * 10_000) / 100;

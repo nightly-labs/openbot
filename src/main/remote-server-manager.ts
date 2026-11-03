@@ -40,6 +40,7 @@ import type {
   SendDirectMessageInput,
   ServerNotificationLevel,
   ServerSummary,
+  SetAgentColorInput,
   SetAgentNotificationLevelInput,
   SetTeamTypingInput,
   TeamInviteSummary,
@@ -60,6 +61,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
@@ -93,6 +95,7 @@ import { contentDispositionFileName } from "./content-disposition";
 import type { HostedServerDesktopService } from "./hosted-server-service";
 import type { PreferenceFileFailure } from "./preference-file";
 import {
+  decodeAgentColorsFromHost,
   decodeAgentNotificationLevelsFromHost,
   decodeAgentSummary,
   decodeDraftAttachment,
@@ -726,6 +729,42 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     );
     this.#rememberLevels(serverId, snapshot);
     return snapshot;
+  }).bind(this);
+
+  /** The agents with the last colours of the server. A server without `agent-colors-v1` has none. */
+  withAgentColors(serverId: string, agents: ClientAgentSummary[]): ClientAgentSummary[] {
+    return this.#refresh.withAgentColors(serverId, agents);
+  }
+
+  /** One agent with the last colour of the server. */
+  agentWithColor(serverId: string, agent: ClientAgentSummary): ClientAgentSummary {
+    return this.#refresh.agentWithColor(serverId, agent);
+  }
+
+  /** Reads the colours of a server with `agent-colors-v1`. A server without it has none to read. */
+  readonly readAgentColors = Effect.fn("RemoteManager.readAgentColors")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+  ) {
+    if (!this.supportsCapability(serverId, AGENT_COLORS_CAPABILITY)) return;
+    const colors = yield* this.request(serverId, AGENT_COLORS_ROUTES.read, decodeAgentColorsFromHost, {
+      method: "POST",
+      body: {},
+    });
+    this.#refresh.rememberAgentColors(serverId, colors);
+  }).bind(this);
+
+  /** Sets or removes the colour of one agent. The caller checks `agent-colors-v1` first. */
+  readonly setAgentColor = Effect.fn("RemoteManager.setAgentColor")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    input: SetAgentColorInput,
+  ) {
+    const colors = yield* this.request(serverId, AGENT_COLORS_ROUTES.set, decodeAgentColorsFromHost, {
+      method: "POST",
+      body: { agentId: input.agentId, color: input.color },
+    });
+    this.#refresh.rememberAgentColors(serverId, colors);
   }).bind(this);
 
   #levelsUnsupported() {
@@ -2097,7 +2136,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       const value = yield* remoteDecode(() =>
         decodeTeamProtocolV1CurrentHttpResponse(image ? "PUT" : "DELETE", url.pathname, response.status, json),
       );
-      return addRemotePreviewUrls(yield* remoteDecode(() => decodeAgentSummary(value)), server.id);
+      const agent = addRemotePreviewUrls(yield* remoteDecode(() => decodeAgentSummary(value)), server.id);
+      return this.#refresh.agentWithColor(server.id, agent);
     },
     (operation) => this.#owned(operation),
   ).bind(this);

@@ -111,7 +111,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   const authorStyle = () => {
     const currentSeed = seed();
     if (own() || currentSeed === undefined) return undefined;
-    return `--message-author-color: ${avatarHeadColor(currentSeed, props.author.agent?.avatarHue ?? null)}`;
+    return `--message-author-color: ${avatarHeadColor(currentSeed, props.author.agent?.avatarHue ?? null, props.author.agent?.avatarColor ?? null)}`;
   };
   const rowClass = () => [
     "message-entry",

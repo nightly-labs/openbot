@@ -1,3 +1,4 @@
+import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -444,8 +445,18 @@ export function agentIpcHandlers({
       }),
       listAgents: scopedQueryHandler({
         local: () => service.listAgents(),
+        // The released agent list has no exact colour, so `agent-colors-v1` gives it on its own route.
         remote: (serverId) =>
-          runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)),
+          runCauseEffect(
+            Effect.all(
+              [
+                remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
+                // A failed read keeps the last colours. An agent without a colour shows its hue.
+                remoteServers.readAgentColors(serverId).pipe(Effect.catch(() => Effect.void)),
+              ],
+              { concurrency: "unbounded" },
+            ).pipe(Effect.map(([agents]) => remoteServers.withAgentColors(serverId, agents))),
+          ),
       }),
       listInstalledSkills: scopedHandler(parseAgentId, {
         local: (agentId) => runCauseEffect(skills.listInstalledForChatTags(agentId)),
@@ -593,13 +604,24 @@ export function agentIpcHandlers({
       }),
       createAgent: scopedHandler(parseCreateAgent, {
         local: (parsed) => runCauseEffect(service.createAgent(parsed, undefined, undefined, host.conversationSender())),
-        remote: (parsed, serverId) =>
-          runCauseEffect(
+        remote: async (parsed, serverId) => {
+          // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.
+          const { avatarColor, ...input } = parsed;
+          const agent = await runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummary, {
               method: "POST",
-              body: parsed,
+              body: input,
             }),
-          ),
+          );
+          if (!avatarColor || !remoteServers.supportsCapability(serverId, AGENT_COLORS_CAPABILITY)) return agent;
+          // The agent exists, so a failed colour change does not fail the create: the agent keeps its hue.
+          await runCauseEffect(
+            remoteServers
+              .setAgentColor(serverId, { agentId: agent.id, color: avatarColor })
+              .pipe(Effect.catch(() => Effect.void)),
+          );
+          return remoteServers.agentWithColor(serverId, agent);
+        },
       }),
       duplicateAgent: scopedHandler(parseAgentId, {
         local: (agentId) =>
@@ -646,18 +668,31 @@ export function agentIpcHandlers({
           }
           // The released agent route does not carry the account, so it changes on its own route after
           // the rest: a provider change on the host returns the agent to the new provider's own sign-in.
-          const { providerAccountId, ...update } = input;
+          const { providerAccountId, avatarColor, ...fields } = input;
           if (
             providerAccountId !== undefined &&
             !remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNTS_CAPABILITY)
           )
             throw new Error(sourceText("error.team.providersUnsupported"));
-          const agent = await runCauseEffect(
+          // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on
+          // its own route first. That route also sets the nearest hue, so the profile change then leaves
+          // the hue out: on the released route a hue removes the colour. A removed colour keeps the hue,
+          // which then sets the colour that the user chose. Without the capability, only the hue goes.
+          const colors = remoteServers.supportsCapability(serverId, AGENT_COLORS_CAPABILITY);
+          const { avatarHue, ...rest } = fields;
+          const update = colors && avatarColor ? rest : fields;
+          if (colors && avatarColor !== undefined)
+            await runCauseEffect(remoteServers.setAgentColor(serverId, { agentId: input.agentId, color: avatarColor }));
+          const patched = await runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
               method: "PATCH",
               body: update,
             }),
           );
+          // A hue alone removes the colour on the host. Read the colours again, so the answer has none.
+          if (colors && avatarColor === undefined && avatarHue !== undefined)
+            await runCauseEffect(remoteServers.readAgentColors(serverId).pipe(Effect.catch(() => Effect.void)));
+          const agent = remoteServers.agentWithColor(serverId, patched);
           if (providerAccountId === undefined) return agent;
           await runCauseEffect(
             remoteServers.request(serverId, PROVIDER_ACCOUNTS_ROUTES.agent, acceptEmpty, {

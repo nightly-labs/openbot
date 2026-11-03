@@ -38,6 +38,7 @@ import type {
   AgentTemplatePublication,
   ApplyAgentImportInput,
   ApplyInstanceTransferInput,
+  AvatarColor,
   AvatarHue,
   AvatarImageInput,
   BitwardenConnectorStatus,
@@ -231,6 +232,11 @@ export interface MobileAgent {
   avatarUrl?: string | null;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /**
+   * The exact colour, which wins over `avatarHue`. Only a host with `agent-colors-v1` gives it, through
+   * its own route; else it is null.
+   */
+  avatarColor: AvatarColor | null;
   /** The Marketplace listing the agent was added from, and the listing version it has. */
   marketplaceSource?: { listingId: string; version: number } | undefined;
 }
@@ -598,6 +604,10 @@ export interface MobileWorkspaceContextValue {
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
   /** Creates an agent on the active server and returns its id. */
   createAgent: (input: CreateAgentInput) => Promise<string>;
+  /**
+   * Changes an agent. A host with `agent-colors-v1` gets `avatarColor` through its colour route, and
+   * sets the hue itself. An older host gets only `avatarHue`, the nearest hue of the colour.
+   */
   updateAgent: (input: UpdateAgentInput, serverId?: string) => Promise<void>;
   setAgentAvatar: (agentId: string, image: RemoteFileUpload | null, serverId: string) => Promise<void>;
   loadAgentAvatar: (agentId: string, avatarUrl: string, serverId: string) => Promise<string>;

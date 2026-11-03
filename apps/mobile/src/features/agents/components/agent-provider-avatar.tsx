@@ -26,6 +26,7 @@ export function AgentProviderAvatar({ agent, size }: { agent: MobileAgent; size:
         agentId={agent.id}
         serverId={agent.serverId}
         hue={agent.avatarHue}
+        color={agent.avatarColor}
         seed={agent.avatarSeed}
         size={size}
       />

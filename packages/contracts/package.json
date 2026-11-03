@@ -166,6 +166,7 @@
     "./team-protocol/providers-v4": "./src/team-protocol/providers-v4.ts",
     "./team-protocol/acp-registry-v1": "./src/team-protocol/acp-registry-v1.ts",
     "./team-protocol/agent-access-v1": "./src/team-protocol/agent-access-v1.ts",
+    "./team-protocol/agent-colors-v1": "./src/team-protocol/agent-colors-v1.ts",
     "./team-protocol/agent-hidden-v1": "./src/team-protocol/agent-hidden-v1.ts",
     "./team-protocol/agent-notification-levels-v1": "./src/team-protocol/agent-notification-levels-v1.ts",
     "./team-protocol/sidebar-pins-v1": "./src/team-protocol/sidebar-pins-v1.ts",

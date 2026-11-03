@@ -4,6 +4,7 @@
 
 import { type AgentProviderId, isAgentProvider } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
+import { type AgentColorEntry, isAgentColors } from "./ipc-agent-colors";
 import { type AgentNotificationLevelEntry, isAgentNotificationLevelsSnapshot } from "./ipc-agent-notification-levels";
 import { type AgentRuntimeSnapshot, isAgentRuntimeSnapshot } from "./ipc-agent-runtime";
 import type { AccountUsage, AgentStatus } from "./ipc-agent-status";
@@ -60,6 +61,8 @@ export type AgentEvent =
   | { type: "sidebar-layout-changed"; layout: SidebarLayoutSnapshot }
   /** The whole hidden list, in the `agent-hidden-v1` wire shape, so the Team API sends it as it is. */
   | { type: "hidden-agents-changed"; agents: HiddenAgent[] }
+  /** The whole list of exact agent colours, in the `agent-colors-v1` wire shape. */
+  | { type: "agent-colors-changed"; agents: AgentColorEntry[] }
   /**
    * The user's own notification levels on this server changed on one of their devices. Only the
    * connections of that member get it (`agent-notification-levels-v1`), with all of their levels.
@@ -214,6 +217,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isSidebarLayoutSnapshot(value.layout);
     case "hidden-agents-changed":
       return isHiddenAgentsSnapshot({ agents: value.agents });
+    case "agent-colors-changed":
+      return isAgentColors({ agents: value.agents });
     case "agent-notification-levels-changed":
       return isAgentNotificationLevelsSnapshot({ server: value.server, agents: value.agents });
     case "sidebar-pins-changed":

@@ -101,6 +101,7 @@ function AgentChoice({ node, agents }: { node: WorkflowNode; agents: readonly Mo
               agentId={agent.id}
               serverId={agent.serverId}
               hue={agent.avatarHue}
+              color={agent.avatarColor}
               seed={agent.avatarSeed}
               size={30}
               animateIdle={false}

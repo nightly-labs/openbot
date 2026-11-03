@@ -1,3 +1,4 @@
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { ConversationMessage } from "@openbot/contracts/ipc";
 import { markdownPlainText } from "@openbot/contracts/markdown-preview-text";
@@ -18,7 +19,6 @@ import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { MobileConversationAnalytics } from "@/features/analytics/conversation";
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
@@ -643,9 +643,11 @@ export function ChatView({
   const voiceColors = useMemo(
     () =>
       voiceAgent
-        ? [getBloubAvatarColor(voiceAgent.avatarSeed, voiceAgent.avatarHue)]
+        ? [avatarHeadColor(voiceAgent.avatarSeed, voiceAgent.avatarHue, voiceAgent.avatarColor)]
         : target.kind === "channel"
-          ? target.members.slice(0, 4).map((member) => getBloubAvatarColor(member.avatarSeed, member.avatarHue))
+          ? target.members
+              .slice(0, 4)
+              .map((member) => avatarHeadColor(member.avatarSeed, member.avatarHue, member.avatarColor))
           : [],
     [voiceAgent, target],
   );
@@ -1244,6 +1246,7 @@ export function ChatView({
                         serverId={target.serverId}
                         seed={voiceAgent.avatarSeed}
                         hue={voiceAgent.avatarHue}
+                        color={voiceAgent.avatarColor}
                       />
                     ) : undefined
                   }

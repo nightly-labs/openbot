@@ -6,6 +6,7 @@ import { ACP_REGISTRY_CAPABILITY } from "./acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "./agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
+import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "./agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "./agent-hidden-v1";
@@ -167,6 +168,7 @@ export {
   AGENT_ACCESS_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
+  AGENT_COLORS_CAPABILITY,
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FOLDERS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
@@ -422,6 +424,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   COMPUTER_ACTIVITY_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
   AGENT_THREAD_REPLIES_CAPABILITY,
+  AGENT_COLORS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -579,7 +582,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== LOCAL_SERVERS_CAPABILITY &&
     capability !== COMPUTER_ACTIVITY_CAPABILITY &&
     capability !== MODEL_VISIBILITY_CAPABILITY &&
-    capability !== AGENT_THREAD_REPLIES_CAPABILITY,
+    capability !== AGENT_THREAD_REPLIES_CAPABILITY &&
+    capability !== AGENT_COLORS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -613,6 +617,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   COMPUTER_ACTIVITY_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
   AGENT_THREAD_REPLIES_CAPABILITY,
+  AGENT_COLORS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -729,6 +734,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== LOCAL_SERVERS_CAPABILITY &&
       capability !== COMPUTER_ACTIVITY_CAPABILITY &&
       capability !== MODEL_VISIBILITY_CAPABILITY &&
-      capability !== AGENT_THREAD_REPLIES_CAPABILITY,
+      capability !== AGENT_THREAD_REPLIES_CAPABILITY &&
+      capability !== AGENT_COLORS_CAPABILITY,
   );
 }

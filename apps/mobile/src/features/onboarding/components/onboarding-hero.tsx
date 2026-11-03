@@ -1,5 +1,6 @@
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
-import type { AvatarHue } from "@openbot/contracts/ipc";
+import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { View, type ViewInstance } from "react-native";
 import Animated, {
@@ -13,9 +14,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import type { OnboardingMotion } from "@/features/onboarding/components/onboarding-motion";
 import { SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 
@@ -85,6 +84,7 @@ export function HeroSlot({ size }: { size: number }) {
 export function OnboardingHero({
   seed,
   hue,
+  color,
   mood,
   slot,
   origin,
@@ -96,6 +96,8 @@ export function OnboardingHero({
 }: {
   seed: string;
   hue: AvatarHue | null;
+  /** The agent's `avatarColor`. It wins over `hue`. */
+  color: AvatarColor | null;
   mood: AvatarMood;
   /** The target, in window coordinates. */
   slot: HeroSlotRect | null;
@@ -193,7 +195,7 @@ export function OnboardingHero({
   });
   // The glow belongs to the large slots. Next to a title it would only blur the text. Only its
   // opacity animates: a shadow redrawn on every frame is expensive on Android.
-  const glowColor = getBloubAvatarColor(seed, hue);
+  const glowColor = avatarHeadColor(seed, hue, color);
   const glowStyle = useAnimatedStyle(() => ({
     opacity: Math.max(0, Math.min(1, (scale.get() * HERO_SIZE - 70) / 50)),
   }));
@@ -222,7 +224,15 @@ export function OnboardingHero({
       />
       {/* Only the hero animates its face while it shows; hidden, it is not drawn at all. */}
       {drawn ? (
-        <BloubAvatarPreview seed={seed} hue={hue} size={HERO_SIZE} mood={mood} animateIdle={full} transition="pop" />
+        <BloubAvatarPreview
+          seed={seed}
+          hue={hue}
+          color={color}
+          size={HERO_SIZE}
+          mood={mood}
+          animateIdle={full}
+          transition="pop"
+        />
       ) : null}
     </Animated.View>
   );

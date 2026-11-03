@@ -257,6 +257,34 @@ A joined desktop, the web client and the mobile app use the optional `agent-hidd
 owner or an admin hides or restores an agent on a host.
 `/v1/agents` and the released agent codecs do not carry `hiddenAt`.
 
+## Exact agent colours
+
+An agent can have an exact colour, `avatarColor` (`#rrggbb`, lower case). The store also keeps the
+nearest released `avatarHue`, so an older app draws a near colour. `avatarColor: null` removes the
+colour. A hue change without a colour removes the colour too.
+
+The released Team API codecs remove `avatarColor`. A joined desktop and the web client use the
+optional `agent-colors-v1` capability (`packages/contracts/src/team-protocol/agent-colors-v1.ts`,
+protocol 9 only). Host route `routeAgentColors` (`src/main/team-api/route-agent-colors.ts`):
+
+- `POST /v1/agent-colors` gives `{agents: [{agentId, color}]}` for the agents that the member can
+  see. An agent that is not in the list draws its hue.
+- `POST /v1/agent-colors/set` takes `{agentId, color | null}`. It needs manage access to the agent,
+  as the avatar on the released agent route, and goes through `agents.updateAgent`.
+- After each `agents-changed`, the host compares the colour list with the list that it sent last. When
+  the list changed, it sends `agent-colors-changed` with the whole list to each peer that has the
+  capability, without the agents that the peer cannot see. A peer that declares the capability on
+  the event socket gets the list at once.
+
+The main process of a joined desktop keeps the last list of each server
+(`RemoteServerEventRefresh`). It puts the colours into each `agents-changed` list and each agent
+result, so the renderer does not get `agent-colors-changed`. A save with a colour or `null` calls the
+set route first. With a colour, the released `PATCH` then leaves out `avatarHue`, because a hue on
+that route removes the colour. With `null`, the hue stays on the `PATCH`. A server without the
+capability gets only the hue. A create sends the hue, then sets the colour; a failed colour change
+does not fail the create. The web client (`web-runtime.ts`, `web-client-context.tsx`) does the same
+and keeps the list in its state.
+
 ## Sidebar folders
 
 The sidebar groups chats in folders. In the stored layout and the released contracts a folder is a
