@@ -198,4 +198,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Actualiza este servidor de escritorio para eliminar canales.",
   "error.remote.historyRefreshFailed": "El mensaje se envió, pero no se pudo actualizar el historial del chat.",
   "error.remote.taskHistoryRefreshFailed": "La tarea se cambió, pero no se pudo actualizar el historial del chat.",
+  "error.remote.localServerAccountRemovalFailed":
+    "El servidor está eliminado en su ordenador, pero la cuenta aún lo muestra. Elimínalo otra vez para quitarlo de la cuenta.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -303,14 +303,25 @@ export class LocalServers {
   });
 
   /** Moves the server's database, agents and files to the Trash. */
-  /** A delete from another device answers after the account service removed the server, or refused to. */
+  /**
+   * A delete from another device answers after the account service removed the server, and fails when
+   * it did not: the device would list the server again. The same delete again then repeats only the
+   * account removal, because the server is already gone from this computer.
+   */
   readonly delete = Effect.fn("LocalServers.delete")(function* (
     this: LocalServers,
     serverId: string,
     from: "desktop" | "device" = "desktop",
   ) {
-    const entry = yield* this.#entry(serverId);
-    yield* this.#forget(entry, from === "device");
+    const entry = this.#registry.findByServerId(serverId);
+    if (from === "desktop" || !this.#registry.removedHostIds.includes(serverId) || entry)
+      yield* this.#forget(yield* this.#entry(serverId), from === "desktop");
+    if (from === "desktop") return;
+    yield* this.#accountSteps.withPermit(this.#removeDeletedHosts());
+    if (this.#registry.removedHostIds.includes(serverId))
+      return yield* new LocalServerFailure({
+        cause: new Error(sourceText("error.remote.localServerAccountRemovalFailed")),
+      });
   });
 
   readonly stop = Effect.fn("LocalServers.stop")(function* (this: LocalServers) {
@@ -607,7 +618,7 @@ export class LocalServers {
   readonly #forget = Effect.fn("LocalServers.forget")(function* (
     this: LocalServers,
     entry: StoredLocalServer,
-    awaitAccount = false,
+    removeFromAccount = true,
   ) {
     yield* this.#stopChild(entry);
     const paths = this.#paths(entry);
@@ -630,11 +641,8 @@ export class LocalServers {
     this.#ready.delete(entry.id);
     if (serverId) yield* this.#options.remoteServers.detachLocalServer(serverId, true).pipe(toLocalServerFailure);
     this.#announce();
-    if (this.#options.account.accountId() !== null) {
-      const remove = this.#accountSteps.withPermit(this.#removeDeletedHosts());
-      if (awaitAccount) yield* remove;
-      else this.#background(remove);
-    }
+    if (removeFromAccount && this.#options.account.accountId() !== null)
+      this.#background(this.#accountSteps.withPermit(this.#removeDeletedHosts()));
   });
 }
 
