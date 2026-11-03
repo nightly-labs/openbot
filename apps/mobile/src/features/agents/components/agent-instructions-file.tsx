@@ -66,6 +66,15 @@ export function AgentInstructionsFileEditor({ agent, available }: { agent: Mobil
     ]);
   });
 
+  async function saved(next: AgentInstructionsFile): Promise<void> {
+    // A read that an event started before the save must not put the old file back.
+    await queryClient.cancelQueries({ queryKey, exact: true });
+    queryClient.setQueryData<AgentInstructionsFile>(queryKey, next);
+    setEdited(undefined);
+    setBase(undefined);
+    void haptics.notification("success");
+  }
+
   async function save(): Promise<void> {
     if (!file.data || !dirty || tooLong || pending.current) return;
     pending.current = true;
@@ -74,16 +83,16 @@ export function AgentInstructionsFileEditor({ agent, available }: { agent: Mobil
     const expected = base ?? file.data.text;
     try {
       const next = await workspace.saveAgentInstructions({ agentId: agent.id, text, expected }, agent.serverId);
-      queryClient.setQueryData<AgentInstructionsFile>(queryKey, next);
-      setEdited(undefined);
-      setBase(undefined);
-      void haptics.notification("success");
+      await saved(next);
     } catch (cause) {
+      const latest = await workspace.loadAgentInstructions(agent.id, agent.serverId).catch(() => null);
+      // The host wrote the file, but its answer did not arrive.
+      if (latest?.text === text) {
+        await saved(latest);
+        return;
+      }
       void haptics.notification("error");
-      const current = await workspace.loadAgentInstructions(agent.id, agent.serverId).then(
-        (latest) => latest.text,
-        () => null,
-      );
+      const current = latest?.text ?? null;
       if (current !== null && current !== expected) {
         setBase(current);
         setError(t("mobile.agent.instructionsFile.changed"));
@@ -94,7 +103,8 @@ export function AgentInstructionsFileEditor({ agent, available }: { agent: Mobil
     }
   }
 
-  if (file.isError)
+  // A failed read again keeps the file and the user's text on the page.
+  if (file.isError && !file.data)
     return (
       <>
         <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">

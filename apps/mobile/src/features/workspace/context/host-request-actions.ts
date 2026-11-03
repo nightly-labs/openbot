@@ -813,7 +813,7 @@ export function createHostRequestActions({
       await request("POST", TEAM_API_ROUTES.agent.routineTest(agentId, routineId), ignoreResponse, undefined, serverId);
     },
     loadAgentModels: async (serverId) => {
-      const models = await request(
+      const models = request(
         "GET",
         TEAM_API_ROUTES.agents.models,
         (value) => {
@@ -832,10 +832,11 @@ export function createHostRequestActions({
       // its own route, as for desktop. The tiers are optional: when that route fails, the models
       // show with no Fast mode switch.
       if (!has(serverId, AGENT_FAST_MODE_CAPABILITY)) return models;
-      const fast = await request("POST", AGENT_FAST_MODE_ROUTES.models, decodeAgentFastModels, {}, serverId).catch(
-        () => [],
-      );
-      return withFastServiceTiers(models, fast);
+      const [options, fast] = await Promise.all([
+        models,
+        request("POST", AGENT_FAST_MODE_ROUTES.models, decodeAgentFastModels, {}, serverId).catch(() => []),
+      ]);
+      return withFastServiceTiers(options, fast);
     },
     loadAgentMemorySelection: (agentId, serverId) =>
       runTeamRequest(

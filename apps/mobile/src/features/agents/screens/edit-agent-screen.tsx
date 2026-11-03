@@ -411,7 +411,12 @@ function AgentForm({
             setAccount(value);
             setError(null);
           }}
-          fastMode={{ agent, server: host, available }}
+          // The switch saves at once, for the saved model. An unsaved model change hides it.
+          fastMode={
+            provider === agent.provider && (edits.model ?? agent.model) === agent.model
+              ? { agent, server: host, available }
+              : undefined
+          }
         />
       ) : null}
       {page === "backup-models" ? <AgentBackupModelsPage agent={agent} server={host} available={available} /> : null}
