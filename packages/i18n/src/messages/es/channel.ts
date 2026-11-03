@@ -17,6 +17,9 @@ export const messages = {
   "channel.panel.close": "Cerrar panel del canal",
   "channel.settings.title": "Ajustes del canal",
   "channel.settings.memories": "Recuerdos",
+  "channel.settings.isolated": "Guardar los recuerdos en este canal",
+  "channel.settings.isolatedDescription":
+    "Los agentes guardan lo que aprenden aquí como recuerdos del canal. Sus otros chats no los ven.",
   "channel.settings.memoryCount": {
     one: "{count} guardado",
     other: "{count} guardados",

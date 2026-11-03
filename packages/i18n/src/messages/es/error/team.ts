@@ -104,6 +104,7 @@ export const messages = {
   "error.team.folderUnavailable": "Esta carpeta no está disponible en el ordenador anfitrión.",
   "error.team.memoryReviewUnsupported": "Esta conexión no admite la revisión de recuerdos.",
   "error.team.promptCacheTtlUnsupported": "Esta conexión no admite la duración de la caché de prompts.",
+  "error.team.modelVisibilityUnsupported": "Esta conexión no admite la lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexión no admite el proveedor predeterminado.",
   "error.team.attachmentNameRequired": "Se requiere un nombre seguro para el archivo adjunto.",
   "error.team.attachmentNotFound": "No se encontró el archivo adjunto.",

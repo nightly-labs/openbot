@@ -33,7 +33,7 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { isOpenCodeInternalFailure } from "./../acp-flavor-opencode";
-import { startAcpAuthentication } from "./../acp-sign-in";
+import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import {
@@ -1548,7 +1548,9 @@ export class ProviderRuntime implements ProviderPort {
                   }
                 : {}),
               privateTemp: temp && { ...temp, provider: providerLabel(provider) },
-              ...(provider === "antigravity" ? { openGoogleSignIn: openExternal } : {}),
+              ...(provider === "antigravity" && googleSignInByOpenBot(onHost)
+                ? { openGoogleSignIn: openExternal }
+                : {}),
             }).pipe(
               // A sign-in that stops after the sign-out leaves no account behind it.
               Effect.map((login) => ({

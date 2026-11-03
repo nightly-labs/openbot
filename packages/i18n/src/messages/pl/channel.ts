@@ -17,6 +17,9 @@ export const messages = {
   "channel.panel.close": "Zamknij panel kanału",
   "channel.settings.title": "Ustawienia kanału",
   "channel.settings.memories": "Wspomnienia",
+  "channel.settings.isolated": "Zachowaj wspomnienia w tym kanale",
+  "channel.settings.isolatedDescription":
+    "Agenci zapisują to, czego się tu nauczą, jako wspomnienia kanału. Ich inne czaty ich nie widzą.",
   "channel.settings.memoryCount": {
     one: "{count} zapisane",
     few: "{count} zapisane",

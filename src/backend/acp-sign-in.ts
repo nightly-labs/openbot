@@ -30,6 +30,17 @@ function serverReason(error: unknown): string | null {
 }
 
 /**
+ * Whether OpenBot, not the Gemini server, opens the Google sign-in page (`openGoogleSignIn`).
+ *
+ * On Windows, the server with `BROWSER=true` never prints the page (#4521), so a sign-in at this
+ * computer lets the server open the page itself. `onHost`: the user is at another device, and the
+ * page must not open here.
+ */
+export function googleSignInByOpenBot(onHost: boolean): boolean {
+  return onHost || process.platform !== "win32";
+}
+
+/**
  * A sign-in that is an ACP `authenticate` call, for a server that has no login command.
  *
  * The call runs in a process of its own, not in the client that serves turns: the server opens the
@@ -54,7 +65,8 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
   onLoggedOut?: () => void;
   /**
    * Gemini prints its Google page instead of opening it, and OpenBot opens it, so a launch that fails
-   * shows an error. When the server opened it itself, a failure showed nothing (#3520).
+   * shows an error. When the server opened it itself, a failure showed nothing (#3520). Without it,
+   * the server opens the page itself (`googleSignInByOpenBot`).
    */
   openGoogleSignIn?: (url: string) => Promise<void>;
   /** A temporary folder of its own for the process (`provider-temp.ts`). */

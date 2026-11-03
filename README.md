@@ -504,6 +504,9 @@ Set `OPENBOT_DEV_ICE_TRANSPORT_POLICY=relay` before this command to force Team A
 coturn. This test option works only with the development renderer. Production always starts with `all`.
 Set `OPENBOT_DEV_SYNC_PROFILE=1` as well to let `bun run perf:remote` read the host requests of the
 desktop client.
+Set `OPENBOT_DEV_AWAY_SECONDS=<seconds>` to change the time without input on the computer after which
+a phone gets the notifications of a host (30 seconds by default), for example `5` to test it. The host
+and the desktop client of the stack both read it. A packaged app ignores it.
 
 The normal `check` command is offline and uses a fake App Server. Manual smoke scripts may use the
 signed-in subscription and must not run in CI.

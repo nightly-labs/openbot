@@ -29,6 +29,7 @@ export const messages = {
   "uiBlock.form.choose": "옵션을 선택하세요",
   "uiBlock.form.notSet": "설정 안 됨",
   "uiBlock.form.invalid": "올바르지 않은 답변이 있어요. 확인한 다음 다시 시도해 주세요.",
+  "uiBlock.form.hiddenValue": "숨김",
   "uiBlock.skip": "건너뛰기",
   "uiBlock.error.answerFailed": "답변을 보내지 못했어요. 다시 시도해 주세요.",
 } as const satisfies PartialTranslation<typeof source>;

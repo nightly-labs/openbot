@@ -16,6 +16,9 @@ export const messages = defineMessages("channel", {
   "channel.panel.close": "Close channel panel",
   "channel.settings.title": "Channel settings",
   "channel.settings.memories": "Memories",
+  "channel.settings.isolated": "Keep memories in this channel",
+  "channel.settings.isolatedDescription":
+    "Agents save what they learn here as channel memories. Their other chats do not see them.",
   "channel.settings.memoryCount": { one: "{count} saved", other: "{count} saved" },
   "channel.settings.routines": "Routines",
   "channel.settings.routineCount": { one: "{count} configured", other: "{count} configured" },
