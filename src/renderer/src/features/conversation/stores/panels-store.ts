@@ -233,6 +233,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
 
   function setActiveRightPanel(mode: RightPanelMode, agentId = conversationOwnerId(deps.props)) {
     if (!agentId) return;
+    // A file read that is still running must not replace what the panel shows now.
+    if (mode !== "file-preview") deps.invalidateFilePreviewGeneration();
     if (mode !== "settings") {
       setSkillSettingsRequest(null);
       setInstructionsSettingsRequest(null);
@@ -271,8 +273,6 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     setPanels((draft) => {
       draft.threads[agentId] = threadId;
     });
-    // A file read that is still running must not replace the thread.
-    deps.invalidateFilePreviewGeneration();
     setActiveRightPanel("thread", agentId);
   }
 
@@ -315,8 +315,6 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   }
 
   function hideBrowserPanel() {
-    // A file read that is still running must not open the panel again.
-    deps.invalidateFilePreviewGeneration();
     setActiveRightPanel("none");
     if (deps.props.browserEnabled !== false)
       void conversationRuntime(deps.props).browser.setVisible({ visible: false });

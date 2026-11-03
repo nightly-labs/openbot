@@ -488,8 +488,6 @@ export function createConversationViewScope(props: ConversationProps) {
     if (browserTabs().length === 0) void openBrowserAddress();
   }
   function openSidePanelPane(pane: SidePanelPane) {
-    // A file read that is still running must not replace the pane.
-    resources.filePreviewRequestGeneration += 1;
     if (pane === "browser") showBrowserPanel();
     else setActiveRightPanel(SIDE_PANEL_MODES[pane]);
   }
