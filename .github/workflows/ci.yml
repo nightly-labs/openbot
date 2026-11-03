@@ -646,6 +646,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-mcp-load-failure
 
+      - name: Run the Antigravity expired token E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-expired-token
+
       - name: Run the Antigravity tool filter E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-tool-filter
@@ -737,6 +741,7 @@ jobs:
             .openbot-build/codex-login-path-e2e/
             .openbot-build/antigravity-login-path-e2e/
             .openbot-build/antigravity-mcp-load-failure-e2e/
+            .openbot-build/antigravity-expired-token-e2e/
             .openbot-build/antigravity-tool-filter-e2e/
             .openbot-build/acp-additional-directories-e2e/
             .openbot-build/acp-flavor-e2e/

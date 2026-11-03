@@ -488,6 +488,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     string,
     Deferred.Deferred<{ thread: { id: string } }, ProviderClientOperationError>
   >();
+  /**
+   * The own processes of sessions that are still opening. No thread holds them yet, so a stop must
+   * end them here: a Gemini process with a refused token waits five minutes for a browser sign-in,
+   * and then deletes the saved token.
+   */
+  readonly #openingSessionProcesses = new Set<AcpConnection>();
   /** Session loads currently being consumed as history. These updates must never become live turns. */
   readonly #historyReplays = new Map<string, HistoryReplay>();
   /** The updates of each background replay's `session/load`, by session. */
@@ -743,6 +749,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           yield* Effect.forEach(
             threads,
             (thread) => (thread.transport ? thread.transport.stop(Effect.void).pipe(Effect.ignore) : Effect.void),
+            { concurrency: "unbounded", discard: true },
+          );
+          yield* Effect.forEach(
+            this.#openingSessionProcesses,
+            (transport) => transport.stop(Effect.void).pipe(Effect.ignore),
             { concurrency: "unbounded", discard: true },
           );
           this.#startingThreads.clear();
@@ -1301,16 +1312,25 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const thread = owner();
       if (thread?.transport === transport) thread.needsResume = true;
     });
+    this.#openingSessionProcesses.add(transport);
     const startTimeout = this.#startTimeout(this.#startTimeoutMs ?? this.#requestTimeoutMs);
     yield* Effect.gen({ self: this }, function* () {
-      yield* providerSync(() => transport.start());
+      yield* providerSync(() => {
+        // A stop that started before this spawn did not see the process. In the same step, so no stop starts between.
+        if (!this.running) throw new Error("ACP client is not running.");
+        transport.start();
+      });
       const connection = yield* providerSync(() => transport.requireConnection());
       const initialization = yield* this.#initializeConnection(connection).pipe(startTimeout);
       yield* (this.options.authenticate?.(connection, initialization) ?? Effect.void).pipe(startTimeout);
     }).pipe(
       // Read before the stop: a stopped process no longer says how it ended.
       Effect.catch((failure) => this.#explainSessionEnd(transport, failure.cause).pipe(Effect.flatMap(Effect.fail))),
-      Effect.onExit((exit) => (Exit.isSuccess(exit) ? Effect.void : transport.stop(Effect.void).pipe(Effect.ignore))),
+      Effect.onExit((exit) => {
+        if (Exit.isSuccess(exit)) return Effect.void;
+        this.#openingSessionProcesses.delete(transport);
+        return transport.stop(Effect.void).pipe(Effect.ignore);
+      }),
     );
     return transport;
   });
@@ -1607,11 +1627,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             retained = true;
             return { thread: { id } };
           } catch (error) {
+            // The server asked for a browser sign-in while the session opened, and the stop ended it.
+            if (!this.#signedIn) return yield* providerFailure(new Error(this.options.signInMessage));
             return yield* transport ? yield* this.#explainSessionEnd(transport, error) : providerFailure(error);
           }
         }),
       (mcp) =>
-        Effect.gen(function* () {
+        Effect.gen({ self: this }, function* () {
+          if (transport) this.#openingSessionProcesses.delete(transport);
           if (retained) return;
           mcp.close();
           if (transport) yield* transport.stop(Effect.void).pipe(Effect.ignore);
