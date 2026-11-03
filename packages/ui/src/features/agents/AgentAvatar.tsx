@@ -22,7 +22,8 @@ interface PlushMood {
 /*
  * How each mood shows on the plush. Only the eyes and the plush's own felt pieces move; the body, which
  * is the agent's identity, stays still and keeps its colour. No ring, glow or dimming is added round
- * it: a working agent looks up while three felt dots pulse beside it, a waiting one shows a felt dot,
+ * it: a working agent looks up while three felt dots pulse beside it (or, with `workingFaces`, changes
+ * faces with no dots), a waiting one shows a felt dot,
  * a failed turn lowers its eyes and shakes "no" once, and an asleep agent closes its eyes as z's rise.
  */
 const PLUSH_MOODS: Readonly<Record<AvatarMood, PlushMood>> = {
@@ -54,6 +55,32 @@ const HOVER_FACES: readonly HoverFace[] = [
   { state: "idle", expression: "attentif" },
   { state: "idle", expression: "curieux" },
 ];
+
+/**
+ * The faces of a working plush that plays no felt dots. It shows each one for a random time, in a
+ * random order, so two working agents never change together. All the faces are here, the silly ones
+ * too: the change, not the face, says that the agent works.
+ */
+const WORKING_FACES: readonly ExpressionId[] = [
+  "neutre",
+  "attentif",
+  "surpris",
+  "excite",
+  "heureux",
+  "hilare",
+  "colere",
+  "triste",
+  "effraye",
+  "mefiant",
+  "confus",
+  "curieux",
+  "fier",
+  "timide",
+  "blase",
+  "somnolent",
+];
+const WORKING_FACE_MIN_MS = 700;
+const WORKING_FACE_MAX_MS = 3200;
 
 /** A photo has no face to move, so a busy agent's photo breathes: a slow scale of the whole circle. */
 const PHOTO_BREATHE = "0.03";
@@ -99,6 +126,11 @@ interface AgentAvatarProps {
    * avatars show. A photo avatar and reduced motion ignore it.
    */
   followPointer?: boolean;
+  /**
+   * A working plush changes to random faces at random times and plays no felt dots. Use it only where
+   * a mark beside the avatar already shows the work, such as the sidebar badge.
+   */
+  workingFaces?: boolean;
   class?: string;
   style?: Record<string, string>;
 }
@@ -139,6 +171,7 @@ export function AgentAvatar(props: AgentAvatarProps) {
           expression={props.expression}
           transition={props.transition ?? "pop"}
           followPointer={props.followPointer === true}
+          workingFaces={props.workingFaces === true}
           class={className()}
           style={props.style}
         />
@@ -172,13 +205,21 @@ function GeneratedAvatar(props: {
   expression?: ExpressionId | undefined;
   transition: PlushTransition;
   followPointer: boolean;
+  workingFaces: boolean;
   class: string;
   style?: Record<string, string> | undefined;
 }) {
   let element: HTMLSpanElement | undefined;
   const [interacting, setInteracting] = createSignal(false);
   const [reducedMotion, setReducedMotion] = createSignal(prefersReducedMotion());
-  const plushMood = createMemo(() => PLUSH_MOODS[props.mood]);
+  const cyclesFaces = () => props.workingFaces && props.mood === "working";
+  const [workingFace, setWorkingFace] = createSignal<ExpressionId>(nextWorkingFace(null));
+  const plushMood = createMemo(
+    (): PlushMood =>
+      cyclesFaces()
+        ? { state: "idle", expression: reducedMotion() ? "attentif" : workingFace(), busy: true }
+        : PLUSH_MOODS[props.mood],
+  );
   const profile = createMemo(() => bloubAvatarProfile(props.seed, props.hue));
   const restingExpression = () => props.expression ?? profile().expression;
   // A preview of a chosen shape or eyes keeps the face it shows, so the choice stays visible on hover.
@@ -203,6 +244,26 @@ function GeneratedAvatar(props: {
   // A mood that carries its own motion has to be seen without being pointed at, and so do eyes that
   // follow the pointer; the resting moods keep the hover gating that the perf note above is about.
   const animated = () => props.followPointer || plushMood().busy || !STATIC_MOTIONS.has(props.motion) || interacting();
+
+  // Reduced motion keeps one face: it is a frozen plush, and a frozen plush cannot morph between faces.
+  createEffect(
+    () => cyclesFaces() && !reducedMotion(),
+    (cycling) => {
+      if (!cycling) return;
+      let timer = 0;
+      const schedule = () => {
+        timer = window.setTimeout(
+          () => {
+            setWorkingFace((current) => nextWorkingFace(current));
+            schedule();
+          },
+          WORKING_FACE_MIN_MS + Math.random() * (WORKING_FACE_MAX_MS - WORKING_FACE_MIN_MS),
+        );
+      };
+      schedule();
+      return () => window.clearTimeout(timer);
+    },
+  );
 
   onSettled(() => {
     const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
@@ -314,6 +375,12 @@ function GeneratedAvatar(props: {
 function randomHoverFace(previous: HoverFace | null, resting: ExpressionId): HoverFace {
   const choices = HOVER_FACES.filter((face) => face !== previous && face.expression !== resting);
   return choices[Math.floor(Math.random() * choices.length)] ?? HOVER_WINK;
+}
+
+/** A random working face other than the one on screen, so each change shows. */
+function nextWorkingFace(current: ExpressionId | null): ExpressionId {
+  const choices = WORKING_FACES.filter((face) => face !== current);
+  return choices[Math.floor(Math.random() * choices.length)] ?? "attentif";
 }
 
 function avatarAnimationPhase(seed: string): number {
