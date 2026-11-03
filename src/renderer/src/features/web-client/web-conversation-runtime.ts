@@ -174,16 +174,16 @@ export function createWebConversationRuntime(
     await discard();
     return null;
   }
-  // The files of each failed import, for Retry, until the composer removes the chip.
-  const failedImports = new Map<string, readonly File[]>();
+  // The files and host of each failed import, for Retry, until the composer removes the chip.
+  const failedImports = new Map<string, { serverId: string; files: readonly File[] }>();
   // The pick whose files upload now. Cancel upload stops the files of the pick that did not start.
   let pick: { cancelled: boolean } | undefined;
   // `started` names the chat on screen, so it comes before any wait. A set over the limit names no
   // files: it has no chips, and the banner says why it failed.
-  const announceImport = (requestId: string, files: readonly File[], retryable: boolean) =>
+  const announceImport = (requestId: string, serverId: string, files: readonly File[], retryable: boolean) =>
     emit({
       type: "started",
-      serverId: hostId(),
+      serverId,
       requestId,
       files: retryable ? files.map((file) => ({ name: file.name, size: file.size })) : [],
     });
@@ -192,28 +192,30 @@ export function createWebConversationRuntime(
    * one after another, because the web client uploads one file at a time.
    */
   async function importPick(files: readonly File[]) {
+    // The pick belongs to the host on screen now. After a host change, its other files go nowhere.
+    const serverId = hostId();
     if (files.length > INPUT_LIMITS.attachments) {
       const requestId = crypto.randomUUID();
-      announceImport(requestId, files, false);
-      await runImportFiles(requestId, files, false);
+      announceImport(requestId, serverId, files, false);
+      await runImportFiles(requestId, serverId, files, false);
       return;
     }
     const current = { cancelled: false };
     pick = current;
     const imports = files.map((file) => ({ requestId: crypto.randomUUID(), files: [file] }));
-    for (const item of imports) announceImport(item.requestId, item.files, true);
+    for (const item of imports) announceImport(item.requestId, serverId, item.files, true);
     for (const item of imports) {
-      if (current.cancelled)
-        emit({ type: "completed", serverId: hostId(), requestId: item.requestId, attachments: [] });
-      else await runImportFiles(item.requestId, item.files, true);
+      if (current.cancelled || hostId() !== serverId)
+        emit({ type: "completed", serverId, requestId: item.requestId, attachments: [] });
+      else await runImportFiles(item.requestId, serverId, item.files, true);
     }
     if (pick === current) pick = undefined;
   }
-  async function runImportFiles(requestId: string, files: readonly File[], retryable: boolean) {
-    const serverId = hostId();
+  // `uploadFiles` stops when the host is no longer `serverId`, and the import then lands nowhere.
+  async function runImportFiles(requestId: string, serverId: string, files: readonly File[], retryable: boolean) {
     failedImports.delete(requestId);
     if (importBusy) {
-      if (retryable) failedImports.set(requestId, files);
+      if (retryable) failedImports.set(requestId, { serverId, files });
       emit({ type: "error", serverId, requestId, message: currentText().t("error.remote.attachmentBusy") });
       return;
     }
@@ -230,7 +232,7 @@ export function createWebConversationRuntime(
           emit({ type: "completed", serverId, requestId, attachments: [] });
           return;
         }
-        if (retryable) failedImports.set(requestId, files);
+        if (retryable) failedImports.set(requestId, { serverId, files });
         emit({
           type: "error",
           serverId,
@@ -310,10 +312,10 @@ export function createWebConversationRuntime(
         };
       },
       retryAttachmentImport(requestId) {
-        const files = failedImports.get(requestId);
-        if (!files) return;
-        announceImport(requestId, files, true);
-        void runImportFiles(requestId, files, true);
+        const failed = failedImports.get(requestId);
+        if (!failed) return;
+        announceImport(requestId, failed.serverId, failed.files, true);
+        void runImportFiles(requestId, failed.serverId, failed.files, true);
       },
       discardAttachmentImport(requestId) {
         failedImports.delete(requestId);
