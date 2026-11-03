@@ -135,10 +135,12 @@ export function AppLogo(props: AppLogoProps) {
   createEffect(
     () => animation() === "blink",
     (blinks) => {
-      if (!blinks || shouldReduceMotion()) return;
+      if (!blinks) return;
       let blinkEndTimer: number | undefined;
       let blinkInterval: number | undefined;
       const blink = () => {
+        // The reduced-motion setting can change while the logo shows.
+        if (shouldReduceMotion()) return;
         setBlinking(true);
         blinkEndTimer = window.setTimeout(() => setBlinking(false), BLINK_DURATION);
       };

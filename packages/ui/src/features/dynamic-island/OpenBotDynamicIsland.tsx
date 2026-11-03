@@ -926,8 +926,10 @@ function IdleGreetingEmoji(props: { moving: boolean }): JSX.Element {
   createEffect(
     () => props.moving,
     (moving) => {
+      // A pending greeting change starts its own motion on the next frame.
+      if (!moving || animationFrame !== undefined) return;
       const slot = untrack(activeSlot);
-      if (!moving || motions[slot].some((motion) => motion.playState === "running")) return;
+      if (motions[slot].some((motion) => motion.playState === "running")) return;
       playMotion(slot, untrack(slot === 0 ? firstEmoji : secondEmoji), true);
     },
   );
@@ -940,6 +942,7 @@ function IdleGreetingEmoji(props: { moving: boolean }): JSX.Element {
       if (nextSlot === 0) setFirstEmoji(nextEmoji);
       else setSecondEmoji(nextEmoji);
       animationFrame = requestAnimationFrame(() => {
+        animationFrame = undefined;
         setIndex(nextIndex);
         setActiveSlot(nextSlot);
         playMotion(nextSlot, nextEmoji, props.moving);

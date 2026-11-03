@@ -141,7 +141,6 @@ export function DynamicIsland(props: DynamicIslandProps): JSX.Element {
   let hoverOpenedState: Exclude<DynamicIslandViewState, "compact"> | null = null;
   const [isHovering, setHoverSignal] = createSignal(false);
   function setIsHovering(hovering: boolean): void {
-    if (untrack(isHovering) === hovering) return;
     setHoverSignal(hovering);
     local.onHoverChange?.(hovering);
   }
