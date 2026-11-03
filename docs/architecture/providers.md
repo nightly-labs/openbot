@@ -171,11 +171,11 @@ adds its rule there, not in the catalog.
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
 `releases/latest` for Codex, Pi and Kimi, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
-for Grok, the `muse-stable` channel for Muse, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
+for Grok, the `muse-stable` channel for Muse, Cognition's `cli/current` manifest for Devin, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex, Pi and Kimi, the manifest `checksum` for Muse, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
+Codex, Pi and Kimi, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
 so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
 `dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
 the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
@@ -731,6 +731,33 @@ adds `cline` to `projection_provider_sessions`.
 Team API v1–v5 do not know `cline`. The host hides Cline agents, models, status, and sign-in state
 from peers on those versions, as for Cursor. Team API v6 and `providers-v4` carry it, as for Cursor.
 
+### Devin
+
+The Devin provider (id `devin`) starts Cognition's Devin CLI with `devin acp`. The runtime manager
+reads `static.devin.ai/cli/current/manifest.json` and downloads
+`devin-<version>-<triple>.tar.gz` (`.zip` on Windows) from `static.devin.ai/cli/<version>/`. The
+archives hold only `bin/` and `share/`. Staging keeps both, because Devin CLI 3000.11.234 has a
+skill that reads its documentation in `share/devin/docs`, and refuses links and other special files.
+The manifest gives a SHA-256 for each target and no size, so a `GET` with `Range: bytes=0-0` gives
+the download size. `OPENBOT_DEVIN_PATH` selects another executable.
+
+Sign in calls the ACP `authenticate` method `devin-browser`, which opens Devin's page in the system
+browser. Devin CLI 3000.11.234 keeps the sign-in in `credentials.toml` of its XDG data folder
+(`~/.local/share/devin`). It has no device-code sign-in, so a joined computer cannot sign in Devin on
+the host. Sign out runs `devin auth logout`. A signed-out Devin process answers `session/new` with an
+empty model list and no error. `noModelsWhenSignedOut` reads that list as "sign-in required".
+
+`devinStatePaths` lets a confined process write `devin/cli` and `devin/mcp` in the XDG data folder,
+`devin` in the XDG cache folder and `~/.devin/plans`. Its config folder, `credentials.toml` and
+`devin/cli/plugins` stay read-only, because every other Devin process loads them. `.devin` and
+`.windsurf` in a workspace are project settings, so a confined process cannot write them. A model
+change with `session/set_model` does not write a file. Devin answers a lost session with `-32016`
+and `{ "cognition.ai/errorKind": "session_not_found" }`, which `DEVIN_ACP_FLAVOR` reads as a missing
+session.
+
+No frozen Team API protocol knows `devin`. The host hides Devin agents, models, status, and sign-in
+state from peers below protocol 8, and `providers-v8` carries it.
+
 ### Kimi
 
 The Kimi provider (id `kimi`) starts the Kimi Code CLI with `kimi acp`. The runtime manager
@@ -1001,9 +1028,10 @@ uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](ser
 ### Disconnect the own sign-in
 
 Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude,
-Codex, Grok, Muse and Cursor (issue #3487). Claude and Codex have an `accounts.signOut` command
+Codex, Grok, Muse, Cursor and Devin (issue #3487). Claude and Codex have an `accounts.signOut` command
 (`claude auth logout`, `codex logout`), which also signs out an account folder before its removal.
-Grok, Muse and Cursor have a driver `signOut` (`grok logout`, `muse logout`, `cursor-agent logout`)
+Grok, Muse, Cursor and Devin have a driver `signOut` (`grok logout`, `muse logout`,
+`cursor-agent logout`, `devin auth logout`)
 for the own sign-in only. Muse offers it only on this computer with no OpenBot key saved
 (`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
 `ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a

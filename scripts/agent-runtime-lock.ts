@@ -8,7 +8,7 @@ const nativeProviderArtifactSchema = z.object({
   assetSha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
   installedBytes: z.number().int().positive(),
-  executable: z.enum(["pi", "pi.exe", "muse", "muse.exe"]),
+  executable: z.enum(["pi", "pi.exe", "muse", "muse.exe", "devin", "devin.exe"]),
   files: z.record(z.string().min(1), sha256Schema),
 });
 const nativeProviderLockSchema = z.object({
@@ -300,6 +300,11 @@ const agentRuntimeLockSchema = z.object({
    */
   pi: nativeProviderLockSchema,
   muse: nativeProviderLockSchema,
+  /**
+   * Cognition's Devin CLI, from its own download site. The licence is proprietary, so OpenBot
+   * downloads the CLI on the user's computer and does not ship it in a release.
+   */
+  devin: nativeProviderLockSchema,
   cline: z.object({
     registry: z.literal("https://registry.npmjs.org"),
     repository: z.literal("https://github.com/cline/cline"),

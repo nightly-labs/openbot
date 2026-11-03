@@ -41,6 +41,7 @@ export const messages = {
   "onboarding.provider.cursorPlan": "Cursor 套餐或 API 密钥",
   "onboarding.provider.clineAccount": "使用 Cline 账号的免费模型",
   "onboarding.provider.kimiAccount": "使用 Kimi Code 账号的 Kimi 模型",
+  "onboarding.provider.devinAccount": "使用 Devin 账号的多种模型",
   "onboarding.provider.hermesNous": "Nous Portal 套餐或你的 Hermes 设置",
   "onboarding.provider.inceptionKey": "使用 Inception API 密钥的 Mercury 模型",
   "onboarding.provider.deepseekKey": "使用 DeepSeek API 密钥的 DeepSeek 模型",

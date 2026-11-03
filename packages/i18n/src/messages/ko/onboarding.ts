@@ -41,6 +41,7 @@ export const messages = {
   "onboarding.provider.cursorPlan": "Cursor 요금제 또는 API 키",
   "onboarding.provider.clineAccount": "Cline 계정으로 쓰는 무료 모델",
   "onboarding.provider.kimiAccount": "Kimi Code 계정으로 쓰는 Kimi 모델",
+  "onboarding.provider.devinAccount": "Devin 계정으로 쓰는 다양한 모델",
   "onboarding.provider.hermesNous": "Nous Portal 요금제 또는 내 Hermes 설정",
   "onboarding.provider.inceptionKey": "Inception API 키로 쓰는 Mercury 모델",
   "onboarding.provider.deepseekKey": "DeepSeek API 키로 쓰는 DeepSeek 모델",

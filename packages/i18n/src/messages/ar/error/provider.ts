@@ -251,6 +251,7 @@ export const messages = {
   "error.provider.kimiNotStarted": "تعذّر تشغيل Kimi. شغّل `kimi --version` في نافذة طرفية.",
   "error.provider.kimiVersionUnreadable": "تتعذّر قراءة إصدار Kimi CLI.",
   "error.provider.kimiSignIn": "سجّل الدخول باستخدام Kimi Code لاستخدام Kimi.",
+  "error.provider.devinSignIn": "سجّل الدخول باستخدام Devin لاستخدام Devin.",
   "error.provider.hermesMissing": "Hermes Agent غير مثبت. ثبّته، ثم أعد المحاولة.",
   "error.provider.hermesNotStarted": "تعذّر تشغيل Hermes Agent. شغّل `hermes --version` في نافذة طرفية.",
   "error.provider.hermesVersionUnreadable": "تتعذّر قراءة إصدار Hermes Agent.",
