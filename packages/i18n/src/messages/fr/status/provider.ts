@@ -7,4 +7,9 @@ export const messages = {
   "status.provider.updateWaiting": "La mise à jour démarre à la fin du tour en cours.",
   "status.provider.confirmContinue": "Continuer",
   "status.provider.confirmCancel": "Annuler",
+  "status.provider.retryUnreachable":
+    "{provider} ne peut pas se connecter à son serveur. Nouvelle tentative {attempt} sur {maxAttempts}.",
+  "status.provider.retryServerError":
+    "Le serveur de {provider} est occupé ou en erreur. Nouvelle tentative {attempt} sur {maxAttempts}.",
+  "status.provider.retryRecovered": "{provider} est de nouveau connecté à son serveur.",
 } as const satisfies PartialTranslation<typeof source>;

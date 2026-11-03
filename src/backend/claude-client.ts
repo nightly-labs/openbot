@@ -206,6 +206,8 @@ interface ActiveTurn {
    * message that only states the limit, so its text is held here and not published as the answer.
    */
   usageLimit: { resetsAt: number | null; text: string | null } | null;
+  /** Set by an `api_retry` until the next reply frame, which shows that the request got through. */
+  retrying: boolean;
   /** The CLI started this turn itself, with no message from OpenBot, such as after a background task ended. */
   unprompted: boolean;
 }
@@ -287,6 +289,10 @@ interface ClaudeStreamMessage {
   user_message_uuid?: string;
   /** Set when the turn runs an interrupted turn again, and `user_message_uuid` names that turn's prompt. */
   resume_reason?: string;
+  /** `api_retry`: the retry that starts next, its limit, and the HTTP status, null when no answer came. */
+  attempt?: unknown;
+  max_retries?: unknown;
+  error_status?: unknown;
 }
 
 interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
@@ -1090,6 +1096,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       thinkingMessages: new Map<string, string>(),
       toolCalls: new Map<string, string>(),
       usageLimit: null,
+      retrying: false,
       unprompted,
     };
     runtime.activeTurn = turn;
@@ -1176,6 +1183,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
   });
 
+  #emitTurnProgress(runtime: ThreadRuntime, turn: ActiveTurn, detail: string): void {
+    this.emit("notification", {
+      method: "openbot/turn-progress",
+      params: { threadId: runtime.id, turnId: turn.id, detail },
+    });
+  }
+
   #fail(error: Error): void {
     if (!this.#running) return;
     this.#running = false;
@@ -1208,6 +1222,38 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (status)
         this.emit("notification", { method: "openbot/context-compaction", params: { threadId: runtime.id, status } });
       return;
+    }
+    // Claude Code tries a failed API request again by itself, for minutes on a bad connection. With
+    // no line for it the chat stayed empty, as if Claude did not answer at all (#4613).
+    if (message.type === "system" && message.subtype === "api_retry") {
+      const turn = runtime.activeTurn;
+      if (!turn || typeof message.attempt !== "number" || typeof message.max_retries !== "number") return;
+      turn.retrying = true;
+      this.#emitTurnProgress(
+        runtime,
+        turn,
+        sourceText(
+          message.error_status === null ? "status.provider.retryUnreachable" : "status.provider.retryServerError",
+          {
+            provider: "Claude",
+            attempt: message.attempt,
+            maxAttempts: message.max_retries,
+          },
+        ),
+      );
+      return;
+    }
+    if (
+      (message.type === "stream_event" || message.type === "assistant") &&
+      message.parent_tool_use_id === null &&
+      runtime.activeTurn?.retrying
+    ) {
+      runtime.activeTurn.retrying = false;
+      this.#emitTurnProgress(
+        runtime,
+        runtime.activeTurn,
+        sourceText("status.provider.retryRecovered", { provider: "Claude" }),
+      );
     }
     if (message.type === "system" && message.subtype === "background_tasks_changed") {
       const before = runtime.backgroundTasks;
