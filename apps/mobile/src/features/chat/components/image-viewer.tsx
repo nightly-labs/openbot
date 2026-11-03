@@ -75,7 +75,7 @@ const THUMB_GAP = 6;
 const THUMB_STEP = THUMB_SIZE + THUMB_GAP;
 const THUMB_RADIUS = 8;
 const STRIP_OFFSET = 8;
-// Tiles this far from the page on screen download their picture; the others show one already loaded.
+// The tiles this far from the page on screen mount. The strip shows about nine.
 const THUMB_WINDOW = 8;
 // The space between two pictures of the carousel while a swipe moves them.
 const PAGE_GAP = 24;
@@ -794,16 +794,19 @@ export function ImageViewer({
               ]}
             >
               <Animated.View style={[{ height: THUMB_SIZE, width: count * THUMB_STEP }, stripRowStyle]}>
-                {pages.map((page, slot) => (
-                  <ViewerThumbnail
-                    key={page.key}
-                    serverId={serverId}
-                    attachment={page.attachment}
-                    slot={slot}
-                    near={Math.abs(slot - shown) <= THUMB_WINDOW}
-                    position={stripPosition}
-                  />
-                ))}
+                {/* Only the tiles near the page on screen mount, as the pictures do: the strip shows
+                    about nine, and each tile runs a style on the UI thread in every frame. */}
+                {pages.map((page, slot) =>
+                  Math.abs(slot - shown) <= THUMB_WINDOW ? (
+                    <ViewerThumbnail
+                      key={page.key}
+                      serverId={serverId}
+                      attachment={page.attachment}
+                      slot={slot}
+                      position={stripPosition}
+                    />
+                  ) : null,
+                )}
               </Animated.View>
             </Animated.View>
           </GestureDetector>
@@ -821,17 +824,14 @@ function ViewerThumbnail({
   serverId,
   attachment,
   slot,
-  near,
   position,
 }: {
   serverId: string;
   attachment: AttachmentSummary;
   slot: number;
-  near: boolean;
   position: SharedValue<number>;
 }) {
-  // A tile far from the page on screen shows its picture only if the chat has loaded it already.
-  const file = useAttachmentFile(serverId, attachment, near);
+  const file = useAttachmentFile(serverId, attachment, true);
   const style = useAnimatedStyle(() => {
     const closeness = clamp(1 - Math.abs(position.get() - slot), 0, 1);
     return { opacity: lerp(0.5, 1, closeness), transform: [{ scale: lerp(0.82, 1, closeness) }] };

@@ -309,21 +309,17 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
   /** Opens one share sheet with every image. */
   async function shareAll() {
     setBusy(true);
-    // A share target can read the files after the sheet closes, so the copies stay until the next share.
-    const folder = new Directory(Paths.cache, "gallery-share");
     try {
       if (!shareFilesNative) throw new Error(t("mobile.chat.imageGallery.shareNeedsUpdate"));
-      if (folder.exists) folder.delete();
-      folder.create({ intermediates: true, idempotent: true });
       const uris: string[] = [];
       const types = new Set<string>();
-      for (const [index, attachment] of attachments.entries()) {
+      for (const attachment of attachments) {
         const data = await load(attachment);
-        // A folder for each file, so two images with one name both keep it.
-        const place = new Directory(folder, String(index));
-        place.create({ intermediates: true, idempotent: true });
+        // The chat media folder holds the file with a safe name, and the next launch clears it.
+        const uri = data.fileUri ?? keepImageFile(serverId, attachment, data);
+        if (!uri) throw new Error(t("mobile.chat.attachment.imageUnavailable"));
         types.add(data.mimeType);
-        uris.push((await writeCopy(place, attachment.name.replace(/[/\\\p{Cc}]/gu, "_"), data)).uri);
+        uris.push(uri);
       }
       await shareFilesNative.shareAsync(uris, types.size === 1 ? ([...types][0] ?? "image/*") : "image/*");
     } catch (error) {
