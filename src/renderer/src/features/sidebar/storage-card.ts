@@ -5,6 +5,7 @@ import { createMemo, createSignal, untrack } from "solid-js";
 import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { canManageStorage } from "../files/storage-usage";
 import { serverSupportsCapability } from "../servers/server-capabilities";
+import { clearServerUpgradeOffered } from "./server-upgrade-offer";
 import { sidebarPort } from "./sidebar-port";
 
 const GB = 1024 ** 3;
@@ -65,8 +66,11 @@ export function createStorageCard(server: () => ServerSummary | undefined) {
           // An answer for a server that is no longer selected is dropped.
           if (untrack(target) !== serverId) return;
           setDisk(answer ? { serverId, disk: answer } : null);
-          // Space came back, so the next "low" shows the card again.
-          if (answer && storageLevel(answer) === null) writeDismissed(serverId, false);
+          // Space came back, so the next "low" shows the card and offers the upgrade again.
+          if (answer && storageLevel(answer) === null) {
+            writeDismissed(serverId, false);
+            clearServerUpgradeOffered(serverId);
+          }
         },
         // A failed read shows no card. The next poll asks again.
         () => {
