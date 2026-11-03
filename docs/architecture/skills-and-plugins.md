@@ -65,6 +65,11 @@ already has is left out. The desktop read-only Skills view reads the same route 
 info with their `~/.agents/skills/<slug>` location. The provider text of a `home:<slug>` tag names the skill's `SKILL.md`
 (`displayMessageReferences`); a person, and the released Team API adapters, see the name alone.
 
+In a channel, the `$` list holds the skills of each agent in the channel, one entry for each skill id
+(`src/renderer/src/features/conversation/stores/skills-store.ts`). A tag reaches each agent by its
+name, so an agent without that skill reads the name only. When the list of one agent fails, the list
+shows the skills that loaded and tries again after a reconnect.
+
 MCP servers do not use folders. `projection_mcp_servers` in SQLite is the source of truth for the
 whole computer. No shared MCP file format exists: Claude Code reads `.mcp.json` and
 `~/.claude.json`, Codex reads `config.toml`, OpenCode reads `opencode.json`, and Cursor, Cline and

@@ -309,6 +309,13 @@ export const messages = {
     "Le secret actuel cesse de fonctionner immédiatement. Les requêtes signées avec ce secret sont rejetées jusqu’à ce que l’expéditeur utilise le nouveau secret.",
   "routine.webhook.regenerateConfirm": "Régénérer",
   "routine.webhook.regenerateFailed": "Impossible de régénérer le secret de signature.",
+  "routine.webhook.useSenderSecret": "Utiliser le secret de l’expéditeur",
+  "routine.webhook.senderSecretTitle": "Utiliser le secret de signature de l’expéditeur ?",
+  "routine.webhook.senderSecretDescription":
+    "Certains expéditeurs, comme Composio et Svix, créent leur propre secret de signature. Collez-le ici. Le secret actuel cesse de fonctionner immédiatement.",
+  "routine.webhook.senderSecretLabel": "Secret de l’expéditeur",
+  "routine.webhook.senderSecretConfirm": "Utiliser",
+  "routine.webhook.senderSecretFailed": "Impossible d’enregistrer le secret de l’expéditeur.",
   "routine.webhook.statusFailed": "Impossible de vérifier si l’hôte est connecté au relais.",
   "routine.settings.instruction": "Instruction",
   "routine.settings.instructionPlaceholderAgent": "Décrivez ce que cet agent doit faire.",

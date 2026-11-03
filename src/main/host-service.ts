@@ -137,7 +137,8 @@ interface HostServiceOptions {
   focusUse?: ForwardedApiOptions["focusUse"];
   appVersion: string;
   store: TeamStore;
-  agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads" | "branchTask" | "markTaskRead">;
+  agents: ForwardedApiOptions["agents"] &
+    Pick<AgentService, "adoptConversationReads" | "branchTask" | "markTaskRead" | "readTask">;
   agentsReady: NonNullable<ForwardedApiOptions["agentsReady"]>;
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
@@ -1255,6 +1256,11 @@ export class HostService extends EventEmitter<HostEvents> {
     return remoteDecode(() => this.#currentAgentReaderId()).pipe(
       Effect.flatMap((readerId) => this.#options.agents.readConversationFor(agentId, readerId)),
     );
+  }
+
+  /** The conversation of one side thread of a local agent. */
+  readAgentTask(agentId: string, taskId: string) {
+    return this.#options.agents.readTask(agentId, taskId);
   }
 
   readAgentConversationPage(agentId: string, anchor: ConversationPageAnchor = { type: "latest" }, limit = 50) {

@@ -1,4 +1,4 @@
-import { type AvatarHue, type ChannelIcon, isAvatarHue } from "@openbot/contracts/ipc";
+import { type AvatarHue, type ChannelIcon, type ChannelIconName, isAvatarHue } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   BookOpen,
@@ -24,9 +24,9 @@ import {
 } from "@openbot/ui";
 
 /**
- * The icons a reader can give a channel. The keys are saved in the channel, so a key never changes
- * its meaning; add new keys at the end. A saved key that this version does not know shows the
- * member faces.
+ * The glyph of each icon a reader can give a channel. `CHANNEL_ICON_NAMES` in the contracts owns the
+ * names and their order, so the agent tools accept the same set. A saved name that this version does
+ * not know shows the member faces.
  */
 export const CHANNEL_ICONS = {
   megaphone: { component: Megaphone, label: "channel.picture.icon.megaphone" },
@@ -49,33 +49,7 @@ export const CHANNEL_ICONS = {
   store: { component: Store, label: "channel.picture.icon.store" },
   workflow: { component: Workflow, label: "channel.picture.icon.workflow" },
   card: { component: CreditCard, label: "channel.picture.icon.card" },
-} as const satisfies Record<string, { component: unknown; label: AppTextKey }>;
-
-export type ChannelIconName = keyof typeof CHANNEL_ICONS;
-
-/** The order of the editor grid. */
-export const CHANNEL_ICON_NAMES = [
-  "megaphone",
-  "chart",
-  "lifebuoy",
-  "search",
-  "briefcase",
-  "code",
-  "globe",
-  "mail",
-  "calendar",
-  "gift",
-  "palette",
-  "brain",
-  "book",
-  "sparkles",
-  "star",
-  "zap",
-  "shield",
-  "store",
-  "workflow",
-  "card",
-] as const satisfies readonly ChannelIconName[];
+} as const satisfies Record<ChannelIconName, { component: unknown; label: AppTextKey }>;
 
 /** The colour of a new icon, before the reader chooses one. */
 export const DEFAULT_CHANNEL_ICON_HUE: AvatarHue = 215;

@@ -239,6 +239,8 @@ export const messages = {
   "chat.marker.unavailableAgent": "وكيل غير متاح",
   "chat.marker.openChat": "فتح الدردشة مع {name}",
   "chat.marker.openRoutine": "فتح المهمة الدورية {name}",
+  "chat.marker.openRoutineThread": "فتح السلسلة",
+  "chat.marker.openRoutineThreadOf": "فتح سلسلة {name}",
   "chat.marker.unavailable": "غير متاح",
   "chat.marker.contextReset": "بدأت دردشة جديدة",
   "chat.marker.instructionsView": "عرض",

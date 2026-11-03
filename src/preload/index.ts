@@ -1470,6 +1470,7 @@ const openbotApi: OpenBotDesktopApi = {
     deleteRoutine: decodeVoid,
     testRoutine: decodeVoid,
     rotateSecret: decodeWebhookSecret,
+    setSecret: decodeVoid,
     sendTestEvent: decodeWebhookTestResult,
     listActivity: decodeEventActivity,
     listRoutineRuns: decodeEventRoutineRuns,

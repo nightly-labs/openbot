@@ -272,6 +272,10 @@ export function AgentEventBridge() {
           if (soundLevel() === "all" && !platform.chatWindow) playCompletionSoundForAgentEvent(event, agentList());
         }
         return;
+      case "routine-thread-turn-completed":
+        // The chat's turn state stays: the run's own `turn-completed` did not leave its thread.
+        if (soundLevel() === "all" && !platform.chatWindow) playCompletionSoundForAgentEvent(event.turn, agentList());
+        return;
       case "prompt":
         setPendingPrompts((current) => ({ ...current, [attentionEventKey(event)]: event }));
         // The agent id keys the answer marks of the agent's own chat. A side thread's question keeps

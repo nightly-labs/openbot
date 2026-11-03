@@ -85,7 +85,8 @@ type PendingRoutineExit =
   | "close"
   | "new"
   | { kind: "routine-selection"; routine: RoutineEditorRecord | null; routineName: string }
-  | { kind: "conversation-message"; messageId: string };
+  | { kind: "conversation-message"; messageId: string }
+  | { kind: "routine-thread"; routineId: string };
 
 interface RoutineDraft {
   id: string | null;
@@ -130,6 +131,11 @@ interface AgentRoutinesSettingsProps {
   selectionRequest?: RoutineSelectionRequest | null | undefined;
   onSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   onOpenRun?: ((messageId: string) => void) | undefined;
+  /**
+   * Opens the side thread where the routine runs. Resolves false when the routine has no thread, for
+   * example on a host that runs routines in the agent's own chat.
+   */
+  onOpenThread?: ((routineId: string) => Promise<boolean>) | undefined;
 }
 
 function codeUnitOrder(a: string, b: string): number {
@@ -462,6 +468,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       props.onOpenRun?.(target.messageId);
       return;
     }
+    if (target.kind === "routine-thread") {
+      void props.onOpenThread?.(target.routineId);
+      return;
+    }
     closeEditor();
     if (target.routine) {
       openRoutine(target.routine);
@@ -656,6 +666,8 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       await props.port.test(current.id);
       trackRoutineAction(analytics, "test", current, startedAt, "succeeded");
       await loadRuns(current.id);
+      // The test run runs in the routine's own thread, so the chat shows it there.
+      if (props.onOpenThread) requestExit({ kind: "routine-thread", routineId: current.id });
     } catch (caught) {
       trackRoutineAction(analytics, "test", current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.testFailed")));
@@ -713,6 +725,22 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     setWebhook((state) => {
       state.secret = secret;
     });
+  }
+
+  /** Uses a secret that the sender made. Undefined when the host cannot do this. */
+  function senderSecret(): ((secret: string) => Promise<void>) | undefined {
+    const events = props.port.events;
+    const set = events?.api.setSecret;
+    if (!events || !set) return undefined;
+    return async (secret) => {
+      const id = draft()?.id;
+      if (!id) throw new Error(t("routine.webhook.senderSecretFailed"));
+      await set({ id, owner: events.owner, secret });
+      if (draft()?.id !== id) return;
+      setWebhook((state) => {
+        state.secret = null;
+      });
+    };
   }
 
   /** The saved record of the open draft. Its trigger, not the draft, says whether a URL and a secret exist. */
@@ -995,6 +1023,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                       secret={webhook.secret}
                       onSecretDismiss={resetWebhookState}
                       onRegenerateSecret={regenerateSecret}
+                      onUseSenderSecret={senderSecret()}
                       onSave={() => void saveDraft()}
                       saving={saving()}
                       onSendTest={sendTestEvent()}

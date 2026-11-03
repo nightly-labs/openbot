@@ -5,7 +5,14 @@
  * back.
  */
 
-import type { AvatarHue, AvatarImageInput, ChannelIcon, ChannelMember } from "@openbot/contracts/ipc";
+import {
+  type AvatarHue,
+  type AvatarImageInput,
+  CHANNEL_ICON_NAMES,
+  type ChannelIcon,
+  type ChannelIconName,
+  type ChannelMember,
+} from "@openbot/contracts/ipc";
 import { Button, IconButton, Input, Pencil, Plus, Popover, RotateCcw, toast } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import { AVATAR_HUE_CHOICES, avatarHueSwatch } from "@openbot/ui/bloub-avatar";
@@ -14,13 +21,7 @@ import { createSignal, For, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { AVATAR_HUE_LABEL } from "../agents/avatar-hue-label";
 import { ChannelAvatar, ChannelIconTile } from "./ChannelAvatar";
-import {
-  CHANNEL_ICON_NAMES,
-  CHANNEL_ICONS,
-  type ChannelIconName,
-  DEFAULT_CHANNEL_ICON_HUE,
-  knownChannelIcon,
-} from "./channel-icons";
+import { CHANNEL_ICONS, DEFAULT_CHANNEL_ICON_HUE, knownChannelIcon } from "./channel-icons";
 
 export interface ChannelPictureEditorProps {
   members: ChannelMember[];

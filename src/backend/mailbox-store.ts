@@ -799,6 +799,23 @@ export class MailboxStore {
       .map((delivery) => delivery.id);
   }
 
+  /**
+   * The routine deliveries of this agent's side threads. `listQueue` hides them, so the routine
+   * scheduler reads them here to follow the status of a run in a routine thread.
+   */
+  taskRoutineDeliveries(agentId: string): QueueDelivery[] {
+    const messages = this.#messagesById();
+    const deliveries = this.#state.deliveries.filter((delivery) => {
+      const message = messages.get(delivery.messageId);
+      return delivery.recipientAgentId === agentId && message?.taskId && message.sender.kind === "routine";
+    });
+    if (deliveries.length === 0) return [];
+    const positions = this.#queuedPositions();
+    return deliveries.map((delivery) =>
+      this.#publicDelivery(delivery, positions, this.#requireMessage(delivery.messageId, messages)),
+    );
+  }
+
   /** Indexed once for a whole read: a queue holds one delivery for each message the agent has. */
   #executionMessageIds(): Set<string> {
     const ids = new Set<string>();
@@ -1728,6 +1745,11 @@ export class MailboxStore {
   /** Whether the message's sender waits for an answer. Unknown messages count as expecting one. */
   expectsReply(messageId: string): boolean {
     return this.#state.messages.find((message) => message.id === messageId)?.expectsReply !== false;
+  }
+
+  /** The person who wrote the user message; undefined for older messages and other senders. */
+  senderMember(messageId: string): ConversationMessageSender | undefined {
+    return this.#state.messages.find((message) => message.id === messageId)?.senderMember;
   }
 
   hasReplyFrom(agentId: string, messageId: string): boolean {

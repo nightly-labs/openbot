@@ -167,7 +167,8 @@ export class MailboxSync {
   emitQueue(agentId: string): void {
     const queue = this.queueSnapshot(agentId);
     let routinesChanged = false;
-    for (const delivery of queue.deliveries) {
+    // A run in a routine's side thread is not in the queue of the chat, but its run still follows it.
+    for (const delivery of [...queue.deliveries, ...this.#mailbox.taskRoutineDeliveries(agentId)]) {
       if (this.#routines.reconcileDelivery(delivery)) routinesChanged = true;
     }
     this.#hooks.emit({ type: "queue-changed", snapshot: queue });
