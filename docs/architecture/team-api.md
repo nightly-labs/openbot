@@ -19,8 +19,8 @@ ICE servers from main for each stream and sends them to the viewer, so its media
 Its candidates are not filtered; a direct public IPv6 path stays possible.
 Mobile server labels in the drawer and connection settings describe the authenticated application
 connection, not membership or Signal presence. Each membership has its own transport and recovery controller while mobile is active.
-On a return to the app, the selected server connects first; the others become active when it is
-online, or after 3 s.
+On a cold start and on a return to the app, the selected server connects first; the others become
+active when it is online, or after 3 s. A cold start with no saved server connects all servers at once.
 Switching servers changes the visible workspace without closing other connections. iOS `inactive`
 transitions leave connections alone. Backgrounding retains the last connection status and pauses
 recovery; transport failures received in the background are retained for resume. Only the paired desktop is Local;

@@ -1083,7 +1083,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
    * Set on background entry with the selected server. Until it clears, the other servers stay
    * inactive. A new selection ends it, so the server that the user leaves keeps its attempt.
    */
-  const [hold, setHold] = useState<{ serverId: string | null } | null>(null);
+  // A cold start holds the others too, as a return to the app does. With no saved server yet there is
+  // nothing to hold for.
+  const [hold, setHold] = useState<{ serverId: string | null } | null>(() =>
+    activeServerId ? { serverId: activeServerId } : null,
+  );
   const othersHeld = hold !== null && hold.serverId === activeServerId;
   const wakeReconnect = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(wakeReconnect.current), []);
@@ -1168,9 +1172,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     directoryRefresh.setActive(foreground);
   }, [foreground, directoryRefresh, conversationStore, connectionWaits, persistServer]);
 
-  // On a return to the app the selected server connects first; the others follow when it is online,
-  // or after a short wait. The phone then sets up the connection the user waits for alone, and the
-  // tickets of the other servers reach the account service later.
+  // On a cold start and on a return to the app the selected server connects first; the others follow
+  // when it is online, or after a short wait. The phone then sets up the connection the user waits for
+  // alone, and the tickets of the other servers reach the account service later.
   useEffect(() => {
     if (!foreground) {
       setHold({ serverId: activeServerIdRef.current });
