@@ -76,6 +76,8 @@ interface CentralAuthEvents {
 type AuthFetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 interface CentralAuthManagerOptions {
+  /** No stored credentials, health probe or account operations in an isolated desktop test. */
+  offline?: boolean;
   apiUrl: string;
   mobileConnectApiUrl?: string;
   storagePath: string;
@@ -189,12 +191,17 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   constructor(options: CentralAuthManagerOptions) {
     super();
-    const fetcher = detectBlockingNetwork(options.fetch ?? fetch, options.apiUrl);
+    const fetcher = options.offline
+      ? async (): Promise<Response> => {
+          throw new Error("Account network access is disabled in desktop test mode.");
+        }
+      : detectBlockingNetwork(options.fetch ?? fetch, options.apiUrl);
     this.#transport = CentralAuthTransport.layer(fetcher);
     this.#options = {
       ...options,
+      offline: options.offline ?? false,
       mobileConnectApiUrl: options.mobileConnectApiUrl ?? options.apiUrl,
-      canPersist: options.canPersist ?? (() => true),
+      canPersist: options.offline ? () => false : (options.canPersist ?? (() => true)),
       fetch: fetcher,
       startupRetryWindowMs: options.startupRetryWindowMs ?? STARTUP_RETRY_WINDOW_MS,
       startupRequestTimeoutMs: options.startupRequestTimeoutMs ?? STARTUP_REQUEST_TIMEOUT_MS,
@@ -1406,6 +1413,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   readonly #initialize = Effect.fn("CentralAuth.initialize")(function* (
     this: CentralAuthManager,
   ): Effect.fn.Return<CentralAuthState, CentralAuthOperationError, CentralAuthTransport> {
+    if (this.#options.offline) return this.#setState({ status: "signed_out" });
     this.#setState({ status: "loading" });
     // A session that cannot be read now stays on disk: a Keychain that is locked or asks for
     // permission at startup can open it at the next start, and the next sign-in replaces it.

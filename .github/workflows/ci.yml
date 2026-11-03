@@ -422,6 +422,36 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:codex-missing-rollout
 
+      # The released build's registry is read from git. A shallow checkout has only the commit under test, so
+      # fetch that one commit by its full hash, with no history. The pinned hash is the release in the script.
+      - name: Fetch the released local-server registry source
+        if: ${{ !cancelled() }}
+        run: git fetch --no-tags --depth=1 origin ed395dadf500922a358422b3514aa3aa3e6c6400
+
+      - name: Run the local-server registry release E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:local-server-registry-release
+
+      - name: Upload the local-server registry release E2E report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: local-server-registry-release-e2e
+          path: .openbot-build/local-server-registry-release-e2e/
+          if-no-files-found: ignore
+
+      - name: Run the local servers damaged-state E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:local-servers-damaged-state
+
+      - name: Upload the local servers damaged-state E2E report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: local-servers-damaged-state-e2e
+          path: .openbot-build/local-servers-damaged-state-e2e/
+          if-no-files-found: ignore
+
       - name: Run the Codex usage metering E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-usage-metering

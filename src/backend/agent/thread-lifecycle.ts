@@ -33,6 +33,7 @@ import {
   codexMcpServerKey,
   codexMcpServers,
   codexThreadMcpServers,
+  isAppiumMcpServer,
   type McpEndpointSource,
   type McpServerDrop,
   type McpServerSource,
@@ -1149,6 +1150,7 @@ export class ThreadLifecycle {
       sectionTeammates: section,
       homeSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
+      appiumConfigured: mcpServers.some(isAppiumMcpServer),
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };

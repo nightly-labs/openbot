@@ -165,12 +165,46 @@ function unusableDrop(server: UnusableMcpServer): McpServerDrop {
   return { name: server.config.name, reason: server.reason, detail: server.error };
 }
 
+/** The name the registered Appium MCP server carries, compared without case. */
+const APPIUM_MCP_SERVER_NAME = "appium-mcp";
+/** An `npx`-style package argument: `appium-mcp`, optionally with a version. */
+const APPIUM_MCP_PACKAGE_ARG = /^appium-mcp(@\S+)?$/u;
+/** The package's canonical entry point, inside any `node_modules` (POSIX or Windows separators). */
+const APPIUM_MCP_ENTRY_POINT = /(^|[\\/])node_modules[\\/]appium-mcp[\\/]dist[\\/]index\.js$/iu;
+/** The executable the package installs as, with an optional Windows extension. */
+const APPIUM_MCP_EXECUTABLE = /^appium-mcp(\.(exe|cmd|ps1))?$/iu;
+
+/** Whether a command names the package's executable, by its last path segment alone. */
+function isAppiumMcpExecutable(command: string): boolean {
+  const segment = command.trim().split(/[\\/]/u).pop() ?? "";
+  return APPIUM_MCP_EXECUTABLE.test(segment);
+}
+
 /**
- * The configurations one agent is given: all of them, or all but Computer Use when the user turned
- * it off for that agent.
+ * Whether a configuration is the registered Appium MCP server: by its name, by its executable, or by
+ * an argument that is its package or its canonical entry point. Only the command and the arguments
+ * count, so a lookalike name or package does not match. It drives a simulator or device, so it
+ * follows the same Computer Use rule.
+ */
+export function isAppiumMcpServer(config: McpServerConfig): boolean {
+  if (config.name.trim().toLowerCase() === APPIUM_MCP_SERVER_NAME) return true;
+  if (config.transport !== "stdio") return false;
+  if (isAppiumMcpExecutable(config.command)) return true;
+  return config.args.some((arg) => {
+    const value = arg.trim();
+    return APPIUM_MCP_PACKAGE_ARG.test(value) || APPIUM_MCP_ENTRY_POINT.test(value);
+  });
+}
+
+/**
+ * The configurations one agent is given: all of them, or all but Computer Use and the Appium MCP
+ * server when the user turned Computer Use off for that agent. The Appium server reaches the device
+ * the same way Computer Use does, so the exposure rule has to remove it here, not in a prompt.
  */
 export function agentMcpServers(configs: readonly McpServerConfig[], computerUse: boolean): readonly McpServerConfig[] {
-  return computerUse ? configs : configs.filter((config) => config.id !== COMPUTER_USE_MCP_SERVER_ID);
+  return computerUse
+    ? configs
+    : configs.filter((config) => config.id !== COMPUTER_USE_MCP_SERVER_ID && !isAppiumMcpServer(config));
 }
 
 /**

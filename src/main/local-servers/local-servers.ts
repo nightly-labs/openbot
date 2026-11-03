@@ -106,6 +106,11 @@ function startFailure(): LocalServerFailure {
   return new LocalServerFailure({ cause: new Error(sourceText("error.remote.localServerStartFailed")) });
 }
 
+/** A registry that cannot be read keeps its rows, so nothing may start, move, remove or change them. */
+function readOnlyFailure(): LocalServerFailure {
+  return new LocalServerFailure({ cause: new Error(sourceText("error.remote.localServersReadOnly")) });
+}
+
 interface RunningChild {
   readonly child: ChildProcess;
   /** Set before this process ends the child, so that its exit does not start it again. */
@@ -247,6 +252,10 @@ export class LocalServers {
    * Then every server starts, in the background.
    */
   readonly initialize = Effect.fn("LocalServers.initialize")(function* (this: LocalServers) {
+    if (this.#registry.readOnly) {
+      this.#options.log.warn(sourceText("error.remote.localServersReadOnly"));
+      return;
+    }
     for (const entry of this.#registry.servers) {
       if (entry.serverId)
         yield* this.#options.remoteServers
@@ -265,6 +274,7 @@ export class LocalServers {
     name: string,
     from: "desktop" | "device" = "desktop",
   ): Effect.fn.Return<ServerSummary, LocalServerFailure> {
+    if (this.#registry.readOnly) return yield* readOnlyFailure();
     const serverName = name.trim();
     yield* localSync(() => validateServerName(serverName));
     if (this.#registry.servers.length >= LOCAL_SERVER_LIMIT)
@@ -296,6 +306,7 @@ export class LocalServers {
 
   /** Stops the server, then starts it again with a new port and a new session. */
   readonly restart = Effect.fn("LocalServers.restart")(function* (this: LocalServers, serverId: string) {
+    if (this.#registry.readOnly) return yield* readOnlyFailure();
     const entry = yield* this.#entry(serverId);
     yield* this.#stopChild(entry);
     this.#exits.delete(entry.id);
@@ -312,6 +323,7 @@ export class LocalServers {
     serverId: string,
     from: "desktop" | "device" = "desktop",
   ) {
+    if (this.#registry.readOnly) return yield* readOnlyFailure();
     const entry = this.#registry.findByServerId(serverId);
     if (from === "desktop" || !this.#registry.removedHostIds.includes(serverId) || entry)
       yield* this.#forget(yield* this.#entry(serverId), from === "desktop");
@@ -404,6 +416,7 @@ export class LocalServers {
 
   /** Removes the deleted servers from the account. One that fails stays for the next try. */
   readonly #removeDeletedHosts = Effect.fn("LocalServers.removeDeletedHosts")(function* (this: LocalServers) {
+    if (this.#registry.readOnly) return;
     for (const hostId of this.#registry.removedHostIds) {
       const removed = yield* this.#options.account.remove(hostId).pipe(
         Effect.as(true),
@@ -445,6 +458,7 @@ export class LocalServers {
     awaitRegistration = false,
   ): Effect.fn.Return<ServerSummary, LocalServerFailure> {
     if (this.#stopped) return yield* startFailure();
+    if (this.#registry.readOnly) return yield* readOnlyFailure();
     const secret = yield* localSync(() => this.#options.cipher.decrypt(Buffer.from(entry.encryptedSecret, "base64")));
     registerSecretValue(secret);
     const paths = this.#paths(entry);
@@ -622,6 +636,7 @@ export class LocalServers {
     entry: StoredLocalServer,
     removeFromAccount = true,
   ) {
+    if (this.#registry.readOnly) return yield* readOnlyFailure();
     yield* this.#stopChild(entry);
     const paths = this.#paths(entry);
     for (const path of [paths.userData, paths.agentRoot]) {

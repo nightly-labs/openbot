@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { COMPUTER_USE_MCP_SERVER_ID, type McpServerConfig } from "@openbot/contracts/ipc";
 import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { McpServerDrop } from "../src/backend/mcp-provider-shapes";
@@ -28,6 +28,7 @@ interface Report {
   passed: boolean;
   requests?: SessionRequest[];
   drops?: McpServerDrop[];
+  offRequests?: SessionRequest[];
   reply?: string;
 }
 
@@ -72,7 +73,7 @@ try {
   );
 
   const drops: McpServerDrop[] = [];
-  const servers = [
+  let servers = [
     server("spaced", "My Server"),
     server("underscored", "My_Server"),
     server("bridge-like", "openbot browser"),
@@ -125,6 +126,34 @@ try {
     ],
     "Each changed name that is taken is reported once.",
   );
+
+  // Computer Use off: the built-in Computer Use server and the registered Appium MCP server are not
+  // given to the session, and the rest are. A new session carries that set, and so does the same
+  // thread switched live with `thread/resume`, which closes the session that held Computer Use.
+  const appium = {
+    ...server("appium", "appium-mcp"),
+    command: process.execPath,
+    args: [join(root, "node_modules", "appium-mcp", "dist", "index.js")],
+  };
+  const builtInComputerUse = { ...server(COMPUTER_USE_MCP_SERVER_ID, "computer_use"), command: "/bin/sh" };
+  const pick = (id: string) => servers.filter((candidate) => candidate.id === id);
+  servers = [...pick("spaced"), ...pick("home"), builtInComputerUse, appium];
+  const offStart = requests.length;
+  const offThread = await startThread(client, { model, cwd: workspace, computerUse: false });
+  const offTurn = await runTurn(client, offThread, { model, text: "Reply with OK only." });
+  assert.equal(offTurn.error, null, "The Computer Use off turn succeeds.");
+  await runCauseEffect(
+    client.request("thread/resume", { threadId: thread, cwd: workspace, model, computerUse: false }, (value) => value),
+  );
+  const liveTurn = await runTurn(client, thread, { model, text: "Reply with OK only." });
+  assert.equal(liveTurn.error, null, "The live switched turn succeeds.");
+  const offRequests = (await readJsonl<SessionRequest>(log)).slice(offStart);
+  report.offRequests = offRequests;
+  const offWithServers = offRequests.filter((request) => request.names.length > 0);
+  assert.equal(offWithServers.length, 2, "A new session and the live switch each open a session with servers.");
+  for (const request of offWithServers) {
+    assert.deepEqual(request.names, ["My_Server", "Home_Assistant"], `${request.method}: Computer Use is off.`);
+  }
 
   report.passed = true;
 } finally {

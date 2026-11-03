@@ -51,6 +51,12 @@ export interface DeveloperInstructionOptions {
   teammatesInTurns?: boolean;
   /** The other agents in this agent's sidebar section. Omitted or null when it has no section. */
   sectionTeammates?: SectionTeammates | null;
+  /**
+   * The per-agent MCP list keeps an Appium MCP server, after Computer Use filtering. For a permitted
+   * conversation this opens the simulator route. A conversation that is not permitted gets the denial
+   * whether or not a server is configured.
+   */
+  appiumConfigured?: boolean;
   /** The session is a task of an agent with Computer Use on. The agent's own chat keeps Computer Use. */
   computerUseInOwnChat?: boolean;
   /** The session is a side thread, which shares the working directory with the agent's other threads. */
@@ -235,6 +241,23 @@ export function isTurnContextBlock(text: string): boolean {
   );
 }
 
+/**
+ * The Appium QA rule has three parts. A permitted conversation with an Appium MCP server gets them as one
+ * line, APPIUM_QA_RULE. A permitted conversation without one gets no Appium line. A conversation that is not
+ * permitted, because Computer Use is off or it is a side thread or a task of the agent's own chat, gets
+ * APPIUM_QA_DENIED whether or not a server is configured.
+ */
+const APPIUM_QA_PREFIX =
+  "For explicitly scoped native iOS or Android QA, use the registered Appium MCP tools available in this conversation. Confirm the approved app/build and a free, authorized target first. Do not create, boot, reset, restart, stop, shut down or take over a device without explicit approval.";
+const APPIUM_QA_RECIPE =
+  "For a fresh read-only screen check on an approved local iOS simulator that is already booted: call appium_session_management action=list. If the approved UDID has a session that this chat did not create, or ownership is uncertain, stop and report it without changing that session. If this chat created a healthy session for the approved UDID and app bundle, reuse it for further reads. If this chat created a session that is unhealthy or for another app, stop and report it. Otherwise call select_device with the UDID, then appium_session_management action=create with platformName iOS, appium:automationName XCUITest, appium:udid, appium:bundleId, appium:usePrebuiltWDA false, appium:noReset true, appium:forceAppLaunch false, appium:shouldTerminateApp false, appium:autoAcceptAlerts false and appium:autoDismissAlerts false. Pass appium:webDriverAgentUrl only when the user supplies it. Read with appium_get_page_source. In this flow, do not call prepare_ios_simulator, tap, type or dismiss alerts. Report a failed create once; do not retry in a loop. When the check ends, delete only a session that this check newly created; keep a reused session.";
+const APPIUM_QA_DENIED =
+  "Native iOS or Android QA through Appium is not permitted in this conversation while Computer Use is off or this is a side thread. Report the prerequisite; do not use another provider or worker to bypass this restriction.";
+const APPIUM_QA_SUFFIX =
+  "Keep device ownership, action approvals and secret-handling rules; never type real credentials through ordinary tool arguments or logs. Tool registration is not permission. If the tools or target authorization are missing, report the prerequisite. Keep work and results in TrueSMAC; do not ask the user to relay prompts through another provider app. This exception does not change desktop or embedded-browser routing.";
+
+const APPIUM_QA_RULE = [APPIUM_QA_PREFIX, APPIUM_QA_RECIPE, APPIUM_QA_SUFFIX].join(" ");
+
 export function developerInstructions(
   agent: AgentSummary,
   sharedRoot: string,
@@ -258,6 +281,10 @@ export function developerInstructions(
   );
   const folders = existingAgentFolders(agent);
   const excluded = workspaceExcludedFolders(agent);
+  // The Appium route is open only where Computer Use is on and this is not a side thread or a task of the
+  // agent's own chat. Only an open route with a configured server names the desktop tools as "desktop".
+  const appiumPermitted = agentComputerUseEnabled(agent) && !options.sideThread && !options.computerUseInOwnChat;
+  const appiumRoute = appiumPermitted && options.appiumConfigured === true;
   const instructionsFileName = options.instructionsFileName ?? "AGENTS.md";
   return [
     "You are a persistent local OpenBot teammate. Lead with the shortest complete answer. Do not narrate setup or use filler openers, apologies, or recaps. Report results, failures, and the input or approval that you need; do not stop only to report progress. Match the user's tone and length. Use they for a person whose pronouns you do not know. Explain internal mechanics only when asked.",
@@ -341,10 +368,11 @@ export function developerInstructions(
       : []),
     ...homeSkillInstructions(options.homeSkills ?? []),
     agentComputerUseEnabled(agent)
-      ? `Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task outside the embedded browser, never Codex Computer Use, the Sky computer use service, or another desktop-control plugin: they show no OpenBot cursor and can fight this one for the pointer. After each action, read its structuredContent, or its JSON copy at the end of the result text: refused or suspected_noop means that the action did not happen, so do not report it as done; unverifiable means read the window again and report what you saw; a delivery.mode of foreground took the screen from the user. Select a window by its title and size, never the first match: most windows are small empty helpers. Pixel coordinates apply only to the main display; on another display, use the element token, or the element_index with the window_id and snapshot_id of the same read. Take the shortest path and do not repeat reads; use query or include_screenshot false when you only need an element. Read skill://cua-driver/SKILL.md before the first GUI action of a conversation.`
+      ? `Use ${COMPUTER_USE_MCP_SERVER_NAME} for ${appiumRoute ? "desktop GUI tasks" : "every GUI task"} outside the embedded browser, never Codex Computer Use, the Sky computer use service, or another desktop-control plugin: they show no OpenBot cursor and can fight this one for the pointer. After each action, read its structuredContent, or its JSON copy at the end of the result text: refused or suspected_noop means that the action did not happen, so do not report it as done; unverifiable means read the window again and report what you saw; a delivery.mode of foreground took the screen from the user. Select a window by its title and size, never the first match: most windows are small empty helpers. Pixel coordinates apply only to the main display; on another display, use the element token, or the element_index with the window_id and snapshot_id of the same read. Take the shortest path and do not repeat reads; use query or include_screenshot false when you only need an element. Read skill://cua-driver/SKILL.md before the first GUI action of a conversation.`
       : options.computerUseInOwnChat
         ? "This conversation runs next to your own chat, and only your own chat uses Computer Use. Here, do not control desktop applications outside the embedded browser or use another desktop-control plugin; when the task needs one, say so, so that the user can continue that step in your own chat."
         : "The user turned Computer Use off for you. Do not control desktop applications outside the embedded browser or use a desktop-control plugin. Delegate such work to a teammate with Computer Use on (openbot.read_agent shows it); when none has it, say that the user can turn it on in your settings.",
+    ...(appiumPermitted ? (appiumRoute ? [APPIUM_QA_RULE] : []) : [APPIUM_QA_DENIED]),
     ...(agentAutomationAllowed(agent, agentDefaults) ? [automationInstructions(agent.id, automationRoot)] : []),
     ...(agentQuickAcknowledgementEnabled(agent, agentDefaults)
       ? [

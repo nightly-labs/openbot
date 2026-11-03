@@ -209,6 +209,8 @@
     "test:sign-in-relay-paste": "bun scripts/sign-in-relay-paste-e2e.ts",
     "test:sign-in-relay-replay": "bun scripts/sign-in-relay-replay-e2e.ts",
     "test:acp-mcp-names": "bun scripts/acp-mcp-server-names-e2e.ts",
+    "test:local-server-registry-release": "bun scripts/local-server-registry-release-e2e.ts",
+    "test:local-servers-damaged-state": "bun scripts/local-servers-damaged-state-e2e.ts",
     "test:acp-mcp-shared-token": "bun scripts/acp-mcp-shared-token-e2e.ts",
     "test:acp-turn-stall": "bun scripts/acp-turn-stall-e2e.ts",
     "test:acp-instructions-once": "bun scripts/acp-instructions-once-e2e.ts",

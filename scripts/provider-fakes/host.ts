@@ -46,6 +46,8 @@ export interface ThreadStartParams {
   model?: string;
   runtimeWorkspaceRoots?: string[];
   developerInstructions?: string;
+  /** Absent means on, as the provider reads it. `false` turns Computer Use off for the session. */
+  computerUse?: boolean;
 }
 
 export async function startThread(client: AgentClient, params: ThreadStartParams): Promise<string> {
