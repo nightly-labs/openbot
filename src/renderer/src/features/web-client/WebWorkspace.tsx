@@ -62,6 +62,7 @@ import {
   getHostAgentMemoryLimit,
   getHostAuditLog,
   getHostMemoryReview,
+  getHostModelVisibility,
   getHostPromptCacheTtl,
   getHostReleaseStatus,
   getHostTimezone,
@@ -71,6 +72,7 @@ import {
   setHostAgentAccess,
   setHostAgentMemoryLimit,
   setHostMemoryReview,
+  setHostModelVisibility,
   setHostPromptCacheTtl,
   setHostTimezone,
   setHostUpdateSettings,
@@ -204,6 +206,7 @@ import {
   showServerUpdate,
 } from "../servers/server-update-flow";
 import { licenseContactUs, trackLicenseEvent } from "../settings/license-analytics";
+import type { HostModelVisibilityCalls } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlCalls } from "../settings/provider-prompt-cache";
 import { createCommunityCardVisibility } from "../sidebar/community-card";
 import { isReaderAuthor } from "../team/reader-identity";
@@ -1177,6 +1180,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(getHostPromptCacheTtl(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setPromptCacheTtl: async (ttl, serverId) =>
       runTeamEffect(setHostPromptCacheTtl(hostRequest(serverId), ttl).pipe(Effect.mapError((error) => error.cause))),
+  };
+  const hostModelVisibilityCalls: HostModelVisibilityCalls = {
+    getModelVisibility: async (provider, serverId) =>
+      runTeamEffect(
+        getHostModelVisibility(hostRequest(serverId), provider).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    setModelVisibility: async (change, serverId) =>
+      runTeamEffect(
+        setHostModelVisibility(hostRequest(serverId), change).pipe(Effect.mapError((error) => error.cause)),
+      ),
   };
   const hostAgentAccessCalls: HostAgentAccessCalls = {
     getAgentAccess: async (serverId) =>
@@ -2346,6 +2359,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
                         memoryReview={{ calls: hostMemoryReviewCalls }}
                         hostPromptCacheTtl={{ calls: hostPromptCacheTtlCalls }}
+                        hostModelVisibility={{ calls: hostModelVisibilityCalls }}
                         agentAccess={{ calls: hostAgentAccessCalls, listAgents: () => workspace.runtime.listAgents() }}
                         serverAudit={{ calls: hostServerAuditCalls, listAgents: () => workspace.runtime.listAgents() }}
                         browserProfiles={browserProfileSettings()}

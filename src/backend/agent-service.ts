@@ -2244,6 +2244,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#endpoints.available();
   }
 
+  /**
+   * Tells the renderer and each joined client to read the model list again, after a change to the
+   * models that the picker shows. The list reaches them by pull, refreshed on a status event.
+   */
+  notifyModelsChanged(): void {
+    this.#emit({ type: "status", status: this.getStatus() });
+  }
+
   readonly generateProfile = Effect.fn("AgentService.generateProfile")(
     function* (this: AgentService, input: GenerateAgentProfileInput, sections: SidebarSection[]) {
       const agent = input.agentId ? this.listAgents().find((candidate) => candidate.id === input.agentId) : null;
