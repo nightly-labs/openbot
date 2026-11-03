@@ -121,6 +121,11 @@ export const messages = {
   "provider.picker.customEmpty":
     "OpenAI uyumlu bir uç nokta ekleyin — bu bilgisayardaki bir model sunucusu veya bir temel URL ve anahtara sahip herhangi bir hizmet.",
   "provider.picker.defaultModelLabel": "{name}, varsayılan",
+  "provider.picker.usageLimit": "Kullanım sınırına ulaşıldı",
+  "provider.picker.usageLimitWindow": "{window} sınırı",
+  "provider.picker.usageLimitResets": "{limit} · {time} tarihinde sıfırlanır",
+  "provider.picker.usageLimitLabel": "{name}, kullanım sınırına ulaşıldı",
+  "provider.picker.usageLimitResetsLabel": "{name}, kullanım sınırına ulaşıldı, {time} tarihinde sıfırlanır",
   "provider.picker.effort": "Efor",
   "provider.picker.effortLabel": "Ajan akıl yürütme eforu",
   "provider.picker.effortFixed": "{effort}, {provider} tarafından sabit",

@@ -140,6 +140,11 @@ export const messages = {
   "provider.picker.customEmpty":
     "أضف نقطة نهاية متوافقة مع OpenAI — خادم نماذج على هذا الحاسوب، أو أي خدمة لها عنوان URL أساسي ومفتاح.",
   "provider.picker.defaultModelLabel": "{name}، الافتراضي",
+  "provider.picker.usageLimit": "تم بلوغ حد الاستخدام",
+  "provider.picker.usageLimitWindow": "حد {window}",
+  "provider.picker.usageLimitResets": "{limit} · يُعاد التعيين {time}",
+  "provider.picker.usageLimitLabel": "{name}، تم بلوغ حد الاستخدام",
+  "provider.picker.usageLimitResetsLabel": "{name}، تم بلوغ حد الاستخدام، يُعاد التعيين {time}",
   "provider.picker.effort": "الجهد",
   "provider.picker.effortLabel": "جهد التفكير لدى الوكيل",
   "provider.picker.effortFixed": "{effort}، يحدده {provider}",
