@@ -5,9 +5,9 @@ import {
   type ProviderAccountStatus,
 } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useProviderAccountName } from "@/features/agents/components/agent-runtime-fields";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
@@ -52,6 +52,13 @@ export function ServerProviderScreen() {
   const [error, setError] = useState<string | null>(null);
   /** The last check found no update, so the page says the provider is up to date. */
   const [checked, setChecked] = useState(false);
+  /** A second tap before the sign-in page shows would start a second sign-in on the host. */
+  const opening = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      opening.current = false;
+    }, []),
+  );
 
   async function run(key: string, operation: () => Promise<void>) {
     if (locked.current) return;
@@ -86,6 +93,8 @@ export function ServerProviderScreen() {
   const state = row.status?.state;
   /** The sign-in runs on its own page, which closes when the sign-in ends. */
   function openSignIn(method: "code" | "relay", extra: { add?: string } = {}) {
+    if (opening.current) return;
+    opening.current = true;
     router.push({ pathname: "/server-settings/provider-sign-in", params: { serverId, provider, method, ...extra } });
   }
 

@@ -1,7 +1,7 @@
-import * as Clipboard from "expo-clipboard";
 import ClipboardPaste from "lucide-react-native/icons/clipboard-paste";
 import { Pressable } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { readClipboardText } from "@/shared/lib/clipboard";
 import { useText } from "@/shared/lib/text";
 
 /**
@@ -19,9 +19,9 @@ export function PasteButton({ disabled, onPaste }: { disabled: boolean; onPaste:
       hitSlop={8}
       className="px-4 py-3"
       onPress={() =>
-        void Clipboard.getStringAsync().then(
+        void readClipboardText().then(
           (text) => {
-            if (text.trim()) onPaste(text.trim());
+            if (text) onPaste(text);
           },
           () => undefined,
         )

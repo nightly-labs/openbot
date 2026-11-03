@@ -7,7 +7,7 @@ import { Linking, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { PasteButton } from "@/features/servers/components/paste-button";
 import { type ProviderAdmin, relayPage } from "@/features/servers/model/provider-admin";
-import { useServerProviderAccounts, useServerProviders } from "@/features/servers/model/use-server-providers";
+import { useRefreshProviderAccounts, useServerProviders } from "@/features/servers/model/use-server-providers";
 import {
   SettingsContent,
   SettingsNote,
@@ -58,7 +58,7 @@ export function ServerProviderSignInScreen() {
   const [signIn, setSignIn] = useState<SignIn | null>(null);
   const providers = useServerProviders(serverId, { watchStatus: signIn !== null && signIn.kind !== "relay" });
   const { available, admin, status, rows, applyStatus, refreshStatus } = providers;
-  const refreshAccounts = useServerProviderAccounts(serverId, admin).refresh;
+  const refreshAccounts = useRefreshProviderAccounts(serverId);
   const row = rows.find((candidate) => candidate.id === provider);
   const locked = useRef(false);
   const [pending, setPending] = useState<string | null>(null);
@@ -82,6 +82,12 @@ export function ServerProviderSignInScreen() {
     }
   }
 
+  /** Back to the page that opened the sign-in, or to the provider page when this page is the first. */
+  const close = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace({ pathname: "/server-settings/provider", params: { serverId, provider: params.provider } });
+  }, [serverId, params.provider]);
+
   // The host keeps a sign-in open until it ends or is cancelled, so leaving the page cancels it.
   const active = useRef<{ admin: ProviderAdmin; signIn: SignIn; provider: AgentProviderId } | null>(null);
   /** The sign-in ended well: the page closes, and the provider page shows the new status. */
@@ -93,8 +99,8 @@ export function ServerProviderSignInScreen() {
     void haptics.notification("success");
     void refreshStatus();
     void refreshAccounts();
-    if (router.canGoBack()) router.back();
-  }, [refreshStatus, refreshAccounts]);
+    close();
+  }, [refreshStatus, refreshAccounts, close]);
 
   // A code sign-in ends on the provider's page. The host then reports the provider connected. A
   // Reconnect starts while the provider is connected, so it ends only after the host reported the
@@ -116,14 +122,21 @@ export function ServerProviderSignInScreen() {
     if (finished.current) return;
     active.current = admin && provider && signIn && signIn.kind !== "starting" ? { admin, signIn, provider } : null;
   }, [admin, provider, signIn]);
-  // A start that answers after the page closed is cancelled where it resolves, in `startSignIn`.
+  // A start that answers after the page closed is cancelled where it resolves, in `startSignIn`. The
+  // page under this one shows the status that the cancel answers, and a cancelled new account goes.
+  const afterCancel = useRef({ applyStatus, refreshAccounts });
+  afterCancel.current = { applyStatus, refreshAccounts };
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
       const current = active.current;
-      if (current) void cancelSignIn(current.admin, current.provider, current.signIn).catch(() => undefined);
+      if (!current) return;
+      const after = afterCancel.current;
+      void cancelSignIn(current.admin, current.provider, current.signIn)
+        .then(after.applyStatus, () => undefined)
+        .finally(() => void after.refreshAccounts());
     };
   }, []);
 
@@ -146,6 +159,7 @@ export function ServerProviderSignInScreen() {
             setError(sourceText(relay.result.error));
             void haptics.notification("error");
             void refreshStatus();
+            void refreshAccounts();
             return;
           }
           if (!relay.authorizeUrl || relayReady) return;
@@ -177,7 +191,7 @@ export function ServerProviderSignInScreen() {
       current = false;
       clearInterval(timer);
     };
-  }, [admin, relayFlow, relayReady, sourceText, applyStatus, refreshStatus, finish]);
+  }, [admin, relayFlow, relayReady, sourceText, applyStatus, refreshStatus, refreshAccounts, finish]);
 
   function startSignIn() {
     if (!admin || !provider || !method || locked.current) return;
@@ -225,15 +239,16 @@ export function ServerProviderSignInScreen() {
   }
 
   // The user asked for the sign-in on the provider page, so it starts once, when the host answers.
+  // It waits for the status, which tells a Reconnect from a first Connect.
   const started = useRef(false);
-  const ready = Boolean(admin && row);
+  const ready = Boolean(admin && row && status.data);
   useEffect(() => {
     if (!ready || started.current) return;
     started.current = true;
     startSignIn();
   });
 
-  if (!available || !admin || !provider || !method || !row)
+  if (!available || !admin || !provider || !method || !row || !status.data)
     return (
       <SettingsContent>
         <SettingsNote>
@@ -293,10 +308,8 @@ export function ServerProviderSignInScreen() {
               if (relay.result) finish();
             })
           }
-          onCancel={() => {
-            // Leaving the page cancels the sign-in on the host.
-            if (router.canGoBack()) router.back();
-          }}
+          // Leaving the page cancels the sign-in on the host.
+          onCancel={close}
         />
       ) : (
         <SettingsSection>
