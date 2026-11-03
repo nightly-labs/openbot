@@ -2694,6 +2694,18 @@ textarea {
   white-space: nowrap;
 }
 
+.avatar-editor-heading-end {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+/* The heading is upper case. The style tabs keep the case of other tabs. */
+.avatar-style-tabs {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .avatar-editor-actions {
   display: flex;
   align-items: center;

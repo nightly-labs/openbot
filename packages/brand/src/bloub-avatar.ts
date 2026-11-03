@@ -182,6 +182,32 @@ export function avatarCandidateSeeds(agentId: string, currentSeed: string, batch
 /** About 50 times the tries that one shape and eyes pair needs on average. */
 const FACE_SEED_TRIES = 10_000;
 
+/** How a generated agent face is drawn. `flat` is the Bloub that agents had before the plush. */
+export type AvatarStyle = "plush" | "flat";
+
+export const AVATAR_STYLES: readonly AvatarStyle[] = ["plush", "flat"];
+
+/** The seed segment of each style. Plush keeps the segment that faces had before styles existed. */
+const STYLE_SEED_SEGMENT: Readonly<Record<AvatarStyle, string>> = { plush: "face", flat: "flat" };
+
+const FLAT_SEED_PATTERN = /:flat:\d+$/;
+
+/**
+ * The style that a seed draws. Only `avatarSeedForFace` makes a flat seed, and only the seed is saved,
+ * so the style needs no new saved field. An app that does not know styles draws the same shape and eyes
+ * from a flat seed, as a plush.
+ */
+export function avatarStyleForSeed(seed: string): AvatarStyle {
+  return FLAT_SEED_PATTERN.test(seed) ? "flat" : "plush";
+}
+
+/** The seed of the agent's own face in a style: the agent ID for the plush, and the same face flat. */
+export function avatarDefaultSeed(agentId: string, style: AvatarStyle): string {
+  if (style === "plush") return agentId;
+  const face = bloubAvatarProfile(agentId, null);
+  return avatarSeedForFace(agentId, { shape: face.shape, expression: face.expression }, style);
+}
+
 /**
  * A seed that draws the given shape and eyes. Only the seed is saved, so a face that a person
  * builds must come from a seed: every app then draws it, with no new saved field. The same agent
@@ -191,9 +217,10 @@ const FACE_SEED_TRIES = 10_000;
 export function avatarSeedForFace(
   agentId: string,
   face: { shape: SupportedAvatarSilhouetteId; expression: ExpressionId },
+  style: AvatarStyle = "plush",
 ): string {
   for (let index = 0; index < FACE_SEED_TRIES; index += 1) {
-    const candidate = `${agentId}:face:${index}`;
+    const candidate = `${agentId}:${STYLE_SEED_SEGMENT[style]}:${index}`;
     const profile = bloubAvatarProfile(candidate, null);
     if (profile.shape === face.shape && profile.expression === face.expression) return candidate;
   }
