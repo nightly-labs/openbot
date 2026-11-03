@@ -416,6 +416,7 @@ class DiscordAdapter implements MessagingAdapter {
         text: discordContextText(
           withMentionNames(discordPlainText(message.content), names),
           message.attachments,
+          message.embeds,
           message.forwarded,
         ),
         sentAt: message.sentAt,
@@ -554,9 +555,14 @@ function snowflakeTime(id: bigint): bigint {
   return (id >> 22n) + DISCORD_EPOCH_MS;
 }
 
-/** A message that has text or files for the context, or a forward, which says when it has neither. */
+/** A message that has text, embeds or files for the context, or a forward, which says when it has none. */
 function hasContent(message: DiscordHistoryMessage): boolean {
-  return discordPlainText(message.content) !== "" || message.attachments.length > 0 || message.forwarded;
+  return (
+    discordPlainText(message.content) !== "" ||
+    message.attachments.length > 0 ||
+    message.embeds.length > 0 ||
+    message.forwarded
+  );
 }
 
 function compareSnowflakes(left: string, right: string): number {

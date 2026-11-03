@@ -215,6 +215,22 @@ const historyAttachmentsSchema = z
     }),
   )
   .optional();
+// Each part is optional: Discord leaves out the parts that an embed does not have.
+const historyEmbedsSchema = z
+  .array(
+    z.object({
+      title: z.string().optional(),
+      description: z.string().optional(),
+      url: z.string().optional(),
+      author: z.object({ name: z.string().optional(), url: z.string().optional() }).optional(),
+      fields: z.array(z.object({ name: z.string(), value: z.string() })).optional(),
+      footer: z.object({ text: z.string().optional() }).optional(),
+      image: z.object({ url: z.string().optional() }).optional(),
+      thumbnail: z.object({ url: z.string().optional() }).optional(),
+      video: z.object({ url: z.string().optional() }).optional(),
+    }),
+  )
+  .optional();
 const historySchema = z
   .array(
     z.object({
@@ -227,10 +243,17 @@ const historySchema = z
         .object({ type: z.number().int().optional(), message_id: snowflakeSchema.optional() })
         .optional(),
       attachments: historyAttachmentsSchema,
+      embeds: historyEmbedsSchema,
       // The forwarded message of a forward.
       message_snapshots: z
         .array(
-          z.object({ message: z.object({ content: z.string().optional(), attachments: historyAttachmentsSchema }) }),
+          z.object({
+            message: z.object({
+              content: z.string().optional(),
+              attachments: historyAttachmentsSchema,
+              embeds: historyEmbedsSchema,
+            }),
+          }),
         )
         .optional(),
     }),
