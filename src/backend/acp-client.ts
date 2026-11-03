@@ -164,6 +164,8 @@ interface AcpTurn {
   interruptedAnswer: string | null;
   /** A failure that the server sent as answer text and then ended the turn as a success. */
   providerError: string | null;
+  /** The agent's process lost its sign-in (`AcpFlavor.signInLostChunk`), and ends after this turn. */
+  signInLost: boolean;
   /**
    * Where the answer text stood when Antigravity logged that its SDK failed this prompt. The
    * server then sends the failure as answer text and ends the turn as a success.
@@ -2067,6 +2069,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       reasoned: false,
       interruptedAnswer: null,
       providerError: null,
+      signInLost: false,
       sdkFailureAt: null,
       answerOptional,
       messages: [],
@@ -2168,6 +2171,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         status,
         status === "failed" ? (turn.providerError ?? response.stopReason) : null,
       );
+      if (turn.signInLost)
+        yield* this.#endAgentProcess(sourceText("error.provider.acpSignInLost", { provider: this.#label }));
     } catch (error) {
       // A session's own process that ended names how it ended, as the agent's process does.
       const transport = thread.transport;
@@ -2313,6 +2318,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
       // The agent's own transport error sent as answer text (Cursor, #3334).
       if (this.#flavor.noiseChunk?.test(update.content.text)) return;
+      if (this.#flavor.signInLostChunk?.test(update.content.text)) {
+        turn.receivedOutput = true;
+        turn.signInLost = true;
+        turn.providerError = sourceText("error.provider.acpSignInLost", { provider: this.#label });
+        return;
+      }
       // An exhausted quota sent as answer text, and a turn then ended as a success (Antigravity).
       const quota = this.#flavor.sdkHarness?.quota(update.content.text) ?? null;
       if (quota !== null) {
@@ -2590,12 +2601,19 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       yield* transport.stop(Effect.void).pipe(Effect.ignore);
       return true;
     }
-    this.emit("exit", new Error(sourceText("error.provider.acpUnresponsive", { provider: this.#label })));
-    // A warm generation client has no runtime that stops it, and it is used again while it runs.
-    // The stop closes the scope of this fiber, so it runs detached.
-    yield* Effect.forkDetach(this.stop().pipe(Effect.ignore), { startImmediately: true });
+    yield* this.#endAgentProcess(sourceText("error.provider.acpUnresponsive", { provider: this.#label }));
     return true;
   });
+
+  /** Ends the agent's own process with this message. The runtime starts a new one. */
+  #endAgentProcess(message: string): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      this.emit("exit", new Error(message));
+      // A warm generation client has no runtime that stops it, and it is used again while it runs.
+      // The stop closes the scope of the calling fiber, so it runs detached.
+      return Effect.forkDetach(this.stop().pipe(Effect.ignore), { startImmediately: true }).pipe(Effect.asVoid);
+    });
+  }
 
   /** Watches a session whose background task can start a turn that the agent sends no update for. */
   #watchBackground(thread: AcpThread): void {
