@@ -61,6 +61,7 @@ import {
   ShieldCheck,
   Shuffle,
   SlidersHorizontal,
+  SlidingTabs,
   Switch,
   Text,
 } from "@openbot/ui";
@@ -68,9 +69,13 @@ import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import {
   AVATAR_COLOR_CHOICES,
   AVATAR_EXPRESSIONS,
+  AVATAR_STYLES,
   type AvatarColorChoice,
+  type AvatarStyle,
+  avatarDefaultSeed,
   avatarHueForColor,
   avatarSeedForFace,
+  avatarStyleForSeed,
   bloubAvatarProfile,
   isAvatarColorChoice,
   SUPPORTED_AVATAR_SILHOUETTES,
@@ -440,6 +445,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const knownProvider = () => (agentForeignProvider() === undefined ? draft.runtime.provider : undefined);
   /** The shape, eyes and automatic colour that the saved seed draws. */
   const avatarFace = createMemo(() => bloubAvatarProfile(draft.avatar.seed, null));
+  /** Plush or flat. The saved seed says which, so every app that knows styles draws the same one. */
+  const avatarStyle = createMemo(() => avatarStyleForSeed(draft.avatar.seed));
+  const avatarResetSeed = createMemo(() => avatarDefaultSeed(props.agent.id, avatarStyle()));
   const avatarColorSelected = (choice: AvatarColorChoice) =>
     isAvatarColorChoice(choice, draft.avatar.hue, draft.avatar.color);
   const automaticColorSelected = () => draft.avatar.hue === null && draft.avatar.color === null;
@@ -735,38 +743,46 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
-  async function selectGeneratedAvatar(seed: string): Promise<void> {
+  /**
+   * Saves a generated face. The automatic colour comes from the seed, so a face on the automatic colour
+   * that the new seed would colour differently keeps `color` as a chosen one. Back on the agent's own
+   * seed, a hue that only kept the colour of that seed is automatic again.
+   */
+  async function selectGeneratedAvatar(seed: string, color: string): Promise<void> {
+    const seedColor = bloubAvatarProfile(seed, null).color;
+    let hue: AvatarHue | null | undefined;
+    if (automaticColorSelected() && seedColor !== color) hue = avatarHueForColor(color) ?? undefined;
+    else if (
+      seed === props.agent.id &&
+      draft.avatar.color === null &&
+      draft.avatar.hue === avatarHueForColor(seedColor)
+    ) {
+      hue = null;
+    }
     if (avatarUrl() && !(await setCustomAvatar(null))) return;
     setDraft((state) => {
       state.avatar.seed = seed;
+      if (hue !== undefined) state.avatar.hue = hue;
     });
-    await saveAgentPatch({ avatarSeed: seed });
+    await saveAgentPatch(hue === undefined ? { avatarSeed: seed } : { avatarSeed: seed, avatarHue: hue });
   }
 
-  /**
-   * Draws the chosen shape and eyes, and keeps the rest of the face. The automatic colour comes from
-   * the seed and changes with the eyes, so a face on the automatic colour keeps its colour as a
-   * chosen one.
-   */
+  /** Draws the chosen shape, eyes or style, and keeps the rest of the face. */
   async function selectAvatarFace(change: {
     shape?: SupportedAvatarSilhouetteId;
     expression?: ExpressionId;
+    style?: AvatarStyle;
   }): Promise<void> {
     const current = avatarFace();
-    const seed = avatarSeedForFace(props.agent.id, {
-      shape: change.shape ?? current.shape,
-      expression: change.expression ?? current.expression,
-    });
-    const keptHue =
-      automaticColorSelected() && bloubAvatarProfile(seed, null).color !== current.color
-        ? avatarHueForColor(current.color)
-        : null;
-    if (avatarUrl() && !(await setCustomAvatar(null))) return;
-    setDraft((state) => {
-      state.avatar.seed = seed;
-      if (keptHue !== null) state.avatar.hue = keptHue;
-    });
-    await saveAgentPatch(keptHue === null ? { avatarSeed: seed } : { avatarSeed: seed, avatarHue: keptHue });
+    const face = { shape: change.shape ?? current.shape, expression: change.expression ?? current.expression };
+    const style = change.style ?? avatarStyle();
+    // The agent's own plush face is its ID, so Plush after Flat saves the seed that the agent had.
+    const own = bloubAvatarProfile(props.agent.id, null);
+    const seed =
+      style === "plush" && own.shape === face.shape && own.expression === face.expression
+        ? props.agent.id
+        : avatarSeedForFace(props.agent.id, face, style);
+    await selectGeneratedAvatar(seed, current.color);
   }
 
   async function selectModel(
@@ -1140,25 +1156,48 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     <div class="avatar-editor-divider" />
                     <div class="avatar-editor-heading">
                       <span>{t("agentSettings.avatar.shape")}</span>
-                      <div class="avatar-editor-actions">
-                        <Show when={draft.avatar.seed !== props.agent.id}>
+                      <div class="avatar-editor-heading-end">
+                        <SlidingTabs.Root
+                          value={avatarStyle()}
+                          onChange={(value) => {
+                            const style = AVATAR_STYLES.find((option) => option === value);
+                            if (style && style !== avatarStyle()) void selectAvatarFace({ style });
+                          }}
+                        >
+                          <SlidingTabs.List class="avatar-style-tabs" aria-label={t("agentSettings.avatar.style")}>
+                            <SlidingTabs.Trigger value="plush">
+                              {t("agentSettings.avatar.stylePlush")}
+                            </SlidingTabs.Trigger>
+                            <SlidingTabs.Trigger value="flat">
+                              {t("agentSettings.avatar.styleFlat")}
+                            </SlidingTabs.Trigger>
+                          </SlidingTabs.List>
+                        </SlidingTabs.Root>
+                        <div class="avatar-editor-actions">
+                          <Show when={draft.avatar.seed !== avatarResetSeed()}>
+                            <IconButton
+                              variant="outline"
+                              type="button"
+                              label={t("agentSettings.avatar.resetToId")}
+                              onClick={() =>
+                                void selectGeneratedAvatar(
+                                  avatarResetSeed(),
+                                  bloubAvatarProfile(props.agent.id, null).color,
+                                )
+                              }
+                            >
+                              <RotateCcw aria-hidden="true" />
+                            </IconButton>
+                          </Show>
                           <IconButton
                             variant="outline"
                             type="button"
-                            label={t("agentSettings.avatar.resetToId")}
-                            onClick={() => void selectGeneratedAvatar(props.agent.id)}
+                            label={t("agentSettings.avatar.shuffle")}
+                            onClick={() => void selectAvatarFace(randomAvatarFace(avatarFace()))}
                           >
-                            <RotateCcw aria-hidden="true" />
+                            <Shuffle aria-hidden="true" />
                           </IconButton>
-                        </Show>
-                        <IconButton
-                          variant="outline"
-                          type="button"
-                          label={t("agentSettings.avatar.shuffle")}
-                          onClick={() => void selectAvatarFace(randomAvatarFace(avatarFace()))}
-                        >
-                          <Shuffle aria-hidden="true" />
-                        </IconButton>
+                        </div>
                       </div>
                     </div>
                     <fieldset class="avatar-face-grid avatar-shape-grid" aria-label={t("agentSettings.avatar.shapes")}>
