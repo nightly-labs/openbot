@@ -127,6 +127,9 @@ const SMTP_CLOSE_TIMEOUT_MS = 250;
 const SMTP_MAX_ATTEMPTS = 3;
 // A service binding needs an absolute URL. The relay reads only the body.
 const RELAY_URL = "https://openbot-email-relay.internal/send";
+// The relay ends its own attempts inside the delivery budget, so its result must arrive before this
+// limit. The margin covers the binding hop and a cold start. Only a relay that hangs reaches it.
+const RELAY_TIMEOUT_MS = EMAIL_CODE_DELIVERY_BUDGET_MS + 5_000;
 const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+$/iu;
 
 export const sendPrivateEmailCode = Effect.fn("Smtp.sendPrivateEmailCode ")(function* (
@@ -312,7 +315,7 @@ const sendThroughRelay = Effect.fn("SmtpEmail.relay")(function* (
     const decoded = Schema.decodeUnknownOption(RelayFailure)(body);
     if (Option.isNone(decoded) || !DELIVERY_ERROR_PATTERN.test(decoded.value.error)) return unknown();
     return new SmtpError(decoded.value.error);
-  }).pipe(Effect.timeoutOrElse({ duration: EMAIL_CODE_DELIVERY_BUDGET_MS, orElse: () => Effect.fail(unknown()) }));
+  }).pipe(Effect.timeoutOrElse({ duration: RELAY_TIMEOUT_MS, orElse: () => Effect.fail(unknown()) }));
   if (failure) return yield* failure;
 });
 
