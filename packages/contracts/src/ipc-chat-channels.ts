@@ -35,6 +35,35 @@ export interface ChannelIcon {
   hue: number;
 }
 
+/**
+ * The icons that this version draws, in the order of the editor grid. The names are saved in the
+ * channel, so a name never changes its meaning; add new names at the end.
+ */
+export const CHANNEL_ICON_NAMES = [
+  "megaphone",
+  "chart",
+  "lifebuoy",
+  "search",
+  "briefcase",
+  "code",
+  "globe",
+  "mail",
+  "calendar",
+  "gift",
+  "palette",
+  "brain",
+  "book",
+  "sparkles",
+  "star",
+  "zap",
+  "shield",
+  "store",
+  "workflow",
+  "card",
+] as const;
+
+export type ChannelIconName = (typeof CHANNEL_ICON_NAMES)[number];
+
 export interface ChannelDraft {
   name: string;
   title: string;

@@ -13,6 +13,7 @@ import {
   CHANNEL_PARALLEL_LIMIT,
   type Channel,
   type ChannelCommand,
+  type ChannelDraft,
   type ChannelMemory,
   type ChannelMessage,
   type ChannelRoutingConversationEventAction,
@@ -278,8 +279,8 @@ export class ChannelService {
     },
   );
 
-  /** The open channels, for an agent that chooses where to send a request (`list_channels`). */
-  handoffTargets(): Array<{
+  /** The open channels, or with `archivedOnly` the archived ones, for an agent that chooses a channel (`list_channels`). */
+  handoffTargets(archivedOnly = false): Array<{
     id: string;
     name: string;
     title: string;
@@ -290,7 +291,7 @@ export class ChannelService {
     const archived = this.store.archivedIds();
     return this.store
       .ids()
-      .filter((id) => !archived.has(id))
+      .filter((id) => archived.has(id) === archivedOnly)
       .map((id) => this.store.get(id))
       .map((channel) => ({
         id: channel.id,
@@ -381,6 +382,44 @@ export class ChannelService {
       }).pipe(Effect.uninterruptible),
     ),
   );
+
+  /**
+   * A channel that an agent creates or changes from its own chat (`create_channel`, `update_channel`).
+   * `draftOf` gets the channel as it is stored when this save's turn in the command queue comes, or
+   * null when it does not exist, so it never undoes a command that waited before it. It throws to
+   * refuse the change, and a change of a channel that is gone. A retried call finds its receipt and
+   * changes nothing again.
+   */
+  readonly agentSave = Effect.fn("ChannelService.agentSave")(
+    (
+      input: { channelId: string; operationId: string; agentId: string; create: boolean },
+      draftOf: (stored: Channel | null) => ChannelDraft,
+    ) =>
+      this.#serialize(
+        input.channelId,
+        Effect.gen({ self: this }, function* () {
+          const stored = (yield* channelSync(() => this.store.exists(input.channelId)))
+            ? yield* channelSync(() => this.store.get(input.channelId))
+            : null;
+          const draft = yield* channelSync(() => draftOf(stored));
+          return yield* this.apply(
+            {
+              type: "save",
+              operationId: input.operationId,
+              channelId: input.channelId,
+              draft,
+              ...(input.create ? {} : { update: true }),
+            },
+            this.agentActor(input.agentId),
+          );
+        }),
+      ),
+  );
+
+  /** The actor of a command that an agent sends from its own chat, as `send_to_channel` writes it. */
+  agentActor(agentId: string): { id: string; name: string } {
+    return { id: channelHandoffAuthorId(agentId), name: this.memberName(agentId) };
+  }
 
   readonly deleteChannel = Effect.fn("ChannelService.deleteChannel")((channelId: string) =>
     this.#serialize(

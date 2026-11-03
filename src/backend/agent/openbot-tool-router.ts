@@ -66,6 +66,12 @@ import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry } from "./attention-registry";
 import { loadAvatarFile } from "./avatar-file";
 import type { BrowserUploads } from "./browser-uploads";
+import {
+  CHANNEL_AGENT_TOOL_NAMES,
+  channelAgentToolInChannelTask,
+  handleChannelAgentTool,
+  listChannelsToolSchema,
+} from "./channel-agent-tools";
 import type { ChatVisualPreviewHost } from "./chat-visual-preview";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { handleDataTool } from "./data-tools";
@@ -526,7 +532,8 @@ export class OpenBotToolRouter {
                 if (!(error instanceof z.ZodError)) logger.warn("An OpenBot tool failed.", { tool, error: message });
                 return openBotToolFailure(message);
               });
-            const correctable = PROFILE_TOOL_NAMES.has(tool) || tool === "attach_files_to_response";
+            const correctable =
+              PROFILE_TOOL_NAMES.has(tool) || CHANNEL_AGENT_TOOL_NAMES.has(tool) || tool === "attach_files_to_response";
             const response = this.#handleOpenBotTool(toolRequest.params).pipe(
               Effect.catch((failure) => (correctable ? correctableFailure(failure.cause) : Effect.fail(failure))),
               Effect.catchDefect((defect) => (correctable ? correctableFailure(defect) : Effect.die(defect))),
@@ -859,7 +866,17 @@ export class OpenBotToolRouter {
       };
     }
 
-    if (params.tool === "list_channels") return openBotToolResult({ channels: this.#channels.handoffTargets() });
+    if (params.tool === "list_channels") {
+      const args = listChannelsToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+      return openBotToolResult({ channels: this.#channels.handoffTargets(args.archived === true) });
+    }
+    if (CHANNEL_AGENT_TOOL_NAMES.has(params.tool)) {
+      if (channelId) return channelAgentToolInChannelTask();
+      return yield* handleChannelAgentTool(params, senderAgentId, {
+        channels: this.#channels,
+        listAgents: () => this.#hooks.listAgents(),
+      });
+    }
     if (params.tool === "send_to_channel") {
       if (channelId) return openBotToolFailure("Use channel_assign or channel_transfer for channel work.");
       const args = sendToChannelToolSchema.parse(params.arguments, { reportInput: true });
