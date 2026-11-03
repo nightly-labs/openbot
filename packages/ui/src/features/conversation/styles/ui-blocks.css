@@ -189,10 +189,10 @@
   overflow-wrap: anywhere;
 }
 
-/* A long draft scrolls, so the user can read all of it before an answer. */
+/* A long draft stops at a fixed height and does not scroll. "Show all" under it opens the rest. */
 .ui-block-preview {
   max-height: 16em;
-  overflow-y: auto;
+  overflow: hidden;
   padding: var(--openbot-space-3);
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);
@@ -204,6 +204,11 @@
 
 .ui-block-preview[data-expanded="true"] {
   max-height: none;
+}
+
+/* The fade shows that the draft goes on below the box. */
+.ui-block-preview[data-clamped="true"] {
+  mask-image: linear-gradient(to bottom, var(--openbot-text-primary) 60%, transparent);
 }
 
 /* The control that opens the rest of a long draft sits under it, at the start of the line. */
