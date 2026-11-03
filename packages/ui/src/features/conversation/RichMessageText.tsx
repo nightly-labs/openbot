@@ -315,6 +315,7 @@ export function MessageLink(props: {
   return (
     <a
       class="message-link"
+      dir="auto"
       href={props.url}
       data-cuelume-navigate=""
       data-cuelume-emphasis="subtle"

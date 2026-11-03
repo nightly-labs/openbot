@@ -20,6 +20,7 @@ import {
   streamingTrailReach,
   useStreamingReveal,
 } from "./streamingReveal";
+import { textDirection } from "./textDirection";
 
 type MarkdownMessageTextProps = Omit<RichMessageTextProps, "showCitationFooter"> & {
   showCitationFooter?: boolean;
@@ -117,6 +118,15 @@ const EXCERPT_BLOCK_LIMIT = 4;
 
 function tokenIs<K extends keyof MarkdownTokenByType>(token: Token, type: K): token is MarkdownTokenByType[K] {
   return token.type === type;
+}
+
+/** The direction of a block, from its prose. Code and math do not count. */
+function blockDirection(token: Token) {
+  let prose = "";
+  void markdown.walkTokens([token], (child) => {
+    if (tokenIs(child, "text") && !child.tokens) prose += `${child.text} `;
+  });
+  return textDirection(prose);
 }
 
 function headingLevel(depth: number): 1 | 2 | 3 | 4 | 5 | 6 {
@@ -370,7 +380,12 @@ function MarkdownBlock(props: {
       if (!tokenIs(token, "heading")) return token.raw;
       const level = headingLevel(token.depth);
       return (
-        <Dynamic component={`h${level}`} class="message-markdown-heading" data-level={level}>
+        <Dynamic
+          component={`h${level}`}
+          class="message-markdown-heading"
+          data-level={level}
+          dir={blockDirection(token)}
+        >
           <MarkdownInline
             tokens={token.tokens}
             content={props.content}
@@ -383,7 +398,7 @@ function MarkdownBlock(props: {
     case "paragraph": {
       if (!tokenIs(token, "paragraph")) return token.raw;
       return (
-        <p>
+        <p dir={blockDirection(token)}>
           <MarkdownInline
             tokens={token.tokens}
             content={props.content}
@@ -396,7 +411,7 @@ function MarkdownBlock(props: {
     case "blockquote": {
       if (!tokenIs(token, "blockquote")) return token.raw;
       return (
-        <blockquote>
+        <blockquote dir={blockDirection(token)}>
           <MarkdownBlocks
             tokens={token.tokens}
             content={props.content}
@@ -527,9 +542,11 @@ function MarkdownList(props: {
   );
 
   return props.token.ordered ? (
-    <ol start={props.token.start === "" ? undefined : props.token.start}>{list()}</ol>
+    <ol start={props.token.start === "" ? undefined : props.token.start} dir={blockDirection(props.token)}>
+      {list()}
+    </ol>
   ) : (
-    <ul>{list()}</ul>
+    <ul dir={blockDirection(props.token)}>{list()}</ul>
   );
 }
 
@@ -541,7 +558,12 @@ function MarkdownTable(props: { token: Tokens.Table; content: MarkdownContentPro
   );
   const { t } = useText();
   return (
-    <section class="message-markdown-table-scroll" aria-label={t("chat.table.data")} tabindex="0">
+    <section
+      class="message-markdown-table-scroll"
+      aria-label={t("chat.table.data")}
+      tabindex="0"
+      dir={blockDirection(props.token)}
+    >
       <table class="message-markdown-table" style={`--message-markdown-table-columns: ${headers().length}`}>
         <thead>
           <tr>
