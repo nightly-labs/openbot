@@ -165,10 +165,10 @@ function AccountPage({
             disclosure={false}
             disabled={pending !== null}
             onPress={() =>
-              // The provider page runs the relayed sign-in and shows its page and pasted address.
-              router.dismissTo({
-                pathname: "/server-settings/provider",
-                params: { serverId, provider, signInAccount: account.id },
+              // The sign-in page runs the relayed sign-in and comes back here when it ends.
+              router.push({
+                pathname: "/server-settings/provider-sign-in",
+                params: { serverId, provider, method: "relay", account: account.id },
               })
             }
           >
