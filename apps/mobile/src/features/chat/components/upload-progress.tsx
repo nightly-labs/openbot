@@ -1,6 +1,6 @@
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import Animated, {
   type CSSTransitionProperties,
@@ -41,9 +41,28 @@ function useGlidingProgress(progress: number) {
  * so the photo comes into focus as it leaves the phone. Only opacity moves: the blur itself is a
  * static layer, and redrawing a blur every frame is what makes a phone stutter.
  */
-export function useUploadRevealStyle(progress: number) {
+function useUploadRevealStyle(progress: number) {
   const value = useGlidingProgress(progress);
   return useAnimatedStyle(() => ({ opacity: value.get() }));
+}
+
+/**
+ * The upload view of an image: the progress it shows, and the style of its sharp copy. The send
+ * can finish before the view has settled, so a finished upload shows as complete for that long,
+ * and the photo finishes coming into focus instead of jumping to sharp in one frame.
+ */
+export function useUploadReveal(upload: number | undefined) {
+  const [lingering, setLingering] = useState(false);
+  useEffect(() => {
+    if (upload !== undefined) {
+      setLingering(true);
+      return;
+    }
+    const timer = setTimeout(() => setLingering(false), UPLOAD_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [upload]);
+  const shownUpload = upload ?? (lingering ? 1 : undefined);
+  return { shownUpload, revealStyle: useUploadRevealStyle(shownUpload ?? 1) };
 }
 
 const CIRCLE_SIZE = 22;

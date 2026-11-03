@@ -38,7 +38,7 @@ import {
 import { rubberBandClamp } from "../model/image-viewer-geometry";
 import { rememberImageDimensions, useAttachmentFile } from "./attachment-preview";
 import { isViewableImage, useChatImageSource } from "./chat-image-viewer";
-import { UPLOAD_BLUR_RADIUS, UPLOAD_SETTLE_MS, useUploadRevealStyle } from "./upload-progress";
+import { UPLOAD_BLUR_RADIUS, useUploadReveal } from "./upload-progress";
 
 const TILE_RADIUS = 10;
 const CARD_WIDTH = 196;
@@ -294,19 +294,8 @@ function StackCard({
   const [imageFailed, setImageFailed] = useState(false);
   const source = useChatImageSource(isViewableImage(attachment) ? attachment.id : null, FRAME_RADIUS);
   const failed = Boolean(query.error) || imageFailed;
-  // As on a single image: the card is blurred while it uploads and comes into focus as it leaves
-  // the phone. A finished upload stays for its settle time, so the focus does not jump.
-  const [lingering, setLingering] = useState(false);
-  useEffect(() => {
-    if (upload !== undefined) {
-      setLingering(true);
-      return;
-    }
-    const timer = setTimeout(() => setLingering(false), UPLOAD_SETTLE_MS);
-    return () => clearTimeout(timer);
-  }, [upload]);
-  const shownUpload = upload ?? (lingering ? 1 : undefined);
-  const revealStyle = useUploadRevealStyle(shownUpload ?? 1);
+  // As on a single image: the card is blurred while it uploads and comes into focus as it leaves the phone.
+  const { shownUpload, revealStyle } = useUploadReveal(upload);
   // A tap on a card that failed loads it again instead of opening the viewer.
   useEffect(() => {
     retries.set(slot, () => {
