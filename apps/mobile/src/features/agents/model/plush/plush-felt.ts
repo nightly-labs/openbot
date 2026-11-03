@@ -20,7 +20,7 @@ import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 
 const clamp01 = (value: number) => (value < 0 ? 0 : value > 1 ? 1 : value);
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
-export const easeOutQuint = (t: number) => 1 - (1 - t) ** 5;
+const easeOutQuint = (t: number) => 1 - (1 - t) ** 5;
 const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
 const TAU = Math.PI * 2;
 
@@ -163,7 +163,7 @@ const PAD = (() => {
 })();
 
 /** One piece of a pad on the screen, and the part of its picture it shows, from 0 to 1. */
-export interface PlushPiece {
+interface PlushPiece {
   /** 0: the lying capsule, 1: the standing capsule. */
   src: 0 | 1;
   x: number;
@@ -287,7 +287,7 @@ const LID_SOFT = 0.1;
 const LID_BANDS = 4;
 const LID_MARGIN = 8;
 
-export interface PlushLid {
+interface PlushLid {
   /** The eye centre, and the vertical squash about it, on the screen. */
   cx: number;
   cy: number;

@@ -42,7 +42,7 @@ export const PLUSH_FPS = 30;
  * the loop holds a whole number of both.
  */
 const LOOP_SECONDS = 6;
-export const LOOP_FRAMES = LOOP_SECONDS * PLUSH_FPS;
+const LOOP_FRAMES = LOOP_SECONDS * PLUSH_FPS;
 /**
  * The eyes play the engine on a smooth periodic clock that goes forward and back, so a loop closes
  * without a jump of the gaze or the lids. The decor keeps a linear clock.
