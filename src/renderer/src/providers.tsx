@@ -173,11 +173,16 @@ const Providers = createSimpleContext({
      * entry point calls this - the composer notice, the model picker, onboarding and settings - so
      * none of them leaves the user to read a documentation page and sign in in a terminal.
      */
-    async function connectProvider(provider: AgentProviderId): Promise<void> {
+    async function connectProvider(
+      provider: AgentProviderId,
+      region: "global" | "mainland-cn" = "global",
+    ): Promise<void> {
       if (refreshingProviders()) return;
       const analytics = beginProviderConnection(provider, "browser");
       try {
-        const status = await providersPort().connectProvider(provider);
+        const status = await (region === "global"
+          ? providersPort().connectProvider(provider)
+          : providersPort().connectProviderInMainlandChina(provider));
         flush(() => applyAgentStatus(status));
       } catch (error) {
         endFailedProviderConnection(provider, analytics, "browser");
@@ -486,7 +491,8 @@ const Providers = createSimpleContext({
           : activeServer()?.kind === "remote"
             ? null
             : { kind: "computer", platform: appInfo()?.platform },
-      connectInBrowser: connectProvider,
+      connectInBrowser: (provider) => connectProvider(provider),
+      connectInMainlandChina: (provider) => connectProvider(provider, "mainland-cn"),
       openVerificationUrl: (url) => void appPort().openUrl(url),
       analytics: {
         begin: (provider) => {

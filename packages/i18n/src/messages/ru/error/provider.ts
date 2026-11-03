@@ -172,6 +172,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} не вернул аккаунт с выполненным входом.",
   "error.provider.signInExpired": "Срок входа в {provider} истёк. Войдите снова, чтобы продолжить.",
   "error.provider.cliActivateFailed": "OpenBot не смог активировать управляемый CLI.",
+  "error.provider.noMainlandChinaSignIn": "У {provider} нет входа для материкового Китая.",
   "error.provider.cliNewVersionNotStarted": "Новая версия не запустилась.",
   "error.provider.cliBusyReconnect":
     "{provider} CLI обрабатывает ход. Дождитесь его завершения, затем подключитесь заново.",

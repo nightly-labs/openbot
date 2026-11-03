@@ -176,6 +176,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider}이(가) 인증된 계정을 반환하지 않았어요.",
   "error.provider.signInExpired": "{provider} 로그인이 만료되었어요. 계속하려면 다시 로그인하세요.",
   "error.provider.cliActivateFailed": "OpenBot이 관리형 CLI를 활성화할 수 없었어요.",
+  "error.provider.noMainlandChinaSignIn": "{provider}에는 중국 본토용 로그인이 없습니다.",
   "error.provider.cliNewVersionNotStarted": "새 버전이 시작되지 않았어요.",
   "error.provider.cliBusyReconnect": "{provider} CLI가 턴을 처리하는 중이에요. 끝날 때까지 기다린 후 다시 연결하세요.",
   "error.provider.cliBusySignOut":

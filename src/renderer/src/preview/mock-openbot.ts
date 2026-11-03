@@ -1262,6 +1262,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     openExternal: async () => undefined,
     connectProvider: async () => clone(agentStatus),
+    connectProviderInMainlandChina: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
     // The preview runs no provider process, so a restart has nothing to wait for.

@@ -49,6 +49,7 @@ export const messages = {
   "provider.action.signIn": "로그인",
   "provider.action.apiKey": "API 키",
   "provider.action.signInWithCode": "코드로 로그인",
+  "provider.action.signInMainlandChina": "{site}로 로그인 (중국)",
   "provider.action.pasteAddress": "주소 붙여넣기",
   "provider.aria.download": "{name} 다운로드",
   "provider.aria.cancel": "{name} 취소",

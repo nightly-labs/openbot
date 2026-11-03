@@ -49,6 +49,7 @@ export const messages = {
   "provider.action.signIn": "Accedi",
   "provider.action.apiKey": "Chiave API",
   "provider.action.signInWithCode": "Accedi con un codice",
+  "provider.action.signInMainlandChina": "Accedi con {site} (Cina)",
   "provider.action.pasteAddress": "Incolla l'indirizzo",
   "provider.aria.download": "Scarica {name}",
   "provider.aria.cancel": "Annulla {name}",

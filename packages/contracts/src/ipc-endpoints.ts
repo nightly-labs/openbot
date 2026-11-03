@@ -755,6 +755,11 @@ export const IPC_ENDPOINTS = {
   providers: {
     setProviderOn: request<{ provider: AgentProviderId; on: boolean }, AgentStatus>()("app:set-provider-on"),
     connectProvider: request<AgentProviderId, AgentStatus>()("app:connect-provider"),
+    /**
+     * Connects a provider whose descriptor has `mainlandChinaSignInSite`, with an account of that
+     * site. `connectProvider` signs in with the global site.
+     */
+    connectProviderInMainlandChina: request<AgentProviderId, AgentStatus>()("app:connect-provider-mainland-china"),
     /** Ends the sign-in that `connectProvider` started and that still waits for the browser. */
     cancelProviderSignIn: request<AgentProviderId, AgentStatus>()("app:cancel-provider-sign-in"),
     /**

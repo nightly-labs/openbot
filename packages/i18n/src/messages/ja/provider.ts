@@ -50,6 +50,7 @@ export const messages = {
   "provider.action.signIn": "サインイン",
   "provider.action.apiKey": "API キー",
   "provider.action.signInWithCode": "コードでログイン",
+  "provider.action.signInMainlandChina": "{site} でログイン (中国)",
   "provider.action.pasteAddress": "アドレスを貼り付け",
   "provider.aria.download": "{name} をダウンロード",
   "provider.aria.cancel": "{name} をキャンセル",

@@ -637,6 +637,9 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
           connect: async (provider) => {
             await props.providers.connectProvider(provider);
           },
+          ...(api.mainlandChinaSite && api.connectInMainlandChina
+            ? { mainlandChinaSite: api.mainlandChinaSite, connectInMainlandChina: api.connectInMainlandChina }
+            : {}),
         }
       : undefined;
   });

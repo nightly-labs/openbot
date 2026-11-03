@@ -156,6 +156,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} 未返回已验证的账号。",
   "error.provider.signInExpired": "你的 {provider} 登录已过期，请重新登录以继续。",
   "error.provider.cliActivateFailed": "OpenBot 无法激活托管的 CLI。",
+  "error.provider.noMainlandChinaSignIn": "{provider} 没有中国大陆的登录方式。",
   "error.provider.cliNewVersionNotStarted": "新版本未能启动。",
   "error.provider.cliBusyReconnect": "{provider} CLI 正在处理对话，请等它结束后再重新连接。",
   "error.provider.cliBusySignOut": "{provider} CLI 正在处理一轮对话。请等待其完成，然后断开连接。",
