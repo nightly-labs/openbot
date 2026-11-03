@@ -5,6 +5,7 @@ import {
   DEFAULT_TRANSPARENT_WINDOW,
   isAppAppearance,
   isAppThemePalette,
+  sameThemePalettes,
   selectedThemePalette,
 } from "@openbot/contracts/app-appearance";
 import {
@@ -54,16 +55,12 @@ function saveTheme(next: AppearanceSelectValue): Promise<AppearanceSelectValue> 
   return appPort().setAppAppearancePreference(appearanceChangeOfSelectValue(next)).then(appearanceSelectValue);
 }
 
-function samePalettes(before: readonly AppThemePalette[], after: readonly AppThemePalette[]): boolean {
-  return JSON.stringify(before) === JSON.stringify(after);
-}
-
 /** The Settings control state of the theme and of the transparent window. */
 export function useAppearanceChoice() {
   const theme = optimisticChoice<AppearanceSelectValue>(DEFAULT_APP_APPEARANCE, saveTheme);
   // Each event from main carries a new array. Kobalte rebuilds its list when the options change, and
   // then reports the selected value again, so an equal list must keep the same array.
-  const [palettes, setPalettes] = createSignal<AppThemePalette[]>([], { equals: samePalettes });
+  const [palettes, setPalettes] = createSignal<AppThemePalette[]>([], { equals: sameThemePalettes });
   const transparentWindow = optimisticChoice<boolean>(DEFAULT_TRANSPARENT_WINDOW, (next) =>
     appPort()
       .setAppAppearancePreference({ transparentWindow: next })

@@ -108,6 +108,11 @@ export function isAppThemePalette(value: unknown): value is AppThemePalette {
   });
 }
 
+/** Two palette lists with the same palettes, colors and order. */
+export function sameThemePalettes(left: readonly AppThemePalette[], right: readonly AppThemePalette[]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 /** The palette that the windows show, or null for the light, dark or system choice. */
 export function selectedThemePalette(preference: AppAppearancePreference): AppThemePalette | null {
   if (preference.palette === null) return null;

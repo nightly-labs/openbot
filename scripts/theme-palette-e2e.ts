@@ -165,6 +165,9 @@ const original = await page.evaluate(() => window.openbot.getAppAppearancePrefer
 type ShownColors = Awaited<ReturnType<typeof shownColors>>;
 const steps: Partial<Record<"chosen" | "rewritten" | "refused" | "restored" | "cleared", ShownColors>> = {};
 try {
+  // The checks below name the base under a refused palette, so the saved base must be known.
+  await page.evaluate(() => window.openbot.setAppAppearancePreference({ appearance: "dark", palette: null }));
+
   // 1. A new file reaches main with no restart.
   publishPalette("dark", TOKYO_NIGHT);
   await waitForListed(page, true);
@@ -202,7 +205,7 @@ try {
     timeout: 10_000,
   });
   shown = await shownColors(page);
-  assert.equal(shown.attribute, "dark", "The window does not show the saved appearance under a refused palette.");
+  assert.equal(shown.attribute, "dark", "The window does not show the saved Dark under a refused palette.");
   steps.refused = shown;
   publishPalette("dark", TOKYO_NIGHT);
   shown = await waitForCanvas(page, TOKYO_NIGHT.canvas);
