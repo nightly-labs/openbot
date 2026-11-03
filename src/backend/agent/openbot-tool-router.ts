@@ -875,6 +875,17 @@ export class OpenBotToolRouter {
     }
     if (CHANNEL_AGENT_TOOL_NAMES.has(params.tool)) {
       if (channelId) return channelAgentToolInChannelTask();
+      // As for webhook routines: an external chat, a routine run or an agent message can carry text
+      // from outside, such as a webhook body. A message steered into a run shares the run's turn.
+      const deliveries = this.#mailbox.findDeliveriesByTurn(senderAgentId, params.turnId);
+      const requested =
+        deliveries.length > 0 &&
+        deliveries.every(({ delivery }) => delivery.sender.kind === "user") &&
+        !this.#conversation.isExecutionThread(executionThreadId);
+      if (!requested)
+        return openBotToolFailure(
+          "Only a person's message in your own OpenBot chat can create or change a channel. Ask the user to request it there.",
+        );
       return yield* handleChannelAgentTool(params, senderAgentId, {
         channels: this.#channels,
         listAgents: () => this.#hooks.listAgents(),

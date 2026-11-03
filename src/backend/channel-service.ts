@@ -406,16 +406,7 @@ export class ChannelService {
             (yield* channelSync(() =>
               this.store.database.commandResult(`channels:${actor.id}:${input.operationId}`),
             )) !== undefined;
-          const draft: ChannelDraft =
-            done && stored
-              ? {
-                  name: stored.name,
-                  title: stored.title,
-                  instructions: stored.instructions,
-                  members: stored.members,
-                  leadAgentId: stored.leadAgentId,
-                }
-              : yield* channelSync(() => draftOf(stored));
+          const draft: ChannelDraft = done && stored ? stored : yield* channelSync(() => draftOf(stored));
           return yield* this.apply(
             {
               type: "save",
