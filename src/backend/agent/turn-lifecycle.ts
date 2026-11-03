@@ -816,12 +816,37 @@ export class TurnLifecycle {
               isPlanLimitDiagnostic(message))) ||
           (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))
         ) {
-          // Only a plan window resets by itself. A spent balance fails as before, with its reason.
+          // Only a plan window resets by itself. A spent balance fails with its reason, unless it moves.
           const planLimit =
             isPlanLimitDiagnostic(message) ||
             (error?.codexErrorInfo === "usageLimitExceeded" && !isBalanceDiagnostic(message));
           if (planLimit && notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
             this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? null);
+          }
+          // A spent balance moves an agent set to switch without asking to its next backup model, as
+          // the provider errors below do. A ChatGPT workspace out of credits says so through
+          // usageLimitExceeded, which used to end here and never reach the failover check.
+          if (
+            !planLimit &&
+            notification.method === "error" &&
+            agentId &&
+            errorTurnId !== null &&
+            this.#runningTurns.has(errorTurnId) &&
+            !this.#limitedTurns.has(errorTurnId) &&
+            this.#hooks.mayFailOver(agentId)
+          ) {
+            this.#failoverTurns.set(errorTurnId, {
+              message,
+              context: {
+                causeCode: classifyFailure(error ?? message),
+                provider: source.provider,
+                model: this.#hooks.turnModel(agentId, errorTurnId),
+                turnId: errorTurnId,
+                severity: "error",
+              },
+            });
+            yield* this.#providers.refreshUsageAfterLimit(source);
+            return;
           }
           this.#hooks.emitFailure?.({
             code: "agent_error",

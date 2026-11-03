@@ -210,6 +210,14 @@ const answer = (request) => {
       const finish = (status) => { turn.status = status; write({ method: "turn/completed", params: { threadId: thread.id, turn } }); };
       active.set(turn.id, finish);
       setImmediate(() => {
+        if (current.includes("credits-spent")) {
+          const error = { message: "Your workspace is out of credits. Ask your workspace owner to refill in order to continue.", codexErrorInfo: "usageLimitExceeded" };
+          turn.error = error;
+          write({ method: "error", params: { threadId: thread.id, turnId: turn.id, error, willRetry: false } });
+          finish("failed");
+          active.delete(turn.id);
+          return;
+        }
         if (limited && !current.includes("usage-empty")) {
           fs.appendFileSync(${JSON.stringify(workLog)}, JSON.stringify({ caseId, step: "checkpoint" }) + "\\n");
           item({ type: "commandExecution", id: randomUUID(), command: "save-checkpoint " + caseId, cwd: params.cwd, status: "completed", exitCode: 0, aggregatedOutput: "checkpoint-result=" + caseId });
@@ -800,6 +808,43 @@ try {
       },
     );
   }
+
+  // A ChatGPT workspace out of credits answers with usageLimitExceeded, but the text names credits,
+  // so the usage-limit gate does not hold it. It is a spent balance, which waits for no reset.
+  await check("spent Codex workspace credits move the agent to its backup model", async () => {
+    await restart();
+    const agent = await createCodex("Codex credits", automaticBackups);
+    const since = events.length;
+    const before = turns().length;
+    const beforeCodex = readLog<CodexTurn>(codexLog).length;
+    const outcome = await send(agent.id, "credits-spent case:credits");
+    assert.equal(outcome.status, "completed", `The message completes on the backup: ${outcome.error}`);
+    assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "Codex is not run again.");
+    assert.deepEqual(
+      turns()
+        .slice(before)
+        .map((turn) => turn.model),
+      [PRIMARY],
+      "The first backup model runs the message.",
+    );
+    const moved = agentOf(agent.id);
+    assert.equal(moved.provider, "claude", "The agent is on its backup model.");
+    assert.equal(moved.usageLimitReturn?.provider, "codex", "The agent keeps Codex to go back to.");
+    assert.equal(moved.usageLimitReturn?.cause, "provider-error", "The return names the provider error.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "No error shows for the moved message.");
+    return { outcome, model: moved.model };
+  });
+
+  await check("spent Codex workspace credits without a backup fail as before", async () => {
+    await restart();
+    const agent = await createCodex("Codex credits stays");
+    const before = turns().length;
+    const outcome = await send(agent.id, "credits-spent case:credits-stays");
+    assert.equal(outcome.status, "failed", "The message fails.");
+    assert.equal(turns().length, before, "No backup runs.");
+    assert.equal(agentOf(agent.id).provider, "codex", "The agent stays on Codex.");
+    return outcome;
+  });
 
   await check("an exhausted backup chain ends without cycling", async () => {
     await restart();
