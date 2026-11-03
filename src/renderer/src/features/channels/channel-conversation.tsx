@@ -4,8 +4,8 @@
  * host from its own contexts.
  */
 
-import { leadingAddress } from "@openbot/contracts/chat-tag-references";
-import type { AgentApproval, AgentEvent, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
+import { chatTagReferences, leadingAddress } from "@openbot/contracts/chat-tag-references";
+import type { AgentApproval, AgentEvent, BrowserTakeoverRequest, InstalledSkill } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { useText } from "@openbot/ui/text";
@@ -37,6 +37,7 @@ import {
   sentChannelMessageId,
   waitingChannelPrompt,
 } from "./channel-conversation-rows";
+import { channelSkillRecipient } from "./channel-skill-recipient";
 import { useChannels } from "./channels-context";
 
 export interface ChannelConversationEnvironment {
@@ -52,6 +53,7 @@ export interface ChannelConversationEnvironment {
   takeovers: () => readonly BrowserTakeoverRequest[];
   /** The agents that a user hid on the host. */
   hiddenAgentIds: () => ReadonlySet<string>;
+  listInstalledSkills: (agentId: string) => Promise<InstalledSkill[]>;
 }
 
 /** Must run inside the view that shows the channel: it reads the channel store and the interface text. */
@@ -163,7 +165,24 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     // mention later in the text is a reference that the owner of the work can see. The host reads
     // every opening mention from the text; the field names the first one for a host that reads one.
     const mention = leadingAddress(body).mentions[0];
+    const skillRecipient = channelSkillRecipient(body);
+    const skillIds = chatTagReferences(body)
+      .filter((reference) => reference.kind === "skill")
+      .map((reference) => reference.id);
     try {
+      if (skillRecipient === null) return { error: t("channel.error.skillAddress") };
+      if (skillRecipient) {
+        const skills = await env.listInstalledSkills(skillRecipient);
+        if (
+          skillIds.some(
+            (id) =>
+              !skills.some(
+                (skill) => skill.skillId === id && skill.enabled !== false && skill.state !== "needs-repair",
+              ),
+          )
+        )
+          return { error: t("channel.error.skillUnavailable") };
+      }
       const after = await channels.send({
         type: "send",
         operationId: clientMessageId ?? crypto.randomUUID(),

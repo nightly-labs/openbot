@@ -23,7 +23,7 @@ import {
   uninstallAgentSkill,
   unpublishAgentTemplate,
 } from "@openbot/team-client/team-admin-requests";
-import { listInstalledSkills, type TeamApiRequest, teamAgentRoutinesApi } from "@openbot/team-client/team-api-requests";
+import { type TeamApiRequest, teamAgentRoutinesApi } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
 import { onCleanup } from "solid-js";
@@ -220,13 +220,8 @@ export function createWebConversationRuntime(
         if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
         return remote.editQueue(input);
       },
-      // The skills store asks only a host that serves `installed-skills`, and the MCP store only as an admin.
-      listInstalledSkills: async (agentId) =>
-        adminRequest
-          ? Effect.runPromise(
-              listInstalledSkills(adminRequest(), agentId).pipe(Effect.mapError((error) => error.cause)),
-            )
-          : [],
+      // `installed-skills` is readable by every member; MCP settings still require an admin.
+      listInstalledSkills: remote.listInstalledSkills,
       listMcpServers: async (serverId) => {
         if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
         return adminRequest

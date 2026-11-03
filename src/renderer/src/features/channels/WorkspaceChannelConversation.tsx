@@ -22,6 +22,7 @@ import { useWindowPage } from "../window/window-page-context";
 import { ChannelErrorNotice } from "./ChannelConversationParts";
 import { createChannelConversation } from "./channel-conversation";
 import { useChannels } from "./channels-context";
+import { listInstalledChannelSkills } from "./channels-port";
 
 /**
  * The desktop's open channel in the conversation view. The reader, the waiting requests and the
@@ -86,6 +87,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
     approvals,
     takeovers,
     hiddenAgentIds: userHiddenAgentIds,
+    listInstalledSkills: listInstalledChannelSkills,
   });
   return (
     <Conversation

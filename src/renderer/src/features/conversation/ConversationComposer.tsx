@@ -1,11 +1,13 @@
 import { isKnownAgentProvider, providerSteersTurns } from "@openbot/contracts/agent-providers";
 import { supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
+import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import {
   type AccountUsageLimit,
   type AgentWait,
   accountUsageCoversModel,
   canPreviewAttachment,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  type InstalledSkill,
   type QueueSnapshot,
   usageQuotaForModel,
 } from "@openbot/contracts/ipc";
@@ -47,7 +49,9 @@ import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "..
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
 import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
+import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
+import { installedSkillsRequestKey } from "./installed-skills-source";
 import { currentConversationTarget } from "./stores/composer-store";
 
 // Module scope: the composer remounts on navigation, and a dismissed notice must stay dismissed.
@@ -133,8 +137,62 @@ export function ConversationComposer() {
         : t("composer.placeholder.messageAgent");
   const [pickerOpen, setPickerOpen] = createSignal(false);
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
+  const [chosenChannelSkillAgentId, setChosenChannelSkillAgentId] = createSignal<string>();
+  const [channelSkillLoad, setChannelSkillLoad] = createStore<{
+    skills: InstalledSkill[];
+    loading: boolean;
+    failed: boolean;
+  }>({
+    skills: [],
+    loading: false,
+    failed: false,
+  });
+  const channelSkillAgents = () => (channel ? (props.mentionAgents ?? []) : undefined);
+  const channelAddress = () => leadingAddress(currentDraft().text);
+  const channelSkillBlocked = () =>
+    Boolean(channel && (channelAddress().everyone || channelAddress().mentions.length > 1));
+  const channelSkillAgent = () => {
+    const agents = channelSkillAgents();
+    if (!agents || channelSkillBlocked()) return undefined;
+    const addressedId = channelAddress().mentions[0]?.id;
+    return (
+      agents.find((agent) => agent.id === (addressedId ?? chosenChannelSkillAgentId())) ??
+      (addressedId ? undefined : agents.length === 1 ? agents[0] : undefined)
+    );
+  };
+  let channelSkillsRequest = 0;
+  createEffect(
+    () =>
+      `${installedSkillsRequestKey(channelSkillAgent()?.id, props.server, props.skillsMarketplaceOpen === true)}\0${props.server?.connectionSequence ?? 0}`,
+    (key) => {
+      const request = ++channelSkillsRequest;
+      const [, agentId, support, visibility] = key.split("\0");
+      setChannelSkillLoad((state) => {
+        state.skills = [];
+        state.failed = false;
+        state.loading = Boolean(agentId && support === "supported" && visibility !== "hidden");
+      });
+      if (!channel || !agentId || support !== "supported" || visibility === "hidden") return;
+      void conversationRuntime(props)
+        .agent.listInstalledSkills(agentId)
+        .then((skills) => {
+          if (request !== channelSkillsRequest) return;
+          setChannelSkillLoad((state) => {
+            state.skills = skills;
+            state.loading = false;
+          });
+        })
+        .catch(() => {
+          if (request !== channelSkillsRequest) return;
+          setChannelSkillLoad((state) => {
+            state.failed = true;
+            state.loading = false;
+          });
+        });
+    },
+  );
   /** A skill belongs to one agent, and a channel message goes to the agents it routes to. */
-  const pickSkill = () => (channel ? undefined : () => setSkillPickerRequest((current) => current + 1));
+  const pickSkill = () => () => setSkillPickerRequest((current) => current + 1);
   /**
    * The draft goes to the side question, so that the chat gets nothing of it. A draft with attachments
    * stays: the side question cannot send files.
@@ -639,8 +697,13 @@ export function ConversationComposer() {
               agentId={props.agent?.id}
               agents={props.mentionAgents ?? props.agents}
               everyoneMention={Boolean(channel) && (props.mentionAgents ?? props.agents).length > 1}
-              skills={installedSkills()}
-              skillsLoadFailed={installedSkillsLoadFailed()}
+              skills={channel ? channelSkillLoad.skills : installedSkills()}
+              skillsLoadFailed={channel ? channelSkillLoad.failed : installedSkillsLoadFailed()}
+              skillsLoading={channel ? channelSkillLoad.loading : false}
+              channelSkillAgents={channelSkillAgents()}
+              channelSkillAgent={channelSkillAgent()}
+              channelSkillBlocked={channelSkillBlocked()}
+              onChooseChannelSkillAgent={setChosenChannelSkillAgentId}
               mcpServers={mcpServers()}
               attachments={currentDraft().attachments}
               value={currentDraft().text}
@@ -676,7 +739,10 @@ export function ConversationComposer() {
               onSubmit={submitComposer}
               onSteer={steerOnTab()}
               sendShortcut={deviceSendShortcut(props.platform)}
-              onPickerOpenChange={setPickerOpen}
+              onPickerOpenChange={(open) => {
+                setPickerOpen(open);
+                if (!open) setChosenChannelSkillAgentId(undefined);
+              }}
               dictation={{ text: voiceLiveText(), final: voicePhase() === "transcribing" }}
               onPasteFiles={pasteFiles}
               onCopyAttachments={(clipboard, text, attachments, remaining) => {

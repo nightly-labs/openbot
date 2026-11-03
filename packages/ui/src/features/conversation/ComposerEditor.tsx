@@ -1,6 +1,6 @@
 import { rankAgentMentions } from "@openbot/contracts/agent-mention-rank";
 import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
-import { EVERYONE_MENTION, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import { EVERYONE_MENTION, leadingAddress, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DraftAttachment } from "@openbot/contracts/ipc";
 import { Badge, Blocks, Listbox, Puzzle, UsersRound } from "@openbot/ui";
@@ -73,6 +73,12 @@ interface ComposerEditorProps {
   agentId: string | undefined;
   agents: ComposerAgent[];
   skills?: ComposerSkill[] | undefined;
+  /** In a channel, the `$` picker first chooses the agent whose skills it will show. */
+  channelSkillAgents?: ComposerAgent[] | undefined;
+  channelSkillAgent?: ComposerAgent | undefined;
+  onChooseChannelSkillAgent?: ((agentId: string) => void) | undefined;
+  channelSkillBlocked?: boolean | undefined;
+  skillsLoading?: boolean | undefined;
   /** The host's MCP servers, offered by the same `$` the skills answer. */
   mcpServers?: ComposerMcpServer[] | undefined;
   attachments?: DraftAttachment[] | undefined;
@@ -221,8 +227,22 @@ export function ComposerEditor(props: ComposerEditorProps) {
       (server) => server.enabled && (!query || server.name.toLocaleLowerCase().includes(query)),
     );
   });
+  const literalDollarAmount = () => {
+    const context = mention();
+    return (
+      context?.trigger === "$" && requestedMentionStart() !== context.start && /^\d/u.test(context.query.trimStart())
+    );
+  };
   const matchingOptions = createMemo<PickerOption[]>(() => {
     const trigger = mention()?.trigger;
+    if (trigger === "$" && props.channelSkillAgents) {
+      if (literalDollarAmount()) return [];
+      const mcpOptions = matchingMcpServers().map((server) => ({ type: "mcp" as const, server }));
+      if (props.channelSkillBlocked) return mcpOptions;
+      if (!props.channelSkillAgent)
+        return [...props.channelSkillAgents.map((agent) => ({ type: "skill-agent" as const, agent })), ...mcpOptions];
+      return [...matchingSkills().map((match) => ({ type: "skill" as const, ...match })), ...mcpOptions];
+    }
     /* Skills first: a skill is what the user writes with, and a server is what one of them reaches. */
     if (trigger === "$")
       return [
@@ -250,6 +270,15 @@ export function ComposerEditor(props: ComposerEditorProps) {
   const pickerStatus = createMemo(() => {
     const context = mention();
     if (context?.trigger !== "$" || matchingOptions().length > 0) return null;
+    if (literalDollarAmount()) return null;
+    if (props.channelSkillBlocked) return t("composer.picker.channelSingleAgent");
+    if (props.channelSkillAgents) {
+      if (!props.channelSkillAgent) return t("composer.picker.channelChooseAgent");
+      if (props.skillsLoading) return t("composer.picker.skillsLoading");
+      if (usableSkills().length === 0)
+        return t(props.skillsLoadFailed ? "composer.picker.skillsLoadFailed" : "composer.picker.noSkills");
+      return t("composer.picker.noSkillMatch", { query: context.query.trim() });
+    }
     if (requestedMentionStart() !== context.start && context.query.trim()) return null;
     if (usableSkills().length === 0)
       return t(props.skillsLoadFailed ? "composer.picker.skillsLoadFailed" : "composer.picker.noSkills");
@@ -259,6 +288,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
   createEffect(
     () => pickerOpen(),
     (open) => {
+      if (!open) setRequestedMentionStart(null);
       props.onPickerOpenChange?.(open);
     },
   );
@@ -598,6 +628,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
   function insertOption(option: PickerOption) {
     const context = mention();
     if (!editor || !context) return;
+    if (option.type === "skill-agent") {
+      props.onChooseChannelSkillAgent?.(option.agent.id);
+      setActiveOption(0);
+      return;
+    }
     const range = rangeFromTextOffsets(editor, context.start, context.end);
     if (!range) return;
     range.deleteContents();
@@ -614,6 +649,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const trailingSpace = document.createTextNode(" ");
     range.insertNode(trailingSpace);
     range.insertNode(token);
+    if (option.type === "skill" && props.channelSkillAgent && leadingAddress(props.value).mentions.length === 0) {
+      // The skill tag does not route a channel message; a leading agent tag does.
+      editor.prepend(createMentionToken(props.channelSkillAgent), document.createTextNode(" "));
+    }
     const selection = window.getSelection();
     range.setStartAfter(trailingSpace);
     range.collapse(true);
@@ -1051,7 +1090,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                       }}
                       onMouseEnter={() => setActiveOption(optionIndex())}
                     >
-                      {option.type === "agent" ? (
+                      {option.type === "agent" || option.type === "skill-agent" ? (
                         <AgentAvatar agent={option.agent} />
                       ) : option.type === "everyone" ? (
                         <span class="mention-picker-skill-icon" aria-hidden="true">

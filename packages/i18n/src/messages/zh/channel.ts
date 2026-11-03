@@ -47,6 +47,8 @@ export const messages = {
   "channel.members.empty": "频道需要至少一名成员才能分派工作。",
   "channel.error.load": "无法加载频道。",
   "channel.error.action": "频道操作失败。",
+  "channel.error.skillAddress": "请将这条技能消息发送给频道中的一位助手。",
+  "channel.error.skillUnavailable": "所选技能已不再对该助手可用。",
   "channel.error.update": "无法更新该频道。",
   "channel.error.loadOlder": "无法加载更早的消息。",
   "channel.error.delete": "无法删除该频道。",
