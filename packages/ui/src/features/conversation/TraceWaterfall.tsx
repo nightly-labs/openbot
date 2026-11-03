@@ -6,6 +6,7 @@ import { Button, IconButton } from "../../button";
 import { Dialog } from "../../complex";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createDigitRoll } from "../../digit-roll";
+import { DigitRuns } from "../../digit-runs";
 import { Input } from "../../form";
 import {
   ArrowLeftRight,
@@ -929,11 +930,12 @@ function TraceTotal(props: { label: string; value: number; format: (value: numbe
           style={{ "--digit-dir-y": direction().up ? 1 : -1 }}
           aria-hidden="true"
         >
-          <For each={shown().text.split("")} keyed={false}>
-            {(character, index) => (
-              <span class={changed(character(), index) ? "t-digit" : undefined}>{character()}</span>
+          <DigitRuns
+            text={shown().text}
+            digit={(character, index) => (
+              <span class={changed(character(), index()) ? "t-digit" : undefined}>{character()}</span>
             )}
-          </For>
+          />
         </span>
       </dd>
     </div>

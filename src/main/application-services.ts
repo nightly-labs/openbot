@@ -94,6 +94,7 @@ import {
   latestTurnAnswer,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
+import { localeDirection } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
@@ -1705,7 +1706,8 @@ export async function createApplicationServices({
   // display of its own, the driver works where they cannot be drawn.
   const drawsComputerUseHighlight = !hasSeparateAgentDisplay(process.platform);
   const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
-    createWindow: () => createComputerUsePermissionHelpWindow(language.translate),
+    createWindow: () =>
+      createComputerUsePermissionHelpWindow(language.translate, () => localeDirection(language.locale)),
     loadWindow: loadComputerUsePermissionHelpRenderer,
     // The bundle that owns this process, which is the one macOS attributes every click and capture
     // to. In a development build that is Electron itself, and the window says so.

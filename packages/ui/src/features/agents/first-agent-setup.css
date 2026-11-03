@@ -280,7 +280,7 @@
   background: transparent;
   padding: var(--openbot-space-4);
   cursor: grab;
-  text-align: left;
+  text-align: start;
   white-space: normal;
   transition:
     border-color var(--openbot-duration-hover) var(--openbot-ease-out),

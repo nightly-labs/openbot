@@ -184,6 +184,11 @@ interface TabHold {
   away: boolean;
   /** The place of the tab among the tabs of its kind when the pointer lets it go. */
   target: number;
+  /**
+   * The page reads right to left, so the chat is right of the panel. Read once, when the hold starts,
+   * from the header: the tab strip keeps the left-to-right order in every language.
+   */
+  rightToLeft: boolean;
 }
 
 /** The kinds of tab that drag, with the class and the data attribute that find them. */
@@ -261,8 +266,15 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     const clearShifts = (group: TabGroup) => {
       for (const tab of groupTabs(group)) tab.style.transform = "";
     };
-    /** The chat is left of the panel. A maximized panel covers the chat, so it has no chat to drop on. */
-    const overChat = (x: number) => !props.maximized && root !== undefined && x < root.getBoundingClientRect().left;
+    /**
+     * The chat is at the inline start of the panel: left of it, or right of it right to left. A
+     * maximized panel covers the chat, so it has no chat to drop on.
+     */
+    const overChat = (x: number, rightToLeft: boolean) => {
+      if (props.maximized || root === undefined) return false;
+      const bounds = root.getBoundingClientRect();
+      return rightToLeft ? x > bounds.right : x < bounds.left;
+    };
     /**
      * Moves the held tab with the pointer, and the other tabs of its kind make room. A tab can be much
      * narrower than the held one, so the leading edge of the held tab, not its center, finds its place.
@@ -325,7 +337,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
         current.moving = true;
         element.setAttribute("data-dragging", "");
       }
-      current.away = overChat(event.clientX);
+      current.away = overChat(event.clientX, current.rightToLeft);
       // Over the chat, the tab goes back to its place. A thread tab fades, and a copy follows the pointer.
       tabOf(current)?.setAttribute("data-dragged", current.away ? "away" : "");
       if (current.away) {
@@ -384,6 +396,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
         moving: false,
         away: false,
         target: 0,
+        rightToLeft: root !== undefined && getComputedStyle(root).direction === "rtl",
       };
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onEnd);

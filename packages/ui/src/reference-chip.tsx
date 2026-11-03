@@ -46,7 +46,10 @@ export function ReferenceChip(props: {
       <span class={referenceChipClasses.icon} aria-hidden="true">
         {props.icon}
       </span>
-      <span class={referenceChipClasses.name}>{props.name}</span>
+      {/* The name is the user's text, so it takes its direction from its own letters. */}
+      <span class={referenceChipClasses.name} dir="auto">
+        {props.name}
+      </span>
     </>
   );
   return (

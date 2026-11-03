@@ -300,13 +300,13 @@
   font-size: var(--openbot-text-sm);
   font-weight: 620;
   line-height: 16px;
-  text-align: left;
+  text-align: start;
 }
 
 .unread-messages-mark-read {
   position: relative;
   z-index: 1;
-  margin-left: auto;
+  margin-inline-start: auto;
   padding: 0;
   font-size: var(--openbot-text-sm);
   font-weight: 680;
@@ -429,4 +429,13 @@
   font-size: var(--openbot-text-sm);
   line-height: 16px;
   text-align: center;
+}
+
+/* The two lines grow out from the badge. In RTL the first line is on the right. */
+:dir(rtl) .unread-messages-divider[data-arrive] hr:first-child {
+  transform-origin: left center;
+}
+
+:dir(rtl) .unread-messages-divider[data-arrive] hr:last-child {
+  transform-origin: right center;
 }

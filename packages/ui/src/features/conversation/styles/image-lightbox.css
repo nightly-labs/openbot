@@ -109,7 +109,8 @@
   padding: var(--openbot-space-3) var(--openbot-space-4);
 }
 
-/* The macOS traffic lights take x 12..71 (`src/main/main-window.ts`), as in `browser-full-view.css`. */
+/* The macOS traffic lights take x 12..71 (`src/main/main-window.ts`), as in `browser-full-view.css`.
+   They are at the inline start in every language, so the inset is too. */
 .image-lightbox-mac-controls .image-lightbox-toolbar {
   padding-inline-start: 82px;
 }
@@ -246,6 +247,9 @@
   gap: var(--openbot-space-2);
   padding: var(--openbot-space-3) var(--openbot-space-4) var(--openbot-space-4);
   scrollbar-width: none;
+  /* The slides, the step buttons, the arrow keys and the swipe go left to right in every language
+     (`ImageLightbox.tsx`), so the thumbnails keep that order too. */
+  direction: ltr;
 }
 
 .image-lightbox-thumb {

@@ -286,7 +286,7 @@ export function SubagentPanel(props: SubagentPanelProps) {
           <section class="subagents-panel-detail" aria-label={subagent().title}>
             <div class="subagents-panel-head">
               <SubagentStatus status={subagent().status} />
-              <h3>{subagent().title}</h3>
+              <h3 dir="auto">{subagent().title}</h3>
             </div>
             <p class="subagents-panel-meta">
               {[
@@ -305,7 +305,7 @@ export function SubagentPanel(props: SubagentPanelProps) {
                     <span class="subagents-prompt-label">
                       {t("chat.subagents.taskFrom", { name: props.agentName })}
                     </span>
-                    {prompt()}
+                    <span dir="auto">{prompt()}</span>
                   </p>
                 )}
               </Show>
@@ -316,7 +316,13 @@ export function SubagentPanel(props: SubagentPanelProps) {
                     return (
                       <li class="subagents-step" data-kind={step().kind}>
                         <StepGlyph kind={step().kind} class="subagents-step-glyph" />
-                        <span class={["subagents-step-text", { "agent-activity-label": live() }]}>{step().text}</span>
+                        {/* A command reads left to right; other steps take their direction from their text. */}
+                        <span
+                          class={["subagents-step-text", { "agent-activity-label": live() }]}
+                          dir={step().kind === "command" ? "ltr" : "auto"}
+                        >
+                          {step().text}
+                        </span>
                       </li>
                     );
                   }}

@@ -174,7 +174,7 @@ export function MachineResources(props: MachineResourcesProps) {
                               {(limit) => (
                                 <span
                                   class="machine-resources-threshold"
-                                  style={{ left: `${limit}%` }}
+                                  style={{ "inset-inline-start": `${limit}%` }}
                                   aria-hidden="true"
                                 />
                               )}

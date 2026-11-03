@@ -94,7 +94,7 @@
   overflow-wrap: anywhere;
   color: var(--openbot-text-primary);
   font-weight: var(--openbot-weight-medium);
-  text-align: right;
+  text-align: end;
   user-select: text;
 }
 
@@ -126,7 +126,7 @@
 .server-settings-search > svg {
   position: absolute;
   top: 50%;
-  left: var(--openbot-space-3);
+  inset-inline-start: var(--openbot-space-3);
   z-index: 1;
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
@@ -136,7 +136,7 @@
 }
 
 .server-settings-search .ui-input {
-  padding-left: var(--openbot-space-8);
+  padding-inline-start: var(--openbot-space-8);
 }
 
 .server-settings-invite-card.ui-card {
@@ -293,12 +293,12 @@
   display: grid;
   justify-items: end;
   gap: var(--openbot-space-1);
-  text-align: right;
+  text-align: end;
 }
 
 .server-settings-desktop-hint {
   max-width: 220px;
-  text-align: right;
+  text-align: end;
 }
 
 .server-settings-desktop-status {
@@ -320,7 +320,7 @@
   .server-settings-readonly-value {
     min-width: 0;
     max-width: none;
-    text-align: left;
+    text-align: start;
   }
 
   .server-settings-error-toast {
@@ -349,9 +349,9 @@
   .server-settings-desktop-meta,
   .server-settings-desktop-hint {
     max-width: none;
-    margin-left: 52px;
+    margin-inline-start: 52px;
     justify-items: start;
-    text-align: left;
+    text-align: start;
   }
 }
 
