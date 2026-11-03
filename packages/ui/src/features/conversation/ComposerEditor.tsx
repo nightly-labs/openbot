@@ -864,10 +864,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
     }
 
     const pastedText = clipboard.getData("text/plain");
-    const text = pastedText.replace(/\r\n?/g, "\n").slice(0, INPUT_LIMITS.messageText);
+    const normalized = pastedText.replace(/\r\n?/g, "\n");
+    const text = normalized.slice(0, INPUT_LIMITS.messageText);
     if (!text) return;
     // The file keeps the text as it was copied, with no limit on the message length.
-    if (pastedText.length > INPUT_LIMITS.pastedText && props.onPasteFiles) {
+    if (normalized.length > INPUT_LIMITS.pastedText && props.onPasteFiles) {
       event.stopPropagation();
       const file = new File([pastedText], PASTED_TEXT_FILE_NAME, { type: "text/plain" });
       finishPaste(props.onPasteFiles([file], selection, text));

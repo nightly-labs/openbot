@@ -167,5 +167,8 @@ export function insertPastedText(
   const result = insertAtSelection(current, text, at);
   const over = result.value.length - INPUT_LIMITS.messageText;
   if (over <= 0) return result;
-  return over < text.length ? insertAtSelection(current, text.slice(0, text.length - over), at) : undefined;
+  let end = text.length - over;
+  // Do not keep half of a character that has two UTF-16 units, such as an emoji.
+  if (end > 0 && /[\uD800-\uDBFF]/u.test(text.charAt(end - 1))) end -= 1;
+  return end > 0 ? insertAtSelection(current, text.slice(0, end), at) : undefined;
 }

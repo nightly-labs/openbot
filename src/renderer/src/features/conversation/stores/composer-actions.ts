@@ -370,9 +370,12 @@ export function createComposerActions(deps: ComposerActionsDeps) {
               return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
             });
       const result = insert(inserted);
-      // The files stay in the row, so a paste that does not fit loses no file.
-      if (!result) throw new Error(t("error.agent.messageTooLong"));
-      return result;
+      if (result) return result;
+      // The files stay in the row, so a paste that does not fit loses no file. The text of a long paste
+      // is in its file, so it does not also go in the message.
+      if (text === undefined) throw new Error(t("error.agent.messageTooLong"));
+      deps.setConversationError(target, t("error.agent.messageTooLong"));
+      return;
     } catch (error) {
       deps.setConversationError(target, errorMessage(error, t("composer.error.keepAttachments")));
       return fallback();
