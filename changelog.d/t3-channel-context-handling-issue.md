@@ -16,6 +16,6 @@
 - An agent shows a notice when two compactions in a row leave its context almost full, and then stops compacting automatically.
 - An agent shows a notice when its provider retries a request 3 times. When the context is half full or more, the agent compacts it before the next turn (#4374).
 - A channel turn after the first sends less: no fixed rules again, and the channel facts only when they change (#3380).
-- A long request is in a channel turn once. A long handoff of an agent and a long message in `channel_history` are cut, and the agent can read the rest.
+- A long request is in a channel turn once. A long handoff of an agent and a long message in `channel_history` are cut, and the agent can read the rest. A `channel_history` page also cuts a long task instruction or expected result.
 - An agent compacts its context before a turn whose input would fill it.
 - A channel summary uses the provider's smaller model when the lead uses a larger one.
