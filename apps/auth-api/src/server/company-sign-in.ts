@@ -314,14 +314,9 @@ export class CompanySignInService {
     if (!this.#development) {
       for (const domain of domains) yield* this.#requireDomainRecord(secret, hostId, domain);
     }
-    let ciphertext: string;
-    if (input.clientSecret) {
-      ciphertext = yield* this.#encrypt(secret, input.clientSecret);
-    } else {
-      const saved = yield* this.#connection(hostId);
-      if (!saved) return yield* invalid("Enter the client secret.");
-      ciphertext = saved.client_secret_ciphertext;
-    }
+    // The saved secret is never used again for a test: a changed issuer must not receive it.
+    if (!input.clientSecret) return yield* invalid("Enter the client secret.");
+    const ciphertext = yield* this.#encrypt(secret, input.clientSecret);
     const metadata = yield* this.#discover(input.issuer);
     return yield* this.#startFlow({
       purpose: "test",
@@ -489,6 +484,8 @@ export class CompanySignInService {
     const result = yield* this.#completeFlow(flow, params, requestUrl).pipe(
       Effect.map((values) => back(values)),
       Effect.catchTag("CompanySignInError", (error) => Effect.succeed(back({ error: error.code }))),
+      // The flow is spent, so each other failure also goes back to the app, which then stops its wait.
+      Effect.catch(() => Effect.succeed(back({ error: "company_sign_in_failed" }))),
     );
     return result;
   });
@@ -604,15 +601,17 @@ export class CompanySignInService {
         this.#database
           .prepare(
             `INSERT INTO company_sign_in_users(host_id, user_id, external_id, active, updated_at)
-             SELECT ?, id, ?, ?, ? FROM users WHERE email = ?
+             SELECT ?, id, ?, 1, ? FROM users WHERE email = ?
              ON CONFLICT(host_id, user_id) DO UPDATE SET external_id = excluded.external_id, updated_at = excluded.updated_at`,
           )
-          .bind(connection.hostId, input.externalId, input.active ? 1 : 0, now, email),
+          .bind(connection.hostId, input.externalId, now, email),
       ]),
     );
     const user = yield* this.scimUser(connection.hostId, { email });
     if (!user) return yield* new CompanySignInOperationError({});
-    if (!input.active) yield* this.scimSetActive(connection, user.id, false);
+    // A new row starts on. Off, or a change of a row that exists, goes through the same path as a PATCH,
+    // which ends sessions and removes the person, or adds the person again.
+    if (user.active !== input.active) yield* this.scimSetActive(connection, user.id, input.active);
     return { ...user, active: input.active };
   });
 
@@ -640,11 +639,19 @@ export class CompanySignInService {
     // A person that the provider turns on again comes back, also after the removal that turning off made.
     if (active) return yield* this.#join(connection.hostId, userId, { restore: true });
     // The trigger on `revoked_at` ends the remote sessions of these sessions and queues their events.
+    // An email code that the person asked for before is spent too, so it cannot make a new session.
     yield* storeCall(() =>
-      this.#database
-        .prepare("UPDATE auth_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
-        .bind(now, userId)
-        .run(),
+      this.#database.batch([
+        this.#database
+          .prepare("UPDATE auth_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
+          .bind(now, userId),
+        this.#database
+          .prepare(
+            `UPDATE email_login_challenges SET consumed_at = ?
+             WHERE email = (SELECT email FROM users WHERE id = ?) AND consumed_at IS NULL`,
+          )
+          .bind(now, userId),
+      ]),
     );
     const membership = yield* storeCall(() =>
       this.#database

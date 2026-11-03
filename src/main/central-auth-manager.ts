@@ -1690,7 +1690,15 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         },
         decodeSessionResponse,
       );
-      if (this.#companySignInCancel !== cancel) return;
+      if (this.#companySignInCancel !== cancel) {
+        // The user stopped the sign-in during the exchange: its session must not stay on the server.
+        yield* this.#requestEffect(
+          "/v1/auth/logout",
+          { method: "POST", headers: { Authorization: `Bearer ${session.sessionToken}` } },
+          decodeVoid,
+        ).pipe(Effect.catch(() => Effect.void));
+        return;
+      }
       this.#companySignInCancel = null;
       yield* this.#applyClaimedSession(session);
     }).pipe(Effect.result);
