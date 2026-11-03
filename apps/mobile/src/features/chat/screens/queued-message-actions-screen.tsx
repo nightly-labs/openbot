@@ -18,7 +18,7 @@ import {
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-import { AttachmentThumbnail, useAttachmentFile } from "../components/attachment-preview";
+import { AttachmentThumbnail, showsAsImage, useAttachmentFile } from "../components/attachment-preview";
 import { useQueuedChat } from "../context/queued-messages-context";
 import { queuedMessageLocks, queuedMessagePreview } from "../model/queued-message-view";
 
@@ -137,7 +137,7 @@ export function QueuedMessageActionsScreen() {
 function QueuedAttachmentRow({ attachment, serverId }: { attachment: AttachmentSummary; serverId: string }) {
   const { t, format } = useText();
   const muted = useThemeColor("muted");
-  const image = attachment.kind === "image";
+  const image = showsAsImage(attachment);
   const file = useAttachmentFile(serverId, attachment, image);
   return (
     <SettingsRow
