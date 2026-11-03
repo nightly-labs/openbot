@@ -1030,6 +1030,12 @@ graph, or ID.
   the run that keeps it, has the message text, the author, and the name, type, size and Discord
   address of each file of the message and of the message that it replies to. These addresses expire
   after about a day.
+- **Telegram triggers** start a run from a new conversation in a linked Telegram group: a message that
+  mentions the OpenBot bot or replies to it. The trigger's output, and the run that keeps it, has the
+  message text, the author's name and Telegram ID, the chat name and ID, and the message ID. It has no
+  files. A message that starts a run does not go to the Telegram Orchestrator.
+- **Telegram outputs** reply to that message, post in a linked chat, or add one reaction from a fixed
+  list, through Signal as other Telegram posts do. The text is redacted.
 - **Slack triggers** start a run from a mention of the OpenBot Slack app in a channel. The trigger's
   output, and the run that keeps it, has the message text, the author, the workspace and channel
   names, and the name, type and size of each file of the message. It does not keep the Slack address
@@ -1179,7 +1185,8 @@ short-lived signed addresses, in transit only.
   authors and the name of the chat. The OpenBot bot has privacy mode off, because with it on,
   Telegram does not send a plain mention to a bot that is not a group admin. A request starts only
   from a message that mentions the bot, a reply to it, another message of a reply chain that an
-  agent answers, or a message of a direct chat. The other messages of a group stay in the
+  agent answers, or a message of a direct chat. A new conversation in a group can start a workflow
+  run instead; see [Workflows](#workflows). The other messages of a group stay in the
   computer's memory until OpenBot quits, and an agent can read the last of them with its history
   tool, as for Slack.
 - **Given to the Telegram Orchestrator.** Every new Telegram request goes first to the orchestrator

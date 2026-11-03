@@ -30,6 +30,8 @@ export const messages = {
     "Esta salida actúa sobre el mensaje de Discord que inició la ejecución. Inicia la ejecución desde una mención en Discord o elige Publicar en canal.",
   "error.workflow.slackNoMessage":
     "Esta salida actúa sobre el mensaje de Slack que inició la ejecución. Inicia la ejecución desde una mención en Slack o elige Publicar en canal.",
+  "error.workflow.telegramNoMessage":
+    "Esta salida actúa sobre el mensaje de Telegram que inició la ejecución. Inicia la ejecución desde una mención en Telegram o elige Publicar en chat.",
   "error.workflow.outputConnectionOff":
     "La conexión de mensajería de esta salida está desactivada o se eliminó. Elige un lugar de nuevo.",
   "error.workflow.outputNotRunning":

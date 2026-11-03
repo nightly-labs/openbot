@@ -30,6 +30,8 @@ export const messages = {
     "この出力は実行を開始した Discord メッセージに対して動作します。Discord のメンションから実行を開始するか、「チャンネルに投稿」を選んでください。",
   "error.workflow.slackNoMessage":
     "この出力は実行を開始した Slack メッセージに対して動作します。Slack のメンションから実行を開始するか、「チャンネルに投稿」を選んでください。",
+  "error.workflow.telegramNoMessage":
+    "この出力は実行を開始した Telegram メッセージに対して動作します。Telegram のメンションから実行を開始するか、「チャットに投稿」を選んでください。",
   "error.workflow.outputConnectionOff":
     "この出力のメッセージング接続はオフか、削除されています。投稿先をもう一度選んでください。",
   "error.workflow.outputNotRunning":

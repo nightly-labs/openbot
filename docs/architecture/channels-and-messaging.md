@@ -489,7 +489,9 @@ must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the con
   is one, and a basic group finds the chain in an in-memory reply map, which a restart forgets. A
   mention starts or continues a conversation; a reply without a mention continues only a linked one.
   Telegram has no history API, so `TelegramChatState` keeps the names and last messages it saw, in
-  memory. One Telegram Orchestrator (`telegram-orchestrator.ts`) answers every chat.
+  memory. One Telegram Orchestrator (`telegram-orchestrator.ts`) answers every chat. A new
+  conversation in a group goes first to the workflows' Telegram triggers; a message that starts a run
+  does not go to the orchestrator ([events.md](events.md#workflow-telegram-triggers)).
 
 The code has two halves. `MessagingThreads` (`src/backend/messaging/`) is built by `AgentService`
 beside `ChannelService` and knows no platform. `MessagingService` is built in the main process and

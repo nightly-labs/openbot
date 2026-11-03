@@ -55,7 +55,7 @@
 
 .web-consent-row .first-run-choice-improve-pop {
   top: 0;
-  right: 0;
+  inset-inline-end: 0;
 }
 
 @media (max-width: 720px) {
@@ -203,7 +203,7 @@
   }
 
   .web-app-frame[data-web-mobile-pane="conversation"] .conversation-panel.browser-panel-active {
-    padding-right: 0;
+    padding-inline-end: 0;
   }
 
   .web-app-frame[data-web-mobile-pane="conversation"] .browser-panel {

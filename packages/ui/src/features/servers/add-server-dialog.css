@@ -88,7 +88,7 @@
 .add-server-bar .hosted-currency {
   position: absolute;
   top: 50%;
-  left: 0;
+  inset-inline-start: 0;
   width: auto;
   flex: 0 0 auto;
   transform: translateY(-50%);
@@ -111,7 +111,7 @@
 }
 
 .add-server-bar[data-license] .hosted-use {
-  margin-right: auto;
+  margin-inline-end: auto;
 }
 
 .add-server-bar[data-license] .hosted-currency {
@@ -136,7 +136,7 @@
   position: absolute;
   top: 3px;
   bottom: 3px;
-  left: 3px;
+  inset-inline-start: 3px;
   width: calc(50% - 3px);
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-control-active);
@@ -147,6 +147,10 @@
 .hosted-billing[data-billing="yearly"]::before,
 .hosted-billing[data-use="work"]::before {
   transform: translateX(100%);
+}
+
+.hosted-billing:dir(rtl):is([data-billing="yearly"], [data-use="work"])::before {
+  transform: translateX(-100%);
 }
 
 .hosted-billing-option {
@@ -233,7 +237,7 @@
 }
 
 .hosted-plan + .hosted-plan {
-  border-left: 1px solid var(--openbot-border);
+  border-inline-start: 1px solid var(--openbot-border);
 }
 
 .hosted-plan[data-recommended] {
@@ -326,7 +330,7 @@
 
 .hosted-plan-was s {
   display: inline-block;
-  margin-right: var(--openbot-space-2);
+  margin-inline-end: var(--openbot-space-2);
   color: var(--openbot-text-dim);
   font-size: var(--openbot-text-xl);
   line-height: var(--openbot-leading-xl);
@@ -352,7 +356,7 @@
 
 .hosted-plan-period {
   white-space: nowrap;
-  margin-left: var(--openbot-space-1);
+  margin-inline-start: var(--openbot-space-1);
   padding-top: var(--openbot-space-1);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
@@ -563,7 +567,7 @@
 .add-server-other {
   position: absolute;
   top: var(--openbot-space-6);
-  left: var(--openbot-space-6);
+  inset-inline-start: var(--openbot-space-6);
   z-index: 2;
 }
 
@@ -939,7 +943,7 @@
 
   .hosted-plan + .hosted-plan {
     border-top: 1px solid var(--openbot-border);
-    border-left: 0;
+    border-inline-start: 0;
   }
 }
 
@@ -960,7 +964,7 @@
 
   .add-server-other {
     top: var(--openbot-space-3);
-    left: var(--openbot-space-3);
+    inset-inline-start: var(--openbot-space-3);
   }
 
   .add-server-intro .ui-text {

@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 // Migration v50: Discord triggers of workflows. The text below is the migration; the latest schema takes
-// the run source line of migration 52, so do not edit it after release.
+// the run source line of migration 53, so do not edit it after release.
 //
 // `workflow_runs` gets `discord` in its source CHECK. SQLite cannot change a CHECK in place, so the
 // migration rebuilds the table, as migration 49 did; its rows keep their run ids, so the steps, output

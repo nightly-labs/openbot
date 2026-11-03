@@ -94,6 +94,7 @@ import {
   latestTurnAnswer,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
+import { localeDirection } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
@@ -1705,7 +1706,8 @@ export async function createApplicationServices({
   // display of its own, the driver works where they cannot be drawn.
   const drawsComputerUseHighlight = !hasSeparateAgentDisplay(process.platform);
   const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
-    createWindow: () => createComputerUsePermissionHelpWindow(language.translate),
+    createWindow: () =>
+      createComputerUsePermissionHelpWindow(language.translate, () => localeDirection(language.locale)),
     loadWindow: loadComputerUsePermissionHelpRenderer,
     // The bundle that owns this process, which is the one macOS attributes every click and capture
     // to. In a development build that is Electron itself, and the window says so.
@@ -1991,6 +1993,7 @@ export async function createApplicationServices({
       connectionOn: (connectionId) => service.messaging.store.connection(connectionId)?.enabled === true,
       post: (connectionId, placeId, markdown) => service.messaging.deliver(connectionId, placeId, markdown),
       discordSend: (connectionId, send) => service.messaging.discordSend(connectionId, send),
+      telegramSend: (connectionId, send) => service.messaging.telegramSend(connectionId, send),
       slackSend: (connectionId, send) => service.messaging.slackSend(connectionId, send),
       // An agent event, so this window, joined clients and the web app hear it the same way.
       changed: (workflowId) => service.notifyWorkflowsChanged(workflowId),
@@ -2022,6 +2025,17 @@ export async function createApplicationServices({
       ),
     ),
   );
+  // A new conversation in a Telegram group goes to the workflows' Telegram triggers in the same way.
+  service.messaging.setTelegramMentionHandler((mention) =>
+    workflowRuntime.receiveTelegram(mention).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          logger.warn("A Telegram message could not reach the workflows.", { cause: String(failure.cause) });
+          return "none" as const;
+        }),
+      ),
+    ),
+  );
   // A Slack mention in a channel goes to the workflows' Slack triggers in the same way.
   service.messaging.setSlackMentionHandler((mention) =>
     workflowRuntime.receiveSlack(mention).pipe(
@@ -2035,6 +2049,7 @@ export async function createApplicationServices({
   );
   teardown.push(TEARDOWN_ORDER.workflows, "the workflows", () => {
     service.messaging.setMentionHandler(null);
+    service.messaging.setTelegramMentionHandler(null);
     service.messaging.setSlackMentionHandler(null);
     return Effect.runPromise(workflowRuntime.close());
   });

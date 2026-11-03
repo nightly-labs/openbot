@@ -56,6 +56,7 @@ const TRIGGER_ICON: Record<WorkflowTriggerType, LucideIcon> = {
   message: MessageSquare,
   github: GitPullRequest,
   discord: AtSign,
+  telegram: Send,
   slack: AtSign,
 };
 

@@ -178,7 +178,7 @@ export function ServerMenu(props: ServerMenuProps) {
               );
             }}
           </For>
-          <SwapLabel class="sidebar-server-name-label" text={props.serverName} from={shownBefore?.name} />
+          <SwapLabel class="sidebar-server-name-label" text={props.serverName} from={shownBefore?.name} dir="auto" />
           <Show when={activeSleep()}>
             {(sleep) => <Moon class="sidebar-server-name-sleep" data-state={sleep()} aria-hidden="true" />}
           </Show>

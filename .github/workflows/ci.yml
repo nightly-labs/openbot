@@ -522,6 +522,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-discord
 
+      - name: Run the workflow Telegram E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-telegram
+
       - name: Run the workflow Slack E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-slack
@@ -608,6 +612,7 @@ jobs:
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/workflow-discord-e2e/
+            .openbot-build/workflow-telegram-e2e/
             .openbot-build/workflow-slack-e2e/
             .openbot-build/discord-github-files-e2e/
             .openbot-build/opencode-usage-metering-e2e/

@@ -41,6 +41,11 @@
   vertical-align: -2px;
 }
 
+/* The old value comes first in the reading direction, so the arrow points to the new one. */
+.server-audit-arrow svg:dir(rtl) {
+  transform: scaleX(-1);
+}
+
 /* The change mark at the start of the row: success adds, danger takes away, accent changes. */
 .server-audit-mark {
   display: inline-flex;

@@ -114,11 +114,41 @@ export interface MessagingOutbound {
     connectionId: string,
     send: MessagingDiscordSend,
   ): Effect.Effect<{ posted: true } | { failure: Exclude<MessagingPostFailure, "gone"> }>;
+  /** A Telegram output of a workflow: a reply, a post or a reaction, in the connection's chat. */
+  telegram(
+    connectionId: string,
+    send: MessagingTelegramSend,
+  ): Effect.Effect<{ posted: true } | { failure: Exclude<MessagingPostFailure, "gone"> }>;
   /** A Slack output of a workflow: a reply in a thread, a post or a reaction. */
   slack(
     connectionId: string,
     send: MessagingSlackSend,
   ): Effect.Effect<{ posted: true } | { failure: Exclude<MessagingPostFailure, "gone"> }>;
+}
+
+/**
+ * A post or a reaction of a workflow's Telegram output. One connection is one chat, so a post needs no
+ * place. `threadKey` keeps a reply in the forum topic of the message.
+ */
+export type MessagingTelegramSend =
+  | { action: "reply"; threadKey: string; messageId: string; text: string }
+  | { action: "post"; text: string }
+  | { action: "react"; messageId: string; emoji: string };
+
+/** A message in a Telegram group that starts a conversation with OpenBot, for the Telegram triggers of workflows. */
+export interface MessagingTelegramMention {
+  connectionId: string;
+  chatName: string;
+  chatId: string;
+  /** The topic or reply chain of the message, which a reply keeps. */
+  threadKey: string;
+  messageId: string;
+  authorId: string;
+  authorName: string;
+  /** The text without OpenBot's own mention. */
+  text: string;
+  /** ISO time. */
+  receivedAt: string;
 }
 
 /**
@@ -269,6 +299,7 @@ export class MessagingThreads {
     | null = null;
   #outbound: MessagingOutbound | null = null;
   #mentionHandler: ((mention: MessagingDiscordMention) => Effect.Effect<MessagingMentionResult>) | null = null;
+  #telegramMentionHandler: ((mention: MessagingTelegramMention) => Effect.Effect<MessagingMentionResult>) | null = null;
   #slackMentionHandler: ((mention: MessagingSlackMention) => Effect.Effect<MessagingMentionResult>) | null = null;
 
   constructor(database: OpenBotDatabase, mailbox: MailboxStore, hooks: MessagingThreadsHooks) {
@@ -350,6 +381,34 @@ export class MessagingThreads {
     const outbound = this.#outbound;
     if (!outbound) return { failure: "not-running" };
     return yield* outbound.discord(connectionId, send);
+  });
+
+  /** The workflows' side of a Telegram group message. Without it, every message goes to an agent. */
+  setTelegramMentionHandler(
+    handler: ((mention: MessagingTelegramMention) => Effect.Effect<MessagingMentionResult>) | null,
+  ): void {
+    this.#telegramMentionHandler = handler;
+  }
+
+  /** Gives a new Telegram group conversation to the workflows first. */
+  workflowTelegramMention(mention: MessagingTelegramMention): Effect.Effect<MessagingMentionResult> {
+    return this.#telegramMentionHandler ? this.#telegramMentionHandler(mention) : Effect.succeed("none");
+  }
+
+  /**
+   * A Telegram output of a workflow. Only an enabled connection of this host can take it. The chat is
+   * outside this computer, so the messaging side removes secrets from the text.
+   */
+  readonly telegramSend = Effect.fn("MessagingThreads.telegramSend")(function* (
+    this: MessagingThreads,
+    connectionId: string,
+    send: MessagingTelegramSend,
+  ): Effect.fn.Return<{ posted: true } | { failure: MessagingPostFailure }> {
+    const record = this.store.connection(connectionId);
+    if (!record?.enabled || record.platform !== "telegram") return { failure: "gone" };
+    const outbound = this.#outbound;
+    if (!outbound) return { failure: "not-running" };
+    return yield* outbound.telegram(connectionId, send);
   });
 
   /**

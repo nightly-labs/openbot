@@ -55,7 +55,7 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 /* Month or year, and the currency: the same pill switch as the app's billing switch. */
@@ -81,13 +81,17 @@
   position: absolute;
   top: 3px;
   bottom: 3px;
-  left: 3px;
+  inset-inline-start: 3px;
   width: calc((100% - 6px) / var(--order-count, 2));
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-surface-light);
   content: "";
   transform: translateX(calc(var(--order-index, 0) * 100%));
   transition: transform var(--order-move) var(--order-spring);
+}
+
+.order-form-segment:dir(rtl)::before {
+  transform: translateX(calc(var(--order-index, 0) * -100%));
 }
 
 .order-form-segment[data-disabled] {
@@ -202,6 +206,16 @@
 
 .order-form .t-digit-group {
   display: inline-flex;
+  /* The digits are flex items: a right-to-left page would put them in reverse order. */
+  direction: ltr;
+}
+
+.order-form .t-digit-run {
+  display: inline-flex;
+}
+
+.order-form .t-digit-word {
+  white-space: pre;
 }
 
 .order-form .t-digit {
@@ -261,7 +275,7 @@
 }
 
 .order-form-half + .order-form-half {
-  border-left: 1px solid var(--openbot-border);
+  border-inline-start: 1px solid var(--openbot-border);
 }
 
 /* The yearly discount: a success-toned pill by the heading, lit when yearly billing is on. */
@@ -448,7 +462,7 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
-  text-align: right;
+  text-align: end;
 }
 
 .order-form-choice-amount {
@@ -488,7 +502,7 @@
 
 .order-form-was s {
   display: inline-block;
-  margin-right: 8px;
+  margin-inline-end: 8px;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-xl);
   font-weight: 500;
@@ -504,7 +518,8 @@
   border: 0;
   align-items: center;
   gap: 12px;
-  padding: 0 18px 16px 50px;
+  padding-block: 0 16px;
+  padding-inline: 50px 18px;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-lg);
   font-variant-numeric: tabular-nums;
@@ -590,12 +605,12 @@
 }
 
 .order-form-summary-license:has([data-open]) {
-  border-left: 1px solid var(--openbot-border);
+  border-inline-start: 1px solid var(--openbot-border);
 }
 
 .order-form:not([data-servers]) .order-form-summary-license {
   grid-column: 1;
-  border-left: 0;
+  border-inline-start: 0;
 }
 
 .order-form-summary-personal {
@@ -678,7 +693,7 @@
 }
 
 .order-form-total .order-form-price {
-  margin-right: auto;
+  margin-inline-end: auto;
 }
 
 .order-form-action {
@@ -690,7 +705,7 @@
 @container order-form (max-width: 760px) {
   .order-form-controls {
     justify-content: flex-start;
-    margin-left: 0;
+    margin-inline-start: 0;
   }
 
   .order-form-frame,
@@ -700,7 +715,7 @@
 
   .order-form-half + .order-form-half {
     border-top: 1px solid var(--openbot-border);
-    border-left: 0;
+    border-inline-start: 0;
   }
 
   .order-form-summary-lines {
@@ -710,7 +725,7 @@
 
   .order-form-summary-license:has([data-open]) {
     border-top: 1px solid var(--openbot-border);
-    border-left: 0;
+    border-inline-start: 0;
   }
 
   .order-form-total {
@@ -731,7 +746,7 @@
   }
 
   .order-form-was s {
-    margin-right: 0;
+    margin-inline-end: 0;
     font-size: var(--openbot-text-md);
   }
 
@@ -740,7 +755,8 @@
   }
 
   .order-form-stepper {
-    padding: 0 14px 14px 46px;
+    padding-block: 0 14px;
+    padding-inline: 46px 14px;
   }
 }
 

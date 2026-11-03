@@ -57,7 +57,11 @@
 /* What lines up with the header's inset is the arrow, not the 32px hit area around it, so
    the button hangs its padding back into the header rather than pushing the glyph right. */
 .agent-usage-identity .ui-icon-button {
-  margin-left: calc(-1 * var(--openbot-space-2));
+  margin-inline-start: calc(-1 * var(--openbot-space-2));
+}
+/* The back arrow points to the start of the reading direction. */
+.agent-usage-identity > .ui-icon-button > svg:dir(rtl) {
+  transform: scaleX(-1);
 }
 .agent-usage-identity h2 {
   display: flex;
@@ -73,7 +77,7 @@
 /* The three filters and the refresh button need more width than the header can always
    give, so the row wraps from the right rather than clipping its last controls. */
 .agent-usage-controls {
-  margin-left: auto;
+  margin-inline-start: auto;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--openbot-space-3);
@@ -160,7 +164,7 @@
     padding: var(--openbot-space-3);
   }
   .agent-usage-controls {
-    margin-left: 0;
+    margin-inline-start: 0;
     justify-content: flex-start;
   }
   .agent-usage-section-header {

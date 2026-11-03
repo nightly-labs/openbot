@@ -23,6 +23,7 @@ import type {
   WorkflowDiscordServer,
   WorkflowPlace,
   WorkflowSlackWorkspace,
+  WorkflowTelegramChat,
 } from "@openbot/ui/features/workflows/workflow-model";
 import { EMPTY_WORKFLOW_RUN_VIEW, type WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
 import { useText } from "@openbot/ui/text";
@@ -110,6 +111,7 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   const [summaries, setSummaries] = createSignal<readonly WorkflowSummary[]>([]);
   const [places, setPlaces] = createSignal<readonly WorkflowPlace[]>([]);
   const [discord, setDiscord] = createSignal<readonly WorkflowDiscordServer[]>([]);
+  const [telegram, setTelegram] = createSignal<readonly WorkflowTelegramChat[]>([]);
   const [slack, setSlack] = createSignal<readonly WorkflowSlackWorkspace[]>([]);
   /** Null while this account manages every agent of the host. */
   const [levels, setLevels] = createSignal<AgentAccessLevels | null>(null);
@@ -305,6 +307,9 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     }, report);
     host.discordServers().then((next) => {
       if (!disposed) setDiscord(next);
+    }, report);
+    host.telegramChats().then((next) => {
+      if (!disposed) setTelegram(next);
     }, report);
     host.slackWorkspaces().then((next) => {
       if (!disposed) setSlack(next);
@@ -531,6 +536,7 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     detail: () => stored()?.detail,
     places,
     discord,
+    telegram,
     slack,
     readOnly: () => lock() !== undefined,
     github,

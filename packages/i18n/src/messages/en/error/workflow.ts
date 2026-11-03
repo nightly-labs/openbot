@@ -28,6 +28,8 @@ export const messages = defineMessages("error.workflow", {
     "This output acts on the Discord message that started the run. Start the run from a Discord mention, or choose Post in channel.",
   "error.workflow.slackNoMessage":
     "This output acts on the Slack message that started the run. Start the run from a Slack mention, or choose Post in channel.",
+  "error.workflow.telegramNoMessage":
+    "This output acts on the Telegram message that started the run. Start the run from a Telegram mention, or choose Post in chat.",
   "error.workflow.outputConnectionOff":
     "The messaging connection of this output is off or removed. Choose a place again.",
   "error.workflow.outputNotRunning": "The messaging connection does not run now. Try again when it runs.",
