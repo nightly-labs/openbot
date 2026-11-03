@@ -406,17 +406,16 @@ class DiscordAdapter implements MessagingAdapter {
   /** Discord messages as context, with each user mention named. A bot's post names the bot. */
   readonly #entries = Effect.fnUntraced(function* (this: DiscordAdapter, messages: DiscordHistoryMessage[]) {
     const names = yield* mentionNames(
-      messages.flatMap((message) => discordMentionIds(message.content)),
+      messages.flatMap((message) => discordMentionIds([message.content, ...message.embeds].join("\n"))),
       (userId) => this.authorName(userId),
     );
     return messages.map(
       (message): ContextEntry => ({
         id: message.id,
         authorName: message.authorIsBot ? `${message.authorName} (bot)` : message.authorName,
-        text: discordContextText(
-          withMentionNames(discordPlainText(message.content), names),
-          message.attachments,
-          message.forwarded,
+        text: withMentionNames(
+          discordContextText(discordPlainText(message.content), message.attachments, message.embeds, message.forwarded),
+          names,
         ),
         sentAt: message.sentAt,
         ...(message.attachments.length ? { files: message.attachments.map(inboundFile) } : {}),
@@ -554,9 +553,14 @@ function snowflakeTime(id: bigint): bigint {
   return (id >> 22n) + DISCORD_EPOCH_MS;
 }
 
-/** A message that has text or files for the context, or a forward, which says when it has neither. */
+/** A message that has text, embeds or files for the context, or a forward, which says when it has none. */
 function hasContent(message: DiscordHistoryMessage): boolean {
-  return discordPlainText(message.content) !== "" || message.attachments.length > 0 || message.forwarded;
+  return (
+    discordPlainText(message.content) !== "" ||
+    message.attachments.length > 0 ||
+    message.embeds.length > 0 ||
+    message.forwarded
+  );
 }
 
 function compareSnowflakes(left: string, right: string): number {
