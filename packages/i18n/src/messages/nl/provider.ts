@@ -115,6 +115,11 @@ export const messages = {
   "provider.picker.customEmpty":
     "Voeg een OpenAI-compatibel endpoint toe: een modelserver op deze computer, of een dienst met een basis-URL en een sleutel.",
   "provider.picker.defaultModelLabel": "{name}, standaard",
+  "provider.picker.usageLimit": "Gebruikslimiet bereikt",
+  "provider.picker.usageLimitWindow": "Limiet ({window})",
+  "provider.picker.usageLimitResets": "{limit} · Reset op {time}",
+  "provider.picker.usageLimitLabel": "{name}, gebruikslimiet bereikt",
+  "provider.picker.usageLimitResetsLabel": "{name}, gebruikslimiet bereikt, reset op {time}",
   "provider.picker.effort": "Denkniveau",
   "provider.picker.effortLabel": "Redeneerniveau van de agent",
   "provider.picker.effortFixed": "{effort}, vastgezet door {provider}",
