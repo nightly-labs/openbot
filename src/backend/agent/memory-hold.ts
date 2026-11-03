@@ -38,7 +38,10 @@ export class MemoryHold {
   #scope = Scope.makeUnsafe();
   readonly #told = new Set<string>();
   #level: HostMemoryLevel = "ok";
-  /** A failed release is reported one time in each low period: a held delivery retries it at each sample. */
+  /**
+   * A failed release is reported one time in each low period, and at each change to critical: a held
+   * delivery retries it at each sample.
+   */
   #releaseFailed = false;
   /** A sample comes each 5 s, and a provider can take longer to stop its idle threads. */
   #releasing = false;
@@ -94,15 +97,13 @@ export class MemoryHold {
     this.#level = level;
     // While a delivery waits, at each sample: an idle thread costs only a slower first message, and
     // its timer could hold the queue for minutes with no turn running (#4676).
-    if (
-      !this.#releasing &&
-      ((level === "critical" && previous !== "critical") || (level !== "ok" && this.#told.size > 0))
-    ) {
+    const critical = level === "critical" && previous !== "critical";
+    if (!this.#releasing && (critical || (level !== "ok" && this.#told.size > 0))) {
       this.#releasing = true;
       yield* this.#hooks.releaseIdleThreads().pipe(
         Effect.catch((failure) =>
           Effect.sync(() => {
-            if (this.#releaseFailed) return;
+            if (this.#releaseFailed && !critical) return;
             this.#releaseFailed = true;
             this.#hooks.emitError("idle_thread_release_failed", failure.cause);
           }),

@@ -250,10 +250,13 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   readonly releaseIdleThreads = Effect.fn("PiAgentClient.releaseIdleThreads")(function* (this: PiAgentClient) {
     for (const [id, thread] of this.#threads) {
-      if (thread.turn) continue;
-      if (thread.configured) this.#released.set(id, thread.params);
-      yield* this.#close(thread);
-      this.#threads.delete(id);
+      // A held gate is a turn that starts, before it sets `turn`, or a compaction.
+      yield* Effect.gen({ self: this }, function* () {
+        if (thread.turn) return;
+        if (thread.configured) this.#released.set(id, thread.params);
+        yield* this.#close(thread);
+        this.#threads.delete(id);
+      }).pipe(thread.gate.withPermitsIfAvailable(1));
     }
   });
 
