@@ -1903,11 +1903,8 @@ export async function createApplicationServices({
   });
   await runCauseEffect(modelVisibility.load());
   /** The answer an agent gave in one turn, for routine flows, routine results and local scripts. */
-  const turnAnswer = (agentId: string, turnId: string): string | null => {
-    const threadId = store.list().find((agent) => agent.id === agentId)?.threadId;
-    if (!threadId) return null;
-    return latestTurnAnswer(store.database.readTurnAssistantMessages(agentId, threadId, turnId), turnId)?.text ?? null;
-  };
+  const turnAnswer = (agentId: string, turnId: string): string | null =>
+    latestTurnAnswer(store.database.readTurnAssistantMessages(agentId, turnId), turnId)?.text ?? null;
   // Listens only while an agent allows local scripts; see `AutomationServer`.
   const automation = new AutomationServer({
     root: store.automationRoot,

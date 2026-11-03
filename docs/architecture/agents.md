@@ -111,7 +111,12 @@ new routine gets no thread and its run goes to the agent's own chat, as before. 
 count against the limits of tasks that the agent starts, and that cleanup does not archive them.
 Deleting the routine archives its thread. `listQueue` hides side-thread deliveries, so
 `MailboxStore.taskRoutineDeliveries` gives the routine deliveries of side threads to the code that
-follows run status (`MailboxSync.emitQueue`) and to the skip policy of a spent plan. The released `agent-tasks-v1` routes do not send
+follows run status (`MailboxSync.emitQueue`) and to the skip policy of a spent plan. Routine flows,
+routine result destinations and local scripts read the answer of a run with
+`readTurnAssistantMessages(agentId, turnId)`: the `projection_turns` row names the thread that ran the
+turn, so the answer of a run in a routine thread is found. A turn in a routine thread sends no
+`turn-completed` event outside `AgentTasks`, as for other side threads, so a run there plays no
+completion sound and sends no push notification. The released `agent-tasks-v1` routes do not send
 `routineId`; only this computer's IPC list has it.
 
 A routine thread is a side thread, so its runs have no Computer Use: only the agent's own chat
