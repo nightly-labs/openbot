@@ -14,6 +14,10 @@ import {
   AGENT_THREAD_READS_CAPABILITY,
   AGENT_THREAD_READS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import {
+  AGENT_THREAD_REPLIES_CAPABILITY,
+  AGENT_THREAD_REPLIES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
@@ -126,6 +130,37 @@ export async function routeAgentThreadFiles(
     202,
     await runCauseEffect(tasks.sendMessage({ ...message, taskId: stringField(body, "taskId") }, memberSender(member))),
   );
+}
+
+/**
+ * `agent-thread-replies-v1`: send a reply to a message of a side thread, with text, attachment drafts that
+ * the member uploaded, or both. The same member who can send to the agent can use it, with the agent level
+ * of a task message, and is the sender. An agent that this peer cannot see (`hiddenAgentIds`) answers as a
+ * missing agent does. The frozen codec has already checked the ids, the bounds, and that text or a file is there.
+ */
+export async function routeAgentThreadReplies(
+  context: TeamApiRequestContext,
+  tasks: TeamApiAgentTasks | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, request, member, json } = context;
+  if (method !== "POST" || url.pathname !== AGENT_THREAD_REPLIES_ROUTES.send) return "unmatched";
+  if (!tasks || !capabilities.has(AGENT_THREAD_REPLIES_CAPABILITY))
+    throw new HttpError(400, sourceText("error.backend.threadRemoteUnsupported"));
+  const body = await readJson(request);
+  const agentId = stringField(body, "agentId");
+  if (hiddenAgentIds.has(agentId)) throw new HttpError(404, sourceText("error.team.agentNotFound"));
+  requireListedAgent(tasks, agentId);
+  requireAgentLevel(context, agentId, "chat");
+  const message = {
+    agentId,
+    taskId: stringField(body, "taskId"),
+    text: stringField(body, "text", true, INPUT_LIMITS.messageText),
+    attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
+    replyToMessageId: stringField(body, "replyToMessageId"),
+    ...(isString(body.clientMessageId) ? { clientMessageId: body.clientMessageId } : {}),
+  };
+  return json(202, await runCauseEffect(tasks.sendMessage(message, memberSender(member))));
 }
 
 /**

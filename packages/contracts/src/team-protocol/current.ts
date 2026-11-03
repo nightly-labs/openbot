@@ -26,6 +26,7 @@ import { AGENT_TASKS_CAPABILITY } from "./agent-tasks-v1";
 import { AGENT_THREAD_BRANCHES_CAPABILITY } from "./agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "./agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "./agent-thread-reads-v1";
+import { AGENT_THREAD_REPLIES_CAPABILITY } from "./agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY } from "./agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
@@ -184,6 +185,7 @@ export {
   AGENT_THREAD_BRANCHES_CAPABILITY,
   AGENT_THREAD_FILES_CAPABILITY,
   AGENT_THREAD_READS_CAPABILITY,
+  AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_THREADS_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
@@ -413,6 +415,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_INSTRUCTIONS_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
+  AGENT_THREAD_REPLIES_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -567,7 +570,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CONTEXT_COMPACT_CAPABILITY &&
     capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
     capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY &&
-    capability !== LOCAL_SERVERS_CAPABILITY,
+    capability !== LOCAL_SERVERS_CAPABILITY &&
+    capability !== AGENT_THREAD_REPLIES_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -598,6 +602,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   AGENT_INSTRUCTIONS_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
+  AGENT_THREAD_REPLIES_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -711,6 +716,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CONTEXT_COMPACT_CAPABILITY &&
       capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
       capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY &&
-      capability !== LOCAL_SERVERS_CAPABILITY,
+      capability !== LOCAL_SERVERS_CAPABILITY &&
+      capability !== AGENT_THREAD_REPLIES_CAPABILITY,
   );
 }

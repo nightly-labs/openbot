@@ -29,6 +29,7 @@ import {
   ComposerUpdateNotice,
   ComposerUsageLimitNotice,
 } from "@openbot/ui/features/conversation/ComposerNotice";
+import { ComposerReplyPreview } from "@openbot/ui/features/conversation/ComposerReplyPreview";
 import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
 import {
   ComposerCompactionNotice,
@@ -36,9 +37,7 @@ import {
   ContextUsageMeter,
   contextUsageView,
 } from "@openbot/ui/features/conversation/ContextUsage";
-import { CloseIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { type OpenWaitItem, OpenWaits } from "@openbot/ui/features/conversation/OpenWaits";
-import { ReplyQuote } from "@openbot/ui/features/conversation/ReplyQuote";
 import { SpeakingBar } from "@openbot/ui/features/conversation/SpeakingBar";
 import { ComposerVoiceControls } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
@@ -508,27 +507,13 @@ export function ConversationComposer() {
           </Show>
           <Show when={replyTarget()}>
             {(message) => (
-              <div class="composer-reply-preview">
-                <div>
-                  <span>{t(message().author === "you" ? "composer.reply.toYou" : "composer.reply.toAgent")}</span>
-                  <ReplyQuote
-                    body={message().body || t("composer.reply.attachment")}
-                    agents={props.agents}
-                    skills={installedSkills()}
-                    attachments={message().attachments}
-                    citations={message().citations}
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  aria-label={t("composer.reply.cancel")}
-                  disabled={voicePhase() === "transcribing"}
-                  onClick={() => updateCurrentDraft({ replyToMessageId: null })}
-                >
-                  <CloseIcon />
-                </Button>
-              </div>
+              <ComposerReplyPreview
+                message={message()}
+                agents={props.agents}
+                skills={installedSkills()}
+                disabled={voicePhase() === "transcribing"}
+                onCancel={() => updateCurrentDraft({ replyToMessageId: null })}
+              />
             )}
           </Show>
           <Show when={providerUpdateRequired()}>
