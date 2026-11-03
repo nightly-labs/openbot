@@ -28,12 +28,14 @@ function downloadKey(serverId: string, attachmentId: string): string {
 
 /**
  * Opens attachments and keeps the download state of each one from a joined server. A local file needs
- * no download, so it gets no state. The owner reports a failure; the card also shows it.
+ * no download, so it gets no state. The owner reports a failure to the `target` of the click; the card
+ * also shows it.
  */
-export function createAttachmentDownloads(options: {
+export function createAttachmentDownloads<Target>(options: {
   serverId: () => string;
   calls: () => AttachmentDownloadCalls;
-  onError: (error: unknown) => void;
+  target: () => Target;
+  onError: (error: unknown, target: Target) => void;
 }): { downloads: AttachmentDownloads; open(attachment: AttachmentSummary, action: FileAction): void } {
   const [tracked, setTracked] = createStore<Record<string, TrackedDownload>>({});
   const unsubscribe = options.calls().subscribe?.((progress) => {
@@ -51,11 +53,14 @@ export function createAttachmentDownloads(options: {
   function open(attachment: AttachmentSummary, action: FileAction): void {
     const serverId = options.serverId();
     const calls = options.calls();
-    const shows = serverId !== LOCAL_SERVER_ID && calls.stop !== undefined;
+    const target = options.target();
     const key = downloadKey(serverId, attachment.id);
+    const running = tracked[key];
+    // The running download delivers the file; a second click does not start another. A different
+    // action shares the download, and the card keeps the state of the first one.
+    if (running?.state.phase === "downloading" && running.action === action) return;
+    const shows = serverId !== LOCAL_SERVER_ID && calls.stop !== undefined && running?.state.phase !== "downloading";
     if (shows) {
-      // The running download delivers the file; a second click does not start another.
-      if (tracked[key]?.state.phase === "downloading") return;
       setTracked((draft) => {
         draft[key] = { action, state: { phase: "downloading", received: 0, total: attachment.size } };
       });
@@ -74,7 +79,7 @@ export function createAttachmentDownloads(options: {
             if (entry) entry.state = { phase: "failed" };
             else draft[key] = { action, state: { phase: "failed" } };
           });
-        options.onError(error);
+        options.onError(error, target);
       },
     );
   }
@@ -85,7 +90,7 @@ export function createAttachmentDownloads(options: {
       void options
         .calls()
         .stop?.(attachment.id)
-        .catch((error: unknown) => options.onError(error));
+        .catch((error: unknown) => options.onError(error, options.target()));
     },
     retry: (attachment) =>
       open(attachment, tracked[downloadKey(options.serverId(), attachment.id)]?.action ?? "download"),

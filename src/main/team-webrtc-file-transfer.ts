@@ -311,7 +311,9 @@ export class TeamWebRtcFileTransfer {
         }
         this.#watches.delete(watch);
         return this.#owned(
-          this.#frames.withPermit(this.#refuse(peerId, transferId, new Error("The download was stopped."))),
+          this.#frames.withPermit(
+            this.#refuse(peerId, transferId, new Error(sourceText("error.remote.downloadStopped"))),
+          ),
         ).pipe(Effect.catch(() => Effect.void));
       }),
     };
@@ -501,7 +503,7 @@ export class TeamWebRtcFileTransfer {
         );
         if (watch?.stopped) {
           this.#watches.delete(watch);
-          return yield* this.#refuse(peerId, frame.transferId, new Error("The download was stopped."));
+          return yield* this.#refuse(peerId, frame.transferId, new Error(sourceText("error.remote.downloadStopped")));
         }
         const activeBytes = [...this.#incoming.values(), ...this.#completed.values()]
           .filter((item) => item.peerId === peerId)
@@ -579,6 +581,10 @@ export class TeamWebRtcFileTransfer {
         };
         this.#completed.set(key, completed);
         this.#scheduleExpiration(key);
+        // A watch can take the file of a stopped request of the same size. When its own answer does not
+        // come with this file, the watch takes the next file.
+        for (const watch of this.#watches)
+          if (watch.peerId === peerId && watch.transferId === frame.transferId) watch.transferId = null;
         const waiter = this.#waiters.get(key);
         if (waiter) {
           clearTimeout(waiter.timer);

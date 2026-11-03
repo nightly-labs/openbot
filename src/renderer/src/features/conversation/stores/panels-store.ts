@@ -293,11 +293,11 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
         subscribe: agent.onAttachmentDownload,
       };
     },
-    onError: (error) => {
+    target: () => {
       const agentId = conversationOwnerId(deps.props);
-      const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
-      deps.setComposerError(errorMessage(error, t("attachment.error.open")), target);
+      return agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     },
+    onError: (error, target) => deps.setComposerError(errorMessage(error, t("attachment.error.open")), target),
   });
   const attachmentDownloads = attachmentFiles.downloads;
 

@@ -92,6 +92,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "La transferencia de archivos WebRTC falló.",
   "error.remote.fileResumeFailed": "La transferencia de archivos WebRTC no pudo reanudarse antes de su plazo límite.",
   "error.remote.fileTransportStopped": "El transporte de archivos WebRTC se detuvo.",
+  "error.remote.downloadStopped": "Se detuvo la descarga.",
   "error.remote.fileResumeExpired": "El plazo para reanudar la transferencia de archivos WebRTC venció.",
   "error.remote.hostRequestFailed": "El host no pudo completar la solicitud.",
   "error.remote.responseTooLarge": "La respuesta del host es demasiado grande para enviarla a este dispositivo.",

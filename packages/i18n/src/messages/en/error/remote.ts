@@ -88,6 +88,7 @@ export const messages = defineMessages("error.remote", {
   "error.remote.fileTransferFailed": "The WebRTC file transfer failed.",
   "error.remote.fileResumeFailed": "The WebRTC file transfer could not resume before its deadline.",
   "error.remote.fileTransportStopped": "The WebRTC file transport stopped.",
+  "error.remote.downloadStopped": "The download was stopped.",
   "error.remote.fileResumeExpired": "The WebRTC file transfer resume deadline expired.",
   "error.remote.hostRequestFailed": "The host could not complete the request.",
   "error.remote.responseTooLarge": "The reply from the host is too large to send to this device.",

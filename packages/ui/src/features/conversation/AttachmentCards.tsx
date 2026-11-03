@@ -1,6 +1,5 @@
 import { attachmentMimeTypeForName, playableMediaKind } from "@openbot/contracts/attachment-files";
 import { type AttachmentSummary, canPreviewAttachment } from "@openbot/contracts/ipc";
-import type { AppFormat } from "@openbot/i18n";
 import {
   AudioLines,
   Button,
@@ -86,7 +85,7 @@ export function AttachmentCards(props: {
     if (state?.phase === "failed") return t("attachment.downloadFailed");
     if (state?.phase === "downloading")
       return t("attachment.downloadProgress", {
-        received: amountInUnitOf(state.received, state.total, format),
+        received: format.fileSizeAmount(state.received, state.total),
         total: format.fileSize(state.total),
       });
     return format.fileSize(attachment.size);
@@ -259,21 +258,6 @@ export function AttachmentCards(props: {
       </For>
     </div>
   );
-}
-
-/**
- * `bytes` in the unit that `format.fileSize` writes `total` in, without the unit: "148.0" of "412.0 MB".
- * The card is narrow, so the unit shows once.
- */
-function amountInUnitOf(bytes: number, total: number, format: AppFormat): string {
-  if (total < 1024) return format.number(bytes, { useGrouping: false });
-  if (total < 1024 ** 2) return format.number(Math.round(bytes / 1024), { useGrouping: false });
-  const exponent = total < 1024 ** 3 ? 2 : total < 1024 ** 4 ? 3 : 4;
-  return format.number(bytes / 1024 ** exponent, {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-    useGrouping: false,
-  });
 }
 
 export function fileBadge(attachment: AttachmentSummary): string {

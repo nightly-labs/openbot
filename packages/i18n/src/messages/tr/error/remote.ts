@@ -91,6 +91,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "WebRTC dosya aktarımı başarısız oldu.",
   "error.remote.fileResumeFailed": "WebRTC dosya aktarımı son tarihinden önce sürdürülemedi.",
   "error.remote.fileTransportStopped": "WebRTC dosya iletimi durdu.",
+  "error.remote.downloadStopped": "İndirme durduruldu.",
   "error.remote.fileResumeExpired": "WebRTC dosya aktarımı sürdürme süresi doldu.",
   "error.remote.hostRequestFailed": "Ana makine isteği tamamlayamadı.",
   "error.remote.responseTooLarge": "Ana makinenin yanıtı bu cihaza gönderilemeyecek kadar büyük.",

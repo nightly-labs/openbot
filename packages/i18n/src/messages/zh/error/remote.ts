@@ -84,6 +84,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "WebRTC 文件传输失败。",
   "error.remote.fileResumeFailed": "WebRTC 文件传输未能在截止时间前恢复。",
   "error.remote.fileTransportStopped": "WebRTC 文件传输已停止。",
+  "error.remote.downloadStopped": "下载已停止。",
   "error.remote.fileResumeExpired": "WebRTC 文件续传的截止时间已过。",
   "error.remote.hostRequestFailed": "主机无法完成该请求。",
   "error.remote.responseTooLarge": "主机返回的回复过大，无法发送到这台设备。",

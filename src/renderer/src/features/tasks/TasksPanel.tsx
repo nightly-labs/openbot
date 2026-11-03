@@ -48,6 +48,8 @@ export function TasksPanel(props: TasksPanelProps) {
       stop: (attachmentId) => window.openbot.agent.stopAttachmentDownload(attachmentId, props.serverId),
       subscribe: window.openbot.agent.onAttachmentDownload,
     }),
+    // A toast has no target.
+    target: () => undefined,
     onError: (error) => {
       const { t, errorMessage } = currentText();
       actionToast.error(errorMessage(error, t("attachment.error.open")));
