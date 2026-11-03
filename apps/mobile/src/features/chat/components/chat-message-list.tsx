@@ -162,8 +162,11 @@ const REPLY_SIZE = { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1), red
 // The pill takes over from the activity row, so it fades rather than grows from nothing: its first
 // measurement is already the size of the first revealed word.
 const REPLY_APPEAR = { duration: 220, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.Never };
-/** The corner of a message bubble. A bubble lower than twice this is a pill. */
-const BUBBLE_RADIUS = 22;
+/**
+ * The corner of a message bubble. React Native draws a radius as at most half of the shorter side,
+ * so a one-line bubble is a pill and a taller one keeps this corner, with no measurement.
+ */
+const BUBBLE_CORNER = { borderCurve: "circular", borderRadius: 22 } as const;
 
 function ChatBubble({
   children,
@@ -189,8 +192,6 @@ function ChatBubble({
   useEffect(() => {
     shown.set(collapsed ? 0 : withTiming(1, REPLY_APPEAR));
   }, [collapsed, shown]);
-  // A short bubble is a pill; a taller one keeps the same corner, so its sides stay straight.
-  const [radius, setRadius] = useState(BUBBLE_RADIUS);
   const background = useAnimatedStyle(() => {
     if (!sized) return { opacity: shown.get() };
     const { width, height, measured } = size.get();
@@ -204,17 +205,19 @@ function ChatBubble({
   return (
     <Animated.View
       className={className}
-      style={[style, { borderRadius: radius }]}
-      onLayout={({ nativeEvent }) => {
-        setRadius(Math.min(nativeEvent.layout.height / 2, BUBBLE_RADIUS));
-        if (!sized) return;
-        const previous = size.get();
-        size.set({
-          width: nativeEvent.layout.width,
-          height: nativeEvent.layout.height,
-          measured: previous.measured || previous.width > 0,
-        });
-      }}
+      style={[style, BUBBLE_CORNER]}
+      onLayout={
+        sized
+          ? ({ nativeEvent }) => {
+              const previous = size.get();
+              size.set({
+                width: nativeEvent.layout.width,
+                height: nativeEvent.layout.height,
+                measured: previous.measured || previous.width > 0,
+              });
+            }
+          : undefined
+      }
     >
       {/* Only the childless background resizes. The list measures the actual
           content once, without a layout animation moving its native anchor. */}
@@ -224,11 +227,7 @@ function ChatBubble({
           key={sized ? "sized" : "filled"}
           pointerEvents="none"
           className="absolute left-0 top-0 bg-control/60"
-          style={[
-            { borderCurve: "circular", borderRadius: radius },
-            sized ? null : StyleSheet.absoluteFill,
-            background,
-          ]}
+          style={[BUBBLE_CORNER, sized ? null : StyleSheet.absoluteFill, background]}
         />
       ) : null}
       {children}
