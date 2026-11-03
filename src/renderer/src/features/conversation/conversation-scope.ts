@@ -498,8 +498,9 @@ export function createConversationViewScope(props: ConversationProps) {
     return id !== null && sideThreadIds().includes(id) ? id : null;
   };
   /**
-   * The panel button opens the side panel at its last pane or side thread, or at the list of panes
-   * when no tab is open.
+   * The panel button opens the side panel at its last file, pane or side thread, or at the list of
+   * panes when no tab is open. A file that is not loaded is read again. The panel lists the panes
+   * until the file shows, so the panel opens also when the read fails.
    */
   function toggleSidePanel() {
     if (sidePanelOpen()) {
@@ -509,8 +510,10 @@ export function createConversationViewScope(props: ConversationProps) {
     const { panes, selected, files, file } = sidePanel();
     const pane = selected && panes.includes(selected) ? selected : null;
     const thread = shownPanelThreadId() ?? sideThreadIds()[0];
-    if (file && files.some((item) => item.key === file)) openSidePanelFile(file);
-    else if (pane) openSidePanelPane(pane);
+    if (file && files.some((item) => item.key === file)) {
+      openSidePanelFile(file);
+      if (!sidePanelOpen()) setActiveRightPanel("side-panel");
+    } else if (pane) openSidePanelPane(pane);
     else if (thread && selected === null) openPanelThread(thread);
     else if (panes[0]) openSidePanelPane(panes[0]);
     else setActiveRightPanel("side-panel");
@@ -549,7 +552,7 @@ export function createConversationViewScope(props: ConversationProps) {
   }
   // A side thread that shows can also leave the side panel from outside it: the thread list or a
   // notification opens it in the chat, or it is archived. The side thread next to it then shows, else
-  // the last pane, as when its tab closes. A thread that is not in the list yet, as before the threads
+  // the last pane or file, as when its tab closes. A thread that is not in the list yet, as before the threads
   // load after a start, did not show, so the panel keeps it.
   createEffect(
     () => ({
@@ -557,6 +560,7 @@ export function createConversationViewScope(props: ConversationProps) {
       requested: activeRightPanel() === "thread" ? panelThreadId() : null,
       ids: sideThreadIds(),
       pane: sidePanel().panes.at(-1),
+      file: sidePanel().files.at(-1)?.key,
     }),
     (next, previous) => {
       if (next.shown !== null || !previous?.shown || next.requested !== previous.shown) return;
@@ -564,6 +568,7 @@ export function createConversationViewScope(props: ConversationProps) {
       const thread = next.ids[Math.min(Math.max(index, 0), next.ids.length - 1)];
       if (thread) openPanelThread(thread);
       else if (next.pane) openSidePanelPane(next.pane);
+      else if (next.file) openSidePanelFile(next.file);
     },
   );
   /** The subagent that the side panel shows now, or null. */

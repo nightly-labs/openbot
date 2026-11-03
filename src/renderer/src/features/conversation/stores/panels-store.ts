@@ -641,7 +641,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
 
   function openSidebarFileBack() {
     const path = sidebarFileBack();
-    if (path !== null) openWorkspaceFolder(path);
+    // Back shows the folder in the tab of the shown file.
+    if (path !== null) openWorkspaceFolder(path, previewWorkspaceAgentId(), "here");
   }
 
   function openSidebarFileExternally() {
