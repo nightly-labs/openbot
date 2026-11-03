@@ -548,7 +548,13 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
               }),
           ),
           Effect.onInterrupt(() => watch?.stop ?? Effect.void),
-          Effect.ensuring(Effect.sync(() => watch?.end())),
+          Effect.onError(() => Effect.sync(() => watch?.end(null))),
+        );
+        // The answer names the file of this request. The watch removes the other files that it took.
+        watch?.end(
+          isDynamicRecord(envelope) && isDynamicRecord(envelope.file) && isString(envelope.file.transferId)
+            ? envelope.file.transferId
+            : null,
         );
         if (!isDynamicRecord(envelope) || !isNumber(envelope.status) || !Object.hasOwn(envelope, "body")) {
           return yield* new RemoteWorkflowError({

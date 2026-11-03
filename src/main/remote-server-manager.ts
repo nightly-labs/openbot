@@ -2107,7 +2107,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     ): Effect.fn.Return<RemoteAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const progress = size === undefined ? undefined : this.#attachmentProgress(server.id, attachmentId, size);
-      return yield* this.#attachments.get(
+      const load = this.#attachments.get(
         server.id,
         attachmentId,
         () =>
@@ -2135,6 +2135,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           ),
         preview,
       );
+      // A click can wait for a load that a preview or a ZIP started. Its stop then ends only its wait.
+      // A click that starts the load stops the load itself, above, so the callers that wait get an error.
+      return yield* progress ? this.#stoppable(server.id, attachmentId, load) : load;
     },
     (operation) => this.#owned(operation),
   ).bind(this);

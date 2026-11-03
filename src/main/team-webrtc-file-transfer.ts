@@ -65,12 +65,17 @@ interface IncomingWatch {
   size: number;
   onProgress: (received: number, size: number) => void;
   transferId: string | null;
+  /** Each file that the watch took. A file of a stopped request of the same size can come first. */
+  taken: string[];
   stopped: boolean;
 }
 
-/** Ends a watch. `stop` also refuses its file, so the host stops sending it. */
+/**
+ * Ends a watch. `end` gets the file that the answer names, or `null`, and removes the other files that
+ * the watch took. `stop` also refuses its file, so the host stops sending it.
+ */
 export interface IncomingFileWatch {
-  end: () => void;
+  end: (answered: string | null) => void;
   stop: Effect.Effect<void>;
 }
 
@@ -288,16 +293,28 @@ export class TeamWebRtcFileTransfer {
    * swap their progress; their bytes still go to the request that the answer names.
    */
   watchIncoming(peerId: string, size: number, onProgress: (received: number, size: number) => void): IncomingFileWatch {
-    const watch: IncomingWatch = { peerId, size, onProgress, transferId: null, stopped: false };
+    const watch: IncomingWatch = { peerId, size, onProgress, transferId: null, taken: [], stopped: false };
     // The host does not keep the order of its files. A stopped request that has no file yet must not
-    // refuse the file of this request; its own file then arrives unclaimed and expires.
+    // refuse the file of this request. This watch can take that file first; `end` then removes it.
     for (const item of this.#watches)
       if (item.stopped && item.peerId === peerId && item.size === size && item.transferId === null)
         this.#watches.delete(item);
     this.#watches.add(watch);
     return {
-      end: () => {
-        if (!watch.stopped) this.#watches.delete(watch);
+      end: (answered) => {
+        if (watch.stopped || !this.#watches.delete(watch)) return;
+        // While another request waits for a file of this size, a file that this watch took can be its file.
+        const shared = [...this.#watches].some((item) => !item.stopped && item.peerId === peerId && item.size === size);
+        const others = shared ? [] : watch.taken.filter((transferId) => transferId !== answered);
+        // The file of a stopped request counts against the file set limit of the peer until it expires.
+        for (const transferId of others)
+          void Effect.runPromise(
+            this.#owned(
+              this.#frames.withPermit(
+                this.#refuse(peerId, transferId, new Error(sourceText("error.remote.downloadStopped"))),
+              ),
+            ),
+          ).catch(() => undefined);
       },
       stop: Effect.suspend(() => {
         if (watch.stopped) return Effect.void;
@@ -529,6 +546,7 @@ export class TeamWebRtcFileTransfer {
         this.#scheduleExpiration(key);
         if (watch) {
           watch.transferId = frame.transferId;
+          watch.taken.push(frame.transferId);
           watch.onProgress(0, frame.size);
         }
         yield* this.#bridge.send(
