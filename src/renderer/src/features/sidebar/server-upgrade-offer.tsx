@@ -11,42 +11,9 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, Show, untrack } from "solid-js";
 import { appPort } from "../../app-port";
 import { usePlatform } from "../../platform";
-
-/**
- * The highest level offered for each server, on this computer. The dialog shows once at "low" and
- * once more at "full". When space comes back, the storage card clears the record.
- */
-const OFFERED_KEY_PREFIX = "openbot:server-upgrade-offered:";
+import { readUpgradeOffered, writeUpgradeOffered } from "./storage-card";
 
 const LEVEL_RANK: Record<SidebarStorageLevel, number> = { low: 1, full: 2 };
-
-function readOffered(serverId: string): SidebarStorageLevel | null {
-  try {
-    const value = window.localStorage.getItem(OFFERED_KEY_PREFIX + serverId);
-    return value === "low" || value === "full" ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-/** False when browser storage is unavailable. The dialog then does not show, so it cannot repeat. */
-function writeOffered(serverId: string, level: SidebarStorageLevel): boolean {
-  try {
-    window.localStorage.setItem(OFFERED_KEY_PREFIX + serverId, level);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Space came back, so the next "low" offers the upgrade again. */
-export function clearServerUpgradeOffered(serverId: string): void {
-  try {
-    window.localStorage.removeItem(OFFERED_KEY_PREFIX + serverId);
-  } catch {
-    // The record stays, and the dialog shows again only at a higher level.
-  }
-}
 
 /** The plan after `plan`, or null for the largest plan. */
 function nextPlan(plan: BillingPlanId): BillingPlanId | null {
@@ -61,8 +28,8 @@ interface StorageCard {
 }
 
 interface Offer {
-  serverId: string;
-  level: SidebarStorageLevel;
+  card: StorageCard;
+  serverName: string;
   plan: BillingServerPlan;
   nextPlan: BillingPlanId;
 }
@@ -87,54 +54,64 @@ export function ServerUpgradeOffer(props: {
     error: null,
   });
 
-  /** Server and level pairs that this window asked billing about, so focus changes do not ask again. */
-  const asked = new Set<string>();
+  /** The offer of the selected server only. The plan change applies to the server that the dialog names. */
+  const shown = () => (state.offer?.card.serverId === props.server?.id ? state.offer : null);
 
+  /** "<server>:<level>" pairs that have no plan to offer. They are asked again after space comes back. */
+  const noOffer = new Set<string>();
+  createEffect(
+    () => props.card === null,
+    (gone) => {
+      if (gone) noOffer.clear();
+    },
+  );
+
+  // The key is a string, so a new card or server object with the same level does not ask billing again.
   createEffect(
     () => {
       const card = props.card;
       const server = props.server;
       if (!card || !server?.hosted || server.id !== card.serverId) return null;
       if (props.blocked || !platform.appFocused() || platform.chatWindow || platform.landingPreview) return null;
-      if (untrack(() => state.offer)) return null;
-      const offered = readOffered(card.serverId);
+      // An open offer waits. An offer for a server that is no longer selected gives way.
+      if (untrack(shown)) return null;
+      const offered = readUpgradeOffered(card.serverId);
       if (offered && LEVEL_RANK[offered] >= LEVEL_RANK[card.level]) return null;
-      if (asked.has(`${card.serverId}:${card.level}`)) return null;
-      return { serverId: card.serverId, level: card.level };
+      const key = `${card.serverId}:${card.level}`;
+      return noOffer.has(key) ? null : key;
     },
-    (candidate) => {
-      if (!candidate) return;
-      const key = `${candidate.serverId}:${candidate.level}`;
-      asked.add(key);
+    (key) => {
+      if (!key) return;
       let current = true;
-      let settled = false;
       appPort()
         .billing.getState()
         .then(
           (billing) => {
-            if (!current) return;
-            settled = true;
+            const card = untrack(() => props.card);
+            const server = untrack(() => props.server);
+            if (!current || !card || !server || `${card.serverId}:${card.level}` !== key) return;
             const plan = billing.servers.find(
               (entry) =>
-                entry.serverId === candidate.serverId && isOpenBillingStatus(entry.status) && !entry.cancelAtPeriodEnd,
+                entry.serverId === card.serverId && isOpenBillingStatus(entry.status) && !entry.cancelAtPeriodEnd,
             );
             const next = plan ? nextPlan(plan.plan) : null;
-            if (!plan || !next || !writeOffered(candidate.serverId, candidate.level)) return;
+            if (!plan || !next) {
+              noOffer.add(key);
+              return;
+            }
+            if (!writeUpgradeOffered(card.serverId, card.level)) return;
             setState((draft) => {
-              draft.offer = { serverId: candidate.serverId, level: candidate.level, plan, nextPlan: next };
+              draft.offer = { card: { ...card }, serverName: server.name, plan, nextPlan: next };
               draft.pending = false;
               draft.error = null;
             });
           },
           // Without the plan there is nothing to offer. The sidebar card still shows; the next change asks again.
-          () => {
-            asked.delete(key);
-          },
+          () => undefined,
         );
+      // A change before the answer, such as a lost focus, drops the answer.
       return () => {
-        // A change before the answer, such as a lost focus, drops it. The next candidate asks again.
         current = false;
-        if (!settled) asked.delete(key);
       };
     },
   );
@@ -166,16 +143,16 @@ export function ServerUpgradeOffer(props: {
   }
 
   /** The disk as the card reads it now, or as it was when the offer opened. */
-  const disk = (offer: Offer) => (props.card?.serverId === offer.serverId ? props.card : null);
+  const disk = (offer: Offer) => (props.card?.serverId === offer.card.serverId ? props.card : offer.card);
 
   return (
-    <Show when={state.offer}>
+    <Show when={shown()}>
       {(offer) => (
         <ServerUpgradeDialog
-          serverName={props.server?.name ?? ""}
-          level={disk(offer())?.level ?? offer().level}
-          freeBytes={disk(offer())?.freeBytes ?? 0}
-          totalBytes={disk(offer())?.totalBytes ?? 0}
+          serverName={offer().serverName}
+          level={disk(offer()).level}
+          freeBytes={disk(offer()).freeBytes}
+          totalBytes={disk(offer()).totalBytes}
           plan={offer().plan.plan}
           nextPlan={offer().nextPlan}
           interval={offer().plan.interval}
@@ -185,7 +162,7 @@ export function ServerUpgradeOffer(props: {
           error={state.error}
           onUpgrade={() => void upgrade(offer())}
           onFreeUpSpace={() => {
-            const { serverId } = offer();
+            const { serverId } = offer().card;
             close();
             props.onFreeUpSpace(serverId);
           }}

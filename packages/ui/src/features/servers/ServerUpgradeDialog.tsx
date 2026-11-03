@@ -9,8 +9,7 @@ import { HOSTED_PLAN_SIZE, HOSTED_SERVER_SIZES } from "@openbot/contracts/hosted
 import { Button, Dialog, Progress } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
-
-const GB = 1024 ** 3;
+import { formatMinorMoney } from "../billing/money";
 
 const PLAN_NAMES = {
   starter: "billing.plan.starter",
@@ -52,23 +51,21 @@ export function ServerUpgradeDialog(props: ServerUpgradeDialogProps) {
   const memoryGb = (plan: BillingPlanId) => HOSTED_SERVER_SIZES[HOSTED_PLAN_SIZE[plan]].memoryGb;
   const price = (amount: number) =>
     t(props.interval === "month" ? "billing.server.price.month" : "billing.server.price.year", {
-      amount: format.number(amount / 100, {
-        style: "currency",
-        currency: props.currency.toUpperCase(),
-        minimumFractionDigits: amount % 100 === 0 ? 0 : 2,
-      }),
+      amount: formatMinorMoney(format, amount, props.currency),
     });
+  // Plan sizes are whole GB, as Billing shows them.
+  const gigabytes = (size: number) => t("format.fileSize.gigabytes", { size: format.number(size) });
   const listPrice = (plan: BillingPlanId) => billingListPrices(plan, props.interval)[props.currency];
   const rows = () => [
     {
       label: t("files.machine.disk"),
-      now: format.fileSize(storageGb(props.plan) * GB),
-      next: format.fileSize(storageGb(props.nextPlan) * GB),
+      now: gigabytes(storageGb(props.plan)),
+      next: gigabytes(storageGb(props.nextPlan)),
     },
     {
       label: t("files.machine.memory"),
-      now: format.fileSize(memoryGb(props.plan) * GB),
-      next: format.fileSize(memoryGb(props.nextPlan) * GB),
+      now: gigabytes(memoryGb(props.plan)),
+      next: gigabytes(memoryGb(props.nextPlan)),
     },
     {
       label: t("server.upgrade.price"),
