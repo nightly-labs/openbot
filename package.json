@@ -211,6 +211,7 @@
     "test:acp-mcp-names": "bun scripts/acp-mcp-server-names-e2e.ts",
     "test:acp-mcp-shared-token": "bun scripts/acp-mcp-shared-token-e2e.ts",
     "test:acp-turn-stall": "bun scripts/acp-turn-stall-e2e.ts",
+    "test:acp-background-review": "bun scripts/acp-background-review-e2e.ts",
     "test:acp-instructions-once": "bun scripts/acp-instructions-once-e2e.ts",
     "test:acp-audio-input": "bun scripts/acp-audio-input-e2e.ts",
     "test:grok-steer": "bun scripts/grok-steer-e2e.ts",

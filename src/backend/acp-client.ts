@@ -243,6 +243,8 @@ interface AcpThread {
   backgroundSkipUntil: number;
   /** A background replay that runs. A prompt waits for it, so that its updates do not mix. */
   backgroundReplay: Deferred.Deferred<void> | null;
+  /** Review notices wait only while another turn is active. */
+  backgroundNotices: string[];
 }
 
 /** What a closed idle session needs to be loaded again. Completed history lives in storage. */
@@ -316,6 +318,7 @@ interface HistoryReplay {
  * agent" makes (`acp-agent-check.ts`) and the real client cannot differ.
  */
 export const OPENBOT_ACP_CLIENT_CAPABILITIES = {
+  _meta: { "com.nousresearch/backgroundReview": true },
   fs: { readTextFile: false, writeTextFile: false },
   terminal: false,
   elicitation: { form: {} },
@@ -569,6 +572,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       client: () => ({
         requestPermission: (params) => runCauseEffect(this.#requestPermission(params)),
         sessionUpdate: (params) => this.#sessionUpdate(params),
+        extNotification: (method, params) => runCauseEffect(this.#backgroundReview(method, params)),
         createElicitation: (params) => runCauseEffect(this.#createElicitation(params)),
         extMethod: (method, params) => runCauseEffect(this.#requestUserInput(method, params)),
       }),
@@ -1586,6 +1590,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               backgroundUpdatedAt: null,
               backgroundSkipUntil: 0,
               backgroundReplay: null,
+              backgroundNotices: [],
             };
             threadRef = thread;
             providerResult(
@@ -1954,10 +1959,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#openingTurns.set(threadId, (this.#openingTurns.get(threadId) ?? 0) + 1);
     return yield* this.#prepareTurn(threadId, params).pipe(
       Effect.ensuring(
-        Effect.sync(() => {
+        Effect.suspend(() => {
           const count = (this.#openingTurns.get(threadId) ?? 1) - 1;
           if (count > 0) this.#openingTurns.set(threadId, count);
           else this.#openingTurns.delete(threadId);
+          const thread = this.#threads.get(threadId);
+          return thread ? this.#flushBackgroundReview(thread) : Effect.void;
         }),
       ),
     );
@@ -2246,6 +2253,33 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn.textMessageId = null;
     turn.textMessageStart = 0;
     return true;
+  });
+
+  readonly #backgroundReview = Effect.fn("AcpAgentClient.backgroundReview")(function* (
+    this: AcpAgentClient,
+    method: string,
+    params: unknown,
+  ): Effect.fn.Return<void> {
+    if (method !== "_com.nousresearch/backgroundReview") return;
+    const sessionId = getString(params, "sessionId");
+    const text = getString(params, "text");
+    if (!sessionId || !text?.trim()) return;
+    const thread = this.#threads.get(sessionId);
+    if (!thread) return;
+    thread.backgroundNotices.push(text);
+    yield* this.#flushBackgroundReview(thread);
+  });
+
+  readonly #flushBackgroundReview = Effect.fn("AcpAgentClient.flushBackgroundReview")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+  ): Effect.fn.Return<void> {
+    if (thread.activeTurn || this.#openingTurns.has(thread.id) || this.#threads.get(thread.id) !== thread) return;
+    const text = thread.backgroundNotices.shift();
+    if (!text) return;
+    const turn = this.#beginTurn(thread, randomUUID(), { unprompted: true, answerOptional: true });
+    this.#applyTurnUpdate(thread, turn, { sessionUpdate: "agent_message_chunk", content: { type: "text", text } });
+    yield* this.#completeTurn(thread, turn, "completed", null);
   });
 
   #sessionUpdate(notification: SessionNotification): void {
@@ -2785,7 +2819,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn: AcpTurn,
     status: string,
     error: unknown,
-  ) {
+  ): Effect.fn.Return<void> {
     if (thread.activeTurn !== turn || turn.completing) return;
     turn.completing = true;
     // The agent may not have kept a prompt that failed.
@@ -2849,6 +2883,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         });
         thread.activeTurn = null;
         if (this.#threads.get(thread.id) === thread) yield* this.#threads.markIdle(thread);
+        yield* this.#flushBackgroundReview(thread);
         return;
       }
     }
@@ -2858,6 +2893,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
     thread.activeTurn = null;
     if (this.#threads.get(thread.id) === thread) yield* this.#threads.markIdle(thread);
+    yield* this.#flushBackgroundReview(thread);
   }, Effect.uninterruptible);
 
   readonly #requestPermission = Effect.fn("AcpAgentClient.requestPermission")(function* (

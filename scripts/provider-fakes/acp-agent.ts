@@ -8,6 +8,7 @@ import type { SessionUpdate } from "@agentclientprotocol/sdk";
 
 /** The request fields that the fakes read. The values come from the client under test. */
 export interface AcpParams {
+  clientCapabilities?: { _meta?: { "com.nousresearch/backgroundReview"?: boolean } };
   sessionId?: string;
   cwd?: string;
   additionalDirectories?: string[];
