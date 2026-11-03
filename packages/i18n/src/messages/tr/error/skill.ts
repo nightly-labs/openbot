@@ -46,6 +46,7 @@ export const messages = {
     "{name} kesin sürüm takibinden önce kurulmuş. Yayımlamadan önce güncelleyin veya onarın.",
   "error.skill.tooManySkills": "Bir ajan en fazla {limit} beceriye sahip olabilir.",
   "error.skill.unmanagedExists": "{path} konumunda zaten yönetilmeyen bir beceri mevcut.",
+  "error.skill.managedSlug": "OpenBot her ajana kendi {slug} becerisini verir. Bu beceriye başka bir ad verin.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md 64 KB'tan daha büyük. Yayımlamadan önce kısaltın.",
   "error.skill.localNoRevisions": "Yerel becerinin yayımlanmış revizyonu yok.",
   "error.skill.localNameTaken": "Bu ada sahip yerel bir beceri zaten mevcut. Bunun yerine revize edin.",
