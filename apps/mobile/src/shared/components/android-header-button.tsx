@@ -10,7 +10,6 @@ import { useChromeGlass } from "@/shared/lib/chrome-glass";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
-import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 /** The 40 dp round state layer of a Material icon button. */
 const ICON_RIPPLE = { borderless: true, radius: 20 } as const;
@@ -96,7 +95,7 @@ function AndroidStackBackButton({ glass: hasGlass, onPress }: { glass: boolean; 
       }}
     >
       <GlassCircle glass={hasGlass ? glass : undefined}>
-        <ArrowLeft color={String(foreground)} size={22} strokeWidth={2} style={MIRROR_IN_RTL} />
+        <ArrowLeft color={String(foreground)} size={22} strokeWidth={2} />
       </GlassCircle>
     </Pressable>
   );

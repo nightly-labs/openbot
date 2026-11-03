@@ -4,7 +4,6 @@ import { ScrollView, TextInput, type TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
-import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE } from "@/shared/lib/text-direction";
 import { type CodeToken, highlightCode } from "../model/code-highlight";
 import { useCodeTokenColors } from "./chat-code-block";
 
@@ -62,7 +61,6 @@ export function CodeDocument({
   }, [text, language]);
   const lineCount = useMemo(() => text.split("\n").length, [text]);
   const codeStyle: TextStyle = {
-    ...CODE_TEXT_STYLE,
     fontFamily: CODE_FONT,
     fontSize: FONT_SIZE,
     lineHeight: LINE_HEIGHT,
@@ -87,9 +85,9 @@ export function CodeDocument({
       contentContainerStyle={{ paddingTop: topInset, paddingBottom: bottomInset + SIDE_PADDING }}
     >
       {wrap ? (
-        <View style={[CODE_LAYOUT_STYLE, sides]}>{code}</View>
+        <View style={sides}>{code}</View>
       ) : (
-        <View className="flex-row" style={[CODE_LAYOUT_STYLE, { paddingLeft: sides.paddingLeft }]}>
+        <View className="flex-row" style={{ paddingLeft: sides.paddingLeft }}>
           <Typography.Code
             selectable={false}
             accessibilityElementsHidden

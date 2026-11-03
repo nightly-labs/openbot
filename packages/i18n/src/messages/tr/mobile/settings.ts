@@ -8,13 +8,6 @@ export const messages = {
   "mobile.settings.language.system": "Sistem varsayılanı",
   "mobile.settings.language.footer":
     "Sistem varsayılanı, telefon ayarlarınızdaki ilk dili takip eder. Henüz çevrilmemiş metinler İngilizce gösterilir.",
-  "mobile.settings.language.restartTitle": "OpenBot yeniden başlatılsın mı?",
-  "mobile.settings.language.restartBody":
-    "Bu dil ters yönde okunur. Ekranlar, OpenBot yeniden başladığında yön değiştirir.",
-  "mobile.settings.language.restartNow": "Yeniden başlat",
-  "mobile.settings.language.restartLater": "Daha sonra",
-  "mobile.settings.language.restartFailed":
-    "OpenBot yeniden başlatılamadı. Ekranlar, OpenBot'u bir sonraki açışınızda yön değiştirir.",
   "mobile.settings.dictation.language": "Dikte dili",
   "mobile.settings.about.development": "Geliştirme",
   "mobile.settings.about.openFailed": "Bağlantı açılamadı. Tekrar deneyin.",

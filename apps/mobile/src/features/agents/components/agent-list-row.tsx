@@ -33,7 +33,6 @@ import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspa
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
-import { lineDirectionStyle } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
@@ -202,11 +201,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
                   {agent.title.trim()}
                 </Typography.Paragraph>
               ) : null}
-              <Typography.Paragraph
-                className="text-text-secondary"
-                numberOfLines={1}
-                style={[typeScale.preview, lineDirectionStyle(previewLine)]}
-              >
+              <Typography.Paragraph className="text-text-secondary" numberOfLines={1} style={typeScale.preview}>
                 {previewLine}
               </Typography.Paragraph>
             </View>

@@ -17,7 +17,6 @@ import { toggleReadAloud, useReadingAloud } from "@/features/voice/model/message
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useCopyMessage } from "./use-copy-message";
 import { useHistoryShown } from "./use-history-shown";
 
@@ -237,7 +236,7 @@ export function ChatMessageActions({
               onReply();
             }}
           >
-            <Reply size={ICON_SIZE} color={muted} style={MIRROR_IN_RTL} />
+            <Reply size={ICON_SIZE} color={muted} />
           </ActionButton>
         ) : null}
         {onSelectText ? (

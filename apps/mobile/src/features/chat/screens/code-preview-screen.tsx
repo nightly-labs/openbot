@@ -36,7 +36,6 @@ import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
-import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
 type PreviewView = "preview" | "code";
@@ -253,7 +252,7 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
             router.back();
           }}
         >
-          <ArrowLeft color={String(foreground)} size={24} strokeWidth={2} style={MIRROR_IN_RTL} />
+          <ArrowLeft color={String(foreground)} size={24} strokeWidth={2} />
         </ChatGlassIconButton>
         <GlassCapsule liquidGlass={liquidGlass} fallbackBackground={fieldBackground} style={{ flexShrink: 1 }}>
           <Animated.View

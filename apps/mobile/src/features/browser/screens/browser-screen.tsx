@@ -43,7 +43,6 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { NATIVE_BAR_HEIGHT } from "@/shared/lib/native-bar";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
-import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 import { BrowserLiveStage, type BrowserLiveStageHandle } from "../components/browser-live-stage";
@@ -634,7 +633,7 @@ function BrowserView({
                 hidden={!showControls}
                 onPress={() => navigate("back")}
               >
-                <ChevronLeft color={iconColor} size={24} strokeWidth={2} style={MIRROR_IN_RTL} />
+                <ChevronLeft color={iconColor} size={24} strokeWidth={2} />
               </ChatGlassIconButton>
               <ChatGlassIconButton
                 accessibilityLabel={t("mobile.browser.nextPage")}
@@ -644,7 +643,7 @@ function BrowserView({
                 hidden={!showControls}
                 onPress={() => navigate("forward")}
               >
-                <ChevronRight color={iconColor} size={24} strokeWidth={2} style={MIRROR_IN_RTL} />
+                <ChevronRight color={iconColor} size={24} strokeWidth={2} />
               </ChatGlassIconButton>
               <HideableMenu hidden={!showControls}>
                 <MenuView
@@ -735,7 +734,7 @@ function BrowserView({
         // The native bar, so its items morph with the items of the chat under the browser.
         <>
           <Stack.Toolbar placement="left">
-            <Stack.Toolbar.Button icon="chevron.backward" accessibilityLabel={t("common.back")} onPress={goBack} />
+            <Stack.Toolbar.Button icon="chevron.left" accessibilityLabel={t("common.back")} onPress={goBack} />
             <Stack.Toolbar.View hidesSharedBackground>
               <View className="flex-row items-center" style={{ height: NATIVE_BAR_HEIGHT, maxWidth: TITLE_MAX_WIDTH }}>
                 {titleView}
@@ -765,7 +764,7 @@ function BrowserView({
             liquidGlassAvailable={liquidGlass}
             onPress={goBack}
           >
-            <ArrowLeft color={iconColor} size={24} strokeWidth={2} style={MIRROR_IN_RTL} />
+            <ArrowLeft color={iconColor} size={24} strokeWidth={2} />
           </ChatGlassIconButton>
           {titleView}
           <View className="flex-1" />

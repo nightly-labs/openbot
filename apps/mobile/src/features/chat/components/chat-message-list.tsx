@@ -87,7 +87,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
-import { lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
 import { nativeTextSelection } from "../model/native-text-selection";
@@ -728,12 +727,11 @@ const MessageRow = memo(function MessageRow({
     >
       {message.replyToMessageId ? (
         <View className={`flex-row items-center gap-1 ${message.author === "user" ? "self-end" : "self-start"}`}>
-          <CornerUpRight size={14} color={themeMuted} style={MIRROR_IN_RTL} />
+          <CornerUpRight size={14} color={themeMuted} />
           <Typography.Paragraph
             type="body-xs"
             numberOfLines={1}
             className="shrink text-muted"
-            style={lineDirectionStyle(replyPreview)}
             accessibilityLabel={t("mobile.chat.reply.to", { text: replyPreview })}
           >
             {replyPreview}

@@ -12,7 +12,6 @@ import { noteChatOpened } from "@/features/quick-actions/model/recent-agents";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 export function AgentChatScreen() {
   const { t } = useText();
@@ -65,7 +64,7 @@ export function AgentChatScreen() {
           leaveChat();
         }}
       >
-        <ArrowLeft color={String(foreground)} size={20} strokeWidth={2} style={MIRROR_IN_RTL} />
+        <ArrowLeft color={String(foreground)} size={20} strokeWidth={2} />
         <Typography.Paragraph weight="semibold">{t("mobile.chat.agentUnavailable.goBack")}</Typography.Paragraph>
       </Pressable>
     </View>

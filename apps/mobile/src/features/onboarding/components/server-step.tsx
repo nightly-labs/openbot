@@ -14,7 +14,6 @@ import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { useBloubStageRequest } from "@/shared/components/bloub-stage/bloub-stage-context";
 import { BLOUB_PRIORITY } from "@/shared/components/bloub-stage/bloub-stage-store";
 import { useText } from "@/shared/lib/text";
-import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 interface ServerOption {
   id: string;
@@ -45,7 +44,7 @@ function OptionRow({ option, index }: { option: ServerOption; index: number }) {
               {option.description}
             </Typography.Paragraph>
           </View>
-          <ChevronRight size={18} color={String(muted)} strokeWidth={1.75} style={MIRROR_IN_RTL} />
+          <ChevronRight size={18} color={String(muted)} strokeWidth={1.75} />
         </View>
       </GlassChoice>
     </View>

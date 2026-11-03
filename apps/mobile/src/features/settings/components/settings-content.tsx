@@ -5,7 +5,6 @@ import { type LayoutChangeEvent, useWindowDimensions, View } from "react-native"
 import { useCSSVariable } from "uniwind";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
-import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 export function SettingsContent({ children }: PropsWithChildren) {
   return (
@@ -135,10 +134,7 @@ export function SettingsRow({
         ? null
         : measures
           ? measuredTrailing
-          : trailing ||
-            (onPress && disclosure ? (
-              <ChevronRight size={18} color={muted} strokeWidth={1.5} style={MIRROR_IN_RTL} />
-            ) : null)}
+          : trailing || (onPress && disclosure ? <ChevronRight size={18} color={muted} strokeWidth={1.5} /> : null)}
     </>
   );
   return onPress ? (

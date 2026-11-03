@@ -51,7 +51,6 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 
@@ -110,7 +109,7 @@ function TaskNote({ note, retry }: { note: string; retry?: () => void }) {
           else leaveTask();
         }}
       >
-        {retry ? null : <ArrowLeft color={String(foreground)} size={20} strokeWidth={2} style={MIRROR_IN_RTL} />}
+        {retry ? null : <ArrowLeft color={String(foreground)} size={20} strokeWidth={2} />}
         <Typography.Paragraph weight="semibold">{retry ? t("common.retry") : t("common.back")}</Typography.Paragraph>
       </Pressable>
     </View>

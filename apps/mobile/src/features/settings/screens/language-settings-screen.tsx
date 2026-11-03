@@ -1,39 +1,17 @@
 import { APP_LANGUAGE_OPTIONS } from "@openbot/i18n/languages";
 import { Typography } from "heroui-native";
 import { useState } from "react";
-import { Alert } from "react-native";
 import { useUniwind } from "uniwind";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { saveAppLanguage, useAppLanguage } from "@/features/settings/model/app-language";
-import { restartApp, syncLayoutDirection } from "@/features/settings/model/layout-direction";
-import { useBloubColors } from "@/shared/components/bloub-stage/bloub-look";
 import { haptics } from "@/shared/lib/haptics";
-import { currentText, useText } from "@/shared/lib/text";
+import { useText } from "@/shared/lib/text";
 
 function AppLanguageSection({ dark }: { dark: boolean }) {
   const { t } = useText();
   const language = useAppLanguage();
-  const colors = useBloubColors();
   const [error, setError] = useState<string | null>(null);
-  // React Native reads the layout direction at startup. A language of the other direction asks
-  // for a restart; the text changes language at once in both cases.
-  function offerRestart() {
-    if (!syncLayoutDirection()) return;
-    // The question is in the new language: this render still holds the text of the previous one.
-    const text = currentText();
-    Alert.alert(text.t("mobile.settings.language.restartTitle"), text.t("mobile.settings.language.restartBody"), [
-      { text: text.t("mobile.settings.language.restartLater"), style: "cancel" },
-      {
-        text: text.t("mobile.settings.language.restartNow"),
-        onPress: () => {
-          void restartApp(colors.dark ? colors.dimBody : colors.body).catch(() => {
-            setError(text.t("mobile.settings.language.restartFailed"));
-          });
-        },
-      },
-    ]);
-  }
   return (
     <SettingsSection footer={error ?? t("mobile.settings.language.footer")}>
       <SettingsRow
@@ -50,7 +28,7 @@ function AppLanguageSection({ dark }: { dark: boolean }) {
             onChange={(next) => {
               setError(null);
               void haptics.selection();
-              void saveAppLanguage(next).then(offerRestart, () => {
+              void saveAppLanguage(next).catch(() => {
                 setError(t("mobile.settings.saveFailed"));
                 void haptics.notification("error");
               });

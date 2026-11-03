@@ -2,7 +2,7 @@ import { BlurView } from "expo-blur";
 import { type Href, router, usePathname } from "expo-router";
 import { useThemeColor } from "heroui-native/hooks";
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { I18nManager, Pressable, useWindowDimensions, View } from "react-native";
+import { Pressable, useWindowDimensions, View } from "react-native";
 import {
   Gesture,
   GestureDetector,
@@ -56,12 +56,6 @@ const DRAWER_SPRING = {
  * blur filter on each frame of the motion; it draws an elevation shadow on the render thread.
  */
 const DRAWER_SURFACE_ELEVATION = 16;
-/**
- * The drawer is at the start edge: on the left, and on the right in a right-to-left layout. React
- * Native moves the drawer's `left` to the right there, but not a horizontal move or a drag, so
- * each of them is multiplied by this value.
- */
-const DRAWER_SIDE = I18nManager.isRTL ? -1 : 1;
 
 /** Where the drawer is: at its closed place, between its places, or at its open place. */
 type DrawerPhase = "closed" | "moving" | "open";
@@ -169,17 +163,16 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
         "worklet";
         if (!openingEnabled.get() || drawerOpenOnUI.get()) GestureStateManager.fail(event.handlerTag);
       },
-      activeOffsetX: 12 * DRAWER_SIDE,
-      failOffsetX: -10 * DRAWER_SIDE,
+      activeOffsetX: 12,
+      failOffsetX: -10,
       failOffsetY: [-10, 10],
       onUpdate: (event) => {
         "worklet";
-        drawerProgress.set(Math.min(1, Math.max(0, (event.translationX * DRAWER_SIDE) / drawerWidth)));
+        drawerProgress.set(Math.min(1, Math.max(0, event.translationX / drawerWidth)));
       },
       onDeactivate: (event) => {
         "worklet";
-        const velocity = (event.velocityX * DRAWER_SIDE) / drawerWidth;
-        const projected = drawerProgress.get() + velocity / 6;
+        const projected = drawerProgress.get() + event.velocityX / drawerWidth / 6;
         const shouldOpen = projected > 0.45;
         if (shouldOpen) {
           drawerOpenOnUI.set(true);
@@ -187,7 +180,11 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
           scheduleOnRN(commitDrawerState, true);
         }
         drawerProgress.set(
-          withSpring(shouldOpen ? 1 : 0, { ...DRAWER_SPRING, velocity }, shouldOpen ? finishOpening : undefined),
+          withSpring(
+            shouldOpen ? 1 : 0,
+            { ...DRAWER_SPRING, velocity: event.velocityX / drawerWidth },
+            shouldOpen ? finishOpening : undefined,
+          ),
         );
       },
     }),
@@ -201,21 +198,20 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
         .onTouchesDown((_event, manager) => {
           if (!drawerOpenOnUI.get()) manager.fail();
         })
-        .activeOffsetX(-8 * DRAWER_SIDE)
-        .failOffsetX(12 * DRAWER_SIDE)
+        .activeOffsetX(-8)
+        .failOffsetX(12)
         .failOffsetY([-12, 12])
         .onUpdate((event) => {
-          drawerProgress.set(Math.min(1, Math.max(0, 1 + (event.translationX * DRAWER_SIDE) / drawerWidth)));
+          drawerProgress.set(Math.min(1, Math.max(0, 1 + event.translationX / drawerWidth)));
         })
         .onEnd((event) => {
-          const velocity = (event.velocityX * DRAWER_SIDE) / drawerWidth;
-          const projected = drawerProgress.get() + velocity / 6;
+          const projected = drawerProgress.get() + event.velocityX / drawerWidth / 6;
           const shouldOpen = projected > 0.55;
           if (!shouldOpen) scheduleOnRN(triggerDrawerHaptic);
           drawerProgress.set(
             withSpring(
               shouldOpen ? 1 : 0,
-              { ...DRAWER_SPRING, velocity },
+              { ...DRAWER_SPRING, velocity: event.velocityX / drawerWidth },
               // A drag that started before the opening motion ended stopped that motion and its callback.
               shouldOpen ? finishOpening : finishClosing,
             ),
@@ -226,7 +222,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
 
   const surfaceStyle = useAnimatedStyle(() =>
     isAndroid
-      ? { transform: [{ translateX: drawerProgress.get() * drawerWidth * DRAWER_SIDE }] }
+      ? { transform: [{ translateX: drawerProgress.get() * drawerWidth }] }
       : {
           borderRadius: interpolate(
             drawerProgress.get(),
@@ -234,7 +230,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
             [0, surfaceCornerRadius],
             Extrapolation.CLAMP,
           ),
-          transform: [{ translateX: drawerProgress.get() * drawerWidth * DRAWER_SIDE }],
+          transform: [{ translateX: drawerProgress.get() * drawerWidth }],
         },
   );
   // Android: the radius and the shadow change only when the drawer leaves or reaches its closed place.
@@ -247,7 +243,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   const drawerStyle = useAnimatedStyle(() => ({
     // Android: a closed drawer lies fully under the surface. At opacity 0, Android does not draw it.
     opacity: isAndroid && drawerProgress.get() <= 0 ? 0 : interpolate(drawerProgress.get(), [0, 1], [0.55, 1]),
-    transform: [{ translateX: interpolate(drawerProgress.get(), [0, 1], [-24 * DRAWER_SIDE, 0]) }],
+    transform: [{ translateX: interpolate(drawerProgress.get(), [0, 1], [-24, 0]) }],
   }));
   const scrimStyle = useAnimatedStyle(() => ({
     opacity: interpolate(drawerProgress.get(), [0, 1], [0, 0.5]),
