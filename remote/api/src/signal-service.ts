@@ -300,6 +300,8 @@ const DEFAULT_INGRESS_DELIVERY_LIMITS: IngressDeliveryLimits = {
 };
 
 const UNAVAILABLE = { status: 503 } as const;
+/** An older host refuses the signature of this format, so the request cannot authenticate. */
+const REFUSED_FORMAT = { status: 401 } as const;
 
 const MAXIMUM_RATE_WINDOWS = 100_000;
 const RATE_WINDOW_MILLISECONDS = 60_000;
@@ -864,8 +866,16 @@ export class SignalService {
    * Passes one generic webhook to the host and waits for its commit acknowledgement. It resolves 503
    * in the same cases as a Slack delivery.
    */
-  readonly deliverWebhook = Effect.fn("Signal.deliverWebhook")((routeId: string, delivery: WebhookDelivery) =>
-    this.#deliver("webhook", this.#webhookRoutes.get(routeId), delivery.body, (requestId, bodyBase64) => ({
+  readonly deliverWebhook = Effect.fn("Signal.deliverWebhook")((routeId: string, delivery: WebhookDelivery) => {
+    const socketId = this.#webhookRoutes.get(routeId);
+    // The route can move to another socket while Signal reads the body. Check the socket that gets the frame.
+    if (
+      delivery.format &&
+      socketId !== undefined &&
+      this.#peers.get(socketId)?.webhookFormats.has(delivery.format) === false
+    )
+      return Effect.succeed<WebhookDeliveryResponse>(REFUSED_FORMAT);
+    return this.#deliver("webhook", socketId, delivery.body, (requestId, bodyBase64) => ({
       type: "webhook-delivery",
       version: 1,
       requestId,
@@ -880,8 +890,8 @@ export class SignalService {
         (result): WebhookDeliveryResponse =>
           result?.type === "webhook-delivery-result" ? { status: result.status } : UNAVAILABLE,
       ),
-    ),
-  );
+    );
+  });
 
   /**
    * The rate limit of the GitHub route: by installation for a signed event, by address for a refused

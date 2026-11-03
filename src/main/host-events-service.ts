@@ -186,12 +186,17 @@ function decodeWebhookBody(body: Uint8Array): DecodedWebhookBody | null {
 /**
  * A Standard Webhooks body: `type`, an optional `timestamp`, and fields that each sender names, such as
  * Composio's `metadata.trigger_slug`. The whole body is the event data, so filters and the agent read
- * every field. A `timestamp` that is not a date is ignored: the sender defines it, not OpenBot.
+ * every field. A `timestamp` that is not an ISO 8601 date is ignored: the sender defines it, not OpenBot.
  */
+const ISO_DATE_PREFIX = /^\d{4}-\d{2}-\d{2}T/u;
+
 function decodeStandardWebhookBody(body: Uint8Array): DecodedWebhookBody | null {
   const value = parseJsonObject(body);
   if (!value || !isEventType(value.type) || !isEventJsonValue(value)) return null;
-  const occurredAt = isString(value.timestamp) && !Number.isNaN(Date.parse(value.timestamp)) ? value.timestamp : null;
+  const occurredAt =
+    isString(value.timestamp) && ISO_DATE_PREFIX.test(value.timestamp) && !Number.isNaN(Date.parse(value.timestamp))
+      ? value.timestamp
+      : null;
   return { type: value.type, occurredAt, data: value };
 }
 

@@ -541,6 +541,12 @@ try {
     events.setSecret({ owner, id: result.routineId, secret: `whsec_${encoded.toString("base64")}` }),
   );
   statuses.whsecKey = (await deliverStandard(encoded, standardBody("GMAIL_NEW_GMAIL_MESSAGE"))).status;
+  // Node skips characters that are not base64: this value decodes to one byte, which is not a key.
+  const malformed = "whsec_!!!!!!!!!!!!!!!!AA==";
+  await Effect.runPromise(events.setSecret({ owner, id: result.routineId, secret: malformed }));
+  statuses.malformedKey = (
+    await deliverStandard(Buffer.from(malformed.slice(6), "base64"), standardBody("GMAIL_NEW_GMAIL_MESSAGE"))
+  ).status;
   const standardActivity = await Effect.runPromise(events.listActivity({ owner, routineId: result.routineId }));
   report.standard = { refusals: { shortSecret, scheduleRoutine }, statuses, activity: standardActivity };
   const [whsecReceipt, slugReceipt, rawReceipt] = standardActivity;
@@ -558,6 +564,7 @@ try {
     "A whsec_ sender's secret signs with its base64 key",
     statuses.whsecKey === 202 && whsecReceipt?.status === "started",
   );
+  pass("A whsec_ value that is not exact base64 is not a short key", statuses.malformedKey === 401);
   pass(
     "The sender's secret is not in the chat",
     !JSON.stringify((await runCauseEffect(agents.readConversation(agent.id))).messages).includes(rawSecret),

@@ -88,6 +88,7 @@ export function serverSupportsCapability(
       capability === "routine-flows-v1" ||
       capability === "routine-recovery-v1" ||
       capability === "webhook-tests-v1" ||
+      capability === "webhook-sender-secret-v1" ||
       capability === "agent-import-v1" ||
       capability === "instance-transfer-v1" ||
       capability === "agent-hidden-v1" ||

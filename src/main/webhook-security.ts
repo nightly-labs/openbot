@@ -18,6 +18,7 @@ const WEBHOOK_SIGNATURE_PATTERN = /^sha256=[0-9a-f]{64}$/i;
 const WEBHOOK_SIGNATURE_PREFIX = "sha256=";
 const STANDARD_WEBHOOK_SIGNATURE_VERSION = "v1,";
 const STANDARD_WEBHOOK_SECRET_PREFIX = "whsec_";
+const STANDARD_WEBHOOK_MINIMUM_KEY_BYTES = 16;
 const SHA256_BYTES = 32;
 
 /** Does not retain the input, secret, or native error. It is safe to show and log. */
@@ -88,8 +89,11 @@ export function verifyWebhookSignature(secret: string, input: WebhookSignatureIn
 function standardWebhookKeys(secret: string): Buffer[] {
   const keys = [Buffer.from(secret, "utf8")];
   if (secret.startsWith(STANDARD_WEBHOOK_SECRET_PREFIX)) {
-    const decoded = Buffer.from(secret.slice(STANDARD_WEBHOOK_SECRET_PREFIX.length), "base64");
-    if (decoded.byteLength > 0) keys.push(decoded);
+    const encoded = secret.slice(STANDARD_WEBHOOK_SECRET_PREFIX.length);
+    const decoded = Buffer.from(encoded, "base64");
+    // Node skips characters that are not base64, so only an exact round trip is the sender's key.
+    if (decoded.byteLength >= STANDARD_WEBHOOK_MINIMUM_KEY_BYTES && decoded.toString("base64") === encoded)
+      keys.push(decoded);
   }
   return keys;
 }

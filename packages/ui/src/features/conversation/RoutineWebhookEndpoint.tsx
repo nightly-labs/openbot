@@ -116,15 +116,6 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
               >
                 <RefreshCw aria-hidden="true" />
               </IconButton>
-              <Show when={props.onUseSenderSecret}>
-                <IconButton
-                  variant="ghost"
-                  label={t("routine.webhook.useSenderSecret")}
-                  onClick={() => setSender({ value: "", pending: false, error: null })}
-                >
-                  <KeyRound aria-hidden="true" />
-                </IconButton>
-              </Show>
             </>
           }
         >
@@ -142,6 +133,16 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
               />
             </>
           )}
+        </Show>
+        {/* A sender such as Composio makes its own secret, so this stays beside a new secret too. */}
+        <Show when={props.onUseSenderSecret}>
+          <IconButton
+            variant="ghost"
+            label={t("routine.webhook.useSenderSecret")}
+            onClick={() => setSender({ value: "", pending: false, error: null })}
+          >
+            <KeyRound aria-hidden="true" />
+          </IconButton>
         </Show>
       </div>
       <Show when={props.secret}>
@@ -170,30 +171,39 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
       />
       <ConfirmDialog
         open={sender() !== null}
-        tone="destructive"
+        tone="default"
+        icon={<KeyRound />}
         title={t("routine.webhook.senderSecretTitle")}
         description={t("routine.webhook.senderSecretDescription")}
         confirmLabel={t("routine.webhook.senderSecretConfirm")}
         cancelLabel={t("common.cancel")}
         pending={sender()?.pending ?? false}
         error={sender()?.error ?? undefined}
-        initialFocus="cancel"
+        initialFocus="field"
         onCancel={() => setSender(null)}
         onConfirm={saveSenderSecret}
       >
-        <Field label={t("routine.webhook.senderSecretLabel")}>
-          <Input
-            type="password"
-            size="sm"
-            autocomplete="off"
-            spellcheck={false}
-            value={sender()?.value ?? ""}
-            onInput={(event) => {
-              const current = sender();
-              if (current) setSender({ ...current, value: event.currentTarget.value });
-            }}
-          />
-        </Field>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void saveSenderSecret();
+          }}
+        >
+          <Field label={t("routine.webhook.senderSecretLabel")}>
+            <Input
+              type="password"
+              size="sm"
+              autocomplete="off"
+              spellcheck={false}
+              disabled={sender()?.pending ?? false}
+              value={sender()?.value ?? ""}
+              onInput={(event) => {
+                const current = sender();
+                if (current) setSender({ ...current, value: event.currentTarget.value });
+              }}
+            />
+          </Field>
+        </form>
       </ConfirmDialog>
     </>
   );

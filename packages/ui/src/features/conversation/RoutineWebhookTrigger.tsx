@@ -107,6 +107,17 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
         });
     },
   );
+  /** The sender's secret is already in the sender, so saving it here finishes step 2. */
+  function senderSecretAction(): ((secret: string) => Promise<void>) | undefined {
+    const action = props.onUseSenderSecret;
+    if (!action) return undefined;
+    return async (secret) => {
+      await action(secret);
+      setSteps((state) => {
+        state.secretCopied = true;
+      });
+    };
+  }
   async function sendTest(): Promise<void> {
     const send = props.onSendTest;
     if (!send || steps.testing) return;
@@ -217,7 +228,7 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
                   secret={props.secret}
                   onSecretDismiss={props.onSecretDismiss}
                   onRegenerateSecret={props.onRegenerateSecret}
-                  onUseSenderSecret={props.onUseSenderSecret}
+                  onUseSenderSecret={senderSecretAction()}
                   onCopy={() =>
                     setSteps((state) => {
                       state.secretCopied = true;
