@@ -302,9 +302,8 @@ export class LocalServers {
     yield* this.#start(entry, false);
   });
 
-  /** Moves the server's database, agents and files to the Trash. */
   /**
-   * A delete from another device answers after the account service removed the server, and fails when
+   * Moves the server's database, agents and files to the Trash. A delete from another device answers after the account service removed the server, and fails when
    * it did not: the device would list the server again. The same delete again then repeats only the
    * account removal, because the server is already gone from this computer.
    */
