@@ -11,9 +11,9 @@ import type { GoogleSignIn, GoogleTokenBroker } from "../backend/google-mcp-sign
 
 /**
  * The "OpenBot Desktop" client (Desktop app, marked for an AI-powered agent) of the Google Cloud
- * project `openbot-a3328`. Its secret is in Signal's `GOOGLE_OAUTH_CLIENTS`.
+ * project 377728991172 (account `admin@synthetify.io`). Its secret is in Signal's `GOOGLE_OAUTH_CLIENTS`.
  */
-const GOOGLE_CLIENT_ID = "1006722609038-u9dutshmpumvkl7tgipiv7gkvd2lnf7n.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "377728991172-kkk4955ok8li6dbav7al3pdu3cs55nft.apps.googleusercontent.com";
 
 /** How this host reaches Signal for a Google token request. */
 export interface GoogleHost {
