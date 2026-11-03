@@ -26,7 +26,7 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** A chat thread with a user message and an answer, the rows that migration 54 must keep. */
+/** A chat thread with a user message and an answer, the rows that migration 55 must keep. */
 function seed(db: DatabaseSync): void {
   db.prepare(`INSERT INTO projection_threads
     (thread_id, agent_id, title, active_turn_id, created_at, updated_at, last_event_sequence)
@@ -71,20 +71,20 @@ function deletedTables(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 54 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 55 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
 }
 
 describe("deleted thread messages migration", () => {
-  it.each(Array.from({ length: 46 }, (_, index) => index + 8))(
+  it.each(Array.from({ length: 47 }, (_, index) => index + 8))(
     "preserves every row from released schema %i",
     (version) => {
       const db = databaseAt(version);
       seed(db);
-      // The earlier migrations run first; the rows after them are what v54 must keep.
-      if (version < 53) migrateUpTo(db, 53);
+      // The earlier migrations run first; the rows after them are what v55 must keep.
+      if (version < 54) migrateUpTo(db, 54);
       const before = contents(db);
       expect(before.projection_thread_messages).toHaveLength(2);
       migrateOpenBotDatabase(db);
@@ -94,15 +94,15 @@ describe("deleted thread messages migration", () => {
   );
 
   it("rolls back the table and the marker after a late failure, then retries", () => {
-    const db = databaseAt(53);
+    const db = databaseAt(54);
     seed(db);
     const before = contents(db);
-    db.exec(`CREATE TEMP TRIGGER fail_marker BEFORE INSERT ON schema_migrations WHEN new.version=54
+    db.exec(`CREATE TEMP TRIGGER fail_marker BEFORE INSERT ON schema_migrations WHEN new.version=55
       BEGIN SELECT RAISE(ABORT, 'late failure'); END;`);
-    expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 54 failed");
+    expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 55 failed");
     expect(contents(db)).toEqual(before);
     expect(deletedTables(db)).toEqual([]);
-    expect(db.prepare("SELECT version FROM schema_migrations WHERE version=54").all()).toEqual([]);
+    expect(db.prepare("SELECT version FROM schema_migrations WHERE version=55").all()).toEqual([]);
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
@@ -111,19 +111,19 @@ describe("deleted thread messages migration", () => {
   });
 
   it("rejects newer and incomplete migration histories before it creates the table", () => {
-    const db = databaseAt(53);
+    const db = databaseAt(54);
     seed(db);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(55,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(56,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=55; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=56; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(deletedTables(db)).toEqual([]);
   });
 
   it("refuses an id of no thread, an empty id or a second record, and goes with its thread", () => {
-    const db = databaseAt(53);
+    const db = databaseAt(54);
     seed(db);
     migrateOpenBotDatabase(db);
     const insert = db.prepare(`INSERT INTO projection_deleted_thread_messages (thread_id, message_id, deleted_at)

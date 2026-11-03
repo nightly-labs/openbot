@@ -144,6 +144,8 @@ export const messages = {
   "chat.marker.unavailableAgent": "Kullanılamayan ajan",
   "chat.marker.openChat": "{name} ile sohbeti aç",
   "chat.marker.openRoutine": "{name} rutinini aç",
+  "chat.marker.openRoutineThread": "Diziyi aç",
+  "chat.marker.openRoutineThreadOf": "{name} mesaj dizisini aç",
   "chat.marker.unavailable": "Kullanılamıyor",
   "chat.marker.contextReset": "Yeni sohbet başlatıldı",
   "chat.marker.instructionsView": "Görüntüle",

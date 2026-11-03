@@ -924,6 +924,27 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return task;
   }
 
+  /** The side thread where a routine runs, made on its first run, as the host does. */
+  function routineTask(agentId: string, routine: { id: string; name: string }): AgentTask {
+    const listed = tasks.get(agentId) ?? [];
+    const existing = listed.find((task) => task.routineId === routine.id);
+    if (existing && !existing.closedAt) return existing;
+    const now = new Date().toISOString();
+    if (existing) {
+      Object.assign(existing, { state: "idle", closedAt: null, updatedAt: now });
+      emitTasks(agentId);
+      return existing;
+    }
+    const task: AgentTask = {
+      ...createTask(agentId, routine.name),
+      origin: "agent",
+      routineId: routine.id,
+    };
+    tasks.set(agentId, [task, ...listed]);
+    emitTasks(agentId);
+    return task;
+  }
+
   /** Runs one mock turn in a task: the user message, a progress line, then a short answer. */
   function runTaskTurn(task: AgentTask, text: string, replyToMessageId: string | null = null): QueuedMessageReceipt {
     if (task.closedAt) throw new Error(sourceText("error.backend.threadArchived"));
@@ -2589,6 +2610,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           input.agentId,
           (routines.get(input.agentId) ?? []).filter((routine) => routine.id !== input.routineId),
         );
+        const thread = tasks.get(input.agentId)?.find((task) => task.routineId === input.routineId);
+        if (thread && !thread.closedAt) {
+          Object.assign(thread, { state: "closed", closedAt: new Date().toISOString() });
+          emitTasks(input.agentId);
+        }
         emitAgentEvent({ type: "routines-changed", agentId: input.agentId });
       },
       testRoutine: async (input) => {
@@ -2611,6 +2637,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           updatedAt: now,
         };
         routineRuns.set(routine.id, [run, ...(routineRuns.get(routine.id) ?? [])]);
+        routineTask(input.agentId, routine);
         emitAgentEvent({ type: "routines-changed", agentId: input.agentId });
         return clone(run);
       },

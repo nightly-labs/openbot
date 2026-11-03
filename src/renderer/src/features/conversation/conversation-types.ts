@@ -473,6 +473,17 @@ export interface ConversationThreads {
   onDeleteMessage?: ((taskId: string, messageId: string) => Promise<void>) | undefined;
   /** Where a side thread came from, when it is a branch. Undefined for a thread that is no branch. */
   branchSource: (task: AgentTask) => ConversationBranchSource | undefined;
+  /**
+   * The action that opens the side thread where a routine runs, by routine id. Undefined when the
+   * list has no open thread of the routine: a host that does not send the routine of a thread, or a
+   * routine that did not run since it got its thread.
+   */
+  routineThread: (routineId: string) => (() => void) | undefined;
+  /**
+   * Opens the side thread where a routine runs, for example after a test run. It reads the list again
+   * when the thread is not in it. Resolves false when the routine has no open thread.
+   */
+  onOpenRoutineThread: (routineId: string) => Promise<boolean>;
   /** The message that a side thread scrolls to once, after a click on "Branched from". */
   focusMessage: { taskId: string; messageId: string; nonce: number } | null;
 }

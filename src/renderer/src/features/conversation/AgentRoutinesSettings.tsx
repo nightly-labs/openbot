@@ -85,7 +85,8 @@ type PendingRoutineExit =
   | "close"
   | "new"
   | { kind: "routine-selection"; routine: RoutineEditorRecord | null; routineName: string }
-  | { kind: "conversation-message"; messageId: string };
+  | { kind: "conversation-message"; messageId: string }
+  | { kind: "routine-thread"; routineId: string };
 
 interface RoutineDraft {
   id: string | null;
@@ -130,6 +131,11 @@ interface AgentRoutinesSettingsProps {
   selectionRequest?: RoutineSelectionRequest | null | undefined;
   onSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   onOpenRun?: ((messageId: string) => void) | undefined;
+  /**
+   * Opens the side thread where the routine runs. Resolves false when the routine has no thread, for
+   * example on a host that runs routines in the agent's own chat.
+   */
+  onOpenThread?: ((routineId: string) => Promise<boolean>) | undefined;
 }
 
 function codeUnitOrder(a: string, b: string): number {
@@ -462,6 +468,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       props.onOpenRun?.(target.messageId);
       return;
     }
+    if (target.kind === "routine-thread") {
+      void props.onOpenThread?.(target.routineId);
+      return;
+    }
     closeEditor();
     if (target.routine) {
       openRoutine(target.routine);
@@ -656,6 +666,8 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       await props.port.test(current.id);
       trackRoutineAction(analytics, "test", current, startedAt, "succeeded");
       await loadRuns(current.id);
+      // The test run runs in the routine's own thread, so the chat shows it there.
+      if (props.onOpenThread) requestExit({ kind: "routine-thread", routineId: current.id });
     } catch (caught) {
       trackRoutineAction(analytics, "test", current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.testFailed")));

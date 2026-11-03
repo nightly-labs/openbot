@@ -10,6 +10,8 @@ import {
   AGENT_THREAD_MIGRATION_SQL,
   AGENT_THREAD_SCHEMA_SQL,
   V48_AGENT_THREAD_BRANCH_COLUMNS_SQL,
+  V54_AGENT_THREAD_ROUTINE_COLUMN_SQL,
+  V54_AGENT_THREAD_ROUTINE_INDEX_SQL,
 } from "./agent-threads/agent-thread-schema";
 import { AGENT_WAIT_SCHEMA_SQL } from "./agent-waits/agent-wait-schema";
 import { BROWSER_PROFILE_SCHEMA_SQL } from "./browser-profiles/browser-profile-schema";
@@ -933,6 +935,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
   },
   {
     version: 54,
+    // Adds one column with no default and an index: no rebuild, so no foreign-key pause and no vacuum.
+    // Every existing thread gets null, which is a thread of no routine, as it was before.
+    up: addAgentThreadRoutine,
+  },
+  {
+    version: 55,
     // Only creates a table, so no foreign-key pause and no vacuum. No message was deleted before it,
     // so the table starts empty and no thread loses a message.
     up: (db) => db.exec(DELETED_THREAD_MESSAGES_SCHEMA_SQL),
@@ -1326,6 +1334,15 @@ function addAgentThreadBranch(db: DatabaseSync): void {
     if (columns.some((existing) => isDynamicRecord(existing) && existing.name === name)) continue;
     db.exec(`ALTER TABLE projection_agent_threads ADD COLUMN ${column}`);
   }
+}
+
+// Migration 54 links a side thread to the routine whose runs go to it.
+function addAgentThreadRoutine(db: DatabaseSync): void {
+  // A development profile that ran this version before it shipped has the column already.
+  const columns = db.prepare("PRAGMA table_info(projection_agent_threads)").all();
+  if (!columns.some((existing) => isDynamicRecord(existing) && existing.name === "routine_id"))
+    db.exec(`ALTER TABLE projection_agent_threads ADD COLUMN ${V54_AGENT_THREAD_ROUTINE_COLUMN_SQL}`);
+  db.exec(V54_AGENT_THREAD_ROUTINE_INDEX_SQL);
 }
 
 // Migration 28 removes the provider CHECK. It rebuilds the table with no guard: every shipped table has the

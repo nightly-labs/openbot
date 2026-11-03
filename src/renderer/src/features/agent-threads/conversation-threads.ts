@@ -182,8 +182,24 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       ? (taskId, messageId) => tasks.deleteTaskMessage(agentId, taskId, messageId)
       : undefined,
     branchSource,
+    routineThread: (routineId) => {
+      const task = routineTask(list, routineId);
+      return task ? () => tabs.open(agentId, task.id) : undefined;
+    },
+    onOpenRoutineThread: async (routineId) => {
+      const listed = () => routineTask(tasks.snapshot(agentId)?.tasks ?? [], routineId);
+      if (!listed()) await tasks.loadTasks(agentId);
+      const task = listed();
+      if (task) tabs.open(agentId, task.id);
+      return task !== undefined;
+    },
     focusMessage: focus && list.some((task) => task.id === focus.taskId) ? focus : null,
   };
+}
+
+/** The open side thread where the routine runs. */
+function routineTask(list: readonly AgentTask[], routineId: string): AgentTask | undefined {
+  return list.find((task) => task.routineId === routineId && task.state !== "closed");
 }
 
 type TaskThread = { agentId: string; threadId: string };

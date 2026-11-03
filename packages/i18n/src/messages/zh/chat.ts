@@ -141,6 +141,8 @@ export const messages = {
   "chat.marker.unavailableAgent": "助手不可用",
   "chat.marker.openChat": "打开与 {name} 的对话",
   "chat.marker.openRoutine": "打开自动化任务 {name}",
+  "chat.marker.openRoutineThread": "打开话题",
+  "chat.marker.openRoutineThreadOf": "打开 {name} 的话题",
   "chat.marker.unavailable": "不可用",
   "chat.marker.contextReset": "已开始新对话",
   "chat.marker.instructionsView": "查看",

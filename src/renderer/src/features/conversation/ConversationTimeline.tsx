@@ -856,6 +856,7 @@ export function ConversationTimeline() {
                                                 )}
                                                 onSelectAgent={props.onSelectAgent}
                                                 onOpenRoutine={openRoutineSettings}
+                                                openRoutineThread={props.threads?.routineThread}
                                                 onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
                                                 onToggleRoutineRun={toggleRoutineRun}
                                                 onToggleAgentMessage={toggleAgentMessage}

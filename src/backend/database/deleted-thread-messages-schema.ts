@@ -1,4 +1,4 @@
-// Shared by migration v54 and the separate new-database schema. IF NOT EXISTS throughout.
+// Shared by migration v55 and the separate new-database schema. IF NOT EXISTS throughout.
 //
 // The messages that a person deleted from a thread. A delete removes the projection row, its
 // attachments and its mailbox copy, but other sources can write the same id again: a full snapshot
