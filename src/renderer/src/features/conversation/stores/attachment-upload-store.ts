@@ -57,5 +57,3 @@ export function createAttachmentUploadStore() {
     },
   };
 }
-
-export type AttachmentUploadStore = ReturnType<typeof createAttachmentUploadStore>;
