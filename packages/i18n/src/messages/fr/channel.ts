@@ -17,6 +17,9 @@ export const messages = {
   "channel.panel.close": "Fermer le panneau du canal",
   "channel.settings.title": "Réglages du canal",
   "channel.settings.memories": "Souvenirs",
+  "channel.settings.isolated": "Garder les souvenirs dans ce canal",
+  "channel.settings.isolatedDescription":
+    "Les agents enregistrent ce qu’ils apprennent ici comme souvenirs du canal. Leurs autres discussions ne les voient pas.",
   "channel.settings.memoryCount": { one: "{count} enregistré", other: "{count} enregistrés" },
   "channel.settings.routines": "Routines",
   "channel.settings.routineCount": { one: "{count} configurée", other: "{count} configurées" },

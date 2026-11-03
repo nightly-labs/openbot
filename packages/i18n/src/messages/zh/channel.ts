@@ -17,6 +17,8 @@ export const messages = {
   "channel.panel.close": "关闭频道面板",
   "channel.settings.title": "频道设置",
   "channel.settings.memories": "记忆",
+  "channel.settings.isolated": "将记忆保留在此频道",
+  "channel.settings.isolatedDescription": "智能体在此学到的内容会保存为频道记忆，它们的其他聊天看不到这些内容。",
   "channel.settings.memoryCount": { one: "已保存 {count} 条", other: "已保存 {count} 条" },
   "channel.settings.routines": "自动化任务",
   "channel.settings.routineCount": { one: "已配置 {count} 个", other: "已配置 {count} 个" },

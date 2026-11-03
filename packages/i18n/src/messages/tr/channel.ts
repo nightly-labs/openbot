@@ -17,6 +17,9 @@ export const messages = {
   "channel.panel.close": "Kanal panelini kapat",
   "channel.settings.title": "Kanal ayarları",
   "channel.settings.memories": "Bellekler",
+  "channel.settings.isolated": "Bellekleri bu kanalda tut",
+  "channel.settings.isolatedDescription":
+    "Ajanlar burada öğrendiklerini kanal belleği olarak kaydeder. Diğer sohbetleri bunları görmez.",
   "channel.settings.memoryCount": { one: "{count} kayıtlı", other: "{count} kayıtlı" },
   "channel.settings.routines": "Rutinler",
   "channel.settings.routineCount": { one: "{count} yapılandırılmış", other: "{count} yapılandırılmış" },
