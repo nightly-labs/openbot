@@ -124,6 +124,8 @@ export function isGoogleConnectionPage(value: string): boolean {
     if (value.length > 8192) return false;
     const page = new URL(value),
       callback = new URL(page.searchParams.get("redirect_uri") ?? "");
+    const keys = [...page.searchParams.keys()];
+    if (new Set(keys).size !== keys.length) return false;
     const scopes = new Set((page.searchParams.get("scope") ?? "").split(" "));
     const required = ["gmail.readonly", "gmail.send", "calendar.calendarlist.readonly", "calendar.events"].map(
       (s) => `https://www.googleapis.com/auth/${s}`,

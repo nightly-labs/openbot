@@ -214,7 +214,7 @@ async function googleCall(path: string, token: string, body: unknown = {}) {
   const response = await call(path, token, body);
   return { status: response.status, body: codec.response(response.status, response.body) };
 }
-async function connected(token: string, email: string, profileId: string | null = null) {
+async function connected(token: string, email: string, profileId: string | null = null, expected = true) {
   await writeFile(join(googleHome, "next-email"), email);
   const started = await call(R.start, token, { profileId });
   assert.equal(started.status, 200);
@@ -233,7 +233,8 @@ async function connected(token: string, email: string, profileId: string | null 
   await attempt.done;
   const finished = await call(R.status, token, { flowId });
   assert.equal(finished.status, 200);
-  assert.deepEqual(finished.body.result, { toolCount: 0, error: null });
+  if (expected) assert.deepEqual(finished.body.result, { toolCount: 0, error: null });
+  else assert.ok(finished.body.result.error);
   return { id, flowId };
 }
 try {
@@ -276,7 +277,7 @@ try {
  import {createServer} from 'node:http';import {readFile,mkdir,writeFile} from 'node:fs/promises';import {join} from 'node:path';import {randomBytes} from 'node:crypto';
  const home=process.env.OPENBOT_GOOGLE_HOME;const profile=process.argv[process.argv.indexOf('--profile')+1];const file=process.argv[process.argv.indexOf('--client')+1];const client=JSON.parse(await readFile(file,'utf8')).installed;const email=await readFile(join(home,'next-email'),'utf8');const state=randomBytes(32).toString('hex');
  const server=createServer(async(req,res)=>{const u=new URL(req.url,'http://localhost');if(u.searchParams.get('state')!==state){res.writeHead(400).end();return;}await mkdir(join(home,profile),{recursive:true,mode:0o700});await writeFile(join(home,profile,'credentials.json'),JSON.stringify({clientId:client.client_id,clientSecret:client.client_secret,email,tokens:{refresh_token:'fixture-private-refresh'}}),{mode:0o600});res.end('Connected');server.close();});
- server.listen(0,'127.0.0.1',()=>{const u=new URL('https://accounts.google.com/o/oauth2/v2/auth');u.search=new URLSearchParams({client_id:client.client_id,response_type:'code',redirect_uri:'http://127.0.0.1:'+server.address().port+'/oauth/callback',code_challenge_method:'S256',code_challenge:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',state,scope:['gmail.readonly','gmail.send','calendar.calendarlist.readonly','calendar.events',...(email==='unexpected-scope@example.com'?['drive']:[])].map(s=>'https://www.googleapis.com/auth/'+s).join(' ')}).toString();process.stderr.write(u.toString()+'\\n');});
+ server.listen(0,'127.0.0.1',()=>{const u=new URL('https://accounts.google.com/o/oauth2/v2/auth');u.search=new URLSearchParams({client_id:client.client_id,response_type:'code',redirect_uri:'http://127.0.0.1:'+server.address().port+'/oauth/callback',code_challenge_method:'S256',code_challenge:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',state,scope:['gmail.readonly','gmail.send','calendar.calendarlist.readonly','calendar.events',...(email==='unexpected-scope@example.com'?['drive']:[])].map(s=>'https://www.googleapis.com/auth/'+s).join(' ')}).toString();if(email==='duplicate-scope@example.com')u.searchParams.append('scope','https://www.googleapis.com/auth/drive');process.stderr.write(u.toString()+'\\n');});
  `,
   );
   const identity = team.getIdentity();
@@ -496,6 +497,9 @@ try {
   report.steps.push(
     "A Google-looking page that asks for an extra Drive permission is rejected before it can open or relay a grant.",
   );
+  await writeFile(join(googleHome, "next-email"), "duplicate-scope@example.com");
+  assert.equal((await call(R.start, stranger, { profileId: null })).status, 400);
+  report.steps.push("Duplicate OAuth parameters cannot hide another scope behind the approved scope value.");
   // Wrong callback state never reaches the owned listener; cancellation stops that process.
   await writeFile(join(googleHome, "next-email"), "cancel@example.com");
   const pending = await call(R.start, stranger, { profileId: null });
@@ -515,6 +519,13 @@ try {
   );
   report.steps.push(
     "A mismatched OAuth state is refused before replay; cancel stops its real owned process and removes the temporary client file.",
+  );
+  assert.equal((await call(R.disconnect, britt, { profileId: profile.id })).status, 200);
+  await connected(britt, "different-google-account@example.com", profile.id, false);
+  assert.equal(store.read().profiles.find((p) => p.id === profile.id)?.email, "britt@example.com");
+  await assert.rejects(stat(join(googleHome, profile.id, "credentials.json")));
+  report.steps.push(
+    "Reconnecting a bound profile with another Google account leaves it disconnected and removes that account's grant.",
   );
   report.passed = true;
 } finally {
