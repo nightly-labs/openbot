@@ -494,8 +494,11 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   function showSidebarFile(file: SidebarFilePreview, place: FileTabPlace) {
     const { ownerAgentId, source } = file;
     const key = filePreviewKey(source);
-    if (place === "open" && !(panels.side[ownerAgentId] ?? SIDE_PANEL_EMPTY).files.some((item) => item.key === key))
+    if (place === "open" && !(panels.side[ownerAgentId] ?? SIDE_PANEL_EMPTY).files.some((item) => item.key === key)) {
+      // The tab closed during the read. No panel shows the page, so main must not keep it.
+      releaseFilePreviewPage(file.preview?.pageUrl);
       return;
+    }
     const tab: SidePanelFile = {
       key,
       name: file.directory?.name ?? file.preview?.name ?? key,
