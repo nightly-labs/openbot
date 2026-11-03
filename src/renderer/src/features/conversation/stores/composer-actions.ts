@@ -30,6 +30,7 @@ import {
   copyComposerDraft,
   EMPTY_DRAFT,
   insertAtSelection,
+  insertPastedText,
   QUEUE_EDIT_STORAGE_KEY,
   type StoredQueueEdit,
 } from "../composer-draft";
@@ -312,10 +313,15 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     return accepted;
   }
 
+  /**
+   * Imports pasted files and puts their references at the selection. `text` is the text of a long paste
+   * that `files` holds: when no file comes, that text goes at the selection, so the paste loses nothing.
+   */
   async function pasteFiles(
     files: ReadonlyArray<File | Promise<File>>,
     selection: ComposerSelection,
     copy?: Pick<PastedComposerCopy, "text" | "sourceIds">,
+    text?: string,
   ): Promise<ComposerPasteResult | undefined> {
     const target = deps.currentTarget();
     if (!target || deps.submitting()) return;
@@ -327,6 +333,15 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       const result = insertAtSelection((deps.drafts()[key] ?? EMPTY_DRAFT).text, text, { before, selection });
       if (result.value.length > INPUT_LIMITS.messageText) return;
       deps.setDrafts((drafts) => ({ ...drafts, [key]: { ...(drafts[key] ?? EMPTY_DRAFT), text: result.value } }));
+      return result;
+    };
+    // When no file comes, the text of a copy comes with their names, as in another app.
+    const fallback = (): ComposerPasteResult | undefined => {
+      if (copy?.text) return insert(expandAttachmentReferences(copy.text));
+      if (text === undefined) return;
+      const result = insertPastedText((deps.drafts()[key] ?? EMPTY_DRAFT).text, text, { before, selection });
+      if (result)
+        deps.setDrafts((drafts) => ({ ...drafts, [key]: { ...(drafts[key] ?? EMPTY_DRAFT), text: result.value } }));
       return result;
     };
     const requestId = crypto.randomUUID();
@@ -343,25 +358,27 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         previews.onAccepted,
       );
       const accepted = await addAttachments(imported, target);
-      // The draft refused the files and shows why. The text of a copy still comes, with their names.
-      if (!accepted.length) return copy?.text ? insert(expandAttachmentReferences(copy.text)) : undefined;
+      // The draft refused the files and shows why. The pasted text still comes.
+      if (!accepted.length) return fallback();
       const replacements = new Map((copy?.sourceIds ?? []).map((id, index) => [id, accepted[index]]));
       // Each file goes in the text where it was pasted. An image also shows in the thumbnail row.
-      const text =
+      const inserted =
         copy === undefined
           ? accepted.map((attachment) => serializeAttachmentReference(attachment.name, attachment.id)).join(" ")
           : rewriteAttachmentReferences(copy.text, (reference) => {
               const attachment = replacements.get(reference.attachmentId);
               return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
             });
-      const result = insert(text);
-      // The files stay in the row, so a paste that does not fit loses no file.
-      if (!result) throw new Error(t("error.agent.messageTooLong"));
-      return result;
+      const result = insert(inserted);
+      if (result) return result;
+      // The files stay in the row, so a paste that does not fit loses no file. The text of a long paste
+      // is in its file, so it does not also go in the message.
+      if (text === undefined) throw new Error(t("error.agent.messageTooLong"));
+      deps.setConversationError(target, t("error.agent.messageTooLong"));
+      return;
     } catch (error) {
       deps.setConversationError(target, errorMessage(error, t("composer.error.keepAttachments")));
-      // When the files of a copy cannot come, its text comes with their names, as in another app.
-      return copy?.text ? insert(expandAttachmentReferences(copy.text)) : undefined;
+      return fallback();
     } finally {
       previews.stop();
       deps.attachmentImports.delete(requestId);
