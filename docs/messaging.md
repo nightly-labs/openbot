@@ -343,8 +343,9 @@ while this computer has no Signal connection is lost, except for a hosted server
   server connects. A message older than one day gets no answer.
 - WhatsApp has one session per linked device. A second OpenBot profile that opens the same store
   stops with "locked"; link it as its own device.
-- A WhatsApp number is managed only on the computer that runs the agents. A joined server and the
-  phone app show no WhatsApp page.
+- An owner or admin of a joined server links and manages the host's numbers from their own computer
+  or the browser client (`whatsapp-connector-v1`). The host's session gets the QR code or the pairing
+  code, and the client shows it. The phone app shows no WhatsApp page.
 
 ## Adding a platform
 

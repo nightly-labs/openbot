@@ -3,6 +3,7 @@
 // mailbox and the browser are small in-memory stand-ins that record each call, so a check can show
 // that a refused request did not reach them. The checks cover the protocol and auth gates, sign-in
 // and account tickets, the admin-only routes, the host's Bitwarden connection over a fake `bw`, the
+// host's WhatsApp numbers over a stand-in messaging service (`whatsapp-connector-v1`), the
 // host's Vault (`vault-v1`, its API keys through `vault-v2`, and the CSV import of `vault-import-v1`)
 // over the real service and store,
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
@@ -33,10 +34,14 @@ import {
   type CustomProviderResult,
   type CustomProviderSummary,
   DEFAULT_AGENT_DEFAULTS,
+  decodeHostWhatsAppLinkState,
+  decodeHostWhatsAppOverview,
   type HiddenAgentsSnapshot,
   type QueueSnapshot,
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
+  type WhatsAppAccount,
+  type WhatsAppLinkState,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -141,6 +146,11 @@ import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbo
 import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
+import {
+  WHATSAPP_CONNECTOR_CAPABILITY,
+  WHATSAPP_CONNECTOR_CODECS,
+  WHATSAPP_CONNECTOR_ROUTES,
+} from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
@@ -170,6 +180,7 @@ import type {
   TeamApiAgents,
   TeamApiAgentTasks,
   TeamApiBrowser,
+  TeamApiConnectors,
   TeamApiMailbox,
 } from "../src/main/team-api/dependencies";
 import { isPeerHiddenProvider } from "../src/main/team-api/provider-visibility";
@@ -716,6 +727,123 @@ const createBitwardenHost = () =>
     },
   });
 const bitwardenConnector = createBitwardenHost();
+// The host's WhatsApp numbers (`whatsapp-connector-v1`): an in-memory stand-in for the messaging
+// service that records each call. The other connector routes are not part of this run.
+const WHATSAPP_NUMBER = "48600100200";
+const whatsappAccount: WhatsAppAccount = {
+  workspaceId: WHATSAPP_NUMBER,
+  ownNumber: true,
+  allowedSenders: [],
+  pendingRequests: [{ code: "K7Q2ZP", senderId: "48600100400", name: "Ola", expiresAt: "2026-11-03T21:00:00.000Z" }],
+};
+/** The link of the stand-in fails with this error, or waits while it is null. */
+let whatsappLinkError: WhatsAppLinkState["error"] = null;
+const whatsappMessaging: TeamApiConnectors["messaging"] = {
+  slackOverview: unused("slackOverview"),
+  discordOverview: unused("discordOverview"),
+  telegramOverview: unused("telegramOverview"),
+  connectSlackWorkspace: unused("connectSlackWorkspace"),
+  connectDiscordGuild: unused("connectDiscordGuild"),
+  connectTelegramChat: unused("connectTelegramChat"),
+  completeSlackWorkspace: unused("completeSlackWorkspace"),
+  completeDiscordGuild: unused("completeDiscordGuild"),
+  disconnectSlackWorkspace: unused("disconnectSlackWorkspace"),
+  disconnectDiscordGuild: unused("disconnectDiscordGuild"),
+  disconnectTelegramChat: unused("disconnectTelegramChat"),
+  addOrchestrator: unused("addOrchestrator"),
+  addTelegramOrchestrator: unused("addTelegramOrchestrator"),
+  discordAccess: unused("discordAccess"),
+  listDiscordRoles: unused("listDiscordRoles"),
+  setDiscordAccess: unused("setDiscordAccess"),
+  reconnect: (platform, workspaceId, opensPage) =>
+    Effect.sync(() => {
+      record("whatsapp.reconnect", platform, workspaceId, opensPage);
+      return null;
+    }),
+  setEnabled: (platform, workspaceId, enabled) =>
+    Effect.sync(() => record("whatsapp.setEnabled", platform, workspaceId, enabled)),
+  whatsappOverview: () => {
+    record("whatsapp.overview");
+    return {
+      connections: [
+        {
+          workspaceId: WHATSAPP_NUMBER,
+          platform: "whatsapp",
+          enabled: true,
+          state: "connected",
+          workspaceName: "+48 600 100 200",
+          botUserId: `${WHATSAPP_NUMBER}:3@s.whatsapp.net`,
+          missingScopes: [],
+          retryAt: null,
+          credentials: "saved",
+          orchestratorAgentId: null,
+        },
+      ],
+      accounts: [structuredClone(whatsappAccount)],
+    };
+  },
+  whatsappLinkState: () => {
+    record("whatsapp.linkState");
+    return {
+      status: whatsappLinkError ? "failed" : "waiting",
+      qr: whatsappLinkError ? null : "2@e2e-qr-ref,e2e-noise-key,e2e-identity-key,e2e-adv-secret",
+      code: null,
+      workspaceId: null,
+      error: whatsappLinkError,
+    };
+  },
+  startWhatsAppLink: (input) =>
+    Effect.sync(() => {
+      record("whatsapp.startLink", input);
+      return {
+        status: "waiting",
+        qr: input.method === "qr" ? "2@e2e-qr-ref,e2e-noise-key,e2e-identity-key,e2e-adv-secret" : null,
+        code: input.method === "code" ? "E2EPAIR1" : null,
+        workspaceId: null,
+        error: null,
+      };
+    }),
+  cancelWhatsAppLink: () => Effect.sync(() => record("whatsapp.cancelLink")),
+  disconnectWhatsAppNumber: (workspaceId) => Effect.sync(() => record("whatsapp.disconnect", workspaceId)),
+  addWhatsAppOrchestrator: (input) =>
+    Effect.sync(() => {
+      record("whatsapp.addOrchestrator", input);
+      return { agentId: "agent-whatsapp-orchestrator", sectionId: "section-integrations" };
+    }),
+  listWhatsAppGroups: (workspaceId) =>
+    Effect.sync(() => {
+      record("whatsapp.groups", workspaceId);
+      return { groups: [{ id: "120363000000000001@g.us", name: "Family" }] };
+    }),
+  addWhatsAppSender: (workspaceId, sender) =>
+    Effect.sync(() => {
+      record("whatsapp.addSender", workspaceId, sender);
+      whatsappAccount.allowedSenders.push(sender);
+    }),
+  removeWhatsAppSender: (workspaceId, senderId) =>
+    Effect.sync(() => {
+      record("whatsapp.removeSender", workspaceId, senderId);
+      whatsappAccount.allowedSenders = whatsappAccount.allowedSenders.filter((sender) => sender.id !== senderId);
+    }),
+  answerWhatsAppRequest: (workspaceId, code, approve) =>
+    Effect.sync(() => record("whatsapp.answerRequest", workspaceId, code, approve)),
+  setWhatsAppOwnNumber: (workspaceId, ownNumber) =>
+    Effect.sync(() => {
+      record("whatsapp.setOwnNumber", workspaceId, ownNumber);
+      whatsappAccount.ownNumber = ownNumber;
+    }),
+};
+const connectors: TeamApiConnectors = {
+  github: {
+    status: unused("github.status"),
+    pages: unused("github.pages"),
+    connect: unused("github.connect"),
+    cancel: unused("github.cancel"),
+    disconnect: unused("github.disconnect"),
+    repositories: unused("github.repositories"),
+  },
+  messaging: whatsappMessaging,
+};
 // The host's Vault: the real service and store, over the same reversible cipher.
 const vaultFile = join(root, "openbot-vault-v1.json");
 const vault = new VaultService({ store: new VaultStore(vaultFile, fakeCipher), canPersist: () => true });
@@ -1068,6 +1196,7 @@ try {
       },
     },
     bitwardenConnector,
+    connectors,
     vault,
     browserProfiles,
     machine,
@@ -4594,6 +4723,197 @@ try {
         !existsSync(bitwardenData) &&
         !bitwardenConnector.connected(),
       summary(disconnect),
+    );
+  }
+
+  // ---- WhatsApp numbers on the host (whatsapp-connector-v1) ----
+  {
+    const v9 = { capabilities: [WHATSAPP_CONNECTOR_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const whatsappCalls = () => calls.filter((entry) => entry.method.startsWith("whatsapp."));
+    /** The answer as the client reads it: the frozen codec, then the client's decoder. */
+    const asClient = <T>(route: string, reply: Reply, decode: (value: unknown) => T): T => {
+      const codec = WHATSAPP_CONNECTOR_CODECS.get(route);
+      assert(codec, route);
+      return decode(codec.response(reply.status, reply.body));
+    };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises whatsapp-connector-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(WHATSAPP_CONNECTOR_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(WHATSAPP_CONNECTOR_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", WHATSAPP_CONNECTOR_ROUTES.overview, {
+      token: adaToken,
+      json: {},
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const memberOverview = await call("POST", WHATSAPP_CONNECTOR_ROUTES.overview, { token: bobToken, json: {}, ...v9 });
+    const memberLink = await call("POST", WHATSAPP_CONNECTOR_ROUTES.linkStart, {
+      token: bobToken,
+      json: { method: "qr", phoneNumber: null, ownNumber: true },
+      ...v9,
+    });
+    check(
+      "a client without the capability gets 400, and a member cannot read or link the host's numbers",
+      errorIs(unsupported, 400, sourceText("error.team.connectorsUnsupported")) &&
+        errorIs(memberOverview, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberLink, 403, sourceText("error.team.adminRequired")) &&
+        whatsappCalls().length === 0,
+      [summary(unsupported), summary(memberOverview), summary(memberLink)],
+    );
+    const overview = await call("POST", WHATSAPP_CONNECTOR_ROUTES.overview, { token: adaToken, json: {}, ...v9 });
+    const read = asClient(WHATSAPP_CONNECTOR_ROUTES.overview, overview, decodeHostWhatsAppOverview);
+    check(
+      "an admin reads the host's numbers, their senders and their pairing requests",
+      overview.status === 200 &&
+        read.connections.length === 1 &&
+        read.connections[0]?.workspaceId === WHATSAPP_NUMBER &&
+        read.connections[0]?.state === "connected" &&
+        read.accounts[0]?.ownNumber === true &&
+        read.accounts[0]?.pendingRequests[0]?.code === "K7Q2ZP",
+      summary(overview),
+    );
+    const qr = await call("POST", WHATSAPP_CONNECTOR_ROUTES.linkStart, {
+      token: adaToken,
+      json: { method: "qr", phoneNumber: null, ownNumber: false },
+      ...v9,
+    });
+    const badPhone = await call("POST", WHATSAPP_CONNECTOR_ROUTES.linkStart, {
+      token: adaToken,
+      json: { method: "code", phoneNumber: "not a number", ownNumber: true },
+      ...v9,
+    });
+    const code = await call("POST", WHATSAPP_CONNECTOR_ROUTES.linkStart, {
+      token: adaToken,
+      json: { method: "code", phoneNumber: "+48 (600) 100-200", ownNumber: true },
+      ...v9,
+    });
+    const qrState = asClient(WHATSAPP_CONNECTOR_ROUTES.linkStart, qr, decodeHostWhatsAppLinkState);
+    const codeState = asClient(WHATSAPP_CONNECTOR_ROUTES.linkStart, code, decodeHostWhatsAppLinkState);
+    check(
+      "a link answers the host's QR code or pairing code; a phone number that is not one is refused before the host links",
+      qrState.status === "waiting" &&
+        qrState.qr?.startsWith("2@") === true &&
+        codeState.code === "E2EPAIR1" &&
+        badPhone.status === 400 &&
+        isDeepStrictEqual(callsOf("whatsapp.startLink"), [
+          [{ method: "qr", phoneNumber: null, ownNumber: false }],
+          [{ method: "code", phoneNumber: WHATSAPP_NUMBER, ownNumber: true }],
+        ]),
+      [summary(qr), summary(badPhone), summary(code)],
+    );
+    whatsappLinkError = "timeout";
+    const failed = await call("POST", WHATSAPP_CONNECTOR_ROUTES.linkState, { token: adaToken, json: {}, ...v9 });
+    whatsappLinkError = null;
+    const cancel = await call("POST", WHATSAPP_CONNECTOR_ROUTES.linkCancel, { token: adaToken, json: {}, ...v9 });
+    const failedState = asClient(WHATSAPP_CONNECTOR_ROUTES.linkState, failed, decodeHostWhatsAppLinkState);
+    // A later host can name a link error that this build does not know; the wire carries it as text.
+    const laterState = asClient(
+      WHATSAPP_CONNECTOR_ROUTES.linkState,
+      { ...failed, body: isDynamicRecord(failed.body) ? { ...failed.body, error: "rate_limited" } : null },
+      decodeHostWhatsAppLinkState,
+    );
+    check(
+      "a failed link reads its error, a later host's unknown error reads as unavailable, and a cancel reaches the host",
+      failedState.status === "failed" &&
+        failedState.error === "timeout" &&
+        laterState.error === "unavailable" &&
+        cancel.status === 200 &&
+        callsOf("whatsapp.cancelLink").length === 1,
+      [summary(failed), summary(cancel)],
+    );
+    const addContact = await call("POST", WHATSAPP_CONNECTOR_ROUTES.senderAdd, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, sender: { id: "+48 600 100 300", kind: "contact", name: " " } },
+      ...v9,
+    });
+    const badGroup = await call("POST", WHATSAPP_CONNECTOR_ROUTES.senderAdd, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, sender: { id: "family", kind: "group", name: "Family" } },
+      ...v9,
+    });
+    const groups = await call("POST", WHATSAPP_CONNECTOR_ROUTES.groups, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER },
+      ...v9,
+    });
+    const removeContact = await call("POST", WHATSAPP_CONNECTOR_ROUTES.senderRemove, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, senderId: "48600100300" },
+      ...v9,
+    });
+    check(
+      "an admin adds a contact in digits, lists the groups and removes the contact; a group id that is not one is refused",
+      addContact.status === 200 &&
+        badGroup.status === 400 &&
+        isDeepStrictEqual(callsOf("whatsapp.addSender"), [
+          [WHATSAPP_NUMBER, { id: "48600100300", kind: "contact", name: "48600100300" }],
+        ]) &&
+        isDeepStrictEqual(field(groups.body, "groups"), [{ id: "120363000000000001@g.us", name: "Family" }]) &&
+        removeContact.status === 200 &&
+        whatsappAccount.allowedSenders.length === 0,
+      [summary(addContact), summary(badGroup), summary(groups), summary(removeContact)],
+    );
+    const badCode = await call("POST", WHATSAPP_CONNECTOR_ROUTES.requestAnswer, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, code: "??", approve: true },
+      ...v9,
+    });
+    const answer = await call("POST", WHATSAPP_CONNECTOR_ROUTES.requestAnswer, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, code: "k7q2zp", approve: true },
+      ...v9,
+    });
+    const ownNumber = await call("POST", WHATSAPP_CONNECTOR_ROUTES.ownNumber, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, ownNumber: false },
+      ...v9,
+    });
+    const orchestrator = await call("POST", WHATSAPP_CONNECTOR_ROUTES.orchestrator, {
+      token: adaToken,
+      json: {},
+      ...v9,
+    });
+    check(
+      "an admin answers a pairing request, sets the number kind and adds the orchestrator on the host's default model",
+      badCode.status === 400 &&
+        answer.status === 200 &&
+        isDeepStrictEqual(callsOf("whatsapp.answerRequest"), [[WHATSAPP_NUMBER, "K7Q2ZP", true]]) &&
+        ownNumber.status === 200 &&
+        whatsappAccount.ownNumber === false &&
+        isDeepStrictEqual(orchestrator.body, {
+          agentId: "agent-whatsapp-orchestrator",
+          sectionId: "section-integrations",
+        }) &&
+        isDeepStrictEqual(callsOf("whatsapp.addOrchestrator"), [[{}]]),
+      [summary(badCode), summary(answer), summary(ownNumber), summary(orchestrator)],
+    );
+    const pause = await call("POST", WHATSAPP_CONNECTOR_ROUTES.enabled, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, enabled: false },
+      ...v9,
+    });
+    const reconnect = await call("POST", WHATSAPP_CONNECTOR_ROUTES.reconnect, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER },
+      ...v9,
+    });
+    const disconnect = await call("POST", WHATSAPP_CONNECTOR_ROUTES.disconnect, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER },
+      ...v9,
+    });
+    check(
+      "an admin pauses, reconnects and disconnects a number of the host",
+      pause.status === 200 &&
+        reconnect.status === 200 &&
+        disconnect.status === 200 &&
+        isDeepStrictEqual(callsOf("whatsapp.setEnabled"), [["whatsapp", WHATSAPP_NUMBER, false]]) &&
+        isDeepStrictEqual(callsOf("whatsapp.reconnect"), [["whatsapp", WHATSAPP_NUMBER, false]]) &&
+        isDeepStrictEqual(callsOf("whatsapp.disconnect"), [[WHATSAPP_NUMBER]]),
+      [summary(pause), summary(reconnect), summary(disconnect)],
     );
   }
 

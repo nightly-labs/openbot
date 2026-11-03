@@ -82,8 +82,10 @@ export const WHATSAPP_LINK_IDLE: WhatsAppLinkState = {
 };
 
 export interface WhatsAppIntegrationPanelProps extends IntegrationPageSlots {
-  /** Every agent on this computer. */
+  /** Every agent on the server. */
   agents: WhatsAppIntegrationAgent[];
+  /** The joined server whose numbers these are. Absent: this computer. */
+  hostName?: string | undefined;
   /** The linked WhatsApp numbers. */
   connections: MessagingConnection[];
   /** The settings of each linked number, by `workspaceId`. */
@@ -149,6 +151,12 @@ const WHATSAPP_TEXT = {
   removeEffectDeleted: "connector.whatsapp.removeEffectDeleted",
   keep: "connector.whatsapp.keep",
   close: "connector.whatsapp.close",
+} as const satisfies ChannelText;
+
+/** On a joined server, the numbers link the host, not this computer. */
+const WHATSAPP_HOST_TEXT = {
+  ...WHATSAPP_TEXT,
+  description: "connector.whatsapp.descriptionHost",
 } as const satisfies ChannelText;
 
 const STATE_HELP: Partial<Record<MessagingConnection["state"], AppTextKey>> = {
@@ -241,7 +249,10 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
       return t("connector.whatsapp.retryAt", {
         time: format.date(new Date(connection.retryAt), { hour: "numeric", minute: "2-digit" }),
       });
-    const help = STATE_HELP[connection.state];
+    const help =
+      connection.state === "invalid_token" && props.hostName
+        ? "connector.whatsapp.helpLoggedOutHost"
+        : STATE_HELP[connection.state];
     if (help) return t(help);
     return account(connection.workspaceId)?.ownNumber === false
       ? t("connector.whatsapp.dedicatedNote")
@@ -267,7 +278,7 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
 
   return (
     <ChannelPage
-      text={WHATSAPP_TEXT}
+      text={props.hostName ? WHATSAPP_HOST_TEXT : WHATSAPP_TEXT}
       logo={<WhatsAppMark />}
       state={whatsappIntegrationState(props.connections, props.agents, props.loadError)}
       connections={props.connections}
@@ -387,6 +398,7 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
         busy={props.busy}
         models={props.models}
         link={props.link}
+        host={props.hostName !== undefined}
         onStartLink={props.onStartLink}
         onAddOrchestrator={props.onAddOrchestrator}
         onClose={closeDialog}
@@ -846,6 +858,8 @@ export function WhatsAppLinkDialog(props: {
   busy: boolean;
   models?: WhatsAppOrchestratorModels | undefined;
   link: WhatsAppLinkState;
+  /** True for a joined server: the phone links the host. */
+  host?: boolean | undefined;
   onStartLink: (input: StartWhatsAppLinkInput) => void;
   onAddOrchestrator: (choice: WhatsAppOrchestratorChoice | null) => void;
   onClose: () => void;
@@ -915,7 +929,12 @@ export function WhatsAppLinkDialog(props: {
   const copy = () => {
     switch (step()) {
       case 0:
-        return { title: t("connector.whatsapp.connectTitle"), description: t("connector.whatsapp.connectDescription") };
+        return {
+          title: t("connector.whatsapp.connectTitle"),
+          description: t(
+            props.host ? "connector.whatsapp.connectDescriptionHost" : "connector.whatsapp.connectDescription",
+          ),
+        };
       case 1:
         return {
           title: t("connector.whatsapp.agentStepTitle"),
