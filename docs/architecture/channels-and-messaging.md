@@ -83,8 +83,12 @@ computer had input in the last 30 seconds (`powerMonitor.getSystemIdleState`), a
 the window of the host's own desktop app has focus or shows the event as a desktop notification, for
 the owner (`desktopShowsAgentEvent`: desktop notifications on, and the mute and the level of this
 computer's server let the event through); or the member sent, answered, or typed from another session in the last 30
-seconds (`TeamApiServer.lastMemberUseElsewhere`, kept in memory). The time is short because a task
-can end at any time after the member leaves the computer. While the phone shows a Live Activity of
+seconds (`TeamApiServer.lastMemberUseElsewhere`, kept in memory); or the computer of the member's
+desktop app had input, in any app, in the last 30 seconds (`computer-activity-v1`, see
+[servers](servers.md#computer-activity)). The time is short because a task can end at any time after
+the member leaves the computer. An unpackaged app reads another time in whole seconds from
+`OPENBOT_DEV_AWAY_SECONDS`, for the host and for the desktop that reports its input, so a check
+need not wait 30 seconds. While the phone shows a Live Activity of
 this host that iOS still updates (8 hours from its start, which the phone gives because a host that
 restarted does not know it), and the next view of the activity shows the event, the host sends no
 notification (`LiveActivityPushService.showsEvent`). The view shows one item, so a reply while

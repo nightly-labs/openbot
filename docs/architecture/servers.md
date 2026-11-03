@@ -470,6 +470,27 @@ not stop the phone's push notifications. A ping moves `lastClientUseAt` only for
 later of the last user action of its session and the start of its focus period. The route is in `PASSIVE_ROUTES`, so the generic client use path
 does not count it. See [hosted servers](../hosted-servers.md) step 5.
 
+### Computer activity
+
+`computer-activity-v1` adds `POST /v1/client/activity` with `{ idleSeconds }`, the whole seconds since
+the last keyboard or mouse input on the computer of a desktop app, in any app. The host answers
+`{ phones }`: whether it sends notifications to a phone of the calling member. A host advertises it
+when it sends phone notifications (`pushNotifications` in `TeamApiOptions`), and the capability is v9
+only. `PushNotificationService.computerInput` keeps the input time of each session in memory, for the
+away time only, and a phone of the same member stays quiet until that time passes, as after a send
+from another session. The route is in `PASSIVE_ROUTES`: input on a computer does not keep a hosted
+server running.
+
+The desktop main process sends it through `ComputerActivityReport`, owned by `RemoteServerManager`. It
+reads `powerMonitor.getSystemIdleTime` each sixth of the away time (at most 5 seconds, at least 1) and
+tells each joined server that is online, advertises the capability, and whose events the desktop shows
+now: a focused main or chat window, or desktop notifications on with the server not muted and its level
+not "Nothing". It sends only when there was input after its last send, so the last send after the
+member leaves gives the time of the last input. A host that answers `phones: false` is not told again
+for 5 minutes, so a host without a phone of the member does not learn when the member is at the
+computer. The web client cannot read the idle time of the computer and does not send it. The owner of
+the host computer needs no report: the host reads `powerMonitor` itself (`hostComputerInUse`).
+
 ### Admin capabilities
 
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.
