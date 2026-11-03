@@ -32,13 +32,15 @@ both and plug in OpenBot's clean-room Signal module (`../../src/signal`, see `..
 | `src/index.ts` | Exports `Signal/lid-mapping` (`LIDMappingStore`). |
 | `src/Utils/messages-media.ts` | `Crypto.Decipheriv` in place of `Crypto.Decipher`, which `@types/node` 24 removed. |
 | `src/Types/optional-modules.d.ts` | New: declares the optional `link-preview-js`, which OpenBot does not install. |
+| `src/Socket/socket.ts` | Handles `companion_reg_refresh`, which WhatsApp sends after the phone scans the code since July 2026: before a link, a new adv secret and the same code drawn again. Each code reads the adv secret when it is drawn. Upstream issue #2737, open PR #2765. Without it, the phone shows "Couldn't link device". |
+| `src/Socket/messages-recv.ts` | `sendMessageAck` reads `creds.me?.id`, so a node before the link (such as `companion_reg_refresh`) gets its ack. Upstream issue #2738, PR #2749. |
 
 ## Updating from upstream
 
 1. Download the new tag into an empty folder outside the repository.
 2. Replace `src/` and `WAProto/`, then delete `src/Signal/libsignal.ts`, `src/Signal/Group/`,
    `src/__tests__/` and `WAProto/fix-imports.js`.
-3. Apply each change in the table again. `grep -rn "libsignal\|whatsapp-rust-bridge" src` must find
+3. Apply each change in the table again. Drop a row when upstream has the same fix. `grep -rn "libsignal\|whatsapp-rust-bridge" src` must find
    only `OPENBOT PATCH` comments.
 4. Compare upstream's dependency list with `packages/whatsapp/package.json`, and check the license
    of each new package.

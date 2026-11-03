@@ -1,8 +1,8 @@
 import {
+  type ConnectorMessagingPlatform,
   MESSAGING_LIMITS,
   type MessagingConnection,
   type MessagingOverview,
-  type MessagingPlatform,
 } from "@openbot/contracts/ipc";
 import type { MessagingConnectorPage as HostPage } from "@openbot/team-client/team-admin-requests";
 import type { UseQueryResult } from "@tanstack/react-query";
@@ -56,7 +56,7 @@ const AVATAR_SIZE = 32;
 /** What to do about a stopped connection, or null for a state that shows the connection's description. */
 function connectionHelp(
   { t }: MobileText,
-  platform: MessagingPlatform,
+  platform: ConnectorMessagingPlatform,
   state: MessagingConnection["state"],
   host: string,
 ): string | null {
@@ -95,7 +95,7 @@ function connectionHelp(
   }
 }
 
-function isWorkspacePlatform(platform: MessagingPlatform): platform is WorkspacePlatform {
+function isWorkspacePlatform(platform: ConnectorMessagingPlatform): platform is WorkspacePlatform {
   return platform !== "telegram";
 }
 
@@ -106,7 +106,7 @@ function isWorkspacePlatform(platform: MessagingPlatform): platform is Workspace
  * Resolves false when the user closed the browser.
  */
 async function openHostPage(
-  platform: MessagingPlatform,
+  platform: ConnectorMessagingPlatform,
   page: HostPage,
   /** Resolves false when the host refused the grant, such as after its install key expired. */
   complete: (grant: { nonce: string; grant: string }) => Promise<boolean>,
@@ -140,7 +140,7 @@ export function MessagingConnectorPage({
   agents,
 }: {
   server: MobileServer;
-  platform: MessagingPlatform;
+  platform: ConnectorMessagingPlatform;
   query: UseQueryResult<MessagingOverview>;
   agents: readonly MobileAgent[];
 }) {

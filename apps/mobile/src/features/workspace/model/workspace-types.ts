@@ -46,6 +46,7 @@ import type {
   BrowserProfileSummary,
   ClearableStorageCategory,
   ClearBrowserDataInput,
+  ConnectorMessagingPlatform,
   ConversationFileSearchPage,
   ConversationSearchPage,
   ConversationSnapshot,
@@ -82,7 +83,6 @@ import type {
   McpSignInState,
   McpTestResult,
   MessagingOverview,
-  MessagingPlatform,
   OnePasswordConnectorStatus,
   QueuedMessageReceipt,
   QueueSnapshot,
@@ -525,7 +525,7 @@ export interface MobileWorkspaceContextValue {
   loadAgentBrowserProfile: (agentId: string, serverId: string) => Promise<AgentBrowserProfile>;
   /** The host closes the open tabs of the agent. */
   updateAgentBrowserProfile: (input: UpdateAgentBrowserProfileInput, serverId: string) => Promise<AgentBrowserProfile>;
-  loadMessagingConnections: (platform: MessagingPlatform, serverId: string) => Promise<MessagingOverview>;
+  loadMessagingConnections: (platform: ConnectorMessagingPlatform, serverId: string) => Promise<MessagingOverview>;
   /** The platform's page that the phone opens. The host opens no page. */
   connectMessaging: (input: HostMessagingConnectInput, serverId: string) => Promise<MessagingConnectorPage>;
   /** Sends the sealed grant of a Slack or Discord install to the host that started it. */
