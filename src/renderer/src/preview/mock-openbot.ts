@@ -2850,11 +2850,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       rewriteMessage: async (input) => {
         const task = input.taskId ? findTask(input.agentId, input.taskId) : null;
         const snapshot = task ? taskConversation(task) : getSnapshot(input.agentId);
-        if (snapshot.activeTurnId || (task && task.state !== "idle")) throw new Error("Thread is busy.");
+        if (snapshot.activeTurnId || (task && task.state !== "idle"))
+          throw new Error(sourceText("error.backend.rewriteSourceBusy"));
         const boundary = snapshot.messages.findIndex(
           (message) => message.id === input.messageId && message.author === "user",
         );
-        if (boundary < 0) throw new Error("Finished user message not found.");
+        if (boundary < 0) throw new Error(sourceText("error.backend.rewriteMessageMissing"));
         const turnId = `mock-turn-${messageCounter++}`;
         const deliveryId = `mock-delivery-${messageCounter++}`;
         const updated = {

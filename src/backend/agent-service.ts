@@ -4687,9 +4687,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }).bind(this);
 
   /** Edits one finished user request and starts a new turn in the same thread. */
-  readonly rewriteMessage = (input: RewriteMessageInput, sender?: ConversationMessageSender) =>
+  readonly rewriteMessage = (
+    input: RewriteMessageInput,
+    sender?: ConversationMessageSender,
+    source: "host" | "member" = "member",
+  ) =>
     this.#rewrites
-      .rewrite(input, sender)
+      .rewrite(input, sender, source)
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "rewrite message", cause: failure.cause })),
       );

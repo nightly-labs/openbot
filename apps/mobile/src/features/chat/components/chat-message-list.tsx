@@ -87,7 +87,7 @@ import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
-import { useText } from "@/shared/lib/text";
+import { currentText, useText } from "@/shared/lib/text";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
 import { nativeTextSelection } from "../model/native-text-selection";
@@ -478,7 +478,7 @@ const MessageRow = memo(function MessageRow({
   selecting?: boolean;
   shared: MessageRowShared;
 }) {
-  const { t } = useText();
+  const { t, errorMessage } = useText();
   const [selectionHeight, setSelectionHeight] = useState(0);
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState("");
@@ -719,7 +719,7 @@ const MessageRow = memo(function MessageRow({
                         .rewrite(message, editDraft.trim(), editRequestId.current)
                         .then(() => setEditing(false))
                         .catch((error: unknown) => {
-                          setEditError(error instanceof Error ? error.message : t("mobile.chat.message.editFailed"));
+                          setEditError(errorMessage(error, t("mobile.chat.message.editFailed")));
                         })
                         .finally(() => setEditSending(false));
                     }}
@@ -1232,7 +1232,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       reply: (message) => actionHandlers.current.onReply?.(message),
       rewrite: (message, text, requestId) =>
         actionHandlers.current.onRewrite?.(message, text, requestId) ??
-        Promise.reject(new Error("Message rewrite is unavailable.")),
+        Promise.reject(new Error(currentText().t("mobile.chat.message.editFailed"))),
       selectQuestion: (messageId) => actionHandlers.current.onSelectQuestion?.(messageId),
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
       selectText: (message) => actionHandlers.current.onSelectText?.(message),

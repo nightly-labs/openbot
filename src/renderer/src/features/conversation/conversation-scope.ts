@@ -779,7 +779,7 @@ export function createConversationViewScope(props: ConversationProps) {
   };
   const rewriteThreadMessage = async (taskId: string, messageId: string, text: string, requestId: string) => {
     const agent = props.agent;
-    if (!agent) throw new Error("Agent is unavailable.");
+    if (!agent) throw new Error(currentText().t("chat.rewrite.failed"));
     await conversationRuntime(props).agent.rewriteMessage(
       { agentId: agent.id, taskId, messageId, text, requestId },
       props.server?.id ?? "local",

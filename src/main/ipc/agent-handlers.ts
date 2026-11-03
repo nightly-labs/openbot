@@ -744,7 +744,7 @@ export function agentIpcHandlers({
         },
       }),
       rewriteMessage: scopedHandler(parseRewriteMessage, {
-        local: (input) => runCauseEffect(service.rewriteMessage(input, host.conversationSender())),
+        local: (input) => runCauseEffect(service.rewriteMessage(input, host.conversationSender(), "host")),
         remote: (input, serverId) => {
           if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_REWRITE_CAPABILITY))
             throw new Error(sourceText("error.backend.threadRemoteUnsupported"));

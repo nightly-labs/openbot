@@ -313,11 +313,16 @@ function assertAbsent(agentId: string, threadId: string, ids: string[], removedT
       `Removed turn resurrected under another message ID: ${turnId}`,
     );
 }
-async function rejected(input: RewriteMessageInput, expected: RegExp, sender?: ConversationMessageSender) {
+async function rejected(
+  input: RewriteMessageInput,
+  expected: RegExp,
+  sender?: ConversationMessageSender,
+  source: "host" | "member" = "member",
+) {
   const threadId = threadFor(input.agentId, input.taskId);
   const before = archives(threadId);
   const messages = service().database.readConversation(input.agentId, threadId).messages;
-  await assert.rejects(runCauseEffect(service().agents.rewriteMessage(input, sender)), expected);
+  await assert.rejects(runCauseEffect(service().agents.rewriteMessage(input, sender, source)), expected);
   assert.deepEqual(archives(threadId), before, "Rejected rewrite changed the archive.");
   assert.deepEqual(
     service().database.readConversation(input.agentId, threadId).messages,
@@ -758,6 +763,12 @@ try {
         /own|member|sender|person|author|自己的|成员/i,
         other,
       );
+      await rejected(
+        rewriteInput(agent.id, source, "HOST-MUST-NOT-REWRITE-ANOTHER-MEMBER", taskId),
+        /own|member|sender|person|author|自己的|成员/i,
+        other,
+        "host",
+      );
       const receipt = await runCauseEffect(
         service().agents.rewriteMessage(rewriteInput(agent.id, source, "OWNER-REWRITE", taskId), owner),
       );
@@ -775,7 +786,28 @@ try {
         /own|member|sender|person|author|自己的|成员/i,
         owner,
       );
-      return { ownerFallbackDelivery: id, otherMemberRejected: true, missingBothRejected: true };
+      const localReceipt = await runCauseEffect(
+        service().agents.rewriteMessage(
+          rewriteInput(agent.id, anonymous, "HOST-CAN-REWRITE-OLD-QUESTION", taskId),
+          owner,
+          "host",
+        ),
+      );
+      const localId = localReceipt.deliveries[0]?.id;
+      assert.ok(localId);
+      await settled(localId);
+      await idle(agent.id, taskId);
+      assert.ok(service().database.rewoundMessageIds(threadId).has(anonymous));
+      assert.equal(
+        service().database.readConversationMessages(agent.id, threadId, [localId])[0]?.senderMember?.id,
+        owner.id,
+      );
+      return {
+        ownerFallbackDelivery: id,
+        otherMemberRejected: true,
+        missingBothRejected: true,
+        localLegacyRewrite: localId,
+      };
     });
 
   await check("routine messages cannot be rewritten as user messages", async () => {

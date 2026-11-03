@@ -291,7 +291,7 @@ export function ConversationThread() {
                     const taskId = current().threads.open?.id;
                     return taskId
                       ? rewriteThreadMessage(taskId, messageId, text, requestId)
-                      : Promise.reject(new Error("Thread is unavailable."));
+                      : Promise.reject(new Error(t("chat.rewrite.failed")));
                   }
             }
             isOwnSender={props.isOwnSender}

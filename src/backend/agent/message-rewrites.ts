@@ -54,7 +54,7 @@ export class MessageRewrites {
     }
   }
 
-  #validate(input: RewriteMessageInput, sender: ConversationMessageSender | undefined) {
+  #validate(input: RewriteMessageInput, sender: ConversationMessageSender | undefined, source: "host" | "member") {
     const agent = this.#conversation.requireKnownAgent(input.agentId);
     if (agent.hiddenAt !== undefined) throw new Error(sourceText("error.backend.recipientHidden"));
     const task = input.taskId ? this.#tasks.requireOpen(agent.id, input.taskId) : null;
@@ -70,7 +70,9 @@ export class MessageRewrites {
     if (message?.author !== "user" || (message.source && message.source !== "user") || message.status !== "completed")
       throw new Error(sourceText("error.backend.rewriteMessageMissing"));
     const owner = message.senderMember ?? this.#mailbox.messageSender(agent.id, input.taskId, message.id);
-    if (sender && owner?.id !== sender.id) throw new Error(sourceText("error.backend.rewriteOtherMember"));
+    // The host may edit a pre-membership message with no recorded owner. A remote member must prove ownership.
+    if (sender && owner?.id !== sender.id && (source === "member" || owner !== undefined))
+      throw new Error(sourceText("error.backend.rewriteOtherMember"));
     return { agent, task, threadId, message };
   }
 
@@ -79,9 +81,10 @@ export class MessageRewrites {
     this: MessageRewrites,
     input: RewriteMessageInput,
     sender?: ConversationMessageSender,
+    source: "host" | "member" = "member",
   ): Effect.fn.Return<QueuedMessageReceipt, MessageRewriteFailed> {
     const idempotencyKey = `user-rewrite:${createHash("sha256")
-      .update(JSON.stringify([sender?.id ?? null, input.agentId, input.taskId, input.requestId]))
+      .update(JSON.stringify([source, sender?.id ?? null, input.agentId, input.taskId, input.requestId]))
       .digest("hex")}`;
     const pending = this.#pending.get(idempotencyKey);
     if (pending) return yield* Deferred.await(pending);
@@ -105,7 +108,7 @@ export class MessageRewrites {
     }
     const rewrite = Deferred.makeUnsafe<QueuedMessageReceipt, MessageRewriteFailed>();
     this.#pending.set(idempotencyKey, rewrite);
-    return yield* this.#rewriteMessage(input, sender, idempotencyKey).pipe(
+    return yield* this.#rewriteMessage(input, sender, source, idempotencyKey).pipe(
       Effect.onExit((exit) => Deferred.done(rewrite, exit)),
       Effect.ensuring(Effect.sync(() => this.#pending.delete(idempotencyKey))),
     );
@@ -135,9 +138,10 @@ export class MessageRewrites {
     this: MessageRewrites,
     input: RewriteMessageInput,
     sender: ConversationMessageSender | undefined,
+    source: "host" | "member",
     idempotencyKey: string,
   ): Effect.fn.Return<QueuedMessageReceipt, MessageRewriteFailed> {
-    const { agent, task, threadId, message } = yield* rewriteStep(() => this.#validate(input, sender));
+    const { agent, task, threadId, message } = yield* rewriteStep(() => this.#validate(input, sender, source));
     const sourceAttachments: Array<{ id: string; path: string }> = [];
     for (const attachment of message.attachments ?? []) {
       const file = yield* this.#mailbox
@@ -164,7 +168,7 @@ export class MessageRewrites {
     const receipt = yield* this.#mailbox.withEnqueueLock((enqueue) =>
       Effect.gen(function* () {
         yield* rewriteStep(() => {
-          const current = service.#validate(input, sender);
+          const current = service.#validate(input, sender, source);
           if (current.threadId !== threadId) throw new Error(sourceText("error.backend.rewriteMessageMissing"));
         });
         const receipt = yield* enqueue({
