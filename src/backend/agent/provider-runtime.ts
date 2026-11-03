@@ -3393,8 +3393,14 @@ export class ProviderRuntime implements ProviderPort {
           logger.info("A provider answered initialize.", { provider, durationMs: stageMs() });
           stage = "account";
           stageStartedAt = performance.now();
+          // Codex can take more than five seconds to read a valid account on a cold start.
           const account = yield* candidate
-            .request("account/read", { refreshToken: false }, decodeAccountReadResult, 5_000)
+            .request(
+              "account/read",
+              { refreshToken: false },
+              decodeAccountReadResult,
+              provider === "codex" ? 30_000 : 5_000,
+            )
             .pipe(toProviderOperationFailed);
           if (!account.account) {
             const message = this.#signInRequiredMessage(provider);

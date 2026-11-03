@@ -6,7 +6,9 @@
 // 2. A process that answers nothing is ended, with the error that says why.
 // 3. With an MCP server configured, a delivery that meets a hung process fails with the timeout
 //    message, not with the `config.toml` guidance. The runtime starts a new process, and the next turn runs.
+//    The first service start also checks an account reply that takes more than five seconds.
 // `bun run test:codex-hung-app-server`. Writes .openbot-build/codex-hung-app-server-e2e/report.json.
+import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -59,6 +61,7 @@ log({ start: true });
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
 let buffer = "";
 let turns = 0;
+let accountReads = 0;
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
   throw error;
@@ -68,7 +71,17 @@ const answer = (message) => {
   const params = message.params || {};
   switch (message.method) {
     case "initialize": return write({ id: message.id, result: {} });
-    case "account/read": return write({ id: message.id, result: { account: { type: "chatgpt", email: "codex@example.com" } } });
+    case "account/read": {
+      const reply = () => {
+        log({ accountAnswered: true, refreshToken: params.refreshToken });
+        write({ id: message.id, result: { account: { type: "chatgpt", email: "codex@example.com" } } });
+      };
+      if (++accountReads === 1 && process.env.OPENBOT_FAKE_CODEX_SLOW_ACCOUNT === "1") {
+        // The slow reply is the failure condition, not a wait for the service to settle.
+        setTimeout(reply, 6_000);
+      } else reply();
+      return;
+    }
     case "account/rateLimits/read": return write({ id: message.id, result: { rateLimits: { limitId: "codex", primary: null, secondary: null }, rateLimitsByLimitId: null } });
     case "model/list": return write({ id: message.id, result: { data: [{ model: "gpt-5.5", displayName: "GPT-5.5" }] } });
     case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
@@ -121,12 +134,15 @@ interface ProtocolLine {
   start?: boolean;
   method?: string | null;
   mode?: string | null;
+  accountAnswered?: boolean;
+  refreshToken?: boolean;
 }
 
 interface Report {
   passed: boolean;
   slowProcess?: { probed: boolean; exited: boolean; answeredAfter: boolean };
   hungProcess?: { exitMessage: string | null; alive: boolean };
+  startupAccount?: { state: string | null; answered: boolean; refreshToken: boolean | null };
   service?: {
     hungPid: number;
     restartedPid: number;
@@ -254,8 +270,18 @@ try {
   await waitFor("the hung process to exit", () => !alive(clientPid), 5_000).catch(() => false);
   report.hungProcess = { exitMessage, alive: alive(clientPid) };
 
-  // 3. The service: one turn, then the shared process hangs between turns.
+  // 3. The service must accept the slow account reply on its first start, without a restart.
+  process.env.OPENBOT_FAKE_CODEX_SLOW_ACCOUNT = "1";
   await runCauseEffect(agents.initialize());
+  delete process.env.OPENBOT_FAKE_CODEX_SLOW_ACCOUNT;
+  const startupPid = lastStartPid();
+  const startupAnswer = protocol().find((line) => line.pid === startupPid && line.accountAnswered);
+  report.startupAccount = {
+    state: agents.getStatus().providers?.find((provider) => provider.id === "codex")?.state ?? null,
+    answered: startupAnswer !== undefined,
+    refreshToken: startupAnswer?.refreshToken ?? null,
+  };
+  assert.deepEqual(report.startupAccount, { state: "available", answered: true, refreshToken: false });
   const agent = await runCauseEffect(
     agents.createAgent({
       name: "Codex hang",
@@ -271,6 +297,7 @@ try {
       .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
   await waitFor("the first turn to end", () => protocol().some((line) => line.method === "turn/start") && idle());
   const hungPid = lastStartPid();
+  assert.equal(hungPid, startupPid, "The first turn uses the process that answered the slow account check.");
   setMode(hungPid, "hung");
 
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Second message." }));
@@ -307,6 +334,7 @@ try {
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {
+  delete process.env.OPENBOT_FAKE_CODEX_SLOW_ACCOUNT;
   await runCauseEffect(client.stop()).catch(() => {});
   await runCauseEffect(agents.stop()).catch(() => {});
   database.close();
