@@ -37,8 +37,7 @@ export function nativeProviderRuntime(runtime: "pi" | "muse" | "devin"): Provide
         // Devin's archives hold only `bin/` and `share/`. Devin CLI 3000.11.234 has a skill that reads
         // its documentation in `share/devin/docs`, so staging keeps both folders.
         if (spec.target === "win32-x64") {
-          yield* extractZipTree(downloadedPath, staging, "bin", message);
-          yield* extractZipTree(downloadedPath, staging, "share", message);
+          yield* extractZipTree(downloadedPath, staging, ["bin", "share"], message);
         } else {
           yield* assertSafeArchive(downloadedPath, ["bin", "share"], message);
           yield* extractArchive(downloadedPath, staging);
