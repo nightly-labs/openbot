@@ -13,6 +13,7 @@ import {
   type AgentProviderId,
   type AgentReasoningEffort,
   type AgentStatus,
+  type AvatarColor,
   type AvatarHue,
   type AvatarImageInput,
   agentAutomationAllowed,
@@ -65,12 +66,13 @@ import {
 } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import {
+  AVATAR_COLOR_CHOICES,
   AVATAR_EXPRESSIONS,
-  AVATAR_HUE_CHOICES,
+  type AvatarColorChoice,
   avatarHueForColor,
-  avatarHueSwatch,
   avatarSeedForFace,
   bloubAvatarProfile,
+  isAvatarColorChoice,
   SUPPORTED_AVATAR_SILHOUETTES,
   type SupportedAvatarSilhouetteId,
 } from "@openbot/ui/bloub-avatar";
@@ -102,7 +104,7 @@ import {
   untrack,
 } from "solid-js";
 import { useText } from "../../text";
-import { AVATAR_HUE_LABEL } from "../agents/avatar-hue-label";
+import { avatarColorChoiceLabel } from "../agents/avatar-hue-label";
 import { SERVER_NOTIFICATION_LEVEL_LABELS } from "../servers/ServerActionItems";
 import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
 import { AgentNewChatDialog } from "./AgentNewChatDialog";
@@ -248,6 +250,7 @@ interface AgentTextFields {
 
 interface AvatarEditor {
   hue: AvatarHue | null;
+  color: AvatarColor | null;
   pickerOpen: boolean;
   seed: string;
   uploadBusy: boolean;
@@ -296,6 +299,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const [draft, setDraft] = createStore<AgentSettingsDraft>({
     avatar: {
       hue: null,
+      color: null,
       pickerOpen: false,
       seed: "agent",
       uploadBusy: false,
@@ -436,9 +440,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const knownProvider = () => (agentForeignProvider() === undefined ? draft.runtime.provider : undefined);
   /** The shape, eyes and automatic colour that the saved seed draws. */
   const avatarFace = createMemo(() => bloubAvatarProfile(draft.avatar.seed, null));
-  /** Hues 100 and 280 have no swatch of their own: they draw the colour of 150 and 245. */
-  const avatarHueSelected = (hue: AvatarHue) =>
-    draft.avatar.hue !== null && avatarHueSwatch(draft.avatar.hue) === avatarHueSwatch(hue);
+  const avatarColorSelected = (choice: AvatarColorChoice) =>
+    isAvatarColorChoice(choice, draft.avatar.hue, draft.avatar.color);
+  const automaticColorSelected = () => draft.avatar.hue === null && draft.avatar.color === null;
   let avatarPickerRoot: HTMLDivElement | undefined;
   let avatarFileInput: HTMLInputElement | undefined;
   let lastSignature: string | undefined;
@@ -478,6 +482,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           runtimeSettings.reasoningEffort,
           agent.avatarSeed,
           String(agent.avatarHue),
+          agent.avatarColor ?? "",
         ].join("\u0000"),
       };
     },
@@ -523,6 +528,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.runtime.reasoningEffort = runtimeSettings.reasoningEffort;
           state.avatar.seed = agent.avatarSeed;
           state.avatar.hue = agent.avatarHue;
+          state.avatar.color = agent.avatarColor ?? null;
           if (agentChanged) state.avatar.pickerOpen = false;
         });
       }),
@@ -752,7 +758,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       expression: change.expression ?? current.expression,
     });
     const keptHue =
-      draft.avatar.hue === null && bloubAvatarProfile(seed, null).color !== current.color
+      automaticColorSelected() && bloubAvatarProfile(seed, null).color !== current.color
         ? avatarHueForColor(current.color)
         : null;
     if (avatarUrl() && !(await setCustomAvatar(null))) return;
@@ -1064,7 +1070,13 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   }
                 >
                   <Popover.Trigger class="agent-settings-avatar" aria-label={t("agentSettings.avatar.edit")}>
-                    <AgentAvatar seed={draft.avatar.seed} hue={draft.avatar.hue} url={avatarUrl()} motion="always" />
+                    <AgentAvatar
+                      seed={draft.avatar.seed}
+                      hue={draft.avatar.hue}
+                      color={draft.avatar.color}
+                      url={avatarUrl()}
+                      motion="always"
+                    />
                     <span class="agent-settings-avatar-badge" aria-hidden="true">
                       <Pencil class="agent-settings-avatar-badge-icon" />
                     </span>
@@ -1110,7 +1122,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                             </svg>
                           }
                         >
-                          <AgentAvatar seed={draft.avatar.seed} hue={draft.avatar.hue} url={avatarUrl()} />
+                          <AgentAvatar
+                            seed={draft.avatar.seed}
+                            hue={draft.avatar.hue}
+                            color={draft.avatar.color}
+                            url={avatarUrl()}
+                          />
                         </Show>
                       </span>
                       <span>
@@ -1162,6 +1179,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                             <AgentAvatar
                               seed={draft.avatar.seed}
                               hue={draft.avatar.hue}
+                              color={draft.avatar.color}
                               shape={shape}
                               transition="cut"
                             />
@@ -1194,6 +1212,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                             <AgentAvatar
                               seed={draft.avatar.seed}
                               hue={draft.avatar.hue}
+                              color={draft.avatar.color}
                               expression={expression}
                               transition="cut"
                             />
@@ -1209,38 +1228,40 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                       <Button
                         variant="ghost"
                         type="button"
-                        class={["avatar-color-choice", { "avatar-choice-selected": draft.avatar.hue === null }]}
+                        class={["avatar-color-choice", { "avatar-choice-selected": automaticColorSelected() }]}
                         aria-label={t("agentSettings.avatar.autoColor")}
-                        aria-pressed={draft.avatar.hue === null ? "true" : "false"}
+                        aria-pressed={automaticColorSelected() ? "true" : "false"}
                         data-cuelume-tap="select"
                         onClick={() => {
                           setDraft((state) => {
                             state.avatar.hue = null;
+                            state.avatar.color = null;
                           });
-                          void saveAgentPatch({ avatarHue: null });
+                          void saveAgentPatch({ avatarHue: null, avatarColor: null });
                         }}
                       >
                         <span class="avatar-color-swatch avatar-color-swatch-auto">
                           {t("agentSettings.avatar.autoInitial")}
                         </span>
                       </Button>
-                      <For each={AVATAR_HUE_CHOICES}>
+                      <For each={AVATAR_COLOR_CHOICES}>
                         {(option) => (
                           <Button
                             variant="ghost"
                             type="button"
-                            class={["avatar-color-choice", { "avatar-choice-selected": avatarHueSelected(option.hue) }]}
-                            aria-label={t("agentSettings.avatar.hueColor", { hue: t(AVATAR_HUE_LABEL[option.hue]) })}
-                            aria-pressed={avatarHueSelected(option.hue) ? "true" : "false"}
+                            class={["avatar-color-choice", { "avatar-choice-selected": avatarColorSelected(option) }]}
+                            aria-label={t("agentSettings.avatar.hueColor", { hue: t(avatarColorChoiceLabel(option)) })}
+                            aria-pressed={avatarColorSelected(option) ? "true" : "false"}
                             data-cuelume-tap="select"
                             onClick={() => {
                               setDraft((state) => {
                                 state.avatar.hue = option.hue;
+                                state.avatar.color = option.color;
                               });
-                              void saveAgentPatch({ avatarHue: option.hue });
+                              void saveAgentPatch({ avatarHue: option.hue, avatarColor: option.color });
                             }}
                           >
-                            <span class="avatar-color-swatch" style={{ background: avatarHueSwatch(option.hue) }} />
+                            <span class="avatar-color-swatch" style={{ background: option.swatch }} />
                           </Button>
                         )}
                       </For>

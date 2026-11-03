@@ -42,6 +42,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   isAccountUsage,
+  isAgentColors,
   isAgentExclusionChange,
   isAgentFolderBrowse,
   isAgentFolderChange,
@@ -65,6 +66,7 @@ import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contrac
 import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
+export const decodeRemoteAgentColors = guardedDecoder(isAgentColors, "agent colors response");
 export const decodeHiddenAgentsFromHost = guardedDecoder(isHiddenAgentsSnapshot, "hidden agents response");
 export const decodeSidebarPinsFromHost = guardedDecoder(isSidebarPinsSnapshot, "pinned chats response");
 export const decodeAgentNotificationLevelsFromHost = guardedDecoder(

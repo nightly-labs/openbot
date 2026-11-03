@@ -1,5 +1,6 @@
 import { KeyboardAwareLegendList } from "@legendapp/list/keyboard";
 import type { AnchoredEndSpaceConfig } from "@legendapp/list/react-native";
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
@@ -54,7 +55,6 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
 import { type ApprovalDecision, approvalTitle, ChatApprovalCard } from "@/features/chat/components/chat-approval-card";
 import { ChatExchangeGroup, ChatExchangeMarker } from "@/features/chat/components/chat-exchange-marker";
@@ -610,7 +610,7 @@ const MessageRow = memo(function MessageRow({
   // Another person in an agent chat: a person's bubble in their own colour, seeded by the member id
   // as on desktop, so it does not read as the reader's own.
   const memberColor =
-    message.kind === "message" && message.sender ? getBloubAvatarColor(message.sender.id, null) : undefined;
+    message.kind === "message" && message.sender ? avatarHeadColor(message.sender.id, null) : undefined;
   const textColor =
     message.kind === "message" && message.author === "user" && userBubbleStyle && !memberColor
       ? userForeground
@@ -671,6 +671,7 @@ const MessageRow = memo(function MessageRow({
                 serverId={speaker?.serverId}
                 seed={speaker?.avatarSeed ?? message.speaker.id}
                 hue={speaker?.avatarHue ?? null}
+                color={speaker?.avatarColor ?? null}
                 size={20}
               />
             ) : null}
@@ -1136,9 +1137,10 @@ export const ChatMessageList = memo(function ChatMessageList({
   );
   const arrivals = useMessageArrivals(replySession.key, messages, animateMessages && historyState === "ready");
   const agentColorMessages = useAgentColorMessages((state) => state.enabled);
-  const userBubbleColor = getBloubAvatarColor(
+  const userBubbleColor = avatarHeadColor(
     target.kind === "agent" ? target.avatarSeed : target.id,
     target.kind === "agent" ? target.avatarHue : null,
+    target.kind === "agent" ? target.avatarColor : null,
   );
   const appearance = useConnectionAppearance(!canSend);
   const red = Number.parseInt(userBubbleColor.slice(1, 3), 16);

@@ -66,6 +66,7 @@ export const messages = {
   "error.team.sharedDataUnsupported": "To połączenie nie obsługuje wspólnych danych.",
   "error.team.agentInstallUnsupported": "To połączenie nie obsługuje dodawania agentów.",
   "error.team.agentHideUnsupported": "To połączenie nie obsługuje ukrywania agentów.",
+  "error.team.agentColorsUnsupported": "To połączenie nie obsługuje kolorów agentów.",
   "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ten serwer nie może zapisać Twojego poziomu powiadomień dla każdego agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",

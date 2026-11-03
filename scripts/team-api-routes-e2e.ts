@@ -44,6 +44,7 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -473,7 +474,16 @@ const fakeAgents: TeamApiAgents = {
   committedAgentDuplication: unused("committedAgentDuplication"),
   duplicateAgent: unused("duplicateAgent"),
   commitAgentDuplication: unused("commitAgentDuplication"),
-  updateAgent: unused("updateAgent"),
+  // Only an exact colour (`agent-colors-v1`) reaches this writer in this run.
+  updateAgent: (input) =>
+    Effect.sync(() => {
+      record("updateAgentColor", input);
+      const target = agents.find((item) => item.id === input.agentId);
+      if (!target) throw new Error("Agent not found.");
+      if (input.avatarColor === null) delete target.avatarColor;
+      else if (input.avatarColor !== undefined) target.avatarColor = input.avatarColor;
+      return target;
+    }),
   getMemorySelection: unused("getMemorySelection"),
   setMemoryInclusion: unused("setMemoryInclusion"),
   listMemories: unused("listMemories"),
@@ -2260,6 +2270,99 @@ try {
       errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
         errorIs(hidden, 404, sourceText("error.team.agentNotFound")),
       [summary(missing), summary(hidden)],
+    );
+  }
+
+  // ---- Exact agent colours (agent-colors-v1) ----
+  {
+    const colorCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_COLORS_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-colors-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_COLORS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_COLORS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", AGENT_COLORS_ROUTES.read, { token: bobToken, json: {} });
+    check(
+      "the colour routes without the capability get 400 agentColorsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentColorsUnsupported")),
+      summary(unsupported),
+    );
+    const empty = await call("POST", AGENT_COLORS_ROUTES.read, {
+      token: bobToken,
+      json: {},
+      capabilities: colorCapabilities,
+    });
+    check(
+      "a member reads an empty list when no agent has a colour",
+      empty.status === 200 && isDeepStrictEqual(empty.body, { agents: [] }),
+      summary(empty),
+    );
+    const writes = callsOf("updateAgentColor").length;
+    const upperCase = await call("POST", AGENT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", color: "#A1B2C3" },
+      capabilities: colorCapabilities,
+    });
+    const extraField = await call("POST", AGENT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", color: "#a1b2c3", avatarHue: 10 },
+      capabilities: colorCapabilities,
+    });
+    const notShown = await call("POST", AGENT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-pi", color: "#a1b2c3" },
+      capabilities: colorCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a colour that is not lower-case #rrggbb, an unknown field, or an agent that the protocol does not show is refused, and nothing is written",
+      upperCase.status === 400 &&
+        extraField.status === 400 &&
+        errorIs(notShown, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgentColor").length === writes,
+      [summary(upperCase), summary(extraField), summary(notShown)],
+    );
+    const set = await call("POST", AGENT_COLORS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-pi", color: "#a1b2c3" },
+      capabilities: colorCapabilities,
+    });
+    const readBack = await call("POST", AGENT_COLORS_ROUTES.read, {
+      token: adaToken,
+      json: {},
+      capabilities: colorCapabilities,
+    });
+    const readV6 = await call("POST", AGENT_COLORS_ROUTES.read, {
+      token: adaToken,
+      json: {},
+      capabilities: colorCapabilities,
+      protocol: 6,
+    });
+    const expected = { agents: [{ agentId: "agent-pi", color: "#a1b2c3" }] };
+    check(
+      "a member with manage access sets a colour through the agent writer, and the read leaves out an agent that the protocol does not show",
+      set.status === 200 &&
+        isDeepStrictEqual(set.body, expected) &&
+        isDeepStrictEqual(readBack.body, expected) &&
+        isDeepStrictEqual(callsOf("updateAgentColor").at(-1), [{ agentId: "agent-pi", avatarColor: "#a1b2c3" }]) &&
+        readV6.status === 200 &&
+        isDeepStrictEqual(readV6.body, { agents: [] }),
+      [summary(set), summary(readBack), summary(readV6)],
+    );
+    const removed = await call("POST", AGENT_COLORS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-pi", color: null },
+      capabilities: colorCapabilities,
+    });
+    check(
+      "a null colour removes the colour",
+      removed.status === 200 &&
+        isDeepStrictEqual(removed.body, { agents: [] }) &&
+        isDeepStrictEqual(callsOf("updateAgentColor").at(-1), [{ agentId: "agent-pi", avatarColor: null }]),
+      summary(removed),
     );
   }
 

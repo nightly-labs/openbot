@@ -416,6 +416,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
                 label: t("sidebar.empty.firstAgent"),
                 avatarSeed: agentSetupDraft().avatarSeed,
                 avatarHue: agentSetupDraft().avatarHue,
+                avatarColor: agentSetupDraft().avatarColor ?? null,
                 onSelect: () => {
                   channels.close();
                   openAgentSetup();

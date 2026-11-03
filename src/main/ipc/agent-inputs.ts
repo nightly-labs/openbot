@@ -29,6 +29,7 @@ import {
   isAgentModel,
   isAgentProvider,
   isAgentTaskLimit,
+  isAvatarColor,
   isAvatarHue,
   isAvatarSeed,
   isBusyMessageMode,
@@ -223,11 +224,16 @@ export function parseCreateAgent(value: unknown): CreateAgentInput {
   const avatarHue = value.avatarHue;
   if (!isAvatarSeed(value.avatarSeed)) throw new Error("Invalid avatar seed.");
   if (avatarHue !== null && !isAvatarHue(avatarHue)) throw new Error("Invalid avatar hue.");
+  const avatarColor = value.avatarColor;
+  if (avatarColor !== undefined && avatarColor !== null && !isAvatarColor(avatarColor)) {
+    throw new Error("Invalid avatar color.");
+  }
   const result: CreateAgentInput = {
     name: requireString(value.name, "name", INPUT_LIMITS.agentName),
     description: requireString(value.description, "description", INPUT_LIMITS.agentDescription),
     avatarSeed: value.avatarSeed,
     avatarHue,
+    ...(avatarColor === undefined ? {} : { avatarColor }),
     initialMessage: requireString(value.initialMessage, "initialMessage", INPUT_LIMITS.messageText),
   };
   if (value.provider !== undefined) {
@@ -759,6 +765,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
       throw new Error("Invalid avatar hue.");
     }
     result.avatarHue = value.avatarHue;
+  }
+  if (value.avatarColor !== undefined) {
+    if (value.avatarColor !== null && !isAvatarColor(value.avatarColor)) throw new Error("Invalid avatar color.");
+    result.avatarColor = value.avatarColor;
   }
   return result;
 }

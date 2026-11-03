@@ -267,9 +267,9 @@ const PHONE_QUERY = "(max-width: 720px)";
 /** The account whose queue edit the browser may hold under `QUEUE_EDIT_STORAGE_KEY`. */
 const QUEUE_EDIT_ACCOUNT_KEY = "openbot.web.queue-edit-account";
 
-function newAgentAvatar(): Pick<FirstAgentDraft, "avatarSeed" | "avatarHue"> {
+function newAgentAvatar(): Pick<FirstAgentDraft, "avatarSeed" | "avatarHue" | "avatarColor"> {
   const { avatarSeed, avatarHue } = createFirstAgentDraft();
-  return { avatarSeed, avatarHue };
+  return { avatarSeed, avatarHue, avatarColor: null };
 }
 
 /**
@@ -2188,6 +2188,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                             label: t("sidebar.empty.firstAgent"),
                             avatarSeed: agentAvatar().avatarSeed,
                             avatarHue: agentAvatar().avatarHue,
+                            avatarColor: agentAvatar().avatarColor ?? null,
                             onSelect: startCreate,
                           }
                         : undefined
@@ -2542,7 +2543,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   liveStatus={status()}
                   // A new form starts empty, with the avatar that the first-agent row showed.
                   initialDraft={{ ...createFirstAgentDraft(), ...untrack(agentAvatar) }}
-                  onDraftChange={({ avatarSeed, avatarHue }) => setAgentAvatar({ avatarSeed, avatarHue })}
+                  onDraftChange={({ avatarSeed, avatarHue, avatarColor }) =>
+                    setAgentAvatar({ avatarSeed, avatarHue, avatarColor })
+                  }
                   onClose={() => setCreating(false)}
                   onSaved={async () => {
                     await workspace.refresh();

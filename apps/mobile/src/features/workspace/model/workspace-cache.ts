@@ -1,4 +1,9 @@
-import type { ConversationPage, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import {
+  type AvatarColor,
+  type ConversationPage,
+  isAvatarColor,
+  type SidebarLayoutSnapshot,
+} from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { RemoteTeamHost } from "@openbot/team-client";
 import * as Crypto from "expo-crypto";
@@ -13,6 +18,11 @@ interface CachedServer {
   agents: RemoteAgent[];
   /** The host's hidden agents, or null for a host without `agent-hidden-v1`. */
   hidden: string[] | null;
+  /**
+   * The colour of each agent that has one, or null for a host without `agent-colors-v1`. A file of an
+   * older build has none.
+   */
+  colors: { agentId: string; color: AvatarColor }[] | null;
   sidebar: SidebarLayoutSnapshot | null;
   conversations: ConversationPage[];
   /**
@@ -101,6 +111,16 @@ function asciiText(bytes: Uint8Array): string {
   return text;
 }
 
+/** The kept colours. A bad entry is left out, so the agents still show. */
+function decodeCachedColors(value: unknown): CachedServer["colors"] {
+  if (!Array.isArray(value)) return null;
+  return value.flatMap((entry: unknown) =>
+    isDynamicRecord(entry) && isString(entry.agentId) && isAvatarColor(entry.color)
+      ? [{ agentId: entry.agentId, color: entry.color }]
+      : [],
+  );
+}
+
 function decodeCachedServer(value: unknown): CachedServer {
   if (
     !isDynamicRecord(value) ||
@@ -113,6 +133,7 @@ function decodeCachedServer(value: unknown): CachedServer {
   return {
     agents: decodeAgentSummaries(value.agents),
     hidden: value.hidden,
+    colors: decodeCachedColors(value.colors),
     sidebar: value.sidebar === null ? null : decodeSidebarLayout(value.sidebar),
     conversations: value.conversations.map(decodeConversationPage),
     // A bad list drops only the early reads: the first connection then waits for its check.

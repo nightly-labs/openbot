@@ -15,7 +15,7 @@
 // The fallback path is for hosts too old to replay events on connect. It reads the whole agent list
 // and one page each, which is expensive, so it runs once per connection rather than per event.
 
-import type { AgentEvent, BrowserTab } from "@openbot/contracts/ipc";
+import type { AgentColors, AgentEvent, AvatarColor, BrowserTab, ClientAgentSummary } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { Deferred, Effect, Result } from "effect";
 import { decodeAgentSummaries, decodeQueueSnapshot } from "./remote-agent-decoding";
@@ -62,6 +62,10 @@ export class RemoteEventRefresh {
   readonly #browserHolds = new Map<string, ReadonlySet<string>>();
   readonly #browserPageStates = new Map<string, ReadonlyMap<string, { canGoBack: boolean; canGoForward: boolean }>>();
   readonly #browserStates = new Map<string, { tabs: BrowserTab[]; activeTabId: string | null }>();
+  // The released agent list has no field for an exact colour, so `agent-colors-v1` sends the colours on
+  // their own. Each server keeps its last colours and its last agent list to merge them here.
+  readonly #agentColors = new Map<string, ReadonlyMap<string, AvatarColor>>();
+  readonly #agentRosters = new Map<string, ClientAgentSummary[]>();
 
   constructor(options: RemoteEventRefreshOptions) {
     this.#request = options.request;
@@ -86,6 +90,11 @@ export class RemoteEventRefresh {
       yield* this.#refreshConversationPage(serverId, event.agentId, event.revision);
     } else if (event.type === "queue-invalidated") {
       yield* this.#refreshQueue(serverId, event.agentId);
+    } else if (event.type === "agent-colors-changed") {
+      // The renderer reads the colours in the agent list, so this event does not go to it.
+      this.rememberAgentColors(serverId, event);
+    } else if (event.type === "agents-changed") {
+      this.#emitRoster(serverId, addRemotePreviewUrls(event.agents, serverId), bufferedLive);
     } else if (event.type === "browser-user-control-changed" || event.type === "browser-page-state-changed") {
       if (event.type === "browser-user-control-changed") this.#browserHolds.set(serverId, new Set(event.tabIds));
       else this.#browserPageStates.set(serverId, new Map(event.tabs.map(({ tabId, ...state }) => [tabId, state])));
@@ -135,7 +144,7 @@ export class RemoteEventRefresh {
     const request = { request: this.#request };
     const agents = yield* request.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries);
     if (this.#generations.get(serverId) !== generation) return;
-    this.#emit(serverId, { type: "agents-changed", agents });
+    this.#emitRoster(serverId, agents);
     yield* Effect.forEach(
       agents,
       (agent) =>
@@ -168,7 +177,7 @@ export class RemoteEventRefresh {
     yield* Effect.gen({ self: this }, function* () {
       const agents = yield* this.#request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries);
       if (this.#rosterLoads.get(serverId) !== operation || !this.#hasServer(serverId)) return;
-      this.#emit(serverId, { type: "agents-changed", agents });
+      this.#emitRoster(serverId, agents);
     }).pipe(
       Effect.onExit((exit) => Deferred.done(operation, exit)),
       Effect.ensuring(
@@ -179,8 +188,42 @@ export class RemoteEventRefresh {
     );
   }).bind(this);
 
+  /** The agents with the last colours that the server sent. A server without `agent-colors-v1` sends none. */
+  withAgentColors(serverId: string, agents: ClientAgentSummary[]): ClientAgentSummary[] {
+    const colors = this.#agentColors.get(serverId);
+    return colors ? agents.map((agent) => withAgentColor(agent, colors.get(agent.id))) : agents;
+  }
+
+  /** One agent with the last colour that the server sent. */
+  agentWithColor(serverId: string, agent: ClientAgentSummary): ClientAgentSummary {
+    const colors = this.#agentColors.get(serverId);
+    return colors ? withAgentColor(agent, colors.get(agent.id)) : agent;
+  }
+
+  /**
+   * Keeps the colours that a read, a change or an event gave. When they changed, the last agent list
+   * goes to the renderer again with them.
+   */
+  rememberAgentColors(serverId: string, colors: AgentColors): void {
+    const next = new Map(colors.agents.map((entry) => [entry.agentId, entry.color]));
+    const previous = this.#agentColors.get(serverId);
+    this.#agentColors.set(serverId, next);
+    if (previous && previous.size === next.size && [...next].every(([id, color]) => previous.get(id) === color)) return;
+    const roster = this.#agentRosters.get(serverId);
+    if (roster) this.#emit(serverId, { type: "agents-changed", agents: this.withAgentColors(serverId, roster) });
+  }
+
+  #emitRoster(serverId: string, agents: ClientAgentSummary[], bufferedLive = false): void {
+    this.#agentRosters.set(serverId, agents);
+    const event = { type: "agents-changed" as const, agents: this.withAgentColors(serverId, agents) };
+    if (bufferedLive) this.#emit(serverId, event, true);
+    else this.#emit(serverId, event);
+  }
+
   forget(serverId: string): void {
     this.#rosterLoads.delete(serverId);
+    this.#agentColors.delete(serverId);
+    this.#agentRosters.delete(serverId);
     this.#browserHolds.delete(serverId);
     this.#browserPageStates.delete(serverId);
     this.#browserStates.delete(serverId);
@@ -195,6 +238,8 @@ export class RemoteEventRefresh {
 
   clear(): void {
     this.#rosterLoads.clear();
+    this.#agentColors.clear();
+    this.#agentRosters.clear();
     this.#browserHolds.clear();
     this.#browserPageStates.clear();
     this.#browserStates.clear();
@@ -299,4 +344,10 @@ export class RemoteEventRefresh {
     this.#generations.set(serverId, generation);
     return generation;
   }
+}
+
+/** The agent with `color`, or without a colour. The released list has none, so `avatarHue` is then the colour. */
+function withAgentColor(agent: ClientAgentSummary, color: AvatarColor | undefined): ClientAgentSummary {
+  const { avatarColor: _, ...rest } = agent;
+  return color ? { ...rest, avatarColor: color } : rest;
 }
