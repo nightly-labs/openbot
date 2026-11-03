@@ -401,7 +401,7 @@
     "@fontsource-variable/inter": "5.3.0",
     "@kobalte/core": "2.0.0-alpha.0",
     "@noble/hashes": "2.4.0",
-    "@norbert_bodziony/bloub": "0.6.1",
+    "@norbert_bodziony/bloub": "0.6.3",
     "@openpanel/web": "1.4.2",
     "@paper-design/shaders": "0.0.80",
     "@solidjs/signals": "2.0.0-rc.18",
@@ -1037,7 +1037,7 @@
 
     "@noble/hashes": ["@noble/hashes@2.4.0", "", {}, "sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA=="],
 
-    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.6.1", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-75bXUZtdHCfUkyuLOSkoD9BKmSLUf1lz0D5q9Dz+MpdwtrUQ7UYie9gHDltgVrYH6lftydrer1HypYZWIO8sGQ=="],
+    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.6.3", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-PIj4jjWBaqxYmCjOAa95pbNrzFpyGHGjJmbHEBAs2oLoVqB4xRM77HI+B4jpE6IgeYu7xuFTowCqCn0SH0w/KQ=="],
 
     "@nothing-but/utils": ["@nothing-but/utils@0.17.0", "", {}, "sha512-TuCHcHLOqDL0SnaAxACfuRHBNRgNJcNn9X0GiH5H3YSDBVquCr3qEIG3FOQAuMyZCbu9w8nk2CHhOsn7IvhIwQ=="],
 
