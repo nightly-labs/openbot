@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["ShareFilesModule"]
+  },
+  "android": {
+    "modules": ["run.openbot.sharefiles.ShareFilesModule"]
+  }
+}

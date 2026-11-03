@@ -198,6 +198,17 @@ export const messages = {
   "mobile.chat.imageViewer.saved": "Bewaard in Foto’s",
   "mobile.chat.imageViewer.save": "Bewaar {name} in Foto’s",
   "mobile.chat.imageViewer.position": "{current} van {total}",
+  "mobile.chat.imageGallery.count": { one: "{count} afbeelding", other: "{count} afbeeldingen" },
+  "mobile.chat.imageGallery.options": "Galerijopties",
+  "mobile.chat.imageGallery.saveAll": "Alles bewaren",
+  "mobile.chat.imageGallery.saved": "Bewaard in Foto’s",
+  "mobile.chat.imageGallery.shareAll": "Alles delen",
+  "mobile.chat.imageGallery.photosPermission":
+    "Sta OpenBot in Instellingen toe foto’s toe te voegen om deze afbeeldingen te bewaren.",
+  "mobile.chat.imageGallery.saveFailed": "Kan afbeeldingen niet bewaren",
+  "mobile.chat.imageGallery.shareFailed": "Kan afbeeldingen niet delen",
+  "mobile.chat.imageGallery.shareNeedsUpdate":
+    "Voor het delen van meerdere afbeeldingen is de nieuwste versie van de app nodig.",
   "mobile.chat.video.play": "Speel {name} af",
   "mobile.chat.video.retry": "Laad video opnieuw",
   "mobile.chat.video.share": "Deel {name}",

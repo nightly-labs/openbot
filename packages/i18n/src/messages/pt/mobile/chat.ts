@@ -226,6 +226,17 @@ export const messages = {
   "mobile.chat.imageViewer.saved": "Salvo em Fotos",
   "mobile.chat.imageViewer.save": "Salvar {name} em Fotos",
   "mobile.chat.imageViewer.position": "{current} de {total}",
+  "mobile.chat.imageGallery.count": { one: "{count} imagem", other: "{count} imagens" },
+  "mobile.chat.imageGallery.options": "Opções da galeria",
+  "mobile.chat.imageGallery.saveAll": "Salvar todas",
+  "mobile.chat.imageGallery.saved": "Salvas em Fotos",
+  "mobile.chat.imageGallery.shareAll": "Compartilhar todas",
+  "mobile.chat.imageGallery.photosPermission":
+    "Permita que o OpenBot adicione fotos em Ajustes para salvar estas imagens.",
+  "mobile.chat.imageGallery.saveFailed": "Não foi possível salvar as imagens",
+  "mobile.chat.imageGallery.shareFailed": "Não foi possível compartilhar as imagens",
+  "mobile.chat.imageGallery.shareNeedsUpdate":
+    "Para compartilhar várias imagens, é necessário ter a versão mais recente do app.",
   "mobile.chat.video.play": "Reproduzir {name}",
   "mobile.chat.video.retry": "Recarregar vídeo",
   "mobile.chat.video.share": "Compartilhar {name}",
