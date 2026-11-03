@@ -182,7 +182,8 @@ mentions the bot or replies to it; not a direct chat, not a message of an existi
 `Workflows.receiveTelegram` before it goes to the Telegram Orchestrator. The trigger matches the
 connection (empty: any linked chat) and a text filter (`telegram-matching.ts`). A matched message
 starts one run for each trigger, with source `telegram` (schema v52) and the idempotency key
-`telegram:<node>:<message>`, and does not start an agent conversation. A workflow with an open run
+`telegram:<node>:<connection>:<message>`, because a Telegram message ID is unique only in its chat. It
+does not start an agent conversation. A workflow with an open run
 skips the message; when all matched triggers skip it, OpenBot adds the failed reaction to it.
 
 The run payload is the message, marked as data, with its chat, thread key and message ID. A Telegram

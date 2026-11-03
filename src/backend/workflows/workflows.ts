@@ -1364,12 +1364,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               let started = false;
               for (const { workflowId, node } of triggers) {
                 const open = runs.openRuns().filter((run) => run.workflowId === workflowId);
-                // A mention that Signal gives again, after a restart, has its run already.
+                // A mention that Signal gives again, after a restart, has its run already. A Telegram message
+                // id is unique only in its chat, so the chat is part of the match and of the key.
                 if (
-                  open.some(
-                    (run) =>
-                      run.source === "telegram" && telegramTriggerMessage(run.payload)?.messageId === mention.messageId,
-                  )
+                  open.some((run) => {
+                    const message = run.source === "telegram" ? telegramTriggerMessage(run.payload) : null;
+                    return message?.connectionId === mention.connectionId && message.messageId === mention.messageId;
+                  })
                 ) {
                   started = true;
                   continue;
@@ -1381,7 +1382,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 const result = yield* begin(detail, node, {
                   source: "telegram",
                   scheduledFor: null,
-                  idempotencyKey: `telegram:${node.id}:${mention.messageId}`,
+                  idempotencyKey: `telegram:${node.id}:${mention.connectionId}:${mention.messageId}`,
                   payload: workflowTelegramPayload(node.id, mention),
                 }).pipe(Effect.result);
                 if (Result.isFailure(result)) {
