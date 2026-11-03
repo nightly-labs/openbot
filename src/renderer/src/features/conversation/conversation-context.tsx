@@ -651,6 +651,22 @@ const Conversation = createSimpleContext({
       } else if (readState) {
         applyConversationReadState(agentId, readStateForMessages(readState, snapshot.messages));
       }
+      if (rewound) {
+        // A snapshot has no page cursor. Reload the latest page so older retained messages
+        // remain reachable, and invalidate an in-flight search page from before the cut.
+        const requestVersion = (conversationPageRequests.get(agentId) ?? 0) + 1;
+        conversationPageRequests.set(agentId, requestVersion);
+        void conversationPort()
+          .agent.readConversationPage(
+            { agentId, anchor: { type: "latest" }, limit: LATEST_PAGE_SIZE },
+            activeServerId(),
+          )
+          .then((page) => {
+            if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== requestVersion) return;
+            applyConversationPage(page, "replace", "latest");
+          })
+          .catch(() => undefined);
+      }
     }
 
     function applyConversationPage(
