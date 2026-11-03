@@ -528,6 +528,7 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Leggi le risposte ad alta voce",
   "settings.voice.speech.readReplies.description":
     "Quando detti un messaggio, la risposta viene letta ad alta voce. Detta di nuovo per fermarla.",
+  "settings.voice.speech.speed.title": "Velocità",
   "settings.voice.speech.voice.title": "Voce",
   "settings.voice.speech.voice.female": "Voce femminile {number}",
   "settings.voice.speech.voice.male": "Voce maschile {number}",

@@ -17,6 +17,7 @@ import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { ConversationSideThread } from "./ConversationSideThread";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
@@ -63,6 +64,8 @@ function VoiceConversationPane() {
           onToggleMute={conversation.toggleMute}
           onInterrupt={conversation.interrupt}
           onEnd={() => closeSidePanelPane("voice")}
+          speed={speechSpeed()}
+          onCycleSpeed={cycleSpeechSpeed}
         />
       )}
     </Show>

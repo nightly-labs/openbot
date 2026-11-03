@@ -11,6 +11,8 @@ const SPEECH = [
 ];
 
 const QUESTION = "What should I put first in the launch post?";
+/** The order of the speed button, as in the app. */
+const SPEEDS = [1, 1.25, 1.5, 2, 0.75];
 
 const meta = {
   title: "Conversation/VoicePanel",
@@ -26,10 +28,13 @@ const meta = {
     onToggleMute: fn(),
     onInterrupt: fn(),
     onEnd: fn(),
+    speed: 1,
+    onCycleSpeed: fn(),
   },
-  // Mute is local here; in the app the voice conversation holds it.
+  // Mute and speed are local here; in the app the voice conversation and the saved speed hold them.
   render: (args) => {
     const [muted, setMuted] = createSignal(untrack(() => args.muted));
+    const [speed, setSpeed] = createSignal(untrack(() => args.speed ?? 1));
     return (
       <div class="conversation-panel" style="height: 100vh; --browser-panel-width: 380px">
         <VoicePanel
@@ -38,6 +43,11 @@ const meta = {
           onToggleMute={() => {
             setMuted(!muted());
             args.onToggleMute();
+          }}
+          speed={speed()}
+          onCycleSpeed={() => {
+            setSpeed(SPEEDS[(SPEEDS.indexOf(speed()) + 1) % SPEEDS.length] ?? 1);
+            args.onCycleSpeed?.();
           }}
         />
       </div>

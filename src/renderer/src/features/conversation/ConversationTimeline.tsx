@@ -43,6 +43,7 @@ import {
   toggleRecording,
   toggleSpokenReply,
 } from "../speech/speech-replies";
+import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { agentInstructionsCalls } from "./agent-folders-port";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
@@ -759,6 +760,9 @@ export function ConversationTimeline() {
                 // Only the kind rebuilds the player, so its controls keep focus when it starts or stops.
                 const player = createMemo(() => voicePlayer(message()));
                 const playerKind = createMemo(() => player()?.kind);
+                // Only a reply has a speed: the user's own recording plays at normal speed.
+                const replySpeed = () => (playerKind() === "reply" ? speechSpeed() : undefined);
+                const replySpeedChange = () => (playerKind() === "reply" ? cycleSpeechSpeed : undefined);
                 const pendingState = () => {
                   const state = pendingSend()?.state;
                   return state === "failed" || state === "waiting" ? state : "sending";
@@ -1353,6 +1357,8 @@ export function ConversationTimeline() {
                                   levels={player()?.levels}
                                   onToggle={() => player()?.onToggle()}
                                   onSeek={(seconds) => player()?.onSeek?.(seconds)}
+                                  speed={replySpeed()}
+                                  onCycleSpeed={replySpeedChange()}
                                 />
                               )}
                             </Show>

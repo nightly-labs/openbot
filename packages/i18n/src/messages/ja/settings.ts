@@ -521,6 +521,7 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "返信を読み上げる",
   "settings.voice.speech.readReplies.description":
     "メッセージを音声入力すると、返信が読み上げられます。止めるには、もう一度音声入力してください。",
+  "settings.voice.speech.speed.title": "速度",
   "settings.voice.speech.voice.title": "声",
   "settings.voice.speech.voice.female": "女性の声 {number}",
   "settings.voice.speech.voice.male": "男性の声 {number}",
