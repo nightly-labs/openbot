@@ -101,9 +101,17 @@ interface ComposerEditorProps {
    */
   sendShortcut?: SendShortcut | undefined;
   onOpenAttachment?: ((attachment: DraftAttachment) => void) | undefined;
-  /** Receives pasted files. Without it, a file paste does nothing here; the desktop preload imports it. */
+  /**
+   * Receives pasted files. Without it, a file paste does nothing here; the desktop preload imports it.
+   * A text paste longer than `INPUT_LIMITS.pastedText` also comes here as `pasted-text.txt`, with
+   * `text` set: when the file cannot come, the receiver puts that text at the selection.
+   */
   onPasteFiles?:
-    | ((files: File[], selection: ComposerSelection) => undefined | Promise<ComposerPasteResult | undefined>)
+    | ((
+        files: File[],
+        selection: ComposerSelection,
+        text?: string,
+      ) => undefined | Promise<ComposerPasteResult | undefined>)
     | undefined;
   onPasteAttachments?: (
     clipboard: DataTransfer,
@@ -147,6 +155,8 @@ interface MentionContext {
 }
 
 const DICTATION_INTERIM_WORDS = 2;
+/** The name of the file that a long text paste becomes, as on mobile. */
+const PASTED_TEXT_FILE_NAME = "pasted-text.txt";
 
 export function expandComposerMentions(value: string): string {
   return value.replace(MENTION_PATTERN, (match, name: string, target: string) => {
@@ -853,8 +863,17 @@ export function ComposerEditor(props: ComposerEditorProps) {
       return;
     }
 
-    const text = clipboard.getData("text/plain").replace(/\r\n?/g, "\n").slice(0, INPUT_LIMITS.messageText);
+    const pastedText = clipboard.getData("text/plain");
+    const normalized = pastedText.replace(/\r\n?/g, "\n");
+    const text = normalized.slice(0, INPUT_LIMITS.messageText);
     if (!text) return;
+    // The file keeps the text as it was copied, with no limit on the message length.
+    if (normalized.length > INPUT_LIMITS.pastedText && props.onPasteFiles) {
+      event.stopPropagation();
+      const file = new File([pastedText], PASTED_TEXT_FILE_NAME, { type: "text/plain" });
+      finishPaste(props.onPasteFiles([file], selection, text));
+      return;
+    }
 
     insertPlainText(editor, text);
     emitValue();

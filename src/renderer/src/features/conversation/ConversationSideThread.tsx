@@ -150,7 +150,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             rowAttachments={rowImages()}
             pendingImages={threadComposer.pendingImages(draftKey())}
             onRemoveAttachment={(attachment) => threadComposer.removeAttachment(draftKey(), attachment.id)}
-            onPasteFiles={(files, selection) => threadComposer.pasteFiles(files, selection, draftKey())}
+            onPasteFiles={(files, selection, text) => threadComposer.pasteFiles(files, selection, draftKey(), text)}
             onDraftChange={(text) => threadComposer.setText(draftKey(), text)}
             onOpenDraftAttachment={(attachment) =>
               canPreviewAttachment(attachment)

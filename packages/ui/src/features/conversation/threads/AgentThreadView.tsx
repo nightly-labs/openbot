@@ -126,9 +126,13 @@ export interface AgentThreadViewProps {
   /** The download state of attachments from a joined server. */
   downloads?: AttachmentDownloads | undefined;
   onDraftChange: (text: string) => void;
-  /** Receives pasted files. Without it, a file paste does nothing here. */
+  /** Receives pasted files and long text pastes, as `ComposerEditor` says. Without it, a file paste does nothing here. */
   onPasteFiles?:
-    | ((files: File[], selection: ComposerSelection) => undefined | Promise<ComposerPasteResult | undefined>)
+    | ((
+        files: File[],
+        selection: ComposerSelection,
+        text?: string,
+      ) => undefined | Promise<ComposerPasteResult | undefined>)
     | undefined;
   onOpenDraftAttachment?: ((attachment: DraftAttachment) => void) | undefined;
   /** Opens the file picker. Without it, the "+" menu has no image or context item. */

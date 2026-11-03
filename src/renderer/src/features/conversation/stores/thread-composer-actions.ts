@@ -9,7 +9,7 @@ import type { ComposerPasteResult, ComposerSelection } from "@openbot/ui/feature
 import { DRAFT_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
 import { actionToast } from "../../../action-toast";
-import { EMPTY_DRAFT, insertAtSelection } from "../composer-draft";
+import { EMPTY_DRAFT, insertAtSelection, insertPastedText } from "../composer-draft";
 import { threadDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationThreads } from "../conversation-types";
@@ -189,14 +189,34 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     return result;
   }
 
+  /** Puts a pasted text at the selection, or at the end when the text changed since `at.before`. */
+  function insertText(
+    key: string,
+    text: string,
+    at: { before: string; selection: ComposerSelection },
+  ): ComposerPasteResult | undefined {
+    const result = insertPastedText(draft(key).text, text, at);
+    if (result) updateDraft(key, (current) => ({ ...current, text: result.value }));
+    return result;
+  }
+
+  /**
+   * Imports pasted files and puts their references at the selection. `text` is the text of a long paste
+   * that `files` holds: when no file comes, that text goes at the selection, so the paste loses nothing.
+   */
   async function pasteFiles(
     files: ReadonlyArray<File | Promise<File>>,
     selection: ComposerSelection,
     key = openDraftKey(),
+    text?: string,
   ): Promise<ComposerPasteResult | undefined> {
     const target = currentConversationTarget(deps.props);
     if (!key || !target) return;
+    const fallback = (before: string) =>
+      text === undefined ? undefined : insertText(key, text, { before, selection });
     if (!deps.props.threads?.acceptsFiles) {
+      // A thread that takes no files still takes a long text.
+      if (text !== undefined) return fallback(draft(key).text);
       refuseFiles();
       return;
     }
@@ -212,9 +232,11 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
         (data) => conversationRuntime(deps.props).agent.importAttachmentData(data, target.serverId),
         previews.onAccepted,
       );
-      return addFiles(key, target.serverId, imported, { before, selection });
+      // The draft refused the files and shows why. The pasted text still comes.
+      return addFiles(key, target.serverId, imported, { before, selection }) ?? fallback(before);
     } catch (error) {
       actionToast.error(errorMessage(error, t("composer.error.keepAttachments")));
+      return fallback(before);
     } finally {
       previews.stop();
       releaseImport(requestId);

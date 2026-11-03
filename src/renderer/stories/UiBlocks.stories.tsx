@@ -196,7 +196,7 @@ export const ConfirmExpired: Story = {
   render: (args) => <LiveConfirm spec={confirmSpec} state={{ status: "expired" }} onRespond={args.onRespond} />,
 };
 
-/** A draft taller than the preview box scrolls inside it, and "Show all" under it opens the rest. */
+/** A draft taller than the preview box fades out at its end, and "Show all" under it opens the rest. */
 export const ConfirmLongPreview: Story = {
   render: (args) => (
     <LiveConfirm

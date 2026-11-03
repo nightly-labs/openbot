@@ -556,6 +556,33 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const current = server();
     return current?.state === "incompatible" ? current : null;
   });
+  const connectionShown = () => !noHost() && workspace.state.status !== "online" && !blockedServer();
+  const connectionPhase = () =>
+    serverWorkspacePhase({
+      hostedSleep: workspace.state.hostedSleep,
+      updating: hostUpdating(),
+      blocked: workspace.state.recovery?.phase === "suspended",
+      loading: workspace.state.status === "connecting",
+      hasContent: workspace.state.workspaceLoaded,
+    });
+  // As on desktop, the first load covers the whole window. A server that sleeps, updates or fails
+  // shows its screen in the pane only.
+  const fullWindowLoading = () =>
+    connectionShown() &&
+    !workspace.state.workspaceLoaded &&
+    !workspace.state.hostOffline &&
+    // The status is "offline" before the first attempt too; only a reported failure ends the cover.
+    !(workspace.state.status === "offline" && workspace.state.connectionError) &&
+    (connectionPhase() === "loading" || connectionPhase() === "connecting");
+  // The full-window screen stays after the load ends, so its crew hop out before it goes. It mounts in
+  // the first render, so the account screen in WebApp hands the pile to it and does not hop alone.
+  const [loadingCover, setLoadingCover] = createSignal<boolean>(untrack(fullWindowLoading));
+  createEffect(
+    () => fullWindowLoading() && !loadingCover(),
+    (show) => {
+      if (show) setLoadingCover(true);
+    },
+  );
   // A phone shows the sidebar as a full pane, so it is never compact there.
   const phoneQuery = window.matchMedia?.(PHONE_QUERY);
   const [phone, setPhone] = createSignal(phoneQuery?.matches ?? false);
@@ -1811,6 +1838,34 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const unavailable = async (): Promise<never> => {
     throw new Error(t("webClient.error.desktopOnly"));
   };
+  const connectionDetail = () =>
+    workspace.state.hostedSleep !== "sleeping" && !workspace.state.hostedIssue && !hostUpdating()
+      ? (workspace.state.connectionError ?? null)
+      : null;
+  const connectionNotice = (cover = false) => (
+    <ServerConnectionNotice
+      name={workspace.state.host?.name ?? t("webClient.notice.findingHosts")}
+      initial={cover || !workspace.state.workspaceLoaded}
+      ready={cover ? !fullWindowLoading() : undefined}
+      onExited={cover ? () => setLoadingCover(false) : undefined}
+      fullWindow={fullWindowLoading()}
+      issue={workspace.state.hostedIssue}
+      start={workspace.state.hostedStart}
+      updateVersion={workspace.state.hostRestart?.version ?? null}
+      detail={connectionDetail()?.message ?? null}
+      reference={connectionDetail()?.reference ?? null}
+      phase={connectionPhase()}
+      remainingSeconds={
+        workspace.state.recovery?.phase === "waiting" || workspace.state.recovery?.phase === "cooldown"
+          ? workspace.state.recovery.remainingSeconds
+          : 0
+      }
+      busy={workspace.state.status === "connecting" || !workspace.state.host}
+      onRetry={() => void workspace.run(workspace.reconnect)}
+      onManage={() => setBillingOpen(true)}
+      upsell={offlineUpsell()}
+    />
+  );
   return (
     <ConversationControllerProvider controller={controller}>
       <ChannelsControllerProvider controller={channels}>
@@ -1875,41 +1930,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               initialLoading={hostOffline()}
               connection={
                 <>
-                  <Show when={!noHost() && workspace.state.status !== "online" && !blockedServer()}>
-                    <ServerConnectionNotice
-                      name={workspace.state.host?.name ?? t("webClient.notice.findingHosts")}
-                      initial={!workspace.state.workspaceLoaded}
-                      issue={workspace.state.hostedIssue}
-                      start={workspace.state.hostedStart}
-                      updateVersion={workspace.state.hostRestart?.version ?? null}
-                      detail={
-                        workspace.state.hostedSleep !== "sleeping" && !workspace.state.hostedIssue && !hostUpdating()
-                          ? (workspace.state.connectionError?.message ?? null)
-                          : null
-                      }
-                      reference={
-                        workspace.state.hostedSleep !== "sleeping" && !workspace.state.hostedIssue && !hostUpdating()
-                          ? (workspace.state.connectionError?.reference ?? null)
-                          : null
-                      }
-                      phase={serverWorkspacePhase({
-                        hostedSleep: workspace.state.hostedSleep,
-                        updating: hostUpdating(),
-                        blocked: workspace.state.recovery?.phase === "suspended",
-                        loading: workspace.state.status === "connecting",
-                        hasContent: workspace.state.workspaceLoaded,
-                      })}
-                      remainingSeconds={
-                        workspace.state.recovery?.phase === "waiting" || workspace.state.recovery?.phase === "cooldown"
-                          ? workspace.state.recovery.remainingSeconds
-                          : 0
-                      }
-                      busy={workspace.state.status === "connecting" || !workspace.state.host}
-                      onRetry={() => void workspace.run(workspace.reconnect)}
-                      onManage={() => setBillingOpen(true)}
-                      upsell={offlineUpsell()}
-                    />
-                  </Show>
+                  <Show when={connectionShown() && !fullWindowLoading()}>{connectionNotice()}</Show>
                   <Show when={workspace.state.status === "online" && workspace.state.panelsFailed}>
                     <ServerPanelLoadNotice
                       busy={workspace.state.panelsLoading}
@@ -2836,6 +2857,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 <ProviderSignInDialogs api={providerSettings()?.connection} opener="composer" />
               </Show>
             </WorkspaceFrame>
+            <Show when={loadingCover()}>{connectionNotice(true)}</Show>
           </div>
         </Show>
       </ChannelsControllerProvider>
