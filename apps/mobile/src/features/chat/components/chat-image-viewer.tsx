@@ -14,11 +14,12 @@ import { ImageViewer, type ImageViewerPage } from "./image-viewer";
 
 /** An image the chat can show itself: one that is on the host and small enough to download. */
 export function isViewableImage(attachment: AttachmentSummary) {
-  return (
-    showsAsImage(attachment) &&
-    attachment.size <= MOBILE_ATTACHMENT_BYTES &&
-    !attachment.id.startsWith("mobile-draft-attachment-")
-  );
+  return isStackImage(attachment) && !attachment.id.startsWith("mobile-draft-attachment-");
+}
+
+/** An image a message stack shows: a viewable one, or one this phone is still sending. */
+export function isStackImage(attachment: AttachmentSummary) {
+  return showsAsImage(attachment) && attachment.size <= MOBILE_ATTACHMENT_BYTES;
 }
 
 interface ImageSource {
