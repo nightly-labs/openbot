@@ -48,13 +48,13 @@ function accountFailure(text: string): ProviderAccountFailed {
 /** Who a client is signed in as. A team and a personal login can share an email in different organizations. */
 interface AccountLogin {
   email: string | null;
-  organizationId: string | null;
+  organization: string | null;
 }
 
 interface AccountState {
   state: ProviderAccountState;
   email: string | null;
-  organizationId: string | null;
+  organization: string | null;
   message: string | null;
   checkedAt: number;
 }
@@ -587,8 +587,8 @@ export class ProviderAccounts {
       ({ client, account: signedIn }) =>
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;
-          const organizationId = signedIn.organizationId ?? null;
-          if (email && this.#loginTaken(provider, account.id, { email, organizationId }))
+          const organization = signedIn.organization ?? null;
+          if (email && this.#loginTaken(provider, account.id, { email, organization }))
             return yield* accountFailure(
               sourceText("error.provider.accountAlreadyAdded", { provider: providerLabel(provider) }),
             );
@@ -614,7 +614,7 @@ export class ProviderAccounts {
                     )
                   : reading
               : null;
-          this.#setState(account.id, { state: "connected", email, organizationId, message: null });
+          this.#setState(account.id, { state: "connected", email, organization, message: null });
           // The rail shows an account only with a reading, and no usage request follows a sign-in.
           if (limit) this.#host.usageChanged(limit);
         }),
@@ -728,7 +728,7 @@ export class ProviderAccounts {
 
   #loginTaken(provider: AgentProviderId, accountId: string, login: AccountLogin): boolean {
     const same = (other: AccountLogin | null | undefined) =>
-      other?.email?.toLowerCase() === login.email?.toLowerCase() && other?.organizationId === login.organizationId;
+      other?.email?.toLowerCase() === login.email?.toLowerCase() && other?.organization === login.organization;
     if (same(this.#host.defaultLogin(provider))) return true;
     return this.#store.list(provider).some((other) => other.id !== accountId && same(this.#states.get(other.id)));
   }
@@ -763,7 +763,7 @@ export class ProviderAccounts {
     this.#states.set(accountId, {
       state: patch.state ?? current?.state ?? "checking",
       email: patch.email !== undefined ? patch.email : (current?.email ?? null),
-      organizationId: patch.organizationId !== undefined ? patch.organizationId : (current?.organizationId ?? null),
+      organization: patch.organization !== undefined ? patch.organization : (current?.organization ?? null),
       message: patch.message !== undefined ? patch.message : (current?.message ?? null),
       checkedAt: patch.state === "connected" || patch.state === "signed-out" ? Date.now() : (current?.checkedAt ?? 0),
     });

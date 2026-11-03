@@ -564,7 +564,7 @@ export class ProviderRuntime implements ProviderPort {
             this.#clients.has(provider) || this.#released.has(provider) ? this.#cli.get(provider) : undefined,
           defaultLogin: (provider) => {
             const account = this.#accounts.get(provider);
-            return account ? { email: account.email ?? null, organizationId: account.organizationId ?? null } : null;
+            return account ? { email: account.email ?? null, organization: account.organization ?? null } : null;
           },
           apiKey: (provider) => this.#credentials.apiKey(provider),
           defaultUsesApiKey: (provider) => this.ownSignInUsesKey(provider),
@@ -2976,7 +2976,7 @@ export class ProviderRuntime implements ProviderPort {
           previousAccount &&
           (previousAccount.type !== account.type ||
             previousAccount.email !== account.email ||
-            previousAccount.organizationId !== account.organizationId ||
+            previousAccount.organization !== account.organization ||
             previousAccount.planType !== account.planType)
         )
           this.#forgetUsage(provider);
