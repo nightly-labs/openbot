@@ -29,6 +29,7 @@ export const messages = {
   "uiBlock.form.choose": "请选择一个选项",
   "uiBlock.form.notSet": "未设置",
   "uiBlock.form.invalid": "有些回答不正确，请检查后重试。",
+  "uiBlock.form.hiddenValue": "已隐藏",
   "uiBlock.skip": "跳过",
   "uiBlock.error.answerFailed": "回答没能发送出去，请重试。",
 } as const satisfies PartialTranslation<typeof source>;

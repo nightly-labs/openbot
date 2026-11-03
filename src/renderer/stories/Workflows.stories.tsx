@@ -20,6 +20,7 @@ import { TriggerNode } from "@openbot/ui/features/workflows/WorkflowTriggerNode"
 import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { NodeGallery } from "./workflow-node-gallery";
+import { createStoryPresence } from "./workflow-presence-story";
 import {
   AGENT_RESULT,
   competitorWatch,
@@ -70,6 +71,21 @@ type Story = StoryObj<typeof meta>;
 /** Competitor watch has every node type, so its stories offer every node kind. */
 export const Example: Story = {
   render: () => <WorkflowStory workflows={[competitorWatch()]} features={STORY_ALL_FEATURES} />,
+};
+
+/** Two other people of the team work on the same canvas: their cursors move, and they select nodes. */
+export const ExampleWithCollaborators: Story = {
+  name: "Example with collaborators",
+  render: () => {
+    const presence = createStoryPresence();
+    return (
+      <WorkflowStory
+        workflows={[competitorWatch()]}
+        features={{ ...STORY_ALL_FEATURES, presence: true }}
+        presence={presence}
+      />
+    );
+  },
 };
 
 /** The canvas in the desktop window, where the Routines page shows its board today. */

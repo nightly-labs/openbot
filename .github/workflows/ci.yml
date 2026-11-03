@@ -350,6 +350,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:push-notification-away
 
+      - name: Run the computer activity phone notification E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:computer-activity
+
       - name: Run the notification summary E2E test
         if: ${{ !cancelled() }}
         run: bun run test:notification-summary
@@ -518,6 +522,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-discord
 
+      - name: Run the workflow Telegram E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-telegram
+
+      - name: Run the workflow Slack E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-slack
+
       - name: Run the Discord files to GitHub E2E test
         if: ${{ !cancelled() }}
         run: bun run test:discord-github-files
@@ -559,6 +571,7 @@ jobs:
             .openbot-build/server-mute-e2e/
             .openbot-build/desktop-notifications-e2e/
             .openbot-build/push-notification-away-e2e/
+            .openbot-build/computer-activity-e2e/
             .openbot-build/notification-summary-e2e/
             .openbot-build/routine-pause-resume-e2e/
             .openbot-build/routine-timezone-move-e2e/
@@ -599,6 +612,8 @@ jobs:
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/workflow-discord-e2e/
+            .openbot-build/workflow-telegram-e2e/
+            .openbot-build/workflow-slack-e2e/
             .openbot-build/discord-github-files-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/

@@ -1,6 +1,7 @@
 import { AGENT_MEMORY_CONTEXT_BUDGET_BYTES, essentialMemoryBytes } from "@openbot/contracts/agent-memory-context";
 import type {
   AcpRegistryEntry,
+  AgentProviderRef,
   AgentSessionSettings,
   HiddenAgentsSnapshot,
   McpSignInApp,
@@ -122,7 +123,9 @@ import {
   type PromptCacheTtlSetting,
   type ProviderAccountStatus,
   type ProviderDetectionSettings,
+  type ProviderModelVisibility,
   parseAgentAccessChange,
+  parseProviderModelVisibilityChange,
   type QueueDelivery,
   type QueuedMessageReceipt,
   type QueueSnapshot,
@@ -455,6 +458,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   // The disk level is below the preview disk use (82%), so Storage shows a passed level.
   let machineAlerts: MachineAlertSettings = { ...DEFAULT_MACHINE_ALERT_SETTINGS, diskPercent: 80 };
   let promptCacheTtl: PromptCacheTtlSetting = { ...DEFAULT_PROMPT_CACHE_TTL };
+  /** The models each provider's picker shows, after the user changed the list. Unchanged providers show all. */
+  const shownModels = new Map<string, readonly string[]>();
   let agentAccess: AgentAccessChange = { revision: 0, everyone: {}, roles: [] };
   let serverAudit: ServerAuditEntry[] = clone(STORY_SERVER_AUDIT_ENTRIES);
   const agentMemoryLimitListeners = new Set<(preference: AgentMemoryLimitPreference) => void>();
@@ -811,6 +816,24 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return { outcome: "added", path, replaced, list: mockAgentFolders(agentId) };
   }
 
+  /** Every model the preview providers list, before the picker's model list. */
+  function allModels() {
+    return [...models, ...customProviders.flatMap(mockCustomProviderModels)].filter(
+      (model) => !agentStatus.providers?.some((row) => row.id === model.provider && row.off),
+    );
+  }
+
+  function modelVisibility(provider: AgentProviderRef): ProviderModelVisibility {
+    const listed = allModels().filter((model) => model.provider === provider);
+    const shown = shownModels.get(provider);
+    return clone({
+      provider,
+      models: listed.map((model) => ({ id: model.id, name: model.name })),
+      shown: listed.filter((model) => !shown || shown.includes(model.id)).map((model) => model.id),
+      changed: shown !== undefined,
+    });
+  }
+
   function emitAgentEvent(event: AgentEvent): void {
     emit(agentListeners, event);
   }
@@ -902,7 +925,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   }
 
   /** Runs one mock turn in a task: the user message, a progress line, then a short answer. */
-  function runTaskTurn(task: AgentTask, text: string): QueuedMessageReceipt {
+  function runTaskTurn(task: AgentTask, text: string, replyToMessageId: string | null = null): QueuedMessageReceipt {
     if (task.closedAt) throw new Error(sourceText("error.backend.threadArchived"));
     const deliveryId = `mock-delivery-${messageCounter++}`;
     const turnId = `mock-turn-${messageCounter++}`;
@@ -915,6 +938,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         author: "user",
         source: "user",
         text,
+        replyToMessageId,
         createdAt: new Date().toISOString(),
         status: "completed",
       },
@@ -1901,9 +1925,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       // respawned OpenCode would: it lists what its config names and nothing else.
       listModels: async (serverId) =>
         clone([
-          ...[...models, ...customProviders.flatMap(mockCustomProviderModels)].filter(
-            (model) => !agentStatus.providers?.some((row) => row.id === model.provider && row.off),
-          ),
+          ...allModels().filter((model) => {
+            const shown = shownModels.get(model.provider);
+            return (
+              !shown ||
+              shown.includes(model.id) ||
+              agents.some((agent) => agent.provider === model.provider && agent.model === model.id)
+            );
+          }),
           ...(serverId === storyForeignServerId ? [STORY_FOREIGN_MODEL] : []),
         ]),
       listAgents: async (serverId) =>
@@ -2701,7 +2730,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       sendMessage: async (input: SendMessageInput) => {
         if (agents.some((agent) => agent.id === input.agentId && agent.hiddenAt !== undefined))
           throw new Error(sourceText("error.backend.recipientHidden"));
-        if (input.taskId) return runTaskTurn(findTask(input.agentId, input.taskId), input.text);
+        if (input.taskId)
+          return runTaskTurn(findTask(input.agentId, input.taskId), input.text, input.replyToMessageId ?? null);
         // As on a host, a repeated client id answers with the first receipt and stores nothing.
         const repeated = input.clientMessageId ? sentReceipts.get(input.clientMessageId) : undefined;
         if (repeated) return repeated;
@@ -3233,6 +3263,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!isPromptCacheTtl(ttl)) throw new Error("Prompt cache time is required.");
         promptCacheTtl = { ttl };
         return clone(promptCacheTtl);
+      },
+      // Preview has one host, so every server shares one model list.
+      getModelVisibility: async (provider) => modelVisibility(provider),
+      setModelVisibility: async (input) => {
+        const change = parseProviderModelVisibilityChange(input);
+        // Preview shows every model by default, so a reset forgets the list.
+        if (change.shown === null) shownModels.delete(change.provider);
+        else shownModels.set(change.provider, change.shown);
+        emitAgentEvent({ type: "status", status: clone(agentStatus) });
+        return modelVisibility(change.provider);
       },
       // Preview has one host, and its user owns it, so `mine` gives every agent.
       getAgentAccess: async () => ({

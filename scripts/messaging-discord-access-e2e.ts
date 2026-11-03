@@ -1,5 +1,5 @@
 // Checks two Discord servers on one OpenBot server, the role list of a Discord server, the
-// replied-to message as context, a forwarded message as context, and an earlier image posted without a mention as context. A Gateway event goes through Signal's normalizer
+// replied-to message as context, a forwarded message as context, embeds as context, and an earlier image posted without a mention as context. A Gateway event goes through Signal's normalizer
 // (`remote/api/src/discord-events.ts`), a JSON round trip and the host's decoder, into the real
 // Discord driver and messaging service on a temporary profile. Signal's API (`makeDiscordApi`) runs
 // over a fake Discord REST client. No agent turn runs: the check reads the prompt that a turn would get.
@@ -64,6 +64,9 @@ const OLEK = "500000000000000009";
 const NINA = "500000000000000010";
 const PIOTR = "500000000000000011";
 const RITA = "500000000000000012";
+const SARA = "500000000000000013";
+const KUBA = "500000000000000014";
+const TICKET_TOOL = "500000000000000015";
 
 interface Step {
   name: string;
@@ -121,6 +124,15 @@ function gateway(t: string, d: unknown): Parameters<DiscordState["handle"]>[0] {
 const calls: DiscordRestRequest[] = [];
 const waiters: Array<{ match: (call: DiscordRestRequest) => boolean; resolve: () => void }> = [];
 let nextMessageId = 600000000000000000n;
+/** One embed as Discord gives it: each part that the embed does not have is left out. */
+interface RestEmbed {
+  title?: string;
+  description?: string;
+  url?: string;
+  color?: number;
+  footer?: { text: string; icon_url?: string };
+  fields?: { name: string; value: string; inline?: boolean }[];
+}
 /** One channel message as Discord's REST API gives it. */
 interface RestMessage {
   id: string;
@@ -128,6 +140,7 @@ interface RestMessage {
   timestamp: string;
   author: { id: string; username: string };
   attachments: { id: string; filename: string; content_type: string; size: number; url: string }[];
+  embeds?: RestEmbed[];
   /** A forward has no text or files of its own: they are in its snapshot. */
   message_reference?: { type: number; message_id: string };
   message_snapshots?: { message: { content: string; attachments: RestMessage["attachments"] } }[];
@@ -335,6 +348,9 @@ interface Mention {
     attachments?: { id: string; filename: string; content_type: string; size: number; url: string }[];
     /** The replied-to message is a forward: Discord gives its text and files in its snapshot. */
     forwarded?: boolean;
+    /** Another bot, such as a ticket bot, wrote the replied-to message. */
+    bot?: boolean;
+    embeds?: RestEmbed[];
   };
 }
 
@@ -357,7 +373,11 @@ async function mention(message: Mention) {
             referenced_message: {
               id: message.replyTo.id,
               timestamp: "2026-10-19T11:40:00.000Z",
-              author: { id: message.replyTo.authorId, username: message.replyTo.authorName },
+              author: {
+                id: message.replyTo.authorId,
+                username: message.replyTo.authorName,
+                ...(message.replyTo.bot ? { bot: true } : {}),
+              },
               ...(message.replyTo.forwarded
                 ? {
                     content: "",
@@ -369,7 +389,11 @@ async function mention(message: Mention) {
                       },
                     ],
                   }
-                : { content: message.replyTo.content, attachments: message.replyTo.attachments ?? [] }),
+                : {
+                    content: message.replyTo.content,
+                    attachments: message.replyTo.attachments ?? [],
+                    embeds: message.replyTo.embeds ?? [],
+                  }),
             },
           }
         : {}),
@@ -916,6 +940,91 @@ try {
       }
       return { forwardedReport: true };
     });
+
+    await step(
+      "a reply to a ticket bot's form, and an earlier link preview, give their embeds to the agent",
+      async () => {
+        // Sara replies to the form of a ticket bot. The bot writes the answers in embed fields.
+        const id = nextId();
+        await mention({
+          id,
+          guildId: GUILD_ONE,
+          channelId: CHANNEL_ONE,
+          authorId: SARA,
+          authorName: "Sara",
+          roles: [MAINTAINERS],
+          content: "please look at this ticket",
+          replyTo: {
+            id: nextId(),
+            authorId: TICKET_TOOL,
+            authorName: "Ticket Tool",
+            bot: true,
+            content: `<@${BOB}> Welcome`,
+            embeds: [
+              {
+                description: `Support will be with you shortly. Opened by <@${KAMIL}>.`,
+                color: 0x2ecc71,
+                footer: {
+                  text: "TicketTool.xyz - Ticketing without clutter",
+                  icon_url: "https://tickettool.xyz/icon.png",
+                },
+              },
+              {
+                fields: [
+                  { name: "What do you need?", value: "```Bug```", inline: false },
+                  { name: "OpenBot version", value: "```0.59.0```", inline: false },
+                  // A blank field, as bots use for spacing: it is left out.
+                  { name: "\u200b", value: "\u200b" },
+                ],
+              },
+              // An embed with no text: it is left out.
+              { color: 0x2ecc71 },
+            ],
+          },
+        });
+        await received(id);
+        assert.match(
+          await promptOf(services, GUILD_ONE, id, CHANNEL_ONE),
+          /--- the message this one replies to \(context\) ---\n\[2026-10-19T11:40:00\.000Z\] Ticket Tool: @Bob Welcome\n\(Embed\)\nSupport will be with you shortly\. Opened by @Kamil\.\nFooter: TicketTool\.xyz - Ticketing without clutter\n\(Embed\)\nWhat do you need\?: ```Bug```\nOpenBot version: ```0\.59\.0```\n--- message ---\nplease look at this ticket/u,
+        );
+
+        // A link that a person posted without a mention has only Discord's preview embed.
+        channelOne.push({
+          id: nextId(),
+          content: "",
+          timestamp: "2026-10-19T11:46:00.000Z",
+          author: { id: TOMEK, username: "tomek" },
+          attachments: [],
+          embeds: [
+            {
+              title: "Login fails after the update",
+              url: "https://github.com/nightly-labs/openbot/issues/1",
+              description: "The app closes at start.",
+            },
+          ],
+        });
+        try {
+          const asked = nextId();
+          await mention({
+            id: asked,
+            guildId: GUILD_ONE,
+            channelId: CHANNEL_ONE,
+            authorId: KUBA,
+            authorName: "Kuba",
+            roles: [MAINTAINERS],
+            content: "is this fixed?",
+          });
+          await received(asked);
+          assert.match(
+            await promptOf(services, GUILD_ONE, asked, CHANNEL_ONE),
+            /--- earlier messages \(context, oldest first\) ---\n\[2026-10-19T11:46:00\.000Z\] tomek: \(Embed\)\nLogin fails after the update\nLink: https:\/\/github\.com\/nightly-labs\/openbot\/issues\/1\nThe app closes at start\.\n/u,
+          );
+        } finally {
+          channelOne.length = 0;
+        }
+        return { embeds: true };
+      },
+    );
   });
 
   await boot(async (services) => {

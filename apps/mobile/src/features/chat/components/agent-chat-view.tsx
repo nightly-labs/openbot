@@ -18,6 +18,7 @@ import { chatRowIndex, latestReadableMessage, projectChatMessages, withFailureRe
 import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
+import { useBranchThread } from "./use-branch-thread";
 import { useChatQueue } from "./use-chat-queue";
 import { useOpenAgentTasks } from "./use-open-agent-tasks";
 import { useQuestionPrompt } from "./use-question-prompt";
@@ -203,6 +204,13 @@ export function MobileChatView({
       message.turnId === conversation?.activeTurnId,
   );
   const viewOnly = useAgentViewOnly(agent.serverId, agent.id);
+  const branching = useBranchThread({
+    serverId: agent.serverId,
+    agentId: agent.id,
+    sourceTaskId: null,
+    messages: conversation?.messages,
+    activeTurnId: conversation?.activeTurnId ?? null,
+  });
   const mentionSkills = useAgentMentionSkills(agent.id, agent.serverId, showsOnline(server));
   const questionForm = useQuestionPrompt(
     agent.id,
@@ -238,6 +246,8 @@ export function MobileChatView({
       activeTurnId={conversation?.activeTurnId ?? null}
       conversation={liveConversation}
       stopTurn={stopTurn}
+      branchPoints={branching.branchPoints}
+      onBranch={branching.branch}
       questionForm={questionForm}
       activityAccessory={activityAccessory}
       threadMenu={threadMenu}

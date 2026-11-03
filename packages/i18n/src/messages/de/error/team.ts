@@ -107,6 +107,7 @@ export const messages = {
   "error.team.folderUnavailable": "Dieser Ordner ist auf dem Host-Computer nicht verfügbar.",
   "error.team.memoryReviewUnsupported": "Diese Verbindung unterstützt die Erinnerungsprüfung nicht.",
   "error.team.promptCacheTtlUnsupported": "Diese Verbindung unterstützt die Prompt-Cache-Dauer nicht.",
+  "error.team.modelVisibilityUnsupported": "Diese Verbindung unterstützt die Modellliste nicht.",
   "error.team.providerDefaultUnsupported": "Diese Verbindung unterstützt den Standardanbieter nicht.",
   "error.team.attachmentNameRequired": "Ein sicherer Anhangsname ist erforderlich.",
   "error.team.attachmentNotFound": "Anhang nicht gefunden.",

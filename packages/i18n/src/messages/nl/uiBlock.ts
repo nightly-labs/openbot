@@ -30,6 +30,7 @@ export const messages = {
   "uiBlock.form.choose": "Kies een optie",
   "uiBlock.form.notSet": "Niet ingesteld",
   "uiBlock.form.invalid": "Sommige antwoorden kloppen niet. Controleer ze en probeer het opnieuw.",
+  "uiBlock.form.hiddenValue": "Verborgen",
   "uiBlock.skip": "Overslaan",
   "uiBlock.error.answerFailed": "Kan je antwoord niet versturen. Probeer het opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -103,6 +103,7 @@ export const messages = {
   "error.team.folderUnavailable": "Ten folder nie jest dostępny na komputerze hosta.",
   "error.team.memoryReviewUnsupported": "To połączenie nie obsługuje przeglądu wspomnień.",
   "error.team.promptCacheTtlUnsupported": "To połączenie nie obsługuje czasu pamięci podręcznej promptów.",
+  "error.team.modelVisibilityUnsupported": "To połączenie nie obsługuje listy modeli.",
   "error.team.providerDefaultUnsupported": "To połączenie nie obsługuje domyślnego dostawcy.",
   "error.team.attachmentNameRequired": "Wymagana jest bezpieczna nazwa załącznika.",
   "error.team.attachmentNotFound": "Nie znaleziono załącznika.",

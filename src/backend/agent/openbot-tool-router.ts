@@ -630,7 +630,7 @@ export class OpenBotToolRouter {
     if (vaultKey) return openBotToolResult({ status: "saved", ...vaultKey });
     if (this.#messaging.store.linkForThread(this.#conversation.publicThreadId(agentId, params.threadId)))
       return openBotToolFailure(
-        "request_api_key does not work in a Slack, Discord or Telegram chat. Ask the user to give you the key in OpenBot.",
+        "request_api_key does not work in an external chat. Ask the user to give you the key in OpenBot.",
       );
     const spec = apiKeyFormSpec(parsed.data);
     if (!spec) return openBotToolFailure("OpenBot could not show this form. Use a shorter title and retry.");
@@ -656,7 +656,7 @@ export class OpenBotToolRouter {
       return;
     }
     const threadId = this.#conversation.publicThreadId(agent.id, params.threadId);
-    // Nobody presses a button on Slack, Discord or Telegram.
+    // Nobody presses a button on Slack, Discord, Telegram or WhatsApp.
     if (this.#messaging.store.linkForThread(threadId)) {
       refuse("This chat cannot show the plan card. Do not call it here; start the work.");
       return;
@@ -830,9 +830,7 @@ export class OpenBotToolRouter {
       // Only the agent that answers a platform conversation, in that conversation's own thread.
       const link = this.#messaging.store.linkForThread(executionThreadId);
       if (!link || link.agentId !== senderAgentId)
-        return openBotToolFailure(
-          "Messaging tools work only in a turn that answers a Slack, Discord or Telegram message.",
-        );
+        return openBotToolFailure("Messaging tools work only in a turn that answers an external chat message.");
       return yield* this.#messaging.tool(link, params.turnId, params.callId, params.tool, params.arguments);
     }
     const channelId = this.#channels.store.channelForThread(executionThreadId);
@@ -1028,6 +1026,39 @@ export class OpenBotToolRouter {
       new Set(this.#hooks.listAgents().map((agent) => agent.id)),
     );
     if (flowResult) return flowResult;
+
+    // An isolated channel keeps what its members learn in it (#4332). The fact becomes a channel
+    // memory, which only the packets of this channel show, so the agent's own chats do not get it.
+    // Its other memory tools still change its own memories, which reach every chat.
+    if (
+      params.tool === "remember" &&
+      channelId &&
+      this.#channels.store.exists(channelId) &&
+      this.#channels.store.get(channelId).isolated
+    ) {
+      const args = isRecord(params.arguments) ? params.arguments : {};
+      if (args.memoryId !== undefined)
+        return openBotToolFailure(
+          "This channel is isolated, so a memory from it cannot change your own memories. Save the corrected fact without memoryId: it becomes a channel memory.",
+        );
+      const result = yield* this.#channels.tool(
+        channelId,
+        senderAgentId,
+        params.turnId,
+        params.callId,
+        "channel_remember",
+        { text: args.text },
+      );
+      return openBotToolResult(
+        isRecord(result) && result.accepted === true
+          ? {
+              status: "saved",
+              savedAs: "channel memory",
+              note: "This channel is isolated: the members of this channel see the memory here, and your other chats do not.",
+            }
+          : result,
+      );
+    }
 
     const memoryResult = this.#memories.handleTool(params, senderAgentId, this.#hooks.redactMcp);
     if (memoryResult) return memoryResult;
@@ -1225,7 +1256,7 @@ export class OpenBotToolRouter {
     const host = this.#screenCapture;
     if (!host) return openBotToolFailure(sourceText("error.agent.screenCaptureUnavailable"));
     const threadId = this.#conversation.publicThreadId(agent.id, params.threadId);
-    // A Slack, Discord or Telegram link sends each agent attachment of the turn to the platform. The
+    // A Slack, Discord, Telegram or WhatsApp link sends each agent attachment of the turn to the platform. The
     // screen of this computer must stay on this computer.
     if (this.#messaging.store.linkForThread(threadId)) {
       return openBotToolFailure(sourceText("error.agent.screenCaptureShared"));

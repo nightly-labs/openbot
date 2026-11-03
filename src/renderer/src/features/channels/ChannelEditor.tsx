@@ -11,6 +11,7 @@ import {
   Plus,
   Popover,
   Search,
+  SwitchField,
   Tooltip,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
@@ -186,6 +187,7 @@ export function ChannelEditor(props: ChannelEditorProps) {
       instructions: instructionsTooLong(fields.instructions) ? current.instructions : fields.instructions,
       members: current.members.map((member) => ({ agentId: member.agentId })),
       leadAgentId: current.leadAgentId,
+      isolated: current.isolated === true,
     };
   }
 
@@ -369,6 +371,16 @@ export function ChannelEditor(props: ChannelEditorProps) {
         />
         <InstructionsLimit text={fields.instructions} />
       </SettingsField>
+      <SwitchField
+        checked={channel()?.isolated === true}
+        onChange={(isolated) =>
+          void commit((draft) => {
+            draft.isolated = isolated;
+          })
+        }
+        label={t("channel.settings.isolated")}
+        description={t("channel.settings.isolatedDescription")}
+      />
       <SettingsLinkGroup>
         <SettingsLinkRow
           label={t("channel.settings.memories")}

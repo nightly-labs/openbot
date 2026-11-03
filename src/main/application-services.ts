@@ -1,6 +1,8 @@
 import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
 import { ANALYTICS_GENERATIONS, openPanelTransport, ReportQueue } from "@openbot/telemetry";
 import { fileReportStorage } from "@openbot/telemetry/node";
+import { makeWASocket } from "@openbot/whatsapp/baileys";
+import { makeOpenBotSignalRepository } from "@openbot/whatsapp/signal-repository";
 import { Effect, Fiber } from "effect";
 import { toAgentRemovalFailed } from "../backend/agent/agent-removal";
 import { toHostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
@@ -92,6 +94,7 @@ import {
   latestTurnAnswer,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
+import { localeDirection } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
@@ -124,6 +127,8 @@ import { discordDriver, downloadDiscordAttachment } from "../backend/messaging/d
 import { MessagingOperationFailed, MessagingService } from "../backend/messaging/messaging-service";
 import { slackDriver } from "../backend/messaging/slack/slack-driver";
 import { telegramDriver } from "../backend/messaging/telegram/telegram-driver";
+import { whatsAppDriver } from "../backend/messaging/whatsapp/whatsapp-driver";
+import { WhatsAppRuntime } from "../backend/messaging/whatsapp/whatsapp-runtime";
 import { OpenBotDatabase } from "../backend/openbot-database";
 import { passwordVaultRouter } from "../backend/password-vault-router";
 import { sweepProviderTemp } from "../backend/provider-temp";
@@ -262,6 +267,7 @@ import {
 import { McpOAuthStore } from "./mcp-oauth-store";
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
+import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
 import { OnePasswordConnectorStore } from "./onepassword-connector-store";
@@ -380,6 +386,7 @@ const AGENT_NOTIFICATION_LEVELS_FILE = "openbot-agent-notification-levels-v1.jso
 const SIDEBAR_PINS_FILE = "openbot-sidebar-pins-v1.json";
 const SERVER_TIMEZONE_PREFERENCE_FILE = "openbot-server-timezone-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
+const MODEL_VISIBILITY_PREFERENCE_FILE = "openbot-model-visibility-v1.json";
 const REMOTE_SESSION_REUSE_PREFERENCE_FILE = "openbot-remote-session-reuse-preference-v1.json";
 const EXTERNAL_LINK_PREFERENCE_FILE = "openbot-external-link-preference-v1.json";
 const REMOTE_NETWORK_ROUTE_PREFERENCE_FILE = "openbot-remote-network-route-v1.json";
@@ -614,6 +621,7 @@ export interface ApplicationServices {
   serverAudit: ServerAuditStore;
   serverTimezone: ServerTimezonePreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
+  modelVisibility: ModelVisibility;
   remoteSessionReuse: RemoteSessionReusePreferenceStore;
   externalLinkPreference: ExternalLinkPreferenceStore;
   externalLinks: ExternalLinkOpener;
@@ -767,6 +775,12 @@ async function createMessagingServices({
   // Development only: `bun run dev:slack` names this loopback port, so a Slack install returns to this
   // dev app and not to an installed OpenBot that owns `openbot://`.
   const developmentSlackCallbackPort = app.isPackaged ? 0 : Number(process.env.OPENBOT_DEV_SLACK_CALLBACK_PORT ?? 0);
+  // The WhatsApp numbers linked as devices of this computer. Their keys stay in `<userData>/whatsapp`.
+  const whatsapp = new WhatsAppRuntime({
+    root: join(app.getPath("userData"), "whatsapp"),
+    createSocket: (config) => makeWASocket(config),
+    makeSignalRepository: makeOpenBotSignalRepository,
+  });
   const messaging = new MessagingService({
     threads: service.messaging,
     agents: {
@@ -788,10 +802,12 @@ async function createMessagingServices({
       slackDriver({ ingress: signalIngress }),
       discordDriver({ ingress: signalIngress }),
       telegramDriver({ ingress: signalIngress }),
+      whatsAppDriver({ runtime: whatsapp }),
     ],
     downloadsRoot: join(app.getPath("userData"), "messaging-downloads"),
     statusPath: join(app.getPath("userData"), "openbot-messaging-status-v1.json"),
     ingress: signalIngress,
+    whatsapp,
     sidebar: sidebarLayout,
     slackApp: {
       authorize: (input) =>
@@ -1692,7 +1708,8 @@ export async function createApplicationServices({
   // display of its own, the driver works where they cannot be drawn.
   const drawsComputerUseHighlight = !hasSeparateAgentDisplay(process.platform);
   const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
-    createWindow: () => createComputerUsePermissionHelpWindow(language.translate),
+    createWindow: () =>
+      createComputerUsePermissionHelpWindow(language.translate, () => localeDirection(language.locale)),
     loadWindow: loadComputerUsePermissionHelpRenderer,
     // The bundle that owns this process, which is the one macOS attributes every click and capture
     // to. In a development build that is Electron itself, and the window says so.
@@ -1878,6 +1895,15 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => runCauseEffect(service.stop()));
   const agentMemoryLimitSetting = reloadingAgentMemoryLimit(agentMemoryLimit, service);
+  // The models that the model picker shows. Agents, tools and automations keep `service.listModels()`.
+  const modelVisibility = new ModelVisibility({
+    path: join(app.getPath("userData"), MODEL_VISIBILITY_PREFERENCE_FILE),
+    catalog: new ModelReleaseCatalog(),
+    listModels: () => service.listModels(),
+    listAgents: () => service.listAgents(),
+    modelsChanged: () => service.notifyModelsChanged(),
+  });
+  await runCauseEffect(modelVisibility.load());
   /** The answer an agent gave in one turn, for routine flows, routine results and local scripts. */
   const turnAnswer = (agentId: string, turnId: string): string | null => {
     const threadId = store.list().find((agent) => agent.id === agentId)?.threadId;
@@ -1969,6 +1995,8 @@ export async function createApplicationServices({
       connectionOn: (connectionId) => service.messaging.store.connection(connectionId)?.enabled === true,
       post: (connectionId, placeId, markdown) => service.messaging.deliver(connectionId, placeId, markdown),
       discordSend: (connectionId, send) => service.messaging.discordSend(connectionId, send),
+      telegramSend: (connectionId, send) => service.messaging.telegramSend(connectionId, send),
+      slackSend: (connectionId, send) => service.messaging.slackSend(connectionId, send),
       // An agent event, so this window, joined clients and the web app hear it the same way.
       changed: (workflowId) => service.notifyWorkflowsChanged(workflowId),
       rearm: () => service.armRoutines(),
@@ -1999,8 +2027,32 @@ export async function createApplicationServices({
       ),
     ),
   );
+  // A new conversation in a Telegram group goes to the workflows' Telegram triggers in the same way.
+  service.messaging.setTelegramMentionHandler((mention) =>
+    workflowRuntime.receiveTelegram(mention).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          logger.warn("A Telegram message could not reach the workflows.", { cause: String(failure.cause) });
+          return "none" as const;
+        }),
+      ),
+    ),
+  );
+  // A Slack mention in a channel goes to the workflows' Slack triggers in the same way.
+  service.messaging.setSlackMentionHandler((mention) =>
+    workflowRuntime.receiveSlack(mention).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          logger.warn("A Slack mention could not reach the workflows.", { cause: String(failure.cause) });
+          return "none" as const;
+        }),
+      ),
+    ),
+  );
   teardown.push(TEARDOWN_ORDER.workflows, "the workflows", () => {
     service.messaging.setMentionHandler(null);
+    service.messaging.setTelegramMentionHandler(null);
+    service.messaging.setSlackMentionHandler(null);
     return Effect.runPromise(workflowRuntime.close());
   });
   // An agent routine's answer sent on to a messaging place; see `routine-results.ts`.
@@ -2474,6 +2526,9 @@ export async function createApplicationServices({
         ? Effect.succeed(localServersForTeam)
         : Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.team.localServersUnsupported")) })),
     );
+  // Development only: a shorter or longer time without input before a phone notifies, to test it.
+  const awaySeconds = app.isPackaged ? Number.NaN : Number(process.env.OPENBOT_DEV_AWAY_SECONDS);
+  const awayAfterMs = Number.isInteger(awaySeconds) && awaySeconds > 0 ? awaySeconds * 1_000 : DESKTOP_USE_MS;
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -2580,6 +2635,7 @@ export async function createApplicationServices({
       memoryLimit: agentMemoryLimitSetting,
       memoryReview,
       promptCacheTtl,
+      modelVisibility,
       // The local Settings save does the same two steps (`saveSetup`).
       defaultProvider: {
         // The provider that a new agent starts on now, also before a setup choice: `preferredProvider` above.
@@ -2661,13 +2717,14 @@ export async function createApplicationServices({
     sendLiveActivityPush: (hostId, push) => centralAuth.sendLiveActivityPush(hostId, push).pipe(toRemoteWorkflowError),
     sendPushNotification: (hostId, push) => centralAuth.sendPushNotification(hostId, push).pipe(toRemoteWorkflowError),
     pushNotificationStore,
+    awayAfterMs,
     // The owner is at this computer only with recent input, also when the window was left in focus.
     // Then the focused window shows the event, or the desktop notifies. When mute or the level of
     // this server keeps the desktop quiet about the event, the phone tells the owner.
     hostComputerInUse: (event) => {
       const window = windows.getMainWindow();
       if (!window || window.isDestroyed()) return false;
-      if (powerMonitor.getSystemIdleState(DESKTOP_USE_MS / 1_000) !== "active") return false;
+      if (powerMonitor.getSystemIdleState(awayAfterMs / 1_000) !== "active") return false;
       if (window.isFocused()) return true;
       // Without a notification service, as on Linux without a daemon, the desktop shows nothing.
       if (!Notification.isSupported()) return false;
@@ -2922,6 +2979,27 @@ export async function createApplicationServices({
           }),
       },
       accountReady: centralAuthInitialization,
+      // A joined host keeps the member's phones quiet while this computer has input and this desktop
+      // shows the events of that host: in a focused window, or as notifications.
+      ...(hostedServer || serverModeEnvironment || localServerChild
+        ? {}
+        : {
+            computerActivity: {
+              awayAfterMs,
+              idleSeconds: () => powerMonitor.getSystemIdleTime(),
+              showsEvents: (server) => {
+                const window = windows.getMainWindow();
+                if (!window || window.isDestroyed()) return false;
+                if (window.isFocused() || windows.getChatWindows().some((chat) => chat.isFocused())) return true;
+                return (
+                  Notification.isSupported() &&
+                  notificationPreference.get().desktopNotifications &&
+                  !server.notificationsMuted &&
+                  server.notificationLevel !== "nothing"
+                );
+              },
+            },
+          }),
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
       hostedServers: {
         unavailable: (serverId, wake) => hostedServers.unavailableHost(serverId, wake),
@@ -3498,6 +3576,7 @@ export async function createApplicationServices({
     serverAudit,
     serverTimezone,
     promptCacheTtl,
+    modelVisibility,
     remoteSessionReuse,
     externalLinkPreference,
     externalLinks,

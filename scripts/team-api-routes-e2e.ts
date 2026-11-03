@@ -68,6 +68,10 @@ import {
   AGENT_TASK_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import {
+  AGENT_THREAD_REPLIES_CAPABILITY,
+  AGENT_THREAD_REPLIES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
+import {
   BITWARDEN_CONNECTOR_CAPABILITY,
   BITWARDEN_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
@@ -156,7 +160,12 @@ import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/ma
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import { SidebarPinStore } from "../src/main/sidebar-pin-store";
-import type { TeamApiAgents, TeamApiBrowser, TeamApiMailbox } from "../src/main/team-api/dependencies";
+import type {
+  TeamApiAgents,
+  TeamApiAgentTasks,
+  TeamApiBrowser,
+  TeamApiMailbox,
+} from "../src/main/team-api/dependencies";
 import { isPeerHiddenProvider } from "../src/main/team-api/provider-visibility";
 import { TeamApiServer } from "../src/main/team-api-server";
 import { TeamStore } from "../src/main/team-store";
@@ -521,6 +530,30 @@ const fakeAgents: TeamApiAgents = {
   respondToBrowserTakeover: unused("respondToBrowserTakeover"),
 };
 
+// Only a reply in a side thread (`agent-thread-replies-v1`) reaches the side threads in this run.
+const fakeAgentTasks: TeamApiAgentTasks = {
+  listAgents: () => agents,
+  listTasks: unused("listTasks"),
+  readTask: unused("readTask"),
+  startTask: unused("startTask"),
+  sendMessage: (input, sender) =>
+    Effect.sync(() => {
+      record("sendTaskMessage", input, sender);
+      return {
+        messageId: "message-reply",
+        deliveries: [{ id: "delivery-reply", recipientAgentId: input.agentId, status: "queued", position: 1 }],
+      };
+    }),
+  stopTask: unused("stopTask"),
+  closeTask: unused("closeTask"),
+  reopenTask: unused("reopenTask"),
+  renameTask: unused("renameTask"),
+  deleteTask: unused("deleteTask"),
+  listTaskReads: unused("listTaskReads"),
+  markTaskRead: unused("markTaskRead"),
+  branchTask: unused("branchTask"),
+};
+
 const mailbox: TeamApiMailbox = {
   resolveAttachment: (id) =>
     Effect.succeed(id === "att-1" ? { path: attachmentPath, mimeType: "text/plain", name: "report one.txt" } : null),
@@ -786,6 +819,7 @@ try {
     appVersion: APP_VERSION,
     store,
     agents: fakeAgents,
+    agentTasks: fakeAgentTasks,
     mailbox,
     browser,
     chat: new TeamChatStore(database),
@@ -2741,6 +2775,86 @@ try {
       "a refused key change gives the owner 409 with the reason, not a host fault",
       errorIs(refusedRotate, 409, sourceText("error.host.keyRotationRefused")),
       summary(refusedRotate),
+    );
+  }
+
+  // ---- A reply in a side thread (agent-thread-replies-v1) ----
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, AGENT_THREAD_REPLIES_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-thread-replies-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_THREAD_REPLIES_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_THREAD_REPLIES_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const reply = {
+      agentId: "agent-ada",
+      taskId: "task-1",
+      text: "About this answer",
+      attachmentDraftIds: [],
+      replyToMessageId: "message-7",
+      clientMessageId: "client-1",
+    };
+    const unsupported = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, { token: bobToken, json: reply });
+    check(
+      "the reply route without the capability gets 400 threadRemoteUnsupported, and sends nothing",
+      errorIs(unsupported, 400, sourceText("error.backend.threadRemoteUnsupported")) &&
+        callsOf("sendTaskMessage").length === 0,
+      summary(unsupported),
+    );
+    const sent = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, { token: bobToken, json: reply, capabilities });
+    const [sentInput, sentSender] = callsOf("sendTaskMessage")[0] ?? [];
+    check(
+      "a member sends a reply to a side thread: the host gets the task, the reply target and the member, and answers the receipt",
+      sent.status === 202 &&
+        field(sent.body, "messageId") === "message-reply" &&
+        isDeepStrictEqual(sentInput, reply) &&
+        isDynamicRecord(sentSender) &&
+        sentSender.id === bobId,
+      [summary(sent), callsOf("sendTaskMessage")],
+    );
+    const extra = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      json: { ...reply, voiceRecordingDraftId: "voice-1" },
+      capabilities,
+    });
+    const empty = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      json: { ...reply, text: " " },
+      capabilities,
+    });
+    const noTarget = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      json: { ...reply, replyToMessageId: "" },
+      capabilities,
+    });
+    check(
+      "the frozen codec refuses an unknown field, a reply with no text and no file, and an empty reply target",
+      extra.status === 400 &&
+        empty.status === 400 &&
+        noTarget.status === 400 &&
+        callsOf("sendTaskMessage").length === 1,
+      [summary(extra), summary(empty), summary(noTarget)],
+    );
+    const hidden = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      json: { ...reply, agentId: "agent-pi" },
+      capabilities,
+      protocol: 6,
+    });
+    const missing = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      json: { ...reply, agentId: "agent-none" },
+      capabilities,
+    });
+    check(
+      "an unknown agent, and an agent that the client protocol does not show, get 404 and send nothing",
+      errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("sendTaskMessage").length === 1,
+      [summary(hidden), summary(missing)],
     );
   }
 

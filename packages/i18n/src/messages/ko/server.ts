@@ -147,6 +147,13 @@ export const messages = {
   "server.upsell.offline": "OpenBot 서버는 24시간 켜져 있어서 루틴이 계속 실행돼요.",
   "server.upsell.seePlans": "요금제 보기",
   "server.upsell.notNow": "나중에",
+  "server.upgrade.title": "에이전트의 공간이 부족해요",
+  "server.upgrade.description":
+    "{server}의 여유 공간이 거의 없어요. 업그레이드하면 에이전트가 중단 없이 계속 작동해요.",
+  "server.upgrade.used": "{total} 중 {used} 사용",
+  "server.upgrade.current": "{plan}(현재)",
+  "server.upgrade.price": "가격",
+  "server.upgrade.action": "{plan}(으)로 업그레이드",
   "server.hosted.progressTitle": "{name} 설정 중",
   // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "브라우저에서 결제를 완료하세요",

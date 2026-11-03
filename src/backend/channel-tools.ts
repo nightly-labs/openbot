@@ -31,6 +31,8 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
     shape: {
       beforeSequence: z.number().int().min(0).optional(),
       attachmentId: z.string().optional(),
+      messageId: z.string().optional(),
+      offset: z.number().int().min(0).optional(),
     },
   },
   {

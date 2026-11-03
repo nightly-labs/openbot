@@ -23,7 +23,7 @@
   margin-top: var(--openbot-space-2);
 }
 .ui-chart-tooltip-value {
-  text-align: right;
+  text-align: end;
 }
 .ui-chart-tooltip-mark {
   display: flex;

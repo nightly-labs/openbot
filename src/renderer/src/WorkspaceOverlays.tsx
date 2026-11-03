@@ -810,6 +810,7 @@ function ServerSettings() {
           hostMemoryLimit={{}}
           memoryReview={{}}
           hostPromptCacheTtl={{}}
+          hostModelVisibility={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           serverAudit={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}

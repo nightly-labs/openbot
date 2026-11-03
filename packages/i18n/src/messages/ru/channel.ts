@@ -17,6 +17,9 @@ export const messages = {
   "channel.panel.close": "Закрыть панель канала",
   "channel.settings.title": "Настройки канала",
   "channel.settings.memories": "Память",
+  "channel.settings.isolated": "Хранить память в этом канале",
+  "channel.settings.isolatedDescription":
+    "Агенты сохраняют то, что узнали здесь, как память канала. Их другие чаты её не видят.",
   "channel.settings.memoryCount": {
     one: "Сохранено: {count}",
     few: "Сохранено: {count}",

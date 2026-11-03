@@ -6,7 +6,7 @@
 
 .server-roles-member-count {
   min-width: 72px;
-  text-align: right;
+  text-align: end;
 }
 
 .server-roles-level {

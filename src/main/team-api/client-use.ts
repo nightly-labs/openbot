@@ -16,6 +16,7 @@ import { AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-pub
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { COMPUTER_ACTIVITY_ROUTES } from "@openbot/contracts/team-protocol/computer-activity-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
@@ -29,6 +30,7 @@ import { LIVE_ACTIVITY_PUSH_ROUTES } from "@openbot/contracts/team-protocol/live
 import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
+import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provider-default-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
@@ -68,6 +70,8 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_MEMORY_LIMIT_ROUTES.settings,
   MEMORY_REVIEW_ROUTES.settings,
   PROMPT_CACHE_TTL_ROUTES.settings,
+  MODEL_VISIBILITY_ROUTES.settings,
+  MODEL_VISIBILITY_ROUTES.listing,
   PROVIDER_DEFAULT_ROUTES.settings,
   LOCAL_SERVERS_ROUTES.list,
   DISCORD_ACCESS_ROUTES.access,
@@ -113,6 +117,8 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PROVIDERS_RUNTIMES_V2_ROUTES.runtimesStatus,
   // A focused app counts as use only for a limited time: `TeamApiServer` records it on its own.
   FOCUS_USE_ROUTES.ping,
+  // Input on the computer of a desktop app keeps the member's phones quiet, not a hosted server running.
+  COMPUTER_ACTIVITY_ROUTES.report,
 ]);
 
 /** A client opens a conversation and the app marks it read, or a member marks it unread. */

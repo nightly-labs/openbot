@@ -14,7 +14,8 @@
   border: 0;
   border-radius: var(--openbot-radius-sm);
   background: var(--openbot-border);
-  padding: var(--openbot-space-1) var(--openbot-space-1-5) var(--openbot-space-1) var(--openbot-space-1);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-1) var(--openbot-space-1-5);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
   font-weight: 500;

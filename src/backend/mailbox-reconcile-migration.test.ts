@@ -119,6 +119,7 @@ function withoutRepeats(rows: Rows): Rows {
     workflow_versions: [],
     workflow_webhook_receipts: [],
     workflows: [],
+    projection_messaging_allowed_senders: [],
   };
 }
 
@@ -133,7 +134,7 @@ describe("mailbox reconcile cleanup migration", () => {
       const before = contents(db);
       migrateOpenBotDatabase(db);
       expect(contents(db)).toEqual(withoutRepeats(before));
-      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 50 });
+      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 53 });
       expect(db.prepare("SELECT name FROM sqlite_temp_master").all()).toEqual([]);
       expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -160,9 +161,9 @@ describe("mailbox reconcile cleanup migration", () => {
     const db = databaseAt(38);
     seed(db);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(51,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(54,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=51; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=54; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
   });
@@ -201,7 +202,9 @@ describe("mailbox reconcile cleanup migration", () => {
 
     const legacy = new DatabaseSync(path);
     // From 38 on: migration 47 reads the task table that 38 creates.
-    legacy.exec("DELETE FROM schema_migrations WHERE version IN (38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50)");
+    legacy.exec(
+      "DELETE FROM schema_migrations WHERE version IN (38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53)",
+    );
     legacy.close();
     const migrated = new OpenBotDatabase(root);
     await runCauseEffect(migrated.initialize());
@@ -217,7 +220,7 @@ describe("mailbox reconcile cleanup migration", () => {
     expect(kept).toEqual(events.filter((event) => !reconciled.slice(0, 2).includes(event)));
     expect(migrated.rebuildThreadProjection("openbot-thread-chief")).toEqual(replayed);
     expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 50,
+      version: 53,
     });
     migrated.close();
   });

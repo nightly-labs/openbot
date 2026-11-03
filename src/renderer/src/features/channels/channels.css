@@ -111,7 +111,7 @@
   justify-content: flex-start;
   height: auto;
   line-height: var(--openbot-leading-md);
-  text-align: left;
+  text-align: start;
   cursor: pointer;
 }
 .channel-member-add > svg {
@@ -399,7 +399,7 @@
   height: 18px;
 }
 .channel-title .channel-avatar .agent-avatar + .agent-avatar {
-  margin-left: -8px;
+  margin-inline-start: -8px;
 }
 /* The faces overlap, and each outline cuts the face below it in the colour of the page. The framed
    window puts the title on the top row instead (window.css). */

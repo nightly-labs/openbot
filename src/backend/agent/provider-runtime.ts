@@ -33,7 +33,7 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { isOpenCodeInternalFailure } from "./../acp-flavor-opencode";
-import { startAcpAuthentication } from "./../acp-sign-in";
+import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import {
@@ -46,7 +46,8 @@ import {
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
 import { causeHelpers } from "../effect-boundary";
-import type { SignInRegion } from "../kimi-region";
+import { isPythonKimiCli, type SignInRegion } from "../kimi-region";
+import { readKimiUsage } from "../kimi-usage";
 import { McpHandoffLog } from "./../mcp-handoff-log";
 import { providerMcpServerName } from "./../mcp-provider-shapes";
 import { customProvidersOn, openCodeSignInMessage } from "./../opencode-config";
@@ -562,7 +563,10 @@ export class ProviderRuntime implements ProviderPort {
           scope: () => this.#scope,
           cli: (provider) =>
             this.#clients.has(provider) || this.#released.has(provider) ? this.#cli.get(provider) : undefined,
-          defaultEmail: (provider) => this.#accounts.get(provider)?.email ?? null,
+          defaultLogin: (provider) => {
+            const account = this.#accounts.get(provider);
+            return account ? { email: account.email ?? null, organization: account.organization ?? null } : null;
+          },
           apiKey: (provider) => this.#credentials.apiKey(provider),
           defaultUsesApiKey: (provider) => this.ownSignInUsesKey(provider),
           signInTemp: (provider) => {
@@ -974,6 +978,16 @@ export class ProviderRuntime implements ProviderPort {
           } else if (provider === "cursor") {
             // Cursor's usage is two HTTPS requests with the CLI's token, so do not start the CLI for it.
             usage = normalizeAccountUsage(yield* readCursorUsage().pipe(toProviderOperationFailed, deadline));
+          } else if (provider === "kimi") {
+            // Kimi's usage is one HTTPS request with the CLI's token. Only a turn refreshes that token, so
+            // a started CLI adds nothing, and a poll that starts it keeps it from going idle. The CLI
+            // version selects the token's folder: with no client in this run, there is no reading yet.
+            const cli = this.#cli.get(provider);
+            if (!cli) return null;
+            const env = { ...process.env, ...this.#credentials.agentEnvironment?.() };
+            usage = normalizeAccountUsage(
+              yield* readKimiUsage(isPythonKimiCli(cli), env).pipe(toProviderOperationFailed, deadline),
+            );
           } else {
             // Starting a provider that has no usage reading only to get nothing back cost a cold
             // start on every dock poll.
@@ -1548,7 +1562,9 @@ export class ProviderRuntime implements ProviderPort {
                   }
                 : {}),
               privateTemp: temp && { ...temp, provider: providerLabel(provider) },
-              ...(provider === "antigravity" ? { openGoogleSignIn: openExternal } : {}),
+              ...(provider === "antigravity" && googleSignInByOpenBot(onHost)
+                ? { openGoogleSignIn: openExternal }
+                : {}),
             }).pipe(
               // A sign-in that stops after the sign-out leaves no account behind it.
               Effect.map((login) => ({
@@ -2971,6 +2987,7 @@ export class ProviderRuntime implements ProviderPort {
           previousAccount &&
           (previousAccount.type !== account.type ||
             previousAccount.email !== account.email ||
+            previousAccount.organization !== account.organization ||
             previousAccount.planType !== account.planType)
         )
           this.#forgetUsage(provider);
@@ -3658,10 +3675,12 @@ export class ProviderRuntime implements ProviderPort {
       }
       // The usage notice reports the limit only for a provider with a usage reading. Another
       // provider's line goes on to the error below, or nothing on screen would name the limit.
-      // Cursor's line goes on too: its reading has no on-demand or team limit.
+      // Cursor's line goes on too: its reading has no on-demand or team limit. Kimi's line goes on
+      // because an account with no Kimi Code plan has no reading.
       if (
         isUsageLimitDiagnostic(message) &&
         client.provider !== "cursor" &&
+        client.provider !== "kimi" &&
         agentProviderDescriptor(client.provider).reportsUsage
       ) {
         stderrLogger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });

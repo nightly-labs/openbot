@@ -17,6 +17,9 @@ export const messages = {
   "channel.panel.close": "채널 패널 닫기",
   "channel.settings.title": "채널 설정",
   "channel.settings.memories": "메모리",
+  "channel.settings.isolated": "메모리를 이 채널에 유지",
+  "channel.settings.isolatedDescription":
+    "에이전트가 여기서 배운 내용은 채널 메모리로 저장되며, 다른 채팅에서는 보이지 않습니다.",
   "channel.settings.memoryCount": { other: "{count}개 저장됨" },
   "channel.settings.routines": "루틴",
   "channel.settings.routineCount": { other: "{count}개 설정됨" },

@@ -38,6 +38,7 @@
       "!!.worktrees",
       "!!.agents",
       "!src/renderer/src/vendor",
+      "!packages/whatsapp/vendor",
       "!marketplace/production-catalog/bundles"
     ]
   },

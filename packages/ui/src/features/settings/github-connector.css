@@ -27,7 +27,7 @@
 
 .github-connector-search > svg {
   position: absolute;
-  left: var(--openbot-space-3);
+  inset-inline-start: var(--openbot-space-3);
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   color: var(--openbot-text-muted);
@@ -36,7 +36,7 @@
 
 .github-connector-search input {
   width: 100%;
-  padding-left: calc(var(--openbot-space-3) * 2 + var(--openbot-icon-sm));
+  padding-inline-start: calc(var(--openbot-space-3) * 2 + var(--openbot-icon-sm));
 }
 
 /* A long list scrolls inside the card, so Disconnect stays near the top of the tab. The rows' hover fill goes past

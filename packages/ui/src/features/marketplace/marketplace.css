@@ -32,7 +32,8 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   gap: var(--openbot-space-3);
   grid-column: 1 / -1;
   min-height: 48px;
-  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--marketplace-inset);
+  padding-block: var(--openbot-space-2);
+  padding-inline: var(--marketplace-inset) var(--openbot-space-2);
   border-bottom: 1px solid var(--openbot-border);
 }
 
@@ -49,7 +50,7 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   gap: var(--openbot-space-1);
   overflow-y: auto;
   padding: var(--openbot-space-4) var(--openbot-space-3) var(--openbot-space-3);
-  border-right: 1px solid var(--openbot-border);
+  border-inline-end: 1px solid var(--openbot-border);
 }
 
 .marketplace-nav-title {
@@ -168,7 +169,8 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   width: fit-content;
   max-width: calc(100% - 32px);
   margin: 0 auto var(--openbot-space-4);
-  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-3);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-1);
   border: 1px solid var(--openbot-danger);
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-bg-control);
@@ -245,6 +247,12 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   color: var(--openbot-text-muted);
+}
+
+/* Right to left, the arrow points the other way. */
+.marketplace-crumb-separator:dir(rtl),
+.marketplace-skill-group-head .ui-button > svg[class~="lucide-chevron-right"]:dir(rtl) {
+  transform: scaleX(-1);
 }
 
 /* A title takes focus when its view opens. The focus is for screen readers, not a control. */
@@ -1197,6 +1205,23 @@ html:active-view-transition-type(marketplace-back)::view-transition-new(marketpl
   animation: marketplace-skill-page-in var(--openbot-duration-overlay) var(--openbot-ease-out) both;
 }
 
+/* A right-to-left page steps the other way. */
+html:dir(rtl):active-view-transition-type(marketplace-forward)::view-transition-old(marketplace-page) {
+  --marketplace-skill-to: var(--openbot-space-2);
+}
+
+html:dir(rtl):active-view-transition-type(marketplace-forward)::view-transition-new(marketplace-page) {
+  --marketplace-skill-from: calc(var(--openbot-space-2) * -1);
+}
+
+html:dir(rtl):active-view-transition-type(marketplace-back)::view-transition-old(marketplace-page) {
+  --marketplace-skill-to: calc(var(--openbot-space-2) * -1);
+}
+
+html:dir(rtl):active-view-transition-type(marketplace-back)::view-transition-new(marketplace-page) {
+  --marketplace-skill-from: var(--openbot-space-2);
+}
+
 /* Another kind in the side panel is a new list, not a step: it rises a little into place. */
 html:active-view-transition-type(marketplace-tab)::view-transition-old(marketplace-page) {
   animation: marketplace-skill-blur-out var(--openbot-duration-normal) var(--openbot-ease-out) both;
@@ -1293,7 +1318,7 @@ html:active-view-transition-type(marketplace-swap)::view-transition-new(marketpl
     grid-row: 2;
     overflow-x: auto;
     padding: var(--openbot-space-2) var(--openbot-space-3);
-    border-right: 0;
+    border-inline-end: 0;
     border-bottom: 1px solid var(--openbot-border);
   }
 

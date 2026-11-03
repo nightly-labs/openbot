@@ -27,6 +27,7 @@ const AgentTasks = createSimpleContext({
       readable: () => local() || activeServerSupportsCapability("agent-thread-reads-v1"),
       branchable: () => local() || activeServerSupportsCapability("agent-thread-branches-v1"),
       filesAccepted: () => local() || activeServerSupportsCapability("agent-thread-files-v1"),
+      repliable: () => local() || activeServerSupportsCapability("agent-thread-replies-v1"),
       reloadKey: () => agentStatus().phase,
     });
   },

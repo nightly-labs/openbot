@@ -1,138 +1,248 @@
 import type { BotExpression, ExpressionId } from "@norbert_bodziony/bloub";
 import { PLUSH_CHARACTER_BY_ID, PlushBot } from "@norbert_bodziony/bloub/plush";
-import { createSignal, For, onSettled, untrack } from "solid-js";
-import { PlushMascot, type PlushMascotFace } from "../../plush-loader";
-import { clamp } from "../../utils";
-import { CREW_PIT, type CrewFace, type CrewMember, type CrewPile } from "./crew-pile";
-
-/**
- * The scale limits of the pit, and the free room in pixels at the sides and above and below the
- * stage. The stage also holds the text, the detail and the actions under the pit, which are measured.
- */
-const PIT_FIT = { maxScale: 1.2, minScale: 0.45, sideRoom: 32, edgeRoom: 152 } as const;
+import { createEffect, createSignal, For, flush, onSettled, untrack } from "solid-js";
+import type { CrewFace, CrewFilm, CrewMember, CrewPile } from "./crew-pile";
 
 /** The face of a crew plush at rest: its character's own face, as PlushBot shows without an expression. */
 function restFace(member: CrewMember): BotExpression | undefined {
-  return member.character ? PLUSH_CHARACTER_BY_ID.get(member.character)?.face : undefined;
-}
-
-/**
- * The neutral face of a crew plush, turned to look at a point `dx`, `dy` pixels away (y down). The
- * gaze is absolute: bloub's rest gaze already looks up and to the right, so an offset hardly shows.
- */
-function faceToward(member: CrewMember, dx: number, dy: number): BotExpression | ExpressionId {
-  const neutral = restFace(member);
-  if (!neutral) return "neutre";
-  const distance = Math.hypot(dx, dy) || 1;
-  return {
-    ...neutral,
-    gaze: {
-      yaw: clamp((dx / distance) * 34, -32, 32),
-      pitch: clamp((-dy / distance) * 34, -8, 30),
-      roll: clamp((-dx / distance) * 8, -8, 8),
-    },
-  };
+  return PLUSH_CHARACTER_BY_ID.get(member.character)?.face;
 }
 
 function crewExpression(member: CrewMember, face: CrewFace): BotExpression | ExpressionId {
   if (face.happy) return "heureux";
-  if (face.look) return faceToward(member, face.look.dx, face.look.dy);
   return restFace(member) ?? "neutre";
 }
 
-function leadFace(face: CrewFace): PlushMascotFace {
-  return face.happy ? "happy" : face.state;
+/** The elements of one plush: its box, which the film moves, and the squash inside it. */
+interface CrewRig {
+  plush: HTMLElement;
+  squash: HTMLElement;
+}
+
+/** The crew hop out after `delay` ms, when the rest of the rain has played, and they are out after `length` ms more. */
+export interface CrewHop {
+  delay: number;
+  length: number;
+}
+
+interface CrewPlayer {
+  hopOut: () => CrewHop;
+  stop: () => void;
+}
+
+/**
+ * The intro animations hold the last pose for this time, so they do not end. When an animation ends
+ * on the compositor while the main thread is busy, the plush goes back to the last pose that the main
+ * thread drew, until the main thread is free again.
+ */
+const INTRO_HOLD_S = 3600;
+
+/** The keyframes of a reel that then holds its last pose for `hold` seconds. */
+function heldKeyframes(keyframes: readonly Keyframe[], length: number, hold: number): Keyframe[] {
+  const share = length / (length + hold);
+  const last = keyframes.at(-1);
+  const moving = keyframes.map((keyframe) => ({ ...keyframe, offset: (keyframe.offset ?? 1) * share }));
+  return last ? [...moving, { ...last, offset: 1 }] : moving;
+}
+
+/**
+ * The keyframes of the intro played at `rate`, then of the exit, as one animation of `length` seconds.
+ * A new animation that starts next to a running one on the same property makes Chrome run both on the
+ * main thread, so the hop replaces the intro animation.
+ */
+function hopKeyframes(
+  intro: readonly Keyframe[],
+  introLength: number,
+  rate: number,
+  exit: readonly Keyframe[] | undefined,
+  exitLength: number,
+): { keyframes: Keyframe[]; length: number } {
+  const introPart = introLength / rate;
+  const length = introPart + exitLength;
+  const at = (time: number) => (length > 0 ? time / length : 1);
+  const keyframes = intro.map((keyframe) => ({ ...keyframe, offset: at((keyframe.offset ?? 1) * introPart) }));
+  for (const keyframe of exit ?? []) {
+    keyframes.push({ ...keyframe, offset: at(introPart + (keyframe.offset ?? 1) * exitLength) });
+  }
+  return { keyframes, length };
+}
+
+/** The keyframes of one breath. More keyframes make it nearer to a sine. */
+const BREATH_KEYFRAMES = 24;
+
+function breathKeyframes(film: CrewFilm, index: number): Keyframe[] {
+  const { amount, from, period, phases } = film.breathe;
+  const first = (2 * Math.PI * from) / period + (phases[index] ?? 0);
+  return Array.from({ length: BREATH_KEYFRAMES + 1 }, (_, step) => {
+    const breath = amount * Math.sin(first + (2 * Math.PI * step) / BREATH_KEYFRAMES);
+    return { scale: `${(1 - breath / 2).toFixed(4)} ${(1 + breath).toFixed(4)}` };
+  });
+}
+
+/**
+ * Plays a film on the rigs, from `start` on the document timeline, so all screens of one run show the
+ * same frame. The compositor runs the animations; a frame loop on the main thread changes the faces.
+ */
+function playFilm(
+  film: CrewFilm,
+  rigs: readonly CrewRig[],
+  start: number,
+  show: (index: number, face: CrewFace) => void,
+): CrewPlayer {
+  const intro: { animation: Animation; element: HTMLElement; keyframes: readonly Keyframe[]; exit?: Keyframe[] }[] = [];
+  let exit: Animation[] = [];
+  let exitDelay = 0;
+  // Where the exit starts in the hop animations, in ms.
+  let exitFrom = 0;
+  rigs.forEach((rig, index) => {
+    const tracks = [
+      [rig.plush, film.intro.plushes[index], film.exit.plushes[index]],
+      [rig.squash, film.intro.squashes[index], film.exit.squashes[index]],
+    ] as const;
+    for (const [element, keyframes, exitKeyframes] of tracks) {
+      if (!keyframes) continue;
+      const animation = element.animate(heldKeyframes(keyframes, film.intro.length, INTRO_HOLD_S), {
+        duration: (film.intro.length + INTRO_HOLD_S) * 1000,
+        fill: "forwards",
+      });
+      animation.startTime = start;
+      intro.push({ animation, element, keyframes, ...(exitKeyframes ? { exit: exitKeyframes } : {}) });
+    }
+    // The breath changes the `scale` property, so it adds to the squash of the film.
+    const breath = rig.squash.animate(breathKeyframes(film, index), {
+      duration: film.breathe.period * 1000,
+      delay: film.breathe.from * 1000,
+      iterations: Number.POSITIVE_INFINITY,
+    });
+    breath.startTime = start;
+    rig.plush.style.visibility = "visible";
+  });
+
+  let introCue = 0;
+  let exitCue = 0;
+  // After a hop during the rain, the rest of the rain plays faster.
+  let rush: { at: number; from: number; rate: number } | undefined;
+  const introTime = (now: number) => (rush ? rush.from + ((now - rush.at) / 1000) * rush.rate : (now - start) / 1000);
+
+  function exitTime(): number {
+    const current = exit[0]?.currentTime;
+    return typeof current === "number" ? (current - exitFrom) / 1000 : -1;
+  }
+
+  function frame(now: number): void {
+    request = requestAnimationFrame(frame);
+    const atExit = exitTime();
+    if (atExit >= 0) {
+      for (let cue = film.exit.faces[exitCue]; cue && cue.at <= atExit; cue = film.exit.faces[++exitCue]) {
+        show(cue.index, cue.face);
+      }
+      return;
+    }
+    const at = introTime(now);
+    for (let cue = film.intro.faces[introCue]; cue && cue.at <= at; cue = film.intro.faces[++introCue]) {
+      show(cue.index, cue.face);
+    }
+  }
+  let request = requestAnimationFrame(frame);
+
+  return {
+    hopOut() {
+      if (exit.length > 0) return { delay: exitDelay, length: film.exit.length * 1000 };
+      const now = performance.now();
+      const at = introTime(now);
+      const left = Math.max(0, film.intro.length - at);
+      const rate = left > 0 ? Math.max(film.rush.rate, left / film.rush.time) : 1;
+      if (left > 0) rush = { at: now, from: at, rate };
+      exitDelay = (left / rate) * 1000;
+      exitFrom = (film.intro.length / rate) * 1000;
+      // Each hop animation replaces its intro animation in this task, so no frame shows the plush
+      // without one. They start at the next frame that the compositor gets.
+      const seek = (Math.min(at, film.intro.length) / rate) * 1000;
+      exit = intro.map((track) => {
+        track.animation.cancel();
+        const hop = hopKeyframes(track.keyframes, film.intro.length, rate, track.exit, film.exit.length);
+        const animation = track.element.animate(hop.keyframes, { duration: hop.length * 1000, fill: "forwards" });
+        animation.currentTime = seek;
+        return animation;
+      });
+      return { delay: exitDelay, length: film.exit.length * 1000 };
+    },
+    stop() {
+      cancelAnimationFrame(request);
+    },
+  };
+}
+
+/** A pile without motion: the still pile, drawn once. */
+function showRest(film: CrewFilm, rigs: readonly CrewRig[]): void {
+  rigs.forEach((rig, index) => {
+    const rest = film.rest[index];
+    if (!rest) return;
+    rig.plush.style.transform = rest.plush;
+    rig.squash.style.transform = rest.squash;
+    rig.plush.style.visibility = "visible";
+  });
 }
 
 export interface CrewPileStageProps {
   pile: CrewPile;
-  /** Called on each frame while the screen is shown. The owner of the pile moves it here. */
-  onFrame: (seconds: number) => void;
+  /** When the run started, from `performance.now()`. The screens of one run show the same frame. */
+  start: number;
+  /** The crew hop out. Set it once; it does not go back. */
+  hop?: boolean;
+  /** The hop started. */
+  onHop?: (hop: CrewHop) => void;
 }
 
 /**
- * Draws a crew pile. The pile sets each transform on each frame; the faces are signals, so a plush
- * updates only when its face changes. The pit scales to the window, and the pointer can grab any
- * plush and throw it.
+ * Draws a crew pile over the whole screen. The pile records its motion as a film, and the stage plays
+ * the film as Web Animations, so the plushes move also while the main thread is busy. The faces are
+ * signals, so a plush updates only when its face changes. Nothing on the screen can be grabbed.
  */
 export function CrewPileStage(props: CrewPileStageProps) {
   const pile = props.pile;
   const plushes: (HTMLElement | undefined)[] = [];
   const squashes: (HTMLElement | undefined)[] = [];
-  const faces = pile.bodies.map((body) => createSignal(body.face, { equals: (a, b) => a.version === b.version }));
-  const [scale, setScale] = createSignal(1);
+  const faces: ((face: CrewFace) => void)[] = [];
+  // A pile without a film gets a new crew when it fits the screen.
+  const [crew, setCrew] = createSignal(pile.crew);
+  const [pitSize, setPitSize] = createSignal(pile.pit);
+  const [player, setPlayer] = createSignal<CrewPlayer>();
   let frame: HTMLDivElement | undefined;
-  let pit: HTMLDivElement | undefined;
-
-  function draw(): void {
-    const poses = pile.poses();
-    poses.forEach((pose, index) => {
-      const plush = plushes[index];
-      const squash = squashes[index];
-      if (!plush || !squash) return;
-      plush.style.visibility = pose.visible ? "visible" : "hidden";
-      plush.style.transform = `translate3d(${pose.x}px, ${pose.y}px, 0) rotate(${pose.tilt}rad) scale(${pose.scale})`;
-      squash.style.transform = `scale(${pose.squashX}, ${pose.squashY})`;
-    });
-    pile.bodies.forEach((body, index) => {
-      faces[index]?.[1](body.face);
-    });
-  }
-
-  /** A pointer point in pit pixels: the pit is scaled to the window. */
-  function pitPoint(event: PointerEvent): { x: number; y: number } | undefined {
-    if (!pit) return undefined;
-    const rect = pit.getBoundingClientRect();
-    const ratio = rect.width / CREW_PIT.width;
-    if (ratio <= 0) return undefined;
-    return { x: (event.clientX - rect.left) / ratio, y: (event.clientY - rect.top) / ratio };
-  }
-
-  function grab(index: number, event: PointerEvent): void {
-    const point = pitPoint(event);
-    if (!point || !pile.grab(index, point.x, point.y, event.timeStamp / 1000)) return;
-    event.preventDefault();
-    if (event.currentTarget instanceof Element) event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function drag(event: PointerEvent): void {
-    const point = pitPoint(event);
-    if (point) pile.drag(point.x, point.y, event.timeStamp / 1000);
-  }
 
   onSettled(() => {
-    const stage = frame?.parentElement;
-    const room = stage?.closest<HTMLElement>(".app-loading");
-    const fitPit = () => {
-      if (!frame || !stage || !room) return;
-      // The text, detail and actions under the pit do not change with its scale.
-      const below = stage.offsetHeight - frame.offsetHeight;
-      const width = (room.clientWidth - PIT_FIT.sideRoom) / CREW_PIT.width;
-      const height = (room.clientHeight - below - PIT_FIT.edgeRoom) / CREW_PIT.height;
-      setScale(clamp(Math.min(width, height), PIT_FIT.minScale, PIT_FIT.maxScale));
-    };
-    fitPit();
-    const observer = new ResizeObserver(fitPit);
-    if (room && stage) {
-      observer.observe(room);
-      observer.observe(stage);
+    if (frame && pile.fit({ width: frame.clientWidth, height: frame.clientHeight })) {
+      // The new crew mount their own elements and faces before the film plays.
+      plushes.length = 0;
+      squashes.length = 0;
+      faces.length = 0;
+      setCrew(pile.crew);
+      setPitSize(pile.pit);
+      flush();
     }
-    draw();
-    let request = 0;
-    let last = -1;
-    const tick = (now: number) => {
-      request = requestAnimationFrame(tick);
-      const seconds = last < 0 ? 0 : (now - last) / 1000;
-      last = now;
-      props.onFrame(seconds);
-      draw();
-    };
-    if (!pile.reduced) request = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(request);
-      observer.disconnect();
-    };
+    const film = pile.film();
+    const rigs = pile.crew.flatMap((_, index): CrewRig[] => {
+      const plush = plushes[index];
+      const squash = squashes[index];
+      return plush && squash ? [{ plush, squash }] : [];
+    });
+    // A test DOM has no Web Animations: the pile stays still, and a hop ends at once.
+    if (pile.reduced || typeof Element.prototype.animate !== "function") {
+      showRest(film, rigs);
+      setPlayer({ hopOut: () => ({ delay: 0, length: 0 }), stop: () => {} });
+      return;
+    }
+    const playing = playFilm(film, rigs, props.start, (index, face) => faces[index]?.(face));
+    setPlayer(playing);
+    return () => playing.stop();
   });
+
+  createEffect(
+    () => [props.hop, player(), props.onHop] as const,
+    ([hop, playing, onHop]) => {
+      if (hop && playing) onHop?.(playing.hopOut());
+    },
+  );
 
   return (
     <div
@@ -140,29 +250,22 @@ export function CrewPileStage(props: CrewPileStageProps) {
         frame = element;
       }}
       class="app-loading-pit-frame"
-      style={{ width: `${CREW_PIT.width * scale()}px`, height: `${CREW_PIT.height * scale()}px` }}
       aria-hidden="true"
     >
       <div
-        ref={(element) => {
-          pit = element;
-        }}
         class="app-loading-pit"
-        style={{ width: `${CREW_PIT.width}px`, height: `${CREW_PIT.height}px`, scale: `${scale()}` }}
+        style={{ width: `${pitSize().width}px`, height: `${pitSize().height}px`, scale: `${pitSize().unit}` }}
       >
-        <For each={pile.crew}>
+        <For each={crew()}>
           {(member, position) => {
-            // The crew of a pile never changes, so each plush keeps its index.
+            // A crew never changes: a new crew mounts new elements, so each plush keeps its index.
             const index = untrack(position);
-            const face = () => faces[index]?.[0]() ?? pile.bodies[index]?.face;
+            const [face, setFace] = createSignal(pile.startFaces[index]);
+            faces[index] = (next) => setFace(next);
             const crewState = () => face()?.state ?? "idle";
             const expression = () => {
               const current = face();
               return current ? crewExpression(member, current) : (restFace(member) ?? "neutre");
-            };
-            const mascotFace = () => {
-              const current = face();
-              return current ? leadFace(current) : "idle";
             };
             return (
               <div
@@ -170,11 +273,6 @@ export function CrewPileStage(props: CrewPileStageProps) {
                   plushes[index] = element;
                 }}
                 class="app-loading-plush"
-                data-lead={member.lead ? "true" : undefined}
-                onPointerDown={(event) => grab(index, event)}
-                onPointerMove={drag}
-                onPointerUp={(event) => pile.release(event.timeStamp / 1000)}
-                onPointerCancel={() => pile.release()}
                 style={{
                   width: `${member.size}px`,
                   height: `${member.size}px`,
@@ -188,20 +286,16 @@ export function CrewPileStage(props: CrewPileStageProps) {
                   class="app-loading-squash"
                   style={{ "transform-origin": `50% ${(member.cy + member.h / 2) * 100}%` }}
                 >
-                  {member.character ? (
-                    <PlushBot
-                      character={member.character}
-                      state={crewState()}
-                      expression={expression()}
-                      size={member.size}
-                      initialPhase={index * 0.7}
-                      autoPause={false}
-                      paused={pile.reduced}
-                      ariaLabel=""
-                    />
-                  ) : (
-                    <PlushMascot face={mascotFace()} class="app-loading-lead" />
-                  )}
+                  <PlushBot
+                    character={member.character}
+                    state={crewState()}
+                    expression={expression()}
+                    size={member.size}
+                    initialPhase={index * 0.7}
+                    autoPause={false}
+                    paused={true}
+                    ariaLabel=""
+                  />
                 </div>
               </div>
             );
