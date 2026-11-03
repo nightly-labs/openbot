@@ -140,7 +140,7 @@ export function createWebConversationRuntime(
     }
   }
   async function cancelImportFiles() {
-    if (pick) pick.cancelled = true;
+    cancelGeneration += 1;
     if (!importing) return;
     importing.cancelled = true;
     try {
@@ -176,8 +176,9 @@ export function createWebConversationRuntime(
   }
   // The files and host of each failed import, for Retry, until the composer removes the chip.
   const failedImports = new Map<string, { serverId: string; files: readonly File[] }>();
-  // The pick whose files upload now. Cancel upload stops the files of the pick that did not start.
-  let pick: { cancelled: boolean } | undefined;
+  // Cancel upload adds one. A pick stops its files that did not start when the value is not the one
+  // it saw at its start, so a later pick cannot hide the earlier one from Cancel.
+  let cancelGeneration = 0;
   // `started` names the chat on screen, so it comes before any wait. A set over the limit names no
   // files: it has no chips, and the banner says why it failed.
   const announceImport = (requestId: string, serverId: string, files: readonly File[], retryable: boolean) =>
@@ -200,16 +201,14 @@ export function createWebConversationRuntime(
       await runImportFiles(requestId, serverId, files, false);
       return;
     }
-    const current = { cancelled: false };
-    pick = current;
+    const generation = cancelGeneration;
     const imports = files.map((file) => ({ requestId: crypto.randomUUID(), files: [file] }));
     for (const item of imports) announceImport(item.requestId, serverId, item.files, true);
     for (const item of imports) {
-      if (current.cancelled || hostId() !== serverId)
+      if (generation !== cancelGeneration || hostId() !== serverId)
         emit({ type: "completed", serverId, requestId: item.requestId, attachments: [] });
       else await runImportFiles(item.requestId, serverId, item.files, true);
     }
-    if (pick === current) pick = undefined;
   }
   // `uploadFiles` stops when the host is no longer `serverId`, and the import then lands nowhere.
   async function runImportFiles(requestId: string, serverId: string, files: readonly File[], retryable: boolean) {
