@@ -1994,6 +1994,7 @@ export async function createApplicationServices({
       post: (connectionId, placeId, markdown) => service.messaging.deliver(connectionId, placeId, markdown),
       discordSend: (connectionId, send) => service.messaging.discordSend(connectionId, send),
       telegramSend: (connectionId, send) => service.messaging.telegramSend(connectionId, send),
+      slackSend: (connectionId, send) => service.messaging.slackSend(connectionId, send),
       // An agent event, so this window, joined clients and the web app hear it the same way.
       changed: (workflowId) => service.notifyWorkflowsChanged(workflowId),
       rearm: () => service.armRoutines(),
@@ -2035,9 +2036,21 @@ export async function createApplicationServices({
       ),
     ),
   );
+  // A Slack mention in a channel goes to the workflows' Slack triggers in the same way.
+  service.messaging.setSlackMentionHandler((mention) =>
+    workflowRuntime.receiveSlack(mention).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          logger.warn("A Slack mention could not reach the workflows.", { cause: String(failure.cause) });
+          return "none" as const;
+        }),
+      ),
+    ),
+  );
   teardown.push(TEARDOWN_ORDER.workflows, "the workflows", () => {
     service.messaging.setMentionHandler(null);
     service.messaging.setTelegramMentionHandler(null);
+    service.messaging.setSlackMentionHandler(null);
     return Effect.runPromise(workflowRuntime.close());
   });
   // An agent routine's answer sent on to a messaging place; see `routine-results.ts`.

@@ -73,6 +73,8 @@ export const messages = {
   "mobile.workflow.trigger.githubHint": "Läuft, wenn in einem GitHub-Repository etwas passiert.",
   "mobile.workflow.trigger.discord": "Discord",
   "mobile.workflow.trigger.discordHint": "Läuft, wenn jemand OpenBot auf einem Discord-Server erwähnt.",
+  "mobile.workflow.trigger.slack": "Slack",
+  "mobile.workflow.trigger.slackHint": "Läuft, wenn jemand OpenBot in einem Slack-Kanal erwähnt.",
   "mobile.workflow.trigger.telegram": "Telegram",
   "mobile.workflow.trigger.telegramHint": "Läuft, wenn jemand OpenBot in einer verknüpften Telegram-Gruppe erwähnt.",
   "mobile.workflow.trigger.startsWhen": "Startet",
@@ -215,6 +217,7 @@ export const messages = {
   "mobile.workflow.output.githubHint":
     "Nimmt eine Änderung auf GitHub vor, zum Beispiel einen Kommentar oder ein Label.",
   "mobile.workflow.output.discord": "Discord",
+  "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
   "mobile.workflow.run.stopStep": "Schritt stoppen",
   "mobile.workflow.run.stopStepFailed": "Der Schritt konnte nicht gestoppt werden",
@@ -357,6 +360,8 @@ export const messages = {
   "mobile.workflow.discord.action.post": "Im Kanal posten",
   "mobile.workflow.discord.action.react": "Reaktion hinzufügen",
   "mobile.workflow.discord.emoji": "Emoji",
+  "mobile.workflow.slack.outputSummary": "Slack · {action}",
+  "mobile.workflow.slack.action.reply": "Im Thread antworten",
   "mobile.workflow.telegram.hostOnly":
     "Nur der Computer, auf dem OpenBot läuft, hat die Telegram-Chats. Ändere diesen Schritt in OpenBot auf diesem Computer.",
   "mobile.workflow.telegram.triggerComputerOnly":

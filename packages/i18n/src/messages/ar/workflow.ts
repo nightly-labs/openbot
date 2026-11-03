@@ -155,6 +155,7 @@ export const messages = {
   "workflow.trigger.webhook.creating": "جارٍ إنشاء العنوان",
   "workflow.trigger.type.github": "GitHub",
   "workflow.trigger.type.discord": "Discord",
+  "workflow.trigger.type.slack": "Slack",
   "workflow.trigger.type": "النوع",
   "workflow.trigger.runLastEvent": "تشغيل بآخر حدث",
   "workflow.trigger.webhook.address": "العنوان",
@@ -174,6 +175,7 @@ export const messages = {
   "workflow.output.sendTo": "إرسال إلى",
   "workflow.output.target.github": "GitHub",
   "workflow.output.target.discord": "Discord",
+  "workflow.output.target.slack": "Slack",
   "workflow.output.notifyTitleRow": "العنوان",
 
   "workflow.discord.server": "الخادم",
@@ -197,6 +199,9 @@ export const messages = {
   "workflow.discord.emoji.eyes": "عينان",
   "workflow.discord.emoji.party": "مفرقعة احتفال",
   "workflow.discord.emoji.cross": "علامة خطأ",
+  "workflow.slack.workspace": "مساحة العمل",
+  "workflow.slack.chooseWorkspace": "اختيار مساحة عمل",
+  "workflow.slack.action.reply": "رد في السلسلة",
 
   "workflow.row.agentPicksFrom": {
     zero: "لا خيارات للوكيل",

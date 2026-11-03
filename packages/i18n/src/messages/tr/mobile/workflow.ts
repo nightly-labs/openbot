@@ -73,6 +73,8 @@ export const messages = {
   "mobile.workflow.trigger.githubHint": "Bir GitHub deposunda bir şey olduğunda çalışır.",
   "mobile.workflow.trigger.discord": "Discord",
   "mobile.workflow.trigger.discordHint": "Biri bir Discord sunucusunda OpenBot'u andığında çalışır.",
+  "mobile.workflow.trigger.slack": "Slack",
+  "mobile.workflow.trigger.slackHint": "Biri bir Slack kanalında OpenBot'u andığında çalışır.",
   "mobile.workflow.trigger.telegram": "Telegram",
   "mobile.workflow.trigger.telegramHint": "Biri bağlı bir Telegram grubunda OpenBot'u andığında çalışır.",
   "mobile.workflow.trigger.startsWhen": "Başlangıç",
@@ -209,6 +211,7 @@ export const messages = {
   "mobile.workflow.output.github": "GitHub",
   "mobile.workflow.output.githubHint": "GitHub'da yorum veya etiket gibi tek bir değişiklik yapar.",
   "mobile.workflow.output.discord": "Discord",
+  "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
   "mobile.workflow.run.stopStep": "Adımı durdur",
   "mobile.workflow.run.stopStepFailed": "Adım durdurulamadı",
@@ -351,6 +354,8 @@ export const messages = {
   "mobile.workflow.discord.action.post": "Kanala gönder",
   "mobile.workflow.discord.action.react": "Tepki ekle",
   "mobile.workflow.discord.emoji": "Emoji",
+  "mobile.workflow.slack.outputSummary": "Slack · {action}",
+  "mobile.workflow.slack.action.reply": "Zincirde yanıtla",
   "mobile.workflow.telegram.hostOnly":
     "Telegram sohbetleri yalnızca OpenBot'u çalıştıran bilgisayarda bulunur. Bu adımı o bilgisayardaki OpenBot'ta değiştirin.",
   "mobile.workflow.telegram.triggerComputerOnly":

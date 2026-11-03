@@ -26,6 +26,8 @@ export const messages = {
   "error.workflow.outputPlaceMissing": "اختر مكان مراسلة لهذا المُخرَج.",
   "error.workflow.discordNoMessage":
     "يعمل هذا المُخرَج على رسالة Discord التي بدأت التشغيل. ابدأ التشغيل من إشارة في Discord، أو اختر «النشر في القناة».",
+  "error.workflow.slackNoMessage":
+    "يعمل هذا المُخرَج على رسالة Slack التي بدأت التشغيل. ابدأ التشغيل من إشارة في Slack، أو اختر «النشر في القناة».",
   "error.workflow.outputConnectionOff": "اتصال المراسلة لهذا المُخرَج متوقف أو محذوف. اختر مكانًا مرة أخرى.",
   "error.workflow.outputNotRunning": "اتصال المراسلة لا يعمل الآن. أعد المحاولة عندما يعمل.",
   "error.workflow.outputRefused": "رفض المكان المنشور. تأكد من أن OpenBot يستطيع النشر هناك.",

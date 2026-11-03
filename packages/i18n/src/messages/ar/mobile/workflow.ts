@@ -93,6 +93,8 @@ export const messages = {
   "mobile.workflow.trigger.githubHint": "يعمل عندما يحدث شيء في مستودع GitHub.",
   "mobile.workflow.trigger.discord": "Discord",
   "mobile.workflow.trigger.discordHint": "يعمل عندما يذكر شخص OpenBot في خادم Discord.",
+  "mobile.workflow.trigger.slack": "Slack",
+  "mobile.workflow.trigger.slackHint": "يعمل عندما يذكر شخص OpenBot في قناة Slack.",
   "mobile.workflow.trigger.startsWhen": "يبدأ",
   "mobile.workflow.trigger.timezone": "المنطقة الزمنية: {zone}",
   "mobile.workflow.trigger.serverZone": "يستخدم الجدول المنطقة الزمنية للخادم.",
@@ -234,6 +236,7 @@ export const messages = {
   "mobile.workflow.output.github": "GitHub",
   "mobile.workflow.output.githubHint": "يُجري تغييرًا واحدًا على GitHub، مثل تعليق أو تسمية.",
   "mobile.workflow.output.discord": "Discord",
+  "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.run.stopStep": "إيقاف الخطوة",
   "mobile.workflow.run.stopStepFailed": "تعذّر إيقاف الخطوة",
   "mobile.workflow.version.history": "سجل الإصدارات",
@@ -374,4 +377,6 @@ export const messages = {
   "mobile.workflow.discord.action.post": "نشر في القناة",
   "mobile.workflow.discord.action.react": "إضافة تفاعل",
   "mobile.workflow.discord.emoji": "رمز تعبيري",
+  "mobile.workflow.slack.outputSummary": "Slack · {action}",
+  "mobile.workflow.slack.action.reply": "رد في السلسلة",
 } as const satisfies PartialTranslation<typeof source>;

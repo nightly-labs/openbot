@@ -64,6 +64,14 @@ export interface WorkflowTelegramChat {
   name: string;
 }
 
+/** A Slack workspace that a Slack trigger listens to or that a Slack output acts on. */
+export interface WorkflowSlackWorkspace {
+  /** The messaging connection of the workspace. */
+  connectionId: string;
+  name: string;
+  channels: readonly { id: string; name: string }[];
+}
+
 /** A model that an image step can draw with. */
 export interface WorkflowImageModel {
   id: string;
@@ -88,6 +96,8 @@ export interface WorkflowCatalogs {
   discord?: readonly WorkflowDiscordServer[] | undefined;
   /** The Telegram chats linked to the host. Only the host that runs the workflow has them. */
   telegram?: readonly WorkflowTelegramChat[] | undefined;
+  /** The Slack workspaces of the host. Only the host that runs the workflow has them. */
+  slack?: readonly WorkflowSlackWorkspace[] | undefined;
   imageModels: readonly WorkflowImageModel[];
   /** The workspace files that an asset node can take, and the images that image steps made. */
   files: readonly StoredFileRow[];

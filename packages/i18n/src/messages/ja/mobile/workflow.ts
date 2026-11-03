@@ -73,6 +73,8 @@ export const messages = {
   "mobile.workflow.trigger.githubHint": "GitHub リポジトリで何かが起きたときに実行します。",
   "mobile.workflow.trigger.discord": "Discord",
   "mobile.workflow.trigger.discordHint": "Discord サーバーで誰かが OpenBot をメンションすると実行されます。",
+  "mobile.workflow.trigger.slack": "Slack",
+  "mobile.workflow.trigger.slackHint": "Slack チャンネルで誰かが OpenBot をメンションすると実行されます。",
   "mobile.workflow.trigger.telegram": "Telegram",
   "mobile.workflow.trigger.telegramHint":
     "リンク済みの Telegram グループで誰かが OpenBot をメンションすると実行されます。",
@@ -212,6 +214,7 @@ export const messages = {
   "mobile.workflow.output.github": "GitHub",
   "mobile.workflow.output.githubHint": "コメントやラベルなど、GitHub で 1 つの変更を行います。",
   "mobile.workflow.output.discord": "Discord",
+  "mobile.workflow.output.slack": "Slack",
   "mobile.workflow.output.telegram": "Telegram",
   "mobile.workflow.run.stopStep": "ステップを停止",
   "mobile.workflow.run.stopStepFailed": "ステップを停止できませんでした",
@@ -351,6 +354,8 @@ export const messages = {
   "mobile.workflow.discord.action.post": "チャンネルに投稿",
   "mobile.workflow.discord.action.react": "リアクションを追加",
   "mobile.workflow.discord.emoji": "絵文字",
+  "mobile.workflow.slack.outputSummary": "Slack · {action}",
+  "mobile.workflow.slack.action.reply": "スレッドで返信",
   "mobile.workflow.telegram.hostOnly":
     "Telegram のチャットは OpenBot を実行しているコンピューターにだけあります。このステップはそのコンピューターの OpenBot で変更してください。",
   "mobile.workflow.telegram.triggerComputerOnly":
