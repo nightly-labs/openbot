@@ -179,8 +179,11 @@ private let interimFrames = 10
 /// at the user's pauses and recognizes each one with Parakeet; in `stream` mode it sends the audio.
 private final class SpeechCapture {
   let queue = DispatchQueue(label: "run.openbot.speech.capture", qos: .userInitiated)
-  /// Its own engine: the playback engine changes its configuration when a reply starts.
-  let engine = AVAudioEngine()
+  /// Its own engine: the playback engine changes its configuration when a reply starts. Each capture
+  /// makes a new one. An engine keeps the microphone format of the route it first saw, and a reply
+  /// or a new route between two captures changes that format: the old engine then cannot start.
+  /// Only `queue` reads and writes it.
+  private(set) var engine = AVAudioEngine()
   private let target = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: captureSampleRate, channels: 1, interleaved: false)!
   private var meter = LoudnessMeter()
   private var pending: [Float] = []
@@ -215,6 +218,7 @@ private final class SpeechCapture {
     guard audio.recordPermission == .granted else { throw CaptureError.permission }
     try audio.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP])
     try audio.setActive(true)
+    engine = AVAudioEngine()
     let input = engine.inputNode
     let hardware = input.inputFormat(forBus: 0)
     guard hardware.sampleRate > 0, hardware.channelCount > 0 else { throw CaptureError.noMicrophone }
@@ -535,9 +539,13 @@ public class SpeechModule: Module {
           let type = (notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init)
           if type == .began { stopped(notification) }
         },
-        // The notice can also come for the change that the start itself made; only a stopped engine ends it.
-        center.addObserver(forName: .AVAudioEngineConfigurationChange, object: capture.engine, queue: nil) { _ in
-          capture.queue.async { if !capture.engine.isRunning { capture.fail("interrupted") } }
+        // The notice can also come for the change that the start itself made; only a stopped engine
+        // ends it. Each capture has a new engine, so the notice names the engine of the capture.
+        center.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil, queue: nil) { notification in
+          let changed = notification.object as AnyObject?
+          capture.queue.async {
+            if changed === capture.engine && !capture.engine.isRunning { capture.fail("interrupted") }
+          }
         },
         // About 1 GB that the next session can load again.
         center.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: nil) { [weak self] _ in
