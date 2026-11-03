@@ -208,7 +208,7 @@ export function MobileChatView({
     serverId: agent.serverId,
     agentId: agent.id,
     sourceTaskId: null,
-    messages: viewOnly ? undefined : conversation?.messages,
+    messages: conversation?.messages,
     activeTurnId: conversation?.activeTurnId ?? null,
   });
   const mentionSkills = useAgentMentionSkills(agent.id, agent.serverId, showsOnline(server));
@@ -247,7 +247,7 @@ export function MobileChatView({
       conversation={liveConversation}
       stopTurn={stopTurn}
       branchPoints={branching.branchPoints}
-      onBranch={viewOnly ? undefined : branching.branch}
+      onBranch={branching.branch}
       questionForm={questionForm}
       activityAccessory={activityAccessory}
       threadMenu={threadMenu}

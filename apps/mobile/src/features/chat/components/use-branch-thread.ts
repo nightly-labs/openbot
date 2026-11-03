@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { useCallback, useMemo, useRef } from "react";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
 import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
@@ -43,12 +44,15 @@ export function useBranchThread({
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const workspace = useMobileWorkspaceReader();
-  const enabled = useMobileWorkspaceSelector(
-    (current) =>
-      current.servers.some((server) => server.id === serverId && server.state === "online") &&
-      current.canUseTasks(serverId) &&
-      current.canBranchThreads(serverId),
-  );
+  // The host branches only for a member who can write to the agent.
+  const viewOnly = useAgentViewOnly(serverId, agentId);
+  const enabled =
+    useMobileWorkspaceSelector(
+      (current) =>
+        current.servers.some((server) => server.id === serverId && server.state === "online") &&
+        current.canUseTasks(serverId) &&
+        current.canBranchThreads(serverId),
+    ) && !viewOnly;
   // One set while its ids stay, so a streamed chunk does not draw every row of the chat again.
   const stable = useRef(NO_IDS);
   const branchPoints = useMemo(() => {
