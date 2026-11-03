@@ -183,7 +183,7 @@ export function ConversationThread() {
     return (message: AgentMessage) => threadComposer.setReply(threadComposer.openDraftKey(), message.id);
   };
   const replyTo = () => {
-    const id = draft()?.replyToMessageId;
+    const id = props.threads?.acceptsReplies ? draft()?.replyToMessageId : null;
     return id ? messages.find((message) => message.id === id) : undefined;
   };
   /** Where the open thread came from, when it is a branch. The agent's own chat shows the agent's name. */

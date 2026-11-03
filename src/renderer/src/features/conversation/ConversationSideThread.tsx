@@ -111,7 +111,7 @@ export function ConversationSideThread(props: { threadId: string }) {
     return (message: AgentMessage) => threadComposer.setReply(draftKey(), message.id);
   };
   const replyTo = () => {
-    const id = draft()?.replyToMessageId;
+    const id = view.threads?.acceptsReplies ? draft()?.replyToMessageId : null;
     return id ? messages.find((message) => message.id === id) : undefined;
   };
   /** Where this thread came from, when it is a branch. The agent's own chat shows the agent's name. */

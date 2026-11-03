@@ -266,10 +266,11 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       if (showMessage(focus.messageId)) focusedNonce = focus.nonce;
     },
   );
-  /** The message that a reply quotes, when the thread shows it. */
+  const messagesById = createMemo(() => new Map(props.messages.map((message) => [message.id, message])));
+  /** The message that a reply quotes, when the thread has it. */
   const referenced = (message: AgentMessage) => {
     const id = message.replyToMessageId;
-    return id ? props.messages.find((candidate) => candidate.id === id) : undefined;
+    return id ? messagesById().get(id) : undefined;
   };
   /** Each Reply moves the caret to the message box, as in the agent's own chat. */
   const [replyFocus, setReplyFocus] = createSignal(0);

@@ -255,7 +255,8 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     const target = currentConversationTarget(deps.props);
     const before = key ? draft(key).text : "";
     const attachments = key ? draft(key).attachments : [];
-    const replyToMessageId = key ? draft(key).replyToMessageId : null;
+    // A server that lost the reply route takes the message without its reply.
+    const replyToMessageId = key && deps.props.threads?.acceptsReplies ? draft(key).replyToMessageId : null;
     const referenced = attachmentReferenceIds(text);
     for (const image of images) referenced.add(image.id);
     const sent = await threads.onSend(
