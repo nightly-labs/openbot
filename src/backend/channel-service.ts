@@ -152,6 +152,29 @@ const RoutingDecision = Schema.Union([...RoutingOutcomes, Schema.Struct({ agentI
 const decodeRoutingDecision = Schema.decodeUnknownResult(RoutingDecision, { onExcessProperty: "error" });
 
 /**
+ * A request that an agent posts into a channel from another conversation (`send_to_channel`). It is
+ * not a client command: no IPC or Team API decoder accepts it, so a client cannot post as an agent.
+ * Like a routine request, it always starts new root tasks.
+ */
+interface ChannelHandoffCommand {
+  type: "handoff";
+  operationId: string;
+  channelId: string;
+  text: string;
+  recipientAgentIds: string[];
+  /** Local files that the agent gives with the request. */
+  sourcePaths: string[];
+  senderAgentId: string;
+}
+
+type ChannelServiceCommand = ChannelCommand | ChannelHandoffCommand;
+
+/** The author id of a handoff request. Like `routine:`, it tells the message from a person's. */
+function channelHandoffAuthorId(agentId: string): string {
+  return `agent:${agentId}`;
+}
+
+/**
  * Owns channel commands and assignment scheduling. It never starts provider turns itself.
  */
 export class ChannelService {
@@ -237,6 +260,72 @@ export class ChannelService {
     },
   );
 
+  /** The open channels, for an agent that chooses where to send a request (`list_channels`). */
+  handoffTargets(): Array<{
+    id: string;
+    name: string;
+    title: string;
+    leadAgentId: string | null;
+    members: Array<{ agentId: string; name: string }>;
+  }> {
+    const names = new Map(this.hooks.agents().map((agent) => [agent.id, agent.name] as const));
+    const archived = this.store.archivedIds();
+    return this.store
+      .ids()
+      .filter((id) => !archived.has(id))
+      .map((id) => this.store.get(id))
+      .map((channel) => ({
+        id: channel.id,
+        name: channel.name,
+        title: channel.title,
+        leadAgentId: channel.leadAgentId,
+        members: this.eligibleMembers(channel).map((agentId) => ({ agentId, name: names.get(agentId) ?? agentId })),
+      }));
+  }
+
+  /**
+   * Posts an agent's request from another conversation into a channel (`send_to_channel`). The
+   * named members get it; with none, the lead routes it, so a channel with no lead needs recipients.
+   */
+  readonly handoff = Effect.fn("ChannelService.handoff")(function* (
+    this: ChannelService,
+    input: {
+      operationId: string;
+      channelId: string;
+      senderAgentId: string;
+      text: string;
+      recipientAgentIds: string[];
+      sourcePaths: string[];
+    },
+  ) {
+    const senderName =
+      this.hooks.agents().find((agent) => agent.id === input.senderAgentId)?.name ?? input.senderAgentId;
+    const channel = yield* channelSync(() => this.store.get(input.channelId));
+    if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
+    for (const agentId of input.recipientAgentIds)
+      yield* channelSync(() => this.requireAvailableMember(channel, agentId));
+    if (
+      !input.recipientAgentIds.length &&
+      !channel.leadAgentId &&
+      !this.#recipients(this.eligibleMembers(channel), input.text, null).length
+    )
+      return yield* channelFailure(new Error(sourceText("error.backend.channelLeadRequired")));
+    const command: ChannelHandoffCommand = {
+      type: "handoff",
+      operationId: input.operationId,
+      channelId: channel.id,
+      text: input.text,
+      recipientAgentIds: [...new Set(input.recipientAgentIds)],
+      sourcePaths: input.sourcePaths,
+      senderAgentId: input.senderAgentId,
+    };
+    const actor = { id: channelHandoffAuthorId(input.senderAgentId), name: senderName };
+    return yield* this.#serialize(
+      channel.id,
+      Effect.suspend(() => this.apply(command, actor)),
+    );
+  });
+
   readonly #serialize = Effect.fn("ChannelService.serialize")(
     <A extends Channel | void>(channelId: string, operation: Effect.Effect<A, ChannelOperationError>) =>
       Effect.uninterruptibleMask((restore) =>
@@ -311,7 +400,7 @@ export class ChannelService {
 
   private readonly apply = Effect.fn("ChannelService.apply")(function* (
     this: ChannelService,
-    command: ChannelCommand,
+    command: ChannelServiceCommand,
     actor: { id: string; name: string },
     /** Messages a save writes with the change, in the same commit. */
     notes: ChannelMessage[] = [],
@@ -660,6 +749,7 @@ export class ChannelService {
       yield* this.wake(channel.id);
       return result;
     }
+    if (command.type === "handoff") return yield* this.#applyHandoff(channel, command, actor, operationId);
     const tasks = yield* channelSync(() => this.store.tasks(channel.id));
     const selected = tasks.find((task) => task.id === command.taskId);
     if (!selected) return yield* channelFailure(new Error(sourceText("error.backend.channelTaskNotFound")));
@@ -720,6 +810,64 @@ export class ChannelService {
     yield* this.wake(channel.id);
     return result;
   }).bind(this);
+
+  /**
+   * One new root task for each recipient, as for a routine request. With no recipient, the lead
+   * routes it. The files become channel attachments before the request is stored, as for `send`.
+   */
+  readonly #applyHandoff = Effect.fn("ChannelService.applyHandoff")(function* (
+    this: ChannelService,
+    channel: Channel,
+    command: ChannelHandoffCommand,
+    actor: { id: string; name: string },
+    operationId: string,
+  ) {
+    for (const agentId of command.recipientAgentIds)
+      yield* channelSync(() => this.requireAvailableMember(channel, agentId));
+    const id = randomUUID();
+    const committed = command.sourcePaths.length
+      ? yield* this.mailbox
+          .commitChannelAttachments({
+            channelId: channel.id,
+            messageId: id,
+            text: command.text,
+            draftIds: [],
+            sourcePaths: command.sourcePaths,
+            sender: { kind: "agent", agentId: command.senderAgentId },
+            assertOpen: () => {
+              if (this.store.get(channel.id).archived) throw new Error(sourceText("error.backend.channelArchived"));
+            },
+          })
+          .pipe(Effect.mapError(channelFailure))
+      : null;
+    const result = yield* Effect.gen({ self: this }, function* () {
+      const current = committed ? yield* channelSync(() => this.store.get(channel.id)) : channel;
+      if (current.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
+      const text = committed?.text ?? command.text;
+      const recipients = [
+        ...new Set([...command.recipientAgentIds, ...this.#recipients(this.eligibleMembers(current), text, null)]),
+      ];
+      const [owner = null, ...rest] = recipients;
+      const task = this.newTask(current.id, id, text, owner);
+      const others = rest.map((agentId) => this.newTask(current.id, id, text, agentId));
+      const message = this.message(current.id, task.id, { kind: "member", ...actor }, text, id);
+      if (committed) message.message.attachments = committed.attachments;
+      return yield* channelSync(() =>
+        this.store.update(current, { messages: [message], tasks: [task, ...others] }, operationId),
+      );
+    }).pipe(
+      Effect.onExit((exit) =>
+        committed
+          ? Exit.isSuccess(exit)
+            ? committed.accept
+            : committed.revert.pipe(Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause))))
+          : Effect.void,
+      ),
+    );
+    this.publish(channel.id);
+    yield* this.wake(channel.id);
+    return result;
+  });
 
   private newTask(channelId: string, messageId: string, instruction: string, ownerAgentId: string | null): ChannelTask {
     const id = randomUUID();

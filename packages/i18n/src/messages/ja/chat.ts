@@ -325,6 +325,8 @@ export const messages = {
   "chat.menu.react": "リアクション",
   "chat.menu.branch": "ここから分岐",
   "chat.menu.markUnread": "未読にする",
+  "chat.menu.sendToChannel": "チャンネルに送信",
+  "chat.menu.chooseChannel": "チャンネルを選択",
   "chat.voice.play": "音声メッセージを再生",
   "chat.voice.pause": "音声メッセージを一時停止",
   "chat.voice.pauseReading": "読み上げを一時停止",

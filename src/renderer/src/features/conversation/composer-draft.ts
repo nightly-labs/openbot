@@ -52,6 +52,12 @@ export function appendPluginPrompt(draft: ComposerDraft, prompt: string): Compos
   return text ? appendDraftLine(draft, text) : draft;
 }
 
+/** A message sent on from another chat, below what the user already typed. */
+export function appendForwardedText(draft: ComposerDraft, text: string): ComposerDraft {
+  const trimmed = text.trim();
+  return trimmed ? appendDraftLine(draft, trimmed) : draft;
+}
+
 /** One more line in the draft, so an added example never overwrites what the user already typed. */
 function appendDraftLine(draft: ComposerDraft, line: string): ComposerDraft {
   return { ...draft, text: draft.text ? `${draft.text}\n${line}` : line };

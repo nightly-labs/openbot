@@ -961,7 +961,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setComposerError: setScopedComposerError,
     setComposerFocusRequest,
   });
-  const { replyToMessage, addPageText, setPageContext, reactToMessage, copyMessage, removeAttachment } = messageActions;
+  const { replyToMessage, addPageText, setPageContext, reactToMessage, copyMessage, messageText, removeAttachment } =
+    messageActions;
   const settings = createSettingsStore({
     props,
     runtimeSettingsAttempts: resources.runtimeSettingsAttempts,
@@ -2010,6 +2011,7 @@ export function createConversationViewScope(props: ConversationProps) {
     composerHasContent,
     copiedMessageId,
     copyMessage,
+    messageText,
     pasteFiles,
     releaseCutAttachments,
     clearSubmittedDraft,

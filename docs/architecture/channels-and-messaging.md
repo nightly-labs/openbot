@@ -207,12 +207,25 @@ Only assignments and awaited results start turns. Completed child results are co
 owner returns. The limit is eight automatic assignments per root request and two active assignments
 per channel (`CHANNEL_PARALLEL_LIMIT`).
 
+An agent can also give work to a channel from another conversation, such as its direct chat with
+the user. `list_channels` lists the open channels with their lead and members.
+`send_to_channel` posts one request (`ChannelService.handoff`): a complete brief, optional
+recipient agents, and optional file paths that the channel copies as attachments. The message has
+the sending agent as a member author with the id `agent:<agentId>`. Routing is the same as for a
+person's request: each named recipient and each opening @mention gets a root task, and with none the
+lead routes it. A channel without a lead refuses a request that names nobody
+(`channelLeadRequired`). The command does not go through `parseChannelCommand`, so no client can
+post as an agent. The tool call id gives the operation id, so a retried call posts no second
+message. Inside a channel task, `send_to_channel` is refused; use `channel_assign` or
+`channel_transfer`. On desktop, a person can do the same by hand: "Send to channel" on a message of
+an agent chat opens the channel with the message text in its composer. Attachments stay behind.
+
 A member can also change its channel when a person asks: `channel_add_member`,
 `channel_remove_member`, `channel_set_instructions`, and `channel_list_routines`,
 `channel_create_routine`, `channel_update_routine`, `channel_delete_routine` for the schedule
 routines. They act only on the channel of the running task (`channel-management.ts`). The request
-message of the root task must have a person as author. A routine run (author id `routine:<id>`)
-and a request that only an agent wrote are refused, so untrusted run input cannot change the
+message of the root task must have a person as author. A routine run (author id `routine:<id>`),
+an agent handoff (author id `agent:<agentId>`) and a request that only an agent wrote are refused, so untrusted run input cannot change the
 channel. A member change is a `save` through the command queue, with the draft read from the stored
 channel when its turn comes. The caller cannot remove itself or an owner of a task above its own,
 and removing the lead clears the lead. An agent that a person adds must be one that person can chat
