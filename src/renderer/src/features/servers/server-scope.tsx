@@ -1,5 +1,6 @@
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { createRemoteConnectionRecovery, type RemoteRecoveryStatus } from "@openbot/team-client/remote-recovery";
 import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { currentText } from "@openbot/ui/text";
@@ -101,7 +102,13 @@ const ServerScope = createSimpleContext({
       loadControlState: loadBrowserControlState,
       beginBrowserLoad,
     } = useBrowserTabs();
-    const { sidebarLayout, setSidebarLayout, loadLayout: loadSidebarLayout, reconcileActiveServerPins } = useSidebar();
+    const {
+      sidebarLayout,
+      setSidebarLayout,
+      loadLayout: loadSidebarLayout,
+      reconcileActiveServerPins,
+      syncActiveServerPins,
+    } = useSidebar();
     const { globalSearchOpen, setGlobalSearchVisibility, selectAgent } = useNavigation();
     const { conversations, clearRecentReplies, requestConversationRead, applyConversationReads, isAgentChatOpen } =
       useConversation();
@@ -246,6 +253,10 @@ const ServerScope = createSimpleContext({
           })
           .catch(failed),
       ];
+      // A server with `sidebar-pins-v1` keeps the pins of the user for all of their devices. Until it
+      // answers, and when it cannot, the pins of this computer stay.
+      if (server && serverSupportsCapability(server, SIDEBAR_PINS_CAPABILITY))
+        void syncActiveServerPins().catch(() => undefined);
       // A joined server without `agent-hidden-v1` has no hidden agents.
       if (server && serverSupportsCapability(server, AGENT_HIDDEN_CAPABILITY)) {
         reads.push(

@@ -81,6 +81,11 @@ export interface SidebarProps {
   layoutMutable?: boolean | undefined;
   collapsedSectionIds: string[];
   onMutateLayout: (action: SidebarLayoutAction) => Promise<void>;
+  /**
+   * Whether this server keeps folders in folders (`sidebar-folders-v1`). Without it, a folder cannot go
+   * into another folder, and the menu has no items to put it there.
+   */
+  foldersSupported?: boolean | undefined;
   /** Whether this server can copy a section with its agents. Without it, the section menu has no duplicate item. */
   sectionDuplicateSupported?: boolean | undefined;
   duplicatingSectionIds?: ReadonlySet<string> | undefined;

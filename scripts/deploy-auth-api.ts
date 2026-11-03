@@ -77,6 +77,12 @@ async function main(): Promise<void> {
       label: "Earlier code files",
     });
   }
+  // Production sends email through the relay Worker, so the relay must exist before the account Worker.
+  if (!cloudflareEnvironment) {
+    await run(wranglerExecutable, ["deploy", "--config", "wrangler.email-relay.jsonc"], {
+      label: "Email relay deployment",
+    });
+  }
   await run(wranglerExecutable, ["deploy", "--keep-vars", ...environmentArgs], {
     label: "Auth API deployment",
   });

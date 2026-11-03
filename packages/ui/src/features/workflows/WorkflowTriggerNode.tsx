@@ -22,12 +22,13 @@ import { useText } from "../../text";
 import { RoutineSchedulePicker } from "../conversation/RoutineSchedulePicker";
 import { RoutineWebhookSecretField } from "../conversation/RoutineWebhookEndpoint";
 import { useBoard } from "./workflow-board";
+import { DISCORD_TRIGGER_DEFAULTS, DiscordIcon, DiscordTriggerRows } from "./workflow-discord-parts";
 import { GITHUB_TRIGGER_DEFAULTS, GitHubIcon, GitHubTriggerRows, useGitHubTriggerReady } from "./workflow-github-parts";
 import { newTriggerSchedule, stableJson } from "./workflow-history";
 import { type Choice, NodeShell, NodeToolbar, oneOf, useField, useLocked, useStepRun } from "./workflow-node-parts";
 import { PlaceRow, SettingRow, SettingRows, SettingsFoot, StaticRow } from "./workflow-setting-rows";
 
-type TriggerType = "schedule" | "manual" | "webhook" | "message" | "github";
+type TriggerType = "schedule" | "manual" | "webhook" | "message" | "github" | "discord";
 
 const TRIGGERS = (t: AppTranslate): readonly Choice<TriggerType>[] => [
   {
@@ -47,9 +48,10 @@ const TRIGGERS = (t: AppTranslate): readonly Choice<TriggerType>[] => [
     icon: () => <MessageSquare aria-hidden="true" />,
   },
   { value: "github", label: t("workflow.trigger.type.github"), icon: () => <GitHubIcon /> },
+  { value: "discord", label: t("workflow.trigger.type.discord"), icon: () => <DiscordIcon /> },
 ];
 
-const TRIGGER_TYPES: readonly TriggerType[] = ["schedule", "manual", "webhook", "message", "github"];
+const TRIGGER_TYPES: readonly TriggerType[] = ["schedule", "manual", "webhook", "message", "github", "discord"];
 
 /**
  * The start of a workflow. The type is the first row of the card, and the settings of that type follow it:
@@ -78,16 +80,24 @@ export function TriggerNode(props: {
     untrack(() => props.trigger ?? "schedule"),
     oneOf(TRIGGER_TYPES),
   );
-  /** A new GitHub trigger stores the event and the filter that its rows show, so the host reads the same. */
+  /**
+   * A new GitHub or Discord trigger stores the fields that its rows show, so the host reads the same. Both
+   * keep an `event`, so a change from one to the other writes the defaults again.
+   */
   const chooseTrigger = (value: TriggerType) => {
-    if (value !== "github" || board.field(props.id, "event") !== undefined) return setTrigger(value);
-    board.setFields(props.id, { trigger: value, ...GITHUB_TRIGGER_DEFAULTS });
+    const defaults =
+      value === "github" ? GITHUB_TRIGGER_DEFAULTS : value === "discord" ? DISCORD_TRIGGER_DEFAULTS : undefined;
+    const fromOther = trigger() !== value && (trigger() === "github" || trigger() === "discord");
+    if (!defaults || (board.field(props.id, "event") !== undefined && !fromOther)) return setTrigger(value);
+    board.setFields(props.id, { trigger: value, ...defaults });
   };
-  /** GitHub needs a host that can run it. Other types show unless the host lists the types it runs. */
+  /** GitHub and Discord need a host that can run them. Other types show unless the host lists the types it runs. */
   const offered = (type: TriggerType) => {
     const triggers = board.features()?.triggers;
     if (type === trigger()) return true;
-    return type === "github" ? triggers?.includes(type) === true : (triggers?.includes(type) ?? true);
+    return type === "github" || type === "discord"
+      ? triggers?.includes(type) === true
+      : (triggers?.includes(type) ?? true);
   };
   /**
    * The draft that the user edits. A cron text with a space at the end saves without it, so the picker
@@ -241,6 +251,9 @@ export function TriggerNode(props: {
         </Show>
         <Show when={isGitHub()}>
           <GitHubTriggerRows id={props.id} locked={locked()} />
+        </Show>
+        <Show when={trigger() === "discord"}>
+          <DiscordTriggerRows id={props.id} locked={locked()} />
         </Show>
       </SettingRows>
     </NodeShell>

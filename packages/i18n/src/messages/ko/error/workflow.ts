@@ -25,6 +25,8 @@ export const messages = {
   "error.workflow.notRetryable": "실패했거나 중지된 단계만 다시 실행할 수 있어요.",
   "error.workflow.noDecision": "이 단계는 결정을 기다리고 있지 않아요.",
   "error.workflow.outputPlaceMissing": "이 출력의 메시징 위치를 선택하세요.",
+  "error.workflow.discordNoMessage":
+    "이 출력은 실행을 시작한 Discord 메시지에 작동합니다. Discord 멘션으로 실행을 시작하거나 채널에 게시를 선택하세요.",
   "error.workflow.outputConnectionOff": "이 출력의 메시징 연결이 꺼져 있거나 삭제됐어요. 위치를 다시 선택하세요.",
   "error.workflow.outputNotRunning": "메시징 연결이 지금 실행되고 있지 않아요. 실행될 때 다시 시도해 주세요.",
   "error.workflow.outputRefused": "위치에서 게시를 거부했어요. OpenBot이 그곳에 게시할 수 있는지 확인하세요.",

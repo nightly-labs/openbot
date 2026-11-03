@@ -39,6 +39,7 @@ import {
   antigravityAnswersUsageCommand,
   antigravityReadsGeminiHome,
   cliPathEnvironment,
+  kimiLoginArgs,
   resolveAntigravityCli,
   resolveClaudeCli,
   resolveClineCli,
@@ -55,6 +56,7 @@ import { clineFreeModels } from "./cline-free-models";
 import { readCursorUsage } from "./cursor-usage";
 import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
 import { GrokAgentClient } from "./grok-client";
+import { isPythonKimiCli, kimiPythonLoginEnv, kimiPythonSavedRegionEnv, type SignInRegion } from "./kimi-region";
 import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
@@ -101,6 +103,17 @@ interface ProviderCliCommand {
    * default answer instead of waiting. Only for a `device` or `link` sign-in, which reads no code.
    */
   readonly closeInput?: true;
+}
+
+/**
+ * The command of a sign-in. Its arguments and variables can depend on the CLI and on the region of
+ * the account, which only Kimi has: another provider ignores it.
+ */
+interface ProviderSignInCommand extends Omit<ProviderCliCommand, "argv" | "env"> {
+  readonly argv:
+    | readonly string[]
+    | ((cli: AgentCliInfo, region: SignInRegion) => Effect.Effect<readonly string[], ProviderClientOperationError>);
+  readonly env: (cli: AgentCliInfo, region: SignInRegion) => Record<string, string>;
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -155,7 +168,7 @@ type ProviderSignIn =
   /** The provider's own protocol hands back a URL for OpenBot to open. */
   | { kind: "browser" }
   /** OpenBot spawns the provider's CLI and waits for the process to exit. */
-  | { kind: "cli-command"; command: ProviderCliCommand }
+  | { kind: "cli-command"; command: ProviderSignInCommand }
   /** The user signs in with the CLI themselves; OpenBot only re-probes the provider afterwards. */
   | { kind: "external" }
   /** The host opens an interactive terminal and refreshes the account when it closes. */
@@ -189,7 +202,7 @@ interface AcpAuthenticateSignIn {
 type ProviderCodeSignIn =
   | { kind: "codex-device" }
   | { kind: "muse-device"; timeoutMs: number }
-  | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderCliCommand };
+  | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderSignInCommand };
 
 /**
  * The Gemini API key sign-in, the other way in when Google's browser sign-in cannot reach this
@@ -346,6 +359,27 @@ const KIMI_ENV: Readonly<Record<string, string>> = { KIMI_CLI_NO_AUTO_UPDATE: "1
  */
 const KIMI_CODE_LOGIN_ENV: Readonly<Record<string, string>> =
   process.platform === "win32" ? KIMI_ENV : { ...KIMI_ENV, BROWSER: "true" };
+
+/** The variables of `kimi login` for the region. Only the Python CLI takes its region from them. */
+function kimiLoginEnv(
+  base: Readonly<Record<string, string>>,
+  cli: AgentCliInfo,
+  region: SignInRegion,
+): Record<string, string> {
+  return isPythonKimiCli(cli) ? { ...base, ...kimiPythonLoginEnv(region) } : { ...base };
+}
+
+/**
+ * A Python CLI signed in on kimi.ai needs the global hosts in each process; Kimi Code 2.x keeps
+ * them with its sign-in. The agent's own variables come last, so that they can name other hosts.
+ */
+function kimiProcessEnv(
+  cli: AgentCliInfo,
+  agentEnvironment: Readonly<Record<string, string>> | undefined,
+): Record<string, string> {
+  const region = isPythonKimiCli(cli) ? kimiPythonSavedRegionEnv({ ...process.env, ...agentEnvironment }) : {};
+  return { ...region, ...agentEnvironment };
+}
 
 /**
  * The sandbox lets a Kimi process write in `~/.kimi`, not create it, so OpenBot makes it. The
@@ -1073,15 +1107,25 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // Kimi's ACP `login` method only checks the sign-in that `kimi login` stored: the user signs in
     // with the CLI. `login` prints a device code and its page, opens the page, and waits until the
     // user confirms the code. A sign-in also writes the account's models into `~/.kimi/config.toml`.
+    // Probe the chosen CLI: Python emits JSON; Kimi Code 2.x emits text. Each takes the region in
+    // its own way (`kimiLoginArgs`).
     signIn: {
       kind: "cli-command",
-      command: { argv: ["login"], env: () => ({ ...KIMI_ENV }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+      command: {
+        argv: (cli, region) => kimiLoginArgs(cli, kimiLoginEnv(KIMI_ENV, cli, region), { code: false, region }),
+        env: (cli, region) => kimiLoginEnv(KIMI_ENV, cli, region),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+      },
     },
-    // `login --json` prints the same device code as one JSON line.
     codeSignIn: {
       kind: "cli",
       flow: "device",
-      command: { argv: ["login", "--json"], env: () => ({ ...KIMI_CODE_LOGIN_ENV }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+      command: {
+        argv: (cli, region) =>
+          kimiLoginArgs(cli, kimiLoginEnv(KIMI_CODE_LOGIN_ENV, cli, region), { code: true, region }),
+        env: (cli, region) => kimiLoginEnv(KIMI_CODE_LOGIN_ENV, cli, region),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+      },
     },
     signOut: { argv: ["logout"], env: () => ({ ...KIMI_ENV }), timeoutMs: 30_000 },
     resolveCli: resolveKimiCli,
@@ -1094,7 +1138,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         ...(confinement
           ? { confine: (target) => confineKimiTarget(target, confinement, context.agentEnvironment?.()) }
           : {}),
-        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        extraEnv: () => kimiProcessEnv(cli, context.agentEnvironment?.()),
         signInMessage: sourceText("error.provider.kimiSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
@@ -1110,6 +1154,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: ["acp"],
         profileGeneration: true,
         env: { ...KIMI_ENV },
+        extraEnv: () => kimiProcessEnv(cli, undefined),
         signInMessage: sourceText("error.provider.kimiSignIn"),
         servesModel: context.servesModel,
       }),

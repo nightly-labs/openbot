@@ -24,6 +24,8 @@ export function useAgentPinSwipe(
   openingGesture: PanGesture,
   onPin: (withHaptic: boolean) => void,
   pinBlocked: boolean,
+  /** The drag of the row. A hold and a move drags the row; the swipe waits until the drag fails. */
+  dragGesture?: PanGesture,
 ) {
   const swipeable = useRef<SwipeableMethods>(null);
   const restOffset = useSharedValue(0);
@@ -89,6 +91,7 @@ export function useAgentPinSwipe(
       // A closed row yields rightward movement to the drawer. An exposed row owns
       // the same movement so it can close without opening the drawer.
       block: openingGesture,
+      requireToFail: dragGesture,
       onTouchesDown: (event) => {
         "worklet";
         if (active.get()) return;
@@ -143,7 +146,20 @@ export function useAgentPinSwipe(
         if (event.canceled && !committing.get()) scheduleOnRN(restore);
       },
     }),
-    [active, armed, committing, feedbackPlayed, openingGesture, origin, pin, pinBlocked, restOffset, restore, start],
+    [
+      active,
+      armed,
+      committing,
+      dragGesture,
+      feedbackPlayed,
+      openingGesture,
+      origin,
+      pin,
+      pinBlocked,
+      restOffset,
+      restore,
+      start,
+    ],
   );
   const gesture = usePanGesture(config);
 
@@ -173,8 +189,8 @@ export function useAgentPinSwipe(
   const scrollGuard = usePanGesture(guardConfig);
   const guardedGesture = useSimultaneousGestures(gesture, scrollGuard);
   const swipeRequires = useMemo(
-    () => (isAndroid ? [openingGesture, scrollGuard] : openingGesture),
-    [openingGesture, scrollGuard],
+    () => [openingGesture, ...(isAndroid ? [scrollGuard] : []), ...(dragGesture ? [dragGesture] : [])],
+    [openingGesture, scrollGuard, dragGesture],
   );
 
   return {
@@ -182,7 +198,7 @@ export function useAgentPinSwipe(
     gesture,
     /** The gesture of the row's detector: on Android with the scroll guard. */
     detectorGesture: isAndroid ? guardedGesture : gesture,
-    /** What the swipe waits for: the drawer, and on Android the scroll guard. */
+    /** What the swipe waits for: the drawer, the drag of the row, and on Android the scroll guard. */
     swipeRequires,
     onClose,
     onWillClose,

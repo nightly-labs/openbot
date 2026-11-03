@@ -26,6 +26,8 @@ export const messages = {
   "error.workflow.notRetryable": "Nur ein fehlgeschlagener oder gestoppter Schritt kann erneut laufen.",
   "error.workflow.noDecision": "Dieser Schritt wartet nicht auf eine Entscheidung.",
   "error.workflow.outputPlaceMissing": "Wähle einen Messaging-Ort für diese Ausgabe.",
+  "error.workflow.discordNoMessage":
+    "Diese Ausgabe wirkt auf die Discord-Nachricht, die den Lauf gestartet hat. Starte den Lauf über eine Discord-Erwähnung oder wähle „Im Kanal posten“.",
   "error.workflow.outputConnectionOff":
     "Die Messaging-Verbindung dieser Ausgabe ist aus oder entfernt. Wähle erneut einen Ort.",
   "error.workflow.outputNotRunning": "Die Messaging-Verbindung läuft gerade nicht. Versuche es erneut, wenn sie läuft.",

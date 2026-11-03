@@ -42,6 +42,8 @@ import type {
   SetMessageReactionInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  SidebarPin,
+  SidebarPinsSnapshot,
   SteerQueuedMessageInput,
   TeamInviteSummary,
   TeamMemberSummary,
@@ -54,6 +56,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   canAdministerServer,
+  decodeAgentFastModels,
   decodeWorkspaceDirectory,
   isAccountUsage,
   isAgentStatus,
@@ -66,10 +69,15 @@ import {
   isQueueSnapshot,
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
+  withFastServiceTiers,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  AGENT_FAST_MODE_CAPABILITY,
+  AGENT_FAST_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
   BROWSER_PAGE_STATE_CAPABILITY,
@@ -90,6 +98,10 @@ import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-prot
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
+import {
+  SIDEBAR_FOLDERS_CAPABILITY,
+  SIDEBAR_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -121,10 +133,13 @@ import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery
 import {
   listAgentNotificationLevels,
   listHiddenAgents,
+  readSidebarPins,
+  seedSidebarPins,
   setAgentHidden,
   setAgentNotificationLevel,
   setAgentProviderAccount,
   setOwnServerNotificationLevel,
+  setSidebarPins,
 } from "@openbot/team-client/team-admin-requests";
 import {
   cancelQueuedMessage,
@@ -278,6 +293,13 @@ export interface WebWorkspaceRuntime {
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
   /** Hides or restores an agent, and returns the host's hidden list. Needs `agent-hidden-v1`. */
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
+  /** The user's own pinned chats on the open host, for all of their devices. Needs `sidebar-pins-v1`. */
+  sidebarPins?: {
+    read: () => Promise<SidebarPinsSnapshot>;
+    set: (items: SidebarPin[]) => Promise<SidebarPinsSnapshot>;
+    /** Saves `items` only when the user has no list on the host yet. */
+    seed: (items: SidebarPin[]) => Promise<SidebarPinsSnapshot>;
+  };
   /**
    * The user's own level for each agent of a host: the open host, or a host with a status connection.
    * Any member can call it. A host without `agent-notification-levels-v1` has no levels.
@@ -596,6 +618,14 @@ export function createWebWorkspaceRuntime(
       }
     }
     if (!completedDraftIdsByHost.has(hostId)) draftCleanupRetryHosts.delete(hostId);
+  }
+  /** With `sidebar-folders-v1`, the layout has the parent of each folder. */
+  async function readSidebarLayout(): Promise<SidebarLayoutSnapshot> {
+    const value = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
+      ? await request("POST", SIDEBAR_FOLDERS_ROUTES.read, {})
+      : await request("GET", TEAM_API_ROUTES.sidebarLayout.state);
+    if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
+    return value;
   }
   async function request(method: string, path: string, body: TeamProtocolV2Json = {}, upload?: RemoteFileUpload) {
     if (disposed) throw new Error(currentText().t("webClient.error.connectionClosed"));
@@ -941,13 +971,17 @@ export function createWebWorkspaceRuntime(
     async browserPreview(tabId) {
       return decodeWebBrowserPreview(await request("POST", TEAM_API_ROUTES.browser.preview, { tabId }));
     },
-    async getSidebarLayout() {
-      const value = await request("GET", TEAM_API_ROUTES.sidebarLayout.state);
-      if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
-    },
+    getSidebarLayout: readSidebarLayout,
     async mutateSidebarLayout(action) {
-      const value = await request("POST", TEAM_API_ROUTES.sidebarLayout.actions, { ...action });
+      const folders = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY);
+      // The released route has every folder at the top: it refuses `nest`, and would drop a parent.
+      if (!folders && (action.type === "nest" || (action.type === "create" && action.parentId !== undefined)))
+        throw new Error(currentText().t("error.team.sidebarFoldersUnsupported"));
+      const value = await request(
+        "POST",
+        folders ? SIDEBAR_FOLDERS_ROUTES.actions : TEAM_API_ROUTES.sidebarLayout.actions,
+        { ...action },
+      );
       if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
     },
@@ -1206,6 +1240,11 @@ export function createWebWorkspaceRuntime(
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    sidebarPins: {
+      read: () => runTeamEffect(readSidebarPins(teamApi).pipe(Effect.mapError((error) => error.cause))),
+      set: (items) => runTeamEffect(setSidebarPins(teamApi, items).pipe(Effect.mapError((error) => error.cause))),
+      seed: (items) => runTeamEffect(seedSidebarPins(teamApi, items).pipe(Effect.mapError((error) => error.cause))),
+    },
     async listAgentNotificationLevels(hostId) {
       if (hostId !== lockedHostId) {
         if (!hosts) throw new Error(currentText().t("webClient.error.hostChanged"));
@@ -1251,10 +1290,14 @@ export function createWebWorkspaceRuntime(
       return runTeamEffect(setOwnServerNotificationLevel(teamApi, level).pipe(Effect.mapError((error) => error.cause)));
     },
     async models() {
-      return guardedListDecoder(
+      const models = guardedListDecoder(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
+      if (!capabilities.includes(AGENT_FAST_MODE_CAPABILITY)) return models;
+      // The fast tiers are optional: when their route fails, the picker gets the models with no Fast switch.
+      const fast = await request("POST", AGENT_FAST_MODE_ROUTES.models, {}).then(decodeAgentFastModels, () => []);
+      return withFastServiceTiers(models, fast);
     },
     async status() {
       const value = await request("GET", TEAM_API_ROUTES.agents.status);
@@ -1280,7 +1323,13 @@ export function createWebWorkspaceRuntime(
       if (!isDynamicRecord(value) || !isClientAgentSummary(value.agent) || !isSidebarLayoutSnapshot(value.layout))
         throw new Error(currentText().t("error.remote.invalidData"));
       duplicateOperationIds.delete(operationKey);
-      return { agent: value.agent, layout: value.layout } satisfies DuplicateAgentResult;
+      // The released route answers the layout without the parents of the folders. The copy exists, so a
+      // failed read keeps that layout rather than failing the copy; the next layout event has the parents.
+      const answered = value.layout;
+      const layout = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
+        ? await readSidebarLayout().catch(() => answered)
+        : answered;
+      return { agent: value.agent, layout } satisfies DuplicateAgentResult;
     },
     async updateAgent(input) {
       // The released agent route ignores the account, so it goes on `provider-accounts-v1` after the

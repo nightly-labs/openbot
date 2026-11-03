@@ -64,8 +64,12 @@ export const messages = {
   "error.team.sharedDataUnsupported": "이 연결에서는 공유 데이터를 지원하지 않아요.",
   "error.team.agentInstallUnsupported": "이 연결에서는 에이전트 추가를 지원하지 않아요.",
   "error.team.agentHideUnsupported": "이 연결에서는 에이전트 숨기기를 지원하지 않아요.",
+  "error.team.sidebarFoldersUnsupported": "이 연결에서는 폴더 안의 폴더를 지원하지 않아요.",
   "error.team.agentNotificationLevelsUnsupported":
     "이 서버는 에이전트별 알림 수준을 저장할 수 없어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
+  "error.team.sidebarPinsUnsupported":
+    "이 서버는 고정한 채팅을 모든 기기에서 유지할 수 없습니다. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
+  "error.team.agentInstructionsUnsupported": "이 연결에서는 에이전트 지침 편집을 지원하지 않아요.",
   "error.team.agentPublishUnsupported": "이 연결에서는 에이전트 게시를 지원하지 않아요.",
   "error.team.agentUpdateUnsupported": "이 연결에서는 에이전트 업데이트를 지원하지 않아요.",
   "error.team.contextResetUnsupported": "이 연결에서는 새 채팅 시작을 지원하지 않아요.",
@@ -98,6 +102,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "이 연결에서는 기본 제공자를 지원하지 않아요.",
   "error.team.agentAccessUnsupported": "이 연결에서는 역할을 지원하지 않아요.",
   "error.team.agentAccessStale": "다른 사람이 역할을 변경했어요. 역할을 다시 열어서 변경해 주세요.",
+  "error.team.serverAuditUnsupported": "이 연결은 감사 로그를 지원하지 않아요.",
   "error.team.agentViewOnly": "이 에이전트는 볼 수만 있어요.",
   "error.team.agentManageDenied": "이 에이전트를 변경할 수 없어요.",
   "error.team.attachmentNameRequired": "안전한 첨부 파일 이름이 필요해요.",

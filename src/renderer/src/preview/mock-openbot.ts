@@ -42,12 +42,14 @@ import {
   type AppSetupState,
   type AttachmentImportEvent,
   type AvatarHue,
+  agentAccessAuditChanges,
   agentAutoApprovalEnabled,
   agentAutomationAllowed,
   agentBrowserProfile,
   agentComputerUseEnabled,
   agentExclusionCoverage,
   agentFolderCoverage,
+  agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
   agentTaskLimit,
   type BackgroundProcess,
@@ -135,12 +137,14 @@ import {
   type RoutineRun,
   type RoutineSchedule,
   type SendMessageInput,
+  type ServerAuditEntry,
   type SetAgentAvatarInput,
   type SetMessageReactionInput,
   type SharedTable,
   SIDEBAR_PEOPLE_SECTION_ID,
   SIDEBAR_UNASSIGNED_SECTION_ID,
   type SidebarLayoutSnapshot,
+  type SidebarPinsSnapshot,
   type SteerQueuedMessageInput,
   sameCustomProviderOrigin,
   type TeamPresenceSnapshot,
@@ -179,7 +183,9 @@ import {
   STORY_MARKETPLACE_AGENTS,
   STORY_MCP_SERVERS,
   STORY_MODELS,
+  STORY_PRESENCE,
   STORY_QUEUES,
+  STORY_SERVER_AUDIT_ENTRIES,
   STORY_SHARED_TABLES,
   STORY_SNAPSHOTS,
   STORY_UPDATE_STATUS,
@@ -198,6 +204,7 @@ import { createMockHostTimezone } from "./mock-host-timezone";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
 import { createMockHostedServers } from "./mock-hosted-servers";
 import { createMockLicense } from "./mock-license";
+import { createMockLinkAccount } from "./mock-link-account";
 import { createMockMessaging } from "./mock-messaging";
 import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
@@ -449,6 +456,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let machineAlerts: MachineAlertSettings = { ...DEFAULT_MACHINE_ALERT_SETTINGS, diskPercent: 80 };
   let promptCacheTtl: PromptCacheTtlSetting = { ...DEFAULT_PROMPT_CACHE_TTL };
   let agentAccess: AgentAccessChange = { revision: 0, everyone: {}, roles: [] };
+  let serverAudit: ServerAuditEntry[] = clone(STORY_SERVER_AUDIT_ENTRIES);
   const agentMemoryLimitListeners = new Set<(preference: AgentMemoryLimitPreference) => void>();
   let remoteSessionReuse: RemoteSessionReusePreference = { ...DEFAULT_REMOTE_SESSION_REUSE_PREFERENCE };
   let externalLinks: ExternalLinkPreference = clone(DEFAULT_EXTERNAL_LINK_PREFERENCE);
@@ -467,6 +475,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let appearancePreference: AppAppearancePreference = {
     appearance: DEFAULT_APP_APPEARANCE,
     transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
+    palette: null,
+    palettes: [],
   };
   const appearanceListeners = new Set<(preference: AppAppearancePreference) => void>();
   let interfaceSizePreference: AppInterfaceSizePreference = { percent: DEFAULT_APP_INTERFACE_SIZE };
@@ -592,6 +602,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     redirectUrl: "http://127.0.0.1:28417/mcp-auth",
     app: mcpSignInApps[mcpServerId] ?? null,
   });
+  let sidebarPins: SidebarPinsSnapshot = { items: [], updatedAt: null };
   let sidebarLayout: SidebarLayoutSnapshot = clone(
     options.sidebarLayout ?? {
       revision: 0,
@@ -1166,7 +1177,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     // The Storybook toolbar sets the colors of a story.
     getAppAppearancePreference: async () => clone(appearancePreference),
     setAppAppearancePreference: async (change) => {
-      appearancePreference = { ...appearancePreference, ...change };
+      const next = { ...appearancePreference, ...change };
+      // As main does, a palette id shows only while that palette is listed.
+      const listed = next.palettes.some((palette) => palette.id === next.palette);
+      appearancePreference = { ...next, palette: listed ? next.palette : null };
       for (const listener of appearanceListeners) listener(clone(appearancePreference));
       return clone(appearancePreference);
     },
@@ -1190,6 +1204,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     openChatWindow: async () => undefined,
     getChatWindows: async () => [],
     onChatWindows: () => () => undefined,
+    // Main reads Cmd + Q, and the preview has no main process.
+    onQuitShortcutHint: () => () => undefined,
     // The preview has no native page, so the overlay is never on screen and the DOM dock stays.
     browserDock: {
       publishPresentation: async () => undefined,
@@ -1251,6 +1267,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     openExternal: async () => undefined,
     connectProvider: async () => clone(agentStatus),
+    connectProviderInMainlandChina: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
     // The preview runs no provider process, so a restart has nothing to wait for.
@@ -1455,6 +1472,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     githubConnector: createMockGitHubConnector(),
+    linkAccount: createMockLinkAccount(),
     onePasswordConnector: createMockOnePasswordConnector(),
     bitwardenConnector: createMockBitwardenConnector(),
     vault: createMockVault(),
@@ -1977,7 +1995,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listAgentFolders: async (agentId) => mockAgentFolders(agentId),
       chooseAgentFolder: async ({ agentId, replace }) =>
         addMockAgentFolder(agentId, replace ? `${replace} (found)` : "/mock/Projects/Leads", replace),
-      addAgentFolder: async ({ agentId, path }) => addMockAgentFolder(agentId, path),
+      addAgentFolder: async ({ agentId, path, replace }) => addMockAgentFolder(agentId, path, replace),
       addDroppedAgentFolder: async (agentId, folder) => addMockAgentFolder(agentId, `/mock/Dropped/${folder.name}`),
       removeAgentFolder: async ({ agentId, path }) => {
         const agent = requireMockAgent(agentId);
@@ -1999,6 +2017,20 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         );
         return { outcome: "included", path, list: mockAgentFolders(agentId) };
       },
+      // A small host tree for the folder browser of a joined server.
+      browseAgentFolders: async ({ path }) => {
+        const home = "/mock";
+        const folder = path ?? home;
+        const names = folder === home ? ["Documents", "Projects"] : [];
+        return {
+          path: folder,
+          parentPath: folder === "/" ? null : folder.slice(0, folder.lastIndexOf("/")) || "/",
+          entries: names.map((name) => ({ name, path: `${folder}/${name}` })),
+          truncated: false,
+          home,
+          volumes: [],
+        };
+      },
       readAgentInstructions: async (agentId) => mockAgentInstructions(agentId),
       saveAgentInstructions: async ({ agentId, text, expected }) => {
         const current = mockAgentInstructions(agentId);
@@ -2019,6 +2051,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         await api.agent.updateAgent(input);
         return api.agent.getAgentTaskLimit(input.agentId);
       },
+      getAgentNewChat: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return { allowNewChat: agentNewChatAllowed(agent, agentDefaults) };
+      },
+      updateAgentNewChat: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentNewChat(input.agentId);
+      },
+      previewAgentTemplate: (agentId) => api.agentTemplates.preview(agentId),
+      publishAgentTemplate: (input) => api.agentTemplates.publish(input),
+      unpublishAgentTemplate: (agentId) => api.agentTemplates.unpublish(agentId),
       getAgentPlanCard: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
         if (!agent) throw new Error("Agent not found");
@@ -2027,6 +2071,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgentPlanCard: async (input) => {
         await api.agent.updateAgent(input);
         return api.agent.getAgentPlanCard(input.agentId);
+      },
+      getAgentFastMode: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return { fastMode: agent.fastMode ?? null };
+      },
+      updateAgentFastMode: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentFastMode(input.agentId);
       },
       listBrowserProfiles: async () => ({
         profiles: browserProfiles.map(browserProfileSummary),
@@ -2182,6 +2235,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         mcpSignInApps = rest;
         forgetMcpSignIn(mcpServerId);
         return mcpSignInAppState(mcpServerId);
+      },
+      getSidebarPins: async () => clone(sidebarPins),
+      setSidebarPins: async ({ items }) => {
+        sidebarPins = { items: clone(items), updatedAt: new Date().toISOString() };
+        emitAgentEvent({ type: "sidebar-pins-changed", ...clone(sidebarPins) });
+        return clone(sidebarPins);
+      },
+      seedSidebarPins: async ({ items }) => {
+        if (sidebarPins.updatedAt === null) sidebarPins = { items: clone(items), updatedAt: new Date().toISOString() };
+        return clone(sidebarPins);
       },
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
@@ -2619,6 +2682,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         throw new Error("ZIP downloads are available in the desktop app.");
       },
       openAttachment: async (_input: OpenAttachmentInput) => undefined,
+      // The preview has no joined server, so no download reports its bytes.
+      stopAttachmentDownload: async () => undefined,
+      onAttachmentDownload: () => () => undefined,
       openSharedFile: async (_input: OpenSharedFileInput) => undefined,
       openWorkspaceFile: async (_input: OpenWorkspaceFileInput) => undefined,
       previewSharedFile: async (input: OpenSharedFileInput) => mockFilePreview(input.path, "shared-file"),
@@ -3173,12 +3239,25 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       setAgentAccess: async (input) => {
         const change = parseAgentAccessChange(input);
         if (change.revision !== agentAccess.revision) throw new Error(sourceText("error.team.agentAccessStale"));
+        const names = {
+          member: (id: string) => STORY_PRESENCE.members.find((member) => member.id === id)?.name ?? id,
+          agent: (id: string) => agents.find((agent) => agent.id === id)?.name ?? id,
+        };
+        const at = new Date().toISOString();
+        const actor = { id: "member-self", name: "Norbert" };
+        serverAudit = [
+          ...agentAccessAuditChanges(agentAccess, change, names)
+            .reverse()
+            .map((auditChange) => ({ id: crypto.randomUUID(), at, actor, change: auditChange })),
+          ...serverAudit,
+        ];
         agentAccess = { ...change, revision: change.revision + 1 };
         return {
           ...clone(agentAccess),
           mine: Object.fromEntries(agents.map((agent) => [agent.id, "manage" as const])),
         };
       },
+      getAuditLog: async () => ({ entries: clone(serverAudit) }),
     },
     storage: createMockStorage(),
     agentImport: {

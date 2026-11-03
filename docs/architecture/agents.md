@@ -225,7 +225,11 @@ changed, on this computer and on a joined host.
   workflow. A GitHub output (`github-output.ts`) changes GitHub as the App's bot through
   `src/main/github-rest.ts`, with 10 actions. "Agent chooses" asks a model to choose labels or a
   person from the repository's own lists, and drops other values. `workflow_github_actions` keeps
-  each change, so a restart does not post a comment, review or issue again.
+  each change, so a restart does not post a comment, review or issue again. When a Discord mention
+  started the run, a new issue or a comment links the files of the mention and of the message that it
+  replies to (`discordTriggerFiles` in `discord-matching.ts`). GitHub has no attachment API for an App
+  token, so `attachFiles` in `github-rest.ts` commits them, before the change is recorded as sent, with the Git Data API to the orphan `openbot-attachments` branch, which has no workflow files
+  and so starts no Actions. A file that it cannot copy keeps its Discord link, which expires.
 - A restart keeps approvals and agent steps, because their state is in the database and the
   mailbox. The first pass fails a model step that was running, and ends a run that was stopping. An
   agent step fails with `agentMissing` when its agent is deleted. A post that did not start is sent; a
@@ -252,6 +256,34 @@ A joined desktop, the web client and the mobile app use the optional `agent-hidd
 (`packages/contracts/src/team-protocol/agent-hidden-v1.ts`). Any member reads the list; only an
 owner or an admin hides or restores an agent on a host.
 `/v1/agents` and the released agent codecs do not carry `hiddenAt`.
+
+## Sidebar folders
+
+The sidebar groups chats in folders. In the stored layout and the released contracts a folder is a
+section. A section can have an optional `parentId`, so a folder can hold folders: three levels in
+all (`SIDEBAR_FOLDER_LEVELS`). The layout stays in `sidebar-layout.json`; the field needs no file
+version and no SQL migration.
+
+`SidebarLayoutStore` rebuilds the tree after each action and at load (`sidebarFolderParents`,
+`sidebarFolderTreeOrder`). A parent that is unknown, that makes a loop or that is too deep counts
+as absent, so the folder goes to the top level and keeps its chats. An older version keeps the
+field in the file but does not maintain it. The store writes the file only on a change. `create`
+takes a `parentId`, and `nest` puts a folder with its folders in a parent before a sibling. A delete
+moves the folders and chats of the folder to its parent; at the top level the chats have no folder.
+The store refuses a fourth level, a folder that goes into itself, and a sibling of another parent.
+
+The renderer shows folders when the server can nest them (`foldersSupported`). A nested header shows
+"Parent / Name", and the headers stay at the top when the list scrolls. A joined desktop, the web
+client and the mobile app use the optional `sidebar-folders-v1` capability
+(`packages/contracts/src/team-protocol/sidebar-folders-v1.ts`), protocol 9 only. Its routes take the
+released actions, `parentId` on `create`, and `nest`. A peer with the capability gets
+`sidebar-folders-changed`; other peers get `sidebar-layout-changed`, and the released
+`/v1/sidebar-layout` routes leave out `parentId`. A peer without the capability shows each folder at
+the top level, and its changes keep the parents. The iPhone app shows nested folders as one list,
+as the desktop does: "Parent / Name", a folder icon, and the unread count of a closed folder. A closed
+folder hides the folders in it. With the capability, its folder menu has "New folder inside" and
+"Move to" (`nest`). An instance transfer creates each folder at the top level, because its
+file has no field for the parent.
 
 ## Browser profile
 

@@ -61,6 +61,7 @@ export function ServerSettingsScreen() {
     canManageMcpServers,
     canViewHostedSites,
     canManageServerRoles,
+    canReadServerAudit,
     canImportAgents,
     canTransferServer,
   } = useMobileWorkspace();
@@ -154,6 +155,11 @@ export function ServerSettingsScreen() {
         {canManageServerRoles(serverId) ? (
           <SettingsRow onPress={() => router.push({ pathname: "/server-settings/roles", params: { serverId } })}>
             <Typography.Paragraph>{t("mobile.server.route.roles")}</Typography.Paragraph>
+          </SettingsRow>
+        ) : null}
+        {canReadServerAudit(serverId) ? (
+          <SettingsRow onPress={() => router.push({ pathname: "/server-settings/audit", params: { serverId } })}>
+            <Typography.Paragraph>{t("mobile.server.route.audit")}</Typography.Paragraph>
           </SettingsRow>
         ) : null}
       </SettingsSection>

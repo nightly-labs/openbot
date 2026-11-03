@@ -28,6 +28,7 @@ import type {
 import { canAdministerServer } from "@openbot/contracts/ipc";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
@@ -611,6 +612,8 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.userHiddenAgents = event.agents;
           });
+        if (event.type === "sidebar-pins-changed")
+          preferences.receiveServerPins(pinScope(), { items: event.items, updatedAt: event.updatedAt });
         // A read loads only the open conversation, so the events of other agents do not start one.
         const changed = changedConversation(event);
         if (changed !== undefined && changed === selectedId) void refresh();
@@ -618,8 +621,30 @@ export function createWebWorkspace(
     },
     props.accountFetch,
   );
+  const pinScope = () => (state.host ? `${props.accountId}:${state.host.hostId}` : "");
+  /**
+   * The scopes whose host said at its last connect that it keeps the pins (`sidebar-pins-v1`). A change
+   * while the host is away stays pending and goes to the host at the next connect.
+   */
+  const pinScopes = new Set<string>();
+  /**
+   * Only the open host takes a request; a pin change of another host waits for its next connect. A
+   * request while the host is away fails and stays pending. This does not read `state.status`: the
+   * connect sets it in the same tick as the first sync, and the store shows it only at the next flush.
+   */
+  const openHostPins = (scope: string) => {
+    const pins = runtime.sidebarPins;
+    if (!pins || scope !== pinScope()) throw new Error(currentText().t("error.team.sidebarPinsUnsupported"));
+    return pins;
+  };
   const preferences = createSidebarPreferences({
-    scope: () => (state.host ? `${props.accountId}:${state.host.hostId}` : ""),
+    scope: pinScope,
+    sync: {
+      supports: (scope) => pinScopes.has(scope),
+      read: async (scope) => openHostPins(scope).read(),
+      set: async (scope, items) => openHostPins(scope).set(items),
+      seed: async (scope, items) => openHostPins(scope).seed(items),
+    },
   });
   // The other tabs show the opened host with the state this tab has for it.
   createEffect(
@@ -1167,7 +1192,10 @@ export function createWebWorkspace(
       markRemoteSync("workspace-ready");
       // From the read values: the store applies the write above only at the next flush.
       saveRemoteWorkspaceFrame(props.accountId, host.hostId, { agents, models });
+      if (capabilities.includes(SIDEBAR_PINS_CAPABILITY)) pinScopes.add(pinScope());
+      else pinScopes.delete(pinScope());
       preferences.reconcileActiveServerPins(agents.map((agent) => agent.id));
+      void preferences.syncActiveServerPins().catch(() => undefined);
       // The open conversation and its queue go out first. One queue read for each agent sent before
       // them held the first page behind ~50 answers on a large host (`bun run perf:remote`).
       // An agent the user opened in the frame stays open.

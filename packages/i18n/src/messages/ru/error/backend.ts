@@ -246,6 +246,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "На сервере может быть не более {limit} разделов боковой панели.",
   "error.backend.sectionNameRequired": "Нужно название раздела.",
   "error.backend.sectionNameTooLong": "Название раздела слишком длинное.",
+  "error.backend.sidebarFolderTooDeep": "Папки могут иметь только три уровня вложенности.",
+  "error.backend.sidebarFolderMoveInvalid": "Эту папку нельзя туда переместить.",
   "error.backend.sectionNameDuplicate": "Названия разделов должны быть уникальными.",
   "error.backend.directMessageRequired": "Сначала напишите сообщение.",
   "error.backend.directMessageTooLong": "Личное сообщение может содержать не более {limit} символов.",
@@ -344,8 +346,8 @@ export const messages = {
   "error.backend.taskToolInvalid": "Дайте задаче название не длиннее 120 символов и описание того, что нужно сделать.",
   "error.backend.taskOwnChatOnly":
     "Задачу можно начать только из своего чата. Канал, диалог в мессенджере или другая задача не может её начать.",
-  "error.backend.taskOpenLimit":
-    "У этого агента уже открыто задач: {count}. Дождитесь, пока пользователь закроет одну из них, прежде чем начинать новую.",
+  "error.backend.taskUnfinishedLimit":
+    "У этого агента уже есть незавершённые задачи: {count}. Начните новую задачу, когда одна из них завершится.",
   "error.backend.taskOpenLimitReached":
     "У этого агента открыто задач: {count}. Закройте задачу, затем начните или откройте другую.",
   "error.backend.taskRemoteUnsupported": "Задачи доступны только для агентов на этом компьютере.",

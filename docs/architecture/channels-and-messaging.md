@@ -207,12 +207,27 @@ Only assignments and awaited results start turns. Completed child results are co
 owner returns. The limit is eight automatic assignments per root request and two active assignments
 per channel (`CHANNEL_PARALLEL_LIMIT`).
 
+An agent can also give work to a channel from another conversation, such as its direct chat with
+the user. `list_channels` lists the open channels with their lead and members.
+`send_to_channel` posts one request (`ChannelService.handoff`): a complete brief, optional
+recipient agents, and optional file paths that the channel copies as attachments. The message has
+the sending agent as a member author with the id `agent:<agentId>`. The assignment of a root task
+from it starts with "Request from OpenBot teammate <name> (<agentId>)" (`assignmentText`), so the
+member does not read the agent's words as the user's. A follow-up under that line names its
+sender, such as "Follow-up from the user". Routing is the same as for a person's request: each named recipient and each opening @mention gets a root task, and with none the
+lead routes it. A channel without a lead refuses a request that names nobody
+(`channelLeadRequired`). The command does not go through `parseChannelCommand`, so no client can
+post as an agent. The tool call id gives the operation id, so a retried call posts no second
+message. Inside a channel task, `send_to_channel` is refused; use `channel_assign` or
+`channel_transfer`. On desktop, a person can do the same by hand: "Send to channel" on a message of
+an agent chat opens the channel with the message text in its composer. Attachments stay behind.
+
 A member can also change its channel when a person asks: `channel_add_member`,
 `channel_remove_member`, `channel_set_instructions`, and `channel_list_routines`,
 `channel_create_routine`, `channel_update_routine`, `channel_delete_routine` for the schedule
 routines. They act only on the channel of the running task (`channel-management.ts`). The request
-message of the root task must have a person as author. A routine run (author id `routine:<id>`)
-and a request that only an agent wrote are refused, so untrusted run input cannot change the
+message of the root task must have a person as author. A routine run (author id `routine:<id>`),
+an agent handoff (author id `agent:<agentId>`) and a request that only an agent wrote are refused, so untrusted run input cannot change the
 channel. A member change is a `save` through the command queue, with the draft read from the stored
 channel when its turn comes. The caller cannot remove itself or an owner of a task above its own,
 and removing the lead clears the lead. An agent that a person adds must be one that person can chat
@@ -301,7 +316,8 @@ responses. The mobile chat list and message history use virtualized lists. Chann
 uses static avatar thumbnails without activity subscriptions or animation timers. Channels appear
 next to agents in the same list, with up to four static member avatars that fade when the host
 is offline. Channel pins share the existing pinned grid and 16-chat limit; local preferences
-preserve agent pins and channel pins separately. Hide removes a channel from the home list and
+preserve agent pins and channel pins separately. A host with `sidebar-pins-v1` keeps both in one list
+for all devices of the user (see [servers](servers.md)). Hide removes a channel from the home list and
 unpins it; the shared Hidden chats sheet restores it. Channel and agent pinning use the same
 measured overlay movement, with static folder artwork for channels. Agent and channel screens
 use the same mobile `ChatView`, header, message list, reply gestures, composer, camera, and keyboard
@@ -488,9 +504,12 @@ the token and does the platform work for the hosts:
   Another account gets `discord_guild_taken`.
 - **Events.** Signal keeps one Gateway connection (`@discordjs/ws`) with the guilds, guild messages
   and direct messages intents, and no privileged intent. It passes on only a guild message that
-  mentions the bot, and a press of an OpenBot button, which it acknowledges to Discord at once. It
-  normalizes each into `DiscordDelivery` (`@openbot/contracts/signal-protocol/discord-api`), takes the
-  bot's own mention out, and sends a `discord-delivery` frame to the `ingress` socket that holds a
+  mentions the bot or the bot's own role, and a press of an OpenBot button, which it acknowledges to
+  Discord at once. Discord makes that role, with the bot's name, when the bot joins a guild, and its
+  autocomplete can choose it instead of the bot. Signal finds the role by its `tags.bot_id` in the
+  guild and role events, and keeps only its ID in memory. It normalizes each message into
+  `DiscordDelivery` (`@openbot/contracts/signal-protocol/discord-api`), takes the bot's own mention
+  and role mention out, and sends a `discord-delivery` frame to the `ingress` socket that holds a
   Discord route ticket for the guild. The ticket mirrors the Slack one (audience
   `openbot-discord-route`, `/v2/remote/hosts/:id/discord-route`, `discord-route-revoked`,
   `/v2/remote/discord-route/validate`). The socket asks for a route only for the platforms whose

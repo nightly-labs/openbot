@@ -679,6 +679,12 @@ server can change it.
   the OpenBot GitHub App's installation tokens in plain text, with mode 0600, for `gh` and `git` in
   agent tools. OpenBot deletes that folder when you disconnect and when the app closes; after a crash
   it stays until the next start. The tokens are redacted from logs, exports and diagnostics.
+- The Link payment account (Server settings › Vault › Cards) is kept in
+  `~/Library/Application Support/OpenBot/openbot-link-account-v1.json`, encrypted by the operating
+  system's secret storage. It holds the Link access and refresh tokens and the account email.
+  Disconnect deletes the file and asks Link to revoke the sign-in. A one-time Link card is not
+  stored: OpenBot reads it from Link for each fill and types it into the page. The tokens and the
+  card number are redacted from logs, exports and diagnostics.
 - The ElevenLabs API key for dictation is kept in
   `~/Library/Application Support/OpenBot/voice-api-key.json`, encrypted by the operating system's
   secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
@@ -784,6 +790,11 @@ server can change it.
   sets only their own levels, and the host applies them to the desktop notifications of this computer
   and to the notifications that it sends to that member's phones. A removed member's levels are
   deleted. It is never sent to the OpenBot account service.
+- `~/Library/Application Support/OpenBot/openbot-sidebar-pins-v1.json` holds the agents and channels
+  that the owner and each member of this host pinned, in their order, by member ID, with agent and
+  channel IDs only. Each member reads and sets only their own list, so their desktop app, web client
+  and phones show the same pins. A removed member's list is deleted. It is never sent to the OpenBot
+  account service.
 
 Attachments copied into OpenBot remain in managed storage after their original file is moved or
 deleted. By default, all agents share one embedded browser profile, including cookies and website
@@ -916,6 +927,14 @@ Network traffic can also occur when:
   tokens for those repositories. It does not store or log either token, and it gets no chats, files
   or commands. Agents reach the GitHub MCP server through a local server on `127.0.0.1`, which adds
   the right token to each call;
+- the user connects Link in Server settings › Vault. OpenBot asks `login.link.com` for a sign-in
+  code and a token, with the label "OpenBot on" and this computer's name, which Link shows in its list
+  of connected apps. OpenBot renews and revokes the token there, and reads the account email from
+  `api.link.com`. When an agent pays with Link, OpenBot reads the payment methods of the account
+  from `api.link.com` and sends a payment request: the method ID, the amount and currency, the
+  merchant name and address, and the agent's description of the purchase. Link asks the user to
+  approve it, and OpenBot then reads the one-time card from `api.link.com`. Nothing else about the
+  user's agents, conversations or files is sent to Link;
 - an installed build checks GitHub Releases for updates;
 - OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
   `Check for updates`. It asks `api.github.com` for Codex and Kimi, `registry.npmjs.org` for Claude,
@@ -998,6 +1017,17 @@ graph, or ID.
   the list. The computer keeps the newest 50 deliveries of each trigger, without the event body: the
   delivery ID, event name, item number, time, and whether it started a run. An event that arrives
   while the computer is offline is lost; the history shows the gap.
+- **Discord triggers** start a run from a mention of the OpenBot Discord app. The trigger's output, and
+  the run that keeps it, has the message text, the author, and the name, type, size and Discord
+  address of each file of the message and of the message that it replies to. These addresses expire
+  after about a day.
+- **GitHub outputs** make the change through the OpenBot GitHub App: a comment, a label, a person, a
+  review, a close or a new issue. The text goes to GitHub. When a Discord mention started the run, a
+  new issue or a comment also keeps those files: the computer downloads each file of up to 25 MB, and
+  up to 50 MB for each change, from Discord and commits it to the `openbot-attachments` branch of the target repository,
+  under `discord/<message ID>/`. The text links the files there. Everyone who can read the repository
+  can read them, also after the issue or the comment is deleted; delete that branch to delete
+  them. A file that the computer cannot copy is linked at its Discord address.
 
 Members of a joined server can read, change, and run a workflow when they can see and use each
 agent in it (`workflows-v1`). The graph and the step text then go to their computer. Only owners
@@ -1064,7 +1094,8 @@ holds it. Unlike Slack, both directions go through Signal:
 - **To the computer.** Signal keeps the bot's connection to Discord. Discord sends it the messages of
   the channels OpenBot can view. When OpenBot's Signal has the Message Content intent, they include
   the text of every message; otherwise only the messages that mention OpenBot have text. Signal
-  passes on only the messages that mention OpenBot and the presses of OpenBot's buttons: the message
+  passes on only the messages that mention OpenBot or OpenBot's own role in the server, and the
+  presses of OpenBot's buttons: the message
   text, the author's ID, name and role IDs in the server, the channel, the addresses of its files, and
   the message it replies to when a person wrote it (with its author, time, and the text and file
   addresses that Discord gave). The computer downloads the files from Discord directly.
@@ -1327,9 +1358,12 @@ for the other providers, when their app supports Cline.
 OpenBot downloads the Kimi Code CLI from `github.com` (GitHub release assets), and its license file
 from `github.com`, when you select Download on the Kimi row. OpenBot starts the CLI as a local
 process. Prompts, attachments, and tool results go to that process, and the CLI sends them to
-Moonshot AI (`api.kimi.com`). Sign in runs `kimi login`, which opens Kimi's sign-in page
-(`auth.kimi.com`) in your browser. The CLI keeps its login, device ID, session files, and settings
-in `~/.kimi`, or in `$KIMI_SHARE_DIR`. OpenBot does not read, copy, or upload these files. Unless you
+Moonshot AI: `api.kimi.ai` for a global account, or `api.kimi.com` for a mainland China account.
+Sign in runs `kimi login`, which opens Kimi's sign-in page in your browser: `auth.kimi.ai` for
+Connect, or `auth.kimi.com` when you select the kimi.com (China) item in the row's ⋯ menu. The CLI
+keeps its login, device ID, session files, and settings in `~/.kimi`, or in `$KIMI_SHARE_DIR`.
+OpenBot reads only the API address in `config.toml` on this computer, to start the CLI with the
+region of its login. OpenBot does not copy or upload these files. Unless you
 set `telemetry = false` in `~/.kimi/config.toml`, or set `KIMI_DISABLE_TELEMETRY=1` in the
 environment that starts OpenBot, the CLI sends anonymous usage events to
 `telemetry-logs.kimi.com`. OpenBot does not change this setting. Moonshot AI's terms for Kimi Code

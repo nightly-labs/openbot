@@ -66,8 +66,12 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Deze verbinding ondersteunt geen gedeelde gegevens.",
   "error.team.agentInstallUnsupported": "Deze verbinding ondersteunt het toevoegen van agents niet.",
   "error.team.agentHideUnsupported": "Deze verbinding ondersteunt het verbergen van agents niet.",
+  "error.team.sidebarFoldersUnsupported": "Deze verbinding ondersteunt geen mappen in mappen.",
   "error.team.agentNotificationLevelsUnsupported":
     "Deze server kan geen eigen meldingsniveau per agent bewaren. Werk OpenBot bij op de computer waarop de server draait.",
+  "error.team.sidebarPinsUnsupported":
+    "Deze server kan je vastgezette chats niet voor al je apparaten bewaren. Werk OpenBot bij op de computer waarop hij draait.",
+  "error.team.agentInstructionsUnsupported": "Deze verbinding ondersteunt het bewerken van agentinstructies niet.",
   "error.team.agentPublishUnsupported": "Deze verbinding ondersteunt het publiceren van agents niet.",
   "error.team.agentUpdateUnsupported": "Deze verbinding ondersteunt het bijwerken van agents niet.",
   "error.team.contextResetUnsupported": "Deze verbinding ondersteunt het starten van een nieuwe chat niet.",
@@ -101,6 +105,7 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "Deze verbinding ondersteunt de standaardaanbieder niet.",
   "error.team.agentAccessUnsupported": "Deze verbinding ondersteunt geen rollen.",
   "error.team.agentAccessStale": "Iemand heeft de rollen gewijzigd. Open ze opnieuw en breng je wijziging aan.",
+  "error.team.serverAuditUnsupported": "Deze verbinding ondersteunt het auditlog niet.",
   "error.team.agentViewOnly": "Je kunt deze agent alleen bekijken.",
   "error.team.agentManageDenied": "Je kunt deze agent niet wijzigen.",
   "error.team.attachmentNameRequired": "Een veilige naam voor de bijlage is verplicht.",

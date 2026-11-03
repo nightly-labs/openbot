@@ -13,7 +13,7 @@ import type { UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup } from "solid-js";
 import type { ChatSearchMatch } from "./chat-search";
 import {
-  appendPluginPrompt,
+  appendDraftText,
   appendSkillCreationRequest,
   appendSkillExample,
   EMPTY_DRAFT,
@@ -308,7 +308,13 @@ export function createStableConversationState(
     },
     appendPluginPrompt(target: { serverId: string; agentId: string }, prompt: string) {
       const key = composerDraftKey(target);
-      setDrafts((current) => ({ ...current, [key]: appendPluginPrompt(current[key] ?? EMPTY_DRAFT, prompt) }));
+      setDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, prompt) }));
+      setComposerFocusRequest((value) => value + 1);
+    },
+    /** Puts a message from another chat into a channel's composer. The user reads it and sends it. */
+    appendChannelText(target: { serverId: string; channelId: string }, text: string) {
+      const key = composerDraftKey({ serverId: target.serverId, agentId: target.channelId });
+      setChannelDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, text) }));
       setComposerFocusRequest((value) => value + 1);
     },
     stopComposerTyping,

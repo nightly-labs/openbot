@@ -97,6 +97,7 @@ import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/pro
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
@@ -105,6 +106,7 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { readHostAnalytics } from "@openbot/team-client";
@@ -131,6 +133,7 @@ import {
   getHostAgentAccess,
   getHostAgentBrowserProfile,
   getHostAgentMemoryLimit,
+  getHostAuditLog,
   getHostReleaseStatus,
   getHostTimezone,
   getHostUpdateStatus,
@@ -331,6 +334,7 @@ type HostRequestActions = Pick<
   | "setAgentMemoryLimit"
   | "loadServerRoles"
   | "setServerRoles"
+  | "loadServerAuditLog"
   | "loadAgentNotificationLevels"
   | "setAgentNotificationLevel"
   | "setOwnServerNotificationLevel"
@@ -505,6 +509,9 @@ export function createHostRequestActions({
   /** The roles that set the agents of each member are an optional admin route set. */
   const rolesAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_ACCESS_CAPABILITY, "mobile.server.roles.unsupported");
+  /** The audit log of the access changes is an optional admin route set. */
+  const auditAdmin = (serverId: string) =>
+    capabilityApi(serverId, SERVER_AUDIT_CAPABILITY, "mobile.server.audit.unsupported");
   /** Each member reads and sets only their own levels, so the host does not check a role. */
   const notificationLevelsApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY, "mobile.agent.notificationLevel.unsupported");
@@ -558,6 +565,8 @@ export function createHostRequestActions({
     canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
     canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
     canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
+    canUseWorkflowGitHub: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_GITHUB_CAPABILITY),
     canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
     canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
     canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
@@ -585,6 +594,7 @@ export function createHostRequestActions({
       runTeamRequest(setHostAgentMemoryLimit(memoryLimitAdmin(serverId), limit)),
     loadServerRoles: async (serverId) => runTeamRequest(getHostAgentAccess(rolesAdmin(serverId))),
     setServerRoles: async (change, serverId) => runTeamRequest(setHostAgentAccess(rolesAdmin(serverId), change)),
+    loadServerAuditLog: async (serverId) => runTeamRequest(getHostAuditLog(auditAdmin(serverId))),
     loadAgentNotificationLevels: async (serverId) =>
       runTeamRequest(listAgentNotificationLevels(notificationLevelsApi(serverId))),
     setAgentNotificationLevel: async (input, serverId) =>

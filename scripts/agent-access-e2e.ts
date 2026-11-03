@@ -3,6 +3,7 @@
 // temporary profile. The owner sets roles; a member signs in as a current desktop client does. The
 // host must hide a `none` agent, refuse a write that the level does not permit, refuse a stale
 // revision, tell the member's event socket about each change, and keep the roles after a restart.
+// The server-audit-v1 log records each roles change with its actor, for owners and admins only.
 // The agent service is not initialized, so no provider CLI starts.
 // Run: `bun scripts/agent-access-e2e.ts`.
 // Writes .openbot-build/agent-access-e2e/report.json.
@@ -12,7 +13,13 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { type AgentAccessChange, type AgentAccessSnapshot, decodeAgentAccessSnapshot } from "@openbot/contracts/ipc";
+import {
+  type AgentAccessChange,
+  type AgentAccessSnapshot,
+  decodeAgentAccessSnapshot,
+  decodeServerAuditLog,
+  type ServerAuditLog,
+} from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -28,7 +35,13 @@ import {
 } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_MEMORY_INCLUSION_ROUTE } from "@openbot/contracts/team-protocol/agent-memories-v1";
 import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
+import {
+  SERVER_AUDIT_CAPABILITY,
+  SERVER_AUDIT_CODECS,
+  SERVER_AUDIT_ROUTES,
+} from "@openbot/contracts/team-protocol/server-audit-v1";
 import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { plugin } from "bun";
 import { Effect } from "effect";
@@ -78,6 +91,9 @@ plugin({
 
 const { TeamApiServer } = await import("../src/main/team-api-server");
 const { AGENT_ACCESS_FILE, AgentAccessStore } = await import("../src/main/agent-access-store");
+const { SERVER_AUDIT_FILE, ServerAuditStore, memberAuditName, serverAuditNames } = await import(
+  "../src/main/server-audit-store"
+);
 const { TeamStore } = await import("../src/main/team-store");
 
 interface Step {
@@ -189,6 +205,7 @@ interface Host {
   server: InstanceType<typeof TeamApiServer>;
   team: InstanceType<typeof TeamStore>;
   access: InstanceType<typeof AgentAccessStore>;
+  audit: InstanceType<typeof ServerAuditStore>;
   port: number;
 }
 
@@ -202,7 +219,15 @@ async function startHost(): Promise<Host> {
   const mailbox = new MailboxStore(userData, agentStore.sharedRoot, agentStore.database);
   const sidebar = new SidebarLayoutStore(join(userData, "sidebar-layout.json"));
   const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
-  const access = new AgentAccessStore(join(userData, AGENT_ACCESS_FILE));
+  const audit = new ServerAuditStore(join(userData, SERVER_AUDIT_FILE));
+  await runCauseEffect(audit.load());
+  // As the app wires it: the roles store records each save in the audit log.
+  const access = new AgentAccessStore(join(userData, AGENT_ACCESS_FILE), {
+    audit: (serverId, before, after, actor) =>
+      audit.recordAgentAccess(serverId, actor, before, after, () =>
+        serverAuditNames(team.listMembers(), agents.listAgents()),
+      ),
+  });
   await runCauseEffect(sidebar.initialize());
   // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
   await runCauseEffect(agentStore.initialize());
@@ -220,9 +245,10 @@ async function startHost(): Promise<Host> {
     appVersion: HOST_VERSION,
     hiddenAgents: agents,
     agentAccess: access,
+    serverAudit: audit,
   });
   const port = await Effect.runPromise(server.start());
-  return { database, agents, server, team, access, port };
+  return { database, agents, server, team, access, audit, port };
 }
 
 async function stopHost(): Promise<void> {
@@ -243,13 +269,14 @@ function current(): Host {
 async function call(
   method: string,
   path: string,
-  input: { token?: string; body?: unknown } = {},
+  input: { token?: string; body?: unknown; protocol?: number; capabilities?: readonly string[] } = {},
 ): Promise<{ status: number; body: unknown }> {
+  const protocol = input.protocol ?? TEAM_PROTOCOL_V7;
   const headers: Record<string, string> = {
     Accept: "application/json",
-    [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V7),
+    [TEAM_PROTOCOL_VERSION_HEADER]: String(protocol),
     [TEAM_APP_VERSION_HEADER]: HOST_VERSION,
-    [TEAM_CAPABILITIES_HEADER]: teamCapabilitiesForProtocol(TEAM_PROTOCOL_V7).join(","),
+    [TEAM_CAPABILITIES_HEADER]: (input.capabilities ?? teamCapabilitiesForProtocol(protocol)).join(","),
   };
   if (input.body !== undefined) headers["Content-Type"] = "application/json";
   if (input.token) headers.Authorization = `Bearer ${input.token}`;
@@ -279,6 +306,53 @@ async function readAccess(token: string): Promise<AgentAccessSnapshot> {
 
 async function setAccess(token: string, change: AgentAccessChange) {
   return access(AGENT_ACCESS_ROUTES.set, token, change);
+}
+
+/**
+ * Reads the audit log through the frozen server-audit-v1 codec, in both directions. The capability
+ * comes after the full protocol 7 and 8 lists, so only a protocol 9 client sends it.
+ */
+async function readAudit(
+  token: string,
+  capabilities?: readonly string[],
+): Promise<{ status: number; log: ServerAuditLog | null }> {
+  const codec = SERVER_AUDIT_CODECS.get(SERVER_AUDIT_ROUTES.read);
+  assert.ok(codec, "No server-audit-v1 codec for the read route.");
+  codec.request({});
+  const response = await call("POST", SERVER_AUDIT_ROUTES.read, {
+    token,
+    body: {},
+    protocol: TEAM_PROTOCOL_V9,
+    ...(capabilities ? { capabilities } : {}),
+  });
+  if (response.status !== 200) return { status: response.status, log: null };
+  return { status: 200, log: decodeServerAuditLog(codec.response(response.status, response.body)) };
+}
+
+/** The name that the audit log keeps for a member of this host. */
+function auditName(memberId: string): string {
+  const member = current()
+    .team.listMembers()
+    .find((value) => value.id === memberId);
+  assert.ok(member, `No member ${memberId}.`);
+  return memberAuditName(member).name;
+}
+
+/** Each entry as `<kind> <role or Everyone> <agent or member> <from>-><to>`, newest first. */
+function auditLines(log: ServerAuditLog): string[] {
+  return log.entries.map(({ change }) => {
+    switch (change.kind) {
+      case "agent-level":
+        return `agent-level ${change.role?.name ?? "Everyone"} ${change.agent.name} ${change.from}->${change.to}`;
+      case "role-member":
+        return `role-member ${change.role.name} ${change.member.name} ${change.added ? "added" : "removed"}`;
+      case "role-created":
+      case "role-deleted":
+        return `${change.kind} ${change.role.name}`;
+      default:
+        return change.kind;
+    }
+  });
 }
 
 async function login(credentials: { username: string; password: string }): Promise<string> {
@@ -416,6 +490,37 @@ try {
     return { revision: 1, agents: ids.length };
   });
 
+  await step("audit: the owner reads the roles change with its actor, newest first", async () => {
+    const { status, log } = await readAudit(ownerToken);
+    assert.equal(status, 200, `Reading the audit log returned ${status}.`);
+    assert.ok(log);
+    const ownerId = current()
+      .team.listMembers()
+      .find((member) => member.role === "owner")?.id;
+    assert.ok(ownerId, "The host has no owner.");
+    const ownerName = { id: ownerId, name: auditName(ownerId) };
+    const memberName = auditName(setup.memberId);
+    assert.deepEqual(auditLines(log), [
+      "agent-level Legal Legal none->chat",
+      "agent-level Everyone Ops manage->view",
+      "agent-level Everyone Finance manage->none",
+      "agent-level Everyone Legal manage->none",
+      `role-member Legal ${memberName} added`,
+      "role-created Legal",
+    ]);
+    for (const entry of log.entries) assert.deepEqual(entry.actor, ownerName, "An entry does not name the owner.");
+    return { entries: log.entries.length, actor: ownerName.name };
+  });
+
+  await step("audit: a member is refused with 403, and a client with no server-audit-v1 gets 400", async () => {
+    const member = await readAudit(setup.memberToken);
+    assert.equal(member.status, 403, `A member read the audit log: ${member.status}.`);
+    const older = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter((value) => value !== SERVER_AUDIT_CAPABILITY);
+    const unsupported = await readAudit(ownerToken, older);
+    assert.equal(unsupported.status, 400, `A client with no server-audit-v1 got ${unsupported.status}.`);
+    return { member: member.status, noCapability: unsupported.status };
+  });
+
   await step("member: reads the levels that apply to them, and the list leaves out the closed agent", async () => {
     const mine = await readAccess(setup.memberToken);
     assert.deepEqual(mine, { revision: 1, mine: { [legal]: "chat", [ops]: "view", [general]: "manage" } });
@@ -527,14 +632,17 @@ try {
     return { admin: 4, member: 3 };
   });
 
-  await step("restart: the roles persist", async () => {
+  await step("restart: the roles and the audit log persist", async () => {
     socket.close();
     await stopHost();
     host = await startHost();
     const mine = await readAccess(setup.memberToken);
     assert.deepEqual(mine, { revision: 1, mine: { [legal]: "chat", [ops]: "view", [general]: "manage" } });
+    const { log } = await readAudit(ownerToken);
+    assert.ok(log, "The owner cannot read the audit log after a restart.");
+    assert.equal(log.entries.length, 6, "The audit log did not persist.");
     socket = await openEvents(setup.memberToken);
-    return mine;
+    return { ...mine, auditEntries: log.entries.length };
   });
 
   await step("owner: taking the member out of the role closes the agent with no reload", async () => {
@@ -548,10 +656,15 @@ try {
     assert.deepEqual(await agentsChanged, [ops, general].sort());
     const response = await call("GET", TEAM_API_ROUTES.agent.conversation(legal), { token: setup.memberToken });
     assert.equal(response.status, 404);
-    return { agents: 2, legal: response.status };
+    const { log } = await readAudit(ownerToken);
+    const memberName = auditName(setup.memberId);
+    assert.ok(log, "The owner cannot read the audit log.");
+    assert.equal(log.entries.length, 7);
+    assert.equal(auditLines(log)[0], `role-member Legal ${memberName} removed`);
+    return { agents: 2, legal: response.status, audit: auditLines(log)[0] };
   });
 
-  await step("delete: the next save drops the levels of a deleted agent", async () => {
+  await step("delete: the next save drops the levels of a deleted agent, and logs nothing", async () => {
     const { agents, access, team } = current();
     await runCauseEffect(agents.deleteAgent(finance));
     const saved = await setAccess(ownerToken, { ...restricted, revision: 2, roles: [{ ...legalRole, memberIds: [] }] });
@@ -559,7 +672,11 @@ try {
     const stored = access.get(team.getIdentity()?.serverId ?? "");
     assert.equal(stored.revision, 3);
     assert.deepEqual(stored.everyone, { [legal]: "none", [ops]: "view" }, "The deleted agent kept its level.");
-    return { everyone: stored.everyone };
+    // Nobody changed the level of the deleted agent, so the log has no entry for it.
+    const { log } = await readAudit(ownerToken);
+    assert.ok(log, "The owner cannot read the audit log.");
+    assert.equal(log.entries.length, 7, `The save of a deleted agent's levels was logged: ${auditLines(log)[0]}.`);
+    return { everyone: stored.everyone, auditEntries: log.entries.length };
   });
 
   await step("duplicate: the copy of a closed agent gets the levels of its source", async () => {

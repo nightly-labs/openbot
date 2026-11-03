@@ -5,6 +5,8 @@
  */
 
 import { type AgentProviderId, agentProviderDescriptor } from "./agent-providers";
+import { INPUT_LIMITS } from "./input-limits";
+import { isAgentModel } from "./ipc-agent-identity";
 import { isAgentTaskLimit } from "./ipc-agent-tasks";
 import {
   type AgentAccess,
@@ -15,7 +17,7 @@ import {
   isAgentBackupModels,
   isAgentUsageLimitReturn,
 } from "./ipc-agents";
-import { isIdentifier } from "./ipc-bounded-values";
+import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { type BusyMessageMode, isBusyMessageMode } from "./ipc-queue";
 import { isBoolean, isDynamicRecord } from "./runtime-values";
 
@@ -285,6 +287,65 @@ export function parseUpdateAgentPlanCardInput(value: unknown): UpdateAgentPlanCa
   if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isBoolean(value.quickAcknowledgement))
     throw new Error("Invalid plan card setting.");
   return { agentId: value.agentId, quickAcknowledgement: value.quickAcknowledgement };
+}
+
+/**
+ * Whether one agent asks its provider for the fast service tier. The local window reads it from the
+ * agent summary; a member of a joined server reads it on `agent-fast-mode-v1`. Null: never set, so
+ * the host sends no tier and the provider keeps its own.
+ */
+export interface AgentFastModeSettings {
+  fastMode: boolean | null;
+}
+
+export interface UpdateAgentFastModeInput {
+  agentId: string;
+  fastMode: boolean;
+}
+
+export function decodeAgentFastModeSettings(value: unknown): AgentFastModeSettings {
+  if (!isDynamicRecord(value) || (value.fastMode !== null && !isBoolean(value.fastMode)))
+    throw new Error("Invalid fast mode setting.");
+  return { fastMode: value.fastMode };
+}
+
+export function parseUpdateAgentFastModeInput(value: unknown): UpdateAgentFastModeInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isBoolean(value.fastMode))
+    throw new Error("Invalid fast mode setting.");
+  return { agentId: value.agentId, fastMode: value.fastMode };
+}
+
+/** A model of a host that has a fast service tier, and the tier id that the host sends for it. */
+export interface AgentFastModel {
+  provider: string;
+  id: string;
+  fastServiceTier: string;
+}
+
+/** A model entry that this build cannot read is left out, as the released model list does. */
+export function decodeAgentFastModels(value: unknown): AgentFastModel[] {
+  if (!isDynamicRecord(value) || !Array.isArray(value.models)) throw new Error("Invalid fast models.");
+  return value.models.flatMap((model: unknown) =>
+    isDynamicRecord(model) &&
+    isIdentifier(model.provider) &&
+    isAgentModel(model.id) &&
+    isBoundedString(model.fastServiceTier, INPUT_LIMITS.serviceTier) &&
+    model.fastServiceTier
+      ? [{ provider: model.provider, id: model.id, fastServiceTier: model.fastServiceTier }]
+      : [],
+  );
+}
+
+/** Puts the fast tiers of `agent-fast-mode-v1` back on a host's model list, which drops them. */
+export function withFastServiceTiers<Model extends { provider: string; id: string; fastServiceTier?: string }>(
+  models: Model[],
+  fast: AgentFastModel[],
+): Model[] {
+  const tiers = new Map(fast.map((model) => [`${model.provider}\u0000${model.id}`, model.fastServiceTier]));
+  return models.map((model) => {
+    const fastServiceTier = tiers.get(`${model.provider}\u0000${model.id}`);
+    return fastServiceTier ? { ...model, fastServiceTier } : model;
+  });
 }
 
 /** The agent a host added from a marketplace listing or a shared template. The agent list has the rest. */

@@ -8,6 +8,8 @@ export const messages = {
     "OpenBot n’a pas pu enregistrer Computer Use dans la configuration de Codex. Vérifiez que votre fichier config.toml de Codex est valide et accessible en écriture, puis redémarrez OpenBot. Vous pouvez désactiver Computer Use dans les réglages du coéquipier pour continuer sans.",
   "error.provider.codexUnresponsive": "Codex ne répondait plus, OpenBot a donc arrêté son processus.",
   "error.provider.acpUnresponsive": "{provider} n’a pas répondu à temps, OpenBot a donc arrêté son processus.",
+  "error.provider.acpSignInLost":
+    "{provider} a perdu sa connexion, OpenBot a donc arrêté son processus. Renvoyez votre message.",
   "error.provider.acpMcpNotLoaded":
     "{provider} n’a pas chargé les outils d’OpenBot : cet agent ne peut donc ni les utiliser ni joindre ses coéquipiers. Une règle d’équipe {provider} peut bloquer les serveurs MCP locaux. Demandez à l’administrateur de votre équipe de les autoriser, puis réessayez.",
   "error.provider.endpointsReadOnly":
@@ -194,6 +196,7 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} n’a renvoyé aucun compte authentifié.",
   "error.provider.signInExpired": "Votre connexion à {provider} a expiré. Reconnectez-vous pour continuer.",
   "error.provider.cliActivateFailed": "OpenBot n’a pas pu activer la CLI gérée.",
+  "error.provider.noMainlandChinaSignIn": "{provider} n’a pas de connexion pour la Chine continentale.",
   "error.provider.cliNewVersionNotStarted": "La nouvelle version n’a pas démarré.",
   "error.provider.cliBusyReconnect": "La CLI {provider} traite un tour. Attendez la fin, puis reconnectez-vous.",
   "error.provider.cliBusySignOut": "La CLI {provider} traite un tour. Attendez la fin, puis déconnectez-vous.",

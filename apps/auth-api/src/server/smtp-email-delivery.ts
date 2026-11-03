@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isCanonicalInviteUrl } from "@openbot/contracts/invite-links";
 import { isValidHostname as isSharedValidHostname } from "@openbot/contracts/validation";
-import { Effect, Fiber, Result, Schema } from "effect";
+import { Effect, Fiber, Option, Result, Schema } from "effect";
 import {
   type ContactMessageEmailInput,
   type LicenseEmailInput,
@@ -14,12 +14,23 @@ import {
   type WelcomeEmailInput,
 } from "./email-templates";
 
+/**
+ * The `EMAIL_RELAY` service binding: the `openbot-email-relay` Worker in `src/email-relay-entry.ts`.
+ * Cloudflare runs that Worker near the mail host, because some Cloudflare locations cannot open a
+ * socket to it (#4578).
+ */
+interface EmailRelay {
+  fetch(request: Request): Promise<Response>;
+}
+
 export interface SmtpEmailConfig {
   host: string;
   port: number;
   username: string;
   password: string;
   from: string;
+  /** Sends through the relay Worker instead of a socket from this Worker. */
+  relay?: EmailRelay;
 }
 
 export interface SmtpEmailMessage {
@@ -114,6 +125,11 @@ const SENDER_LIMIT_REPLY = /too many (?:messages|emails|recipients)|(?:sending|s
 const SMTP_TIMEOUT_MS = 7_500;
 const SMTP_CLOSE_TIMEOUT_MS = 250;
 const SMTP_MAX_ATTEMPTS = 3;
+// A service binding needs an absolute URL. The relay reads only the body.
+const RELAY_URL = "https://openbot-email-relay.internal/send";
+// The relay ends its own attempts inside the delivery budget, so its result must arrive before this
+// limit. The margin covers the binding hop and a cold start. Only a relay that hangs reaches it.
+const RELAY_TIMEOUT_MS = EMAIL_CODE_DELIVERY_BUDGET_MS + 5_000;
 const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+$/iu;
 
 export const sendPrivateEmailCode = Effect.fn("Smtp.sendPrivateEmailCode ")(function* (
@@ -229,6 +245,7 @@ const sendPrivateEmail = Effect.fn("SmtpEmail.send")(function* (
   if (replyTo !== undefined) yield* smtpValidate(() => validateEmail(replyTo, "reply_to"));
   const { subject } = message.content;
   if (!subject || subject.length > 160 || hasHeaderBreak(subject)) return yield* new SmtpError("smtp_invalid_subject");
+  if (config.relay) return yield* sendThroughRelay(config.relay, config, message);
   const connect = connector ?? (yield* smtpCall(loadCloudflareConnector));
   for (let attempt = 1; attempt <= SMTP_MAX_ATTEMPTS; attempt += 1) {
     const result = yield* Effect.result(sendPrivateEmailAttempt(config, message, connect));
@@ -244,6 +261,73 @@ const sendPrivateEmail = Effect.fn("SmtpEmail.send")(function* (
     if (!isRetryableSmtpError(smtpError) || attempt === SMTP_MAX_ATTEMPTS) return yield* smtpError;
     yield* Effect.sleep(attempt * 250);
   }
+});
+
+// The relay request. The password crosses only the service binding, inside Cloudflare, and neither
+// Worker logs a request body.
+const RelayedEmail = Schema.Struct({
+  config: Schema.Struct({
+    host: Schema.String,
+    port: Schema.Number,
+    username: Schema.String,
+    password: Schema.String,
+    from: Schema.String,
+  }),
+  message: Schema.Struct({
+    email: Schema.String,
+    replyTo: Schema.optionalKey(Schema.String),
+    content: Schema.Struct({
+      subject: Schema.String,
+      preheader: Schema.String,
+      text: Schema.String,
+      html: Schema.String,
+    }),
+  }),
+});
+// The relay answers 204 when the mail host took the message, and 502 with the message of the failure.
+const RelayFailure = Schema.Struct({ error: Schema.String });
+const DELIVERY_ERROR_PATTERN = /^(?:smtp|email_delivery)_[a-z_]+$/u;
+
+// The relay runs the same send, with its retries and sender-limit check, so its failure message keeps
+// its meaning here. When the relay does not answer, it can have sent the message.
+const sendThroughRelay = Effect.fn("SmtpEmail.relay")(function* (
+  relay: EmailRelay,
+  config: SmtpEmailConfig,
+  message: PreparedEmailMessage,
+): Effect.fn.Return<void, SmtpFailure> {
+  const { relay: _relay, ...smtp } = config;
+  const unknown = () => new SmtpError("smtp_delivery_unknown");
+  const failure = yield* Effect.gen(function* () {
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        relay.fetch(
+          new Request(RELAY_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ config: smtp, message }),
+            signal,
+          }),
+        ),
+      catch: unknown,
+    });
+    if (response.status === 204) return null;
+    const body = yield* Effect.tryPromise({ try: () => response.json(), catch: unknown });
+    const decoded = Schema.decodeUnknownOption(RelayFailure)(body);
+    if (Option.isNone(decoded) || !DELIVERY_ERROR_PATTERN.test(decoded.value.error)) return unknown();
+    return new SmtpError(decoded.value.error);
+  }).pipe(Effect.timeoutOrElse({ duration: RELAY_TIMEOUT_MS, orElse: () => Effect.fail(unknown()) }));
+  if (failure) return yield* failure;
+});
+
+/** Sends one relay request in the relay Worker. A request that does not decode fails permanently. */
+export const sendRelayedEmail = Effect.fn("SmtpEmail.sendRelayed")(function* (
+  request: Request,
+  connector?: SmtpConnector,
+): Effect.fn.Return<void, SmtpFailure> {
+  const invalid = () => new SmtpError("smtp_invalid_relay_request");
+  const body = yield* Effect.tryPromise({ try: () => request.json(), catch: invalid });
+  const { config, message } = yield* Schema.decodeUnknownEffect(RelayedEmail)(body).pipe(Effect.mapError(invalid));
+  return yield* sendPrivateEmail(config, message, connector);
 });
 
 const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (

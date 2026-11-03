@@ -28,6 +28,7 @@ export function ConversationSideThread(props: { threadId: string }) {
     openExternalMessageUrl,
     previewAttachment,
     attachmentAction,
+    attachmentDownloads,
     installedSkills,
     installedSkillsLoadFailed,
     mcpServers,
@@ -148,6 +149,7 @@ export function ConversationSideThread(props: { threadId: string }) {
                 : attachmentAction(attachment, "open")
             }
             mediaSource={view.runtime?.attachmentMedia}
+            downloads={attachmentDownloads}
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}

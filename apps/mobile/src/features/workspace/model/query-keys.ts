@@ -130,6 +130,7 @@ export const queryKeys = {
   serverTimezone: (scope: QueryScope, serverId: string) => ["server-timezone", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
   serverRoles: (scope: QueryScope, serverId: string) => ["server-roles", ...scope, serverId],
+  serverAudit: (scope: QueryScope, serverId: string) => ["server-audit", ...scope, serverId],
   serverConnector: (scope: QueryScope, serverId: string, connector: string) => [
     "server-connector",
     ...scope,
@@ -202,13 +203,36 @@ export const queryKeys = {
   /** The workflows of a server. `workflows-changed` invalidates the list and the one workflow under it. */
   serverWorkflows: (scope: QueryScope, serverId: string) => ["server-workflows", ...scope, serverId],
   workflowList: (scope: QueryScope, serverId: string) => [...queryKeys.serverWorkflows(scope, serverId), "list"],
-  /** A workflow, its newest runs, all its runs page by page, and a run that is older than the first page. */
+  /**
+   * A workflow, its newest runs, all its runs page by page, a run that is older than the first page,
+   * its versions, and the events of its GitHub triggers.
+   */
   workflow: (
     scope: QueryScope,
     serverId: string,
     workflowId: string,
-    ...part: [] | ["detail"] | ["runs"] | ["history"] | ["run", runId: string]
+    ...part: [] | ["detail"] | ["runs"] | ["history"] | ["run", runId: string] | ["versions"] | ["github-history"]
   ) => [...queryKeys.serverWorkflows(scope, serverId), "workflow", workflowId, ...part],
+  /**
+   * The graph of one version. A version does not change, so the key is outside `workflow(...)`: a
+   * `workflows-changed` event does not read it again.
+   */
+  workflowVersionGraph: (scope: QueryScope, serverId: string, workflowId: string, versionId: string) => [
+    ...queryKeys.serverWorkflows(scope, serverId),
+    "version-graph",
+    workflowId,
+    versionId,
+  ],
+  /** The repositories of the host's GitHub connection, and the labels and people of one of them. */
+  workflowGitHubCatalog: (scope: QueryScope, serverId: string) => [
+    ...queryKeys.serverWorkflows(scope, serverId),
+    "github-catalog",
+  ],
+  workflowGitHubOptions: (scope: QueryScope, serverId: string, repository: string) => [
+    ...queryKeys.serverWorkflows(scope, serverId),
+    "github-options",
+    repository.toLowerCase(),
+  ],
   /** The query is the last part: a search that continues the typed query keeps its results on screen. */
   messageSearch: (scope: QueryScope, serverId: string, query: string) => ["message-search", ...scope, serverId, query],
   fileSearch: (scope: QueryScope, serverId: string, query: string) => ["file-search", ...scope, serverId, query],

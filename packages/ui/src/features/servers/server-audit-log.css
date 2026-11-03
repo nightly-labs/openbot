@@ -1,0 +1,72 @@
+.server-audit-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.server-audit-time {
+  white-space: nowrap;
+}
+
+/* The words between keywords step back, so the keywords carry the line. */
+.server-audit-row .server-audit-title {
+  color: var(--openbot-text-secondary);
+  font-weight: var(--openbot-weight-regular);
+}
+
+.server-audit-key {
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+}
+
+/* The danger tone takes access away, success lets the member chat, warning gives full control. */
+.server-audit-key[data-level="none"] {
+  color: var(--openbot-danger);
+}
+
+.server-audit-key[data-level="chat"] {
+  color: var(--openbot-success);
+}
+
+.server-audit-key[data-level="manage"] {
+  color: var(--openbot-warning);
+}
+
+.server-audit-arrow svg {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-inline: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  vertical-align: -2px;
+}
+
+/* The change mark at the start of the row: success adds, danger takes away, accent changes. */
+.server-audit-mark {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--openbot-radius-md);
+}
+
+.server-audit-mark svg {
+  width: 16px;
+  height: 16px;
+}
+
+.server-audit-mark[data-tone="success"] {
+  background: var(--openbot-success-soft);
+  color: var(--openbot-success);
+}
+
+.server-audit-mark[data-tone="danger"] {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger);
+}
+
+.server-audit-mark[data-tone="accent"] {
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
+}

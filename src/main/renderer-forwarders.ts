@@ -557,6 +557,10 @@ export function createRendererForwarders({
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.githubConnector.changed, status);
   }
 
+  function forwardLinkAccountStatus(status: import("@openbot/contracts/ipc").LinkAccountStatus): void {
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.linkAccount.changed, status);
+  }
+
   function forwardOnePasswordConnectorStatus(
     status: import("@openbot/contracts/ipc").OnePasswordConnectorStatus,
   ): void {
@@ -619,6 +623,12 @@ export function createRendererForwarders({
     sendToRenderer(window, IPC_ENDPOINTS.servers.scopedDirectTyping, { serverId, event });
   }
 
+  // Every window can show the chat that holds the attachment.
+  function forwardAttachmentDownload(progress: import("@openbot/contracts/ipc").AttachmentDownloadProgress): void {
+    for (const target of appWindows())
+      sendToRenderer(target, IPC_ENDPOINTS.agentAttachments.attachmentDownload, progress);
+  }
+
   return {
     forwardAgentEvent,
     forwardWorkflowNotice,
@@ -632,6 +642,7 @@ export function createRendererForwarders({
     forwardVoiceServerSettings,
     forwardProviderRuntimeStatus,
     forwardGitHubConnectorStatus,
+    forwardLinkAccountStatus,
     forwardOnePasswordConnectorStatus,
     forwardBitwardenConnectorStatus,
     forwardVaultState,
@@ -641,5 +652,6 @@ export function createRendererForwarders({
     forwardTeamPresence,
     forwardDirectMessage,
     forwardDirectTyping,
+    forwardAttachmentDownload,
   };
 }

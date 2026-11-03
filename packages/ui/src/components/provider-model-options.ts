@@ -20,11 +20,14 @@ import { currentText } from "../text";
 
 /** The efforts that have a name in the catalog. The other efforts show their id. */
 const EFFORT_LABELS: Partial<Record<string, AppTextKey>> = {
+  none: "provider.effort.none",
+  minimal: "provider.effort.minimal",
   low: "provider.effort.low",
   medium: "provider.effort.medium",
   high: "provider.effort.high",
   xhigh: "provider.effort.xhigh",
   max: "provider.effort.max",
+  ultra: "provider.effort.ultra",
 };
 
 export interface PickerModel {

@@ -100,7 +100,8 @@ export function createMessageActions(deps: MessageActionsDeps) {
     }
   }
 
-  async function copyMessage(message: AgentMessage) {
+  /** The text of a message as the reader sees it: names in place of agent, skill and attachment markers. */
+  function messageText(message: AgentMessage): string {
     const attachmentNames = new Map((message.attachments ?? []).map((attachment) => [attachment.id, attachment.name]));
     const agentNames = new Map(deps.props.agents.map((agent) => [agent.id, agent.name]));
     const skillNames = new Map(
@@ -109,12 +110,16 @@ export function createMessageActions(deps: MessageActionsDeps) {
         .filter((skill) => skill.state !== "needs-repair")
         .map((skill) => [skill.skillId, skill.name]),
     );
-    const text = expandAttachmentReferences(
+    return expandAttachmentReferences(
       expandChatTagReferences(message.body, (reference) =>
         reference.kind === "agent" ? agentNames.get(reference.id) : skillNames.get(reference.id),
       ),
       (reference) => attachmentNames.get(reference.attachmentId),
     );
+  }
+
+  async function copyMessage(message: AgentMessage) {
+    const text = messageText(message);
     if (!text && !message.attachments?.length) return;
     const agentId = conversationOwnerId(deps.props);
     const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
@@ -167,6 +172,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
     setPageContext,
     reactToMessage,
     copyMessage,
+    messageText,
     removeAttachment,
     draftAttachmentIds,
   };

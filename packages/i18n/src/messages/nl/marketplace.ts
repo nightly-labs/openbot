@@ -112,6 +112,7 @@ export const messages = {
   "marketplace.app.setup.account": "Log via de browser in met je {name}-account.",
   "marketplace.app.setup.key": "Vereist een API-sleutel van je {name}-account.",
   "marketplace.app.setup.keySaved": "{field} opgeslagen op {host}.",
+  "marketplace.app.account.removeDescription": "OpenBot verwijdert de inloggegevens van dit account op {host}.",
   "marketplace.app.setup.desktop": "Draait in de desktop-app van {name} op {address}.",
   "marketplace.app.setup.desktopConnected": "Verbonden met {address}.",
   "marketplace.app.setup.open": "Geen login of sleutel nodig.",

@@ -436,6 +436,8 @@ export const messages = {
   "chat.menu.react": "Реакция",
   "chat.menu.branch": "Ответвить отсюда",
   "chat.menu.markUnread": "Не прочитано",
+  "chat.menu.sendToChannel": "Отправить в канал",
+  "chat.menu.chooseChannel": "Выберите канал",
   "chat.voice.play": "Воспроизвести голосовое сообщение",
   "chat.voice.pause": "Приостановить голосовое сообщение",
   "chat.voice.pauseReading": "Приостановить чтение",

@@ -92,6 +92,7 @@ export const messages = {
   "error.remote.fileResumeFailed":
     "Die WebRTC-Dateiübertragung konnte nicht vor Ablauf ihrer Frist fortgesetzt werden.",
   "error.remote.fileTransportStopped": "Der WebRTC-Dateitransport wurde gestoppt.",
+  "error.remote.downloadStopped": "Der Download wurde gestoppt.",
   "error.remote.fileResumeExpired": "Die Frist zum Fortsetzen der WebRTC-Dateiübertragung ist abgelaufen.",
   "error.remote.hostRequestFailed": "Der Host konnte die Anfrage nicht abschließen.",
   "error.remote.responseTooLarge": "Die Antwort des Hosts ist zu groß, um sie an dieses Gerät zu senden.",

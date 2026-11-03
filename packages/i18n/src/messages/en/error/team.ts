@@ -64,8 +64,12 @@ export const messages = defineMessages("error.team", {
   "error.team.sharedDataUnsupported": "Shared data is not supported by this connection.",
   "error.team.agentInstallUnsupported": "Adding agents is not supported by this connection.",
   "error.team.agentHideUnsupported": "Hiding agents is not supported by this connection.",
+  "error.team.sidebarFoldersUnsupported": "Folders in folders are not supported by this connection.",
   "error.team.agentNotificationLevelsUnsupported":
     "This server cannot keep your own notification level for each agent. Update OpenBot on the computer that runs it.",
+  "error.team.sidebarPinsUnsupported":
+    "This server cannot keep your pinned chats for all of your devices. Update OpenBot on the computer that runs it.",
+  "error.team.agentInstructionsUnsupported": "Editing agent instructions is not supported by this connection.",
   "error.team.agentPublishUnsupported": "Publishing agents is not supported by this connection.",
   "error.team.agentUpdateUnsupported": "Updating agents is not supported by this connection.",
   "error.team.contextResetUnsupported": "Starting a new chat is not supported by this connection.",
@@ -99,6 +103,7 @@ export const messages = defineMessages("error.team", {
   "error.team.providerDefaultUnsupported": "The default provider is not supported by this connection.",
   "error.team.agentAccessUnsupported": "Roles are not supported by this connection.",
   "error.team.agentAccessStale": "Someone changed the roles. Open them again and make your change.",
+  "error.team.serverAuditUnsupported": "The audit log is not supported by this connection.",
   "error.team.agentViewOnly": "You can only view this agent.",
   "error.team.agentManageDenied": "You cannot change this agent.",
   "error.team.attachmentNameRequired": "A safe attachment name is required.",

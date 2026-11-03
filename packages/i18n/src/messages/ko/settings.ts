@@ -35,6 +35,8 @@ export const messages = {
   "settings.launchAtLogin.description": "이 컴퓨터에 로그인하면 앱을 열어요.",
   "settings.keepRunning.title": "OpenBot을 백그라운드에서 계속 실행",
   "settings.keepRunning.description": "창을 닫은 뒤에도 진행 중인 작업을 계속 실행해요.",
+  "settings.menuBar.title": "메뉴 막대에 OpenBot 표시",
+  "settings.menuBar.description": "메뉴 막대 아이콘에서 OpenBot을 열거나 종료해요.",
   "settings.keepAwake.title": "이 컴퓨터를 절전 모드로 전환하지 않기",
   "settings.keepAwake.description": "컴퓨터가 전원에 연결되어 있으면 루틴이 제시간에 실행돼요. 화면은 꺼질 수 있어요.",
   "settings.keepAwakeOnBattery.title": "배터리 사용 중에도 적용",

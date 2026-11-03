@@ -465,7 +465,7 @@
 }
 
 .agent-activity-avatar {
-  --agent-avatar-optical-offset: -2px;
+  --agent-avatar-optical-offset: calc(32px * -0.14);
 
   width: 32px;
   height: 32px;
@@ -1031,8 +1031,19 @@ button.chat-action-target:active,
   letter-spacing: -0.15px;
 }
 
+/*
+ * Bubbles grow with the chat column, between a minimum and a maximum, so a big screen shows more of a
+ * reply and a narrow pane is not wasted. A percentage refers to the message row. An agent reply, code,
+ * and a table use the wide width; a person's message uses the narrow width, and leaves a gap at the
+ * other side on a narrow pane.
+ */
+:root {
+  --message-wide-bubble-width: min(100%, max(720px, 70%), 1200px);
+  --message-narrow-bubble-width: min(92%, max(420px, 50%), 800px);
+}
+
 .message-entry-agent .ui-bubble {
-  max-width: min(720px, 100%);
+  max-width: var(--message-wide-bubble-width);
 }
 
 .message-entry-agent .ui-bubble:has(.choice-card) {

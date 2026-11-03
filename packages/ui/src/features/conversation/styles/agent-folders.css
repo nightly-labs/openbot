@@ -244,3 +244,40 @@
 .agent-folders-chat-zone[data-dragging] svg {
   color: var(--openbot-text-primary);
 }
+
+/* The folder picker for an agent on another computer. It uses the frame of the "More providers"
+   dialog: a title, a close button and one plain list, here with the places, the path and the buttons. */
+.host-folder-picker-places {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-1);
+  padding: 0 var(--openbot-space-3) var(--openbot-space-2);
+}
+
+.host-folder-picker-path {
+  margin: 0;
+  padding: 0 var(--openbot-space-3) var(--openbot-space-2);
+  overflow-wrap: anywhere;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.host-folder-picker .provider-more-list {
+  flex: 1 1 auto;
+  min-height: 160px;
+}
+
+.host-folder-picker-note {
+  margin: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.host-folder-picker-footer {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-2) var(--openbot-space-1) var(--openbot-space-1);
+}

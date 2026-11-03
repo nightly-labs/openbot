@@ -395,11 +395,15 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
                 .filter(isString)
                 .map((level) => (level === "off" ? "none" : level));
             }
-            const preferred = getString(state, "thinkingLevel");
+            const thinkingLevel = getString(state, "thinkingLevel");
+            const preferred = thinkingLevel === "off" ? "none" : thinkingLevel;
+            const defaultLevel = preferred && levels.includes(preferred) ? preferred : levels[0];
             models.push({
               model: keyProvider ? id : `${provider}/${id}`,
               displayName: getString(model, "name") ?? id,
-              defaultReasoningEffort: preferred && levels.includes(preferred) ? preferred : (levels[0] ?? "none"),
+              // A model without reasoning has no level. The catalog then gives it the `medium` of every
+              // model that cannot change its effort.
+              ...(defaultLevel === undefined ? {} : { defaultReasoningEffort: defaultLevel }),
               supportedReasoningEfforts: levels.map((reasoningEffort) => ({ reasoningEffort })),
               reasoningEffortConfigurable: levels.length > 0,
             });

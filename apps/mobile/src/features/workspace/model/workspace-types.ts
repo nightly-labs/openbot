@@ -99,6 +99,7 @@ import type {
   RoutineResultDestination,
   RoutineResultRoutineInput,
   SaveWorkflowGraphInput,
+  ServerAuditLog,
   ServerNotificationLevel,
   SetAgentMemoryInclusionInput,
   SetAgentNotificationLevelInput,
@@ -109,6 +110,7 @@ import type {
   SharedTable,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  SidebarPin,
   SignInRelayStatus,
   StorageUsage,
   UninstallSkillInput,
@@ -127,12 +129,18 @@ import type {
   VaultSaveInput,
   VaultState,
   WorkflowDetail,
+  WorkflowGitHubCatalog,
+  WorkflowGitHubHistory,
+  WorkflowGitHubRepositoryOptions,
+  WorkflowGraph,
   WorkflowRunDetail,
   WorkflowRunPage,
   WorkflowSaveResult,
   WorkflowStep,
   WorkflowSummary,
   WorkflowTriggerInput,
+  WorkflowVersion,
+  WorkflowVersionInput,
   WorkflowWebhookSecret,
 } from "@openbot/contracts/ipc";
 import type {
@@ -271,6 +279,11 @@ export interface MobileWorkspaceContextValue {
   respondToBrowserSecret: (serverId: string, input: RespondToBrowserSecretInput) => Promise<void>;
   sidebarByServer: Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>;
   mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
+  /**
+   * Moves a chat in the layout of a host. The list shows the move at once; a failure puts the chat
+   * back and rejects.
+   */
+  moveSidebarChat: (serverId: string, action: Extract<SidebarLayoutAction, { type: "move-agent" }>) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
   /** True when the host advertises `message-client-id-v1`: a repeat of a message is stored once. */
@@ -310,6 +323,10 @@ export interface MobileWorkspaceContextValue {
   hideChannel: (channelId: string, serverId: string) => boolean;
   unhideChannel: (channelId: string, serverId: string) => boolean;
   toggleChannelPin: (channelId: string, serverId: string) => ToggleAgentPinResult;
+  /** Replaces the pinned agents and channels of a server, in their order, such as after a drag. */
+  setChatPins: (serverId: string, items: readonly SidebarPin[]) => boolean;
+  /** The pinned agents and channels of a server in one list, in the order of the host. */
+  readChatPins: (serverId: string) => SidebarPin[];
   /** The pinned workflows of each server, in the order the drawer shows them. Saved on this device. */
   pinnedWorkflowIds: Readonly<Record<string, readonly string[]>>;
   toggleWorkflowPin: (workflowId: string, serverId: string) => ToggleAgentPinResult;
@@ -392,6 +409,10 @@ export interface MobileWorkspaceContextValue {
   loadServerRoles: (serverId: string) => Promise<AgentAccessSnapshot>;
   /** Replaces all roles. The host refuses a change made from an earlier revision. */
   setServerRoles: (change: AgentAccessChange, serverId: string) => Promise<AgentAccessSnapshot>;
+  /** An owner or admin of an online host that serves `server-audit-v1`. The host checks the role again. */
+  canReadServerAudit: (serverId: string) => boolean;
+  /** The changes to the members, roles and agent access of the server, newest first. */
+  loadServerAuditLog: (serverId: string) => Promise<ServerAuditLog>;
   /**
    * An owner or admin of an online host that serves `connectors-v1`: its Slack, Discord, Telegram and
    * GitHub connections. The host checks the role again.
@@ -706,6 +727,8 @@ export interface MobileWorkspaceContextValue {
   resetAgentSessionSetting: (input: ResetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
   /** An owner or admin of an online host that serves `agent-folders-v1`. The host checks the role again. */
   canManageAgentFolders: (serverId: string) => boolean;
+  /** True when the host advertises `sidebar-folders-v1`: a chat list folder can hold folders. */
+  canNestSidebarFolders: (serverId: string) => boolean;
   /** The folders that the agent can change besides its workspace. Owners and admins only. */
   loadAgentFolders: (agentId: string, serverId: string) => Promise<AgentFolderList>;
   /** With `replace`, the folder takes the place of a folder that was moved. */
@@ -769,12 +792,31 @@ export interface MobileWorkspaceContextValue {
   /** The newest runs of a workflow, or the runs older than `before`. */
   loadWorkflowRuns: (workflowId: string, serverId: string, before?: string) => Promise<WorkflowRunPage>;
   loadWorkflowRun: (runId: string, serverId: string) => Promise<WorkflowRunDetail>;
-  startWorkflowRun: (workflowId: string, serverId: string) => Promise<WorkflowRunDetail>;
+  /** With `fromNodeId`, runs that step and the steps after it, with the newest results of the steps before it. */
+  startWorkflowRun: (workflowId: string, serverId: string, fromNodeId?: string) => Promise<WorkflowRunDetail>;
   stopWorkflowRun: (runId: string, serverId: string) => Promise<void>;
+  /** Runs one step alone, outside a run, with the newest results of the steps before it. */
+  runWorkflowStep: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowStep>;
+  stopWorkflowStep: (stepId: string, serverId: string) => Promise<void>;
   retryWorkflowStep: (stepId: string, serverId: string) => Promise<WorkflowStep>;
   decideWorkflowStep: (input: DecideWorkflowStepInput, serverId: string) => Promise<void>;
   /** A new webhook secret, which the host shows once. Only an owner or admin can make one. */
   rotateWorkflowWebhookSecret: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowWebhookSecret>;
+  /** The saved versions of a workflow, newest first. */
+  loadWorkflowVersions: (workflowId: string, serverId: string) => Promise<WorkflowVersion[]>;
+  loadWorkflowVersionGraph: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowGraph>;
+  /** Makes a version the current graph. The host keeps the graph before it as a version. */
+  restoreWorkflowVersion: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowDetail>;
+  /** True when the host advertises `workflows-github-v1`: it runs GitHub triggers and outputs. */
+  canUseWorkflowGitHub: (serverId: string) => boolean;
+  /** The repositories of the host's GitHub connection. Only an owner or admin reads them. */
+  loadWorkflowGitHubCatalog: (serverId: string) => Promise<WorkflowGitHubCatalog>;
+  /** The labels and people of one repository. Only an owner or admin reads them. */
+  loadWorkflowGitHubOptions: (repository: string, serverId: string) => Promise<WorkflowGitHubRepositoryOptions>;
+  /** The newest events of the GitHub triggers of a workflow, and the items of their runs. */
+  loadWorkflowGitHubHistory: (workflowId: string, serverId: string) => Promise<WorkflowGitHubHistory>;
+  /** Runs a GitHub trigger with the newest item that matches it. */
+  runWorkflowGitHubLastEvent: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowRunDetail>;
   /** The tasks of one agent. The host answers 404 for an agent that this member cannot see. */
   loadAgentTasks: (agentId: string, serverId: string) => Promise<AgentTasksSnapshot>;
   loadAgentTaskConversation: (input: AgentTaskInput, serverId: string) => Promise<ConversationSnapshot>;
@@ -877,6 +919,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canReadThreads"
   | "canAttachThreadFiles"
   | "canUseWorkflows"
+  | "canUseWorkflowGitHub"
   | "canReadServerStorage"
   | "canSetAgentNotificationLevel";
 
@@ -902,6 +945,7 @@ type MobileWorkspaceStateKey =
   | "canManageServerTimezone"
   | "canManageAgentMemoryLimit"
   | "canManageServerRoles"
+  | "canReadServerAudit"
   | "hasAgentAccessLimits"
   | "canManageConnectors"
   | "canManageOnePasswordConnector"
@@ -935,6 +979,7 @@ type MobileWorkspaceStateKey =
   | "canManageProviderAccounts"
   | "canManageSharedTables"
   | "canManageAgentFolders"
+  | "canNestSidebarFolders"
   | "canPublishAgent";
 
 /**

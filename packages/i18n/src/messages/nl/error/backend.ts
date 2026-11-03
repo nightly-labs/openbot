@@ -255,6 +255,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Een server kan maximaal {limit} zijbalksecties hebben.",
   "error.backend.sectionNameRequired": "Een naam voor de sectie is verplicht.",
   "error.backend.sectionNameTooLong": "De naam van de sectie is te lang.",
+  "error.backend.sidebarFolderTooDeep": "Mappen kunnen maar drie niveaus diep zijn.",
+  "error.backend.sidebarFolderMoveInvalid": "Deze map kan daar niet naartoe worden verplaatst.",
   "error.backend.sectionNameDuplicate": "Namen van secties moeten uniek zijn.",
   "error.backend.directMessageRequired": "Schrijf eerst een bericht.",
   "error.backend.directMessageTooLong": "Een direct bericht kan maximaal {limit} tekens hebben.",
@@ -291,6 +293,9 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
   "error.backend.apiKeyNotAllowed": "Alleen de eigenaar van de server of een beheerder kan een API-sleutel invoeren.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
+  "error.backend.vaultItemNotAllowed":
+    "Alleen de eigenaar van de server of een beheerder kan een item aan de Kluis toevoegen.",
+  "error.backend.vaultItemSaving": "Het Kluis-item wordt al opgeslagen.",
   "error.backend.authRequestInactive": "Dit beveiligde verificatieverzoek is niet meer actief.",
   "error.backend.secureAuthUnavailable": "Beveiligde verificatie is niet beschikbaar.",
   "error.backend.browserUrlRequired": "Een URL voor de browser is verplicht.",
@@ -357,8 +362,8 @@ export const messages = {
     "Geef de taak een titel van maximaal 120 tekens en een korte opdracht die zegt wat er moet gebeuren.",
   "error.backend.taskOwnChatOnly":
     "Start een taak alleen vanuit je eigen chat. Een kanaal, een berichtengesprek of een andere taak kan er geen starten.",
-  "error.backend.taskOpenLimit":
-    "Deze agent heeft al {count} open taken. Wacht tot de gebruiker er een sluit voordat je een nieuwe taak start.",
+  "error.backend.taskUnfinishedLimit":
+    "Deze agent heeft al {count} onvoltooide taken. Start een nieuwe taak wanneer er een klaar is.",
   "error.backend.taskOpenLimitReached":
     "Deze agent heeft {count} open taken. Sluit een taak en start of open dan een andere.",
   "error.backend.taskRemoteUnsupported": "Taken zijn alleen beschikbaar voor agents op deze computer.",

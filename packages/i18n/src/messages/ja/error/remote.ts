@@ -94,6 +94,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "WebRTC ファイル転送に失敗しました。",
   "error.remote.fileResumeFailed": "WebRTC ファイル転送を期限までに再開できませんでした。",
   "error.remote.fileTransportStopped": "WebRTC ファイル転送が停止しました。",
+  "error.remote.downloadStopped": "ダウンロードを停止しました。",
   "error.remote.fileResumeExpired": "WebRTC ファイル転送の再開期限が切れました。",
   "error.remote.hostRequestFailed": "ホストがリクエストを完了できませんでした。",
   "error.remote.responseTooLarge": "ホストからの応答が大きすぎるため、このデバイスに送信できません。",

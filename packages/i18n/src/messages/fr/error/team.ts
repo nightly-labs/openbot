@@ -69,8 +69,14 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Les données partagées ne sont pas prises en charge par cette connexion.",
   "error.team.agentInstallUnsupported": "L’ajout d’agents n’est pas pris en charge par cette connexion.",
   "error.team.agentHideUnsupported": "Le masquage d’agents n’est pas pris en charge par cette connexion.",
+  "error.team.sidebarFoldersUnsupported":
+    "Les dossiers dans des dossiers ne sont pas pris en charge par cette connexion.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ce serveur ne peut pas garder votre propre niveau de notifications pour chaque agent. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
+  "error.team.sidebarPinsUnsupported":
+    "Ce serveur ne peut pas garder vos discussions épinglées pour tous vos appareils. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
+  "error.team.agentInstructionsUnsupported":
+    "La modification des instructions d’agent n’est pas prise en charge par cette connexion.",
   "error.team.agentPublishUnsupported": "La publication d’agents n’est pas prise en charge par cette connexion.",
   "error.team.agentUpdateUnsupported": "La mise à jour des agents n’est pas prise en charge par cette connexion.",
   "error.team.contextResetUnsupported":

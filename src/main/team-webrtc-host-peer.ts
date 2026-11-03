@@ -28,6 +28,11 @@ import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   withUiBlockAutoAnswers,
 } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import {
+  addUiBlockVaultRequests,
+  TEAM_UI_BLOCK_VAULT_CAPABILITY,
+  withUiBlockVaultRequests,
+} from "@openbot/contracts/team-protocol/ui-block-vault-v1";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
   decodeTeamProtocolV2AuthFrame,
@@ -761,11 +766,10 @@ export class TeamWebRtcHostPeer {
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
             promptMultiSelect: peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
           };
-          const autoAnswers = peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY);
           return yield* remoteDecode(() => ({
             status: response.status,
-            body: withAutoAnswers(
-              autoAnswers,
+            body: withBlockExtensions(
+              peerCapabilities,
               body,
               sideRoute
                 ? sideRoute.response(input.path, response.status, body, responseOptions)
@@ -859,6 +863,7 @@ export class TeamWebRtcHostPeer {
         );
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY))
           frame = withUiBlockAutoAnswers(frame, event);
+        if (this.#peerCapabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) frame = withUiBlockVaultRequests(frame, event);
       } catch {
         return;
       }
@@ -1194,8 +1199,16 @@ class GatewayError extends Error {
   }
 }
 
-/** A response body with the automatic answer of each block, for a peer with `ui-block-auto-answer-v1`. */
-function withAutoAnswers(enabled: boolean, source: unknown, encoded: TeamProtocolV2Json): TeamProtocolV2Json {
-  if (enabled) addUiBlockAutoAnswers(encoded, source);
+/**
+ * A response body with the automatic answer of each block, for a peer with `ui-block-auto-answer-v1`,
+ * and its Vault request, for a peer with `ui-block-vault-v1`.
+ */
+function withBlockExtensions(
+  capabilities: ReadonlySet<string>,
+  source: unknown,
+  encoded: TeamProtocolV2Json,
+): TeamProtocolV2Json {
+  if (capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)) addUiBlockAutoAnswers(encoded, source);
+  if (capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) addUiBlockVaultRequests(encoded, source);
   return encoded;
 }
