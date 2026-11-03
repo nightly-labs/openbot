@@ -413,6 +413,28 @@ try {
   );
   const stale = await send(comment("acme/before-b", 1, "ana").body);
   check("a list whose first line is not `repository` is not watched", stale.status === 404, stale);
+  // An older client changes `repository` and later chooses the list's first name again: the save removed
+  // the old list, so its other repository is not watched again.
+  const back = await run(
+    workflows.create({
+      title: "Back",
+      graph: withRepositories(graphOf("acme/back-a", "notify"), "acme/back-a\nacme/back-c"),
+    }),
+  );
+  const resave = async (repository: string) => {
+    const current = await run(workflows.get(back.summary.id));
+    const graph = {
+      ...current.graph,
+      nodes: current.graph.nodes.map((node) =>
+        node.id === "trigger" ? { ...node, fields: { ...node.fields, repository } } : node,
+      ),
+    };
+    await run(workflows.saveGraph({ workflowId: back.summary.id, baseRevision: current.revision, graph }));
+  };
+  await resave("acme/back-b");
+  await resave("acme/back-a");
+  const backC = await send(comment("acme/back-c", 1, "ana").body);
+  check("a list that an older client left behind does not come back", backC.status === 404, backC);
   // An event that waits for the run of its item does not start after the user removes its repository.
   const dropGraph = withRepositories(graphOf("acme/drop-a", "approval"), "acme/drop-a\nacme/drop-b");
   const drop = await run(workflows.create({ title: "Drop", graph: dropGraph }));

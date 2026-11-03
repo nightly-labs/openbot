@@ -13,6 +13,7 @@ import {
   WORKFLOW_GITHUB_EVENTS,
   type WorkflowGitHubEvent,
   type WorkflowGitHubItem,
+  type WorkflowGraph,
   type WorkflowNode,
   workflowGitHubEventItemKind,
   workflowGitHubTriggerRepositories,
@@ -306,6 +307,28 @@ export function githubFilterRefuses(node: WorkflowNode, facts: GitHubEventFacts)
 export function githubTriggerRepositories(node: WorkflowNode): string[] {
   if (node.kind !== "trigger" || node.fields.trigger !== "github") return [];
   return workflowGitHubTriggerRepositories(node.fields);
+}
+
+/**
+ * The graph without a repository list that an older client left behind: one that changed `repository` and
+ * kept `repositories`. The host removes it on each save, so a later change back to its first name does not
+ * watch the old list again.
+ */
+export function withoutStaleGitHubRepositories(graph: WorkflowGraph): WorkflowGraph {
+  const stale = (node: WorkflowNode) =>
+    node.kind === "trigger" &&
+    node.fields.trigger === "github" &&
+    node.fields.repositories !== undefined &&
+    workflowListField(node.fields.repositories)[0] !== node.fields.repository;
+  if (!graph.nodes.some(stale)) return graph;
+  return {
+    ...graph,
+    nodes: graph.nodes.map((node) =>
+      stale(node)
+        ? { ...node, fields: Object.fromEntries(Object.entries(node.fields).filter(([key]) => key !== "repositories")) }
+        : node,
+    ),
+  };
 }
 
 /** Whether a GitHub trigger starts on this event of one of its repositories. */

@@ -94,6 +94,7 @@ import {
   githubFilterRefuses,
   githubTriggerMatches,
   githubTriggerRepositories,
+  withoutStaleGitHubRepositories,
   workflowGitHubPayload,
 } from "./github-matching";
 import {
@@ -1108,18 +1109,17 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return yield* attempt(() => store.listWithGraphs());
         });
 
+        /** The graph as the host saves it. */
+        const prepareGraph = (graph: WorkflowGraph) =>
+          withoutStaleGitHubRepositories(prepareWorkflowSchedules(graph, dependencies.timezone(), now()));
+
         const get = Effect.fn("Workflows.get")(function* (workflowId: string) {
           return yield* attempt(() => detailOf(workflowId));
         });
 
         const create = Effect.fn("Workflows.create")(function* (input: CreateWorkflowInput) {
           const detail = yield* attempt(() =>
-            store.create(
-              input.graph
-                ? { ...input, graph: prepareWorkflowSchedules(input.graph, dependencies.timezone(), now()) }
-                : input,
-              now(),
-            ),
+            store.create(input.graph ? { ...input, graph: prepareGraph(input.graph) } : input, now()),
           );
           changed(detail.summary.id);
           rearm();
@@ -1150,12 +1150,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
 
         const saveGraph = Effect.fn("Workflows.saveGraph")(function* (input: SaveWorkflowGraphInput) {
           const result = yield* attempt(() =>
-            store.saveGraph(
-              input.workflowId,
-              input.baseRevision,
-              prepareWorkflowSchedules(input.graph, dependencies.timezone(), now()),
-              now(),
-            ),
+            store.saveGraph(input.workflowId, input.baseRevision, prepareGraph(input.graph), now()),
           );
           // A conflict changed nothing: the editor that saved gets the newer workflow in the answer.
           if (result.ok) {
