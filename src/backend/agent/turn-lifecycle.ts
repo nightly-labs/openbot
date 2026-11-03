@@ -88,6 +88,8 @@ import { collectProviderUsage } from "./usage-collection";
 import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
 
 const logger = createOpenBotLogger("turn-lifecycle");
+/** The retry of one turn after which the user gets a notice. A single retry is a normal network error. */
+const RETRY_NOTICE_ATTEMPTS = 3;
 const ENDED_TURN_LIMIT = 256;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
@@ -161,6 +163,11 @@ export interface TurnHooks {
   /** Whether a provider error moves this agent to a backup model: it switches without asking and has a ready one. */
   mayFailOver(agentId: string): boolean;
   /**
+   * Whether a ready backup continues work that a usage limit stopped after it started. An agent set
+   * to ask uses its order too: the turn already started, so there is no moment to ask.
+   */
+  mayContinueOnBackup(agentId: string): boolean;
+  /**
    * Gives a channel task back to its channel's queue after a spent plan refused its turn. False
    * when the delivery is not an active channel assignment that can go back.
    */
@@ -172,6 +179,8 @@ export interface TurnHooks {
   quietRoutineDelivery(deliveryId: string): boolean;
   /** The task whose thread this is, or null for any other thread. */
   taskForThread(threadId: string): string | null;
+  /** Whether this public thread is the side thread of a routine, which takes that routine's runs. */
+  isRoutineThread(threadId: string): boolean;
   /** Whether this task's thread exists and is not archived. */
   taskOpen(taskId: string): boolean;
   /** The error of a task turn. It shows in the task's panel, not in the agent's own chat. */
@@ -266,6 +275,8 @@ export class TurnLifecycle {
    * reason once the banner that showed it is gone.
    */
   readonly #turnErrors = new Map<string, string>();
+  /** How many times the provider retried a request of each running turn. */
+  readonly #turnRetries = new Map<string, number>();
   /**
    * The client, provider thread and start time of each running turn, from its `turn/started`.
    * `produced` is set by the first item or delta: a refused turn is run again only without one.
@@ -382,6 +393,7 @@ export class TurnLifecycle {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
+    this.#turnRetries.clear();
     this.#limitedTurns.clear();
     this.#failoverTurns.clear();
     this.#failoverRetries.clear();
@@ -744,7 +756,7 @@ export class TurnLifecycle {
       case "thread/tokenUsage/updated": {
         if (!threadId || !agentId) return;
         if (this.#conversation.loadedClientFor(threadId) !== source) return;
-        this.#compaction.updateBudget(threadId, params);
+        this.#compaction.updateBudget(threadId, params, agentId);
         const usage = getRecord(params, "tokenUsage");
         const last = getRecord(usage, "last");
         if (typeof last?.totalTokens === "number" && typeof usage?.modelContextWindow === "number")
@@ -765,6 +777,15 @@ export class TurnLifecycle {
         if (status !== "running" && status !== "completed" && status !== "failed") return;
         // Native Claude compaction does not report comparable full-context counts.
         this.#compaction.observeCompaction(threadId, status, "none");
+        return;
+      }
+      case "openbot/turn-progress": {
+        // A provider's own status for the running turn, such as a retry of a failed API request.
+        const turnId = getString(params, "turnId");
+        const detail = getString(params, "detail");
+        if (!threadId || !agentId || !turnId || !detail || !this.#runningTurns.has(turnId)) return;
+        if (this.#conversation.loadedClientFor(threadId) !== source) return;
+        this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, detail);
         return;
       }
       case "thread/archived": {
@@ -802,7 +823,10 @@ export class TurnLifecycle {
           return;
         }
         // Codex retries on its own and reports the final failure again without `willRetry`.
-        if (isRecord(params) && params.willRetry === true) return;
+        if (isRecord(params) && params.willRetry === true) {
+          this.#providerRetried(agentId, threadId, getString(params, "turnId"), source.provider);
+          return;
+        }
         // A usage limit shows no banner, but the failed delivery still keeps it as the reason.
         const errorTurnId = getString(params, "turnId");
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
@@ -815,14 +839,16 @@ export class TurnLifecycle {
         // with nothing on screen; Gemini keeps the banner, because an API key sign-in, a runtime
         // before 1.4.1 and a Claude or GPT model have no reading. Cursor keeps it too: an on-demand
         // budget and a team limit are not in its reading. OpenCode keeps it because only a Go key
-        // has a reading, and the free models failed with nothing on screen. A plan window holds the
-        // queue until its reset for every provider.
+        // has a reading, and the free models failed with nothing on screen. Kimi keeps it because an
+        // account with no Kimi Code plan has no reading. A plan window holds the queue until its
+        // reset for every provider.
         if (
           error?.codexErrorInfo === "usageLimitExceeded" ||
           (isUsageLimitDiagnostic(message) &&
             ((source.provider !== "antigravity" &&
               source.provider !== "cursor" &&
               source.provider !== "opencode" &&
+              source.provider !== "kimi" &&
               agentProviderDescriptor(source.provider).reportsUsage) ||
               isPlanLimitDiagnostic(message))) ||
           (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))
@@ -889,6 +915,46 @@ export class TurnLifecycle {
   }).bind(this);
 
   /**
+   * Codex sent a request of a running turn again. A turn that retries again and again looked like
+   * work: Codex sent the same large request for 11 minutes, and the agent showed as working (#4374).
+   * The user gets one notice per turn. A large session also compacts before its next turn.
+   */
+  #providerRetried(
+    agentId: string | null | undefined,
+    threadId: string | null | undefined,
+    turnId: string | null,
+    provider: AgentClient["provider"],
+  ): void {
+    if (!agentId || !threadId || !turnId || !this.#runningTurns.has(turnId)) return;
+    const attempts = (this.#turnRetries.get(turnId) ?? 0) + 1;
+    this.#turnRetries.set(turnId, attempts);
+    logger.info("A provider retries a request.", {
+      provider,
+      attempts,
+      usedPercent: this.#compaction.usedPercent(threadId),
+    });
+    if (attempts !== RETRY_NOTICE_ATTEMPTS) return;
+    const compacts = this.#compaction.retrying(threadId);
+    const percent = this.#compaction.usedPercent(threadId);
+    this.#hooks.emitError(
+      "agent_warning",
+      compacts && percent !== null
+        ? sourceText("error.backend.providerRetryingLargeContext", {
+            attempts: String(attempts),
+            percent: String(percent),
+          })
+        : sourceText("error.backend.providerRetrying", { attempts: String(attempts) }),
+      agentId,
+      {
+        provider,
+        model: this.#hooks.turnModel(agentId, turnId),
+        turnId,
+        severity: "warning",
+      },
+    );
+  }
+
+  /**
    * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs, so
    * its completion keeps the text answers as quiet answers; `shown` when a person waits for the answer, as in a Test
    * run; null when no routine run started the turn. The completion decides again, because a message
@@ -900,7 +966,7 @@ export class TurnLifecycle {
     this.#noUpdateTurns.add(turnId);
     // A failed run is never quiet, so its answer must still be written.
     if (this.#reportedFailures.has(turnId)) return "shown";
-    return this.#quietRoutineTurn(threadId, deliveries) ? "quiet" : "shown";
+    return this.#quietRoutineTurn(agentId, threadId, deliveries) ? "quiet" : "shown";
   }
 
   /**
@@ -914,11 +980,16 @@ export class TurnLifecycle {
     return true;
   }
 
-  /** Only a turn that runs nothing but quiet routine runs, outside a channel or messaging thread. */
-  #quietRoutineTurn(threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
+  /**
+   * Only a turn that runs nothing but quiet routine runs, in the agent's own chat or in a routine's
+   * side thread: not in a channel, a messaging thread or another task.
+   */
+  #quietRoutineTurn(agentId: string, threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
+    const publicThreadId = threadId === null ? null : this.#conversation.publicThreadId(agentId, threadId);
     return (
       deliveries.length > 0 &&
-      !this.#conversation.isExecutionThread(threadId) &&
+      (!this.#conversation.isExecutionThread(publicThreadId) ||
+        (publicThreadId !== null && this.#hooks.isRoutineThread(publicThreadId))) &&
       deliveries.every(
         ({ delivery }) => delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id),
       )
@@ -951,6 +1022,7 @@ export class TurnLifecycle {
       }
       const reportedError = this.#turnErrors.get(turnId);
       this.#turnErrors.delete(turnId);
+      this.#turnRetries.delete(turnId);
       // The error is kept only while the turn runs, so a refused turn always has its entry.
       const refusedFailure =
         running !== undefined && status === "failed" && reportedError !== undefined
@@ -996,13 +1068,13 @@ export class TurnLifecycle {
         return;
       }
       const channelTurn = !taskTurn && this.#conversation.isExecutionThread(snapshot.threadId);
-      // After work started, only a ready automatic backup continues it. A turn refused before
+      // After work started, only a ready backup in the agent's order continues it. A turn refused before
       // work still waits for the reset when no backup is ready. A continuation that a backup refused
       // before work keeps the earlier provider's work.
       const carriesWork =
         running !== undefined &&
         (running.acted || deliveries.some((context) => context.resumeAfterUsageLimit !== undefined));
-      let continuing = limited && carriesWork && deliveries.length > 0 && this.#hooks.mayFailOver(agentId);
+      let continuing = limited && carriesWork && deliveries.length > 0 && this.#hooks.mayContinueOnBackup(agentId);
       if (continuing) {
         for (const { delivery, channelId } of deliveries) {
           if (channelId && !(yield* this.#hooks.requeueChannelDelivery(delivery.id, true))) {
@@ -1129,7 +1201,7 @@ export class TurnLifecycle {
       const quiet =
         outcome === "completed" &&
         reportedFailure === undefined &&
-        this.#quietRoutineTurn(snapshot.threadId, deliveries) &&
+        this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries) &&
         settleQuietRoutineTurn(snapshot, turnId, noUpdateCalled);
       const latestAssistant = latestTurnAnswer(snapshot.messages, turnId);
       // A routine run that answered only the no-update marker, also a Test run that shows it in the
@@ -1138,8 +1210,9 @@ export class TurnLifecycle {
         latestAssistant !== undefined &&
         deliveries.some(({ delivery }) => delivery.sender.kind === "routine") &&
         isNoUpdateAnswer(latestAssistant.text);
-      // Before the deliveries end: until then they hold the chat's lane, so no turn of the chat
-      // starts before the digest is in its handoff.
+      // Before the deliveries end: until then they hold their lane, so no later turn of that lane
+      // starts before the digest is in its handoff. A chat turn that starts at the same time keeps
+      // the digest for its next turn (see `ThreadLifecycle.deletePendingHandoff`).
       const routineDelivery = deliveries[0]?.delivery.id;
       if (routineSession && routineDelivery && outcome === "completed" && !quiet && !markerAnswer && latestAssistant)
         yield* this.#hooks.routineAnswered(agentId, routineDelivery, latestAssistant.text);

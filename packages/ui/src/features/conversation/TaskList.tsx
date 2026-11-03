@@ -1,6 +1,7 @@
 import { Button, ChevronDown } from "@openbot/ui";
 import { createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
 import { createDigitRoll } from "../../digit-roll";
+import { DigitRuns } from "../../digit-runs";
 import { useText } from "../../text";
 
 export type TaskListItemState = "pending" | "active" | "done";
@@ -194,16 +195,17 @@ function TaskProgress(props: { value: number }) {
     <span class="task-list-item-progress">
       <span ref={roll.ref} class="task-list-item-progress-digits t-digit-group" aria-hidden="true">
         {/* Only the digits roll. The percent sign and the spaces of the locale stay still. */}
-        <For each={characters()} keyed={false}>
-          {(character, index) => (
+        <DigitRuns
+          text={characters().join("")}
+          digit={(character, index) => (
             <span
               class={isDigit(character()) ? "t-digit" : undefined}
-              data-stagger={isDigit(character()) ? stagger(index) : undefined}
+              data-stagger={isDigit(character()) ? stagger(index()) : undefined}
             >
               {character()}
             </span>
           )}
-        </For>
+        />
       </span>
       <span class="sr-only">{format.percent(props.value, { maximumFractionDigits: 0 })}</span>
     </span>

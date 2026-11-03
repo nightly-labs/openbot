@@ -189,6 +189,15 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
 };
 
 /**
+ * Devin CLI 3000.11.234 refuses `session/load` of a session that it does not have with -32016 and
+ * `{ "cognition.ai/errorKind": "session_not_found" }`. Only that kind counts.
+ */
+export const DEVIN_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: (error) =>
+    error.code === -32016 ? isRecord(error.data) && error.data["cognition.ai/errorKind"] === "session_not_found" : null,
+};
+
+/**
  * omp 18.8.4 wraps its exact missing-ID error in an internal error (#1690). Other internal failures,
  * including an error for another session, are not lifecycle signals.
  */

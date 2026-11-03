@@ -55,7 +55,7 @@
 /* The row layout overlaps its faces. `:where` keeps the cluster out at no weight, so a surface
    that sets its own overlap wins. */
 .channel-avatar:where(:not(.channel-avatar-cluster)) .agent-avatar + .agent-avatar {
-  margin-left: calc(-1 * var(--openbot-space-4));
+  margin-inline-start: calc(-1 * var(--openbot-space-4));
 }
 /* One member is the channel's whole face. Two sit side by side, and three read as a triangle; a
    count of two digits takes the third place. */
@@ -104,4 +104,90 @@
   font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
+}
+/*
+ * A channel picture: an uploaded image, or an icon on the channel colour. It takes the square the
+ * faces take. Agents are round, so a channel picture is a rounded square: a channel with a picture
+ * does not look like an agent.
+ */
+.channel-avatar-picture {
+  width: var(--channel-avatar-size, var(--openbot-space-8));
+  min-width: var(--channel-avatar-size, var(--openbot-space-8));
+  height: var(--channel-avatar-size, var(--openbot-space-8));
+}
+.channel-picture {
+  display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-sm);
+  background: color-mix(in oklab, var(--channel-picture-hue) 26%, var(--openbot-bg-control));
+  color: color-mix(in oklab, var(--channel-picture-hue) 78%, var(--openbot-text-primary));
+}
+.channel-picture > svg {
+  width: 55%;
+  height: 55%;
+}
+.channel-picture-image {
+  object-fit: cover;
+  background: var(--openbot-bg-control);
+}
+/* Biome wants these in rising specificity; later rules win on the elements they share. */
+.channel-icon-grid .channel-picture {
+  width: 32px;
+  height: 32px;
+}
+.channel-icon-grid .channel-picture > svg {
+  width: 18px;
+  height: 18px;
+}
+.channel-avatar-cluster .channel-picture {
+  border-radius: var(--openbot-radius-lg);
+}
+.channel-picture-trigger .channel-picture {
+  border-radius: var(--openbot-radius-xl);
+}
+.channel-picture-editor .avatar-image-upload-preview .channel-picture {
+  width: 100%;
+  height: 100%;
+}
+.agent-row.sidebar-pinned-row .channel-avatar-cluster .channel-picture {
+  border-radius: var(--openbot-radius-xl);
+}
+
+/* The picture at the top of channel settings. The badge is the one of the agent settings. */
+.channel-picture-trigger {
+  --agent-row-avatar-size: 62px;
+
+  position: relative;
+  display: grid;
+  width: 62px;
+  height: 62px;
+  margin: 0;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-xl);
+  background: transparent;
+}
+.channel-picture-trigger:hover {
+  filter: brightness(1.08);
+}
+
+/* The editor is the agent avatar editor: the same headings, upload row and colour grid. */
+.channel-picture-editor .avatar-image-upload-preview {
+  border-radius: var(--openbot-radius-md);
+}
+/* The agent editor grids load later at the same weight, so the editor scopes these. */
+.channel-picture-editor .channel-icon-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.channel-icon-grid .channel-icon-choice {
+  height: 44px;
+}
+/* Eight colours and no automatic one: an icon always has a colour. */
+.channel-picture-editor .channel-icon-color-grid {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
 }

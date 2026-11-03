@@ -75,7 +75,8 @@
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-control);
-  padding: 6px 8px 6px 12px;
+  padding-block: 6px;
+  padding-inline: 12px 8px;
   box-shadow: 0 7px 22px var(--openbot-shadow-popover-ambient);
 }
 
@@ -262,14 +263,14 @@
 }
 
 .voice-morph-bar {
-  right: 46px;
+  inset-inline-end: 46px;
   width: 28px;
   transition: width var(--voice-morph-exit-duration) var(--openbot-ease-out);
 }
 
 .voice-morph-send-blob,
 .voice-morph-finish-blob {
-  right: 12px;
+  inset-inline-end: 12px;
   width: 28px;
   opacity: 0;
   transition: opacity 0s linear var(--voice-morph-exit-duration);
@@ -296,6 +297,10 @@
   opacity: 1;
   transform: translateX(-34px) scale(0.8);
   transition: transform var(--voice-morph-duration) var(--voice-morph-ease);
+}
+
+:dir(rtl) .voice-morph[data-recording] .voice-morph-finish-blob {
+  transform: translateX(34px) scale(0.8);
 }
 
 /* Positioned, so the controls paint over the goo layers before them. */
@@ -332,7 +337,8 @@
   margin: 0;
   border: 0;
   overflow: hidden;
-  padding: 0 3px 0 12px;
+  padding-block: 0;
+  padding-inline: 12px 3px;
   color: var(--openbot-text-secondary);
   animation: voice-morph-content-in var(--openbot-duration-slow) var(--openbot-ease-out) var(--openbot-duration-fast)
     both;
@@ -367,6 +373,8 @@
   justify-content: flex-end;
   overflow: hidden;
   mask-image: linear-gradient(to right, transparent, currentColor 24px);
+  /* A time axis: the newest sample is at the right in every language. */
+  direction: ltr;
 }
 
 .voice-waveform-track {
@@ -535,7 +543,7 @@
 
 .composer[data-compact] .composer-editor-placeholder {
   top: 4px;
-  left: 0;
+  inset-inline-start: 0;
 }
 
 .composer[data-has-attachments] .composer-input-label,
@@ -585,6 +593,9 @@
   white-space: pre-wrap;
   word-break: break-word;
   user-select: text;
+  /* Each line takes its direction and its start side from its own text. The surface keeps the
+     interface direction, so an empty draft puts the caret on the placeholder's side. */
+  unicode-bidi: plaintext;
 }
 
 .composer-editor-surface[aria-disabled="true"] {
@@ -621,7 +632,7 @@
   display: inline-block;
   width: 2px;
   height: 16px;
-  margin-left: 2px;
+  margin-inline-start: 2px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-accent);
   vertical-align: -3px;
@@ -656,7 +667,7 @@
 .composer-editor-placeholder {
   position: absolute;
   top: 2px;
-  left: 4px;
+  inset-inline-start: 4px;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-lg);
   line-height: 20px;
@@ -676,15 +687,15 @@
 
 .composer-editor-root[data-size="compact"] .composer-editor-placeholder {
   top: 4px;
-  left: 0;
+  inset-inline-start: 0;
 }
 
 /* The box comes from `.reference-chip`; this token only loses the chip fill and gains the outline. */
 .composer-mention-token.composer-tag-unavailable {
   border: 1px dashed var(--openbot-border-strong);
   background: transparent;
-  /* No leading icon, so the left inset matches the right one. */
-  padding-left: var(--openbot-space-1-5);
+  /* No leading icon, so the start inset matches the end one. */
+  padding-inline-start: var(--openbot-space-1-5);
   color: var(--openbot-text-muted);
 }
 
@@ -794,7 +805,7 @@
   background: transparent;
   padding: 0 8px;
   color: var(--openbot-queue-text);
-  text-align: left;
+  text-align: start;
 }
 
 .mention-picker-file-option .attachment-reference-visual {
@@ -872,7 +883,7 @@
 }
 
 .mention-picker-badge {
-  margin-left: auto;
+  margin-inline-start: auto;
   flex: 0 0 auto;
   color: var(--openbot-queue-action);
 }
@@ -914,7 +925,8 @@
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-control);
-  padding: 7px 12px 7px 8px;
+  padding-block: 7px;
+  padding-inline: 8px 12px;
 }
 
 .composer-attachment-copy {
@@ -981,4 +993,34 @@
   position: absolute;
   inset: 0;
   margin: auto;
+}
+
+/* A file on its way to the server. The dashed edge says that it is not there yet; the ring takes
+   the place of the extension badge. */
+.composer-attachment[data-upload="uploading"] {
+  border-style: dashed;
+}
+
+.composer-attachment[data-upload="failed"] {
+  border-color: var(--openbot-danger);
+}
+
+.composer-attachment[data-upload="failed"] .composer-attachment-copy small {
+  color: var(--openbot-danger-text);
+}
+
+.composer-upload-ring {
+  width: 28px;
+}
+
+.composer-upload-failed-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--openbot-danger-text);
+}
+
+.composer-upload-retry {
+  flex: none;
+  margin-inline-end: -4px;
+  color: var(--openbot-danger-text);
 }

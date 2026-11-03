@@ -237,7 +237,7 @@
 .integration-dialog-close {
   position: absolute;
   top: var(--openbot-space-3);
-  right: var(--openbot-space-3);
+  inset-inline-end: var(--openbot-space-3);
 }
 
 /* ------------------------------------------------ stepper */
@@ -465,6 +465,11 @@
   height: var(--openbot-icon-sm);
   margin: 0 var(--openbot-space-1-5);
   color: var(--openbot-text-muted);
+}
+
+/* Right to left, the arrow points the other way. */
+.integrations-hub-chevron:dir(rtl) {
+  transform: scaleX(-1);
 }
 
 .integrations-face-stack {

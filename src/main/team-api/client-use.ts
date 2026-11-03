@@ -1,6 +1,7 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_FAST_MODE_ROUTES } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
@@ -16,6 +17,7 @@ import { AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-pub
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { COMPUTER_ACTIVITY_ROUTES } from "@openbot/contracts/team-protocol/computer-activity-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
@@ -26,8 +28,10 @@ import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-time
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { LIVE_ACTIVITY_PUSH_ROUTES } from "@openbot/contracts/team-protocol/live-activity-push-v1";
+import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
+import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provider-default-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
@@ -44,6 +48,7 @@ import { STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-di
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
+import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 
 /**
  * POST routes that a client sends with no user action: polls, previews, mark-read, and reads that use
@@ -67,12 +72,18 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_MEMORY_LIMIT_ROUTES.settings,
   MEMORY_REVIEW_ROUTES.settings,
   PROMPT_CACHE_TTL_ROUTES.settings,
+  MODEL_VISIBILITY_ROUTES.settings,
+  MODEL_VISIBILITY_ROUTES.listing,
   PROVIDER_DEFAULT_ROUTES.settings,
+  LOCAL_SERVERS_ROUTES.list,
   DISCORD_ACCESS_ROUTES.access,
+  WHATSAPP_CONNECTOR_ROUTES.overview,
+  WHATSAPP_CONNECTOR_ROUTES.linkState,
   LIVE_ACTIVITY_PUSH_ROUTES.register,
   LIVE_ACTIVITY_PUSH_ROUTES.remove,
   AGENT_NOTIFICATION_LEVELS_ROUTES.read,
   SIDEBAR_PINS_ROUTES.read,
+  AGENT_COLORS_ROUTES.read,
   SERVER_AUDIT_ROUTES.read,
   PUSH_NOTIFICATIONS_ROUTES.register,
   PUSH_NOTIFICATIONS_ROUTES.remove,
@@ -111,6 +122,8 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PROVIDERS_RUNTIMES_V2_ROUTES.runtimesStatus,
   // A focused app counts as use only for a limited time: `TeamApiServer` records it on its own.
   FOCUS_USE_ROUTES.ping,
+  // Input on the computer of a desktop app keeps the member's phones quiet, not a hosted server running.
+  COMPUTER_ACTIVITY_ROUTES.report,
 ]);
 
 /** A client opens a conversation and the app marks it read, or a member marks it unread. */

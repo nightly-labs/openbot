@@ -20,7 +20,7 @@ import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
-import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
@@ -43,6 +43,7 @@ import {
   toggleRecording,
   toggleSpokenReply,
 } from "../speech/speech-replies";
+import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { agentInstructionsCalls } from "./agent-folders-port";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
@@ -220,6 +221,15 @@ export function ConversationTimeline() {
     if (channel || !onMarkUnread || !isIncomingAgentMessage(message) || message.streaming) return;
     return () => void onMarkUnread(message.id);
   };
+  /** The message that the delete dialog asks about. */
+  const [deleteTargetId, setDeleteTargetId] = createSignal<string | null>(null);
+  /** A message that the host stores can be deleted, when the reader may delete it. */
+  const deleteAction = (message: AgentMessage) => {
+    if (!props.onDeleteMessage || message.streaming || message.id.startsWith(PENDING_SEND_ID_PREFIX)) return;
+    if (props.canDeleteMessage && !props.canDeleteMessage(message)) return;
+    return () => setDeleteTargetId(message.id);
+  };
+  const deleteMessage = (messageId: string) => props.onDeleteMessage?.(messageId) ?? Promise.resolve();
   /** A finished message of an agent chat can start work in a channel. A channel message stays where it is. */
   const sendToChannelAction = (message: AgentMessage) => {
     const target = props.sendToChannel;
@@ -759,6 +769,9 @@ export function ConversationTimeline() {
                 // Only the kind rebuilds the player, so its controls keep focus when it starts or stops.
                 const player = createMemo(() => voicePlayer(message()));
                 const playerKind = createMemo(() => player()?.kind);
+                // Only a reply has a speed: the user's own recording plays at normal speed.
+                const replySpeed = () => (playerKind() === "reply" ? speechSpeed() : undefined);
+                const replySpeedChange = () => (playerKind() === "reply" ? cycleSpeechSpeed : undefined);
                 const pendingState = () => {
                   const state = pendingSend()?.state;
                   return state === "failed" || state === "waiting" ? state : "sending";
@@ -843,6 +856,7 @@ export function ConversationTimeline() {
                                                 )}
                                                 onSelectAgent={props.onSelectAgent}
                                                 onOpenRoutine={openRoutineSettings}
+                                                openRoutineThread={props.threads?.routineThread}
                                                 onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
                                                 onToggleRoutineRun={toggleRoutineRun}
                                                 onToggleAgentMessage={toggleAgentMessage}
@@ -1338,6 +1352,7 @@ export function ConversationTimeline() {
                                       sendToChannel={sendToChannelAction(message() ?? initialMessage)}
                                       onBranch={branchAction(message() ?? initialMessage)}
                                       branchDisabled={Boolean(props.activeTurnId)}
+                                      onDelete={deleteAction(message() ?? initialMessage)}
                                     />
                                   )
                             }
@@ -1353,6 +1368,8 @@ export function ConversationTimeline() {
                                   levels={player()?.levels}
                                   onToggle={() => player()?.onToggle()}
                                   onSeek={(seconds) => player()?.onSeek?.(seconds)}
+                                  speed={replySpeed()}
+                                  onCycleSpeed={replySpeedChange()}
                                 />
                               )}
                             </Show>
@@ -1474,6 +1491,11 @@ export function ConversationTimeline() {
           </div>
         </Show>
       </div>
+      <DeleteMessageDialog
+        messageId={deleteTargetId()}
+        onDelete={deleteMessage}
+        onClose={() => setDeleteTargetId(null)}
+      />
     </>
   );
 }

@@ -1,5 +1,5 @@
 /* transitions.dev panel reveal for the file preview. The panel enters from
-   the right edge, so it travels on X. `.browser-panel` declares its own
+   the end edge, so it travels on X. `.browser-panel` declares its own
    transition later in the cascade than the `.t-panel-slide` snippet, so both
    property lists are restated here at a higher specificity. */
 .file-preview-panel.t-panel-slide {
@@ -30,7 +30,8 @@
   align-items: center;
   gap: 8px;
   border-bottom: 1px solid var(--openbot-border);
-  padding: 0 7px 0 11px;
+  padding-block: 0;
+  padding-inline: 11px 7px;
 }
 
 .file-preview-header h2 {
@@ -209,15 +210,15 @@
   padding: 10px 12px;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  text-align: left;
+  text-align: start;
 }
 
 .file-preview-spreadsheet-table th,
 .file-preview-spreadsheet-table td {
   border-top: 1px solid var(--openbot-border);
-  border-right: 1px solid var(--openbot-border);
+  border-inline-end: 1px solid var(--openbot-border);
   padding: 8px 12px;
-  text-align: left;
+  text-align: start;
   white-space: pre;
 }
 
@@ -228,7 +229,7 @@
 
 .file-preview-spreadsheet-table td:last-child,
 .file-preview-spreadsheet-table th:last-child {
-  border-right: 0;
+  border-inline-end: 0;
 }
 
 .file-preview-spreadsheet-note {
@@ -308,7 +309,7 @@
   justify-content: stretch;
   padding: 6px 10px;
   font-size: var(--openbot-text-sm);
-  text-align: left;
+  text-align: start;
 }
 
 .file-preview-folder-name {
@@ -330,4 +331,14 @@
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   text-align: center;
+}
+
+/* In RTL the panel is on the left edge, so it enters from the left. */
+:dir(rtl) .file-preview-panel.t-panel-slide {
+  --panel-translate-x: -24px;
+}
+
+/* Back points to the start side. */
+:dir(rtl) .file-preview-header svg[class~="lucide-arrow-left"] {
+  transform: scaleX(-1);
 }

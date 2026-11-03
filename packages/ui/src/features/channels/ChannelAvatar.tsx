@@ -7,18 +7,74 @@
  * Two layouts: a row of overlapping avatars, and the cluster the sidebar uses, which holds the
  * members in the square one agent avatar occupies. The cluster keeps a channel row the same shape
  * as the agent rows around it, and it counts the members it cannot show.
+ *
+ * A channel can have its own picture instead: an uploaded image, or an icon on a colour. The
+ * picture is square, so a channel does not look like an agent, and it takes the place the faces
+ * would take.
  */
 
-import type { ChannelMember } from "@openbot/contracts/ipc";
+import type { AvatarHue, ChannelIcon, ChannelIconName, ChannelMember } from "@openbot/contracts/ipc";
 import { UsersRound } from "@openbot/ui";
-import { For, Show } from "solid-js";
+import { avatarHueSwatch } from "@openbot/ui/bloub-avatar";
+import { createSignal, For, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { CHANNEL_ICONS, knownChannelIcon } from "./channel-icons";
 
 const ROW_LIMIT = 3;
 const CLUSTER_CELLS = 4;
 
-export function ChannelAvatar(props: { members: ChannelMember[]; agents: AgentProfile[]; layout?: "row" | "cluster" }) {
+interface ChannelAvatarProps {
+  members: ChannelMember[];
+  agents: AgentProfile[];
+  layout?: "row" | "cluster";
+  icon?: ChannelIcon | null | undefined;
+  imageUrl?: string | null | undefined;
+}
+
+export function ChannelAvatar(props: ChannelAvatarProps) {
+  /* An image that does not load, such as a file removed by hand, shows the icon or the faces. */
+  const [failedUrl, setFailedUrl] = createSignal<string | null>(null);
+  const imageUrl = () => (props.imageUrl && props.imageUrl !== failedUrl() ? props.imageUrl : null);
+  const icon = () => knownChannelIcon(props.icon);
+  const hasPicture = () => Boolean(imageUrl() || icon());
+  return (
+    <Show when={hasPicture()} fallback={<MemberFaces {...props} />}>
+      <span
+        class={["channel-avatar", "channel-avatar-picture", { "channel-avatar-cluster": props.layout === "cluster" }]}
+        aria-hidden="true"
+      >
+        <Show when={imageUrl()} fallback={<Show when={icon()}>{(choice) => <ChannelIconTile {...choice()} />}</Show>}>
+          {(url) => (
+            <img
+              class="channel-picture channel-picture-image"
+              src={url()}
+              alt=""
+              draggable={false}
+              onError={() => setFailedUrl(url())}
+            />
+          )}
+        </Show>
+      </span>
+    </Show>
+  );
+}
+
+/** An icon on the channel colour. The editor draws its choices with it too. */
+export function ChannelIconTile(props: { name: ChannelIconName; hue: AvatarHue }) {
+  return (
+    <span class="channel-picture" style={{ "--channel-picture-hue": avatarHueSwatch(props.hue) }} aria-hidden="true">
+      <Show when={props.name} keyed>
+        {(name) => {
+          const Glyph = CHANNEL_ICONS[name].component;
+          return <Glyph aria-hidden="true" />;
+        }}
+      </Show>
+    </span>
+  );
+}
+
+function MemberFaces(props: ChannelAvatarProps) {
   const agentFor = (member: ChannelMember) => props.agents.find((agent) => agent.id === member.agentId);
   const cluster = () => props.layout === "cluster";
   /* The last cell of a full cluster is the count, so a fifth member costs a face rather than

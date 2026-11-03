@@ -50,6 +50,8 @@ export const AGENT_SETTINGS_PARTS: readonly string[] = [
 export const queryKeys = {
   accountSessions: (...scope: [QueryScope] | []) => ["account-sessions", ...(scope[0] ?? [])],
   hostedServerPlans: (...scope: [QueryScope] | []) => ["hosted-server-plans", ...(scope[0] ?? [])],
+  /** The server IDs of the owner's hosted servers, as Server settings reads them. */
+  ownerHostedServerIds: (scope: QueryScope) => ["owner-hosted-server-ids", ...scope],
   agentTemplate: (apiUrl: string | null, templateId: string | null) => ["agent-template", apiUrl, templateId],
   /** The public Marketplace catalog of one account service: a list read, or one listing. */
   marketplace: (apiUrl: string | null, ...parts: (string | null)[]) => ["marketplace", apiUrl, ...parts],
@@ -131,6 +133,8 @@ export const queryKeys = {
   serverMembers: (scope: QueryScope, serverId: string) => ["server-members", ...scope, serverId],
   serverInvites: (scope: QueryScope, serverId: string) => ["server-invites", ...scope, serverId],
   serverTimezone: (scope: QueryScope, serverId: string) => ["server-timezone", ...scope, serverId],
+  /** The servers that the desktop app of `serverId` runs on its computer (`local-servers-v1`). */
+  localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
   serverRoles: (scope: QueryScope, serverId: string) => ["server-roles", ...scope, serverId],
   serverAudit: (scope: QueryScope, serverId: string) => ["server-audit", ...scope, serverId],

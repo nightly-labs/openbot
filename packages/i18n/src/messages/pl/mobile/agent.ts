@@ -35,6 +35,13 @@ export const messages = {
   "mobile.agent.appearance.hue.indigo": "Indygo",
   "mobile.agent.appearance.hue.violet": "Fioletowy",
   "mobile.agent.appearance.hue.magenta": "Magenta",
+  "mobile.agent.appearance.hue.pink": "Różowy",
+  "mobile.agent.appearance.hue.sky": "Błękitny",
+  "mobile.agent.appearance.hue.navy": "Granatowy",
+  "mobile.agent.appearance.hue.wine": "Bordowy",
+  "mobile.agent.appearance.hue.brown": "Brązowy",
+  "mobile.agent.appearance.hue.sand": "Piaskowy",
+  "mobile.agent.appearance.hue.grey": "Szary",
   "mobile.agent.menu.deleteFailed": "Nie udało się usunąć agenta",
   "mobile.agent.menu.duplicateFailed": "Nie udało się zduplikować agenta",
   "mobile.agent.menu.hideFailed": "Nie udało się ukryć agenta",
@@ -373,7 +380,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "Chwilowo niedostępny · pominięto",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} nigdy się nie przełącza po tym, jak zacznie pisać. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
+    "Gdy limit użycia zatrzyma agenta {name} po rozpoczęciu pracy, {name} kontynuuje tę samą pracę na pierwszym dostępnym modelu z kolejności. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
   "mobile.agent.busyMessage.label": "Podczas pracy",
   "mobile.agent.busyMessage.footer":
     "Co dzieje się z wiadomością wysłaną, gdy agent pracuje. Kolejka trzyma ją do końca tury. Pokieruj przekazuje ją agentowi w trakcie tury.",

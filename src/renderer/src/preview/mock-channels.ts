@@ -17,12 +17,23 @@ import type {
   ListChannelRoutineRunsInput,
   RoutineSchedule,
   RoutineTrigger,
+  SetChannelImageInput,
   TestChannelRoutineInput,
   UpdateChannelMemoryInput,
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
 import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
+import { sourceText } from "@openbot/i18n/source";
+import { avatarImageDataUrl } from "@openbot/ui/avatar-image";
+
+/** A save keeps the picture, as the host does: the draft carries the icon only when it changes. */
+function storedPicture(channel: Channel | undefined): Pick<Channel, "icon" | "imageUrl"> {
+  return {
+    ...(channel?.icon === undefined ? {} : { icon: channel.icon }),
+    ...(channel?.imageUrl === undefined ? {} : { imageUrl: channel.imageUrl }),
+  };
+}
 
 /** A channel that exists when the preview starts, with its history. */
 export interface MockChannelSeed {
@@ -80,6 +91,9 @@ export function createMockChannels(
       let channel =
         input.type === "save"
           ? {
+              ...storedPicture(channels.get(input.channelId)),
+              // A draft without `isolated` keeps the stored value, as the service does.
+              ...(channels.get(input.channelId)?.isolated ? { isolated: true } : {}),
               ...input.draft,
               id: input.channelId,
               revision: channels.get(input.channelId)?.revision ?? 0,
@@ -213,6 +227,28 @@ export function createMockChannels(
       receipts.set(input.operationId, structuredClone(channel));
       changed(channel.id, channel.revision);
       return structuredClone(channel);
+    },
+    setChannelImage: async (input: SetChannelImageInput): Promise<Channel> => {
+      const current = requireChannel(input.channelId);
+      const channel = {
+        ...current,
+        imageUrl: input.image ? avatarImageDataUrl(input.image) : null,
+        revision: current.revision + 1,
+      };
+      channels.set(channel.id, structuredClone(channel));
+      changed(channel.id, channel.revision);
+      return structuredClone(channel);
+    },
+    deleteChannelMessage: async (input: { channelId: string; messageId: string }): Promise<void> => {
+      const channel = requireChannel(input.channelId);
+      const list = messages.get(input.channelId) ?? [];
+      if (!list.some((entry) => entry.id === input.messageId))
+        throw new Error(sourceText("error.backend.messageDeleteNotFound"));
+      messages.set(
+        input.channelId,
+        list.filter((entry) => entry.id !== input.messageId),
+      );
+      changed(channel.id, channel.revision);
     },
     deleteChannel: async (channelId: string): Promise<void> => {
       requireChannel(channelId);

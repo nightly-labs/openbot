@@ -39,4 +39,18 @@ export const messages = {
     "OpenBot est connecté à cette discussion. Mentionnez {bot} ou répondez à un message d’OpenBot pour solliciter les agents.",
   "status.messaging.telegramOrchestratorName": "Orchestrateur Telegram",
   "status.messaging.telegramOrchestratorTitle": "Répond dans Telegram et consulte l’équipe",
+  "status.messaging.whatsappNoAgent":
+    "Aucun agent ne peut encore répondre ici. Ajoutez l’Orchestrateur WhatsApp dans OpenBot.",
+  "status.messaging.whatsappApprovalMenu": "Répondez 1 pour approuver ou 2 pour refuser.",
+  "status.messaging.whatsappStopMenu": "Répondez « stop » pour arrêter.",
+  "status.messaging.whatsappPairingCode":
+    "Ce numéro répond uniquement aux personnes autorisées par son propriétaire. Donnez ce code au propriétaire : {code}",
+  "status.messaging.whatsappPairingApproved": "Vous pouvez maintenant envoyer des demandes à ce numéro.",
+  "status.messaging.whatsappOwnChat": "Message à vous-même",
+  "status.messaging.whatsappWelcomeOwn":
+    "👋 *OpenBot est connecté*\n\nÉcrivez ici pour poser vos questions à vos agents. Le WhatsApp Orchestrator répond, ou confie le travail au bon agent.\n\nEnvoyez *stop* pour arrêter une demande.",
+  "status.messaging.whatsappWelcomeDedicated":
+    "👋 *OpenBot est connecté*\n\nLes personnes que vous autorisez dans OpenBot peuvent maintenant écrire à ce numéro. Une nouvelle personne reçoit un code : approuvez-le dans OpenBot, sous Demandes.\n\nEnvoyez *stop* pour arrêter une demande.",
+  "status.messaging.whatsappOrchestratorName": "Orchestrateur WhatsApp",
+  "status.messaging.whatsappOrchestratorTitle": "Répond dans WhatsApp et consulte l’équipe",
 } as const satisfies PartialTranslation<typeof source>;

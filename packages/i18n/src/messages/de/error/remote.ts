@@ -203,4 +203,6 @@ export const messages = {
     "Die Nachricht wurde gesendet, aber der Chatverlauf konnte nicht aktualisiert werden.",
   "error.remote.taskHistoryRefreshFailed":
     "Die Aufgabe wurde geändert, aber der Chatverlauf konnte nicht aktualisiert werden.",
+  "error.remote.localServerAccountRemovalFailed":
+    "Der Server ist auf seinem Computer gelöscht, aber das Konto führt ihn noch. Lösche ihn erneut, um ihn aus dem Konto zu entfernen.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -18,11 +18,16 @@ export default defineConfig({
           "@openbot/team-client",
           "@openbot/telemetry",
           "@openbot/user-errors",
+          // Its vendored Baileys source is TypeScript too. Baileys' own dependencies stay external.
+          "@openbot/whatsapp",
         ],
       }),
     ],
     build: {
       rollupOptions: {
+        // Optional peers of the vendored Baileys that OpenBot does not install: Baileys imports them
+        // when it runs and goes on without them (no thumbnails, link previews or audio waveforms).
+        external: ["jimp", "sharp", "audio-decode", "link-preview-js"],
         input: {
           index: resolve("src/main/index.ts"),
           // The database host is its own process. Only node:* and the installed Effect package

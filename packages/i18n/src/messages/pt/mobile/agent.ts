@@ -34,6 +34,13 @@ export const messages = {
   "mobile.agent.appearance.hue.indigo": "Índigo",
   "mobile.agent.appearance.hue.violet": "Violeta",
   "mobile.agent.appearance.hue.magenta": "Magenta",
+  "mobile.agent.appearance.hue.pink": "Rosa",
+  "mobile.agent.appearance.hue.sky": "Azul-celeste",
+  "mobile.agent.appearance.hue.navy": "Azul-marinho",
+  "mobile.agent.appearance.hue.wine": "Vinho",
+  "mobile.agent.appearance.hue.brown": "Marrom",
+  "mobile.agent.appearance.hue.sand": "Areia",
+  "mobile.agent.appearance.hue.grey": "Cinza",
   "mobile.agent.menu.deleteFailed": "Não foi possível excluir o agente",
   "mobile.agent.menu.duplicateFailed": "Não foi possível duplicar o agente",
   "mobile.agent.menu.hideFailed": "Não foi possível ocultar o agente",
@@ -351,7 +358,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "Indisponível agora · ignorado",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} nunca troca depois de começar a escrever. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
+    "Quando um limite de uso para {name} depois de começar a trabalhar, {name} continua o mesmo trabalho no primeiro modelo disponível da ordem. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
   "mobile.agent.busyMessage.label": "Durante o trabalho",
   "mobile.agent.busyMessage.footer":
     "O que acontece com uma mensagem enviada enquanto o agente trabalha. Fila a guarda até o fim do turno. Orientar a entrega ao agente durante o turno.",

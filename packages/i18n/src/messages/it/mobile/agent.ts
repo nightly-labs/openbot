@@ -35,6 +35,13 @@ export const messages = {
   "mobile.agent.appearance.hue.indigo": "Indaco",
   "mobile.agent.appearance.hue.violet": "Viola",
   "mobile.agent.appearance.hue.magenta": "Magenta",
+  "mobile.agent.appearance.hue.pink": "Rosa",
+  "mobile.agent.appearance.hue.sky": "Azzurro",
+  "mobile.agent.appearance.hue.navy": "Blu navy",
+  "mobile.agent.appearance.hue.wine": "Bordeaux",
+  "mobile.agent.appearance.hue.brown": "Marrone",
+  "mobile.agent.appearance.hue.sand": "Sabbia",
+  "mobile.agent.appearance.hue.grey": "Grigio",
   "mobile.agent.menu.deleteFailed": "Impossibile eliminare l'agente",
   "mobile.agent.menu.duplicateFailed": "Impossibile duplicare l'agente",
   "mobile.agent.menu.hideFailed": "Impossibile nascondere l'agente",
@@ -345,7 +352,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "Non disponibile ora · saltato",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} non cambia mai dopo aver iniziato a scrivere. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
+    "Se un limite di utilizzo ferma {name} dopo l'inizio del lavoro, {name} continua lo stesso lavoro con il primo modello disponibile nell'ordine. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
   "mobile.agent.busyMessage.label": "Durante il lavoro",
   "mobile.agent.busyMessage.footer":
     "Cosa fa un messaggio inviato mentre l'agente lavora. Coda lo tiene fino alla fine del turno. Indirizza lo consegna all'agente durante il turno.",

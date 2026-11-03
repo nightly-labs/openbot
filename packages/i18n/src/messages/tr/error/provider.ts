@@ -270,6 +270,7 @@ export const messages = {
   "error.provider.kimiNotStarted": "Kimi başlatılamadı. Bir terminalde `kimi --version` komutunu çalıştırın.",
   "error.provider.kimiVersionUnreadable": "Kimi CLI sürümü okunamıyor.",
   "error.provider.kimiSignIn": "Kimi'yi kullanmak için Kimi Code ile oturum açın.",
+  "error.provider.devinSignIn": "Devin'i kullanmak için Devin ile oturum açın.",
   "error.provider.hermesMissing": "Hermes Agent yüklü değil. Yükleyin ve yeniden deneyin.",
   "error.provider.hermesNotStarted":
     "Hermes Agent başlatılamadı. Bir terminalde `hermes --version` komutunu çalıştırın.",

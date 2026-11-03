@@ -536,8 +536,9 @@ export const agentLiveActivity: AgentLiveActivityLoader = () => {
       return fileName;
     },
     hasAvatar: (fileName) => Boolean(widgetsDirectory) && new File(widgetsDirectory, fileName).exists,
+    // The host names these pictures from the seed and the hue only, so they show the hue, not `avatarColor`.
     renderBloub: async (seed, hue, mood) =>
-      `data:image/png;base64,${await renderPlushPicture({ seed, hue, mood, pixels: AVATAR_PIXELS, saturation: 1 })}`,
+      `data:image/png;base64,${await renderPlushPicture({ seed, hue, color: null, mood, pixels: AVATAR_PIXELS, saturation: 1 })}`,
     removeAvatars(keep) {
       if (!widgetsDirectory) return;
       for (const entry of new Directory(widgetsDirectory).list()) {

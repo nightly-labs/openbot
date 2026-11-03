@@ -197,15 +197,27 @@ interface ActiveTurn {
   narrationCount: number;
   thinking: string;
   thinkingStarted: boolean;
-  thinkingStreamId: string | null;
+  /**
+   * The text of each thinking block by `<message id>:thinking:<ordinal>`, in the order the blocks
+   * began. Every stream event has a uuid of its own, so only the message and the block order name a
+   * block. No value is empty.
+   */
+  thinkingBlocks: Map<string, string>;
+  /** The block that `thinking` ends with, which a streamed delta can extend in place. */
+  thinkingTail: string | null;
+  /** How many thinking blocks the complete messages of each message id have given. */
+  thinkingSnapshotCounts: Map<string, number>;
+  /** The complete messages whose thinking is applied, so that a repeated one is not counted again. */
+  thinkingSnapshots: Set<string>;
   assistantMessages: Map<string, string>;
-  thinkingMessages: Map<string, string>;
   toolCalls: Map<string, string>;
   /**
    * Set when Claude refuses the turn for a spent plan window. The refusal arrives as an assistant
    * message that only states the limit, so its text is held here and not published as the answer.
    */
   usageLimit: { resetsAt: number | null; text: string | null } | null;
+  /** Set by an `api_retry` until the next reply frame, which shows that the request got through. */
+  retrying: boolean;
   /** The CLI started this turn itself, with no message from OpenBot, such as after a background task ended. */
   unprompted: boolean;
 }
@@ -243,6 +255,8 @@ interface ThreadRuntime {
    * after the turn's last request. Its history names the turn by that uuid (#3365).
    */
   nextTurnId: string | null;
+  /** The message the stream sends now, and the thinking block key of each of its content indexes. */
+  streamMessage: { id: string | null; thinkingBlocks: Map<number, string> };
 }
 
 /**
@@ -287,6 +301,12 @@ interface ClaudeStreamMessage {
   user_message_uuid?: string;
   /** Set when the turn runs an interrupted turn again, and `user_message_uuid` names that turn's prompt. */
   resume_reason?: string;
+  /** `api_retry`: the retry that starts next, its limit, and the HTTP status, null when no answer came. */
+  attempt?: unknown;
+  max_retries?: unknown;
+  error_status?: unknown;
+  /** `api_retry`: set when the server sent no headers in time, with a retry limit of its own. */
+  no_response?: unknown;
 }
 
 interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
@@ -708,6 +728,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         type: this.#onApiKey ? CLAUDE_API_KEY_ACCOUNT_TYPE : "claude",
         email: isString(status.email) ? status.email : null,
         planType: isString(status.subscriptionType) ? status.subscriptionType : null,
+        organization: isString(status.orgId) ? status.orgId : null,
       },
       requiresOpenaiAuth: false,
     };
@@ -983,6 +1004,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       subagents: newClaudeSubagentState(),
       backgroundTasks: 0,
       nextTurnId: null,
+      streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
     };
     runtime.consume = yield* Effect.forkIn(this.#consume(runtime), this.#scope, { startImmediately: true });
     this.#threads.add(runtime);
@@ -1085,11 +1107,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       narrationCount: 0,
       thinking: "",
       thinkingStarted: false,
-      thinkingStreamId: null,
+      thinkingBlocks: new Map<string, string>(),
+      thinkingTail: null,
+      thinkingSnapshotCounts: new Map<string, number>(),
+      thinkingSnapshots: new Set<string>(),
       assistantMessages: new Map<string, string>(),
-      thinkingMessages: new Map<string, string>(),
       toolCalls: new Map<string, string>(),
       usageLimit: null,
+      retrying: false,
       unprompted,
     };
     runtime.activeTurn = turn;
@@ -1176,6 +1201,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
   });
 
+  #emitTurnProgress(runtime: ThreadRuntime, turn: ActiveTurn, detail: string): void {
+    this.emit("notification", {
+      method: "openbot/turn-progress",
+      params: { threadId: runtime.id, turnId: turn.id, detail },
+    });
+  }
+
   #fail(error: Error): void {
     if (!this.#running) return;
     this.#running = false;
@@ -1208,6 +1240,43 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (status)
         this.emit("notification", { method: "openbot/context-compaction", params: { threadId: runtime.id, status } });
       return;
+    }
+    // Claude Code tries a failed API request again by itself, for minutes on a bad connection. With
+    // no line for it the chat stayed empty, as if Claude did not answer at all (#4613).
+    if (message.type === "system" && message.subtype === "api_retry") {
+      const turn = runtime.activeTurn;
+      if (!turn || typeof message.attempt !== "number" || typeof message.max_retries !== "number") return;
+      turn.retrying = true;
+      this.#emitTurnProgress(
+        runtime,
+        turn,
+        sourceText(
+          // A first-byte timeout (`no_response`) also has no status, but the server was reached.
+          message.error_status === null && !message.no_response
+            ? "status.provider.retryUnreachable"
+            : "status.provider.retryServerError",
+          {
+            provider: "Claude",
+            attempt: message.attempt,
+            maxAttempts: message.max_retries,
+          },
+        ),
+      );
+      return;
+    }
+    // A retry names no subagent, so a reply frame of any agent ends it. The CLI's own error frame
+    // after the last retry is not an answer.
+    if (
+      (message.type === "stream_event" || message.type === "assistant") &&
+      !message.error &&
+      runtime.activeTurn?.retrying
+    ) {
+      runtime.activeTurn.retrying = false;
+      this.#emitTurnProgress(
+        runtime,
+        runtime.activeTurn,
+        sourceText("status.provider.retryRecovered", { provider: "Claude" }),
+      );
     }
     if (message.type === "system" && message.subtype === "background_tasks_changed") {
       const before = runtime.backgroundTasks;
@@ -1275,13 +1344,23 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (message.type === "stream_event" && message.parent_tool_use_id === null) {
       const event = message.event;
       const delta = isRecord(event) ? event.delta : null;
-      if (event && isRecord(event) && event.type === "content_block_delta" && isRecord(delta)) {
+      const block = isRecord(event) ? event.content_block : null;
+      if (isRecord(event) && event.type === "message_start") {
+        runtime.streamMessage = { id: getString(event.message, "id"), thinkingBlocks: new Map<number, string>() };
+      } else if (
+        isRecord(event) &&
+        event.type === "content_block_start" &&
+        isRecord(block) &&
+        block.type === "thinking"
+      ) {
+        this.#streamThinkingBlock(runtime, event.index, true);
+      } else if (event && isRecord(event) && event.type === "content_block_delta" && isRecord(delta)) {
         if (delta.type === "text_delta" && isString(delta.text)) {
           this.#outputTurn(runtime);
           this.#bufferText(runtime, delta.text);
         } else if (delta.type === "thinking_delta" && isString(delta.thinking)) {
           this.#outputTurn(runtime);
-          this.#appendThinkingDelta(runtime, delta.thinking, message.uuid);
+          this.#appendThinking(runtime, this.#streamThinkingBlock(runtime, event.index, false), delta.thinking);
         }
       }
       return;
@@ -1310,9 +1389,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // an answer. The result after it carries the same text and fails the turn.
       if (message.error && message.error !== "max_output_tokens") return;
       const thinking = messageThinking(message.message);
-      /* The deltas never announced this block, so its own order is all there is to say what came
-         before it. Text the message placed there is narration, and only that much may go. */
-      if (thinking && message.uuid !== turn.thinkingStreamId) {
+      /* The message's own order is all there is to say what came before its thinking. Text the
+         message placed there is narration, and only that much may go. */
+      if (thinking) {
         const before = textBeforeThinking(message.message);
         if (before) {
           turn.assistantMessages.set(message.uuid, before);
@@ -1321,11 +1400,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           this.#flushNarration(runtime);
         }
       }
-      if (thinking) {
-        turn.thinkingMessages.set(message.uuid, thinking);
-        const completeThinking = [...turn.thinkingMessages.values()].join("\n");
-        if (completeThinking.startsWith(turn.thinking)) {
-          this.#appendThinkingDelta(runtime, completeThinking.slice(turn.thinking.length));
+      if (!turn.thinkingSnapshots.has(message.uuid)) {
+        turn.thinkingSnapshots.add(message.uuid);
+        const messageId = getString(message.message, "id") ?? message.uuid;
+        for (const blockText of messageThinkingBlocks(message.message)) {
+          const ordinal = turn.thinkingSnapshotCounts.get(messageId) ?? 0;
+          turn.thinkingSnapshotCounts.set(messageId, ordinal + 1);
+          // The complete block is the true text. An empty one is redacted, and keeps what the stream gave.
+          if (blockText) this.#setThinkingBlock(runtime, `${messageId}:thinking:${ordinal}`, blockText, false);
         }
       }
       /* Hold this message's own text first. Claude can omit the stream deltas and send one message
@@ -1567,15 +1649,60 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
-  /* Claude streams reasoning as its own content block; the app-server vocabulary carries it as a
-     separate agentMessage item whose `commentary` phase becomes the thinking disclosure. */
-  #appendThinkingDelta(runtime: ThreadRuntime, delta: string, streamId?: string): void {
+  /**
+   * The key of the thinking block at a content index of the streamed message. A block start always
+   * names a new block; a delta whose start never came makes one.
+   */
+  #streamThinkingBlock(runtime: ThreadRuntime, index: unknown, starts: boolean): string {
+    const stream = runtime.streamMessage;
+    const position = typeof index === "number" ? index : -1;
+    const known = stream.thinkingBlocks.get(position);
+    if (known && !starts) return known;
+    stream.id ??= randomUUID();
+    const key = `${stream.id}:thinking:${stream.thinkingBlocks.size}`;
+    stream.thinkingBlocks.set(position, key);
+    return key;
+  }
+
+  /** Add a streamed delta to its thinking block. The usual case extends the last block in place. */
+  #appendThinking(runtime: ThreadRuntime, key: string, delta: string): void {
     const turn = runtime.activeTurn;
     if (!turn || !delta) return;
+    const previous = turn.thinkingBlocks.get(key);
+    if (previous && key === turn.thinkingTail) {
+      turn.thinkingBlocks.set(key, `${previous}${delta}`);
+      this.#emitThinking(runtime, delta);
+      return;
+    }
+    this.#setThinkingBlock(runtime, key, `${previous ?? ""}${delta}`, true);
+  }
+
+  /** Set the whole text of one thinking block, and stream what that adds to the turn's thinking. */
+  #setThinkingBlock(runtime: ThreadRuntime, key: string, text: string, streamed: boolean): void {
+    const turn = runtime.activeTurn;
+    if (!turn || !text || turn.thinkingBlocks.get(key) === text) return;
+    const begins = !turn.thinkingBlocks.has(key);
     /* A thinking block beginning closes the step. Filling in the rest of one that already began
        does not, and a message carries that backfill with no stream of its own: flushing there
        would publish text the turn holds for its answer as narration and end with no answer. */
-    if (streamId !== undefined && streamId !== turn.thinkingStreamId) this.#flushNarration(runtime);
+    if (streamed && begins) this.#flushNarration(runtime);
+    turn.thinkingBlocks.set(key, text);
+    if (begins) turn.thinkingTail = key;
+    // Blocks are one line apart, as `messageThinking` joins them in the saved history.
+    const thinking = [...turn.thinkingBlocks.values()].join("\n");
+    if (thinking.startsWith(turn.thinking)) {
+      this.#emitThinking(runtime, thinking.slice(turn.thinking.length));
+      return;
+    }
+    // A complete message changed text that already streamed. The turn's completed item carries the correction.
+    turn.thinking = thinking;
+  }
+
+  /* Claude streams reasoning as its own content block; the app-server vocabulary carries it as a
+     separate agentMessage item whose `commentary` phase becomes the thinking disclosure. */
+  #emitThinking(runtime: ThreadRuntime, delta: string): void {
+    const turn = runtime.activeTurn;
+    if (!turn || !delta) return;
     if (!turn.thinkingStarted) {
       turn.thinkingStarted = true;
       this.emit("notification", {
@@ -1587,16 +1714,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         },
       });
     }
-    const nextDelta = streamId && turn.thinkingStreamId && streamId !== turn.thinkingStreamId ? `\n${delta}` : delta;
-    if (streamId) turn.thinkingStreamId = streamId;
-    turn.thinking += nextDelta;
+    turn.thinking += delta;
     this.emit("notification", {
       method: "item/agentMessage/delta",
       params: {
         threadId: runtime.id,
         turnId: turn.id,
         itemId: turn.reasoningItemId,
-        delta: nextDelta,
+        delta,
       },
     });
   }
@@ -2299,14 +2424,17 @@ function textBeforeThinking(message: unknown): string {
   return `${before.join("\n")}${follows ? "\n" : ""}`;
 }
 
-function messageThinking(message: unknown): string {
-  if (!isRecord(message) || !Array.isArray(message.content)) return "";
+/** The text of each thinking block of a message, in order. A redacted block is empty. */
+function messageThinkingBlocks(message: unknown): string[] {
+  if (!isRecord(message) || !Array.isArray(message.content)) return [];
   return message.content
     .filter(isRecord)
     .filter((block) => block.type === "thinking")
-    .map((block) => getString(block, "thinking"))
-    .filter(isString)
-    .join("\n");
+    .map((block) => getString(block, "thinking") ?? "");
+}
+
+function messageThinking(message: unknown): string {
+  return messageThinkingBlocks(message).filter(Boolean).join("\n");
 }
 
 function messageToolCalls(message: unknown): Array<{ id: string; name: string; input: unknown }> {

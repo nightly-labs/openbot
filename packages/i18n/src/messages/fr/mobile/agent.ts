@@ -35,6 +35,13 @@ export const messages = {
   "mobile.agent.appearance.hue.indigo": "Indigo",
   "mobile.agent.appearance.hue.violet": "Violet",
   "mobile.agent.appearance.hue.magenta": "Magenta",
+  "mobile.agent.appearance.hue.pink": "Rose",
+  "mobile.agent.appearance.hue.sky": "Bleu ciel",
+  "mobile.agent.appearance.hue.navy": "Bleu marine",
+  "mobile.agent.appearance.hue.wine": "Bordeaux",
+  "mobile.agent.appearance.hue.brown": "Marron",
+  "mobile.agent.appearance.hue.sand": "Sable",
+  "mobile.agent.appearance.hue.grey": "Gris",
   "mobile.agent.menu.deleteFailed": "Impossible de supprimer l’agent",
   "mobile.agent.menu.duplicateFailed": "Impossible de dupliquer l’agent",
   "mobile.agent.menu.hideFailed": "Impossible de masquer l’agent",
@@ -356,7 +363,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "Indisponible pour le moment · ignoré",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} ne change jamais de modèle après avoir commencé à écrire. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
+    "Si une limite d’utilisation arrête {name} après le début du travail, {name} poursuit le même travail avec le premier modèle disponible dans l’ordre. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
   "mobile.agent.busyMessage.label": "Pendant le travail",
   "mobile.agent.busyMessage.footer":
     "Ce que devient un message envoyé pendant que l’agent travaille. « File d’attente » le garde jusqu’à la fin du tour. « Orienter » le donne à l’agent pendant le tour.",

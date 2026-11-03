@@ -17,7 +17,6 @@
 @import "@openbot/ui/features/account/app-loading-screen.css";
 @import "@openbot/ui/features/account/language-wheel.css";
 @import "./features/onboarding/onboarding.css";
-@import "./features/startup/startup-splash.css";
 @import "@openbot/ui/features/agents/first-agent-setup.css";
 @import "./styles/app-shell.css";
 @import "@openbot/ui/features/sidebar/sidebar-views.css";
@@ -26,6 +25,7 @@
 @import "@openbot/ui/features/servers/add-server-dialog.css";
 @import "@openbot/ui/features/servers/create-local-server-dialog.css";
 @import "@openbot/ui/features/servers/hosted-server-upsell.css";
+@import "@openbot/ui/features/servers/server-upgrade-dialog.css";
 @import "@openbot/ui/features/servers/restart-server-dialog.css";
 @import "@openbot/ui/features/servers/server-roles.css";
 @import "@openbot/ui/features/servers/server-audit-log.css";
@@ -64,6 +64,7 @@
 @import "./features/computer-use/computer-use.css";
 @import "./features/servers/server-settings-modal.css";
 @import "./features/servers/server-mcp.css";
+@import "./features/servers/server-company-sign-in.css";
 @import "@openbot/ui/features/marketplace/marketplace.css";
 @import "@openbot/ui/features/settings/logo-color-picker.css";
 @import "@openbot/ui/features/settings/sound-choice-select.css";

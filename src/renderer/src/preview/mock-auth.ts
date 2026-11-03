@@ -2,6 +2,7 @@ import type {
   AccountSession,
   CentralAuthState,
   CentralAuthUser,
+  CompanySignInSettings,
   MobileConnectLink,
   OpenBotDesktopApi,
 } from "@openbot/contracts/ipc";
@@ -59,6 +60,13 @@ export function createMockAuth(options: MockAuthOptions, { emit }: MockRuntime) 
       lastActiveAt: Date.now() - 60_000,
     },
   ];
+  let companySignIn: CompanySignInSettings = {
+    redirectUri: "https://api.openbot.run/v1/auth/company/callback",
+    scimUrl: "https://api.openbot.run/scim/v2",
+    domainRecord: { name: "_openbot", value: "openbot-domain=preview" },
+    domainCheck: false,
+    connection: null,
+  };
   const authListeners = new Set<Listener<CentralAuthState>>();
   function emitAuthState(state: CentralAuthState): void {
     authState = clone(state);
@@ -146,6 +154,49 @@ export function createMockAuth(options: MockAuthOptions, { emit }: MockRuntime) 
       authState = { status: "signed_out" };
       emitAuthState(authState);
       return clone(authState);
+    },
+    openCompanySignIn: async () => clone(authState),
+    getCompanySignIn: async () => clone(companySignIn),
+    testCompanySignIn: async (input) => {
+      companySignIn = {
+        ...companySignIn,
+        connection: {
+          issuer: input.issuer,
+          clientId: input.clientId,
+          domains: input.domains,
+          enabled: companySignIn.connection?.enabled ?? false,
+          testedAt: Date.now(),
+          scimTokenCreatedAt: companySignIn.connection?.scimTokenCreatedAt ?? null,
+        },
+      };
+      return { email: `admin@${input.domains[0] ?? "example.com"}` };
+    },
+    cancelCompanySignInTest: async () => undefined,
+    setCompanySignInEnabled: async ({ enabled }) => {
+      if (companySignIn.connection) {
+        companySignIn = { ...companySignIn, connection: { ...companySignIn.connection, enabled } };
+      }
+      return clone(companySignIn);
+    },
+    removeCompanySignIn: async () => {
+      companySignIn = { ...companySignIn, connection: null };
+      return clone(companySignIn);
+    },
+    createCompanySignInScimToken: async () => {
+      const createdAt = Date.now();
+      if (companySignIn.connection) {
+        companySignIn = {
+          ...companySignIn,
+          connection: { ...companySignIn.connection, scimTokenCreatedAt: createdAt },
+        };
+      }
+      return { token: `obscim_${crypto.randomUUID().replaceAll("-", "")}`, createdAt };
+    },
+    revokeCompanySignInScimToken: async () => {
+      if (companySignIn.connection) {
+        companySignIn = { ...companySignIn, connection: { ...companySignIn.connection, scimTokenCreatedAt: null } };
+      }
+      return clone(companySignIn);
     },
     onEvent: (listener) => {
       authListeners.add(listener);

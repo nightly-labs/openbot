@@ -113,7 +113,7 @@
 :where(.ui-button).chat-visual-expand {
   position: absolute;
   top: var(--openbot-space-2);
-  right: var(--openbot-space-2);
+  inset-inline-end: var(--openbot-space-2);
   opacity: 0;
   transition: opacity var(--openbot-duration-hover) var(--openbot-ease-out);
 }

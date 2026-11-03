@@ -1,4 +1,5 @@
 import { type AgentAccessEvent, agentAccessEvent } from "./agent-access-v1";
+import { type AgentColorsEvent, agentColorsEvent } from "./agent-colors-v1";
 import { type AgentHiddenEvent, agentHiddenEvent } from "./agent-hidden-v1";
 import { type AgentNotificationLevelsEvent, agentNotificationLevelsEvent } from "./agent-notification-levels-v1";
 import { type AgentSessionSettingsEvent, agentSessionSettingsEvent } from "./agent-session-settings-v1";
@@ -22,6 +23,7 @@ import { type WorkflowsEvent, workflowsEvent } from "./workflows-v1";
 
 export type OptionalTeamEvent =
   | AgentAccessEvent
+  | AgentColorsEvent
   | AgentHiddenEvent
   | AgentNotificationLevelsEvent
   | AgentSessionSettingsEvent
@@ -52,6 +54,7 @@ export interface OptionalTeamEventOptions {
 export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOptions): OptionalTeamEvent | null {
   const event =
     agentAccessEvent(value) ??
+    agentColorsEvent(value) ??
     agentHiddenEvent(value) ??
     agentNotificationLevelsEvent(value) ??
     agentSessionSettingsEvent(value) ??

@@ -38,14 +38,17 @@ import type {
   AgentTemplatePublication,
   ApplyAgentImportInput,
   ApplyInstanceTransferInput,
+  AvatarColor,
   AvatarHue,
   AvatarImageInput,
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
+  BranchAgentTaskInput,
   BrowserProfileList,
   BrowserProfileSummary,
   ClearableStorageCategory,
   ClearBrowserDataInput,
+  ConnectorMessagingPlatform,
   ConversationFileSearchPage,
   ConversationSearchPage,
   ConversationSnapshot,
@@ -82,7 +85,6 @@ import type {
   McpSignInState,
   McpTestResult,
   MessagingOverview,
-  MessagingPlatform,
   OnePasswordConnectorStatus,
   QueuedMessageReceipt,
   QueueSnapshot,
@@ -167,7 +169,11 @@ import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-ed
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import type { MessagingConnectorPage } from "@openbot/team-client/team-admin-requests";
+import type {
+  HostLocalServer,
+  HostLocalServerList,
+  MessagingConnectorPage,
+} from "@openbot/team-client/team-admin-requests";
 import type { MobileBrowserTab } from "@/features/browser/model/browser-tabs";
 import type { BrowserViewBridgeEvent, RemoteBrowserViewSession } from "@/features/browser/model/browser-view-bridge";
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
@@ -232,6 +238,11 @@ export interface MobileAgent {
   avatarUrl?: string | null;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /**
+   * The exact colour, which wins over `avatarHue`. Only a host with `agent-colors-v1` gives it, through
+   * its own route; else it is null.
+   */
+  avatarColor: AvatarColor | null;
   /** The Marketplace listing the agent was added from, and the listing version it has. */
   marketplaceSource?: { listingId: string; version: number } | undefined;
 }
@@ -407,6 +418,26 @@ export interface MobileWorkspaceContextValue {
   rotateServerKey: (serverId: string) => Promise<{ publicKey: string }>;
   /** Reads the server list again, with its signed key changes. It does not connect again. */
   reloadServerList: () => Promise<void>;
+  /**
+   * The owner of an online host that serves `local-servers-v1`: a desktop app that can run more
+   * servers on its computer. The host checks the role again.
+   */
+  canCreateLocalServers: (serverId: string) => boolean;
+  /** The servers that the desktop app of `serverId` runs on its computer, and how many it can run. */
+  listLocalServers: (serverId: string) => Promise<HostLocalServerList>;
+  /**
+   * Makes a server on the computer of `serverId`, then reads the server list again, so the new server
+   * is in it when the computer registered it for the account.
+   */
+  createLocalServer: (serverId: string, name: string) => Promise<HostLocalServer>;
+  /**
+   * `computer`: the own server of an OpenBot desktop app, which the account cannot remove. `onComputer`:
+   * a server that such an app runs beside its own server, which only that app deletes. Known after the
+   * computer server was online in this session.
+   */
+  localServerKind: (serverId: string) => "computer" | "onComputer" | null;
+  /** Deletes a server on a computer through the computer's own server, which must be online. */
+  deleteLocalServer: (serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `host-timezone-v1`. The host checks the role again. */
   canManageServerTimezone: (serverId: string) => boolean;
   /** The zone of a routine that an agent creates with no zone. Owners and admins only. */
@@ -517,7 +548,7 @@ export interface MobileWorkspaceContextValue {
   loadAgentBrowserProfile: (agentId: string, serverId: string) => Promise<AgentBrowserProfile>;
   /** The host closes the open tabs of the agent. */
   updateAgentBrowserProfile: (input: UpdateAgentBrowserProfileInput, serverId: string) => Promise<AgentBrowserProfile>;
-  loadMessagingConnections: (platform: MessagingPlatform, serverId: string) => Promise<MessagingOverview>;
+  loadMessagingConnections: (platform: ConnectorMessagingPlatform, serverId: string) => Promise<MessagingOverview>;
   /** The platform's page that the phone opens. The host opens no page. */
   connectMessaging: (input: HostMessagingConnectInput, serverId: string) => Promise<MessagingConnectorPage>;
   /** Sends the sealed grant of a Slack or Discord install to the host that started it. */
@@ -589,6 +620,10 @@ export interface MobileWorkspaceContextValue {
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
   /** Creates an agent on the active server and returns its id. */
   createAgent: (input: CreateAgentInput) => Promise<string>;
+  /**
+   * Changes an agent. A host with `agent-colors-v1` gets `avatarColor` through its colour route, and
+   * sets the hue itself. An older host gets only `avatarHue`, the nearest hue of the colour.
+   */
   updateAgent: (input: UpdateAgentInput, serverId?: string) => Promise<void>;
   setAgentAvatar: (agentId: string, image: RemoteFileUpload | null, serverId: string) => Promise<void>;
   loadAgentAvatar: (agentId: string, avatarUrl: string, serverId: string) => Promise<string>;
@@ -823,6 +858,8 @@ export interface MobileWorkspaceContextValue {
   canReadThreads: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-files-v1`: a message in a thread can carry files. */
   canAttachThreadFiles: (serverId: string) => boolean;
+  /** True when the host advertises `agent-thread-branches-v1`: a member who can message an agent can branch its chats. */
+  canBranchThreads: (serverId: string) => boolean;
   /** True when the host advertises `workflows-v1`. The host shows each member the workflows of their agents. */
   canUseWorkflows: (serverId: string) => boolean;
   listWorkflows: (serverId: string) => Promise<WorkflowSummary[]>;
@@ -879,6 +916,11 @@ export interface MobileWorkspaceContextValue {
   renameAgentThread: (input: AgentTaskInput & { title: string }, serverId: string) => Promise<void>;
   /** Deletes a thread, its conversation, its files and its queued messages for good. */
   deleteAgentThread: (input: AgentTaskInput, serverId: string) => Promise<void>;
+  /**
+   * Copies the agent's chat (`taskId` null) or a thread through the turn of `messageId` into a new
+   * thread. No turn starts. A retry with the same `requestId` answers the same thread.
+   */
+  branchAgentThread: (input: BranchAgentTaskInput, serverId: string) => Promise<AgentTask>;
   /** The person's read mark of each open thread of the agent. The member's devices share it. */
   loadAgentThreadReads: (agentId: string, serverId: string) => Promise<AgentTaskReadState[]>;
   /** Moves the person's read mark of a thread to a message that they see. */
@@ -962,6 +1004,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canEditThreads"
   | "canReadThreads"
   | "canAttachThreadFiles"
+  | "canBranchThreads"
   | "canUseWorkflows"
   | "canUseWorkflowGitHub"
   | "canReadServerStorage"
@@ -986,6 +1029,8 @@ type MobileWorkspaceStateKey =
   | "canUnhideAgent"
   | "canEditServerIdentity"
   | "canRotateServerKey"
+  | "canCreateLocalServers"
+  | "localServerKind"
   | "canManageServerTimezone"
   | "canManageAgentMemoryLimit"
   | "canManageServerRoles"

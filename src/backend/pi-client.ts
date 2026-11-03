@@ -139,6 +139,8 @@ interface PiThread {
   mcp: LocalMcpSession;
   extension: PiMcpExtension;
   keyExtension: PiMcpExtension | null;
+  /** The user's MCP tools wait for Pi's `tool_search`. */
+  deferredMcp: boolean;
   turn: PiTurn | null;
   closed: boolean;
   gate: Semaphore.Semaphore;
@@ -185,6 +187,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       this.#running = true;
     }
   }
+  deferredMcpTools = (id: string): boolean => this.#threads.get(id)?.deferredMcp ?? false;
   canReleaseProcess = (): boolean => [...this.#threads.values()].every((thread) => thread.turn === null);
   notify(): void {
     /* Pi has no post-initialize notification. */
@@ -250,10 +253,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   readonly releaseIdleThreads = Effect.fn("PiAgentClient.releaseIdleThreads")(function* (this: PiAgentClient) {
     for (const [id, thread] of this.#threads) {
-      if (thread.turn) continue;
-      if (thread.configured) this.#released.set(id, thread.params);
-      yield* this.#close(thread);
-      this.#threads.delete(id);
+      // A held gate is a turn that starts, before it sets `turn`, or a compaction. Out of the map
+      // before it closes, so a turn that starts during the close opens the thread again.
+      yield* Effect.gen({ self: this }, function* () {
+        if (thread.turn) return;
+        if (thread.configured) this.#released.set(id, thread.params);
+        this.#threads.delete(id);
+        yield* this.#close(thread);
+      }).pipe(thread.gate.withPermitsIfAvailable(1));
     }
   });
 
@@ -574,6 +581,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         mcp,
         extension,
         keyExtension,
+        deferredMcp: !this.options.profileGeneration && Object.keys(handoff.servers).length > 0,
         turn: null,
         closed: false,
         gate: Semaphore.makeUnsafe(1),

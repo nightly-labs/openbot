@@ -3,6 +3,7 @@ import { GlassView } from "expo-glass-effect";
 import { useIsFocused } from "expo-router";
 import { Button, Spinner, Typography } from "heroui-native";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
+import AudioLines from "lucide-react-native/icons/audio-lines";
 import Blocks from "lucide-react-native/icons/blocks";
 import Mic from "lucide-react-native/icons/mic";
 import MicOff from "lucide-react-native/icons/mic-off";
@@ -19,6 +20,7 @@ import {
   ScrollView,
   TextInput,
   type TextInputInstance,
+  useColorScheme,
   useWindowDimensions,
   View,
   type ViewStyle,
@@ -34,6 +36,7 @@ import Animated, {
   LayoutAnimationConfig,
   ReduceMotion,
   type SharedValue,
+  useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -67,9 +70,11 @@ import type { VoicePalette } from "../model/voice-palette";
 import { attachmentTypeLabel, shareLocalAttachment } from "./attachment-preview";
 import { AttachmentPreviewSheet } from "./attachment-preview-sheet";
 import { ComposerAttachmentTile, localPreviewUri } from "./composer-attachment-tile";
+import { DictationMic, DictationStrip } from "./composer-dictation";
 import { ComposerPasteTarget, type PastedFiles } from "./composer-paste-target";
 import type { ComposerVoice } from "./composer-voice";
 import type { ChatAttachments } from "./use-chat-attachments";
+import type { ComposerDictation } from "./use-composer-dictation";
 import { VoiceCallBar } from "./voice-call-bar";
 
 // The field grows to this many lines, then keeps its height and scrolls.
@@ -93,6 +98,8 @@ const SHAPE_DURATION = 120;
 // and the room the toolbar holds around them.
 const CONTROL_SIZE = 40;
 const TOOLBAR_PADDING = 8;
+// Between the mic that dictates and Send, when the draft has text.
+const CONTROL_GAP = 4;
 // At rest the composer is the same bar, smaller: it hugs its placeholder with
 // only this gap to each control, and gives up this much height. The height is
 // taken off the single line the field would otherwise be, so it follows the
@@ -179,8 +186,13 @@ interface ChatComposerProps {
   onCancelReply: () => void;
   /** Absent for a text-only composer: the control never opens a voice mode. */
   voice?: ComposerVoice;
+  /**
+   * Dictation into the draft. With it, a mic always sits to the left of the main control: a tap
+   * dictates hands-free, and the same mic turns into Stop until the user taps it again.
+   */
+  dictation?: ComposerDictation;
   /** The agent's colour for the filled voice controls, the glyph colour on it, and the glass tint. */
-  voiceAccent?: { fill: string; glyph: string; tint: string };
+  voiceAccent?: { fill: string; glyph: string; tint: string; lightGlyph?: boolean };
   /** The agent's avatar in the call bar of a live conversation. */
   voiceAvatar?: ReactNode;
   /** The agent's colours for the glow in the call bar. */
@@ -232,6 +244,8 @@ function VoiceSideGlyph({ icon, color }: { icon: ComposerVoice["trailing"]["icon
 /** How long a handoff focus keeps asking for the keyboard, and how often. */
 const FOCUS_RETRY_MS = 1500;
 const FOCUS_RETRY_INTERVAL_MS = 100;
+/** How long a reply waits for the software keyboard to start rising before it opens the composer. */
+const REPLY_KEYBOARD_WAIT_MS = 400;
 
 export const ChatComposer = memo(function ChatComposer({
   sendLabel,
@@ -266,6 +280,7 @@ export const ChatComposer = memo(function ChatComposer({
   handoffFocusVersion = 0,
   onCancelReply,
   voice,
+  dictation,
   voiceAccent,
   voiceAvatar,
   voicePalette,
@@ -311,6 +326,16 @@ export const ChatComposer = memo(function ChatComposer({
   // A live conversation turns the card into a call bar of the full width, not the round button.
   const voiceBar = voice?.bar;
   const barMode = Boolean(voiceBar);
+  // Dictation keeps the composer: the words go into the field, and a strip takes the toolbar's place.
+  const dictating = dictation?.active ?? false;
+  // Until the last words land, the recognizer owns the draft: a key typed then stops dictation.
+  const dictationBusy = dictation?.busy ?? false;
+  const dictationPresence = dictation?.presence ?? still;
+  // The dictation mic sits left of the main control whatever the draft holds. It stays mounted in the
+  // voice mode and fades with the morph, so the controls do not jump when the mode opens.
+  const dictationMic = Boolean(dictation?.available);
+  // How far the main control sits right of the centre of the control row, which the row scales about.
+  const micSlack = dictationMic ? (CONTROL_SIZE + CONTROL_GAP) / 2 : 0;
   const focusedReplyVersion = useRef(0);
   useEffect(() => {
     if (isFocused && !disabled && replyTarget && focusedReplyVersion.current !== replyFocusVersion) {
@@ -390,13 +415,15 @@ export const ChatComposer = memo(function ChatComposer({
   const lineHeight = 22 * fontScale;
   // Without the plus, the text starts at the card's own inset.
   const leadingInset = attachments ? ROW_CONTROL_INSET : FIELD_INSET;
-  const rowTextWidth = barWidth - BAR_INSET * 2 - ROW_CONTROL_INSET - leadingInset;
+  const trailingInset = ROW_CONTROL_INSET + (dictationMic ? CONTROL_SIZE + CONTROL_GAP : 0);
+  const rowTextWidth = barWidth - BAR_INSET * 2 - trailingInset - leadingInset;
   // One reading drives both the shape and the height. Measuring the two widths
   // separately gave the card two targets in two frames, so it animated twice.
   const [wrap, setWrap] = useState({ lines: 1, width: 0 });
   // The bar stays a single row while the text fits beside the controls, then
-  // becomes a card with the field on its own line.
-  const stacked = wrap.lines > 1 || wrap.width > rowTextWidth;
+  // becomes a card with the field on its own line. Dictation always uses the card: its strip needs
+  // the toolbar row.
+  const stacked = dictating || wrap.lines > 1 || wrap.width > rowTextWidth;
   const fieldHeight = Math.max(
     TOOLBAR_HEIGHT,
     Math.min(MAX_INPUT_LINES, wrap.lines) * lineHeight + FIELD_VERTICAL_PADDING,
@@ -412,7 +439,9 @@ export const ChatComposer = memo(function ChatComposer({
   // full field as the keyboard rises, so an interactive dismissal closes it
   // frame by frame instead of snapping when the keyboard finally commits.
   const [placeholderWidth, setPlaceholderWidth] = useState(0);
-  const placeholderText = placeholder ?? t("mobile.chat.composer.ask", { name: agentName });
+  const placeholderText = dictating
+    ? t("mobile.chat.voice.listening")
+    : (placeholder ?? t("mobile.chat.composer.ask", { name: agentName }));
   const cardWidth = barWidth - BAR_INSET * 2;
   const restHeight = restingComposerHeight(fontScale);
   // The toolbar keeps its height and the control rides down into the smaller
@@ -426,10 +455,12 @@ export const ChatComposer = memo(function ChatComposer({
   const restTextInset = (restHeight - restControlDrawn) / 2 + restControlDrawn + REST_TEXT_GAP;
   // Without the plus, the placeholder starts at the card's own inset.
   const restLeadingInset = attachments ? restTextInset : FIELD_INSET;
+  // The dictation mic takes its drawn size and gap beside the main control.
+  const restTrailingInset = restTextInset + (dictationMic ? (CONTROL_SIZE + CONTROL_GAP) * REST_CONTROL_SCALE : 0);
   // Sized from the placeholder, so the bar carries no empty space. Full width
   // until the measurement lands: a bar that starts narrow would jump open.
   const restWidth =
-    placeholderWidth > 0 ? Math.min(cardWidth, placeholderWidth + restLeadingInset + restTextInset) : cardWidth;
+    placeholderWidth > 0 ? Math.min(cardWidth, placeholderWidth + restLeadingInset + restTrailingInset) : cardWidth;
   // The worklets read the resting width from here, so a new placeholder tweens the bar instead of
   // snapping it. The first measurement is taken at once, as before: the bar must not shrink in
   // from full width when the chat opens.
@@ -467,7 +498,7 @@ export const ChatComposer = memo(function ChatComposer({
     // it, which is why it is safe to run on every open.
     if (menuOpen && openedWith?.focused) inputRef.current?.focus();
   }, [menuOpen, openedWith]);
-  const anchored = hasDraft || Boolean(openedWith?.expanded);
+  const anchored = hasDraft || Boolean(openedWith?.expanded) || dictating;
   const held = useSharedValue(anchored ? 1 : 0);
   useEffect(() => {
     held.set(
@@ -477,12 +508,57 @@ export const ChatComposer = memo(function ChatComposer({
       }),
     );
   }, [anchored, held, reducedMotion]);
+  // The reply row opens with the composer, on the keyboard's own progress, instead of popping in
+  // before it. The last target stays drawn while the row closes.
+  const [shownReply, setShownReply] = useState(replyTarget);
+  if (replyTarget && replyTarget !== shownReply) setShownReply(replyTarget);
+  const replyActive = replyTarget !== null;
+  const replyActiveValue = useSharedValue(replyActive);
+  const replyPresence = useSharedValue(replyActive ? 1 : 0);
+  const replyRowHeight = useSharedValue(0);
+  // Once the keyboard is fully up, a reply holds the composer open like a draft does, so a
+  // dismissal keeps the reply readable. Taken then and not on the press, so the opening still
+  // follows the keyboard.
+  const replyHold = useSharedValue(replyActive ? 1 : 0);
+  useEffect(() => {
+    replyActiveValue.set(replyActive);
+    const timing = { duration: shapeDuration, easing: SHAPE_EASING_FN, reduceMotion: ReduceMotion.System };
+    replyPresence.set(
+      withTiming(replyActive ? 1 : 0, timing, (finished) => {
+        if (finished && !replyActive) scheduleOnRN(setShownReply, null);
+      }),
+    );
+    // A disabled composer takes no focus, so no keyboard comes to open it.
+    if (!replyActive || disabled) replyHold.set(withTiming(replyActive ? 1 : 0, timing));
+  }, [replyActive, replyActiveValue, replyPresence, replyHold, shapeDuration, disabled]);
+  useAnimatedReaction(
+    () => keyboardProgress.get(),
+    (progress, previous) => {
+      if (!replyActiveValue.get() || replyHold.get() > 0) return;
+      if (progress >= 0.99) replyHold.set(1);
+      // The keyboard closes before it is fully up: open the rest of the way from where it is.
+      else if (previous !== null && progress < previous) {
+        replyHold.set(progress);
+        replyHold.set(
+          withTiming(1, { duration: shapeDuration, easing: SHAPE_EASING_FN, reduceMotion: ReduceMotion.System }),
+        );
+      }
+    },
+  );
   // The keyboard drives the shape frame by frame, so zeroing the other
   // durations leaves this one path moving. Reduced motion answers it by
   // dropping the resting shape altogether: the composer stays open, and the
   // keyboard changes nothing about it. Two discrete states would still jump
   // on every keyboard, which is the motion the setting asks us to remove.
-  const expansion = useDerivedValue(() => (resizes ? Math.max(Math.min(1, keyboardProgress.get()), held.get()) : 1));
+  const expansion = useDerivedValue(() =>
+    resizes ? Math.max(Math.min(1, keyboardProgress.get()), held.get(), replyHold.get()) : 1,
+  );
+  // The smaller of the two: from rest the row follows the keyboard, and with the composer already
+  // open it takes the shape's own timing.
+  const replyStyle = useAnimatedStyle(() => {
+    const progress = Math.min(replyPresence.get(), expansion.get());
+    return { height: replyRowHeight.get() * progress, opacity: progress };
+  });
   const cardStyle = useAnimatedStyle(() => {
     const voiced = morph.get();
     const width = interpolate(expansion.get(), [0, 1], [restWidthValue.get(), cardWidth]);
@@ -502,16 +578,23 @@ export const ChatComposer = memo(function ChatComposer({
     const voiced = barMode ? 0 : morph.get();
     const x = interpolate(progress, [0, 1], [restControlShift, 0]);
     const y = interpolate(progress, [0, 1], [restControlOffset, 0]);
-    const scale = interpolate(progress, [0, 1], [REST_CONTROL_SCALE, 1]);
+    const restScale = interpolate(progress, [0, 1], [REST_CONTROL_SCALE, 1]);
+    const scale = restScale + (VOICE_CONTROL_SCALE - restScale) * voiced;
     return {
       transform: [
-        { translateX: x + (VOICE_CONTROL_SHIFT_X - x) * voiced },
+        // The row scales about its centre, which the dictation mic moves left of the main control. This
+        // keeps the main control where a row of the main control alone would put it.
+        { translateX: x + (VOICE_CONTROL_SHIFT_X - x) * voiced + micSlack * (1 - scale) },
         { translateY: y + (VOICE_CONTROL_SHIFT_Y - y) * voiced },
-        { scale: scale + (VOICE_CONTROL_SCALE - scale) * voiced },
+        { scale },
       ],
       opacity: barMode ? interpolate(morph.get(), [0, 0.4], [1, 0], Extrapolation.CLAMP) : 1,
     };
   });
+  // The round button has room for one control: the dictation mic leaves in the first part of the morph.
+  const dictationMicStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(morph.get(), [0, 0.3], [1, 0], Extrapolation.CLAMP),
+  }));
   // With Liquid Glass the round button stays glass, so the glow under it shows
   // through and spreads on it. Without glass the card is opaque, so the agent's
   // colour fills it while it listens. Continue is the card again.
@@ -558,7 +641,8 @@ export const ChatComposer = memo(function ChatComposer({
     const openWidth = interpolate(progress, [0, 1], [restWidthValue.get(), cardWidth]);
     const width = openWidth + ((barMode ? cardWidth : VOICE_BUTTON_SIZE) - openWidth) * voiced;
     return {
-      opacity: interpolate(voiced, [0, 0.3], [1, 0], Extrapolation.CLAMP),
+      // Dictation has no attachments: the plus leaves the strip's corner to Cancel.
+      opacity: interpolate(voiced, [0, 0.3], [1, 0], Extrapolation.CLAMP) * (1 - dictationPresence.get()),
       transform: [
         // The card centres while it is narrow, so follow its left edge in, and
         // out to it by the same slack the control on the far side takes.
@@ -637,6 +721,18 @@ export const ChatComposer = memo(function ChatComposer({
     ],
   }));
   const [focused, setFocused] = useState(false);
+  // A hardware keyboard gives focus with no software keyboard, so no progress comes to open the
+  // reply row. When the keyboard has not started to rise by then, open the composer on its own.
+  useEffect(() => {
+    if (!focused || !replyActive) return;
+    const timer = setTimeout(() => {
+      if (replyHold.get() > 0 || keyboardProgress.get() > 0) return;
+      replyHold.set(
+        withTiming(1, { duration: shapeDuration, easing: SHAPE_EASING_FN, reduceMotion: ReduceMotion.System }),
+      );
+    }, REPLY_KEYBOARD_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [focused, replyActive, replyHold, keyboardProgress, shapeDuration]);
 
   useLayoutEffect(() => {
     // Selecting a file is a draft edit even when TextInput never receives focus.
@@ -694,7 +790,7 @@ export const ChatComposer = memo(function ChatComposer({
   // plus and the composer around it both carry Reanimated transforms that
   // never reach it. `focused` and `hasDraft` are the React mirror of the two
   // things that open the composer, and both change once per interaction.
-  const restingPlus = resizes && !hasDraft && !focused;
+  const restingPlus = resizes && !hasDraft && !focused && !replyActive;
   const plusDrawn = CONTROL_SIZE * (restingPlus ? REST_CONTROL_SCALE : 1);
   const plusInset = (CONTROL_SIZE - plusDrawn) / 2;
   const attachmentAnchor = {
@@ -709,12 +805,43 @@ export const ChatComposer = memo(function ChatComposer({
   };
   const control = composerAction({
     disabled,
-    hasDraft,
+    // Dictation counts as a draft from its start: the words are on their way.
+    hasDraft: hasDraft || dictationBusy,
     busy,
     canStop: Boolean(onStop),
     stopping,
     voiceAvailable: voice?.available ?? false,
   });
+  // While dictation writes the draft, the main control is Send, and Send waits for the last words.
+  const controlReady = control.pressable && !dictationBusy;
+
+  // Dictation leaves the keyboard as it is: hiding it would move the whole chat under the finger.
+  // Stop opens it on the words when it was closed.
+  const editAfterDictation = useRef(false);
+  useEffect(() => {
+    if (dictationBusy || !editAfterDictation.current) return;
+    editAfterDictation.current = false;
+    inputRef.current?.focus();
+  }, [dictationBusy]);
+  const finishDictation = useCallback(() => {
+    if (!dictation) return;
+    editAfterDictation.current = true;
+    dictation.finish();
+  }, [dictation]);
+  // The dictation mic: a tap listens hands-free, and the same control, now Stop, keeps the words.
+  const toggleDictation = useCallback(() => {
+    if (!dictation) return;
+    if (dictation.active) finishDictation();
+    else dictation.start();
+  }, [dictation, finishDictation]);
+  // The agent's own colour for Send, Stop and the dictation controls; a channel keeps the action colour.
+  const accentFill = voiceAccent?.fill ?? String(action);
+  // In dark mode the glyphs on the main control take the text colour, as the other composer glyphs do,
+  // while a white glyph still reads on the agent's colour. A very light colour keeps the dark glyph. In
+  // light mode they take the colour with the higher contrast.
+  const dark = useColorScheme() === "dark";
+  const accentGlyph =
+    dark && (voiceAccent?.lightGlyph ?? true) ? String(foreground) : (voiceAccent?.glyph ?? String(actionForeground));
 
   function requestSend(): void {
     if (disabled || preparing) return;
@@ -799,6 +926,7 @@ export const ChatComposer = memo(function ChatComposer({
                   agentId={agent.id}
                   serverId={agent.serverId}
                   hue={agent.avatarHue}
+                  color={agent.avatarColor}
                   seed={agent.avatarSeed}
                   size={28}
                 />
@@ -1021,25 +1149,32 @@ export const ChatComposer = memo(function ChatComposer({
               {`${displayText}​`}
             </NativeText>
             {/* The voice mode shows the reply above the spoken words instead. */}
-            {replyTarget && !voiceOpen ? (
-              <View className="flex-row items-center gap-2 pt-2 pl-4 pr-2">
-                <Reply color={String(muted)} size={16} />
-                <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-text-secondary">
-                  {mentionDraft(replyTarget.body).text || t("mobile.chat.reply.attachment")}
-                </Typography.Paragraph>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="ghost"
-                  accessibilityLabel={t("mobile.chat.composer.cancelReply")}
-                  onPress={() => {
-                    void haptics.selection();
-                    onCancelReply();
-                  }}
+            {shownReply && !voiceOpen ? (
+              <Animated.View style={[{ overflow: "hidden" }, replyStyle]}>
+                {/* Out of flow, so it keeps its natural height while the box opens over it. */}
+                <View
+                  className="flex-row items-center gap-2 pt-2 pl-4 pr-2"
+                  style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+                  onLayout={({ nativeEvent }) => replyRowHeight.set(nativeEvent.layout.height)}
                 >
-                  <X color={String(muted)} size={16} />
-                </Button>
-              </View>
+                  <Reply color={String(muted)} size={16} />
+                  <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-text-secondary">
+                    {mentionDraft(shownReply.body).text || t("mobile.chat.reply.attachment")}
+                  </Typography.Paragraph>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    accessibilityLabel={t("mobile.chat.composer.cancelReply")}
+                    onPress={() => {
+                      void haptics.selection();
+                      onCancelReply();
+                    }}
+                  >
+                    <X color={String(muted)} size={16} />
+                  </Button>
+                </View>
+              </Animated.View>
             ) : null}
             <Animated.View
               style={{
@@ -1098,9 +1233,11 @@ export const ChatComposer = memo(function ChatComposer({
                       ref={inputRef}
                       nativeID="chat-composer-input"
                       accessibilityLabel={t("mobile.chat.composer.messageAgent", { name: agentName })}
-                      accessibilityState={{ disabled: disabled || voiceOpen }}
+                      accessibilityState={{ disabled: disabled || voiceOpen || dictationBusy }}
                       accessibilityElementsHidden={voiceOpen}
                       importantForAccessibility={voiceOpen ? "no-hide-descendants" : "auto"}
+                      // Not read-only while dictating: on iOS a field that stops being editable gives up
+                      // the keyboard. A key typed then stops dictation instead, in onChangeText.
                       editable={!disabled && !voiceOpen}
                       showSoftInputOnFocus={!disabled && !voiceOpen}
                       className="min-w-0 font-sans text-foreground"
@@ -1130,6 +1267,12 @@ export const ChatComposer = memo(function ChatComposer({
                       }}
                       onBlur={() => setFocused(false)}
                       onChangeText={(text) => {
+                        // The recognizer writes the draft until its last words land, and would overwrite
+                        // the key. The key stops dictation; the words stay, and the field is the user's.
+                        if (dictationBusy) {
+                          if (dictating) finishDictation();
+                          return;
+                        }
                         sendGate.edit();
                         // A text-only composer keeps a long paste as text: it has no file to turn it into.
                         const pasted = attachments ? largePastedText(latestTextRef.current, text) : null;
@@ -1205,7 +1348,7 @@ export const ChatComposer = memo(function ChatComposer({
                       {
                         position: "absolute",
                         left: FIELD_INSET,
-                        right: ROW_CONTROL_INSET,
+                        right: trailingInset,
                         top: 0,
                         bottom: 0,
                         justifyContent: "center",
@@ -1229,6 +1372,10 @@ export const ChatComposer = memo(function ChatComposer({
                     </LayoutAnimationConfig>
                   </Animated.View>
                 )}
+                {dictating ? (
+                  // A tap on the words stops dictation and opens the keyboard on them, as Stop does.
+                  <Pressable accessible={false} style={{ position: "absolute", inset: 0 }} onPress={finishDictation} />
+                ) : null}
               </Animated.View>
               <View
                 pointerEvents="box-none"
@@ -1246,9 +1393,41 @@ export const ChatComposer = memo(function ChatComposer({
                   paddingHorizontal: TOOLBAR_PADDING,
                 }}
               >
-                <Animated.View style={controlStyle} pointerEvents={barMode && voiceOpen ? "none" : "auto"}>
+                {dictating && dictation ? (
+                  <DictationStrip
+                    level={dictation.level}
+                    presence={dictationPresence}
+                    // The strip ends at the dictation mic, which is Stop now, left of the main control.
+                    right={TOOLBAR_PADDING + 2 * (CONTROL_SIZE + CONTROL_GAP)}
+                    foreground={String(foreground)}
+                    accent={accentFill}
+                  />
+                ) : null}
+                <Animated.View
+                  style={[{ flexDirection: "row", alignItems: "center", gap: CONTROL_GAP }, controlStyle]}
+                  pointerEvents={barMode && voiceOpen ? "none" : "auto"}
+                >
+                  {dictationMic && dictation ? (
+                    <Animated.View
+                      key="dictation-mic"
+                      style={dictationMicStyle}
+                      pointerEvents={voiceOpen ? "none" : "auto"}
+                      accessibilityElementsHidden={voiceOpen}
+                      importantForAccessibility={voiceOpen ? "no-hide-descendants" : "auto"}
+                    >
+                      <DictationMic
+                        active={dictating}
+                        presence={dictationPresence}
+                        enabled={!disabled && !voiceOpen}
+                        label={t(dictating ? "mobile.chat.composer.stopDictation" : "mobile.chat.composer.dictate")}
+                        foreground={String(foreground)}
+                        onPress={toggleDictation}
+                      />
+                    </Animated.View>
+                  ) : null}
                   {voiceOpen && voice && !barMode ? (
                     <Pressable
+                      key="voice"
                       accessibilityLabel={voice.center.label}
                       accessibilityRole="button"
                       accessibilityState={{ disabled: !voice.center.pressable, busy: voice.center.busy }}
@@ -1273,38 +1452,32 @@ export const ChatComposer = memo(function ChatComposer({
                     </Pressable>
                   ) : (
                     <Pressable
+                      key="control"
                       accessibilityLabel={controlLabel}
                       accessibilityRole="button"
-                      accessibilityState={{ disabled: !control.pressable, busy: control.spinner }}
-                      disabled={!control.pressable}
+                      accessibilityState={{ disabled: !controlReady, busy: control.spinner }}
+                      // Words still arrive into the draft: a send now would leave them behind.
+                      disabled={!controlReady}
                       className="size-10 items-center justify-center rounded-full"
                       style={{
                         // Nothing to send reads as a bare glyph on the card, not as a
-                        // filled control the user could press.
-                        backgroundColor: control.primed ? action : "transparent",
+                        // filled control the user could press. The voice mode is always filled:
+                        // it sets it apart from the dictation mic beside it.
+                        backgroundColor: control.primed || control.mode === "dictate" ? accentFill : "transparent",
                         // The card dims as a whole when the composer is disabled.
                         // Dim only this control for a state the card does not show.
-                        opacity: disabled || control.pressable ? 1 : 0.45,
+                        opacity: disabled || controlReady ? 1 : 0.45,
                       }}
                       onPress={pressControl}
                     >
                       {control.spinner ? (
-                        <Spinner size="sm" color={String(actionForeground)} />
+                        <Spinner size="sm" color={accentGlyph} />
                       ) : control.mode === "stop" ? (
-                        <Square
-                          color={String(actionForeground)}
-                          fill={String(actionForeground)}
-                          size={14}
-                          strokeWidth={2}
-                        />
+                        <Square color={accentGlyph} fill={accentGlyph} size={14} strokeWidth={2} />
                       ) : control.mode === "dictate" ? (
-                        <Mic color={String(foreground)} size={21} strokeWidth={1.8} />
+                        <AudioLines color={accentGlyph} size={20} strokeWidth={2} />
                       ) : (
-                        <ArrowUp
-                          color={String(control.primed ? actionForeground : muted)}
-                          size={21}
-                          strokeWidth={2.2}
-                        />
+                        <ArrowUp color={control.primed ? accentGlyph : String(muted)} size={21} strokeWidth={2.2} />
                       )}
                     </Pressable>
                   )}
@@ -1328,9 +1501,9 @@ export const ChatComposer = memo(function ChatComposer({
         {attachments ? (
           <Animated.View
             // The plus fades out with the morph, and the voice mode has no attachments.
-            pointerEvents={voiceOpen ? "none" : "box-none"}
-            accessibilityElementsHidden={voiceOpen}
-            importantForAccessibility={voiceOpen ? "no-hide-descendants" : "auto"}
+            pointerEvents={voiceOpen || dictating ? "none" : "box-none"}
+            accessibilityElementsHidden={voiceOpen || dictating}
+            importantForAccessibility={voiceOpen || dictating ? "no-hide-descendants" : "auto"}
             // Absolute insets here are measured from the bar's outer edge, so they
             // have to carry the bar's own padding to land on the card.
             style={[

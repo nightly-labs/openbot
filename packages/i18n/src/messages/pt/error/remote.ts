@@ -205,4 +205,6 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Atualize este servidor no computador para excluir canais.",
   "error.remote.historyRefreshFailed": "A mensagem foi enviada, mas não foi possível atualizar o histórico do chat.",
   "error.remote.taskHistoryRefreshFailed": "A tarefa foi alterada, mas não foi possível atualizar o histórico do chat.",
+  "error.remote.localServerAccountRemovalFailed":
+    "O servidor foi excluído no computador dele, mas a conta ainda o mostra. Exclua de novo para removê-lo da conta.",
 } as const satisfies PartialTranslation<typeof source>;

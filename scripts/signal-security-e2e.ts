@@ -1,7 +1,7 @@
 // Starts the real Signal service (`remote/api`) on a free local port with throwaway secrets and a
 // fake account service, then checks its secret and authentication rules over real HTTP and
 // WebSocket connections: the Telegram secret header, the Slack signature, the signed account
-// events, the GitHub App signature and the fan-out of a GitHub event to each host that watches its repository, the body limits, the remote and route tickets, a failed account service during an initial ticket check after a start, the limit on parallel account service checks during a burst of hellos, the generic webhook headers, the hello deadline, the reuse of
+// events, the GitHub App signature and the fan-out of a GitHub event to each host that watches its repository, the body limits, the remote and route tickets, a failed account service during an initial ticket check after a start, the limit on parallel account service checks during a burst of hellos, the generic webhook headers, the Standard Webhooks headers only for a host that names the format, the hello deadline, the reuse of
 // TURN credentials, the pick of one TURN relay that allocates for each host, the `signal` ticket claim and the entry rule of
 // two Signal machines (with a second Signal and a fake DNS server), and that no frame or log line holds the Telegram bot token. Writes .openbot-build/signal-security-e2e/report.json and exits
 // non-zero when a check fails. It makes no request to Telegram, Slack or Discord.
@@ -33,6 +33,7 @@ import {
   type RemoteTicketClaims,
 } from "@openbot/contracts/signal-protocol/ticket";
 import {
+  STANDARD_WEBHOOKS_FORMAT,
   WEBHOOK_DELIVERY_ID_HEADER,
   WEBHOOK_EVENTS_PATH,
   WEBHOOK_ROUTE_AUDIENCE,
@@ -60,6 +61,9 @@ const HOST_ID = "host-e2e";
 const ROUTED_CHAT = "-100";
 const SECOND_CHAT = "-300";
 const WEBHOOK_ROUTE = "route-e2e";
+// A host that names the Standard Webhooks format in its hello, and its route.
+const STANDARD_HOST_ID = "host-standard-e2e";
+const STANDARD_ROUTE = "route-standard-e2e";
 const GITHUB_WEBHOOK_SECRET = randomBytes(32).toString("hex");
 const GITHUB_HOST_ID = "host-github-e2e";
 const GITHUB_INSTALLATION = 7;
@@ -789,6 +793,67 @@ try {
     const delivered = ingress.frames.filter((frame) => frame.includes('"delivery-1"'));
     expect(delivered.length === 0, "A refused webhook request reached the host.");
     return "missing 401, malformed 401, bad timestamp 401, unheld route 503, nothing delivered";
+  });
+
+  // Standard Webhooks (Composio, Svix): Signal relays the `webhook-*` or `svix-*` headers only to a
+  // host that names the format, because an older host refuses that signature.
+  await check("A Standard Webhooks request reaches only a host that names the format", async () => {
+    const body = JSON.stringify({ type: "composio.trigger.message", metadata: { trigger_slug: "E2E" } });
+    const standard = (route: string, prefix: "webhook" | "svix", id: string, signature = `v1,${"A".repeat(43)}=`) =>
+      fetch(`${base}${WEBHOOK_EVENTS_PATH}/${route}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          [`${prefix}-id`]: id,
+          [`${prefix}-timestamp`]: nowSeconds(),
+          [`${prefix}-signature`]: signature,
+        },
+        body,
+      });
+    // The ingress socket above names no format, as an OpenBot version before this one.
+    const older = await standard(WEBHOOK_ROUTE, "webhook", "msg_older");
+    expect(older.status === 401, `older host: ${older.status}`);
+    expect(!ingress.frames.some((frame) => frame.includes('"msg_older"')), "The older host got the request.");
+    const malformed = await standard(WEBHOOK_ROUTE, "webhook", "msg_malformed", "sha256=abc");
+    expect(malformed.status === 401, `malformed v1 signature: ${malformed.status}`);
+
+    const peer = await connect(signalUrl);
+    peer.socket.send(
+      JSON.stringify({
+        type: "hello",
+        version: 1,
+        peer: "ingress",
+        token: await remoteTicket({ hostId: STANDARD_HOST_ID, membershipId: `${STANDARD_HOST_ID}:host` }),
+        webhookRoute: await sign(
+          { hid: STANDARD_HOST_ID, routes: [{ id: STANDARD_ROUTE, linkedAt: 1_000 }] },
+          WEBHOOK_ROUTE_AUDIENCE,
+        ),
+        webhookFormats: [STANDARD_WEBHOOKS_FORMAT],
+      }),
+    );
+    await peer.next((frame) => frame.includes('"type":"ready"'), "Standard Webhooks ingress ready");
+    const statuses: string[] = [];
+    try {
+      for (const prefix of ["webhook", "svix"] as const) {
+        const id = `msg_${prefix}_e2e`;
+        const response = standard(STANDARD_ROUTE, prefix, id);
+        const frame = JSON.parse(
+          await peer.next((value) => value.includes('"type":"webhook-delivery"') && value.includes(`"${id}"`), id),
+        );
+        expect(frame.format === STANDARD_WEBHOOKS_FORMAT, `${prefix} format: ${frame.format}`);
+        expect(frame.signature.startsWith("v1,"), `${prefix} signature was not passed on.`);
+        expect(Buffer.from(frame.bodyBase64, "base64").toString() === body, `${prefix} body changed.`);
+        peer.socket.send(
+          JSON.stringify({ type: "webhook-delivery-result", version: 1, requestId: frame.requestId, status: 202 }),
+        );
+        const answered = await response;
+        expect(answered.status === 202, `${prefix} status: ${answered.status}`);
+        statuses.push(`${prefix}-* ${answered.status}`);
+      }
+    } finally {
+      peer.socket.close();
+    }
+    return `older host 401, malformed 401, ${statuses.join(", ")} with the format`;
   });
 
   // GitHub: Signal checks the App's signature, and passes an event to every host that watches its

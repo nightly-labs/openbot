@@ -496,15 +496,20 @@ const uploadRemoteImports = Effect.fn("AttachmentIpc.uploadRemoteImports")(funct
       bytes: item.bytes,
     })),
   ];
-  return yield* uploadRemoteFiles(remoteServers, serverId, files);
+  return yield* uploadRemoteFiles(remoteServers, serverId, files, input.requestId);
 });
 
-/** Checks the names and sizes, then uploads every file at once, as one import. */
+/**
+ * Checks the names and sizes, then uploads every file at once, as one import. With `requestId`, the
+ * import reports the bytes of a single file; several files at once would mix their progress.
+ */
 function uploadRemoteFiles(
   remoteServers: AttachmentIpcDependencies["remoteServers"],
   serverId: string,
   files: { name: string; mimeType: string; bytes: Uint8Array }[],
+  requestId?: string,
 ) {
+  const progressId = files.length === 1 ? requestId : undefined;
   return remoteDecode(() => {
     for (const file of files) assertSupportedAttachmentName(file.name);
     if (files.some((file) => file.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)) {
@@ -515,9 +520,11 @@ function uploadRemoteFiles(
     }
   }).pipe(
     Effect.andThen(
-      Effect.forEach(files, (file) => remoteServers.uploadAttachment(file.name, file.mimeType, file.bytes, serverId), {
-        concurrency: "unbounded",
-      }),
+      Effect.forEach(
+        files,
+        (file) => remoteServers.uploadAttachment(file.name, file.mimeType, file.bytes, serverId, progressId),
+        { concurrency: "unbounded" },
+      ),
     ),
   );
 }

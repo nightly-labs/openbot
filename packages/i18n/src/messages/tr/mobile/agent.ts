@@ -34,6 +34,13 @@ export const messages = {
   "mobile.agent.appearance.hue.indigo": "Çivit mavisi",
   "mobile.agent.appearance.hue.violet": "Menekşe",
   "mobile.agent.appearance.hue.magenta": "Eflatun",
+  "mobile.agent.appearance.hue.pink": "Pembe",
+  "mobile.agent.appearance.hue.sky": "Gök mavisi",
+  "mobile.agent.appearance.hue.navy": "Lacivert",
+  "mobile.agent.appearance.hue.wine": "Bordo",
+  "mobile.agent.appearance.hue.brown": "Kahverengi",
+  "mobile.agent.appearance.hue.sand": "Kum",
+  "mobile.agent.appearance.hue.grey": "Gri",
   "mobile.agent.menu.deleteFailed": "Ajan silinemedi",
   "mobile.agent.menu.duplicateFailed": "Ajan çoğaltılamadı",
   "mobile.agent.menu.hideFailed": "Ajan gizlenemedi",
@@ -357,7 +364,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "Şu an uygun değil · atlandı",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} yazmaya başladıktan sonra asla model değiştirmez. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
+    "Bir kullanım sınırı {name} işe başladıktan sonra onu durdurursa, {name} aynı işe sıradaki ilk kullanılabilir modelle devam eder. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "mobile.agent.busyMessage.label": "Çalışırken",
   "mobile.agent.busyMessage.footer":
     "Ajan çalışırken gönderdiğiniz bir mesajın ne olacağı. Kuyruk, mesajı tur bitene kadar tutar. Yönlendir, mesajı tur sırasında ajana verir.",

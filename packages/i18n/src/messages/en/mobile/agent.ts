@@ -33,6 +33,13 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.appearance.hue.indigo": "Indigo",
   "mobile.agent.appearance.hue.violet": "Violet",
   "mobile.agent.appearance.hue.magenta": "Magenta",
+  "mobile.agent.appearance.hue.pink": "Pink",
+  "mobile.agent.appearance.hue.sky": "Sky blue",
+  "mobile.agent.appearance.hue.navy": "Navy",
+  "mobile.agent.appearance.hue.wine": "Wine",
+  "mobile.agent.appearance.hue.brown": "Brown",
+  "mobile.agent.appearance.hue.sand": "Sand",
+  "mobile.agent.appearance.hue.grey": "Gray",
   "mobile.agent.menu.deleteFailed": "Could not delete agent",
   "mobile.agent.menu.duplicateFailed": "Could not duplicate agent",
   "mobile.agent.menu.hideFailed": "Could not hide agent",
@@ -338,7 +345,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.backupModels.unavailable": "Not available now · skipped",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} never switches after it starts to write. It goes back to {model} when the limit ends, or 10 minutes after a provider error.",
+    "When a usage limit stops {name} after it starts to work, {name} continues the same work on the first available model in the order. It goes back to {model} when the limit ends, or 10 minutes after a provider error.",
   "mobile.agent.busyMessage.label": "While working",
   "mobile.agent.busyMessage.footer":
     "What a message does when you send it while the agent works. Queue keeps it until the turn ends. Steer gives it to the agent during the turn.",

@@ -26,6 +26,8 @@ import { createOpenBotLogger } from "@openbot/logging";
 // the dropped item has no path.
 const HAND_WRITTEN_METHODS: ReadonlyMap<string, IpcEndpoint | null> = new Map<string, IpcEndpoint | null>([
   ["agent.onAttachmentImport", null],
+  ["agent.retryAttachmentImport", null],
+  ["agent.discardAttachmentImport", null],
   ["agent.addDroppedAgentFolder", null],
   ["agent.onEvent", IPC_ENDPOINTS.agent.scopedEvent],
   ["servers.onPresence", IPC_ENDPOINTS.servers.scopedPresence],

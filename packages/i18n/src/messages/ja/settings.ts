@@ -67,6 +67,23 @@ export const messages = {
   "settings.busyMessage.title": "作業中のエージェントの方向を修正",
   "settings.busyMessage.description":
     "新しいメッセージはキューに入らず、エージェントの現在の作業に加わります。ChatGPT と Claude で使えます。",
+  "settings.agentDefaults.title": "デフォルト",
+  "settings.agentDefaults.description": "エージェントごとに変更しない限り、エージェントはこのデフォルトに従います。",
+  "settings.agentDefaults.value": "デフォルト: {value}",
+  "settings.agentDefaults.on": "オン",
+  "settings.agentDefaults.off": "オフ",
+  "settings.agentDefaults.followDefault": "デフォルト ({value})",
+  "settings.agentDefaults.count": "{total} 件中 {on} 件がオン",
+  "settings.agentDefaults.open": "{name} を開く",
+  "settings.agentDefaults.agentList": "オン: {names}",
+  "settings.agentDefaults.defaultTitle": "デフォルト",
+  "settings.agentDefaults.defaultDescription":
+    "新しいエージェントはこれを使います。デフォルトのエージェントはこれに従います。",
+  "settings.agentDefaults.agents": "エージェント",
+  "settings.agentDefaults.setAll": "すべて設定",
+  "settings.agentDefaults.setAllLabel": "すべてのエージェントの {setting} を設定",
+  "settings.agentDefaults.agentLabel": "{agent} の {setting}",
+  "settings.agentDefaults.loadFailed": "エージェントを読み込めませんでした。",
   "settings.backgroundProcesses.title": "バックグラウンドプロセス",
   "settings.backgroundProcesses.description":
     "エージェントが起動して実行したままにしたプログラム（開発サーバーなど）です。チャットが終わっても、OpenBot を終了しても動き続けます。",
@@ -148,6 +165,9 @@ export const messages = {
     "オン: 利用状況と安定性のメタデータを、アカウント ID とメールアドレスとともに OpenBot の自社運用の分析基盤に送信します。オフ: 同じメタデータをランダムなインストール ID のみとともに送信します。チャット、ファイル、プロンプトは送信しません。この設定はこのブラウザーに適用されます。",
   "settings.tab.general.title": "一般",
   "settings.tab.general.description": "このコンピューターでの OpenBot の動作を設定します。",
+  "settings.tab.agents.title": "エージェント",
+  "settings.tab.agents.description":
+    "エージェントごとに設定しないときに、このコンピューターのエージェントができることを選びます。",
   "settings.tab.notifications.title": "通知",
   "settings.tab.notifications.description": "OpenBot からの知らせ方を選びます。",
   "settings.tab.voice.title": "音声",
@@ -521,6 +541,7 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "返信を読み上げる",
   "settings.voice.speech.readReplies.description":
     "メッセージを音声入力すると、返信が読み上げられます。止めるには、もう一度音声入力してください。",
+  "settings.voice.speech.speed.title": "速度",
   "settings.voice.speech.voice.title": "声",
   "settings.voice.speech.voice.female": "女性の声 {number}",
   "settings.voice.speech.voice.male": "男性の声 {number}",

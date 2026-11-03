@@ -60,6 +60,7 @@ export const messages = {
   "error.team.providersUnsupported": "Les réglages des fournisseurs ne sont pas pris en charge par cette connexion.",
   "error.team.providerNotManaged": "OpenBot ne gère pas la CLI de ce fournisseur.",
   "error.team.channelsUnsupported": "Les discussions de canal ne sont pas prises en charge par cette connexion.",
+  "error.team.channelPictureUnsupported": "Les images de canal ne sont pas prises en charge par cette connexion.",
   "error.team.channelDeleteUnsupported": "La suppression de canaux n’est pas prise en charge par cette connexion.",
   "error.team.channelTaskCancelUnsupported":
     "L’annulation des tâches de canal n’est pas prise en charge par cette connexion.",
@@ -69,6 +70,7 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Les données partagées ne sont pas prises en charge par cette connexion.",
   "error.team.agentInstallUnsupported": "L’ajout d’agents n’est pas pris en charge par cette connexion.",
   "error.team.agentHideUnsupported": "Le masquage d’agents n’est pas pris en charge par cette connexion.",
+  "error.team.agentColorsUnsupported": "Les couleurs d’agents ne sont pas prises en charge par cette connexion.",
   "error.team.sidebarFoldersUnsupported":
     "Les dossiers dans des dossiers ne sont pas pris en charge par cette connexion.",
   "error.team.agentNotificationLevelsUnsupported":
@@ -82,6 +84,7 @@ export const messages = {
   "error.team.contextResetUnsupported":
     "Commencer une nouvelle discussion n’est pas pris en charge par cette connexion.",
   "error.team.contextCompactUnsupported": "Cette connexion ne prend pas en charge la compaction du contexte.",
+  "error.team.messageDeleteUnsupported": "Cette connexion ne permet pas de supprimer des messages.",
   "error.team.workspaceDirectoryUnsupported": "L’affichage des dossiers n’est pas pris en charge par cette connexion.",
   "error.team.conversationFileSearchUnsupported":
     "La recherche de fichiers n’est pas prise en charge par cette connexion.",
@@ -104,12 +107,14 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Les mises à jour de l’hôte ne sont pas prises en charge par cette connexion.",
   "error.team.hostTimezoneUnsupported": "Cette connexion ne prend pas en charge le fuseau horaire du serveur.",
   "error.team.hostKeyRotationUnsupported": "Cette connexion ne prend pas en charge le changement de clé du serveur.",
+  "error.team.localServersUnsupported": "Cette connexion ne prend pas en charge les serveurs sur cet ordinateur.",
   "error.team.routineResultsUnsupported": "Cette connexion ne prend pas en charge les destinations des routines.",
   "error.team.agentMemoryLimitUnsupported": "Cette connexion ne prend pas en charge la limite de souvenirs des agents.",
   "error.team.agentFoldersUnsupported": "Cette connexion ne prend pas en charge les dossiers des agents.",
   "error.team.folderUnavailable": "Ce dossier n’est pas disponible sur l’ordinateur hôte.",
   "error.team.memoryReviewUnsupported": "Cette connexion ne prend pas en charge la revue des souvenirs.",
   "error.team.promptCacheTtlUnsupported": "Cette connexion ne prend pas en charge la durée du cache de prompt.",
+  "error.team.modelVisibilityUnsupported": "Cette connexion ne prend pas en charge la liste des modèles.",
   "error.team.providerDefaultUnsupported": "Cette connexion ne prend pas en charge le fournisseur par défaut.",
   "error.team.attachmentNameRequired": "Un nom de pièce jointe sûr est requis.",
   "error.team.attachmentNotFound": "Pièce jointe introuvable.",

@@ -1,10 +1,10 @@
 {
-  "version": "0.59.0",
+  "version": "0.60.0",
   "highlights": [
-    "Kimi is a new provider, and you can use Hermes Agent from Nous Research with your own memories and skills.",
-    "Start a workflow when someone mentions OpenBot in Discord, and send its result back to Discord.",
-    "Sidebar folders can now hold folders, up to three levels.",
-    "Pinned agents and channels stay the same on each device that connects to a server.",
-    "On a Mac, OpenBot has a menu bar icon and keeps your tasks running after you close the window. Hold ⌘Q or press it twice to quit."
+    "Talk to your agents from WhatsApp: link a number under Marketplace → Apps → WhatsApp.",
+    "Start a workflow when someone mentions OpenBot in Slack or in a Telegram group, and send its result back there.",
+    "OpenBot is now available in Arabic, with a right-to-left layout.",
+    "Turn models off for each provider, and find the newest models first in the model picker.",
+    "Owners and admins can see an Audit log of member, role and agent access changes in Server settings."
   ]
 }

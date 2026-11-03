@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentApproval,
+  AgentColorEntry,
   AgentEvent,
   AgentRuntimeApproval,
   AgentStatus,
@@ -26,8 +27,9 @@ import type {
   TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { canAdministerServer } from "@openbot/contracts/ipc";
-import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { AGENT_COLORS_CAPABILITY, AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
@@ -182,6 +184,8 @@ interface WebWorkspaceState {
   sidebarLayout: SidebarLayoutSnapshot;
   /** The agents that a user hid on the host (`agent-hidden-v1`). Not the same as `hiddenIds`. */
   userHiddenAgents: HiddenAgent[];
+  /** The exact agent colours on the host (`agent-colors-v1`). The released agent list does not carry them. */
+  agentColors: AgentColorEntry[];
 }
 
 export type WebRuntimeFactory = (
@@ -253,6 +257,7 @@ export function createWebWorkspace(
     duplicatingAgentIds: [],
     sidebarLayout: defaultSidebarLayout(),
     userHiddenAgents: [],
+    agentColors: [],
   });
   // Every progress line of the newest turns, by turn, for the steps under the activity line.
   const [stepLines, setStepLines] = createSignal<TurnStepLines>({});
@@ -612,6 +617,10 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.userHiddenAgents = event.agents;
           });
+        if (event.type === "agent-colors-changed")
+          setState((draft) => {
+            draft.agentColors = event.agents;
+          });
         if (event.type === "sidebar-pins-changed")
           preferences.receiveServerPins(pinScope(), { items: event.items, updatedAt: event.updatedAt });
         // A read loads only the open conversation, so the events of other agents do not start one.
@@ -740,12 +749,16 @@ export function createWebWorkspace(
       loadAvatars();
     },
   );
-  const shownAgents = createMemo(() =>
-    state.agents.map((agent) => {
+  const shownAgents = createMemo(() => {
+    const colors = new Map(state.agentColors.map((entry) => [entry.agentId, entry.color]));
+    return state.agents.map((agent) => {
       const avatar = avatars().get(agent.id);
-      return avatar && avatar.source === agent.avatarUrl ? { ...agent, avatarUrl: avatar.url } : agent;
-    }),
-  );
+      const { avatarColor: _avatarColor, ...shown } =
+        avatar && avatar.source === agent.avatarUrl ? { ...agent, avatarUrl: avatar.url } : agent;
+      const color = colors.get(agent.id);
+      return color ? { ...shown, avatarColor: color } : shown;
+    });
+  });
   // A frame agent's last message is not known: its row shows no preview, not "No messages yet".
   const profiles = createMemo(() =>
     shownAgents().map((agent) => {
@@ -795,6 +808,12 @@ export function createWebWorkspace(
   async function readUserHiddenAgents(capabilities: readonly string[]): Promise<HiddenAgent[]> {
     const read = runtime.listHiddenAgents;
     if (!capabilities.includes(AGENT_HIDDEN_CAPABILITY) || !read) return [];
+    return (await read()).agents;
+  }
+  /** A host without `agent-colors-v1` has no exact colours. */
+  async function readAgentColors(capabilities: readonly string[]): Promise<AgentColorEntry[]> {
+    const read = runtime.listAgentColors;
+    if (!capabilities.includes(AGENT_COLORS_CAPABILITY) || !read) return [];
     return (await read()).agents;
   }
   function reconcileAgents(agents: ClientAgentSummary[]): void {
@@ -873,6 +892,7 @@ export function createWebWorkspace(
             draft.browserControlState = { sessions: [] };
             draft.sidebarLayout = defaultSidebarLayout();
             draft.userHiddenAgents = [];
+            draft.agentColors = [];
             draft.duplicatingAgentIds = [];
             draft.capabilities = [];
             draft.status = "offline";
@@ -989,6 +1009,7 @@ export function createWebWorkspace(
       draft.browserControlState = { sessions: [] };
       draft.sidebarLayout = defaultSidebarLayout();
       draft.userHiddenAgents = [];
+      draft.agentColors = [];
       draft.capabilities = [];
       draft.presence = null;
       draft.duplicatingAgentIds = [];
@@ -1111,6 +1132,7 @@ export function createWebWorkspace(
         draft.activeBrowserTabId = null;
         draft.sidebarLayout = defaultSidebarLayout();
         draft.userHiddenAgents = [];
+        draft.agentColors = [];
         draft.duplicatingAgentIds = [];
         draft.capabilities = [];
         draft.presence = null;
@@ -1331,6 +1353,15 @@ export function createWebWorkspace(
             });
         })
         .catch(failed),
+      // The colours are not a panel. If the read fails, the agents keep their nearest hue.
+      readAgentColors(capabilities)
+        .then((colors) => {
+          if (isCurrent())
+            setState((draft) => {
+              draft.agentColors = colors;
+            });
+        })
+        .catch(() => undefined),
     ]);
     if (isCurrent())
       setState((draft) => {
@@ -1524,7 +1555,7 @@ export function createWebWorkspace(
     const current = generation;
     try {
       // A hide on another device can land while this tab is offline, and the event is then lost.
-      const [{ agents, sidebarLayout }, userHiddenAgents] = await Promise.all([
+      const [{ agents, sidebarLayout }, userHiddenAgents, agentColors] = await Promise.all([
         // The layout read needs the agent ids.
         runtime.listAgents().then(async (agents) => ({
           agents,
@@ -1534,6 +1565,8 @@ export function createWebWorkspace(
           ),
         })),
         readUserHiddenAgents(state.capabilities),
+        // A failed colour read keeps the colours that this tab has.
+        readAgentColors(state.capabilities).catch(() => state.agentColors),
       ]);
       if (disposed || current !== generation) return;
       syncedAt = Date.now();
@@ -1541,6 +1574,7 @@ export function createWebWorkspace(
       setState((draft) => {
         if (sidebarLayout.revision >= draft.sidebarLayout.revision) draft.sidebarLayout = sidebarLayout;
         draft.userHiddenAgents = userHiddenAgents;
+        draft.agentColors = agentColors;
       });
       for (const agent of agents) loadQueue(agent.id);
       if (!selectedId && agents[0]) await select(agents[0].id);
@@ -1797,6 +1831,27 @@ export function createWebWorkspace(
     },
     markRead,
     markAllRead,
+    /**
+     * Deletes one message of an agent's chat on the connected host, and removes it from the loaded
+     * page at once. A reply that quotes it shows the original as deleted. A failure throws to the
+     * dialog that asked.
+     */
+    async deleteMessage(agentId: string, messageId: string): Promise<void> {
+      const remove = runtime.deleteMessage;
+      if (state.status !== "online" || !remove || !state.capabilities.includes(MESSAGE_DELETE_CAPABILITY))
+        throw new Error(currentText().t("error.team.messageDeleteUnsupported"));
+      const current = generation;
+      await remove({ kind: "agent", agentId, messageId });
+      if (disposed || current !== generation) return;
+      setState((draft) => {
+        const item = draft.conversations[agentId];
+        const page = item?.page;
+        if (!item || !page) return;
+        page.messages = page.messages.filter((message) => message.id !== messageId);
+        delete page.references[messageId];
+        item.missingReferences = { ...item.missingReferences, [messageId]: true };
+      });
+    },
     async mutateSidebarLayout(action: SidebarLayoutAction) {
       if (state.status !== "online" || !state.capabilities.includes("sidebar-layout")) {
         throw new Error(currentText().t("webClient.error.sidebarLayout"));

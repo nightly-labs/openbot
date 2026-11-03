@@ -1,4 +1,4 @@
-import type { AvatarHue } from "@openbot/contracts/ipc";
+import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Mic from "lucide-react-native/icons/mic";
@@ -32,11 +32,14 @@ export function VoiceAgentAvatar({
   serverId,
   seed,
   hue,
+  color,
 }: {
   agentId: string;
   serverId: string;
   seed: string;
   hue: AvatarHue | null;
+  /** The agent's `avatarColor`. It wins over `hue`. */
+  color: AvatarColor | null;
 }) {
   const activity = useAgentActivity(agentId);
   return (
@@ -45,6 +48,7 @@ export function VoiceAgentAvatar({
       serverId={serverId}
       seed={seed}
       hue={hue}
+      color={color}
       size={VOICE_BAR_AVATAR_SIZE}
       mood={agentActivityMood(activity)}
       transition="pop"
