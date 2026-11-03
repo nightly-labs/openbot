@@ -193,9 +193,9 @@ When no agents have loaded and the selected server is connecting or offline, the
 `Waiting for connection`. The empty-server prompt appears only once the server is online; agents
 already loaded remain visible during reconnection.
 
-The phone keeps an encrypted copy of the agents, hidden agents, sections and latest chat pages of
-each server (`workspace-cache.ts`), and writes it when a server load ends and when the app goes to
-the background. After a start, a server shows its copy at once, and its first connection attempt is
+The phone keeps an encrypted copy of the agents, hidden agents, sections, latest chat pages and last
+drawer values (`drawer-snapshot.ts`) of each server (`workspace-cache.ts`), and writes it when a
+server load ends and when the app goes to the background. After a start, a server shows its copy at once, and its first connection attempt is
 quiet for 5 seconds, as a return to the app is. The UI does not mark the copy: a server that takes
 longer shows the usual reconnect status and faded avatars. Its own reads then replace the copy.
 Sign-out, an expired session and the removal of a server delete it.
