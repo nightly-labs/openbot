@@ -111,6 +111,8 @@ interface Sent {
   jid: string;
   content: AnyMessageContent;
   id: string;
+  /** The id of the message that the post quotes. */
+  quotedId: string | null;
 }
 
 /** One Baileys socket as OpenBot sees it. The phone drives it from the steps. */
@@ -184,7 +186,7 @@ class FakeSocket implements WhatsAppSocket {
   async sendMessage(jid: string, content: AnyMessageContent, options?: MiscMessageGenerationOptions) {
     if (this.ended) throw new Error("socket closed");
     const id = options?.messageId ?? `SENT${this.#phone.sent.length}`;
-    this.#phone.sent.push({ jid, content, id });
+    this.#phone.sent.push({ jid, content, id, quotedId: options?.quoted?.key.id ?? null });
     const text = "text" in content && typeof content.text === "string" ? content.text : "";
     const message: WAMessage = {
       key: { remoteJid: jid, id, fromMe: true },
@@ -542,6 +544,11 @@ try {
         () => phone.textsTo(OWNER_JID).some((text) => text.includes("No agent can answer here yet")),
         "the answer to the message that came before the transport listened",
       );
+      // In "Message yourself", an answer quotes the message it answers, so it reads as a reply.
+      const answer = phone.sent.find(
+        (sent) => sent.jid === OWNER_JID && "text" in sent.content && sent.content.text.includes("No agent can answer"),
+      );
+      assert.equal(answer?.quotedId, early.key.id, "The answer in the owner's own chat does not quote the message.");
       assert.equal(live.platform, "whatsapp");
       assert.ok(existsSync(storeFile(agents)), "The connection has no store file.");
       const account = messaging.whatsappOverview().accounts[0];

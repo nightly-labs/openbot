@@ -130,7 +130,8 @@ export async function whatsAppInbound(
   const threadKey = !isGroup ? WHATSAPP_DIRECT_THREAD : (quotedThread ?? id);
   const target: MessageTarget = {
     platformChannelId: chatJid,
-    replyThreadId: isGroup ? `${threadKey}:${id}` : null,
+    // In "Message yourself", every bubble is the owner's: an answer quotes its message, so it reads as a reply.
+    replyThreadId: isGroup ? `${threadKey}:${id}` : isSelfChat ? `${WHATSAPP_DIRECT_THREAD}:${id}` : null,
   };
 
   // A numbered answer to an approval menu: the quoted menu, or the newest one of the conversation.
