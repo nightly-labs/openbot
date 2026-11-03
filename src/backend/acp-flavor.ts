@@ -134,20 +134,24 @@ export interface AcpFlavor {
 }
 
 /**
- * Chisel, the Grok agent, answers `session/load` for a session that is not in its store with
- * JSON-RPC `-32016` and the message `Session not found`. The session id is in the agent's log.
- * This check runs only for the session of the request. `data` that names another session does not
- * match. Any other code uses the protocol's `-32002` rule.
+ * Chisel answers `session/load` for a session that is not in its store with JSON-RPC `-32016` and
+ * the message `Session not found`. The same agent writes `session <id> not found in store` to its
+ * log. This check runs only for the session of the request. `data` that names another session does
+ * not match. Any other code uses the protocol's `-32002` rule.
+ *
+ * Grok uses this flavor. A custom agent built on the same server, such as Devin ACP, uses it too.
  */
+function chiselSessionNotFound(error: RequestError, sessionId: string): boolean | null {
+  if (error.code !== -32016) return null;
+  if (isRecord(error.data)) {
+    const named = error.data.sessionId ?? error.data.uri;
+    if (typeof named === "string") return named === sessionId || named === `session ${sessionId}`;
+  }
+  return error.message === "Session not found" || error.message.includes(sessionId);
+}
+
 export const GROK_ACP_FLAVOR: AcpFlavor = {
-  sessionNotFound: (error, sessionId) => {
-    if (error.code !== -32016) return null;
-    if (isRecord(error.data)) {
-      const named = error.data.sessionId ?? error.data.uri;
-      if (typeof named === "string") return named === sessionId || named === `session ${sessionId}`;
-    }
-    return error.message === "Session not found" || error.message.includes(sessionId);
-  },
+  sessionNotFound: chiselSessionNotFound,
 };
 
 /** The protocol's own behavior: Cline. */
@@ -219,10 +223,16 @@ function ompSessionNotFound(error: RequestError, sessionId: string): boolean | n
 const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound };
 
 /**
- * A custom agent without a flavor of its own. It keeps omp's rule: the rule needs the exact session
- * ID, and an agent can reuse omp's error text.
+ * A custom agent without a flavor of its own. It keeps omp's rule and Chisel's rule. Each rule needs
+ * the exact session, and an agent can reuse that error text. Devin ACP is one of these agents.
  */
-const CUSTOM_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound };
+function customSessionNotFound(error: RequestError, sessionId: string): boolean | null {
+  const omp = ompSessionNotFound(error, sessionId);
+  if (omp !== null) return omp;
+  return chiselSessionNotFound(error, sessionId);
+}
+
+const CUSTOM_ACP_FLAVOR: AcpFlavor = { sessionNotFound: customSessionNotFound };
 
 const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = { omp: OMP_ACP_FLAVOR };
 

@@ -46,6 +46,12 @@ const logger = createOpenBotLogger("drain-scheduler");
 const CHANNEL_START_FAILED = sourceText("error.backend.channelAssignmentStartFailed");
 /** How long messages wait for their turn after the provider did not confirm `turn/start` in time. */
 const TURN_START_GRACE_MS = 5 * 60_000;
+/**
+ * How long a delivery may stay `starting` with no turn id. A session resume that never answers, or
+ * a start that never reaches `turn/start`, used to hold the team queue with no error. This is longer
+ * than one request and shorter than the longest learned CLI start, so a slow open can still finish.
+ */
+const STARTING_WITHOUT_TURN_MS = 120_000;
 
 export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
@@ -140,6 +146,11 @@ export interface DrainSchedulerOptions {
   hooks: DrainHooks;
   channels?: ChannelService;
   messaging?: MessagingThreads;
+  /**
+   * How long a delivery may stay `starting` with no turn id. Tests set a short value. Omitted, the
+   * delivery is interrupted after {@link STARTING_WITHOUT_TURN_MS}.
+   */
+  startingWithoutTurnMs?: number;
 }
 
 /**
@@ -202,6 +213,7 @@ export class DrainScheduler {
   readonly #startingDeliveries = new Map<AgentProvider, number>();
   readonly #scheduledDrains = new Set<string>();
   readonly #drainTasks = new Map<string, Deferred.Deferred<void, DeliveryStartFailed>>();
+  readonly #startingWithoutTurnMs: number;
 
   constructor(options: DrainSchedulerOptions) {
     this.#store = options.store;
@@ -221,6 +233,7 @@ export class DrainScheduler {
     this.#hooks = options.hooks;
     this.#channels = options.channels;
     this.#messaging = options.messaging;
+    this.#startingWithoutTurnMs = options.startingWithoutTurnMs ?? STARTING_WITHOUT_TURN_MS;
     this.#slots = new TurnSlots({
       limit: () => this.#memory.turnLimit(),
       lanes: () =>
@@ -668,6 +681,14 @@ export class DrainScheduler {
     yield* Effect.gen({ self: this }, function* () {
       for (const item of batch) yield* this.#mailbox.markStarting(item.delivery.id).pipe(toDeliveryStartFailed);
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+      // The start below can wait on a session that never answers. This limit ends the row anyway.
+      // It does not release the turn reservation: the start that is still in this function does.
+      const startingIds = batch.map((item) => item.delivery.id);
+      yield* Effect.forkDetach(
+        this.#settleUnstarted(delivery.recipientAgentId, startingIds, () => {}, null).pipe(
+          Effect.delay(this.#startingWithoutTurnMs),
+        ),
+      );
       yield* this.#mailbox.verifyDeliveryAttachments(delivery.id).pipe(toDeliveryStartFailed);
       // An answer whose attachment changed fails alone. The message that starts the turn still runs.
       const failedCompanions = new Set<string>();
@@ -825,6 +846,15 @@ export class DrainScheduler {
         });
       }
       this.#conversation.emitConversation(snapshot);
+
+      // The limit above can have ended these rows while the session was opening. Do not send a prompt
+      // for a delivery that is no longer starting.
+      const awaitingTurn = () =>
+        batch.some((item) => {
+          const current = this.#mailbox.getDelivery(item.delivery.id)?.delivery;
+          return current?.status === "starting" && !current.turnId;
+        });
+      if (!awaitingTurn()) return;
 
       const startTurn = (providerThreadId: string) =>
         Effect.gen({ self: this }, function* () {

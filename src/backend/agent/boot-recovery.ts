@@ -42,6 +42,12 @@ export interface BootRecoveryOptions {
   mailboxSync: MailboxSync;
   threads: ThreadLifecycle;
   hooks: BootRecoveryHooks;
+  /**
+   * How long one provider history read may take while a restart settles a delivery. A read that
+   * does not answer is the same as a read that failed: the delivery is interrupted, and the next
+   * delivery of this pass is not left `starting`.
+   */
+  historyTimeoutMs?: number;
 }
 
 /**
@@ -83,6 +89,8 @@ export class BootRecovery {
    * process has no rollout for.
    */
   readonly #unreadableHistory = new Set<string>();
+  /** A hung history read must not keep the rest of this restart pass in `starting`. */
+  readonly #historyTimeoutMs: number;
 
   constructor(options: BootRecoveryOptions) {
     this.#store = options.store;
@@ -92,6 +100,7 @@ export class BootRecovery {
     this.#mailboxSync = options.mailboxSync;
     this.#threads = options.threads;
     this.#hooks = options.hooks;
+    this.#historyTimeoutMs = options.historyTimeoutMs ?? 30_000;
   }
 
   private threads() {
@@ -223,6 +232,11 @@ export class BootRecovery {
               }),
           )
           .pipe(
+            Effect.timeoutOrElse({
+              duration: this.#historyTimeoutMs,
+              orElse: () =>
+                Effect.fail(new BootRecoveryFailed({ cause: new Error("provider history read timed out") })),
+            }),
             Effect.tapError((failure) =>
               Effect.sync(() => {
                 if (unreadableHistory(failure)) this.#unreadableHistory.add(historyKey);

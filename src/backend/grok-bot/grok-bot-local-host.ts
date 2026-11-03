@@ -20,10 +20,10 @@ import { buildGrokBotVncProxy } from "./grok-bot-computer";
 
 export const OPENBOT_LOCAL_GATEWAY_URL = "http://127.0.0.1:1340";
 export const OPENBOT_LOCAL_VM_CONTAINER = "openbot-local-vm";
-export const OPENBOT_LOCAL_VM_OWNER_LABEL = "app.openbot.desktop.local-vm=1";
+const OPENBOT_LOCAL_VM_OWNER_LABEL = "app.openbot.desktop.local-vm=1";
 export const OPENBOT_LOCAL_VM_IMAGE = "public.ecr.aws/k0i0n2g5/cursorenvironments/universal:sand-box-latest";
-export const OPENBOT_LOCAL_VM_WORKSPACE_VOLUME = "openbot-local-vm-workspace";
-export const OPENBOT_LOCAL_VM_DATA_VOLUME = "openbot-local-vm-data";
+const OPENBOT_LOCAL_VM_WORKSPACE_VOLUME = "openbot-local-vm-workspace";
+const OPENBOT_LOCAL_VM_DATA_VOLUME = "openbot-local-vm-data";
 
 const TOKEN_FILE = "openbot-local-vm.json";
 const ENV_FILE = "openbot-local-vm.env";

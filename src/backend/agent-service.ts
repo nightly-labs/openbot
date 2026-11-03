@@ -289,6 +289,11 @@ export interface AgentServiceOptions {
   browser: AgentBrowserHost;
   requestTimeoutMs?: number;
   /**
+   * How long a delivery may stay `starting` with no turn id. Tests set a short value. Omitted, the
+   * drain uses its own limit.
+   */
+  startingWithoutTurnMs?: number;
+  /**
    * How long a provider takes to start a context compaction before OpenBot stops it. A started
    * compaction runs ten times as long. Tests make it short.
    */
@@ -506,6 +511,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mailbox,
       browser,
       requestTimeoutMs = 30_000,
+      startingWithoutTurnMs,
       preferredProvider = "codex",
       preferredModel = null,
       clientFactory = null,
@@ -1083,6 +1089,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       mailboxSync: this.#mailboxSync,
       threads: this.#threads,
+      historyTimeoutMs: requestTimeoutMs,
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         // A deleted routine takes its runs with it, so a run without a record counts as quiet:
@@ -1306,6 +1313,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.#drain = new DrainScheduler({
       channels: this.channels,
+      ...(startingWithoutTurnMs === undefined ? {} : { startingWithoutTurnMs }),
       messaging: this.messaging,
       store,
       mailbox,

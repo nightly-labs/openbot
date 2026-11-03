@@ -516,6 +516,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --import tsx scripts/channel-session-visibility-e2e.ts
 
+      - name: Run ACP stuck starting delivery E2E
+        if: ${{ !cancelled() }}
+        run: bun scripts/acp-stuck-starting-e2e.ts
+
       - name: Run the Cursor deep login E2E test
         if: ${{ !cancelled() }}
         run: bun run test:cursor-deep-login

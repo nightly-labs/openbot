@@ -517,6 +517,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     Deferred.Deferred<{ thread: { id: string } }, ProviderClientOperationError>
   >();
   /**
+   * Settles when the agent logs that this session is gone from its store. A resume that never
+   * answers still has to open a new session, or the delivery that asked stays `starting`.
+   */
+  readonly #absentSessions = new Map<string, Deferred.Deferred<void>>();
+  /**
    * The own processes of sessions that are still opening. No thread holds them yet, so a stop must
    * end them here: a Gemini process with a refused token waits five minutes for a browser sign-in,
    * and then deletes the saved token.
@@ -599,6 +604,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const failedSession = this.options.flavor.sdkHarness?.failedSession(message);
         const failedTurn = failedSession ? this.#threads.get(failedSession)?.activeTurn : undefined;
         if (failedTurn && failedTurn.sdkFailureAt === null) failedTurn.sdkFailureAt = failedTurn.text.length;
+        this.#noteAbsentSession(message);
         this.emit("diagnostic", message, origin);
       },
       exit,
@@ -983,10 +989,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         sessionId &&
         (method === "turn/start" || method === "thread/resume") &&
         !this.#threads.get(sessionId)?.activeTurn &&
-        isSessionNotFound(error, sessionId, this.#flavor)
+        (error instanceof MissingAcpSessionError || isSessionNotFound(error, sessionId, this.#flavor))
       ) {
         // No prompt was sent. Drop the stale handle so the queue can load or replace the session.
         this.#forgetMissingSession(sessionId);
+        if (error instanceof MissingAcpSessionError) return yield* providerFailure(error);
         return yield* providerFailure(new MissingAcpSessionError(`ACP session not found: ${sessionId}`, error));
       }
       if (
@@ -1729,47 +1736,81 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     let failure: unknown;
     let recovery: "wait-for-start" | "list-sessions" | null = null;
     let restored: LoadSessionResponse | ResumeSessionResponse | undefined;
+    const absent = Deferred.makeUnsafe<void>();
+    this.#absentSessions.set(request.sessionId, absent);
+    const missing = new MissingAcpSessionError(
+      `ACP session not found: ${request.sessionId}`,
+      "session not found in store",
+    );
     try {
-      restored = providerResult(yield* Effect.result(providerSync(connection).pipe(Effect.flatMap(restore))));
-    } catch (error) {
-      // For `thread/resume` and `turn/start`, `request` forgets the session and converts this response.
-      if (method === "load" && isSessionNotFound(error, request.sessionId, this.#flavor)) {
-        return yield* providerFailure(new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, error));
-      }
-      recovery = this.#flavor.restoreFailure?.(error, method) ?? null;
-      if (!recovery) return yield* providerFailure(error);
-      failure = error;
-    }
-    if (restored) {
-      if (method === "load" && this.#flavor.loadInsteadOfResume?.missing(restored))
-        return yield* providerFailure(
-          new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, "empty session/load reply"),
+      try {
+        restored = providerResult(
+          yield* Effect.result(
+            Effect.raceFirst(
+              providerSync(connection).pipe(Effect.flatMap(restore), Effect.interruptible),
+              Deferred.await(absent).pipe(Effect.andThen(Effect.fail(providerFailure(missing)))),
+            ),
+          ),
         );
-      return restored;
-    }
-    if (recovery === "wait-for-start") {
-      yield* Effect.sleep(RESTORE_START_RETRY_MS);
-      // The process can have stopped during the wait; this reports that instead of a closed stream.
-      const current = yield* providerSync(connection);
-      return yield* restore(current);
-    }
-    const listing = yield* this.#sessionListingEffect(yield* providerSync(connection), request);
-    if (listing === "absent")
-      return yield* providerFailure(
-        new MissingAcpSessionError(
-          `OpenCode session not found: ${request.sessionId} (OpenCode service failure)`,
-          failure,
-        ),
-      );
-    yield* Effect.sleep(RESTORE_LIST_RETRY_MS);
-    try {
-      // The process can have stopped during the wait; this reports that instead of a closed stream.
-      return providerResult(yield* Effect.result(providerSync(connection).pipe(Effect.flatMap(restore))));
-    } catch (error) {
-      if (this.#flavor.restoreFailure?.(error, method) !== "list-sessions") return yield* providerFailure(error);
-      return yield* providerFailure(new Error(sourceText("error.provider.opencodeServiceFailure"), { cause: error }));
+      } catch (error) {
+        // `request` forgets the in-memory session for `thread/resume` and `turn/start`.
+        if (error instanceof MissingAcpSessionError || isSessionNotFound(error, request.sessionId, this.#flavor)) {
+          return yield* providerFailure(
+            error instanceof MissingAcpSessionError
+              ? error
+              : new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, error),
+          );
+        }
+        recovery = this.#flavor.restoreFailure?.(error, method) ?? null;
+        if (!recovery) return yield* providerFailure(error);
+        failure = error;
+      }
+      if (restored) {
+        if (method === "load" && this.#flavor.loadInsteadOfResume?.missing(restored))
+          return yield* providerFailure(
+            new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, "empty session/load reply"),
+          );
+        return restored;
+      }
+      if (recovery === "wait-for-start") {
+        yield* Effect.sleep(RESTORE_START_RETRY_MS);
+        // The process can have stopped during the wait; this reports that instead of a closed stream.
+        const current = yield* providerSync(connection);
+        return yield* restore(current);
+      }
+      const listing = yield* this.#sessionListingEffect(yield* providerSync(connection), request);
+      if (listing === "absent")
+        return yield* providerFailure(
+          new MissingAcpSessionError(
+            `OpenCode session not found: ${request.sessionId} (OpenCode service failure)`,
+            failure,
+          ),
+        );
+      yield* Effect.sleep(RESTORE_LIST_RETRY_MS);
+      try {
+        // The process can have stopped during the wait; this reports that instead of a closed stream.
+        return providerResult(yield* Effect.result(providerSync(connection).pipe(Effect.flatMap(restore))));
+      } catch (error) {
+        if (this.#flavor.restoreFailure?.(error, method) !== "list-sessions") return yield* providerFailure(error);
+        return yield* providerFailure(new Error(sourceText("error.provider.opencodeServiceFailure"), { cause: error }));
+      }
+    } finally {
+      if (this.#absentSessions.get(request.sessionId) === absent) this.#absentSessions.delete(request.sessionId);
     }
   });
+
+  /**
+   * The agent wrote that this session is not in its store. The resume that is waiting on that
+   * session ends, and the caller opens a new one. A line that names another session does not match.
+   */
+  #noteAbsentSession(message: string): void {
+    const named = /session\s+(\S+)\s+not found in store/i.exec(message);
+    const sessionId = named?.[1];
+    if (!sessionId) return;
+    const waiting = this.#absentSessions.get(sessionId);
+    if (!waiting) return;
+    Deferred.doneUnsafe(waiting, Exit.void);
+  }
 
   /** Queue one replay fragment without retaining the provider transcript in this client. */
   #enqueueHistoryFragment(replay: HistoryReplay, fragment: ProviderHistoryFragment): void {
@@ -3344,11 +3385,23 @@ function startsBackgroundTask(rawOutput: unknown): boolean {
   return metadata?.status === "running" && isString(metadata.sessionID);
 }
 
+/**
+ * The agent's log line `session <id> not found in store`, when the RPC error carries the same text.
+ * A line that names another session is not this request.
+ */
+function absentStoreSession(error: RequestError, sessionId: string): boolean {
+  const detail = failureDetail(error);
+  const text = detail && !error.message.includes(detail) ? `${error.message}\n${detail}` : error.message;
+  const named = /session\s+(\S+)\s+not found in store/i.exec(text);
+  return named?.[1] === sessionId;
+}
+
 /** A missing session, identified by the agent's flavor or by the protocol's `-32002` error. */
 function isSessionNotFound(error: unknown, sessionId: string, flavor: AcpFlavor): boolean {
   if (!(error instanceof RequestError)) return false;
   const flavored = flavor.sessionNotFound?.(error, sessionId) ?? null;
-  if (flavored !== null) return flavored;
+  if (flavored === true || absentStoreSession(error, sessionId)) return true;
+  if (flavored === false) return false;
   if (error.code !== -32002) return false;
   if (isRecord(error.data)) {
     const named = error.data.sessionId ?? error.data.uri;
