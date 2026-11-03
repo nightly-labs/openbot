@@ -317,6 +317,7 @@ import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
+import { THEME_PALETTE_DIRECTORY } from "./theme-palette-files";
 import { TraceFile } from "./trace-file";
 import { readUpdatePreference, writeUpdatePreference } from "./update-preference-store";
 import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
@@ -438,6 +439,7 @@ const TEARDOWN_ORDER = {
   computerUsePermissionHelp: 19,
   dynamicIsland: 20,
   machineAlerts: 21,
+  themePalettes: 22,
   // Before the browser, so no sign-in opens a tab while it stops.
   providerAccountsHost: 27,
   providerHostSignIns: 28,
@@ -1203,9 +1205,15 @@ export async function createApplicationServices({
   // Before the renderer loads, so the window background takes the saved colors.
   const appearance = new AppearanceService({
     path: join(app.getPath("userData"), APPEARANCE_PREFERENCE_FILE),
+    paletteDirectory: join(app.getPath("userData"), THEME_PALETTE_DIRECTORY),
     supportsTransparentWindow: process.platform === "darwin",
   });
   await runCauseEffect(appearance.load());
+  teardown.push(
+    TEARDOWN_ORDER.themePalettes,
+    "the theme palette watch",
+    await Effect.runPromise(appearance.followPalettes()),
+  );
   // Before the renderer loads, so its first navigation applies the saved size.
   const interfaceSize = new InterfaceSizeService({
     path: join(app.getPath("userData"), INTERFACE_SIZE_PREFERENCE_FILE),

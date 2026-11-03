@@ -475,6 +475,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let appearancePreference: AppAppearancePreference = {
     appearance: DEFAULT_APP_APPEARANCE,
     transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
+    palette: null,
+    palettes: [],
   };
   const appearanceListeners = new Set<(preference: AppAppearancePreference) => void>();
   let interfaceSizePreference: AppInterfaceSizePreference = { percent: DEFAULT_APP_INTERFACE_SIZE };
