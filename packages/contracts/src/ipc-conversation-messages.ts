@@ -1,7 +1,12 @@
 import emojiRegex from "emoji-regex";
 
 import { INPUT_LIMITS } from "./input-limits";
-import { type AgentInstructionsChange, isAgentInstructionsChange } from "./ipc-agent-instructions";
+import {
+  type AgentInstructionsChange,
+  type AgentRuleProposal,
+  isAgentInstructionsChange,
+  isAgentRuleProposal,
+} from "./ipc-agent-instructions";
 import { type AttachmentSummary, isAttachmentSummary } from "./ipc-attachments";
 import { isBoundedString, isIdentifier, isRequestId } from "./ipc-bounded-values";
 import { type ConversationMemoryChange, isConversationMemoryChanges } from "./ipc-conversation-memory-changes";
@@ -235,6 +240,8 @@ export interface ConversationMessage {
   memoryChanges?: ConversationMemoryChange[] | undefined;
   /** Set on an `instructions-change` message. */
   instructionsChange?: AgentInstructionsChange | undefined;
+  /** Set on a `rule-proposal` message. */
+  ruleProposal?: AgentRuleProposal | undefined;
   /**
    * An interactive block from `ask_ui` (see `ui-blocks.ts`). It rides on a `question_prompt` message
    * beside `questionPrompt`. Absent on a message from an older host.
@@ -292,6 +299,7 @@ export function isConversationMessage(value: unknown): value is ConversationMess
     (value.subagents === undefined || isConversationSubagents(value.subagents)) &&
     (value.memoryChanges === undefined || isConversationMemoryChanges(value.memoryChanges)) &&
     (value.instructionsChange === undefined || isAgentInstructionsChange(value.instructionsChange)) &&
+    (value.ruleProposal === undefined || isAgentRuleProposal(value.ruleProposal)) &&
     (value.uiBlock === undefined || isConversationUiBlock(value.uiBlock)) &&
     (value.trace === undefined || isConversationTurnTrace(value.trace))
   );

@@ -70,6 +70,7 @@ export const messages = defineMessages("error.team", {
   "error.team.sidebarPinsUnsupported":
     "This server cannot keep your pinned chats for all of your devices. Update OpenBot on the computer that runs it.",
   "error.team.agentInstructionsUnsupported": "Editing agent instructions is not supported by this connection.",
+  "error.team.ruleProposalsUnsupported": "Suggested rules are not supported by this connection.",
   "error.team.agentPublishUnsupported": "Publishing agents is not supported by this connection.",
   "error.team.agentUpdateUnsupported": "Updating agents is not supported by this connection.",
   "error.team.contextResetUnsupported": "Starting a new chat is not supported by this connection.",

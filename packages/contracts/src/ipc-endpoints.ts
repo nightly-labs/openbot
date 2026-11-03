@@ -77,7 +77,11 @@ import type {
   AgentImportSkillSource,
   ApplyAgentImportInput,
 } from "./ipc-agent-import";
-import type { AgentInstructionsFile, SaveAgentInstructionsInput } from "./ipc-agent-instructions";
+import type {
+  AgentInstructionsFile,
+  DecideRuleProposalInput,
+  SaveAgentInstructionsInput,
+} from "./ipc-agent-instructions";
 import type {
   AgentMemory,
   AgentMemoryLimitPreference,
@@ -1499,6 +1503,8 @@ export const IPC_ENDPOINTS = {
     updateMemory: scopedRequest<UpdateAgentMemoryInput, AgentMemory>()("agent:update-memory"),
     deleteMemory: scopedRequest<DeleteAgentMemoryInput, void>()("agent:delete-memory"),
     clearMemories: scopedRequest<string, void>()("agent:clear-memories"),
+    // Accepts or dismisses a rule that the memory review suggested. Only for an agent on this computer.
+    decideRuleProposal: scopedRequest<DecideRuleProposalInput, void>()("agent:decide-rule-proposal"),
   },
   sharedTables: {
     // Shared tables are not scoped to an agent: there is no `agentId` on either call. The list is

@@ -51,6 +51,7 @@ export const messages = {
   "status.agent.agentResponseReviewing": "正在查看另一个助手的回复…",
   "status.agent.toolStepWorking": "正在处理下一个工具步骤…",
   "status.agent.memoryChanges": "记忆：已保存 {saved} 条，已更新 {updated} 条，已忘记 {forgotten} 条。",
+  "status.agent.ruleProposal": "建议的规则：{rule}",
   "status.agent.memoryChangesWithConflicts":
     "记忆：已保存 {saved} 条，已更新 {updated} 条，已忘记 {forgotten} 条，{notChanged} 条因另一个话题先更改而未更改。",
   "status.agent.mcpServerAdd":

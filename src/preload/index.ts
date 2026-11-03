@@ -1130,6 +1130,7 @@ const openbotApi: OpenBotDesktopApi = {
       updateMemory: decodeMemory,
       deleteMemory: decodeVoid,
       clearMemories: decodeVoid,
+      decideRuleProposal: decodeVoid,
     }),
     ...bridgeGroup(IPC_ENDPOINTS.sharedTables, {
       listTables: decodeTables,

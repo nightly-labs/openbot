@@ -16,6 +16,7 @@ import { MemoryReviewResult, memoryReviewPrompt } from "./memory-review-prompt";
 import type { ProfileClients } from "./profile-clients";
 import { type GenerationObserver, GenerationUsageLimitError, generateTextWithoutTools } from "./profile-generation";
 import type { ProviderOperationFailed } from "./provider-runtime";
+import { ruleKey, ruleProposalMessage } from "./rule-proposal-message";
 import { inputPrice } from "./usage-pricing";
 
 const logger = createOpenBotLogger("memory-review");
@@ -64,6 +65,8 @@ export interface MemoryReviewOptions {
   /** Whether a turn of the conversation runs and holds its cached snapshot. */
   turnActive(agentId: string, threadId: string | null): boolean;
   appendSystemMessage(agentId: string, threadId: string | null, message: ConversationMessage): void;
+  /** The learned rules in the agent's instruction file. A review does not suggest them again. */
+  learnedRules(agent: AgentSummary): Effect.Effect<readonly string[], unknown>;
   redact(text: string): string;
   stopping(): boolean;
   /** The pause before an early review. Omitted, `MEMORY_REVIEW_IDLE_MS`. */
@@ -81,10 +84,10 @@ interface ReviewedConversation {
   readonly agentId: string;
   readonly threadId: string | null;
   turns: number;
-  /** The last message that a review read, or that the agent's own memory change made old. */
+  /** The last message that a review read. */
   cursor: string | null;
-  /** A review's line that waits for the running turn to end, so the turn does not write over it. */
-  heldLine: ConversationMessage | null;
+  /** A review's lines that wait for the running turn to end, so the turn does not write over them. */
+  heldLines: ConversationMessage[];
   idle: Fiber.Fiber<void> | null;
   /** A review was due while another review ran or no profile client was free: it runs next. */
   waiting: boolean;
@@ -95,6 +98,8 @@ interface ReviewedConversation {
  * own chat or side thread, after a pause in it, when the chat is cleared and when a side thread
  * closes, one generation without tools reads the new part of the conversation and the agent's
  * memories, and proposes changes that `AgentMemories` applies with the checks of the memory tools.
+ * The same generation can suggest rules for the agent's instruction file: each one is a line in the
+ * agent's own chat that the user accepts or dismisses.
  * One review runs at a time, and only when a profile client stays free for the user. A review that
  * cannot start waits, and starts when the running review ends or at the next turn. The counts live
  * in memory only.
@@ -114,7 +119,7 @@ export class MemoryReview {
   /**
    * A turn of the agent's own chat (`threadId` null) or of its side thread ended. A completed turn
    * that counts brings the next review closer. A turn in which the agent changed its memories itself
-   * starts the count again.
+   * starts the count again, and the next review still reads it.
    */
   readonly turnEnded = Effect.fn("MemoryReview.turnEnded")(function* (
     this: MemoryReview,
@@ -127,11 +132,9 @@ export class MemoryReview {
     yield* this.#stopIdle(conversation);
     this.#flush(conversation);
     if (counts && memoryCommitted) {
+      // The turns stay unread: a later review still learns lessons from them, often a correction that
+      // the agent saved as a memory. That review sees the saved memory and does not add it again.
       conversation.turns = 0;
-      const messages = yield* Effect.try(() => this.#options.chat(agentId, threadId)).pipe(
-        Effect.orElseSucceed(() => []),
-      );
-      this.#moveCursor(conversation, messages);
       return;
     }
     if (counts) conversation.turns += 1;
@@ -207,7 +210,7 @@ export class MemoryReview {
     const key = conversationKey(agentId, threadId);
     const known = this.#conversations.get(key);
     if (known) return known;
-    const conversation = { key, agentId, threadId, turns: 0, cursor: null, heldLine: null, idle: null, waiting: false };
+    const conversation = { key, agentId, threadId, turns: 0, cursor: null, heldLines: [], idle: null, waiting: false };
     this.#conversations.set(key, conversation);
     return conversation;
   }
@@ -318,10 +321,21 @@ export class MemoryReview {
           .filter((entry, index) => entry.memory.text !== base.memories[index]?.memory.text)
           .map((entry) => entry.memory.id),
       );
+      // Rules the user has or saw are not suggested again. A file that cannot be read has none.
+      const learned = yield* options.learnedRules(agent).pipe(Effect.orElseSucceed((): readonly string[] => []));
+      // Suggested rules always go to the agent's own chat, where the user answers them.
+      const ownChat =
+        threadId === null
+          ? messages
+          : yield* Effect.try(() => options.chat(agentId, null)).pipe(Effect.orElseSucceed(() => []));
+      const proposals = ownChat.flatMap((message) => (message.ruleProposal ? [message.ruleProposal] : []));
+      const proposed = (status: "proposed" | "dismissed") =>
+        proposals.filter((proposal) => proposal.status === status).map((proposal) => options.redact(proposal.rule));
       const prompt = memoryReviewPrompt(
         agent,
         { ...base, memories: redacted },
         excerpt.map((message) => ({ ...message, text: options.redact(message.text) })),
+        { learned: learned.map(options.redact), suggested: proposed("proposed"), dismissed: proposed("dismissed") },
       );
       const client = yield* Effect.try(() => options.createProfileClient(agent));
       const answer = yield* options.profileClients.run(client, (cancelled) =>
@@ -339,17 +353,43 @@ export class MemoryReview {
       const operations = result.operations.filter(
         (operation) => operation.type === "add" || !hidden.has(operation.memoryId),
       );
-      if (operations.length === 0 || options.stopping()) return;
+      const known = new Set([...learned, ...proposals.map((proposal) => proposal.rule)].map(ruleKey));
+      const lessons = (result.lessons ?? []).filter((lesson) => {
+        const key = ruleKey(lesson.rule);
+        if (known.has(key)) return false;
+        known.add(key);
+        return true;
+      });
+      if ((operations.length === 0 && lessons.length === 0) || options.stopping()) return;
       if (!options.listAgents().some((candidate) => candidate.id === agentId)) return;
       const turnId = `memory-review-${randomUUID()}`;
-      const changes = yield* Effect.try(() => options.memories.applyReview(agentId, base, operations, turnId));
-      const line = memoryChangesMessage(turnId, changes, options.redact);
-      if (!line) return;
-      if (options.turnActive(agentId, threadId)) conversation.heldLine = line;
-      else yield* Effect.try(() => options.appendSystemMessage(agentId, threadId, line));
+      const changes =
+        operations.length === 0
+          ? []
+          : yield* Effect.try(() => options.memories.applyReview(agentId, base, operations, turnId));
+      const memoryLine = memoryChangesMessage(turnId, changes, options.redact);
+      if (memoryLine) yield* this.#show(conversation, memoryLine);
+      const own = this.#conversation(agentId, null);
+      for (const [index, lesson] of lessons.entries()) {
+        const line = ruleProposalMessage(turnId, index, {
+          rule: options.redact(lesson.rule),
+          reason: options.redact(lesson.reason),
+        });
+        yield* this.#show(own, line);
+      }
     },
     Effect.mapError((failure) => new MemoryReviewFailed({ cause: failure })),
   ).bind(this);
+
+  /** Adds a review's line to the conversation now, or after its running turn ends. */
+  readonly #show = Effect.fn("MemoryReview.show")(function* (
+    this: MemoryReview,
+    conversation: ReviewedConversation,
+    line: ConversationMessage,
+  ) {
+    if (this.#options.turnActive(conversation.agentId, conversation.threadId)) conversation.heldLines.push(line);
+    else yield* Effect.try(() => this.#options.appendSystemMessage(conversation.agentId, conversation.threadId, line));
+  }).bind(this);
 
   #moveCursor(conversation: ReviewedConversation, messages: readonly ConversationMessage[]): void {
     const last = messages.at(-1);
@@ -357,13 +397,15 @@ export class MemoryReview {
   }
 
   #flush(conversation: ReviewedConversation): void {
-    const line = conversation.heldLine;
-    if (!line || this.#options.turnActive(conversation.agentId, conversation.threadId)) return;
-    conversation.heldLine = null;
-    try {
-      this.#options.appendSystemMessage(conversation.agentId, conversation.threadId, line);
-    } catch (error) {
-      logger.warn("Could not show the memory review's changes.", { error });
+    const lines = conversation.heldLines;
+    if (lines.length === 0 || this.#options.turnActive(conversation.agentId, conversation.threadId)) return;
+    conversation.heldLines = [];
+    for (const line of lines) {
+      try {
+        this.#options.appendSystemMessage(conversation.agentId, conversation.threadId, line);
+      } catch (error) {
+        logger.warn("Could not show the memory review's changes.", { error });
+      }
     }
   }
 }

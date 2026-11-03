@@ -1467,3 +1467,58 @@ button.chat-action-target:active,
   content: "·";
   margin-inline-end: var(--openbot-space-1);
 }
+
+/* A rule that the memory review suggests: a small card in the chat, with its answer. */
+.rule-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1-5);
+  width: min(var(--openbot-chat-marker-width), calc(100% - var(--openbot-space-6)));
+  margin: 0 auto;
+  padding: var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface-raised);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.rule-proposal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+}
+
+.rule-proposal-head svg,
+.rule-proposal-status svg,
+.rule-proposal-actions .ui-button svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.rule-proposal-rule {
+  color: var(--openbot-text-primary);
+}
+
+.rule-proposal-reason {
+  color: var(--openbot-text-secondary);
+}
+
+.rule-proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.rule-proposal-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+}
+
+.rule-proposal-error {
+  color: var(--openbot-danger-text);
+}

@@ -55,6 +55,7 @@ export const messages = {
   "status.agent.agentResponseReviewing": "Analyse de la réponse de l’autre agent…",
   "status.agent.toolStepWorking": "Traitement de l’étape assistée par outil suivante…",
   "status.agent.memoryChanges": "Souvenirs : {saved} enregistrés, {updated} mis à jour, {forgotten} oubliés.",
+  "status.agent.ruleProposal": "Règle suggérée : {rule}",
   "status.agent.memoryChangesWithConflicts":
     "Souvenirs : {saved} enregistrés, {updated} mis à jour, {forgotten} oubliés, {notChanged} non modifiés, car un autre fil les a modifiés avant.",
   "status.agent.nextStepContinues": "L’agent s’est arrêté avant l’étape suivante. Il continue ({current} sur {limit}).",

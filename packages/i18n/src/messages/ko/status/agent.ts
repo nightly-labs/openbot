@@ -53,6 +53,7 @@ export const messages = {
   "status.agent.agentResponseReviewing": "다른 에이전트의 응답을 확인하는 중…",
   "status.agent.toolStepWorking": "다음 도구 단계를 처리하는 중…",
   "status.agent.memoryChanges": "메모리: {saved}개 저장, {updated}개 업데이트, {forgotten}개 삭제.",
+  "status.agent.ruleProposal": "제안된 규칙: {rule}",
   "status.agent.memoryChangesWithConflicts":
     "메모리: {saved}개 저장, {updated}개 업데이트, {forgotten}개 삭제, {notChanged}개는 다른 스레드가 먼저 변경해서 변경 안 됨.",
   "status.agent.mcpServerAdd":

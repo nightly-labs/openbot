@@ -55,6 +55,7 @@ export const messages = {
   "status.agent.agentResponseReviewing": "Diğer ajanın yanıtı inceleniyor…",
   "status.agent.toolStepWorking": "Bir sonraki araç destekli adım işleniyor…",
   "status.agent.memoryChanges": "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu.",
+  "status.agent.ruleProposal": "Önerilen kural: {rule}",
   "status.agent.memoryChangesWithConflicts":
     "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu, {notChanged} değiştirilmedi çünkü önce başka bir mesaj dizisi değiştirdi.",
   "status.agent.nextStepContinues": "Ajan bir sonraki adımdan önce durdu. Devam ediyor ({current}/{limit}).",

@@ -795,14 +795,15 @@ export class DrainScheduler {
       const shortened = channelDelivery ? channels : messagingDelivery ? messaging : undefined;
       const delta = shortened?.delta(delivery.id);
       const deltaInput = delta ? promptInput(delta.text) : null;
-      const inputForThread = (providerThreadId: string) => {
+      const inputForThread = (providerThreadId: string, instructionsUpdate: string | undefined) => {
         const input = deltaInput && shortened?.sendsDelta(delivery.id, providerThreadId) ? deltaInput : completeInput;
-        const handoff = this.#threads.consumePendingHandoff(providerThreadId);
-        if (!handoff) return input;
+        const before = [instructionsUpdate, this.#threads.consumePendingHandoff(providerThreadId)].filter(
+          (text): text is string => Boolean(text),
+        );
+        if (before.length === 0) return input;
+        const prefix = before.map((text) => `${text}${CURRENT_MESSAGE_SEPARATOR}`).join("");
         return input.map((item, index) =>
-          index === 0 && item.type === "text"
-            ? { ...item, text: `${handoff}${CURRENT_MESSAGE_SEPARATOR}${item.text}` }
-            : item,
+          index === 0 && item.type === "text" ? { ...item, text: `${prefix}${item.text}` } : item,
         );
       };
 
@@ -829,6 +830,11 @@ export class DrainScheduler {
           // between, and an endpoint removed during that wait finds the process still running. The
           // retry below calls this as well, so the recovered thread is checked too.
           yield* drainStep(requireServedModel);
+          // A changed instruction file reaches the running session with this turn. A file that cannot
+          // be read sends no block; the session keeps the text it has.
+          const instructionsUpdate = yield* this.#threads
+            .instructionsUpdate(agent, client, providerThreadId)
+            .pipe(Effect.orElseSucceed(() => undefined));
           return yield* this.#threads
             .requestWithArchivedThreadRecovery(
               agent,
@@ -850,7 +856,7 @@ export class DrainScheduler {
                 // turn is the expected result and not a provider that swallowed its error.
                 answerOptional:
                   delivery.sender.kind === "agent" && delivery.expectsReply === false && !delivery.replyToMessageId,
-                input: inputForThread(providerThreadId),
+                input: inputForThread(providerThreadId, instructionsUpdate),
                 cwd: agent.workspacePath,
                 runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
                 approvalPolicy: "on-request",
@@ -934,6 +940,15 @@ export class DrainScheduler {
           this.#conversation.emitConversation(snapshot);
         }
       }
+      yield* this.#threads
+        .instructionsDelivered(threadId)
+        .pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() =>
+              logger.warn("Could not record the instructions that the session got.", { error: failure }),
+            ),
+          ),
+        );
       yield* this.#threads.deletePendingHandoff(threadId).pipe(
         Effect.catch((failure) =>
           Effect.sync(() => {

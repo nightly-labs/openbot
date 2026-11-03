@@ -22,6 +22,9 @@ export const messages = {
   "error.agent.instructionsTooLarge": "지침 파일이 너무 커서 여기서 열 수 없어요. 텍스트 편집기에서 줄여 주세요.",
   "error.agent.instructionsOutside": "지침 파일이 에이전트 작업 공간 밖을 가리켜서 OpenBot에서 열지 않아요.",
   "error.agent.instructionsReadFailed": "지침 파일을 읽지 못했어요.",
+  "error.agent.ruleProposalMissing": "이 제안된 규칙은 더 이상 채팅에 없습니다.",
+  "error.agent.ruleProposalAnswered": "이 제안된 규칙에는 이미 답했습니다.",
+  "error.agent.ruleProposalFailed": "규칙을 지침 파일에 추가할 수 없습니다.",
   "error.agent.instructionsSaveFailed": "지침 파일을 저장하지 못했어요.",
   "error.agent.profileGenerationBusy": "프로필 생성이 바빠요. 잠시 후 다시 시도해 주세요.",
   "error.agent.instructionsChanged":

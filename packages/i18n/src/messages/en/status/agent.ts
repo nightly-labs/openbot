@@ -58,6 +58,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.agentResponseReviewing": "Reviewing the other agent’s response…",
   "status.agent.toolStepWorking": "Working through the next tool-assisted step…",
   "status.agent.memoryChanges": "Memory: {saved} saved, {updated} updated, {forgotten} forgotten.",
+  "status.agent.ruleProposal": "Suggested rule: {rule}",
   "status.agent.memoryChangesWithConflicts":
     "Memory: {saved} saved, {updated} updated, {forgotten} forgotten, {notChanged} not changed because another thread changed it first.",
   "status.agent.mcpServerAdd":

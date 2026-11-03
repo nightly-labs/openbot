@@ -1,7 +1,9 @@
 // An agent's long-lived memories: the notes it carries between threads.
 
+import { parseDecideRuleProposalInput } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_MEMORIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memories-v1";
+import { sourceText } from "@openbot/i18n/source";
 import {
   readAgentMemories,
   readAgentMemorySelection,
@@ -105,6 +107,13 @@ export function memoryIpcHandlers({
           runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.memories(agentId), decodeVoid, { method: "DELETE" }),
           ),
+      }),
+      // No Team API carries suggested rules: the Team API projections drop them.
+      decideRuleProposal: scopedHandler(parseDecideRuleProposalInput, {
+        local: (input) => service.decideRuleProposal(input),
+        remote: () => {
+          throw new Error(sourceText("error.team.ruleProposalsUnsupported"));
+        },
       }),
     },
   };

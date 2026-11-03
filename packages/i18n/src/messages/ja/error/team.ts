@@ -71,6 +71,7 @@ export const messages = {
   "error.team.sidebarPinsUnsupported":
     "このサーバーは、ピン留めしたチャットをすべてのデバイスで共有できません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
   "error.team.agentInstructionsUnsupported": "この接続ではエージェントの指示を編集できません。",
+  "error.team.ruleProposalsUnsupported": "この接続は提案されたルールに対応していません。",
   "error.team.agentPublishUnsupported": "この接続ではエージェントを公開できません。",
   "error.team.agentUpdateUnsupported": "この接続ではエージェントを更新できません。",
   "error.team.contextResetUnsupported": "この接続では新しいチャットを始められません。",

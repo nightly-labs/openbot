@@ -60,6 +60,7 @@ export const messages = {
   "status.agent.agentResponseReviewing": "Bekijkt het antwoord van de andere agent…",
   "status.agent.toolStepWorking": "Werkt de volgende toolondersteunde stap af…",
   "status.agent.memoryChanges": "Geheugen: {saved} opgeslagen, {updated} bijgewerkt, {forgotten} vergeten.",
+  "status.agent.ruleProposal": "Voorgestelde regel: {rule}",
   "status.agent.memoryChangesWithConflicts":
     "Geheugen: {saved} opgeslagen, {updated} bijgewerkt, {forgotten} vergeten, {notChanged} niet gewijzigd omdat een andere thread ze eerst heeft gewijzigd.",
   "status.agent.mcpServerAdd":

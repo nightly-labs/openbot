@@ -26,6 +26,9 @@ export const messages = {
   "error.agent.instructionsOutside":
     "指示ファイルがエージェントのワークスペース外を指しているため、OpenBot では開きません。",
   "error.agent.instructionsReadFailed": "指示ファイルを読み込めませんでした。",
+  "error.agent.ruleProposalMissing": "この提案されたルールはチャットにありません。",
+  "error.agent.ruleProposalAnswered": "この提案されたルールには既に回答済みです。",
+  "error.agent.ruleProposalFailed": "ルールを指示ファイルに追加できませんでした。",
   "error.agent.instructionsSaveFailed": "指示ファイルを保存できませんでした。",
   "error.agent.profileGenerationBusy": "プロフィールの生成中です。しばらくしてからもう一度お試しください。",
   "error.agent.instructionsChanged":

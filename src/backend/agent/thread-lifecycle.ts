@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   type AgentSummary,
   agentAutomationAllowed,
@@ -52,6 +52,7 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { agentNamesById } from "./delivery-content";
 import {
   developerInstructions,
+  instructionsUpdateBlock,
   memoryContext,
   type SectionTeammates,
   type VaultContents,
@@ -234,6 +235,8 @@ export class ThreadLifecycle {
   readonly #channelThread: (threadId: string) => boolean;
   readonly #branchThread: (threadId: string) => boolean;
   readonly #pendingHandoffs = new Map<string, string>();
+  /** The instruction file text that a turn's update block carries, saved as seen when the turn starts. */
+  readonly #pendingInstructions = new Map<string, string>();
   readonly #pendingRuntimeRefreshes = new Set<string>();
   /**
    * How many starts of each agent are in flight: a provider session, or a turn on one.
@@ -313,6 +316,68 @@ export class ThreadLifecycle {
     return this.#pendingHandoffs.get(threadId);
   }
 
+  /**
+   * The block for the next turn of a session whose instruction file changed after the session read
+   * it, or undefined. The text counts as seen only after the turn starts (`instructionsDelivered`).
+   * A session from before this record has none: it records the file now and gets no block.
+   */
+  readonly instructionsUpdate = Effect.fn("ThreadLifecycle.instructionsUpdate")(function* (
+    this: ThreadLifecycle,
+    agent: AgentSummary,
+    client: AgentClient,
+    sessionId: string,
+  ) {
+    const current = yield* this.#instructionsFile(agent, client);
+    const text = current.found?.text ?? "";
+    const seen = yield* this.#instructionsSeen(sessionId);
+    if (seen === null) {
+      yield* this.#writeInstructionsSeen(sessionId, text);
+      return undefined;
+    }
+    if (seen === text) return undefined;
+    this.#pendingInstructions.set(sessionId, text);
+    return instructionsUpdateBlock(current.fileName, current.found);
+  }).bind(this);
+
+  /** The turn that carried the update block started: the session has the file text now. */
+  readonly instructionsDelivered = Effect.fn("ThreadLifecycle.instructionsDelivered")(function* (
+    this: ThreadLifecycle,
+    sessionId: string,
+  ) {
+    const text = this.#pendingInstructions.get(sessionId);
+    if (text === undefined) return;
+    this.#pendingInstructions.delete(sessionId);
+    yield* this.#writeInstructionsSeen(sessionId, text);
+  }).bind(this);
+
+  /** The instruction file text that the session read, or null for a session from before the record. */
+  readonly #instructionsSeen = Effect.fn("ThreadLifecycle.instructionsSeen")(function* (
+    this: ThreadLifecycle,
+    sessionId: string,
+  ) {
+    const stored = yield* Effect.result(threadIo(() => readFile(this.instructionsSeenPath(sessionId), "utf8")));
+    if (Result.isSuccess(stored)) return stored.success;
+    if (missingSessionFile(stored.failure.cause)) return null;
+    return yield* stored.failure;
+  }).bind(this);
+
+  readonly #writeInstructionsSeen = Effect.fn("ThreadLifecycle.writeInstructionsSeen")(function* (
+    this: ThreadLifecycle,
+    sessionId: string,
+    text: string,
+  ) {
+    yield* threadIo(() => mkdir(dirname(this.instructionsSeenPath(sessionId)), { recursive: true, mode: 0o700 }));
+    yield* threadIo(() => writeFile(this.instructionsSeenPath(sessionId), text, { mode: 0o600 }));
+  }).bind(this);
+
+  private instructionsSeenPath(sessionId: string): string {
+    return join(
+      this.#store.database.userDataPath,
+      "provider-instructions",
+      createHash("sha256").update(sessionId).digest("hex"),
+    );
+  }
+
   readonly deletePendingHandoff = Effect.fn("ThreadLifecycle.deletePendingHandoff")(function* (
     this: ThreadLifecycle,
     threadId: string,
@@ -374,6 +439,7 @@ export class ThreadLifecycle {
   ) {
     yield* threadIo(() => rm(this.handoffPath(sessionId), { force: true }));
     yield* threadIo(() => rm(this.toolManifestPath(sessionId), { force: true }));
+    yield* threadIo(() => rm(this.instructionsSeenPath(sessionId), { force: true }));
     if (databaseSessionId) yield* threadIo(() => rm(this.workStepsPath(databaseSessionId), { force: true }));
     // Unattributed legacy captures stay until no recorded session uses the external identifier.
     if (!this.#store.database.listProviderSessionIds(sessionId).some((id) => id !== databaseSessionId))
@@ -685,11 +751,14 @@ export class ThreadLifecycle {
               environment,
               section,
               proxy,
-              instructionsFile,
+              // The session gets a later change of the text as an update block, so the text stays out.
+              { fileName: instructionsFile.fileName, found: null },
             ),
             approvals,
           );
         }
+        // The session reads the file at its start. A later change reaches it as an update block.
+        yield* this.#writeInstructionsSeen(externalThreadId, instructionsFile.found?.text ?? "");
         // The handoff reads the store synchronously. A failure there must also clean up this session.
         const handoff = yield* this.buildProviderHandoff(agent.id, publicThreadId).pipe(
           Effect.catchDefect((cause) => Effect.fail(new ThreadOperationFailed({ cause }))),
@@ -948,7 +1017,7 @@ export class ThreadLifecycle {
     environment: Readonly<Record<string, string>>,
     section: SectionTeammates | null,
     proxy: string | null,
-    instructionsFile: InstructionsFileInPrompt,
+    instructionsFile: Pick<InstructionsFileInPrompt, "fileName"> & { found: { text: string } | null },
   ): string {
     const folders = existingAgentFolders(agent);
     const excluded = workspaceExcludedFolders(agent);
@@ -1080,13 +1149,31 @@ export class ThreadLifecycle {
     const environment = this.#agentEnvironment();
     const section = this.#sectionTeammates(agent.id);
     const approvals = this.#toolApprovals(configs, own);
-    const instructionsFile = yield* this.#instructionsFile(agent, client);
+    // A session with a seen record gets a change of the text as an update block (`instructionsUpdate`),
+    // so its fingerprint has no text and a change does not start a new session. A session from before
+    // has the text it read in its fingerprint. When that text is still the file, the session moves to
+    // a seen record and a fingerprint without the text, so the upgrade does not replace it.
+    const current = yield* this.#instructionsFile(agent, client);
+    const seen = yield* this.#instructionsSeen(sessionId);
+    const textless = { fileName: current.fileName, found: null };
+    const instructionsFile = seen === null ? current : textless;
+    const moveToRecord = Effect.gen({ self: this }, function* () {
+      if (seen !== null) return;
+      const fingerprint = yield* threadStep(() =>
+        this.toolFingerprint(agent, configs, own, approvals, toolRuntimes, environment, section, proxy, textless),
+      );
+      yield* this.#writeToolManifest(sessionId, fingerprint, approvals);
+      yield* this.#writeInstructionsSeen(sessionId, current.found?.text ?? "");
+    });
     const newline = stored.success.indexOf("\n");
     const storedFingerprint = newline < 0 ? stored.success : stored.success.slice(0, newline);
     const fingerprint = yield* threadStep(() =>
       this.toolFingerprint(agent, configs, own, approvals, toolRuntimes, environment, section, proxy, instructionsFile),
     );
-    if (storedFingerprint === fingerprint) return true;
+    if (storedFingerprint === fingerprint) {
+      yield* moveToRecord;
+      return true;
+    }
     if (newline < 0) return false;
     // An approval given since the start is in the loaded session already: Codex saved it from that
     // session's answer. Only a revoked one needs a new session. The manifest takes the new approvals,
@@ -1110,6 +1197,7 @@ export class ThreadLifecycle {
     );
     if (storedFingerprint !== sessionFingerprint) return false;
     yield* this.#writeToolManifest(sessionId, fingerprint, approvals);
+    yield* moveToRecord;
     return true;
   });
 

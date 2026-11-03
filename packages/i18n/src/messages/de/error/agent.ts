@@ -29,6 +29,9 @@ export const messages = {
   "error.agent.instructionsOutside":
     "Die Anweisungsdatei verweist auf einen Ort außerhalb des Arbeitsbereichs des Agenten, daher öffnet OpenBot sie nicht.",
   "error.agent.instructionsReadFailed": "Die Anweisungsdatei konnte nicht gelesen werden.",
+  "error.agent.ruleProposalMissing": "Diese vorgeschlagene Regel ist nicht mehr im Chat.",
+  "error.agent.ruleProposalAnswered": "Diese vorgeschlagene Regel wurde bereits beantwortet.",
+  "error.agent.ruleProposalFailed": "Die Regel konnte nicht zur Anweisungsdatei hinzugefügt werden.",
   "error.agent.instructionsSaveFailed": "Die Anweisungsdatei konnte nicht gespeichert werden.",
   "error.agent.profileGenerationBusy": "Die Profilerstellung ist ausgelastet. Versuche es gleich noch einmal.",
   "error.agent.instructionsChanged":

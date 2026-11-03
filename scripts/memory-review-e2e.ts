@@ -10,7 +10,8 @@
 //   2. A secret in the chat is not in the review prompt.
 //   3. A review shows every essential memory, and of the searchable ones only those that fit its
 //      budget, the ones that relate to the chat first.
-//   4. A turn in which the agent saves a memory itself starts the count again.
+//   4. A turn in which the agent saves a memory itself starts the count again. The next review still
+//      reads that turn, so a correction that the agent saved can teach a rule.
 //   5. A pause after new turns starts a review, which changes the agent's own memory, and not a
 //      memory that the user wrote or chose.
 //   6. A pause after fewer than three turns starts no review. Clearing the chat starts a review of
@@ -26,7 +27,13 @@
 //      no error.
 //  14. A review does not forget a memory that it sees only redacted, and does not add the text of a
 //      saved memory again, which would change the user's inclusion choice.
-//  15. Stopping the service during a slow review applies nothing and shows no error.
+//  15. A review suggests a rule in the agent's own chat. Accepting it puts it in the agent's
+//      instruction file under "Learned rules", and the line keeps the answer. The session stays: its
+//      next turn, and only that one, carries the changed file. Undo takes the rule out and opens the line.
+//  16. A review does not suggest again a rule that the file has or that the user dismissed, in other
+//      case or without its stop, and its prompt lists them.
+//  17. A lesson from a side thread is suggested in the agent's own chat, not in the thread.
+//  18. Stopping the service during a slow review applies nothing and shows no error.
 // No provider, account or network is used. `bun run test:memory-review`.
 // Writes .openbot-build/memory-review-e2e/report.json.
 import assert from "node:assert/strict";
@@ -34,7 +41,15 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, type AgentEvent, CONVERSATION_MEMORY_CHANGES_ITEM_TYPE } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  AGENT_RULE_PROPOSAL_ITEM_TYPE,
+  type AgentEvent,
+  CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
+  learnedRules,
+  withLearnedRule,
+  withoutLearnedRule,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -60,6 +75,9 @@ const { AgentStore } = await import("../src/backend/agent-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { readAgentInstructionsFile, saveAgentInstructionsFile } = await import(
+  "../src/backend/agent/workspace-instructions"
+);
 
 /** A tool call that the fake makes in an agent turn. */
 interface FakeCall {
@@ -114,7 +132,9 @@ const answer = (message) => {
     case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
     case "config/read": return write({ id: message.id, result: config });
     case "config/batchWrite": return write({ id: message.id, result: {} });
-    case "thread/start": return write({ id: message.id, result: { thread: { id: "thread-" + (++threads), turns: [] } } });
+    case "thread/start":
+      log({ method: "thread", text: JSON.stringify(params) });
+      return write({ id: message.id, result: { thread: { id: "thread-" + (++threads), turns: [] } } });
     case "thread/resume": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
     case "thread/unsubscribe": return write({ id: message.id, result: { status: "Unsubscribed" } });
     case "thread/turns/list":
@@ -317,6 +337,14 @@ function memoryLines(agentId: string, sideThreadId?: string) {
     );
 }
 
+/** The suggested-rule lines in the agent's chat or side thread, as the database holds them. */
+function ruleLines(agentId: string, sideThreadId?: string) {
+  const threadId = sideThreadId ?? store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
+  return database
+    .readConversation(agentId, threadId)
+    .messages.filter((message) => message.itemType === AGENT_RULE_PROPOSAL_ITEM_TYPE);
+}
+
 function errorsFor(agentId: string, since: number) {
   return events.slice(since).filter((event) => event.type === "error" && event.agentId === agentId);
 }
@@ -410,6 +438,10 @@ try {
 
   await check("a pause after new turns starts a review of the agent's own memories", async () => {
     await reviewed(3);
+    assert.ok(
+      reviews()[2]?.includes("Save it."),
+      "The review still reads the turns in which the agent saved a memory, to learn from them.",
+    );
     await waitFor("the updated memory", () =>
       service
         .listMemories(second.id)
@@ -617,13 +649,113 @@ try {
     return { memories: memories.length, inclusion: before };
   });
 
+  const learner = await createAgent("Learner");
+  const RULE = "Run the tests before you say that a change is done.";
+  const workspace = store.list().find((agent) => agent.id === learner.id)?.workspacePath ?? "";
+  await check("a review suggests a rule, and Accept puts it in the agent's instruction file", async () => {
+    control({
+      operations: [],
+      lessons: [{ rule: RULE, reason: "The user asked twice for a fix that the tests showed was broken." }],
+    });
+    await send(learner.id, "The fix is still broken. Run the tests first.");
+    await runCauseEffect(service.clearAgentContext(learner.id));
+    await reviewed(15);
+    const line = await waitFor("the suggested rule", () => ruleLines(learner.id)[0]);
+    assert.equal(line.ruleProposal?.status, "proposed", "The line waits for an answer.");
+    assert.equal(line.ruleProposal?.rule, RULE);
+    assert.ok(line.text.includes(RULE), "The text names the rule for a client that does not read the field.");
+    assert.equal(memoryLines(learner.id).length, 0, "A review with no memory change shows no memory line.");
+    // The chat after the clear has its session before the file changes.
+    await send(learner.id, "Hello again.");
+    // As Accept does: the rule goes into the file with the editor's save, then the line is marked.
+    const file = await Effect.runPromise(readAgentInstructionsFile(workspace));
+    await Effect.runPromise(saveAgentInstructionsFile(workspace, withLearnedRule(file.text, RULE), file.text));
+    const decision = { agentId: learner.id, threadId: null, messageId: line.id } as const;
+    service.decideRuleProposal({ ...decision, decision: "accepted" });
+    assert.equal(ruleLines(learner.id)[0]?.ruleProposal?.status, "accepted", "The line keeps the answer.");
+    assert.throws(() => service.decideRuleProposal({ ...decision, decision: "dismissed" }), /already answered/);
+    const saved = readFileSync(join(workspace, file.fileName), "utf8");
+    assert.deepEqual(learnedRules(saved), [RULE], "The file has the rule under its heading.");
+    // The session keeps its context: the next turn carries the changed file, and only that turn.
+    const threads = logged("thread").length;
+    await send(learner.id, "Fix the parser.");
+    const updated = logged("turn").at(-1)?.text ?? "";
+    assert.equal(logged("thread").length, threads, "No new session starts.");
+    assert.ok(updated.includes("<openbot_instructions_update>"), "The turn says that the file changed.");
+    assert.ok(updated.includes(RULE), "The turn carries the rule.");
+    await send(learner.id, "Fix the lexer too.");
+    assert.ok(!logged("turn").at(-1)?.text.includes("<openbot_instructions_update>"), "The next turn has no update.");
+    assert.equal(logged("thread").length, threads, "The session stays after the update.");
+    // Undo: the rule leaves the file and the line is open again. Accept again for the checks below.
+    const accepted = readFileSync(join(workspace, file.fileName), "utf8");
+    await Effect.runPromise(saveAgentInstructionsFile(workspace, withoutLearnedRule(accepted, RULE), accepted));
+    service.decideRuleProposal({ ...decision, decision: "proposed" });
+    assert.equal(ruleLines(learner.id)[0]?.ruleProposal?.status, "proposed", "Undo opens the line again.");
+    assert.deepEqual(learnedRules(readFileSync(join(workspace, file.fileName), "utf8")), [], "Undo removes the rule.");
+    assert.throws(() => service.decideRuleProposal({ ...decision, decision: "proposed" }), /already answered/);
+    // A second change reaches the same session too.
+    await send(learner.id, "Fix the printer.");
+    const removed = logged("turn").at(-1)?.text ?? "";
+    assert.equal(logged("thread").length, threads, "A second change starts no new session.");
+    assert.ok(removed.includes("<openbot_instructions_update>"), "The turn says that the file changed again.");
+    assert.ok(!removed.includes(RULE), "The update has no rule now.");
+    const undone = readFileSync(join(workspace, file.fileName), "utf8");
+    await Effect.runPromise(saveAgentInstructionsFile(workspace, withLearnedRule(undone, RULE), undone));
+    service.decideRuleProposal({ ...decision, decision: "accepted" });
+    return { file: saved };
+  });
+
+  await check("a review does not suggest a rule that the file has or that the user dismissed", async () => {
+    control({
+      operations: [],
+      lessons: [
+        { rule: "run the tests before you say that a change is done", reason: "The same lesson." },
+        { rule: "Answer in German.", reason: "The user wrote in German twice." },
+      ],
+    });
+    await send(learner.id, "Bitte auf Deutsch.");
+    await runCauseEffect(service.clearAgentContext(learner.id));
+    await reviewed(16);
+    assert.ok(reviews()[15]?.includes(RULE), "The prompt lists the learned rule.");
+    const german = await waitFor("the new rule", () =>
+      ruleLines(learner.id).find((line) => line.ruleProposal?.rule === "Answer in German."),
+    );
+    await settle();
+    assert.equal(ruleLines(learner.id).length, 2, "The learned rule is not suggested again.");
+    service.decideRuleProposal({ agentId: learner.id, threadId: null, messageId: german.id, decision: "dismissed" });
+    control({ operations: [], lessons: [{ rule: "Answer in German", reason: "Again." }] });
+    await send(learner.id, "Noch einmal auf Deutsch.");
+    await runCauseEffect(service.clearAgentContext(learner.id));
+    await reviewed(17);
+    const prompt = reviews()[16] ?? "";
+    assert.ok(/"dismissed":\s*\[\s*"Answer in German\."/.test(prompt), "The prompt lists the dismissed rule.");
+    await settle();
+    assert.equal(ruleLines(learner.id).length, 2, "A dismissed rule is not suggested again.");
+    assert.deepEqual(learnedRules(readFileSync(join(workspace, "AGENTS.md"), "utf8")), [RULE], "Dismiss adds nothing.");
+    return { lines: ruleLines(learner.id).map((line) => line.ruleProposal) };
+  });
+
+  await check("a lesson from a side thread is suggested in the agent's own chat", async () => {
+    const rule = "Keep summaries under five lines.";
+    control({ operations: [], lessons: [{ rule, reason: "The user cut a long summary in a side thread." }] });
+    const task = await startTask(learner.id, "Summarize the report.");
+    await send(learner.id, "Too long. Keep it under five lines.", task.id);
+    await runCauseEffect(service.closeTask({ agentId: learner.id, taskId: task.id }));
+    await reviewed(18);
+    await waitFor("the rule in the agent's own chat", () =>
+      ruleLines(learner.id).some((line) => line.ruleProposal?.rule === rule),
+    );
+    assert.equal(ruleLines(learner.id, task.threadId).length, 0, "The side thread shows no rule line.");
+    return { rule };
+  });
+
   await check("stopping the service during a slow review applies nothing", async () => {
     const since = events.length;
     const before = service.listMemories(third.id).length;
     control({ operations: [{ type: "add", text: "Never saved either.", inclusion: "searchable" }] }, 3_000);
     await send(third.id, "Remember that I like pears.");
     await runCauseEffect(service.clearAgentContext(third.id));
-    await reviewed(15);
+    await reviewed(19);
     const started = Date.now();
     await runCauseEffect(service.stop());
     const stopMs = Date.now() - started;

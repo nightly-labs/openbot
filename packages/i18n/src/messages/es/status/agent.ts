@@ -55,6 +55,7 @@ export const messages = {
   "status.agent.agentResponseReviewing": "Revisando la respuesta del otro agente…",
   "status.agent.toolStepWorking": "Procesando el siguiente paso asistido por herramientas…",
   "status.agent.memoryChanges": "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados.",
+  "status.agent.ruleProposal": "Regla sugerida: {rule}",
   "status.agent.memoryChangesWithConflicts":
     "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados, {notChanged} sin cambios porque otro hilo los cambió antes.",
   "status.agent.nextStepContinues": "El agente se detuvo antes del siguiente paso. Continúa ({current} de {limit}).",

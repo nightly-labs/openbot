@@ -2,7 +2,7 @@
 // Instructions page. The folders and the Instructions page also work for a joined server's agent,
 // through `agent-folders-v1` and `agent-instructions-v1`.
 
-import { agentFolderParent } from "@openbot/contracts/ipc";
+import { agentFolderParent, withLearnedRule, withoutLearnedRule } from "@openbot/contracts/ipc";
 import type { AgentFolderCalls } from "@openbot/ui/features/conversation/AgentFolders";
 import type {
   AgentInstructionsCalls,
@@ -108,5 +108,33 @@ export function agentInstructionsCalls(serverId?: string): Omit<AgentInstruction
       return () => watchers.delete(watcher);
     },
     reveal: serverId === undefined ? (agentId) => window.openbot.agent.revealAgentInstructions(agentId) : undefined,
+  };
+}
+
+/**
+ * Accept, Dismiss and Undo of a rule that the memory review suggested, for an agent on this computer.
+ * Accept adds the rule to the instruction file, with the save that the Instructions page uses, and
+ * then marks the line. A save that fails leaves the line as it was.
+ */
+export function ruleProposalCalls(agentId: string, messageId: string, rule: string) {
+  const instructions = agentInstructionsCalls();
+  const decide = (decision: "accepted" | "dismissed" | "proposed") =>
+    window.openbot.agent.decideRuleProposal({ agentId, threadId: null, messageId, decision });
+  const change = async (edit: (text: string, rule: string) => string) => {
+    const file = await instructions.read(agentId);
+    const next = edit(file.text, rule);
+    if (next !== file.text) await instructions.save(agentId, next, file.text);
+  };
+  return {
+    accept: async () => {
+      await change(withLearnedRule);
+      await decide("accepted");
+    },
+    dismiss: () => decide("dismissed"),
+    /** An accepted rule leaves the file first. A rule that the user removed by hand is gone already. */
+    undo: async (status: "accepted" | "dismissed") => {
+      if (status === "accepted") await change(withoutLearnedRule);
+      await decide("proposed");
+    },
   };
 }

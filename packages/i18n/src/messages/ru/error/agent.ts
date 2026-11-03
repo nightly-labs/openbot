@@ -24,6 +24,9 @@ export const messages = {
   "error.agent.instructionsOutside":
     "Файл инструкций ссылается на место вне рабочей папки агента, поэтому OpenBot его не открывает.",
   "error.agent.instructionsReadFailed": "Не удалось прочитать файл инструкций.",
+  "error.agent.ruleProposalMissing": "Этого предложенного правила больше нет в чате.",
+  "error.agent.ruleProposalAnswered": "На это предложенное правило уже есть ответ.",
+  "error.agent.ruleProposalFailed": "Не удалось добавить правило в файл инструкций.",
   "error.agent.instructionsSaveFailed": "Не удалось сохранить файл инструкций.",
   "error.agent.profileGenerationBusy": "Создание профиля уже выполняется. Повторите попытку чуть позже.",
   "error.agent.instructionsChanged":

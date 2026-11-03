@@ -23,6 +23,9 @@ export const messages = defineMessages("error.agent", {
   "error.agent.instructionsOutside":
     "The instructions file links to a place outside the agent's workspace, so OpenBot does not open it.",
   "error.agent.instructionsReadFailed": "Could not read the instructions file.",
+  "error.agent.ruleProposalMissing": "This suggested rule is no longer in the chat.",
+  "error.agent.ruleProposalAnswered": "This suggested rule was already answered.",
+  "error.agent.ruleProposalFailed": "Could not add the rule to the instructions file.",
   "error.agent.instructionsSaveFailed": "Could not save the instructions file.",
   "error.agent.profileGenerationBusy": "Profile generation is busy. Try again shortly.",
   "error.agent.instructionsChanged":

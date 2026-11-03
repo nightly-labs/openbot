@@ -56,6 +56,7 @@ export const messages = {
   "status.agent.agentResponseReviewing": "Sprawdzanie odpowiedzi innego agenta…",
   "status.agent.toolStepWorking": "Przetwarzanie kolejnego kroku z narzędziem…",
   "status.agent.memoryChanges": "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}.",
+  "status.agent.ruleProposal": "Proponowana reguła: {rule}",
   "status.agent.memoryChangesWithConflicts":
     "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}, niezmienione {notChanged}, bo inny wątek zmienił je wcześniej.",
   "status.agent.nextStepContinues": "Agent zatrzymał się przed następnym krokiem. Kontynuuje ({current} z {limit}).",

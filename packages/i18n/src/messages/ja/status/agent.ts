@@ -52,6 +52,7 @@ export const messages = {
   "status.agent.agentResponseReviewing": "別のエージェントの応答を確認しています…",
   "status.agent.toolStepWorking": "次のツールステップを処理しています…",
   "status.agent.memoryChanges": "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却。",
+  "status.agent.ruleProposal": "提案されたルール: {rule}",
   "status.agent.memoryChangesWithConflicts":
     "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却、{notChanged} 件は別のスレッドが先に変更したため未変更。",
   "status.agent.nextStepContinues": "エージェントが次のステップの前で止まりました。続けます（{current}/{limit}）。",

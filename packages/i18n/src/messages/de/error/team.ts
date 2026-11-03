@@ -75,6 +75,7 @@ export const messages = {
     "Dieser Server kann deine angehefteten Chats nicht für alle deine Geräte speichern. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
   "error.team.agentInstructionsUnsupported":
     "Diese Verbindung unterstützt das Bearbeiten von Agentenanweisungen nicht.",
+  "error.team.ruleProposalsUnsupported": "Vorgeschlagene Regeln werden von dieser Verbindung nicht unterstützt.",
   "error.team.agentPublishUnsupported": "Diese Verbindung unterstützt das Veröffentlichen von Agenten nicht.",
   "error.team.agentUpdateUnsupported": "Diese Verbindung unterstützt das Aktualisieren von Agenten nicht.",
   "error.team.contextResetUnsupported": "Diese Verbindung unterstützt das Starten eines neuen Chats nicht.",

@@ -25,6 +25,9 @@ export const messages = {
   "error.agent.instructionsOutside":
     "Talimat dosyası ajanın çalışma alanı dışındaki bir yeri gösteriyor, bu yüzden OpenBot onu açmıyor.",
   "error.agent.instructionsReadFailed": "Talimat dosyası okunamadı.",
+  "error.agent.ruleProposalMissing": "Bu önerilen kural artık sohbette değil.",
+  "error.agent.ruleProposalAnswered": "Bu önerilen kurala zaten yanıt verildi.",
+  "error.agent.ruleProposalFailed": "Kural talimat dosyasına eklenemedi.",
   "error.agent.instructionsSaveFailed": "Talimat dosyası kaydedilemedi.",
   "error.agent.profileGenerationBusy": "Profil oluşturma meşgul. Kısa bir süre sonra tekrar deneyin.",
   "error.agent.instructionsChanged":
