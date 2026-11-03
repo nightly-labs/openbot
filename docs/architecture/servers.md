@@ -751,6 +751,11 @@ shows the log on desktop and web, with a filter by kind and a search. The tab sh
 admin of the local server and of a joined server whose host advertises the capability. It reads the log
 again each time it shows.
 
+On the phone, Server settings → Audit log (`apps/mobile/src/features/servers/screens/server-audit-screen.tsx`)
+shows the same log, with the same filter and a native search bar. The row shows for an owner or admin
+of an online server that advertises the capability (`canReadServerAudit`). The page reads the log
+over the Team API (`getHostAuditLog`) each time it opens, and keeps no copy.
+
 Known limits: a host with no account directory records no join from a local-store invite, and the log
 has no page or date filter.
 
