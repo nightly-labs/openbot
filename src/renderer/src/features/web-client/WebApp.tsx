@@ -425,7 +425,9 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     };
     void checkSession();
     // A page restored from the back-forward cache still has its session; its connection ends normally.
-    const restore = () => {
+    // A browser also sends `pageshow` after a normal load, which can come after the session check.
+    const restore = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
       clearSession(false);
       void checkSession();
     };
