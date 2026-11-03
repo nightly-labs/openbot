@@ -163,6 +163,8 @@ const REPLY_SIZE = { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1), red
 // The pill takes over from the activity row, so it fades rather than grows from nothing: its first
 // measurement is already the size of the first revealed word.
 const REPLY_APPEAR = { duration: 220, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.Never };
+/** The corner of a message bubble. A bubble lower than twice this is a pill. */
+const BUBBLE_RADIUS = 22;
 
 function ChatBubble({
   children,
@@ -188,6 +190,8 @@ function ChatBubble({
   useEffect(() => {
     shown.set(collapsed ? 0 : withTiming(1, REPLY_APPEAR));
   }, [collapsed, shown]);
+  // A short bubble is a pill; a taller one keeps the same corner, so its sides stay straight.
+  const [radius, setRadius] = useState(BUBBLE_RADIUS);
   const background = useAnimatedStyle(() => {
     if (!sized) return { opacity: shown.get() };
     const { width, height, measured } = size.get();
@@ -201,19 +205,17 @@ function ChatBubble({
   return (
     <Animated.View
       className={className}
-      style={style}
-      onLayout={
-        sized
-          ? ({ nativeEvent }) => {
-              const previous = size.get();
-              size.set({
-                width: nativeEvent.layout.width,
-                height: nativeEvent.layout.height,
-                measured: previous.measured || previous.width > 0,
-              });
-            }
-          : undefined
-      }
+      style={[style, { borderRadius: radius }]}
+      onLayout={({ nativeEvent }) => {
+        setRadius(Math.min(nativeEvent.layout.height / 2, BUBBLE_RADIUS));
+        if (!sized) return;
+        const previous = size.get();
+        size.set({
+          width: nativeEvent.layout.width,
+          height: nativeEvent.layout.height,
+          measured: previous.measured || previous.width > 0,
+        });
+      }}
     >
       {/* Only the childless background resizes. The list measures the actual
           content once, without a layout animation moving its native anchor. */}
@@ -222,8 +224,12 @@ function ChatBubble({
           // A new view when the setting changes, so a filled background keeps no animated size.
           key={sized ? "sized" : "filled"}
           pointerEvents="none"
-          className="absolute left-0 top-0 rounded-[20px] bg-control/60"
-          style={[{ borderCurve: "circular" }, sized ? null : StyleSheet.absoluteFill, background]}
+          className="absolute left-0 top-0 bg-control/60"
+          style={[
+            { borderCurve: "circular", borderRadius: radius },
+            sized ? null : StyleSheet.absoluteFill,
+            background,
+          ]}
         />
       ) : null}
       {children}
@@ -675,8 +681,8 @@ const MessageRow = memo(function MessageRow({
             animateSize={shared.textReveal}
             className={
               message.author === "user"
-                ? `self-end rounded-[20px] px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[92%]" : "max-w-full"}`
-                : `max-w-full self-start rounded-[20px] ${waiting ? "" : "px-4 py-3"}`
+                ? `self-end px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[92%]" : "max-w-full"}`
+                : `max-w-full self-start ${waiting ? "" : "px-4 py-3"}`
             }
             style={[
               { borderCurve: "circular", overflow: "hidden" },
