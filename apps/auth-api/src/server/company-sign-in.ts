@@ -669,11 +669,15 @@ export class CompanySignInService {
     // A person that the provider turns on again comes back, also after the removal that turning off made.
     if (active) return yield* this.#join(connection.hostId, userId, { restore: true });
     // The trigger on `revoked_at` ends the remote sessions of these sessions and queues their events.
-    // An email code that the person asked for before is spent too, so it cannot make a new session.
+    // An email code or a company sign-in code that the person got before is spent too, so it cannot
+    // make a new session.
     yield* storeCall(() =>
       this.#database.batch([
         this.#database
           .prepare("UPDATE auth_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
+          .bind(now, userId),
+        this.#database
+          .prepare("UPDATE company_sign_in_codes SET redeemed_at = ? WHERE user_id = ? AND redeemed_at IS NULL")
           .bind(now, userId),
         this.#database
           .prepare(

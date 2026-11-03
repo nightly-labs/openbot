@@ -829,7 +829,7 @@ SCIM 2.0 (`/scim/v2/Users`, `company-sign-in-scim.ts`) supports what Entra ID an
 with the filter `userName eq "…"`, create, read, and PATCH, PUT and DELETE of `active`. The bearer
 token starts with `obscim_`, shows once, and D1 keeps only its hash. Other attributes belong to the
 OpenBot account and do not change. `active` accepts the strings `"True"` and `"False"`. Off, and
-DELETE, end every session of the account, spend its open email codes, and revoke the membership. A
+DELETE, end every session of the account, spend its open email and company sign-in codes, and revoke the membership. A
 create for a person who exists sets `active` as a PATCH does. Off → on joins the person again,
 also after that revocation. A repeated on does not change a membership that the owner revoked.
 
