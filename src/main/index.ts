@@ -30,7 +30,8 @@ import {
 import { runCauseEffect } from "../backend/effect-boundary";
 import { answerHostTool } from "../backend/host-tools/host-tool-asks";
 import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
-import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath } from "./app-icon";
+import { watchAppArchive } from "./app-archive-watch";
+import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { type BackgroundTray, createBackgroundTray } from "./background-tray";
 import { removeClaudeCodeSessionEnvironment } from "./claude-session-environment";
@@ -82,6 +83,7 @@ import { hostedServerIpcHandlers } from "./ipc/hosted-server-handlers";
 import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
 import { instanceTransferIpcHandlers } from "./ipc/instance-transfer-handlers";
 import { licenseIpcHandlers } from "./ipc/license-handlers";
+import { linkAccountIpcHandlers } from "./ipc/link-account-handlers";
 import { localServerIpcHandlers } from "./ipc/local-server-handlers";
 import { macAutomationIpcHandlers } from "./ipc/mac-automation-handlers";
 import { marketplaceAgentIpcHandlers } from "./ipc/marketplace-agent-handlers";
@@ -122,6 +124,7 @@ import {
   createMainWindowController,
   createMainWindowHolder,
   hideWindowsForQuit,
+  keepWindowsHidden,
   showMainWindow,
 } from "./main-window";
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
@@ -131,8 +134,10 @@ import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
 import { RoutineWake } from "./routine-wake";
+import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
+import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { trustSystemCertificates } from "./system-certificates";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
@@ -165,13 +170,19 @@ function hideExceptionErrorBox(): void {
   });
 }
 
-type ExitReason = "main_window_closed" | "signal" | "session_end" | "quit";
+/**
+ * `menu` and `shortcut` are the macOS Quit item by click and by `Cmd + Q`, `tray` is the tray item on
+ * Windows and Linux, and `update` is an update install. `quit` is any other request: the Dock, another
+ * app, or a system logout on macOS.
+ */
+type ExitReason = "main_window_closed" | "signal" | "session_end" | "menu" | "shortcut" | "tray" | "update" | "quit";
 let exitRecorded = false;
 
 /**
  * Records once why OpenBot quits, in the main log and in the trace, before the teardown closes the
  * trace. The first reason wins: closing the window then also quits. A process that ends with no such
- * line and no crash dump stopped from outside, such as Task Manager.
+ * line and no crash dump stopped from outside with a signal that cannot be caught, such as SIGKILL or
+ * Task Manager.
  */
 function recordExit(reason: ExitReason): void {
   if (exitRecorded) return;
@@ -180,6 +191,11 @@ function recordExit(reason: ExitReason): void {
   if (!crashTrace) return;
   crashTrace.record({ kind: "exit", name: reason, durationMs: 0, outcome: "requested" });
   Effect.runFork(crashTrace.flush());
+}
+
+function quitFor(reason: ExitReason): void {
+  recordExit(reason);
+  app.quit();
 }
 
 function reportMainProcessFailure(origin: "uncaughtException" | "unhandledRejection", error: unknown): void {
@@ -214,6 +230,7 @@ const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, proces
 const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
 if (serverMode || hostedServer || localServerChild) hideExceptionErrorBox();
+if (serverMode || hostedServer) keepWindowsHidden();
 // A local server has no window, so it has no Dock tile either.
 if (localServerChild && process.platform === "darwin") app.dock?.hide();
 const inviteLinkOptions = {
@@ -362,13 +379,13 @@ const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
 
 // A server is stopped with SIGTERM (systemd, Docker). Without a handler, Electron ends at once and its
 // services do not stop. A hosted server's boat pre-stop hook stops it this way before the disk save
-// (`scripts/hosting/openbot-boat-pre-stop`).
-if (!app.isPackaged || hostedServer || serverMode || localServerChild) {
+// (`scripts/hosting/openbot-boat-pre-stop`). The desktop app quits the same way, so a `kill` from a
+// terminal or another app also stops its services and leaves a "Quitting: signal." line (#4149).
+{
   const quitAfterSignal = () => {
-    recordExit("signal");
     // Before `app.quit()`: the same signal can stop the Computer Use driver first.
     quitStarted = true;
-    app.quit();
+    quitFor("signal");
   };
   process.once("SIGINT", quitAfterSignal);
   process.once("SIGTERM", quitAfterSignal);
@@ -407,6 +424,7 @@ const {
   forwardVoiceServerSettings,
   forwardProviderRuntimeStatus,
   forwardGitHubConnectorStatus,
+  forwardLinkAccountStatus,
   forwardOnePasswordConnectorStatus,
   forwardBitwardenConnectorStatus,
   forwardVaultState,
@@ -416,6 +434,8 @@ const {
   forwardTeamPresence,
   forwardDirectMessage,
   forwardDirectTyping,
+  forwardAttachmentDownload,
+  forwardAttachmentImportProgress,
 } = createRendererForwarders({
   getMainWindow: () => windowHolder.current,
   // A function: the window controller is made after the forwarders, and no event comes before it.
@@ -462,6 +482,7 @@ const windows = createMainWindowController({
     attachQuitOnMainWindowClose(window);
   },
   reportError: (message, error) => logger.error(message, toLogValue(error)),
+  quitFromShortcut: () => quitFor("shortcut"),
 });
 
 let appIconColorImage: NativeImage | undefined;
@@ -590,6 +611,7 @@ function registerIpcHandlers({
   agentAdminSettings,
   agentHostSettings,
   agentFolders,
+  agentInstructions,
   browserProfiles,
   language,
   logoColor,
@@ -601,6 +623,7 @@ function registerIpcHandlers({
   agentMemoryLimit,
   memoryReview,
   agentAccess,
+  serverAudit,
   teamStore,
   serverTimezone,
   promptCacheTtl,
@@ -613,6 +636,7 @@ function registerIpcHandlers({
   appBehavior,
   agentInitialization,
   sidebarLayout,
+  sidebarPins,
   host,
   remoteDesktop,
   remoteServers,
@@ -620,6 +644,7 @@ function registerIpcHandlers({
   skills,
   hostedSites,
   githubConnector,
+  linkAccount,
   onePasswordConnector,
   bitwardenConnector,
   vault,
@@ -718,10 +743,11 @@ function registerIpcHandlers({
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
       folders: agentFolders,
+      remoteServers,
       getMainWindow: getDialogParent,
       translate: language.translate,
     }),
-    ...agentInstructionsIpcHandlers({ service }),
+    ...agentInstructionsIpcHandlers({ files: agentInstructions, remoteServers }),
     ...hostedSiteIpcHandlers({
       hostedSites,
       remoteServers,
@@ -729,6 +755,7 @@ function registerIpcHandlers({
       translate: language.translate,
     }),
     ...githubConnectorIpcHandlers({ githubConnector, remoteServers, openExternal: openLink }),
+    ...linkAccountIpcHandlers({ linkAccount }),
     ...onePasswordConnectorIpcHandlers({ onePasswordConnector, remoteServers }),
     ...bitwardenConnectorIpcHandlers({ bitwardenConnector, remoteServers }),
     ...vaultIpcHandlers({ vault, getMainWindow: getDialogParent, translate: language.translate, remoteServers }),
@@ -814,8 +841,15 @@ function registerIpcHandlers({
       machineAlerts,
       promptCacheTtl,
       agentAccess,
+      serverAudit,
       localServerId: () => teamStore.getIdentity()?.serverId,
       localAgentIds: () => service.listAgents().map((agent) => agent.id),
+      localOwner: () => {
+        const owner = teamStore.configured
+          ? teamStore.listMembers().find((member) => member.role === "owner")
+          : undefined;
+        return owner ? memberAuditName(owner) : null;
+      },
     }),
     ...providerAdminIpcHandlers({
       service,
@@ -862,6 +896,7 @@ function registerIpcHandlers({
     ...agentIpcHandlers({
       service,
       sidebarLayout,
+      sidebarPins,
       host,
       remoteServers,
       skills,
@@ -1223,6 +1258,10 @@ if (!hasSingleInstanceLock) {
       });
       services = built;
       performance.mark("openbot:services-built");
+      // A server has nobody to read the warning; a development build runs no `app.asar`.
+      if (app.isPackaged && !serverMode && !hostedServer && !localServerChild) {
+        teardown.push(0, "app archive watch", watchAppArchive(process.resourcesPath, built.language.translate));
+      }
       // `forwardCentralAuth` reaches the host, the remote servers and analytics only through
       // `services`, so every account change announced during construction was dropped.
       // `createApplicationServices` bound the local host to the one state it read and attributed the
@@ -1318,6 +1357,11 @@ if (!hasSingleInstanceLock) {
       service.on("workflowRun", (end) => built.analytics.handleWorkflowRun(end));
       built.browser.onSiteVisited((visit) => built.analytics.handleSiteVisit(visit));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));
+      // A pin from the owner's phone shows at once in the sidebar of this computer.
+      built.sidebarPins.subscribe((key) => {
+        if (key === OWNER_PIN_KEY)
+          forwardAgentEvent("local", { type: "sidebar-pins-changed", ...built.sidebarPins.snapshot(OWNER_PIN_KEY) });
+      });
       built.approvalAutomation.subscribe((preference) => {
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.approvalAutomation, preference);
@@ -1334,6 +1378,7 @@ if (!hasSingleInstanceLock) {
       host.on("directTyping", (event) => forwardDirectTyping("local", event));
       remoteDesktop.on("changed", forwardRemoteDesktopSessions);
       built.githubConnector.onChanged(forwardGitHubConnectorStatus);
+      built.linkAccount.onChanged(forwardLinkAccountStatus);
       built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
       built.bitwardenConnector.onChanged(forwardBitwardenConnectorStatus);
       built.vault.onChanged(forwardVaultState);
@@ -1344,6 +1389,8 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("presence", forwardTeamPresence);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
+      remoteServers.on("attachmentDownload", forwardAttachmentDownload);
+      remoteServers.on("attachmentImportProgress", forwardAttachmentImportProgress);
       // Machine alerts are hidden for now: the check does not start, and no alert notification shows.
       // The selected server connects while the window loads. Its WebRTC setup takes seconds, and
       // the first screen waits for it. The other servers start after the load, below. The connection
@@ -1409,14 +1456,16 @@ if (!hasSingleInstanceLock) {
         interfaceSize,
         language.translate,
         () => windowHolder.current,
+        quitFor,
         runGrokBotUsageDiagnostic,
       );
-      // The way back to a window hidden in the background on Windows and Linux.
+      // The way back to a window hidden in the background.
       backgroundTray = createBackgroundTray({
         icon: appIconColorImage ?? nativeImage.createFromPath(appIconPath),
+        menuBarIcon: loadMenuBarIcon(),
         translate: language.translate,
         open: reopenMainWindow,
-        quit: () => app.quit(),
+        quit: () => quitFor("tray"),
       });
       const tray = backgroundTray;
       tray.sync(appBehavior.keepRunningInBackground);
@@ -1435,6 +1484,7 @@ if (!hasSingleInstanceLock) {
           interfaceSize,
           language.translate,
           () => windowHolder.current,
+          quitFor,
           runGrokBotUsageDiagnostic,
         );
         tray.relabel();
@@ -1638,6 +1688,21 @@ app.on("before-quit", (event) => {
   void prepareForShutdown().finally(() => app.quit());
 });
 
+/** Null outside macOS, or when the file is missing: the tray then shows the app icon. */
+function loadMenuBarIcon(): NativeImage | null {
+  if (process.platform !== "darwin") return null;
+  const icon = nativeImage.createFromPath(
+    resolveMenuBarIconPath({
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      sourceRoot: resolve(__dirname, "../.."),
+    }),
+  );
+  if (!icon.isEmpty()) return icon;
+  logger.warn("The menu bar icon is missing.");
+  return null;
+}
+
 function reopenMainWindow(): void {
   void windows
     .ensureMainWindow()
@@ -1667,6 +1732,7 @@ function forceExitAfterShutdownDeadline(deadlineMs: number): void {
  * so Squirrel gets that time less the teardown.
  */
 async function prepareForUpdateInstall(deadlineMs = UPDATE_INSTALL_TIMEOUT_MS): Promise<void> {
+  recordExit("update");
   if (services) await runCauseEffect(services.browser.flushPersistentStorage());
   await prepareForShutdown(deadlineMs);
 }

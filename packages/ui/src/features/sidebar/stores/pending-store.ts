@@ -24,7 +24,9 @@ interface SidebarPendingDelete {
 }
 
 /** What the section editor is editing: a section about to exist, or the one being renamed. */
-type SidebarSectionEditorTarget = { kind: "create"; agentId?: string } | { kind: "rename"; sectionId: string };
+type SidebarSectionEditorTarget =
+  | { kind: "create"; agentId?: string; parentId?: string }
+  | { kind: "rename"; sectionId: string };
 
 /**
  * The open section-name editor. The name as typed, its validation message and the save in flight
@@ -147,14 +149,15 @@ export function createSidebarPendingStore(deps: {
     });
   }
 
-  function startCreateSection(agentId?: string): void {
+  /** Opens the name editor for a new folder, at the top or in `parentId`, with `agentId` in it. */
+  function startCreateSection(agentId?: string, parentId?: string): void {
     props.onExpand();
     setPending((state) => {
       state.sectionEditor = {
         error: null,
         name: "",
         saving: false,
-        target: { kind: "create", ...(agentId ? { agentId } : {}) },
+        target: { kind: "create", ...(agentId ? { agentId } : {}), ...(parentId ? { parentId } : {}) },
       };
     });
     focusSectionName();
@@ -212,7 +215,12 @@ export function createSidebarPendingStore(deps: {
     try {
       await props.onMutateLayout(
         target.kind === "create"
-          ? { type: "create", name, ...(target.agentId ? { agentId: target.agentId } : {}) }
+          ? {
+              type: "create",
+              name,
+              ...(target.agentId ? { agentId: target.agentId } : {}),
+              ...(target.parentId ? { parentId: target.parentId } : {}),
+            }
           : { type: "rename", sectionId: target.sectionId, name },
       );
       // The editor closes on success, which is also what releases the save it was holding.

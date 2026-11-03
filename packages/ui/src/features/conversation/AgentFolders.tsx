@@ -1,5 +1,5 @@
 /**
- * The folders a local agent can change besides its workspace and the shared folder, and the folders in
+ * The folders an agent can change besides its workspace and the shared folder, and the folders in
  * them that it must not change: the Folders row of the settings panel, its page, and the folder half
  * of the chat's drop overlay. With Ask first or Full access the agent can change all files, so the
  * folders apply only in Workspace only.
@@ -40,8 +40,11 @@ export interface AgentFolderCalls {
   choose: (agentId: string, replace?: string) => Promise<AgentFolderChange>;
   add: (agentId: string, path: string) => Promise<AgentFolderChange>;
   remove: (agentId: string, path: string) => Promise<AgentFolderChange>;
-  /** Adds a folder dragged from the computer's file manager. */
-  drop: (agentId: string, folder: File) => Promise<AgentFolderChange>;
+  /**
+   * Adds a folder dragged from the computer's file manager. Absent when the agent runs on another
+   * computer: a folder of this computer is not on the host.
+   */
+  drop?: ((agentId: string, folder: File) => Promise<AgentFolderChange>) | undefined;
   /** Opens the folder picker for a folder the agent must not change. */
   exclude: (agentId: string) => Promise<AgentExclusionChange>;
   addExclusion: (agentId: string, path: string) => Promise<AgentExclusionChange>;
@@ -273,9 +276,14 @@ export function createAgentFolders(source: () => AgentFolderSource | undefined) 
     remove: (path: string) => act(({ agentId, calls }) => calls.remove(agentId, path)),
     exclude: () => actExclusion(({ agentId, calls }) => calls.exclude(agentId)),
     include: (path: string) => actExclusion(({ agentId, calls }) => calls.include(agentId, path)),
+    /** The agent's computer takes a folder dropped from this computer. */
+    canDrop: (): boolean => source()?.calls.drop !== undefined,
     /** One folder at a time, so each toast names its folder and the list ends with all of them. */
     async drop(folders: readonly File[]): Promise<void> {
-      for (const folder of folders) await act(({ agentId, calls }) => calls.drop(agentId, folder));
+      for (const folder of folders)
+        await act(async ({ agentId, calls }) =>
+          calls.drop ? calls.drop(agentId, folder) : { outcome: "cancelled", list: await calls.list(agentId) },
+        );
     },
     clearFlash(): void {
       setState((current) => {
@@ -288,16 +296,17 @@ export function createAgentFolders(source: () => AgentFolderSource | undefined) 
 export type AgentFolders = ReturnType<typeof createAgentFolders>;
 
 /** Drag handlers for a place that takes a dropped folder, with the state that shows it. */
-function createFolderDropTarget(onDrop: (folders: readonly File[]) => void) {
+function createFolderDropTarget(onDrop: (folders: readonly File[]) => void, enabled: () => boolean = () => true) {
   const [over, setOver] = createSignal(false);
+  const takes = (event: DragEvent) => enabled() && carriesFiles(event);
   return {
     over,
     handlers: {
       onDragEnter: (event: DragEvent) => {
-        if (carriesFiles(event)) setOver(true);
+        if (takes(event)) setOver(true);
       },
       onDragOver: (event: DragEvent) => {
-        if (!carriesFiles(event)) return;
+        if (!takes(event)) return;
         event.preventDefault();
         // The chat under the panel does not attach what the user drops here.
         event.stopPropagation();
@@ -310,6 +319,7 @@ function createFolderDropTarget(onDrop: (folders: readonly File[]) => void) {
       },
       onDrop: (event: DragEvent) => {
         setOver(false);
+        if (!enabled()) return;
         const folders = droppedFolders(event.dataTransfer);
         if (!folders) return;
         event.preventDefault();
@@ -332,7 +342,7 @@ export function AgentFoldersRow(props: {
   ref?: (element: HTMLButtonElement) => void;
 }) {
   const { t } = useText();
-  const drop = createFolderDropTarget((folders) => void props.folders.drop(folders));
+  const drop = createFolderDropTarget((folders) => void props.folders.drop(folders), props.folders.canDrop);
   const list = () => props.folders.state.list;
   const added = () => list()?.folders.length ?? 0;
   const lost = () => list()?.folders.filter((folder) => !folder.found).length ?? 0;
@@ -516,7 +526,7 @@ export function AgentFoldersPage(props: {
   onChangeAccess: () => void;
 }) {
   const { t } = useText();
-  const drop = createFolderDropTarget((folders) => void props.folders.drop(folders));
+  const drop = createFolderDropTarget((folders) => void props.folders.drop(folders), props.folders.canDrop);
   // The rows that are there when the page opens do not animate in; a folder added later does.
   let opened = false;
   onSettled(() => {

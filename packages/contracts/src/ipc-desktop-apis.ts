@@ -14,6 +14,10 @@ export interface AgentDesktopApi extends PathApi<"agent"> {
   /** Gives the agent a folder that the user dropped. The preload reads its path; the page never does. */
   addDroppedAgentFolder: (agentId: string, folder: File) => Promise<AgentFolderChange>;
   onAttachmentImport: (listener: (event: AttachmentImportEvent) => void) => () => void;
+  /** Sends the files of a failed import again. Its events keep the same request id. */
+  retryAttachmentImport: (requestId: string) => void;
+  /** Forgets the files of an import, so a failed one is no longer kept for a retry. */
+  discardAttachmentImport: (requestId: string) => void;
   onEvent: (listener: (event: AgentEvent) => void) => () => void;
 }
 
@@ -76,6 +80,7 @@ export type SkillsDesktopApi = GroupApi<IpcEndpoints["skills"]>;
 
 export type HostedSitesDesktopApi = GroupApi<IpcEndpoints["hostedSites"]>;
 export type GitHubConnectorDesktopApi = GroupApi<IpcEndpoints["githubConnector"]>;
+export type LinkAccountDesktopApi = GroupApi<IpcEndpoints["linkAccount"]>;
 export type OnePasswordConnectorDesktopApi = GroupApi<IpcEndpoints["onePasswordConnector"]>;
 export type BillingDesktopApi = GroupApi<IpcEndpoints["billing"]>;
 export type LicenseDesktopApi = GroupApi<IpcEndpoints["license"]>;

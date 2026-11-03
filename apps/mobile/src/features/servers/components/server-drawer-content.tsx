@@ -79,6 +79,10 @@ interface ServerDrawerContentProps {
   onNavigate: (href: Href) => void;
   onLeave: (serverId: string) => Promise<void>;
   onRemove: (serverId: string) => Promise<void>;
+  /** Deletes a server that an OpenBot desktop app runs beside its own server, through that app. */
+  onDelete: (serverId: string) => Promise<void>;
+  /** See `MobileWorkspaceState.localServerKind`. */
+  localServerKind: (serverId: string) => "computer" | "onComputer" | null;
   onReorder: (serverIds: string[]) => boolean;
   onSelectServer: (serverId: string) => void;
 }
@@ -90,7 +94,32 @@ function serverDetail(server: MobileServer, t: MobileTranslate): string {
   return pending || server.state === "error" ? `${label} · ${serverStatusLabel(server, t)}` : label;
 }
 
-type ServerExit = "leave" | "remove";
+type ServerExit = "leave" | "remove" | "delete";
+
+const EXIT_TEXT = {
+  leave: {
+    action: "mobile.server.settings.leave",
+    title: "mobile.server.settings.leaveTitle",
+    body: "mobile.server.settings.leaveBody",
+    failed: "mobile.server.drawer.leaveFailed",
+  },
+  remove: {
+    action: "mobile.server.settings.remove",
+    title: "mobile.server.settings.removeTitle",
+    body: "mobile.server.settings.removeBody",
+    failed: "mobile.server.drawer.removeFailed",
+  },
+  delete: {
+    action: "mobile.server.settings.delete",
+    title: "mobile.server.settings.deleteTitle",
+    body: "mobile.server.settings.deleteBody",
+    failed: "mobile.server.drawer.deleteFailed",
+  },
+} as const;
+
+function isServerExit(value: string): value is ServerExit {
+  return value === "leave" || value === "remove" || value === "delete";
+}
 
 function serverKindLabel(server: MobileServer, t: MobileTranslate): string {
   return server.kind === "local" ? t("mobile.server.drawer.local") : t("mobile.server.drawer.remote");
@@ -113,6 +142,8 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   onNavigate,
   onLeave,
   onRemove,
+  onDelete,
+  localServerKind,
   onReorder,
   onSelectServer,
 }: ServerDrawerContentProps) {
@@ -145,6 +176,10 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   // server, so Remove shows only after the hosted servers are known.
   function serverExit(server: MobileServer): ServerExit | null {
     if (server.role !== "owner") return "leave";
+    // The desktop app's own server stays while the app runs; a server beside it is deleted on its computer.
+    const kind = localServerKind(server.id);
+    if (kind === "computer") return null;
+    if (kind === "onComputer") return "delete";
     return hostedServerIds && !hostedServerIds.has(server.id) ? "remove" : null;
   }
   function menuActions(server: MobileServer): MenuAction[] {
@@ -160,7 +195,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
         subactions: [
           {
             id: exit,
-            title: exit === "leave" ? t("mobile.server.settings.leave") : t("mobile.server.settings.remove"),
+            title: t(EXIT_TEXT[exit].action),
             image: exit === "leave" ? "rectangle.portrait.and.arrow.right" : "trash",
             attributes: { destructive: true },
           },
@@ -171,28 +206,22 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
 
   // The server leaves the list after it succeeds, and the workspace selects another server if it was active.
   function confirmExit(server: MobileServer, exit: ServerExit) {
-    const leave = exit === "leave";
-    Alert.alert(
-      leave
-        ? t("mobile.server.settings.leaveTitle", { name: server.name })
-        : t("mobile.server.settings.removeTitle", { name: server.name }),
-      leave ? t("mobile.server.settings.leaveBody") : t("mobile.server.settings.removeBody"),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: leave ? t("mobile.server.settings.leave") : t("mobile.server.settings.remove"),
-          style: "destructive",
-          onPress: () => void exitServer(server, exit),
-        },
-      ],
-    );
+    const text = EXIT_TEXT[exit];
+    Alert.alert(t(text.title, { name: server.name }), t(text.body), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t(text.action),
+        style: "destructive",
+        onPress: () => void exitServer(server, exit),
+      },
+    ]);
   }
 
   async function exitServer(server: MobileServer, exit: ServerExit) {
     if (exiting.current) return;
     exiting.current = true;
     try {
-      await (exit === "leave" ? onLeave : onRemove)(server.id);
+      await (exit === "leave" ? onLeave : exit === "remove" ? onRemove : onDelete)(server.id);
       void haptics.notification("success");
     } catch (error) {
       void haptics.notification("error");
@@ -201,9 +230,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
       showFailureAlert(
         error,
         "team",
-        exit === "leave"
-          ? text.t("mobile.server.drawer.leaveFailed", { name: server.name })
-          : text.t("mobile.server.drawer.removeFailed", { name: server.name }),
+        text.t(EXIT_TEXT[exit].failed, { name: server.name }),
         text.errorMessage(error, text.t("mobile.server.drawer.actionFailed")),
       );
     } finally {
@@ -248,12 +275,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     const serverLabel = serverKindLabel(serverItem, t);
     const exit = serverExit(serverItem);
     const accessibilityActions = [
-      ...(editing
-        ? []
-        : [
-            ...(exit === "leave" ? [{ name: "leave", label: t("mobile.server.settings.leave") }] : []),
-            ...(exit === "remove" ? [{ name: "remove", label: t("mobile.server.settings.remove") }] : []),
-          ]),
+      ...(editing ? [] : [...(exit ? [{ name: exit, label: t(EXIT_TEXT[exit].action) }] : [])]),
       ...(listIndex > 0 ? [{ name: "moveUp", label: t("mobile.server.drawer.moveUp") }] : []),
       ...(listIndex >= 0 && listIndex < serverIds.length - 1
         ? [{ name: "moveDown", label: t("mobile.server.drawer.moveDown") }]
@@ -268,7 +290,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
         accessibilityActions={accessibilityActions}
         onAccessibilityAction={(event) => {
           const action = event.nativeEvent.actionName;
-          if (action === "leave" || action === "remove") confirmExit(serverItem, action);
+          if (isServerExit(action)) confirmExit(serverItem, action);
           if (action === "moveUp") move(serverItem.id, listIndex - 1);
           if (action === "moveDown") move(serverItem.id, listIndex + 1);
         }}
@@ -342,8 +364,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
         actions={actions}
         onPressAction={(event) => {
           if (event.nativeEvent.event === "reorder") setEditing(true);
-          if (event.nativeEvent.event === "leave" || event.nativeEvent.event === "remove")
-            confirmExit(serverItem, event.nativeEvent.event);
+          if (isServerExit(event.nativeEvent.event)) confirmExit(serverItem, event.nativeEvent.event);
         }}
       >
         {renderRow(serverItem, rowWidth)}

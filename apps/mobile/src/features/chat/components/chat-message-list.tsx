@@ -551,9 +551,9 @@ const MessageRow = memo(function MessageRow({
     message.kind === "message"
       ? ((message.imageGeneration ? message.attachments?.slice(1) : message.attachments) ?? [])
       : [];
-  // Two or more images in an agent's reply show together, as on desktop.
-  const gallery =
-    message.kind === "message" && message.author === "agent" && !upload ? files.filter(isViewableImage) : [];
+  // Two or more images in one message show together, as on desktop. A message that is still
+  // uploading keeps one row for each file, with its progress.
+  const gallery = message.kind === "message" && !upload ? files.filter(isViewableImage) : [];
   const rendered =
     message.kind === "routine" ? (
       <RoutineMarkerRow key={message.id} message={message} muted={muted} />
@@ -568,6 +568,7 @@ const MessageRow = memo(function MessageRow({
     ) : message.kind === "question" ? (
       <ChatQuestionPrompt
         key={message.id}
+        serverId={serverId}
         prompt={message.prompt}
         uiBlock={message.uiBlock}
         controller={questionForm}
@@ -616,7 +617,13 @@ const MessageRow = memo(function MessageRow({
             serverId={serverId}
           />
         ) : null}
-        {gallery.length > 1 ? <ChatImageGallery attachments={gallery} serverId={serverId} /> : null}
+        {gallery.length > 1 ? (
+          <ChatImageGallery
+            attachments={gallery}
+            serverId={serverId}
+            alignment={message.author === "user" ? "right" : "left"}
+          />
+        ) : null}
         {(gallery.length > 1 ? files.filter((attachment) => !isViewableImage(attachment)) : files).map(
           (attachment, index) => (
             <ChatAttachmentView

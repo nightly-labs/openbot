@@ -3,6 +3,7 @@ import { sourceText } from "@openbot/i18n/source";
 import type { Logger } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
 import type { AgentApiKeys } from "../agent-api-keys";
+import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
 import { causeHelpers } from "../effect-boundary";
@@ -27,6 +28,12 @@ export interface AgentRemovalHooks {
   cancelMemoryReview(agentId: string): Effect.Effect<void>;
   /** Stops the agent's own provider process, which runs in its workspace. */
   stopAgentProcess(agentId: string): Effect.Effect<void, AgentRemovalFailed>;
+  /** The provider's shared client, which can hold a session of the agent that the conversation does not list. */
+  currentClient(provider: AgentProvider): AgentClient | null;
+  /** Whether a usage limit holds the agent's queue. */
+  usageLimitHolds(agentId: string): boolean;
+  /** Waits for a model move of the agent that already runs. A move that starts later sees the deletion. */
+  settleModelMoves(agentId: string): Effect.Effect<void>;
 }
 
 export interface AgentRemovalOptions {
@@ -107,7 +114,12 @@ export class AgentRemoval {
     return this.#deleting;
   }
 
-  /** Fails as `delete` would when the agent is being deleted, has an active turn or an unfinished delivery. */
+  /**
+   * Fails as `delete` would when the agent is being deleted, has an active turn or compaction, or an
+   * unfinished delivery.
+   * While a usage limit holds the agent, only started work blocks: the hold can last for days, and
+   * the messages that wait for it go with the agent.
+   */
   readonly ensureDeletable = Effect.fn("AgentRemoval.ensureDeletable")(function* (this: AgentRemoval, agentId: string) {
     yield* removalStep(() => this.#deletable(agentId));
   });
@@ -123,8 +135,16 @@ export class AgentRemoval {
       }),
       ({ wasPending }) =>
         Effect.gen({ self: this }, function* () {
+          // The drain and the model moves now leave this agent alone. Work that started before can still
+          // start a queued message, a compaction or a model move, so wait for it and check again.
+          yield* this.#drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void;
+          yield* this.#hooks.settleModelMoves(agentId);
+          const current = yield* removalStep(() => {
+            this.#assertIdle(agentId);
+            return this.#store.list().find((entry) => entry.id === agentId) ?? agent;
+          });
           yield* removalStep(() => this.#routines.arm());
-          yield* this.deleteData(agent ?? { id: agentId, threadId: null });
+          yield* this.deleteData(current ?? { id: agentId, threadId: null });
           yield* removalStep(() => {
             this.#channels.removeDeletedMembers(new Set(this.#store.list().map((candidate) => candidate.id)));
             this.#duplication.forget(agentId);
@@ -144,11 +164,22 @@ export class AgentRemoval {
 
   #deletable(agentId: string): AgentSummary | undefined {
     if (this.#deleting.has(agentId)) throw new Error(sourceText("error.agent.deletionBusy"));
-    const candidate = this.#store.list().find((entry) => entry.id === agentId);
-    if (this.#mailbox.hasUnfinishedDelivery(agentId) || this.#conversation.anyWorkingSnapshot(agentId)?.activeTurnId) {
+    this.#assertIdle(agentId);
+    return this.#store.list().find((entry) => entry.id === agentId);
+  }
+
+  #assertIdle(agentId: string): void {
+    // A held channel delivery keeps its assignment active, and the channel would wait for it forever.
+    const pendingWork = this.#hooks.usageLimitHolds(agentId)
+      ? this.#mailbox.hasStartedDelivery(agentId) || this.#channels.queueHold(agentId) !== null
+      : this.#mailbox.hasUnfinishedDelivery(agentId);
+    if (
+      pendingWork ||
+      this.#conversation.anyWorkingSnapshot(agentId)?.activeTurnId ||
+      this.#compaction.heldThreads(agentId).length > 0
+    ) {
       throw new Error(sourceText("error.agent.stopBeforeDelete"));
     }
-    return candidate;
   }
 
   readonly deleteData = Effect.fn("AgentRemoval.deleteData")(function* (
@@ -170,8 +201,16 @@ export class AgentRemoval {
     const providerSessions = yield* removalStep(() =>
       agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [],
     );
-    // Keep provider session records until their private files have been removed.
-    yield* this.#threads.releaseAgentSessions(agent.id);
+    // Keep provider session records until their private files have been removed. A shared client
+    // can still hold a recorded session that the conversation forgot, such as after another
+    // provider's exit or a history read (#4346).
+    yield* this.#threads.releaseAgentSessions(
+      agent.id,
+      providerSessions.map((session) => ({
+        externalThreadId: session.externalSessionId,
+        client: this.#hooks.currentClient(session.provider),
+      })),
+    );
     let stage = "provider-files";
     yield* Effect.gen({ self: this }, function* () {
       for (const session of providerSessions)

@@ -661,6 +661,10 @@ export class MailboxStore {
       messageId: string;
       text: string;
       draftIds: string[];
+      /** Local files that an agent gives with a request from another conversation. */
+      sourcePaths?: string[];
+      /** The user by default; the agent of a request from another conversation. */
+      sender?: StoredMessage["sender"];
       /** Throws when the channel can no longer take the request; runs after the copy. */
       assertOpen?: () => void;
     },
@@ -674,19 +678,13 @@ export class MailboxStore {
         if (draft.ownerEditId) throw new Error(sourceText("error.backend.attachmentInQueueEdit"));
         return draft;
       });
-      if (drafts.length > MAX_ATTACHMENTS)
+      const sourcePaths = [...drafts.map((draft) => draft.path), ...(input.sourcePaths ?? [])];
+      if (sourcePaths.length > MAX_ATTACHMENTS)
         throw new Error(sourceText("error.backend.attachLimit", { limit: MAX_ATTACHMENTS }));
-      const sender: StoredMessage["sender"] = { kind: "user" };
+      const sender: StoredMessage["sender"] = input.sender ?? { kind: "user" };
       const createdAt = new Date().toISOString();
       const attachments = yield* this.#files
-        .commitMessageTransfer(
-          input.messageId,
-          sender,
-          [],
-          input.messageId,
-          createdAt,
-          drafts.map((draft) => draft.path),
-        )
+        .commitMessageTransfer(input.messageId, sender, [], input.messageId, createdAt, sourcePaths)
         .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
       // The channel can be archived or deleted during the copy. Refuse before the drafts are
       // consumed, so the composer can send the same files again.

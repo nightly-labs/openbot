@@ -27,6 +27,7 @@ import {
   Download,
   Globe2,
   HardDrive,
+  History,
   KeyRound,
   Monitor,
   RefreshCw,
@@ -58,6 +59,7 @@ import { type HostProviderSettings, HostProviderSettingsPanel } from "../setting
 import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../settings/provider-prompt-cache";
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
+import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
 import { ServerDesktopPanel } from "./ServerDesktopPanel";
 import { createServerGeneralSection } from "./ServerGeneralSection";
 import type { ServerGrokBotOptions } from "./ServerGrokBotPanel";
@@ -224,6 +226,11 @@ export interface ServerSettingsModalProps {
    */
   agentAccess?: ServerAgentAccessOptions | undefined;
   /**
+   * The Audit log section appears only when a caller supplies this, and only for the local server or
+   * a remote host with `server-audit-v1` that this member administers.
+   */
+  serverAudit?: ServerAuditOptions | undefined;
+  /**
    * The Routines section appears only when a caller supplies this: the feed listens on this
    * computer, so a remote server passes nothing.
    */
@@ -256,6 +263,7 @@ export type ServerSettingsSection =
   | "vault"
   | "members"
   | "roles"
+  | "audit"
   | "desktop"
   | "mcp"
   | "storage"
@@ -275,6 +283,7 @@ const sections = {
   vault: { title: "server.settings.vaultTitle", description: "server.settings.vaultDescription" },
   members: { title: "server.settings.membersTitle", description: "server.settings.membersDescription" },
   roles: { title: "server.settings.rolesTitle", description: "server.settings.rolesDescription" },
+  audit: { title: "server.settings.auditTitle", description: "server.settings.auditDescription" },
   desktop: { title: "server.settings.desktopTitle", description: "server.settings.desktopDescription" },
   mcp: { title: "server.settings.mcpTitle", description: "server.settings.mcpDescription" },
   storage: { title: "server.settings.storageTitle", description: "server.settings.storageDescription" },
@@ -374,6 +383,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   };
   const general = createServerGeneralSection(host);
   const roles = createServerRolesSection(host, () => section() === "roles" || section() === "members");
+  const audit = createServerAuditSection(host, () => section() === "audit");
   const members = createServerMembersSection(
     host,
     {
@@ -438,6 +448,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         general.resetForServer();
         members.resetForServer();
         roles.resetForServer();
+        audit.resetForServer();
       }
       if (!editing) general.syncFromServer(name, logoUrl);
     },
@@ -446,6 +457,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   /** Roles leaves with the access that gives it: a host that goes offline or a role that changes. */
   createEffect(
     () => section() === "roles" && !roles.available(),
+    (gone) => {
+      if (gone) setSection("members");
+    },
+  );
+
+  /** The audit log leaves with the access that gives it, as Roles does. */
+  createEffect(
+    () => section() === "audit" && !audit.available(),
     (gone) => {
       if (gone) setSection("members");
     },
@@ -504,6 +523,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         value === "vault" ||
         value === "members" ||
         value === "roles" ||
+        value === "audit" ||
         value === "desktop" ||
         value === "mcp" ||
         value === "storage" ||
@@ -681,6 +701,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <span>{t(sections.roles.title)}</span>
               </Tabs.Trigger>
             </Show>
+            <Show when={audit.available()}>
+              <Tabs.Trigger class="settings-modal-nav-item" value="audit">
+                <History aria-hidden="true" />
+                <span>{t(sections.audit.title)}</span>
+              </Tabs.Trigger>
+            </Show>
             <Show when={remoteDesktopSection()}>
               <Tabs.Trigger class="settings-modal-nav-item" value="desktop">
                 <Monitor aria-hidden="true" />
@@ -772,6 +798,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Show when={roles.available()}>
           <Tabs.Content value="roles" class="settings-modal-tab-panel server-settings-panel" data-tab="roles">
             <roles.Panel />
+          </Tabs.Content>
+        </Show>
+        <Show when={audit.available()}>
+          <Tabs.Content value="audit" class="settings-modal-tab-panel server-settings-panel" data-tab="audit">
+            <audit.Panel />
           </Tabs.Content>
         </Show>
         <Show when={remoteDesktopSection()}>

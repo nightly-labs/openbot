@@ -35,6 +35,8 @@ export const messages = {
   "settings.launchAtLogin.description": "Otwieraj aplikację, gdy logujesz się na tym komputerze.",
   "settings.keepRunning.title": "Utrzymuj OpenBot w tle",
   "settings.keepRunning.description": "Aktywne zadania działają dalej po zamknięciu okna.",
+  "settings.menuBar.title": "Pokazuj OpenBot na pasku menu",
+  "settings.menuBar.description": "Otwieraj i zamykaj OpenBot z ikony na pasku menu.",
   "settings.keepAwake.title": "Nie usypiaj komputera",
   "settings.keepAwake.description":
     "Rutyny działają o czasie, gdy komputer jest podłączony do zasilania. Ekran nadal może się wyłączyć.",

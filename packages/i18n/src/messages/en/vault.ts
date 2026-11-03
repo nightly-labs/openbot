@@ -103,7 +103,26 @@ export const messages = defineMessages("vault", {
   "vault.unreadableTitle": "OpenBot cannot read the Vault",
   "vault.unreadableDescription":
     "The Vault file is on this computer, but OpenBot cannot decrypt it. This can occur when the system keychain changes. Reset the Vault to start again with no items.",
+  "vault.link.group": "Payment accounts",
+  "vault.link.name": "Link",
+  "vault.link.connect": "Connect",
+  "vault.link.cancel": "Cancel",
+  "vault.link.waiting": "Waiting for Link in your browser…",
+  "vault.link.actions": "Link actions",
+  "vault.link.disconnect": "Disconnect",
+  "vault.link.failed": "Could not change the Link connection.",
+  "vault.link.disconnectTitle": "Disconnect Link?",
+  "vault.link.disconnectDescription":
+    "Agents can no longer ask to pay with Link. Your Link account and its cards stay as they are.",
   "vault.reset": "Reset Vault",
   "vault.resetTitle": "Reset the Vault?",
   "vault.resetDescription": "OpenBot deletes the Vault file and all items in it. You cannot undo this.",
+  // Chat card: an agent asks the user to add a Vault item. The agent never sees its secrets.
+  "vault.request.private": "Goes to your Vault. {agent} never sees it.",
+  "vault.request.privateUnnamed": "Goes to your Vault. The agent never sees it.",
+  "vault.request.addLogin": "Add login",
+  "vault.request.addCard": "Add card",
+  "vault.request.addContact": "Add address",
+  "vault.request.notNow": "Not now",
+  "vault.request.saved": "Saved to Vault",
 });

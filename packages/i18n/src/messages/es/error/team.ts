@@ -66,8 +66,12 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Esta conexión no admite datos compartidos.",
   "error.team.agentInstallUnsupported": "Esta conexión no permite añadir agentes.",
   "error.team.agentHideUnsupported": "Esta conexión no permite ocultar agentes.",
+  "error.team.sidebarFoldersUnsupported": "Esta conexión no permite carpetas dentro de carpetas.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor no puede guardar tu propio nivel de notificaciones para cada agente. Actualiza OpenBot en el ordenador que lo ejecuta.",
+  "error.team.sidebarPinsUnsupported":
+    "Este servidor no puede guardar tus chats fijados para todos tus dispositivos. Actualiza OpenBot en el ordenador que lo ejecuta.",
+  "error.team.agentInstructionsUnsupported": "Esta conexión no permite editar las instrucciones de los agentes.",
   "error.team.agentPublishUnsupported": "Esta conexión no permite publicar agentes.",
   "error.team.agentUpdateUnsupported": "Esta conexión no permite actualizar agentes.",
   "error.team.contextResetUnsupported": "Esta conexión no permite iniciar un nuevo chat.",
@@ -92,6 +96,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Esta conexión no admite actualizaciones del host.",
   "error.team.hostTimezoneUnsupported": "Esta conexión no admite la zona horaria del servidor.",
   "error.team.hostKeyRotationUnsupported": "Esta conexión no admite cambiar la clave del servidor.",
+  "error.team.localServersUnsupported": "Esta conexión no admite servidores en este ordenador.",
   "error.team.routineResultsUnsupported": "Esta conexión no admite destinos de rutinas.",
   "error.team.agentMemoryLimitUnsupported": "Esta conexión no admite el límite de recuerdos de los agentes.",
   "error.team.agentFoldersUnsupported": "Esta conexión no admite las carpetas de los agentes.",

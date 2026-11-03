@@ -101,6 +101,11 @@ export interface ProviderConnectionOptions {
    * provider whose Connect is that sign-in has no Connect.
    */
   connectInBrowser?: (provider: AgentProviderId) => Promise<void>;
+  /**
+   * The browser sign-in of this computer with an account of the provider's mainland China site
+   * (`mainlandChinaSignInSite`). Without it, the ⋯ menu does not offer that site.
+   */
+  connectInMainlandChina?: (provider: AgentProviderId) => Promise<void>;
   openVerificationUrl: (url: string) => void;
   /** Opens the page that downloads the OpenBot app, for a provider that only the app can sign in. */
   openAppDownload?: () => void;
@@ -548,6 +553,12 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
       void startProviderCodeLogin(provider, relay ? "relay" : "host-page", null, accountId);
     },
     alternative: (provider, opener) => run(provider, route(provider).alternative, opener ?? null),
+    // Only the browser sign-in of this computer takes the region. A server's sign-in uses the global site.
+    mainlandChinaSite: (provider) =>
+      route(provider).connect === "browser" && options.connectInMainlandChina
+        ? (agentProviderDescriptor(provider).mainlandChinaSignInSite ?? null)
+        : null,
+    connectInMainlandChina: (provider) => options.connectInMainlandChina?.(provider) ?? Promise.resolve(),
     useApp,
     closeUseApp: () => setUseApp(null),
     openAppDownload: options.openAppDownload,

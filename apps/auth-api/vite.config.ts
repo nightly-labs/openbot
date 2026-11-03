@@ -25,6 +25,11 @@ export default defineConfig(({ command }) => {
         "@openbot/renderer-web": rendererWebAlias,
       },
     },
+    optimizeDeps: {
+      // bloub finds its plush images with `new URL(..., import.meta.url)`. A pre-bundle moves the
+      // code away from the images, so Vite serves the package as it is.
+      exclude: ["@norbert_bodziony/bloub", "@norbert_bodziony/bloub/plush"],
+    },
     // Vite removes license comments by default. The home page beam's license requires its notice
     // in each copy, so the minifier moves `/*!` and `@license` comments to the end of each file.
     esbuild: { legalComments: "eof" },
@@ -53,6 +58,11 @@ export default defineConfig(({ command }) => {
       cloudflare({
         viteEnvironment: { name: "ssr" },
         config(config) {
+          // `vite dev` runs no relay Worker, so local email leaves from the local socket. The plugin
+          // merges arrays from the return value, so the binding must leave the config it passes.
+          if (command === "serve") {
+            config.services = config.services?.filter((service) => service.binding !== "EMAIL_RELAY");
+          }
           return { vars: { ...config.vars, ...localRuntimeVars } };
         },
       }),
@@ -114,21 +124,41 @@ function lazyLanguageCatalogs(): Plugin {
   };
 }
 
-const BLOUB_PACKAGE = "@norbert_bodziony/bloub";
+const BLOUB_ENTRIES = ["@norbert_bodziony/bloub", "@norbert_bodziony/bloub/plush"] as const;
+
+/** The plush build finds each picture with a `new URL()` of `./assets/<file>` on `import.meta.url`. */
+const BLOUB_ASSET_URL = /new URL\(`(\.\/assets\/[\w.-]+\.webp)`,\s*import\.meta\.url\)\.href/g;
 
 /**
  * The Cloudflare plugin gives the Worker the `browser` export condition, which selects the DOM
  * build of bloub. That build calls `template()` when it loads, and the Solid server runtime throws
- * there, so every request failed with a 500. The Worker takes the server build instead.
+ * there, so every request failed with a 500. The Worker takes the server build of each entry instead.
+ *
+ * Vite rewrites `new URL(..., import.meta.url)` for the browser only. In the Worker, the plush
+ * pictures would point at the module file, not at the site. Each one becomes a `?url` import, which
+ * gives the same `/assets/` file that the browser build emits.
  */
 function bloubServerBuild(): Plugin {
-  const serverEntry = fileURLToPath(import.meta.resolve(BLOUB_PACKAGE));
+  const serverEntries = new Map<string, string>(
+    BLOUB_ENTRIES.map((entry) => [entry, fileURLToPath(import.meta.resolve(entry))]),
+  );
+  const serverFiles = new Set(serverEntries.values());
   return {
     name: "openbot-bloub-server-build",
     enforce: "pre",
     applyToEnvironment: (environment) => environment.name === "ssr",
     resolveId(source) {
-      return source === BLOUB_PACKAGE ? serverEntry : null;
+      return serverEntries.get(source) ?? null;
+    },
+    transform(code, id) {
+      if (!serverFiles.has(id)) return null;
+      const imports: string[] = [];
+      const rewritten = code.replace(BLOUB_ASSET_URL, (_match, path: string) => {
+        const name = `bloubAsset${imports.length}`;
+        imports.push(`import ${name} from ${JSON.stringify(`${path}?url`)};`);
+        return name;
+      });
+      return imports.length === 0 ? null : { code: `${imports.join("\n")}\n${rewritten}`, map: null };
     },
   };
 }

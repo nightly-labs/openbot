@@ -25,6 +25,8 @@ export interface WorkerBindings {
   EMAIL_FROM?: string;
   /** The sender of license emails. Empty uses `EMAIL_FROM`. The SMTP account must be allowed to send as it. */
   EMAIL_LICENSE_FROM?: string;
+  /** The email relay Worker. Without it, email leaves from this Worker's own socket. */
+  EMAIL_RELAY?: Fetcher;
   EMAIL_DELIVERY_WEBHOOK_URL?: string;
   EMAIL_DELIVERY_WEBHOOK_SECRET?: string;
   SKILLS_ADMIN_TOKEN?: string;

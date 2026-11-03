@@ -1,12 +1,14 @@
 import { Effect, Schema } from "effect";
 // Computer Use, local scripts, the busy-message mode, the backup models, the task limit, the agent's
-// own new chats and the plan card of one agent, as this computer holds them. The
-// `agent-host-settings-v1`, `agent-backup-models-v1`, `agent-task-limit-v1`, `agent-new-chat-v1` and
-// `agent-plan-card-v1` host routes use this, and they write through `AgentService.updateAgent`, the
+// own new chats, the plan card and the fast mode of one agent, as this computer holds them. The
+// `agent-host-settings-v1`, `agent-backup-models-v1`, `agent-task-limit-v1`, `agent-new-chat-v1`,
+// `agent-plan-card-v1` and `agent-fast-mode-v1` host routes use this, and they write through `AgentService.updateAgent`, the
 // writer of the local window, so a remote admin changes the same state.
 
 import {
   type AgentBackupModelSettings,
+  type AgentFastModel,
+  type AgentFastModeSettings,
   type AgentHostSettings,
   type AgentNewChatSettings,
   type AgentPlanCardSettings,
@@ -17,6 +19,7 @@ import {
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
   type UpdateAgentBackupModelsInput,
+  type UpdateAgentFastModeInput,
   type UpdateAgentHostSettingsInput,
   type UpdateAgentNewChatInput,
   type UpdateAgentPlanCardInput,
@@ -30,7 +33,7 @@ import type { AgentDefaultsPreferenceStore } from "./agent-defaults-preference-s
 import type { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
 
 export interface AgentHostSettingsDependencies {
-  agents: Pick<AgentService, "listAgents" | "updateAgent">;
+  agents: Pick<AgentService, "listAgents" | "listModels" | "updateAgent">;
   busyMessageMode: Pick<BusyMessageModePreferenceStore, "get">;
   agentDefaults: Pick<AgentDefaultsPreferenceStore, "get">;
 }
@@ -48,6 +51,10 @@ export interface AgentHostSettingsService {
   updateNewChat(input: UpdateAgentNewChatInput): Effect.Effect<AgentNewChatSettings, AgentHostSettingsFailure>;
   readPlanCard(agentId: string): AgentPlanCardSettings;
   updatePlanCard(input: UpdateAgentPlanCardInput): Effect.Effect<AgentPlanCardSettings, AgentHostSettingsFailure>;
+  readFastMode(agentId: string): AgentFastModeSettings;
+  updateFastMode(input: UpdateAgentFastModeInput): Effect.Effect<AgentFastModeSettings, AgentHostSettingsFailure>;
+  /** The models of this computer that have a fast service tier. The released model list drops the tier. */
+  listFastModels(): AgentFastModel[];
 }
 
 export function createAgentHostSettings({
@@ -134,6 +141,18 @@ export function createAgentHostSettings({
     const agent = yield* agents.updateAgent({ agentId, quickAcknowledgement }).pipe(toAgentHostSettingsFailure);
     return planCard(agent);
   });
+  const fastMode = (agent: AgentSummary): AgentFastModeSettings => ({ fastMode: agent.fastMode ?? null });
+  const updateFastMode = Effect.fn("AgentHostSettings.updateFastMode")(function* ({
+    agentId,
+    fastMode: next,
+  }: UpdateAgentFastModeInput) {
+    yield* Effect.try({
+      try: () => requireAgent(agentId),
+      catch: (cause) => new AgentHostSettingsFailure({ cause }),
+    });
+    const agent = yield* agents.updateAgent({ agentId, fastMode: next }).pipe(toAgentHostSettingsFailure);
+    return fastMode(agent);
+  });
   return {
     read: (agentId) => settings(requireAgent(agentId)),
     update: (input) => update(input).pipe(Effect.uninterruptible),
@@ -145,6 +164,12 @@ export function createAgentHostSettings({
     updateNewChat: (input) => updateNewChat(input).pipe(Effect.uninterruptible),
     readPlanCard: (agentId) => planCard(requireAgent(agentId)),
     updatePlanCard: (input) => updatePlanCard(input).pipe(Effect.uninterruptible),
+    readFastMode: (agentId) => fastMode(requireAgent(agentId)),
+    updateFastMode: (input) => updateFastMode(input).pipe(Effect.uninterruptible),
+    listFastModels: () =>
+      agents
+        .listModels()
+        .flatMap(({ provider, id, fastServiceTier }) => (fastServiceTier ? [{ provider, id, fastServiceTier }] : [])),
   };
 }
 

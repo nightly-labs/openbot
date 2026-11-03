@@ -35,6 +35,8 @@ export const messages = {
   "settings.launchAtLogin.description": "Open de app wanneer je inlogt op deze computer.",
   "settings.keepRunning.title": "Laat OpenBot op de achtergrond draaien",
   "settings.keepRunning.description": "Laat actieve taken doorlopen nadat je het venster sluit.",
+  "settings.menuBar.title": "OpenBot in de menubalk tonen",
+  "settings.menuBar.description": "Open of stop OpenBot via een symbool in de menubalk.",
   "settings.keepAwake.title": "Houd deze computer wakker",
   "settings.keepAwake.description":
     "Routines starten op tijd zolang de computer op netstroom is aangesloten. Het scherm kan nog steeds uitgaan.",

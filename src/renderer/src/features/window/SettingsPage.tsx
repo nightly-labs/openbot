@@ -13,13 +13,20 @@ import {
   navItem,
   navItems,
   type SettingsTab,
+  settingsRowShown,
   settingsTabShown,
 } from "../settings/settings-tabs";
 import { ServerSettingsPageTitle, SettingsPageFrame } from "./SettingsPageFrame";
 import { type SettingsKind, useWindowPage } from "./window-page-context";
 
 /** A personal search entry: a tab, or a row of a tab. A row has an anchor; a tab has none and opens at the top. */
-type PersonalRow = { tab: SettingsTab; titleKey: AppTextKey; descriptionKey?: AppTextKey; anchor?: AppTextKey };
+type PersonalRow = {
+  tab: SettingsTab;
+  titleKey: AppTextKey;
+  descriptionKey?: AppTextKey;
+  anchor?: AppTextKey;
+  macOS?: boolean;
+};
 
 /** A section of the active server's settings. A user looks for providers in the user settings too. */
 type ServerRow = { section: ServerSettingsSection; titleKey: AppTextKey; descriptionKey: AppTextKey };
@@ -82,7 +89,9 @@ export function SettingsPage(props: { kind: SettingsKind }) {
   /** The rows of the tabs shown on this computer, then the sections that the active server's settings show. */
   const searchRows = (): SearchRow[] => {
     const server = activeServer();
-    const personal = SEARCH_ROWS.filter((row) => tabShown(row.tab));
+    const personal = SEARCH_ROWS.filter(
+      (row) => tabShown(row.tab) && settingsRowShown(row, platform.appInfo()?.platform),
+    );
     if (!server) return personal;
     return [
       ...personal,

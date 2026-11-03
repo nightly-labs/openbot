@@ -67,8 +67,12 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Esta conexão não oferece suporte a dados compartilhados.",
   "error.team.agentInstallUnsupported": "Esta conexão não oferece suporte à adição de agentes.",
   "error.team.agentHideUnsupported": "Esta conexão não oferece suporte à ocultação de agentes.",
+  "error.team.sidebarFoldersUnsupported": "Esta conexão não oferece suporte a pastas dentro de pastas.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor não pode guardar seu próprio nível de notificações para cada agente. Atualize o OpenBot no computador que o executa.",
+  "error.team.sidebarPinsUnsupported":
+    "Este servidor não consegue guardar as suas conversas fixadas para todos os seus dispositivos. Atualize o OpenBot no computador que o executa.",
+  "error.team.agentInstructionsUnsupported": "Esta conexão não oferece suporte à edição das instruções dos agentes.",
   "error.team.agentPublishUnsupported": "Esta conexão não oferece suporte à publicação de agentes.",
   "error.team.agentUpdateUnsupported": "Esta conexão não oferece suporte à atualização de agentes.",
   "error.team.contextResetUnsupported": "Esta conexão não oferece suporte ao início de um novo chat.",
@@ -94,6 +98,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Esta conexão não oferece suporte a atualizações do computador anfitrião.",
   "error.team.hostTimezoneUnsupported": "Esta conexão não oferece suporte ao fuso horário do servidor.",
   "error.team.hostKeyRotationUnsupported": "Esta conexão não oferece suporte à alteração da chave do servidor.",
+  "error.team.localServersUnsupported": "Esta conexão não oferece suporte a servidores neste computador.",
   "error.team.routineResultsUnsupported": "Esta conexão não oferece suporte a destinos de rotinas.",
   "error.team.agentMemoryLimitUnsupported": "Esta conexão não oferece suporte ao limite de memórias dos agentes.",
   "error.team.agentFoldersUnsupported": "Esta conexão não oferece suporte às pastas dos agentes.",

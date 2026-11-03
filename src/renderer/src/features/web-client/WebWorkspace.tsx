@@ -13,7 +13,9 @@ import {
   type ClientAgentModelOption,
   canAdministerServer,
   decodeAgentBackupModelSettings,
+  decodeAgentFastModeSettings,
   decodeAgentHostSettings,
+  decodeAgentNewChatSettings,
   decodeAgentPlanCardSettings,
   decodeAgentTaskLimitSettings,
   type ServerConnectionState,
@@ -22,8 +24,10 @@ import {
 import type { PricingOrder } from "@openbot/contracts/license";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_FAST_MODE_ROUTES } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
+import { AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
@@ -56,6 +60,7 @@ import {
   getAgentAdminSettings,
   getHostAgentAccess,
   getHostAgentMemoryLimit,
+  getHostAuditLog,
   getHostMemoryReview,
   getHostPromptCacheTtl,
   getHostReleaseStatus,
@@ -178,6 +183,7 @@ import type { ScheduleRoutine } from "../schedule/SchedulePanel";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
+import type { HostServerAuditCalls } from "../servers/ServerAuditSection";
 import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
 import type { HostMemoryReviewCalls } from "../servers/ServerMemoryReviewSetting";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
@@ -815,12 +821,26 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           agentId,
           taskLimit,
         }),
+      getAgentNewChat: (agentId, serverId) =>
+        hostRequest(serverId)("POST", AGENT_NEW_CHAT_ROUTES.settings, decodeAgentNewChatSettings, { agentId }),
+      updateAgentNewChat: ({ agentId, allowNewChat }, serverId) =>
+        hostRequest(serverId)("POST", AGENT_NEW_CHAT_ROUTES.update, decodeAgentNewChatSettings, {
+          agentId,
+          allowNewChat,
+        }),
       getAgentPlanCard: (agentId, serverId) =>
         hostRequest(serverId)("POST", AGENT_PLAN_CARD_ROUTES.settings, decodeAgentPlanCardSettings, { agentId }),
       updateAgentPlanCard: ({ agentId, quickAcknowledgement }, serverId) =>
         hostRequest(serverId)("POST", AGENT_PLAN_CARD_ROUTES.update, decodeAgentPlanCardSettings, {
           agentId,
           quickAcknowledgement,
+        }),
+      getAgentFastMode: (agentId, serverId) =>
+        hostRequest(serverId)("POST", AGENT_FAST_MODE_ROUTES.settings, decodeAgentFastModeSettings, { agentId }),
+      updateAgentFastMode: ({ agentId, fastMode }, serverId) =>
+        hostRequest(serverId)("POST", AGENT_FAST_MODE_ROUTES.update, decodeAgentFastModeSettings, {
+          agentId,
+          fastMode,
         }),
       getAgentAdminSettings: (agentId, serverId) =>
         runTeamEffect(
@@ -844,6 +864,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
     const taskLimit = remoteAgentAdmin.taskLimit();
     const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
+    const fastMode = remoteAgentAdmin.fastMode();
+    const computerUse = remoteAgentAdmin.computerUse();
+    const allowNewChat = remoteAgentAdmin.allowNewChat();
     return agent
       ? {
           ...agent,
@@ -854,6 +877,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           ...(usageLimitReturn ? { usageLimitReturn } : {}),
           ...(typeof taskLimit === "number" ? { taskLimit } : {}),
           ...(quickAcknowledgement === undefined ? {} : { quickAcknowledgement }),
+          ...(typeof fastMode === "boolean" ? { fastMode } : {}),
+          ...(computerUse === undefined ? {} : { computerUse }),
+          ...(allowNewChat === undefined ? {} : { allowNewChat }),
         }
       : agent;
   });
@@ -1157,6 +1183,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(getHostAgentAccess(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setAgentAccess: async (change, serverId) =>
       runTeamEffect(setHostAgentAccess(hostRequest(serverId), change).pipe(Effect.mapError((error) => error.cause))),
+  };
+  const hostServerAuditCalls: HostServerAuditCalls = {
+    getAuditLog: async (serverId) =>
+      runTeamEffect(getHostAuditLog(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
   };
   const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
   /** Set when the Marketplace asked for the form that adds an MCP server, until the MCP section opens it. */
@@ -2061,6 +2091,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     layoutMutable={
                       workspace.state.status === "online" && workspace.state.capabilities.includes("sidebar-layout")
                     }
+                    foldersSupported={
+                      workspace.state.status === "online" && workspace.state.capabilities.includes("sidebar-folders-v1")
+                    }
                     collapsedSectionIds={workspace.preferences.collapsedSidebarSectionIds()}
                     onMutateLayout={workspace.mutateSidebarLayout}
                     sectionDuplicateSupported={
@@ -2314,6 +2347,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         memoryReview={{ calls: hostMemoryReviewCalls }}
                         hostPromptCacheTtl={{ calls: hostPromptCacheTtlCalls }}
                         agentAccess={{ calls: hostAgentAccessCalls, listAgents: () => workspace.runtime.listAgents() }}
+                        serverAudit={{ calls: hostServerAuditCalls, listAgents: () => workspace.runtime.listAgents() }}
                         browserProfiles={browserProfileSettings()}
                         vault={vaultSettings()}
                         // Any member imports into a host with `agent-import-v1`.
@@ -2763,6 +2797,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
                   remoteTaskLimitLoaded={remoteAgentAdmin.taskLimit() !== undefined}
                   remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
+                  remoteComputerUseLoaded={remoteAgentAdmin.computerUse() !== undefined}
+                  remoteNewChatLoaded={remoteAgentAdmin.allowNewChat() !== undefined}
                   remoteBusyMessageModeLoaded={remoteAgentAdmin.busyMessageMode() !== undefined}
                   defaultBusyMessageMode={remoteAgentAdmin.defaultBusyMessageMode()}
                   onUpdateAgentPermissions={remoteAgentAdmin.settings() ? remoteAgentAdmin.update : undefined}

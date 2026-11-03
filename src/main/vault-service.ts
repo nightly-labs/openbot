@@ -27,6 +27,7 @@ import type {
   VaultAgentChange,
   VaultAgentResult,
   VaultCardSecret,
+  VaultEnteredItem,
   VaultItems,
   VaultTypedLogin,
 } from "../backend/vault-items";
@@ -473,6 +474,21 @@ export class VaultService {
     return outcome.saved ?? (yield* vaultError("error.vault.itemMissing"));
   });
 
+  readonly #addEntered = Effect.fn("VaultService.addEntered")(function* (
+    this: VaultService,
+    item: VaultEnteredItem,
+    addedBy: string | undefined,
+  ) {
+    const outcome: { saved: VaultAgentResult | null } = { saved: null };
+    yield* this.#change((record) => {
+      // The same checks as the Vault page: an HTTPS website, a card number that passes the Luhn check.
+      const next = this.#put(record, decodeVaultSaveInput(item), addedBy);
+      outcome.saved = itemName(next.record, next.id);
+      return next.record;
+    });
+    return outcome.saved ?? (yield* vaultError("error.vault.itemMissing"));
+  });
+
   /** The cards and contact info, for the browser tools, and the API keys, for `AgentApiKeys`. */
   readonly items: VaultItems = {
     ready: () => this.#status === "ready",
@@ -529,6 +545,7 @@ export class VaultService {
     save: (change, addedBy) => this.#agentSave(change, addedBy),
     delete: (id) => this.#agentDelete(id),
     saveLogin: (login, addedBy) => this.#saveTypedLogin(login, addedBy),
+    addEntered: (item, addedBy) => this.#addEntered(item, addedBy),
   };
 
   /** `record` with `input` added or changed, and the id of that item. */

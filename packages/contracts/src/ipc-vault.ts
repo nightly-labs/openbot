@@ -22,6 +22,12 @@ export interface VaultItemOrigin {
 }
 
 export type VaultCardBrand = "visa" | "mastercard" | "amex" | "discover";
+export const VAULT_CARD_BRANDS: readonly VaultCardBrand[] = ["visa", "mastercard", "amex", "discover"];
+
+/** A card's expiry as MM/YY. */
+export function vaultExpiryText(month: number, year: number): string {
+  return `${String(month).padStart(2, "0")}/${String(year % 100).padStart(2, "0")}`;
+}
 
 /** The brand of a card number, from its first digits. */
 export function cardBrand(number: string): VaultCardBrand | null {
@@ -178,7 +184,6 @@ export interface VaultHostImportResult {
 }
 
 const VAULT_STATUSES: readonly VaultStatus[] = ["ready", "unavailable", "unreadable"];
-const VAULT_CARD_BRANDS: readonly VaultCardBrand[] = ["visa", "mastercard", "amex", "discover"];
 const VAULT_SECRET_KEYS = ["password", "number", "securityCode", "key"] as const;
 
 function hostAddedBy(item: DynamicRecord): VaultItemOrigin {

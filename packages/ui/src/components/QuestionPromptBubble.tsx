@@ -29,6 +29,7 @@ import {
 import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { MarkdownInlineText, markdownPlainText } from "../features/conversation/MarkdownMessageText";
 import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "../features/conversation/send-shortcut";
 
 /** Lets the chat composer answer the open question with its text, as the custom answer field does. */
@@ -53,6 +54,8 @@ export interface QuestionPromptBubbleProps {
   sendShortcut?: SendShortcut | undefined;
   onSubmit: (answers: Record<string, string[]>) => Promise<boolean>;
   onResolutionPresented?: () => void;
+  /** Opens a Markdown link of a question. */
+  onOpenLink: (url: string) => void;
   /** Gives the composer answer of this form to the composer. The returned function takes it back. */
   registerComposerAnswer?: ((answer: QuestionPromptComposerAnswer) => () => void) | undefined;
 }
@@ -100,7 +103,18 @@ function summaryResolution(questions: AgentPromptQuestion[], answers: Record<str
   };
 }
 
-function CompletedQuestionPrompt(props: { questions: AgentPromptQuestion[]; resolution: AgentPromptResolution }) {
+/** The question text. An agent can write Markdown in it, such as a link. */
+function QuestionText(props: { question: string; onOpenLink: (url: string) => void }) {
+  return (
+    <MarkdownInlineText body={props.question} agents={[]} onSelectAgent={() => {}} onOpenLink={props.onOpenLink} />
+  );
+}
+
+function CompletedQuestionPrompt(props: {
+  questions: AgentPromptQuestion[];
+  resolution: AgentPromptResolution;
+  onOpenLink: (url: string) => void;
+}) {
   const { t } = useText();
   const title = () => {
     if (props.resolution.status === "cancelled") return t("prompt.question.cancelled");
@@ -131,7 +145,9 @@ function CompletedQuestionPrompt(props: { questions: AgentPromptQuestion[]; reso
             {(question) => (
               <Item size="compact">
                 <ItemContent>
-                  <ItemDescription>{question.question}</ItemDescription>
+                  <ItemDescription>
+                    <QuestionText question={question.question} onOpenLink={props.onOpenLink} />
+                  </ItemDescription>
                   <ItemTitle>{answerLabel(question)}</ItemTitle>
                 </ItemContent>
               </Item>
@@ -494,7 +510,9 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
             onSubmit={(event) => event.preventDefault()}
           >
             <header class="question-prompt-header conversation-interaction-header">
-              <Questionnaire.Title>{current().question}</Questionnaire.Title>
+              <Questionnaire.Title>
+                <QuestionText question={current().question} onOpenLink={props.onOpenLink} />
+              </Questionnaire.Title>
               <Badge variant="warning-light" class="conversation-interaction-status">
                 <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
                 {t("prompt.inputRequired")}
@@ -502,7 +520,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
             </header>
             <Questionnaire.Choices
               role={current().multiSelect ? "group" : "radiogroup"}
-              aria-label={current().question}
+              aria-label={markdownPlainText(current().question)}
             >
               <ItemGroup class="question-prompt-options">
                 <For each={current().options ?? []}>
@@ -552,7 +570,9 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                     placeholder={
                       current().isSecret ? t("prompt.question.privatePlaceholder") : t("prompt.customPlaceholder")
                     }
-                    aria-label={t("prompt.question.customAnswerFor", { question: current().question })}
+                    aria-label={t("prompt.question.customAnswerFor", {
+                      question: markdownPlainText(current().question),
+                    })}
                     aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
                     maxlength={INPUT_LIMITS.promptAnswerText}
                     disabled={busy()}
@@ -655,6 +675,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                                 <CompletedQuestionPrompt
                                   questions={props.questions}
                                   resolution={resolutionPage().resolution}
+                                  onOpenLink={props.onOpenLink}
                                 />
                               )}
                             </Show>

@@ -117,6 +117,7 @@ export const messages = {
   "marketplace.app.setup.account": "ブラウザーで {name} アカウントにサインインします。",
   "marketplace.app.setup.key": "{name} アカウントの API キーが必要です。",
   "marketplace.app.setup.keySaved": "{field} は {host} に保存されています。",
+  "marketplace.app.account.removeDescription": "OpenBot は {host} にあるこのアカウントのサインイン情報を削除します。",
   "marketplace.app.setup.desktop": "{name} デスクトップアプリの {address} で動作します。",
   "marketplace.app.setup.desktopConnected": "{address} に接続済みです。",
   "marketplace.app.setup.open": "サインインもキーも不要です。",

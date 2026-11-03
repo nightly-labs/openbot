@@ -68,8 +68,13 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Diese Verbindung unterstützt keine geteilten Daten.",
   "error.team.agentInstallUnsupported": "Diese Verbindung unterstützt das Hinzufügen von Agenten nicht.",
   "error.team.agentHideUnsupported": "Diese Verbindung unterstützt das Ausblenden von Agenten nicht.",
+  "error.team.sidebarFoldersUnsupported": "Diese Verbindung unterstützt keine Ordner in Ordnern.",
   "error.team.agentNotificationLevelsUnsupported":
     "Dieser Server kann keine eigene Benachrichtigungsstufe pro Agent speichern. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
+  "error.team.sidebarPinsUnsupported":
+    "Dieser Server kann deine angehefteten Chats nicht für alle deine Geräte speichern. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
+  "error.team.agentInstructionsUnsupported":
+    "Diese Verbindung unterstützt das Bearbeiten von Agentenanweisungen nicht.",
   "error.team.agentPublishUnsupported": "Diese Verbindung unterstützt das Veröffentlichen von Agenten nicht.",
   "error.team.agentUpdateUnsupported": "Diese Verbindung unterstützt das Aktualisieren von Agenten nicht.",
   "error.team.contextResetUnsupported": "Diese Verbindung unterstützt das Starten eines neuen Chats nicht.",
@@ -94,6 +99,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Diese Verbindung unterstützt keine Host-Aktualisierungen.",
   "error.team.hostTimezoneUnsupported": "Diese Verbindung unterstützt die Zeitzone des Servers nicht.",
   "error.team.hostKeyRotationUnsupported": "Diese Verbindung unterstützt keine Änderung des Serverschlüssels.",
+  "error.team.localServersUnsupported": "Diese Verbindung unterstützt keine Server auf diesem Computer.",
   "error.team.routineResultsUnsupported": "Diese Verbindung unterstützt keine Ziele für Routinen.",
   "error.team.agentMemoryLimitUnsupported": "Diese Verbindung unterstützt das Erinnerungslimit der Agenten nicht.",
   "error.team.agentFoldersUnsupported": "Diese Verbindung unterstützt die Ordner der Agenten nicht.",

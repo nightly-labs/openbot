@@ -41,6 +41,7 @@ export function ConversationThread() {
     openExternalMessageUrl,
     previewAttachment,
     attachmentAction,
+    attachmentDownloads,
     browserTakeoverResolution,
     installedSkills,
     installedSkillsLoadFailed,
@@ -268,6 +269,7 @@ export function ConversationThread() {
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
             mediaSource={props.runtime?.attachmentMedia}
+            downloads={attachmentDownloads}
             macWindowControls={props.platform === "darwin"}
             approval={current().threads.approval}
             onRespondApproval={(decision) =>

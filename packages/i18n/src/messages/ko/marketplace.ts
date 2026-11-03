@@ -109,6 +109,7 @@ export const messages = {
   "marketplace.app.setup.account": "브라우저에서 {name} 계정으로 로그인해요.",
   "marketplace.app.setup.key": "{name} 계정의 API 키가 필요해요.",
   "marketplace.app.setup.keySaved": "{field}: {host}에 저장돼 있어요.",
+  "marketplace.app.account.removeDescription": "OpenBot이 {host}에 있는 이 계정의 로그인 정보를 삭제해요.",
   "marketplace.app.setup.desktop": "{name} 데스크톱 앱의 {address}에서 실행돼요.",
   "marketplace.app.setup.desktopConnected": "{address}에 연결됐어요.",
   "marketplace.app.setup.open": "로그인이나 키가 필요 없어요.",

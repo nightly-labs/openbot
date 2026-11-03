@@ -70,8 +70,13 @@ export const messages = {
   "error.team.sharedDataUnsupported": "I dati condivisi non sono supportati da questa connessione.",
   "error.team.agentInstallUnsupported": "L'aggiunta di agenti non è supportata da questa connessione.",
   "error.team.agentHideUnsupported": "Nascondere gli agenti non è supportato da questa connessione.",
+  "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
   "error.team.agentNotificationLevelsUnsupported":
     "Questo server non può salvare il tuo livello di notifiche per ogni agente. Aggiorna OpenBot sul computer che lo esegue.",
+  "error.team.sidebarPinsUnsupported":
+    "Questo server non può salvare le chat fissate per tutti i tuoi dispositivi. Aggiorna OpenBot sul computer che lo esegue.",
+  "error.team.agentInstructionsUnsupported":
+    "La modifica delle istruzioni degli agenti non è supportata da questa connessione.",
   "error.team.agentPublishUnsupported": "La pubblicazione di agenti non è supportata da questa connessione.",
   "error.team.agentUpdateUnsupported": "L'aggiornamento degli agenti non è supportato da questa connessione.",
   "error.team.contextResetUnsupported": "L'avvio di una nuova chat non è supportato da questa connessione.",
@@ -97,6 +102,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Gli aggiornamenti dell'host non sono supportati da questa connessione.",
   "error.team.hostTimezoneUnsupported": "Questa connessione non supporta il fuso orario del server.",
   "error.team.hostKeyRotationUnsupported": "Questa connessione non supporta il cambio della chiave del server.",
+  "error.team.localServersUnsupported": "Questa connessione non supporta i server su questo computer.",
   "error.team.routineResultsUnsupported": "Questa connessione non supporta le destinazioni delle routine.",
   "error.team.agentMemoryLimitUnsupported": "Questa connessione non supporta il limite di memorie degli agenti.",
   "error.team.agentFoldersUnsupported": "Questa connessione non supporta le cartelle degli agenti.",

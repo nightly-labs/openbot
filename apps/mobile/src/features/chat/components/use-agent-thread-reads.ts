@@ -80,12 +80,13 @@ export function useMarkThreadRead(
 
 /**
  * The person's read mark of each open thread in `tasks`, by task id. Null on a host without
- * `agent-thread-reads-v1`. It reads the marks of each agent that has an open thread.
+ * `agent-thread-reads-v1`. It reads the marks of each agent that has an open thread. `ready` is
+ * false while a read of the marks goes on, and `failed` is true when a read failed.
  */
 export function useServerThreadReads(
   serverId: string,
   tasks: readonly AgentTask[],
-): ReadonlyMap<string, AgentTaskReadState> | null {
+): { reads: ReadonlyMap<string, AgentTaskReadState> | null; ready: boolean; failed: boolean } {
   const queryScope = useQueryScope();
   const workspace = useMobileWorkspaceReader();
   const enabled = useThreadReadsEnabled(serverId);
@@ -100,7 +101,12 @@ export function useServerThreadReads(
       retry: false,
       queryFn: () => workspace().loadAgentThreadReads(agentId, serverId),
     })),
-    combine: (results) =>
-      enabled ? new Map(results.flatMap((result) => result.data ?? []).map((read) => [read.taskId, read])) : null,
+    combine: (results) => ({
+      reads: enabled
+        ? new Map(results.flatMap((result) => result.data ?? []).map((read) => [read.taskId, read]))
+        : null,
+      ready: !enabled || results.every((result) => result.data !== undefined || result.isError),
+      failed: enabled && results.some((result) => result.isError),
+    }),
   });
 }

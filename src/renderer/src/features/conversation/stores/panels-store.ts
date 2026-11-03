@@ -10,6 +10,7 @@ import type { MessageImageFile } from "@openbot/ui/features/conversation/Markdow
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
+import { createAttachmentDownloads } from "../attachment-downloads";
 import { attachmentFilePreview } from "../attachment-preview";
 import { releaseFilePreviewPage } from "../conversation-port";
 import { conversationRuntime } from "../conversation-runtime";
@@ -283,17 +284,32 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     }
   }
 
+  const attachmentFiles = createAttachmentDownloads({
+    serverId: () => deps.props.server?.id ?? "local",
+    calls: () => {
+      const agent = conversationRuntime(deps.props).agent;
+      const stop = agent.stopAttachmentDownload;
+      return {
+        open: (input) => agent.openAttachment(input),
+        stop: stop && ((attachmentId) => stop(attachmentId)),
+        subscribe: agent.onAttachmentDownload,
+      };
+    },
+    target: () => {
+      const agentId = conversationOwnerId(deps.props);
+      return agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
+    },
+    onError: (error, target) => deps.setComposerError(errorMessage(error, t("attachment.error.open")), target),
+  });
+  const attachmentDownloads = attachmentFiles.downloads;
+
   function attachmentAction(attachment: AttachmentSummary, action: FileAction) {
     // A runtime has no app to open a file in, so a file it can preview opens in the panel.
     if (action === "open" && deps.props.runtime && canPreviewAttachment(attachment)) {
       void previewAttachment(attachment);
       return;
     }
-    const agentId = conversationOwnerId(deps.props);
-    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
-    void conversationRuntime(deps.props)
-      .agent.openAttachment({ attachmentId: attachment.id, action })
-      .catch((error) => deps.setComposerError(errorMessage(error, t("attachment.error.open")), target));
+    attachmentFiles.open(attachment, action);
   }
 
   function openSharedFile(path: string) {
@@ -608,6 +624,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
+    attachmentDownloads,
     openSharedFile,
     openWorkspaceFile,
     openWorkspaceFolder,

@@ -130,6 +130,28 @@ export function parseOptionalAgentId(value: unknown): string | undefined {
   return parseAgentId(value);
 }
 
+/** An action of the renderer or of `sidebar-folders-v1`: it can nest a folder in a folder. */
+export function parseSidebarFolderAction(value: unknown): SidebarLayoutAction {
+  if (!isObject(value) || !isString(value.type)) throw new Error("Invalid sidebar layout action.");
+  if (value.type === "nest") {
+    const parentId = value.parentId;
+    const beforeSectionId = value.beforeSectionId;
+    if (parentId !== null && !isString(parentId)) throw new Error("Invalid sidebar folder parent.");
+    if (beforeSectionId !== null && !isString(beforeSectionId)) throw new Error("Invalid sidebar folder order target.");
+    return {
+      type: "nest",
+      sectionId: requireString(value.sectionId, "sectionId", INPUT_LIMITS.identifier),
+      parentId: parentId === null ? null : requireString(parentId, "parentId", INPUT_LIMITS.identifier),
+      beforeSectionId:
+        beforeSectionId === null ? null : requireString(beforeSectionId, "beforeSectionId", INPUT_LIMITS.identifier),
+    };
+  }
+  const action = parseSidebarLayoutAction(value);
+  if (action.type !== "create" || value.parentId === undefined) return action;
+  return { ...action, parentId: requireString(value.parentId, "parentId", INPUT_LIMITS.identifier) };
+}
+
+/** An action of the released `/v1/sidebar-layout/actions` route: every folder is at the top level. */
 export function parseSidebarLayoutAction(value: unknown): SidebarLayoutAction {
   if (!isObject(value) || !isString(value.type)) throw new Error("Invalid sidebar layout action.");
   switch (value.type) {
@@ -777,7 +799,13 @@ export function parseImportAttachments(value: unknown): ImportAttachmentsInput {
     }
     return { name: item.name, mimeType: item.mimeType, bytes: item.bytes };
   });
-  return { paths: value.paths, data };
+  return {
+    paths: value.paths,
+    data,
+    ...(value.requestId === undefined
+      ? {}
+      : { requestId: requireString(value.requestId, "requestId", INPUT_LIMITS.identifier) }),
+  };
 }
 
 /** A renderer can provide file bytes, but it cannot ask main to read a disk path. */
@@ -818,9 +846,13 @@ export function parseOpenAttachment(value: unknown): OpenAttachmentInput {
   if (!isObject(value) || (value.action !== "open" && value.action !== "reveal" && value.action !== "download")) {
     throw new Error("Invalid attachment action.");
   }
+  if (value.size !== undefined && (!Number.isSafeInteger(value.size) || Number(value.size) < 0)) {
+    throw new Error("Invalid attachment size.");
+  }
   return {
     attachmentId: requireString(value.attachmentId, "attachmentId"),
     action: value.action,
+    ...(isNumber(value.size) ? { size: value.size } : {}),
   };
 }
 

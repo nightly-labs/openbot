@@ -31,7 +31,8 @@
   height: 128%;
 }
 
-.agent-settings-avatar:hover {
+/* A photo keeps its own colours, as on mobile, so only a generated face lights up. */
+.agent-settings-avatar:hover:not(:has(.agent-avatar-custom)) {
   filter: brightness(1.08);
 }
 
@@ -834,13 +835,6 @@
 
 .agent-memories-search-input::-webkit-search-cancel-button {
   display: none;
-}
-
-.agent-memories-row-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .agent-memories-reading {

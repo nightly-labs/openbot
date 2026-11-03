@@ -31,6 +31,7 @@ export type EmailDeliveryBindings = Pick<
   | "EMAIL_SMTP_PASSWORD"
   | "EMAIL_FROM"
   | "EMAIL_LICENSE_FROM"
+  | "EMAIL_RELAY"
   | "EMAIL_DELIVERY_WEBHOOK_URL"
   | "EMAIL_DELIVERY_WEBHOOK_SECRET"
 >;
@@ -158,5 +159,6 @@ function readSmtpConfig(bindings: EmailDeliveryBindings): SmtpEmailConfig | null
     username: values.username,
     password: values.password,
     from: values.from,
+    ...(bindings.EMAIL_RELAY ? { relay: bindings.EMAIL_RELAY } : {}),
   };
 }

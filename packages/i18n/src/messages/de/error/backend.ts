@@ -268,6 +268,8 @@ export const messages = {
   "error.backend.sidebarSectionLimit": "Ein Server kann bis zu {limit} Seitenleistenabschnitte haben.",
   "error.backend.sectionNameRequired": "Ein Abschnittsname ist erforderlich.",
   "error.backend.sectionNameTooLong": "Der Abschnittsname ist zu lang.",
+  "error.backend.sidebarFolderTooDeep": "Ordner können nur drei Ebenen tief sein.",
+  "error.backend.sidebarFolderMoveInvalid": "Dieser Ordner kann nicht dorthin verschoben werden.",
   "error.backend.sectionNameDuplicate": "Abschnittsnamen müssen eindeutig sein.",
   "error.backend.directMessageRequired": "Schreibe zuerst eine Nachricht.",
   "error.backend.directMessageTooLong": "Eine Direktnachricht kann bis zu {limit} Zeichen haben.",
@@ -371,8 +373,8 @@ export const messages = {
     "Gib der Aufgabe einen Titel mit höchstens 120 Zeichen und eine kurze Beschreibung, was zu tun ist.",
   "error.backend.taskOwnChatOnly":
     "Starte eine Aufgabe nur aus deinem eigenen Chat. Ein Kanal, eine Messaging-Unterhaltung oder eine andere Aufgabe kann keine starten.",
-  "error.backend.taskOpenLimit":
-    "Dieser Agent hat bereits {count} offene Aufgaben. Warte, bis der Benutzer eine schließt, bevor du eine weitere Aufgabe startest.",
+  "error.backend.taskUnfinishedLimit":
+    "Dieser Agent hat bereits {count} unfertige Aufgaben. Starte eine weitere Aufgabe, wenn eine davon endet.",
   "error.backend.taskOpenLimitReached":
     "Dieser Agent hat {count} offene Aufgaben. Schließe eine Aufgabe und starte oder öffne dann eine andere.",
   "error.backend.taskRemoteUnsupported": "Aufgaben sind nur für Agenten auf diesem Computer verfügbar.",

@@ -37,6 +37,8 @@ export const messages = defineMessages("settings", {
   "settings.launchAtLogin.description": "Open the app when you sign in to this computer.",
   "settings.keepRunning.title": "Keep OpenBot running in the background",
   "settings.keepRunning.description": "Keep active tasks running after you close the window.",
+  "settings.menuBar.title": "Show OpenBot in the menu bar",
+  "settings.menuBar.description": "Open or quit OpenBot from an icon in the menu bar.",
   "settings.keepAwake.title": "Keep this computer awake",
   "settings.keepAwake.description":
     "Routines run on time while the computer is connected to power. The display can still turn off.",

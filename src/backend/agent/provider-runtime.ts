@@ -46,6 +46,7 @@ import {
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
 import { causeHelpers } from "../effect-boundary";
+import type { SignInRegion } from "../kimi-region";
 import { McpHandoffLog } from "./../mcp-handoff-log";
 import { providerMcpServerName } from "./../mcp-provider-shapes";
 import { customProvidersOn, openCodeSignInMessage } from "./../opencode-config";
@@ -293,7 +294,10 @@ export interface ProviderHooks {
   onAgentClientLost(agentId: string, client: AgentClient): Effect.Effect<void>;
   /** The shared folder, which every Workspace only agent may write besides its workspace. */
   sharedRoot(): string;
-  /** Runs after a CLI replacement, so deliveries held back during it are delivered. */
+  /**
+   * Runs after a CLI replacement, and when a provider that waited for a sign-in is signed in again,
+   * so deliveries held back during it are delivered.
+   */
   onProviderResumed(provider: AgentProvider): void;
   /**
    * Runs once a new client for this provider is the one the app uses, with the catalogue it reported
@@ -621,9 +625,7 @@ export class ProviderRuntime implements ProviderPort {
       : null;
     this.#modelCatalog = new ModelCatalog({
       client: (provider) => (this.#off.has(provider) ? undefined : this.#clients.get(provider)),
-      isSignedOut: (provider) =>
-        this.#status.providers?.some((status) => status.id === provider && status.state === "sign-in-required") ??
-        false,
+      isSignedOut: (provider) => this.signInRequired(provider),
       credentials: this.#credentials,
       requestTimeoutMs: this.#requestTimeoutMs,
       recordProviderError: (provider, error) => this.#recordProviderError(provider, error),
@@ -790,6 +792,13 @@ export class ProviderRuntime implements ProviderPort {
 
   isReady(): boolean {
     return this.#status.phase === "ready";
+  }
+
+  /** True while the provider waits for a sign-in: no turn can start on it until then. */
+  signInRequired(provider: AgentProvider): boolean {
+    return (
+      this.#status.providers?.some((status) => status.id === provider && status.state === "sign-in-required") ?? false
+    );
   }
 
   /**
@@ -1439,16 +1448,21 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     provider: AgentProvider,
     openExternal: (url: string) => Promise<void>,
+    region: SignInRegion = "global",
   ) {
-    return yield* this.#connectProvider(provider, openExternal, false);
+    return yield* this.#connectProvider(provider, openExternal, false, region);
   }).bind(this);
 
-  /** `onHost`: the user is not at this computer, so the CLI's page goes to `openExternal`, never to a browser here. */
+  /**
+   * `onHost`: the user is not at this computer, so the CLI's page goes to `openExternal`, never to a
+   * browser here. `region`: the site of the account, for a provider that has more than one.
+   */
   readonly #connectProvider = Effect.fn("ProviderRuntime.connectProvider")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
     openExternal: (url: string) => Promise<void>,
     onHost: boolean,
+    region: SignInRegion = "global",
   ) {
     this.#startFailures.delete(provider);
     const start = this.#providerStarts.get(provider);
@@ -1459,7 +1473,7 @@ export class ProviderRuntime implements ProviderPort {
     }
     const signIn = requireProviderDriver(provider).signIn;
     return yield* this.#runProviderConnectionCommand(provider, () =>
-      this.#signIn(provider, signIn, openExternal, onHost),
+      this.#signIn(provider, signIn, openExternal, onHost, region),
     );
   });
 
@@ -1469,6 +1483,7 @@ export class ProviderRuntime implements ProviderPort {
     signIn: ReturnType<typeof requireProviderDriver>["signIn"],
     openExternal: (url: string) => Promise<void>,
     onHost: boolean,
+    region: SignInRegion,
   ) {
     switch (signIn.kind) {
       case "browser":
@@ -1481,13 +1496,17 @@ export class ProviderRuntime implements ProviderPort {
           .start(provider, (cli) =>
             Effect.gen(function* () {
               const browser = onHost ? yield* captureBrowser(openExternal) : {};
-              const target = cliSpawnTarget(cli.executable, signIn.command.argv);
+              const { argv } = signIn.command;
+              const target = cliSpawnTarget(
+                cli.executable,
+                typeof argv === "function" ? yield* argv(cli, region) : argv,
+              );
               const child = yield* Effect.acquireRelease(
                 Effect.try({
                   try: () =>
                     spawn(target.command, target.args, {
                       cwd: process.cwd(),
-                      env: { ...process.env, ...signIn.command.env(cli), ...browser },
+                      env: { ...process.env, ...signIn.command.env(cli, region), ...browser },
                       stdio: "ignore",
                       shell: false,
                       windowsHide: process.platform === "win32",
@@ -1818,13 +1837,16 @@ export class ProviderRuntime implements ProviderPort {
       .startCode(
         provider,
         (cli) =>
-          startCliCodeLogin({
-            flow,
-            executable: cli.executable,
-            argv: command.argv,
-            env: { ...cliPathEnvironment(cli), ...command.env(cli) },
-            timeoutMs: command.timeoutMs,
-            ...(command.closeInput ? { closeInput: true } : {}),
+          Effect.gen(function* () {
+            const argv = typeof command.argv === "function" ? yield* command.argv(cli, "global") : command.argv;
+            return yield* startCliCodeLogin({
+              flow,
+              executable: cli.executable,
+              argv,
+              env: { ...cliPathEnvironment(cli), ...command.env(cli, "global") },
+              timeoutMs: command.timeoutMs,
+              ...(command.closeInput ? { closeInput: true } : {}),
+            });
           }),
         command.timeoutMs,
       )
@@ -2784,11 +2806,23 @@ export class ProviderRuntime implements ProviderPort {
           });
           return;
         }
+        const version = this.#cli.get(provider)?.version ?? null;
         this.#clients.delete(provider);
         this.#cli.delete(provider);
         this.#accounts.delete(provider);
         // The next sign-in can be another login.
         this.#forgetUsage(provider);
+        // Before the stop ends the client's turns: the drain that each end schedules then holds the
+        // queued messages for the sign-in, and does not fail them on a provider it cannot start (#4326).
+        this.#setStatus({
+          providers: updateProviderStatus(this.#status.providers, provider, {
+            state: "sign-in-required",
+            version,
+            message: this.#signInRequiredMessage(provider),
+            email: null,
+            checkError: null,
+          }),
+        });
         yield* client.stop().pipe(toProviderOperationFailed).pipe(Effect.ignore);
         yield* this.#hooks.onClientStopped(client);
         yield* Effect.forEach(
@@ -3956,11 +3990,16 @@ export class ProviderRuntime implements ProviderPort {
   });
 
   #setStatus(patch: Partial<AgentStatus>): void {
+    const available: AgentProvider[] = [];
     if (patch.providers) {
       logProviderStateChanges(this.#status.providers ?? [], patch.providers, this.#redactMcp);
       // A provider with no CLI has nothing left to diagnose, and its row already says why: an error
       // from a removed custom agent must not stay under an empty list.
       for (const row of patch.providers) if (row.state === "not-installed") this.#lastErrors.delete(row.id);
+      for (const row of patch.providers) {
+        const current = this.#status.providers?.find((candidate) => candidate.id === row.id);
+        if (row.state === "available" && current?.state !== "available") available.push(row.id);
+      }
     }
     this.#status = {
       ...this.#status,
@@ -3968,6 +4007,9 @@ export class ProviderRuntime implements ProviderPort {
       capabilities: patch.capabilities ?? this.#status.capabilities,
     };
     this.#emit({ type: "status", status: this.status() });
+    // The drain holds the messages of a provider that waits for a sign-in, and no other event wakes
+    // them. A provider that becomes available again can start them.
+    for (const provider of available) this.#hooks.onProviderResumed(provider);
   }
 }
 

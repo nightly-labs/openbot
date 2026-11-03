@@ -1,9 +1,11 @@
 import type { ConversationPage, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import type { RemoteTeamHost } from "@openbot/team-client";
 import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system/legacy";
 import * as LockedKeychain from "@/shared/lib/locked-keychain";
 import { decodeConversationPage } from "./conversation";
+import { type DrawerSnapshot, decodeDrawerSnapshot } from "./drawer-snapshot";
 import { decodeAgentSummaries, decodeSidebarLayout, type RemoteAgent } from "./workspace-records";
 
 /** What the phone shows for one server before its connection is back. The host stays the source of truth. */
@@ -13,6 +15,13 @@ interface CachedServer {
   hidden: string[] | null;
   sidebar: SidebarLayoutSnapshot | null;
   conversations: ConversationPage[];
+  /**
+   * The capabilities of the last connection, so the first connection after a start reads the
+   * workspace with its compatibility check. Null in a file from before them.
+   */
+  capabilities: readonly string[] | null;
+  /** The last values of the drawer. A file of an older build has none. */
+  drawer: DrawerSnapshot | null;
 }
 
 export interface WorkspaceCache {
@@ -21,11 +30,16 @@ export interface WorkspaceCache {
   remove(serverId: string): Promise<void>;
   /** Deletes the files of the servers that the account no longer lists, also those removed while the app was closed. */
   retain(serverIds: readonly string[]): Promise<void>;
+  /** The last server list of the account service, so the connections start before it answers again. */
+  readHosts(): Promise<RemoteTeamHost[] | null>;
+  writeHosts(hosts: readonly RemoteTeamHost[]): Promise<void>;
 }
 
 const FORMAT = 1;
 const ROOT = "workspace-cache-v1/";
 const KEY_NAME = "openbot.mobile.workspace-cache-key.v1";
+/** `segment` never makes a `~`, so no server file has this name. */
+const HOSTS_NAME = "~hosts";
 /**
  * The escaped JSON of a server file. Base64 adds a third, so the file stays under 4 MB. A server with
  * more keeps its agents and the chats that fit, newest first.
@@ -95,32 +109,75 @@ function decodeCachedServer(value: unknown): CachedServer {
     (value.hidden !== null && !(Array.isArray(value.hidden) && value.hidden.every(isString)))
   )
     throw new Error("The workspace cache is invalid.");
+  const capabilities = value.capabilities;
   return {
     agents: decodeAgentSummaries(value.agents),
     hidden: value.hidden,
     sidebar: value.sidebar === null ? null : decodeSidebarLayout(value.sidebar),
     conversations: value.conversations.map(decodeConversationPage),
+    // A bad list drops only the early reads: the first connection then waits for its check.
+    capabilities: Array.isArray(capabilities) && capabilities.every(isString) ? capabilities : null,
+    drawer: decodeDrawerSnapshot(value.drawer),
   };
 }
 
+/** A server record as `RemoteTeamDirectoryClient.listHosts` gave it, its key already checked there. */
+function decodeCachedHost(value: unknown): RemoteTeamHost {
+  if (!isDynamicRecord(value)) throw new Error("The cached server list is invalid.");
+  const { hostId, name, logoKey, devicePublicKey, membershipId, role, memberLimit, hosted, keyChangedAt } = value;
+  if (
+    !isString(hostId) ||
+    !isString(name) ||
+    (logoKey !== null && !isString(logoKey)) ||
+    !isString(devicePublicKey) ||
+    !devicePublicKey ||
+    !isString(membershipId) ||
+    (role !== "owner" && role !== "admin" && role !== "member") ||
+    (memberLimit !== undefined && !(isNumber(memberLimit) && Number.isSafeInteger(memberLimit))) ||
+    (hosted !== undefined && !isBoolean(hosted)) ||
+    (keyChangedAt !== undefined && !isNumber(keyChangedAt))
+  )
+    throw new Error("The cached server list is invalid.");
+  return {
+    hostId,
+    name,
+    logoKey,
+    devicePublicKey,
+    membershipId,
+    role,
+    ...(memberLimit === undefined ? {} : { memberLimit }),
+    ...(hosted === undefined ? {} : { hosted }),
+    ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
+  };
+}
+
+function decodeCachedHosts(value: unknown): RemoteTeamHost[] {
+  if (!isDynamicRecord(value) || value.format !== FORMAT || !Array.isArray(value.hosts))
+    throw new Error("The cached server list is invalid.");
+  return value.hosts.map(decodeCachedHost);
+}
+
 /**
- * The agents, sections and recent chats of each server of one account, so the app shows them at
- * once after a start, before the connection is back. Each server has one file in `Library/Caches`,
- * which is not in a backup and which the system can delete when the device is low on storage. The
- * files are sealed with AES-256-GCM and bound to the account and the server.
+ * The server list, and the agents, sections and recent chats of each server of one account, so the
+ * app shows them at once after a start, before the account service and the connection answer. The
+ * list and each server have one file in `Library/Caches`, which is not in a backup and which the
+ * system can delete when the device is low on storage. The files are sealed with AES-256-GCM and
+ * bound to the account and to the server, or to the list.
  */
 export function createWorkspaceCache(scope: string): WorkspaceCache | null {
   const root = rootDirectory();
   if (!root) return null;
   const account = Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, scope);
-  const paths = async (serverId: string) => {
+  /** `serverId` null is the server list. */
+  const paths = async (serverId: string | null) => {
     const folder = `${root}${await account}/`;
-    return { folder, file: `${folder}${segment(serverId)}.bin`, next: `${folder}${segment(serverId)}.next.bin` };
+    const name = serverId === null ? HOSTS_NAME : segment(serverId);
+    return { folder, file: `${folder}${name}.bin`, next: `${folder}${name}.next.bin` };
   };
-  const binding = async (serverId: string) => asciiBytes(asciiJson([FORMAT, await account, serverId]));
+  const binding = async (serverId: string | null) => asciiBytes(asciiJson([FORMAT, await account, serverId]));
   // A remove that follows a write of the same server runs after it, so the file does not come back.
-  const queues = new Map<string, Promise<unknown>>();
-  const inOrder = <T>(serverId: string, operation: () => Promise<T>): Promise<T> => {
+  const queues = new Map<string | null, Promise<unknown>>();
+  const inOrder = <T>(serverId: string | null, operation: () => Promise<T>): Promise<T> => {
     const result = (queues.get(serverId) ?? Promise.resolve()).then(operation, operation);
     const tail = result.catch(() => undefined);
     queues.set(serverId, tail);
@@ -129,26 +186,41 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
     });
     return result;
   };
+  const open = <T>(serverId: string | null, decode: (value: unknown) => T) =>
+    inOrder(serverId, async () => {
+      const key = await cacheKey();
+      if (!key) return null;
+      const { file } = await paths(serverId);
+      if (!(await FileSystem.getInfoAsync(file)).exists) return null;
+      try {
+        const sealed = Crypto.AESSealedData.fromCombined(await FileSystem.readAsStringAsync(file));
+        const plain = await Crypto.aesDecryptAsync(sealed, key, {
+          output: "bytes",
+          additionalData: await binding(serverId),
+        });
+        return decode(JSON.parse(asciiText(plain)));
+      } catch {
+        // A file of an older format, of another key or a damaged one: the server loads as before.
+        await FileSystem.deleteAsync(file, { idempotent: true });
+        return null;
+      }
+    });
+  const seal = async (serverId: string | null, key: Crypto.AESEncryptionKey, json: string) => {
+    const sealed = await Crypto.aesEncryptAsync(asciiBytes(json), key, { additionalData: await binding(serverId) });
+    const { folder, file, next } = await paths(serverId);
+    await FileSystem.makeDirectoryAsync(folder, { intermediates: true });
+    await FileSystem.writeAsStringAsync(next, await sealed.combined("base64"));
+    await FileSystem.deleteAsync(file, { idempotent: true });
+    await FileSystem.moveAsync({ from: next, to: file });
+  };
 
   return {
-    read: (serverId) =>
-      inOrder(serverId, async () => {
+    read: (serverId) => open(serverId, decodeCachedServer),
+    readHosts: () => open(null, decodeCachedHosts),
+    writeHosts: (hosts) =>
+      inOrder(null, async () => {
         const key = await cacheKey();
-        if (!key) return null;
-        const { file } = await paths(serverId);
-        if (!(await FileSystem.getInfoAsync(file)).exists) return null;
-        try {
-          const sealed = Crypto.AESSealedData.fromCombined(await FileSystem.readAsStringAsync(file));
-          const plain = await Crypto.aesDecryptAsync(sealed, key, {
-            output: "bytes",
-            additionalData: await binding(serverId),
-          });
-          return decodeCachedServer(JSON.parse(asciiText(plain)));
-        } catch {
-          // A file of an older format, of another key or a damaged one: the server loads as before.
-          await FileSystem.deleteAsync(file, { idempotent: true });
-          return null;
-        }
+        if (key) await seal(null, key, asciiJson({ format: FORMAT, hosts }));
       }),
     write: (serverId, value) =>
       inOrder(serverId, async () => {
@@ -169,16 +241,7 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
           if (length > MAX_JSON_LENGTH) break;
           conversations.push(page);
         }
-        const sealed = await Crypto.aesEncryptAsync(
-          asciiBytes(asciiJson({ format: FORMAT, ...value, agents, conversations })),
-          key,
-          { additionalData: await binding(serverId) },
-        );
-        const { folder, file, next } = await paths(serverId);
-        await FileSystem.makeDirectoryAsync(folder, { intermediates: true });
-        await FileSystem.writeAsStringAsync(next, await sealed.combined("base64"));
-        await FileSystem.deleteAsync(file, { idempotent: true });
-        await FileSystem.moveAsync({ from: next, to: file });
+        await seal(serverId, key, asciiJson({ format: FORMAT, ...value, agents, conversations }));
       }),
     remove: (serverId) =>
       inOrder(serverId, async () => {
@@ -189,7 +252,9 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
     retain: async (serverIds) => {
       const folder = `${root}${await account}/`;
       if (!(await FileSystem.getInfoAsync(folder)).exists) return;
-      const kept = new Set(serverIds.flatMap((id) => [`${segment(id)}.bin`, `${segment(id)}.next.bin`]));
+      const kept = new Set(
+        [HOSTS_NAME, ...serverIds.map(segment)].flatMap((name) => [`${name}.bin`, `${name}.next.bin`]),
+      );
       for (const name of await FileSystem.readDirectoryAsync(folder))
         if (!kept.has(name)) await FileSystem.deleteAsync(`${folder}${name}`, { idempotent: true });
     },

@@ -122,7 +122,7 @@
 
 .subagents-list {
   display: flex;
-  width: min(100%, 720px);
+  width: var(--message-wide-bubble-width);
   flex-direction: column;
   margin: 0;
   border: 1px solid var(--openbot-border);

@@ -66,6 +66,7 @@ import {
   removeApiKeyToolSchema,
   requestApiKeyToolSchema,
   routineReportFailureToolSchema,
+  sendToChannelToolSchema,
 } from "../openbot-tools";
 import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
@@ -129,7 +130,7 @@ import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
-import { discoverTools, namesInSearch, resolveDeferredTool } from "./tool-catalog";
+import { DEFERRED_MCP_NOTE, discoverTools, namesInSearch, resolveDeferredTool } from "./tool-catalog";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 import type { AgentBrowserHost } from "./turn-lifecycle";
 import { handleUpdateAgentsTool } from "./update-agents-tool";
@@ -376,6 +377,10 @@ export class OpenBotToolRouter {
           if (!isDynamicToolCall(request.params)) throw new Error("Invalid dynamic tool request.");
           let params = request.params;
           if (params.namespace === "openbot") {
+            const deferredMcp = client.deferredMcpTools?.(params.threadId) ?? false;
+            const invalid = deferredMcp
+              ? `${sourceText("error.agent.toolRequestInvalid")} ${DEFERRED_MCP_NOTE}`
+              : sourceText("error.agent.toolRequestInvalid");
             if (params.tool === "tool_search" || params.tool === "tool_describe") {
               const agentId = this.#conversation.agentForThread(params.threadId);
               if (!agentId) throw new Error("The calling OpenBot agent is unknown.");
@@ -384,21 +389,23 @@ export class OpenBotToolRouter {
                 this.#requireAgent(agentId);
                 result = discoverTools(params);
               } catch {
-                client.respond(request.id, openBotToolFailure(sourceText("error.agent.toolRequestInvalid")));
+                client.respond(request.id, openBotToolFailure(invalid));
                 return;
               }
               const signIns = yield* this.#searchSignIns(agentId, params);
               if (request.signal?.aborted || !client.running) return;
+              const found =
+                deferredMcp && params.tool === "tool_search" ? { ...result, mcpTools: DEFERRED_MCP_NOTE } : result;
               client.respond(
                 request.id,
-                openBotToolResult(signIns.length > 0 ? { ...result, mcpServers: signIns } : result),
+                openBotToolResult(signIns.length > 0 ? { ...found, mcpServers: signIns } : found),
               );
               return;
             }
             if (params.tool === "tool_call") {
               const resolved = resolveDeferredTool(params);
               if (!resolved) {
-                client.respond(request.id, openBotToolFailure(sourceText("error.agent.toolRequestInvalid")));
+                client.respond(request.id, openBotToolFailure(invalid));
                 return;
               }
               params = resolved;
@@ -437,6 +444,16 @@ export class OpenBotToolRouter {
               if (client.running) client.respond(toolRequest.id, result);
               return;
             }
+            // It needs no tab: the card waits in the chat, and the registry answers it.
+            if (toolRequest.params.tool === "request_vault_item") {
+              const result = yield* this.#attention.requestVaultItem(client, toolRequest, {
+                ...toolRequest.params,
+                threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
+                ownerAgentId: agentId,
+              });
+              if (result && client.running) client.respond(toolRequest.id, result);
+              return;
+            }
             if (this.#attention.hasBrowserTakeoverForAgent(agentId)) {
               client.respond(toolRequest.id, {
                 success: false,
@@ -466,11 +483,17 @@ export class OpenBotToolRouter {
                   return yield* this.#attention.saveVaultItem(params);
                 case "delete_vault_item":
                   return yield* this.#attention.deleteVaultItem(params);
-                default:
+                case "request_link_payment":
+                  return yield* this.#attention.requestLinkPayment(params);
+                default: {
+                  // A Link card is read from Link before the fill; a saved card comes from the Vault.
+                  const linkVault = yield* this.#attention.linkCardVault(client, toolRequest, params);
+                  if (linkVault && !("secret" in linkVault)) return linkVault;
                   return yield* this.#browser.handleDynamicTool(params, {
                     onUserControl: userControl,
-                    cardVault: this.#attention.cardVault(client, toolRequest, params),
+                    cardVault: linkVault ?? this.#attention.cardVault(client, toolRequest, params),
                   });
+                }
               }
             });
             const signal = toolRequest.signal;
@@ -871,10 +894,29 @@ export class OpenBotToolRouter {
         contentItems: [
           {
             type: "inputText",
-            text: "This chat has no active channel assignment. Channel tools work only inside a channel task. Use openbot.send_message for direct teammate work, or sidebar section tools (list_sections, create_section, assign_agent_section) to group agents.",
+            text: "This chat has no active channel assignment. Channel tools work only inside a channel task. To give work to a channel from this chat, use openbot.list_channels and openbot.send_to_channel. Use openbot.send_message for direct teammate work.",
           },
         ],
       };
+    }
+
+    if (params.tool === "list_channels") return openBotToolResult({ channels: this.#channels.handoffTargets() });
+    if (params.tool === "send_to_channel") {
+      if (channelId) return openBotToolFailure("Use channel_assign or channel_transfer for channel work.");
+      const args = sendToChannelToolSchema.parse(params.arguments, { reportInput: true });
+      const channel = yield* this.#channels.handoff({
+        operationId: toolCallIdempotencyKey(params),
+        channelId: args.channelId,
+        senderAgentId,
+        text: args.text,
+        recipientAgentIds: args.recipientAgentIds ?? [],
+        sourcePaths: args.paths ?? [],
+      });
+      return openBotToolResult({
+        status: "posted",
+        channel: { id: channel.id, name: channel.name },
+        next: "The channel members work on it in the channel. Tell the user to follow it there, and do not do the work here.",
+      });
     }
 
     if (params.tool === "html_preview") {
