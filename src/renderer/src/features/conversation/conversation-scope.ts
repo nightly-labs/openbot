@@ -278,6 +278,9 @@ export function createConversationViewScope(props: ConversationProps) {
     sidePanelOpen,
     setSidePanelMaximized,
     removeSidePanelPane,
+    removeSidePanelFile,
+    moveSidePanelFile,
+    openSidePanelFile,
     filePreviewOpen,
     setActiveRightPanel,
     openRoutineSettings,
@@ -303,7 +306,7 @@ export function createConversationViewScope(props: ConversationProps) {
     downloadSidebarFile,
     downloadMessageImageFile,
     revealSidebarFile,
-    closeSidebarFilePreview,
+    clearSidebarFilePreview,
   } = panels;
   const sideQuestions = createSideQuestionStore({
     props,
@@ -495,18 +498,22 @@ export function createConversationViewScope(props: ConversationProps) {
     return id !== null && sideThreadIds().includes(id) ? id : null;
   };
   /**
-   * The panel button opens the side panel at its last pane or side thread, or at the list of panes
-   * when no tab is open.
+   * The panel button opens the side panel at its last file, pane or side thread, or at the list of
+   * panes when no tab is open. A file that is not loaded is read again. The panel lists the panes
+   * until the file shows, so the panel opens also when the read fails.
    */
   function toggleSidePanel() {
     if (sidePanelOpen()) {
       hideBrowserPanel();
       return;
     }
-    const { panes, selected } = sidePanel();
+    const { panes, selected, files, file } = sidePanel();
     const pane = selected && panes.includes(selected) ? selected : null;
     const thread = shownPanelThreadId() ?? sideThreadIds()[0];
-    if (pane) openSidePanelPane(pane);
+    if (file && files.some((item) => item.key === file)) {
+      setActiveRightPanel("side-panel");
+      openSidePanelFile(file);
+    } else if (pane) openSidePanelPane(pane);
     else if (thread && selected === null) openPanelThread(thread);
     else if (panes[0]) openSidePanelPane(panes[0]);
     else setActiveRightPanel("side-panel");
@@ -524,9 +531,13 @@ export function createConversationViewScope(props: ConversationProps) {
     const rest = ids.filter((other) => other !== id);
     const thread = rest[Math.min(Math.max(index, 0), rest.length - 1)];
     const pane = sidePanel().panes.at(-1);
+    const file = sidePanel().files.at(-1);
     if (thread) openPanelThread(thread);
     else if (pane) openSidePanelPane(pane);
-    else setActiveRightPanel("side-panel");
+    else if (file) {
+      setActiveRightPanel("side-panel");
+      openSidePanelFile(file.key);
+    } else setActiveRightPanel("side-panel");
   }
   /** Closes the tab of a side thread in the side panel. The thread stays in the thread list. */
   function closePanelThread(id: string) {
@@ -543,7 +554,7 @@ export function createConversationViewScope(props: ConversationProps) {
   }
   // A side thread that shows can also leave the side panel from outside it: the thread list or a
   // notification opens it in the chat, or it is archived. The side thread next to it then shows, else
-  // the last pane, as when its tab closes. A thread that is not in the list yet, as before the threads
+  // the last pane or file, as when its tab closes. A thread that is not in the list yet, as before the threads
   // load after a start, did not show, so the panel keeps it.
   createEffect(
     () => ({
@@ -551,6 +562,7 @@ export function createConversationViewScope(props: ConversationProps) {
       requested: activeRightPanel() === "thread" ? panelThreadId() : null,
       ids: sideThreadIds(),
       pane: sidePanel().panes.at(-1),
+      file: sidePanel().files.at(-1)?.key,
     }),
     (next, previous) => {
       if (next.shown !== null || !previous?.shown || next.requested !== previous.shown) return;
@@ -558,6 +570,10 @@ export function createConversationViewScope(props: ConversationProps) {
       const thread = next.ids[Math.min(Math.max(index, 0), next.ids.length - 1)];
       if (thread) openPanelThread(thread);
       else if (next.pane) openSidePanelPane(next.pane);
+      else if (next.file) {
+        setActiveRightPanel("side-panel");
+        openSidePanelFile(next.file);
+      }
     },
   );
   /** The subagent that the side panel shows now, or null. */
@@ -574,9 +590,40 @@ export function createConversationViewScope(props: ConversationProps) {
     const next = removeSidePanelPane(pane);
     if (!shown) return;
     const thread = sideThreadIds()[0];
+    const file = sidePanel().files.at(-1);
     if (next) openSidePanelPane(next);
     else if (thread) openPanelThread(thread);
+    else if (file) {
+      // The closed pane must not stay on screen while the file reads, or after a failed read.
+      setActiveRightPanel("side-panel");
+      openSidePanelFile(file.key);
+    } else setActiveRightPanel("side-panel");
+  }
+  /**
+   * Closes the tab of a file. When the file showed, the file next to it shows, else the last pane or
+   * side thread. With no tab, the panel lists the panes.
+   */
+  function closeSidePanelFile(key: string) {
+    const shown = filePreviewOpen() && sidePanel().file === key;
+    const next = removeSidePanelFile(key);
+    if (!shown) return;
+    // The closed file must not show under the next tab while it loads, or after a failed read.
+    clearSidebarFilePreview();
+    if (next) {
+      setActiveRightPanel("side-panel");
+      openSidePanelFile(next);
+      return;
+    }
+    const pane = sidePanel().panes.at(-1);
+    const thread = sideThreadIds()[0];
+    if (pane) openSidePanelPane(pane);
+    else if (thread) openPanelThread(thread);
     else setActiveRightPanel("side-panel");
+  }
+  /** Closes the tab of the file that shows. */
+  function closeShownSidePanelFile() {
+    const key = sidePanel().file;
+    if (key) closeSidePanelFile(key);
   }
   const viewIsMounted = createScopeGuard();
   let attachmentPicker: HTMLInputElement | undefined;
@@ -2043,7 +2090,7 @@ export function createConversationViewScope(props: ConversationProps) {
     releaseBrowserControl,
     closeChatSearch,
     clearNewMessages,
-    closeSidebarFilePreview,
+    closeShownSidePanelFile,
     composerError: currentComposerError,
     currentComposerError,
     currentChatError,
@@ -2092,6 +2139,9 @@ export function createConversationViewScope(props: ConversationProps) {
     openSidePanelPane,
     toggleSidePanel,
     closeSidePanelPane,
+    openSidePanelFile,
+    moveSidePanelFile,
+    closeSidePanelFile,
     filePreviewOpen,
     handleChatSearchShortcut,
     hideBrowserPanel,
