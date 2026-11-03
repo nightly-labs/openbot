@@ -803,7 +803,15 @@ try {
         adapter.edit({ platformChannelId: OWNER_JID, replyThreadId: null }, "UNKNOWN-POST", { text: "Updated" }),
       );
       await until(() => phone.textsTo(OWNER_JID).length === before + 1, "the edit as a new post");
-      return { refused: true };
+      // In the owner's own chat, a last blank line makes the bubble wide, so the answer starts at the left.
+      const spacer = /\n\u2800{20,}$/u;
+      assert.match(phone.textsTo(OWNER_JID).at(-1) ?? "", spacer, "A post in the owner's own chat has no spacer line.");
+      const contactJid = `${STRANGER}@s.whatsapp.net`;
+      await runCauseEffect(
+        adapter.post({ platformChannelId: contactJid, replyThreadId: null }, { text: "To a contact" }),
+      );
+      await until(() => phone.textsTo(contactJid).includes("To a contact"), "the post to an allowed contact, as it is");
+      return { refused: true, spacer: true };
     });
   });
 
