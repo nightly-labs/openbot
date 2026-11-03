@@ -3,7 +3,6 @@ import {
   type AgentModelOption,
   type AgentSummary,
   type ConversationMessage,
-  defaultProviderModel,
   isContextResetMarker,
 } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -11,12 +10,12 @@ import { Effect, Exit, Fiber, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import { extractJsonObject } from "../structured-output";
 import type { AgentMemories } from "./agent-memories";
+import { backgroundModel } from "./background-model";
 import { memoryChangesMessage } from "./memory-changes-message";
 import { MemoryReviewResult, memoryReviewPrompt } from "./memory-review-prompt";
 import type { ProfileClients } from "./profile-clients";
 import { type GenerationObserver, GenerationUsageLimitError, generateTextWithoutTools } from "./profile-generation";
 import type { ProviderOperationFailed } from "./provider-runtime";
-import { inputPrice } from "./usage-pricing";
 
 const logger = createOpenBotLogger("memory-review");
 
@@ -28,22 +27,6 @@ const MEMORY_REVIEW_IDLE_MS = 15 * 60_000;
 const MEMORY_REVIEW_IDLE_TURNS = 3;
 /** The latest chat messages that a review reads when the chat is not loaded. */
 export const MEMORY_REVIEW_MESSAGES = 200;
-
-/**
- * The model of a review: the provider's default model when its known price is lower than the agent's
- * model, so an agent on a large model reviews at the small model's price. A model with no known
- * price stays as it is. Null when the agent's own model is not available.
- */
-function reviewModel(agent: AgentSummary, models: readonly AgentModelOption[]): AgentModelOption | null {
-  const listed = (id: string) => models.find((model) => model.provider === agent.provider && model.id === id);
-  const own = listed(agent.model);
-  if (!own) return null;
-  const smaller = listed(defaultProviderModel(agent.provider));
-  if (!smaller || smaller.id === own.id) return own;
-  const ownPrice = inputPrice(agent.provider, own.id);
-  const smallerPrice = inputPrice(agent.provider, smaller.id);
-  return ownPrice !== null && smallerPrice !== null && smallerPrice < ownPrice ? smaller : own;
-}
 
 class MemoryReviewFailed extends Schema.TaggedError<MemoryReviewFailed>()("MemoryReviewFailed", {
   cause: Schema.Defect(),
@@ -298,7 +281,7 @@ export class MemoryReview {
       if (!excerpt.some((message) => message.author === "user")) return;
       const agent = options.listAgents().find((candidate) => candidate.id === agentId);
       if (!agent) return;
-      const model = reviewModel(agent, yield* options.models(agent));
+      const model = backgroundModel(agent, yield* options.models(agent));
       if (!model || options.stopping()) return;
       if (!options.profileClients.hasSpare()) {
         // A user turn took the spare client while the model list loaded: wait, and read these turns then.

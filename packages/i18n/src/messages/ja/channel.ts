@@ -17,6 +17,9 @@ export const messages = {
   "channel.panel.close": "チャンネルパネルを閉じる",
   "channel.settings.title": "チャンネル設定",
   "channel.settings.memories": "メモリー",
+  "channel.settings.isolated": "メモリーをこのチャンネルに保持",
+  "channel.settings.isolatedDescription":
+    "エージェントがここで学んだことはチャンネルのメモリーとして保存され、ほかのチャットには表示されません。",
   "channel.settings.memoryCount": { other: "{count} 件保存済み" },
   "channel.settings.routines": "ルーティン",
   "channel.settings.routineCount": { other: "{count} 件設定済み" },

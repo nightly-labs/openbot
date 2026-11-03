@@ -56,6 +56,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine non è diventato pronto.",
   "error.backend.sunshineNotReadyReason": "Sunshine non è diventato pronto. {reason}",
   "error.backend.channelLeadModelUnavailable": "Il modello del responsabile del canale non è disponibile.",
+  "error.backend.contextCompactionIneffective":
+    "La compattazione non riduce questa chat: dopo due compattazioni usa ancora il {percent}% della finestra di contesto del modello, quindi OpenBot smette di compattarla. Strumenti e istruzioni usano la maggior parte della finestra. Disattiva i server MCP o l'uso del computer che questo agente non usa, oppure scegli un modello con una finestra più grande. Poi avvia una nuova chat.",
+  "error.backend.providerRetrying":
+    "Il provider non è riuscito a completare questa richiesta {attempts} volte e riprova. Se l'agente non continua, interrompi il turno.",
+  "error.backend.providerRetryingLargeContext":
+    "Il provider non è riuscito a completare questa richiesta {attempts} volte e riprova. Questa chat usa il {percent}% della finestra di contesto del modello. Se l'agente non continua, interrompi il turno: OpenBot compatterà la chat prima del prossimo messaggio.",
   "error.backend.sharedDataUnavailable": "I dati condivisi non sono disponibili.",
   "error.backend.shuttingDown": "OpenBot si sta chiudendo.",
   "error.backend.channelUnconfirmedStart":
@@ -110,9 +116,9 @@ export const messages = {
     "Hai {saved} memorie su {limit}. Per fare spazio, aggiorna una memoria tramite memoryId con il testo combinato di due memorie correlate e poi dimentica l'altra, oppure dimentica una memoria che non è più vera. Poi riprova.",
   "error.backend.agentMemoryLimitExceeded":
     "Hai {saved} memorie e il limite è {limit}. L'utente ha impostato il limite al di sotto del numero di memorie salvate. Non dimenticare memorie per fare spazio. Di' all'utente che questa memoria non è stata salvata.",
+  "error.backend.channelHistoryArriving": "Un messaggio condiviso sta ancora arrivando. Riprendi quando è completo.",
   "error.backend.channelHistoryLeadRequired":
     "Scegli un responsabile del canale per preparare la cronologia condivisa.",
-  "error.backend.channelHistoryArriving": "Un messaggio condiviso sta ancora arrivando. Riprendi quando è completo.",
   "error.backend.channelHistoryInvalid": "Il riepilogo della cronologia non è valido. Riprendi per riprovare.",
   "error.backend.channelContextTooLong":
     "Questa assegnazione supera il limite del contesto condiviso. Invia una richiesta più breve o riassegnala.",

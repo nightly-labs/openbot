@@ -46,6 +46,7 @@ import {
 } from "./browser-view-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
+import { COMPUTER_ACTIVITY_CAPABILITY } from "./computer-activity-v1";
 import { CONNECTORS_CAPABILITY } from "./connectors-v1";
 import { CONTEXT_COMPACT_CAPABILITY } from "./context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY } from "./context-reset-v1";
@@ -197,6 +198,7 @@ export {
   BROWSER_USER_CONTROL_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
+  COMPUTER_ACTIVITY_CAPABILITY,
   CONNECTORS_CAPABILITY,
   CONTEXT_COMPACT_CAPABILITY,
   CONTEXT_RESET_CAPABILITY,
@@ -415,6 +417,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_INSTRUCTIONS_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
+  COMPUTER_ACTIVITY_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
 ] as const;
 
@@ -571,6 +574,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
     capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY &&
     capability !== LOCAL_SERVERS_CAPABILITY &&
+    capability !== COMPUTER_ACTIVITY_CAPABILITY &&
     capability !== MODEL_VISIBILITY_CAPABILITY,
 );
 /**
@@ -602,6 +606,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   AGENT_INSTRUCTIONS_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
+  COMPUTER_ACTIVITY_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -717,6 +722,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
       capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY &&
       capability !== LOCAL_SERVERS_CAPABILITY &&
+      capability !== COMPUTER_ACTIVITY_CAPABILITY &&
       capability !== MODEL_VISIBILITY_CAPABILITY,
   );
 }

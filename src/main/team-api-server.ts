@@ -64,6 +64,7 @@ import {
   BROWSER_SIGN_IN_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
+  COMPUTER_ACTIVITY_CAPABILITY,
   CONNECTORS_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
@@ -251,6 +252,7 @@ import { routeBitwardenConnector } from "./team-api/route-bitwarden-connector";
 import { routeBrowser } from "./team-api/route-browser";
 import { routeBrowserProfiles } from "./team-api/route-browser-profiles";
 import { routeChannels } from "./team-api/route-channels";
+import { routeComputerActivity } from "./team-api/route-computer-activity";
 import { routeConnectors } from "./team-api/route-connectors";
 import { routeContextCompact } from "./team-api/route-context-compact";
 import { routeContextReset } from "./team-api/route-context-reset";
@@ -1099,6 +1101,7 @@ export class TeamApiServer {
       )
         return;
       if ((await routePushNotifications(context, this.#options.pushNotifications)) === "handled") return;
+      if ((await routeComputerActivity(context, this.#options.pushNotifications)) === "handled") return;
       if (
         (await routeFocusUse(context, this.#options.focusUse ? (id) => this.#recordFocusUse(id) : undefined)) ===
         "handled"
@@ -2231,7 +2234,11 @@ export class TeamApiServer {
           if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
           if (capability === WORKFLOWS_GITHUB_CAPABILITY) return this.#options.workflows?.github !== undefined;
-          if (capability === PUSH_NOTIFICATIONS_CAPABILITY || capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY)
+          if (
+            capability === PUSH_NOTIFICATIONS_CAPABILITY ||
+            capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY ||
+            capability === COMPUTER_ACTIVITY_CAPABILITY
+          )
             return this.#options.pushNotifications !== undefined;
           if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;
           if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)

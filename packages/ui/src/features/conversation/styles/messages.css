@@ -410,8 +410,9 @@
   animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
+/* The line's padding, the 32px face, and its lower padding. */
 .agent-activity-slot[data-reserved="true"] {
-  min-height: 44px;
+  min-height: 52px;
 }
 
 .agent-activity-entry {
@@ -439,7 +440,9 @@
   gap: 8px;
   overflow: clip;
   overflow-clip-margin: var(--openbot-space-3);
-  padding: 4px 0 8px 8px;
+  /* The working face's felt dots reach about 10px above it. The top padding keeps them in this line,
+     so they do not cover the message above. */
+  padding: var(--openbot-space-3) 0 8px 8px;
   opacity: 1;
   filter: blur(0);
   transform: translateY(0);

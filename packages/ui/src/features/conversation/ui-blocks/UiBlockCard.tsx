@@ -18,6 +18,8 @@ export interface UiBlockCardProps {
   status: UiBlockStatus;
   /** The line a frozen block shows, such as the chosen button. */
   outcome?: string | undefined;
+  /** A logo before the title, such as the key of a form that asks for a secret. */
+  icon?: JSX.Element | undefined;
   /** Draws the card as dangerous. */
   danger?: boolean | undefined;
   /** An answer is on its way. */
@@ -115,6 +117,7 @@ export function UiBlockCard(props: UiBlockCardProps) {
       ref={(element) => props.elementRef?.(element)}
     >
       <header class="ui-block-header">
+        {props.icon}
         <div class="ui-block-heading">
           <Show when={props.title}>
             <h3 id={titleId} class="ui-block-title">

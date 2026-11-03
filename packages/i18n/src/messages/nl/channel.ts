@@ -17,6 +17,9 @@ export const messages = {
   "channel.panel.close": "Kanaalpaneel sluiten",
   "channel.settings.title": "Kanaalinstellingen",
   "channel.settings.memories": "Herinneringen",
+  "channel.settings.isolated": "Herinneringen in dit kanaal houden",
+  "channel.settings.isolatedDescription":
+    "Agenten bewaren wat ze hier leren als kanaalherinneringen. Hun andere chats zien ze niet.",
   "channel.settings.memoryCount": { one: "{count} opgeslagen", other: "{count} opgeslagen" },
   "channel.settings.routines": "Routines",
   "channel.settings.routineCount": { one: "{count} ingesteld", other: "{count} ingesteld" },
