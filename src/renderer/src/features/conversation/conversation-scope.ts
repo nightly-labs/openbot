@@ -568,7 +568,10 @@ export function createConversationViewScope(props: ConversationProps) {
       const thread = next.ids[Math.min(Math.max(index, 0), next.ids.length - 1)];
       if (thread) openPanelThread(thread);
       else if (next.pane) openSidePanelPane(next.pane);
-      else if (next.file) openSidePanelFile(next.file);
+      else if (next.file) {
+        setActiveRightPanel("side-panel");
+        openSidePanelFile(next.file);
+      }
     },
   );
   /** The subagent that the side panel shows now, or null. */
@@ -588,8 +591,11 @@ export function createConversationViewScope(props: ConversationProps) {
     const file = sidePanel().files.at(-1);
     if (next) openSidePanelPane(next);
     else if (thread) openPanelThread(thread);
-    else if (file) openSidePanelFile(file.key);
-    else setActiveRightPanel("side-panel");
+    else if (file) {
+      // The closed pane must not stay on screen while the file reads, or after a failed read.
+      setActiveRightPanel("side-panel");
+      openSidePanelFile(file.key);
+    } else setActiveRightPanel("side-panel");
   }
   /**
    * Closes the tab of a file. When the file showed, the file next to it shows, else the last pane or
