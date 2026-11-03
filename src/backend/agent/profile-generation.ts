@@ -278,6 +278,9 @@ const profileCompletion = Effect.fnUntraced(function* (
 ) {
   return yield* Effect.callback<string, ProfileGenerationFailed | GenerationUsageLimitError>((resume) => {
     let text = "";
+    // ACP and Claude send reasoning as commentary message items. It is not the answer, and it
+    // must not count against the size limit (#4558).
+    const commentary = new Set<string>();
     let limit: { resetsAt: number | null } | null = null;
     const finish = (effect: Effect.Effect<string, ProfileGenerationFailed | GenerationUsageLimitError>) => {
       cleanup();
@@ -309,10 +312,17 @@ const profileCompletion = Effect.fnUntraced(function* (
         )
           limit ??= { resetsAt: null };
       }
-      if (notification.method === "item/agentMessage/delta") text += getString(notification.params, "delta") ?? "";
+      if (notification.method === "item/started") {
+        const item = getRecord(params, "item");
+        const id = getString(item, "id");
+        if (id && getString(item, "phase") === "commentary") commentary.add(id);
+      }
+      if (notification.method === "item/agentMessage/delta" && !commentary.has(getString(params, "itemId") ?? ""))
+        text += getString(params, "delta") ?? "";
       if (notification.method === "item/completed") {
-        const item = getRecord(notification.params, "item");
-        if (getString(item, "type") === "agentMessage") text = getString(item, "text") ?? text;
+        const item = getRecord(params, "item");
+        if (getString(item, "type") === "agentMessage" && getString(item, "phase") !== "commentary")
+          text = getString(item, "text") ?? text;
       }
       if (notification.method === "turn/completed") {
         const turn = getRecord(notification.params, "turn");
