@@ -568,6 +568,7 @@ const MessageRow = memo(function MessageRow({
     ) : message.kind === "question" ? (
       <ChatQuestionPrompt
         key={message.id}
+        serverId={serverId}
         prompt={message.prompt}
         uiBlock={message.uiBlock}
         controller={questionForm}

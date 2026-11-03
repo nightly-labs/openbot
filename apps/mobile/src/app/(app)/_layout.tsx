@@ -540,6 +540,18 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="vault-request"
+          // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
           name="turn-thinking"
           options={{
             contentStyle: { backgroundColor: sheetBackground },

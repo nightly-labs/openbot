@@ -19,6 +19,7 @@ export function SheetFormField({
       {!hideLabel && (
         <Typography type="body-xs" className="px-4 text-grouped-secondary">
           {label}
+          {isRequired ? " *" : ""}
         </Typography>
       )}
       <View

@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import type { ChatMessage } from "@/features/chat/model/chat-messages";
 import { answeredPromptResolution, nextUnansweredQuestion } from "@/features/chat/model/question-prompt";
 import { haptics } from "@/shared/lib/haptics";
+import { currentText } from "@/shared/lib/text";
 
 interface PromptState {
   scope: string;
@@ -50,21 +51,30 @@ export function useQuestionPrompt(
     setState((current) => (current.scope === scope ? { ...current, ...change } : current));
   }
 
-  async function submit(answers: Record<string, string[]>): Promise<void> {
-    if (disabled || !prompt || submitting.current.has(scope)) return;
+  /** Sends all answers at once. A failure rejects, so the caller can show the host's reason. */
+  async function send(answers: Record<string, string[]>): Promise<void> {
+    if (disabled || !prompt || submitting.current.has(scope))
+      throw new Error(currentText().t("mobile.chat.question.sendFailed"));
     submitting.current.add(scope);
     update({ pending: true, failedAnswers: null });
     try {
       await respond(agentId, { requestId: prompt.requestId, answers });
       update({ resolution: answeredPromptResolution(prompt.questions, answers), answers: {}, drafts: {} });
-      void haptics.notification("success");
-    } catch {
-      void haptics.notification("error");
-      update({ failedAnswers: answers });
     } finally {
       submitting.current.delete(scope);
       update({ pending: false });
     }
+  }
+
+  async function submit(answers: Record<string, string[]>): Promise<void> {
+    if (disabled || !prompt || submitting.current.has(scope)) return;
+    await send(answers).then(
+      () => void haptics.notification("success"),
+      () => {
+        void haptics.notification("error");
+        update({ failedAnswers: answers });
+      },
+    );
   }
 
   function answer(values: string[]): void {
@@ -108,6 +118,7 @@ export function useQuestionPrompt(
     },
     answer,
     submit,
+    send,
   };
 }
 

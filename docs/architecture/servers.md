@@ -297,6 +297,13 @@ and the WebRTC host peer adds it again after its own encoding. A client copies i
 value after it decodes (`addUiBlockAutoAnswers`); the shared team client does this, and the mobile
 app shows the countdown with it. The desktop transports do not copy it yet.
 
+`ui-block-vault-v1` (`team-protocol/ui-block-vault-v1.ts`, protocol 9 only) adds `vault`
+(`{ kind, saved? }`) to the same blocks in the same way (`withUiBlockVaultRequests`,
+`addUiBlockVaultRequests`). It marks the form of `request_vault_item`, and after the save it names
+the item and the last four digits of a card; it never holds a secret value. The mobile app shows the
+Vault card with it and answers through the released prompt route. A client without it gets the form
+as questions. The desktop transports do not copy it yet.
+
 ### Subagents
 
 `subagents-v1` carries the subagents that an agent started in one turn (see

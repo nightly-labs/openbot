@@ -106,6 +106,7 @@ import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_DISK_CAPABILITY } from "./storage-disk-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
+import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "./v8";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
@@ -262,6 +263,7 @@ export {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
+  TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
@@ -407,6 +409,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_FAST_MODE_CAPABILITY,
   CONTEXT_COMPACT_CAPABILITY,
   AGENT_INSTRUCTIONS_CAPABILITY,
+  TEAM_UI_BLOCK_VAULT_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -559,7 +562,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== SERVER_AUDIT_CAPABILITY &&
     capability !== AGENT_FAST_MODE_CAPABILITY &&
     capability !== CONTEXT_COMPACT_CAPABILITY &&
-    capability !== AGENT_INSTRUCTIONS_CAPABILITY,
+    capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
+    capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -588,6 +592,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   AGENT_FAST_MODE_CAPABILITY,
   CONTEXT_COMPACT_CAPABILITY,
   AGENT_INSTRUCTIONS_CAPABILITY,
+  TEAM_UI_BLOCK_VAULT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -699,6 +704,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== SERVER_AUDIT_CAPABILITY &&
       capability !== AGENT_FAST_MODE_CAPABILITY &&
       capability !== CONTEXT_COMPACT_CAPABILITY &&
-      capability !== AGENT_INSTRUCTIONS_CAPABILITY,
+      capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
+      capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY,
   );
 }
