@@ -18,6 +18,7 @@ import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
@@ -115,6 +116,7 @@ export function ConversationTimeline() {
     activeChatSearchIndex,
     agentActivitySpaceReserved,
     attachmentAction,
+    attachmentDownloads,
     channel,
     chatSearchMatches,
     chatSearchOpen,
@@ -130,6 +132,7 @@ export function ConversationTimeline() {
     editingDeliveryId,
     editPendingSend,
     copyMessage,
+    messageText,
     expandedEmojiMessageId,
     installedSkills,
     scrollFades,
@@ -216,6 +219,19 @@ export function ConversationTimeline() {
     const onMarkUnread = props.onMarkUnread;
     if (channel || !onMarkUnread || !isIncomingAgentMessage(message) || message.streaming) return;
     return () => void onMarkUnread(message.id);
+  };
+  /** A finished message of an agent chat can start work in a channel. A channel message stays where it is. */
+  const sendToChannelAction = (message: AgentMessage) => {
+    const target = props.sendToChannel;
+    if (
+      channel ||
+      !target ||
+      message.streaming ||
+      !message.body.trim() ||
+      message.id.startsWith(PENDING_SEND_ID_PREFIX)
+    )
+      return;
+    return { channels: target.channels, onSend: (channelId: string) => target.onSend(channelId, messageText(message)) };
   };
   /** The answers of the agent that end a finished turn. Each one offers a branch. */
   const branchPoints = createMemo(() =>
@@ -385,6 +401,9 @@ export function ConversationTimeline() {
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
+            onOpenSharedFile={openSharedFile}
+            // A workspace path is in the workspace of the agent that wrote it, as in a channel.
+            onOpenWorkspaceFile={(path) => openWorkspaceFile(path, undefined, current().exchange?.senderAgentId)}
             onOpenQuote={openQuote}
             macWindowControls={props.platform === "darwin"}
           />
@@ -555,7 +574,9 @@ export function ConversationTimeline() {
     <>
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {props.prompt
-          ? t("prompt.inputRequiredAnnouncement", { question: props.prompt.questions[0]?.question ?? "" })
+          ? t("prompt.inputRequiredAnnouncement", {
+              question: markdownPlainText(props.prompt.questions[0]?.question ?? ""),
+            })
           : ""}
       </span>
       <Show when={chatSearchOpen() && !sideThreadOpen()}>
@@ -899,6 +920,7 @@ export function ConversationTimeline() {
                               <AttachmentCards
                                 attachments={message()?.attachments ?? []}
                                 mediaSource={runtime.attachmentMedia}
+                                downloads={attachmentDownloads}
                                 onPreview={(attachment) => void previewAttachment(attachment)}
                                 onAction={attachmentAction}
                               />
@@ -1236,6 +1258,7 @@ export function ConversationTimeline() {
                             onOpenQuote={openQuote}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             mediaSource={runtime.attachmentMedia}
+                            downloads={attachmentDownloads}
                             macWindowControls={props.platform === "darwin"}
                             loadImageFile={
                               loadImageFile &&
@@ -1312,6 +1335,7 @@ export function ConversationTimeline() {
                                       {...messageActions}
                                       readAloud={messageReadAloud()}
                                       onMarkUnread={markUnreadAction(message() ?? initialMessage)}
+                                      sendToChannel={sendToChannelAction(message() ?? initialMessage)}
                                       onBranch={branchAction(message() ?? initialMessage)}
                                       branchDisabled={Boolean(props.activeTurnId)}
                                     />
@@ -1349,6 +1373,7 @@ export function ConversationTimeline() {
                                       questions={questionPrompt.questions}
                                       resolution={resolution}
                                       onSubmit={async () => false}
+                                      onOpenLink={(url) => void openExternalMessageUrl(url)}
                                     />
                                   </article>
                                 )}

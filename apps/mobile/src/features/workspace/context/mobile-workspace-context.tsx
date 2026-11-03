@@ -18,6 +18,7 @@ import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
+import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
@@ -39,6 +40,7 @@ import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-up
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
+import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
@@ -46,6 +48,7 @@ import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-p
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notifications-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import {
   SIDEBAR_FOLDERS_CAPABILITY,
@@ -80,6 +83,10 @@ import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import {
+  createHostLocalServer,
+  deleteHostLocalServer,
+  type HostLocalServerList,
+  listHostLocalServers,
   readSidebarPins,
   rotateHostKey,
   seedSidebarPins,
@@ -157,6 +164,13 @@ import {
 import { ConnectionWaits } from "@/features/workspace/model/connection-waits";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
+import {
+  drawerSnapshot,
+  forgetDrawerSnapshots,
+  rememberDrawerValues,
+  restoreDrawerSnapshot,
+  startDrawerSnapshots,
+} from "@/features/workspace/model/drawer-snapshot";
 import { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
 import {
   dropApproval,
@@ -354,16 +368,39 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [],
   );
   useEffect(() => () => conversationStore.dispose(), [conversationStore]);
-  const workspaceCache = useMemo(
-    () => createWorkspaceCache(`${session.apiUrl}:${session.user.id}`),
-    [session.apiUrl, session.user.id],
-  );
+  const workspaceCache = useMemo(() => {
+    // In render, before the effects of the drawer and the cache read below, so the drawer values of
+    // another account do not show and the first values of this one stay.
+    startDrawerSnapshots(`${session.apiUrl}:${session.user.id}`);
+    return createWorkspaceCache(`${session.apiUrl}:${session.user.id}`);
+  }, [session.apiUrl, session.user.id]);
+  useEffect(() => {
+    startDrawerSnapshots(`${session.apiUrl}:${session.user.id}`);
+    return () => startDrawerSnapshots(null);
+  }, [session.apiUrl, session.user.id]);
   /** The last agent list of each server, as the host sent it, for the phone's cache. */
   const cachedSummaries = useRef(new Map<string, RemoteAgent[]>());
   /** Servers whose cache this run read, once each. */
   const restoredServers = useRef(new Set<string>());
   /** Servers shown from the cache whose connection did not register yet. */
   const quietStarts = useRef(new Set<string>());
+  /**
+   * The capabilities that the phone kept from the last connection of each server, until this run
+   * checks them. Only the first workspace reads use them: the checks and the actions wait for the host.
+   */
+  const keptCapabilities = useRef(new Map<string, readonly string[]>());
+  /** The server list that the phone keeps, as the account service last gave it. */
+  const keptHosts = useRef<readonly RemoteTeamHost[] | null>(null);
+  /** The account service gave the server list in this run, so the phone's copy no longer applies. */
+  const directoryLoaded = useRef(false);
+  const keepHosts = useCallback(
+    (hosts: readonly RemoteTeamHost[]) => {
+      if (keptHosts.current && JSON.stringify(keptHosts.current) === JSON.stringify(hosts)) return;
+      keptHosts.current = hosts;
+      void workspaceCache?.writeHosts(hosts).catch(() => undefined);
+    },
+    [workspaceCache],
+  );
   const [liveState] = useState(() => new LiveWorkspaceStore());
   const preferenceStore = useMemo(
     () =>
@@ -451,6 +488,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         for (const id of serverAgentIds.current.get(serverId) ?? []) removedAgentIds.add(id);
         serverAgentIds.current.delete(serverId);
         cachedSummaries.current.delete(serverId);
+        keptCapabilities.current.delete(serverId);
         void workspaceCache?.remove(serverId).catch(() => undefined);
         presenceSignatures.current.delete(serverId);
         for (const queryKey of [
@@ -462,6 +500,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         ])
           queryClient.removeQueries({ queryKey });
       }
+      forgetDrawerSnapshots(serverIds);
       setSidebarByServer((current) => withoutKeys(current, serverIds));
       setHostHidden((current) => withoutKeys(current, serverIds));
       setAgents((current) => current.filter((agent) => !serverIds.has(agent.serverId)));
@@ -473,17 +512,28 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState.update("approvalRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserTabs", (current) => withoutKeys(current, serverIds));
+      // A server that the user left does not come back with the next start.
+      const kept = keptHosts.current;
+      if (kept?.some((host) => serverIds.has(host.hostId)))
+        keepHosts(kept.filter((host) => !serverIds.has(host.hostId)));
     },
-    [connectionWaits, readRefresh, queryClient, queryScope, conversationStore, liveState, workspaceCache],
+    [connectionWaits, readRefresh, queryClient, queryScope, conversationStore, liveState, workspaceCache, keepHosts],
   );
 
+  /**
+   * Shows the servers of a list. `confirmed` is false for the list that the phone kept: it only
+   * starts the connections early, and the list of the account service then drops and keeps.
+   */
   const installHosts = useCallback(
-    (hosts: RemoteTeamHost[]) => {
+    (hosts: readonly RemoteTeamHost[], confirmed = true) => {
       const available = new Set(hosts.map((host) => host.hostId));
-      dropServerState(new Set(serversRef.current.filter((server) => !available.has(server.id)).map(({ id }) => id)));
-      // Also the copies of servers that the account left while the app was closed.
-      void workspaceCache?.retain([...available]).catch(() => undefined);
-      for (const host of hosts) removedServers.current.delete(host.hostId);
+      if (confirmed) {
+        dropServerState(new Set(serversRef.current.filter((server) => !available.has(server.id)).map(({ id }) => id)));
+        // Also the copies of servers that the account left while the app was closed.
+        void workspaceCache?.retain([...available]).catch(() => undefined);
+        for (const host of hosts) removedServers.current.delete(host.hostId);
+        keepHosts(hosts);
+      }
       setServers((current) => {
         const previousServers = new Map(current.map((server) => [server.id, server]));
         return hosts.map((host) =>
@@ -496,7 +546,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           : (sortByPreference(hosts.map((host) => ({ id: host.hostId })))[0]?.id ?? null),
       );
     },
-    [dropServerState, session.host?.hostId, sortByPreference, workspaceCache],
+    [dropServerState, session.host?.hostId, sortByPreference, workspaceCache, keepHosts],
   );
 
   const directoryRefresh = useMemo(
@@ -519,12 +569,39 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             ),
           );
           if (generation !== directoryGeneration.current) return;
+          directoryLoaded.current = true;
           installHosts(hosts);
           setServerDirectoryState("ready");
         }),
       ),
     [directory, installHosts],
   );
+  // At a start, the servers that the phone kept connect while the account service answers. The
+  // account service still decides: its list drops a server that the account left, and each ticket
+  // checks the membership. Each key must be the key that this phone trusts for the server.
+  useEffect(() => {
+    if (!workspaceCache) return;
+    let current = true;
+    const hostKeys = trustedHostKeys(session.apiUrl, session.user.id);
+    void workspaceCache
+      .readHosts()
+      .then(async (cached) => {
+        if (!cached?.length) return;
+        const checked = await Promise.all(
+          cached.map(async (host) => ((await hostKeys.get(host.hostId)) === host.devicePublicKey ? host : null)),
+        );
+        if (!current || directoryLoaded.current || serversRef.current.length > 0) return;
+        keptHosts.current ??= cached;
+        const trusted = checked.filter(
+          (host): host is RemoteTeamHost => host !== null && !removedServers.current.has(host.hostId),
+        );
+        if (trusted.length > 0) installHosts(trusted, false);
+      })
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [workspaceCache, session.apiUrl, session.user.id, installHosts]);
   const refreshHosts = useCallback(() => runTeamEffect(directoryRefresh.refresh(true)), [directoryRefresh]);
   const refreshMemberships = useCallback(() => {
     directoryGeneration.current += 1;
@@ -612,6 +689,48 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         request(method, path, decode, body, serverId, upload, onUploadProgress),
     [request],
   );
+
+  /**
+   * The desktop apps' own servers (`local-servers-v1`), and the computer server of each server that one
+   * of them runs beside it. Read while the computer server is online; kept for the session, so a server
+   * whose computer went offline keeps its delete action and does not get the account's remove action.
+   */
+  const [localServerLinks, setLocalServerLinks] = useState<{
+    computers: ReadonlySet<string>;
+    parents: ReadonlyMap<string, string>;
+  }>(() => ({ computers: new Set(), parents: new Map() }));
+  const localServerLinksRef = useRef(localServerLinks);
+  localServerLinksRef.current = localServerLinks;
+  const linkLocalServers = useCallback((computerId: string, list: HostLocalServerList) => {
+    setLocalServerLinks((current) => {
+      const parents = new Map([...current.parents].filter(([, parentId]) => parentId !== computerId));
+      for (const server of list.servers) parents.set(server.serverId, computerId);
+      return { computers: new Set([...current.computers, computerId]), parents };
+    });
+  }, []);
+  const onlineComputerIds = servers
+    .filter(
+      (server) =>
+        server.role === "owner" &&
+        showsOnline(server) &&
+        hasCapability(serverCapabilities.current, server.id, LOCAL_SERVERS_CAPABILITY),
+    )
+    .map((server) => server.id)
+    .join("\n");
+  useEffect(() => {
+    if (!onlineComputerIds) return;
+    let active = true;
+    for (const computerId of onlineComputerIds.split("\n"))
+      void runTeamRequest(listHostLocalServers(teamApi(computerId))).then(
+        (list) => {
+          if (active) linkLocalServers(computerId, list);
+        },
+        () => undefined,
+      );
+    return () => {
+      active = false;
+    };
+  }, [onlineComputerIds, teamApi, linkLocalServers]);
 
   /** The open channels of each server that the routine calendar last read its owners from. */
   const calendarChannels = useRef(new Map<string, string>());
@@ -771,6 +890,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           hidden: hostHiddenRef.current[serverId] ?? null,
           sidebar: sidebarByServerRef.current[serverId]?.layout ?? null,
           conversations: agents.flatMap((agent) => conversationStore.cachedPage(agent.id) ?? []),
+          capabilities: serverCapabilities.current.get(serverId) ?? keptCapabilities.current.get(serverId) ?? null,
+          drawer: drawerSnapshot(serverId),
         })
         .catch(() => undefined);
     },
@@ -786,7 +907,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       void workspaceCache
         .read(id)
         .then((cached) => {
-          if (!cached || removedServers.current.has(id) || cachedSummaries.current.has(id)) return;
+          if (!cached || removedServers.current.has(id)) return;
+          // A connection that checked its capabilities in this run uses its own.
+          if (cached.capabilities) keptCapabilities.current.set(id, cached.capabilities);
+          if (cached.drawer) restoreDrawerSnapshot(id, cached.drawer);
+          if (cachedSummaries.current.has(id)) return;
           if (cached.hidden)
             applyHostHidden(
               id,
@@ -896,11 +1021,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       if (!context.isCurrent()) return;
       context.stage = "compatibility";
       const compatibilityRead = client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV9);
-      // On a reconnect the capabilities of the last connection are known, so the workspace reads go
-      // out with the compatibility read and do not wait one more round trip. Their results apply only
-      // after the check. The read state applies when it arrives: it does not depend on the protocol,
-      // and its refresh must start now to keep its order with the event reads.
-      const known = serverCapabilities.current.get(serverId);
+      // On a reconnect the capabilities of the last connection are known, and at a start those that
+      // the phone kept, so the workspace reads go out with the compatibility read and do not wait one
+      // more round trip. Their results apply only after the check. The read state applies when it
+      // arrives: it does not depend on the protocol, and its refresh must start now to keep its order
+      // with the event reads.
+      const known = serverCapabilities.current.get(serverId) ?? keptCapabilities.current.get(serverId);
       const loadReads = () =>
         runTeamEffect(
           readRefresh.refresh(
@@ -1080,10 +1206,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   );
   /**
    * Set on background entry with the selected server. Until it clears, the other servers stay
-   * inactive. A new selection ends it, so the server that the user leaves keeps its attempt.
+   * inactive. A new selection ends it, so the server that the user leaves keeps its attempt. A
+   * selected server that cannot be online soon ends it too: the others do not wait for nothing.
    */
   const [hold, setHold] = useState<{ serverId: string | null } | null>(null);
   const othersHeld = hold !== null && hold.serverId === activeServerId;
+  const handleServerUnavailable = useCallback((hostId: string) => {
+    if (hostId === activeServerIdRef.current) setHold(null);
+  }, []);
   const wakeReconnect = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(wakeReconnect.current), []);
   /** The account server says that the hosted server starts, so the app connects to it again soon. */
@@ -1263,6 +1393,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           setMemberCountByServer((current) =>
             current[serverId] === members ? current : { ...current, [serverId]: members },
           );
+          rememberDrawerValues(serverId, { memberCount: members });
           void queryClient.invalidateQueries({ queryKey: queryKeys.serverMembers(queryScope, serverId) });
           void queryClient.invalidateQueries({ queryKey: queryKeys.serverInvites(queryScope, serverId) });
         }
@@ -1610,6 +1741,51 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return rotated;
       },
       reloadServerList: () => refreshHosts(),
+      listLocalServers: async (serverId) => {
+        requireCapability(
+          serverCapabilities.current,
+          serverId,
+          LOCAL_SERVERS_CAPABILITY,
+          "mobile.server.local.unsupported",
+        );
+        const list = await runTeamRequest(listHostLocalServers(teamApi(serverId)));
+        linkLocalServers(serverId, list);
+        return list;
+      },
+      createLocalServer: async (serverId, name) => {
+        const server = serversRef.current.find((candidate) => candidate.id === serverId);
+        if (server?.role !== "owner") throw new Error(currentText().t("mobile.server.local.ownerOnly"));
+        requireCapability(
+          serverCapabilities.current,
+          serverId,
+          LOCAL_SERVERS_CAPABILITY,
+          "mobile.server.local.unsupported",
+        );
+        const created = await runTeamRequest(createHostLocalServer(teamApi(serverId), name));
+        setLocalServerLinks((current) => ({
+          computers: current.computers,
+          parents: new Map(current.parents).set(created.serverId, serverId),
+        }));
+        // The computer registered the server before it answered. The server exists, so a failed read
+        // must not report a failure: the next read lists it.
+        await refreshMemberships().catch(() => undefined);
+        return created;
+      },
+      deleteLocalServer: async (serverId) => {
+        const computerId = localServerLinksRef.current.parents.get(serverId);
+        const computer = serversRef.current.find((candidate) => candidate.id === computerId);
+        // The server runs as a part of OpenBot on its computer, so only that computer can delete it.
+        if (!computerId || !computer || !showsOnline(computer))
+          throw new Error(currentText().t("mobile.server.local.deleteOffline"));
+        await runTeamRequest(deleteHostLocalServer(teamApi(computerId), serverId));
+        setLocalServerLinks((current) => {
+          const parents = new Map(current.parents);
+          parents.delete(serverId);
+          return { computers: current.computers, parents };
+        });
+        forgetServer(serverId);
+        await refreshMemberships().catch(() => undefined);
+      },
       refreshServers: async () => {
         for (const connection of connections.current.values()) connection.refresh();
         await refreshHosts();
@@ -1899,6 +2075,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       pinnedAgentIds: currentPinnedAgentIds(),
     }));
   }, [
+    linkLocalServers,
     browser,
     workflows,
     hostRequests,
@@ -1982,9 +2159,19 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canRotateServerKey: (serverId) =>
         servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
         administers(serverId, HOST_KEY_ROTATION_CAPABILITY),
+      localServerKind: (serverId) =>
+        localServerLinks.computers.has(serverId)
+          ? "computer"
+          : localServerLinks.parents.has(serverId)
+            ? "onComputer"
+            : null,
+      canCreateLocalServers: (serverId) =>
+        servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
+        administers(serverId, LOCAL_SERVERS_CAPABILITY),
       canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
       canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
       canManageServerRoles: (serverId) => administers(serverId, AGENT_ACCESS_CAPABILITY),
+      canReadServerAudit: (serverId) => administers(serverId, SERVER_AUDIT_CAPABILITY),
       hasAgentAccessLimits: (serverId) => {
         const server = servers.find((candidate) => candidate.id === serverId);
         return Boolean(
@@ -2037,16 +2224,20 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageAgentSkills: (serverId) => administers(serverId, SKILLS_ADMIN_CAPABILITY),
       canManageSharedTables: (serverId) => administers(serverId, SHARED_TABLES_CAPABILITY),
       canManageAgentFolders: (serverId) => administers(serverId, AGENT_FOLDERS_CAPABILITY),
+      canNestSidebarFolders: (serverId) =>
+        hasCapability(serverCapabilities.current, serverId, SIDEBAR_FOLDERS_CAPABILITY),
       canManageAgentAccess: (serverId) => administers(serverId, AGENT_ADMIN_CAPABILITY),
       canManageAgentHostSettings: (serverId) => administers(serverId, AGENT_HOST_SETTINGS_CAPABILITY),
       canManageAgentBackupModels: (serverId) => administers(serverId, AGENT_BACKUP_MODELS_CAPABILITY),
       canManageAgentTaskLimit: (serverId) => administers(serverId, AGENT_TASK_LIMIT_CAPABILITY),
       canManageAgentNewChat: (serverId) => administers(serverId, AGENT_NEW_CHAT_CAPABILITY),
       canManageAgentPlanCard: (serverId) => administers(serverId, AGENT_PLAN_CARD_CAPABILITY),
+      canManageAgentInstructions: (serverId) => administers(serverId, AGENT_INSTRUCTIONS_CAPABILITY),
       canPublishAgent: (serverId) => administers(serverId, AGENT_PUBLISH_CAPABILITY),
       canManageProviderAccounts: (serverId) => administers(serverId, PROVIDER_ACCOUNTS_CAPABILITY),
     };
   }, [
+    localServerLinks,
     hostRequests,
     browser,
     sidebarByServer,
@@ -2103,6 +2294,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               onStatus={handleConnectionStatus}
               onMembershipChanged={refreshMemberships}
               onTeamEvent={handleTeamEvent}
+              onUnavailable={handleServerUnavailable}
             />
           ))}
         </View>

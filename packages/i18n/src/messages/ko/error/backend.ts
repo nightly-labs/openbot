@@ -55,6 +55,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine이 준비되지 않았어요.",
   "error.backend.sunshineNotReadyReason": "Sunshine이 준비되지 않았어요. {reason}",
   "error.backend.channelLeadModelUnavailable": "채널 리더 모델을 사용할 수 없어요.",
+  "error.backend.contextCompactionIneffective":
+    "압축해도 이 채팅이 작아지지 않아요. 두 번 압축한 뒤에도 모델 컨텍스트 창의 {percent}%를 사용해서 OpenBot이 압축을 멈춰요. 창의 대부분은 도구와 지침이 사용해요. 이 에이전트에 필요 없는 MCP 서버나 컴퓨터 사용을 끄거나, 창이 더 큰 모델을 선택하세요. 그런 다음 새 채팅을 시작하세요.",
+  "error.backend.providerRetrying":
+    "제공자가 이 요청에 {attempts}번 실패해서 다시 시도하고 있어요. 에이전트가 계속하지 않으면 턴을 중지하세요.",
+  "error.backend.providerRetryingLargeContext":
+    "제공자가 이 요청에 {attempts}번 실패해서 다시 시도하고 있어요. 이 채팅은 모델 컨텍스트 창의 {percent}%를 사용해요. 에이전트가 계속하지 않으면 턴을 중지하세요. 그러면 OpenBot이 다음 메시지 전에 채팅을 압축해요.",
   "error.backend.sharedDataUnavailable": "공유 데이터를 사용할 수 없어요.",
   "error.backend.shuttingDown": "OpenBot이 종료되는 중이에요.",
   "error.backend.channelUnconfirmedStart":
@@ -103,8 +109,8 @@ export const messages = {
     "메모리가 {limit}개 중 {saved}개예요. 공간을 만들려면 관련된 메모리 두 개의 내용을 합쳐 memoryId로 메모리 하나를 업데이트한 후 나머지 하나를 삭제하거나, 더 이상 사실이 아닌 메모리를 삭제하세요. 그런 다음 다시 시도해 주세요.",
   "error.backend.agentMemoryLimitExceeded":
     "메모리가 {saved}개인데 한도는 {limit}개예요. 사용자가 한도를 저장된 메모리 수보다 낮게 설정했어요. 공간을 만들려고 메모리를 삭제하지 마세요. 사용자에게 이 메모리가 저장되지 않았다고 알리세요.",
-  "error.backend.channelHistoryLeadRequired": "공유 기록을 준비하려면 채널 리더를 선택하세요.",
   "error.backend.channelHistoryArriving": "공유 메시지가 아직 도착하는 중이에요. 완료되면 재개하세요.",
+  "error.backend.channelHistoryLeadRequired": "공유 기록을 준비하려면 채널 리더를 선택하세요.",
   "error.backend.channelHistoryInvalid": "기록 요약이 올바르지 않아요. 재개해서 다시 시도해 주세요.",
   "error.backend.channelContextTooLong":
     "이 배정이 공유 컨텍스트 한도를 넘었어요. 더 짧은 요청을 보내거나 다시 배정하세요.",
@@ -333,8 +339,8 @@ export const messages = {
   "error.backend.taskToolInvalid": "작업에 120자 이하의 제목과 할 일을 설명하는 지시문을 지정하세요.",
   "error.backend.taskOwnChatOnly":
     "작업은 자신의 채팅에서만 시작할 수 있어요. 채널, 메시징 대화, 다른 작업에서는 시작할 수 없어요.",
-  "error.backend.taskOpenLimit":
-    "이 에이전트에는 이미 열린 작업이 {count}개 있어요. 다른 작업을 시작하기 전에 사용자가 작업 하나를 닫을 때까지 기다리세요.",
+  "error.backend.taskUnfinishedLimit":
+    "이 에이전트에는 이미 끝나지 않은 작업이 {count}개 있어요. 그중 하나가 끝나면 다른 작업을 시작하세요.",
   "error.backend.taskOpenLimitReached":
     "이 에이전트에는 열린 작업이 {count}개 있어요. 작업 하나를 닫은 후 다른 작업을 시작하거나 여세요.",
   "error.backend.taskRemoteUnsupported": "작업은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",

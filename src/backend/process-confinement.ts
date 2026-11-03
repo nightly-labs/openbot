@@ -323,8 +323,13 @@ export function hermesStatePaths(env: NodeJS.ProcessEnv = process.env, home = ho
  * servers, plugins, skills and downloaded tools are in that folder too, and every other Kimi process
  * loads them, so they stay read-only.
  */
+/** The state directory of the Python Kimi CLI: `$KIMI_SHARE_DIR`, or `~/.kimi`. */
+export function kimiHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.KIMI_SHARE_DIR?.trim() || join(home, ".kimi");
+}
+
 export function kimiStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const kimiHome = env.KIMI_SHARE_DIR?.trim() || join(home, ".kimi");
+  const kimiHome = kimiHomeDirectory(env, home);
   return {
     writable: unique([kimiHome, join(home, ".kimi", "plans")]),
     protected: ["config.toml", "config.json", "mcp.json", "plugins", "skills", "bin"].map((name) =>

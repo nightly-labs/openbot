@@ -6,6 +6,8 @@ import { type InviteLinkOptions, type InviteLinkPayload, parseInviteUrl } from "
 import type {
   AgentEvent,
   AgentImportPreview,
+  AttachmentDownloadProgress,
+  AttachmentImportProgress,
   AvatarImageInput,
   ClientAgentSummary,
   ConversationPage,
@@ -64,6 +66,10 @@ import {
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
+import {
+  COMPUTER_ACTIVITY_CAPABILITY,
+  COMPUTER_ACTIVITY_ROUTES,
+} from "@openbot/contracts/team-protocol/computer-activity-v1";
 import { TEAM_MEMBER_LEAVE_CAPABILITY, type TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
@@ -82,6 +88,7 @@ import {
 } from "@openbot/team-client/hosted-server-wake";
 import { Deferred, Effect, Exit, Layer, Result, Scope, Semaphore } from "effect";
 import type { CentralAuthOperationError } from "./central-auth-effects";
+import { ComputerActivityReport } from "./computer-activity-report";
 import { contentDispositionFileName } from "./content-disposition";
 import type { HostedServerDesktopService } from "./hosted-server-service";
 import type { PreferenceFileFailure } from "./preference-file";
@@ -91,7 +98,7 @@ import {
   decodeDraftAttachment,
   decodeDuplicateAgentResultFromHost,
 } from "./remote-agent-decoding";
-import { type RemoteAttachment, RemoteAttachmentCache } from "./remote-attachment-cache";
+import { AttachmentDownloadStopped, type RemoteAttachment, RemoteAttachmentCache } from "./remote-attachment-cache";
 import type { RemoteConnectTrace } from "./remote-connect-trace";
 import {
   decodeConversationPageFromHost,
@@ -107,7 +114,7 @@ import {
 } from "./remote-conversation-decoding";
 import { decodeRemoteDesktopSetupFromHost, decodeRemoteDesktopTestFromHost } from "./remote-desktop-setup-decoding";
 import { decodeRemoteDesktopSession } from "./remote-device-decoding";
-import { acceptEmpty, decodeVoid, type ResponseDecoder } from "./remote-host-decoding";
+import { acceptEmpty, decodeComputerActivityReply, decodeVoid, type ResponseDecoder } from "./remote-host-decoding";
 import { type RemoteRequestInit, RemoteServerClient } from "./remote-server-client";
 import { RemoteServerConnections } from "./remote-server-connections";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
@@ -126,6 +133,7 @@ import type { StoredRemoteServer } from "./remote-server-stored-shape";
 import { remoteServerSummaries } from "./remote-server-summaries";
 import { addRemotePreviewUrls, isLocalDevelopmentApi, pageQuery } from "./remote-server-urls";
 import {
+  type RemoteFileProgress,
   RemoteRequest,
   RemoteWorkflowError,
   remoteCall,
@@ -163,7 +171,12 @@ interface RemoteServerEvents {
   directMessage: [serverId: string, event: DirectMessageRealtimeEvent];
   directTyping: [serverId: string, event: DirectTypingRealtimeEvent];
   machineAlert: [serverId: string, event: MachineAlertEvent];
+  attachmentDownload: [progress: AttachmentDownloadProgress];
+  attachmentImportProgress: [progress: AttachmentImportProgress];
 }
+
+// The renderer redraws a progress ring; more than about ten updates a second show nothing more.
+const ATTACHMENT_PROGRESS_INTERVAL_MS = 100;
 
 interface CentralAccountSession {
   createTeamAuthTicket: (serverId: string) => Effect.Effect<string, CentralAuthOperationError>;
@@ -194,6 +207,17 @@ interface RemoteServerManagerOptions {
   accountReady?: Effect.Effect<unknown, RemoteWorkflowError>;
   /** The notification levels that the owner of this computer chose on its own server. */
   localNotificationLevels?: LocalNotificationLevels;
+  /** Tells each joined host when this computer had input (`computer-activity-v1`). */
+  computerActivity?: ComputerActivityOptions;
+}
+
+interface ComputerActivityOptions {
+  /** The time without input after which a host lets the member's phone notify. */
+  awayAfterMs: number;
+  /** Whole seconds since the last keyboard or mouse input on this computer. */
+  idleSeconds(): number;
+  /** Whether this desktop shows the events of the server now, in a focused window or as notifications. */
+  showsEvents(server: ServerSummary): boolean;
 }
 
 /** The levels of the owner on the server of this computer, which the host also reads for the owner's phones. */
@@ -253,6 +277,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #events: RemoteEventStream;
   readonly #presence: RemotePresenceCache;
   readonly #attachments = new RemoteAttachmentCache();
+  /** The downloads that `stopAttachmentDownload` can end, by server and attachment. */
+  readonly #attachmentStops = new Map<string, Deferred.Deferred<never, RemoteWorkflowError>>();
   readonly #localLevels: LocalNotificationLevels | null;
   /**
    * The notification levels that the user chose on each joined server, as each server last gave them.
@@ -294,6 +320,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #focusUse = createFocusUsePing((serverId) =>
     this.#background(this.request(serverId, FOCUS_USE_ROUTES.ping, acceptEmpty, { method: "POST", body: {} })),
   );
+  readonly #computerActivity: ComputerActivityReport | null;
   readonly #remoteViewerProxy: RemoteViewerProxy | null;
   #selections = Semaphore.makeUnsafe(1);
   /** One read of the account's host list at a time, so an older answer cannot replace a newer one. */
@@ -332,6 +359,30 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#connectTrace = options.connectTrace ?? null;
     this.#accountReady = options.accountReady ?? Effect.void;
     this.#localLevels = options.localNotificationLevels ?? null;
+    const activity = options.computerActivity;
+    this.#computerActivity = activity
+      ? new ComputerActivityReport({
+          awayAfterMs: activity.awayAfterMs,
+          idleSeconds: () => activity.idleSeconds(),
+          // A server whose events this desktop does not show tells the member's phone.
+          targets: () =>
+            this.list()
+              .filter(
+                (server) =>
+                  server.id !== LOCAL_SERVER_ID &&
+                  this.#connections.stateFor(server.id) === "online" &&
+                  this.supportsCapability(server.id, COMPUTER_ACTIVITY_CAPABILITY) &&
+                  activity.showsEvents(server),
+              )
+              .map((server) => server.id),
+          send: (serverId, idleSeconds) =>
+            this.request(serverId, COMPUTER_ACTIVITY_ROUTES.report, decodeComputerActivityReply, {
+              method: "POST",
+              body: { idleSeconds },
+            }),
+          run: (operation) => this.#background(operation),
+        })
+      : null;
     // A change from the owner's phone shows at once in the server list and in Settings › Notifications.
     this.#localLevels?.subscribe(() => {
       this.#emitChanged();
@@ -752,6 +803,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly startEventConnections = Effect.fn("RemoteManager.startEventConnections")(function* (
     this: RemoteServerManager,
   ) {
+    this.#computerActivity?.start();
     yield* this.#events.start();
   }).bind(this);
 
@@ -1912,18 +1964,28 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       mimeType: string,
       bytes: Uint8Array,
       serverId = this.#store.activeServerId,
+      // With it, the bytes that the host confirms go to the renderer as `attachmentImportProgress`.
+      requestId?: string,
     ): Effect.fn.Return<DraftAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const url = new URL(TEAM_API_ROUTES.attachments, server.apiUrl);
       url.searchParams.set("name", name);
       url.searchParams.set("mime", mimeType || "application/octet-stream");
-      const response = yield* this.#client.fetch(server, url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/octet-stream",
+      const response = yield* this.#client.fetch(
+        server,
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+          },
+          body: Buffer.from(bytes),
         },
-        body: Buffer.from(bytes),
-      });
+        true,
+        undefined,
+        undefined,
+        requestId === undefined ? undefined : this.#importProgress(serverId, requestId),
+      );
       const json = yield* remoteCall(() => response.json());
       return yield* remoteDecode(() =>
         addRemotePreviewUrls(
@@ -2094,9 +2156,12 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       attachmentId: string,
       serverId = this.#store.activeServerId,
       preview = false,
+      // The size that the message names. With it, the download reports its bytes and can be stopped.
+      size?: number,
     ): Effect.fn.Return<RemoteAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
-      return yield* this.#attachments.get(
+      const progress = size === undefined ? undefined : this.#attachmentProgress(server.id, attachmentId, size);
+      const load = this.#attachments.get(
         server.id,
         attachmentId,
         () =>
@@ -2105,19 +2170,81 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
               const response = yield* this.#client.fetch(
                 server,
                 new URL(TEAM_API_ROUTES.attachment(attachmentId), server.apiUrl),
+                {},
+                true,
+                undefined,
+                progress,
               );
               return {
-                bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
+                bytes: yield* remoteCall((signal) =>
+                  // A WebRTC answer holds the whole file already, and its bytes were reported.
+                  progress && server.transport !== "webrtc-v2"
+                    ? countedResponseBytes(response, progress, signal)
+                    : response.arrayBuffer().then((buffer) => new Uint8Array(buffer)),
+                ),
                 name: contentDispositionFileName(response.headers.get("content-disposition"), attachmentId),
                 mimeType: response.headers.get("content-type") ?? "application/octet-stream",
               };
-            }),
+            }).pipe((download) => (progress ? this.#stoppable(server.id, attachmentId, download) : download)),
           ),
         preview,
       );
+      // A click can wait for a load that a preview or a ZIP started. Its stop then ends only its wait.
+      // A click that starts the load stops the load itself, above, so the callers that wait get an error.
+      return yield* progress ? this.#stoppable(server.id, attachmentId, load) : load;
     },
     (operation) => this.#owned(operation),
   ).bind(this);
+
+  /** Ends a download that an open or a save started. The open or the save answers without a file. */
+  stopAttachmentDownload(attachmentId: string, serverId: string): void {
+    const stop = this.#attachmentStops.get(JSON.stringify([serverId, attachmentId]));
+    if (stop)
+      Deferred.doneUnsafe(stop, Effect.fail(new RemoteWorkflowError({ cause: new AttachmentDownloadStopped() })));
+  }
+
+  #stoppable<A>(
+    serverId: string,
+    attachmentId: string,
+    download: Effect.Effect<A, RemoteWorkflowError, RemoteRequest>,
+  ): Effect.Effect<A, RemoteWorkflowError, RemoteRequest> {
+    return Effect.suspend(() => {
+      const key = JSON.stringify([serverId, attachmentId]);
+      const stop = Deferred.makeUnsafe<never, RemoteWorkflowError>();
+      this.#attachmentStops.set(key, stop);
+      // The stop interrupts the download, and the WebRTC transfer then refuses the file.
+      return Effect.raceFirst(download, Deferred.await(stop)).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (this.#attachmentStops.get(key) === stop) this.#attachmentStops.delete(key);
+          }),
+        ),
+      );
+    });
+  }
+
+  #importProgress(serverId: string, requestId: string): (sent: number, total: number) => void {
+    let reportedAt = 0;
+    return (sent, total) => {
+      const now = Date.now();
+      if (sent < total && now - reportedAt < ATTACHMENT_PROGRESS_INTERVAL_MS) return;
+      reportedAt = now;
+      this.emit("attachmentImportProgress", { serverId, requestId, sent, total });
+    };
+  }
+
+  #attachmentProgress(serverId: string, attachmentId: string, size: number): RemoteFileProgress {
+    let reportedAt = 0;
+    return {
+      size,
+      onProgress: (received, total) => {
+        const now = Date.now();
+        if (received < total && now - reportedAt < ATTACHMENT_PROGRESS_INTERVAL_MS) return;
+        reportedAt = now;
+        this.emit("attachmentDownload", { serverId, attachmentId, received, total });
+      },
+    };
+  }
 
   readonly downloadSharedFile = Effect.fn("RemoteManager.downloadSharedFile")(
     function* (
@@ -2167,6 +2294,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return yield* Effect.gen({ self: this }, function* () {
       for (const serverId of [...this.#hostedStartAt.keys()]) this.#clearHostedStart(serverId);
       this.#focusUse.dispose();
+      this.#computerActivity?.dispose();
       yield* this.#events.stop();
       this.#refresh.clear();
       this.#client.clear();
@@ -2321,6 +2449,44 @@ function requiredServerSummary(servers: ServerSummary[], serverId: string): Serv
   const server = servers.find((candidate) => candidate.id === serverId);
   if (!server) throw new Error("Remote server summary is missing.");
   return server;
+}
+
+/**
+ * The body of a host file, read in parts so that `progress` gets the bytes as they arrive. The total
+ * is the length that the host names, or the size that the message names.
+ */
+async function countedResponseBytes(
+  response: Response,
+  progress: RemoteFileProgress,
+  signal: AbortSignal,
+): Promise<Uint8Array> {
+  const reader = response.body?.getReader();
+  if (!reader) return new Uint8Array(await response.arrayBuffer());
+  const stop = () => void reader.cancel().catch(() => undefined);
+  signal.addEventListener("abort", stop, { once: true });
+  try {
+    const named = Number(response.headers.get("content-length"));
+    const total = Number.isSafeInteger(named) && named > 0 ? named : progress.size;
+    const parts: Uint8Array[] = [];
+    let received = 0;
+    progress.onProgress(0, total);
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parts.push(value);
+      received += value.byteLength;
+      progress.onProgress(Math.min(received, total), total);
+    }
+    const bytes = new Uint8Array(received);
+    let offset = 0;
+    for (const part of parts) {
+      bytes.set(part, offset);
+      offset += part.byteLength;
+    }
+    return bytes;
+  } finally {
+    signal.removeEventListener("abort", stop);
+  }
 }
 
 /**

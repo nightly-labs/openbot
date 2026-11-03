@@ -18,6 +18,12 @@
   line-height: var(--openbot-leading-md);
 }
 
+/* The buttons sit nearer the corner. The thank-you state has no buttons and keeps even padding. */
+.github-star-toast:has(.github-star-toast-actions) {
+  padding-right: var(--openbot-space-3);
+  padding-bottom: var(--openbot-space-3);
+}
+
 .github-star-toast-close {
   position: absolute;
   top: var(--openbot-space-2);

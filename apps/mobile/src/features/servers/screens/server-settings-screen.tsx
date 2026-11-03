@@ -49,6 +49,8 @@ export function ServerSettingsScreen() {
     memberCountByServer,
     leaveServer,
     removeServer,
+    deleteLocalServer,
+    localServerKind,
     refreshServer,
     hostedServerStarting,
     canManageConnectors,
@@ -61,6 +63,7 @@ export function ServerSettingsScreen() {
     canManageMcpServers,
     canViewHostedSites,
     canManageServerRoles,
+    canReadServerAudit,
     canImportAgents,
     canTransferServer,
   } = useMobileWorkspace();
@@ -154,6 +157,11 @@ export function ServerSettingsScreen() {
         {canManageServerRoles(serverId) ? (
           <SettingsRow onPress={() => router.push({ pathname: "/server-settings/roles", params: { serverId } })}>
             <Typography.Paragraph>{t("mobile.server.route.roles")}</Typography.Paragraph>
+          </SettingsRow>
+        ) : null}
+        {canReadServerAudit(serverId) ? (
+          <SettingsRow onPress={() => router.push({ pathname: "/server-settings/audit", params: { serverId } })}>
+            <Typography.Paragraph>{t("mobile.server.route.audit")}</Typography.Paragraph>
           </SettingsRow>
         ) : null}
       </SettingsSection>
@@ -279,6 +287,40 @@ export function ServerSettingsScreen() {
           >
             <Typography.Paragraph className="text-danger-text">
               {t("mobile.server.settings.leave")}
+            </Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
+      ) : localServerKind(serverId) === "computer" ? null : localServerKind(serverId) === "onComputer" ? (
+        // A server that the desktop app runs beside its own server: that app stops it and moves its data
+        // to the Trash. Removed from the account only, it would come back at the next start of the app.
+        <SettingsSection>
+          <SettingsRow
+            disclosure={false}
+            disabled={busy}
+            onPress={() =>
+              Alert.alert(
+                t("mobile.server.settings.deleteTitle", { name: server.name }),
+                t("mobile.server.settings.deleteBody"),
+                [
+                  { text: t("common.cancel"), style: "cancel" },
+                  {
+                    text: t("mobile.server.settings.delete"),
+                    style: "destructive",
+                    onPress: () =>
+                      void perform(
+                        async () => {
+                          await deleteLocalServer(serverId);
+                          router.dismiss();
+                        },
+                        (caught) => errorMessage(caught, t("mobile.server.settings.updateFailed")),
+                      ),
+                  },
+                ],
+              )
+            }
+          >
+            <Typography.Paragraph className="text-danger-text">
+              {t("mobile.server.settings.delete")}
             </Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>

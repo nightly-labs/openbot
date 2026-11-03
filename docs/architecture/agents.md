@@ -225,7 +225,11 @@ changed, on this computer and on a joined host.
   workflow. A GitHub output (`github-output.ts`) changes GitHub as the App's bot through
   `src/main/github-rest.ts`, with 10 actions. "Agent chooses" asks a model to choose labels or a
   person from the repository's own lists, and drops other values. `workflow_github_actions` keeps
-  each change, so a restart does not post a comment, review or issue again.
+  each change, so a restart does not post a comment, review or issue again. When a Discord mention
+  started the run, a new issue or a comment links the files of the mention and of the message that it
+  replies to (`discordTriggerFiles` in `discord-matching.ts`). GitHub has no attachment API for an App
+  token, so `attachFiles` in `github-rest.ts` commits them, before the change is recorded as sent, with the Git Data API to the orphan `openbot-attachments` branch, which has no workflow files
+  and so starts no Actions. A file that it cannot copy keeps its Discord link, which expires.
 - A restart keeps approvals and agent steps, because their state is in the database and the
   mailbox. The first pass fails a model step that was running, and ends a run that was stopping. An
   agent step fails with `agentMissing` when its agent is deleted. A post that did not start is sent; a
@@ -276,7 +280,9 @@ released actions, `parentId` on `create`, and `nest`. A peer with the capability
 `sidebar-folders-changed`; other peers get `sidebar-layout-changed`, and the released
 `/v1/sidebar-layout` routes leave out `parentId`. A peer without the capability shows each folder at
 the top level, and its changes keep the parents. The iPhone app shows nested folders as one list,
-with the path in each name. An instance transfer creates each folder at the top level, because its
+as the desktop does: "Parent / Name", a folder icon, and the unread count of a closed folder. A closed
+folder hides the folders in it. With the capability, its folder menu has "New folder inside" and
+"Move to" (`nest`). An instance transfer creates each folder at the top level, because its
 file has no field for the parent.
 
 ## Browser profile

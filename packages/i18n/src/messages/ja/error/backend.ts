@@ -56,6 +56,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine の準備ができませんでした。",
   "error.backend.sunshineNotReadyReason": "Sunshine の準備ができませんでした。{reason}",
   "error.backend.channelLeadModelUnavailable": "チャンネルリードのモデルを使用できません。",
+  "error.backend.contextCompactionIneffective":
+    "圧縮してもこのチャットは小さくなりません。2回圧縮しても、モデルのコンテキストウィンドウの{percent}%を使っているため、OpenBotは自動圧縮を止めます。ウィンドウの大部分はツールと指示が使っています。このエージェントに不要なMCPサーバーやコンピューター操作をオフにするか、より大きなウィンドウのモデルを選んでください。その後、新しいチャットを開始してください。",
+  "error.backend.providerRetrying":
+    "プロバイダーでこのリクエストが{attempts}回失敗し、再試行しています。エージェントが続かない場合は、ターンを停止してください。",
+  "error.backend.providerRetryingLargeContext":
+    "プロバイダーでこのリクエストが{attempts}回失敗し、再試行しています。このチャットはモデルのコンテキストウィンドウの{percent}%を使っています。エージェントが続かない場合は、ターンを停止してください。OpenBotは次のメッセージの前にチャットを圧縮します。",
   "error.backend.sharedDataUnavailable": "共有データを使用できません。",
   "error.backend.shuttingDown": "OpenBot を終了しています。",
   "error.backend.channelUnconfirmedStart":
@@ -112,8 +118,8 @@ export const messages = {
     "メモリーは {limit} 個中 {saved} 個です。空きを作るには、関連する 2 つのメモリーをまとめた文で一方を memoryId で更新してからもう一方を削除するか、もう正しくないメモリーを削除してください。そのあと、もう一度試してください。",
   "error.backend.agentMemoryLimitExceeded":
     "メモリーは {saved} 個あり、上限は {limit} 個です。ユーザーが保存済みの数より低い上限を設定しました。空きを作るためにメモリーを削除しないでください。このメモリーは保存されなかったとユーザーに伝えてください。",
-  "error.backend.channelHistoryLeadRequired": "共有履歴を準備するには、チャンネルリードを選択してください。",
   "error.backend.channelHistoryArriving": "共有メッセージをまだ受信中です。完了してから再開してください。",
+  "error.backend.channelHistoryLeadRequired": "共有履歴を準備するには、チャンネルリードを選択してください。",
   "error.backend.channelHistoryInvalid": "履歴の要約が無効です。再開してもう一度お試しください。",
   "error.backend.channelContextTooLong":
     "この割り当ては共有コンテキストの上限を超えています。短い依頼を送信するか、割り当て直してください。",
@@ -357,8 +363,8 @@ export const messages = {
   "error.backend.taskToolInvalid": "タスクには 120 文字以内のタイトルと、何をするかを説明する指示を付けてください。",
   "error.backend.taskOwnChatOnly":
     "タスクは自分のチャットからのみ開始してください。チャンネル、メッセージングの会話、別のタスクからは開始できません。",
-  "error.backend.taskOpenLimit":
-    "このエージェントにはすでに {count} 件の開いているタスクがあります。別のタスクを開始する前に、ユーザーがいずれかを閉じるまで待ってください。",
+  "error.backend.taskUnfinishedLimit":
+    "このエージェントにはすでに未完了のタスクが {count} 件あります。いずれかが終わってから、別のタスクを開始してください。",
   "error.backend.taskOpenLimitReached":
     "このエージェントには {count} 件の開いているタスクがあります。タスクを閉じてから、別のタスクを開始するか開いてください。",
   "error.backend.taskRemoteUnsupported": "タスクは、このコンピューター上のエージェントでのみ利用できます。",

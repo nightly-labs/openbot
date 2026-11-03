@@ -83,8 +83,12 @@ computer had input in the last 30 seconds (`powerMonitor.getSystemIdleState`), a
 the window of the host's own desktop app has focus or shows the event as a desktop notification, for
 the owner (`desktopShowsAgentEvent`: desktop notifications on, and the mute and the level of this
 computer's server let the event through); or the member sent, answered, or typed from another session in the last 30
-seconds (`TeamApiServer.lastMemberUseElsewhere`, kept in memory). The time is short because a task
-can end at any time after the member leaves the computer. While the phone shows a Live Activity of
+seconds (`TeamApiServer.lastMemberUseElsewhere`, kept in memory); or the computer of the member's
+desktop app had input, in any app, in the last 30 seconds (`computer-activity-v1`, see
+[servers](servers.md#computer-activity)). The time is short because a task can end at any time after
+the member leaves the computer. An unpackaged app reads another time in whole seconds from
+`OPENBOT_DEV_AWAY_SECONDS`, for the host and for the desktop that reports its input, so a check
+need not wait 30 seconds. While the phone shows a Live Activity of
 this host that iOS still updates (8 hours from its start, which the phone gives because a host that
 restarted does not know it), and the next view of the activity shows the event, the host sends no
 notification (`LiveActivityPushService.showsEvent`). The view shows one item, so a reply while
@@ -153,6 +157,16 @@ changing existing agent data. Channel commands use the orchestration log and com
 Messages have stable IDs and per-channel sequences. A channel projection can be rebuilt from its events.
 Archiving stops channel work and retains its records. Restore makes the chat available for new messages again. Neither action removes agents or linked conversations. The sidebar calls archiving "Delete". On desktop and web, the row menu in Deleted channels restores a channel; it shows to the people who can delete one.
 
+A channel can have a picture. `channel_json` keeps an optional icon (`{ name, hue }`) and an
+optional `imageUrl`. A channel save keeps both when its draft has no `icon` key. The image is a file
+for each version under `userData/avatars/channels/<sha256(channel id)>/`, served as
+`openbot-avatar://channel/<id>?v=<version>&type=<mime>`. `ChannelService.setImage` writes the new file,
+commits the URL, and then removes the old file. Archiving keeps the file; only the permanent
+delete of the channel records removes the folder. An icon or
+color choice removes the image. A name or hue that this version does not know shows the member
+faces or the default color. Only the local host edits the picture. The channels-v1 Team API codec
+keeps only its released fields, so remote clients, the web client, and mobile show member faces.
+
 Each channel-agent pair has a separate execution thread in `projection_threads`. The normal agent
 thread is never replaced. Provider sessions, turns, questions, approvals, attachments, compaction,
 and restart recovery use the explicit execution thread. These internal execution records do not
@@ -207,12 +221,27 @@ Only assignments and awaited results start turns. Completed child results are co
 owner returns. The limit is eight automatic assignments per root request and two active assignments
 per channel (`CHANNEL_PARALLEL_LIMIT`).
 
+An agent can also give work to a channel from another conversation, such as its direct chat with
+the user. `list_channels` lists the open channels with their lead and members.
+`send_to_channel` posts one request (`ChannelService.handoff`): a complete brief, optional
+recipient agents, and optional file paths that the channel copies as attachments. The message has
+the sending agent as a member author with the id `agent:<agentId>`. The assignment of a root task
+from it starts with "Request from OpenBot teammate <name> (<agentId>)" (`assignmentText`), so the
+member does not read the agent's words as the user's. A follow-up under that line names its
+sender, such as "Follow-up from the user". Routing is the same as for a person's request: each named recipient and each opening @mention gets a root task, and with none the
+lead routes it. A channel without a lead refuses a request that names nobody
+(`channelLeadRequired`). The command does not go through `parseChannelCommand`, so no client can
+post as an agent. The tool call id gives the operation id, so a retried call posts no second
+message. Inside a channel task, `send_to_channel` is refused; use `channel_assign` or
+`channel_transfer`. On desktop, a person can do the same by hand: "Send to channel" on a message of
+an agent chat opens the channel with the message text in its composer. Attachments stay behind.
+
 A member can also change its channel when a person asks: `channel_add_member`,
 `channel_remove_member`, `channel_set_instructions`, and `channel_list_routines`,
 `channel_create_routine`, `channel_update_routine`, `channel_delete_routine` for the schedule
 routines. They act only on the channel of the running task (`channel-management.ts`). The request
-message of the root task must have a person as author. A routine run (author id `routine:<id>`)
-and a request that only an agent wrote are refused, so untrusted run input cannot change the
+message of the root task must have a person as author. A routine run (author id `routine:<id>`),
+an agent handoff (author id `agent:<agentId>`) and a request that only an agent wrote are refused, so untrusted run input cannot change the
 channel. A member change is a `save` through the command queue, with the draft read from the stored
 channel when its turn comes. The caller cannot remove itself or an owner of a task above its own,
 and removing the lead clears the lead. An agent that a person adds must be one that person can chat
@@ -261,6 +290,68 @@ provider replacement or compaction does not remove shared decisions. Unrelated s
 are available through paginated retrieval and are not inserted automatically. Agent memories keep
 their existing meaning. A packet leaves out a member's thinking, and the commentary of a turn that
 posted a `channel_result`: the result is the answer of that turn.
+
+### How a channel keeps context
+
+`ChannelHistory.prepare` (`src/backend/channel-history.ts`) makes the packet of each turn.
+
+| Step | Value | Where |
+| --- | --- | --- |
+| Packet budget | 120,000 characters (`CONTEXT_CHARACTERS`) | `channel-history.ts` |
+| Transcript part | budget / 4 (`TRANSCRIPT_SHARE`), newest first | `newest()` |
+| Summary in `prepare` | when the recent messages are more than the transcript part; it keeps the newest half of that part | `summarize` |
+| Summary after a turn | at 0.75 of that threshold (`AHEAD_SHARE`), in the background | `ChannelService.#summarizeAhead` |
+| Assignment again at the end | when 2,000 characters or less | `REPEATED_ASSIGNMENT_CHARACTERS` |
+| Provider compaction | at 80% of the context window, or before a turn whose input would fill it over 80% | `ContextCompaction` |
+| `channel_history` page | 24,000 characters (`HISTORY_PAGE_CHARACTERS`); a longer message is cut at 16,000 | `boundedHistoryPage` |
+| Handoff of an agent in the packet | 24,000 characters (`HANDOFF_INSTRUCTION_CHARACTERS`): 18,000 first and 6,000 last | `cutInstruction` |
+| Instruction of a task this task waits for | 500 characters (`DEPENDENCY_INSTRUCTION_CHARACTERS`) | `channel-history.ts` |
+| Compaction stops | after 2 compactions that leave 90% or more; a `context_compaction_ineffective` notice | `ContextCompaction` |
+| Retry notice | at the 3rd provider retry; at 50% or more, a compaction before the next turn | `TurnLifecycle` |
+
+- The packet starts with the current assignment. A short assignment comes again at the end, because
+  a provider can cut a long message (#3630).
+- The summary keeps the recent messages under the transcript part, so a message is in the summary
+  or in the transcript. Only when the oldest recent message still streams does the summary wait,
+  and the transcript then leaves out older messages with a line that tells how to read them.
+- The task facts in the packet have no instruction or expected result: the assignment block gives
+  them.
+- The summary block is reference only. The request messages of the task are always in "Referenced
+  messages", not only in the summary (#3557).
+- A delta has no replies of the member that gets it: its session already has them (#3905). It has no
+  fixed rules, and it has the channel facts only when they changed since the packet before it (#3380).
+- A request that is the assignment is in the packet once: its transcript row refers to "Current
+  assignment". A handoff of an agent over 24,000 characters is cut, with a line that gives the
+  `channel_history` `messageId` and `offset` of the rest.
+- `channel_history` gives a page of about 24,000 characters at most. A message over 16,000 characters
+  is cut in the page and named in `cutMessages`; a read with its `messageId` and `offset` gives the
+  next part.
+- Before a turn, the drain gives `ContextCompaction.expectInput` the size of the message text (4
+  characters a token). Attachments and images are not in this estimate. When the last usage and that
+  text are over 80% of the window, the session compacts first.
+- A channel with no lead summarizes with the model of the member that gets the packet.
+- A change to `supersededAt` only does not reset the summary or the contexts. A text edit resets them
+  (#3761).
+- The summary uses the lead's provider. `backgroundModel` (`src/backend/agent/background-model.ts`)
+  selects the provider's default model when its price is lower than the lead's model, as a memory
+  review does. When the lead's provider or model is not available, the summary uses the model of
+  another visible member (#3957).
+- An isolated channel (`Channel.isolated`, off by default, in `channel_json`, so no migration) keeps
+  what its members learn there (#4332). `OpenBotToolRouter` saves `openbot.remember` of a channel turn
+  as a channel memory (`channel_remember`), and refuses a `memoryId`, so a channel cannot change an
+  agent memory. Agent memories still reach the channel. The packet gives `isolated: true` in the
+  channel facts with a rule line, and a line when a person turns it off. A save without the field
+  keeps the stored value, so a client from before it does not turn it off. The agent import archive
+  (`src/main/agent-import-manifest.ts`) has no field for it, so an imported channel starts with it off.
+- After a turn, a channel starts one background summary. `prepare` waits for it only when its own
+  budget needs a summary (`ChannelHistory.needsSummary`), so a turn does not summarize the same
+  messages again. A deleted channel stops the summary. It does not start when it would take the
+  last generation slot of `ProfileClients`: the next packet makes the summary. It uses the member's
+  reasoning effort only on the member's own model.
+- The log line "A channel packet was prepared." gives the size of each part (`packetParts`,
+  `deltaParts`): assignment, memories, summary, referenced messages, transcript, and the count of
+  kept and left-out messages. `otherCharacters` is the rest: the rules and the JSON facts. It never
+  contains message text.
 
 The channel copies the assistant rows of a member's execution thread. The first rows of a turn go
 to the running assignment before it knows the turn id; a row of another turn does not. A new row

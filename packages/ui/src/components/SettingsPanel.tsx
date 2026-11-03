@@ -1,6 +1,6 @@
 import { Button, ChevronRight, FieldContext } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createUniqueId, onSettled, Show } from "solid-js";
+import { children, createUniqueId, onSettled, Show } from "solid-js";
 import { useText } from "../text";
 import { createScrollFades } from "./createScrollFades";
 import { PanelResizer } from "./PanelResizer";
@@ -181,6 +181,9 @@ export interface SettingsLinkRowProps {
 
 /** One row of the group: what it opens on the left, where that stands on the right. */
 export function SettingsLinkRow(props: SettingsLinkRowProps): JSX.Element {
+  // Resolved once: each read of a JSX prop builds it again. Only plain text can end in an ellipsis;
+  // a value made of elements keeps the row's flex gap between them.
+  const value = children(() => props.value);
   return (
     <Button
       ref={(element) => props.ref?.(element)}
@@ -194,10 +197,12 @@ export function SettingsLinkRow(props: SettingsLinkRowProps): JSX.Element {
         <Show when={props.icon}>
           <span class="settings-link-icon">{props.icon}</span>
         </Show>
-        {props.label}
+        <span class="settings-link-text ui-text-truncate">{props.label}</span>
       </span>
       <span class="settings-link-value">
-        {props.value}
+        <Show when={typeof value() === "string"} fallback={value()}>
+          <span class="settings-link-text ui-text-truncate">{value()}</span>
+        </Show>
         <ChevronRight />
       </span>
     </Button>

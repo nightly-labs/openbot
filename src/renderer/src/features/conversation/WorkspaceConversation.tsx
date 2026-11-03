@@ -41,6 +41,7 @@ import { agentsPort } from "../agents/agents-port";
 import { withHostAccountUsage } from "../agents/host-provider-accounts";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { useBrowserTabs } from "../browser/browser-context";
+import { useChannels } from "../channels/channels-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
@@ -55,6 +56,7 @@ import { useUsage } from "../usage/usage-context";
 import { useWindowPage } from "../window/window-page-context";
 import { Conversation } from "./Conversation";
 import { useConversation } from "./conversation-context";
+import { useConversationController } from "./conversation-controller-context";
 import { messagePromptRequestKey, promptRequestKey } from "./conversation-keys";
 import type { ConversationThreads } from "./conversation-types";
 
@@ -184,6 +186,21 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const auth = useAuth();
   const { teamPresence, currentTeamMember } = usePresence();
   const { selectAgent, openAgentMessage, messageFocusRequest, globalSearchOpen } = useNavigation();
+  const channels = useChannels();
+  const conversationController = useConversationController();
+  /** The open channels, for "Send to channel" on a message. The text waits in the channel's composer. */
+  const sendToChannel = () => {
+    if (!channels.supported()) return;
+    const open = channels.state.channels.filter((channel) => !channel.archived);
+    if (open.length === 0) return;
+    return {
+      channels: open.map((channel) => ({ id: channel.id, name: channel.name })),
+      onSend: (channelId: string, text: string) => {
+        conversationController.appendChannelText({ serverId: activeServer()?.id ?? "local", channelId }, text);
+        void channels.open(channelId);
+      },
+    };
+  };
 
   // The waits of the agents that this agent asked, by the same rules as the sidebar's "Needs you".
   const agentWaits = createMemo(() =>
@@ -612,6 +629,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
               }
             : undefined
         }
+        sendToChannel={sendToChannel()}
         onLoadOlder={() => void loadOlderAgentMessages()}
         onLoadLatest={() => (activeAgent() ? loadLatestAgentMessages(activeAgent()?.id ?? "") : Promise.resolve())}
         onSearchMessages={(query) =>

@@ -20,6 +20,7 @@ const COMMENT: WorkflowGitHubChange = {
   labels: [],
   people: [],
   reason: "completed",
+  files: null,
 };
 
 /** The failure of one comment change, over `fetch`. */

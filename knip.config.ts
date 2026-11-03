@@ -85,8 +85,9 @@ const config: KnipConfig = {
       ignoreUnresolved: ["scripts/.+\\.ts"],
     },
     "apps/auth-api": {
-      // The wrangler plugin of knip reads `main` (src/worker-entry.ts) from wrangler.jsonc.
-      entry: ["*.ts"],
+      // The wrangler plugin of knip reads `main` (src/worker-entry.ts) from wrangler.jsonc only. The
+      // email relay Worker's `main` is in wrangler.email-relay.jsonc.
+      entry: ["*.ts", "src/email-relay-entry.ts"],
       project: ["src/**/*.{ts,tsx,css}", "test/**/*.ts", "*.ts"],
       // `cloudflare:workers` is a runtime module of the Workers platform, not an npm package.
       ignoreDependencies: ["cloudflare"],

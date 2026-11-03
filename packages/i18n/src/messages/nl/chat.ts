@@ -341,6 +341,8 @@ export const messages = {
   "chat.menu.react": "Reageren",
   "chat.menu.branch": "Hier aftakken",
   "chat.menu.markUnread": "Markeer als ongelezen",
+  "chat.menu.sendToChannel": "Naar kanaal sturen",
+  "chat.menu.chooseChannel": "Kies een kanaal",
   "chat.voice.play": "Spraakbericht afspelen",
   "chat.voice.pause": "Spraakbericht pauzeren",
   "chat.voice.pauseReading": "Voorlezen pauzeren",

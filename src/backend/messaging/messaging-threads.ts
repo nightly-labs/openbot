@@ -20,7 +20,7 @@ import { type MessagingContextMessage, messagingPromptText } from "./messaging-p
 import type { MessagingOperationFailed } from "./messaging-service";
 import { type MessagingLink, MessagingStore } from "./messaging-store";
 import { boundedHistory, parseMessagingOutboundTool, parseMessagingTool } from "./messaging-tools";
-import type { ContextEntry, MessageTarget, MessagingPlace } from "./messaging-types";
+import type { ContextEntry, InboundFile, MessageTarget, MessagingPlace } from "./messaging-types";
 
 /** A file the agent attached to its answer, ready to upload. */
 export interface MessagingAnswerFile {
@@ -134,6 +134,8 @@ export interface MessagingDiscordMention {
   authorRoleIds: readonly string[];
   /** The text with each mention as `@name`. */
   text: string;
+  /** The files of the message and of the message it replies to, as signed addresses on Discord's CDN. */
+  files: readonly InboundFile[];
   /** ISO time. */
   receivedAt: string;
 }

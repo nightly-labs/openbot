@@ -66,6 +66,7 @@ import {
   type SendMessageInput,
   type SetAgentAvatarInput,
   type SetAgentMemoryInclusionInput,
+  type SetChannelImageInput,
   type SetMessageReactionInput,
   type SidebarLayoutAction,
   type StartAgentTaskInput,
@@ -770,6 +771,14 @@ export function parseSetAgentAvatar(value: unknown): SetAgentAvatarInput {
   };
 }
 
+export function parseSetChannelImage(value: unknown): SetChannelImageInput {
+  if (!isObject(value)) throw new Error("Invalid channel image request.");
+  return {
+    channelId: requireString(value.channelId, "channelId"),
+    image: parseAvatarImage(value.image),
+  };
+}
+
 export function parseImportAttachments(value: unknown): ImportAttachmentsInput {
   if (!isObject(value) || !Array.isArray(value.paths) || !Array.isArray(value.data)) {
     throw new Error("Invalid attachment import.");
@@ -793,7 +802,13 @@ export function parseImportAttachments(value: unknown): ImportAttachmentsInput {
     }
     return { name: item.name, mimeType: item.mimeType, bytes: item.bytes };
   });
-  return { paths: value.paths, data };
+  return {
+    paths: value.paths,
+    data,
+    ...(value.requestId === undefined
+      ? {}
+      : { requestId: requireString(value.requestId, "requestId", INPUT_LIMITS.identifier) }),
+  };
 }
 
 /** A renderer can provide file bytes, but it cannot ask main to read a disk path. */
@@ -834,9 +849,13 @@ export function parseOpenAttachment(value: unknown): OpenAttachmentInput {
   if (!isObject(value) || (value.action !== "open" && value.action !== "reveal" && value.action !== "download")) {
     throw new Error("Invalid attachment action.");
   }
+  if (value.size !== undefined && (!Number.isSafeInteger(value.size) || Number(value.size) < 0)) {
+    throw new Error("Invalid attachment size.");
+  }
   return {
     attachmentId: requireString(value.attachmentId, "attachmentId"),
     action: value.action,
+    ...(isNumber(value.size) ? { size: value.size } : {}),
   };
 }
 

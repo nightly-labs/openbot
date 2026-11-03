@@ -106,61 +106,61 @@
   "opencode": {
     "registry": "https://registry.npmjs.org",
     "repository": "https://github.com/anomalyco/opencode",
-    "version": "2.1.1",
+    "version": "2.2.5",
     "license": "MIT",
     "licensePackage": {
       "name": "opencode-ai",
-      "version": "1.19.3"
+      "version": "1.19.5"
     },
     "licenseSha256": "625f0f619133f89bbbb2abe37369613dfa1885eba1e50d02170deb62bb42cb6b",
     "artifacts": {
       "darwin-arm64": {
         "package": "@opencode/cli-darwin-arm64",
-        "asset": "cli-darwin-arm64-2.1.1.tgz",
-        "assetSha256": "967d7d61c2afd1afa73b37d0cb6928e33324665aa3a013affc5002f9f0828a6b",
-        "binarySha256": "2f6fe5c3cf1e7827a93b14c7b07117ef0cde776c32613b0aae70c15e4780f271",
-        "downloadBytes": 85869579,
-        "installedBytes": 200000000,
+        "asset": "cli-darwin-arm64-2.2.5.tgz",
+        "assetSha256": "dfd827de3281b4c3ca2b0bfc8f4beb103fa660c419d148a1a515c4344f9e9c02",
+        "binarySha256": "abe4d88594bffb12b364375b8a6732d2d1f7a977195ed1a35c5c76f8e89c9e0e",
+        "downloadBytes": 105814595,
+        "installedBytes": 240000000,
         "executable": "opencode",
         "platformDirectory": "mac"
       },
       "darwin-x64": {
         "package": "@opencode/cli-darwin-x64",
-        "asset": "cli-darwin-x64-2.1.1.tgz",
-        "assetSha256": "05c05d120e3c54b36a3449b5a130fe1a49c5be6d9ca0089bc34d9d76c73762a2",
-        "binarySha256": "dba3cd24177abd9bb9c5dceedd4996ccd2fef36cab9a63d5be76e532e918a430",
-        "downloadBytes": 90916949,
-        "installedBytes": 220000000,
+        "asset": "cli-darwin-x64-2.2.5.tgz",
+        "assetSha256": "304f4666e7e37eac338de258f763b7f5b8987ab1bde2341dc1a613a8205c0010",
+        "binarySha256": "5e0cf9c94ee0fd4a4635807534e9ca4bf51ffe1c83260ada3510bf60e7333173",
+        "downloadBytes": 111044366,
+        "installedBytes": 260000000,
         "executable": "opencode",
         "platformDirectory": "mac"
       },
       "linux-x64": {
         "package": "@opencode/cli-linux-x64",
-        "asset": "cli-linux-x64-2.1.1.tgz",
-        "assetSha256": "64591057ea593e9a11374d4630c2249930d8f33598af0b3e02137493860ab17b",
-        "binarySha256": "0e81c77fcc27b263708b133bbf9880cd641060c20e22d3dec8a79b9a8db90450",
-        "downloadBytes": 98936640,
-        "installedBytes": 230000000,
+        "asset": "cli-linux-x64-2.2.5.tgz",
+        "assetSha256": "92690eee07a680d3cb760ca02ba43878de9eab1b4e5d5dfae8795518c53628f4",
+        "binarySha256": "8d060e1d2fbb9bb44cf09ae6ed1f3f6a7cff070b5227e2f90970132b23a92050",
+        "downloadBytes": 118637290,
+        "installedBytes": 270000000,
         "executable": "opencode",
         "platformDirectory": "linux"
       },
       "linux-arm64": {
         "package": "@opencode/cli-linux-arm64",
-        "asset": "cli-linux-arm64-2.1.1.tgz",
-        "assetSha256": "cfa3ae6363fc3082f03072297069d81f53559a761371fdb4b56fe6bfa01ca066",
-        "binarySha256": "137140e3b4d6cbc0e82683de9741de06fe185cd2435981977738eb2a71c31c38",
-        "downloadBytes": 97694833,
-        "installedBytes": 220000000,
+        "asset": "cli-linux-arm64-2.2.5.tgz",
+        "assetSha256": "f8c5a82075fede9b5b044ed6c8a6d13ad807a7e62caea1cd0a878adef49eb053",
+        "binarySha256": "dcc7e6f4ac1672e1884dcb8d26ab333e55ffc3f080e01a7a60177aa05f54935f",
+        "downloadBytes": 117223869,
+        "installedBytes": 270000000,
         "executable": "opencode",
         "platformDirectory": "linux"
       },
       "win32-x64": {
         "package": "@opencode/cli-windows-x64",
-        "asset": "cli-windows-x64-2.1.1.tgz",
-        "assetSha256": "3343e8140dde91e45bee24ee6dbabc16aa0cae5b1e1a0184b580b1c8b0530e12",
-        "binarySha256": "39b9df25675050b1162e30d09326231bde84bf6db9c63605d1a68221bd091517",
-        "downloadBytes": 101966282,
-        "installedBytes": 230000000,
+        "asset": "cli-windows-x64-2.2.5.tgz",
+        "assetSha256": "7a9e1dbe80965b75ace78d512c91ce4e6c9e4683fa5a5a25b00ff0b736f1c15c",
+        "binarySha256": "0c346fdaf519d2f23a31d3b6cb9d65e369a72d77cac6f027b5e0a06376ec3a43",
+        "downloadBytes": 121997426,
+        "installedBytes": 280000000,
         "executable": "opencode.exe",
         "platformDirectory": "win"
       }

@@ -27,7 +27,7 @@ import type { ServerAuditLog } from "./ipc-server-audit";
 // change on one side is a type error on the other. The types are phantom members: they exist only
 // for the checker, and the runtime value is still `{ kind, channel }`.
 
-import type { ManagedProviderId } from "./agent-providers";
+import type { AgentProviderRef, ManagedProviderId } from "./agent-providers";
 import type { AppAppearancePreference, SetAppAppearancePreferenceInput } from "./app-appearance";
 import type { AppInterfaceSizePreference, SetAppInterfaceSizePreferenceInput } from "./app-interface-size";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
@@ -181,6 +181,8 @@ import type {
 } from "./ipc-approvals";
 import type {
   AttachmentDataInput,
+  AttachmentDownloadProgress,
+  AttachmentImportProgress,
   ChooseAttachmentsInput,
   DownloadAttachmentsInput,
   DraftAttachment,
@@ -236,7 +238,14 @@ import type {
   TestChannelRoutineInput,
   UpdateChannelRoutineInput,
 } from "./ipc-channel-routines";
-import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
+import type {
+  Channel,
+  ChannelCommand,
+  ChannelPage,
+  ChannelReadInput,
+  ChannelSummary,
+  SetChannelImageInput,
+} from "./ipc-chat-channels";
 import type {
   CancelMessageLinkInput,
   ConversationFileSearchPage,
@@ -377,6 +386,7 @@ import type {
   TelegramChatInput,
   TelegramOverview,
 } from "./ipc-messaging";
+import type { ProviderModelVisibility, ProviderModelVisibilityChange } from "./ipc-model-visibility";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type {
   OnePasswordConnectInput,
@@ -755,6 +765,11 @@ export const IPC_ENDPOINTS = {
   providers: {
     setProviderOn: request<{ provider: AgentProviderId; on: boolean }, AgentStatus>()("app:set-provider-on"),
     connectProvider: request<AgentProviderId, AgentStatus>()("app:connect-provider"),
+    /**
+     * Connects a provider whose descriptor has `mainlandChinaSignInSite`, with an account of that
+     * site. `connectProvider` signs in with the global site.
+     */
+    connectProviderInMainlandChina: request<AgentProviderId, AgentStatus>()("app:connect-provider-mainland-china"),
     /** Ends the sign-in that `connectProvider` started and that still waits for the browser. */
     cancelProviderSignIn: request<AgentProviderId, AgentStatus>()("app:cancel-provider-sign-in"),
     /**
@@ -1167,6 +1182,13 @@ export const IPC_ENDPOINTS = {
     setPromptCacheTtl: scopedRequest<PromptCacheTtl, PromptCacheTtlSetting, "required">()(
       "host-admin:set-prompt-cache-ttl",
     ),
+    // The models that the model picker of the server shows for one provider. An owner or admin sets them.
+    getModelVisibility: scopedRequest<AgentProviderRef, ProviderModelVisibility, "required">()(
+      "host-admin:get-model-visibility",
+    ),
+    setModelVisibility: scopedRequest<ProviderModelVisibilityChange, ProviderModelVisibility, "required">()(
+      "host-admin:set-model-visibility",
+    ),
     // The roles of the server and the level each gives for each agent. A member reads only `mine`.
     getAgentAccess: scopedQuery<AgentAccessSnapshot, "required">()("host-admin:get-agent-access"),
     setAgentAccess: scopedRequest<AgentAccessChange, AgentAccessSnapshot, "required">()("host-admin:set-agent-access"),
@@ -1401,6 +1423,8 @@ export const IPC_ENDPOINTS = {
     readChannel: scopedRequest<ChannelReadInput, ChannelPage>()("agent:channels:read"),
     channelCommand: scopedRequest<ChannelCommand, Channel>()("agent:channels:command"),
     deleteChannel: scopedRequest<string, void>()("agent:channels:delete"),
+    // Only this computer keeps a channel image. A joined server has no route for it.
+    setChannelImage: scopedRequest<SetChannelImageInput, Channel>()("agent:channels:set-image"),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
     mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),
     // The user's own pinned chats. A joined server answers through `sidebar-pins-v1`.
@@ -1602,6 +1626,9 @@ export const IPC_ENDPOINTS = {
     discardDraftAttachment: scopedRequest<string, void>()("agent:discard-draft-attachment"),
     downloadAttachments: scopedRequest<DownloadAttachmentsInput, void>()("agent:download-attachments"),
     openAttachment: scopedRequest<OpenAttachmentInput, void>()("agent:open-attachment"),
+    /** Stops the download of an attachment. Its open or save then answers without a file. */
+    stopAttachmentDownload: scopedRequest<string, void>()("agent:stop-attachment-download"),
+    attachmentDownload: event<AttachmentDownloadProgress>()("agent:attachment-download"),
     openSharedFile: scopedRequest<OpenSharedFileInput, void>()("agent:open-shared-file"),
     openWorkspaceFile: scopedRequest<OpenWorkspaceFileInput, void>()("agent:open-workspace-file"),
     previewSharedFile: scopedRequest<PreviewSharedFileInput, FilePreview>()("agent:preview-shared-file"),
@@ -1644,6 +1671,7 @@ export const IPC_ENDPOINTS = {
   // renderer must never name a path to import. So this group is never bridged to the renderer.
   attachmentImports: {
     importAttachments: scopedRequest<ImportAttachmentsInput, DraftAttachment[]>()("agent:import-attachments"),
+    importProgress: event<AttachmentImportProgress>()("agent:attachment-import-progress"),
   },
   browser: {
     open: request<BrowserOpenInput, BrowserTab>()("browser:open"),

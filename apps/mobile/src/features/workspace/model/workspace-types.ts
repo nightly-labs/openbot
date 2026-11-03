@@ -11,12 +11,14 @@ import type {
   AgentBackupModelSettings,
   AgentBrowserProfile,
   AgentExclusionChange,
+  AgentFastModeSettings,
   AgentFolderBrowse,
   AgentFolderChange,
   AgentFolderInput,
   AgentFolderList,
   AgentHostSettings,
   AgentImportPreview,
+  AgentInstructionsFile,
   AgentMemory,
   AgentMemorySelectionState,
   AgentModelId,
@@ -98,7 +100,9 @@ import type {
   RoutineResultConnectionOption,
   RoutineResultDestination,
   RoutineResultRoutineInput,
+  SaveAgentInstructionsInput,
   SaveWorkflowGraphInput,
+  ServerAuditLog,
   ServerNotificationLevel,
   SetAgentMemoryInclusionInput,
   SetAgentNotificationLevelInput,
@@ -116,6 +120,7 @@ import type {
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
   UpdateAgentBrowserProfileInput,
+  UpdateAgentFastModeInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
   UpdateAgentNewChatInput,
@@ -128,12 +133,18 @@ import type {
   VaultSaveInput,
   VaultState,
   WorkflowDetail,
+  WorkflowGitHubCatalog,
+  WorkflowGitHubHistory,
+  WorkflowGitHubRepositoryOptions,
+  WorkflowGraph,
   WorkflowRunDetail,
   WorkflowRunPage,
   WorkflowSaveResult,
   WorkflowStep,
   WorkflowSummary,
   WorkflowTriggerInput,
+  WorkflowVersion,
+  WorkflowVersionInput,
   WorkflowWebhookSecret,
 } from "@openbot/contracts/ipc";
 import type {
@@ -150,7 +161,11 @@ import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-ed
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import type { MessagingConnectorPage } from "@openbot/team-client/team-admin-requests";
+import type {
+  HostLocalServer,
+  HostLocalServerList,
+  MessagingConnectorPage,
+} from "@openbot/team-client/team-admin-requests";
 import type { MobileBrowserTab } from "@/features/browser/model/browser-tabs";
 import type { BrowserViewBridgeEvent, RemoteBrowserViewSession } from "@/features/browser/model/browser-view-bridge";
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
@@ -380,6 +395,26 @@ export interface MobileWorkspaceContextValue {
   rotateServerKey: (serverId: string) => Promise<{ publicKey: string }>;
   /** Reads the server list again, with its signed key changes. It does not connect again. */
   reloadServerList: () => Promise<void>;
+  /**
+   * The owner of an online host that serves `local-servers-v1`: a desktop app that can run more
+   * servers on its computer. The host checks the role again.
+   */
+  canCreateLocalServers: (serverId: string) => boolean;
+  /** The servers that the desktop app of `serverId` runs on its computer, and how many it can run. */
+  listLocalServers: (serverId: string) => Promise<HostLocalServerList>;
+  /**
+   * Makes a server on the computer of `serverId`, then reads the server list again, so the new server
+   * is in it when the computer registered it for the account.
+   */
+  createLocalServer: (serverId: string, name: string) => Promise<HostLocalServer>;
+  /**
+   * `computer`: the own server of an OpenBot desktop app, which the account cannot remove. `onComputer`:
+   * a server that such an app runs beside its own server, which only that app deletes. Known after the
+   * computer server was online in this session.
+   */
+  localServerKind: (serverId: string) => "computer" | "onComputer" | null;
+  /** Deletes a server on a computer through the computer's own server, which must be online. */
+  deleteLocalServer: (serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `host-timezone-v1`. The host checks the role again. */
   canManageServerTimezone: (serverId: string) => boolean;
   /** The zone of a routine that an agent creates with no zone. Owners and admins only. */
@@ -402,6 +437,10 @@ export interface MobileWorkspaceContextValue {
   loadServerRoles: (serverId: string) => Promise<AgentAccessSnapshot>;
   /** Replaces all roles. The host refuses a change made from an earlier revision. */
   setServerRoles: (change: AgentAccessChange, serverId: string) => Promise<AgentAccessSnapshot>;
+  /** An owner or admin of an online host that serves `server-audit-v1`. The host checks the role again. */
+  canReadServerAudit: (serverId: string) => boolean;
+  /** The changes to the members, roles and agent access of the server, newest first. */
+  loadServerAuditLog: (serverId: string) => Promise<ServerAuditLog>;
   /**
    * An owner or admin of an online host that serves `connectors-v1`: its Slack, Discord, Telegram and
    * GitHub connections. The host checks the role again.
@@ -689,6 +728,22 @@ export interface MobileWorkspaceContextValue {
   loadAgentPlanCard: (agentId: string, serverId: string) => Promise<AgentPlanCardSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the setting the host saved. */
   updateAgentPlanCard: (input: UpdateAgentPlanCardInput, serverId: string) => Promise<AgentPlanCardSettings>;
+  /**
+   * Null when the host does not advertise `agent-fast-mode-v1`. A member with view access reads the
+   * setting, and with manage access changes it, as the model. The host checks the access.
+   */
+  loadAgentFastMode: (agentId: string, serverId: string) => Promise<AgentFastModeSettings | null>;
+  /** Resolves with the setting the host saved. It applies from the next turn. */
+  updateAgentFastMode: (input: UpdateAgentFastModeInput, serverId: string) => Promise<AgentFastModeSettings>;
+  /** An owner or admin of an online host that serves `agent-instructions-v1`. The host checks the role again. */
+  canManageAgentInstructions: (serverId: string) => boolean;
+  /** The instruction file at the root of the agent's workspace on the host. Owners and admins only. */
+  loadAgentInstructions: (agentId: string, serverId: string) => Promise<AgentInstructionsFile>;
+  /**
+   * Owners and admins only. The host refuses the save when the file is different from `expected`
+   * now, or when the text is too long. Resolves with the file the host saved.
+   */
+  saveAgentInstructions: (input: SaveAgentInstructionsInput, serverId: string) => Promise<AgentInstructionsFile>;
   /** An owner or admin of an online host that serves `provider-accounts-v1`. The host checks the role again. */
   canManageProviderAccounts: (serverId: string) => boolean;
   /**
@@ -716,6 +771,8 @@ export interface MobileWorkspaceContextValue {
   resetAgentSessionSetting: (input: ResetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
   /** An owner or admin of an online host that serves `agent-folders-v1`. The host checks the role again. */
   canManageAgentFolders: (serverId: string) => boolean;
+  /** True when the host advertises `sidebar-folders-v1`: a chat list folder can hold folders. */
+  canNestSidebarFolders: (serverId: string) => boolean;
   /** The folders that the agent can change besides its workspace. Owners and admins only. */
   loadAgentFolders: (agentId: string, serverId: string) => Promise<AgentFolderList>;
   /** With `replace`, the folder takes the place of a folder that was moved. */
@@ -727,6 +784,13 @@ export interface MobileWorkspaceContextValue {
   /** The folders in one folder of the host computer; `path` null is the home folder. */
   browseAgentFolders: (agentId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
+  /** True when the host advertises `context-compact-v1`. Any member who can send messages can compact. */
+  canCompactContext: (serverId: string) => boolean;
+  /**
+   * The provider compacts the context of the agent's chat now; the messages stay. The host refuses
+   * while the agent works, or when its provider cannot compact.
+   */
+  compactContext: (agentId: string, serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `shared-tables-v1`. The host checks the role again. */
   canManageSharedTables: (serverId: string) => boolean;
   /** Every table that the agents of the host share. Owners and admins only. */
@@ -779,12 +843,31 @@ export interface MobileWorkspaceContextValue {
   /** The newest runs of a workflow, or the runs older than `before`. */
   loadWorkflowRuns: (workflowId: string, serverId: string, before?: string) => Promise<WorkflowRunPage>;
   loadWorkflowRun: (runId: string, serverId: string) => Promise<WorkflowRunDetail>;
-  startWorkflowRun: (workflowId: string, serverId: string) => Promise<WorkflowRunDetail>;
+  /** With `fromNodeId`, runs that step and the steps after it, with the newest results of the steps before it. */
+  startWorkflowRun: (workflowId: string, serverId: string, fromNodeId?: string) => Promise<WorkflowRunDetail>;
   stopWorkflowRun: (runId: string, serverId: string) => Promise<void>;
+  /** Runs one step alone, outside a run, with the newest results of the steps before it. */
+  runWorkflowStep: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowStep>;
+  stopWorkflowStep: (stepId: string, serverId: string) => Promise<void>;
   retryWorkflowStep: (stepId: string, serverId: string) => Promise<WorkflowStep>;
   decideWorkflowStep: (input: DecideWorkflowStepInput, serverId: string) => Promise<void>;
   /** A new webhook secret, which the host shows once. Only an owner or admin can make one. */
   rotateWorkflowWebhookSecret: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowWebhookSecret>;
+  /** The saved versions of a workflow, newest first. */
+  loadWorkflowVersions: (workflowId: string, serverId: string) => Promise<WorkflowVersion[]>;
+  loadWorkflowVersionGraph: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowGraph>;
+  /** Makes a version the current graph. The host keeps the graph before it as a version. */
+  restoreWorkflowVersion: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowDetail>;
+  /** True when the host advertises `workflows-github-v1`: it runs GitHub triggers and outputs. */
+  canUseWorkflowGitHub: (serverId: string) => boolean;
+  /** The repositories of the host's GitHub connection. Only an owner or admin reads them. */
+  loadWorkflowGitHubCatalog: (serverId: string) => Promise<WorkflowGitHubCatalog>;
+  /** The labels and people of one repository. Only an owner or admin reads them. */
+  loadWorkflowGitHubOptions: (repository: string, serverId: string) => Promise<WorkflowGitHubRepositoryOptions>;
+  /** The newest events of the GitHub triggers of a workflow, and the items of their runs. */
+  loadWorkflowGitHubHistory: (workflowId: string, serverId: string) => Promise<WorkflowGitHubHistory>;
+  /** Runs a GitHub trigger with the newest item that matches it. */
+  runWorkflowGitHubLastEvent: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowRunDetail>;
   /** The tasks of one agent. The host answers 404 for an agent that this member cannot see. */
   loadAgentTasks: (agentId: string, serverId: string) => Promise<AgentTasksSnapshot>;
   loadAgentTaskConversation: (input: AgentTaskInput, serverId: string) => Promise<ConversationSnapshot>;
@@ -879,6 +962,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canRetryMessage"
   | "attachmentSupport"
   | "canStartNewChat"
+  | "canCompactContext"
   | "canChooseNewAgentModel"
   | "canInstallAgentTemplate"
   | "canSearchFiles"
@@ -887,6 +971,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canReadThreads"
   | "canAttachThreadFiles"
   | "canUseWorkflows"
+  | "canUseWorkflowGitHub"
   | "canReadServerStorage"
   | "canSetAgentNotificationLevel";
 
@@ -909,9 +994,12 @@ type MobileWorkspaceStateKey =
   | "canUnhideAgent"
   | "canEditServerIdentity"
   | "canRotateServerKey"
+  | "canCreateLocalServers"
+  | "localServerKind"
   | "canManageServerTimezone"
   | "canManageAgentMemoryLimit"
   | "canManageServerRoles"
+  | "canReadServerAudit"
   | "hasAgentAccessLimits"
   | "canManageConnectors"
   | "canManageOnePasswordConnector"
@@ -942,9 +1030,11 @@ type MobileWorkspaceStateKey =
   | "canManageAgentTaskLimit"
   | "canManageAgentNewChat"
   | "canManageAgentPlanCard"
+  | "canManageAgentInstructions"
   | "canManageProviderAccounts"
   | "canManageSharedTables"
   | "canManageAgentFolders"
+  | "canNestSidebarFolders"
   | "canPublishAgent";
 
 /**

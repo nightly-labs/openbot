@@ -253,6 +253,13 @@ that a newer revision refused shows the conflict, and the person keeps the draft
 workflow. The pins of the mobile drawer stay on the phone, in the workspace preferences of the
 account and server (`pinnedWorkflows`); the host does not know them.
 
+The phone also uses the version, single-step and stop-step routes, and `workflows-github-v1`, as a
+joined desktop does. An owner or admin adds and changes a GitHub trigger or output there
+(`apps/mobile/src/features/workflows/model/workflow-github.ts` reads and writes the same fields as
+the desktop cards); a member reads them, the event history and the item of a run. Discord triggers
+and outputs show read-only on the phone, because only the computer that runs OpenBot has the Discord
+servers, channels and roles.
+
 ### History extent
 
 `history-extent-v1` lets the chat's scroll rail draw the history that is not loaded on a joined server.
@@ -296,6 +303,13 @@ directions, so the host adds it after it encodes a response or an event (`withUi
 and the WebRTC host peer adds it again after its own encoding. A client copies it back from the wire
 value after it decodes (`addUiBlockAutoAnswers`); the shared team client does this, and the mobile
 app shows the countdown with it. The desktop transports do not copy it yet.
+
+`ui-block-vault-v1` (`team-protocol/ui-block-vault-v1.ts`, protocol 9 only) adds `vault`
+(`{ kind, saved? }`) to the same blocks in the same way (`withUiBlockVaultRequests`,
+`addUiBlockVaultRequests`). It marks the form of `request_vault_item`, and after the save it names
+the item and the last four digits of a card; it never holds a secret value. The mobile app shows the
+Vault card with it and answers through the released prompt route. A client without it gets the form
+as questions. The desktop transports do not copy it yet.
 
 ### Subagents
 
@@ -456,6 +470,28 @@ not stop the phone's push notifications. A ping moves `lastClientUseAt` only for
 later of the last user action of its session and the start of its focus period. The route is in `PASSIVE_ROUTES`, so the generic client use path
 does not count it. See [hosted servers](../hosted-servers.md) step 5.
 
+### Computer activity
+
+`computer-activity-v1` adds `POST /v1/client/activity` with `{ idleSeconds }`, the whole seconds since
+the last keyboard or mouse input on the computer of a desktop app, in any app. The host answers
+`{ phones }`: whether it sends notifications to a phone of the calling member. A host advertises it
+when it sends phone notifications (`pushNotifications` in `TeamApiOptions`), and the capability is v9
+only. `PushNotificationService.computerInput` keeps the input time of each session in memory and
+uses it for the away time only. It removes an old time at the next report and at the end of the
+session. A phone of the same member stays quiet until that time passes, as after a send
+from another session. The route is in `PASSIVE_ROUTES`: input on a computer does not keep a hosted
+server running.
+
+The desktop main process sends it through `ComputerActivityReport`, owned by `RemoteServerManager`. It
+reads `powerMonitor.getSystemIdleTime` each sixth of the away time (at most 5 seconds, at least 1) and
+tells each joined server that is online, advertises the capability, and whose events the desktop shows
+now: a focused main or chat window, or desktop notifications on with the server not muted and its level
+not "Nothing". It sends only when there was input after its last send, so the last send after the
+member leaves gives the time of the last input. A host that answers `phones: false` is not told again
+for 5 minutes, so a host without a phone of the member does not learn when the member is at the
+computer. The web client cannot read the idle time of the computer and does not send it. The owner of
+the host computer needs no report: the host reads `powerMonitor` itself (`hostComputerInUse`).
+
 ### Admin capabilities
 
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.
@@ -496,12 +532,14 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
+| `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
 | `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
+| `model-visibility-v1` | Read every model of one provider of the host, and set which of them the model picker shows. Every member reads which models the picker folds under Older models or labels New. Protocol 9 only | `hostAdmin` |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
 | `agent-access-v1` | Read and set the roles that give members access to agents (see [Roles](#roles)) | `hostAdmin` |
 | `server-audit-v1` | Read the changes to the members, roles and agent access of the server (see [Audit log](#audit-log)). Protocol 9 only | `hostAdmin` |
@@ -632,6 +670,40 @@ the next Claude process, not to a running one; an idle thread starts a new proce
 The Cache section of the Claude page in Server settings → Providers sets it for this computer and
 for a joined server.
 
+`model-visibility-v1` reads every model that one provider of the host lists, and sets which of them
+the model picker shows. The file `openbot-model-visibility-v1.json` keeps, for each provider, only the
+models that an admin turned off (`hidden`); the picker leaves them out. Every other model shows, so a
+new release shows after an admin edits the list too. The default below puts a model in the main list
+or under Older models; an admin cannot move a model between them. `shown: null` on the update route
+resets a provider, and the settings route's `changed` tells the Models section to offer the reset. A
+choice for a model that the provider does not list now stays in the file.
+
+The main list uses the models.dev copy in OpenCode's cache. When a provider lists 12 models or fewer,
+it folds only a model that the list has a newer model of the same family for, such as `claude-opus-5`
+next to `claude-opus-5-5`. A longer list shows, for each service, such as `anthropic` or
+`openrouter`, the newest model of each of the newest model families (12 families in total, and at
+least 4 for each service). A family more than 120 days older than the newest family of its service
+is a past generation and goes under the fold. It skips deprecated models, models that do not write text,
+and models with no tool calls. OpenCode ids are models.dev keys (`openai/gpt-6.1-sol`); Hermes ids
+put a `:` after the service (`nous:openai/gpt-6.1-sol`). For a service that models.dev does not list,
+such as `nous` or `openai-codex`, the model name finds the release, with a dot read as a dash. A
+variant suffix, such as Kimi's `,thinking`, gets the release of its model. A model that models.dev
+does not have is in the main list only when no model of its service is in models.dev, as with a
+custom endpoint. So a `-fast` or `-flex` service tier goes under the fold.
+
+The model list that the host gives to this computer leaves out each model that an admin turned off,
+and gives each other model that is not in the main list `listing: "older"`. The picker folds those models under
+an Older models row at the end of each provider's list; a search shows them too. A model in the main
+list that models.dev released less than 7 days ago gets `listing: "new"`, and the picker labels it
+New. The host keeps each model that an agent uses, goes back to, moves to next, or keeps as a backup
+in the main list, also when an admin turned it off, and never moves an agent to another model. Agents, tools, automations and the
+backup model switch still reach every model. The released model list of the Team API does not carry
+`listing`: it gives the main and older models in one list, as before. Every member reads the listing
+of each model from the `listing` route, and a joined client merges it, as it merges the fast tiers of
+`agent-fast-mode-v1`. The settings and update routes are for an owner or admin. The Models section of
+each provider page in Server settings → Providers sets the list for this computer and for a joined
+server. A change sends a `status` event, so each client reads the model list again.
+
 `provider-default-v1` reads and sets the provider, and the model beside it, that a new agent of the
 host starts on when its creator chooses none. It is the setup choice of the host (`openbot-setup`
 file, `preferredProvider` and `preferredModel`): a set writes the file and calls
@@ -750,6 +822,11 @@ Server settings → Audit log (`ServerAuditSection.tsx`, `@openbot/ui/features/s
 shows the log on desktop and web, with a filter by kind and a search. The tab shows for an owner or
 admin of the local server and of a joined server whose host advertises the capability. It reads the log
 again each time it shows.
+
+On the phone, Server settings → Audit log (`apps/mobile/src/features/servers/screens/server-audit-screen.tsx`)
+shows the same log, with the same filter and a native search bar. The row shows for an owner or admin
+of an online server that advertises the capability (`canReadServerAudit`). The page reads the log
+over the Team API (`getHostAuditLog`) each time it opens, and keeps no copy.
 
 Known limits: a host with no account directory records no join from a local-store invite, and the log
 has no page or date filter.
@@ -956,6 +1033,30 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
   with `shell.trashItem`. It never deletes them.
 - **Rename.** The `host-admin` identity route, as on any joined server that the user owns.
+- **Account.** While the desktop app is signed in, `LocalServers` registers each running server for
+  the account (`centralAuth.registerRemoteHost`), with the child's key, its name, and its owner member
+  as the owner membership. The ready line carries that member id. The desktop app keeps the machine
+  token with its session and writes it to the child's standard input, one JSON line
+  (`local-server-child.ts`). The child keeps it in memory only (`CentralAuthManager.useHostCredential`)
+  and calls `HostService.publishLocalServer`: it gets Signal tickets, meets devices, and sends push
+  notifications and Live Activity updates with that token, as a published host does. Its Team API
+  stays on loopback for the desktop app. A device ticket names the child's owner member, so the
+  owner's phone acts as the owner. A sign-out or another account sends `unpublish`. A sign-in, and
+  each start, registers again. A start on this computer does not wait for the account service.
+- **Directory.** The account then lists the server. `reconcileWebRtcHosts` leaves out every server
+  that `setThisComputerServers` names, so the desktop app keeps its loopback entry. Other computers
+  and phones of the account list it as a WebRTC server.
+- **Delete from the account.** A delete records the server id in `removedHostIds` of the registry and
+  removes the host from the account (`removeOwnedRemoteHost`) when signed in. A 403 or 404 counts as
+  removed; a 401 does not. The id stays until then, so a sign-in retries it, and the directory sync does not
+  list it meanwhile. An earlier build ignores the field.
+- **From a phone.** `local-servers-v1` on the desktop app's own server lists the servers and creates
+  one. The create does not change the server that the desktop app shows. It answers after the child
+  started and was registered, so the phone reads its server list again and finds the new server.
+  A delete from the phone runs the desktop delete and answers after the account removal. The phone
+  shows Delete server for such a server, through its computer's server, which must be online. It shows
+  no Remove server for the desktop app's own server, which the app registers again at each start.
+  The phone knows both kinds after the computer's server was online in that session.
 
 Limits:
 
@@ -965,8 +1066,12 @@ Limits:
   they type a name.
 - A child server is reached as a joined server. Features behind `kind === "local"`, such as
   Computer Use, voice and the local browser dock, work only as far as the Team API carries them.
-- Only this computer can connect. The child does not publish to the account service and has no
-  WebRTC, so phones, the web client and other members cannot join it.
+- While the desktop app is signed out, only this computer can connect.
+- Only the owner connects from other devices. The account service accepts invitations for the
+  server, but the child does not sync members from the account directory. Not confirmed: how a
+  member that joins with an invitation is shown.
+- The child has no account session, so an owner that ends a device's session from the child's Server
+  settings does not end it on the account service. The account has the name of the child's last start.
 - The provider CLI sign-ins in the home folder (`~/.codex`, `~/.claude`) and `~/.agents/skills` are
   shared with the other servers.
 - Not confirmed: the memory of each child, the agent browser in a child with no window, and which

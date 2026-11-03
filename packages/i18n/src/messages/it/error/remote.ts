@@ -90,6 +90,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "Il trasferimento file WebRTC non è riuscito.",
   "error.remote.fileResumeFailed": "Il trasferimento file WebRTC non ha potuto riprendere entro la scadenza.",
   "error.remote.fileTransportStopped": "Il trasporto file WebRTC si è fermato.",
+  "error.remote.downloadStopped": "Il download è stato interrotto.",
   "error.remote.fileResumeExpired": "La scadenza per riprendere il trasferimento file WebRTC è trascorsa.",
   "error.remote.hostRequestFailed": "L'host non ha potuto completare la richiesta.",
   "error.remote.responseTooLarge": "La risposta dell'host è troppo grande per essere inviata a questo dispositivo.",
@@ -198,4 +199,6 @@ export const messages = {
     "Il messaggio è stato inviato, ma non è stato possibile aggiornare la cronologia della chat.",
   "error.remote.taskHistoryRefreshFailed":
     "L'attività è stata modificata, ma non è stato possibile aggiornare la cronologia della chat.",
+  "error.remote.localServerAccountRemovalFailed":
+    "Il server è eliminato sul suo computer, ma l’account lo elenca ancora. Eliminalo di nuovo per rimuoverlo dall’account.",
 } as const satisfies PartialTranslation<typeof source>;

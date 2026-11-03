@@ -4,6 +4,7 @@ import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import {
   ComposerCompactionNotice,
+  ComposerNewChatButton,
   ContextCompactionMarker,
   type ContextCompactionView,
   ContextUsageMeter,
@@ -71,7 +72,8 @@ const ACP_NO_SUMMARY: ContextUsageView = {
 
 /** The composer's toolbar row: the ring sits with the voice and send controls, away from "+". */
 function ComposerToolbar(props: {
-  usage: ContextUsageView;
+  /** Undefined until the provider reports usage: the toolbar then shows only the New chat button. */
+  usage: ContextUsageView | undefined;
   onStartNewChat?: (() => Promise<void>) | undefined;
   onCompact?: (() => Promise<void>) | undefined;
 }) {
@@ -81,11 +83,22 @@ function ComposerToolbar(props: {
         <Plus aria-hidden="true" />
       </Button>
       <div class="composer-primary-actions">
-        <ContextUsageMeter
-          usage={props.usage}
-          newChat={props.onStartNewChat ? { agent: STORY_AGENT, start: props.onStartNewChat } : undefined}
-          compact={props.onCompact}
-        />
+        <Show
+          when={props.usage}
+          fallback={
+            <Show when={props.onStartNewChat}>
+              {(start) => <ComposerNewChatButton agent={STORY_AGENT} start={start()} />}
+            </Show>
+          }
+        >
+          {(usage) => (
+            <ContextUsageMeter
+              usage={usage()}
+              newChat={props.onStartNewChat ? { agent: STORY_AGENT, start: props.onStartNewChat } : undefined}
+              compact={props.onCompact}
+            />
+          )}
+        </Show>
         <Button type="button" variant="ghost" class="dictation-button" aria-label="Dictate">
           <Mic aria-hidden="true" />
         </Button>
@@ -98,7 +111,7 @@ function ComposerToolbar(props: {
 }
 
 function Composer(props: {
-  usage: ContextUsageView;
+  usage: ContextUsageView | undefined;
   notice?: JSX.Element;
   width?: string;
   onStartNewChat?: (() => Promise<void>) | undefined;
@@ -186,7 +199,10 @@ export const CodexTotal: Story = {
   render: (args) => <Composer usage={args.usage} />,
 };
 
-/** A local agent: the popover ends with a New chat row. The second ring shows a failed start. */
+/**
+ * A local agent: the popover ends with a New chat row. The second ring shows a failed start. Before
+ * the provider reports usage, such as after a restart, the toolbar shows a New chat button.
+ */
 export const NewChat: Story = {
   args: { usage: { ...CODEX, usedTokens: 206_700 } },
   render: (args) => (
@@ -196,6 +212,9 @@ export const NewChat: Story = {
       </Row>
       <Row label="The agent is busy">
         <Composer usage={args.usage} onStartNewChat={() => Promise.reject(new Error("The agent is busy."))} />
+      </Row>
+      <Row label="No usage reported yet">
+        <Composer usage={undefined} onStartNewChat={() => new Promise((resolve) => setTimeout(resolve, 1500))} />
       </Row>
     </div>
   ),
