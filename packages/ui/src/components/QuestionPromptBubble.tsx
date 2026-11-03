@@ -29,7 +29,7 @@ import {
 import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
-import { MarkdownInlineText } from "../features/conversation/MarkdownMessageText";
+import { MarkdownInlineText, markdownPlainText } from "../features/conversation/MarkdownMessageText";
 import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "../features/conversation/send-shortcut";
 
 /** Lets the chat composer answer the open question with its text, as the custom answer field does. */
@@ -520,7 +520,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
             </header>
             <Questionnaire.Choices
               role={current().multiSelect ? "group" : "radiogroup"}
-              aria-label={current().question}
+              aria-label={markdownPlainText(current().question)}
             >
               <ItemGroup class="question-prompt-options">
                 <For each={current().options ?? []}>
@@ -570,7 +570,9 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                     placeholder={
                       current().isSecret ? t("prompt.question.privatePlaceholder") : t("prompt.customPlaceholder")
                     }
-                    aria-label={t("prompt.question.customAnswerFor", { question: current().question })}
+                    aria-label={t("prompt.question.customAnswerFor", {
+                      question: markdownPlainText(current().question),
+                    })}
                     aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
                     maxlength={INPUT_LIMITS.promptAnswerText}
                     disabled={busy()}
