@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
+import { useAgentNewChat } from "@/features/agents/components/use-agent-new-chat";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
@@ -26,6 +27,8 @@ function useAgentMenuActions(agent: MobileAgent) {
     canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id),
   );
   const isUnread = useAgentUnread(agent.id);
+  const canStartNewChat = useMobileWorkspaceSelector((state) => state.canStartNewChat(agent.serverId));
+  const { confirmNewChat } = useAgentNewChat(agent);
   const actionPending = useRef(false);
   const { t } = useText();
 
@@ -89,11 +92,13 @@ function useAgentMenuActions(agent: MobileAgent) {
     isPinned,
     isUnread,
     canPin,
+    canStartNewChat,
     sectionMenu,
     handleRead,
     handlePin,
     handleHide,
     handleInfo,
+    handleNewChat: confirmNewChat,
     handleCopyId,
     handleDuplicate,
     handleDelete,
@@ -106,11 +111,13 @@ function useAgentContextMenu(agent: MobileAgent) {
     isPinned,
     isUnread,
     canPin,
+    canStartNewChat,
     sectionMenu,
     handleRead,
     handlePin,
     handleHide,
     handleInfo,
+    handleNewChat,
     handleCopyId,
     handleDuplicate,
     handleDelete,
@@ -130,6 +137,11 @@ function useAgentContextMenu(agent: MobileAgent) {
       <Link.MenuAction icon="info.circle" onPress={handleInfo}>
         {t("mobile.agent.menu.info")}
       </Link.MenuAction>
+      {canStartNewChat ? (
+        <Link.MenuAction icon="plus" onPress={handleNewChat}>
+          {t("mobile.agent.newChat.title")}
+        </Link.MenuAction>
+      ) : null}
       <Link.Menu icon="ellipsis" title={t("mobile.agent.menu.more")}>
         <Link.MenuAction icon="doc.on.doc" onPress={handleCopyId}>
           {t("mobile.agent.menu.copyId")}
@@ -207,15 +219,18 @@ function OpenAgentMenu({
     isPinned,
     isUnread,
     canPin,
+    canStartNewChat,
     sectionMenu,
     handleRead,
     handlePin,
     handleHide,
     handleInfo,
+    handleNewChat,
     handleCopyId,
     handleDuplicate,
     handleDelete,
   } = useAgentMenuActions(agent);
+  const newChatAction: MenuAction = { id: "newChat", title: t("mobile.agent.newChat.title"), image: "plus" };
   const actions: MenuAction[] = [
     {
       id: "read",
@@ -231,6 +246,7 @@ function OpenAgentMenu({
     { id: "hide", title: t("mobile.agent.menu.hide"), image: "eye.slash" },
     ...sectionMenu.androidActions,
     { id: "info", title: t("mobile.agent.menu.info"), image: "info.circle" },
+    ...(canStartNewChat ? [newChatAction] : []),
     {
       id: "more",
       title: t("mobile.agent.menu.more"),
@@ -247,6 +263,7 @@ function OpenAgentMenu({
     pin: handlePin,
     hide: handleHide,
     info: handleInfo,
+    newChat: handleNewChat,
     copy: handleCopyId,
     duplicate: handleDuplicate,
     delete: handleDelete,
