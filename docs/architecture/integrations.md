@@ -471,7 +471,7 @@ code text or the pairing code that the host's session got, and the client shows 
 pairing requests, and set them, and add the WhatsApp Orchestrator on the host's default model. The
 client uses the same WhatsApp page through `hostWhatsAppPort`
 ([`whatsapp-connector.ts`](../../src/renderer/src/features/connectors/whatsapp-connector.ts)). No route
-carries a key.
+carries a stored key; the QR code text holds the one-use secret of its link.
 
 The optional capability `onepassword-connector-v1`
 ([`onepassword-connector-v1.ts`](../../packages/contracts/src/team-protocol/onepassword-connector-v1.ts),

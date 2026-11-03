@@ -33,7 +33,8 @@ function parse<T>(parser: (value: unknown) => T, body: unknown): T {
 /**
  * The WhatsApp numbers of this host, which an administrator links and manages from their own
  * computer. Frozen by `whatsapp-connector-v1`. This host's session gets the QR code or the pairing
- * code and answers it; the client shows it. No answer carries a key. `requireAdmin` runs on every route.
+ * code and answers it; the client shows it. No answer carries a stored key. `requireAdmin` runs on
+ * every route.
  */
 export async function routeWhatsAppConnector(
   context: TeamApiRequestContext,

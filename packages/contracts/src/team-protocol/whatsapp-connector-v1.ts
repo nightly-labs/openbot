@@ -2,9 +2,9 @@
 //
 // What it grants, recorded here because freezing it makes it permanent: an owner or admin of a joined
 // server links WhatsApp numbers to the host from their own computer, and manages them. The host runs
-// the WhatsApp session and keeps its keys; no route carries a key. A link answers the QR code text or
-// the pairing code that the host's session got from WhatsApp, and the client shows it, so the phone
-// links the host as a device. The client reads `linkState` while it waits; the QR code changes about
+// the WhatsApp session and keeps its keys; no route carries a stored key. A link answers the QR code
+// text or the pairing code that the host's session got from WhatsApp, and the client shows it, so the
+// phone links the host as a device. The QR code text holds the one-use secret of that link. The client reads `linkState` while it waits; the QR code changes about
 // every 20 seconds. The other routes read and set the numbers, the contacts and groups that each
 // number allows, the pairing requests that wait, and the WhatsApp Orchestrator, which starts on the
 // host's default provider and model. A member cannot use any route; `requireAdmin` on the host is the
@@ -57,7 +57,7 @@ const connection = fields({
   credentials: string(64),
   orchestratorAgentId: nullable(identifier),
 });
-const sender = fields({ id: string(64), kind: oneOf("contact", "group"), name: string(256) });
+const sender = fields({ id: string(128), kind: oneOf("contact", "group"), name: string(256) });
 const pairingRequest = fields({ code: string(16), senderId: string(64), name: string(256), expiresAt: string(64) });
 const account = fields({
   workspaceId: identifier,
@@ -96,12 +96,12 @@ export const WHATSAPP_CONNECTOR_CODECS: ReadonlyMap<string, OptionalRouteCodec> 
   ],
   [
     WHATSAPP_CONNECTOR_ROUTES.groups,
-    adminRoute(number, fields({ groups: list(fields({ id: string(64), name: string(256) }), 500) })),
+    adminRoute(number, fields({ groups: list(fields({ id: string(128), name: string(256) }), 500) })),
   ],
   [WHATSAPP_CONNECTOR_ROUTES.senderAdd, adminRoute(fields({ workspaceId: identifier, sender }), empty)],
   [
     WHATSAPP_CONNECTOR_ROUTES.senderRemove,
-    adminRoute(fields({ workspaceId: identifier, senderId: string(64) }), empty),
+    adminRoute(fields({ workspaceId: identifier, senderId: string(128) }), empty),
   ],
   [
     WHATSAPP_CONNECTOR_ROUTES.requestAnswer,
