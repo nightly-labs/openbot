@@ -155,6 +155,10 @@ import {
   withUiBlockAutoAnswers,
 } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
 import {
+  TEAM_UI_BLOCK_VAULT_CAPABILITY,
+  withUiBlockVaultRequests,
+} from "@openbot/contracts/team-protocol/ui-block-vault-v1";
+import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
   TEAM_PROTOCOL_V1_CAPABILITIES,
@@ -1273,9 +1277,11 @@ export class TeamApiServer {
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
         promptMultiSelect: capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
       });
-      return encoded !== null && capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
+      if (encoded === null) return null;
+      const answered = capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
         ? withUiBlockAutoAnswers(encoded, visible)
         : encoded;
+      return capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY) ? withUiBlockVaultRequests(answered, visible) : answered;
     }
     return encodeTeamProtocolV1CurrentEvent(visible, options);
   }
@@ -1502,7 +1508,7 @@ export class TeamApiServer {
           event.snapshot.messages.some((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE))
       ) {
         // The payloads are shared between clients, so the key holds what the roles allow too.
-        const key = `${blockedKey}:${eventProtocol(connection.capabilities)}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${blockedKey}:${eventProtocol(connection.capabilities)}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
           filtered =
@@ -1970,9 +1976,12 @@ export class TeamApiServer {
     const encoded = sideRoute
       ? JSON.stringify(sideRoute.response(route.path, status, effortValue, options))
       : teamHttpCodec(route.protocol).encodeResponse(route.method, route.path, status, effortValue, options);
-    const body = route.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
+    const answered = route.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
       ? withUiBlockAutoAnswers(encoded, effortValue)
       : encoded;
+    const body = route.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)
+      ? withUiBlockVaultRequests(answered, effortValue)
+      : answered;
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
     return "handled";

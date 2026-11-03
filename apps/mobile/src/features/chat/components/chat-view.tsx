@@ -75,7 +75,12 @@ import { queueReceiptMessages, queueRowsWithHeldEdit } from "../model/queue-edit
 import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
 import { voiceAccent, voicePalette } from "../model/voice-palette";
 import { rememberImageDimensions } from "./attachment-preview";
-import { asksForSecret, BrowserSecretComposer, BrowserTakeoverCard } from "./browser-secret-card";
+import {
+  asksForSecret,
+  BrowserSecretComposer,
+  BrowserTakeoverCard,
+  QuestionSecretComposer,
+} from "./browser-secret-card";
 import { ChatAttachmentPanel } from "./chat-attachment-panel";
 import type { OutboxRowStatus } from "./chat-outbox-status";
 import { ChatQueueButton } from "./chat-queue-button";
@@ -620,6 +625,11 @@ export function ChatView({
   // mode and the attachment card keep the composer until they close. Other secret requests wait.
   const secretRequest =
     showBrowserRequests && !voiceOpen && !attachments.menuOpen ? chatBrowserRequests.find(asksForSecret) : undefined;
+  // A private answer to a form question is typed there too, never in a second field beside the composer.
+  const secretQuestion =
+    !secretRequest && !voiceOpen && !attachments.menuOpen && questionForm?.question?.isSecret
+      ? questionForm
+      : undefined;
   const dark = useColorScheme() === "dark";
   // The glow and the filled voice controls take that agent's colour. A channel with no leader mixes
   // the colours of its first members.
@@ -1181,6 +1191,18 @@ export function ChatView({
                   key={`${target.serverId}:${secretRequest.requestId}`}
                   request={secretRequest}
                   respond={(input) => workspace().respondToBrowserSecret(target.serverId, input)}
+                  bottomInset={insets.bottom}
+                  liquidGlassAvailable={liquidGlassAvailable}
+                  fallbackBackground={fieldBackground}
+                  foreground={foreground}
+                  muted={muted}
+                  action={action}
+                  actionForeground={actionForeground}
+                />
+              ) : secretQuestion ? (
+                <QuestionSecretComposer
+                  key={`${target.serverId}:${secretQuestion.messageId}:${secretQuestion.question?.id}`}
+                  controller={secretQuestion}
                   bottomInset={insets.bottom}
                   liquidGlassAvailable={liquidGlassAvailable}
                   fallbackBackground={fieldBackground}

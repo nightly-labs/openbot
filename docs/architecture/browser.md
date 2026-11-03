@@ -394,7 +394,9 @@ The agent can fill in the fields that are not secret; the password, card number 
 are secret form fields, so the stored block never holds them. The desktop card opens the Vault
 dialog with the agent's values. The host saves the answer through `VaultItems.addEntered` (owner or
 admin only) and answers the tool with only the item's id, kind and name. The `ui-blocks-v1` wire
-leaves out `vault`, so a remote client shows the ordinary form. Messaging threads refuse the tool.
+leaves out `vault`; `ui-block-vault-v1` (protocol 9) adds it back, and the mobile app then shows the
+same card, which opens its Vault item form with the agent's values and answers the prompt with the
+form's field ids. Another remote client shows the ordinary form. Messaging threads refuse the tool.
 
 The browser host owns the protection state and serializes entry behind existing browser work. CDP
 resolves fields before consent and checks the document and origin again before entry. The host
