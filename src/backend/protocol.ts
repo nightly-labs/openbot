@@ -264,7 +264,8 @@ export function decodeAccountReadResult(value: unknown): AccountReadResult {
   const accountRecord = decodeRecord(account, "account");
   const email = optionalString(accountRecord, "email");
   const planType = optionalString(accountRecord, "planType");
-  const organization = optionalString(accountRecord, "workspaceName");
+  // The Claude client gives `organization`; the Codex app server gives `workspaceName`.
+  const organization = optionalString(accountRecord, "organization") ?? optionalString(accountRecord, "workspaceName");
   return {
     account: {
       type: requiredString(accountRecord, "type"),
