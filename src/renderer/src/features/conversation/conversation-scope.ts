@@ -599,11 +599,13 @@ export function createConversationViewScope(props: ConversationProps) {
     const shown = filePreviewOpen() && sidePanel().file === key;
     const next = removeSidePanelFile(key);
     if (!shown) return;
+    // The closed file must not show under the next tab while it loads, or after a failed read.
+    clearSidebarFilePreview();
     if (next) {
+      setActiveRightPanel("side-panel");
       openSidePanelFile(next);
       return;
     }
-    clearSidebarFilePreview();
     const pane = sidePanel().panes.at(-1);
     const thread = sideThreadIds()[0];
     if (pane) openSidePanelPane(pane);

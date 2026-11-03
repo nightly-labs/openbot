@@ -37,7 +37,7 @@ export interface RoutineSettingsRequest {
 }
 
 /** A file or folder with a tab in the side panel. */
-export interface SidePanelFile {
+interface SidePanelFile {
   /** See `filePreviewKey`. */
   key: string;
   name: string;
@@ -519,6 +519,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (!ownerAgentId || !tab) return;
     const shown = deps.sidebarFilePreview();
     if (shown?.ownerAgentId === ownerAgentId && filePreviewKey(shown.source) === key) {
+      // A read that is still running must not replace the tab that you selected.
+      deps.invalidateFilePreviewGeneration();
       updateSidePanel(ownerAgentId, (state) => ({ ...state, file: key, selected: null }));
       setActiveRightPanel("file-preview", ownerAgentId);
       return;
