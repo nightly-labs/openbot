@@ -338,10 +338,12 @@ try {
     return { owner: sent.slice(from, index).includes(OWNER_PHONE) };
   }
 
+  // A server stops being a target, as when the window loses focus with desktop notifications off.
+  let targets = ["fixture-server"];
   const activity = new ComputerActivityReport({
     awayAfterMs: AWAY_AFTER_MS,
     idleSeconds: () => idleSeconds,
-    targets: () => ["fixture-server"],
+    targets: () => targets,
     send: (_serverId, idle) =>
       Effect.tryPromise(async () => {
         const body = { idleSeconds: idle };
@@ -431,7 +433,14 @@ try {
     desktopNow += 1_000;
     const next = await checkActivity();
     assert.equal(next, 0, "The desktop told a host with no phone of the member again at once.");
-    return { first, next };
+    targets = [];
+    desktopNow += 1_000;
+    await checkActivity();
+    targets = ["fixture-server"];
+    desktopNow += 1_000;
+    const afterTargetChange = await checkActivity();
+    assert.equal(afterTargetChange, 0, "A target change ended the pause of a host with no phone of the member.");
+    return { first, next, afterTargetChange };
   });
 
   report.passed = true;

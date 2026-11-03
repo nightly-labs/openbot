@@ -20,7 +20,6 @@ export interface ComputerActivityReportOptions {
 interface ServerReport {
   /** The time of the last send, or `null` before one and after a failed one. */
   sentAt: number | null;
-  pausedUntil: number;
   sending: boolean;
 }
 
@@ -36,6 +35,11 @@ export class ComputerActivityReport {
   /** Shorter than the away time, so the host's input time is never older than that time while the member works. */
   readonly #checkMs: number;
   readonly #servers = new Map<string, ServerReport>();
+  /**
+   * The end of the pause of each host that answered that it notifies no phone of the member. It stays
+   * when the host stops being a target, so a focus change does not end it.
+   */
+  readonly #pausedUntil = new Map<string, number>();
   #timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(options: ComputerActivityReportOptions) {
@@ -53,6 +57,7 @@ export class ComputerActivityReport {
     if (this.#timer) clearInterval(this.#timer);
     this.#timer = null;
     this.#servers.clear();
+    this.#pausedUntil.clear();
   }
 
   /** Sends the idle time to each target that has not had it since the last input. */
@@ -64,13 +69,14 @@ export class ComputerActivityReport {
     // The member is away already, and the last send gave the time of the last input.
     if (idleSeconds * 1_000 >= this.#options.awayAfterMs) return;
     const now = this.#now();
+    for (const [serverId, until] of this.#pausedUntil) if (until <= now) this.#pausedUntil.delete(serverId);
     for (const serverId of targets) {
       let report = this.#servers.get(serverId);
       if (!report) {
-        report = { sentAt: null, pausedUntil: 0, sending: false };
+        report = { sentAt: null, sending: false };
         this.#servers.set(serverId, report);
       }
-      if (report.sending || report.pausedUntil > now) continue;
+      if (report.sending || this.#pausedUntil.has(serverId)) continue;
       // No input since the last send: the host has the time of the last input.
       if (report.sentAt !== null && idleSeconds * 1_000 >= now - report.sentAt) continue;
       const current = report;
@@ -81,7 +87,7 @@ export class ComputerActivityReport {
           Effect.match({
             onSuccess: (phones) => {
               current.sending = false;
-              if (!phones) current.pausedUntil = this.#now() + NO_PHONE_PAUSE_MS;
+              if (!phones) this.#pausedUntil.set(serverId, this.#now() + NO_PHONE_PAUSE_MS);
             },
             onFailure: () => {
               current.sending = false;
