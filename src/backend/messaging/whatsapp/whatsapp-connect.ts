@@ -93,7 +93,7 @@ export class WhatsAppConnect implements WhatsAppPolicy {
       this.#state = { ...IDLE, status: "failed", error: "unavailable" };
       return this.#state;
     }
-    const timer = setTimeout(() => this.#hooks.dispatch(this.#fail("timeout")), LINK_TIMEOUT_MS);
+    const timer = setTimeout(() => this.#hooks.dispatch(this.#fail(link, "timeout")), LINK_TIMEOUT_MS);
     timer.unref?.();
     const link: RunningLink = { storeId, handle, timer, unsubscribe: [], finishing: false };
     this.#link = link;
@@ -117,16 +117,16 @@ export class WhatsAppConnect implements WhatsAppPolicy {
                   this.#state = { ...this.#state, code: code.replace(/[^A-Z0-9]/giu, "").toUpperCase() };
               }),
             ),
-            Effect.catch(() => this.#fail("refused")),
+            Effect.catch(() => this.#fail(link, "refused")),
           ),
         );
       }),
       handle.session.onState((state) => {
         if (this.#link !== link) return;
         if (state === "open" && handle.store.linked) this.#hooks.dispatch(this.#finish(link, key, input.ownNumber));
-        else if (state === "logged_out" || state === "replaced") this.#hooks.dispatch(this.#fail("refused"));
-        else if (state === "unreachable") this.#hooks.dispatch(this.#fail("unavailable"));
-        else if (state === "stopped" && !link.finishing) this.#hooks.dispatch(this.#fail("timeout"));
+        else if (state === "logged_out" || state === "replaced") this.#hooks.dispatch(this.#fail(link, "refused"));
+        else if (state === "unreachable") this.#hooks.dispatch(this.#fail(link, "unavailable"));
+        else if (state === "stopped" && !link.finishing) this.#hooks.dispatch(this.#fail(link, "timeout"));
       }),
     );
     handle.session.start();
@@ -256,21 +256,22 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     if (link.finishing || this.#link !== link) return;
     link.finishing = true;
     const identity = whatsAppIdentity(link.handle);
-    if (!identity) return yield* this.#fail("refused");
+    if (!identity) return yield* this.#fail(link, "refused");
     const name = link.handle.store.creds.me?.name?.trim();
     const workspaceName = name ? `${name} (${maskedNumber(identity.number)})` : maskedNumber(identity.number);
     yield* this.#end(link, false);
     yield* Effect.gen({ self: this }, function* () {
       const connectionId = yield* this.#hooks.prepare(identity.number, workspaceName);
-      // The number's earlier device was replaced by this link, so its keys go.
       const previous = this.#credentials.get(connectionId)?.storeId;
-      if (previous && previous !== link.storeId) this.#runtime.delete(previous);
       this.#runtime.promote(link.storeId);
       yield* this.#hooks.finish(connectionId, {
         whatsappStoreKey: Buffer.from(key).toString("base64"),
         storeId: link.storeId,
         ownNumber: ownNumber ? "1" : "0",
       });
+      // The number's earlier device was replaced by this link, so its keys go, but only once the new
+      // link is saved: a failed save keeps the device that worked before.
+      if (previous && previous !== link.storeId) this.#runtime.delete(previous);
     }).pipe(
       // A link that cannot become a connection leaves no socket and no store.
       Effect.onError(() =>
@@ -298,10 +299,10 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     );
   });
 
-  #fail(error: NonNullable<WhatsAppLinkState["error"]>): Effect.Effect<void> {
+  /** Ends `link` as failed. A late failure of a link that was cancelled or replaced does nothing. */
+  #fail(link: RunningLink, error: NonNullable<WhatsAppLinkState["error"]>): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
-      const link = this.#link;
-      if (!link) return;
+      if (this.#link !== link) return;
       yield* this.#end(link, true);
       this.#state = { ...IDLE, status: "failed", error };
     });

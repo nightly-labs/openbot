@@ -197,7 +197,16 @@ class FakeSocket implements WhatsAppSocket {
   }
 
   async requestPairingCode(_phoneNumber: string): Promise<string> {
-    return PAIRING_CODE;
+    const hold = this.#phone.holdPairing;
+    if (!hold) return PAIRING_CODE;
+    this.#phone.pairingWaits += 1;
+    try {
+      await hold;
+      if (this.ended) throw new Error("socket closed");
+      return PAIRING_CODE;
+    } finally {
+      this.#phone.pairingDone += 1;
+    }
   }
 
   async logout(): Promise<void> {
@@ -229,6 +238,10 @@ class FakePhone {
   offline = false;
   /** A message that the next linked socket receives at once, before any transport listens. */
   onOpen: WAMessage | null = null;
+  /** While set, a pairing-code request waits for it, and fails when its socket closed meanwhile. */
+  holdPairing: Promise<void> | null = null;
+  pairingWaits = 0;
+  pairingDone = 0;
 
   readonly create = (config: UserFacingSocketConfig): WhatsAppSocket => {
     const socket = new FakeSocket(this, config);
@@ -911,6 +924,36 @@ try {
         return { states: ["error", "connected", "reconnecting", "connected", "invalid_token"] };
       },
     );
+
+    await step("a cancelled pairing-code request that fails late leaves the next link alone", async () => {
+      let release = () => {};
+      phone.holdPairing = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const waits = phone.pairingWaits;
+      const done = phone.pairingDone;
+      await runCauseEffect(
+        messaging.startWhatsAppLink(
+          parseStartWhatsAppLinkInput({ method: "code", phoneNumber: "+48 600 100 200", ownNumber: false }),
+        ),
+      );
+      await until(() => phone.pairingWaits === waits + 1, "the held pairing-code request");
+      await runCauseEffect(messaging.cancelWhatsAppLink());
+      phone.holdPairing = null;
+      await runCauseEffect(
+        messaging.startWhatsAppLink(parseStartWhatsAppLinkInput({ method: "qr", ownNumber: false })),
+      );
+      await linkState(messaging, (state) => state.qr !== null, "the new link's QR code");
+      release();
+      await until(() => phone.pairingDone === done + 1, "the late failure of the old request");
+      // The failure runs as a dispatched Effect: one turn of the event loop lets it finish.
+      await new Promise((resolve) => setImmediate(resolve));
+      const after = messaging.whatsappLinkState();
+      assert.equal(after.status, "waiting", "The old request's late failure ended the new link.");
+      assert.notEqual(after.qr, null);
+      await runCauseEffect(messaging.cancelWhatsAppLink());
+      return { status: after.status };
+    });
 
     await step(
       "link by pairing code: the phone types the code, and the same number links again with its settings",
