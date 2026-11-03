@@ -8,6 +8,7 @@ import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc"
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result } from "effect";
+import type { SignInRegion } from "./kimi-region";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
 const execFileAsync = promisify(execFile);
@@ -603,13 +604,18 @@ export const resolveKimiCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
-/** The Python CLI supports JSON; Kimi Code 2.x prints a device code as text. */
-export const kimiCodeLoginArgs = Effect.fn("Cli.kimiCodeLoginArgs")(function* (
+/**
+ * The arguments of `kimi login`. The Python CLI supports JSON, and takes its region from the
+ * variables of `kimiPythonLoginEnv`. Kimi Code 2.x prints a device code as text, and takes the
+ * region as an option: without it, a first sign-in goes to kimi.com.
+ */
+export const kimiLoginArgs = Effect.fn("Cli.kimiLoginArgs")(function* (
   cli: { executable: string; launchPath?: string },
   env: Readonly<Record<string, string>>,
+  options: { code: boolean; region: SignInRegion },
 ): Effect.fn.Return<readonly string[], ProviderClientOperationError> {
   const target = cliSpawnTarget(cli.executable, ["login", "--help"]);
-  const output = yield* Effect.tryPromise({
+  const probe = Effect.tryPromise({
     try: (signal) =>
       execFileAsync(target.command, target.args, {
         signal,
@@ -631,11 +637,14 @@ export const kimiCodeLoginArgs = Effect.fn("Cli.kimiCodeLoginArgs")(function* (
       );
     },
   });
+  // A browser sign-in needs no option, so a probe that fails keeps the plain `kimi login`.
+  const output = options.code ? yield* probe : yield* Effect.orElseSucceed(probe, () => ({ stdout: "", stderr: "" }));
   const help = stripVTControlCharacters(`${output.stdout}\n${output.stderr}`);
   if (/\bkimi\b/i.test(help)) {
-    if (/--json(?:\s|[,=]|$)/u.test(help)) return ["login", "--json"];
-    if (/--region\b/u.test(help) && /device-code/u.test(help)) return ["login"];
+    if (/--json(?:\s|[,=]|$)/u.test(help)) return options.code ? ["login", "--json"] : ["login"];
+    if (/--region\b/u.test(help) && /device-code/u.test(help)) return ["login", "--region", options.region];
   }
+  if (!options.code) return ["login"];
   return yield* providerFailure(
     new CodexCliError(sourceText("error.provider.noCodeSignIn", { provider: agentProviderName("kimi") }), "invalid"),
   );

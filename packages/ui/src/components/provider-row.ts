@@ -94,6 +94,11 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     codeFallback.startedWithCode();
     host.connection?.alternative(option().id);
   };
+  /** The mainland China site that the ⋯ menu signs in with, while the row is not signed in. */
+  const mainlandChinaSite = (): string | null =>
+    browserConnect() && !off() && state() !== "available"
+      ? (host.connection?.mainlandChinaSite?.(option().id) ?? null)
+      : null;
   /** A Connect that failed before the sign-in started. The status reports the rest. */
   const [connectError, setConnectError] = createSignal<string | null>(null);
   const connect = () => {
@@ -107,6 +112,13 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     else codeFallback.startedWithCode();
     setConnectError(null);
     void Promise.resolve(host.connection?.connect(option().id)).catch((error: unknown) =>
+      setConnectError(errorMessage(error, t("app.provider.connectFailedRetry", { name: option().name }))),
+    );
+  };
+  const connectInMainlandChina = () => {
+    codeFallback.startedInBrowser();
+    setConnectError(null);
+    void Promise.resolve(host.connection?.connectInMainlandChina?.(option().id)).catch((error: unknown) =>
       setConnectError(errorMessage(error, t("app.provider.connectFailedRetry", { name: option().name }))),
     );
   };
@@ -238,6 +250,8 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     runtimeAction,
     codeFallbackOffered,
     signInAlternative,
+    mainlandChinaSite,
+    connectInMainlandChina,
     connectError,
     connect,
     runAction,

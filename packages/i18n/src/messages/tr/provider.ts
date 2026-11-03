@@ -49,6 +49,7 @@ export const messages = {
   "provider.action.signIn": "Oturum aç",
   "provider.action.apiKey": "API anahtarı",
   "provider.action.signInWithCode": "Kodla oturum aç",
+  "provider.action.signInMainlandChina": "{site} ile oturum aç (Çin)",
   "provider.action.pasteAddress": "Adresi yapıştır",
   "provider.aria.download": "{name} sağlayıcısını indir",
   "provider.aria.cancel": "{name} için işlemi iptal et",

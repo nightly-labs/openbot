@@ -55,6 +55,7 @@ export const messages = defineMessages("provider", {
   "provider.action.signIn": "Sign in",
   "provider.action.apiKey": "API key",
   "provider.action.signInWithCode": "Log in with code",
+  "provider.action.signInMainlandChina": "Sign in with {site} (China)",
   "provider.action.pasteAddress": "Paste the address",
   "provider.aria.download": "Download {name}",
   "provider.aria.cancel": "Cancel {name}",

@@ -56,6 +56,7 @@ export const messages = {
   "provider.action.signIn": "登录",
   "provider.action.apiKey": "API 密钥",
   "provider.action.signInWithCode": "用验证码登录",
+  "provider.action.signInMainlandChina": "用 {site} 登录（中国大陆）",
   "provider.action.pasteAddress": "粘贴地址",
   "provider.aria.download": "下载 {name}",
   "provider.aria.cancel": "取消 {name}",

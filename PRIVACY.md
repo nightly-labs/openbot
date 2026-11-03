@@ -1347,9 +1347,12 @@ for the other providers, when their app supports Cline.
 OpenBot downloads the Kimi Code CLI from `github.com` (GitHub release assets), and its license file
 from `github.com`, when you select Download on the Kimi row. OpenBot starts the CLI as a local
 process. Prompts, attachments, and tool results go to that process, and the CLI sends them to
-Moonshot AI (`api.kimi.com`). Sign in runs `kimi login`, which opens Kimi's sign-in page
-(`auth.kimi.com`) in your browser. The CLI keeps its login, device ID, session files, and settings
-in `~/.kimi`, or in `$KIMI_SHARE_DIR`. OpenBot does not read, copy, or upload these files. Unless you
+Moonshot AI: `api.kimi.ai` for a global account, or `api.kimi.com` for a mainland China account.
+Sign in runs `kimi login`, which opens Kimi's sign-in page in your browser: `auth.kimi.ai` for
+Connect, or `auth.kimi.com` when you select the kimi.com (China) item in the row's ⋯ menu. The CLI
+keeps its login, device ID, session files, and settings in `~/.kimi`, or in `$KIMI_SHARE_DIR`.
+OpenBot reads only the API address in `config.toml` on this computer, to start the CLI with the
+region of its login. OpenBot does not copy or upload these files. Unless you
 set `telemetry = false` in `~/.kimi/config.toml`, or set `KIMI_DISABLE_TELEMETRY=1` in the
 environment that starts OpenBot, the CLI sends anonymous usage events to
 `telemetry-logs.kimi.com`. OpenBot does not change this setting. Moonshot AI's terms for Kimi Code
