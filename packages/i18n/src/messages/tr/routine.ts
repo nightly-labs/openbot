@@ -309,6 +309,13 @@ export const messages = {
     "Mevcut gizli anahtar hemen çalışmayı durdurur. Gönderen yeni gizli anahtarı kullanana kadar onunla imzalanan istekler reddedilir.",
   "routine.webhook.regenerateConfirm": "Yeniden oluştur",
   "routine.webhook.regenerateFailed": "İmzalama gizli anahtarı yeniden oluşturulamadı.",
+  "routine.webhook.useSenderSecret": "Gönderenin gizli anahtarını kullan",
+  "routine.webhook.senderSecretTitle": "Gönderenin imza gizli anahtarı kullanılsın mı?",
+  "routine.webhook.senderSecretDescription":
+    "Composio ve Svix gibi bazı gönderenler kendi imza gizli anahtarını oluşturur. Buraya yapıştırın. Mevcut gizli anahtar hemen çalışmayı bırakır.",
+  "routine.webhook.senderSecretLabel": "Gönderenin gizli anahtarı",
+  "routine.webhook.senderSecretConfirm": "Kullan",
+  "routine.webhook.senderSecretFailed": "Gönderenin gizli anahtarı kaydedilemedi.",
   "routine.webhook.statusFailed": "Ana makinenin aktarıcıya bağlı olup olmadığı denetlenemedi.",
   "routine.settings.instruction": "Talimat",
   "routine.settings.instructionPlaceholderAgent": "Bu ajanın ne yapması gerektiğini açıklayın.",

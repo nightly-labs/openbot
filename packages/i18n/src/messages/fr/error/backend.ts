@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "La base de données OpenBot a échoué à la vérification d’intégrité.",
   "error.backend.webhookRouteLimit": "Un hôte peut avoir au plus {limit} routines webhook.",
   "error.backend.webhookSettingsInvalid": "Vérifiez les réglages du webhook et réessayez.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Collez le secret de signature complet de l’expéditeur. Il compte de 16 à 1024 caractères, sans espace.",
   "error.backend.webhookRouteUnavailable":
     "La route publique du webhook n’est pas prête. Vérifiez la connexion à l’hôte et réessayez.",
   "error.backend.browserViewRemoteOnly": "Une vue de navigateur en direct est réservée à un hôte distant.",

@@ -163,6 +163,8 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     githubRoute: z.string().min(1).max(16_384).optional(),
     telegramRoute: z.string().min(1).max(16_384).optional(),
     queueKey: z.string().max(128).optional(),
+    // Unknown formats are kept but never used: Signal sends only the formats it knows.
+    webhookFormats: z.array(z.string().min(1).max(64)).max(8).optional(),
   }),
   z.object({
     type: z.enum(["offer", "answer"]),

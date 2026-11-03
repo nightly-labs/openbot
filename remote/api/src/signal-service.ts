@@ -16,7 +16,11 @@ import {
   type TelegramRouteChat,
   telegramRouteChatKey,
 } from "@openbot/contracts/signal-protocol/telegram-route";
-import { WEBHOOK_ROUTE_TTL_SECONDS, type WebhookRoute } from "@openbot/contracts/signal-protocol/webhook-route";
+import {
+  WEBHOOK_ROUTE_TTL_SECONDS,
+  type WebhookRoute,
+  type WebhookSignatureFormat,
+} from "@openbot/contracts/signal-protocol/webhook-route";
 import { Context, Effect, Fiber, Layer, Result, Schema } from "effect";
 import { IngressQueue, queueRouteKey, type RouteWaker } from "./ingress-queue";
 import {
@@ -130,6 +134,8 @@ interface AuthenticatedPeer {
   discordSession: string | null;
   // `ingress` only: opaque generic webhook route IDs whose requests this socket receives.
   webhookRoutes: string[];
+  // `ingress` only: the signature formats that the host checks in addition to `X-OpenBot-Signature`.
+  webhookFormats: ReadonlySet<string>;
   // `ingress` only: the GitHub repositories whose events this socket receives (`githubRepositoryKey`).
   githubRepositories: string[];
   // The TURN credentials of the last `turn-refresh`, and when Signal made them.
@@ -230,6 +236,8 @@ export interface WebhookDelivery {
   deliveryId: string;
   signature: string;
   body: Uint8Array;
+  /** Absent for an `X-OpenBot-Signature` request. */
+  format?: WebhookSignatureFormat;
 }
 
 export interface WebhookDeliveryResponse {
@@ -845,6 +853,13 @@ export class SignalService {
     return socketId !== undefined && this.#peers.has(socketId);
   }
 
+  /** Whether the host that holds this route checks signatures of `format`. An older host does not. */
+  webhookRouteAccepts(routeId: string, format: WebhookSignatureFormat): boolean {
+    const socketId = this.#webhookRoutes.get(routeId);
+    const peer = socketId === undefined ? undefined : this.#peers.get(socketId);
+    return peer?.webhookFormats.has(format) === true;
+  }
+
   /**
    * Passes one generic webhook to the host and waits for its commit acknowledgement. It resolves 503
    * in the same cases as a Slack delivery.
@@ -859,6 +874,7 @@ export class SignalService {
       deliveryId: delivery.deliveryId,
       signature: delivery.signature,
       bodyBase64,
+      ...(delivery.format ? { format: delivery.format } : {}),
     })).pipe(
       Effect.map(
         (result): WebhookDeliveryResponse =>
@@ -1403,6 +1419,7 @@ export class SignalService {
           discordGuilds: discordRoute.guilds.map((guild) => guild.id),
           discordSession: null,
           webhookRoutes: webhookRoute.routes.map((route) => route.id),
+          webhookFormats: new Set(message.peer === "ingress" ? (message.webhookFormats ?? []) : []),
           githubRepositories: githubRoute.repositories.map((repository) =>
             githubRepositoryKey(repository.installationId, repository.id),
           ),

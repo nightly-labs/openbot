@@ -126,6 +126,11 @@ export function serverSendsWebhookTests(server: ServerSummary | undefined): bool
   return serverCanAdminister(server, "webhook-tests-v1");
 }
 
+/** Whether a webhook routine can use a secret that the sender made: this computer, or a joined server with `webhook-sender-secret-v1`. */
+export function serverSetsWebhookSenderSecret(server: ServerSummary | undefined): boolean {
+  return serverCanAdminister(server, "webhook-sender-secret-v1");
+}
+
 /**
  * Whether a joined server signs in to an MCP server for this computer. With `sign-in-relay-v1` the
  * page opens in this computer's browser and the callback is relayed to the host. An older host opens

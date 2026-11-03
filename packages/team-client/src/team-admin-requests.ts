@@ -240,6 +240,7 @@ import {
   type ListEventRoutinesInput,
   type SaveEventRoutineInput,
   type SaveEventRoutineResult,
+  type SetWebhookSecretInput,
   type WebhookSecret,
   type WebhookTestResult,
 } from "@openbot/contracts/ipc-events";
@@ -282,6 +283,7 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
+import { WEBHOOK_SENDER_SECRET_ROUTES } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { Effect, Schema } from "effect";
 import { bytesToBase64 } from "./base64";
@@ -503,6 +505,14 @@ export function rotateEventRoutineSecret(
   input: EventRoutineRef,
 ): Effect.Effect<WebhookSecret, TeamAdminRequestError> {
   return adminCall(() => request("POST", EVENTS_ROUTES.rotateSecret, decodeWebhookSecret, eventBody(input)));
+}
+
+/** Gives the routine a secret that the sender made. Only a host with `webhook-sender-secret-v1` answers it. */
+export function setEventRoutineSecret(
+  request: TeamApiRequest,
+  input: SetWebhookSecretInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WEBHOOK_SENDER_SECRET_ROUTES.set, ignoreResponse, eventBody(input)));
 }
 
 /** Asks the host to send one signed test event to the routine. Only a host with `webhook-tests-v1` answers it. */

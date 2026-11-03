@@ -25,6 +25,8 @@ export interface RoutineWebhookTriggerProps {
   onSecretDismiss: () => void;
   /** Makes a new secret. The parent shows it through `secret`. */
   onRegenerateSecret: () => Promise<void>;
+  /** Replaces the secret with one that the sender made. Leave it out when the host cannot do this. */
+  onUseSenderSecret?: ((secret: string) => Promise<void>) | undefined;
   /** A control at the end of the header, such as the menu that changes the trigger. */
   menu?: JSX.Element;
   /** Saves a new routine, so the host makes its URL and secret. Without it the card only asks for a save. */
@@ -215,6 +217,7 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
                   secret={props.secret}
                   onSecretDismiss={props.onSecretDismiss}
                   onRegenerateSecret={props.onRegenerateSecret}
+                  onUseSenderSecret={props.onUseSenderSecret}
                   onCopy={() =>
                     setSteps((state) => {
                       state.secretCopied = true;
