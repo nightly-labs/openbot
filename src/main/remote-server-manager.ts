@@ -6,6 +6,7 @@ import { type InviteLinkOptions, type InviteLinkPayload, parseInviteUrl } from "
 import type {
   AgentEvent,
   AgentImportPreview,
+  AttachmentDownloadProgress,
   AvatarImageInput,
   ClientAgentSummary,
   ConversationPage,
@@ -91,7 +92,7 @@ import {
   decodeDraftAttachment,
   decodeDuplicateAgentResultFromHost,
 } from "./remote-agent-decoding";
-import { type RemoteAttachment, RemoteAttachmentCache } from "./remote-attachment-cache";
+import { AttachmentDownloadStopped, type RemoteAttachment, RemoteAttachmentCache } from "./remote-attachment-cache";
 import type { RemoteConnectTrace } from "./remote-connect-trace";
 import {
   decodeConversationPageFromHost,
@@ -126,6 +127,7 @@ import type { StoredRemoteServer } from "./remote-server-stored-shape";
 import { remoteServerSummaries } from "./remote-server-summaries";
 import { addRemotePreviewUrls, isLocalDevelopmentApi, pageQuery } from "./remote-server-urls";
 import {
+  type RemoteFileProgress,
   RemoteRequest,
   RemoteWorkflowError,
   remoteCall,
@@ -163,7 +165,11 @@ interface RemoteServerEvents {
   directMessage: [serverId: string, event: DirectMessageRealtimeEvent];
   directTyping: [serverId: string, event: DirectTypingRealtimeEvent];
   machineAlert: [serverId: string, event: MachineAlertEvent];
+  attachmentDownload: [progress: AttachmentDownloadProgress];
 }
+
+// The renderer redraws a progress ring; more than about ten updates a second show nothing more.
+const ATTACHMENT_PROGRESS_INTERVAL_MS = 100;
 
 interface CentralAccountSession {
   createTeamAuthTicket: (serverId: string) => Effect.Effect<string, CentralAuthOperationError>;
@@ -253,6 +259,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #events: RemoteEventStream;
   readonly #presence: RemotePresenceCache;
   readonly #attachments = new RemoteAttachmentCache();
+  /** The downloads that `stopAttachmentDownload` can end, by server and attachment. */
+  readonly #attachmentStops = new Map<string, Deferred.Deferred<never, RemoteWorkflowError>>();
   readonly #localLevels: LocalNotificationLevels | null;
   /**
    * The notification levels that the user chose on each joined server, as each server last gave them.
@@ -2094,8 +2102,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       attachmentId: string,
       serverId = this.#store.activeServerId,
       preview = false,
+      // The size that the message names. With it, the download reports its bytes and can be stopped.
+      size?: number,
     ): Effect.fn.Return<RemoteAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const progress = size === undefined ? undefined : this.#attachmentProgress(server.id, attachmentId, size);
       return yield* this.#attachments.get(
         server.id,
         attachmentId,
@@ -2105,19 +2116,68 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
               const response = yield* this.#client.fetch(
                 server,
                 new URL(TEAM_API_ROUTES.attachment(attachmentId), server.apiUrl),
+                {},
+                true,
+                undefined,
+                progress,
               );
               return {
-                bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
+                bytes: yield* remoteCall((signal) =>
+                  // A WebRTC answer holds the whole file already, and its bytes were reported.
+                  progress && server.transport !== "webrtc-v2"
+                    ? countedResponseBytes(response, progress, signal)
+                    : response.arrayBuffer().then((buffer) => new Uint8Array(buffer)),
+                ),
                 name: contentDispositionFileName(response.headers.get("content-disposition"), attachmentId),
                 mimeType: response.headers.get("content-type") ?? "application/octet-stream",
               };
-            }),
+            }).pipe((download) => (progress ? this.#stoppable(server.id, attachmentId, download) : download)),
           ),
         preview,
       );
     },
     (operation) => this.#owned(operation),
   ).bind(this);
+
+  /** Ends a download that an open or a save started. The open or the save answers without a file. */
+  stopAttachmentDownload(attachmentId: string, serverId: string): void {
+    const stop = this.#attachmentStops.get(JSON.stringify([serverId, attachmentId]));
+    if (stop)
+      Deferred.doneUnsafe(stop, Effect.fail(new RemoteWorkflowError({ cause: new AttachmentDownloadStopped() })));
+  }
+
+  #stoppable<A>(
+    serverId: string,
+    attachmentId: string,
+    download: Effect.Effect<A, RemoteWorkflowError, RemoteRequest>,
+  ): Effect.Effect<A, RemoteWorkflowError, RemoteRequest> {
+    return Effect.suspend(() => {
+      const key = JSON.stringify([serverId, attachmentId]);
+      const stop = Deferred.makeUnsafe<never, RemoteWorkflowError>();
+      this.#attachmentStops.set(key, stop);
+      // The stop interrupts the download, and the WebRTC transfer then refuses the file.
+      return Effect.raceFirst(download, Deferred.await(stop)).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (this.#attachmentStops.get(key) === stop) this.#attachmentStops.delete(key);
+          }),
+        ),
+      );
+    });
+  }
+
+  #attachmentProgress(serverId: string, attachmentId: string, size: number): RemoteFileProgress {
+    let reportedAt = 0;
+    return {
+      size,
+      onProgress: (received, total) => {
+        const now = Date.now();
+        if (received < total && now - reportedAt < ATTACHMENT_PROGRESS_INTERVAL_MS) return;
+        reportedAt = now;
+        this.emit("attachmentDownload", { serverId, attachmentId, received, total });
+      },
+    };
+  }
 
   readonly downloadSharedFile = Effect.fn("RemoteManager.downloadSharedFile")(
     function* (
@@ -2321,6 +2381,44 @@ function requiredServerSummary(servers: ServerSummary[], serverId: string): Serv
   const server = servers.find((candidate) => candidate.id === serverId);
   if (!server) throw new Error("Remote server summary is missing.");
   return server;
+}
+
+/**
+ * The body of a host file, read in parts so that `progress` gets the bytes as they arrive. The total
+ * is the length that the host names, or the size that the message names.
+ */
+async function countedResponseBytes(
+  response: Response,
+  progress: RemoteFileProgress,
+  signal: AbortSignal,
+): Promise<Uint8Array> {
+  const reader = response.body?.getReader();
+  if (!reader) return new Uint8Array(await response.arrayBuffer());
+  const stop = () => void reader.cancel().catch(() => undefined);
+  signal.addEventListener("abort", stop, { once: true });
+  try {
+    const named = Number(response.headers.get("content-length"));
+    const total = Number.isSafeInteger(named) && named > 0 ? named : progress.size;
+    const parts: Uint8Array[] = [];
+    let received = 0;
+    progress.onProgress(0, total);
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parts.push(value);
+      received += value.byteLength;
+      progress.onProgress(Math.min(received, total), total);
+    }
+    const bytes = new Uint8Array(received);
+    let offset = 0;
+    for (const part of parts) {
+      bytes.set(part, offset);
+      offset += part.byteLength;
+    }
+    return bytes;
+  } finally {
+    signal.removeEventListener("abort", stop);
+  }
 }
 
 /**

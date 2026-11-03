@@ -18,7 +18,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import { plainTaskTitle, taskApproval } from "@openbot/team-client/agent-tasks";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { AgentTaskWait } from "@openbot/ui/features/conversation/AgentTasks";
-import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
+import type { AttachmentDownloads, AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import type { ComposerPasteResult, ComposerSelection } from "@openbot/ui/features/conversation/ComposerEditor";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { AgentThreadView } from "@openbot/ui/features/conversation/threads/AgentThreadView";
@@ -91,6 +91,8 @@ interface TasksViewProps {
   files?: TaskFiles | undefined;
   /** Loads the images of a client that gets no `previewUrl`. */
   mediaSource?: AttachmentMediaSource | undefined;
+  /** The download state of attachments from a joined server. */
+  downloads?: AttachmentDownloads | undefined;
   /** The waiting approvals of the server's agents. */
   approvals: readonly AgentApproval[];
   onRespondApproval: (approval: AgentApproval, decision: "accept" | "decline") => Promise<boolean>;
@@ -757,6 +759,7 @@ export function TasksView(props: TasksViewProps) {
               onPreview={(attachment) => props.onAttachmentAction(attachment, "open")}
               onAttachmentAction={props.onAttachmentAction}
               mediaSource={props.mediaSource}
+              downloads={props.downloads}
               approval={approval()}
               onRespondApproval={async (decision) => {
                 const current = approval();

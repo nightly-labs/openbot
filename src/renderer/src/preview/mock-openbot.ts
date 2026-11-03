@@ -2640,6 +2640,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         throw new Error("ZIP downloads are available in the desktop app.");
       },
       openAttachment: async (_input: OpenAttachmentInput) => undefined,
+      // The preview has no joined server, so no download reports its bytes.
+      stopAttachmentDownload: async () => undefined,
+      onAttachmentDownload: () => () => undefined,
       openSharedFile: async (_input: OpenSharedFileInput) => undefined,
       openWorkspaceFile: async (_input: OpenWorkspaceFileInput) => undefined,
       previewSharedFile: async (input: OpenSharedFileInput) => mockFilePreview(input.path, "shared-file"),

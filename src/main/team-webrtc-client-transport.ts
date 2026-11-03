@@ -39,7 +39,12 @@ import type {
 } from "./central-auth-records";
 import type { RemoteConnectTrace } from "./remote-connect-trace";
 import { transportFailure } from "./remote-server-connection-status";
-import { RemoteWorkflowError, remoteDecode, toRemoteWorkflowError } from "./remote-service-effects";
+import {
+  type RemoteFileProgress,
+  RemoteWorkflowError,
+  remoteDecode,
+  toRemoteWorkflowError,
+} from "./remote-service-effects";
 import type { RemoteSessionCache } from "./remote-session-cache";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
@@ -454,6 +459,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       preserveSemanticTags?: boolean | undefined;
       agentCreateModel?: boolean | undefined;
       timeoutMs?: number | undefined;
+      fileProgress?: RemoteFileProgress | undefined;
     } = {},
   ): Effect.fn.Return<
     {
@@ -528,6 +534,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         // lost: a request that fails late must not drop the connection another request just made.
         profile = startRemoteRequest(method, path, frame);
         const refusedBy = this.#active.get(hostId);
+        // The host sends the file before the answer that names it. A stopped request refuses the file.
+        const progress = init.fileProgress;
+        const watch = progress ? this.#files.watchIncoming(hostId, progress.size, progress.onProgress) : null;
         const envelope = yield* this.#exchange(hostId, requestId, frame, profile, remainingMs).pipe(
           Effect.catchIf(
             (error) => !bodyTransferId && isClosedChannelError(error.cause),
@@ -538,6 +547,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                 return yield* this.#exchange(hostId, requestId, frame, profile, timeoutMs);
               }),
           ),
+          Effect.onInterrupt(() => watch?.stop ?? Effect.void),
+          Effect.ensuring(Effect.sync(() => watch?.end())),
         );
         if (!isDynamicRecord(envelope) || !isNumber(envelope.status) || !Object.hasOwn(envelope, "body")) {
           return yield* new RemoteWorkflowError({

@@ -73,6 +73,16 @@ export interface DownloadAttachmentsInput {
 export interface OpenAttachmentInput {
   attachmentId: string;
   action: "open" | "reveal" | "download";
+  /** The size that the message names. With it, a download from a joined server reports its bytes. */
+  size?: number;
+}
+
+/** The bytes of an attachment that main downloads from a joined server for an open or a save. */
+export interface AttachmentDownloadProgress {
+  serverId: string;
+  attachmentId: string;
+  received: number;
+  total: number;
 }
 
 /** What the file view does with a shared or workspace file. Absent means `open`. */

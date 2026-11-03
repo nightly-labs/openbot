@@ -174,6 +174,7 @@ import type {
 } from "./ipc-approvals";
 import type {
   AttachmentDataInput,
+  AttachmentDownloadProgress,
   ChooseAttachmentsInput,
   DownloadAttachmentsInput,
   DraftAttachment,
@@ -1595,6 +1596,9 @@ export const IPC_ENDPOINTS = {
     discardDraftAttachment: scopedRequest<string, void>()("agent:discard-draft-attachment"),
     downloadAttachments: scopedRequest<DownloadAttachmentsInput, void>()("agent:download-attachments"),
     openAttachment: scopedRequest<OpenAttachmentInput, void>()("agent:open-attachment"),
+    /** Stops the download of an attachment. Its open or save then answers without a file. */
+    stopAttachmentDownload: scopedRequest<string, void>()("agent:stop-attachment-download"),
+    attachmentDownload: event<AttachmentDownloadProgress>()("agent:attachment-download"),
     openSharedFile: scopedRequest<OpenSharedFileInput, void>()("agent:open-shared-file"),
     openWorkspaceFile: scopedRequest<OpenWorkspaceFileInput, void>()("agent:open-workspace-file"),
     previewSharedFile: scopedRequest<PreviewSharedFileInput, FilePreview>()("agent:preview-shared-file"),
