@@ -43,9 +43,9 @@ function popularFirst(options: readonly ProviderPickerOption[]): ProviderPickerO
  * The provider rows of the first-run list.
  *
  * The list has `PLAN_ROWS` plan rows. Providers that the user has come first: the connected ones,
- * then the ones that only need a sign-in, each with the popular ones first. Popular providers fill
+ * then the ones that need a sign-in or an update, each with the popular ones first. Popular providers fill
  * the rows that are left, and the free provider is always last. The other providers are in "More
- * providers", the ones that the user has first.
+ * providers", the ones that the user has first, in the same order.
  *
  * `kept` holds the rows that must stay in the list in their order: the rows the user saw when they
  * first used the list, and each provider that they chose from "More providers". Thus a row does not
@@ -62,12 +62,13 @@ export function onboardingProviderRows(
 ): OnboardingProviderRows {
   const plans = options.filter((option) => option.id !== FREE_PROVIDER);
   const connected = popularFirst(plans.filter((option) => option.state === "available"));
-  const signInOnly = popularFirst(plans.filter((option) => userHasProvider(option) && option.state !== "available"));
+  const notReady = popularFirst(plans.filter((option) => userHasProvider(option) && option.state !== "available"));
   const popular = POPULAR_PROVIDERS.flatMap((id) => {
     const option = plans.find((candidate) => candidate.id === id);
     return option && !userHasProvider(option) ? [option] : [];
   });
-  const ruled = [...connected, ...signInOnly, ...popular].slice(0, PLAN_ROWS);
+  const owned = [...connected, ...notReady];
+  const ruled = [...owned, ...popular].slice(0, PLAN_ROWS);
   const keptRows = kept.flatMap((id) => plans.filter((option) => option.id === id));
   const listedPlans = [...keptRows, ...ruled.filter((option) => !kept.includes(option.id))];
   const listedIds = new Set(listedPlans.map((option) => option.id));
@@ -76,7 +77,7 @@ export function onboardingProviderRows(
   return {
     listed: includeFree ? [...listedPlans, ...free] : listedPlans,
     hidden: [
-      ...hidden.filter(userHasProvider),
+      ...owned.filter((option) => !listedIds.has(option.id)),
       ...hidden.filter((option) => !userHasProvider(option) && !option.freeModels),
       ...hidden.filter((option) => !userHasProvider(option) && option.freeModels),
       ...(includeFree ? [] : free),

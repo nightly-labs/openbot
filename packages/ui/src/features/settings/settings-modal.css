@@ -148,7 +148,9 @@
 
 .settings-page-path-current {
   min-width: 0;
+  margin: 0;
   overflow: hidden;
+  font: inherit;
   text-overflow: ellipsis;
 }
 
@@ -219,8 +221,8 @@
   gap: var(--openbot-space-6);
   overflow-y: auto;
   /*
-   * The inline padding stays a plain token so the panel text keeps the same left edge as the header
-   * title. A gutter subtracted from the padding only lines up when the platform draws a classic
+   * The inline padding stays a plain token so the panel text keeps the same left edge as the section
+   * title above the panel, when the window does not put that title in its top row. A gutter subtracted from the padding only lines up when the platform draws a classic
    * scrollbar; with overlay scrollbars it moved the whole panel inward.
    */
   padding: 0 var(--openbot-space-6) calc(var(--openbot-space-6) + var(--settings-modal-floating-space, 0px));

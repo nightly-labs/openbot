@@ -387,8 +387,8 @@ export const LazyProviderDownloadsWithFailure: Story = {
 };
 
 /**
- * The user signed in to every provider. The list still has three rows: ChatGPT, Claude and Gemini.
- * The other providers are in "More providers".
+ * The user signed in to every provider. The list still has three plan rows, ChatGPT, Claude and Gemini,
+ * and the free row. The other providers are in "More providers".
  */
 export const EveryProviderSignedIn: Story = {
   render: () => (

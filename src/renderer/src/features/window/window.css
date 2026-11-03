@@ -513,6 +513,16 @@
     -webkit-app-region: drag;
   }
 
+  .app-frame-edge[data-window-page-kind="settings"]
+    > .window-page
+    > .settings-page
+    > .settings-page-path-row
+    > .settings-page-path {
+    max-width: none;
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+
   /* The hidden chat header no longer moves the window, so the empty top row of the settings page does. */
   .app-frame-edge[data-window-page-kind="settings"] {
     -webkit-app-region: drag;
@@ -615,11 +625,19 @@
   grid-column: 2;
   grid-row: 1;
   align-items: center;
-  padding: var(--openbot-space-4) var(--openbot-space-6) 0;
+  padding: var(--openbot-space-4) 0 0;
 }
 
 .settings-page-path-row:empty {
   display: none;
+}
+
+/* Below the top row, the path takes the column and the inline padding of the panel, so both start on one edge. */
+.settings-page-path-row > .settings-page-path {
+  width: 100%;
+  max-width: 784px;
+  margin-inline: auto;
+  padding-inline: var(--openbot-space-8);
 }
 
 .settings-page-nav {
@@ -817,6 +835,10 @@
   .settings-page-path-row {
     grid-column: 1;
     grid-row: 2;
+  }
+
+  .settings-page-path-row > .settings-page-path {
+    padding-inline: var(--openbot-space-4);
   }
 
   .settings-page-content {

@@ -234,9 +234,10 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
               aria-describedby={descriptionId}
             >
               <div class="settings-modal-main">
+                {/* The heading names only the open page, as a Marketplace title does; the parent before it goes back. */}
                 <Portal mount={page().path}>
-                  <h2 id={titleId} class="settings-page-path">
-                    <Show when={props.crumb} fallback={<span class="settings-page-path-current">{props.title}</span>}>
+                  <div class="settings-page-path">
+                    <Show when={props.crumb}>
                       {(crumb) => (
                         <>
                           <Button
@@ -249,11 +250,13 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
                             {props.title}
                           </Button>
                           <ChevronRight class="settings-page-path-separator" aria-hidden="true" />
-                          <span class="settings-page-path-current">{crumb().title}</span>
                         </>
                       )}
                     </Show>
-                  </h2>
+                    <h2 id={titleId} class="settings-page-path-current">
+                      {props.crumb?.title ?? props.title}
+                    </h2>
+                  </div>
                 </Portal>
                 <p id={descriptionId} class="settings-page-description">
                   {props.description}
