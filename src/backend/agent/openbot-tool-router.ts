@@ -533,7 +533,10 @@ export class OpenBotToolRouter {
                 return openBotToolFailure(message);
               });
             const correctable =
-              PROFILE_TOOL_NAMES.has(tool) || CHANNEL_AGENT_TOOL_NAMES.has(tool) || tool === "attach_files_to_response";
+              PROFILE_TOOL_NAMES.has(tool) ||
+              CHANNEL_AGENT_TOOL_NAMES.has(tool) ||
+              tool === "list_channels" ||
+              tool === "attach_files_to_response";
             const response = this.#handleOpenBotTool(toolRequest.params).pipe(
               Effect.catch((failure) => (correctable ? correctableFailure(failure.cause) : Effect.fail(failure))),
               Effect.catchDefect((defect) => (correctable ? correctableFailure(defect) : Effect.die(defect))),

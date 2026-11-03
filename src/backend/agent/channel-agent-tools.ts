@@ -15,7 +15,7 @@ import type { DynamicToolCallParams } from "../protocol";
 import { loadAvatarFile } from "./avatar-file";
 import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
-import { toToolOperationFailed } from "./tool-operation";
+import { ToolOperationFailed, toToolOperationFailed } from "./tool-operation";
 
 /** The tools an agent creates and changes channels with from its own chat. */
 export const CHANNEL_AGENT_TOOL_NAMES: ReadonlySet<string> = new Set(["create_channel", "update_channel"]);
@@ -51,7 +51,8 @@ const ICON_TEXT = "The channel picture: an icon on a colour. It replaces an imag
 const IMAGE_TEXT =
   "The channel picture: a PNG, JPEG, or WebP file up to 512 KB, absolute or relative to your workspace.";
 
-export const listChannelsToolSchema = z.strictObject({
+// Not strict: list_channels took no arguments before, and a call with an extra key still lists.
+export const listChannelsToolSchema = z.object({
   archived: z.boolean().describe("true lists the archived channels instead of the open ones.").optional(),
 });
 
@@ -115,8 +116,8 @@ function requireMemberCount(count: number): void {
   if (count > INPUT_LIMITS.agents) throw new Error(`A channel has at most ${INPUT_LIMITS.agents} members.`);
 }
 
-function channelIcon(icon: { name: string; hue: number } | null | undefined): Pick<ChannelDraft, "icon"> {
-  return icon === undefined ? {} : { icon: icon === null ? null : { name: icon.name, hue: icon.hue } };
+function channelIcon(icon: ChannelDraft["icon"]): Pick<ChannelDraft, "icon"> {
+  return icon === undefined ? {} : { icon };
 }
 
 /** The draft of a new channel. The lead is the first member unless the call names one, as in the create dialog. */
@@ -217,7 +218,10 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   dependencies: ChannelAgentToolDependencies,
 ) {
   const { channels, listAgents } = dependencies;
-  const sender = listAgents().find((agent) => agent.id === senderAgentId);
+  // The drafts read the agents again at their turn in the queue. The sender and the member names
+  // of the result come from this one read.
+  const agents = listAgents();
+  const sender = agents.find((agent) => agent.id === senderAgentId);
   if (!sender) throw new Error("The calling agent no longer exists.");
   const operationId = toolCallIdempotencyKey(params);
   const picture = (path: string | null | undefined) =>
@@ -234,8 +238,19 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
     let channel = yield* channels.agentSave({ channelId, operationId, agentId: senderAgentId, create: true }, () =>
       createdChannelDraft(args, listAgents()),
     );
-    if (image) channel = yield* channels.setImage(channelId, image);
-    return openBotToolResult({ status: "created", channel: channelResult(channel, listAgents()) });
+    // The channel is already there: a failure says so, or the agent makes a second one with a new call.
+    if (image)
+      channel = yield* channels.setImage(channelId, image).pipe(
+        Effect.mapError(
+          () =>
+            new ToolOperationFailed({
+              cause: new Error(
+                `Channel ${channelId} was created, but its picture was not saved. To try again, call openbot.update_channel with that channelId and imagePath.`,
+              ),
+            }),
+        ),
+      );
+    return openBotToolResult({ status: "created", channel: channelResult(channel, agents) });
   }
 
   const args = updateChannelToolSchema.parse(params.arguments, { reportInput: true });
@@ -243,11 +258,16 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   const image = yield* picture(imagePath);
   if (!channels.store.exists(channelId)) throw new Error(UNKNOWN_CHANNEL);
   const actor = channels.agentActor(senderAgentId);
+  const changesDraft = Object.values(draftChange).some((value) => value !== undefined);
   // A restore comes before the other changes and an archive after them, so an archived channel
-  // takes the same changes as an open one and the archive stops the work they start.
-  if (archived === false && channels.store.get(channelId).archived)
+  // takes the same changes as an open one and the archive stops the work they start. The changes
+  // are checked first, so that a refused change does not leave the channel restored.
+  const stored = channels.store.get(channelId);
+  if (archived === false && stored.archived) {
+    if (changesDraft) updatedChannelDraft(stored, args, agents);
     yield* channels.command({ type: "restore", operationId: `${operationId}:restore`, channelId }, actor);
-  let channel = Object.values(draftChange).some((value) => value !== undefined)
+  }
+  let channel = changesDraft
     ? yield* channels.agentSave({ channelId, operationId, agentId: senderAgentId, create: false }, (stored) =>
         updatedChannelDraft(stored, args, listAgents()),
       )
@@ -257,7 +277,7 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   else if (image === null || (args.icon !== undefined && args.icon !== null)) channel = yield* removeImage(channel);
   if (archived === true && !channel.archived)
     channel = yield* channels.command({ type: "archive", operationId: `${operationId}:archive`, channelId }, actor);
-  return openBotToolResult({ status: "updated", channel: channelResult(channel, listAgents()) });
+  return openBotToolResult({ status: "updated", channel: channelResult(channel, agents) });
 });
 
 /** The response to a call from a channel task: there, only a person's request changes the channel. */

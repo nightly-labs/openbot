@@ -161,6 +161,8 @@ interface ChannelToolArgs {
   icon?: { name: string; hue: number };
   imagePath?: string;
   archived?: boolean;
+  /** A key that list_channels does not know. */
+  query?: string;
 }
 
 interface ToolLog {
@@ -432,6 +434,22 @@ try {
         .handoffTargets(true)
         .some((target) => target.id === channelId),
   );
+  const refusedRestore = await callFromChat("restore with a refused change", lead.id, "update_channel", {
+    channelId,
+    archived: false,
+    leadAgentId: hidden.id,
+  });
+  pass(
+    "A restore with a refused change leaves the channel archived",
+    !refusedRestore.success && refusedRestore.text.includes("leadAgentId") && channelOf(channelId).archived,
+    refusedRestore.text,
+  );
+  const extraKey = await callFromChat("list with an extra key", lead.id, "list_channels", { query: "release" });
+  pass(
+    "list_channels ignores a key it does not know",
+    extraKey.success && extraKey.text.includes('"channels"'),
+    extraKey.text,
+  );
   const restored = await callFromChat("restore", lead.id, "update_channel", {
     channelId,
     archived: false,
@@ -483,16 +501,18 @@ try {
     callId: "retry-call",
     namespace: "openbot",
     tool: "create_channel",
-    arguments: { name: "retry", memberAgentIds: [lead.id], icon: { name: "star", hue: 55 } },
+    arguments: { name: "retry", memberAgentIds: [lead.id, writer.id], icon: { name: "star", hue: 55 } },
   };
   const dependencies = { channels: channels(), listAgents: () => agents.listAgents() };
   const first = await runCauseEffect(handleChannelAgentTool(params, lead.id, dependencies));
   const count = channelCount();
+  // The user hides a member between the attempts: the retry still finds the first result.
+  await runCauseEffect(agents.setAgentHidden({ agentId: writer.id, hidden: true }));
   const second = await runCauseEffect(handleChannelAgentTool(params, lead.id, dependencies));
   const firstText = first.contentItems.map((item) => ("text" in item ? item.text : "")).join();
   const secondText = second.contentItems.map((item) => ("text" in item ? item.text : "")).join();
   pass(
-    "A repeated call makes one channel",
+    "A repeated call makes one channel, also after a member is hidden",
     first.success &&
       second.success &&
       channelCount() === count &&

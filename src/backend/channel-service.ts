@@ -317,8 +317,6 @@ export class ChannelService {
       sourcePaths: string[];
     },
   ) {
-    const senderName =
-      this.hooks.agents().find((agent) => agent.id === input.senderAgentId)?.name ?? input.senderAgentId;
     const command: ChannelHandoffCommand = {
       type: "handoff",
       operationId: input.operationId,
@@ -328,7 +326,7 @@ export class ChannelService {
       sourcePaths: input.sourcePaths,
       senderAgentId: input.senderAgentId,
     };
-    const actor = { id: channelHandoffAuthorId(input.senderAgentId), name: senderName };
+    const actor = this.agentActor(input.senderAgentId);
     return yield* this.#serialize(
       input.channelId,
       Effect.suspend(() => this.apply(command, actor)),
@@ -401,7 +399,23 @@ export class ChannelService {
           const stored = (yield* channelSync(() => this.store.exists(input.channelId)))
             ? yield* channelSync(() => this.store.get(input.channelId))
             : null;
-          const draft = yield* channelSync(() => draftOf(stored));
+          const actor = this.agentActor(input.agentId);
+          // A retried call that already committed gets its channel back. The draft is not checked
+          // again: an agent that the user hid after the first attempt must not turn it into a failure.
+          const done =
+            (yield* channelSync(() =>
+              this.store.database.commandResult(`channels:${actor.id}:${input.operationId}`),
+            )) !== undefined;
+          const draft: ChannelDraft =
+            done && stored
+              ? {
+                  name: stored.name,
+                  title: stored.title,
+                  instructions: stored.instructions,
+                  members: stored.members,
+                  leadAgentId: stored.leadAgentId,
+                }
+              : yield* channelSync(() => draftOf(stored));
           return yield* this.apply(
             {
               type: "save",
@@ -410,7 +424,7 @@ export class ChannelService {
               draft,
               ...(input.create ? {} : { update: true }),
             },
-            this.agentActor(input.agentId),
+            actor,
           );
         }),
       ),
