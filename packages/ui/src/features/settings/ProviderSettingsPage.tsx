@@ -523,7 +523,8 @@ function ProviderPage(props: PageProps) {
   const keyShown = () =>
     Boolean(props.onSignInProvider) &&
     (props.option.id === "opencode" || props.option.id === "muse" || row.apiKeyOffered());
-  const models = props.modelVisibility?.(props.option.id);
+  // The source can arrive after the page opens, such as when the host's capabilities load.
+  const models = createMemo(() => props.modelVisibility?.(props.option.id));
   return (
     <>
       <DetailHeader
@@ -544,7 +545,7 @@ function ProviderPage(props: PageProps) {
         <Show when={props.option.id === "claude" && props.promptCache}>
           {(cache) => <PromptCacheSection cache={cache()} disabled={props.disabled} menuMount={props.menuMount} />}
         </Show>
-        <Show when={models}>{(control) => <ModelsSection control={control()} />}</Show>
+        <Show when={models()}>{(control) => <ModelsSection control={control()} />}</Show>
       </Show>
       <UseSection {...props} row={row} />
       <DownloadSection {...props} row={row} />

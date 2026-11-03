@@ -276,6 +276,8 @@ interface ProviderPicker {
   byDefault: ReadonlySet<string>;
   /** The models that the picker shows in its main list: the default, with the admin's changes. */
   shown: ReadonlySet<string>;
+  /** The models that an admin turned off. The picker leaves them out, also after the default drops them. */
+  hidden: ReadonlySet<string>;
   /** The release date of each model that the catalog has, `YYYY-MM-DD`. */
   released: ReadonlyMap<string, string>;
 }
@@ -357,7 +359,7 @@ export class ModelVisibility {
     provider: AgentProviderRef,
   ) {
     const models = this.#options.listModels().filter((model) => model.provider === provider);
-    const { shown } = yield* this.#providerPicker(provider, models);
+    const { shown } = this.#providerPicker(provider, models, yield* this.#options.catalog.lookup());
     const overrides = this.#overrides.get(provider);
     const visibility: ProviderModelVisibility = {
       provider,
@@ -390,7 +392,7 @@ export class ModelVisibility {
             const hidden = [...(previous?.hidden ?? [])].filter((id) => !listedIds.has(id));
             for (const id of listedIds) {
               if (on.has(id) && !byDefault.has(id)) shown.push(id);
-              else if (!on.has(id) && byDefault.has(id)) hidden.push(id);
+              else if (!on.has(id) && (byDefault.has(id) || previous?.hidden.has(id))) hidden.push(id);
             }
             if (shown.length + hidden.length > 0)
               next.set(change.provider, { shown: new Set(shown), hidden: new Set(hidden) });
@@ -409,9 +411,14 @@ export class ModelVisibility {
     Model extends { provider: string; id: string; listing?: AgentModelListing },
   >(this: ModelVisibility, models: readonly Model[]) {
     const providers = new Map<string, Model[]>();
-    for (const model of models) providers.set(model.provider, [...(providers.get(model.provider) ?? []), model]);
+    for (const model of models) {
+      const listed = providers.get(model.provider);
+      if (listed) listed.push(model);
+      else providers.set(model.provider, [model]);
+    }
+    const lookup = yield* this.#options.catalog.lookup();
     const pickers = new Map<string, ProviderPicker>();
-    for (const [provider, listed] of providers) pickers.set(provider, yield* this.#providerPicker(provider, listed));
+    for (const [provider, listed] of providers) pickers.set(provider, this.#providerPicker(provider, listed, lookup));
     const inUse = modelsInUse(this.#options.listAgents());
     const now = yield* Clock.currentTimeMillis;
     // The provider lists give no `listing` of their own.
@@ -420,31 +427,27 @@ export class ModelVisibility {
       if (!picker) return [model];
       if (!picker.shown.has(model.id)) {
         if (inUse.has(modelKey(model.provider, model.id))) return [model];
-        return picker.byDefault.has(model.id) ? [] : [{ ...model, listing: "older" }];
+        return picker.byDefault.has(model.id) || picker.hidden.has(model.id) ? [] : [{ ...model, listing: "older" }];
       }
       const released = Date.parse(picker.released.get(model.id) ?? "");
       return now - released < NEW_MODEL_MS ? [{ ...model, listing: "new" }] : [model];
     });
   });
 
-  #providerPicker(provider: string, models: readonly { id: string }[]): Effect.Effect<ProviderPicker> {
+  #providerPicker(provider: string, models: readonly { id: string }[], lookup: ReleaseLookup): ProviderPicker {
     const overrides = this.#overrides.get(provider);
-    return this.#options.catalog.lookup().pipe(
-      Effect.map((lookup) => {
-        const byDefault = new Set(defaultShownModelIds(models, lookup));
-        const shown = new Set(
-          models
-            .map((model) => model.id)
-            .filter((id) => overrides?.shown.has(id) || (byDefault.has(id) && !overrides?.hidden.has(id))),
-        );
-        const released = new Map<string, string>();
-        for (const model of models) {
-          const date = matchCatalog(model.id, lookup).release?.date;
-          if (date) released.set(model.id, date);
-        }
-        return { byDefault, shown, released };
-      }),
+    const byDefault = new Set(defaultShownModelIds(models, lookup));
+    const shown = new Set(
+      models
+        .map((model) => model.id)
+        .filter((id) => overrides?.shown.has(id) || (byDefault.has(id) && !overrides?.hidden.has(id))),
     );
+    const released = new Map<string, string>();
+    for (const model of models) {
+      const date = matchCatalog(model.id, lookup).release?.date;
+      if (date) released.set(model.id, date);
+    }
+    return { byDefault, shown, hidden: overrides?.hidden ?? new Set(), released };
   }
 }
 

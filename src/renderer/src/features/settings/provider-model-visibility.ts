@@ -41,16 +41,19 @@ export function createProviderModelVisibility(
     });
     /** Bumped for each server, so an answer for an earlier one is dropped. */
     let generation = 0;
+    /** Bumped for each change, so a read that started before it cannot show the list from before it. */
+    let reads = 0;
     let saving = false;
     /** The next list to send; `shown: null` resets the provider. */
     let queued: { shown: AgentModelId[] | null } | null = null;
 
     function load(serverId: string, request: number): void {
+      const read = ++reads;
       untrack(calls)
         .getModelVisibility(provider, serverId)
         .then(
           (next) => {
-            if (request === generation && !saving)
+            if (request === generation && read === reads && !saving)
               setState((draft) => {
                 draft.list = next;
               });
@@ -135,6 +138,7 @@ export function createProviderModelVisibility(
           draft.error = null;
         });
         queued = { shown: [...shown] };
+        reads++;
         if (!saving) void flush(serverId, generation);
       },
       onReset: () => {
@@ -145,6 +149,7 @@ export function createProviderModelVisibility(
           draft.error = null;
         });
         queued = { shown: null };
+        reads++;
         if (!saving) void flush(serverId, generation);
       },
     };

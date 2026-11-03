@@ -335,24 +335,27 @@ export function agentIpcHandlers({
           // optional: when a route fails, the picker gets the models with no Fast switch or listing.
           return runCauseEffect(
             Effect.gen(function* () {
-              const options = yield* models;
               const fast = remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY)
-                ? yield* remoteServers
+                ? remoteServers
                     .request(serverId, AGENT_FAST_MODE_ROUTES.models, decodeAgentFastModels, {
                       method: "POST",
                       body: {},
                     })
                     .pipe(Effect.orElseSucceed(() => []))
-                : [];
+                : Effect.succeed([]);
               const listings = remoteServers.supportsCapability(serverId, MODEL_VISIBILITY_CAPABILITY)
-                ? yield* remoteServers
+                ? remoteServers
                     .request(serverId, MODEL_VISIBILITY_ROUTES.listing, decodeAgentModelListings, {
                       method: "POST",
                       body: {},
                     })
                     .pipe(Effect.orElseSucceed(() => []))
-                : [];
-              return withModelListings(withFastServiceTiers(options, fast), listings);
+                : Effect.succeed([]);
+              // The three requests go to the same host at the same time.
+              const [options, fastModels, listed] = yield* Effect.all([models, fast, listings], {
+                concurrency: "unbounded",
+              });
+              return withModelListings(withFastServiceTiers(options, fastModels), listed);
             }),
           );
         },

@@ -378,8 +378,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     },
   );
 
-  /** An effort chosen on a tab that does not hold the agent's model. The next model picked there gets it. */
-  const [queuedEffort, setQueuedEffort] = createSignal<{ key: RailKey; effort: AgentReasoningEffort }>();
+  /**
+   * An effort chosen on a tab that does not hold the agent's model. The next model picked there gets it.
+   * `variant` is the suffix of an OpenCode variant id (`<model>/<variant>`); "" is the model's default.
+   */
+  const [queuedEffort, setQueuedEffort] = createSignal<
+    { key: RailKey; effort: AgentReasoningEffort } | { key: RailKey; variant: string }
+  >();
 
   function setPickerOpen(next: boolean): void {
     if (props.disabled) return;
@@ -398,14 +403,23 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     if (!showsReasoningEffort() && !option.variants.length) setOpen(false);
     const queued = queuedEffort();
     setQueuedEffort(undefined);
-    const effort =
-      queued?.key === key &&
-      props.modelOptions
-        .find((model) => model.provider === option.provider && model.id === option.id)
-        ?.supportedReasoningEfforts.includes(queued.effort)
-        ? queued.effort
-        : undefined;
-    props.onChange(option.id, option.provider, chosenAccount(option.provider, accountId), effort);
+    const account = chosenAccount(option.provider, accountId);
+    if (queued?.key !== key) {
+      props.onChange(option.id, option.provider, account);
+      return;
+    }
+    if ("variant" in queued) {
+      const variantId = queued.variant ? `${option.id}/${queued.variant}` : option.id;
+      const variant = option.variants.find((variant) => variant.id === variantId);
+      props.onChange(variant?.id ?? option.id, option.provider, account);
+      return;
+    }
+    const effort = props.modelOptions
+      .find((model) => model.provider === option.provider && model.id === option.id)
+      ?.supportedReasoningEfforts.includes(queued.effort)
+      ? queued.effort
+      : undefined;
+    props.onChange(option.id, option.provider, account, effort);
   }
 
   function selectRailProvider(provider: RailKey): void {
@@ -812,10 +826,15 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     : [];
                 });
                 const effortValue = () => {
-                  if (effortModel()?.variants.length) return ownsSelection() ? props.value : undefined;
-                  if (ownsSelection()) return props.reasoningEffort;
+                  const model = effortModel();
                   const queued = queuedEffort();
-                  if (queued?.key === key) return queued.effort;
+                  if (model?.variants.length) {
+                    if (ownsSelection()) return props.value;
+                    if (queued?.key !== key || !("variant" in queued)) return model.id;
+                    return queued.variant ? `${model.id}/${queued.variant}` : model.id;
+                  }
+                  if (ownsSelection()) return props.reasoningEffort;
+                  if (queued?.key === key && "effort" in queued) return queued.effort;
                   // A model change keeps the agent's effort when the new model has it.
                   const option = effortOption();
                   const current = props.reasoningEffort;
@@ -827,7 +846,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   if (props.disabled || effortLocked() || id === effortValue()) return;
                   const model = effortModel();
                   if (model?.variants.length) {
-                    props.onChange(id, model.provider, chosenAccount(model.provider, accountId()));
+                    if (ownsSelection()) props.onChange(id, model.provider, chosenAccount(model.provider, accountId()));
+                    else setQueuedEffort({ key, variant: id === model.id ? "" : id.slice(model.id.length + 1) });
                     return;
                   }
                   const effort = effortOption()?.supportedReasoningEfforts.find((effort) => effort === id);
