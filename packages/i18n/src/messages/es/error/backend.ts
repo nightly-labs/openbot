@@ -57,6 +57,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine no llegó a estar listo.",
   "error.backend.sunshineNotReadyReason": "Sunshine no llegó a estar listo. {reason}",
   "error.backend.channelLeadModelUnavailable": "El modelo del coordinador del canal no está disponible.",
+  "error.backend.contextCompactionIneffective":
+    "La compactación no reduce este chat: tras dos compactaciones aún usa el {percent}% de la ventana de contexto del modelo, así que OpenBot deja de compactarlo. Las herramientas y las instrucciones usan la mayor parte de la ventana. Desactiva los servidores MCP o el uso del ordenador que este agente no necesita, o elige un modelo con una ventana mayor. Después, inicia un chat nuevo.",
+  "error.backend.providerRetrying":
+    "El proveedor falló esta solicitud {attempts} veces y lo vuelve a intentar. Si el agente no continúa, detén el turno.",
+  "error.backend.providerRetryingLargeContext":
+    "El proveedor falló esta solicitud {attempts} veces y lo vuelve a intentar. Este chat usa el {percent}% de la ventana de contexto del modelo. Si el agente no continúa, detén el turno: OpenBot compactará el chat antes del siguiente mensaje.",
   "error.backend.sharedDataUnavailable": "Los datos compartidos no están disponibles.",
   "error.backend.shuttingDown": "OpenBot se está cerrando.",
   "error.backend.channelUnconfirmedStart":
@@ -110,7 +116,6 @@ export const messages = {
   "error.backend.agentMemoryLimitExceeded":
     "Tienes {saved} recuerdos y el límite es {limit}. El usuario fijó el límite por debajo del número de recuerdos guardados. No olvides recuerdos para hacer sitio. Dile al usuario que este recuerdo no se guardó.",
   "error.backend.channelHistoryLeadRequired": "Elige un coordinador de canal para preparar el historial compartido.",
-  "error.backend.channelHistoryArriving": "Aún se está recibiendo un mensaje compartido. Reanuda cuando esté completo.",
   "error.backend.channelHistoryInvalid": "El resumen del historial no es válido. Reanuda para intentarlo de nuevo.",
   "error.backend.channelContextTooLong":
     "Esta asignación supera el límite de contexto compartido. Envía una solicitud más corta o vuelve a asignarla.",

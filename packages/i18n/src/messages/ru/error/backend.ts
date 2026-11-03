@@ -55,6 +55,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine не стал готов.",
   "error.backend.sunshineNotReadyReason": "Sunshine не стал готов. {reason}",
   "error.backend.channelLeadModelUnavailable": "Модель ведущего канала недоступна.",
+  "error.backend.contextCompactionIneffective":
+    "Сжатие не уменьшает этот чат: после двух сжатий он всё ещё занимает {percent}% окна контекста модели, поэтому OpenBot перестаёт его сжимать. Большую часть окна занимают инструменты и инструкции. Отключите MCP-серверы или управление компьютером, которые не нужны этому агенту, или выберите модель с большим окном. Затем начните новый чат.",
+  "error.backend.providerRetrying":
+    "Провайдер не выполнил этот запрос {attempts} раза и пробует снова. Если агент не продолжит, остановите ход.",
+  "error.backend.providerRetryingLargeContext":
+    "Провайдер не выполнил этот запрос {attempts} раза и пробует снова. Этот чат занимает {percent}% окна контекста модели. Если агент не продолжит, остановите ход: тогда OpenBot сожмёт чат перед следующим сообщением.",
   "error.backend.sharedDataUnavailable": "Общие данные недоступны.",
   "error.backend.shuttingDown": "OpenBot завершает работу.",
   "error.backend.channelUnconfirmedStart":
@@ -106,7 +112,6 @@ export const messages = {
   "error.backend.agentMemoryLimitExceeded":
     "У вас {saved} записей памяти, а лимит — {limit}. Пользователь установил лимит ниже числа сохранённых записей. Не забывайте записи, чтобы освободить место. Сообщите пользователю, что эта запись не сохранена.",
   "error.backend.channelHistoryLeadRequired": "Выберите ведущего канала, чтобы подготовить общую историю.",
-  "error.backend.channelHistoryArriving": "Общее сообщение ещё приходит. Продолжите, когда оно придёт полностью.",
   "error.backend.channelHistoryInvalid": "Сводка истории некорректна. Продолжите, чтобы повторить попытку.",
   "error.backend.channelContextTooLong":
     "Это назначение превышает лимит общего контекста. Отправьте запрос короче или назначьте его заново.",

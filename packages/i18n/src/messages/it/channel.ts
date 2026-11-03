@@ -17,6 +17,9 @@ export const messages = {
   "channel.panel.close": "Chiudi il pannello del canale",
   "channel.settings.title": "Impostazioni del canale",
   "channel.settings.memories": "Memorie",
+  "channel.settings.isolated": "Tieni le memorie in questo canale",
+  "channel.settings.isolatedDescription":
+    "Gli agenti salvano ciò che imparano qui come memorie del canale. Le loro altre chat non le vedono.",
   "channel.settings.memoryCount": { one: "{count} salvata", other: "{count} salvate" },
   "channel.settings.routines": "Routine",
   "channel.settings.routineCount": { one: "{count} configurata", other: "{count} configurate" },

@@ -53,6 +53,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine 未能就绪。",
   "error.backend.sunshineNotReadyReason": "Sunshine 未能就绪。{reason}",
   "error.backend.channelLeadModelUnavailable": "频道主责模型不可用。",
+  "error.backend.contextCompactionIneffective":
+    "压缩无法缩小这个聊天：压缩两次后，它仍占用模型上下文窗口的 {percent}%，所以 OpenBot 停止自动压缩。窗口的大部分被工具和指令占用。请关闭这个智能体不需要的 MCP 服务器或电脑操作，或选择窗口更大的模型。然后开始新的聊天。",
+  "error.backend.providerRetrying":
+    "提供方已 {attempts} 次未能完成这个请求，正在重试。如果智能体没有继续，请停止本轮。",
+  "error.backend.providerRetryingLargeContext":
+    "提供方已 {attempts} 次未能完成这个请求，正在重试。这个聊天占用模型上下文窗口的 {percent}%。如果智能体没有继续，请停止本轮：OpenBot 会在下一条消息前压缩聊天。",
   "error.backend.sharedDataUnavailable": "共享数据不可用。",
   "error.backend.shuttingDown": "OpenBot 正在关闭。",
   "error.backend.channelUnconfirmedStart": "该频道有一项未确认的派活启动，请在删除前确认其结果。",
@@ -99,7 +105,6 @@ export const messages = {
   "error.backend.agentMemoryLimitExceeded":
     "你已保存 {saved} 条记忆，上限为 {limit} 条。用户把上限设在了已保存数量以下。不要为了腾空间而忘掉记忆，请告诉用户这条记忆未被保存。",
   "error.backend.channelHistoryLeadRequired": "请选择一个频道主责来整理共享历史。",
-  "error.backend.channelHistoryArriving": "仍有一条共享消息在传输中，请等它完整后再继续。",
   "error.backend.channelHistoryInvalid": "历史摘要无效，请继续以重试。",
   "error.backend.channelContextTooLong": "该派活超出共享上下文限制。请发送更短的请求或重新派活。",
   "error.backend.draftAttachmentLimit": "草稿附件最多保留 {limit} 个。",

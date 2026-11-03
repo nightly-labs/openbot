@@ -25,13 +25,16 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { type ChannelOperationError, channelFailure, channelResult, channelSync } from "./channel-effects";
 import {
   assignmentText,
+  boundedHistoryPage,
   ChannelHistory,
   type ChannelTextModel,
   type DeliveredChannelContext,
+  historyMessagePart,
   isMemberThinking,
   sameRequest,
 } from "./channel-history";
@@ -51,6 +54,8 @@ import { type ChannelAssignment, type ChannelContext, ChannelStore } from "./cha
 import type { DeliveryContext, MailboxStore } from "./mailbox-store";
 import type { OpenBotDatabase } from "./openbot-database";
 import { extractJsonObject, StructuredOutputError } from "./structured-output";
+
+const logger = createOpenBotLogger("channel-service");
 
 export interface ChannelHooks {
   agents(): AgentSummary[];
@@ -164,6 +169,11 @@ export class ChannelService {
   readonly #commandFibers = new Set<Fiber.Fiber<Channel | void, ChannelOperationError>>();
   readonly #interrupts = new Set<Fiber.Fiber<void>>();
   readonly #events = new Set<Fiber.Fiber<void>>();
+  /**
+   * The summary that runs after a turn of each channel ends. Not awaited by `stop`: closing the
+   * scope interrupts it, and the next packet summarizes what it did not save.
+   */
+  readonly #summaries = new Map<string, Fiber.Fiber<void>>();
   #stopped = false;
   readonly #wakeAgain = new Set<string>();
   /**
@@ -190,12 +200,15 @@ export class ChannelService {
   /** By delivery: the packet with only unread messages, and the provider session that read the rest. */
   readonly #deltas = new Map<string, { sessionId: string; text: string }>();
   /**
-   * The cursors that this process accepted, by channel, agent and session. A cursor from an earlier
-   * run is not used: an earlier version did not reset it at a compaction.
+   * The cursors that this process accepted, by channel, agent and session, with the channel facts
+   * that the session got. A cursor from an earlier run is not used: an earlier version did not reset
+   * it at a compaction.
    */
-  readonly #acceptedContexts = new Set<string>();
+  readonly #acceptedContexts = new Map<string, string>();
   /** By delivery: the count of in-place message changes when its packet was built. */
   readonly #preparedChanges = new Map<string, number>();
+  /** By delivery: the channel facts in its packet. */
+  readonly #preparedFacts = new Map<string, string>();
 
   constructor(
     database: OpenBotDatabase,
@@ -1127,7 +1140,15 @@ export class ChannelService {
           if (prompt.length > ROUTING_PROMPT_CHARACTERS)
             throw new ChannelRoutingError(sourceText("error.backend.channelRoutingTooLong"));
           const response = channelResult(
-            yield* Effect.result(this.hooks.generate(lead, prompt).pipe(Effect.mapError(channelFailure))),
+            yield* Effect.result(
+              this.hooks
+                .generate(
+                  lead,
+                  prompt,
+                  agents.filter((agent) => agent.id !== lead.id),
+                )
+                .pipe(Effect.mapError(channelFailure)),
+            ),
           );
           if (this.#deletedChannels.has(channelId)) return;
           if (this.routingState(channelId) !== revision) {
@@ -1614,6 +1635,7 @@ export class ChannelService {
     return Effect.gen({ self: this }, function* () {
       this.#deltas.delete(deliveryId);
       this.#preparedChanges.delete(deliveryId);
+      this.#preparedFacts.delete(deliveryId);
       const assignment = yield* channelSync(() => this.store.assignmentForDelivery(deliveryId));
       if (!assignment || !activeAssignment(assignment)) return;
       const task = (yield* channelSync(() => this.store.tasks(assignment.channelId))).find(
@@ -1937,6 +1959,7 @@ export class ChannelService {
     const context = yield* channelSync(() => this.store.context(channel.id, agent.id));
     this.#preparedChanges.set(delivery.delivery.id, this.store.completedMessageChanges(channel.id));
     const delivered = this.#deliveredContext(channel.id, context, agent);
+    yield* this.#awaitSummary(channel.id);
     const history = yield* this.#history.prepare(
       task,
       agent,
@@ -1948,6 +1971,7 @@ export class ChannelService {
     if (delivered && history.delta !== null)
       this.#deltas.set(delivery.delivery.id, { sessionId: delivered.sessionId, text: history.delta });
     else this.#deltas.delete(delivery.delivery.id);
+    this.#preparedFacts.set(delivery.delivery.id, history.channelFacts);
     const current = (yield* channelSync(() => this.store.tasks(channel.id))).find((item) => item.id === task.id);
     if (
       !current ||
@@ -1984,7 +2008,11 @@ export class ChannelService {
       return null;
     const session = this.store.database.activeProviderSession(context.threadId, agent.provider);
     return session?.externalSessionId === context.sessionId
-      ? { sessionId: context.sessionId, throughSequence: context.throughSequence }
+      ? {
+          sessionId: context.sessionId,
+          throughSequence: context.throughSequence,
+          channelFacts: this.#acceptedContexts.get(JSON.stringify([channelId, agent.id, context.sessionId])) ?? null,
+        }
       : null;
   }
 
@@ -1994,9 +2022,10 @@ export class ChannelService {
     sessionId: string,
     throughSequence: number,
     summaryVersion: number,
+    channelFacts: string,
   ): void {
     this.store.acceptContext(channelId, agentId, sessionId, throughSequence, summaryVersion);
-    this.#acceptedContexts.add(JSON.stringify([channelId, agentId, sessionId]));
+    this.#acceptedContexts.set(JSON.stringify([channelId, agentId, sessionId]), channelFacts);
   }
 
   /** The packet of a delivery with only the unread messages, and the session that read the others. */
@@ -2038,6 +2067,8 @@ export class ChannelService {
       // The cursor goes to zero, and the next packet is complete.
       const prepared = this.#preparedChanges.get(deliveryId);
       this.#preparedChanges.delete(deliveryId);
+      const facts = this.#preparedFacts.get(deliveryId);
+      this.#preparedFacts.delete(deliveryId);
       const cursor =
         prepared === undefined || prepared === this.store.completedMessageChanges(assignment.channelId)
           ? { throughSequence: assignment.throughSequence, summaryVersion: assignment.summaryVersion }
@@ -2054,6 +2085,8 @@ export class ChannelService {
             sessionId,
             cursor.throughSequence,
             cursor.summaryVersion,
+            // Unknown facts never match, so the next delta gives them again.
+            facts ?? "",
           ),
         );
       }
@@ -2103,6 +2136,7 @@ export class ChannelService {
         return false;
       }
       this.#dispatchEvent(this.complete(channelId, event.turnId, event.status));
+      this.#summarizeAhead(channelId);
       return true;
     }
     if (event.type === "turn-started") {
@@ -2131,6 +2165,52 @@ export class ChannelService {
       for (const channelId of waiting) this.#dispatchEvent(this.wake(channelId));
     }
     return false;
+  }
+
+  /**
+   * Summarizes a long channel after a turn ends. The summary used to run when the next assignment
+   * started, so that member waited for the lead's model before its own turn (#3957).
+   */
+  #summarizeAhead(channelId: string): void {
+    if (this.#stopped || this.#summaries.has(channelId) || this.#deletedChannels.has(channelId)) return;
+    const channel = this.store.exists(channelId) ? this.store.get(channelId) : null;
+    const lead = channel ? this.hooks.agents().find((agent) => agent.id === channel.leadAgentId) : undefined;
+    if (!channel || channel.archived || !lead || this.hooks.hidden?.(lead.id)) return;
+    const fallbacks = this.hooks
+      .agents()
+      .filter(
+        (agent) =>
+          agent.id !== lead.id &&
+          channel.members.some((member) => member.agentId === agent.id) &&
+          !this.hooks.hidden?.(agent.id),
+      );
+    const fiber = Effect.runSync(
+      Effect.forkIn(
+        this.#history.summarizeAhead(channelId, lead, fallbacks).pipe(
+          // The next packet summarizes again and reports its own failure.
+          Effect.catch((failure) =>
+            Effect.sync(() =>
+              logger.warn("A channel summary after a turn failed.", {
+                channelId,
+                reason: failure.cause instanceof Error ? failure.cause.message : String(failure.cause),
+              }),
+            ),
+          ),
+        ),
+        this.#scope,
+        { startImmediately: true },
+      ),
+    );
+    this.#summaries.set(channelId, fiber);
+    fiber.addObserver(() => {
+      if (this.#summaries.get(channelId) === fiber) this.#summaries.delete(channelId);
+    });
+  }
+
+  /** Waits for the summary that runs after a turn, so a packet does not ask the model for it twice. */
+  #awaitSummary(channelId: string): Effect.Effect<void> {
+    const fiber = this.#summaries.get(channelId);
+    return fiber ? Fiber.await(fiber).pipe(Effect.asVoid) : Effect.void;
   }
 
   /** Native event callbacks and synchronous hooks own this work; stop drains it before closing the scope. */
@@ -2458,6 +2538,15 @@ export class ChannelService {
         if (!attachment) return yield* channelFailure(new Error("The attachment is unavailable."));
         return attachment;
       }
+      if (isString(args.messageId)) {
+        const messageId = args.messageId;
+        const message = yield* channelSync(() => this.store.message(channelId, messageId));
+        if (!message || isMemberThinking(message))
+          return yield* channelFailure(new Error("Message not found in this channel."));
+        const offset =
+          typeof args.offset === "number" && Number.isSafeInteger(args.offset) && args.offset >= 0 ? args.offset : 0;
+        return historyMessagePart(message, offset);
+      }
       const page = yield* channelSync(() =>
         this.store.page(
           channelId,
@@ -2469,7 +2558,10 @@ export class ChannelService {
         ),
       );
       // The cursors still count every row, so the next page starts where this one ended.
-      return { ...page, messages: page.messages.filter((message) => !isMemberThinking(message)) };
+      return boundedHistoryPage({
+        ...page,
+        messages: page.messages.filter((message) => !isMemberThinking(message)),
+      });
     }
     const operationId = `tool:${turnId}:${callId}`;
     if ((yield* channelSync(() => this.store.database.commandResult(`channels:${operationId}`))) !== undefined)
@@ -2657,6 +2749,7 @@ export class ChannelService {
     const prepared = this.store.completedMessageChanges(channelId);
     const tasks = yield* channelSync(() => this.store.tasks(channelId));
     let history: Effect.Success<ReturnType<ChannelHistory["prepare"]>>;
+    yield* this.#awaitSummary(channelId);
     try {
       history = channelResult(
         yield* Effect.result(
@@ -2748,6 +2841,7 @@ export class ChannelService {
             session.externalSessionId,
             cursor.throughSequence,
             cursor.summaryVersion,
+            history.channelFacts,
           ),
         );
     }

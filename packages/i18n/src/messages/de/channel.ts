@@ -17,6 +17,9 @@ export const messages = {
   "channel.panel.close": "Kanalbereich schließen",
   "channel.settings.title": "Kanaleinstellungen",
   "channel.settings.memories": "Erinnerungen",
+  "channel.settings.isolated": "Erinnerungen in diesem Kanal behalten",
+  "channel.settings.isolatedDescription":
+    "Agenten speichern, was sie hier lernen, als Kanalerinnerungen. Ihre anderen Chats sehen sie nicht.",
   "channel.settings.memoryCount": {
     one: "{count} gespeichert",
     other: "{count} gespeichert",

@@ -30,6 +30,12 @@ export interface ChannelDraft {
   instructions: string;
   members: ChannelMember[];
   leadAgentId: string | null;
+  /**
+   * An isolated channel keeps what its members learn in it: `openbot.remember` saves a channel
+   * memory there, not a memory of the agent (#4332). Absent is off. A save without it keeps the
+   * stored value, so a client from before it does not turn it off.
+   */
+  isolated?: boolean;
 }
 
 export interface Channel extends ChannelDraft {
@@ -185,6 +191,7 @@ export function isChannelDraft(value: unknown): value is ChannelDraft {
     value.name.trim().length > 0 &&
     isBoundedString(value.title, INPUT_LIMITS.agentTitle) &&
     isBoundedString(value.instructions, INPUT_LIMITS.agentDescription) &&
+    (value.isolated === undefined || typeof value.isolated === "boolean") &&
     Array.isArray(value.members) &&
     value.members.length <= INPUT_LIMITS.agents &&
     value.members.every(isChannelMember) &&

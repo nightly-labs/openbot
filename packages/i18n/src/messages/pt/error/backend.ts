@@ -61,6 +61,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "O Sunshine não ficou pronto.",
   "error.backend.sunshineNotReadyReason": "O Sunshine não ficou pronto. {reason}",
   "error.backend.channelLeadModelUnavailable": "O modelo do líder do canal está indisponível.",
+  "error.backend.contextCompactionIneffective":
+    "A compactação não reduz este chat: após duas compactações, ele ainda usa {percent}% da janela de contexto do modelo, por isso o OpenBot para de compactá-lo. Ferramentas e instruções usam a maior parte da janela. Desative os servidores MCP ou o uso do computador de que este agente não precisa, ou escolha um modelo com uma janela maior. Depois, inicie um novo chat.",
+  "error.backend.providerRetrying":
+    "O provedor falhou nesta solicitação {attempts} vezes e tenta novamente. Se o agente não continuar, pare o turno.",
+  "error.backend.providerRetryingLargeContext":
+    "O provedor falhou nesta solicitação {attempts} vezes e tenta novamente. Este chat usa {percent}% da janela de contexto do modelo. Se o agente não continuar, pare o turno: o OpenBot compacta o chat antes da próxima mensagem.",
   "error.backend.sharedDataUnavailable": "Os dados compartilhados estão indisponíveis.",
   "error.backend.shuttingDown": "O OpenBot está encerrando.",
   "error.backend.channelUnconfirmedStart":
@@ -113,8 +119,6 @@ export const messages = {
   "error.backend.agentMemoryLimitExceeded":
     "Você tem {saved} memórias, e o limite é {limit}. O usuário definiu o limite abaixo do número de memórias salvas. Não esqueça memórias para abrir espaço. Diga ao usuário que esta memória não foi salva.",
   "error.backend.channelHistoryLeadRequired": "Escolha um líder de canal para preparar o histórico compartilhado.",
-  "error.backend.channelHistoryArriving":
-    "Uma mensagem compartilhada ainda está chegando. Retome quando ela estiver completa.",
   "error.backend.channelHistoryInvalid": "O resumo do histórico é inválido. Retome para tentar novamente.",
   "error.backend.channelContextTooLong":
     "Esta tarefa atribuída excede o limite de contexto compartilhado. Envie uma solicitação mais curta ou atribua a tarefa novamente.",

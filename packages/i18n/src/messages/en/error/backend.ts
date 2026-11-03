@@ -55,6 +55,12 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sunshineNotReady": "Sunshine did not become ready.",
   "error.backend.sunshineNotReadyReason": "Sunshine did not become ready. {reason}",
   "error.backend.channelLeadModelUnavailable": "The channel lead model is unavailable.",
+  "error.backend.contextCompactionIneffective":
+    "Compaction does not make this chat smaller: after two compactions it still uses {percent}% of the model's context window, so OpenBot stops compacting it. Tools and instructions use most of the window. Turn off the MCP servers or computer use that this agent does not need, or select a model with a larger window. Then start a new chat.",
+  "error.backend.providerRetrying":
+    "The provider failed this request {attempts} times and tries again. If the agent does not continue, stop the turn.",
+  "error.backend.providerRetryingLargeContext":
+    "The provider failed this request {attempts} times and tries again. This chat uses {percent}% of the model's context window. If the agent does not continue, stop the turn: OpenBot then compacts the chat before the next message.",
   "error.backend.sharedDataUnavailable": "Shared data is unavailable.",
   "error.backend.shuttingDown": "OpenBot is shutting down.",
   "error.backend.channelUnconfirmedStart":
@@ -104,7 +110,6 @@ export const messages = defineMessages("error.backend", {
   "error.backend.agentMemoryLimitExceeded":
     "You have {saved} memories, and the limit is {limit}. The user set the limit below the number of saved memories. Do not forget memories to make room. Tell the user that this memory was not saved.",
   "error.backend.channelHistoryLeadRequired": "Choose a channel lead to prepare the shared history.",
-  "error.backend.channelHistoryArriving": "A shared message is still arriving. Resume when it is complete.",
   "error.backend.channelHistoryInvalid": "The history summary is invalid. Resume to try again.",
   "error.backend.channelContextTooLong":
     "This assignment exceeds the shared context limit. Send a shorter request or reassign it.",

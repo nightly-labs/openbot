@@ -1003,6 +1003,34 @@ export class OpenBotToolRouter {
     );
     if (flowResult) return flowResult;
 
+    // An isolated channel keeps what its members learn in it (#4332). The fact becomes a channel
+    // memory, which only the packets of this channel show, so the agent's own chats do not get it.
+    // Its other memory tools still change its own memories, which reach every chat.
+    if (params.tool === "remember" && channelId && this.#channels.store.get(channelId).isolated) {
+      const args = isRecord(params.arguments) ? params.arguments : {};
+      if (args.memoryId !== undefined)
+        return openBotToolFailure(
+          "This channel is isolated, so a memory from it cannot change your own memories. Save the corrected fact without memoryId: it becomes a channel memory.",
+        );
+      const result = yield* this.#channels.tool(
+        channelId,
+        senderAgentId,
+        params.turnId,
+        params.callId,
+        "channel_remember",
+        { text: args.text },
+      );
+      return openBotToolResult(
+        isRecord(result) && result.accepted === true
+          ? {
+              status: "saved",
+              savedAs: "channel memory",
+              note: "This channel is isolated: the members of this channel see the memory here, and your other chats do not.",
+            }
+          : result,
+      );
+    }
+
     const memoryResult = this.#memories.handleTool(params, senderAgentId, this.#hooks.redactMcp);
     if (memoryResult) return memoryResult;
 

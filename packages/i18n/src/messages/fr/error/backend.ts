@@ -58,6 +58,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine n’est pas devenu prêt.",
   "error.backend.sunshineNotReadyReason": "Sunshine n’est pas devenu prêt. {reason}",
   "error.backend.channelLeadModelUnavailable": "Le modèle du responsable du canal est indisponible.",
+  "error.backend.contextCompactionIneffective":
+    "La compaction ne réduit pas ce chat : après deux compactions, il utilise encore {percent} % de la fenêtre de contexte du modèle, donc OpenBot arrête de le compacter. Les outils et les instructions occupent la plus grande partie de la fenêtre. Désactive les serveurs MCP ou le contrôle de l'ordinateur dont cet agent n'a pas besoin, ou choisis un modèle avec une fenêtre plus grande. Puis démarre un nouveau chat.",
+  "error.backend.providerRetrying":
+    "Le fournisseur a échoué {attempts} fois sur cette requête et réessaie. Si l'agent ne continue pas, arrête le tour.",
+  "error.backend.providerRetryingLargeContext":
+    "Le fournisseur a échoué {attempts} fois sur cette requête et réessaie. Ce chat utilise {percent} % de la fenêtre de contexte du modèle. Si l'agent ne continue pas, arrête le tour : OpenBot compactera alors le chat avant le prochain message.",
   "error.backend.sharedDataUnavailable": "Les données partagées sont indisponibles.",
   "error.backend.shuttingDown": "OpenBot est en cours d’arrêt.",
   "error.backend.channelUnconfirmedStart":
@@ -113,8 +119,6 @@ export const messages = {
   "error.backend.agentMemoryLimitExceeded":
     "Vous avez {saved} souvenirs, et la limite est de {limit}. L’utilisateur a fixé la limite sous le nombre de souvenirs enregistrés. N’oubliez aucun souvenir pour faire de la place. Dites à l’utilisateur que ce souvenir n’a pas été enregistré.",
   "error.backend.channelHistoryLeadRequired": "Choisissez un responsable de canal pour préparer l’historique partagé.",
-  "error.backend.channelHistoryArriving":
-    "Un message partagé est encore en cours de réception. Reprenez quand il sera complet.",
   "error.backend.channelHistoryInvalid": "Le résumé de l’historique n’est pas valide. Reprenez pour réessayer.",
   "error.backend.channelContextTooLong":
     "Cette tâche dépasse la limite du contexte partagé. Envoyez une demande plus courte ou réattribuez-la.",

@@ -80,6 +80,8 @@ export function createMockChannels(
       let channel =
         input.type === "save"
           ? {
+              // A draft without `isolated` keeps the stored value, as the service does.
+              ...(channels.get(input.channelId)?.isolated ? { isolated: true } : {}),
               ...input.draft,
               id: input.channelId,
               revision: channels.get(input.channelId)?.revision ?? 0,
