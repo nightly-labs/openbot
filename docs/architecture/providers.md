@@ -771,7 +771,9 @@ The reader accepts only an `https` address. The rolling 5-hour window (the short
 `usages.limit_7d`) the secondary one. No sign-in, a 401, 403 or 404, or an answer with no quota
 gives no reading. The token lasts 15 minutes, and the CLI refreshes it only during a turn, so an
 expired token fails the read and the dock keeps the last reading. An account with no Kimi Code plan
-has no reading, so a Kimi limit failure stays a turn error.
+has no reading, so a Kimi limit failure stays a turn error. The dock poll calls `readKimiUsage`
+directly, with the CLI that the last Kimi client ran on, so it does not start or wake the CLI for a
+reading. Before a Kimi client runs, the poll has no reading.
 
 No frozen Team API protocol knows `kimi`. The host hides Kimi agents, models, status, and sign-in
 state from peers below protocol 8, and `providers-v8` carries it.
