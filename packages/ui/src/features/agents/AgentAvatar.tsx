@@ -4,7 +4,12 @@ import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 import type { AvatarHue } from "@openbot/contracts/ipc";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
-import { type AvatarMotion, bloubAvatarProfile, type SupportedAvatarSilhouetteId } from "../../bloub-avatar";
+import {
+  AVATAR_EXPRESSIONS,
+  type AvatarMotion,
+  bloubAvatarProfile,
+  type SupportedAvatarSilhouetteId,
+} from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
 
 // Cap avatar animation at 30fps: uncapped bloub clocks measured 30% renderer / 24% GPU
@@ -57,28 +62,10 @@ const HOVER_FACES: readonly HoverFace[] = [
 ];
 
 /**
- * The faces of a working plush that plays no felt dots. It shows each one for a random time, in a
- * random order, so two working agents never change together. All the faces are here, the silly ones
- * too: the change, not the face, says that the agent works.
+ * How long a working plush with no felt dots keeps one face. It takes every Bloub face, the silly ones
+ * too, for a random time in this range, so two working agents never change together: the change, not
+ * the face, says that the agent works.
  */
-const WORKING_FACES: readonly ExpressionId[] = [
-  "neutre",
-  "attentif",
-  "surpris",
-  "excite",
-  "heureux",
-  "hilare",
-  "colere",
-  "triste",
-  "effraye",
-  "mefiant",
-  "confus",
-  "curieux",
-  "fier",
-  "timide",
-  "blase",
-  "somnolent",
-];
 const WORKING_FACE_MIN_MS = 700;
 const WORKING_FACE_MAX_MS = 3200;
 
@@ -379,7 +366,7 @@ function randomHoverFace(previous: HoverFace | null, resting: ExpressionId): Hov
 
 /** A random working face other than the one on screen, so each change shows. */
 function nextWorkingFace(current: ExpressionId | null): ExpressionId {
-  const choices = WORKING_FACES.filter((face) => face !== current);
+  const choices = AVATAR_EXPRESSIONS.filter((face) => face !== current);
   return choices[Math.floor(Math.random() * choices.length)] ?? "attentif";
 }
 
