@@ -7,7 +7,7 @@
 // request stays small, that both runs use one routine thread and their answers show there and not in
 // the chat, that the chat keeps its session, and that the chat turns read the answers. While the
 // second run is held, a chat message and a run of a second routine must finish: the lanes do not wait
-// for each other.
+// for each other. The second routine opens a wait, which a routine thread can do as the chat can.
 // It also drives saved password and authenticator fills through the routine tool router, checks
 // the sign-in guidance, and checks that no secret reaches the provider.
 // `bun scripts/routine-fresh-session-e2e.ts`. Writes .openbot-build/routine-fresh-session-e2e/report.json.
@@ -158,6 +158,9 @@ const answer = (message) => {
         browserCall("open", { url: ${JSON.stringify(VAULT_ORIGIN)} }),
         browserCall("list_logins", { tabId: "routine-tab" }),
         secret("password"), secret("authenticator"),
+      ] : second ? [
+        // A routine thread keeps the tools of the agent's own chat, as a routine run in the chat had.
+        { tool: "await_event", arguments: { note: "Report when the docs change." } },
       ] : [];
       callNext({ threadId: params.threadId, turnId, calls, finish });
       return;
@@ -224,6 +227,7 @@ const report: {
   routineAnswersInChat: string[];
   routineThreads: { routine: string; taskId: string; threadId: string; title: string; answers: string[] }[];
   whileHeld?: { chatTurn: string; secondRoutineRun: string; heldRunStatus: string };
+  waitInRoutineThread?: unknown[];
   digestInNextTurn?: { marker: boolean; answers: string[] };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
@@ -523,7 +527,17 @@ try {
     .filter((entry) => entry.method === "thread/unsubscribe")
     .map((entry) => entry.threadId);
   const routineStarts = report.threadStarts.filter((entry) => entry.ephemeral === true);
-  const results = entries.filter((entry) => entry.method === "tool-result");
+  const toolResults = entries.filter((entry) => entry.method === "tool-result");
+  const results = toolResults.filter((entry) => entry.tool !== "await_event");
+  const waitResults = toolResults.filter((entry) => entry.tool === "await_event");
+  report.waitInRoutineThread = waitResults.map((entry) => entry.result ?? entry.error ?? null);
+  pass(
+    "A run in a routine thread can open a wait",
+    waitResults.length === 1 &&
+      waitResults[0]?.result?.success === true &&
+      waitResults[0].turnId ===
+        entries.find((entry) => entry.method === "turn/start" && entry.text?.includes(SECOND_MARK))?.turnId,
+  );
   pass(
     "Routine Vault tool calls succeed",
     results.length === 10 && results.every((entry) => entry.result?.success && !entry.error),

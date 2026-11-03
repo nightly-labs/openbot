@@ -1063,11 +1063,15 @@ export class OpenBotToolRouter {
     const memoryResult = this.#memories.handleTool(params, senderAgentId, this.#hooks.redactMcp);
     if (memoryResult) return memoryResult;
 
+    // A routine thread takes the runs that the agent's own chat took before, so its runs keep the
+    // tools of the chat: they wait for events and start tasks.
+    const callerThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+    const callerTaskId = this.#tasks.taskForThread(callerThreadId);
     const caller = {
       agentId: senderAgentId,
-      inExecutionThread: this.#conversation.isExecutionThread(
-        this.#conversation.publicThreadId(senderAgentId, params.threadId),
-      ),
+      inExecutionThread:
+        this.#conversation.isExecutionThread(callerThreadId) &&
+        !(callerTaskId !== null && this.#tasks.isRoutineThread(callerTaskId)),
     };
     const waitResult = this.#waits.handleTool(params, caller);
     if (waitResult) return waitResult;

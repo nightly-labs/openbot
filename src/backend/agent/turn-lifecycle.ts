@@ -1203,8 +1203,9 @@ export class TurnLifecycle {
         latestAssistant !== undefined &&
         deliveries.some(({ delivery }) => delivery.sender.kind === "routine") &&
         isNoUpdateAnswer(latestAssistant.text);
-      // Before the deliveries end: until then they hold the chat's lane, so no turn of the chat
-      // starts before the digest is in its handoff.
+      // Before the deliveries end: until then they hold their lane, so no later turn of that lane
+      // starts before the digest is in its handoff. A chat turn that starts at the same time keeps
+      // the digest for its next turn (see `ThreadLifecycle.deletePendingHandoff`).
       const routineDelivery = deliveries[0]?.delivery.id;
       if (routineSession && routineDelivery && outcome === "completed" && !quiet && !markerAnswer && latestAssistant)
         yield* this.#hooks.routineAnswered(agentId, routineDelivery, latestAssistant.text);

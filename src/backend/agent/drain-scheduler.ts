@@ -802,10 +802,13 @@ export class DrainScheduler {
       const shortened = channelDelivery ? channels : messagingDelivery ? messaging : undefined;
       const delta = shortened?.delta(delivery.id);
       const deltaInput = delta ? promptInput(delta.text) : null;
+      // The handoff that each start sent: the cleanup after the turn removes only that part.
+      const sentHandoffs = new Map<string, string>();
       const inputForThread = (providerThreadId: string) => {
         const input = deltaInput && shortened?.sendsDelta(delivery.id, providerThreadId) ? deltaInput : completeInput;
         const handoff = this.#threads.consumePendingHandoff(providerThreadId);
         if (!handoff) return input;
+        sentHandoffs.set(providerThreadId, handoff);
         return input.map((item, index) =>
           index === 0 && item.type === "text"
             ? { ...item, text: `${handoff}${CURRENT_MESSAGE_SEPARATOR}${item.text}` }
@@ -941,7 +944,7 @@ export class DrainScheduler {
           this.#conversation.emitConversation(snapshot);
         }
       }
-      yield* this.#threads.deletePendingHandoff(threadId).pipe(
+      yield* this.#threads.deletePendingHandoff(threadId, sentHandoffs.get(threadId)).pipe(
         Effect.catch((failure) =>
           Effect.sync(() => {
             this.#hooks.emitError("history_handoff_cleanup_failed", failure.cause, agent.id);

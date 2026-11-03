@@ -200,23 +200,32 @@ export class AgentTasks implements TaskLanes {
    */
   routineThread(agentId: string, routineId: string, routineName: string): AgentThreadRecord | null {
     const existing = this.#store.threadForRoutine(agentId, routineId);
+    const title = taskTitle(routineName);
     if (existing?.closedAt === null) {
       this.#conversation.registerTaskThread(agentId, existing.threadId);
-      return existing;
+      return this.#followRoutineName(existing, title);
     }
     if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks) return null;
     if (existing) {
       this.#store.reopen(existing.taskId);
       this.#conversation.registerTaskThread(agentId, existing.threadId);
+      const reopened = this.#store.task(existing.taskId);
       this.changed(agentId);
-      return this.#store.task(existing.taskId);
+      return reopened ? this.#followRoutineName(reopened, title) : null;
     }
-    const title = taskTitle(routineName);
     if (!title) return null;
     const task = this.#store.create({ agentId, origin: "agent", title, titleSource: "agent", routineId });
     this.#conversation.registerTaskThread(agentId, task.threadId);
     this.changed(agentId);
     return task;
+  }
+
+  /** A routine thread takes the routine's new name, unless a person renamed the thread. */
+  #followRoutineName(thread: AgentThreadRecord, title: string | null): AgentThreadRecord {
+    if (!title || thread.title === title || thread.titleSource === "user") return thread;
+    this.#store.retitle(thread.threadId, title);
+    this.changed(thread.agentId);
+    return this.#store.task(thread.taskId) ?? thread;
   }
 
   /** The thread belongs to a routine: each run of the routine starts a new session in it. */

@@ -415,6 +415,21 @@ export class AgentThreadStore {
     );
   }
 
+  /** A title that OpenBot gave, such as the name of a renamed routine. A person's title stays. */
+  retitle(threadId: string, title: string): void {
+    this.#database.dispatch(
+      `agent-thread-retitled:${threadId}:${randomUUID()}`,
+      [{ aggregateType: "agent-thread", aggregateId: threadId, eventType: "agent-thread.renamed", payload: {} }],
+      (db, sequences) => {
+        db.prepare(
+          `UPDATE projection_agent_threads SET title = ?, last_event_sequence = ?
+           WHERE thread_id = ? AND title_source <> 'user'`,
+        ).run(title, sequences[0] ?? 0, threadId);
+        return null;
+      },
+    );
+  }
+
   /** Records the end of the thread's last turn. */
   setOutcome(taskId: string, outcome: AgentTaskOutcome): void {
     this.#database.connection

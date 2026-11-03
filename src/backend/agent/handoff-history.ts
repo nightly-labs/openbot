@@ -218,13 +218,37 @@ const ROUTINE_DIGEST_MARKER = "\n\n--- routine run in its own session (also in t
  */
 export function appendRoutineDigest(existing: string | undefined, routineName: string, answer: string): string {
   const digest = redactText(historyExcerpt(`[routine: ${routineName}]\n${answer.trim()}`, ROUTINE_DIGEST_CHARACTERS));
-  const end = `\n${HANDOFF_END}`;
-  const packet =
-    existing?.startsWith(HANDOFF_START) && existing.endsWith(end)
-      ? existing.slice(0, -end.length).trimEnd()
-      : HANDOFF_START;
-  const [history = HANDOFF_START, ...digests] = packet.split(ROUTINE_DIGEST_MARKER);
+  const { history, digests } = handoffParts(existing);
   digests.push(digest);
   while (digests.length > 1 && digests.join(ROUTINE_DIGEST_MARKER).length > ROUTINE_DIGESTS_CHARACTERS) digests.shift();
-  return `${[history, ...digests].join(ROUTINE_DIGEST_MARKER)}\n${end}`;
+  return handoffPacket(history, digests);
+}
+
+/**
+ * What stays of a handoff after a turn sent `sent`, or undefined when nothing stays. A routine run
+ * that ends while a turn starts adds its digest after the turn read the handoff: that digest stays
+ * for the next turn, and the part that the turn sent does not repeat.
+ */
+export function unsentHandoff(current: string, sent: string | undefined): string | undefined {
+  if (current === sent) return undefined;
+  const now = handoffParts(current);
+  const before = handoffParts(sent);
+  if (sent === undefined || !now.packet || now.history !== before.history) return current;
+  const unsent = now.digests.filter((digest) => !before.digests.includes(digest));
+  return unsent.length > 0 ? handoffPacket(HANDOFF_START, unsent) : undefined;
+}
+
+const HANDOFF_PACKET_END = `\n${HANDOFF_END}`;
+
+function handoffParts(handoff: string | undefined): { packet: boolean; history: string; digests: string[] } {
+  const body =
+    handoff?.startsWith(HANDOFF_START) && handoff.endsWith(HANDOFF_PACKET_END)
+      ? handoff.slice(0, -HANDOFF_PACKET_END.length).trimEnd()
+      : undefined;
+  const [history = HANDOFF_START, ...digests] = (body ?? HANDOFF_START).split(ROUTINE_DIGEST_MARKER);
+  return { packet: body !== undefined, history, digests };
+}
+
+function handoffPacket(history: string, digests: readonly string[]): string {
+  return `${[history, ...digests].join(ROUTINE_DIGEST_MARKER)}\n${HANDOFF_PACKET_END}`;
 }

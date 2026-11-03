@@ -14,7 +14,7 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Result, Schema } from "effect";
+import { Effect, Result, Schema, Semaphore } from "effect";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ProviderSession } from "../database/provider-sessions";
@@ -61,6 +61,7 @@ import {
   readHandoffHistory,
   renderProviderHandoff,
   renderRoutineHandoff,
+  unsentHandoff,
 } from "./handoff-history";
 import { decodeCapturedSteps, readCapturedSteps } from "./handoff-tool-steps";
 import { isProviderTimeout } from "./provider-status";
@@ -234,6 +235,11 @@ export class ThreadLifecycle {
   readonly #channelThread: (threadId: string) => boolean;
   readonly #branchThread: (threadId: string) => boolean;
   readonly #pendingHandoffs = new Map<string, string>();
+  /**
+   * Routine digests and the cleanup after a turn change a handoff one at a time. A routine thread
+   * runs beside the chat, so its digest can arrive while a chat turn starts with the handoff.
+   */
+  readonly #handoffWrites = Semaphore.makeUnsafe(1);
   readonly #pendingRuntimeRefreshes = new Set<string>();
   /**
    * How many starts of each agent are in flight: a provider session, or a turn on one.
@@ -313,13 +319,29 @@ export class ThreadLifecycle {
     return this.#pendingHandoffs.get(threadId);
   }
 
+  /**
+   * Removes the part of the handoff that a started turn sent (`sent`). A digest that arrived after
+   * the turn read the handoff stays for the next turn.
+   */
   readonly deletePendingHandoff = Effect.fn("ThreadLifecycle.deletePendingHandoff")(function* (
     this: ThreadLifecycle,
     threadId: string,
+    sent: string | undefined,
   ) {
-    if (!this.#pendingHandoffs.has(threadId)) return;
-    yield* threadIo(() => rm(this.handoffPath(threadId), { force: true }));
-    this.#pendingHandoffs.delete(threadId);
+    const remove = Effect.gen({ self: this }, function* () {
+      const current = this.#pendingHandoffs.get(threadId);
+      if (current === undefined) return;
+      const rest = unsentHandoff(current, sent);
+      if (rest === current) return;
+      if (rest === undefined) {
+        yield* threadIo(() => rm(this.handoffPath(threadId), { force: true }));
+        this.#pendingHandoffs.delete(threadId);
+        return;
+      }
+      yield* threadIo(() => writeFile(this.handoffPath(threadId), rest, { mode: 0o600 }));
+      this.#pendingHandoffs.set(threadId, rest);
+    });
+    yield* this.#handoffWrites.withPermit(remove);
   }).bind(this);
 
   /**
@@ -597,18 +619,21 @@ export class ThreadLifecycle {
     const session = this.#store.database.activeProviderSession(threadId, provider);
     if (!session) return;
     const id = session.externalSessionId;
-    let existing = this.#pendingHandoffs.get(id);
-    if (existing === undefined) {
-      const stored = yield* Effect.result(threadIo(() => readFile(this.handoffPath(id), "utf8")));
-      if (Result.isSuccess(stored)) existing = stored.success;
-      else if (!missingSessionFile(stored.failure.cause)) return yield* stored.failure;
-    }
-    const handoff = appendRoutineDigest(existing, routineName, answer);
-    yield* threadIo(() =>
-      mkdir(join(this.#store.database.userDataPath, "provider-handoffs"), { recursive: true, mode: 0o700 }),
-    );
-    yield* threadIo(() => writeFile(this.handoffPath(id), handoff, { mode: 0o600 }));
-    this.#pendingHandoffs.set(id, handoff);
+    const add = Effect.gen({ self: this }, function* () {
+      let existing = this.#pendingHandoffs.get(id);
+      if (existing === undefined) {
+        const stored = yield* Effect.result(threadIo(() => readFile(this.handoffPath(id), "utf8")));
+        if (Result.isSuccess(stored)) existing = stored.success;
+        else if (!missingSessionFile(stored.failure.cause)) return yield* stored.failure;
+      }
+      const handoff = appendRoutineDigest(existing, routineName, answer);
+      yield* threadIo(() =>
+        mkdir(join(this.#store.database.userDataPath, "provider-handoffs"), { recursive: true, mode: 0o700 }),
+      );
+      yield* threadIo(() => writeFile(this.handoffPath(id), handoff, { mode: 0o600 }));
+      this.#pendingHandoffs.set(id, handoff);
+    });
+    yield* this.#handoffWrites.withPermit(add);
   }).bind(this);
 
   /**

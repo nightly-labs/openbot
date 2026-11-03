@@ -102,7 +102,8 @@ the marker it skips the turn's thinking too, so a later import does not bring a 
 Each routine of an agent runs in its own side thread, the routine thread. `AgentTasks.routineThread`
 makes the thread on the first run, with the routine's name as its title and `routine_id` set
 (migration 54; a unique index keeps one thread for each routine of an agent, also when it is
-archived). A later run uses the same thread, and a run reopens an archived one. `RoutineScheduler`
+archived). A later run uses the same thread, and a run reopens an archived one. A run also gives the
+thread the routine's current name, unless a person renamed the thread. `RoutineScheduler`
 enqueues the run with the thread's task id, so the run is a task lane in `DrainScheduler`: it counts
 against the agent's task limit (default 4, `AGENT_TASK_LIMIT_DEFAULT`) and does not wait for the
 agent's own chat or for other routines. When the agent has `INPUT_LIMITS.agentTasks` open threads, a
@@ -110,6 +111,11 @@ new routine gets no thread and its run goes to the agent's own chat, as before. 
 count against the limits of tasks that the agent starts, and that cleanup does not archive them.
 Deleting the routine archives its thread. The released `agent-tasks-v1` routes do not send
 `routineId`; only this computer's IPC list has it.
+
+A routine thread is a side thread, so its runs have no Computer Use: only the agent's own chat
+drives the screen. Its runs keep the tools of the chat that side threads do not have:
+`OpenBotToolRouter` does not count a routine thread as an execution thread, so a run can call
+`await_event` and `start_task`.
 
 A routine run (in its thread, or in the agent's own chat) does not resume a provider session.
 `DrainScheduler.startDelivery` starts a new session for each run with
@@ -125,7 +131,9 @@ When the turn ends, `TurnLifecycle` closes the session (`closeRoutineThread`). A
 routine thread drops its answer as a quiet run in the chat does. A non-quiet run adds a short digest
 of its answer to the pending handoff of the chat session, and of the routine thread's session
 (`appendRoutineDigest`: 1,500 characters for each run, 6,000 in total), so the next turn of each reads
-it. The answer stays in the routine thread; the chat shows the run marker, with an "Open thread" link
+it. The chat can start a turn while the digest arrives: one permit orders the digest writes and the
+cleanup after a turn start, and the cleanup removes only the part that the turn sent
+(`unsentHandoff`), so a later digest stays for the next turn. The answer stays in the routine thread; the chat shows the run marker, with an "Open thread" link
 when the thread is in the task list. A Test run from the routine settings opens the routine thread in
 the chat. A restart during a run marks the run interrupted: the session is not saved.
 
