@@ -647,4 +647,24 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Usa",
   "mobile.agent.folders.notAddedTitle": "Cartella non aggiunta",
   "mobile.agent.folders.notExcludedTitle": "Cartella non esclusa",
+  "mobile.agent.fastMode.label": "Modalità veloce",
+  "mobile.agent.fastMode.footer":
+    "L’agente chiede risposte più veloci al suo provider. Una modifica vale dal turno successivo.",
+  "mobile.agent.compact.title": "Compatta contesto",
+  "mobile.agent.compact.compacting": "Avvio della compattazione…",
+  "mobile.agent.compact.footer": "Il provider accorcia il contesto di questa chat. I messaggi restano.",
+  "mobile.agent.compact.started": "Compattazione avviata. Il provider accorcia il contesto sull’host.",
+  "mobile.agent.compact.failed": "Impossibile compattare il contesto",
+  "mobile.agent.compact.failedBody": "L’host non è riuscito a compattare il contesto.",
+  "mobile.agent.compact.unsupported": "Questo host non può compattare il contesto da un dispositivo remoto.",
+  "mobile.agent.instructionsFile.title": "File delle istruzioni",
+  "mobile.agent.instructionsFile.placeholder": "Regole che questo agente segue sempre",
+  "mobile.agent.instructionsFile.footer": "L’agente legge questo file in ogni sessione. Può anche modificarlo.",
+  "mobile.agent.instructionsFile.changed":
+    "L’agente ha modificato le sue istruzioni mentre le modificavi. Salva di nuovo per sostituire la sua versione.",
+  "mobile.agent.instructionsFile.saveFailed": "Impossibile salvare il file delle istruzioni.",
+  "mobile.agent.instructionsFile.readFailed": "Impossibile leggere il file delle istruzioni.",
+  "mobile.agent.instructionsFile.loading": "Caricamento del file delle istruzioni…",
+  "mobile.agent.instructionsFile.unsupported":
+    "Questo host non può modificare il file delle istruzioni da un dispositivo remoto.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -18,6 +18,7 @@ import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
+import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
@@ -2043,6 +2044,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageAgentTaskLimit: (serverId) => administers(serverId, AGENT_TASK_LIMIT_CAPABILITY),
       canManageAgentNewChat: (serverId) => administers(serverId, AGENT_NEW_CHAT_CAPABILITY),
       canManageAgentPlanCard: (serverId) => administers(serverId, AGENT_PLAN_CARD_CAPABILITY),
+      canManageAgentInstructions: (serverId) => administers(serverId, AGENT_INSTRUCTIONS_CAPABILITY),
       canPublishAgent: (serverId) => administers(serverId, AGENT_PUBLISH_CAPABILITY),
       canManageProviderAccounts: (serverId) => administers(serverId, PROVIDER_ACCOUNTS_CAPABILITY),
     };

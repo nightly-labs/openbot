@@ -656,4 +656,23 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Kullan",
   "mobile.agent.folders.notAddedTitle": "Klasör eklenmedi",
   "mobile.agent.folders.notExcludedTitle": "Klasör hariç tutulmadı",
+  "mobile.agent.fastMode.label": "Hızlı mod",
+  "mobile.agent.fastMode.footer":
+    "Ajan, sağlayıcısından daha hızlı yanıtlar ister. Değişiklik bir sonraki turdan itibaren geçerli olur.",
+  "mobile.agent.compact.title": "Bağlamı sıkıştır",
+  "mobile.agent.compact.compacting": "Sıkıştırma başlatılıyor…",
+  "mobile.agent.compact.footer": "Sağlayıcı bu sohbetin bağlamını kısaltır. Mesajlar kalır.",
+  "mobile.agent.compact.started": "Sıkıştırma başladı. Sağlayıcı bağlamı ana bilgisayarda kısaltır.",
+  "mobile.agent.compact.failed": "Bağlam sıkıştırılamadı",
+  "mobile.agent.compact.failedBody": "Ana bilgisayar bağlamı sıkıştıramadı.",
+  "mobile.agent.compact.unsupported": "Bu ana bilgisayar, bağlamı uzak bir cihazdan sıkıştıramaz.",
+  "mobile.agent.instructionsFile.title": "Talimat dosyası",
+  "mobile.agent.instructionsFile.placeholder": "Bu ajanın her zaman uyduğu kurallar",
+  "mobile.agent.instructionsFile.footer": "Ajan bu dosyayı her oturumda okur. Ajan dosyayı değiştirebilir de.",
+  "mobile.agent.instructionsFile.changed":
+    "Siz düzenlerken ajan talimatlarını değiştirdi. Onun sürümünü değiştirmek için yeniden kaydedin.",
+  "mobile.agent.instructionsFile.saveFailed": "Talimat dosyası kaydedilemedi.",
+  "mobile.agent.instructionsFile.readFailed": "Talimat dosyası okunamadı.",
+  "mobile.agent.instructionsFile.loading": "Talimat dosyası yükleniyor…",
+  "mobile.agent.instructionsFile.unsupported": "Bu ana bilgisayar, talimat dosyasını uzak bir cihazdan düzenleyemez.",
 } as const satisfies PartialTranslation<typeof source>;

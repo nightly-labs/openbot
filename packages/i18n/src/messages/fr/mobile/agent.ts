@@ -658,4 +658,24 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Utiliser",
   "mobile.agent.folders.notAddedTitle": "Dossier non ajouté",
   "mobile.agent.folders.notExcludedTitle": "Dossier non exclu",
+  "mobile.agent.fastMode.label": "Mode rapide",
+  "mobile.agent.fastMode.footer":
+    "L’agent demande des réponses plus rapides à son fournisseur. Un changement s’applique à partir du tour suivant.",
+  "mobile.agent.compact.title": "Compacter le contexte",
+  "mobile.agent.compact.compacting": "Démarrage de la compaction…",
+  "mobile.agent.compact.footer": "Le fournisseur raccourcit le contexte de ce chat. Les messages restent.",
+  "mobile.agent.compact.started": "Compaction démarrée. Le fournisseur raccourcit le contexte sur l’hôte.",
+  "mobile.agent.compact.failed": "Impossible de compacter le contexte",
+  "mobile.agent.compact.failedBody": "L’hôte n’a pas pu compacter le contexte.",
+  "mobile.agent.compact.unsupported": "Cet hôte ne peut pas compacter le contexte depuis un appareil distant.",
+  "mobile.agent.instructionsFile.title": "Fichier d’instructions",
+  "mobile.agent.instructionsFile.placeholder": "Règles que cet agent suit toujours",
+  "mobile.agent.instructionsFile.footer": "L’agent lit ce fichier à chaque session. Il peut aussi le modifier.",
+  "mobile.agent.instructionsFile.changed":
+    "L’agent a modifié ses instructions pendant que vous les modifiiez. Enregistrez à nouveau pour remplacer sa version.",
+  "mobile.agent.instructionsFile.saveFailed": "Impossible d’enregistrer le fichier d’instructions.",
+  "mobile.agent.instructionsFile.readFailed": "Impossible de lire le fichier d’instructions.",
+  "mobile.agent.instructionsFile.loading": "Chargement du fichier d’instructions…",
+  "mobile.agent.instructionsFile.unsupported":
+    "Cet hôte ne peut pas modifier le fichier d’instructions depuis un appareil distant.",
 } as const satisfies PartialTranslation<typeof source>;

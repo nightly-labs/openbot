@@ -654,4 +654,24 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Verwenden",
   "mobile.agent.folders.notAddedTitle": "Ordner nicht hinzugefügt",
   "mobile.agent.folders.notExcludedTitle": "Ordner nicht ausgeschlossen",
+  "mobile.agent.fastMode.label": "Schnellmodus",
+  "mobile.agent.fastMode.footer":
+    "Der Agent fordert bei seinem Anbieter schnellere Antworten an. Eine Änderung gilt ab dem nächsten Durchgang.",
+  "mobile.agent.compact.title": "Kontext komprimieren",
+  "mobile.agent.compact.compacting": "Komprimierung wird gestartet…",
+  "mobile.agent.compact.footer": "Der Anbieter kürzt den Kontext dieses Chats. Die Nachrichten bleiben erhalten.",
+  "mobile.agent.compact.started": "Komprimierung gestartet. Der Anbieter kürzt den Kontext auf dem Host.",
+  "mobile.agent.compact.failed": "Kontext konnte nicht komprimiert werden",
+  "mobile.agent.compact.failedBody": "Der Host konnte den Kontext nicht komprimieren.",
+  "mobile.agent.compact.unsupported": "Dieser Host kann den Kontext nicht von einem Remote-Gerät aus komprimieren.",
+  "mobile.agent.instructionsFile.title": "Anweisungsdatei",
+  "mobile.agent.instructionsFile.placeholder": "Regeln, die dieser Agent immer befolgt",
+  "mobile.agent.instructionsFile.footer": "Der Agent liest diese Datei in jeder Sitzung. Er kann sie auch ändern.",
+  "mobile.agent.instructionsFile.changed":
+    "Der Agent hat seine Anweisungen geändert, während du sie bearbeitet hast. Speichere erneut, um seine Version zu ersetzen.",
+  "mobile.agent.instructionsFile.saveFailed": "Die Anweisungsdatei konnte nicht gespeichert werden.",
+  "mobile.agent.instructionsFile.readFailed": "Die Anweisungsdatei konnte nicht gelesen werden.",
+  "mobile.agent.instructionsFile.loading": "Anweisungsdatei wird geladen…",
+  "mobile.agent.instructionsFile.unsupported":
+    "Dieser Host kann die Anweisungsdatei nicht von einem Remote-Gerät aus bearbeiten.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -648,4 +648,24 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Gebruiken",
   "mobile.agent.folders.notAddedTitle": "Map niet toegevoegd",
   "mobile.agent.folders.notExcludedTitle": "Map niet uitgesloten",
+  "mobile.agent.fastMode.label": "Snelle modus",
+  "mobile.agent.fastMode.footer":
+    "De agent vraagt zijn provider om snellere antwoorden. Een wijziging geldt vanaf de volgende beurt.",
+  "mobile.agent.compact.title": "Context comprimeren",
+  "mobile.agent.compact.compacting": "Comprimeren starten…",
+  "mobile.agent.compact.footer": "De provider maakt de context van deze chat korter. De berichten blijven.",
+  "mobile.agent.compact.started": "Comprimeren gestart. De provider maakt de context korter op de host.",
+  "mobile.agent.compact.failed": "Kan de context niet comprimeren",
+  "mobile.agent.compact.failedBody": "De host kon de context niet comprimeren.",
+  "mobile.agent.compact.unsupported": "Deze host kan de context niet comprimeren vanaf een extern apparaat.",
+  "mobile.agent.instructionsFile.title": "Instructiebestand",
+  "mobile.agent.instructionsFile.placeholder": "Regels die deze agent altijd volgt",
+  "mobile.agent.instructionsFile.footer": "De agent leest dit bestand in elke sessie. De agent kan het ook wijzigen.",
+  "mobile.agent.instructionsFile.changed":
+    "De agent heeft zijn instructies gewijzigd terwijl jij ze bewerkte. Sla opnieuw op om zijn versie te vervangen.",
+  "mobile.agent.instructionsFile.saveFailed": "Kan het instructiebestand niet opslaan.",
+  "mobile.agent.instructionsFile.readFailed": "Kan het instructiebestand niet lezen.",
+  "mobile.agent.instructionsFile.loading": "Instructiebestand laden…",
+  "mobile.agent.instructionsFile.unsupported":
+    "Deze host kan het instructiebestand niet bewerken vanaf een extern apparaat.",
 } as const satisfies PartialTranslation<typeof source>;

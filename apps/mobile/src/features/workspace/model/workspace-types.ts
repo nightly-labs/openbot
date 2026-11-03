@@ -11,12 +11,14 @@ import type {
   AgentBackupModelSettings,
   AgentBrowserProfile,
   AgentExclusionChange,
+  AgentFastModeSettings,
   AgentFolderBrowse,
   AgentFolderChange,
   AgentFolderInput,
   AgentFolderList,
   AgentHostSettings,
   AgentImportPreview,
+  AgentInstructionsFile,
   AgentMemory,
   AgentMemorySelectionState,
   AgentModelId,
@@ -98,6 +100,7 @@ import type {
   RoutineResultConnectionOption,
   RoutineResultDestination,
   RoutineResultRoutineInput,
+  SaveAgentInstructionsInput,
   SaveWorkflowGraphInput,
   ServerNotificationLevel,
   SetAgentMemoryInclusionInput,
@@ -116,6 +119,7 @@ import type {
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
   UpdateAgentBrowserProfileInput,
+  UpdateAgentFastModeInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
   UpdateAgentNewChatInput,
@@ -689,6 +693,22 @@ export interface MobileWorkspaceContextValue {
   loadAgentPlanCard: (agentId: string, serverId: string) => Promise<AgentPlanCardSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the setting the host saved. */
   updateAgentPlanCard: (input: UpdateAgentPlanCardInput, serverId: string) => Promise<AgentPlanCardSettings>;
+  /**
+   * Null when the host does not advertise `agent-fast-mode-v1`. A member with view access reads the
+   * setting, and with manage access changes it, as the model. The host checks the access.
+   */
+  loadAgentFastMode: (agentId: string, serverId: string) => Promise<AgentFastModeSettings | null>;
+  /** Resolves with the setting the host saved. It applies from the next turn. */
+  updateAgentFastMode: (input: UpdateAgentFastModeInput, serverId: string) => Promise<AgentFastModeSettings>;
+  /** An owner or admin of an online host that serves `agent-instructions-v1`. The host checks the role again. */
+  canManageAgentInstructions: (serverId: string) => boolean;
+  /** The instruction file at the root of the agent's workspace on the host. Owners and admins only. */
+  loadAgentInstructions: (agentId: string, serverId: string) => Promise<AgentInstructionsFile>;
+  /**
+   * Owners and admins only. The host refuses the save when the file is different from `expected`
+   * now, or when the text is too long. Resolves with the file the host saved.
+   */
+  saveAgentInstructions: (input: SaveAgentInstructionsInput, serverId: string) => Promise<AgentInstructionsFile>;
   /** An owner or admin of an online host that serves `provider-accounts-v1`. The host checks the role again. */
   canManageProviderAccounts: (serverId: string) => boolean;
   /**
@@ -727,6 +747,13 @@ export interface MobileWorkspaceContextValue {
   /** The folders in one folder of the host computer; `path` null is the home folder. */
   browseAgentFolders: (agentId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
+  /** True when the host advertises `context-compact-v1`. Any member who can send messages can compact. */
+  canCompactContext: (serverId: string) => boolean;
+  /**
+   * The provider compacts the context of the agent's chat now; the messages stay. The host refuses
+   * while the agent works, or when its provider cannot compact.
+   */
+  compactContext: (agentId: string, serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `shared-tables-v1`. The host checks the role again. */
   canManageSharedTables: (serverId: string) => boolean;
   /** Every table that the agents of the host share. Owners and admins only. */
@@ -879,6 +906,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canRetryMessage"
   | "attachmentSupport"
   | "canStartNewChat"
+  | "canCompactContext"
   | "canChooseNewAgentModel"
   | "canInstallAgentTemplate"
   | "canSearchFiles"
@@ -942,6 +970,7 @@ type MobileWorkspaceStateKey =
   | "canManageAgentTaskLimit"
   | "canManageAgentNewChat"
   | "canManageAgentPlanCard"
+  | "canManageAgentInstructions"
   | "canManageProviderAccounts"
   | "canManageSharedTables"
   | "canManageAgentFolders"

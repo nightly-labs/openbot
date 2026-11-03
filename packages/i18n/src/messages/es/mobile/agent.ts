@@ -643,4 +643,24 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Usar",
   "mobile.agent.folders.notAddedTitle": "Carpeta no añadida",
   "mobile.agent.folders.notExcludedTitle": "Carpeta no excluida",
+  "mobile.agent.fastMode.label": "Modo rápido",
+  "mobile.agent.fastMode.footer":
+    "El agente pide respuestas más rápidas a su proveedor. Un cambio se aplica desde el siguiente turno.",
+  "mobile.agent.compact.title": "Compactar contexto",
+  "mobile.agent.compact.compacting": "Iniciando la compactación…",
+  "mobile.agent.compact.footer": "El proveedor acorta el contexto de este chat. Los mensajes se mantienen.",
+  "mobile.agent.compact.started": "Compactación iniciada. El proveedor acorta el contexto en el host.",
+  "mobile.agent.compact.failed": "No se pudo compactar el contexto",
+  "mobile.agent.compact.failedBody": "El host no pudo compactar el contexto.",
+  "mobile.agent.compact.unsupported": "Este host no puede compactar el contexto desde un dispositivo remoto.",
+  "mobile.agent.instructionsFile.title": "Archivo de instrucciones",
+  "mobile.agent.instructionsFile.placeholder": "Reglas que este agente siempre sigue",
+  "mobile.agent.instructionsFile.footer": "El agente lee este archivo en cada sesión. También puede cambiarlo.",
+  "mobile.agent.instructionsFile.changed":
+    "El agente cambió sus instrucciones mientras las editabas. Guarda de nuevo para reemplazar su versión.",
+  "mobile.agent.instructionsFile.saveFailed": "No se pudo guardar el archivo de instrucciones.",
+  "mobile.agent.instructionsFile.readFailed": "No se pudo leer el archivo de instrucciones.",
+  "mobile.agent.instructionsFile.loading": "Cargando el archivo de instrucciones…",
+  "mobile.agent.instructionsFile.unsupported":
+    "Este host no puede editar el archivo de instrucciones desde un dispositivo remoto.",
 } as const satisfies PartialTranslation<typeof source>;
