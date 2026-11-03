@@ -96,6 +96,8 @@ export interface TaskLanes {
   limit(agentId: string): number;
   /** Whether the agent's provider runs one turn at a time, across its own chat and its tasks. */
   oneTurnAtATime(agentId: string): boolean;
+  /** Whether this task is the side thread of a routine, whose runs each get their own session. */
+  isRoutineThread(taskId: string): boolean;
 }
 
 /**
@@ -737,14 +739,18 @@ export class DrainScheduler {
       }
       if (taskThreadId) this.#conversation.registerTaskThread(agent.id, taskThreadId);
       if (ownSession) {
-        const publicThreadId = yield* this.#store.ensureThreadId(agent.id).pipe(toDeliveryStartFailed);
-        // Checked again below. Here, so a busy chat does not start a session for nothing.
+        // The routine's side thread, or the agent's own chat.
+        const publicThreadId =
+          execution?.threadId ?? (yield* this.#store.ensureThreadId(agent.id).pipe(toDeliveryStartFailed));
+        // Checked again below. Here, so a busy thread does not start a session for nothing.
         if (this.#conversation.ensureSnapshot(agent.id, publicThreadId).activeTurnId) {
           for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
           this.#mailboxSync.emitQueue(agent.id);
           return;
         }
-        routineThreadId = yield* this.#threads.startRoutineThread(agent, client).pipe(toDeliveryStartFailed);
+        routineThreadId = yield* this.#threads
+          .startRoutineThread(agent, client, execution?.threadId)
+          .pipe(toDeliveryStartFailed);
       }
       let threadId =
         routineThreadId ??
@@ -1063,14 +1069,17 @@ export class DrainScheduler {
    * run does not read that whole session again. A routine run for a channel, an external
    * conversation or a task runs in that thread's session.
    */
+  /**
+   * Whether this delivery is a routine run with its own provider session: in the agent's own chat, or
+   * in the routine's side thread. A routine run in another task, a channel or a messaging thread
+   * runs in that thread's session.
+   */
   #runsInOwnSession(context: DeliveryContext): boolean {
     const id = context.delivery.id;
-    return (
-      context.delivery.sender.kind === "routine" &&
-      this.#mailbox.taskIdForDelivery(id) === null &&
-      !this.#channels?.store.assignmentForDelivery(id) &&
-      !this.#messaging?.ownsDelivery(id)
-    );
+    if (context.delivery.sender.kind !== "routine") return false;
+    const taskId = this.#mailbox.taskIdForDelivery(id);
+    if (taskId !== null) return this.#tasks.isRoutineThread(taskId);
+    return !this.#channels?.store.assignmentForDelivery(id) && !this.#messaging?.ownsDelivery(id);
   }
 
   /**

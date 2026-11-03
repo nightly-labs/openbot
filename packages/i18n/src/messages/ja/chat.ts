@@ -141,6 +141,8 @@ export const messages = {
   "chat.marker.unavailableAgent": "利用できないエージェント",
   "chat.marker.openChat": "{name} とのチャットを開く",
   "chat.marker.openRoutine": "ルーティン {name} を開く",
+  "chat.marker.openRoutineThread": "スレッドを開く",
+  "chat.marker.openRoutineThreadOf": "{name} のスレッドを開く",
   "chat.marker.unavailable": "利用不可",
   "chat.marker.contextReset": "新しいチャットを開始しました",
   "chat.marker.instructionsView": "表示",

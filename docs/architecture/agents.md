@@ -99,19 +99,35 @@ the marker it skips the turn's thinking too, so a later import does not bring a 
 
 ## Routine sessions
 
-A routine run in an agent's own chat (no task, channel or messaging delivery) does not resume the
-chat's provider session. `DrainScheduler.startDelivery` starts a new session for it with
-`ThreadLifecycle.startRoutineThread`: the chat's thread parameters, with `ephemeral: true` and
-`persistSession: false`. `ConversationRuntime` binds the session to the agent's public thread, so the
-run's items show in the chat, and `registerRoutineSession` marks it. The first message reads a short
-handoff of the newest chat messages (`renderRoutineHandoff`, 8,000 characters). Interrupt and steer
-go to the routine session while it runs. Usage records of the run use the session id
-`routine:<external id>`; their origin stays `routine`.
+Each routine of an agent runs in its own side thread, the routine thread. `AgentTasks.routineThread`
+makes the thread on the first run, with the routine's name as its title and `routine_id` set
+(migration 54; a unique index keeps one thread for each routine of an agent, also when it is
+archived). A later run uses the same thread, and a run reopens an archived one. `RoutineScheduler`
+enqueues the run with the thread's task id, so the run is a task lane in `DrainScheduler`: it counts
+against the agent's task limit (default 4, `AGENT_TASK_LIMIT_DEFAULT`) and does not wait for the
+agent's own chat or for other routines. When the agent has `INPUT_LIMITS.agentTasks` open threads, a
+new routine gets no thread and its run goes to the agent's own chat, as before. Routine threads do not
+count against the limits of tasks that the agent starts, and that cleanup does not archive them.
+Deleting the routine archives its thread. The released `agent-tasks-v1` routes do not send
+`routineId`; only this computer's IPC list has it.
 
-When the turn ends, `TurnLifecycle` closes the session (`closeRoutineThread`). A non-quiet run adds a
-short digest of its answer to the chat session's pending handoff (`appendRoutineDigest`: 1,500
-characters for each run, 6,000 in total), so the next chat turn reads it. The chat session keeps its
-id and its context. A restart during a run marks the run interrupted: the session is not saved.
+A routine run (in its thread, or in the agent's own chat) does not resume a provider session.
+`DrainScheduler.startDelivery` starts a new session for each run with
+`ThreadLifecycle.startRoutineThread`: the thread parameters of the agent's chat, with
+`ephemeral: true` and `persistSession: false`. `ConversationRuntime` binds the session to the public
+thread of the run, the routine thread or the chat, so the run's items show there, and
+`registerRoutineSession` marks it. The first message reads a handoff (`renderRoutineHandoff`, 8,000
+characters): the newest messages of earlier runs from the routine thread, at most half, and then the
+newest chat messages. Interrupt and steer go to the routine session while it runs. Usage records of
+the run use the session id `routine:<external id>`; their origin stays `routine`.
+
+When the turn ends, `TurnLifecycle` closes the session (`closeRoutineThread`). A quiet run in a
+routine thread drops its answer as a quiet run in the chat does. A non-quiet run adds a short digest
+of its answer to the pending handoff of the chat session, and of the routine thread's session
+(`appendRoutineDigest`: 1,500 characters for each run, 6,000 in total), so the next turn of each reads
+it. The answer stays in the routine thread; the chat shows the run marker, with an "Open thread" link
+when the thread is in the task list. A Test run from the routine settings opens the routine thread in
+the chat. A restart during a run marks the run interrupted: the session is not saved.
 
 ## Routine calendar feed
 

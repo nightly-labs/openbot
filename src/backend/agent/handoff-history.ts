@@ -153,35 +153,58 @@ export function renderProviderHandoff(
   return packet;
 }
 
-/**
- * The start of a routine run's own provider session: the newest messages of the agent's chat, up to
- * `ROUTINE_HANDOFF_CHARACTERS`. The run reads more through the history tools when it needs more.
- */
-export function renderRoutineHandoff(
+/** The newest messages of one history that fit `budget`, in conversation order, and their size. */
+function newestMessages(
   history: ReturnType<typeof readHandoffHistory>,
   names: ReadonlyMap<string, string>,
+  budget: number,
+): { text: string; size: number } {
+  const kept = new Map<string, string>();
+  let size = 0;
+  // Newest first, so a long history keeps its end.
+  for (const row of history.recent) {
+    const text = historyExcerpt(render(row.message, names), ROUTINE_MESSAGE_CHARACTERS);
+    if (size + text.length + 2 > budget) break;
+    kept.set(row.message.id, text);
+    size += text.length + 2;
+  }
+  const text = sortConversationMessages(history.recent.map((row) => row.message))
+    .flatMap((message) => (kept.has(message.id) ? [kept.get(message.id)] : []))
+    .join("\n\n");
+  return { text, size };
+}
+
+/**
+ * The start of a routine run's own provider session: the newest messages of the agent's chat and,
+ * for a routine with its own thread, the newest messages of that thread, up to
+ * `ROUTINE_HANDOFF_CHARACTERS` together. The earlier runs get at most half, and the chat gets the
+ * rest. The run reads more through the history tools when it needs more.
+ */
+export function renderRoutineHandoff(
+  chat: ReturnType<typeof readHandoffHistory>,
+  names: ReadonlyMap<string, string>,
+  earlierRuns?: ReturnType<typeof readHandoffHistory>,
 ): string | null {
-  if (!history.recent.length) return null;
   const header = [
     HANDOFF_START,
     "This routine run has its own session. These are the newest messages of your conversation. Do not repeat completed work.",
     "Omitted details remain available: discover openbot.history_search and openbot.history_read.",
-    "--- recent messages ---",
   ].join("\n");
-  const kept = new Map<string, string>();
-  let size = header.length + HANDOFF_END.length + 4;
-  // Newest first, so a long chat keeps its end.
-  for (const row of history.recent) {
-    const text = historyExcerpt(render(row.message, names), ROUTINE_MESSAGE_CHARACTERS);
-    if (size + text.length + 2 > ROUTINE_HANDOFF_CHARACTERS) break;
-    kept.set(row.message.id, text);
-    size += text.length + 2;
-  }
-  if (!kept.size) return null;
-  const recentText = sortConversationMessages(history.recent.map((row) => row.message))
-    .flatMap((message) => (kept.has(message.id) ? [kept.get(message.id)] : []))
-    .join("\n\n");
-  return [header, recentText, HANDOFF_END].join("\n\n");
+  const runsHeader = "--- earlier runs of this routine (its own thread) ---";
+  const chatHeader = "--- recent messages ---";
+  const available = ROUTINE_HANDOFF_CHARACTERS - header.length - HANDOFF_END.length - 8;
+  const runs = earlierRuns?.recent.length
+    ? newestMessages(earlierRuns, names, available / 2 - runsHeader.length)
+    : { text: "", size: 0 };
+  const runsSize = runs.text ? runs.size + runsHeader.length + 2 : 0;
+  const recent = newestMessages(chat, names, available - runsSize - chatHeader.length);
+  if (!runs.text && !recent.text) return null;
+  return [
+    header,
+    ...(runs.text ? [runsHeader, runs.text] : []),
+    ...(recent.text ? [chatHeader, recent.text] : []),
+    HANDOFF_END,
+  ].join("\n\n");
 }
 
 const ROUTINE_DIGEST_CHARACTERS = 1_500;

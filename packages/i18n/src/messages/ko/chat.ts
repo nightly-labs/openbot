@@ -141,6 +141,8 @@ export const messages = {
   "chat.marker.unavailableAgent": "사용할 수 없는 에이전트",
   "chat.marker.openChat": "{name}과(와)의 채팅 열기",
   "chat.marker.openRoutine": "루틴 {name} 열기",
+  "chat.marker.openRoutineThread": "스레드 열기",
+  "chat.marker.openRoutineThreadOf": "{name} 스레드 열기",
   "chat.marker.unavailable": "사용할 수 없음",
   "chat.marker.contextReset": "새 채팅이 시작됨",
   "chat.marker.instructionsView": "보기",

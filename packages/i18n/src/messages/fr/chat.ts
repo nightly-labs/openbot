@@ -141,6 +141,8 @@ export const messages = {
   "chat.marker.unavailableAgent": "Agent indisponible",
   "chat.marker.openChat": "Ouvrir la discussion avec {name}",
   "chat.marker.openRoutine": "Ouvrir la routine {name}",
+  "chat.marker.openRoutineThread": "Ouvrir le fil",
+  "chat.marker.openRoutineThreadOf": "Ouvrir le fil de {name}",
   "chat.marker.unavailable": "Indisponible",
   "chat.marker.contextReset": "Nouvelle discussion commencée",
   "chat.marker.instructionsView": "Voir",

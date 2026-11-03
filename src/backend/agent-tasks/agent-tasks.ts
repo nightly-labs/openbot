@@ -195,6 +195,41 @@ export class AgentTasks implements TaskLanes {
   }
 
   /**
+   * The open thread that takes the runs of this routine. It is made at the first run and restored when
+   * it was archived. Null when the task list has no room: the run then goes to the agent's own chat.
+   */
+  routineThread(agentId: string, routineId: string, routineName: string): AgentThreadRecord | null {
+    const existing = this.#store.threadForRoutine(agentId, routineId);
+    if (existing?.closedAt === null) {
+      this.#conversation.registerTaskThread(agentId, existing.threadId);
+      return existing;
+    }
+    if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks) return null;
+    if (existing) {
+      this.#store.reopen(existing.taskId);
+      this.#conversation.registerTaskThread(agentId, existing.threadId);
+      this.changed(agentId);
+      return this.#store.task(existing.taskId);
+    }
+    const title = taskTitle(routineName);
+    if (!title) return null;
+    const task = this.#store.create({ agentId, origin: "agent", title, titleSource: "agent", routineId });
+    this.#conversation.registerTaskThread(agentId, task.threadId);
+    this.changed(agentId);
+    return task;
+  }
+
+  /** The thread belongs to a routine: each run of the routine starts a new session in it. */
+  isRoutineThread(taskId: string): boolean {
+    return (this.#store.task(taskId)?.routineId ?? null) !== null;
+  }
+
+  /** The thread of this routine, open or archived, or null before its first run. */
+  threadOfRoutine(agentId: string, routineId: string): AgentThreadRecord | null {
+    return this.#store.threadForRoutine(agentId, routineId);
+  }
+
+  /**
    * Makes a branch: a new side thread with a copy of a conversation of the agent, through the turn of
    * the chosen message. The files of the copied messages are copied as files of the branch, so they
    * stay when the source is deleted. No turn starts. A retry with the same request id returns the
@@ -481,14 +516,16 @@ export class AgentTasks implements TaskLanes {
     if (startedTask) return startedTaskResult(startedTask);
     const open = this.#store.openTaskIds(caller.agentId).flatMap((taskId) => this.#store.task(taskId) ?? []);
     const finished = open.filter((task) => this.#finished(task));
-    if (open.length - finished.length >= AGENT_STARTED_UNFINISHED_TASKS)
+    // A routine thread is the routine's own: its runs do not count as tasks that the agent started.
+    const unfinishedTasks = open.filter((task) => task.routineId === null && !finished.includes(task)).length;
+    if (unfinishedTasks >= AGENT_STARTED_UNFINISHED_TASKS)
       return openBotToolFailure(
         sourceText("error.backend.taskUnfinishedLimit", { count: AGENT_STARTED_UNFINISHED_TASKS }),
       );
     // The newest finished tasks that the agent started stay open, when the task list has a place for them
-    // and for the new task. The person's own tasks and branches stay open.
+    // and for the new task. The person's own tasks, branches and routine threads stay open.
     const finishedByAgent = finished
-      .filter((task) => task.origin === "agent" && task.branch === null)
+      .filter((task) => task.origin === "agent" && task.branch === null && task.routineId === null)
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
     const others = open.length - finishedByAgent.length;
     const kept = Math.max(0, Math.min(AGENT_STARTED_FINISHED_KEPT, INPUT_LIMITS.agentTasks - 1 - others));
@@ -636,6 +673,7 @@ export class AgentTasks implements TaskLanes {
       updatedAt: task.updatedAt,
       closedAt: task.closedAt,
       branch: this.#publicBranch(task),
+      routineId: task.routineId,
     };
   }
 

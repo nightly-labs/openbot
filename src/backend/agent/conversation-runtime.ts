@@ -844,7 +844,10 @@ export class ConversationRuntime {
     return open;
   }
 
-  /** Marks this provider session as the one routine run of the agent. Its items show in the agent's own chat. */
+  /**
+   * Marks this provider session as the session of one routine run of the agent. Its items show in the
+   * thread that it is bound to: the routine's own side thread, or the agent's own chat.
+   */
   registerRoutineSession(agentId: string, externalThreadId: string): void {
     this.#routineSessions.set(externalThreadId, agentId);
   }
@@ -853,11 +856,21 @@ export class ConversationRuntime {
     this.#routineSessions.delete(externalThreadId);
   }
 
-  /** The newest open routine session of this agent. Its chat runs one turn at a time. */
-  routineSession(agentId: string): string | undefined {
+  /**
+   * The newest open routine session of this agent in one thread: the agent's own chat or a routine's
+   * side thread. Each thread runs one turn at a time.
+   */
+  routineSession(agentId: string, publicThreadId: string): string | undefined {
     let newest: string | undefined;
-    for (const [externalThreadId, owner] of this.#routineSessions) if (owner === agentId) newest = externalThreadId;
+    for (const [externalThreadId, owner] of this.#routineSessions)
+      if (owner === agentId && this.#publicThreads.get(externalThreadId) === publicThreadId) newest = externalThreadId;
     return newest;
+  }
+
+  /** Whether any routine run of this agent has an open session, in any thread. */
+  hasRoutineSession(agentId: string): boolean {
+    for (const owner of this.#routineSessions.values()) if (owner === agentId) return true;
+    return false;
   }
 
   isRoutineSession(externalThreadId: string): boolean {
