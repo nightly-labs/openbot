@@ -707,7 +707,9 @@ function isPrivateIpv4(address: string): boolean {
 async function waitForDevelopmentApi(portValue: string | undefined, child: ChildProcess): Promise<void> {
   const port = readPort(portValue);
   if (!port) throw new Error("The development API port is missing.");
-  const deadline = Date.now() + 30_000;
+  // The first start after an install bundles the Worker's dependencies, which took more than
+  // 30 seconds on Windows. A stopped API still ends the wait at once.
+  const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error("The development Auth API stopped before it became ready.");
     try {
@@ -823,10 +825,13 @@ export function signalOwnedProcess(
   if (!child.pid) return;
   try {
     if (platform === "win32") {
-      // Windows has no process groups to signal, so this reaches the process
-      // alone; anything it started outlives it. `exitCode` guards a child this
-      // runner already reaped, which a recorded pid never has.
-      if (child.exitCode === null) killProcess(child.pid, signal);
+      // `exitCode` guards a child this runner already reaped, which a recorded pid never has.
+      if (child.exitCode !== null) return;
+      // Windows has no process groups. A service pid is often a launcher, and the Vite
+      // worker, workerd and Electron run below it, so "group" stops the whole tree.
+      // `process.kill` also stops a process by force on Windows.
+      if (scope === "group" && stopWindowsProcessTree(child.pid)) return;
+      killProcess(child.pid, signal);
     } else {
       killProcess(scope === "group" ? -child.pid : child.pid, signal);
     }
@@ -872,13 +877,25 @@ function ownedProcessIsRunning(
   scope: SignalScope = "group",
 ): boolean {
   if (!child.pid) return false;
-  if (platform === "win32") return child.exitCode === null;
+  if (platform === "win32" && child.exitCode !== null) return false;
   try {
-    killProcess(scope === "group" ? -child.pid : child.pid, 0);
+    // Windows has no groups: signal 0 asks about the process itself, and EPERM means it exists.
+    killProcess(scope === "group" && platform !== "win32" ? -child.pid : child.pid, 0);
     return true;
   } catch (error) {
     if (isUnavailableProcess(error, platform)) return false;
+    if (platform === "win32" && error instanceof Error && "code" in error && error.code === "EPERM") return true;
     throw error;
+  }
+}
+
+/** Stops a process and everything below it. False when `taskkill` fails, for example because the process is gone. */
+function stopWindowsProcessTree(pid: number): boolean {
+  try {
+    execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore", timeout: 10_000 });
+    return true;
+  } catch {
+    return false;
   }
 }
 

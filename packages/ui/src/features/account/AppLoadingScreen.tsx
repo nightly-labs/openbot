@@ -179,13 +179,16 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
   }
 
   // The status line changes at each step of the run's clock, so screens on one pile show the same line.
+  // Read the phase, not `props.ready`: a prop that a parent writes as an expression makes a memo when
+  // it is read, and Solid stops all updates when `onSettled` makes one. The `ready` effect stops the
+  // clock if it runs after this.
   onSettled(() => {
     const next = () => {
       const now = age();
       setClock(now);
       statusTimer = setTimeout(next, (STATUS_EVERY_S - (now % STATUS_EVERY_S)) * 1000 + 16);
     };
-    if (!props.ready) next();
+    if (untrack(phase) === "loading") next();
     return () => {
       clearTimeout(statusTimer);
       clearTimeout(exitTimer);
