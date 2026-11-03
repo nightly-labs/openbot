@@ -65,7 +65,8 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
   onLoggedOut?: () => void;
   /**
    * Gemini prints its Google page instead of opening it, and OpenBot opens it, so a launch that fails
-   * shows an error. When the server opened it itself, a failure showed nothing (#3520).
+   * shows an error. When the server opened it itself, a failure showed nothing (#3520). Without it,
+   * the server opens the page itself (`googleSignInByOpenBot`).
    */
   openGoogleSignIn?: (url: string) => Promise<void>;
   /** A temporary folder of its own for the process (`provider-temp.ts`). */
