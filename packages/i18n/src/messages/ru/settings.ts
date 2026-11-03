@@ -37,7 +37,7 @@ export const messages = {
   "settings.keepRunning.title": "Оставлять OpenBot работать в фоне",
   "settings.keepRunning.description": "Активные задачи продолжат выполняться после закрытия окна.",
   "settings.menuBar.title": "Показывать OpenBot в строке меню",
-  "settings.menuBar.description": "Скрывать значок в Dock после закрытия окна. Активные задачи продолжают работать.",
+  "settings.menuBar.description": "Открывать и закрывать OpenBot из значка в строке меню.",
   "settings.keepAwake.title": "Не переводить компьютер в сон",
   "settings.keepAwake.description":
     "Регулярные задачи запускаются вовремя, пока компьютер подключён к сети. Экран всё равно может выключаться.",

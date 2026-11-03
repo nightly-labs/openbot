@@ -49,7 +49,6 @@ import type { HighlightDisplay } from "./computer-use-highlight-window";
 import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
-import { hideMacDockWhenNoWindowShows, showMacDock } from "./mac-dock";
 import { preventPanelActivation } from "./mac-panel-activation";
 import {
   createMainWindowBoundsRecorder,
@@ -253,11 +252,11 @@ export function createMainWindowController({
       getServices()?.browser.releaseUserControlHeldBy({ kind: "local" });
       // The hidden renderer owns the cross-host Dynamic Island coordinator and must outlive its visible
       // window. On Windows and Linux the user chooses it, and the tray icon is the way back. On macOS
-      // the Dock icon is the way back, or the menu bar icon when the user chooses it.
+      // the Dock icon is the way back, and the menu bar icon too when the user chooses it. The Dock
+      // icon stays, so its dot shows that OpenBot still runs.
       if ((process.platform === "darwin" || keepRunningInBackground()) && !isQuitting()) {
         event.preventDefault();
         window.hide();
-        if (process.platform === "darwin" && keepRunningInBackground()) hideMacDockWhenNoWindowShows();
       }
     });
     onMainWindowCreated(window);
@@ -827,18 +826,7 @@ export function hideWindowsForQuit(): void {
 
 export function showMainWindow(window: BrowserWindow): void {
   if (windowsKeptHidden) return;
-  if (process.platform !== "darwin" || app.dock?.isVisible() !== false) {
-    presentMainWindow(window, process.platform, () => app.show());
-    return;
-  }
-  // Menu bar mode hid the Dock icon. It comes back before the window takes focus.
-  void showMacDock().then(() => {
-    if (windowsKeptHidden || window.isDestroyed()) return;
-    presentMainWindow(window, process.platform, () => app.show());
-    // An app with no Dock icon is not active, and a click on its menu bar icon does not make it
-    // active. Without this, the window opens behind the app in front.
-    app.focus({ steal: true });
-  });
+  presentMainWindow(window, process.platform, () => app.show());
 }
 
 export function loadDynamicIslandRenderer(window: BrowserWindow, display: Display, variant: AppVariant): Promise<void> {
