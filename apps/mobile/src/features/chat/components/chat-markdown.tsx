@@ -41,6 +41,13 @@ import { graphemes } from "@/shared/lib/graphemes";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference } from "@/shared/lib/motion";
 import { currentText, useText } from "@/shared/lib/text";
+import {
+  layoutDirection,
+  physicalTextDirectionStyle,
+  type TextDirection,
+  textDirection,
+  textDirectionStyle,
+} from "@/shared/lib/text-direction";
 import { parseFinishedChatMarkdown, parseStreamingChatMarkdown } from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
 import { createReplyReveal, finishedReplyReveal } from "../model/reply-reveal";
@@ -111,6 +118,18 @@ interface TextPresentation {
   fontScale: number;
   t: MobileTranslate;
   linkFavicons: boolean;
+  /** The layout direction of the view that holds the block. A list item or a quote can change it. */
+  direction: TextDirection;
+}
+
+/** Each block reads in the direction of its own first letter, in an app of either direction. */
+function blockDirectionStyle(source: string, presentation: TextPresentation): TextStyle {
+  return textDirectionStyle(textDirection(source, presentation.direction), presentation.direction);
+}
+
+/** The presentation of the blocks in a list item or a quote that has its own direction. */
+function withDirection(presentation: TextPresentation, direction: TextDirection): TextPresentation {
+  return direction === presentation.direction ? presentation : { ...presentation, direction };
 }
 
 /** The font size of a text type, in points, which inline math is sized against. */
@@ -745,8 +764,10 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
     }
   }
   const source = (run: Token[]) => run.map((token) => token.raw).join("");
+  // The words are items of a wrapping row, so the row runs in the direction of the paragraph.
+  const direction = textDirection(source(tokens));
   return (
-    <View className="min-w-0 gap-1">
+    <View className="min-w-0 gap-1" style={{ direction }}>
       {sourceEntries(lines, (line) => line.map(source).join("")).map(({ value: line, offset: lineOffset }) => (
         // Multiline chips must participate in flex layout, not sit inside a fixed-height native text line.
         <View key={lineOffset} className="min-w-0 flex-row flex-wrap items-center gap-y-1">
@@ -763,6 +784,8 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
                 style={[
                   CHAT_TEXT_STYLES[presentation.type],
                   textContainerStyle(source(run), presentation),
+                  // The space after a word stays on the side of the next word.
+                  textDirectionStyle(direction, direction),
                   { maxWidth: "100%" },
                 ]}
               >
@@ -820,14 +843,21 @@ const MarkdownBlock = memo(function MarkdownBlock({
         <SelectableParagraph
           tokens={token.tokens ?? [{ type: "text", raw: token.text, text: token.text, escaped: false }]}
           presentation={{ ...presentation, nativeSelection }}
-          style={textContainerStyle(token.raw, presentation)}
+          style={{
+            ...textContainerStyle(token.raw, presentation),
+            ...physicalTextDirectionStyle(textDirection(token.raw)),
+          }}
         />
       );
     }
     return (
       <Text
         selectable={presentation.selectable}
-        style={[CHAT_TEXT_STYLES[presentation.type], textContainerStyle(token.raw, presentation)]}
+        style={[
+          CHAT_TEXT_STYLES[presentation.type],
+          textContainerStyle(token.raw, presentation),
+          blockDirectionStyle(token.raw, presentation),
+        ]}
       >
         {token.tokens ? inline(token.tokens, presentation) : token.text}
       </Text>
@@ -842,7 +872,10 @@ const MarkdownBlock = memo(function MarkdownBlock({
           heading
           tokens={token.tokens}
           presentation={{ ...heading, nativeSelection }}
-          style={textContainerStyle(token.raw, presentation)}
+          style={{
+            ...textContainerStyle(token.raw, presentation),
+            ...physicalTextDirectionStyle(textDirection(token.text)),
+          }}
         />
       );
     }
@@ -852,7 +885,11 @@ const MarkdownBlock = memo(function MarkdownBlock({
         selectable={presentation.selectable}
         accessibilityRole="header"
         dynamicTypeRamp={CHAT_HEADING_RAMP[level]}
-        style={[CHAT_TEXT_STYLES[level], textContainerStyle(token.raw, presentation)]}
+        style={[
+          CHAT_TEXT_STYLES[level],
+          textContainerStyle(token.raw, presentation),
+          blockDirectionStyle(token.text, presentation),
+        ]}
       >
         {inline(token.tokens, heading)}
       </Text>
@@ -897,25 +934,37 @@ const MarkdownBlock = memo(function MarkdownBlock({
     );
   }
   if (tokenIs(token, "blockquote")) {
+    // The line is at the start of the quote, so it moves to the right of a right-to-left quote.
+    const direction = textDirection(token.text);
     return (
-      <View className="border-l-2 border-separator pl-3">
-        <MarkdownBlocks tokens={token.tokens} presentation={presentation} inList={inList} />
+      <View className="border-separator" style={{ direction, borderStartWidth: 2, paddingStart: 12 }}>
+        <MarkdownBlocks tokens={token.tokens} presentation={withDirection(presentation, direction)} inList={inList} />
       </View>
     );
   }
   if (tokenIs(token, "list")) {
     return (
       <View className="gap-1.5">
-        {sourceEntries(token.items, (item) => item.raw).map(({ value: item, offset: itemOffset }, itemIndex) => (
-          <View key={itemOffset} className="flex-row items-start gap-2">
-            <Text style={[CHAT_TEXT_STYLES[presentation.type], presentation.style]}>
-              {item.task ? (item.checked ? "☑" : "☐") : token.ordered ? `${Number(token.start) + itemIndex}.` : "•"}
-            </Text>
-            <View className="min-w-0 shrink">
-              <MarkdownBlocks tokens={item.tokens} inList presentation={presentation} />
+        {sourceEntries(token.items, (item) => item.raw).map(({ value: item, offset: itemOffset }, itemIndex) => {
+          // The mark is at the start of the item, so it moves to the right of a right-to-left item.
+          const direction = textDirection(item.text);
+          return (
+            <View key={itemOffset} className="flex-row items-start gap-2" style={{ direction }}>
+              <Text
+                style={[
+                  CHAT_TEXT_STYLES[presentation.type],
+                  presentation.style,
+                  textDirectionStyle(direction, direction),
+                ]}
+              >
+                {item.task ? (item.checked ? "☑" : "☐") : token.ordered ? `${Number(token.start) + itemIndex}.` : "•"}
+              </Text>
+              <View className="min-w-0 shrink">
+                <MarkdownBlocks tokens={item.tokens} inList presentation={withDirection(presentation, direction)} />
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
     );
   }
@@ -933,7 +982,10 @@ const MarkdownBlock = memo(function MarkdownBlock({
                       style={[
                         CHAT_TEXT_STYLES[presentation.type],
                         textContainerStyle(cell.text, presentation),
-                        { textAlign: cell.align ?? "left", fontWeight: cell.header ? "600" : "400" },
+                        blockDirectionStyle(cell.text, presentation),
+                        // A column that the Markdown aligns keeps its alignment.
+                        cell.align ? { textAlign: cell.align } : null,
+                        { fontWeight: cell.header ? "600" : "400" },
                       ]}
                     >
                       {inline(cell.tokens, presentation)}
@@ -949,7 +1001,10 @@ const MarkdownBlock = memo(function MarkdownBlock({
   }
   if (token.type === "hr") return <View className="h-px bg-separator" />;
   return (
-    <Text selectable={presentation.selectable} style={[CHAT_TEXT_STYLES[presentation.type], presentation.style]}>
+    <Text
+      selectable={presentation.selectable}
+      style={[CHAT_TEXT_STYLES[presentation.type], presentation.style, blockDirectionStyle(token.raw, presentation)]}
+    >
       {token.raw}
     </Text>
   );
@@ -1052,6 +1107,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       animateTail,
       nativeSelection: nativeSelectionTarget,
       linkFavicons,
+      direction: layoutDirection(),
     }),
     [
       linkFavicons,

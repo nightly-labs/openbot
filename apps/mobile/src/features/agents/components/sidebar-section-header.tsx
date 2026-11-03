@@ -14,7 +14,7 @@ import Ellipsis from "lucide-react-native/icons/ellipsis";
 import Folder from "lucide-react-native/icons/folder";
 import FolderOpen from "lucide-react-native/icons/folder-open";
 import { memo, useRef, useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Alert, I18nManager, Pressable, View } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import {
@@ -26,7 +26,11 @@ import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { currentText, useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
+
+/** The open chevron turns down: clockwise from the right, or counterclockwise from the mirrored left. */
+const OPEN_ROTATION = I18nManager.isRTL ? "-90deg" : "90deg";
 
 /**
  * A folder header, as on the desktop: folders do not indent, so a folder in a folder names its parent
@@ -194,13 +198,13 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
           ) : (
             <Animated.View
               style={{
-                transform: [{ rotate: collapsed ? "0deg" : "90deg" }],
+                transform: [{ rotate: collapsed ? "0deg" : OPEN_ROTATION }],
                 transitionProperty: "transform",
                 transitionDuration: reducedMotion ? 0 : 120,
                 transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1),
               }}
             >
-              <ChevronRight size={14} color={muted} strokeWidth={2.2} />
+              <ChevronRight size={14} color={muted} strokeWidth={2.2} style={MIRROR_IN_RTL} />
             </Animated.View>
           )}
         </Pressable>

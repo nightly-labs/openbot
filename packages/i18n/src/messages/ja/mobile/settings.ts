@@ -8,6 +8,13 @@ export const messages = {
   "mobile.settings.language.system": "システムの設定",
   "mobile.settings.language.footer":
     "「システムの設定」は、スマートフォンの設定で最初に表示される言語に従います。まだ翻訳されていないテキストは英語で表示されます。",
+  "mobile.settings.language.restartTitle": "OpenBot を再起動しますか？",
+  "mobile.settings.language.restartBody":
+    "この言語は逆方向に読みます。OpenBot を次に起動したときに画面の向きが切り替わります。",
+  "mobile.settings.language.restartNow": "再起動",
+  "mobile.settings.language.restartLater": "あとで",
+  "mobile.settings.language.restartFailed":
+    "OpenBot を再起動できませんでした。次に OpenBot を開いたときに画面の向きが切り替わります。",
   "mobile.settings.dictation.language": "音声入力の言語",
   "mobile.settings.about.development": "開発版",
   "mobile.settings.about.openFailed": "リンクを開けませんでした。もう一度お試しください。",

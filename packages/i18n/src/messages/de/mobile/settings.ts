@@ -8,6 +8,13 @@ export const messages = {
   "mobile.settings.language.system": "Systemstandard",
   "mobile.settings.language.footer":
     "Systemstandard verwendet die erste Sprache in den Telefoneinstellungen. Noch nicht übersetzter Text erscheint auf Englisch.",
+  "mobile.settings.language.restartTitle": "OpenBot neu starten?",
+  "mobile.settings.language.restartBody":
+    "Diese Sprache liest sich in die andere Richtung. Die Ansichten wechseln die Richtung, wenn OpenBot neu startet.",
+  "mobile.settings.language.restartNow": "Neu starten",
+  "mobile.settings.language.restartLater": "Später",
+  "mobile.settings.language.restartFailed":
+    "OpenBot konnte nicht neu starten. Die Ansichten wechseln die Richtung, wenn du OpenBot das nächste Mal öffnest.",
   "mobile.settings.dictation.language": "Diktiersprache",
   "mobile.settings.about.development": "Entwicklung",
   "mobile.settings.about.openFailed": "Der Link konnte nicht geöffnet werden. Versuche es erneut.",

@@ -8,6 +8,13 @@ export const messages = {
   "mobile.settings.language.system": "Systeemstandaard",
   "mobile.settings.language.footer":
     "Systeemstandaard volgt de eerste taal in de instellingen van je telefoon. Tekst die nog niet is vertaald, wordt in het Engels getoond.",
+  "mobile.settings.language.restartTitle": "OpenBot opnieuw starten?",
+  "mobile.settings.language.restartBody":
+    "Deze taal lees je in de andere richting. De schermen draaien om wanneer OpenBot opnieuw start.",
+  "mobile.settings.language.restartNow": "Opnieuw starten",
+  "mobile.settings.language.restartLater": "Later",
+  "mobile.settings.language.restartFailed":
+    "OpenBot kon niet opnieuw starten. De schermen draaien om wanneer je OpenBot de volgende keer opent.",
   "mobile.settings.dictation.language": "Dicteertaal",
   "mobile.settings.about.development": "Ontwikkeling",
   "mobile.settings.about.openFailed": "Kan de link niet openen. Probeer het opnieuw.",
