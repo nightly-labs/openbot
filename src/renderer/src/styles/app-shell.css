@@ -2327,6 +2327,12 @@ textarea {
   color: var(--openbot-text-secondary);
 }
 
+/* A plush shows the work itself: three felt balls pulse above its head. The row keeps the pill for a
+   photo, which has no face to move. */
+.agent-row-avatar:has(.agent-avatar-bloub) .agent-row-agent-status-working {
+  display: none;
+}
+
 .agent-row-thinking-dots {
   display: inline-flex;
   align-items: center;
