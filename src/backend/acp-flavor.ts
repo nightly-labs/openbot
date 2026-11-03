@@ -43,6 +43,12 @@ export interface AcpFlavor {
    * starts, or list the sessions to find out whether this one exists. `null` reports the failure.
    */
   restoreFailure?(error: unknown, method: "load" | "resume"): "wait-for-start" | "list-sessions" | null;
+  /**
+   * How long a silent `session/load` or `session/resume` waits before the session is missing.
+   * The caller then opens a new session. A session-open budget that is already shorter keeps that
+   * budget, so a late answer is not read as a missing session. Absent: only that budget applies.
+   */
+  silentRestoreMs?: number;
   /** A failed model refresh keeps the last list that the agent gave. */
   keepModelsOnRefreshFailure?: true;
   /**
@@ -225,6 +231,10 @@ const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound };
 /**
  * A custom agent without a flavor of its own. It keeps omp's rule and Chisel's rule. Each rule needs
  * the exact session, and an agent can reuse that error text. Devin ACP is one of these agents.
+ *
+ * Chisel can leave `session/resume` unanswered and write no store-miss line. The team delivery then
+ * stays in `starting` until the drain ends it. Fifteen seconds is long enough for a resume that
+ * will answer, and short enough that the drain's two-minute limit does not win.
  */
 function customSessionNotFound(error: RequestError, sessionId: string): boolean | null {
   const omp = ompSessionNotFound(error, sessionId);
@@ -232,7 +242,12 @@ function customSessionNotFound(error: RequestError, sessionId: string): boolean 
   return chiselSessionNotFound(error, sessionId);
 }
 
-const CUSTOM_ACP_FLAVOR: AcpFlavor = { sessionNotFound: customSessionNotFound };
+const SILENT_CUSTOM_RESTORE_MS = 15_000;
+
+const CUSTOM_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: customSessionNotFound,
+  silentRestoreMs: SILENT_CUSTOM_RESTORE_MS,
+};
 
 const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = { omp: OMP_ACP_FLAVOR };
 

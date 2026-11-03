@@ -518,7 +518,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   >();
   /**
    * Settles when the agent logs that this session is gone from its store. A resume that never
-   * answers still has to open a new session, or the delivery that asked stays `starting`.
+   * answers, and never writes that line, still has to open a new session. Otherwise the delivery
+   * that asked stays `starting` until the drain's limit.
    */
   readonly #absentSessions = new Map<string, Deferred.Deferred<void>>();
   /**
@@ -1742,16 +1743,41 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       `ACP session not found: ${request.sessionId}`,
       "session not found in store",
     );
+    const silentMissing = new MissingAcpSessionError(
+      `ACP session not found: ${request.sessionId}`,
+      `session/${method} did not answer`,
+    );
     try {
       try {
-        restored = providerResult(
-          yield* Effect.result(
-            Effect.raceFirst(
-              providerSync(connection).pipe(Effect.flatMap(restore), Effect.interruptible),
-              Deferred.await(absent).pipe(Effect.andThen(Effect.fail(providerFailure(missing)))),
-            ),
-          ),
+        const answered = Effect.raceFirst(
+          providerSync(connection).pipe(Effect.flatMap(restore), Effect.interruptible),
+          Deferred.await(absent).pipe(Effect.andThen(Effect.fail(providerFailure(missing)))),
         );
+        // A custom agent can leave resume unanswered and write no store-miss line. The race above
+        // then waits for the session-open budget, and the delivery's start limit ends the turn
+        // first. This bound runs only when it is shorter than that budget.
+        const silentMs = this.#flavor.silentRestoreMs;
+        const startBudgetMs = this.#startTimeoutMs ?? this.#requestTimeoutMs;
+        const bounded =
+          silentMs !== undefined && silentMs < startBudgetMs
+            ? Effect.raceFirst(
+                answered,
+                Effect.sleep(silentMs).pipe(
+                  Effect.andThen(
+                    Effect.sync(() => {
+                      this.emit(
+                        "diagnostic",
+                        this.#redact(
+                          `${this.#label} session/${method} for ${request.sessionId} failed with no answer. OpenBot will open a new session.`,
+                        ),
+                      );
+                    }),
+                  ),
+                  Effect.andThen(Effect.fail(providerFailure(silentMissing))),
+                ),
+              )
+            : answered;
+        restored = providerResult(yield* Effect.result(bounded));
       } catch (error) {
         // `request` forgets the in-memory session for `thread/resume` and `turn/start`.
         if (error instanceof MissingAcpSessionError || isSessionNotFound(error, request.sessionId, this.#flavor)) {

@@ -1,7 +1,7 @@
 // A custom ACP agent loses its session store after a restart. A channel delivery must not stay
 // `starting` with no turn id: a logged or returned missing session opens a new session, a resume
-// that never answers is interrupted, and a delivery left `starting` by the previous process is
-// interrupted on the next start.
+// that neither answers nor logs a store miss opens a new session, and a delivery left `starting`
+// by the previous process is interrupted on the next start.
 // bun scripts/acp-stuck-starting-e2e.ts
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -193,7 +193,7 @@ try {
     () => service.channels.store.tasks(channelId).find((item) => item.id === replacedId)?.state === "completed",
   );
   const replacedLog = await readJsonl<{ event?: string; mode?: string }>(logPath);
-  assert.ok(replacedLog.some((entry) => entry.event === "session/load" && entry.mode === "store-miss"));
+  assert.ok(replacedLog.some((entry) => entry.event === "session/resume" && entry.mode === "store-miss"));
   assert.ok(
     replacedLog.filter((entry) => entry.event === "session/new").length > newSessionsBeforeMiss,
     "A session missing from the store must be replaced.",
@@ -220,6 +220,46 @@ try {
   ).length;
   assert.ok(chiselNew > beforeNew, "JSON-RPC -32016 Session not found must open a new session.");
   report.cases.push("A custom agent Chisel missing-session error opens a new session.");
+
+  await runCauseEffect(service.stop());
+  await setMode("hang");
+  const beforeHangNew = (await readJsonl<{ event?: string }>(logPath)).filter(
+    (entry) => entry.event === "session/new",
+  ).length;
+  service = openService({ requestTimeoutMs: 60_000, startingWithoutTurnMs: 30_000 }).service;
+  await runCauseEffect(service.initialize());
+  const silentStarted = Date.now();
+  const silentId = await send(channelId, "Resume and do not answer.");
+  await until(
+    "a fresh session after a silent resume",
+    () => service.channels.store.tasks(channelId).find((item) => item.id === silentId)?.state === "completed",
+    40_000,
+  );
+  const silentMs = Date.now() - silentStarted;
+  assert.ok(silentMs < 45_000, `A silent resume must not wait for the two-minute limit (${silentMs}ms).`);
+  const hangLog = await readJsonl<{ event?: string; mode?: string }>(logPath);
+  const hangAt = hangLog.findLastIndex((entry) => entry.event === "session/resume" && entry.mode === "hang");
+  assert.ok(hangAt >= 0, "The resume must be sent and must not log a store miss.");
+  const afterHang = hangLog.slice(hangAt + 1);
+  assert.ok(
+    afterHang.some((entry) => entry.event === "session/new"),
+    "A silent resume must open a new session.",
+  );
+  assert.ok(
+    afterHang.some((entry) => entry.event === "session/prompt"),
+    "The new session must run the turn.",
+  );
+  assert.ok(
+    hangLog.filter((entry) => entry.event === "session/new").length > beforeHangNew,
+    "A silent resume must open a new session.",
+  );
+  assert.ok(
+    !service.listQueue(agent.id).deliveries.some((delivery) => delivery.status === "starting" && !delivery.turnId),
+  );
+  assert.ok(
+    !service.listQueue(agent.id).deliveries.some((delivery) => delivery.error?.includes("did not start this turn")),
+  );
+  report.cases.push(`A resume that neither answers nor logs a store miss opens a new session in ${silentMs}ms.`);
 
   await runCauseEffect(service.stop());
   await setMode("ok");

@@ -1,7 +1,8 @@
 // The ACP agent of `acp-stuck-starting-e2e.ts`. `FAKE_CONTROL` is a JSON file `{ "mode" }`.
 // `ok` answers load and resume. `store-miss` writes the Chisel log line and does not answer.
 // `chisel-error` answers `-32016` `Session not found`. `hang` does not answer and does not log.
-// `session/new` always opens a session, so a missing stored session can be replaced.
+// The agent advertises `session/resume`. `session/new` always opens a session, so a missing stored
+// session can be replaced.
 import { readFileSync } from "node:fs";
 import { type AcpParams, type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
@@ -62,7 +63,7 @@ serveFakeAcpAgent({
     peer.reply(request, {
       protocolVersion: 1,
       agentInfo: { name: "stuck-session", version: "1.0.0" },
-      agentCapabilities: { loadSession: true },
+      agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } },
       authMethods: [],
     }),
   "session/new": (request, peer) => {
