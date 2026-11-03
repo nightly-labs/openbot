@@ -34,6 +34,22 @@ function withTaskDelta(conversation: ConversationSnapshot, delta: TaskDelta): Co
 }
 
 /**
+ * The list of an event, with the branch link of each task that the stored list has. The
+ * `agent-tasks-v1` events carry no link, and a link does not change.
+ */
+function withStoredBranches(snapshot: AgentTasksSnapshot, stored: AgentTasksSnapshot | undefined): AgentTasksSnapshot {
+  if (!stored?.tasks.some((task) => task.branch)) return snapshot;
+  const links = new Map(stored.tasks.flatMap((task) => (task.branch ? [[task.id, task.branch] as const] : [])));
+  return {
+    ...snapshot,
+    tasks: snapshot.tasks.map((task) => {
+      const branch = task.branch === undefined ? links.get(task.id) : undefined;
+      return branch ? { ...task, branch } : task;
+    }),
+  };
+}
+
+/**
  * Writes one task event of `agent-tasks-v1` into the cached reads, as the desktop Tasks page does: the
  * whole task list of one agent, the whole conversation of one task, or streamed text of it.
  */
@@ -44,7 +60,13 @@ export function applyTaskEvent(
   event: AgentEvent | TeamRealtimeEvent,
 ): void {
   if (event.type === "agent-tasks-changed") {
-    queryClient.setQueryData(queryKeys.agentTasks(scope, serverId, event.snapshot.agentId), event.snapshot);
+    const key = queryKeys.agentTasks(scope, serverId, event.snapshot.agentId);
+    const stored = queryClient.getQueryData<AgentTasksSnapshot>(key);
+    queryClient.setQueryData(key, withStoredBranches(event.snapshot, stored));
+    // The event carries no branch link. A task that the list did not have can be a branch from
+    // another device, so the list loads again with the links.
+    if (stored && event.snapshot.tasks.some((task) => !stored.tasks.some((entry) => entry.id === task.id)))
+      void queryClient.invalidateQueries({ queryKey: key, exact: true });
     // A new answer in a thread, or a thread that starts or goes, changes what is unread. The host
     // sends no event when a read mark moves, so the marks load again with the list.
     void queryClient.invalidateQueries({

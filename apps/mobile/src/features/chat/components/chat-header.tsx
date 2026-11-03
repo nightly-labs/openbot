@@ -23,7 +23,7 @@ import { showsOnline } from "@/features/workspace/model/server-status";
 import { useColumnWidth, useSplitLayout } from "@/shared/components/adaptive-split";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
-import { ToolbarMenuItems } from "@/shared/components/toolbar-menu-items";
+import { toolbarMenuItems } from "@/shared/components/toolbar-menu-items";
 import { haptics } from "@/shared/lib/haptics";
 import { BAR_BUTTON_SIZE, NATIVE_BAR_BUTTON_TOP, NATIVE_BAR_HEIGHT, useBarTop } from "@/shared/lib/native-bar";
 import { isIOS } from "@/shared/lib/platform";
@@ -329,7 +329,7 @@ export function ChatHeader({
           />
           {actionsMenu ? (
             <Stack.Toolbar.Menu icon="ellipsis" accessibilityLabel={actionsMenu.label} hidden={accessibilityHidden}>
-              <ToolbarMenuItems actions={actionsMenu.actions} onPressAction={actionsMenu.onPressAction} />
+              {toolbarMenuItems(actionsMenu.actions, actionsMenu.onPressAction)}
             </Stack.Toolbar.Menu>
           ) : null}
         </Stack.Toolbar>
