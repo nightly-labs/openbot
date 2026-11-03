@@ -76,6 +76,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "تحديث الوكلاء غير مدعوم في هذا الاتصال.",
   "error.team.contextResetUnsupported": "بدء دردشة جديدة غير مدعوم في هذا الاتصال.",
   "error.team.contextCompactUnsupported": "ضغط السياق غير مدعوم في هذا الاتصال.",
+  "error.team.messageDeleteUnsupported": "لا يدعم هذا الاتصال حذف الرسائل.",
   "error.team.workspaceDirectoryUnsupported": "عرض المجلدات غير مدعوم في هذا الاتصال.",
   "error.team.conversationFileSearchUnsupported": "البحث في الملفات غير مدعوم في هذا الاتصال.",
   "error.team.sideQuestionUnsupported": "الأسئلة الجانبية غير مدعومة في هذا الاتصال.",

@@ -218,6 +218,11 @@ export const messages = {
     "Offene Wartevorgänge sind nur für Agenten auf diesem Computer verfügbar.",
   "error.backend.markUnreadRemoteUnsupported":
     "Eine Nachricht als ungelesen markieren ist nur für Agenten auf diesem Computer verfügbar.",
+  "error.backend.messageDeleteUnsupported": "Dieser Server unterstützt das Löschen von Nachrichten nicht.",
+  "error.backend.messageDeleteNotFound": "Diese Nachricht ist nicht im Chat.",
+  "error.backend.messageDeleteBusy":
+    "Diese Nachricht gehört zu einem laufenden Durchlauf. Lösche sie, wenn der Durchlauf endet.",
+  "error.backend.messageDeleteForbidden": "Du kannst nur die Nachrichten löschen, die du gesendet hast.",
   "error.backend.routineFlowHandoffFailed": "Die Routine konnte die Arbeit nicht an diesen Agenten übergeben.",
   "error.backend.mcpServerLimit": "OpenBot verwaltet bis zu {limit} MCP-Server.",
   "error.backend.mcpServerNameTaken": "Ein MCP-Server mit dem Namen {name} existiert bereits.",

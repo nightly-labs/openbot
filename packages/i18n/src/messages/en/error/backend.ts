@@ -194,6 +194,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.agentWaitRemoteUnsupported": "Open waits are only available for agents on this computer.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marking a message unread is only available for agents on this computer.",
+  "error.backend.messageDeleteUnsupported": "Deleting messages is not supported by this server.",
+  "error.backend.messageDeleteNotFound": "This message is not in the chat.",
+  "error.backend.messageDeleteBusy": "This message is part of a running turn. Delete it when the turn ends.",
+  "error.backend.messageDeleteForbidden": "You can delete only the messages that you sent.",
   "error.backend.routineFlowHandoffFailed": "The routine could not pass the work on to this agent.",
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",

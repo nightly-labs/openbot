@@ -21,6 +21,7 @@ import {
   type CreateChannelMemoryInput,
   channelRoutingConversationEventItemType,
   type DeleteChannelMemoryInput,
+  type DeleteChannelMessageInput,
   type QueueHold,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
@@ -54,6 +55,7 @@ import {
 import { ChannelMemoryStore } from "./channel-memory-store";
 import { type ChannelAssignment, type ChannelContext, ChannelStore } from "./channel-store";
 import type { DeliveryContext, MailboxStore } from "./mailbox-store";
+import { type MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import type { OpenBotDatabase } from "./openbot-database";
 import { extractJsonObject, StructuredOutputError } from "./structured-output";
 
@@ -193,7 +195,7 @@ export class ChannelService {
   #scope = Scope.makeUnsafe();
   readonly #pumps = new Map<string, Fiber.Fiber<void>>();
   readonly #commands = new Map<string, Deferred.Deferred<void>>();
-  readonly #commandFibers = new Set<Fiber.Fiber<Channel | void, ChannelOperationError>>();
+  readonly #commandFibers = new Set<Fiber.Fiber<Channel | void, ChannelOperationError | MessageDeleteRefused>>();
   readonly #interrupts = new Set<Fiber.Fiber<void>>();
   readonly #events = new Set<Fiber.Fiber<void>>();
   /**
@@ -335,7 +337,10 @@ export class ChannelService {
   });
 
   readonly #serialize = Effect.fn("ChannelService.serialize")(
-    <A extends Channel | void>(channelId: string, operation: Effect.Effect<A, ChannelOperationError>) =>
+    <A extends Channel | void, E extends ChannelOperationError | MessageDeleteRefused = ChannelOperationError>(
+      channelId: string,
+      operation: Effect.Effect<A, E>,
+    ) =>
       Effect.uninterruptibleMask((restore) =>
         Effect.gen({ self: this }, function* () {
           const prior = this.#commands.get(channelId);
@@ -432,6 +437,40 @@ export class ChannelService {
         }).pipe(Effect.ensuring(Effect.sync(() => this.#deletedChannels.delete(channelId))));
       }),
     ),
+  );
+
+  /**
+   * Deletes one message from the channel view and history. Members that already read it can still
+   * remember it. A message that an open task still uses, or that still streams, is `busy`.
+   */
+  readonly deleteMessage = Effect.fn("ChannelService.deleteMessage")(
+    (input: DeleteChannelMessageInput, access: MessageDeleteAccess) =>
+      this.#serialize(
+        input.channelId,
+        Effect.gen({ self: this }, function* () {
+          if (this.#deletedChannels.has(input.channelId))
+            return yield* new MessageDeleteRefused({ reason: "not-found" });
+          const message = yield* channelSync(() => this.store.message(input.channelId, input.messageId));
+          if (!message) return yield* new MessageDeleteRefused({ reason: "not-found" });
+          if (!access.deleteAny && !(message.author.kind === "member" && message.author.id === access.memberId))
+            return yield* new MessageDeleteRefused({ reason: "forbidden" });
+          const tasks = yield* channelSync(() => this.store.tasks(input.channelId));
+          if (
+            message.message.status === "streaming" ||
+            tasks.some(
+              (task) =>
+                !terminal(task) && (task.requestMessageId === message.id || task.sourceMessageIds.includes(message.id)),
+            )
+          )
+            return yield* new MessageDeleteRefused({ reason: "busy" });
+          const channel = yield* channelSync(() => this.store.get(input.channelId));
+          yield* channelSync(() => this.store.deleteMessage(channel, message));
+          yield* this.mailbox
+            .deleteChannelMessageCopy(input.channelId, message.id)
+            .pipe(Effect.mapError(channelFailure));
+          this.publish(input.channelId);
+        }),
+      ),
   );
 
   private readonly apply = Effect.fn("ChannelService.apply")(function* (

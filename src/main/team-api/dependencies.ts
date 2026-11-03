@@ -150,6 +150,7 @@ type TeamApiAgentMethods = Pick<
   | "listQueue"
   | "acknowledgeFailedTurn"
   | "setMessageReaction"
+  | "deleteConversationMessage"
   | "cancelQueuedMessage"
   | "steerQueuedMessage"
   | "updateQueuedMessage"

@@ -977,6 +977,33 @@ const Conversation = createSimpleContext({
       }
     }
 
+    /**
+     * Deletes a message of an agent's chat, or of one of its side threads with `taskId`. The host
+     * publishes the change, but a merge of the latest page keeps the loaded messages that the page
+     * does not hold, so the chat removes the message itself. A reply that quotes it shows the original
+     * as deleted. A failure throws to the dialog that asked.
+     */
+    async function deleteAgentMessage(
+      agentId: string,
+      messageId: string,
+      taskId?: string,
+      serverId = activeServerId(),
+    ): Promise<void> {
+      await conversationPort().agent.deleteConversationMessage(
+        taskId === undefined ? { agentId, messageId } : { agentId, messageId, taskId },
+        serverId,
+      );
+      if (taskId !== undefined || !scopeIsCurrent() || !conversations[agentId]) return;
+      rawAgentMessageBodies.delete(agentMessageKey(agentId, messageId));
+      updateConversation(agentId, (conversation) => {
+        conversation.messages = conversation.messages.filter((message) => message.id !== messageId);
+        conversation.references = Object.fromEntries(
+          Object.entries(conversation.references ?? {}).filter(([id]) => id !== messageId),
+        );
+        conversation.missingReferences = { ...conversation.missingReferences, [messageId]: true };
+      });
+    }
+
     /** Marks each unread agent chat read through its newest message, which may not be loaded yet. */
     async function markAllAgentMessagesRead(): Promise<void> {
       const serverId = activeServerId();
@@ -1058,6 +1085,7 @@ const Conversation = createSimpleContext({
       sendMessage,
       markAgentMessagesRead,
       markAgentMessagesUnread,
+      deleteAgentMessage,
       markAllAgentMessagesRead,
       presentPromptResolution,
       // See `AppProviders`: a chat window sends no typing state.

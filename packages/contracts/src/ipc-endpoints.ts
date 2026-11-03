@@ -249,6 +249,7 @@ import type {
   ChannelPage,
   ChannelReadInput,
   ChannelSummary,
+  DeleteChannelMessageInput,
   SetChannelImageInput,
 } from "./ipc-chat-channels";
 import type {
@@ -259,6 +260,7 @@ import type {
   ConversationSearchPage,
   ConversationSnapshot,
   ConversationWithReadState,
+  DeleteConversationMessageInput,
   MarkConversationReadInput,
   MarkConversationUnreadInput,
   OpenMessageLinkInput,
@@ -1467,6 +1469,8 @@ export const IPC_ENDPOINTS = {
     readChannel: scopedRequest<ChannelReadInput, ChannelPage>()("agent:channels:read"),
     channelCommand: scopedRequest<ChannelCommand, Channel>()("agent:channels:command"),
     deleteChannel: scopedRequest<string, void>()("agent:channels:delete"),
+    // A joined server takes it through `message-delete-v1`.
+    deleteChannelMessage: scopedRequest<DeleteChannelMessageInput, void>()("agent:channels:delete-message"),
     // Only this computer keeps a channel image. A joined server has no route for it.
     setChannelImage: scopedRequest<SetChannelImageInput, Channel>()("agent:channels:set-image"),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
@@ -1517,6 +1521,10 @@ export const IPC_ENDPOINTS = {
     ),
     sendMessage: scopedRequest<SendMessageInput, QueuedMessageReceipt>()("agent:send-message"),
     setMessageReaction: scopedRequest<SetMessageReactionInput, void>()("agent:set-message-reaction"),
+    // A joined server takes it through `message-delete-v1`.
+    deleteConversationMessage: scopedRequest<DeleteConversationMessageInput, void>()(
+      "agent:delete-conversation-message",
+    ),
     listQueue: scopedRequest<string, QueueSnapshot>()("agent:list-queue"),
     listWaits: scopedRequest<string, AgentWaitsSnapshot>()("agent:list-waits"),
     cancelWait: scopedRequest<CancelAgentWaitInput, void>()("agent:cancel-wait"),

@@ -99,6 +99,12 @@ export interface ChannelMessage {
   message: ConversationMessage;
 }
 
+/** Deletes one message of a channel from its history and view. Agents can still remember it. */
+export interface DeleteChannelMessageInput {
+  channelId: string;
+  messageId: string;
+}
+
 /** One ellipsised sidebar line: enough to preview a channel, never a whole message body. */
 export interface ChannelPreview {
   authorName: string;

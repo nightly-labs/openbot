@@ -34,6 +34,7 @@ const onReply = fn();
 const onCopy = fn();
 const onMarkUnread = fn();
 const onBranch = fn();
+const onDelete = fn();
 
 /** A message row with the action row and the right-click menu, as the timeline draws it. */
 function MenuRow(props: { message: AgentMessage; channel?: boolean; busy?: boolean }) {
@@ -104,6 +105,7 @@ function MenuRow(props: { message: AgentMessage; channel?: boolean; busy?: boole
           onMarkUnread={own() || props.channel ? undefined : onMarkUnread}
           onBranch={branch()}
           branchDisabled={props.busy}
+          onDelete={onDelete}
           {...actions}
         />
       )}
@@ -121,7 +123,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Right-click a message, or press Shift+F10 in its action row. React opens a submenu. The last
- * answer of a turn also has Branch from here, and an agent message has Mark unread.
+ * answer of a turn also has Branch from here, and an agent message has Mark unread. Delete is last.
  */
 export const AgentChat: Story = {
   render: () => (

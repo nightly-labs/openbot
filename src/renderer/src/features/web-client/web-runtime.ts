@@ -100,6 +100,7 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -216,6 +217,11 @@ interface WebConnectOptions {
   early?: WebEarlyReads;
 }
 
+/** The message that `message-delete-v1` deletes: in the chat of an agent, or in a channel. */
+export type WebMessageDelete =
+  | { kind: "agent"; agentId: string; messageId: string }
+  | { kind: "channel"; channelId: string; messageId: string };
+
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
   /** The status connections of the hosts that this tab has not opened. */
@@ -262,6 +268,11 @@ export interface WebWorkspaceRuntime {
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   /** This member's read state for each agent, keyed by agent id. Invalid entries are left out. */
   conversationReads(): Promise<Record<string, ConversationReadState>>;
+  /**
+   * Deletes one message of an agent's chat or of a channel, with `message-delete-v1`. A host
+   * without it refuses before a request goes out.
+   */
+  deleteMessage?: (input: WebMessageDelete) => Promise<void>;
   /** Tells a hosted server that this tab has focus. Send it only to a host with `focus-use-v1`. */
   focusUse(): Promise<void>;
   /** Resolves to the conversation message the host stored: the delivery id of the receipt. */
@@ -1107,6 +1118,17 @@ export function createWebWorkspaceRuntime(
     },
     async focusUse() {
       await request("POST", FOCUS_USE_ROUTES.ping);
+    },
+    async deleteMessage(input) {
+      if (!capabilities.includes(MESSAGE_DELETE_CAPABILITY))
+        throw new Error(currentText().t("error.team.messageDeleteUnsupported"));
+      if (input.kind === "agent")
+        await request("POST", MESSAGE_DELETE_ROUTES.agent, { agentId: input.agentId, messageId: input.messageId });
+      else
+        await request("POST", MESSAGE_DELETE_ROUTES.channel, {
+          channelId: input.channelId,
+          messageId: input.messageId,
+        });
     },
     async conversationReads() {
       const value = await request("GET", TEAM_API_ROUTES.agents.conversationReads);

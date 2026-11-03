@@ -177,6 +177,11 @@ export class AgentTasks implements TaskLanes {
     return task;
   }
 
+  /** Whether this agent has the task, open or closed. */
+  has(agentId: string, taskId: string): boolean {
+    return this.#store.task(taskId)?.agentId === agentId;
+  }
+
   /** A task of this agent, open or closed. */
   require(agentId: string, taskId: string): AgentThreadRecord {
     const task = this.#store.task(taskId);

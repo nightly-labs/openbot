@@ -155,6 +155,8 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       onCloseBrowserTab={closeBrowserTab}
       onOpenRemoteDesktop={openRemoteDesktopWorkspace}
       onStop={view.onStop}
+      onDeleteMessage={view.deleteMessageAction()}
+      canDeleteMessage={view.canDeleteMessage}
     />
   );
 }

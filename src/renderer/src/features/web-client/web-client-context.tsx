@@ -29,6 +29,7 @@ import type {
 import { canAdministerServer } from "@openbot/contracts/ipc";
 import { AGENT_COLORS_CAPABILITY, AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
@@ -1830,6 +1831,27 @@ export function createWebWorkspace(
     },
     markRead,
     markAllRead,
+    /**
+     * Deletes one message of an agent's chat on the connected host, and removes it from the loaded
+     * page at once. A reply that quotes it shows the original as deleted. A failure throws to the
+     * dialog that asked.
+     */
+    async deleteMessage(agentId: string, messageId: string): Promise<void> {
+      const remove = runtime.deleteMessage;
+      if (state.status !== "online" || !remove || !state.capabilities.includes(MESSAGE_DELETE_CAPABILITY))
+        throw new Error(currentText().t("error.team.messageDeleteUnsupported"));
+      const current = generation;
+      await remove({ kind: "agent", agentId, messageId });
+      if (disposed || current !== generation) return;
+      setState((draft) => {
+        const item = draft.conversations[agentId];
+        const page = item?.page;
+        if (!item || !page) return;
+        page.messages = page.messages.filter((message) => message.id !== messageId);
+        delete page.references[messageId];
+        item.missingReferences = { ...item.missingReferences, [messageId]: true };
+      });
+    },
     async mutateSidebarLayout(action: SidebarLayoutAction) {
       if (state.status !== "online" || !state.capabilities.includes("sidebar-layout")) {
         throw new Error(currentText().t("webClient.error.sidebarLayout"));
