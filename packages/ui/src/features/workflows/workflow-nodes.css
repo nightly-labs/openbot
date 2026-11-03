@@ -3090,7 +3090,7 @@ svg.wfn-shape-surface {
   }
 }
 
-/* The emoji of a Discord reaction, in the place of an icon. */
+/* The emoji of a Discord or Telegram reaction, in the place of an icon. */
 .wfn-emoji {
   display: inline-flex;
   flex: none;
