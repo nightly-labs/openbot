@@ -1520,6 +1520,11 @@ export class ChannelService {
       // those drafts into attachments and rewrites the stored request. Every other dispatch -
       // a resume, or a hand-off to another task - re-sends the committed copies instead.
       const request = yield* channelSync(() => this.store.message(channelId, task.requestMessageId));
+      const originId = task.sourceMessageIds[0];
+      const origin =
+        !originId || originId === task.requestMessageId
+          ? request
+          : yield* channelSync(() => this.store.message(channelId, originId));
       const ownsRequest = request?.taskId === task.id;
       const committing = ownsRequest && task.attachmentDraftIds.length > 0;
       // A request to several members gives each one a task of its own. The message names only the
@@ -1536,7 +1541,7 @@ export class ChannelService {
               .enqueue({
                 sender: { kind: "user" },
                 recipientAgentIds: [assignment.agentId],
-                text: assignmentText(task, request),
+                text: assignmentText(task, request, origin),
                 draftIds: task.attachmentDraftIds,
                 sourcePaths,
                 channelId,
