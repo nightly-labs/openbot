@@ -271,10 +271,10 @@ protocol 9 only). Host route `routeAgentColors` (`src/main/team-api/route-agent-
   see. An agent that is not in the list draws its hue.
 - `POST /v1/agent-colors/set` takes `{agentId, color | null}`. It needs manage access to the agent,
   as the avatar on the released agent route, and goes through `agents.updateAgent`.
-- After each `agents-changed`, the host compares the colour list with the list that it sent last. When
-  the list changed, it sends `agent-colors-changed` with the whole list to each peer that has the
-  capability, without the agents that the peer cannot see. A peer that declares the capability on
-  the event socket gets the list at once.
+- After each `agents-changed`, the host sends `agent-colors-changed` with the whole list to each peer
+  that has the capability, without the agents that the peer cannot see. It sends the list also when
+  no colour changed, so a peer that can now see an agent gets its colour; a client ignores a list
+  that did not change. A peer that declares the capability on the event socket gets the list at once.
 
 The main process of a joined desktop keeps the last list of each server
 (`RemoteServerEventRefresh`). It puts the colours into each `agents-changed` list and each agent
@@ -821,7 +821,8 @@ between app versions, so add only optional fields and raise `version` for a chan
 with a higher `version` is refused. An invalid agent is left out with a warning and the others are
 offered; invalid settings are left out the same way.
 
-Each agent carries its profile (name, title, instructions, avatar seed and image), provider, model
+Each agent carries its profile (name, title, instructions, avatar seed, colour and image; the exact
+colour is in the optional `avatarColor` field, and an older app draws the nearest `avatarHue`), provider, model
 and reasoning effort, notifications and busy-message mode, its routines (schedule, limit and missed
 policies; one-time routines are in the optional `oneTimeRoutines` field, so an older app skips them and
 keeps the agent), its memories (with the essential or searchable choice the user made) and the skill folders

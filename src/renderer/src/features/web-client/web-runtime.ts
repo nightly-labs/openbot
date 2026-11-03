@@ -1381,11 +1381,12 @@ export function createWebWorkspaceRuntime(
       // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on its
       // own route first. That route also sets the nearest hue, so the profile change then leaves the hue
       // out: on the released route a hue removes the colour. A removed colour keeps the hue, which then
-      // sets the colour that the user chose. Without the capability, only the hue goes.
+      // sets the colour that the user chose. A removed colour with a hue needs only the released route,
+      // because the hue removes the colour. Without the capability, only the hue goes.
       const colors = capabilities.includes(AGENT_COLORS_CAPABILITY);
-      const { avatarHue: _avatarHue, ...withoutHue } = fields;
+      const { avatarHue, ...withoutHue } = fields;
       const profile = colors && avatarColor ? withoutHue : fields;
-      if (colors && avatarColor !== undefined)
+      if (colors && avatarColor !== undefined && !(avatarColor === null && avatarHue !== undefined))
         await runTeamEffect(
           setAgentColor(teamApi, { agentId: input.agentId, color: avatarColor }).pipe(
             Effect.mapError((error) => error.cause),

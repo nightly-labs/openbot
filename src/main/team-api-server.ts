@@ -408,8 +408,6 @@ export class TeamApiServer {
   /** When the focus period of each session started, and its last focus ping. Push notifications do not read it. */
   readonly #sessionFocus = new Map<string, { since: number; at: number }>();
   #agentListener: ((event: AgentEvent) => void) | null = null;
-  /** The colours in the last `agent-colors-changed`, to send the event only when a colour changes. */
-  #lastAgentColorsKey: string | null = null;
   #sidebarLayoutListener: ((layout: SidebarLayoutSnapshot) => void) | null = null;
   #stopAgentAccessListener: (() => void) | null = null;
   #stopMachineAlertListener: (() => void) | null = null;
@@ -536,7 +534,6 @@ export class TeamApiServer {
     this.#heartbeat = null;
     if (this.#agentListener) this.#options.agents.off("event", this.#agentListener);
     this.#agentListener = null;
-    this.#lastAgentColorsKey = null;
     if (this.#sidebarLayoutListener) this.#options.sidebarLayout.off("changed", this.#sidebarLayoutListener);
     this.#sidebarLayoutListener = null;
     this.#stopAgentAccessListener?.();
@@ -1308,7 +1305,7 @@ export class TeamApiServer {
   #broadcastAgentEvent(event: AgentEvent): void {
     if (event.type !== "conversation") {
       this.#broadcastAgentEventToClients(event);
-      if (event.type === "agents-changed") this.#broadcastAgentColorsIfChanged();
+      if (event.type === "agents-changed") this.#broadcastAgentColors();
       return;
     }
 
@@ -1589,15 +1586,15 @@ export class TeamApiServer {
   }
 
   /**
-   * Each change of the agents sends `agents-changed`, also a change of a colour. The colours are compared
-   * with the last list that was sent, so `agent-colors-changed` goes out only when a colour changed.
+   * Each change of the agents sends `agents-changed`, also a change of a colour or of access. The colours
+   * go out after each one: a peer that can now see an agent gets its colour, and a client ignores a list
+   * that did not change.
    */
-  #broadcastAgentColorsIfChanged(): void {
-    const colors = agentColorsOf(this.#options.agents.listAgents());
-    const key = JSON.stringify(colors.agents);
-    if (key === this.#lastAgentColorsKey) return;
-    this.#lastAgentColorsKey = key;
-    this.#broadcastAgentEventToClients({ type: "agent-colors-changed", ...colors });
+  #broadcastAgentColors(): void {
+    this.#broadcastAgentEventToClients({
+      type: "agent-colors-changed",
+      ...agentColorsOf(this.#options.agents.listAgents()),
+    });
   }
 
   #sendBrowserPageState(client: Ws.WebSocket, connection: EventClientState): void {

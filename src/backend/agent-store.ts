@@ -2067,9 +2067,9 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     updatedAt: isString(value.updatedAt) || value.updatedAt === null ? value.updatedAt : reset("updatedAt", null),
     avatarSeed: isAvatarSeed(value.avatarSeed) ? value.avatarSeed : reset("avatarSeed", id),
     avatarHue,
-    // A build without colours that keeps unknown fields can change the hue and leave the colour.
-    // The hue is then the newer choice, so a colour that does not match it is dropped.
-    ...(avatarColor === undefined || nearestAvatarHue(avatarColor) !== avatarHue ? {} : { avatarColor }),
+    // A released build reads only the fields it knows, so its next write removes the colour. A stored
+    // colour is thus always the newest choice, and it stays even if the nearest hue changes later.
+    ...(avatarColor === undefined ? {} : { avatarColor }),
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
     ...(provider === undefined ? {} : { provider }),
     ...(access === undefined ? {} : { access }),
