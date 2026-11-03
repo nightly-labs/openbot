@@ -532,12 +532,21 @@ export const ChatComposer = memo(function ChatComposer({
         if (finished && !replyActive) scheduleOnRN(setShownReply, null);
       }),
     );
-    if (!replyActive) replyHold.set(withTiming(0, timing));
-  }, [replyActive, replyActiveValue, replyPresence, replyHold, shapeDuration]);
+    // A disabled composer takes no focus, so no keyboard comes to open it.
+    if (!replyActive || disabled) replyHold.set(withTiming(replyActive ? 1 : 0, timing));
+  }, [replyActive, replyActiveValue, replyPresence, replyHold, shapeDuration, disabled]);
   useAnimatedReaction(
-    () => replyActiveValue.get() && keyboardProgress.get() >= 0.99,
-    (open) => {
-      if (open) replyHold.set(1);
+    () => keyboardProgress.get(),
+    (progress, previous) => {
+      if (!replyActiveValue.get() || replyHold.get() > 0) return;
+      if (progress >= 0.99) replyHold.set(1);
+      // The keyboard closes before it is fully up: open the rest of the way from where it is.
+      else if (previous !== null && progress < previous) {
+        replyHold.set(progress);
+        replyHold.set(
+          withTiming(1, { duration: shapeDuration, easing: SHAPE_EASING_FN, reduceMotion: ReduceMotion.System }),
+        );
+      }
     },
   );
   // The keyboard drives the shape frame by frame, so zeroing the other
