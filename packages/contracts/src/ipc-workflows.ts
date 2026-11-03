@@ -60,7 +60,8 @@ export type WorkflowFieldValue = string | number | boolean;
 /**
  * The fields of a node, by name. The host reads only the names its runtime needs:
  * - trigger: `trigger` (a `WorkflowTriggerType`) and `timezone`; the schedule is `WorkflowNode.schedule`.
- *   For `github`: `repository` ("owner/name"), `event` (a `WorkflowGitHubEvent`), `filters` and `labels`
+ *   For `github`: `repositories` ("owner/name", one a line) and `repository` (its first name; read both
+ *   with `workflowGitHubTriggerRepositories`), `event` (a `WorkflowGitHubEvent`), `filters` and `labels`
  *   (lists, one name a line), `titleText` and `branch` (the values of those filters). For `discord`:
  *   `connectionId` (the Discord server's messaging connection), `event` (a `WorkflowDiscordEvent`),
  *   `placeId` (a channel id, "" for any channel), `roles` (role ids, one a line, "" for anyone) and
@@ -74,7 +75,7 @@ export type WorkflowFieldValue = string | number | boolean;
  * - condition: `rule`, the yes-or-no question about its input.
  * - approval: `question`.
  * - output: `target` (a `WorkflowOutputTarget`); for `channel`, `connectionId` and `placeId`. For
- *   `github`: `repository` ("owner/name", or "trigger" for the trigger's), `item` ("event" for the item
+ *   `github`: `repository` ("owner/name", or "trigger" for the repository of the trigger's event), `item` ("event" for the item
  *   of the event, "input" for the number in the input), `action` (a `WorkflowGitHubAction`), `labels`
  *   (a list), `labelsFrom` and `person` ("agent" when the agent chooses), `reason` and `title`. For
  *   `discord`: `connectionId` ("trigger" for the trigger's server), `action` (a `WorkflowDiscordAction`),

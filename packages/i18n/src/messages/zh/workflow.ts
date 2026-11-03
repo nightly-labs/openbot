@@ -221,6 +221,8 @@ export const messages = {
   "workflow.row.agentCanChoose": "助手可选项",
   "workflow.row.whoChooses": "由谁选择",
   "workflow.github.repository": "仓库",
+  "workflow.github.repositories": "仓库",
+  "workflow.github.noEvents": "无事件",
   "workflow.github.chooseRepository": "选择仓库",
   "workflow.github.searchRepositories": "搜索仓库",
   "workflow.github.events.issues": "议题",

@@ -89,10 +89,12 @@ import {
   workflowDiscordPayload,
 } from "./discord-matching";
 import {
+  type GitHubEventFacts,
   githubEventFacts,
   githubFilterRefuses,
   githubTriggerMatches,
-  githubTriggerRepository,
+  githubTriggerRepositories,
+  withoutStaleGitHubRepositories,
   workflowGitHubPayload,
 } from "./github-matching";
 import {
@@ -1107,18 +1109,17 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return yield* attempt(() => store.listWithGraphs());
         });
 
+        /** The graph as the host saves it. */
+        const prepareGraph = (graph: WorkflowGraph) =>
+          withoutStaleGitHubRepositories(prepareWorkflowSchedules(graph, dependencies.timezone(), now()));
+
         const get = Effect.fn("Workflows.get")(function* (workflowId: string) {
           return yield* attempt(() => detailOf(workflowId));
         });
 
         const create = Effect.fn("Workflows.create")(function* (input: CreateWorkflowInput) {
           const detail = yield* attempt(() =>
-            store.create(
-              input.graph
-                ? { ...input, graph: prepareWorkflowSchedules(input.graph, dependencies.timezone(), now()) }
-                : input,
-              now(),
-            ),
+            store.create(input.graph ? { ...input, graph: prepareGraph(input.graph) } : input, now()),
           );
           changed(detail.summary.id);
           rearm();
@@ -1149,12 +1150,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
 
         const saveGraph = Effect.fn("Workflows.saveGraph")(function* (input: SaveWorkflowGraphInput) {
           const result = yield* attempt(() =>
-            store.saveGraph(
-              input.workflowId,
-              input.baseRevision,
-              prepareWorkflowSchedules(input.graph, dependencies.timezone(), now()),
-              now(),
-            ),
+            store.saveGraph(input.workflowId, input.baseRevision, prepareGraph(input.graph), now()),
           );
           // A conflict changed nothing: the editor that saved gets the newer workflow in the answer.
           if (result.ok) {
@@ -1425,14 +1421,14 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           store.listWithGraphs().flatMap(({ summary, graph }) =>
             graph.nodes.flatMap((node) => {
               const event = node.fields.event;
-              return githubTriggerRepository(node) && isOneOf(WORKFLOW_GITHUB_EVENTS, event)
+              return githubTriggerRepositories(node).length > 0 && isOneOf(WORKFLOW_GITHUB_EVENTS, event)
                 ? [{ workflowId: summary.id, node, event }]
                 : [];
             }),
           );
 
         const watchedRepositories = () => [
-          ...new Set(githubTriggers().flatMap((trigger) => githubTriggerRepository(trigger.node) ?? [])),
+          ...new Set(githubTriggers().flatMap((trigger) => githubTriggerRepositories(trigger.node))),
         ];
 
         /** Tells the GitHub route which repositories the saved triggers watch. The change it follows stays. */
@@ -1499,8 +1495,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const detail = store.detail(workflowId);
           for (const delivery of github.waiting(workflowId)) {
             if (github.runOpen(workflowId, delivery.item)) continue;
+            // An event of a repository that the trigger no longer watches does not start a run.
+            const repository = delivery.item.repository.toLowerCase();
             const trigger = detail?.graph.nodes.find(
-              (node) => node.id === delivery.nodeId && githubTriggerRepository(node) !== null,
+              (node) =>
+                node.id === delivery.nodeId &&
+                githubTriggerRepositories(node).some((name) => name.toLowerCase() === repository),
             );
             if (!detail || !trigger) github.endWaiting(delivery, { reason: "refused" });
             else if (delivery.causedByBot && chainTooLong(delivery.item))
@@ -1613,29 +1613,40 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           if (!api) return yield* refuse("refused", sourceText("error.workflow.githubNotConnected"));
           const detail = yield* attempt(() => detailOf(input.workflowId));
           const trigger = detail.graph.nodes.find((node) => node.id === input.nodeId);
-          const repository = trigger ? githubTriggerRepository(trigger) : null;
+          const repositories = trigger ? githubTriggerRepositories(trigger) : [];
           const event = trigger?.fields.event;
-          if (!trigger || !repository || !isOneOf(WORKFLOW_GITHUB_EVENTS, event))
+          if (!trigger || repositories.length === 0 || !isOneOf(WORKFLOW_GITHUB_EVENTS, event))
             return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
-          // GitHub is asked outside the lock: the other runs do not wait for it.
-          const recent = yield* api
-            .recentEvents(repository, event)
-            .pipe(Effect.mapError((failure) => refuse("refused", failure.message)));
+          // GitHub is asked outside the lock: the other runs do not wait for it. The events of different
+          // repositories have no common time, so the first repository in the trigger's order with a
+          // matching event gives it. A repository that GitHub refuses is skipped while another one answers.
           const bot = dependencies.githubApp();
-          const facts = recent
-            .map((candidate) => githubEventFacts(candidate.event, candidate.body, bot))
-            .find(
-              (candidate) =>
-                candidate !== null &&
-                githubTriggerMatches(trigger, candidate) &&
-                !githubFilterRefuses(trigger, candidate),
+          let facts: GitHubEventFacts | undefined;
+          let failure: string | null = null;
+          for (const repository of repositories) {
+            const answer = yield* api.recentEvents(repository, event).pipe(
+              Effect.map((recent) => ({ recent, failure: null })),
+              Effect.catch((error) => Effect.succeed({ recent: [], failure: error.message })),
             );
-          if (!facts) return yield* refuse("refused", sourceText("error.workflow.githubNoEvent"));
+            failure = answer.failure ?? failure;
+            facts = answer.recent
+              .map((candidate) => githubEventFacts(candidate.event, candidate.body, bot))
+              .find(
+                (candidate): candidate is GitHubEventFacts =>
+                  candidate !== null &&
+                  githubTriggerMatches(trigger, candidate) &&
+                  !githubFilterRefuses(trigger, candidate),
+              );
+            if (facts) break;
+          }
+          if (!facts) return yield* refuse("refused", failure ?? sourceText("error.workflow.githubNoEvent"));
+          const found = facts;
+          const repository = found.repository.toLowerCase();
           return yield* locked(
             Effect.gen(function* () {
               const current = yield* attempt(() => detailOf(input.workflowId));
               const node = current.graph.nodes.find((candidate) => candidate.id === trigger.id);
-              if (!node || githubTriggerRepository(node) !== repository)
+              if (!node || !githubTriggerRepositories(node).some((name) => name.toLowerCase() === repository))
                 return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
               const deliveryId = `last:${input.requestId}`;
               const { run } = yield* begin(
@@ -1645,7 +1656,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                   source: "manual",
                   scheduledFor: null,
                   idempotencyKey: `manual:${input.requestId}`,
-                  payload: workflowGitHubPayload(node.id, deliveryId, event, facts, now().toISOString()),
+                  payload: workflowGitHubPayload(node.id, deliveryId, event, found, now().toISOString()),
                 },
                 // A run that a person starts does not wait for the run of its item.
                 (started) =>
@@ -1654,7 +1665,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                     workflowId: current.summary.id,
                     nodeId: node.id,
                     deliveryId: null,
-                    item: facts.item,
+                    item: found.item,
                     causedByBot: false,
                     startedAt: started.startedAt,
                   }),
