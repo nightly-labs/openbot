@@ -39,6 +39,14 @@ export function knownImageDimensions(id: string): ImageDimensions | null {
   return dimensionCache.get(id);
 }
 
+/**
+ * A file the chat shows as a picture, as desktop does. An SVG is a `file` attachment, so the agent
+ * reads its text, but its preview is an image.
+ */
+export function showsAsImage(attachment: Pick<AttachmentSummary, "kind" | "previewKind">): boolean {
+  return attachment.kind === "image" || attachment.previewKind === "image";
+}
+
 /** The short type a file card shows, such as PDF or CSV, from the name the user sees. */
 export function attachmentTypeLabel(name: string, mimeType: string, t: MobileTranslate): string {
   const extension = attachmentFileExtension(name);

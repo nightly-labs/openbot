@@ -19,7 +19,7 @@ import { useText } from "@/shared/lib/text";
 import { attachmentFrame, FILL, FRAME_RADIUS, MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { storeCodePreview } from "../model/code-preview-store";
 import { type ImageDimensions, sameShape } from "../model/image-dimensions";
-import { attachmentTypeLabel, rememberImageDimensions, useAttachmentFile } from "./attachment-preview";
+import { attachmentTypeLabel, rememberImageDimensions, showsAsImage, useAttachmentFile } from "./attachment-preview";
 import { ChatCodePreview } from "./chat-code-preview";
 import { isViewableImage, useChatImageSource } from "./chat-image-viewer";
 import { HtmlPage } from "./html-page";
@@ -174,7 +174,7 @@ function ChatFileAttachment({ attachment, serverId, alignment = "left", upload }
   const { width } = useWindowDimensions();
   const tooLarge = attachment.size > MOBILE_ATTACHMENT_BYTES;
   // An image above the transfer limit cannot be shown here, so it is a file the user opens on desktop.
-  const image = attachment.kind === "image" && !tooLarge;
+  const image = showsAsImage(attachment) && !tooLarge;
   const { pending, localUri, uri, dimensions, query, sharing, share } = useAttachmentFile(serverId, attachment, image);
   // The conversation's viewer measures this copy and hides it on the UI thread while it holds the picture.
   const source = useChatImageSource(image && isViewableImage(attachment) ? attachment.id : null, FRAME_RADIUS);
