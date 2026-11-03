@@ -408,13 +408,14 @@ export class BrowserHost {
   #destroying: Deferred.Deferred<void, BrowserOperationError> | null = null;
   /** Whether the machine is too low on memory for one more tab. Only a server has a reading. */
   readonly #memoryLow: () => boolean;
-  readonly #idleTabSweep: NodeJS.Timeout;
+  readonly #idleTabSweep: NodeJS.Timeout | null;
 
   constructor(
     window: BrowserWindow,
     downloadsRoot: string,
     statePath: string,
     options: {
+      idleSweep?: boolean;
       recordingDurationMs?: number;
       recordingMaxConcurrent?: number;
       recordingMaxAggregateBytes?: number;
@@ -456,12 +457,15 @@ export class BrowserHost {
     // Service workers read the process fallback instead of the session, so it changes too.
     app.userAgentFallback = sessionBrowserUserAgent(app.userAgentFallback);
     this.#configureSession(this.#session);
-    this.#idleTabSweep = setInterval(() => {
-      void runCauseEffect(this.#sleepIdleTabs()).catch((error) =>
-        logger.warn("Unable to sleep browser tabs", { error: toLogValue(error) }),
-      );
-    }, IDLE_TAB_SWEEP_MS);
-    this.#idleTabSweep.unref();
+    this.#idleTabSweep =
+      options.idleSweep === false
+        ? null
+        : setInterval(() => {
+            void runCauseEffect(this.#sleepIdleTabs()).catch((error) =>
+              logger.warn("Unable to sleep browser tabs", { error: toLogValue(error) }),
+            );
+          }, IDLE_TAB_SWEEP_MS);
+    this.#idleTabSweep?.unref();
   }
 
   readonly restore = Effect.fn("BrowserHost.restore")(function* (
@@ -2448,7 +2452,7 @@ export class BrowserHost {
     if (this.#destroying) return yield* Deferred.await(this.#destroying);
     const done = Deferred.makeUnsafe<void, BrowserOperationError>();
     this.#destroying = done;
-    clearInterval(this.#idleTabSweep);
+    if (this.#idleTabSweep) clearInterval(this.#idleTabSweep);
     const result = yield* Effect.exit(
       Effect.gen({ self: this }, function* () {
         // Capture the persisted tab list before removing native views.

@@ -35,6 +35,7 @@ import { type BackgroundTray, createBackgroundTray } from "./background-tray";
 import { removeClaudeCodeSessionEnvironment } from "./claude-session-environment";
 import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
 import { requestNotificationPermission, showRetainedNotification } from "./desktop-notifications";
+import { admitDesktopTest, desktopTestRequestAllowed } from "./desktop-test-mode";
 import { guardDevelopmentOutput } from "./development-output";
 import {
   developmentUserDataName,
@@ -134,7 +135,7 @@ import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { trustSystemCertificates } from "./system-certificates";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
-import { setIpcCallObserver } from "./trusted-ipc";
+import { setDesktopTestRequestGuard, setIpcCallObserver } from "./trusted-ipc";
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setWindowAppearance } from "./window-appearance";
 
@@ -205,7 +206,31 @@ try {
   logger.warn("Could not read the system certificate store; Node uses its bundled roots only:", toLogValue(error));
 }
 
-const commandLineUserDataDirectory = app.commandLine.getSwitchValue("user-data-dir").trim();
+const desktopTestRoot = app.commandLine.getSwitchValue("desktop-test-root").trim();
+if (
+  app.commandLine.hasSwitch("desktop-test-root") &&
+  (app.commandLine.hasSwitch("user-data-dir") ||
+    Object.keys(process.env).some((key) => key.startsWith("OPENBOT_") || key === "ELECTRON_RENDERER_URL"))
+) {
+  throw new Error("Desktop test mode refuses profile and runtime environment overrides.");
+}
+const desktopTest = app.commandLine.hasSwitch("desktop-test-root")
+  ? Effect.runSync(admitDesktopTest(desktopTestRoot, app.isPackaged))
+  : null;
+if (desktopTest) {
+  setDesktopTestRequestGuard(desktopTestRequestAllowed);
+  app.setPath("sessionData", desktopTest.profile);
+  app.setPath("crashDumps", join(desktopTest.profile, "crashes"));
+  app.setPath("temp", desktopTest.temporary);
+  app.on("session-created", (session) => {
+    session.webRequest.onBeforeRequest((details, callback) => {
+      callback({
+        cancel: !["file:", "devtools:", "openbot-app:", "about:", "data:"].includes(new URL(details.url).protocol),
+      });
+    });
+  });
+}
+const commandLineUserDataDirectory = desktopTest?.profile ?? app.commandLine.getSwitchValue("user-data-dir").trim();
 const developmentProfile = !app.isPackaged ? readDevelopmentProfile(process.env.OPENBOT_DEV_PROFILE) : null;
 const developmentRemoteRole =
   !app.isPackaged &&
@@ -267,11 +292,11 @@ if (hasSingleInstanceLock) {
   startMainLog(join(app.getPath("userData"), "logs"));
   // Crash dumps stay in `crashDumps` on this computer. Crashpad removes old reports itself. Without
   // them, a window that disappeared on Windows left nothing to tell a crash from a quit (#2675).
-  crashReporter.start({ uploadToServer: false });
+  if (!desktopTest) crashReporter.start({ uploadToServer: false });
   // Linux AppImage: the handler must stop before the AppImage unmounts (#3066).
-  stopAppImageCrashpadHandlerAtExit();
+  if (!desktopTest) stopAppImageCrashpadHandlerAtExit();
   // A file request that never finishes must not keep the process and its lock after an exit.
-  stopStuckExitAfterLimit(join(app.getPath("userData"), "logs"));
+  if (!desktopTest) stopStuckExitAfterLimit(join(app.getPath("userData"), "logs"));
 }
 // Linux: the GPU stays on until it fails on this computer (#992). `userData` has its final path here.
 configureLinuxGpu({
@@ -365,7 +390,9 @@ type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace"
 // One link at a time, of whichever kind: a second replaces the first, because what a user opened
 // last is what they meant. `deepLinkReceiverReady` says a window has asked for it, which is what
 // tells a link that arrives now to be sent rather than held.
-let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(findDeepLink(process.argv, inviteLinkOptions));
+let pendingDeepLink: RendererDeepLink | null = desktopTest
+  ? null
+  : takeRendererDeepLink(findDeepLink(process.argv, inviteLinkOptions));
 let deepLinkReceiverReady = false;
 
 const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
@@ -918,6 +945,7 @@ function requestDesktopNotificationPermission(
 /** `null` for every state but a signed-in one, matching what the two principal trackers store. */
 /** The Dock tile, the Linux desktop entry and the `openbot://` scheme. A local server has none of them. */
 async function presentApplication(): Promise<void> {
+  if (desktopTest) return;
   await ensureMacApplicationPresence(
     process.platform,
     (policy) => app.setActivationPolicy(policy),
@@ -948,6 +976,10 @@ function centralAuthPrincipalId(state: CentralAuthState): string | null {
 }
 
 function forwardCentralAuth(state: CentralAuthState): void {
+  if (desktopTest) {
+    sendToRenderer(windowHolder.current, IPC_ENDPOINTS.auth.event, state);
+    return;
+  }
   // A local server has no account: its owner is a password member that a sign-out must not unbind.
   if (localServerChild) return;
   if (state.status === "signed_in") {
@@ -1051,6 +1083,7 @@ function forwardCentralAuth(state: CentralAuthState): void {
  * cold start work: the window that the link itself opened asks for it once it is ready.
  */
 function acceptDeepLink(link: DeepLink): void {
+  if (desktopTest) return;
   if (link.kind === "mcp-auth") {
     receiveMcpAuthorizationCode(link.state, link.code);
     return;
@@ -1156,6 +1189,10 @@ function receiveMcpAuthorizationCode(state: string, code: string): void {
 }
 
 app.on("open-url", (event, url) => {
+  if (desktopTest) {
+    event.preventDefault();
+    return;
+  }
   const link = parseDeepLink(url, inviteLinkOptions);
   if (!link) return;
   event.preventDefault();
@@ -1163,6 +1200,10 @@ app.on("open-url", (event, url) => {
 });
 
 app.on("continue-activity", (event, type, _userInfo, details) => {
+  if (desktopTest) {
+    event.preventDefault();
+    return;
+  }
   if (type !== "NSUserActivityTypeBrowsingWeb" || !details.webpageURL) return;
   try {
     parseInviteUrl(details.webpageURL, inviteLinkOptions);
@@ -1208,7 +1249,7 @@ if (!hasSingleInstanceLock) {
       // Set the Dock icon before `dock.show()` below. A development build runs the stock Electron.app,
       // so until this call its Dock tile shows the Electron logo.
       if (process.platform === "darwin" && !localServerChild) setDockIcon(appIconPath);
-      if (!(await runCauseEffect(hostAllowsTenantLaunch()))) {
+      if (!desktopTest && !(await runCauseEffect(hostAllowsTenantLaunch()))) {
         app.quit();
         return;
       }
@@ -1220,6 +1261,7 @@ if (!hasSingleInstanceLock) {
       const mainWindow = windows.openMainWindow();
 
       const built = await createApplicationServices({
+        desktopTest,
         mainWindow,
         windows,
         appIconPath,
@@ -1289,6 +1331,7 @@ if (!hasSingleInstanceLock) {
       // Turns and channel messages also send these events, so only a deleted owner starts a sync.
       let webhookAgentIds = new Set(service.listAgents().map((agent) => agent.id));
       const onRoutineEvent = (event: AgentEvent): void => {
+        if (desktopTest) return;
         switch (event.type) {
           case "routines-changed":
           case "channel-routines-changed":
@@ -1312,6 +1355,7 @@ if (!hasSingleInstanceLock) {
       let webhookPrincipalId = centralAuthPrincipalId(built.centralAuth.getState());
       built.eventsRuntime.setAccountPrincipal(webhookPrincipalId);
       const refreshWebhookRoutes = (state: CentralAuthState): void => {
+        if (desktopTest) return;
         const principalId = centralAuthPrincipalId(state);
         if (principalId === webhookPrincipalId) return;
         webhookPrincipalId = principalId;
@@ -1326,7 +1370,7 @@ if (!hasSingleInstanceLock) {
         webhookHostId = status.serverId;
         forwardHostStatus(status);
         const principalId = centralAuthPrincipalId(built.centralAuth.getState());
-        if (hostIdentityChanged && principalId !== null && status.serverId !== null)
+        if (!desktopTest && hostIdentityChanged && principalId !== null && status.serverId !== null)
           built.eventsRuntime.syncRoutes({ all: true });
       };
       teardown.push(0, "event service listeners", () => {
@@ -1396,7 +1440,7 @@ if (!hasSingleInstanceLock) {
         app.exit(0);
       });
       built.requestedUpdate.on("preference", forwardUpdatePreference);
-      updater.start();
+      if (!desktopTest) updater.start();
       // Each tenant quits only itself. The host verifies process exit independently.
       built.hostUpdateCoordinator.setStopHandler(async () => {
         await prepareForUpdateInstall(SHUTDOWN_DEADLINE_MS);
@@ -1423,9 +1467,10 @@ if (!hasSingleInstanceLock) {
         });
         return;
       }
-      void requestDesktopNotificationPermission(built.notificationPreference, language.translate).catch((error) =>
-        logger.warn("Unable to ask for notification permission:", toLogValue(error)),
-      );
+      if (!desktopTest)
+        void requestDesktopNotificationPermission(built.notificationPreference, language.translate).catch((error) =>
+          logger.warn("Unable to ask for notification permission:", toLogValue(error)),
+        );
       configureApplicationMenu(
         service,
         updater,
@@ -1433,6 +1478,7 @@ if (!hasSingleInstanceLock) {
         language.translate,
         () => windowHolder.current,
         quitFor,
+        desktopTest !== null,
       );
       // The way back to a window hidden in the background.
       backgroundTray = createBackgroundTray({
@@ -1471,6 +1517,7 @@ if (!hasSingleInstanceLock) {
           language.translate,
           () => windowHolder.current,
           quitFor,
+          desktopTest !== null,
         );
         tray.relabel();
         for (const window of BrowserWindow.getAllWindows()) {
@@ -1499,20 +1546,22 @@ if (!hasSingleInstanceLock) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appInterfaceSizePreference, preference);
         }
       });
-      await runCauseEffect(dynamicIsland.initialize()).catch((error) =>
-        logger.error("Unable to initialize Dynamic Island:", toLogValue(error)),
-      );
+      if (!desktopTest)
+        await runCauseEffect(dynamicIsland.initialize()).catch((error) =>
+          logger.error("Unable to initialize Dynamic Island:", toLogValue(error)),
+        );
       const reconcileDynamicIsland = () =>
         void Effect.runPromise(dynamicIsland.reconcileWindow()).catch((error) =>
           logger.error("Unable to reconcile Dynamic Island displays:", toLogValue(error)),
         );
       // The island pages load beside the main window, not before it.
-      reconcileDynamicIsland();
+      if (!desktopTest) reconcileDynamicIsland();
       await windows.loadRenderer(mainWindow);
       performance.mark("openbot:renderer-loaded");
       // `sendToRenderer` dropped the server changes made while the window loaded: the host list and
       // the connection of the selected server. The renderer can have read the list before them.
       forwardServers(remoteServers.list());
+      if (desktopTest) return;
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       await Effect.runPromise(remoteServers.startEventConnections());
       screen.on("display-added", reconcileDynamicIsland);

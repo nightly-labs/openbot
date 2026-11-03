@@ -69,6 +69,8 @@ export function setIpcCallObserver(observer: ((call: IpcCallRecord) => void) | n
 }
 
 function observeCall<Result>(channel: string, run: () => Result): Result {
+  if (desktopTestRequestGuard && !desktopTestRequestGuard(channel))
+    throw new Error("This action is disabled in desktop test mode.");
   const observer = ipcCallObserver;
   if (!observer) return run();
   const startedAt = performance.now();
@@ -187,4 +189,11 @@ export function handleTrustedWithEvent(channel: string, ...registration: Trusted
       }),
     );
   });
+}
+
+/** An unpackaged desktop test permits only inspected local bootstrap reads. */
+let desktopTestRequestGuard: ((channel: string) => boolean) | null = null;
+export function setDesktopTestRequestGuard(guard: (channel: string) => boolean): void {
+  if (desktopTestRequestGuard) throw new Error("Desktop test request guard is already set.");
+  desktopTestRequestGuard = guard;
 }

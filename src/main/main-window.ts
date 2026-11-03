@@ -942,6 +942,7 @@ export function configureApplicationMenu(
   translate: AppTranslate,
   getMainWindow: () => BrowserWindow | null,
   quit: (source: MenuQuitSource) => void,
+  desktopTest = false,
 ): void {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
@@ -950,14 +951,16 @@ export function configureApplicationMenu(
         submenu: [
           {
             label: translate("menu.stopAllAgents"),
+            enabled: !desktopTest,
             accelerator: "CommandOrControl+.",
             click: () => {
-              Effect.runFork(service.interruptAll());
+              if (!desktopTest) Effect.runFork(service.interruptAll());
             },
           },
           { type: "separator" },
           {
             label: translate("menu.checkForUpdates"),
+            enabled: !desktopTest,
             click: (_item, focusedWindow) => {
               // On macOS a closed main window only hides and the menu stays, so show it again: the
               // check and its result are visible only in Settings.
@@ -967,7 +970,7 @@ export function configureApplicationMenu(
                 if (target !== focused) showMainWindow(target);
                 sendToRenderer(target, IPC_ENDPOINTS.app.openUpdateSettings);
               }
-              Effect.runFork(updater.checkForUpdates());
+              if (!desktopTest) Effect.runFork(updater.checkForUpdates());
             },
           },
           { type: "separator" },
