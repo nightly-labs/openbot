@@ -216,7 +216,7 @@ function newestOfEachFamily(matches: readonly { id: string; match: CatalogMatch 
  * service is in the catalog, as with a custom endpoint: the user added it. So a `-fast` or `-flex`
  * service tier that OpenCode adds to a known service does not show.
  */
-export function defaultShownModelIds(models: readonly { id: string }[], lookup: ReleaseLookup): string[] {
+function defaultShownModelIds(models: readonly { id: string }[], lookup: ReleaseLookup): string[] {
   const matches = models.map((model) => ({ id: model.id, match: matchCatalog(model.id, lookup) }));
   if (models.length <= SHORT_LIST) return newestOfEachFamily(matches);
   const catalogued = new Set(matches.filter(({ match }) => match.release).map(({ match }) => match.service));
@@ -264,19 +264,11 @@ function modelsInUse(agents: readonly AgentSummary[]): Set<ModelKey> {
   return keys;
 }
 
-/** The models of one provider that an admin turned on or off. Every other model follows the default. */
-interface ModelOverrides {
-  shown: ReadonlySet<string>;
-  hidden: ReadonlySet<string>;
-}
-
 /** How the picker shows each model of one provider. */
 interface ProviderPicker {
-  /** The models that the default shows. */
+  /** The models that the main list shows. The picker folds the others under Older models. */
   byDefault: ReadonlySet<string>;
-  /** The models that the picker shows in its main list: the default, with the admin's changes. */
-  shown: ReadonlySet<string>;
-  /** The models that an admin turned off. The picker leaves them out, also after the default drops them. */
+  /** The models that an admin turned off. The picker leaves them out. */
   hidden: ReadonlySet<string>;
   /** The release date of each model that the catalog has, `YYYY-MM-DD`. */
   released: ReadonlyMap<string, string>;
@@ -297,17 +289,18 @@ export interface ModelVisibilityOptions {
  * Which models the model picker of this server shows, for each provider. Only the list that clients
  * read changes: agents, tools, automations and the backup model switch still reach every model.
  *
- * The file keeps only the models that an admin turned on or off. Every other model follows the
- * default of `defaultShownModelIds`, so a new release shows after an admin edits the list too. The
- * picker folds a model that the default hides under Older models, and leaves out a model that an
- * admin turned off. A model that an agent uses stays in the main list, so its picker can show it.
+ * The file keeps only the models that an admin turned off, and the picker leaves them out. Every
+ * other model shows: in the main list when `defaultShownModelIds` gives it, otherwise under Older
+ * models. So a new release shows after an admin edits the list too. A model that an agent uses stays
+ * in the picker, out of the fold, so its picker can show it.
  *
  * A file that is missing or unreadable as JSON reads as no changes. Writes are chained for the reason
  * `update-preference-store.ts` chains its own.
  */
 export class ModelVisibility {
   readonly #options: ModelVisibilityOptions;
-  #overrides = new Map<string, ModelOverrides>();
+  /** The models that an admin turned off, for each provider. */
+  #hidden = new Map<string, ReadonlySet<string>>();
   #writes = Semaphore.makeUnsafe(1);
 
   constructor(options: ModelVisibilityOptions) {
@@ -316,9 +309,9 @@ export class ModelVisibility {
 
   load(): Effect.Effect<void, PreferenceFileFailure> {
     return Effect.gen({ self: this }, function* () {
-      const loaded = yield* Effect.result(readPreferenceFile(this.#options.path, decodeOverrides));
+      const loaded = yield* Effect.result(readPreferenceFile(this.#options.path, decodeHidden));
       if (Result.isSuccess(loaded)) {
-        if (loaded.success) this.#overrides = loaded.success;
+        if (loaded.success) this.#hidden = loaded.success;
       } else if (!isMissingFileError(loaded.failure.cause) && !(loaded.failure.cause instanceof SyntaxError))
         return yield* loaded.failure;
     });
@@ -359,13 +352,12 @@ export class ModelVisibility {
     provider: AgentProviderRef,
   ) {
     const models = this.#options.listModels().filter((model) => model.provider === provider);
-    const { shown } = this.#providerPicker(provider, models, yield* this.#options.catalog.lookup());
-    const overrides = this.#overrides.get(provider);
+    const hidden = this.#hidden.get(provider);
     const visibility: ProviderModelVisibility = {
       provider,
       models: models.map((model) => ({ id: model.id, name: model.name })),
-      shown: models.filter((model) => shown.has(model.id)).map((model) => model.id),
-      changed: overrides !== undefined && overrides.shown.size + overrides.hidden.size > 0,
+      shown: models.filter((model) => !hidden?.has(model.id)).map((model) => model.id),
+      changed: hidden !== undefined && hidden.size > 0,
     };
     return visibility;
   });
@@ -374,32 +366,28 @@ export class ModelVisibility {
     this: ModelVisibility,
     change: ProviderModelVisibilityChange,
   ) {
-    const lookup = yield* this.#options.catalog.lookup();
     yield* this.#writes.withPermit(
       Effect.uninterruptible(
         Effect.gen({ self: this }, function* () {
-          const next = new Map(this.#overrides);
+          const next = new Map(this.#hidden);
           const requested = change.shown;
           if (requested === null) next.delete(change.provider);
           else {
-            const listed = this.#options.listModels().filter((model) => model.provider === change.provider);
-            const listedIds = new Set(listed.map((model) => model.id));
-            const byDefault = new Set(defaultShownModelIds(listed, lookup));
+            const listed = new Set(
+              this.#options
+                .listModels()
+                .filter((model) => model.provider === change.provider)
+                .map((model) => model.id),
+            );
             const on = new Set(requested);
             // A model that the provider does not list now, such as one of a signed-out service, keeps its choice.
-            const previous = this.#overrides.get(change.provider);
-            const shown = [...(previous?.shown ?? [])].filter((id) => !listedIds.has(id));
-            const hidden = [...(previous?.hidden ?? [])].filter((id) => !listedIds.has(id));
-            for (const id of listedIds) {
-              if (on.has(id) && !byDefault.has(id)) shown.push(id);
-              else if (!on.has(id) && (byDefault.has(id) || previous?.hidden.has(id))) hidden.push(id);
-            }
-            if (shown.length + hidden.length > 0)
-              next.set(change.provider, { shown: new Set(shown), hidden: new Set(hidden) });
+            const hidden = new Set([...(this.#hidden.get(change.provider) ?? [])].filter((id) => !listed.has(id)));
+            for (const id of listed) if (!on.has(id)) hidden.add(id);
+            if (hidden.size > 0) next.set(change.provider, hidden);
             else next.delete(change.provider);
           }
-          yield* writePreferenceFile(this.#options.path, encodeOverrides(next));
-          this.#overrides = next;
+          yield* writePreferenceFile(this.#options.path, encodeHidden(next));
+          this.#hidden = next;
         }),
       ),
     );
@@ -425,54 +413,45 @@ export class ModelVisibility {
     return models.flatMap((model): Model[] => {
       const picker = pickers.get(model.provider);
       if (!picker) return [model];
-      if (!picker.shown.has(model.id)) {
-        if (inUse.has(modelKey(model.provider, model.id))) return [model];
-        return picker.byDefault.has(model.id) || picker.hidden.has(model.id) ? [] : [{ ...model, listing: "older" }];
+      const used = inUse.has(modelKey(model.provider, model.id));
+      if (picker.hidden.has(model.id) && !used) return [];
+      if (picker.byDefault.has(model.id)) {
+        const released = Date.parse(picker.released.get(model.id) ?? "");
+        return now - released < NEW_MODEL_MS ? [{ ...model, listing: "new" }] : [model];
       }
-      const released = Date.parse(picker.released.get(model.id) ?? "");
-      return now - released < NEW_MODEL_MS ? [{ ...model, listing: "new" }] : [model];
+      return used ? [model] : [{ ...model, listing: "older" }];
     });
   });
 
   #providerPicker(provider: string, models: readonly { id: string }[], lookup: ReleaseLookup): ProviderPicker {
-    const overrides = this.#overrides.get(provider);
     const byDefault = new Set(defaultShownModelIds(models, lookup));
-    const shown = new Set(
-      models
-        .map((model) => model.id)
-        .filter((id) => overrides?.shown.has(id) || (byDefault.has(id) && !overrides?.hidden.has(id))),
-    );
     const released = new Map<string, string>();
     for (const model of models) {
       const date = matchCatalog(model.id, lookup).release?.date;
       if (date) released.set(model.id, date);
     }
-    return { byDefault, shown, hidden: overrides?.hidden ?? new Set(), released };
+    return { byDefault, hidden: this.#hidden.get(provider) ?? new Set(), released };
   }
 }
 
 /**
- * `{ version: 1, providers: { <provider>: { shown: [...], hidden: [...] } } }`. A provider entry of
- * another shape, such as the full list that a development build of this file kept, reads as no change.
+ * `{ version: 1, providers: { <provider>: { hidden: [...] } } }`. A provider entry of another shape,
+ * such as the full list that a development build of this file kept, reads as no change.
  */
-function decodeOverrides(parsed: unknown): Map<string, ModelOverrides> | null {
+function decodeHidden(parsed: unknown): Map<string, ReadonlySet<string>> | null {
   if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isDynamicRecord(parsed.providers)) return null;
-  const overrides = new Map<string, ModelOverrides>();
+  const hidden = new Map<string, ReadonlySet<string>>();
   for (const [provider, entry] of Object.entries(parsed.providers)) {
-    if (!isDynamicRecord(entry) || !Array.isArray(entry.shown) || !Array.isArray(entry.hidden)) continue;
-    overrides.set(provider, {
-      shown: new Set(entry.shown.filter(isString)),
-      hidden: new Set(entry.hidden.filter(isString)),
-    });
+    if (!isDynamicRecord(entry) || !Array.isArray(entry.hidden)) continue;
+    const ids = entry.hidden.filter(isString);
+    if (ids.length > 0) hidden.set(provider, new Set(ids));
   }
-  return overrides;
+  return hidden;
 }
 
-function encodeOverrides(overrides: ReadonlyMap<string, ModelOverrides>) {
+function encodeHidden(hidden: ReadonlyMap<string, ReadonlySet<string>>) {
   return {
     version: 1,
-    providers: Object.fromEntries(
-      [...overrides].map(([provider, entry]) => [provider, { shown: [...entry.shown], hidden: [...entry.hidden] }]),
-    ),
+    providers: Object.fromEntries([...hidden].map(([provider, ids]) => [provider, { hidden: [...ids] }])),
   };
 }
