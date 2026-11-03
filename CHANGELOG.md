@@ -62,6 +62,9 @@ All notable changes to OpenBot will be documented here. The project follows
   on each model that it stops. The picker uses the readings of the Usage rings and asks the
   provider for nothing new.
 - Usage and the usage rail show the Kimi Code plan usage: the 5-hour window and the weekly window.
+- Company sign-in. A server owner can connect an OpenID Connect provider, such as Microsoft Entra ID, Okta or Google Workspace, in Members → Company sign-in. After a test sign-in passes, people with an email at the company domains sign in through the company page: in the browser from the desktop app, and in the same tab in the web app. A person who signs in this way joins the server as a member with no invitation, while the server has a free seat. A person whom the owner removed stays out.
+- For Microsoft Entra ID, the issuer field accepts the tenant ID URL, the tenant domain, or the metadata URL from the portal.
+- User sync (SCIM). When the company provider turns off a person, OpenBot signs them out and removes them from the server. When the provider turns the person on again, they come back.
 
 ### Changed
 
@@ -177,6 +180,8 @@ All notable changes to OpenBot will be documented here. The project follows
   reports the result. Before, an agent could say that a booking failed when the page showed that it
   was done, because a separate list did not update yet.
 - On the web, a signed-in user no longer sees the sign-in form for a moment when the page loads.
+- The desktop app now signs out when the account service ends its session, for example after a revocation. Before, it stayed signed in until the next start.
+- The app no longer stops responding while a chat history loads, on desktop and on the web.
 
 ## [0.59.0] - 2026-11-02
 
