@@ -346,8 +346,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.taskToolInvalid": "Give the task a title of at most 120 characters and a brief that says what to do.",
   "error.backend.taskOwnChatOnly":
     "Start a task only from your own chat. A channel, a messaging conversation or another task cannot start one.",
-  "error.backend.taskOpenLimit":
-    "This agent already has {count} open tasks. Wait until the user closes one before you start another task.",
+  "error.backend.taskUnfinishedLimit":
+    "This agent already has {count} unfinished tasks. Start another task when one of them ends.",
   "error.backend.taskOpenLimitReached":
     "This agent has {count} open tasks. Close a task, then start or open another one.",
   "error.backend.taskRemoteUnsupported": "Tasks are only available for agents on this computer.",

@@ -369,8 +369,8 @@ export const messages = {
     "Donnez à la tâche un titre de 120 caractères au plus et des consignes qui disent quoi faire.",
   "error.backend.taskOwnChatOnly":
     "Lancez une tâche uniquement depuis votre propre discussion. Un canal, une conversation de messagerie ou une autre tâche ne peut pas en lancer.",
-  "error.backend.taskOpenLimit":
-    "Cet agent a déjà {count} tâches ouvertes. Attendez que l’utilisateur en ferme une avant de lancer une autre tâche.",
+  "error.backend.taskUnfinishedLimit":
+    "Cet agent a déjà {count} tâches non terminées. Lancez une autre tâche quand l’une d’elles se termine.",
   "error.backend.taskOpenLimitReached":
     "Cet agent a {count} tâches ouvertes. Fermez une tâche, puis lancez-en ou ouvrez-en une autre.",
   "error.backend.taskRemoteUnsupported": "Les tâches sont disponibles uniquement pour les agents de cet ordinateur.",
