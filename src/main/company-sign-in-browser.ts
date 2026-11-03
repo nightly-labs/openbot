@@ -9,7 +9,7 @@ import { Deferred, Effect, Schema } from "effect";
 import type { LanguageService } from "./language-service";
 import { startLoopbackCallbackServer } from "./loopback-callback-server";
 
-export const COMPANY_SIGN_IN_PATH = "/company-sign-in";
+const COMPANY_SIGN_IN_PATH = "/company-sign-in";
 /** The account service keeps a flow for 10 minutes. */
 const COMPANY_SIGN_IN_WAIT_MS = 10 * 60_000;
 

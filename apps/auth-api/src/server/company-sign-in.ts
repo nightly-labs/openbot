@@ -91,7 +91,7 @@ function invalid(message: string): CompanySignInError {
   return new CompanySignInError(400, "invalid_company_sign_in", message);
 }
 
-export interface CompanySignInConnection {
+interface CompanySignInConnection {
   issuer: string;
   clientId: string;
   domains: string[];
