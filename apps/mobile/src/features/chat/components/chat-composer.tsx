@@ -20,6 +20,7 @@ import {
   ScrollView,
   TextInput,
   type TextInputInstance,
+  useColorScheme,
   useWindowDimensions,
   View,
   type ViewStyle,
@@ -835,7 +836,10 @@ export const ChatComposer = memo(function ChatComposer({
   }, [dictation, finishDictation]);
   // The agent's own colour for Send, Stop and the dictation controls; a channel keeps the action colour.
   const accentFill = voiceAccent?.fill ?? String(action);
-  const accentGlyph = voiceAccent?.glyph ?? String(actionForeground);
+  // In dark mode the glyphs on the main control take the text colour, as the other composer glyphs do,
+  // whatever the agent's colour is. In light mode they take the colour with the higher contrast.
+  const dark = useColorScheme() === "dark";
+  const accentGlyph = dark ? String(foreground) : (voiceAccent?.glyph ?? String(actionForeground));
 
   function requestSend(): void {
     if (disabled || preparing) return;
