@@ -82,7 +82,7 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       const attachment = id ? await runCauseEffect(mailbox.resolveAttachment(id)) : null;
       if (!attachment) return new Response("Not found", { status: 404 });
       return await runCauseEffect(
-        fileResponse(attachment.path, {
+        fileResponse(attachment.path, request, {
           "Content-Type": attachment.mimeType,
           "Cache-Control": "no-store",
           ...attachmentCorsHeaders(request.headers.get("Origin")),
@@ -158,7 +158,7 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
         return new Response("Not found", { status: 404 });
       }
       return await runCauseEffect(
-        fileResponse(avatar.path, {
+        fileResponse(avatar.path, request, {
           "Content-Type": avatar.mimeType,
           "Cache-Control": "private, max-age=31536000, immutable",
           "X-Content-Type-Options": "nosniff",
@@ -204,7 +204,7 @@ export function configureServerLogoProtocols({ teamStore, remoteServers }: Serve
         return new Response("Not found", { status: 404 });
       }
       return await runCauseEffect(
-        fileResponse(logo.path, {
+        fileResponse(logo.path, request, {
           "Content-Type": logo.mimeType,
           "Cache-Control": "private, max-age=31536000, immutable",
           "X-Content-Type-Options": "nosniff",
