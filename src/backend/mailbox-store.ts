@@ -1730,6 +1730,11 @@ export class MailboxStore {
     return this.#state.messages.find((message) => message.id === messageId)?.expectsReply !== false;
   }
 
+  /** The person who wrote the user message; undefined for older messages and other senders. */
+  senderMember(messageId: string): ConversationMessageSender | undefined {
+    return this.#state.messages.find((message) => message.id === messageId)?.senderMember;
+  }
+
   hasReplyFrom(agentId: string, messageId: string): boolean {
     return this.#state.messages.some(
       (message) =>

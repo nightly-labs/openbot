@@ -264,8 +264,8 @@ comes from the tool call id, so a retried call makes no second channel. Members 
 be hidden, and the lead must be a member; an icon removes an image, as in the channel settings.
 These changes write no `channel-change` note. Inside a channel task, both tools are refused, so only
 a person's request changes the channel there. As for webhook routines, they also need a turn of only
-the person's messages, outside an execution thread: an external chat, a routine run or an agent
-message can carry text from outside.
+this computer's user's messages, outside an execution thread: an external chat, a routine run or an
+agent message can carry text from outside, and the Team API checks a team member's agent access.
 
 Channel work holds only the agent that does it. An agent runs one main-lane turn at a time: its chat,
 a channel delivery or a messaging delivery. While the agent has an active assignment,

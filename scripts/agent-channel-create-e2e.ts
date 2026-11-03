@@ -41,6 +41,8 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 const CALL_MARK = "CHANNEL-CALL";
 const PERSON = { id: "local", name: "Alex" };
+/** A team member, whose app has only what the Team API gives it. */
+const MEMBER = { id: "member-remote", name: "Sam" };
 // A 1x1 PNG.
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
@@ -237,7 +239,7 @@ const agents = new AgentService({
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
   timezone: () => "UTC",
   channelPersonAgentLevel: () => "manage",
-  channelRemotePerson: () => false,
+  channelRemotePerson: (personId) => personId === MEMBER.id,
 });
 
 const channels = () => agents.channels;
@@ -261,11 +263,20 @@ async function logged(name: string, before: number) {
   return { success: entry.result?.success === true, text };
 }
 
-/** Sends the user's message to the agent's own chat that makes the fake call `tool`. */
-async function callFromChat(name: string, agentId: string, tool: string, args: ChannelToolArgs) {
+/** Sends the person's message to the agent's own chat that makes the fake call `tool`. */
+async function callFromChat(
+  name: string,
+  agentId: string,
+  tool: string,
+  args: ChannelToolArgs,
+  sender: { id: string; name: string } = PERSON,
+) {
   const before = toolLogs().length;
   await runCauseEffect(
-    agents.sendMessage({ agentId, text: `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: tool, ...args })}ARGS>>` }),
+    agents.sendMessage(
+      { agentId, text: `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: tool, ...args })}ARGS>>` },
+      sender,
+    ),
   );
   const result = await logged(name, before);
   await idle(agentId);
@@ -512,6 +523,20 @@ try {
     "A routine run cannot use create_channel",
     !fromRun.success && fromRun.text.includes("Only a person's message") && channelCount() === countBeforeRun,
     fromRun.text,
+  );
+
+  // 7c. A team member's message is refused: the Team API checks that member's agent access.
+  const fromMember = await callFromChat(
+    "create from a team member",
+    lead.id,
+    "create_channel",
+    { name: "from-member", memberAgentIds: [lead.id] },
+    MEMBER,
+  );
+  pass(
+    "A team member's message cannot use create_channel",
+    !fromMember.success && fromMember.text.includes("Only a person's message") && channelCount() === countBeforeRun,
+    fromMember.text,
   );
 
   // 8. A repeated tool call makes one channel and gives the same result.

@@ -876,11 +876,16 @@ export class OpenBotToolRouter {
     if (CHANNEL_AGENT_TOOL_NAMES.has(params.tool)) {
       if (channelId) return channelAgentToolInChannelTask();
       // As for webhook routines: an external chat, a routine run or an agent message can carry text
-      // from outside, such as a webhook body. A message steered into a run shares the run's turn.
+      // from outside, such as a webhook body. A message steered into a run shares the run's turn. A
+      // team member's message is refused too: the Team API checks that member's agent access.
       const deliveries = this.#mailbox.findDeliveriesByTurn(senderAgentId, params.turnId);
+      const remote = (messageId: string) => {
+        const member = this.#mailbox.senderMember(messageId);
+        return member !== undefined && (this.#channels.hooks.remotePerson?.(member.id) ?? false);
+      };
       const requested =
         deliveries.length > 0 &&
-        deliveries.every(({ delivery }) => delivery.sender.kind === "user") &&
+        deliveries.every(({ delivery }) => delivery.sender.kind === "user" && !remote(delivery.messageId)) &&
         !this.#conversation.isExecutionThread(executionThreadId);
       if (!requested)
         return openBotToolFailure(
