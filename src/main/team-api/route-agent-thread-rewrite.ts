@@ -9,11 +9,15 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { memberSender, readJson, requireAgentLevel, requireListedAgent, stringField } from "./request-helpers";
 
+export interface AgentThreadRewriteRouteDependencies {
+  tasks: Pick<TeamApiAgentTasks, "listAgents" | "rewriteMessage"> | undefined;
+  hiddenAgentIds: ReadonlySet<string>;
+}
+
 /** Rewrites one finished user message in an agent main thread or side thread. */
 export async function routeAgentThreadRewrite(
   context: TeamApiRequestContext,
-  tasks: TeamApiAgentTasks | undefined,
-  hiddenAgentIds: ReadonlySet<string>,
+  { tasks, hiddenAgentIds }: AgentThreadRewriteRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, request, member, json } = context;
   if (method !== "POST" || url.pathname !== AGENT_THREAD_REWRITE_ROUTES.rewrite) return "unmatched";

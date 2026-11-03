@@ -1031,6 +1031,12 @@ button.chat-action-target:active,
   letter-spacing: -0.15px;
 }
 
+.message-entry.message-entry-editing .ui-bubble,
+.message-entry.message-entry-editing .ui-bubble > .ui-bubble-content {
+  width: 100%;
+  max-width: 100%;
+}
+
 .message-entry-agent .ui-bubble {
   max-width: min(720px, 100%);
 }
@@ -1459,12 +1465,28 @@ button.chat-action-target:active,
 
 .message-rewrite {
   display: grid;
-  gap: var(--openbot-space-2);
+  gap: var(--openbot-space-3);
   width: 100%;
+  min-width: 0;
 }
 
 .message-rewrite textarea {
   width: 100%;
+  field-sizing: content;
+  min-height: calc(var(--openbot-leading-lg) * 3);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  resize: none;
+}
+
+.message-entry-editing .ui-bubble:focus-within > .ui-bubble-content {
+  border-color: var(--openbot-border-focus);
 }
 
 .message-rewrite-actions {

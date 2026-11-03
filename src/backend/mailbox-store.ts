@@ -34,7 +34,7 @@ import { type DynamicRecord, isNumber, isOneOf, isString } from "@openbot/contra
 import { QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import { Effect, Result } from "effect";
+import { Effect, Result, Semaphore } from "effect";
 import {
   AttachmentFiles,
   type ExportedAttachmentFile,
@@ -225,6 +225,9 @@ export interface MailboxStoredFile {
 
 export interface DeliveryContext {
   delivery: QueueDelivery;
+  /** Conversation metadata kept outside the provider prompt and released queue wire shape. */
+  senderMember?: ConversationMessageSender;
+  voiceRecording?: AttachmentSummary;
   managedAttachments: Array<AttachmentSummary & { path: string }>;
   resumeAfterUsageLimit?: UsageLimitContinuation;
   planContinuation?: PlanContinuationMarker;
@@ -257,6 +260,7 @@ export interface CommittedChannelAttachments {
 export const MAILBOX_CONVERSATION_MESSAGE_LIMIT = 100;
 
 export class MailboxStore {
+  readonly #enqueues = Semaphore.makeUnsafe(1);
   readonly #statePath: string;
   readonly #files: AttachmentFiles;
   readonly #database: OpenBotDatabase;
@@ -500,7 +504,18 @@ export class MailboxStore {
     );
   }
 
-  enqueue = Effect.fn("MailboxStore.enqueue")(function* (
+  /** All producers share this lock; a rewrite holds it from its last idle check through the cut. */
+  withEnqueueLock<A, E, R>(
+    use: (
+      enqueue: (input: EnqueueInput) => Effect.Effect<QueuedMessageReceipt, StoredStateFailure>,
+    ) => Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E, R> {
+    return this.#enqueues.withPermit(Effect.suspend(() => use(this.#enqueue)));
+  }
+
+  enqueue = (input: EnqueueInput) => this.withEnqueueLock((enqueue) => enqueue(input));
+
+  readonly #enqueue = Effect.fn("MailboxStore.enqueue")(function* (
     this: MailboxStore,
     input: EnqueueInput,
   ): Effect.fn.Return<QueuedMessageReceipt, StoredStateFailure> {
@@ -1571,6 +1586,29 @@ export class MailboxStore {
   getDelivery(deliveryId: string): DeliveryContext | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     return delivery ? this.#context(delivery) : null;
+  }
+
+  /** Recover only a host-stamped identity from the exact delivery in the same conversation lane. */
+  messageSender(agentId: string, taskId: string | null, messageId: string): ConversationMessageSender | undefined {
+    return this.messageSenders(agentId, taskId, new Set([messageId])).get(messageId);
+  }
+
+  /** One mailbox scan for an old history page, rather than a scan for every unattributed message. */
+  messageSenders(
+    agentId: string,
+    taskId: string | null,
+    messageIds: ReadonlySet<string>,
+  ): ReadonlyMap<string, ConversationMessageSender> {
+    const senders = new Map<string, ConversationMessageSender>();
+    if (messageIds.size === 0) return senders;
+    const messages = new Map(this.#state.messages.map((message) => [message.id, message]));
+    for (const delivery of this.#state.deliveries) {
+      if (delivery.recipientAgentId !== agentId || !messageIds.has(delivery.id)) continue;
+      const message = messages.get(delivery.messageId);
+      if (message?.sender.kind === "user" && (message.taskId ?? null) === taskId && message.senderMember)
+        senders.set(delivery.id, { ...message.senderMember });
+    }
+    return senders;
   }
 
   /** Provider history can name a continuation turn instead of the original delivery. */
@@ -2800,6 +2838,10 @@ export class MailboxStore {
     const message = this.#requireMessage(delivery.messageId, messages);
     return {
       delivery: this.#publicDelivery(delivery, positions, message),
+      ...(message.senderMember ? { senderMember: { ...message.senderMember } } : {}),
+      ...(message.voiceRecording && !message.voiceRecording.deletedAt
+        ? { voiceRecording: toAttachmentSummary(message.voiceRecording) }
+        : {}),
       ...(delivery.resumeAfterUsageLimit ? { resumeAfterUsageLimit: delivery.resumeAfterUsageLimit } : {}),
       ...(delivery.planContinuation ? { planContinuation: delivery.planContinuation } : {}),
       ...(message.channelId ? { channelId: message.channelId } : {}),

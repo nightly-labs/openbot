@@ -286,6 +286,8 @@ function fileImage(file: MessageImageFile, url: string): AttachmentSummary {
 export function MessageBody(props: {
   animate?: boolean | undefined;
   message: AgentMessage;
+  /** Replaces the text without changing attachment, quote, or media rendering. */
+  textEditor?: (() => JSX.Element) | undefined;
   referencedMessage?: AgentMessage | undefined;
   /**
    * Who wrote the quoted message. A chat with several authors has to name the one it quotes, and
@@ -644,79 +646,91 @@ export function MessageBody(props: {
       </Show>
       <div class="message-content-resize" ref={(element) => (messageContentResize = element)}>
         <div class="message-content-blocks" ref={(element) => (messageContent = element)}>
-          <StreamingRevealContext value={streamingBody.trail}>
-            <Show when={props.message.author === "agent" ? streamedBody() : props.message.body}>
-              {/* Unkeyed, so a growing reply keeps each block mounted and updates only the block that grew. */}
-              <For each={contentBlocks()} keyed={false}>
-                {(block, index) => (
-                  <Switch>
-                    <Match when={comparisonTableContent(block())}>
-                      {(table) => <ComparisonTable table={table()} renderCell={renderMarkdownInline} />}
-                    </Match>
-                    <Match when={dataTableContent(block())}>
-                      {(table) => <DataTable table={table()} renderCell={renderMarkdownInline} />}
-                    </Match>
-                    <Match when={codeContent(block())}>
-                      {(code) => (
-                        // The id lets the selection actions open for text selected in the code.
-                        <div
-                          data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
-                        >
-                          <Show
-                            when={chatPreviewKind(code().language)}
-                            fallback={
-                              <CodeBlock
-                                block={code()}
-                                streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
-                              />
-                            }
-                          >
-                            {(preview) => (
-                              <CodePreview
-                                block={code()}
-                                kind={preview()}
-                                streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+          <Show
+            when={props.textEditor}
+            fallback={
+              <StreamingRevealContext value={streamingBody.trail}>
+                <Show when={props.message.author === "agent" ? streamedBody() : props.message.body}>
+                  {/* Unkeyed, so a growing reply keeps each block mounted and updates only the block that grew. */}
+                  <For each={contentBlocks()} keyed={false}>
+                    {(block, index) => (
+                      <Switch>
+                        <Match when={comparisonTableContent(block())}>
+                          {(table) => <ComparisonTable table={table()} renderCell={renderMarkdownInline} />}
+                        </Match>
+                        <Match when={dataTableContent(block())}>
+                          {(table) => <DataTable table={table()} renderCell={renderMarkdownInline} />}
+                        </Match>
+                        <Match when={codeContent(block())}>
+                          {(code) => (
+                            // The id lets the selection actions open for text selected in the code.
+                            <div
+                              data-selection-message-id={
+                                props.message.streaming !== true ? props.message.id : undefined
+                              }
+                            >
+                              <Show
+                                when={chatPreviewKind(code().language)}
+                                fallback={
+                                  <CodeBlock
+                                    block={code()}
+                                    streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                                  />
+                                }
+                              >
+                                {(preview) => (
+                                  <CodePreview
+                                    block={code()}
+                                    kind={preview()}
+                                    streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                                    onOpenLink={props.onOpenLink}
+                                  />
+                                )}
+                              </Show>
+                            </div>
+                          )}
+                        </Match>
+                        <Match when={textContent(block())}>
+                          {(text) => (
+                            <div
+                              class={`message-copy message-markdown${streamingBody.animateTail() ? " t-stream" : ""}`}
+                              data-selection-message-id={
+                                props.message.streaming !== true ? props.message.id : undefined
+                              }
+                            >
+                              <MarkdownMessageText
+                                body={text().text}
+                                agents={props.agents}
+                                skills={props.skills}
+                                attachments={props.message.attachments}
+                                citations={props.message.citations}
+                                onSelectAgent={props.onSelectAgent}
                                 onOpenLink={props.onOpenLink}
+                                onOpenAttachment={openAttachment}
+                                onOpenImage={openMarkdownImage}
+                                onOpenSharedFile={props.onOpenSharedFile}
+                                onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+                                onOpenQuote={props.onOpenQuote}
+                                showCitationFooter={index === lastTextBlockIndex()}
+                                streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                                streamingTailAfter={textTailAfter()[index]}
                               />
-                            )}
-                          </Show>
-                        </div>
-                      )}
-                    </Match>
-                    <Match when={textContent(block())}>
-                      {(text) => (
-                        <div
-                          class={`message-copy message-markdown${streamingBody.animateTail() ? " t-stream" : ""}`}
-                          data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
-                        >
-                          <MarkdownMessageText
-                            body={text().text}
-                            agents={props.agents}
-                            skills={props.skills}
-                            attachments={props.message.attachments}
-                            citations={props.message.citations}
-                            onSelectAgent={props.onSelectAgent}
-                            onOpenLink={props.onOpenLink}
-                            onOpenAttachment={openAttachment}
-                            onOpenImage={openMarkdownImage}
-                            onOpenSharedFile={props.onOpenSharedFile}
-                            onOpenWorkspaceFile={props.onOpenWorkspaceFile}
-                            onOpenQuote={props.onOpenQuote}
-                            showCitationFooter={index === lastTextBlockIndex()}
-                            streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
-                            streamingTailAfter={textTailAfter()[index]}
-                          />
-                        </div>
-                      )}
-                    </Match>
-                  </Switch>
-                )}
-              </For>
-              <Show when={selectionInstruction()}>
-                {(selection) => <blockquote class="message-selection-quote">{selection().quote}</blockquote>}
-              </Show>
-            </Show>
-          </StreamingRevealContext>
+                            </div>
+                          )}
+                        </Match>
+                      </Switch>
+                    )}
+                  </For>
+                  <Show when={selectionInstruction()}>
+                    {(selection) => <blockquote class="message-selection-quote">{selection().quote}</blockquote>}
+                  </Show>
+                </Show>
+              </StreamingRevealContext>
+            }
+          >
+            {/* Keep the draft and requestId when the message refreshes during this edit. */}
+            {(editor) => untrack(() => editor()())}
+          </Show>
         </div>
       </div>
       <Show when={generatedImageShown() && props.message.imageGeneration}>
@@ -771,6 +785,7 @@ export function MessageBody(props: {
    * names the images that show above it says nothing more.
    */
   const imagesOnly = () =>
+    !props.textEditor &&
     !standaloneImageAttachments()
       .reduce((body, image) => removeAttachmentReferences(body, image.id), props.message.body)
       .trim() &&

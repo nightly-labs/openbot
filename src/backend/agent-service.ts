@@ -170,6 +170,7 @@ import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } fro
 import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
 import { MemoryHold } from "./agent/memory-hold";
 import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
+import { MessageRewrites } from "./agent/message-rewrites";
 import {
   creationModel,
   developmentDefaultsApply,
@@ -455,8 +456,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #mcp: McpGateway;
   readonly #providers: ProviderRuntime;
   readonly #providerUseChanges = Semaphore.makeUnsafe(1);
-  /** A rewrite's final busy check, enqueue, and cut must exclude other user enqueues. */
-  readonly #messageQueueChanges = Semaphore.makeUnsafe(1);
+  readonly #rewrites: MessageRewrites;
   readonly #endpoints: CustomEndpoints;
   readonly #prepareAgentWorkspace: (agent: AgentSummary) => Effect.Effect<void, AgentLifecycleFailed>;
   readonly #hostedSites: HostedSiteCoordinator;
@@ -1559,6 +1559,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         steerAgentMessage: (recipientAgentId, deliveryId) => this.#steerAgentMessage(recipientAgentId, deliveryId),
       },
+    });
+    this.#rewrites = new MessageRewrites({
+      store,
+      mailbox,
+      conversation: this.#conversation,
+      tasks: this.#tasks,
+      threads: this.#threads,
+      mailboxSync: this.#mailboxSync,
+      drain: this.#drain,
+      agentsChanged: () => this.#emit({ type: "agents-changed", agents: this.listAgents() }),
     });
   }
 
@@ -3525,14 +3535,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
     // The mailbox may have committed a rewritten delivery just before the process stopped.
     // Finish its cut before providers or queue recovery can start that delivery.
-    yield* lifecycleStep("recover queued message rewrites", () => {
-      for (const intent of this.#mailbox.pendingRewrites()) {
-        if (!this.#store.list().some((agent) => agent.id === intent.agentId)) continue;
-        if (this.#store.database.readConversationMessages(intent.agentId, intent.threadId, [intent.messageId]).length)
-          this.#store.database.rewindConversation(intent.agentId, intent.threadId, intent.messageId);
-        this.#store.database.deactivateProviderSessions(intent.threadId);
-      }
-    });
+    yield* lifecycleStep("recover queued message rewrites", () => this.#rewrites.recover());
     yield* lifecycleStep("restore channel links", () => {
       this.#mcp.migrateCatalogBridgesToHttp();
       this.channels.restoreDeliveryLinks();
@@ -4291,7 +4294,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /** The conversation of one task, for its panel. */
   readTask(agentId: string, taskId: string): ConversationSnapshot {
-    return structuredClone(this.#tasks.read(agentId, taskId));
+    const snapshot = structuredClone(this.#tasks.read(agentId, taskId));
+    this.#mailboxSync.restoreMessageSenders(snapshot, taskId);
+    return snapshot;
   }
 
   /** Starts a task of the agent with its first message. The task runs beside the agent's own chat. */
@@ -4682,171 +4687,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }).bind(this);
 
   /** Edits one finished user request and starts a new turn in the same thread. */
-  readonly rewriteMessage = Effect.fn("AgentService.rewriteMessage")(function* (
-    this: AgentService,
-    input: RewriteMessageInput,
-    sender?: ConversationMessageSender,
-  ): Effect.fn.Return<QueuedMessageReceipt, AgentLifecycleFailed> {
-    const idempotencyKey = `user-rewrite:${createHash("sha256")
-      .update(JSON.stringify([sender?.id ?? null, input.agentId, input.taskId, input.requestId]))
-      .digest("hex")}`;
-    const pending = this.#pendingUserSends.get(idempotencyKey);
-    if (pending) return yield* Deferred.await(pending);
-    const priorReceipt = this.#mailbox.receiptForKey(idempotencyKey);
-    if (priorReceipt) {
-      const intent = this.#mailbox.pendingRewrites().find((item) => item.deliveryId === priorReceipt.deliveries[0]?.id);
-      if (intent) {
-        yield* this.#messageQueueChanges.withPermit(
-          this.#cutForRewrite(intent.agentId, input.taskId, intent.threadId, intent.messageId),
-        );
-        if (input.taskId) this.#tasks.changed(input.agentId);
-        else {
-          const current = this.#conversation.ensureSnapshot(input.agentId, intent.threadId);
-          this.#mailboxSync.syncMailboxMessages(current);
-          this.#conversation.emitConversation(current);
-        }
-      }
-      this.#mailboxSync.emitQueue(input.agentId);
-      this.#drain.scheduleDrain(input.agentId);
-      return priorReceipt;
-    }
-    const rewrite = Deferred.makeUnsafe<QueuedMessageReceipt, AgentLifecycleFailed>();
-    this.#pendingUserSends.set(idempotencyKey, rewrite);
-    return yield* this.#rewriteMessage(input, sender, idempotencyKey).pipe(
-      Effect.onExit((exit) => Deferred.done(rewrite, exit)),
-      Effect.ensuring(Effect.sync(() => this.#pendingUserSends.delete(idempotencyKey))),
-    );
-  }, Effect.uninterruptible).bind(this);
-
-  readonly #cutForRewrite = Effect.fn("AgentService.cutForRewrite")(function* (
-    this: AgentService,
-    agentId: string,
-    taskId: string | null,
-    threadId: string,
-    messageId: string,
-  ) {
-    if (!this.#store.database.readConversationMessages(agentId, threadId, [messageId]).length) return;
-    // End the provider session before removing history. A queued rewrite is held until this cut.
-    yield* this.#threads.endThreadContext(threadId);
-    yield* lifecycleStep("rewind conversation", () => {
-      const work = () => {
-        const snapshot = this.#store.database.rewindConversation(agentId, threadId, messageId);
-        return { result: undefined, snapshot };
-      };
-      if (taskId) this.#conversation.withThreadTransaction(agentId, threadId, work);
-      else this.#conversation.withConversationTransaction(agentId, work);
-    });
-  }, Effect.uninterruptible).bind(this);
-
-  readonly #rewriteMessage = Effect.fn("AgentService.performMessageRewrite")(function* (
-    this: AgentService,
-    input: RewriteMessageInput,
-    sender: ConversationMessageSender | undefined,
-    idempotencyKey: string,
-  ): Effect.fn.Return<QueuedMessageReceipt, AgentLifecycleFailed> {
-    const { agent, task, threadId, message } = yield* lifecycleStep("prepare message rewrite", () => {
-      const agent = this.#conversation.requireKnownAgent(input.agentId);
-      this.#requireNotHidden(agent.id);
-      const task = input.taskId ? this.#tasks.requireOpen(agent.id, input.taskId) : null;
-      const threadId = task?.threadId ?? agent.threadId;
-      if (!threadId) throw new Error(sourceText("error.backend.threadNotFound"));
-      const busy = task
-        ? this.#tasks.publicTask(task).state !== "idle"
-        : this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agent.id) || this.#threads.mainContextBusy(agent);
-      if (busy) throw new Error(sourceText("error.backend.rewriteSourceBusy"));
-      const message = this.#store.database
-        .readConversation(agent.id, threadId)
-        .messages.find((item) => item.id === input.messageId);
-      if (message?.author !== "user" || message.status !== "completed")
-        throw new Error(sourceText("error.backend.rewriteMessageMissing"));
-      if (sender && message.senderMember?.id !== sender.id)
-        throw new Error(sourceText("error.backend.rewriteOtherMember"));
-      return { agent, task, threadId, message };
-    });
-    const sourceAttachments: Array<{ id: string; path: string }> = [];
-    for (const attachment of message.attachments ?? []) {
-      const file = yield* this.#mailbox
-        .resolveAttachment(attachment.id)
-        .pipe(
-          Effect.mapError(
-            (failure) => new AgentLifecycleFailed({ operation: "resolve message attachment", cause: failure.cause }),
-          ),
-        );
-      if (!file)
-        return yield* new AgentLifecycleFailed({
-          operation: "rewrite message",
-          cause: new Error(sourceText("error.backend.rewriteAttachmentMissing")),
-        });
-      sourceAttachments.push({ id: attachment.id, path: file.path });
-    }
-    let voiceRecordingSource: { path: string; mimeType: string } | undefined;
-    if (message.voiceRecording) {
-      const file = yield* this.#mailbox
-        .resolveAttachment(message.voiceRecording.id)
-        .pipe(
-          Effect.mapError(
-            (failure) => new AgentLifecycleFailed({ operation: "resolve voice recording", cause: failure.cause }),
-          ),
-        );
-      if (!file)
-        return yield* new AgentLifecycleFailed({
-          operation: "rewrite message",
-          cause: new Error(sourceText("error.backend.rewriteAttachmentMissing")),
-        });
-      voiceRecordingSource = { path: file.path, mimeType: message.voiceRecording.mimeType };
-    }
-    const service = this;
-    const receipt = yield* this.#messageQueueChanges.withPermit(
-      Effect.gen(function* () {
-        yield* lifecycleStep("recheck message rewrite", () => {
-          const busy = task
-            ? service.#tasks.publicTask(service.#tasks.requireOpen(agent.id, task.taskId)).state !== "idle"
-            : service.#mailbox.hasUnfinishedDeliveryOutsideTasks(agent.id) || service.#threads.mainContextBusy(agent);
-          if (busy) throw new Error(sourceText("error.backend.rewriteSourceBusy"));
-          const current = service.#store.database
-            .readConversation(agent.id, threadId)
-            .messages.find((item) => item.id === input.messageId);
-          if (current?.author !== "user" || current.status !== "completed")
-            throw new Error(sourceText("error.backend.rewriteMessageMissing"));
-        });
-        const receipt = yield* service.#mailbox
-          .enqueue({
-            sender: { kind: "user" },
-            ...(sender ? { senderMember: sender } : {}),
-            ...(task ? { taskId: task.taskId } : {}),
-            recipientAgentIds: [agent.id],
-            text: input.text,
-            sourceAttachments,
-            rewriteSource: { threadId, messageId: input.messageId },
-            ...(voiceRecordingSource ? { voiceRecordingSource } : {}),
-            idempotencyKey,
-          })
-          .pipe(
-            Effect.mapError(
-              (failure) => new AgentLifecycleFailed({ operation: "enqueue rewritten message", cause: failure.cause }),
-            ),
-          );
-        if (!receipt.deliveries[0]?.id)
-          return yield* new AgentLifecycleFailed({
-            operation: "rewrite message",
-            cause: new Error(sourceText("error.backend.rewriteQueueFailed")),
-          });
-        yield* service.#cutForRewrite(agent.id, task?.taskId ?? null, threadId, input.messageId);
-        return receipt;
-      }),
-    );
-    if (task) this.#tasks.changed(agent.id);
-    else {
-      const current = this.#conversation.ensureSnapshot(agent.id, threadId);
-      this.#mailboxSync.syncMailboxMessages(current);
-      this.#conversation.emitConversation(current);
-      yield* this.#store.updatePreview(agent.id, input.text).pipe(Effect.ignore);
-      this.#emit({ type: "agents-changed", agents: this.listAgents() });
-    }
-    this.#mailboxSync.emitQueue(agent.id);
-    this.#drain.scheduleDrain(agent.id);
-    return receipt;
-  }, Effect.uninterruptible).bind(this);
+  readonly rewriteMessage = (input: RewriteMessageInput, sender?: ConversationMessageSender) =>
+    this.#rewrites
+      .rewrite(input, sender)
+      .pipe(
+        Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "rewrite message", cause: failure.cause })),
+      );
 
   readonly #sendUserMessage = Effect.fn("AgentService.sendUserMessage")(function* (
     this: AgentService,
@@ -4888,26 +4734,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const task = taskId
       ? yield* lifecycleStep("find message task", () => this.#tasks.requireOpen(agent.id, taskId))
       : null;
-    const receipt = yield* this.#messageQueueChanges.withPermit(
-      this.#mailbox
-        .enqueue({
-          sender: { kind: "user" },
-          ...(sender ? { senderMember: sender } : {}),
-          ...(task ? { taskId: task.taskId } : {}),
-          recipientAgentIds: [agent.id],
-          text: input.text,
-          draftIds: input.attachmentDraftIds ?? [],
-          ...(input.voiceRecordingDraftId ? { voiceRecordingDraftId: input.voiceRecordingDraftId } : {}),
-          // A reply names a message of the agent's own chat, which a task does not show.
-          replyToMessageId: task ? null : (input.replyToMessageId ?? null),
-          ...(idempotencyKey ? { idempotencyKey } : {}),
-        })
-        .pipe(
-          Effect.mapError(
-            (failure) => new AgentLifecycleFailed({ operation: "enqueue message", cause: failure.cause }),
-          ),
-        ),
-    );
+    const receipt = yield* this.#mailbox
+      .enqueue({
+        sender: { kind: "user" },
+        ...(sender ? { senderMember: sender } : {}),
+        ...(task ? { taskId: task.taskId } : {}),
+        recipientAgentIds: [agent.id],
+        text: input.text,
+        draftIds: input.attachmentDraftIds ?? [],
+        ...(input.voiceRecordingDraftId ? { voiceRecordingDraftId: input.voiceRecordingDraftId } : {}),
+        // A reply names a message of the agent's own chat, which a task does not show.
+        replyToMessageId: task ? null : (input.replyToMessageId ?? null),
+        ...(idempotencyKey ? { idempotencyKey } : {}),
+      })
+      .pipe(
+        Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "enqueue message", cause: failure.cause })),
+      );
     const [queued] = receipt.deliveries;
     const delivery = queued ? this.#mailbox.getDelivery(queued.id) : null;
     if (!delivery)

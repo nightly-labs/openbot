@@ -34,6 +34,7 @@ export function MessageRewriteForm(props: {
       }}
     >
       <Textarea
+        rows={3}
         aria-label={t("chat.rewrite.draft")}
         value={text()}
         onInput={(event) => setText(event.currentTarget.value)}
@@ -45,10 +46,10 @@ export function MessageRewriteForm(props: {
       />
       {error() && <p role="alert">{error()}</p>}
       <div class="message-rewrite-actions">
-        <Button type="button" variant="ghost" disabled={submitting()} onClick={props.onCancel}>
+        <Button type="button" variant="ghost" size="sm" disabled={submitting()} onClick={props.onCancel}>
           {t("common.cancel")}
         </Button>
-        <Button type="submit" disabled={submitting() || !text().trim()}>
+        <Button type="submit" size="sm" disabled={submitting() || !text().trim()}>
           {t("chat.rewrite.send")}
         </Button>
       </div>

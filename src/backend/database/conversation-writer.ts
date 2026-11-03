@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { isDeepStrictEqual } from "node:util";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n";
@@ -66,6 +67,8 @@ export class ConversationWriter {
         )
         .all(threadId),
     ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
+    // A queued question can predate the preceding answer. Cut in the order the conversation uses.
+    sortConversationMessages(priorMessages);
     const boundary = priorMessages.findIndex((message) => message.id === messageId);
     if (boundary < 0 || priorMessages[boundary]?.author !== "user" || priorMessages[boundary]?.status !== "completed")
       throw new Error(sourceText("error.backend.rewriteMessageMissing"));

@@ -1232,6 +1232,17 @@ export function ConversationTimeline() {
                         fallback={
                           <ChatMessageRow
                             message={message() ?? initialMessage}
+                            textEditor={
+                              rewritingMessage()?.id === message()?.id
+                                ? () => (
+                                    <MessageRewriteForm
+                                      text={rewritingMessage()?.body ?? ""}
+                                      onCancel={() => setRewritingMessage(null)}
+                                      onSubmit={submitRewrite}
+                                    />
+                                  )
+                                : undefined
+                            }
                             author={author()}
                             showAuthor={
                               author().kind === "member" || (channel && author().kind === "agent")
@@ -1350,13 +1361,6 @@ export function ConversationTimeline() {
                                   )
                             }
                           >
-                            <Show when={rewritingMessage()?.id === message()?.id}>
-                              <MessageRewriteForm
-                                text={rewritingMessage()?.body ?? ""}
-                                onCancel={() => setRewritingMessage(null)}
-                                onSubmit={submitRewrite}
-                              />
-                            </Show>
                             <Show when={playerKind()}>
                               {(kind) => (
                                 <VoicePlayer

@@ -426,6 +426,17 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                 </Show>
                 <ChatMessageRow
                   message={message()}
+                  textEditor={
+                    rewritingMessage()?.id === message().id
+                      ? () => (
+                          <MessageRewriteForm
+                            text={rewritingMessage()?.body ?? ""}
+                            onCancel={() => setRewritingMessage(null)}
+                            onSubmit={submitRewrite}
+                          />
+                        )
+                      : undefined
+                  }
                   author={author(message())}
                   agents={props.agents}
                   skills={props.skills}
@@ -439,15 +450,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                   actions={messageActions(message())}
                   menu={messageMenu(message())}
                   data-chat-search-message={message().id}
-                >
-                  <Show when={rewritingMessage()?.id === message().id}>
-                    <MessageRewriteForm
-                      text={rewritingMessage()?.body ?? ""}
-                      onCancel={() => setRewritingMessage(null)}
-                      onSubmit={submitRewrite}
-                    />
-                  </Show>
-                </ChatMessageRow>
+                />
                 <Show when={branchDividerAfter(message().id)}>{(source) => <BranchDivider source={source()} />}</Show>
               </div>
             )}

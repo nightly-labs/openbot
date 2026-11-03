@@ -1041,7 +1041,11 @@ export class TeamApiServer {
       if ((await routeAgentThreadReads(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadFiles(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadBranches(context, this.#options.agentTasks, hidden)) === "handled") return;
-      if ((await routeAgentThreadRewrite(context, this.#options.agentTasks, hidden)) === "handled") return;
+      if (
+        (await routeAgentThreadRewrite(context, { tasks: this.#options.agentTasks, hiddenAgentIds: hidden })) ===
+        "handled"
+      )
+        return;
       if ((await routeSkillsAdmin(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeSharedTables(context, this.#options.admin)) === "handled") return;
       if ((await routeAgentInstall(context, this.#options.admin, hidden, newAgentHidden)) === "handled") return;

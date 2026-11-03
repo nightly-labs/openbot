@@ -74,6 +74,7 @@ export class MailboxSync {
   }
 
   syncMailboxMessages(snapshot: ConversationSnapshot, mailboxMessages?: readonly ConversationMessage[]): void {
+    this.restoreMessageSenders(snapshot);
     if (this.#conversation.isExecutionThread(snapshot.threadId)) return;
     const fromCreatedAt = snapshot.messages[0]?.createdAt;
     const incomingMailboxMessages =
@@ -105,6 +106,23 @@ export class MailboxSync {
       message.reaction = message.reactions.find((reaction) => reaction.actor.kind === "user")?.emoji ?? null;
     }
     sortConversationMessages(snapshot.messages);
+  }
+
+  /** Old conversation projections can omit a sender that the original mailbox record still proves. */
+  restoreMessageSenders(
+    snapshot: Pick<ConversationSnapshot, "agentId" | "messages">,
+    taskId: string | null = null,
+  ): void {
+    const missing = snapshot.messages.filter((message) => message.author === "user" && !message.senderMember);
+    const senders = this.#mailbox.messageSenders(
+      snapshot.agentId,
+      taskId,
+      new Set(missing.map((message) => message.id)),
+    );
+    for (const message of missing) {
+      const sender = senders.get(message.id);
+      if (sender) message.senderMember = sender;
+    }
   }
 
   reconcilePersistedMailboxMessages(agent: AgentSummary): void {

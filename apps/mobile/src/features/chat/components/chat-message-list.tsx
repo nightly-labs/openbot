@@ -7,7 +7,7 @@ import { markdownPlainText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import * as Crypto from "expo-crypto";
 import { useIsFocused } from "expo-router";
-import { Button, Typography } from "heroui-native";
+import { Button, TextArea, Typography } from "heroui-native";
 import type { LucideIcon } from "lucide-react-native";
 import CalendarClock from "lucide-react-native/icons/calendar-clock";
 import CalendarPlus from "lucide-react-native/icons/calendar-plus";
@@ -38,7 +38,6 @@ import {
   type GestureResponderEvent,
   Pressable,
   StyleSheet,
-  TextInput,
   useWindowDimensions,
   View,
   type ViewInstance,
@@ -102,6 +101,7 @@ import { ChatMessageActions } from "./chat-message-actions";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
 import { ChatSelectableText } from "./chat-selectable-text";
+import { CHAT_TEXT_STYLES } from "./chat-text-styles";
 import { HistoryShownContext } from "./use-history-shown";
 import { useReplyHaptics } from "./use-reply-haptics";
 
@@ -482,6 +482,7 @@ const MessageRow = memo(function MessageRow({
   const [selectionHeight, setSelectionHeight] = useState(0);
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState("");
+  const [editHeight, setEditHeight] = useState(0);
   const [editSending, setEditSending] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const editRequestId = useRef(Crypto.randomUUID());
@@ -592,7 +593,9 @@ const MessageRow = memo(function MessageRow({
           arriving && !isFirstUser ? (message.author === "user" ? USER_MESSAGE_ENTRANCE : undefined) : undefined
         }
         className={
-          message.author === "user" ? "max-w-full items-end self-end gap-2" : "max-w-full items-start self-start gap-2"
+          message.author === "user"
+            ? `max-w-full items-end self-end gap-2 ${editing ? "w-full" : ""}`
+            : "max-w-full items-start self-start gap-2"
         }
         style={[{ borderCurve: "circular" }, isFirstUser ? firstMessageStyle : undefined]}
       >
@@ -653,14 +656,14 @@ const MessageRow = memo(function MessageRow({
             </Button.Label>
           </Button>
         ) : null}
-        {message.body.trim() ? (
+        {editing || message.body.trim() ? (
           <ChatBubble
             agent={message.author === "agent"}
             collapsed={waiting}
-            animateSize={shared.textReveal}
+            animateSize={shared.textReveal && !editing}
             className={
               message.author === "user"
-                ? `self-end rounded-[30px] px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[92%]" : "max-w-full"}`
+                ? `self-end rounded-[30px] px-4 py-3 ${editing ? "w-full" : ""} ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[92%]" : "max-w-full"}`
                 : `max-w-full self-start rounded-[30px] ${waiting ? "" : "px-4 py-3"}`
             }
             style={[
@@ -672,35 +675,92 @@ const MessageRow = memo(function MessageRow({
                 : undefined,
             ]}
           >
-            {/* The message text stays mounted while the reader selects, so it does not change size or
+            {editing ? (
+              <View className="w-full gap-3">
+                <TextArea
+                  accessibilityLabel={t("mobile.chat.message.edit")}
+                  multiline
+                  autoFocus
+                  value={editDraft}
+                  onChangeText={setEditDraft}
+                  isDisabled={editSending}
+                  background={null}
+                  scrollEnabled={false}
+                  onContentSizeChange={({ nativeEvent }) => setEditHeight(nativeEvent.contentSize.height)}
+                  className="w-full min-h-0 rounded-none border-0 bg-transparent p-0 shadow-none"
+                  style={[
+                    CHAT_TEXT_STYLES.body,
+                    { color: textColor, height: Math.max(CHAT_TEXT_STYLES.body.lineHeight * 3, editHeight) },
+                  ]}
+                />
+                {editError ? (
+                  <Typography.Paragraph type="body-xs" className="text-danger">
+                    {editError}
+                  </Typography.Paragraph>
+                ) : null}
+                <View className="flex-row justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => {
+                      setEditing(false);
+                      setEditError(null);
+                    }}
+                    isDisabled={editSending}
+                  >
+                    <Button.Label>{t("mobile.chat.message.cancelEdit")}</Button.Label>
+                  </Button>
+                  <Button
+                    size="sm"
+                    isDisabled={editSending || !editDraft.trim()}
+                    onPress={() => {
+                      setEditSending(true);
+                      actions
+                        .rewrite(message, editDraft.trim(), editRequestId.current)
+                        .then(() => setEditing(false))
+                        .catch((error: unknown) => {
+                          setEditError(error instanceof Error ? error.message : t("mobile.chat.message.editFailed"));
+                        })
+                        .finally(() => setEditSending(false));
+                    }}
+                  >
+                    <Button.Label>{t("mobile.chat.message.sendEdit")}</Button.Label>
+                  </Button>
+                </View>
+              </View>
+            ) : (
+              <>
+                {/* The message text stays mounted while the reader selects, so it does not change size or
                 play its reveal again. Without native text views, the selectable text covers it at
                 the same place. */}
-            <View style={overlaySelecting ? { minHeight: selectionHeight } : undefined}>
-              <View
-                style={overlaySelecting ? { opacity: 0 } : undefined}
-                accessibilityElementsHidden={overlaySelecting}
-                importantForAccessibility={overlaySelecting ? "no-hide-descendants" : "auto"}
-              >
-                <ChatMarkdown
-                  agents={agents}
-                  body={message.body}
-                  finished={!isStreamingReply(message)}
-                  selectable={message.author === "user"}
-                  color={textColor}
-                  playback={playback}
-                  animationEnabled={shared.animationActive && arriving}
-                  nativeSelection={nativeSelection}
-                />
-              </View>
-              {overlaySelecting ? (
-                <ChatSelectableText
-                  text={markdownPlainText(message.body)}
-                  color={textColor}
-                  onHeight={setSelectionHeight}
-                  onSelectionChange={actions.selectionChange}
-                />
-              ) : null}
-            </View>
+                <View style={overlaySelecting ? { minHeight: selectionHeight } : undefined}>
+                  <View
+                    style={overlaySelecting ? { opacity: 0 } : undefined}
+                    accessibilityElementsHidden={overlaySelecting}
+                    importantForAccessibility={overlaySelecting ? "no-hide-descendants" : "auto"}
+                  >
+                    <ChatMarkdown
+                      agents={agents}
+                      body={message.body}
+                      finished={!isStreamingReply(message)}
+                      selectable={message.author === "user"}
+                      color={textColor}
+                      playback={playback}
+                      animationEnabled={shared.animationActive && arriving}
+                      nativeSelection={nativeSelection}
+                    />
+                  </View>
+                  {overlaySelecting ? (
+                    <ChatSelectableText
+                      text={markdownPlainText(message.body)}
+                      color={textColor}
+                      onHeight={setSelectionHeight}
+                      onSelectionChange={actions.selectionChange}
+                    />
+                  ) : null}
+                </View>
+              </>
+            )}
           </ChatBubble>
         ) : null}
       </Animated.View>
@@ -722,9 +782,11 @@ const MessageRow = memo(function MessageRow({
       className={
         message.author === "agent"
           ? "max-w-full self-start gap-1"
-          : message.attachments?.length
-            ? "max-w-full self-end gap-1"
-            : "max-w-[92%] self-end gap-1"
+          : editing
+            ? "w-full max-w-[92%] self-end gap-1"
+            : message.attachments?.length
+              ? "max-w-full self-end gap-1"
+              : "max-w-[92%] self-end gap-1"
       }
     >
       {message.replyToMessageId ? (
@@ -740,7 +802,9 @@ const MessageRow = memo(function MessageRow({
           </Typography.Paragraph>
         </View>
       ) : null}
-      {message.author === "agent" ? (
+      {editing ? (
+        rendered
+      ) : message.author === "agent" ? (
         <ChatMessageGesture
           selecting={selecting}
           onReply={shared.canReply ? () => actions.reply(message) : undefined}
@@ -767,7 +831,7 @@ const MessageRow = memo(function MessageRow({
       )}
       {message.author === "user" && message.status === "failed" ? <TurnFailure reason={message.failureReason} /> : null}
       {outbox ? <ChatOutboxStatus status={outbox} /> : null}
-      {bubble ? (
+      {bubble && !editing ? (
         <ChatMessageActions
           align={message.author === "user" ? "end" : "start"}
           copyText={messageCopyText(message)}
@@ -786,6 +850,7 @@ const MessageRow = memo(function MessageRow({
             !outbox
               ? () => {
                   setEditDraft(message.body);
+                  setEditHeight(0);
                   editRequestId.current = Crypto.randomUUID();
                   setEditError(null);
                   setEditing(true);
@@ -795,50 +860,6 @@ const MessageRow = memo(function MessageRow({
           selecting={selecting}
           readAloudId={canReadAloud && message.author === "agent" ? message.id : undefined}
         />
-      ) : null}
-      {editing && message.kind === "message" ? (
-        <View className="w-full gap-2 rounded-2xl bg-control/60 p-3">
-          <TextInput
-            accessibilityLabel={t("mobile.chat.message.edit")}
-            multiline
-            autoFocus
-            value={editDraft}
-            onChangeText={setEditDraft}
-            className="min-h-20 text-foreground"
-          />
-          {editError ? (
-            <Typography.Paragraph type="body-xs" className="text-danger">
-              {editError}
-            </Typography.Paragraph>
-          ) : null}
-          <View className="flex-row justify-end gap-2">
-            <Button
-              variant="ghost"
-              onPress={() => {
-                setEditing(false);
-                setEditError(null);
-              }}
-              isDisabled={editSending}
-            >
-              {t("mobile.chat.message.cancelEdit")}
-            </Button>
-            <Button
-              isDisabled={editSending || !editDraft.trim()}
-              onPress={() => {
-                setEditSending(true);
-                actions
-                  .rewrite(message, editDraft.trim(), editRequestId.current)
-                  .then(() => setEditing(false))
-                  .catch((error: unknown) => {
-                    setEditError(error instanceof Error ? error.message : t("mobile.chat.message.editFailed"));
-                  })
-                  .finally(() => setEditSending(false));
-              }}
-            >
-              {t("mobile.chat.message.sendEdit")}
-            </Button>
-          </View>
-        </View>
       ) : null}
     </View>
   );

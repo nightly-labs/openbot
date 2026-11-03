@@ -276,6 +276,10 @@ export class OpenBotDatabase {
     return this.#conversations.rewoundMessageIds(threadId);
   }
 
+  rewoundTurnIds(threadId: string): ReadonlySet<string> {
+    return this.#conversations.rewoundTurnIds(threadId);
+  }
+
   /** Writes one message of a thread, for a caller that knows only that message changed. */
   persistStreamingMessage(input: {
     snapshot: ConversationSnapshot;

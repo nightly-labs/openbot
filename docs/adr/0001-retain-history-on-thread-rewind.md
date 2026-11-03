@@ -20,3 +20,24 @@ older snapshot events. A direct snapshot cut would lose the prior conversation. 
 version before the active history changes, and make both changes in one durable operation. This
 adds storage cost but protects the old conversation from an accidental edit and matches Codex's
 retention behavior.
+
+The cut uses conversation order, not enqueue timestamps: a queued question can be stored before
+the preceding answer finishes. All mailbox producers share the same enqueue lock while a rewrite
+rechecks its source, queues the replacement, and ends the old context. Restart recovery finishes
+a committed replacement's cut before providers can drain it. Provider-history imports keep their
+raw records but exclude archived message IDs and removed turns from the active conversation.
+
+A missing sender in a conversation projection can be recovered only from the host-stamped mailbox
+delivery for that agent and conversation lane. If both records lack a sender, remote authorship
+cannot be proved; those messages remain editable on the local host. This is an outstanding scope
+exception for remote clients, not an inference that the current member owns old messages.
+
+Repeatable checks:
+
+- `bun scripts/thread-rewind-e2e.ts` writes its report under `.openbot-build/thread-rewind-e2e/`.
+- `bun scripts/thread-rewrite-service-e2e.ts` restarts the complete service, database and a separate
+  deterministic provider process, then verifies completed history imports and subsequent turns.
+- `bun scripts/thread-rewrite-ui-e2e.ts --allow-mutations` drives Edit, Cancel and Resend in main and
+  side threads on this worktree's isolated desktop dev profile using a signed-in live Codex model.
+  After stopping and starting that stack, `--verify-restart --allow-mutations` checks new provider
+  turns and retained active history. Reports and screenshots stay under `.openbot-build/`.
