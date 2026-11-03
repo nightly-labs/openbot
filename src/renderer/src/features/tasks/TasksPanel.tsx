@@ -1,4 +1,5 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
+import { AGENT_THREAD_REWRITE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-rewrite-v1";
 import { currentText } from "@openbot/ui/text";
 import { createSignal, onCleanup } from "solid-js";
 import { actionToast } from "../../action-toast";
@@ -9,6 +10,7 @@ import { usePlatform } from "../../platform";
 import { deviceSendShortcut } from "../../send-shortcut-preference";
 import { useTurns } from "../../turns";
 import { appendVoiceTranscript } from "../../voice-recording";
+import { useAuth } from "../account/account-context";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { attentionKey } from "../agents/agent-runtime-snapshot";
@@ -17,6 +19,9 @@ import { EMPTY_DRAFT } from "../conversation/composer-draft";
 import { composerDraftKey } from "../conversation/conversation-keys";
 import type { ComposerDraft } from "../conversation/conversation-types";
 import { createVoiceStore, VOICE_LEVEL_COUNT, type VoiceStoreDeps } from "../conversation/stores/voice-store";
+import { useServers } from "../servers/servers-context";
+import { isReaderAuthor } from "../team/reader-identity";
+import { usePresence } from "../team/team-context";
 import { TasksView, type TasksVoiceAdapter, type TasksVoiceControls } from "./TasksView";
 import { desktopTasksSource } from "./tasks-port";
 
@@ -34,6 +39,9 @@ interface TasksPanelProps {
 /** The Tasks page on desktop: the agents of the active server, the task IPC, and voice from this computer. */
 export function TasksPanel(props: TasksPanelProps) {
   const { agentList } = useAgents();
+  const auth = useAuth();
+  const { currentTeamMember } = usePresence();
+  const { activeServer, activeServerSupportsCapability } = useServers();
   const { approvals, pendingPrompts, respondToApprovalRequest } = useTurns();
   const threads = useAgentTasks();
   const tabs = useAgentThreads();
@@ -52,6 +60,16 @@ export function TasksPanel(props: TasksPanelProps) {
     <TasksView
       {...props}
       source={desktopTasksSource()}
+      rewriteAvailable={activeServerSupportsCapability(AGENT_THREAD_REWRITE_CAPABILITY)}
+      requireSenderForRewrite={activeServer()?.kind === "remote"}
+      isOwnSender={(senderId) => {
+        const state = auth.centralAuth();
+        return isReaderAuthor(senderId, {
+          memberId: currentTeamMember()?.id ?? null,
+          accountUserId: state.status === "signed_in" ? state.user.id : null,
+          onOwnComputer: activeServer()?.kind === "local",
+        });
+      }}
       agents={agentList()}
       voice={createTasksVoice}
       onOpenLink={(url) => void appPort().openUrl(url)}

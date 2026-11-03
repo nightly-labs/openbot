@@ -2426,6 +2426,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       agentsOpen={!tasksAgentsHidden()}
                       onToggleAgents={() => setTasksAgentsOpen(tasksAgentsHidden())}
                       source={tasksSource}
+                      rewriteAvailable={workspace.state.capabilities.includes(AGENT_THREAD_REWRITE_CAPABILITY)}
+                      requireSenderForRewrite={true}
+                      isOwnSender={(senderId) =>
+                        isReaderAuthor(senderId, {
+                          memberId: workspace.state.memberId,
+                          accountUserId: props.accountId,
+                          onOwnComputer: false,
+                        })
+                      }
                       mediaSource={runtime.attachmentMedia}
                       files={{
                         accepted: () => workspace.state.capabilities.includes(AGENT_THREAD_FILES_CAPABILITY),

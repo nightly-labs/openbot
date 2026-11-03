@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { isDeepStrictEqual } from "node:util";
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
 import { type DatabaseCore, deleteReceiptsOf } from "./database-core";
@@ -56,8 +57,8 @@ export class ConversationWriter {
         )
         .get(threadId, agentId),
     );
-    if (!thread) throw new Error("Thread not found.");
-    if (thread.active_turn_id !== null) throw new Error("Thread is busy.");
+    if (!thread) throw new Error(sourceText("error.backend.threadNotFound"));
+    if (thread.active_turn_id !== null) throw new Error(sourceText("error.backend.rewriteSourceBusy"));
     const priorMessages = databaseRows(
       db
         .prepare(
@@ -67,7 +68,7 @@ export class ConversationWriter {
     ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
     const boundary = priorMessages.findIndex((message) => message.id === messageId);
     if (boundary < 0 || priorMessages[boundary]?.author !== "user" || priorMessages[boundary]?.status !== "completed")
-      throw new Error("Finished user message not found.");
+      throw new Error(sourceText("error.backend.rewriteMessageMissing"));
     return this.persistConversation(
       {
         agentId,

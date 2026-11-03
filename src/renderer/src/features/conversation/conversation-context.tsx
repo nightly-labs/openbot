@@ -1,11 +1,10 @@
-import {
-  type AgentEvent,
-  type AgentRuntimeSnapshot,
-  CONVERSATION_SNAPSHOT_MESSAGE_LIMIT,
-  type ConversationPage,
-  type ConversationPageInfo,
-  type ConversationReadState,
-  type ConversationSnapshot,
+import type {
+  AgentEvent,
+  AgentRuntimeSnapshot,
+  ConversationPage,
+  ConversationPageInfo,
+  ConversationReadState,
+  ConversationSnapshot,
 } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type { AgentMessage } from "@openbot/ui/data";
@@ -40,7 +39,12 @@ import {
   messagePromptRequestKey,
   promptRequestKey,
 } from "./conversation-keys";
-import { mergeConversationPage, missingReplyOriginals, windowedSnapshotMessages } from "./conversation-merge";
+import {
+  mergeConversationPage,
+  missingReplyOriginals,
+  snapshotMovesBack,
+  windowedSnapshotMessages,
+} from "./conversation-merge";
 import { conversationPort } from "./conversation-port";
 import {
   decideAgentAutoRead,
@@ -167,6 +171,7 @@ const Conversation = createSimpleContext({
     );
 
     const pendingConversationSnapshots = new Map<string, ConversationSnapshot>();
+    const pendingConversationRewinds = new Set<string>();
     const agentChatsRetriedOnOpen = new Set<string>();
     const conversationPageRequests = new Map<string, number>();
     const conversationReadOperations = new Map<string, Promise<void>>();
@@ -268,6 +273,7 @@ const Conversation = createSimpleContext({
       });
       deleteAgentMessageBodies(rawAgentMessageBodies, agentId);
       pendingConversationSnapshots.delete(agentId);
+      pendingConversationRewinds.delete(agentId);
       conversationPageRequests.delete(agentId);
       agentChatsRetriedOnOpen.delete(agentId);
     }
@@ -340,6 +346,9 @@ const Conversation = createSimpleContext({
       const pending = pendingConversationSnapshots.get(agentId);
       const pendingRevision = pending?.revision ?? -1;
       if (snapshot.revision < Math.max(appliedRevision, pendingRevision)) return;
+      if (snapshotMovesBack(pending?.messages ?? conversations[agentId]?.messages ?? [], snapshot.messages)) {
+        pendingConversationRewinds.add(agentId);
+      }
       for (const message of snapshot.messages) {
         const key = agentMessageKey(agentId, message.id);
         if (message.author !== "user" && message.status === "streaming") rawAgentMessageBodies.set(key, message.text);
@@ -550,9 +559,10 @@ const Conversation = createSimpleContext({
     function applyConversation(snapshot: ConversationSnapshot, markNewMessagesRead = false) {
       const agentId = snapshot.agentId;
       if (snapshot.revision < (conversations[agentId]?.revision ?? -1)) return;
+      const rewound = pendingConversationRewinds.delete(agentId);
       const initialLoad = conversations[agentId]?.loaded !== true;
       const inactive = agentId !== activeAgentId();
-      const windowMode = conversations[agentId]?.windowMode ?? "latest";
+      const windowMode = rewound ? "latest" : (conversations[agentId]?.windowMode ?? "latest");
       // A snapshot carries the latest part of the thread. An agent that is not open shows none of it,
       // and opening it reads the latest page again, so only the tail is converted and kept. A window
       // around an older message, from a search, converts the whole snapshot.
@@ -561,6 +571,13 @@ const Conversation = createSimpleContext({
           ? snapshot.messages.slice(-INACTIVE_SNAPSHOT_TAIL)
           : snapshot.messages;
       updateConversation(agentId, (conversation) => {
+        if (rewound) {
+          conversation.messages = [];
+          conversation.windowMode = "latest";
+          conversation.page = undefined;
+          conversation.references = {};
+          conversation.missingReferences = {};
+        }
         conversation.revision = snapshot.revision;
         conversation.loaded = true;
         const previous = conversation.messages;
@@ -570,9 +587,7 @@ const Conversation = createSimpleContext({
           previous,
           windowedSnapshotMessages(previous, allMappedMessages, {
             mode: windowMode,
-            // Main also cuts a snapshot by size, so a window with older pages takes it as a tail too.
-            capped:
-              snapshot.messages.length >= CONVERSATION_SNAPSHOT_MESSAGE_LIMIT || conversation.page?.hasOlder === true,
+            snapshotMessageCount: snapshot.messages.length,
           }),
         );
         const next = mappedMessages.map((mapped) => {

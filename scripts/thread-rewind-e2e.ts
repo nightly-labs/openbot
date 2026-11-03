@@ -11,6 +11,10 @@ import { AgentStore } from "../src/backend/agent-store";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
+import {
+  snapshotMovesBack,
+  windowedSnapshotMessages,
+} from "../src/renderer/src/features/conversation/conversation-merge";
 
 const root = await mkdtemp(join(tmpdir(), "openbot-thread-rewind-"));
 const database = new OpenBotDatabase(join(root, "state"));
@@ -54,6 +58,18 @@ try {
     database.readConversation(agent.id, threadId).messages.map((entry) => entry.id),
     ["first-question", "first-answer"],
   );
+  const shownAfterSearch = windowedSnapshotMessages(original.slice(2), rewound.messages, {
+    mode: "around",
+    snapshotMessageCount: rewound.messages.length,
+  });
+  assert.deepEqual(
+    shownAfterSearch.map((entry) => entry.id),
+    ["first-question", "first-answer"],
+  );
+  assert.equal(snapshotMovesBack(original.slice(2), rewound.messages), true);
+  const longHistory = Array.from({ length: 102 }, (_, index) => message(`long-${index}`, "user", "long", index));
+  const longRewind = longHistory.slice(0, 100);
+  assert.equal(snapshotMovesBack(longHistory.slice(-2), longRewind), true);
 
   database.persistConversation(
     { ...rewound, messages: [...rewound.messages, message("rewritten-question", "user", "turn-three", 5)] },
@@ -111,7 +127,7 @@ try {
   assert.equal(rewritten.voiceRecording?.mimeType, "audio/wav");
   if (receipt.deliveries[0]) mailbox.cancelNow(agent.id, receipt.deliveries[0].id);
 
-  // The persisted rewrite intent keeps a queued delivery from starting before a recovered cut.
+  // Reinitializing MailboxStore restores the delivery hold before the cut is completed.
   database.persistConversation(
     {
       agentId: agent.id,
@@ -138,7 +154,7 @@ try {
   database.rewindConversation(agent.id, threadId, "pending-question");
   assert.equal(restoredMailbox.nextQueued(agent.id)?.delivery.id, pending.deliveries[0]?.id);
   assert.ok(restoredMailbox.pendingRewrites().some((intent) => intent.deliveryId === pending.deliveries[0]?.id));
-  process.stdout.write("thread rewind: history, attachment references, and durable delivery hold passed\n");
+  process.stdout.write("thread rewind: history, search window, attachments, and mailbox reload passed\n");
 } finally {
   database.close();
   await rm(root, { recursive: true, force: true });

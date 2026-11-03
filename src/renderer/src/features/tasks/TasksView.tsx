@@ -82,6 +82,10 @@ interface TasksViewProps {
   agentsOpen?: boolean | undefined;
   onToggleAgents?: (() => void) | undefined;
   source: TasksSource;
+  /** The remote capability and the message owner's identity are checked before showing Edit. */
+  rewriteAvailable?: boolean | undefined;
+  requireSenderForRewrite?: boolean | undefined;
+  isOwnSender?: ((memberId: string) => boolean) | undefined;
   agents: AgentProfile[];
   /** Absent where the client cannot record. */
   voice?: ((controls: TasksVoiceControls) => TasksVoiceAdapter) | undefined;
@@ -748,6 +752,17 @@ export function TasksView(props: TasksViewProps) {
                 })
               }
               onSend={send}
+              onRewrite={
+                props.rewriteAvailable === false || !props.source.rewrite
+                  ? undefined
+                  : async (messageId, text, requestId) => {
+                      const target = input();
+                      if (!target || !props.source.rewrite) return;
+                      await props.source.rewrite({ ...target, messageId, text, requestId }, props.serverId);
+                    }
+              }
+              isOwnSender={props.isOwnSender}
+              requireSenderForRewrite={props.requireSenderForRewrite}
               onStop={() => {
                 const target = input();
                 if (target)

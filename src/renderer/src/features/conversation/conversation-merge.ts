@@ -1,4 +1,4 @@
-import type { ConversationPage } from "@openbot/contracts/ipc";
+import { CONVERSATION_SNAPSHOT_MESSAGE_LIMIT, type ConversationPage } from "@openbot/contracts/ipc";
 
 /**
  * Which messages a conversation shows after a page or a snapshot arrives.
@@ -56,6 +56,17 @@ export function missingReplyOriginals(page: Pick<ConversationPage, "messages" | 
   return missing;
 }
 
+/** A rewind publishes a snapshot whose newest message precedes the message being edited. */
+export function snapshotMovesBack(
+  loaded: readonly { createdAt?: string }[],
+  snapshot: readonly { createdAt: string }[],
+): boolean {
+  const lastLoaded = loaded.findLast((message) => message.createdAt !== undefined)?.createdAt;
+  if (!lastLoaded) return false;
+  const lastSnapshot = snapshot.at(-1)?.createdAt;
+  return lastSnapshot === undefined || lastSnapshot < lastLoaded;
+}
+
 /**
  * The part of a refreshed snapshot a conversation may show without losing its
  * window.
@@ -71,9 +82,11 @@ export function missingReplyOriginals(page: Pick<ConversationPage, "messages" | 
 export function windowedSnapshotMessages<Message extends { id: string }>(
   loaded: readonly Message[],
   snapshot: readonly Message[],
-  window: { mode: "latest" | "around"; capped: boolean },
+  window: { mode: "latest" | "around"; snapshotMessageCount: number },
 ): Message[] {
-  if (!window.capped) return [...snapshot];
+  // A page loaded around a search result may have older messages, but that does not make a
+  // shorter snapshot a tail. After a rewind, the shorter snapshot is authoritative.
+  if (window.snapshotMessageCount < CONVERSATION_SNAPSHOT_MESSAGE_LIMIT) return [...snapshot];
   const snapshotIds = new Set(snapshot.map((message) => message.id));
   const firstShared = loaded.findIndex((message) => snapshotIds.has(message.id));
   if (window.mode === "latest" && firstShared === -1) return [...snapshot];
