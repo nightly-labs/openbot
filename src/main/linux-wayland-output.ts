@@ -27,6 +27,12 @@ const DISPLAY_ID = 1;
 const REGISTRY_ID = 2;
 const CALLBACK_ID = 3;
 const HEADER_BYTES = 8;
+const X11_ARGUMENT = "--ozone-platform=x11";
+
+// Wayland uses the byte order of the computer.
+const littleEndian = endianness() === "LE";
+const readUInt32 = littleEndian ? Buffer.prototype.readUInt32LE : Buffer.prototype.readUInt32BE;
+const writeUInt32 = littleEndian ? Buffer.prototype.writeUInt32LE : Buffer.prototype.writeUInt32BE;
 
 class WaylandProbeFailure extends Schema.TaggedError<WaylandProbeFailure>()("WaylandProbeFailure", {
   cause: Schema.Defect(),
@@ -56,21 +62,18 @@ function chromiumChoosesWayland(): boolean {
 
 function message(id: number, opcode: number, newId: number): Buffer {
   const bytes = Buffer.alloc(12);
-  const write = (endianness() === "LE" ? bytes.writeUInt32LE : bytes.writeUInt32BE).bind(bytes);
-  write(id, 0);
-  write((12 << 16) | opcode, 4);
-  write(newId, 8);
+  writeUInt32.call(bytes, id, 0);
+  writeUInt32.call(bytes, (12 << 16) | opcode, 4);
+  writeUInt32.call(bytes, newId, 8);
   return bytes;
 }
 
 /**
  * The interface names of the compositor's globals: `wl_display.get_registry`, then `wl_display.sync`.
- * The callback's `done` comes after every `wl_registry.global` of the first burst. Wayland uses the
- * byte order of the computer.
+ * The callback's `done` comes after every `wl_registry.global` of the first burst.
  */
 function listWaylandGlobals(socketPath: string): Effect.Effect<ReadonlySet<string>, WaylandProbeFailure> {
   return Effect.callback<ReadonlySet<string>, WaylandProbeFailure>((resume) => {
-    const read = endianness() === "LE" ? Buffer.prototype.readUInt32LE : Buffer.prototype.readUInt32BE;
     const interfaces = new Set<string>();
     let pending = Buffer.alloc(0);
     let finished = false;
@@ -89,8 +92,8 @@ function listWaylandGlobals(socketPath: string): Effect.Effect<ReadonlySet<strin
     socket.on("data", (chunk: Buffer) => {
       pending = Buffer.concat([pending, chunk]);
       while (pending.length >= HEADER_BYTES) {
-        const id = read.call(pending, 0);
-        const word = read.call(pending, 4);
+        const id = readUInt32.call(pending, 0);
+        const word = readUInt32.call(pending, 4);
         const size = word >>> 16;
         const opcode = word & 0xffff;
         if (size < HEADER_BYTES) return fail(new Error(`A Wayland message has the size ${size}.`));
@@ -100,7 +103,7 @@ function listWaylandGlobals(socketPath: string): Effect.Effect<ReadonlySet<strin
         // wl_registry.global(name: uint, interface: string, version: uint). A string is a length that
         // counts its NUL, then the bytes.
         if (id === REGISTRY_ID && opcode === 0 && body.length >= 8) {
-          const length = read.call(body, 4);
+          const length = readUInt32.call(body, 4);
           if (length > 0 && body.length >= 8 + length)
             interfaces.add(body.subarray(8, 8 + length - 1).toString("utf8"));
         } else if (id === CALLBACK_ID && opcode === 0) {
@@ -121,9 +124,10 @@ function startOnX11(environment: NodeJS.ProcessEnv): Effect.Effect<void, Wayland
   return Effect.callback<void, WaylandProbeFailure>((resume) => {
     // An AppImage mounts itself for each start, and the mount of this process goes away with it.
     const executable = environment.APPIMAGE || process.execPath;
-    const child = spawn(executable, [...process.argv.slice(1), "--ozone-platform=x11"], {
+    // A terminal start keeps the output. The desktop app does not read its input.
+    const child = spawn(executable, [...process.argv.slice(1), X11_ARGUMENT], {
       detached: true,
-      stdio: "ignore",
+      stdio: ["ignore", "inherit", "inherit"],
       env: { ...environment, [RESTART_MARKER]: "1" },
     });
     child.once("error", (cause) => resume(Effect.fail(new WaylandProbeFailure({ cause }))));
@@ -134,11 +138,26 @@ function startOnX11(environment: NodeJS.ProcessEnv): Effect.Effect<void, Wayland
   });
 }
 
-/** True in the process that the restart below started. Agents do not inherit the marker. */
-export function takeXWaylandRestartMarker(environment: NodeJS.ProcessEnv): boolean {
+/**
+ * True in the process that the restart below started. Agents do not inherit the marker. A relaunch
+ * takes the arguments of `argv`, so the restart argument goes out of it: the next start probes again.
+ */
+export function takeXWaylandRestartMarker(environment: NodeJS.ProcessEnv, argv: string[]): boolean {
   const restarted = environment[RESTART_MARKER] !== undefined;
   delete environment[RESTART_MARKER];
+  const index = argv.lastIndexOf(X11_ARGUMENT);
+  if (restarted && index > 0) argv.splice(index, 1);
   return restarted;
+}
+
+/**
+ * The Ozone platform of this process, for an OpenBot child process such as a local server. On XWayland,
+ * the child must not wait for a monitor on Wayland. Elsewhere it is the platform that the child chooses.
+ */
+export function ozonePlatformArguments(): string[] {
+  if (process.platform !== "linux") return [];
+  const platform = app.commandLine.getSwitchValue("ozone-platform");
+  return platform ? [`--ozone-platform=${platform}`] : [];
 }
 
 /**

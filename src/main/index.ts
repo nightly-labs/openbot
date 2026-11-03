@@ -266,9 +266,15 @@ app.setName("OpenBot");
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
 // Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
-// XWayland. Before the single-instance lock, so that the new process can take it.
-const startedOnXWayland = takeXWaylandRestartMarker(process.env);
-if (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env))) app.exit(0);
+// XWayland. Before the single-instance lock, so that the new process can take it. A parent process or
+// systemd watches the process, the output and the input of a headless server, so it does not restart.
+const startedOnXWayland = takeXWaylandRestartMarker(process.env, process.argv);
+if (
+  app.isPackaged &&
+  !(serverMode || hostedServer || localServerChildEnvironment) &&
+  (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env)))
+)
+  app.exit(0);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 // A second launch exits at once and must not write into the files of the instance that runs.
 if (hasSingleInstanceLock) {
