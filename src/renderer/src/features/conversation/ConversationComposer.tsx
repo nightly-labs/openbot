@@ -63,7 +63,7 @@ export function ConversationComposer() {
     providerUpdateRequired,
     attachmentAction,
     attachmentBusy,
-    attachmentImporting,
+    uploadFailed,
     currentUploads,
     removeUpload,
     retryUpload,
@@ -248,6 +248,7 @@ export function ConversationComposer() {
     voicePhase() === "idle" &&
     agentReady() &&
     !attachmentBusy() &&
+    !uploadFailed() &&
     !submitting()
       ? steerComposer
       : undefined;
@@ -384,6 +385,7 @@ export function ConversationComposer() {
       title={sendTitle()}
       disabled={
         attachmentBusy() ||
+        uploadFailed() ||
         submitting() ||
         !agentReady() ||
         Boolean(providerUpdateRequired()) ||
@@ -487,7 +489,7 @@ export function ConversationComposer() {
                   variant="ghost"
                   size="sm"
                   type="button"
-                  disabled={submitting() || attachmentImporting()}
+                  disabled={submitting() || attachmentBusy()}
                   onClick={() => void cancelQueuedMessageEdit()}
                 >
                   {t("composer.queueEdit.cancel")}
@@ -736,13 +738,9 @@ export function ConversationComposer() {
               open={showComposerActions()}
               onOpenChange={setShowComposerActions}
               disabled={
-                attachmentImporting() ||
-                submitting() ||
-                voicePhase() === "transcribing" ||
-                !agentReady() ||
-                savePending()
+                attachmentBusy() || submitting() || voicePhase() === "transcribing" || !agentReady() || savePending()
               }
-              attachDisabled={attachmentImporting()}
+              attachDisabled={attachmentBusy()}
               onAttach={openAttachmentPicker}
               onPickSkill={pickSkill()}
               onSideQuestion={askSideQuestion()}
@@ -767,7 +765,7 @@ export function ConversationComposer() {
                   <ContextUsageMeter newChat={newChat()} compact={props.onCompactAgentContext} usage={usage()} />
                 )}
               </Show>
-              <Show when={attachmentImporting() && props.runtime?.cancelImportFiles} keyed>
+              <Show when={attachmentBusy() && props.runtime?.cancelImportFiles} keyed>
                 {(cancelImportFiles) => (
                   <Button variant="ghost" type="button" onClick={() => void cancelImportFiles()}>
                     {t("composer.upload.cancel")}

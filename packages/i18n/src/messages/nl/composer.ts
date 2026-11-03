@@ -84,7 +84,6 @@ export const messages = {
   "composer.upload.progress": "{sent} van {total}",
   "composer.upload.failed": "Uploaden mislukt",
   "composer.upload.retry": "{name} opnieuw proberen",
-  "composer.upload.cancelFile": "Uploaden van {name} annuleren",
   "composer.voice.progress": "Spraakmodel downloaden {progress}%",
   "composer.voice.recording": "Spraakopname",
   "composer.voice.limitSoon": "De opname stopt over {seconds} seconden.",

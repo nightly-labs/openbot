@@ -80,7 +80,6 @@ export const messages = defineMessages("composer", {
   "composer.upload.progress": "{sent} of {total}",
   "composer.upload.failed": "Upload failed",
   "composer.upload.retry": "Retry {name}",
-  "composer.upload.cancelFile": "Cancel upload of {name}",
   "composer.voice.progress": "Downloading voice model {progress}%",
   "composer.voice.recording": "Voice recording",
   "composer.voice.limitSoon": "Recording stops in {seconds} seconds.",

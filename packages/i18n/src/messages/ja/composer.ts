@@ -83,7 +83,6 @@ export const messages = {
   "composer.upload.progress": "{sent} / {total}",
   "composer.upload.failed": "アップロードに失敗しました",
   "composer.upload.retry": "{name} を再試行",
-  "composer.upload.cancelFile": "{name} のアップロードをキャンセル",
   "composer.voice.progress": "音声モデルをダウンロード中 {progress}%",
   "composer.voice.recording": "音声の録音",
   "composer.voice.limitSoon": "あと {seconds} 秒で録音が止まります。",

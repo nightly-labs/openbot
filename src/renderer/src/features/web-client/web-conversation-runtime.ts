@@ -140,6 +140,7 @@ export function createWebConversationRuntime(
     }
   }
   async function cancelImportFiles() {
+    if (pick) pick.cancelled = true;
     if (!importing) return;
     importing.cancelled = true;
     try {
@@ -175,20 +176,44 @@ export function createWebConversationRuntime(
   }
   // The files of each failed import, for Retry, until the composer removes the chip.
   const failedImports = new Map<string, readonly File[]>();
-  async function runImportFiles(requestId: string, files: readonly File[]) {
-    const serverId = hostId();
-    failedImports.delete(requestId);
-    // A set over the limit names no files: it has no chips, and the banner says why it failed.
-    const withinLimit = files.length <= INPUT_LIMITS.attachments;
-    // `started` names the chat on screen, so it comes before any wait.
+  // The pick whose files upload now. Cancel upload stops the files of the pick that did not start.
+  let pick: { cancelled: boolean } | undefined;
+  // `started` names the chat on screen, so it comes before any wait. A set over the limit names no
+  // files: it has no chips, and the banner says why it failed.
+  const announceImport = (requestId: string, files: readonly File[], retryable: boolean) =>
     emit({
       type: "started",
-      serverId,
+      serverId: hostId(),
       requestId,
-      files: withinLimit ? files.map((file) => ({ name: file.name, size: file.size })) : [],
+      files: retryable ? files.map((file) => ({ name: file.name, size: file.size })) : [],
     });
+  /**
+   * Each file is its own import, as on desktop, so a failed file does not drop the others. They go
+   * one after another, because the web client uploads one file at a time.
+   */
+  async function importPick(files: readonly File[]) {
+    if (files.length > INPUT_LIMITS.attachments) {
+      const requestId = crypto.randomUUID();
+      announceImport(requestId, files, false);
+      await runImportFiles(requestId, files, false);
+      return;
+    }
+    const current = { cancelled: false };
+    pick = current;
+    const imports = files.map((file) => ({ requestId: crypto.randomUUID(), files: [file] }));
+    for (const item of imports) announceImport(item.requestId, item.files, true);
+    for (const item of imports) {
+      if (current.cancelled)
+        emit({ type: "completed", serverId: hostId(), requestId: item.requestId, attachments: [] });
+      else await runImportFiles(item.requestId, item.files, true);
+    }
+    if (pick === current) pick = undefined;
+  }
+  async function runImportFiles(requestId: string, files: readonly File[], retryable: boolean) {
+    const serverId = hostId();
+    failedImports.delete(requestId);
     if (importBusy) {
-      if (withinLimit) failedImports.set(requestId, files);
+      if (retryable) failedImports.set(requestId, files);
       emit({ type: "error", serverId, requestId, message: currentText().t("error.remote.attachmentBusy") });
       return;
     }
@@ -205,7 +230,7 @@ export function createWebConversationRuntime(
           emit({ type: "completed", serverId, requestId, attachments: [] });
           return;
         }
-        if (withinLimit) failedImports.set(requestId, files);
+        if (retryable) failedImports.set(requestId, files);
         emit({
           type: "error",
           serverId,
@@ -286,7 +311,9 @@ export function createWebConversationRuntime(
       },
       retryAttachmentImport(requestId) {
         const files = failedImports.get(requestId);
-        if (files) void runImportFiles(requestId, files);
+        if (!files) return;
+        announceImport(requestId, files, true);
+        void runImportFiles(requestId, files, true);
       },
       discardAttachmentImport(requestId) {
         failedImports.delete(requestId);
@@ -349,8 +376,7 @@ export function createWebConversationRuntime(
     attachmentMedia,
     visualPage: files.visualPage,
     async importFiles(files) {
-      if (files.length === 0) return;
-      await runImportFiles(crypto.randomUUID(), files);
+      if (files.length > 0) await importPick(files);
     },
     cancelImportFiles,
     // `request()` names the connected host at call time, so a host switch reaches the new host.

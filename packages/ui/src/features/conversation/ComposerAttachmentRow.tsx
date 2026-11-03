@@ -123,8 +123,8 @@ function ComposerUploadChip(props: {
         data-file-tone={failed() ? undefined : attachmentReferenceTone(props.upload.name)}
       >
         <Show when={!failed()} fallback={<CircleAlert class="composer-upload-failed-icon" aria-hidden="true" />}>
-          <Show when={percent()} keyed fallback={<Spinner size="sm" label={uploadingLabel()} />}>
-            {(value) => <RadialProgress class="composer-upload-ring" value={value} aria-label={uploadingLabel()} />}
+          <Show when={percent() !== null} fallback={<Spinner size="sm" label={uploadingLabel()} />}>
+            <RadialProgress class="composer-upload-ring" value={percent() ?? 0} aria-label={uploadingLabel()} />
           </Show>
         </Show>
       </span>
@@ -150,11 +150,8 @@ function ComposerUploadChip(props: {
       <Show when={props.onRemove}>
         {(remove) => (
           <ImageRemoveButton
-            label={
-              failed()
-                ? t("composer.attachment.remove", { name: props.upload.name })
-                : t("composer.upload.cancelFile", { name: props.upload.name })
-            }
+            // An upload goes on in the background; the file lands nowhere.
+            label={t("composer.attachment.remove", { name: props.upload.name })}
             onClick={() => remove()(props.upload.uploadId)}
           />
         )}

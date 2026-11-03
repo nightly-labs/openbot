@@ -80,7 +80,6 @@ export const messages = {
   "composer.upload.progress": "{sent} / {total}",
   "composer.upload.failed": "上传失败",
   "composer.upload.retry": "重试 {name}",
-  "composer.upload.cancelFile": "取消上传 {name}",
   "composer.voice.progress": "正在下载语音模型 {progress}%",
   "composer.voice.recording": "录音中",
   "composer.voice.limitSoon": "录音将在 {seconds} 秒后停止。",

@@ -375,11 +375,14 @@ export function createConversationViewScope(props: ConversationProps) {
     return entry?.message === message ? entry.run : null;
   });
   /** True while a file import for the chat waits. An import for another chat does not stop this one. */
-  const attachmentImporting = (target = currentTarget()) =>
-    target !== undefined && importingDrafts().has(composerDraftKey(target));
-  /** No send while a file of the chat uploads or failed: the message would go without it. */
   const attachmentBusy = (target = currentTarget()) =>
-    attachmentImporting(target) || (target !== undefined && attachmentUploads.hasFailed(composerDraftKey(target)));
+    target !== undefined && importingDrafts().has(composerDraftKey(target));
+  /**
+   * A failed file of the chat stops a typed send until Retry or remove: the message would go
+   * without it. A voice conversation turn does not carry the draft files, so it still sends.
+   */
+  const uploadFailed = (target = currentTarget()) =>
+    target !== undefined && attachmentUploads.hasFailed(composerDraftKey(target));
   const syncAttachmentImports = () =>
     setImportingDrafts(new Set(Array.from(resources.importTargetAgents.values(), composerDraftKey)));
   const currentUploads = createMemo(() => {
@@ -851,6 +854,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const actions = createComposerActions({
     props,
     attachmentBusy,
+    uploadFailed,
     syncAttachmentImports,
     setPastePreviews,
     attachmentImports: resources.importTargetAgents,
@@ -1102,6 +1106,8 @@ export function createConversationViewScope(props: ConversationProps) {
       } else if (threadKey !== undefined) {
         if (event.type === "error") {
           importSounds.cancel(event.requestId);
+          // A side thread has no upload chip, so no Retry: the files are not kept for one.
+          conversationRuntime(props).agent.discardAttachmentImport?.(event.requestId);
           actionToast.error(event.message);
         } else {
           // A cancelled import completes with no attachments.
@@ -1126,6 +1132,9 @@ export function createConversationViewScope(props: ConversationProps) {
               [composerDraftKey(target)]: event.message,
             }));
         } else importSounds.cancel(event.requestId);
+        // Only a chip offers Retry, so the files of an import with none are not kept for one.
+        if (!attachmentUploads.get(event.requestId))
+          conversationRuntime(props).agent.discardAttachmentImport?.(event.requestId);
       } else {
         const target = resources.importTargetAgents.get(event.requestId);
         if (target) {
@@ -2013,7 +2022,7 @@ export function createConversationViewScope(props: ConversationProps) {
     attachmentAction,
     attachmentDownloads,
     attachmentBusy,
-    attachmentImporting,
+    uploadFailed,
     currentUploads,
     removeUpload,
     retryUpload,

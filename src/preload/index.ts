@@ -446,7 +446,13 @@ function emitAttachmentImport(event: AttachmentImportEvent): void {
  * The files of each import that this window started, by request id, until the import lands. A
  * failed import keeps its files for `retryAttachmentImport` until the renderer discards it.
  */
-const attachmentImportFiles = new Map<string, { serverId: string; files: File[] }>();
+const attachmentImportFiles = new Map<string, { serverId: string; files: NamedFile[] }>();
+
+/** A file and the name that the chip and the server show. A retry keeps the name. */
+interface NamedFile {
+  file: File;
+  name: string;
+}
 
 listen(IPC_ENDPOINTS.attachmentImports.importProgress, (value) => {
   const progress = decodeAttachmentImportProgress(value);
@@ -463,11 +469,13 @@ async function importFiles(files: File[]): Promise<void> {
   const overLimit =
     files.length > INPUT_LIMITS.attachments ||
     files.reduce((sum, file) => sum + file.size, 0) > ATTACHMENT_LIMITS.totalBytes;
+  // A pasted image has no name. It gets one here, so the chip and the server show the same name.
+  const named = files.map((file) => ({ file, name: file.name || `pasted-${Date.now()}.png` }));
   if (overLimit) {
-    await runAttachmentImport(crypto.randomUUID(), serverId, files, false);
+    await runAttachmentImport(crypto.randomUUID(), serverId, named, false);
     return;
   }
-  await Promise.all(files.map((file) => runAttachmentImport(crypto.randomUUID(), serverId, [file], true)));
+  await Promise.all(named.map((file) => runAttachmentImport(crypto.randomUUID(), serverId, [file], true)));
 }
 
 /**
@@ -477,12 +485,10 @@ async function importFiles(files: File[]): Promise<void> {
 async function runAttachmentImport(
   requestId: string,
   serverId: string,
-  files: File[],
+  named: NamedFile[],
   retryable: boolean,
 ): Promise<void> {
-  // A pasted image has no name. It gets one here, so the chip and the server show the same name.
-  const named = files.map((file) => ({ file, name: file.name || `pasted-${Date.now()}.png` }));
-  if (retryable) attachmentImportFiles.set(requestId, { serverId, files });
+  if (retryable) attachmentImportFiles.set(requestId, { serverId, files: named });
   emitAttachmentImport({
     type: "started",
     requestId,

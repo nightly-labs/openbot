@@ -80,7 +80,6 @@ export const messages = {
   "composer.upload.progress": "{sent} / {total}",
   "composer.upload.failed": "업로드 실패",
   "composer.upload.retry": "{name} 다시 시도",
-  "composer.upload.cancelFile": "{name} 업로드 취소",
   "composer.voice.progress": "음성 모델 다운로드 중 {progress}%",
   "composer.voice.recording": "음성 녹음",
   "composer.voice.limitSoon": "{seconds}초 후 녹음이 중지돼요.",

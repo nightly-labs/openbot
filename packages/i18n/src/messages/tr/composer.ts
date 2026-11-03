@@ -84,7 +84,6 @@ export const messages = {
   "composer.upload.progress": "{sent} / {total}",
   "composer.upload.failed": "Yükleme başarısız",
   "composer.upload.retry": "{name} için yeniden dene",
-  "composer.upload.cancelFile": "{name} yüklemesini iptal et",
   "composer.voice.progress": "Ses modeli indiriliyor %{progress}",
   "composer.voice.recording": "Ses kaydı",
   "composer.voice.limitSoon": "Kayıt {seconds} saniye içinde duracak.",

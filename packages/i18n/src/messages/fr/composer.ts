@@ -85,7 +85,6 @@ export const messages = {
   "composer.upload.progress": "{sent} sur {total}",
   "composer.upload.failed": "Échec de l’envoi",
   "composer.upload.retry": "Réessayer {name}",
-  "composer.upload.cancelFile": "Annuler l’envoi de {name}",
   "composer.voice.progress": "Téléchargement du modèle vocal {progress} %",
   "composer.voice.recording": "Enregistrement vocal",
   "composer.voice.limitSoon": "L’enregistrement s’arrête dans {seconds} secondes.",
