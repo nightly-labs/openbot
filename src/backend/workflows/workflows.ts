@@ -172,6 +172,9 @@ interface WorkflowTextRequest {
 }
 
 /** How a run began, and the key that makes a second start of the same run answer the first. */
+/** The part of a Discord or Telegram send that an output delivery keeps. */
+type ChatOutputSend = { action: "reply" | "post"; text: string } | { action: "react"; emoji: string };
+
 interface RunOrigin {
   source: WorkflowRunSource;
   scheduledFor: string | null;
@@ -588,48 +591,16 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             ? dependencies.discordSend(plan.connectionId, plan.send)
             : Effect.succeed({ failure: "not-running" as const });
 
-        /** Keeps a Discord output's reply, post or reaction, then sends it. */
-        const sendDiscord = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) => {
-          const plan = discordPlan(step, node, run);
-          if ("error" in plan) {
-            settle(step, { status: "failed", error: plan.error });
-            return Effect.void;
-          }
-          const { send } = plan;
-          // Nothing to say: the server gets no post. A reaction needs no text.
-          if (send.action !== "react" && !send.text.trim()) {
-            settle(step, { status: "done", output: "" });
-            return Effect.void;
-          }
-          if (!dependencies.connectionOn(plan.connectionId)) {
-            settle(step, { status: "failed", error: outputError("gone") });
-            return Effect.void;
-          }
-          runs.addOutput(
-            {
-              stepId: step.id,
-              connectionId: plan.connectionId,
-              placeId: send.channelId,
-              text: send.action === "react" ? send.emoji : send.text,
-            },
-            now(),
-          );
-          const output = runs.output(step.id);
-          return output ? startPost(step, output, discordPost(plan)) : Effect.void;
-        };
-
-        /** The reply, post or reaction of a Telegram output. Only a run that a message started has its message. */
-        const telegramPlan = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
-          telegramOutputPlan(node, step.input, run?.source === "telegram" ? telegramTriggerMessage(run.payload) : null);
-
-        const telegramPost = (plan: Extract<TelegramOutputPlan, { send: unknown }>) =>
-          dependencies.telegramSend
-            ? dependencies.telegramSend(plan.connectionId, plan.send)
-            : Effect.succeed({ failure: "not-running" as const });
-
-        /** Keeps a Telegram output's reply, post or reaction, then sends it. */
-        const sendTelegram = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) => {
-          const plan = telegramPlan(step, node, run);
+        /**
+         * Keeps a chat output's reply, post or reaction, then sends it. Discord and Telegram differ only in the
+         * plan, the place of the post and the send function, so a fix here applies to both.
+         */
+        const sendChat = <Plan extends { connectionId: string; send: ChatOutputSend }>(
+          step: StoredWorkflowStep,
+          plan: Plan | { error: string },
+          placeId: (plan: Plan) => string,
+          post: (plan: Plan) => Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>,
+        ) => {
           if ("error" in plan) {
             settle(step, { status: "failed", error: plan.error });
             return Effect.void;
@@ -648,14 +619,29 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             {
               stepId: step.id,
               connectionId: plan.connectionId,
-              placeId: plan.chatId,
+              placeId: placeId(plan),
               text: send.action === "react" ? send.emoji : send.text,
             },
             now(),
           );
           const output = runs.output(step.id);
-          return output ? startPost(step, output, telegramPost(plan)) : Effect.void;
+          return output ? startPost(step, output, post(plan)) : Effect.void;
         };
+
+        const sendDiscord = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          sendChat(step, discordPlan(step, node, run), (plan) => plan.send.channelId, discordPost);
+
+        /** The reply, post or reaction of a Telegram output. Only a run that a message started has its message. */
+        const telegramPlan = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          telegramOutputPlan(node, step.input, run?.source === "telegram" ? telegramTriggerMessage(run.payload) : null);
+
+        const telegramPost = (plan: Extract<TelegramOutputPlan, { send: unknown }>) =>
+          dependencies.telegramSend
+            ? dependencies.telegramSend(plan.connectionId, plan.send)
+            : Effect.succeed({ failure: "not-running" as const });
+
+        const sendTelegram = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) =>
+          sendChat(step, telegramPlan(step, node, run), (plan) => plan.chatId, telegramPost);
 
         /**
          * The key of a GitHub output's change: one for each pass of a node through a run, or one for a step
