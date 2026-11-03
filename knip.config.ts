@@ -82,6 +82,7 @@ const config: KnipConfig = {
         // The vendored Baileys in `@openbot/whatsapp` imports these at runtime. The main bundle keeps
         // them external, so electron-builder packs them only from these root entries.
         "@cacheable/node-cache",
+        "@hapi/boom",
         "@noble/curves",
         "async-mutex",
         "long",
