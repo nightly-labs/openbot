@@ -109,6 +109,19 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
                 {MASKED_WEBHOOK_SECRET}
               </code>
               <span class="sr-only">{t("routine.webhook.secretHidden")}</span>
+            </>
+          }
+        >
+          {(secret) => (
+            <code class="routine-webhook-value routine-webhook-secret" title={secret()}>
+              {secret()}
+            </code>
+          )}
+        </Show>
+        <span class="routine-webhook-actions">
+          <Show
+            when={props.secret}
+            fallback={
               <IconButton
                 variant="ghost"
                 label={t("routine.webhook.regenerateSecret")}
@@ -116,14 +129,9 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
               >
                 <RefreshCw aria-hidden="true" />
               </IconButton>
-            </>
-          }
-        >
-          {(secret) => (
-            <>
-              <code class="routine-webhook-value routine-webhook-secret" title={secret()}>
-                {secret()}
-              </code>
+            }
+          >
+            {(secret) => (
               <CopyButton
                 value={secret()}
                 label={t("routine.webhook.copySecret")}
@@ -131,19 +139,19 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
                 iconOnly
                 onCopy={() => props.onCopy?.()}
               />
-            </>
-          )}
-        </Show>
-        {/* A sender such as Composio makes its own secret, so this stays beside a new secret too. */}
-        <Show when={props.onUseSenderSecret}>
-          <IconButton
-            variant="ghost"
-            label={t("routine.webhook.useSenderSecret")}
-            onClick={() => setSender({ value: "", pending: false, error: null })}
-          >
-            <KeyRound aria-hidden="true" />
-          </IconButton>
-        </Show>
+            )}
+          </Show>
+          {/* A sender such as Composio makes its own secret, so this stays beside a new secret too. */}
+          <Show when={props.onUseSenderSecret}>
+            <IconButton
+              variant="ghost"
+              label={t("routine.webhook.useSenderSecret")}
+              onClick={() => setSender({ value: "", pending: false, error: null })}
+            >
+              <KeyRound aria-hidden="true" />
+            </IconButton>
+          </Show>
+        </span>
       </div>
       <Show when={props.secret}>
         <div class="routine-webhook-note routine-webhook-secret-note">
