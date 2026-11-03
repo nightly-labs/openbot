@@ -288,6 +288,8 @@ export function ContextUsageMeter(props: {
 export function ComposerNewChatButton(props: {
   agent: Pick<AgentProfile, "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
   start: () => Promise<void>;
+  /** A running compaction: the meter's New chat row is disabled for the same reason. */
+  disabled?: boolean | undefined;
 }) {
   const { t } = useText();
   const [confirming, setConfirming] = createSignal(false);
@@ -301,6 +303,7 @@ export function ComposerNewChatButton(props: {
         class="composer-button"
         aria-label={t("composer.newChat.action")}
         aria-haspopup="dialog"
+        disabled={props.disabled}
         onClick={() => setConfirming(true)}
       >
         <MessageCirclePlus aria-hidden="true" />

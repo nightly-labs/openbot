@@ -728,7 +728,13 @@ export function ConversationComposer() {
                 when={contextUsageView(context())}
                 fallback={
                   <Show when={newChat()}>
-                    {(action) => <ComposerNewChatButton agent={action().agent} start={action().start} />}
+                    {(action) => (
+                      <ComposerNewChatButton
+                        agent={action().agent}
+                        start={action().start}
+                        disabled={context()?.compaction?.status === "running"}
+                      />
+                    )}
                   </Show>
                 }
               >
