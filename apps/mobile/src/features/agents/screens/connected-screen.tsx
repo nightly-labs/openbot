@@ -576,14 +576,18 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     return ids;
   }, [items, collapsedSectionIds]);
   // As on the desktop, a closed folder counts the unread messages in it and in the folders in it.
+  // The read state changes on each message, so the counts become a string first: the map, and with it
+  // `renderItem`, change only when the count of a closed folder changes.
   const unreadCounts = useUnreadCounts();
-  const folderUnread = useMemo(() => {
+  const folderUnreadKey = useMemo(() => {
+    if (!collapsedSectionIds?.size) return "[]";
     const unread = new Set(unreadAgentIds);
     const counts = new Map<string, number>();
     let folderIds: readonly string[] = [];
     for (const item of items) {
       if (item.kind === "waiting") folderIds = [];
-      else if (item.kind === "section") folderIds = [...item.ancestorIds, item.id];
+      else if (item.kind === "section")
+        folderIds = [...item.ancestorIds, item.id].filter((id) => collapsedSectionIds.has(id));
       else {
         const count =
           item.kind === "channel"
@@ -594,8 +598,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         if (count > 0) for (const folderId of folderIds) counts.set(folderId, (counts.get(folderId) ?? 0) + count);
       }
     }
-    return counts;
-  }, [items, unreadAgentIds, unreadCounts]);
+    return JSON.stringify([...counts]);
+  }, [items, collapsedSectionIds, unreadAgentIds, unreadCounts]);
+  const folderUnread = useMemo(() => new Map<string, number>(JSON.parse(folderUnreadKey)), [folderUnreadKey]);
   const sidebarLayout = sidebar?.layout ?? null;
   const serverId = activeServer.id;
   const toggleSection = useCallback(
@@ -630,7 +635,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                 parentName={item.parentName}
                 custom={item.custom}
                 empty={item.empty}
-                unread={collapsedSectionIds?.has(item.id) ? (folderUnread.get(item.id) ?? 0) : 0}
+                unread={folderUnread.get(item.id) ?? 0}
                 visibleSectionIds={visibleSectionIds}
                 collapsed={collapsedSectionIds?.has(item.id) ?? false}
                 onToggle={toggleSection}
