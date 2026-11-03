@@ -28,8 +28,8 @@ const WEEKLY_WINDOW_MINS = 10_080;
 const NO_USAGE: AccountRateLimitsReadResult = { rateLimits: null, rateLimitsByLimitId: null };
 
 /**
- * No sign-in, an expired or rejected token, and a plan with no quota all read as no usage, so the
- * dock shows the provider as not reporting instead of an error.
+ * No sign-in, a rejected token, and a plan with no quota all read as no usage, so the dock shows the
+ * provider as not reporting. An expired token fails the read, so the dock keeps the last reading.
  */
 class KimiUsageFailed extends Schema.TaggedError<KimiUsageFailed>()("KimiUsageFailed", {
   cause: Schema.Defect(),
@@ -40,8 +40,8 @@ function kimiCodeHomeDirectory(env: NodeJS.ProcessEnv, home = homedir()): string
   return env.KIMI_CODE_HOME?.trim() || join(home, ".kimi-code");
 }
 
-const MANAGED_PROVIDER_HEADER = /^\[\s*providers\.(?:"managed:kimi-code"|'managed:kimi-code')\s*\]$/u;
-const MANAGED_OAUTH_HEADER = /^\[\s*providers\.(?:"managed:kimi-code"|'managed:kimi-code')\.oauth\s*\]$/u;
+const MANAGED_PROVIDER_HEADER = /^\[\s*providers\.(?:"managed:kimi-code"|'managed:kimi-code')\s*\]\s*(?:#.*)?$/u;
+const MANAGED_OAUTH_HEADER = /^\[\s*providers\.(?:"managed:kimi-code"|'managed:kimi-code')\.oauth\s*\]\s*(?:#.*)?$/u;
 const quoted = (name: string) => new RegExp(`^${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "u");
 const BASE_URL_LINE = quoted("base_url");
 const KEY_LINE = quoted("key");
@@ -106,9 +106,11 @@ export const readKimiUsage = Effect.fn("Kimi.readUsage")(function* (python: bool
   const text = yield* readText(join(home, "credentials", `${name}.json`));
   if (Option.isNone(text)) return NO_USAGE;
   const token = Schema.decodeUnknownOption(Schema.fromJsonString(KimiToken))(text.value);
-  // The CLI refreshes an expired token itself; the next poll reads the new one.
-  if (Option.isNone(token) || (token.value.expires_at !== undefined && token.value.expires_at * 1_000 <= Date.now()))
-    return NO_USAGE;
+  if (Option.isNone(token)) return NO_USAGE;
+  // The token lasts 15 minutes, and the CLI refreshes it only during a turn. An idle Kimi keeps its
+  // last reading until the next turn gives a new token.
+  if (token.value.expires_at !== undefined && token.value.expires_at * 1_000 <= Date.now())
+    return yield* new KimiUsageFailed({ cause: new Error("The Kimi sign-in token has expired.") });
   const usage = yield* getUsages(url, token.value.access_token);
   return usage === null ? NO_USAGE : kimiRateLimits(usage);
 });

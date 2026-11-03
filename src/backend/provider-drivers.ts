@@ -1148,10 +1148,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         mcpEndpoint: context.mcpEndpoint,
         history: context.history?.("kimi"),
         readRateLimits: () =>
-          readKimiUsage(isPythonKimiCli(cli), {
-            ...process.env,
-            ...kimiProcessEnv(cli, context.agentEnvironment?.()),
-          }).pipe(Effect.mapError((failure) => providerFailure(failure.cause))),
+          // Not `kimiProcessEnv`: its region variables repeat the `base_url` that the reader takes from `config.toml`.
+          readKimiUsage(isPythonKimiCli(cli), { ...process.env, ...context.agentEnvironment?.() }).pipe(
+            Effect.mapError((failure) => providerFailure(failure.cause)),
+          ),
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
