@@ -110,6 +110,7 @@ import { stopAppImageCrashpadHandlerAtExit } from "./linux-appimage-crashpad";
 import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { configureLinuxGpu } from "./linux-gpu-mode";
 import { configureLinuxPasswordStore } from "./linux-password-store";
+import { restartOnXWaylandWithoutMonitor, takeXWaylandRestartMarker } from "./linux-wayland-output";
 import { takeLocalServerChildEnvironment } from "./local-server-child";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
@@ -264,6 +265,16 @@ if (commandLineUserDataDirectory) {
 app.setName("OpenBot");
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
+// Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
+// XWayland. Before the single-instance lock, so that the new process can take it. A parent process or
+// systemd watches the process, the output and the input of a headless server, so it does not restart.
+const startedOnXWayland = takeXWaylandRestartMarker(process.env, process.argv);
+if (
+  app.isPackaged &&
+  !(serverMode || hostedServer || localServerChildEnvironment) &&
+  (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env)))
+)
+  app.exit(0);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 // A second launch exits at once and must not write into the files of the instance that runs.
 if (hasSingleInstanceLock) {
@@ -275,6 +286,8 @@ if (hasSingleInstanceLock) {
   stopAppImageCrashpadHandlerAtExit();
   // A file request that never finishes must not keep the process and its lock after an exit.
   stopStuckExitAfterLimit(join(app.getPath("userData"), "logs"));
+  if (startedOnXWayland)
+    logger.warn("The Wayland session had no monitor, so OpenBot uses XWayland until the next start.");
 }
 // Linux: the GPU stays on until it fails on this computer (#992). `userData` has its final path here.
 configureLinuxGpu({

@@ -231,6 +231,7 @@ import { prepareToolRuntimeForTest } from "./ipc/mcp-server-handlers";
 import { LanguageService } from "./language-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
+import { ozonePlatformArguments } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import { type LocalServerChildEnvironment, startLocalServerChild } from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
@@ -3047,7 +3048,10 @@ export async function createApplicationServices({
           runtimeRoot: providerRuntimesRoot,
           cipher: safeStorageCipher("error.app.macSecureStorageUnavailable"),
           remoteServers,
-          command: { executable: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] },
+          command: {
+            executable: process.execPath,
+            args: [...(app.isPackaged ? [] : [app.getAppPath()]), ...ozonePlatformArguments()],
+          },
           trash: (path) => shell.trashItem(path),
           account: {
             accountId: () => {
@@ -3406,7 +3410,8 @@ export async function createApplicationServices({
     relaunch: () => {
       // A development build only quits: its supervisor stops the stack, and a relaunched Electron
       // would run outside it with no renderer server.
-      if (app.isPackaged) app.relaunch();
+      // The arguments of `process.argv`: after an XWayland start, they do not keep `--ozone-platform=x11`.
+      if (app.isPackaged) app.relaunch({ args: process.argv.slice(1) });
       app.quit();
     },
     log: (message) => logger.info(message),
