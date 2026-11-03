@@ -60,9 +60,10 @@ export interface SidePanelState {
 /**
  * Where a file opens. A link in the chat opens the file in a new tab. A link or folder entry in the
  * shown file or folder opens in its tab, as a link in a browser tab does. A file that has a tab
- * always opens in that tab.
+ * always opens in that tab. A click on a tab reads its file again in that tab; when the tab closes
+ * before the read ends, the file does not show.
  */
-type FileTabPlace = "tab" | "here";
+type FileTabPlace = "tab" | "here" | "open";
 
 /** The side panel of each agent, the subagent in its Subagent pane, and the side thread that it shows. */
 export interface SidePanelsState {
@@ -322,7 +323,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
    * uses. The bytes come from `previewUrl` rather than the preview IPC, because an attachment is
    * named by its id and has no path on the agent's computer.
    */
-  async function previewAttachment(attachment: AttachmentSummary) {
+  async function previewAttachment(attachment: AttachmentSummary, place: FileTabPlace = "tab") {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!ownerAgentId || !canPreviewAttachment(attachment)) return;
     const target = { agentId: ownerAgentId, serverId: deps.props.server?.id ?? "local" };
@@ -332,7 +333,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       const preview = await (deps.props.runtime?.previewAttachment?.(attachment) ?? attachmentFilePreview(attachment));
       if (generation !== deps.currentFilePreviewGeneration() || conversationOwnerId(deps.props) !== ownerAgentId)
         return;
-      showSidebarFile({ ownerAgentId, source: { kind: "attachment", attachment }, preview }, "tab");
+      showSidebarFile({ ownerAgentId, source: { kind: "attachment", attachment }, preview }, place);
     } catch (error) {
       if (generation !== deps.currentFilePreviewGeneration()) return;
       deps.setComposerError(errorMessage(error, t("attachment.error.preview", { name: attachment.name })), target);
@@ -493,6 +494,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   function showSidebarFile(file: SidebarFilePreview, place: FileTabPlace) {
     const { ownerAgentId, source } = file;
     const key = filePreviewKey(source);
+    if (place === "open" && !(panels.side[ownerAgentId] ?? SIDE_PANEL_EMPTY).files.some((item) => item.key === key))
+      return;
     const tab: SidePanelFile = {
       key,
       name: file.directory?.name ?? file.preview?.name ?? key,
@@ -526,10 +529,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       return;
     }
     const source = tab.source;
-    if (source.kind === "attachment") void previewAttachment(source.attachment);
-    else if (source.kind === "shared") openSharedFile(source.path);
-    else if (source.kind === "workspace") openWorkspaceFile(source.path, source.folder, source.agentId);
-    else openWorkspaceFolder(source.path, source.agentId, "tab");
+    if (source.kind === "attachment") void previewAttachment(source.attachment, "open");
+    else if (source.kind === "shared") openSharedFile(source.path, "open");
+    else if (source.kind === "workspace") openWorkspaceFile(source.path, source.folder, source.agentId, "open");
+    else openWorkspaceFolder(source.path, source.agentId, "open");
   }
 
   /**
