@@ -17,6 +17,7 @@ import { useCSSVariable } from "uniwind";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import type { QueuedUpload } from "../context/queued-messages-context";
 import { queuedMessageLocks, queuedMessagePreview } from "../model/queued-message-view";
 import { ChatGlassButton } from "./chat-glass-icon-button";
@@ -190,7 +191,12 @@ function ChatQueueCard({
             onPress={() => openSheet(queue.chatId)}
           >
             <Clock color={muted} size={16} strokeWidth={2} />
-            <Typography.Paragraph type="body-sm" numberOfLines={1} className="min-w-0 flex-1">
+            <Typography.Paragraph
+              type="body-sm"
+              numberOfLines={1}
+              className="min-w-0 flex-1"
+              style={lineDirectionStyle(preview)}
+            >
               {preview}
             </Typography.Paragraph>
           </Pressable>
@@ -216,7 +222,7 @@ function ChatQueueCard({
               }}
             >
               <View className="flex-row items-center gap-1 px-1">
-                <CornerDownRight color={foreground} size={18} strokeWidth={2} />
+                <CornerDownRight color={foreground} size={18} strokeWidth={2} style={MIRROR_IN_RTL} />
                 <Typography.Paragraph type="body-sm" weight="semibold">
                   {t("mobile.chat.queue.steer")}
                 </Typography.Paragraph>

@@ -41,7 +41,7 @@
   color: var(--openbot-text-secondary);
   font: inherit;
   font-size: var(--openbot-text-md);
-  text-align: left;
+  text-align: start;
   transition:
     background-color var(--openbot-duration-hover) ease,
     color var(--openbot-duration-hover) ease;
@@ -120,8 +120,8 @@
 .settings-modal-scroll-frame::before,
 .settings-modal-scroll-frame::after {
   position: absolute;
-  right: var(--openbot-space-2);
-  left: 0;
+  inset-inline-end: var(--openbot-space-2);
+  inset-inline-start: 0;
   z-index: 1;
   height: var(--openbot-space-8);
   opacity: 0;
@@ -334,7 +334,8 @@
 
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-header {
   align-items: center;
-  padding: var(--openbot-space-4) var(--openbot-space-4) var(--openbot-space-6) var(--openbot-space-8);
+  padding-block: var(--openbot-space-4) var(--openbot-space-6);
+  padding-inline: var(--openbot-space-8) var(--openbot-space-4);
 }
 
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-description {
@@ -398,12 +399,14 @@
 /* The row has no inline padding of its own here, so the message moves left to stay under the name. */
 .provider-picker-embedded .provider-picker-check-error.provider-picker-used-by {
   margin-top: calc(-1 * var(--openbot-space-4));
-  padding: 0 0 var(--openbot-space-3) 54px;
+  padding-block: 0 var(--openbot-space-3);
+  padding-inline: 54px 0;
 }
 
 .provider-picker-embedded .provider-picker-accounts {
   margin-top: calc(-1 * var(--openbot-space-2));
-  padding: 0 0 var(--openbot-space-2) 54px;
+  padding-block: 0 var(--openbot-space-2);
+  padding-inline: 54px 0;
 }
 
 .provider-picker-embedded .provider-picker-option + .provider-picker-option,
@@ -431,7 +434,7 @@
 
 .provider-picker-embedded .provider-picker-install,
 .provider-picker-embedded .provider-picker-custom-count {
-  margin-right: 0;
+  margin-inline-end: 0;
 }
 
 /* Row actions keep the onboarding colours: Download and Update stay light and only Connect takes
@@ -612,7 +615,7 @@
   overflow-wrap: anywhere;
   color: var(--openbot-text-primary);
   font-weight: var(--openbot-weight-medium);
-  text-align: right;
+  text-align: end;
   user-select: text;
 }
 
@@ -764,7 +767,7 @@
   .settings-modal-readonly-value {
     min-width: 0;
     max-width: none;
-    text-align: left;
+    text-align: start;
   }
 
   .settings-modal-save-bar {
@@ -826,4 +829,9 @@
 
 .settings-panel .settings-identity-name-control {
   width: 100%;
+}
+
+/* Back and Continue of the phone dialog follow the reading direction. */
+.settings-mobile-dialog-footer svg:is([class~="lucide-arrow-left"], [class~="lucide-arrow-right"]):dir(rtl) {
+  transform: scaleX(-1);
 }

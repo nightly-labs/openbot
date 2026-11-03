@@ -103,13 +103,26 @@ function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Elemen
     return (
       <span class="agent-step-memory" data-action={change.action}>
         <span class="agent-step-memory-action">{text.t(MEMORY_ACTION_LABEL[change.action])}</span>
-        <Show when={change.previousText}>{(previous) => <s class="agent-step-memory-previous">{previous()}</s>}</Show>
-        {change.action === "forgotten" ? <s>{change.text}</s> : <span>{change.text}</span>}
+        <Show when={change.previousText}>
+          {(previous) => (
+            <s class="agent-step-memory-previous" dir="auto">
+              {previous()}
+            </s>
+          )}
+        </Show>
+        {change.action === "forgotten" ? <s dir="auto">{change.text}</s> : <span dir="auto">{change.text}</span>}
       </span>
     );
   }
-  const shown = step.kind === "thinking" ? step.text : text.sourceText(step.text);
-  return <span class={["agent-step-text", { "agent-activity-label": newest }]}>{shown}</span>;
+  if (step.kind === "thinking") {
+    // The agent's own words take their direction from their letters; a progress line is interface text.
+    return (
+      <span class={["agent-step-text", { "agent-activity-label": newest }]} dir="auto">
+        {step.text}
+      </span>
+    );
+  }
+  return <span class={["agent-step-text", { "agent-activity-label": newest }]}>{text.sourceText(step.text)}</span>;
 }
 
 function StepIcon(props: { kind: AgentStep["kind"] }) {

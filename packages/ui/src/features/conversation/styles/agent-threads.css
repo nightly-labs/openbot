@@ -7,7 +7,7 @@
 .conversation-heading-group:has(.agent-threads-header) {
   min-width: 0;
   flex: 1 1 0;
-  margin-right: 6px;
+  margin-inline-end: 6px;
 }
 
 /* The same gap as between two tabs, so "+" and the thread list read as part of the tab row. */
@@ -16,14 +16,15 @@
   min-width: 0;
   align-items: center;
   gap: 3px;
-  margin-left: 4px;
+  margin-inline-start: 4px;
 }
 
 /* The agent's name is the first tab, for the agent's own chat, with the shape of the thread tabs. */
 .conversation-title.ui-button[data-tab] {
   height: var(--openbot-control-sm);
   gap: var(--openbot-space-1-5);
-  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-1-5);
+  padding-block: 0;
+  padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
   border-radius: var(--openbot-radius-md);
   color: var(--openbot-text-secondary);
 }
@@ -45,7 +46,7 @@
 
 /* The gap after the name tab is the gap between two tabs, with the same divider in it. */
 .conversation-heading-group:has(.conversation-title[data-tab]) .agent-threads-header {
-  margin-left: 1px;
+  margin-inline-start: 1px;
 }
 
 /*
@@ -66,7 +67,7 @@
 .conversation-heading-group:has(.agent-threads-header[data-fold]) .conversation-title {
   position: relative;
   flex-shrink: 0;
-  padding-right: var(--openbot-space-1-5);
+  padding-inline-end: var(--openbot-space-1-5);
 }
 
 .conversation-heading-group:has(.agent-threads-header[data-fold]) .conversation-title h1 {
@@ -127,12 +128,15 @@
   min-width: 0;
   max-width: 100%;
   /* "+" and the thread list follow the last tab directly. */
-  padding-right: 0;
+  padding-inline-end: 0;
   overflow-x: auto;
   gap: var(--openbot-space-1);
   background: transparent;
   box-shadow: none;
   scrollbar-width: none;
+  /* The soft edges, the fill, the drag and the scroll into view measure `scrollLeft` and `offsetLeft`
+     from the left edge (`ThreadTabs.tsx`), so the tabs keep the left-to-right order in every language. */
+  direction: ltr;
 }
 
 /* A soft edge where more tabs are out of view. */
@@ -177,7 +181,8 @@
   flex: 0 1 auto;
   align-items: center;
   gap: var(--openbot-space-1-5);
-  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-1-5);
+  padding-block: 0;
+  padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
   border-radius: var(--openbot-radius-md);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
@@ -316,7 +321,8 @@
   gap: var(--openbot-space-1-5);
   border-radius: var(--openbot-radius-md);
   background-color: var(--openbot-bg-control-active);
-  padding: 0 var(--openbot-space-1) 0 var(--openbot-space-1-5);
+  padding-block: 0;
+  padding-inline: var(--openbot-space-1-5) var(--openbot-space-1);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-regular);
@@ -408,7 +414,7 @@
 .agent-threads-stem-elbow::before,
 .agent-threads-stem-elbow::after {
   position: absolute;
-  left: 7px;
+  inset-inline-start: 7px;
   border: 0 solid color-mix(in srgb, var(--openbot-text-muted) 60%, transparent);
   content: "";
 }
@@ -416,20 +422,20 @@
 .agent-threads-stem-line::before,
 .agent-threads-stem-elbow::before {
   inset-block: 0;
-  border-left-width: 1px;
+  border-inline-start-width: 1px;
 }
 
 .agent-threads-stem-elbow::after {
   top: 50%;
-  right: 0;
+  inset-inline-end: 0;
   border-top-width: 1px;
 }
 
 .agent-threads-stem-last::before {
-  right: 0;
+  inset-inline-end: 0;
   bottom: 50%;
   border-bottom-width: 1px;
-  border-bottom-left-radius: 6px;
+  border-end-start-radius: 6px;
 }
 
 .agent-threads-stem-last::after {
@@ -510,7 +516,7 @@
   + .agent-threads-tab::before {
   position: absolute;
   top: 50%;
-  left: calc(var(--openbot-space-1) / -2 - 0.5px);
+  inset-inline-start: calc(var(--openbot-space-1) / -2 - 0.5px);
   width: 1px;
   height: var(--openbot-icon-lg);
   background: var(--openbot-border-strong);
@@ -593,17 +599,17 @@
   display: grid;
   flex: 0 0 auto;
   grid-template-columns: 0fr;
-  margin-left: -4px;
+  margin-inline-start: -4px;
   opacity: 0;
   transition:
     grid-template-columns var(--sliding-tabs-duration) var(--sliding-tabs-ease),
-    margin-left var(--sliding-tabs-duration) var(--sliding-tabs-ease),
+    margin-inline-start var(--sliding-tabs-duration) var(--sliding-tabs-ease),
     opacity var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
 .agent-threads-tab-mark-slot[data-open] {
   grid-template-columns: 1fr;
-  margin-left: 0;
+  margin-inline-start: 0;
   opacity: 1;
 }
 
@@ -716,7 +722,7 @@
 
 /* The hint holds the thread title, which can be long. It stays on the one line of the compact box. */
 .agent-thread-composer .composer-editor-placeholder {
-  right: 0;
+  inset-inline-end: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -33,7 +33,7 @@
 .language-wheel-arrows {
   position: absolute;
   top: 50%;
-  left: calc(100% + var(--openbot-space-2));
+  inset-inline-start: calc(100% + var(--openbot-space-2));
   translate: 0 -50%;
   display: flex;
   flex-direction: column;
@@ -160,6 +160,19 @@
 
 .language-wheel-continue:active:not(:disabled) svg {
   translate: var(--openbot-space-2) 0;
+}
+
+/* Right to left, the arrow points and moves the other way. */
+.language-wheel-continue svg:dir(rtl) {
+  transform: scaleX(-1);
+}
+
+.language-wheel-continue:is(:hover, :focus-visible):not(:disabled) svg:dir(rtl) {
+  translate: calc(var(--openbot-space-1) * -1) 0;
+}
+
+.language-wheel-continue:active:not(:disabled) svg:dir(rtl) {
+  translate: calc(var(--openbot-space-2) * -1) 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -55,9 +55,10 @@ import {
 } from "@/shared/lib/composer-metrics";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
-import { isAndroid } from "@/shared/lib/platform";
+import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
+import { layoutDirection, MIRROR_IN_RTL, physicalTextDirectionStyle, textDirection } from "@/shared/lib/text-direction";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { applyMarkdownListEdit, markdownListReturn } from "../model/composer-lists";
 import { largePastedText } from "../model/composer-paste";
@@ -1198,7 +1199,7 @@ export const ChatComposer = memo(function ChatComposer({
                   style={{ position: "absolute", top: 0, left: 0, right: 0 }}
                   onLayout={({ nativeEvent }) => replyRowHeight.set(nativeEvent.layout.height)}
                 >
-                  <Reply color={String(muted)} size={16} />
+                  <Reply color={String(muted)} size={16} style={MIRROR_IN_RTL} />
                   <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-text-secondary">
                     {mentionDraft(shownReply.body).text || t("mobile.chat.reply.attachment")}
                   </Typography.Paragraph>
@@ -1296,6 +1297,11 @@ export const ChatComposer = memo(function ChatComposer({
                         lineHeight: 22,
                         paddingVertical: FIELD_VERTICAL_PADDING / 2,
                         textAlignVertical: "top",
+                        // An Android field finds the direction of each paragraph from its text. An
+                        // iOS field reads in the direction of the draft, and of the app when it is empty.
+                        ...(isIOS
+                          ? physicalTextDirectionStyle(textDirection(displayText, layoutDirection()))
+                          : undefined),
                       }}
                       onSelectionChange={({ nativeEvent }) =>
                         setCursor(

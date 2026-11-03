@@ -25,6 +25,7 @@ import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { devFeatureOverride } from "@/shared/lib/dev-feature-overrides";
 import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 const PLAN_TEXT = {
   starter: { name: "mobile.server.hosted.plan.starter", summary: "mobile.server.hosted.plan.starterSummary" },
@@ -289,7 +290,7 @@ function OwnedServerRow({ server, listed }: { server: HostedServerSummary; liste
         inSetup ? (
           <View className="flex-row items-center gap-1">
             {label}
-            <ChevronRight size={18} color={muted} strokeWidth={1.5} />
+            <ChevronRight size={18} color={muted} strokeWidth={1.5} style={MIRROR_IN_RTL} />
           </View>
         ) : (
           label

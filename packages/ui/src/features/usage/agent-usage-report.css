@@ -105,19 +105,19 @@
 }
 .agent-usage-table th,
 .agent-usage-table td {
-  text-align: right;
+  text-align: end;
   padding: var(--openbot-space-2) var(--openbot-space-3);
   border-bottom: 1px solid var(--openbot-border-strong);
   white-space: nowrap;
   font-weight: 400;
 }
 .agent-usage-table th:first-child {
-  text-align: left;
-  padding-left: 0;
+  text-align: start;
+  padding-inline-start: 0;
   white-space: normal;
 }
 .agent-usage-table td:last-child {
-  padding-right: 0;
+  padding-inline-end: 0;
 }
 .agent-usage-table thead th {
   color: var(--openbot-text-muted);

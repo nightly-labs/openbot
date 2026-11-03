@@ -1,11 +1,12 @@
 import { useThemeColor } from "heroui-native/hooks";
 import Reply from "lucide-react-native/icons/reply";
 import { type PropsWithChildren, useMemo, useRef, useState } from "react";
-import { View } from "react-native";
+import { I18nManager, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { haptics } from "@/shared/lib/haptics";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 /**
  * A swipe away from the bubble's side of the chat replies: to the right for a bubble at the start,
@@ -27,9 +28,11 @@ export function ChatMessageGesture({
   onSelectText?: () => void;
 }>) {
   const muted = useThemeColor("muted");
-  // The swipe distance toward the middle of the chat, in points. A bubble at the end moves left.
+  // The swipe distance toward the middle of the chat, in points. A bubble at the end moves left, or
+  // right in a right-to-left layout: React Native swaps the sides of the layout, not the gestures and
+  // the transforms.
   const offset = useSharedValue(0);
-  const direction = align === "end" ? -1 : 1;
+  const direction = (align === "end" ? -1 : 1) * (I18nManager.isRTL ? -1 : 1);
   const bubbleStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.get() * direction }] }));
   const iconStyle = useAnimatedStyle(() => ({ opacity: Math.min(1, offset.get() / 64) }));
   // The reply icon behind the bubble mounts with the first swipe, not with each row of the chat.
@@ -81,7 +84,7 @@ export function ChatMessageGesture({
           className={`absolute bottom-0 top-0 justify-center ${align === "end" ? "right-0" : "left-0"}`}
           style={iconStyle}
         >
-          <Reply color={muted} size={22} />
+          <Reply color={muted} size={22} style={MIRROR_IN_RTL} />
         </Animated.View>
       ) : null}
       <GestureDetector gesture={gesture}>

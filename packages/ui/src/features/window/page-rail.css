@@ -99,7 +99,7 @@
 .window-rail-notice {
   position: absolute;
   top: var(--openbot-space-1-5);
-  right: var(--openbot-space-1-5);
+  inset-inline-end: var(--openbot-space-1-5);
   width: var(--openbot-space-2);
   height: var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);

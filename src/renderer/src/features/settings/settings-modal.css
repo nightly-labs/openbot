@@ -57,6 +57,11 @@
   color: var(--openbot-text-muted);
 }
 
+/* The separator points to the reading direction. */
+.settings-modal-crumb-separator:dir(rtl) {
+  transform: scaleX(-1);
+}
+
 .settings-modal-crumb-current {
   min-width: 0;
   overflow: hidden;

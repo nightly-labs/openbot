@@ -1,6 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import { For } from "solid-js";
 import { useText } from "../../text";
+import { textDirection } from "./content-direction";
 import type { ComparisonTableBlock } from "./DataTable";
 
 export function ComparisonTable(props: { table: ComparisonTableBlock; renderCell?: (text: string) => JSX.Element }) {
@@ -14,6 +15,7 @@ export function ComparisonTable(props: { table: ComparisonTableBlock; renderCell
       <table
         class="message-data-table message-comparison-table"
         style={`--message-data-table-columns: ${props.table.headers.length}`}
+        dir={textDirection([...props.table.headers, ...props.table.rows.flat()].join(" "))}
       >
         <thead>
           <tr>

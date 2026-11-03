@@ -27,6 +27,7 @@ import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
 import { loadDictationLanguage } from "@/features/settings/model/dictation-language";
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
+import { syncLayoutDirection } from "@/features/settings/model/layout-direction";
 import { loadLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import { loadAgentColorMessages } from "@/features/settings/model/message-color";
 import { useMotionPreferences } from "@/features/settings/model/motion";
@@ -214,7 +215,12 @@ export default function RootLayout() {
       void loadVoiceSettings().catch(() => undefined);
       supertonicModel.check();
       parakeetModel.check();
-      void loadAppLanguage().catch(() => undefined);
+      // The layout direction follows the app language from the next start.
+      void loadAppLanguage()
+        .then(() => {
+          syncLayoutDirection();
+        })
+        .catch(() => undefined);
       void loadOnboardingProgress().catch(() => undefined);
     });
   }, []);

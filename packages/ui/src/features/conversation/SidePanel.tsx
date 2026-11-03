@@ -194,8 +194,15 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     const clearShifts = () => {
       for (const tab of threadTabs()) tab.style.transform = "";
     };
-    /** The chat is left of the panel. A maximized panel covers the chat, so it has no chat to drop on. */
-    const overChat = (x: number) => !props.maximized && root !== undefined && x < root.getBoundingClientRect().left;
+    /**
+     * The chat is at the inline start of the panel: left of it, or right of it right to left. A
+     * maximized panel covers the chat, so it has no chat to drop on.
+     */
+    const overChat = (x: number) => {
+      if (props.maximized || root === undefined) return false;
+      const bounds = root.getBoundingClientRect();
+      return getComputedStyle(root).direction === "rtl" ? x > bounds.right : x < bounds.left;
+    };
     /**
      * Moves the held tab with the pointer, and the other thread tabs make room. A tab can be much
      * narrower than the held one, so the leading edge of the held tab, not its center, finds its place.

@@ -292,7 +292,9 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
         }
         const ends = [...starts.slice(1), content];
         geometry = { starts, ends, lastScroll, height };
-        inset ??= Number.parseFloat(getComputedStyle(element).paddingRight) || 0;
+        // The rail sits at the inline end: the right edge, or the left one right to left.
+        const style = getComputedStyle(element);
+        inset ??= Number.parseFloat(style.direction === "rtl" ? style.paddingLeft : style.paddingRight) || 0;
         const railInset = inset;
         setRail((state) => {
           state.shown = true;
@@ -503,7 +505,9 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
                         props.onJump(index);
                       }}
                     >
-                      <span class="chat-scroll-rail-label">{section().label}</span>
+                      <span class="chat-scroll-rail-label" dir="auto">
+                        {section().label}
+                      </span>
                       <span class="chat-scroll-rail-bar" aria-hidden="true">
                         <span class="chat-scroll-rail-fill" />
                       </span>

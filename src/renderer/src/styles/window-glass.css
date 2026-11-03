@@ -65,7 +65,7 @@
   .channel-avatar
   .agent-avatar
   + .agent-avatar {
-  margin-left: 0;
+  margin-inline-start: 0;
 }
 
 /* The pages in the card are clear, so the card's tint shows once and not twice. */

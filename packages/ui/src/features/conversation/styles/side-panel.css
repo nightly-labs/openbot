@@ -6,7 +6,7 @@
   position: absolute;
   z-index: 16;
   top: 0;
-  right: 0;
+  inset-inline-end: 0;
   display: flex;
   align-items: center;
   gap: var(--openbot-space-1);
@@ -21,7 +21,7 @@
 .side-panel-header::before {
   position: absolute;
   top: 50%;
-  left: 0;
+  inset-inline-start: 0;
   width: 1px;
   height: var(--openbot-icon-lg);
   translate: 0 -50%;
@@ -36,6 +36,9 @@
   align-items: center;
   gap: var(--openbot-space-1);
   min-width: 0;
+  /* A tab drag measures `offsetLeft` from the left edge (`SidePanel.tsx`, `BrowserTabStrip.tsx`), so
+     the tabs keep the left-to-right order in every language. */
+  direction: ltr;
 }
 
 .side-panel-actions {
@@ -60,7 +63,8 @@
   gap: var(--openbot-space-1-5);
   min-width: 0;
   height: var(--openbot-control-sm);
-  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-1-5);
+  padding-block: 0;
+  padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
   border-radius: var(--openbot-radius-md);
   color: var(--openbot-text-secondary);
 }
@@ -79,7 +83,7 @@
 .side-panel-tab + .side-panel-tab::before {
   position: absolute;
   top: 50%;
-  left: calc(var(--openbot-space-1) / -2 - 0.5px);
+  inset-inline-start: calc(var(--openbot-space-1) / -2 - 0.5px);
   width: 1px;
   height: var(--openbot-icon-lg);
   translate: 0 -50%;
@@ -379,7 +383,7 @@
   position: absolute;
   z-index: 17;
   top: calc(var(--left-header-height, 38px) + var(--openbot-space-2));
-  right: var(--openbot-space-2);
+  inset-inline-end: var(--openbot-space-2);
   bottom: var(--openbot-space-2);
   display: grid;
   width: calc(var(--side-panel-width, 380px) - 2 * var(--openbot-space-2));

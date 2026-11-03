@@ -236,6 +236,11 @@
   pointer-events: none;
 }
 
+/* The hold fill grows from the start side. */
+:dir(rtl) .ui-block-hold-fill {
+  transform-origin: right;
+}
+
 .ui-block-hold[data-holding] .ui-block-hold-fill {
   transform: scaleX(1);
   transition: transform var(--ui-block-hold-duration) linear;

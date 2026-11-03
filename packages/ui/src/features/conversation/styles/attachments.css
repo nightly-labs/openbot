@@ -62,7 +62,7 @@
   background: transparent;
   padding: 0;
   color: inherit;
-  text-align: left;
+  text-align: start;
 }
 
 .attachment-preview-button:disabled {
@@ -227,7 +227,8 @@
  */
 .agent-queue-hold {
   margin: 0;
-  padding: var(--queue-row-gutter) var(--queue-row-inset-end) 0 var(--queue-row-inset-start);
+  padding-block: var(--queue-row-gutter) 0;
+  padding-inline: var(--queue-row-inset-start) var(--queue-row-inset-end);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: 16px;

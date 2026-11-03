@@ -8,6 +8,13 @@ export const messages = {
   "mobile.settings.language.system": "Как в системе",
   "mobile.settings.language.footer":
     "Вариант «Как в системе» берёт первый язык из настроек телефона. Непереведённый текст показывается на английском.",
+  "mobile.settings.language.restartTitle": "Перезапустить OpenBot?",
+  "mobile.settings.language.restartBody":
+    "Этот язык читается в другом направлении. Экраны сменят направление при следующем запуске OpenBot.",
+  "mobile.settings.language.restartNow": "Перезапустить",
+  "mobile.settings.language.restartLater": "Позже",
+  "mobile.settings.language.restartFailed":
+    "Не удалось перезапустить OpenBot. Экраны сменят направление, когда вы снова откроете OpenBot.",
   "mobile.settings.dictation.language": "Язык диктовки",
   "mobile.settings.about.development": "Разработка",
   "mobile.settings.about.openFailed": "Не удалось открыть ссылку. Повторите попытку.",

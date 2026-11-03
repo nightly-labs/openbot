@@ -10,7 +10,8 @@
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface-raised);
   box-shadow: var(--openbot-shadow-raised);
-  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-2);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-2) var(--openbot-space-1);
   animation: speaking-bar-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
 }
 

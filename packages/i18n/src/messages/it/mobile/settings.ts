@@ -8,6 +8,13 @@ export const messages = {
   "mobile.settings.language.system": "Predefinita di sistema",
   "mobile.settings.language.footer":
     "«Predefinita di sistema» segue la prima lingua nelle impostazioni del telefono. Il testo non ancora tradotto resta in inglese.",
+  "mobile.settings.language.restartTitle": "Riavviare OpenBot?",
+  "mobile.settings.language.restartBody":
+    "Questa lingua si legge nell’altra direzione. Le schermate cambiano direzione al prossimo avvio di OpenBot.",
+  "mobile.settings.language.restartNow": "Riavvia",
+  "mobile.settings.language.restartLater": "Più tardi",
+  "mobile.settings.language.restartFailed":
+    "Impossibile riavviare OpenBot. Le schermate cambiano direzione la prossima volta che apri OpenBot.",
   "mobile.settings.dictation.language": "Lingua di dettatura",
   "mobile.settings.about.development": "Sviluppo",
   "mobile.settings.about.openFailed": "Impossibile aprire il link. Riprova.",
