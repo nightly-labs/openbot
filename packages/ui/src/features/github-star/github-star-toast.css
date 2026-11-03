@@ -3,13 +3,12 @@
   width: var(--width);
 }
 
-/* The raised toast surface with the 1px ring only. The bottom and end padding are smaller, so the
-   buttons sit nearer the corner. */
+/* The raised toast surface with the 1px ring only. */
 .github-star-toast {
   position: relative;
   display: grid;
   gap: var(--openbot-space-2);
-  padding: var(--openbot-space-4) var(--openbot-space-3) var(--openbot-space-3) var(--openbot-space-4);
+  padding: var(--openbot-space-4);
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-surface-raised);
   box-shadow: 0 0 0 1px var(--openbot-border);
@@ -17,6 +16,12 @@
   font-family: var(--openbot-font-sans);
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
+}
+
+/* The buttons sit nearer the corner. The thank-you state has no buttons and keeps even padding. */
+.github-star-toast:has(.github-star-toast-actions) {
+  padding-right: var(--openbot-space-3);
+  padding-bottom: var(--openbot-space-3);
 }
 
 .github-star-toast-close {
