@@ -7,6 +7,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema, Semaphore } from "effect";
 import { parse as parseYaml } from "yaml";
 import { causeHelpers } from "../backend/effect-boundary";
+import { MANAGED_SKILL_SLUGS } from "./managed-skill-service";
 import { archiveDirectory, inspectArchive, normalizedFiles } from "./skill-package";
 
 /** Owns immutable local revisions. A revision exists only after its directory is published. */
@@ -28,7 +29,10 @@ export class LocalSkillLibrary {
         if (revisions.some((name) => /^[1-9]\d*$/u.test(name))) published.push(entry.name);
       }
       const results = yield* Effect.forEach(published, (id) => this.get(id), { concurrency: "unbounded" });
-      return results.sort((a, b) => a.name.localeCompare(b.name));
+      // An older version took a skill with the name of an OpenBot skill. It can never install, so it stays hidden.
+      return results
+        .filter((skill) => !MANAGED_SKILL_SLUGS.has(skill.slug))
+        .sort((a, b) => a.name.localeCompare(b.name));
     });
   }
 
@@ -102,6 +106,10 @@ export class LocalSkillLibrary {
       Effect.gen({ self: this }, function* () {
         const bytes = yield* this.sourceEffect(agentId, sourcePath);
         const info = yield* localSync(() => inspectArchive(bytes));
+        if (MANAGED_SKILL_SLUGS.has(info.slug))
+          return yield* new LocalSkillFailure({
+            cause: new Error(sourceText("error.skill.managedSlug", { slug: info.slug })),
+          });
         if ((yield* this.list()).some((skill) => skill.slug === info.slug))
           return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localNameTaken")) });
         const id = `local-skill-${randomUUID()}`;

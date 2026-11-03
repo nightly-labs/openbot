@@ -238,7 +238,7 @@ function useSystemDictation({
       speechRecognition.addListener("start", () => {
         if (owner !== id || !session.current?.native || phaseRef.current !== "starting") return;
         session.current.listeningAt ??= performance.now();
-        // The recognizer's session silences haptics, and a hold on the mic ticks while the user speaks.
+        // The recognizer's session silences haptics, and the composer's controls tap while the user speaks.
         speechNative?.allowHapticsWhileRecording?.();
         update("listening");
         void haptics.impact("light");

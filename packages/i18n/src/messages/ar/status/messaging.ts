@@ -36,4 +36,17 @@ export const messages = {
   "status.messaging.telegramLinked": "OpenBot متصل بهذه الدردشة. اذكر {bot} أو ردّ على رسالة من OpenBot لسؤال الوكلاء.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "يجيب في Telegram ويسأل الفريق",
+  "status.messaging.whatsappNoAgent": "لا يوجد وكيل يستطيع الإجابة هنا بعد. أضف WhatsApp Orchestrator في OpenBot.",
+  "status.messaging.whatsappApprovalMenu": "أرسل 1 للموافقة أو 2 للرفض.",
+  "status.messaging.whatsappStopMenu": "أرسل stop للإيقاف.",
+  "status.messaging.whatsappPairingCode":
+    "يجيب هذا الرقم عن الأشخاص الذين سمح لهم مالكه فقط. أعطِ المالك هذا الرمز: {code}",
+  "status.messaging.whatsappPairingApproved": "يمكنك الآن إرسال الطلبات إلى هذا الرقم.",
+  "status.messaging.whatsappOwnChat": "مراسلة نفسك",
+  "status.messaging.whatsappWelcomeOwn":
+    "👋 *OpenBot متصل*\n\nاكتب هنا لتسأل وكلاءك. يجيب WhatsApp Orchestrator، أو يسند العمل إلى الوكيل المناسب.\n\nأرسل *stop* لإيقاف طلب.",
+  "status.messaging.whatsappWelcomeDedicated":
+    "👋 *OpenBot متصل*\n\nيستطيع الأشخاص الذين تسمح لهم في OpenBot الكتابة الآن إلى هذا الرقم. يحصل الشخص الجديد على رمز: وافق عليه في OpenBot ضمن الطلبات.\n\nأرسل *stop* لإيقاف طلب.",
+  "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
+  "status.messaging.whatsappOrchestratorTitle": "يجيب في WhatsApp ويسأل الفريق",
 } as const satisfies PartialTranslation<typeof source>;

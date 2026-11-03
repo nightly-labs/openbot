@@ -363,11 +363,18 @@
   padding: 9px 7px;
 }
 
+/* Many providers or accounts scroll here, so the add button below stays in the panel. The padding
+ * keeps the focus outline inside the scroll box. */
 .provider-model-rail-tabs {
   display: flex;
+  min-height: 0;
   flex-direction: column;
   align-items: center;
   gap: var(--openbot-space-1);
+  overflow-y: auto;
+  scrollbar-width: none;
+  margin: -2px;
+  padding: 2px;
 }
 
 /* Opens the provider settings, to connect a provider that the rail leaves out. */

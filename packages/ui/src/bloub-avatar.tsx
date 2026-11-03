@@ -13,7 +13,6 @@ export type AvatarMotion = "hover" | "always" | "idle";
 export {
   AVATAR_EXPRESSIONS,
   AVATAR_HUE_CHOICES,
-  avatarCandidateSeeds,
   avatarHeadColor,
   avatarHueForColor,
   avatarHueSwatch,

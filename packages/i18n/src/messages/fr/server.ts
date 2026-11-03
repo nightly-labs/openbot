@@ -130,6 +130,13 @@ export const messages = {
     other: "Un compte peut avoir {count} serveurs payants. Pour ajouter un serveur, supprimez-en d’abord un.",
   },
   "server.add.limit.manage": "Gérer les serveurs",
+  "server.upgrade.title": "Vos agents manquent d’espace",
+  "server.upgrade.description":
+    "{server} n’a presque plus d’espace libre. Passez à un plan supérieur pour que vos agents continuent sans interruption.",
+  "server.upgrade.used": "{used} sur {total} utilisés",
+  "server.upgrade.current": "{plan} (actuel)",
+  "server.upgrade.price": "Prix",
+  "server.upgrade.action": "Passer à {plan}",
   "server.hosted.progressTitle": "Configuration de {name}",
   "server.hosted.paymentTitle": "Terminez le paiement dans votre navigateur",
   "server.hosted.paymentDescription": "La configuration commence quand Stripe confirme le paiement.",

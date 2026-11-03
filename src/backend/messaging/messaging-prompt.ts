@@ -36,6 +36,7 @@ const PLATFORM_WORDS: Record<MessagingPlatform, { name: string; workspace: strin
   slack: { name: "Slack", workspace: "Slack workspace", conversation: "in a thread" },
   discord: { name: "Discord", workspace: "Discord server", conversation: "in a chain of replies" },
   telegram: { name: "Telegram", workspace: "Telegram chat", conversation: "in a reply chain" },
+  whatsapp: { name: "WhatsApp", workspace: "WhatsApp number", conversation: "in a reply chain" },
 };
 const CONTEXT_MESSAGES = 30;
 const CONTEXT_CHARACTERS = 12_000;

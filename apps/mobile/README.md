@@ -39,12 +39,6 @@ Expo modules by default, so a patch to Expo Swift code needs `expo.autolinking.i
 extend `NativeMethods`, which React Native 0.87 removed from its types, so `MaskedView` was not a
 valid JSX component. Remove the patch when a release fixes the types.
 
-react-native-uitextview 2.7.1 is patched in `patches/react-native-uitextview@2.7.1.patch` so the
-native selectable message text applies the same baseline offset as React Native `Text`. React Native
-centers each line in its `lineHeight`. Without the offset, the text view drew each line at the bottom
-of its line box, so iOS message bubbles had more space above the text than below it. Remove the
-patch when a release applies the offset.
-
 react-native-screens 4.30.0 is patched in `patches/react-native-screens@4.30.0.patch` so the full
 screen swipe back of a chat waits for a gesture handler pan in the top screen to fail. The swipe back
 starts anywhere in the chat, and a swipe to the right on a message bubble still replies. Without
