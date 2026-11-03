@@ -279,6 +279,35 @@ export const FormAnswered: Story = {
   ),
 };
 
+const vaultLoginSpec: UiFormSpec = {
+  type: "form",
+  title: "Test account for the Hetzner console (ask Sam for the password)",
+  fields: [
+    { id: "website", kind: "text", label: "Website", required: true, value: "console.hetzner.com" },
+    { id: "username", kind: "text", label: "Username or email", value: "ada@example.com" },
+    { id: "password", kind: "text", label: "Password", required: true, secret: true },
+  ],
+  submit: "Save to Vault",
+};
+
+/** A form that asks for a secret. Once answered, its values show as rows and the secret shows as hidden. */
+export const SecretFormPending: Story = {
+  render: (args) => <LiveForm spec={vaultLoginSpec} onRespond={args.onRespond} />,
+};
+
+export const SecretFormAnswered: Story = {
+  render: (args) => (
+    <LiveForm
+      spec={vaultLoginSpec}
+      state={answered(vaultLoginSpec, {
+        actionId: "submit",
+        values: { website: "console.hetzner.com", username: "ada@example.com" },
+      })}
+      onRespond={args.onRespond}
+    />
+  ),
+};
+
 export const Narrow: Story = {
   render: (args) => (
     <div style={{ "max-width": "360px" }}>

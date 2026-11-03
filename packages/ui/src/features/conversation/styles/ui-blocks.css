@@ -436,6 +436,82 @@
   color: var(--openbot-text-primary);
 }
 
+/* An answered form that asked for a secret: a key before the title, and the answer as rows in one
+   inset group, not as disabled inputs. */
+.ui-block-header:has(> .ui-block-icon) {
+  align-items: center;
+}
+
+.ui-block-header:has(> .ui-block-icon) > .ui-block-heading {
+  flex: 1;
+}
+
+.ui-block-header:has(> .ui-block-icon) .ui-block-title {
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
+.ui-block-header:has(> .ui-block-icon) > .ui-block-status {
+  align-self: flex-start;
+}
+
+.ui-block-answer-rows {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  margin: 0;
+  border: 1px solid var(--openbot-border-grouped);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-canvas);
+}
+
+.ui-block-answer-row {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--openbot-space-4);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.ui-block-answer-row + .ui-block-answer-row {
+  border-top: 1px solid var(--openbot-border-grouped);
+}
+
+.ui-block-answer-row > dt {
+  flex: none;
+  color: var(--openbot-text-muted);
+}
+
+.ui-block-answer-row > dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+  text-align: end;
+}
+
+.ui-block-answer-value {
+  overflow-wrap: anywhere;
+}
+
+.ui-block-answer-hidden {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  color: var(--openbot-text-dim);
+  vertical-align: top;
+}
+
+.ui-block-answer-hidden > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: none;
+  color: var(--openbot-text-muted);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ui-block-card,
   .ui-block-option,
