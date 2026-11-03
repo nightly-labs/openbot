@@ -17,7 +17,13 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { AGENT_PROVIDERS, type AgentEvent, type BrowserTab, decodeUsageTokens } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  type AgentEvent,
+  type BrowserTab,
+  decodeUsageTokens,
+  parseRoutineRunConversationEventItemType,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { getRecord, getString } from "../src/backend/protocol";
@@ -227,6 +233,8 @@ const report: {
   routineAnswersInChat: string[];
   routineThreads: { routine: string; taskId: string; threadId: string; title: string; answers: string[] }[];
   whileHeld?: { chatTurn: string; secondRoutineRun: string; heldRunStatus: string };
+  runStatuses?: string[];
+  runMarkersInChat?: string[];
   waitInRoutineThread?: unknown[];
   digestInNextTurn?: { marker: boolean; answers: string[] };
   checks: { name: string; passed: boolean }[];
@@ -624,6 +632,27 @@ try {
     .map((message) => message.text)
     .filter((text) => text.startsWith("Routine report") || text.startsWith("Second routine report"));
   pass("No routine answer shows in the chat", report.routineAnswersInChat.length === 0);
+  // A run in a routine thread still gets its status, its History row and its marker in the chat.
+  const runStatuses = () =>
+    [routine, secondRoutine].flatMap((item) =>
+      agents.listRoutineRuns({ agentId: agent.id, routineId: item.id }).map((run) => run.status),
+    );
+  report.runStatuses = await waitFor("the routine runs to succeed", () => {
+    const statuses = runStatuses();
+    return statuses.length === 3 && statuses.every((status) => status === "succeeded") ? statuses : null;
+  }).catch(() => runStatuses());
+  pass(
+    "Each routine run in a routine thread succeeds",
+    report.runStatuses.every((status) => status === "succeeded"),
+  );
+  report.runMarkersInChat = (await runCauseEffect(agents.readConversation(agent.id))).messages.flatMap((message) => {
+    const event = parseRoutineRunConversationEventItemType(message.itemType);
+    return event ? [event.status] : [];
+  });
+  pass(
+    "The chat shows each routine run as a marker",
+    report.runMarkersInChat.filter((status) => status === "succeeded").length === 3,
+  );
   pass(
     "Both runs of a routine answer in its one thread",
     buildThread.answers.length === 2 && buildThread.title === "Build check",

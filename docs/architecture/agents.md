@@ -109,7 +109,9 @@ against the agent's task limit (default 4, `AGENT_TASK_LIMIT_DEFAULT`) and does 
 agent's own chat or for other routines. When the agent has `INPUT_LIMITS.agentTasks` open threads, a
 new routine gets no thread and its run goes to the agent's own chat, as before. Routine threads do not
 count against the limits of tasks that the agent starts, and that cleanup does not archive them.
-Deleting the routine archives its thread. The released `agent-tasks-v1` routes do not send
+Deleting the routine archives its thread. `listQueue` hides side-thread deliveries, so
+`MailboxStore.taskRoutineDeliveries` gives the routine deliveries of side threads to the code that
+follows run status (`MailboxSync.emitQueue`) and to the skip policy of a spent plan. The released `agent-tasks-v1` routes do not send
 `routineId`; only this computer's IPC list has it.
 
 A routine thread is a side thread, so its runs have no Computer Use: only the agent's own chat
