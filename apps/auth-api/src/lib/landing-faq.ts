@@ -13,7 +13,7 @@ export const LANDING_FAQ: readonly LandingQuestion[] = [
   {
     question: "Is OpenBot free?",
     answer:
-      "Yes. OpenBot costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have.",
+      "Yes, for personal use. OpenBot costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have. Use at work needs a license.",
   },
   {
     question: "Is OpenBot's source code open?",
