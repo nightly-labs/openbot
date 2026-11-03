@@ -834,9 +834,13 @@ export function parseOpenAttachment(value: unknown): OpenAttachmentInput {
   if (!isObject(value) || (value.action !== "open" && value.action !== "reveal" && value.action !== "download")) {
     throw new Error("Invalid attachment action.");
   }
+  if (value.size !== undefined && (!Number.isSafeInteger(value.size) || Number(value.size) < 0)) {
+    throw new Error("Invalid attachment size.");
+  }
   return {
     attachmentId: requireString(value.attachmentId, "attachmentId"),
     action: value.action,
+    ...(isNumber(value.size) ? { size: value.size } : {}),
   };
 }
 

@@ -46,6 +46,7 @@ import { causeHelpers, runCauseEffect } from "../../backend/effect-boundary";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import { filePreviewFromBytes, localFilePreview, mimeTypeForName } from "../file-preview";
 import { filePreviewPages } from "../file-preview-pages";
+import { AttachmentDownloadStopped } from "../remote-attachment-cache";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import { remoteCall, remoteDecode } from "../remote-service-effects";
@@ -83,6 +84,7 @@ export interface AttachmentIpcDependencies {
     | "supportsCapability"
     | "request"
     | "downloadAttachment"
+    | "stopAttachmentDownload"
     | "downloadSharedFile"
     | "downloadWorkspaceFile"
     | "uploadAttachment"
@@ -224,6 +226,11 @@ export function attachmentIpcHandlers({
       openAttachment: payloadHandler(agentRequest(parseOpenAttachment), (scoped) =>
         openAttachmentForServer({ mailbox, remoteServers, getMainWindow, translate }, scoped.serverId, scoped.payload),
       ),
+      stopAttachmentDownload: scopedHandler(parseAttachmentId, {
+        // A local file needs no download.
+        local: async () => undefined,
+        remote: async (attachmentId, serverId) => remoteServers.stopAttachmentDownload(attachmentId, serverId),
+      }),
       openSharedFile: scopedHandler(parseOpenSharedFile, {
         local: async (parsed) => {
           // A chat link can name a folder. The file manager shows it; nothing opens it.
@@ -338,7 +345,13 @@ export function openAttachmentForServer(
       await openOrRevealPath(attachment.path);
     },
     remote: async (target) => {
-      const downloaded = await runCauseEffect(remoteServers.downloadAttachment(input.attachmentId, target));
+      const downloaded = await runCauseEffect(
+        remoteServers.downloadAttachment(input.attachmentId, target, false, input.size),
+      ).catch((error: unknown) => {
+        if (error instanceof AttachmentDownloadStopped) return null;
+        throw error;
+      });
+      if (!downloaded) return;
       const suggestedName = basename(downloaded.name) || `attachment-${input.attachmentId}`;
       if (input.action === "download") {
         const filePath = await chooseSavePath(getMainWindow(), translate, suggestedName);

@@ -115,6 +115,7 @@ export function ConversationTimeline() {
     activeChatSearchIndex,
     agentActivitySpaceReserved,
     attachmentAction,
+    attachmentDownloads,
     channel,
     chatSearchMatches,
     chatSearchOpen,
@@ -899,6 +900,7 @@ export function ConversationTimeline() {
                               <AttachmentCards
                                 attachments={message()?.attachments ?? []}
                                 mediaSource={runtime.attachmentMedia}
+                                downloads={attachmentDownloads}
                                 onPreview={(attachment) => void previewAttachment(attachment)}
                                 onAction={attachmentAction}
                               />
@@ -1236,6 +1238,7 @@ export function ConversationTimeline() {
                             onOpenQuote={openQuote}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             mediaSource={runtime.attachmentMedia}
+                            downloads={attachmentDownloads}
                             macWindowControls={props.platform === "darwin"}
                             loadImageFile={
                               loadImageFile &&

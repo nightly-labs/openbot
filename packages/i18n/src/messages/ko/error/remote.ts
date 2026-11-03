@@ -88,6 +88,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "WebRTC 파일 전송에 실패했어요.",
   "error.remote.fileResumeFailed": "WebRTC 파일 전송을 제한 시간 안에 재개할 수 없었어요.",
   "error.remote.fileTransportStopped": "WebRTC 파일 전송이 중지되었어요.",
+  "error.remote.downloadStopped": "다운로드를 중지했어요.",
   "error.remote.fileResumeExpired": "WebRTC 파일 전송 재개 제한 시간이 지났어요.",
   "error.remote.hostRequestFailed": "호스트가 요청을 완료할 수 없었어요.",
   "error.remote.responseTooLarge": "호스트의 응답이 너무 커서 이 기기로 보낼 수 없어요.",

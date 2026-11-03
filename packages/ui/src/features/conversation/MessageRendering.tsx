@@ -31,7 +31,7 @@ import {
 } from "solid-js";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
-import { AttachmentCards, type AttachmentMediaSource } from "./AttachmentCards";
+import { AttachmentCards, type AttachmentDownloads, type AttachmentMediaSource } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
 import { CodePreview } from "./CodePreview";
 import { ComparisonTable } from "./ComparisonTable";
@@ -311,6 +311,8 @@ export function MessageBody(props: {
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
+  /** The download state of attachments from a joined server. */
+  downloads?: AttachmentDownloads | undefined;
   /**
    * Draws the images of the message first, outside `frame`, which wraps the rest: the text, the quote
    * and the files. `imagesOnly` reads true when the rest is empty. Absent, the images stay in the body.
@@ -758,6 +760,7 @@ export function MessageBody(props: {
           <AttachmentCards
             attachments={standaloneFileAttachments()}
             mediaSource={props.mediaSource}
+            downloads={props.downloads}
             onPreview={openAttachment}
             onAction={props.onAttachmentAction}
           />
