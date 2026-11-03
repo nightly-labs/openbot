@@ -475,6 +475,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let appearancePreference: AppAppearancePreference = {
     appearance: DEFAULT_APP_APPEARANCE,
     transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
+    palette: null,
+    palettes: [],
   };
   const appearanceListeners = new Set<(preference: AppAppearancePreference) => void>();
   let interfaceSizePreference: AppInterfaceSizePreference = { percent: DEFAULT_APP_INTERFACE_SIZE };
@@ -1175,7 +1177,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     // The Storybook toolbar sets the colors of a story.
     getAppAppearancePreference: async () => clone(appearancePreference),
     setAppAppearancePreference: async (change) => {
-      appearancePreference = { ...appearancePreference, ...change };
+      const next = { ...appearancePreference, ...change };
+      // As main does, a palette id shows only while that palette is listed.
+      const listed = next.palettes.some((palette) => palette.id === next.palette);
+      appearancePreference = { ...next, palette: listed ? next.palette : null };
       for (const listener of appearanceListeners) listener(clone(appearancePreference));
       return clone(appearancePreference);
     },
