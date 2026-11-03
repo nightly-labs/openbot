@@ -7,6 +7,7 @@ import {
   type SkImage,
   Skia,
   type SkPaint,
+  type SkRect,
   StrokeCap,
   StrokeJoin,
 } from "@shopify/react-native-skia";
@@ -46,6 +47,10 @@ function opacityPaint(opacity: number): SkPaint {
   return paint;
 }
 
+/**
+ * Draws `source` of `image`, or all of it, into a rectangle. Do not give a worklet parameter a default
+ * that reads a closure value: on the UI runtime the default runs before the closure is read.
+ */
 function drawPicture(
   canvas: SkCanvas,
   image: SkImage,
@@ -54,12 +59,12 @@ function drawPicture(
   width: number,
   height: number,
   paint: SkPaint,
-  source = Skia.XYWHRect(0, 0, image.width(), image.height()),
+  source: SkRect | null,
 ) {
   "worklet";
   canvas.drawImageRectOptions(
     image,
-    source,
+    source ?? Skia.XYWHRect(0, 0, image.width(), image.height()),
     Skia.XYWHRect(x, y, width, height),
     FilterMode.Linear,
     MipmapMode.Linear,
@@ -188,14 +193,14 @@ export function drawPlush(canvas: SkCanvas, frame: PlushFrame, art: PlushArt, si
   }
   const faded = frame.bodyAlpha < 1;
   if (faded) canvas.saveLayer(opacityPaint(frame.bodyAlpha));
-  drawPicture(canvas, art.body, -HALF_VIEW_BOX, -HALF_VIEW_BOX, VIEW_BOX, VIEW_BOX, Skia.Paint());
+  drawPicture(canvas, art.body, -HALF_VIEW_BOX, -HALF_VIEW_BOX, VIEW_BOX, VIEW_BOX, Skia.Paint(), null);
   for (const eye of frame.eyes) drawEye(canvas, eye, art);
   if (faded) canvas.restore();
   for (const dot of frame.dots)
-    drawPicture(canvas, art.dot, dot.x, dot.y, dot.size, dot.size, opacityPaint(dot.opacity));
+    drawPicture(canvas, art.dot, dot.x, dot.y, dot.size, dot.size, opacityPaint(dot.opacity), null);
   if (frame.notif) {
     const { x, y, size: ball } = frame.notif;
-    drawPicture(canvas, art.notif, x, y, ball, ball, Skia.Paint());
+    drawPicture(canvas, art.notif, x, y, ball, ball, Skia.Paint(), null);
   }
   if (frame.zs.length > 0) {
     const stroke = Skia.Paint();
