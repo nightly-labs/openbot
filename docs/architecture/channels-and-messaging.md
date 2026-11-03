@@ -489,7 +489,9 @@ must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the con
   is one, and a basic group finds the chain in an in-memory reply map, which a restart forgets. A
   mention starts or continues a conversation; a reply without a mention continues only a linked one.
   Telegram has no history API, so `TelegramChatState` keeps the names and last messages it saw, in
-  memory. One Telegram Orchestrator (`telegram-orchestrator.ts`) answers every chat.
+  memory. One Telegram Orchestrator (`telegram-orchestrator.ts`) answers every chat. A new
+  conversation in a group goes first to the workflows' Telegram triggers; a message that starts a run
+  does not go to the orchestrator ([events.md](events.md#workflow-telegram-triggers)).
 
 The code has two halves. `MessagingThreads` (`src/backend/messaging/`) is built by `AgentService`
 beside `ChannelService` and knows no platform. `MessagingService` is built in the main process and
@@ -521,6 +523,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   it, so each one is its own conversation. `MessagingThreads.event` takes that thread's conversation
   and turn events, so the public chat, the renderer and Team peers never see them. Approvals still
   reach the host.
+- **Workflows.** Before a channel mention that is not in a linked thread goes to the orchestrator,
+  `MessagingService` gives it to `Workflows.receiveSlack`. A matched Slack trigger takes the mention,
+  and no agent conversation starts. A Slack output replies, posts or reacts through
+  `MessagingThreads.slackSend`. See [Workflow Slack triggers](events.md#workflow-slack-triggers).
 - **Deliveries.** An external message is a mailbox message from `user` with a `messaging` origin
   (link, author, platform message). No new sender kind, so the frozen Team protocol codecs are
   unchanged. The queue and the public chat hide it like channel work. A request the agent sends from

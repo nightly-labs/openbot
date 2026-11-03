@@ -32,7 +32,7 @@
 .server-upgrade-compare td {
   padding: var(--openbot-space-2) 0;
   border-bottom: 1px solid var(--openbot-border);
-  text-align: left;
+  text-align: start;
 }
 
 .server-upgrade-compare thead th {

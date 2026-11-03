@@ -191,7 +191,7 @@ export function CodeBlock(props: {
 
   // One element, so the code keeps its scroll position when a caller moves it into its body.
   const code = (
-    <pre class="message-code-scroll" tabindex="0">
+    <pre class="message-code-scroll" tabindex="0" dir="ltr">
       <code>
         <For each={lines()}>
           {(line, lineIndex) => (

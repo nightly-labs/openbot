@@ -1,5 +1,6 @@
 import type { TranslatedLocale } from "./locale";
 import type { PartialTranslation } from "./message";
+import { arMobile } from "./messages/ar/mobile";
 import { deMobile } from "./messages/de/mobile";
 import { type AppMobileMessages, enMobile } from "./messages/en/mobile";
 import { esMobile } from "./messages/es/mobile";
@@ -15,6 +16,7 @@ import { trMobile } from "./messages/tr/mobile";
 import { zhMobile } from "./messages/zh/mobile";
 
 const catalogs = {
+  ar: arMobile,
   de: deMobile,
   es: esMobile,
   en: enMobile,

@@ -49,7 +49,7 @@
   display: inline-block;
   width: 6px;
   height: 6px;
-  margin-right: var(--openbot-space-2);
+  margin-inline-end: var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-success);
 }

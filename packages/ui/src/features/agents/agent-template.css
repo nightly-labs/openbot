@@ -200,3 +200,10 @@
   font-size: var(--openbot-text-sm);
   white-space: pre-wrap;
 }
+
+/* Back, the row chevrons and the closed skill chevron follow the reading direction. */
+.agent-template-row > svg[class~="lucide-chevron-right"]:dir(rtl),
+.agent-template-skill-toggle > svg[class~="lucide-chevron-right"]:dir(rtl),
+.agent-template-detail-header .ui-icon-button > svg[class~="lucide-arrow-left"]:dir(rtl) {
+  transform: scaleX(-1);
+}

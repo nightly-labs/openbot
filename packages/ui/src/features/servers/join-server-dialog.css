@@ -22,7 +22,7 @@
 .join-server-close {
   position: absolute;
   top: var(--openbot-space-6);
-  right: var(--openbot-space-6);
+  inset-inline-end: var(--openbot-space-6);
   z-index: 2;
   color: var(--openbot-text-muted);
 }
@@ -304,7 +304,7 @@
 
   .join-server-close {
     top: var(--openbot-space-3);
-    right: var(--openbot-space-3);
+    inset-inline-end: var(--openbot-space-3);
   }
 
   .join-server-content {

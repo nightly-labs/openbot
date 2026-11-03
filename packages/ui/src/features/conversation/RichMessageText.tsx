@@ -145,7 +145,9 @@ export function RichMessageText(props: RichMessageTextProps) {
                 }}
               >
                 <AttachmentReferenceVisual name={name} />
-                <span class="inline-file-reference-name">{name}</span>
+                <span class="inline-file-reference-name" dir="auto">
+                  {name}
+                </span>
               </Button>
             );
           }
@@ -154,6 +156,7 @@ export function RichMessageText(props: RichMessageTextProps) {
               <MessageLink
                 url={part.url}
                 title={linkTitle(part.text, part.url)}
+                isolate={linkTitle(part.text, part.url) === undefined}
                 favicon={props.linkFavicons !== false}
                 onOpenLink={props.onOpenLink}
               >
@@ -198,7 +201,7 @@ export function RichMessageText(props: RichMessageTextProps) {
             return (
               <span class="message-tag-unavailable">
                 <span class="sr-only">{t(UNAVAILABLE_TAG_LABELS[part.unavailableKind])} </span>
-                {part.text}
+                <span dir="auto">{part.text}</span>
               </span>
             );
           }
@@ -253,7 +256,9 @@ export function RichMessageText(props: RichMessageTextProps) {
                 }}
               >
                 <span class="message-citation-mark">{citation.number}</span>
-                <span class="message-citation-ref-label">{citation.label}</span>
+                <span class="message-citation-ref-label" dir="auto">
+                  {citation.label}
+                </span>
                 <span class="message-citation-separator" aria-hidden="true">
                   ·
                 </span>
@@ -310,12 +315,18 @@ export function MessageLink(props: {
   children: JSX.Element;
   /** False keeps the request for the linked site's favicon from being made. */
   favicon?: boolean;
+  /**
+   * True when the link text is the URL. The URL then gets its own direction, so its punctuation
+   * does not mix with the text around it in a right-to-left paragraph.
+   */
+  isolate?: boolean | undefined;
   onOpenLink: (url: string) => void;
 }) {
   return (
     <a
       class="message-link"
       href={props.url}
+      dir={props.isolate ? "auto" : undefined}
       data-cuelume-navigate=""
       data-cuelume-emphasis="subtle"
       title={props.title}

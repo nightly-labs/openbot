@@ -44,7 +44,7 @@
   > :is(.web-app-frame, .app-frame:not(.app-frame-platform-darwin)):not(.app-frame-with-server-rail)
   > .sidebar:not(.sidebar-compact)
   .sidebar-topbar {
-  padding-left: var(--openbot-space-3);
+  padding-inline-start: var(--openbot-space-3);
 }
 
 @media (min-width: 721px) {
@@ -54,12 +54,13 @@
   }
 
   /* The rail holds the window buttons, so the server menu needs only the part of them that is past
-   * the rail. */
+   * the rail. The window buttons are at the inline start in every language (`window-buttons.ts`).
+   * The web frame has no window buttons; the rule above sets its inset. */
   .app-window
-    > .app-frame-platform-darwin:not(.app-frame-with-server-rail)
+    > .app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame)
     > .sidebar:not(.sidebar-compact)
     .sidebar-topbar {
-    padding-left: var(--openbot-space-6);
+    padding-inline-start: var(--openbot-space-6);
   }
 
   /* One card holds the sidebar, the chat and the side panel, below the top row. The frame draws the
@@ -68,14 +69,16 @@
   .app-window > .app-frame-edge {
     position: relative;
     isolation: isolate;
-    padding: 0 calc(var(--window-edge) + 1px) calc(var(--window-edge) + 1px) 0;
+    padding-block: 0 calc(var(--window-edge) + 1px);
+    padding-inline: 0 calc(var(--window-edge) + 1px);
     background: var(--window-frame);
   }
 
   .app-window > .app-frame-edge::before {
     position: absolute;
     z-index: -1;
-    inset: calc(var(--left-header-height) - 1px) var(--window-edge) var(--window-edge) 0;
+    inset-block: calc(var(--left-header-height) - 1px) var(--window-edge);
+    inset-inline: 0 var(--window-edge);
     border: 1px solid var(--openbot-border);
     border-radius: var(--openbot-radius-card);
     background: var(--openbot-bg-canvas);
@@ -84,7 +87,7 @@
   }
 
   .app-window > .app-frame-edge.app-frame-with-server-rail::before {
-    left: var(--server-rail-width);
+    inset-inline-start: var(--server-rail-width);
   }
 
   .app-window > .app-frame-edge > .server-rail {
@@ -114,7 +117,8 @@
   /* The line between the agent list and the chat starts at the card's top line. In the top row, a short
    * line sits above it. */
   .app-window > .app-frame-edge > .sidebar::before {
-    inset: var(--left-header-height) 0 0 auto;
+    inset-block: var(--left-header-height) 0;
+    inset-inline: auto 0;
     width: 1px;
     border: 0;
     border-radius: 0;
@@ -137,16 +141,17 @@
   }
 
   .app-window > .app-frame-edge > .sidebar:not(.sidebar-compact) .sidebar-topbar::after {
-    right: 0;
+    inset-inline-end: 0;
   }
 
   /* A side panel is the right part of the card. Its line to the chat starts at the card's top line. */
   .app-window > .app-frame-edge :is(.settings-panel, .browser-panel) {
-    border-left: 0;
+    border-inline-start: 0;
   }
 
   .app-window > .app-frame-edge :is(.settings-panel, .browser-panel)::before {
-    inset: calc(var(--left-header-height) - 1px) auto 0 0;
+    inset-block: calc(var(--left-header-height) - 1px) 0;
+    inset-inline: 0 auto;
     width: 1px;
     border: 0;
     border-radius: 0;
@@ -164,7 +169,7 @@
     > .app-frame-edge
     :is(.settings-panel, .browser-panel)
     > :is(.settings-panel-header, .file-preview-header, .browser-preview-header)::before {
-    left: 0;
+    inset-inline-start: 0;
   }
 
   /* In the side panel, the tab row is in the top row and a pane starts under it, so the pane's line to
@@ -184,15 +189,16 @@
   /* A maximized pane covers the hidden chat. A chat preview frame keeps its own visibility, so the
    * pane paints the card under it. */
   .app-window > .app-frame-edge .side-panel-maximized > :is(.settings-panel, .browser-panel) {
-    border-bottom-right-radius: calc(var(--openbot-radius-card) - 1px);
+    border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
     background: var(--openbot-bg-canvas);
   }
 
   /* The routine canvas fills the card, so its board follows the card's rounded corner. */
   .app-window > .app-frame-edge .diagram-view-body {
     border-top: 0;
-    border-right: 0;
-    border-radius: 0 0 calc(var(--openbot-radius-card) - 1px) 0;
+    border-inline-end: 0;
+    border-radius: 0;
+    border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
   }
 
   /* The top row controls are flat: one height and one radius, with no line. A control fills on hover,
@@ -246,14 +252,14 @@
   /* A short line between the model and the side panel button */
   .app-window > .app-frame-edge .conversation-header-actions > .side-panel-toggle {
     position: relative;
-    margin-left: calc(var(--openbot-space-2) + 1px);
+    margin-inline-start: calc(var(--openbot-space-2) + 1px);
     overflow: visible;
   }
 
   .app-window > .app-frame-edge .conversation-header-actions > .side-panel-toggle::before {
     position: absolute;
     top: 50%;
-    left: calc(-1 * var(--openbot-space-2) - 1px);
+    inset-inline-start: calc(-1 * var(--openbot-space-2) - 1px);
     width: 1px;
     height: var(--window-hairline-height);
     translate: 0 -50%;
@@ -290,7 +296,7 @@
   }
 
   .app-window > .app-frame-edge > .window-page :is(.agent-usage-identity, .routine-planner-identity) .ui-icon-button {
-    margin-left: 0;
+    margin-inline-start: 0;
   }
 
   .app-window > .app-frame-edge > .window-page :is(.agent-usage-identity, .routine-planner-title) h2 {
@@ -432,7 +438,7 @@
   }
 
   .app-window > .app-frame-edge > .app-frame-panes .tasks-page-side {
-    border-bottom-right-radius: calc(var(--openbot-radius-card) - 1px);
+    border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
   }
 
   /* The Tasks page opens with the agent list hidden. Its header button shows the list. Until then the
@@ -458,7 +464,7 @@
   }
 
   .app-window > .app-frame-edge.app-frame-sidebar-hidden > .app-frame-panes .tasks-page-header {
-    left: var(--left-panel-width);
+    inset-inline-start: var(--left-panel-width);
   }
 
   .app-window > .app-frame-edge.app-frame-sidebar-hidden > .app-frame-panes :is(.tasks-page-scroll, .tasks-page-side) {
@@ -474,7 +480,8 @@
     position: absolute;
     grid-row: 1 / -1;
     grid-column: 1 / -1;
-    inset: 0 0 0 1px;
+    inset-block: 0;
+    inset-inline: 1px 0;
   }
 
   /* The settings page starts below the top row. The schedule, usage and Marketplace titles go in the
@@ -495,7 +502,7 @@
   }
 
   .app-frame-edge.app-frame-with-server-rail:not([data-window-page-kind="agents"]) > .window-page {
-    left: calc(var(--server-rail-width) + 1px);
+    inset-inline-start: calc(var(--server-rail-width) + 1px);
   }
 
   .app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar > :not(.sidebar-topbar),
@@ -517,7 +524,7 @@
     > .app-frame-edge[data-window-page-kind="titled"]
     > .window-page
     :is(.agent-usage-header, .routine-planner-title, .skills-marketplace-topbar) {
-    margin-left: var(--left-panel-width);
+    margin-inline-start: var(--left-panel-width);
   }
 
   .app-frame-edge[data-window-page-kind="titled"]
@@ -587,7 +594,7 @@
   flex-direction: column;
   gap: var(--openbot-space-1);
   overflow: hidden;
-  border-right: 1px solid var(--openbot-border);
+  border-inline-end: 1px solid var(--openbot-border);
   padding: var(--openbot-space-4) var(--openbot-space-3) 0;
 }
 
@@ -690,7 +697,7 @@
   padding: var(--openbot-space-1-5) var(--openbot-space-2);
   color: var(--openbot-text-primary);
   font: inherit;
-  text-align: left;
+  text-align: start;
   cursor: pointer;
 }
 
@@ -720,7 +727,7 @@
 
 .settings-page-result-title {
   overflow: hidden;
-  padding-left: calc(var(--openbot-icon-sm) + var(--openbot-space-2));
+  padding-inline-start: calc(var(--openbot-icon-sm) + var(--openbot-space-2));
   font-size: var(--openbot-text-md);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -769,7 +776,7 @@
   }
 
   .settings-page-nav {
-    border-right: 0;
+    border-inline-end: 0;
     border-bottom: 1px solid var(--openbot-border);
     padding: var(--openbot-space-3) var(--openbot-space-3) 0;
   }
@@ -796,7 +803,7 @@
 }
 
 .app-frame-chat-window.app-frame-platform-darwin .conversation-header {
-  padding-left: 76px;
+  padding-inline-start: 76px;
 }
 
 /* The hint that one press of Cmd + Q does not quit. The window behind it is dimmed and blurred, as
