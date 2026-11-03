@@ -10,12 +10,6 @@ import { cx } from "./utils";
 /** A face that the lilac plush can make. `idle` breathes, blinks and looks around. */
 export type PlushMascotFace = "idle" | "wide" | "wink" | "happy";
 
-/**
- * The felt body of the lilac plush inside its square box, as fractions of the box: the centre on
- * the y axis, the width and the height. Measured from the image.
- */
-export const PLUSH_MASCOT_BODY = { cy: 0.511, w: 0.992, h: 0.967 } as const;
-
 const BALLS = [ballLilac, ballMint, ballPink];
 
 /**
