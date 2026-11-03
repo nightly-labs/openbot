@@ -229,6 +229,17 @@ export const Trigger: Story = {
       fields={{
         github: { trigger: "github", repository: "openbot-preview/app", event: "issue.opened", filters: "notBot" },
         "github-empty": { trigger: "github", event: "issue.opened", filters: "notBot" },
+        "github-many": {
+          trigger: "github",
+          repository: "openbot-preview/app",
+          repositories: [
+            "openbot-preview/app",
+            "openbot-preview/desktop-release-pipeline-and-installers",
+            "openbot-preview-labs/team-api-gateway",
+          ].join("\n"),
+          event: "issue.opened",
+          filters: "notBot",
+        },
       }}
     >
       <TriggerNode id="schedule" nextRun={STORY_SEED.nextRun} />
@@ -237,6 +248,7 @@ export const Trigger: Story = {
       <TriggerNode id="message" trigger="message" />
       <TriggerNode id="github" trigger="github" />
       <TriggerNode id="github-empty" trigger="github" />
+      <TriggerNode id="github-many" trigger="github" />
     </NodeGallery>
   ),
 };

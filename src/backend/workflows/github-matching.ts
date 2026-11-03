@@ -15,6 +15,7 @@ import {
   type WorkflowGitHubItem,
   type WorkflowNode,
   workflowGitHubEventItemKind,
+  workflowGitHubTriggerRepositories,
   workflowListField,
 } from "@openbot/contracts/ipc";
 import {
@@ -301,19 +302,17 @@ export function githubFilterRefuses(node: WorkflowNode, facts: GitHubEventFacts)
   return false;
 }
 
-/** The repository of a GitHub trigger, or null when it has none. */
-export function githubTriggerRepository(node: WorkflowNode): string | null {
-  if (node.kind !== "trigger" || node.fields.trigger !== "github") return null;
-  const repository = node.fields.repository;
-  return isGitHubRepositoryName(repository) ? repository : null;
+/** The repositories of a GitHub trigger, in its order; empty when it has none or is not one. */
+export function githubTriggerRepositories(node: WorkflowNode): string[] {
+  if (node.kind !== "trigger" || node.fields.trigger !== "github") return [];
+  return workflowGitHubTriggerRepositories(node.fields);
 }
 
-/** Whether a GitHub trigger starts on this event of its repository. */
+/** Whether a GitHub trigger starts on this event of one of its repositories. */
 export function githubTriggerMatches(node: WorkflowNode, facts: GitHubEventFacts): boolean {
-  const repository = githubTriggerRepository(node);
+  const repository = facts.repository.toLowerCase();
   return (
-    repository !== null &&
-    repository.toLowerCase() === facts.repository.toLowerCase() &&
+    githubTriggerRepositories(node).some((name) => name.toLowerCase() === repository) &&
     isOneOf(WORKFLOW_GITHUB_EVENTS, node.fields.event) &&
     facts.events.includes(node.fields.event)
   );

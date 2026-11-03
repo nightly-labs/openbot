@@ -814,14 +814,13 @@
   color: var(--openbot-text-muted);
 }
 
-/* The divider under the field shows where typing goes, so the shared outline goes. */
+/*
+ * The field takes the focus each time the menu opens, so a focus colour on the divider would always
+ * show. The caret shows where typing goes, as in the shared search select.
+ */
 .wfn-picker .wfn-picker-field:focus-visible {
   outline: none;
   box-shadow: none;
-}
-
-.wfn-picker-search:has(.wfn-picker-field:focus-visible) {
-  border-bottom-color: var(--openbot-border-focus);
 }
 
 .wfn-picker-list {
@@ -2665,6 +2664,9 @@ fieldset.wfn-picker-group {
 .wfn-tag {
   display: inline-flex;
   align-items: center;
+  gap: var(--openbot-space-1);
+  min-width: 0;
+  max-width: 100%;
   height: 22px;
   padding: 0 var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);
@@ -2673,6 +2675,23 @@ fieldset.wfn-picker-group {
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
   white-space: nowrap;
+}
+
+/* A long name ends with "…" inside its tag, so the tag stays in the value column. */
+.wfn-tag-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wfn-tag > svg {
+  flex: none;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+/* A repository that sends no events. */
+.wfn-tag[data-warning] {
+  color: var(--openbot-warning-text);
 }
 
 .wfn-tag[data-tone] {

@@ -11,7 +11,9 @@
 // (`self`); a comment output with only the trigger's event posts nothing; a change that is done already
 // is not made again; each pass of a loop posts its own comment; "Agent chooses" gives the repository's
 // own label; a restart while a comment is on its way does not post it again, but sends a label again;
-// "Run with last event" starts a run with the newest matching item. No app, provider, account, Signal or
+// "Run with last event" starts a run with the newest matching item. A trigger with two repositories starts
+// on an event of the second one and its output comments there; a list that an older client left behind,
+// whose first line is not `repository`, is not watched. No app, provider, account, Signal or
 // network is started.
 //
 // Run: bun scripts/github-workflow-e2e.ts
@@ -374,6 +376,43 @@ try {
   const own = await send(JSON.stringify(ownBody));
   const ownRow = await delivery(reply.summary.id, own.deliveryId);
   check("the event of the output's own comment is skipped", ownRow?.reason === "self", ownRow);
+
+  // A trigger with two repositories starts on an event of the second one, and its "trigger" output acts there.
+  const withRepositories = (graph: WorkflowGraph, repositories: string): WorkflowGraph => ({
+    ...graph,
+    nodes: graph.nodes.map((node) =>
+      node.id === "trigger" ? { ...node, fields: { ...node.fields, repositories } } : node,
+    ),
+  });
+  const many = await run(
+    workflows.create({
+      title: "Many",
+      graph: withRepositories(
+        saying(lineOf("acme/many-a", [githubOutput({ action: "comment" })])),
+        "acme/many-a\nacme/many-b",
+      ),
+    }),
+  );
+  const manyRun = await startedRun(many.summary.id, comment("acme/many-b", 6, "ana").body);
+  const manyEnd = await runEnd(manyRun);
+  const manyPosted = changes.filter((change) => change.repository.startsWith("acme/many-"));
+  check(
+    "a trigger with two repositories starts on the second one, and its output comments there",
+    manyEnd.status === "done" &&
+      manyPosted.length === 1 &&
+      manyPosted[0]?.repository === "acme/many-b" &&
+      manyPosted[0]?.number === 6,
+    { manyEnd, manyPosted },
+  );
+  // A client that knows one repository changed `repository` and kept the old list: the list is not used.
+  await run(
+    workflows.create({
+      title: "Changed by an older client",
+      graph: withRepositories(graphOf("acme/now", "notify"), "acme/before\nacme/before-b"),
+    }),
+  );
+  const stale = await send(comment("acme/before-b", 1, "ana").body);
+  check("a list whose first line is not `repository` is not watched", stale.status === 404, stale);
 
   const hold = await run(
     workflows.create({

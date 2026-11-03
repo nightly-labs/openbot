@@ -237,6 +237,8 @@ export const messages = {
   "workflow.row.whoChooses": "من يختار",
 
   "workflow.github.repository": "المستودع",
+  "workflow.github.repositories": "المستودعات",
+  "workflow.github.noEvents": "لا أحداث",
   "workflow.github.chooseRepository": "اختيار مستودع",
   "workflow.github.searchRepositories": "البحث في المستودعات",
   "workflow.github.events.issues": "المشكلات",

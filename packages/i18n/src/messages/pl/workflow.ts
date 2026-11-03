@@ -231,6 +231,8 @@ export const messages = {
   "workflow.row.agentCanChoose": "Agent może wybrać",
   "workflow.row.whoChooses": "Kto wybiera",
   "workflow.github.repository": "Repozytorium",
+  "workflow.github.repositories": "Repozytoria",
+  "workflow.github.noEvents": "Brak zdarzeń",
   "workflow.github.chooseRepository": "Wybierz repozytorium",
   "workflow.github.searchRepositories": "Szukaj repozytoriów",
   "workflow.github.events.issues": "Zgłoszenia",
