@@ -76,6 +76,23 @@ export const messages = {
   "settings.busyMessage.title": "Orienter les agents pendant leur travail",
   "settings.busyMessage.description":
     "Les nouveaux messages rejoignent le travail en cours de l’agent, pas la file. Fonctionne avec ChatGPT et Claude.",
+  "settings.agentDefaults.title": "Valeurs par défaut",
+  "settings.agentDefaults.description": "Les agents suivent ces valeurs, sauf si vous les modifiez pour un agent.",
+  "settings.agentDefaults.value": "Par défaut : {value}",
+  "settings.agentDefaults.on": "Activé",
+  "settings.agentDefaults.off": "Désactivé",
+  "settings.agentDefaults.followDefault": "Par défaut ({value})",
+  "settings.agentDefaults.count": "Activé pour {on} sur {total}",
+  "settings.agentDefaults.open": "Ouvrir {name}",
+  "settings.agentDefaults.agentList": "Activé pour {names}",
+  "settings.agentDefaults.defaultTitle": "Par défaut",
+  "settings.agentDefaults.defaultDescription":
+    "Les nouveaux agents l’utilisent. Les agents réglés sur Par défaut le suivent.",
+  "settings.agentDefaults.agents": "Agents",
+  "settings.agentDefaults.setAll": "Tout régler",
+  "settings.agentDefaults.setAllLabel": "Régler {setting} pour tous les agents",
+  "settings.agentDefaults.agentLabel": "{setting} pour {agent}",
+  "settings.agentDefaults.loadFailed": "Impossible de lire les agents.",
   "settings.backgroundProcesses.title": "Processus en arrière-plan",
   "settings.backgroundProcesses.description":
     "Programmes que les agents ont lancés et laissés en marche, comme des serveurs de développement. Ils continuent après la fin du chat et quand vous quittez OpenBot.",
@@ -162,6 +179,9 @@ export const messages = {
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "Général",
   "settings.tab.general.description": "Contrôler le comportement d’OpenBot sur cet ordinateur.",
+  "settings.tab.agents.title": "Agents",
+  "settings.tab.agents.description":
+    "Choisir ce que les agents de cet ordinateur peuvent faire quand vous ne le réglez pas pour un agent.",
   "settings.tab.notifications.title": "Notifications",
   "settings.tab.notifications.description": "Choisir comment OpenBot vous alerte.",
   "settings.tab.voice.title": "Voix",
