@@ -300,11 +300,10 @@ export class ChannelService {
   ) {
     const senderName =
       this.hooks.agents().find((agent) => agent.id === input.senderAgentId)?.name ?? input.senderAgentId;
-    const channel = yield* channelSync(() => this.store.get(input.channelId));
     const command: ChannelHandoffCommand = {
       type: "handoff",
       operationId: input.operationId,
-      channelId: channel.id,
+      channelId: input.channelId,
       text: input.text,
       recipientAgentIds: [...new Set(input.recipientAgentIds)],
       sourcePaths: input.sourcePaths,
@@ -312,7 +311,7 @@ export class ChannelService {
     };
     const actor = { id: channelHandoffAuthorId(input.senderAgentId), name: senderName };
     return yield* this.#serialize(
-      channel.id,
+      input.channelId,
       Effect.suspend(() => this.apply(command, actor)),
     );
   });
