@@ -23,6 +23,10 @@ const FLOW_TTL_MS = 10 * 60_000;
 const CODE_TTL_MS = 2 * 60_000;
 const PROVIDER_TIMEOUT_MS = 10_000;
 const MAX_DOMAINS = 20;
+// The same window and limits as the email start: each start asks the provider for its metadata.
+const RATE_WINDOW_MS = 15 * 60_000;
+const START_EMAIL_LIMIT = 5;
+const START_IP_LIMIT = 20;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
 /** The app's loopback listener. The port is the one the app took. */
 const RETURN_PATTERN = /^http:\/\/(?:127\.0\.0\.1|localhost):[0-9]{2,5}\/company-sign-in$/u;
@@ -113,7 +117,6 @@ export interface CompanySignInSettings {
 export interface CompanySignInTestInput {
   issuer: string;
   clientId: string;
-  /** Empty keeps the saved secret. */
   clientSecret: string;
   domains: string[];
   returnTo: string;
@@ -125,6 +128,8 @@ export interface CompanySignInStartInput {
   returnTo: string;
   clientState: string;
   clientChallenge: string;
+  /** The client address from `requestSourceIp`, for the rate limit. */
+  sourceIp: string;
 }
 
 export interface ScimUser {
@@ -409,6 +414,29 @@ export class CompanySignInService {
     );
   });
 
+  /** Counts one attempt for `key` in the current window, in the table of the email sign-in limits. */
+  readonly #enforceRateLimit = Effect.fn("CompanySignIn.enforceRateLimit")(function* (
+    this: CompanySignInService,
+    key: string,
+    limit: number,
+  ): Effect.fn.Return<void, CompanySignInFailure> {
+    const windowStart = Math.floor(this.#now() / RATE_WINDOW_MS) * RATE_WINDOW_MS;
+    const keyHash = yield* sha256(key).pipe(Effect.mapError(() => new CompanySignInOperationError({})));
+    const row = yield* storeCall(() =>
+      this.#database
+        .prepare(
+          `INSERT INTO auth_rate_limits(key_hash, window_start, attempts) VALUES (?, ?, 1)
+           ON CONFLICT(key_hash, window_start) DO UPDATE SET attempts = attempts + 1
+           RETURNING attempts`,
+        )
+        .bind(keyHash, windowStart)
+        .first<{ attempts: number }>(),
+    );
+    if ((row?.attempts ?? limit + 1) > limit) {
+      return yield* new CompanySignInError(429, "rate_limited", "Too many sign-in attempts. Try again later.");
+    }
+  });
+
   readonly startSignIn = Effect.fn("CompanySignIn.startSignIn")(function* (
     this: CompanySignInService,
     input: CompanySignInStartInput,
@@ -421,6 +449,8 @@ export class CompanySignInService {
     if (!TOKEN_PATTERN.test(input.clientChallenge)) return yield* invalid("The sign-in request is invalid.");
     const email = normalizeEmailAddress(input.email);
     if (!email) return yield* new CompanySignInError(400, "invalid_email", "Enter a valid email address.");
+    yield* this.#enforceRateLimit(`company:start:ip:${input.sourceIp}`, START_IP_LIMIT);
+    yield* this.#enforceRateLimit(`company:start:email:${email}`, START_EMAIL_LIMIT);
     const connection = yield* storeCall(() =>
       this.#database
         .prepare(

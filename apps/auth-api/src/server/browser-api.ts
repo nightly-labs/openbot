@@ -272,6 +272,7 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
           returnTo: new URL(WEB_RETURN_PATH, site.origin).toString(),
           clientState,
           clientChallenge: yield* sha256(verifier),
+          sourceIp: services.sourceIp(request),
         },
         companySignInApiOrigin(site),
         site.origin,

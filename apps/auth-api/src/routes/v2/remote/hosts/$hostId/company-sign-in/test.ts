@@ -26,7 +26,7 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/company-sign-in/t
             if (
               !isString(issuer) ||
               !isString(clientId) ||
-              !(clientSecret === undefined || isString(clientSecret)) ||
+              !isString(clientSecret) ||
               !Array.isArray(domains) ||
               !domains.every(isString) ||
               !isString(returnTo) ||
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/company-sign-in/t
               yield* requestCompanySignIn().startTest(
                 user,
                 params.hostId,
-                { issuer, clientId, clientSecret: clientSecret ?? "", domains, returnTo, clientState },
+                { issuer, clientId, clientSecret, domains, returnTo, clientState },
                 request.url,
               ),
             );
