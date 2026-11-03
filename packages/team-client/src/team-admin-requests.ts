@@ -10,6 +10,7 @@ import {
   type AgentFolderList,
   type AgentNotificationLevelsSnapshot,
   type AgentSessionSettings,
+  type AnswerWhatsAppRequestInput,
   type BrowseAgentFoldersInput,
   type DiscordAccess,
   type DiscordRoleList,
@@ -18,6 +19,8 @@ import {
   decodeAgentFolderBrowse,
   decodeAgentFolderChangeFromMain,
   decodeAgentFolderListFromMain,
+  decodeHostWhatsAppLinkState,
+  decodeHostWhatsAppOverview,
   decodeServerAuditLog,
   type HiddenAgentsSnapshot,
   type HostDiscordAccessInput,
@@ -29,15 +32,25 @@ import {
   isDiscordRoleList,
   isHiddenAgentsSnapshot,
   isSidebarPinsSnapshot,
+  isWhatsAppGroupList,
+  type MessagingWorkspaceInput,
+  type RemoveWhatsAppSenderInput,
   type ResetAgentSessionSettingInput,
   type ServerAuditLog,
   type SetAgentColorInput,
   type SetAgentHiddenInput,
   type SetAgentNotificationLevelInput,
   type SetAgentSessionSettingInput,
+  type SetMessagingEnabledInput,
   type SetOwnServerNotificationLevelInput,
+  type SetWhatsAppOwnNumberInput,
   type SidebarPin,
   type SidebarPinsSnapshot,
+  type StartWhatsAppLinkInput,
+  type WhatsAppGroupList,
+  type WhatsAppLinkState,
+  type WhatsAppOverview,
+  type WhatsAppSenderInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
@@ -61,6 +74,7 @@ import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provid
 import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
+import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the server timezone, the browser profiles, the server key, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
 //
@@ -1781,4 +1795,109 @@ export function setDiscordAccess(
       allowedRoles: input.allowedRoles.map((role) => ({ id: role.id, name: role.name })),
     }),
   );
+}
+
+/** The host's WhatsApp numbers and the settings of each (`whatsapp-connector-v1`). */
+export function whatsappConnectorOverview(
+  request: TeamApiRequest,
+): Effect.Effect<WhatsAppOverview, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.overview, decodeHostWhatsAppOverview, {}));
+}
+
+/** Starts a link on the host. The answer holds the QR code or the pairing code that the phone uses. */
+export function whatsappConnectorStartLink(
+  request: TeamApiRequest,
+  input: StartWhatsAppLinkInput,
+): Effect.Effect<WhatsAppLinkState, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", WHATSAPP_CONNECTOR_ROUTES.linkStart, decodeHostWhatsAppLinkState, { ...input }),
+  );
+}
+
+export function whatsappConnectorLinkState(
+  request: TeamApiRequest,
+): Effect.Effect<WhatsAppLinkState, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.linkState, decodeHostWhatsAppLinkState, {}));
+}
+
+export function whatsappConnectorCancelLink(request: TeamApiRequest): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.linkCancel, ignoreResponse, {}));
+}
+
+export function whatsappConnectorDisconnect(
+  request: TeamApiRequest,
+  input: MessagingWorkspaceInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.disconnect, ignoreResponse, { ...input }));
+}
+
+export function whatsappConnectorReconnect(
+  request: TeamApiRequest,
+  input: MessagingWorkspaceInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.reconnect, ignoreResponse, { ...input }));
+}
+
+export function whatsappConnectorSetEnabled(
+  request: TeamApiRequest,
+  input: SetMessagingEnabledInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.enabled, ignoreResponse, { ...input }));
+}
+
+/** The orchestrator starts on the host's default provider and model. */
+export function whatsappConnectorAddOrchestrator(
+  request: TeamApiRequest,
+): Effect.Effect<AddMessagingOrchestratorResult, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.orchestrator, decodeMessagingOrchestrator, {}));
+}
+
+export function whatsappConnectorGroups(
+  request: TeamApiRequest,
+  input: MessagingWorkspaceInput,
+): Effect.Effect<WhatsAppGroupList, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      WHATSAPP_CONNECTOR_ROUTES.groups,
+      (value) => {
+        if (!isWhatsAppGroupList(value)) throw new Error("Invalid WhatsApp groups response.");
+        return value;
+      },
+      { ...input },
+    ),
+  );
+}
+
+export function whatsappConnectorAddSender(
+  request: TeamApiRequest,
+  input: WhatsAppSenderInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", WHATSAPP_CONNECTOR_ROUTES.senderAdd, ignoreResponse, {
+      workspaceId: input.workspaceId,
+      sender: { id: input.sender.id, kind: input.sender.kind, name: input.sender.name },
+    }),
+  );
+}
+
+export function whatsappConnectorRemoveSender(
+  request: TeamApiRequest,
+  input: RemoveWhatsAppSenderInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.senderRemove, ignoreResponse, { ...input }));
+}
+
+export function whatsappConnectorAnswerRequest(
+  request: TeamApiRequest,
+  input: AnswerWhatsAppRequestInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.requestAnswer, ignoreResponse, { ...input }));
+}
+
+export function whatsappConnectorSetOwnNumber(
+  request: TeamApiRequest,
+  input: SetWhatsAppOwnNumberInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.ownNumber, ignoreResponse, { ...input }));
 }

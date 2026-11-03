@@ -328,6 +328,8 @@ export const messages = {
   "connector.telegram.close": "关闭",
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description": "把一个 WhatsApp 号码关联到这台电脑。WhatsApp 调度助手会找到合适的助手来回答。",
+  "connector.whatsapp.descriptionHost":
+    "把一个 WhatsApp 号码关联到这台服务器。WhatsApp 调度助手会找到合适的助手来回答。",
   "connector.whatsapp.statusConnected": "已连接",
   "connector.whatsapp.statusAttention": "需要关注",
   // {count} is the number of linked WhatsApp numbers.
@@ -352,6 +354,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote": "你的“给自己发消息”聊天和你允许的人可以联系 OpenBot。",
   "connector.whatsapp.dedicatedNote": "你允许的人可以联系 OpenBot。其他人会收到一个代码，需要把它交给你。",
   "connector.whatsapp.helpLoggedOut": "WhatsApp 已把这台电脑从已关联的设备中移除。请重新关联该号码。",
+  "connector.whatsapp.helpLoggedOutHost": "WhatsApp 已把这台服务器从已关联的设备中移除。请重新关联该号码。",
   "connector.whatsapp.helpError": "OpenBot 无法通过该号码连接 WhatsApp。请重新连接，或断开该号码。",
   "connector.whatsapp.retryAt": "WhatsApp 要求 OpenBot 等待，将于 {time} 重试。",
   "connector.whatsapp.pause": "暂停",
@@ -379,6 +382,7 @@ export const messages = {
   "connector.whatsapp.stepAgent": "助手",
   "connector.whatsapp.connectTitle": "关联 WhatsApp",
   "connector.whatsapp.connectDescription": "选择号码，然后在手机上的 WhatsApp 中关联这台电脑。",
+  "connector.whatsapp.connectDescriptionHost": "选择号码，然后在手机上的 WhatsApp 中关联这台服务器。",
   "connector.whatsapp.kindLabel": "号码",
   "connector.whatsapp.kindPersonal": "我的个人号码",
   "connector.whatsapp.kindPersonalDescription": "OpenBot 只回答你的“给自己发消息”聊天和你允许的人。",

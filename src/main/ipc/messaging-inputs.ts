@@ -71,7 +71,7 @@ export function parseAddTelegramOrchestratorInput(value: unknown): AddTelegramOr
   return result;
 }
 
-/** A platform that a joined server's `connectors-v1` carries. WhatsApp is managed only on its host. */
+/** A platform that a joined server's `connectors-v1` carries. WhatsApp uses `whatsapp-connector-v1`. */
 function parsePlatform(value: unknown): ConnectorMessagingPlatform {
   if (!isOneOf(CONNECTOR_MESSAGING_PLATFORMS, value)) throw new Error("A messaging request is invalid.");
   return value;
