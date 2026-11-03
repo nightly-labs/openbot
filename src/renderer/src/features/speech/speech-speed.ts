@@ -1,23 +1,41 @@
-import type { SpeechSpeed } from "@openbot/contracts/ipc";
+import { type OpenBotDesktopApi, SPEECH_SPEEDS, type SpeechSettings, type SpeechSpeed } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { createSignal } from "solid-js";
 import { setReplyPlaybackRate } from "./speech-playback";
 import { speechPort } from "./speech-port";
 
-/** The order in which a speed button goes through the speeds, from normal speed. */
-const SPEED_CYCLE: readonly SpeechSpeed[] = [1, 1.25, 1.5, 2, 0.75];
+/** The order in which a speed button goes through the speeds: from normal speed up, then the slower ones. */
+export const SPEED_CYCLE: readonly SpeechSpeed[] = [
+  ...SPEECH_SPEEDS.filter((speed) => speed >= 1),
+  ...SPEECH_SPEEDS.filter((speed) => speed < 1),
+];
 
 const [speed, setSpeed] = createSignal<SpeechSpeed>(1);
 let loading: Promise<void> | undefined;
 /** True after the user changed the speed, so that a slower first load does not undo the change. */
 let changed = false;
-/** The saves in the order of the changes, so that the last change is also the last save. */
-let saving = Promise.resolve();
+/** The speed that main saved last. A failed save goes back to it. */
+let saved: SpeechSpeed = 1;
+/** The saves of speech settings in the order of the changes, so that the last change is also the last save. */
+let saving: Promise<unknown> = Promise.resolve();
 
 function apply(next: SpeechSpeed): void {
   setSpeed(next);
   setReplyPlaybackRate(next);
+}
+
+/**
+ * Saves a change to the speech settings after the saves before it. Each save reads the settings
+ * again, so that it keeps a change that another control made since its own load.
+ */
+export function updateSpeechSettings(
+  voice: Pick<OpenBotDesktopApi["voice"], "getSpeechSettings" | "setSpeechSettings">,
+  patch: Partial<SpeechSettings>,
+): Promise<SpeechSettings> {
+  const next = saving.then(async () => voice.setSpeechSettings({ ...(await voice.getSpeechSettings()), ...patch }));
+  saving = next.catch(() => undefined);
+  return next;
 }
 
 /**
@@ -35,7 +53,9 @@ export function loadSpeechSpeed(): Promise<void> {
     .voice.getSpeechSettings()
     .then(
       (settings) => {
-        if (!changed) apply(settings.speed);
+        if (changed) return;
+        saved = settings.speed;
+        apply(settings.speed);
       },
       () => {
         loading = undefined;
@@ -46,30 +66,32 @@ export function loadSpeechSpeed(): Promise<void> {
 
 /**
  * Changes the speed of replies, also of the reply that plays now, and saves it. A failed save goes
- * back to the speed before the change.
+ * back to the speed that main saved last.
  */
 export function changeSpeechSpeed(next: SpeechSpeed): void {
-  const previous = speed();
-  if (next === previous) return;
+  if (next === speed()) return;
   changed = true;
   apply(next);
-  saving = saving
-    .then(async () => {
-      const voice = speechPort().voice;
-      // Read again, so that a change of another speech setting since the load is kept.
-      const settings = await voice.getSpeechSettings();
-      await voice.setSpeechSettings({ ...settings, speed: next });
-    })
-    .catch(() => {
-      if (speed() === next) apply(previous);
+  updateSpeechSettings(speechPort().voice, { speed: next }).then(
+    (settings) => {
+      saved = settings.speed;
+    },
+    () => {
+      if (speed() === next) apply(saved);
       toast.error(currentText().t("settings.voice.saveFailed"), {
         report: { operation: "settings", source: "system", cause_code: "unknown" },
       });
-    });
+    },
+  );
 }
 
-/** Changes to the next speed of a speed button: 1×, 1.25×, 1.5×, 2×, 0.75×, then 1× again. */
+/**
+ * Changes to the next speed of a speed button: 1×, 1.25×, 1.5×, 2×, 0.75×, then 1× again. It waits
+ * for the saved speed, so that a click before the load does not start from normal speed.
+ */
 export function cycleSpeechSpeed(): void {
-  const index = SPEED_CYCLE.indexOf(speed());
-  changeSpeechSpeed(SPEED_CYCLE[(index + 1) % SPEED_CYCLE.length] ?? 1);
+  void loadSpeechSpeed().then(() => {
+    const index = SPEED_CYCLE.indexOf(speed());
+    changeSpeechSpeed(SPEED_CYCLE[(index + 1) % SPEED_CYCLE.length] ?? 1);
+  });
 }

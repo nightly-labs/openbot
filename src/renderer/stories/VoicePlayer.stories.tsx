@@ -2,14 +2,13 @@ import { VoicePlayer } from "@openbot/ui/features/conversation/VoicePlayer";
 import { createSignal, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { SPEED_CYCLE } from "../src/features/speech/speech-speed";
 
 const PEAKS = [
   0.05, 0.1, 0.35, 0.6, 0.8, 0.55, 0.3, 0.7, 1, 0.85, 0.4, 0.2, 0.1, 0.45, 0.75, 0.9, 0.6, 0.35, 0.5, 0.8, 0.65, 0.3,
   0.15, 0.05, 0.2, 0.55, 0.7, 0.95, 0.6, 0.4, 0.25, 0.5, 0.7, 0.45, 0.3, 0.15, 0.1, 0.05, 0.03, 0.02,
 ];
 
-/** The order of the speed button, as in the app. */
-const SPEEDS = [1, 1.25, 1.5, 2, 0.75];
 /** A spoken reply has a speed button; the user's own voice message does not. */
 const REPLY = { kind: "reply", speed: 1, onCycleSpeed: fn() } as const;
 
@@ -23,7 +22,7 @@ const meta = {
     const [elapsed, setElapsed] = createSignal(untrack(() => args.elapsed ?? 0));
     const [speed, setSpeed] = createSignal(untrack(() => args.speed ?? 1));
     const cycleSpeed = () => {
-      setSpeed(SPEEDS[(SPEEDS.indexOf(speed()) + 1) % SPEEDS.length] ?? 1);
+      setSpeed(SPEED_CYCLE[(SPEED_CYCLE.findIndex((step) => step === speed()) + 1) % SPEED_CYCLE.length] ?? 1);
       args.onCycleSpeed?.();
     };
     const speedChange = () => (args.onCycleSpeed ? cycleSpeed : undefined);

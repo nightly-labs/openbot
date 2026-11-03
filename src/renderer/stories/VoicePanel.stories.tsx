@@ -2,6 +2,7 @@ import { VoicePanel } from "@openbot/ui/features/conversation/VoicePanel";
 import { createSignal, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { SPEED_CYCLE } from "../src/features/speech/speech-speed";
 import { STORY_AGENT } from "./fixtures";
 
 const QUIET = new Array(24).fill(0);
@@ -11,8 +12,6 @@ const SPEECH = [
 ];
 
 const QUESTION = "What should I put first in the launch post?";
-/** The order of the speed button, as in the app. */
-const SPEEDS = [1, 1.25, 1.5, 2, 0.75];
 
 const meta = {
   title: "Conversation/VoicePanel",
@@ -46,7 +45,7 @@ const meta = {
           }}
           speed={speed()}
           onCycleSpeed={() => {
-            setSpeed(SPEEDS[(SPEEDS.indexOf(speed()) + 1) % SPEEDS.length] ?? 1);
+            setSpeed(SPEED_CYCLE[(SPEED_CYCLE.findIndex((step) => step === speed()) + 1) % SPEED_CYCLE.length] ?? 1);
             args.onCycleSpeed?.();
           }}
         />
