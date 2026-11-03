@@ -7,4 +7,8 @@ export const messages = {
   "status.provider.updateWaiting": "Güncelleme, geçerli tur bitince başlar.",
   "status.provider.confirmContinue": "Devam et",
   "status.provider.confirmCancel": "İptal",
+  "status.provider.retryUnreachable": "{provider} sunucusuna bağlanamıyor. Yeniden deneme {attempt}/{maxAttempts}.",
+  "status.provider.retryServerError":
+    "{provider} sunucusu meşgul veya bir hata verdi. Yeniden deneme {attempt}/{maxAttempts}.",
+  "status.provider.retryRecovered": "{provider} sunucusundan yeniden yanıt alıyor.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -141,8 +141,13 @@ export function SettingListRow(props: {
             <span class="wfn-row-value">
               <For each={props.values}>
                 {(value) => (
-                  <span class="wfn-tag" data-tone={props.tone?.(value) ? "" : undefined} style={toneStyle(value)}>
-                    {tag(value)}
+                  <span
+                    class="wfn-tag"
+                    data-tone={props.tone?.(value) ? "" : undefined}
+                    style={toneStyle(value)}
+                    title={tag(value)}
+                  >
+                    <span class="wfn-tag-text">{tag(value)}</span>
                   </span>
                 )}
               </For>

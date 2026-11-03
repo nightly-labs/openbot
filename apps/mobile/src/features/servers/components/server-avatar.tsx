@@ -1,3 +1,4 @@
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -8,7 +9,6 @@ import { View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 import { thumbnailColor } from "@/features/agents/components/bloub-avatar";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { loadServerLogo } from "@/features/servers/model/server-logo";
 import { DISCONNECTED_APPEARANCE } from "@/features/workspace/components/use-connection-appearance";
@@ -90,7 +90,7 @@ export function ServerAvatar({
     <View
       className="items-center justify-center"
       style={{
-        backgroundColor: thumbnailColor(getBloubAvatarColor(server.id, null), muted),
+        backgroundColor: thumbnailColor(avatarHeadColor(server.id, null), muted),
         borderCurve: "continuous",
         borderRadius: size * SERVER_AVATAR_CORNER_RATIO,
         height: size,

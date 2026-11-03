@@ -30,6 +30,7 @@ import {
   isAgentModel,
   isAgentProvider,
   isAgentTaskLimit,
+  isAvatarColor,
   isAvatarHue,
   isAvatarSeed,
   isBusyMessageMode,
@@ -67,6 +68,7 @@ import {
   type SendMessageInput,
   type SetAgentAvatarInput,
   type SetAgentMemoryInclusionInput,
+  type SetChannelImageInput,
   type SetMessageReactionInput,
   type SidebarLayoutAction,
   type StartAgentTaskInput,
@@ -223,11 +225,16 @@ export function parseCreateAgent(value: unknown): CreateAgentInput {
   const avatarHue = value.avatarHue;
   if (!isAvatarSeed(value.avatarSeed)) throw new Error("Invalid avatar seed.");
   if (avatarHue !== null && !isAvatarHue(avatarHue)) throw new Error("Invalid avatar hue.");
+  const avatarColor = value.avatarColor;
+  if (avatarColor !== undefined && avatarColor !== null && !isAvatarColor(avatarColor)) {
+    throw new Error("Invalid avatar color.");
+  }
   const result: CreateAgentInput = {
     name: requireString(value.name, "name", INPUT_LIMITS.agentName),
     description: requireString(value.description, "description", INPUT_LIMITS.agentDescription),
     avatarSeed: value.avatarSeed,
     avatarHue,
+    ...(avatarColor === undefined ? {} : { avatarColor }),
     initialMessage: requireString(value.initialMessage, "initialMessage", INPUT_LIMITS.messageText),
   };
   if (value.provider !== undefined) {
@@ -765,6 +772,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     }
     result.avatarHue = value.avatarHue;
   }
+  if (value.avatarColor !== undefined) {
+    if (value.avatarColor !== null && !isAvatarColor(value.avatarColor)) throw new Error("Invalid avatar color.");
+    result.avatarColor = value.avatarColor;
+  }
   return result;
 }
 
@@ -772,6 +783,14 @@ export function parseSetAgentAvatar(value: unknown): SetAgentAvatarInput {
   if (!isObject(value)) throw new Error("Invalid agent avatar request.");
   return {
     agentId: requireString(value.agentId, "agentId"),
+    image: parseAvatarImage(value.image),
+  };
+}
+
+export function parseSetChannelImage(value: unknown): SetChannelImageInput {
+  if (!isObject(value)) throw new Error("Invalid channel image request.");
+  return {
+    channelId: requireString(value.channelId, "channelId"),
     image: parseAvatarImage(value.image),
   };
 }

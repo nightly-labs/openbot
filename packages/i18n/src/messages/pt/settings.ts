@@ -527,6 +527,7 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Ler respostas em voz alta",
   "settings.voice.speech.readReplies.description":
     "Quando você dita uma mensagem, a resposta é lida em voz alta. Dite de novo para parar.",
+  "settings.voice.speech.speed.title": "Velocidade",
   "settings.voice.speech.voice.title": "Voz",
   "settings.voice.speech.voice.female": "Voz feminina {number}",
   "settings.voice.speech.voice.male": "Voz masculina {number}",

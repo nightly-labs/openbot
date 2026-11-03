@@ -2,6 +2,7 @@ import type { ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers"
 import type { AgentModelId } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
 import { integerInRange, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
+import { decodeRecord, nullableNumber, requiredBoolean, requiredNumber, requiredString } from "./ipc-decoding";
 import { isDynamicRecord, isString } from "./runtime-values";
 
 export type DesktopPlatform = "darwin" | "win32" | "linux";
@@ -237,8 +238,95 @@ export type CentralAuthState =
       developmentCode?: string;
       issue?: CentralAuthIssue | undefined;
     }
+  /** The email signs in with the company's provider. The browser has the sign-in page. */
+  | { status: "company_sign_in"; email: string; issue?: CentralAuthIssue | undefined }
   | { status: "signed_in"; user: CentralAuthUser }
   | { status: "error"; issue: CentralAuthIssue };
+
+/** The company provider (OpenID Connect) that a server owner connected. */
+export interface CompanySignInConnection {
+  issuer: string;
+  clientId: string;
+  domains: string[];
+  /** True: email codes are refused for the domains, and people sign in with the provider. */
+  enabled: boolean;
+  testedAt: number;
+  /** When the SCIM token was made, or null when the server has none. */
+  scimTokenCreatedAt: number | null;
+}
+
+export interface CompanySignInSettings {
+  /** The address to add to the app at the provider. */
+  redirectUri: string;
+  /** The SCIM base address for user sync. */
+  scimUrl: string;
+  /** The DNS TXT record that proves a domain: `<name>.<domain>` holds `value`. */
+  domainRecord: { name: string; value: string };
+  /** False on a development account service, which does not read DNS. */
+  domainCheck: boolean;
+  connection: CompanySignInConnection | null;
+}
+
+/** The values of the setup dialog. An empty client secret keeps the saved one. */
+export interface TestCompanySignInInput {
+  serverId: string;
+  issuer: string;
+  clientId: string;
+  clientSecret: string;
+  domains: string[];
+}
+
+/** A test that passed saved the values. `email` is the account that signed in at the provider. */
+export interface TestCompanySignInResult {
+  email: string;
+}
+
+export interface SetCompanySignInEnabledInput {
+  serverId: string;
+  enabled: boolean;
+}
+
+/** Shown once. The account service keeps only its hash. */
+export interface CompanySignInScimToken {
+  token: string;
+  createdAt: number;
+}
+
+/** Decodes the settings that the account service answers, and that main sends the renderer. */
+export function decodeCompanySignInSettings(value: unknown): CompanySignInSettings {
+  const settings = decodeRecord(value, "company sign-in settings");
+  const record = decodeRecord(settings.domainRecord, "company sign-in domain record");
+  return {
+    redirectUri: requiredString(settings, "redirectUri"),
+    scimUrl: requiredString(settings, "scimUrl"),
+    domainRecord: { name: requiredString(record, "name"), value: requiredString(record, "value") },
+    domainCheck: requiredBoolean(settings, "domainCheck"),
+    connection: settings.connection === null ? null : decodeCompanySignInConnection(settings.connection),
+  };
+}
+
+function decodeCompanySignInConnection(value: unknown): CompanySignInConnection {
+  const connection = decodeRecord(value, "company sign-in connection");
+  const { domains } = connection;
+  if (!Array.isArray(domains) || !domains.every(isString)) throw new Error("Invalid company sign-in domains.");
+  return {
+    issuer: requiredString(connection, "issuer"),
+    clientId: requiredString(connection, "clientId"),
+    domains,
+    enabled: requiredBoolean(connection, "enabled"),
+    testedAt: requiredNumber(connection, "testedAt"),
+    scimTokenCreatedAt: nullableNumber(connection, "scimTokenCreatedAt"),
+  };
+}
+
+export function decodeCompanySignInScimToken(value: unknown): CompanySignInScimToken {
+  const token = decodeRecord(value, "SCIM token");
+  return { token: requiredString(token, "token"), createdAt: requiredNumber(token, "createdAt") };
+}
+
+export function decodeTestCompanySignInResult(value: unknown): TestCompanySignInResult {
+  return { email: requiredString(decodeRecord(value, "company sign-in test"), "email") };
+}
 
 /** The sign-in code the user typed, with the challenge `requestEmailCode` answered. */
 export interface VerifyEmailCodeInput {

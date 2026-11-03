@@ -27,7 +27,7 @@ import type { ServerAuditLog } from "./ipc-server-audit";
 // change on one side is a type error on the other. The types are phantom members: they exist only
 // for the checker, and the runtime value is still `{ kind, channel }`.
 
-import type { ManagedProviderId } from "./agent-providers";
+import type { AgentProviderRef, ManagedProviderId } from "./agent-providers";
 import type { AppAppearancePreference, SetAppAppearancePreferenceInput } from "./app-appearance";
 import type { AppInterfaceSizePreference, SetAppInterfaceSizePreferenceInput } from "./app-interface-size";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
@@ -153,6 +153,8 @@ import type {
   BackgroundProcess,
   CentralAuthState,
   ChatWindowTarget,
+  CompanySignInScimToken,
+  CompanySignInSettings,
   ComputerUseHighlightPlacement,
   ComputerUsePermissionApp,
   ComputerUseState,
@@ -167,6 +169,9 @@ import type {
   ProviderRuntimeSnapshot,
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
+  SetCompanySignInEnabledInput,
+  TestCompanySignInInput,
+  TestCompanySignInResult,
   UpdatePreference,
   UpdatePreferenceChange,
   UpdateRestartMode,
@@ -246,6 +251,7 @@ import type {
   ChannelReadInput,
   ChannelSummary,
   RecoverChannelTaskInput,
+  SetChannelImageInput,
 } from "./ipc-chat-channels";
 import type {
   CancelMessageLinkInput,
@@ -302,6 +308,7 @@ import type {
   ListEventRoutinesInput,
   SaveEventRoutineInput,
   SaveEventRoutineResult,
+  SetWebhookSecretInput,
   WebhookSecret,
   WebhookTestResult,
 } from "./ipc-events";
@@ -382,6 +389,8 @@ import type {
   AddSlackOrchestratorInput,
   AddSlackOrchestratorResult,
   AddTelegramOrchestratorInput,
+  AddWhatsAppOrchestratorInput,
+  AnswerWhatsAppRequestInput,
   ConnectTelegramChatInput,
   DiscordAccess,
   DiscordRoleList,
@@ -394,14 +403,21 @@ import type {
   HostSetMessagingEnabledInput,
   MessagingOverview,
   MessagingWorkspaceInput,
+  RemoveWhatsAppSenderInput,
   SetDiscordAccessInput,
   SetMessagingEnabledInput,
   SetSlackEnabledInput,
   SetTelegramEnabledInput,
+  SetWhatsAppOwnNumberInput,
   SlackOverview,
   SlackWorkspaceInput,
+  StartWhatsAppLinkInput,
   TelegramChatInput,
   TelegramOverview,
+  WhatsAppGroupList,
+  WhatsAppLinkState,
+  WhatsAppOverview,
+  WhatsAppSenderInput,
 } from "./ipc-messaging";
 import type { MigrationAssessmentAssessInput, MigrationAssessmentState } from "./ipc-migration-assessment";
 import type {
@@ -409,6 +425,7 @@ import type {
   MigrationPreparationPrepareInput,
   MigrationPreparationState,
 } from "./ipc-migration-preparation";
+import type { ProviderModelVisibility, ProviderModelVisibilityChange } from "./ipc-model-visibility";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type { OllamaQuotaSnapshot } from "./ipc-ollama-quota";
 import type {
@@ -1177,6 +1194,24 @@ export const IPC_ENDPOINTS = {
     addTelegramOrchestrator: request<AddTelegramOrchestratorInput, AddMessagingOrchestratorResult>()(
       "messaging:add-telegram-orchestrator",
     ),
+    // The WhatsApp numbers linked as a device of this computer. A link shows a QR code or a pairing
+    // code that the phone uses; the page reads the link state while its dialog is open. No Signal and
+    // no account service: this computer holds the session.
+    getWhatsAppOverview: request<undefined, WhatsAppOverview>()("messaging:get-whatsapp-overview"),
+    startWhatsAppLink: request<StartWhatsAppLinkInput, WhatsAppLinkState>()("messaging:start-whatsapp-link"),
+    getWhatsAppLinkState: request<undefined, WhatsAppLinkState>()("messaging:get-whatsapp-link-state"),
+    cancelWhatsAppLink: request<undefined, void>()("messaging:cancel-whatsapp-link"),
+    disconnectWhatsAppNumber: request<MessagingWorkspaceInput, void>()("messaging:disconnect-whatsapp-number"),
+    reconnectWhatsAppNumber: request<MessagingWorkspaceInput, void>()("messaging:reconnect-whatsapp-number"),
+    setWhatsAppEnabled: request<SetMessagingEnabledInput, void>()("messaging:set-whatsapp-enabled"),
+    addWhatsAppOrchestrator: request<AddWhatsAppOrchestratorInput, AddMessagingOrchestratorResult>()(
+      "messaging:add-whatsapp-orchestrator",
+    ),
+    listWhatsAppGroups: request<MessagingWorkspaceInput, WhatsAppGroupList>()("messaging:list-whatsapp-groups"),
+    addWhatsAppSender: request<WhatsAppSenderInput, void>()("messaging:add-whatsapp-sender"),
+    removeWhatsAppSender: request<RemoveWhatsAppSenderInput, void>()("messaging:remove-whatsapp-sender"),
+    answerWhatsAppRequest: request<AnswerWhatsAppRequestInput, void>()("messaging:answer-whatsapp-request"),
+    setWhatsAppOwnNumber: request<SetWhatsAppOwnNumberInput, void>()("messaging:set-whatsapp-own-number"),
     // The same for a joined server with `connectors-v1`, which an owner or admin manages from here.
     // The host opens no page: main opens it in this computer's browser. A Slack or Discord install
     // returns to this computer's `openbot://` link, and main sends the sealed grant on to the host.
@@ -1231,6 +1266,13 @@ export const IPC_ENDPOINTS = {
     getPromptCacheTtl: scopedQuery<PromptCacheTtlSetting, "required">()("host-admin:get-prompt-cache-ttl"),
     setPromptCacheTtl: scopedRequest<PromptCacheTtl, PromptCacheTtlSetting, "required">()(
       "host-admin:set-prompt-cache-ttl",
+    ),
+    // The models that the model picker of the server shows for one provider. An owner or admin sets them.
+    getModelVisibility: scopedRequest<AgentProviderRef, ProviderModelVisibility, "required">()(
+      "host-admin:get-model-visibility",
+    ),
+    setModelVisibility: scopedRequest<ProviderModelVisibilityChange, ProviderModelVisibility, "required">()(
+      "host-admin:set-model-visibility",
     ),
     // The roles of the server and the level each gives for each agent. A member reads only `mine`.
     getAgentAccess: scopedQuery<AgentAccessSnapshot, "required">()("host-admin:get-agent-access"),
@@ -1413,6 +1455,18 @@ export const IPC_ENDPOINTS = {
     revokeAccountSession: request<string, void>()("auth:revoke-account-session"),
     revokeMobileConnectedDevice: request<string, void>()("auth:revoke-mobile-connected-device"),
     logout: request<undefined, CentralAuthState>()("auth:logout"),
+    // Company sign-in. `openCompanySignIn` opens the provider page again for the email in the state.
+    openCompanySignIn: request<undefined, CentralAuthState>()("auth:open-company-sign-in"),
+    // The setup of a server that the user owns, by server id. `testCompanySignIn` waits for the browser.
+    getCompanySignIn: request<string, CompanySignInSettings>()("auth:company-sign-in:get"),
+    testCompanySignIn: request<TestCompanySignInInput, TestCompanySignInResult>()("auth:company-sign-in:test"),
+    cancelCompanySignInTest: request<undefined, void>()("auth:company-sign-in:cancel-test"),
+    setCompanySignInEnabled: request<SetCompanySignInEnabledInput, CompanySignInSettings>()(
+      "auth:company-sign-in:set-enabled",
+    ),
+    removeCompanySignIn: request<string, CompanySignInSettings>()("auth:company-sign-in:remove"),
+    createCompanySignInScimToken: request<string, CompanySignInScimToken>()("auth:company-sign-in:create-scim-token"),
+    revokeCompanySignInScimToken: request<string, CompanySignInSettings>()("auth:company-sign-in:revoke-scim-token"),
     event: event<CentralAuthState>()("auth:event"),
   },
   update: {
@@ -1468,6 +1522,8 @@ export const IPC_ENDPOINTS = {
     cancelChannelTask: scopedRequest<CancelChannelTaskInput, Channel>()("agent:channels:cancel-task"),
     recoverChannelTask: scopedRequest<RecoverChannelTaskInput, Channel>()("agent:channels:recover-task"),
     deleteChannel: scopedRequest<string, void>()("agent:channels:delete"),
+    // Only this computer keeps a channel image. A joined server has no route for it.
+    setChannelImage: scopedRequest<SetChannelImageInput, Channel>()("agent:channels:set-image"),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
     mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),
     // The user's own pinned chats. A joined server answers through `sidebar-pins-v1`.
@@ -2016,6 +2072,7 @@ export const IPC_ENDPOINTS = {
     deleteRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:delete-routine"),
     testRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:test-routine"),
     rotateSecret: scopedRequest<EventRoutineRef, WebhookSecret, "required">()("events:rotate-secret"),
+    setSecret: scopedRequest<SetWebhookSecretInput, void, "required">()("events:set-secret"),
     sendTestEvent: scopedRequest<EventRoutineRef, WebhookTestResult, "required">()("events:send-test-event"),
     listActivity: scopedRequest<ListEventActivityInput, EventActivity[], "required">()("events:list-activity"),
     listRoutineRuns: scopedRequest<ListEventRoutineRunsInput, EventRoutineRun[], "required">()(

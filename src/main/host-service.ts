@@ -137,7 +137,8 @@ interface HostServiceOptions {
   focusUse?: ForwardedApiOptions["focusUse"];
   appVersion: string;
   store: TeamStore;
-  agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads" | "branchTask" | "markTaskRead">;
+  agents: ForwardedApiOptions["agents"] &
+    Pick<AgentService, "adoptConversationReads" | "branchTask" | "markTaskRead" | "readTask">;
   agentsReady: NonNullable<ForwardedApiOptions["agentsReady"]>;
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
@@ -212,6 +213,8 @@ interface HostServiceOptions {
   pushNotificationStore?: PushNotificationStore;
   /** Whether the owner uses the desktop app on this computer now and sees the event there, so the owner's phone stays quiet. */
   hostComputerInUse?: (event: AgentEvent) => boolean;
+  /** How long after the member's last use of another app or computer a phone notifies. `DESKTOP_USE_MS` when not set. */
+  awayAfterMs?: number;
   verifyRemoteSessionTicket?: (ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>;
   endRemoteSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   remoteControlPlaneUrl?: string;
@@ -408,6 +411,7 @@ export class HostService extends EventEmitter<HostEvents> {
               return member !== null && !member.disabled;
             },
             lastUseElsewhere: (memberId, sessionId) => this.#api.lastMemberUseElsewhere(memberId, sessionId),
+            ...(options.awayAfterMs === undefined ? {} : { awayAfterMs: options.awayAfterMs }),
             // The desktop app of this computer runs as the owner.
             atHostComputer: (memberId, event) =>
               memberId === options.store.getOwnerMemberId() && (options.hostComputerInUse?.(event) ?? false),
@@ -1252,6 +1256,11 @@ export class HostService extends EventEmitter<HostEvents> {
     return remoteDecode(() => this.#currentAgentReaderId()).pipe(
       Effect.flatMap((readerId) => this.#options.agents.readConversationFor(agentId, readerId)),
     );
+  }
+
+  /** The conversation of one side thread of a local agent. */
+  readAgentTask(agentId: string, taskId: string) {
+    return this.#options.agents.readTask(agentId, taskId);
   }
 
   readAgentConversationPage(agentId: string, anchor: ConversationPageAnchor = { type: "latest" }, limit = 50) {

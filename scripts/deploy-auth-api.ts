@@ -38,6 +38,8 @@ async function main(): Promise<void> {
   if (cloudflareEnvironment === "test") await putOptionalSecret("HOSTED_SERVER_TEMPLATE");
   // Without the key, agents act on GitHub as the signed-in user and not as the OpenBot GitHub App.
   await putOptionalSecret("GITHUB_APP_PRIVATE_KEY");
+  // Without it, company sign-in answers 503 company_sign_in_not_configured and email codes stay.
+  await putOptionalSecret("COMPANY_SIGN_IN_SECRET");
   // Without the token, no one can make a server claim.
   await putOptionalSecret("SERVER_CLAIMS_ADMIN_TOKEN");
   // Slack is optional: without these, the Slack routes answer 503 slack_not_configured. The test

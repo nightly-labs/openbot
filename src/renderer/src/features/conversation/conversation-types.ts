@@ -441,8 +441,13 @@ export interface ConversationThreads {
   approval: AgentApproval | undefined;
   /** The thread takes files. Only this computer sends them: `agent-tasks-v1` carries text only. */
   acceptsFiles: boolean;
-  /** `attachmentDraftIds` are the files that the text names. */
-  onSend: (text: string, attachmentDraftIds: string[]) => Promise<boolean>;
+  /** A message of a side thread can reply to another message of it: this computer, or `agent-thread-replies-v1`. */
+  acceptsReplies: boolean;
+  /**
+   * `attachmentDraftIds` are the files that the text names. `replyToMessageId` is the message of the open
+   * thread that the message replies to; a new thread has no message to reply to.
+   */
+  onSend: (text: string, attachmentDraftIds: string[], replyToMessageId?: string | null) => Promise<boolean>;
   onStop: () => void;
   /** The person sees the open side thread through this message. */
   onRead: (messageId: string) => void;
@@ -461,6 +466,17 @@ export interface ConversationThreads {
   onBranch?: ((sourceTaskId: string | null, messageId: string) => Promise<boolean>) | undefined;
   /** Where a side thread came from, when it is a branch. Undefined for a thread that is no branch. */
   branchSource: (task: AgentTask) => ConversationBranchSource | undefined;
+  /**
+   * The action that opens the side thread where a routine runs, by routine id. Undefined when the
+   * list has no open thread of the routine: a host that does not send the routine of a thread, or a
+   * routine that did not run since it got its thread.
+   */
+  routineThread: (routineId: string) => (() => void) | undefined;
+  /**
+   * Opens the side thread where a routine runs, for example after a test run. It reads the list again
+   * when the thread is not in it. Resolves false when the routine has no open thread.
+   */
+  onOpenRoutineThread: (routineId: string) => Promise<boolean>;
   /** The message that a side thread scrolls to once, after a click on "Branched from". */
   focusMessage: { taskId: string; messageId: string; nonce: number } | null;
 }
@@ -494,7 +510,7 @@ export interface SideThread {
   task: AgentTask;
   conversation: ConversationSnapshot | undefined;
   approval: AgentApproval | undefined;
-  onSend: (text: string, attachmentDraftIds: string[]) => Promise<boolean>;
+  onSend: (text: string, attachmentDraftIds: string[], replyToMessageId?: string | null) => Promise<boolean>;
   onStop: () => void;
   onRead: (messageId: string) => void;
   onRespondApproval: (decision: "accept" | "decline", options?: PromptAnswerOptions) => Promise<boolean>;

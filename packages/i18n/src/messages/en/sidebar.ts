@@ -3,6 +3,7 @@ import { defineMessages } from "../../message";
 export const messages = defineMessages("sidebar", {
   "sidebar.frame.label": "Agent navigation",
   "sidebar.nav.label": "Chat list",
+  "sidebar.nav.freeArea": "Sidebar free area",
   "sidebar.nav.actions": "Sidebar actions",
   "sidebar.deletedChannels.title": "Deleted channels",
   "sidebar.deletedChannels.empty": "No deleted channels.",

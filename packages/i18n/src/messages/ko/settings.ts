@@ -531,6 +531,7 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "답변 소리 내어 읽기",
   "settings.voice.speech.readReplies.description":
     "음성으로 메시지를 입력하면 답변을 소리 내어 읽어줘요. 다시 음성 입력을 하면 멈춰요.",
+  "settings.voice.speech.speed.title": "속도",
   "settings.voice.speech.voice.title": "음성",
   "settings.voice.speech.voice.female": "여성 음성 {number}",
   "settings.voice.speech.voice.male": "남성 음성 {number}",

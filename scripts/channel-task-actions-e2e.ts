@@ -40,6 +40,7 @@ import { type ChannelHooks, ChannelService } from "../src/backend/channel-servic
 import type { ChannelAssignment } from "../src/backend/channel-store";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
+import { ChannelImages } from "../src/backend/channel-images";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { HttpError } from "../src/main/team-api/http-error";
 import { type ChannelSettingsAgents, routeChannels } from "../src/main/team-api/route-channels";
@@ -72,6 +73,7 @@ let generations = 0;
 let scheduler: ChannelRoutineScheduler | null = null;
 let failInterrupt = false;
 let denyRecovery = false;
+const images = new ChannelImages(join(root, "avatars", "channels"));
 const hooks: ChannelHooks = {
   agents: () => [agent],
   generate: () => {
@@ -89,7 +91,7 @@ const hooks: ChannelHooks = {
   changed: (channelId) => scheduler?.reconcile(channelId),
   error: (error) => errors.push(error),
 };
-let channels = new ChannelService(database, mailbox, hooks);
+let channels = new ChannelService(database, mailbox, images, hooks);
 const report: { passed: boolean; cases: string[]; interruptions: string[]; providerGenerations: number } = {
   passed: false,
   cases: [],
@@ -621,7 +623,7 @@ try {
   await runCauseEffect(channels.stop());
   database.close();
   await Effect.runPromise(database.initialize());
-  channels = new ChannelService(database, mailbox, hooks);
+  channels = new ChannelService(database, mailbox, images, hooks);
   await runCauseEffect(channels.cancelTask(cancel, actor));
   assert.deepEqual(channels.store.page(first.channelId), after);
   await runCauseEffect(channels.recover());

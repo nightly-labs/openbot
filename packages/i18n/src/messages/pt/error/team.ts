@@ -59,6 +59,7 @@ export const messages = {
   "error.team.providersUnsupported": "Esta conexão não oferece suporte às configurações de provedores.",
   "error.team.providerNotManaged": "O OpenBot não gerencia a CLI deste provedor.",
   "error.team.channelsUnsupported": "Esta conexão não oferece suporte a chats em canais.",
+  "error.team.channelPictureUnsupported": "Esta conexão não oferece suporte a imagens de canal.",
   "error.team.channelDeleteUnsupported": "Esta conexão não oferece suporte à exclusão de canais.",
   "error.team.channelTaskCancelUnsupported": "Esta conexão não oferece suporte ao cancelamento de tarefas de canais.",
   "error.team.membersCannotDeleteChannels": "Membros não podem excluir canais.",
@@ -67,6 +68,7 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Esta conexão não oferece suporte a dados compartilhados.",
   "error.team.agentInstallUnsupported": "Esta conexão não oferece suporte à adição de agentes.",
   "error.team.agentHideUnsupported": "Esta conexão não oferece suporte à ocultação de agentes.",
+  "error.team.agentColorsUnsupported": "Esta conexão não oferece suporte a cores de agentes.",
   "error.team.sidebarFoldersUnsupported": "Esta conexão não oferece suporte a pastas dentro de pastas.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor não pode guardar seu próprio nível de notificações para cada agente. Atualize o OpenBot no computador que o executa.",
@@ -105,6 +107,7 @@ export const messages = {
   "error.team.folderUnavailable": "Esta pasta não está disponível no computador host.",
   "error.team.memoryReviewUnsupported": "Esta conexão não oferece suporte à revisão de memórias.",
   "error.team.promptCacheTtlUnsupported": "Esta conexão não oferece suporte à duração do cache de prompts.",
+  "error.team.modelVisibilityUnsupported": "Esta conexão não oferece suporte à lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexão não oferece suporte ao provedor padrão.",
   "error.team.attachmentNameRequired": "É necessário informar um nome seguro para o anexo.",
   "error.team.attachmentNotFound": "Anexo não encontrado.",

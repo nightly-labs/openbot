@@ -332,11 +332,17 @@ export const ELEVENLABS_SPEECH_LIMITS = {
   voices: 500,
 } as const;
 
+/** The speeds of a reply that is read aloud, slowest first. 1 is normal speed. */
+export const SPEECH_SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
+export type SpeechSpeed = (typeof SPEECH_SPEEDS)[number];
+
 export interface SpeechSettings {
   /** Read the reply to a dictated message aloud. */
   readReplies: boolean;
   /** The Supertonic 3 voice. Kept when ElevenLabs is the engine, so a switch back keeps it. */
   voice: SpeechVoice;
+  /** The speed of each reply that is read aloud. The pitch stays the same. */
+  speed: SpeechSpeed;
   /**
    * Which engine reads replies. A saved file from before this field reads as Supertonic, which is
    * what that version did.
@@ -349,6 +355,7 @@ export interface SpeechSettings {
 export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = {
   readReplies: false,
   voice: "F1",
+  speed: 1,
   engine: "supertonic",
   elevenLabsVoice: null,
 };
@@ -400,6 +407,10 @@ export function isElevenLabsSpeechVoice(value: unknown): value is ElevenLabsSpee
 export function elevenLabsVoiceParts(name: string): { title: string; description: string | null } {
   const at = name.indexOf(" - ");
   return at > 0 ? { title: name.slice(0, at), description: name.slice(at + 3) } : { title: name, description: null };
+}
+
+export function isSpeechSpeed(value: unknown): value is SpeechSpeed {
+  return isOneOf(SPEECH_SPEEDS, value);
 }
 
 export function isSpeechLanguage(value: unknown): value is SpeechLanguage {

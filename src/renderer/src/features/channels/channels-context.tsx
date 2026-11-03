@@ -1,4 +1,8 @@
-import { CHANNEL_CHATS_CAPABILITY, CHANNEL_TASK_ACTIONS_CAPABILITY } from "@openbot/contracts/ipc";
+import {
+  CHANNEL_CHATS_CAPABILITY,
+  CHANNEL_TASK_ACTIONS_CAPABILITY,
+  CHANNEL_TASK_CANCEL_CAPABILITY,
+} from "@openbot/contracts/ipc";
 import { createContext, type ParentProps, untrack, useContext } from "solid-js";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
@@ -56,6 +60,9 @@ export function ChannelsProvider(props: ParentProps) {
     deletionSupported: () => activeServer()?.kind !== "remote" || serverRoleCanAdminister(activeServer()),
     taskActionsSupported: () =>
       activeServer()?.kind !== "remote" || activeServerSupportsCapability(CHANNEL_TASK_ACTIONS_CAPABILITY),
+    taskCancelSupported: () => activeServerSupportsCapability(CHANNEL_TASK_CANCEL_CAPABILITY),
+    // The picture is a file on this computer. Until the server is known, the editor stays hidden.
+    pictureSupported: () => activeServer()?.kind === "local",
     beforeOpen: () => {
       setAgentSetupOpen(false);
       // The channel covers the workspace, and a direct conversation left selected under it is read

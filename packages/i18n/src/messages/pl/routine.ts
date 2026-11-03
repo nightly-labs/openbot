@@ -352,6 +352,13 @@ export const messages = {
     "Obecny sekret natychmiast przestanie działać. Żądania podpisane nim będą odrzucane, dopóki nadawca nie użyje nowego sekretu.",
   "routine.webhook.regenerateConfirm": "Wygeneruj nowy",
   "routine.webhook.regenerateFailed": "Nie udało się wygenerować nowego sekretu podpisu.",
+  "routine.webhook.useSenderSecret": "Użyj sekretu nadawcy",
+  "routine.webhook.senderSecretTitle": "Użyć sekretu podpisu nadawcy?",
+  "routine.webhook.senderSecretDescription":
+    "Niektórzy nadawcy, np. Composio i Svix, tworzą własny sekret podpisu. Wklej go tutaj. Obecny sekret od razu przestaje działać.",
+  "routine.webhook.senderSecretLabel": "Sekret nadawcy",
+  "routine.webhook.senderSecretConfirm": "Użyj",
+  "routine.webhook.senderSecretFailed": "Nie udało się zapisać sekretu nadawcy.",
   "routine.webhook.statusFailed": "Nie udało się sprawdzić, czy host jest połączony z przekaźnikiem.",
 
   "routine.settings.instruction": "Instrukcja",

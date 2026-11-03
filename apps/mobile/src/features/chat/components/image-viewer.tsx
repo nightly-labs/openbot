@@ -178,7 +178,8 @@ export function ImageViewer({
   /** The actions of the page on screen. */
   busy: boolean;
   onShare: () => void;
-  onSave: () => Promise<boolean>;
+  /** Absent for a picture that the photo library does not take, such as an SVG. */
+  onSave?: (() => Promise<boolean>) | undefined;
   onIndexChange?: (index: number) => void;
   /** Called once the picture is back in its place. */
   onDismissed: () => void;
@@ -748,29 +749,31 @@ export function ImageViewer({
               >
                 <Share size={20} color={String(foreground)} />
               </ChatGlassIconButton>
-              <ChatGlassIconButton
-                accessibilityLabel={
-                  saved ? text.t("mobile.chat.imageViewer.saved") : text.t("mobile.chat.imageViewer.save", { name })
-                }
-                hidden={!chromeVisible}
-                disabled={busy || saved}
-                fallbackBackground={fallbackBackground}
-                liquidGlassAvailable={liquidGlassAvailable}
-                onPress={() => {
-                  const key = current?.key;
-                  void onSave().then((done) => {
-                    if (!done || key === undefined) return;
-                    void haptics.notification("success");
-                    setSavedKeys((keys) => new Set(keys).add(key));
-                  });
-                }}
-              >
-                {saved ? (
-                  <Check size={21} color={String(foreground)} />
-                ) : (
-                  <Download size={20} color={String(foreground)} />
-                )}
-              </ChatGlassIconButton>
+              {onSave ? (
+                <ChatGlassIconButton
+                  accessibilityLabel={
+                    saved ? text.t("mobile.chat.imageViewer.saved") : text.t("mobile.chat.imageViewer.save", { name })
+                  }
+                  hidden={!chromeVisible}
+                  disabled={busy || saved}
+                  fallbackBackground={fallbackBackground}
+                  liquidGlassAvailable={liquidGlassAvailable}
+                  onPress={() => {
+                    const key = current?.key;
+                    void onSave().then((done) => {
+                      if (!done || key === undefined) return;
+                      void haptics.notification("success");
+                      setSavedKeys((keys) => new Set(keys).add(key));
+                    });
+                  }}
+                >
+                  {saved ? (
+                    <Check size={21} color={String(foreground)} />
+                  ) : (
+                    <Download size={20} color={String(foreground)} />
+                  )}
+                </ChatGlassIconButton>
+              ) : null}
             </View>
           </View>
         </View>

@@ -58,6 +58,7 @@ export const messages = {
   "error.team.providersUnsupported": "Esta conexión no admite los ajustes de proveedores.",
   "error.team.providerNotManaged": "OpenBot no gestiona la CLI de este proveedor.",
   "error.team.channelsUnsupported": "Esta conexión no admite chats de canal.",
+  "error.team.channelPictureUnsupported": "Esta conexión no admite imágenes de canal.",
   "error.team.channelDeleteUnsupported": "Esta conexión no admite la eliminación de canales.",
   "error.team.channelTaskCancelUnsupported": "Esta conexión no admite la cancelación de tareas de canales.",
   "error.team.membersCannotDeleteChannels": "Los miembros no pueden eliminar canales.",
@@ -66,6 +67,7 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Esta conexión no admite datos compartidos.",
   "error.team.agentInstallUnsupported": "Esta conexión no permite añadir agentes.",
   "error.team.agentHideUnsupported": "Esta conexión no permite ocultar agentes.",
+  "error.team.agentColorsUnsupported": "Esta conexión no admite colores de agentes.",
   "error.team.sidebarFoldersUnsupported": "Esta conexión no permite carpetas dentro de carpetas.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor no puede guardar tu propio nivel de notificaciones para cada agente. Actualiza OpenBot en el ordenador que lo ejecuta.",
@@ -103,6 +105,7 @@ export const messages = {
   "error.team.folderUnavailable": "Esta carpeta no está disponible en el ordenador anfitrión.",
   "error.team.memoryReviewUnsupported": "Esta conexión no admite la revisión de recuerdos.",
   "error.team.promptCacheTtlUnsupported": "Esta conexión no admite la duración de la caché de prompts.",
+  "error.team.modelVisibilityUnsupported": "Esta conexión no admite la lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexión no admite el proveedor predeterminado.",
   "error.team.attachmentNameRequired": "Se requiere un nombre seguro para el archivo adjunto.",
   "error.team.attachmentNotFound": "No se encontró el archivo adjunto.",

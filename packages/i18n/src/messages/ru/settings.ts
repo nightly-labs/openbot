@@ -557,6 +557,7 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Читать ответы вслух",
   "settings.voice.speech.readReplies.description":
     "Когда вы диктуете сообщение, ответ читается вслух. Чтобы остановить его, начните диктовать снова.",
+  "settings.voice.speech.speed.title": "Скорость",
   "settings.voice.speech.voice.title": "Голос",
   "settings.voice.speech.voice.female": "Женский голос {number}",
   "settings.voice.speech.voice.male": "Мужской голос {number}",

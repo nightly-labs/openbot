@@ -139,7 +139,7 @@ async function main(): Promise<void> {
     const downloadMs = Date.now() - downloadStartedAt;
     for (const sample of SAMPLES) {
       await Effect.runPromise(
-        speech.setSettings({ ...DEFAULT_SPEECH_SETTINGS, readReplies: true, voice: sample.voice }),
+        speech.setSettings({ ...DEFAULT_SPEECH_SETTINGS, readReplies: true, voice: sample.voice, speed: 1 }),
       );
       const startedAt = Date.now();
       const audio = await Effect.runPromise(speech.speak({ text: sample.text, language: sample.language }));

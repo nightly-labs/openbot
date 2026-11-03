@@ -56,6 +56,7 @@ export const messages = {
   "error.team.providersUnsupported": "이 연결에서는 제공자 설정을 지원하지 않아요.",
   "error.team.providerNotManaged": "OpenBot은 이 제공자의 CLI를 관리하지 않아요.",
   "error.team.channelsUnsupported": "이 연결에서는 채널 채팅을 지원하지 않아요.",
+  "error.team.channelPictureUnsupported": "이 연결에서는 채널 사진을 지원하지 않아요.",
   "error.team.channelDeleteUnsupported": "이 연결에서는 채널 삭제를 지원하지 않아요.",
   "error.team.channelTaskCancelUnsupported": "이 연결에서는 채널 작업 취소를 지원하지 않아요.",
   "error.team.membersCannotDeleteChannels": "멤버는 채널을 삭제할 수 없어요.",
@@ -64,6 +65,7 @@ export const messages = {
   "error.team.sharedDataUnsupported": "이 연결에서는 공유 데이터를 지원하지 않아요.",
   "error.team.agentInstallUnsupported": "이 연결에서는 에이전트 추가를 지원하지 않아요.",
   "error.team.agentHideUnsupported": "이 연결에서는 에이전트 숨기기를 지원하지 않아요.",
+  "error.team.agentColorsUnsupported": "이 연결에서는 에이전트 색상을 지원하지 않아요.",
   "error.team.sidebarFoldersUnsupported": "이 연결에서는 폴더 안의 폴더를 지원하지 않아요.",
   "error.team.agentNotificationLevelsUnsupported":
     "이 서버는 에이전트별 알림 수준을 저장할 수 없어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
@@ -100,6 +102,7 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "이 연결에서는 에이전트 폴더를 지원하지 않아요.",
   "error.team.folderUnavailable": "이 폴더는 호스트 컴퓨터에서 사용할 수 없어요.",
   "error.team.memoryReviewUnsupported": "이 연결에서는 메모리 검토를 지원하지 않아요.",
+  "error.team.modelVisibilityUnsupported": "이 연결에서는 모델 목록을 지원하지 않아요.",
   "error.team.providerDefaultUnsupported": "이 연결에서는 기본 제공자를 지원하지 않아요.",
   "error.team.agentAccessUnsupported": "이 연결에서는 역할을 지원하지 않아요.",
   "error.team.agentAccessStale": "다른 사람이 역할을 변경했어요. 역할을 다시 열어서 변경해 주세요.",

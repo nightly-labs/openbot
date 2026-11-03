@@ -4,7 +4,10 @@ import { supportLog, supportLogValue } from "@/features/support/model/support-lo
 import { savedAgentAvatar } from "./agent-avatar-cache";
 import type { MobileAgent } from "./workspace-types";
 
-export type AvatarFileAgent = Pick<MobileAgent, "serverId" | "id" | "avatarUrl" | "avatarSeed" | "avatarHue">;
+export type AvatarFileAgent = Pick<
+  MobileAgent,
+  "serverId" | "id" | "avatarUrl" | "avatarSeed" | "avatarHue" | "avatarColor"
+>;
 
 interface AvatarFile {
   name: string;
@@ -32,11 +35,13 @@ export function agentAvatarFile(agent: AvatarFileAgent, pixels: number): AvatarF
     };
   }
   return {
-    name: `${nameHash(`${PLUSH_STYLE}|${agent.avatarSeed}|${agent.avatarHue}`)}.png`,
+    // An agent without a colour keeps the name of an older build.
+    name: `${nameHash(`${PLUSH_STYLE}|${agent.avatarSeed}|${agent.avatarHue}${agent.avatarColor ? `|${agent.avatarColor}` : ""}`)}.png`,
     write: async (file, wanted) => {
       const data = await renderPlushPicture({
         seed: agent.avatarSeed,
         hue: agent.avatarHue,
+        color: agent.avatarColor,
         mood: "idle",
         pixels,
         saturation: 1,

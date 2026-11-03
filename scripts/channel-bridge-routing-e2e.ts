@@ -18,6 +18,7 @@ import {
   CHANNEL_ROUTING_BRIDGE_RULE,
   routingQuestionSuperseded,
 } from "../src/backend/channel-routing";
+import { ChannelImages } from "../src/backend/channel-images";
 import { ChannelService } from "../src/backend/channel-service";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
@@ -53,12 +54,13 @@ const agent = (id: string, name: string): AgentSummary => ({
 });
 const lead = agent("lead", "Codex Engineering");
 const worker = agent("worker", "Research");
+const images = new ChannelImages(join(root, "avatars", "channels"));
 const prompts: string[] = [];
 
-const channels = new ChannelService(database, mailbox, {
+const channels = new ChannelService(database, mailbox, images, {
   agents: () => [lead, worker],
   // One answer per send, in order: the bridge question, the plain question, then a member choice.
-  generate: (_agent, prompt) => {
+  generate: (_agent, prompt, _fallbacks, _background) => {
     prompts.push(prompt);
     const answer =
       prompts.length === 1

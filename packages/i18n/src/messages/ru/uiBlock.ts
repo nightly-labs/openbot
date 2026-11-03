@@ -34,6 +34,7 @@ export const messages = {
   "uiBlock.form.choose": "Выберите вариант",
   "uiBlock.form.notSet": "Не указано",
   "uiBlock.form.invalid": "Некоторые ответы указаны неверно. Проверьте их и попробуйте снова.",
+  "uiBlock.form.hiddenValue": "Скрыто",
   "uiBlock.skip": "Пропустить",
   "uiBlock.error.answerFailed": "Не удалось отправить ответ. Попробуйте ещё раз.",
 } as const satisfies PartialTranslation<typeof source>;

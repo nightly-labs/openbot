@@ -55,7 +55,10 @@ export function providerAuthKind(agent: AgentSummary, facts: ProviderAuthFacts):
     case "cursor":
       if (facts.envKey("CURSOR_API_KEY")) return "api_key";
       return facts.account("cursor") ? "subscription" : "unknown";
+      // Devin signs in only with a Devin account, and takes no API key.
+    case "devin":
     case "grok-bot":
+      return facts.account("devin") ? "subscription" : "unknown";
       return facts.account("grok-bot") ? "subscription" : "unknown";
     case "cline":
       return model.startsWith("cline-free/") ? "free" : "unknown";

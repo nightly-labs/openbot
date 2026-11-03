@@ -57,6 +57,7 @@ export const messages = {
   "error.team.providersUnsupported": "Sağlayıcı ayarları bu bağlantı tarafından desteklenmiyor.",
   "error.team.providerNotManaged": "OpenBot bu sağlayıcının CLI aracını yönetmiyor.",
   "error.team.channelsUnsupported": "Kanal sohbetleri bu bağlantı tarafından desteklenmiyor.",
+  "error.team.channelPictureUnsupported": "Kanal resimleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.channelDeleteUnsupported": "Kanal silme bu bağlantı tarafından desteklenmiyor.",
   "error.team.channelTaskCancelUnsupported": "Kanal görevlerini iptal etme bu bağlantı tarafından desteklenmiyor.",
   "error.team.membersCannotDeleteChannels": "Üyeler kanalları silemez.",
@@ -65,6 +66,7 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Paylaşılan veriler bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentInstallUnsupported": "Ajan ekleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentHideUnsupported": "Ajan gizleme bu bağlantı tarafından desteklenmiyor.",
+  "error.team.agentColorsUnsupported": "Ajan renkleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentNotificationLevelsUnsupported":
     "Bu sunucu her ajan için kendi bildirim düzeyinizi saklayamıyor. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
@@ -102,6 +104,7 @@ export const messages = {
   "error.team.folderUnavailable": "Bu klasör ana bilgisayarda kullanılamıyor.",
   "error.team.memoryReviewUnsupported": "Bu bağlantı bellek incelemesini desteklemiyor.",
   "error.team.promptCacheTtlUnsupported": "Bu bağlantı istem önbelleği süresini desteklemiyor.",
+  "error.team.modelVisibilityUnsupported": "Bu bağlantı model listesini desteklemiyor.",
   "error.team.providerDefaultUnsupported": "Bu bağlantı varsayılan sağlayıcıyı desteklemiyor.",
   "error.team.attachmentNameRequired": "Güvenli bir ek adı gereklidir.",
   "error.team.attachmentNotFound": "Ek bulunamadı.",

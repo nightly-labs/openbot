@@ -87,6 +87,7 @@ import {
   isRemoteDesktopTestStatus,
   isRemoteNetworkRoute,
   isSpeechEngine,
+  isSpeechSpeed,
   isSpeechVoice,
   isVoiceLanguage,
   isVoiceModelId,
@@ -270,6 +271,14 @@ export function decodeCentralAuthState(value: unknown): CentralAuthState {
         expiresAt: requiredNumber(state, "expiresAt"),
         resendAvailableAt: requiredNumber(state, "resendAvailableAt"),
         ...(developmentCode === undefined ? {} : { developmentCode }),
+        ...(issue === undefined ? {} : { issue: decodeCentralAuthIssue(issue) }),
+      };
+    }
+    case "company_sign_in": {
+      const { issue } = state;
+      return {
+        status: "company_sign_in",
+        email: requiredString(state, "email"),
         ...(issue === undefined ? {} : { issue: decodeCentralAuthIssue(issue) }),
       };
     }
@@ -512,13 +521,15 @@ export function decodeSpeechModelStatus(value: unknown): SpeechModelStatus {
 
 export function decodeSpeechSettings(value: unknown): SpeechSettings {
   const settings = decodeRecord(value, "speech settings");
-  const { voice, engine, elevenLabsVoice } = settings;
-  if (!isSpeechVoice(voice) || !isSpeechEngine(engine)) throw new Error("Invalid speech settings.");
+  const { voice, speed, engine, elevenLabsVoice } = settings;
+  if (!isSpeechVoice(voice) || !isSpeechSpeed(speed) || !isSpeechEngine(engine))
+    throw new Error("Invalid speech settings.");
   if (elevenLabsVoice !== null && !isElevenLabsSpeechVoice(elevenLabsVoice))
     throw new Error("Invalid speech settings.");
   return {
     readReplies: requiredBoolean(settings, "readReplies"),
     voice,
+    speed,
     engine,
     elevenLabsVoice: elevenLabsVoice === null ? null : { id: elevenLabsVoice.id, name: elevenLabsVoice.name },
   };

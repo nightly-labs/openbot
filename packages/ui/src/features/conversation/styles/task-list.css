@@ -34,7 +34,7 @@
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-regular);
   padding: var(--openbot-space-3);
-  text-align: left;
+  text-align: start;
 }
 
 .task-list .task-list-header:focus-visible {
@@ -132,6 +132,11 @@
   transition: transform var(--openbot-duration-normal) var(--task-list-ease);
 }
 
+/* The closed chevron points to the end side: right in LTR, left in RTL. */
+:dir(rtl) .task-list-chevron {
+  transform: rotate(90deg);
+}
+
 .task-list[data-open] .task-list-chevron {
   transform: rotate(0deg);
 }
@@ -179,6 +184,10 @@
     opacity var(--task-list-close) var(--task-list-close-ease),
     filter var(--task-list-close) var(--task-list-close-ease),
     transform var(--task-list-close) var(--task-list-close-ease);
+}
+
+:dir(rtl) .task-list-item {
+  transform-origin: right top;
 }
 
 .task-list[data-open] .task-list-item {
@@ -234,6 +243,11 @@
   transform: scaleX(0);
   transform-origin: left center;
   transition: transform var(--openbot-duration-slow) var(--task-list-ease);
+}
+
+/* The strike-through grows from the start of the text. */
+:dir(rtl) .task-list-item-text::after {
+  transform-origin: right center;
 }
 
 .task-list-item[data-state="done"] .task-list-item-text::after {

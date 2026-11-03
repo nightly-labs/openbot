@@ -78,7 +78,7 @@ function readFixture(): void {
     assert.equal(queries.readConversationRuntime(agentId, threadId).latestMessage?.id, messageIds[3]);
     assert.deepEqual(
       queries
-        .readTurnAssistantMessages(agentId, threadId, stringField(ids, "firstTurnId"))
+        .readTurnAssistantMessages(agentId, stringField(ids, "firstTurnId"))
         .map((message) => message.id),
       [messageIds[1]],
     );

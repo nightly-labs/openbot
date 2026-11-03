@@ -55,7 +55,8 @@ function pickerRoom(header: Element | null): number {
   let room = 0;
   for (const part of trigger.querySelectorAll(".provider-model-trigger-name, .provider-model-trigger-effort")) {
     if (part.getClientRects().length === 0) continue;
-    room += part.getBoundingClientRect().width + gap + (Number.parseFloat(getComputedStyle(part).marginLeft) || 0);
+    room +=
+      part.getBoundingClientRect().width + gap + (Number.parseFloat(getComputedStyle(part).marginInlineStart) || 0);
   }
   return Math.max(0, room);
 }
@@ -107,7 +108,11 @@ function ThreadRow(props: ThreadHeaderProps) {
       const buttons = row.querySelectorAll(".agent-threads-icon-button");
       const button = buttons[0]?.getBoundingClientRect().width ?? 0;
       const box = group.getBoundingClientRect();
-      if (measured() !== "minimal") start = row.getBoundingClientRect().left - box.left;
+      // Distances count from the inline start of the group: its right edge in a right-to-left page.
+      const rightToLeft = getComputedStyle(group).direction === "rtl";
+      const fromStart = (rect: DOMRect) => (rightToLeft ? box.right - rect.right : rect.left - box.left);
+      const toEnd = (rect: DOMRect) => (rightToLeft ? box.right - rect.left : rect.right - box.left);
+      if (measured() !== "minimal") start = fromStart(row.getBoundingClientRect());
       const header = row.closest(".conversation-header");
       const chevron = header?.querySelector(".provider-model-trigger > .provider-model-chevron");
       if (chevron && chevron.getClientRects().length > 0) {
@@ -128,8 +133,8 @@ function ThreadRow(props: ThreadHeaderProps) {
       // agent name ends after the avatar and the padding before it.
       const title = group.firstElementChild;
       const avatar = title?.querySelector(".agent-avatar")?.getBoundingClientRect();
-      const padding = title ? Number.parseFloat(getComputedStyle(title).paddingLeft) || 0 : 0;
-      const avatarEnd = avatar ? avatar.right - box.left + padding + 1 : start;
+      const padding = title ? Number.parseFloat(getComputedStyle(title).paddingInlineStart) || 0 : 0;
+      const avatarEnd = avatar ? toEnd(avatar) + padding + 1 : start;
       setFold(rowFold(width, chevronRoom, start, avatarEnd, button));
     };
     const observer = new ResizeObserver(measure);

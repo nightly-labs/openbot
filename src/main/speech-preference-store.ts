@@ -2,6 +2,7 @@ import {
   DEFAULT_SPEECH_SETTINGS,
   isElevenLabsSpeechVoice,
   isSpeechEngine,
+  isSpeechSpeed,
   isSpeechVoice,
   type SpeechSettings,
 } from "@openbot/contracts/ipc";
@@ -18,6 +19,8 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
  * A file that is missing, unreadable as JSON or names an unknown Supertonic voice reads as the default:
  * replies are not read aloud. A file from before the engine field reads as Supertonic 3 and keeps its
  * voice. The ElevenLabs voice is kept beside it, so a switch back does not ask the user to choose again.
+ * A file with no known speed, such as one from an earlier version, reads at normal speed. The speed is
+ * an extra field of version 1, so an earlier version still reads the file.
  */
 export class SpeechPreferenceStore {
   readonly #path: string;
@@ -45,6 +48,7 @@ export class SpeechPreferenceStore {
     return {
       readReplies: settings.readReplies,
       voice: settings.voice,
+      speed: settings.speed,
       engine: settings.engine,
       elevenLabsVoice: settings.elevenLabsVoice
         ? { id: settings.elevenLabsVoice.id, name: settings.elevenLabsVoice.name }
@@ -69,12 +73,13 @@ export class SpeechPreferenceStore {
   });
 }
 
-/** Version 1, plus the engine fields. An older reader keeps `readReplies` and `voice` and drops the rest. */
+/** Version 1, plus the engine and speed fields. An older reader keeps `readReplies` and `voice`. */
 function speechPreferenceRecord(settings: SpeechSettings) {
   return {
     version: 1 as const,
     readReplies: settings.readReplies,
     voice: settings.voice,
+    speed: settings.speed,
     engine: settings.engine,
     elevenLabsVoice: settings.elevenLabsVoice
       ? { id: settings.elevenLabsVoice.id, name: settings.elevenLabsVoice.name }
@@ -86,6 +91,7 @@ function speechSettingsFromRecord(record: ReturnType<typeof speechPreferenceReco
   return {
     readReplies: record.readReplies,
     voice: record.voice,
+    speed: record.speed,
     engine: record.engine,
     elevenLabsVoice: record.elevenLabsVoice,
   };
@@ -103,6 +109,7 @@ function decodeSpeechPreference(parsed: unknown): SpeechSettings | null {
   return {
     readReplies: parsed.readReplies,
     voice: parsed.voice,
+    speed: isSpeechSpeed(parsed.speed) ? parsed.speed : DEFAULT_SPEECH_SETTINGS.speed,
     engine: isSpeechEngine(parsed.engine) ? parsed.engine : "supertonic",
     elevenLabsVoice: isElevenLabsSpeechVoice(parsed.elevenLabsVoice)
       ? { id: parsed.elevenLabsVoice.id, name: parsed.elevenLabsVoice.name }

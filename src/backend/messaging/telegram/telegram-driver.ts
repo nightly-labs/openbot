@@ -143,6 +143,20 @@ class TelegramAdapter implements MessagingAdapter {
     });
   });
 
+  /** A workflow's reaction. A bot has one reaction on a message, so it replaces a status reaction. */
+  readonly addEmoji = Effect.fnUntraced(function* (
+    this: TelegramAdapter,
+    target: MessageTarget,
+    messageId: string,
+    emoji: string,
+  ) {
+    yield* this.#call("setMessageReaction", {
+      chat_id: this.#chatNumber(target),
+      message_id: Number(messageId),
+      reaction: [{ type: "emoji", emoji }],
+    });
+  });
+
   readonly postAnswer = Effect.fnUntraced(function* (
     this: TelegramAdapter,
     target: MessageTarget,

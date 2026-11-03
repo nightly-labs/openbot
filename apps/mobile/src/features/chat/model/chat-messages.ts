@@ -292,7 +292,7 @@ let lastOrder: { key: string; ids: string[] } | null = null;
  * The sort reads only these fields. A streamed chunk changes only text and status, so the order of
  * the previous frame applies and the transcript is not sorted again.
  */
-function sortedConversationMessages(messages: readonly ConversationMessage[]) {
+export function sortedConversationMessages(messages: readonly ConversationMessage[]) {
   const key = messages
     .map(
       (message) =>

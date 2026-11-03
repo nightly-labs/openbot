@@ -45,6 +45,8 @@ export const messages = {
     "{name} foi instalada antes do controle exato de versões. Atualize ou repare a habilidade antes de publicar.",
   "error.skill.tooManySkills": "Um agente pode ter até {limit} habilidades.",
   "error.skill.unmanagedExists": "Uma habilidade não gerenciada já existe em {path}.",
+  "error.skill.managedSlug":
+    "O OpenBot dá a cada agente sua própria habilidade {slug}. Dê outro nome a esta habilidade.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md tem mais de 64 KB. Encurte o texto antes de publicar.",
   "error.skill.localNoRevisions": "A habilidade local não tem revisões publicadas.",
   "error.skill.localNameTaken": "Já existe uma habilidade local com este nome. Revise a habilidade existente.",

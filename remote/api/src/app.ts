@@ -33,6 +33,9 @@ import {
   type TelegramUploadAnswer,
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import {
+  STANDARD_WEBHOOK_HEADER_SETS,
+  STANDARD_WEBHOOK_SIGNATURE_PATTERN,
+  STANDARD_WEBHOOKS_FORMAT,
   WEBHOOK_DELIVERY_ID_HEADER,
   WEBHOOK_DELIVERY_ID_PATTERN,
   WEBHOOK_EVENTS_PATH,
@@ -41,6 +44,7 @@ import {
   WEBHOOK_SIGNATURE_PATTERN,
   WEBHOOK_TIMESTAMP_HEADER,
   WEBHOOK_TIMESTAMP_PATTERN,
+  type WebhookSignatureFormat,
 } from "@openbot/contracts/signal-protocol/webhook-route";
 import { Effect, type ManagedRuntime, Result } from "effect";
 import { Elysia } from "elysia";
@@ -49,7 +53,13 @@ import type { RemoteApiConfig } from "./config";
 import { type DiscordApi, type DiscordUpload, decodeDiscordApiRequest } from "./discord-api";
 import type { SignalEntry } from "./entry";
 import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./protocol";
-import type { SignalService, SignalSocket, SignalTokens, SlackDeliveryResponse } from "./signal-service";
+import type {
+  SignalService,
+  SignalSocket,
+  SignalTokens,
+  SlackDeliveryResponse,
+  WebhookDelivery,
+} from "./signal-service";
 import { telegramFailure } from "./telegram";
 import { verifyGitHubSignature, verifySlackSignature, verifyWebhookSignature } from "./tokens";
 import type { TurnRelays } from "./turn-relays";
@@ -282,17 +292,11 @@ export function createRemoteApiApp(
         }
         const mediaType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
         if (mediaType !== "application/json") return webhookResponse(415);
-        const timestamp = request.headers.get(WEBHOOK_TIMESTAMP_HEADER) ?? "";
-        const deliveryId = request.headers.get(WEBHOOK_DELIVERY_ID_HEADER) ?? "";
-        const signature = request.headers.get(WEBHOOK_SIGNATURE_HEADER) ?? "";
-        if (
-          !WEBHOOK_TIMESTAMP_PATTERN.test(timestamp) ||
-          !WEBHOOK_DELIVERY_ID_PATTERN.test(deliveryId) ||
-          !WEBHOOK_SIGNATURE_PATTERN.test(signature)
-        ) {
-          return webhookResponse(401);
-        }
+        const signed = webhookSignedHeaders(request.headers);
+        if (!signed) return webhookResponse(401);
         if (!signal.holdsWebhookRoute(routeId)) return webhookResponse(503);
+        // An older host refuses the signature of this format, so the request cannot authenticate.
+        if (signed.format && !signal.webhookRouteAccepts(routeId, signed.format)) return webhookResponse(401);
         const address = signalClientIp(
           server?.requestIP(request)?.address,
           request.headers.get("x-forwarded-for"),
@@ -301,10 +305,9 @@ export function createRemoteApiApp(
         if (!signal.acceptWebhookRequest(`${routeId}:${address}`)) return webhookResponse(429);
         const body = await readBounded(request, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT);
         if (!body) return webhookResponse(413);
-        const result = await runtime.runPromise(
-          signal.deliverWebhook(routeId, { timestamp, deliveryId, signature, body }),
-          { signal: request.signal },
-        );
+        const result = await runtime.runPromise(signal.deliverWebhook(routeId, { ...signed, body }), {
+          signal: request.signal,
+        });
         return webhookResponse(result.status);
       },
       { parse: "none" },
@@ -604,6 +607,55 @@ async function readBody(request: Request, limit: number): Promise<Uint8Array<Arr
     return null;
   }
   return readBounded(request, limit);
+}
+
+interface WebhookHeaderSet {
+  deliveryId: string;
+  timestamp: string;
+  signature: string;
+  pattern: RegExp;
+  format?: WebhookSignatureFormat;
+}
+
+// The signed header sets of a generic webhook request, in order: `X-OpenBot-*`, then Standard Webhooks.
+const WEBHOOK_HEADER_SETS: readonly WebhookHeaderSet[] = [
+  {
+    deliveryId: WEBHOOK_DELIVERY_ID_HEADER,
+    timestamp: WEBHOOK_TIMESTAMP_HEADER,
+    signature: WEBHOOK_SIGNATURE_HEADER,
+    pattern: WEBHOOK_SIGNATURE_PATTERN,
+  },
+  ...STANDARD_WEBHOOK_HEADER_SETS.map(
+    (names): WebhookHeaderSet => ({
+      ...names,
+      pattern: STANDARD_WEBHOOK_SIGNATURE_PATTERN,
+      format: STANDARD_WEBHOOKS_FORMAT,
+    }),
+  ),
+];
+
+/**
+ * The three signed header values of the first header set that the request uses. Null when that set
+ * is not complete and valid. Signal does not check the signature: the host does.
+ */
+function webhookSignedHeaders(headers: Headers): Omit<WebhookDelivery, "body"> | null {
+  for (const names of WEBHOOK_HEADER_SETS) {
+    const timestamp = headers.get(names.timestamp);
+    const deliveryId = headers.get(names.deliveryId);
+    const signature = headers.get(names.signature);
+    if (timestamp === null && deliveryId === null && signature === null) continue;
+    if (
+      timestamp === null ||
+      deliveryId === null ||
+      signature === null ||
+      !WEBHOOK_TIMESTAMP_PATTERN.test(timestamp) ||
+      !WEBHOOK_DELIVERY_ID_PATTERN.test(deliveryId) ||
+      !names.pattern.test(signature)
+    )
+      return null;
+    return { timestamp, deliveryId, signature, ...(names.format ? { format: names.format } : {}) };
+  }
+  return null;
 }
 
 function webhookResponse(status: WebhookDeliveryStatus | 415): Response {

@@ -145,6 +145,8 @@ export function WorkflowCanvasHeader(props: {
   progress: { done: number; total: number };
   onRun: () => void;
   onStop: () => void;
+  /** The people on this canvas, before the run controls. */
+  people?: JSX.Element;
 }) {
   const { t, format } = useText();
   const duration = (seconds: number) => t("workflow.node.runTime", { seconds: format.number(Math.max(1, seconds)) });
@@ -273,6 +275,7 @@ export function WorkflowCanvasHeader(props: {
             )}
           </Show>
         </div>
+        {props.people}
         <Show when={!props.previewing && (props.pastRuns.length > 0 || props.canRun || props.running)}>
           <div class="wfn-hud">
             <Show when={props.pastRuns.length > 0}>

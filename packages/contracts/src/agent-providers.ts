@@ -37,6 +37,7 @@ export const AGENT_PROVIDERS = [
   "hermes",
   "acp",
   "kimi",
+  "devin",
 ] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
@@ -133,8 +134,8 @@ export interface AgentProviderDescriptor {
    * The workspace skill folders the CLI reads by itself, in its own order. OpenBot writes only
    * `.agents/skills` and `.claude/skills`, so each list names at least one of them.
    * Sources: the Codex "build skills" guide, the Claude Code skills guide, the opencode skills guide
-   * and the skill paths in Google's Antigravity ACP server, in the Cursor CLI, in the Cline CLI and in
-   * the Kimi Code CLI.
+   * and the skill paths in Google's Antigravity ACP server, in the Cursor CLI, in the Cline CLI, in
+   * the Kimi Code CLI and in the commands that Devin CLI 3000.11.234 lists for each skill folder.
    */
   readonly skillFolders: readonly [string, ...string[]];
   /**
@@ -142,8 +143,9 @@ export interface AgentProviderDescriptor {
    * itself. `plugin`: OpenBot gives the folder to Claude as a session plugin
    * (`claudeHomeSkillPlugin`). `instructions`: the CLI does not read it, so the developer instructions
    * name each skill and its `SKILL.md`. Sources: the strings and docs of the installed Codex, Grok,
-   * OpenCode, Cursor, Cline, Kimi and Pi CLIs; the Antigravity ACP server reads only `$GEMINI_HOME`; Muse
-   * and a custom ACP agent are not known to read it.
+   * OpenCode, Cursor, Cline, Kimi and Pi CLIs, and the commands of Devin CLI 3000.11.234; the
+   * Antigravity ACP server reads only `$GEMINI_HOME`; Muse and a custom ACP agent are not known to
+   * read it.
    */
   readonly homeSkills: "native" | "plugin" | "instructions";
   /**
@@ -175,7 +177,8 @@ export interface AgentProviderDescriptor {
    * Whether OpenBot can read the plan's remaining usage. `false`: the CLI exposes no usage reading,
    * so the dock says the provider does not report usage instead of waiting for a reading. Declared
    * here because the renderer cannot see the drivers; set it to `true` with a driver's usage read
-   * (Codex and Claude read it themselves, Grok, OpenCode, Antigravity and Cursor through `readRateLimits`).
+   * (Codex and Claude read it themselves, Grok, OpenCode, Antigravity, Cursor and Kimi through
+   * `readRateLimits`).
    */
   readonly reportsUsage: boolean;
   /**
@@ -391,6 +394,31 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
+    reportsUsage: true,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
+  // Cognition's Devin CLI (`devin acp`). The ACP `devin-browser` method opens Devin's page, and the
+  // page sends the sign-in back to the CLI. A session opens without an account, but lists no model.
+  devin: {
+    id: "devin",
+    displayName: "Devin",
+    cliName: "Devin CLI",
+    onboardingDescription: "Many models with a Devin account",
+    signInMessage: "Sign in with Devin to use Devin.",
+    installGuideLink: null,
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "devin",
+    pickerOrder: 8,
+    localCodeSignIn: null,
+    signInPageEnd: "callback",
+    skillFolders: [".devin/skills", ".claude/skills", ".agents/skills"],
+    homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
+    workspaceEnforcement: "confined-process",
+    steer: "deferred",
+    concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
     foldersInFullAccess: false,
@@ -405,7 +433,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "pi",
-    pickerOrder: 8,
+    pickerOrder: 9,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
@@ -428,7 +456,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "muse",
-    pickerOrder: 9,
+    pickerOrder: 10,
     localCodeSignIn: "device",
     signInPageEnd: "page",
     skillFolders: [".agents/skills"],
@@ -453,7 +481,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "mercury-3",
     legacyModelPrefix: null,
     authKind: "inception",
-    pickerOrder: 10,
+    pickerOrder: 11,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
@@ -478,7 +506,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "deepseek-v4-pro",
     legacyModelPrefix: null,
     authKind: "deepseek",
-    pickerOrder: 11,
+    pickerOrder: 12,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
@@ -503,7 +531,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "anthropic/claude-sonnet-5.5",
     legacyModelPrefix: null,
     authKind: "openrouter",
-    pickerOrder: 12,
+    pickerOrder: 13,
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
@@ -558,7 +586,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "hermes",
-    pickerOrder: 13,
+    pickerOrder: 14,
     localCodeSignIn: "device",
     signInPageEnd: "page",
     skillFolders: [".agents/skills"],
@@ -650,6 +678,7 @@ export const MANAGED_RUNTIME_PROVIDERS = [
   "cursor",
   "cline",
   "kimi",
+  "devin",
   "pi",
   "muse",
 ] as const satisfies readonly AgentProviderId[];
@@ -662,7 +691,7 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
 /**
  * The providers that only newer Team API protocols carry: Gemini and custom ACP agents from protocol
  * 5, Cursor and Cline from protocol 6, Pi and Muse from protocol 7, Inception, DeepSeek and OpenRouter
- * from protocol 8, and Kimi and Hermes, which no frozen protocol names.
+ * from protocol 8, and Kimi, Devin and Hermes, which no frozen protocol names.
  * A joined server's settings list one only when the host's status names it.
  */
 export const LOCAL_ONLY_PROVIDERS = [
@@ -670,6 +699,7 @@ export const LOCAL_ONLY_PROVIDERS = [
   "cursor",
   "cline",
   "kimi",
+  "devin",
   "pi",
   "muse",
   "inception",

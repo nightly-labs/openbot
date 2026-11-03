@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "Baza danych OpenBot nie przeszła kontroli integralności.",
   "error.backend.webhookRouteLimit": "Host może mieć maksymalnie {limit} rutyn typu webhook.",
   "error.backend.webhookSettingsInvalid": "Sprawdź ustawienia webhooka i spróbuj ponownie.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Wklej pełny sekret podpisu od nadawcy. Ma od 16 do 1024 znaków i nie zawiera spacji.",
   "error.backend.webhookRouteUnavailable":
     "Publiczna trasa webhooka nie jest gotowa. Sprawdź połączenie z hostem i spróbuj ponownie.",
   "error.backend.browserViewRemoteOnly": "Podgląd przeglądarki na żywo jest tylko dla zdalnego hosta.",
@@ -57,6 +59,12 @@ export const messages = {
   "error.backend.sunshineNotReady": "Sunshine nie osiągnął gotowości.",
   "error.backend.sunshineNotReadyReason": "Sunshine nie osiągnął gotowości. {reason}",
   "error.backend.channelLeadModelUnavailable": "Model lidera kanału jest niedostępny.",
+  "error.backend.contextCompactionIneffective":
+    "Kompaktowanie nie zmniejsza tego czatu: po dwóch kompaktowaniach nadal zajmuje {percent}% okna kontekstu modelu, więc OpenBot przestaje go kompaktować. Narzędzia i instrukcje zajmują większość okna. Wyłącz serwery MCP lub sterowanie komputerem, których ten agent nie potrzebuje, albo wybierz model z większym oknem. Potem zacznij nowy czat.",
+  "error.backend.providerRetrying":
+    "Dostawca nie wykonał tego żądania {attempts} razy i próbuje ponownie. Jeśli agent nie będzie kontynuować, zatrzymaj turę.",
+  "error.backend.providerRetryingLargeContext":
+    "Dostawca nie wykonał tego żądania {attempts} razy i próbuje ponownie. Ten czat zajmuje {percent}% okna kontekstu modelu. Jeśli agent nie będzie kontynuować, zatrzymaj turę: OpenBot skompaktuje czat przed następną wiadomością.",
   "error.backend.sharedDataUnavailable": "Dane współdzielone są niedostępne.",
   "error.backend.shuttingDown": "OpenBot się zamyka.",
   "error.backend.channelUnconfirmedStart":
@@ -108,8 +116,8 @@ export const messages = {
     "Masz {saved} z {limit} wspomnień. Aby zrobić miejsce, zaktualizuj jedno wspomnienie przez memoryId, łącząc tekst dwóch powiązanych wspomnień, a następnie zapomnij drugie lub zapomnij wspomnienie, które nie jest już prawdziwe. Potem spróbuj ponownie.",
   "error.backend.agentMemoryLimitExceeded":
     "Liczba zapisanych wspomnień: {saved}. Limit: {limit}. Użytkownik ustawił limit poniżej liczby zapisanych wspomnień. Nie zapominaj wspomnień, aby zrobić miejsce. Powiedz użytkownikowi, że to wspomnienie nie zostało zapisane.",
-  "error.backend.channelHistoryLeadRequired": "Wybierz lidera kanału, aby przygotować wspólną historię.",
   "error.backend.channelHistoryArriving": "Wspólna wiadomość wciąż napływa. Wznów, gdy będzie kompletna.",
+  "error.backend.channelHistoryLeadRequired": "Wybierz lidera kanału, aby przygotować wspólną historię.",
   "error.backend.channelHistoryInvalid": "Podsumowanie historii jest nieprawidłowe. Wznów, aby spróbować ponownie.",
   "error.backend.channelContextTooLong":
     "Ten przydział przekracza limit wspólnego kontekstu. Wyślij krótsze żądanie lub przydziel je ponownie.",

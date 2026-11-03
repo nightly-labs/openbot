@@ -171,11 +171,11 @@ adds its rule there, not in the catalog.
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
 `releases/latest` for Codex, Pi and Kimi, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
-for Grok, the `muse-stable` channel for Muse, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
+for Grok, the `muse-stable` channel for Muse, Cognition's `cli/current` manifest for Devin, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex, Pi and Kimi, the manifest `checksum` for Muse, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
+Codex, Pi and Kimi, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
 so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
 `dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
 the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
@@ -731,6 +731,33 @@ adds `cline` to `projection_provider_sessions`.
 Team API v1–v5 do not know `cline`. The host hides Cline agents, models, status, and sign-in state
 from peers on those versions, as for Cursor. Team API v6 and `providers-v4` carry it, as for Cursor.
 
+### Devin
+
+The Devin provider (id `devin`) starts Cognition's Devin CLI with `devin acp`. The runtime manager
+reads `static.devin.ai/cli/current/manifest.json` and downloads
+`devin-<version>-<triple>.tar.gz` (`.zip` on Windows) from `static.devin.ai/cli/<version>/`. The
+archives hold only `bin/` and `share/`. Staging keeps both, because Devin CLI 3000.11.234 has a
+skill that reads its documentation in `share/devin/docs`, and refuses links and other special files.
+The manifest gives a SHA-256 for each target and no size, so a `GET` with `Range: bytes=0-0` gives
+the download size. `OPENBOT_DEVIN_PATH` selects another executable.
+
+Sign in calls the ACP `authenticate` method `devin-browser`, which opens Devin's page in the system
+browser. Devin CLI 3000.11.234 keeps the sign-in in `credentials.toml` of its XDG data folder
+(`~/.local/share/devin`). It has no device-code sign-in, so a joined computer cannot sign in Devin on
+the host. Sign out runs `devin auth logout`. A signed-out Devin process answers `session/new` with an
+empty model list and no error. `noModelsWhenSignedOut` reads that list as "sign-in required".
+
+`devinStatePaths` lets a confined process write `devin/cli` and `devin/mcp` in the XDG data folder,
+`devin` in the XDG cache folder and `~/.devin/plans`. Its config folder, `credentials.toml` and
+`devin/cli/plugins` stay read-only, because every other Devin process loads them. `.devin` and
+`.windsurf` in a workspace are project settings, so a confined process cannot write them. A model
+change with `session/set_model` does not write a file. Devin answers a lost session with `-32016`
+and `{ "cognition.ai/errorKind": "session_not_found" }`, which `DEVIN_ACP_FLAVOR` reads as a missing
+session.
+
+No frozen Team API protocol knows `devin`. The host hides Devin agents, models, status, and sign-in
+state from peers below protocol 8, and `providers-v8` carries it.
+
 ### Kimi
 
 The Kimi provider (id `kimi`) starts the Kimi Code CLI with `kimi acp`. The runtime manager
@@ -759,6 +786,21 @@ Kimi CLI 1.52.0 has no ACP configuration options, so OpenBot changes the model w
 and the path in `data.details`. `AcpFlavor.modelSetUnsaved` reads that failure as a model change
 that applied. A Full access Kimi agent saves the model, so it becomes the default model of each new
 Kimi session, also in a terminal.
+
+The CLI reports no usage over ACP. The driver's `readRateLimits` (`src/backend/kimi-usage.ts`)
+sends the request of the CLI's `/usage` command, `GET <base_url>/usages`, with the CLI's access
+token. The CLI's version selects the folder: `KIMI_SHARE_DIR` or `~/.kimi` for the Python CLI 1.x,
+`KIMI_CODE_HOME` or `~/.kimi-code` for Kimi Code 2.x. Both write `base_url` and the token key into
+`[providers."managed:kimi-code"]` of `config.toml`, and the token into `credentials/<key without
+"oauth/">.json`. `KIMI_CODE_BASE_URL` comes first, then `base_url`, then `https://api.kimi.com/coding/v1`.
+The reader accepts only an `https` address. The rolling 5-hour window (the shortest window of
+`limits[]`, else `usages.limit_5h`) fills the primary window, and the weekly quota (`usage`, else
+`usages.limit_7d`) the secondary one. No sign-in, a 401, 403 or 404, or an answer with no quota
+gives no reading. The token lasts 15 minutes, and the CLI refreshes it only during a turn, so an
+expired token fails the read and the dock keeps the last reading. An account with no Kimi Code plan
+has no reading, so a Kimi limit failure stays a turn error. The dock poll calls `readKimiUsage`
+directly, with the CLI that the last Kimi client ran on, so it does not start or wake the CLI for a
+reading. Before a Kimi client runs, the poll has no reading.
 
 No frozen Team API protocol knows `kimi`. The host hides Kimi agents, models, status, and sign-in
 state from peers below protocol 8, and `providers-v8` carries it.
@@ -986,9 +1028,10 @@ uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](ser
 ### Disconnect the own sign-in
 
 Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude,
-Codex, Grok, Muse and Cursor (issue #3487). Claude and Codex have an `accounts.signOut` command
+Codex, Grok, Muse, Cursor and Devin (issue #3487). Claude and Codex have an `accounts.signOut` command
 (`claude auth logout`, `codex logout`), which also signs out an account folder before its removal.
-Grok, Muse and Cursor have a driver `signOut` (`grok logout`, `muse logout`, `cursor-agent logout`)
+Grok, Muse, Cursor and Devin have a driver `signOut` (`grok logout`, `muse logout`,
+`cursor-agent logout`, `devin auth logout`)
 for the own sign-in only. Muse offers it only on this computer with no OpenBot key saved
 (`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
 `ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a

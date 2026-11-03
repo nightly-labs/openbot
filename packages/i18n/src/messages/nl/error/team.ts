@@ -58,6 +58,7 @@ export const messages = {
   "error.team.providersUnsupported": "Deze verbinding ondersteunt geen instellingen voor aanbieders.",
   "error.team.providerNotManaged": "OpenBot beheert de CLI van deze aanbieder niet.",
   "error.team.channelsUnsupported": "Deze verbinding ondersteunt geen kanaalchats.",
+  "error.team.channelPictureUnsupported": "Deze verbinding ondersteunt geen kanaalafbeeldingen.",
   "error.team.channelDeleteUnsupported": "Deze verbinding ondersteunt het verwijderen van kanalen niet.",
   "error.team.channelTaskCancelUnsupported": "Deze verbinding ondersteunt het annuleren van kanaaltaken niet.",
   "error.team.membersCannotDeleteChannels": "Leden kunnen geen kanalen verwijderen.",
@@ -66,6 +67,7 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Deze verbinding ondersteunt geen gedeelde gegevens.",
   "error.team.agentInstallUnsupported": "Deze verbinding ondersteunt het toevoegen van agents niet.",
   "error.team.agentHideUnsupported": "Deze verbinding ondersteunt het verbergen van agents niet.",
+  "error.team.agentColorsUnsupported": "Deze verbinding ondersteunt geen agentkleuren.",
   "error.team.sidebarFoldersUnsupported": "Deze verbinding ondersteunt geen mappen in mappen.",
   "error.team.agentNotificationLevelsUnsupported":
     "Deze server kan geen eigen meldingsniveau per agent bewaren. Werk OpenBot bij op de computer waarop de server draait.",
@@ -103,6 +105,7 @@ export const messages = {
   "error.team.folderUnavailable": "Deze map is niet beschikbaar op de hostcomputer.",
   "error.team.memoryReviewUnsupported": "Deze verbinding ondersteunt de geheugencontrole niet.",
   "error.team.promptCacheTtlUnsupported": "Deze verbinding ondersteunt de cachetijd van prompts niet.",
+  "error.team.modelVisibilityUnsupported": "Deze verbinding ondersteunt de modellijst niet.",
   "error.team.providerDefaultUnsupported": "Deze verbinding ondersteunt de standaardaanbieder niet.",
   "error.team.agentAccessUnsupported": "Deze verbinding ondersteunt geen rollen.",
   "error.team.agentAccessStale": "Iemand heeft de rollen gewijzigd. Open ze opnieuw en breng je wijziging aan.",

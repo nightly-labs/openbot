@@ -814,14 +814,13 @@
   color: var(--openbot-text-muted);
 }
 
-/* The divider under the field shows where typing goes, so the shared outline goes. */
+/*
+ * The field takes the focus each time the menu opens, so a focus colour on the divider would always
+ * show. The caret shows where typing goes, as in the shared search select.
+ */
 .wfn-picker .wfn-picker-field:focus-visible {
   outline: none;
   box-shadow: none;
-}
-
-.wfn-picker-search:has(.wfn-picker-field:focus-visible) {
-  border-bottom-color: var(--openbot-border-focus);
 }
 
 .wfn-picker-list {
@@ -867,7 +866,8 @@ fieldset.wfn-picker-group {
   height: auto;
   min-height: calc(var(--openbot-control-md) + var(--openbot-space-2));
   gap: calc(var(--openbot-space-2) + var(--openbot-space-0-5));
-  padding: var(--openbot-space-1) var(--openbot-space-2) var(--openbot-space-1) var(--openbot-space-1);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-1) var(--openbot-space-2);
   border-radius: var(--wfn-radius-row);
   white-space: normal;
 }
@@ -1070,7 +1070,7 @@ fieldset.wfn-picker-group {
 .wfn-picker.ui-action-menu .wfn-picker-row > svg.wfn-picker-check {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
-  margin-left: auto;
+  margin-inline-start: auto;
   color: var(--openbot-text-primary);
 }
 
@@ -1104,7 +1104,7 @@ fieldset.wfn-picker-group {
   align-items: center;
   gap: var(--openbot-space-1);
   padding: var(--openbot-space-2);
-  border-right: 1px solid var(--wfn-ring-strong);
+  border-inline-end: 1px solid var(--wfn-ring-strong);
 }
 
 .wfn-model-tab-hint {
@@ -1187,7 +1187,8 @@ fieldset.wfn-picker-group {
   gap: var(--openbot-space-2);
   min-height: calc(var(--openbot-control-md) + var(--openbot-space-2));
   /* With the list padding, the name starts on the line of the heading and the search icon. */
-  padding: var(--openbot-space-1) var(--openbot-space-2) var(--openbot-space-1) var(--openbot-space-1-5);
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
   border-radius: var(--wfn-radius-row);
   outline: 0;
   color: var(--openbot-text-primary);
@@ -1368,7 +1369,7 @@ fieldset.wfn-picker-group {
   height: auto;
   padding: var(--openbot-space-1);
   border-radius: var(--openbot-radius-md);
-  text-align: left;
+  text-align: start;
 }
 
 .wfn-popover .wfn-library-tile[aria-pressed="true"] {
@@ -1890,8 +1891,8 @@ fieldset.wfn-picker-group {
 }
 
 .wfn-menu :is([role="menuitem"], [role="menuitemcheckbox"]) .wfn-keys {
-  margin-left: auto;
-  padding-left: var(--openbot-space-4);
+  margin-inline-start: auto;
+  padding-inline-start: var(--openbot-space-4);
 }
 
 /* ------------------------------------------------------------ Minimap */
@@ -1927,7 +1928,7 @@ fieldset.wfn-picker-group {
 }
 
 .ui-tooltip.wfn-tooltip:has(.wfn-keys) {
-  padding-right: var(--openbot-space-1-5);
+  padding-inline-end: var(--openbot-space-1-5);
 }
 
 /* The results of the selected step, oldest first, under its card, as on the Higgsfield canvas. The
@@ -2663,6 +2664,9 @@ fieldset.wfn-picker-group {
 .wfn-tag {
   display: inline-flex;
   align-items: center;
+  gap: var(--openbot-space-1);
+  min-width: 0;
+  max-width: 100%;
   height: 22px;
   padding: 0 var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);
@@ -2671,6 +2675,23 @@ fieldset.wfn-picker-group {
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
   white-space: nowrap;
+}
+
+/* A long name ends with "…" inside its tag, so the tag stays in the value column. */
+.wfn-tag-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wfn-tag > svg {
+  flex: none;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+/* A repository that sends no events. */
+.wfn-tag[data-warning] {
+  color: var(--openbot-warning-text);
 }
 
 .wfn-tag[data-tone] {
@@ -3090,10 +3111,166 @@ svg.wfn-shape-surface {
   }
 }
 
-/* The emoji of a Discord reaction, in the place of an icon. */
+/* The emoji of a Discord or Telegram reaction, in the place of an icon. */
 .wfn-emoji {
   display: inline-flex;
   flex: none;
   justify-content: center;
   width: var(--openbot-icon-xs);
+}
+
+/* ------------------------------------------------------------ Presence */
+
+/*
+ * Another person's cursor: a soft arrowhead with a notch, and a name in the colour of the person's
+ * avatar. A ring in paper colour keeps both apart from any canvas or node under them. It is in world
+ * pixels, so it pans and zooms with the canvas, and it keeps its screen size at every zoom, as the
+ * remove button of a connection does. The cursor eases between two places from the presence feed.
+ */
+.wfn-peer-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  width: max-content;
+  align-items: flex-start;
+  pointer-events: none;
+  transform-origin: 0 0;
+  scale: calc(1 / var(--wfn-scale, 1));
+  transition: translate var(--wfn-peer-feed) linear;
+  animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* The ring is the stroke under the fill, so half of it shows outside the arrow. */
+.wfn-peer-arrow {
+  flex: none;
+  width: 19px;
+  height: 20px;
+  fill: var(--wfn-peer);
+  stroke: var(--openbot-paper);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+
+.wfn-peer-name,
+.wfn-peer-tag {
+  padding: 1px var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--wfn-peer);
+  color: var(--openbot-paper-text);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+/* The name sits under the arrow, a little to the right of its point. */
+.wfn-peer-name {
+  margin: 17px 0 0 -11px;
+  padding: 2px var(--openbot-space-2);
+  border-radius: var(--openbot-radius-sm);
+  outline: 1.5px solid var(--openbot-paper);
+  font-weight: var(--openbot-weight-bold);
+}
+
+/* The node that another person selected has a ring in that person's colour, and their name under it. */
+.wfn-slot[data-peer] .wfn-node:not([data-selected]) .wfn-card {
+  outline-color: var(--wfn-peer);
+}
+
+.wfn-slot[data-peer] .wfn-text:not([data-selected]) .wfn-text-input {
+  outline: var(--wfn-select-line) solid var(--wfn-peer);
+  outline-offset: var(--wfn-select-gap);
+}
+
+.wfn-peer-tag {
+  position: absolute;
+  top: calc(100% + var(--openbot-space-2) / var(--wfn-scale, 1));
+  left: 0;
+  z-index: 2;
+  pointer-events: none;
+  transform-origin: 0 0;
+  scale: calc(1 / var(--wfn-scale, 1));
+  animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* Your own selection comes first: the results strip of the node takes the place of the tag. */
+.wfn-slot:has(> [data-selected]) .wfn-peer-tag {
+  display: none;
+}
+
+/*
+ * The avatars of the people on the canvas: round, each on a tint of its cursor colour. The button and
+ * your own avatar have the same 32px box, and the avatar is centred in it. A photo fills the circle.
+ */
+.wfn-stage .wfn-hud-button.wfn-presence-person,
+.wfn-presence-self {
+  display: grid;
+  width: var(--openbot-control-md);
+  height: var(--openbot-control-md);
+  padding: 0;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+}
+
+.wfn-presence-person .person-avatar {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+  overflow: hidden;
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--wfn-peer, var(--openbot-text-primary)) 16%, transparent);
+}
+
+/* The generated face fills its circle. The bar button rule would make it the size of an icon. */
+.wfn-stage .wfn-hud-presence .wfn-presence-person .person-avatar-generated > svg {
+  width: 100%;
+  height: 100%;
+}
+
+.wfn-presence-person .person-avatar > i {
+  display: none;
+}
+
+/* The person you follow has a ring in their colour around the avatar. */
+.wfn-presence-person[aria-pressed="true"] .person-avatar {
+  outline: 2px solid var(--wfn-peer);
+  outline-offset: 0;
+}
+
+/* While you follow a person, a frame in their colour holds the view, with their name at the top. */
+.wfn-follow-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  border: 2px solid var(--wfn-peer);
+  pointer-events: none;
+  animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.wfn-follow-name {
+  height: fit-content;
+  padding: 1px var(--openbot-space-2) var(--openbot-space-0-5);
+  border-radius: 0 0 var(--openbot-radius-sm) var(--openbot-radius-sm);
+  background: var(--wfn-peer);
+  color: var(--openbot-paper-text);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wfn-peer-cursor {
+    transition: none;
+  }
+
+  .wfn-peer-cursor,
+  .wfn-peer-tag,
+  .wfn-follow-frame {
+    animation: none;
+  }
 }

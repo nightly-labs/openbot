@@ -366,6 +366,11 @@ export interface AcpProviderOptions {
    */
   allowNoModels?: boolean;
   /**
+   * An agent that lists no model is signed out. Devin CLI 3000.11.234 opens a session without an
+   * account, and lists its models only when it is signed in.
+   */
+  noModelsWhenSignedOut?: boolean;
+  /**
    * The folder of the session that model discovery opens and closes. The app's own working folder
    * when absent. A custom agent gets an empty folder, because an unknown agent can write where its
    * session starts.
@@ -1291,6 +1296,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       this.#models = providerResult(discovery);
+      if (this.#models.length === 0 && this.options.noModelsWhenSignedOut) {
+        this.#signedIn = false;
+        return;
+      }
       if (this.#models.length === 0 && !this.options.allowNoModels) {
         throw new Error(sourceText("error.provider.acpNoModels"));
       }

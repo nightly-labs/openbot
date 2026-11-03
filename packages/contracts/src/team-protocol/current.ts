@@ -6,6 +6,7 @@ import { ACP_REGISTRY_CAPABILITY } from "./acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "./agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
+import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "./agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "./agent-hidden-v1";
@@ -26,6 +27,7 @@ import { AGENT_TASKS_CAPABILITY } from "./agent-tasks-v1";
 import { AGENT_THREAD_BRANCHES_CAPABILITY } from "./agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "./agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "./agent-thread-reads-v1";
+import { AGENT_THREAD_REPLIES_CAPABILITY } from "./agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY } from "./agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
@@ -47,6 +49,7 @@ import {
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_TASK_ACTIONS_CAPABILITY } from "./channel-task-actions-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
+import { COMPUTER_ACTIVITY_CAPABILITY } from "./computer-activity-v1";
 import { CONNECTORS_CAPABILITY } from "./connectors-v1";
 import { CONTEXT_COMPACT_CAPABILITY } from "./context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY } from "./context-reset-v1";
@@ -73,6 +76,7 @@ import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "./memory-review-v1";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
+import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
@@ -115,6 +119,7 @@ import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } 
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
+import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
@@ -165,6 +170,7 @@ export {
   AGENT_ACCESS_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
+  AGENT_COLORS_CAPABILITY,
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FOLDERS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
@@ -185,6 +191,7 @@ export {
   AGENT_THREAD_BRANCHES_CAPABILITY,
   AGENT_THREAD_FILES_CAPABILITY,
   AGENT_THREAD_READS_CAPABILITY,
+  AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_THREADS_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
@@ -198,6 +205,7 @@ export {
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_TASK_ACTIONS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
+  COMPUTER_ACTIVITY_CAPABILITY,
   CONNECTORS_CAPABILITY,
   CONTEXT_COMPACT_CAPABILITY,
   CONTEXT_RESET_CAPABILITY,
@@ -222,6 +230,7 @@ export {
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
   MEMORY_REVIEW_CAPABILITY,
+  MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
@@ -272,6 +281,7 @@ export {
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
+  WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
@@ -416,6 +426,11 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_INSTRUCTIONS_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
+  COMPUTER_ACTIVITY_CAPABILITY,
+  MODEL_VISIBILITY_CAPABILITY,
+  AGENT_THREAD_REPLIES_CAPABILITY,
+  AGENT_COLORS_CAPABILITY,
+  WEBHOOK_SENDER_SECRET_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -570,7 +585,12 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CONTEXT_COMPACT_CAPABILITY &&
     capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
     capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY &&
-    capability !== LOCAL_SERVERS_CAPABILITY,
+    capability !== LOCAL_SERVERS_CAPABILITY &&
+    capability !== COMPUTER_ACTIVITY_CAPABILITY &&
+    capability !== MODEL_VISIBILITY_CAPABILITY &&
+    capability !== AGENT_THREAD_REPLIES_CAPABILITY &&
+    capability !== AGENT_COLORS_CAPABILITY &&
+    capability !== WEBHOOK_SENDER_SECRET_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -602,6 +622,11 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   AGENT_INSTRUCTIONS_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
+  COMPUTER_ACTIVITY_CAPABILITY,
+  MODEL_VISIBILITY_CAPABILITY,
+  AGENT_THREAD_REPLIES_CAPABILITY,
+  AGENT_COLORS_CAPABILITY,
+  WEBHOOK_SENDER_SECRET_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -716,6 +741,11 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CONTEXT_COMPACT_CAPABILITY &&
       capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
       capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY &&
-      capability !== LOCAL_SERVERS_CAPABILITY,
+      capability !== LOCAL_SERVERS_CAPABILITY &&
+      capability !== COMPUTER_ACTIVITY_CAPABILITY &&
+      capability !== MODEL_VISIBILITY_CAPABILITY &&
+      capability !== AGENT_THREAD_REPLIES_CAPABILITY &&
+      capability !== AGENT_COLORS_CAPABILITY &&
+      capability !== WEBHOOK_SENDER_SECRET_CAPABILITY,
   );
 }

@@ -18,6 +18,7 @@ import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { ConversationSideThread } from "./ConversationSideThread";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
@@ -66,6 +67,8 @@ function VoiceConversationPane() {
           onToggleMute={conversation.toggleMute}
           onInterrupt={conversation.interrupt}
           onEnd={() => closeSidePanelPane("voice")}
+          speed={speechSpeed()}
+          onCycleSpeed={cycleSpeechSpeed}
         />
       )}
     </Show>
@@ -84,7 +87,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     browserExpandedOpen,
     hideBrowserPanel,
     browserTabs,
-    closeSidebarFilePreview,
+    closeShownSidePanelFile,
     closeBrowserTab,
     downloadSidebarFile,
     revealSidebarFile,
@@ -129,6 +132,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     openSidePanelPane,
     toggleSidePanel,
     closeSidePanelPane,
+    openSidePanelFile,
+    closeSidePanelFile,
+    moveSidePanelFile,
     sideQuestion,
     setSideQuestionDraft,
     askSideQuestion,
@@ -340,6 +346,14 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   /** With no side thread to show, the side panel lists the panes. */
   const launcherShown = () =>
     activeRightPanel() === "side-panel" || (activeRightPanel() === "thread" && shownPanelThreadId() === null);
+  /** The file that shows, and whose tab is selected. */
+  const shownFile = () => (filePreviewOpen() ? sidePanel().file : null);
+  /** Opens the routine's side thread in the chat, and closes the settings that cover it. */
+  const openRoutineThread = async (routineId: string): Promise<boolean> => {
+    const opened = (await props.threads?.onOpenRoutineThread(routineId)) ?? false;
+    if (opened) setActiveRightPanel("none");
+    return opened;
+  };
   const sideThreadTabs = () => props.threads?.side.tabs ?? [];
   const moveSideThread = (id: string, index: number) => props.threads?.side.onMove(id, index);
   return (
@@ -361,6 +375,13 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             onClose: closePanelThread,
             onMove: moveSideThread,
             onToChat: movePanelThreadToChat,
+          }}
+          files={{
+            items: sidePanel().files,
+            selectedKey: shownFile(),
+            onSelect: openSidePanelFile,
+            onClose: closeSidePanelFile,
+            onMove: moveSidePanelFile,
           }}
           onToggleMaximized={() => setSidePanelMaximized(!sidePanel().maximized)}
           onCollapse={toggleSidePanel}
@@ -405,7 +426,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 }
                 onWidthChange={setBrowserPanelWidth}
                 onOpenLink={(url) => void openExternalMessageUrl(url)}
-                onOpenSharedFile={openSharedFile}
+                onOpenSharedFile={(path) => openSharedFile(path, "here")}
                 onOpenWorkspaceFile={previewWorkspaceAgentId() ? openWorkspaceFolderEntry : undefined}
                 onOpenWorkspaceFolder={openWorkspaceFolder}
                 onBack={sidebarFileBack() === null ? undefined : openSidebarFileBack}
@@ -418,7 +439,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 onDownload={downloadSidebarFile}
                 /* A browser cannot show a file in the file manager. */
                 onReveal={props.runtime ? undefined : revealSidebarFile}
-                onClose={closeSidebarFilePreview}
+                onClose={closeShownSidePanelFile}
               />
             </Loading>
           );
@@ -664,6 +685,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               }
               onRoutineSelectionRequestHandled={handleRoutineSettingsRequest}
               onOpenRoutineRun={props.onOpenSearchMessage ? openRoutineRunMessage : undefined}
+              onOpenRoutineThread={props.threads ? openRoutineThread : undefined}
               files={agentFiles(props.server, agent().id)}
               eventRoutines={desktopChatEventRoutinesApi(props.server, props.runtime)}
               routines={props.runtime?.routines}

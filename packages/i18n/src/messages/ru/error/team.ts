@@ -58,6 +58,7 @@ export const messages = {
   "error.team.providersUnsupported": "Это подключение не поддерживает настройки провайдеров.",
   "error.team.providerNotManaged": "OpenBot не управляет CLI этого провайдера.",
   "error.team.channelsUnsupported": "Это подключение не поддерживает чаты каналов.",
+  "error.team.channelPictureUnsupported": "Это подключение не поддерживает изображения каналов.",
   "error.team.channelDeleteUnsupported": "Это подключение не поддерживает удаление каналов.",
   "error.team.channelTaskCancelUnsupported": "Это подключение не поддерживает отмену задач каналов.",
   "error.team.membersCannotDeleteChannels": "Участники не могут удалять каналы.",
@@ -66,6 +67,7 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Это подключение не поддерживает общие данные.",
   "error.team.agentInstallUnsupported": "Это подключение не поддерживает добавление агентов.",
   "error.team.agentHideUnsupported": "Это подключение не поддерживает скрытие агентов.",
+  "error.team.agentColorsUnsupported": "Это подключение не поддерживает цвета агентов.",
   "error.team.sidebarFoldersUnsupported": "Это подключение не поддерживает папки в папках.",
   "error.team.agentNotificationLevelsUnsupported":
     "Этот сервер не может хранить ваш уровень уведомлений для каждого агента. Обновите OpenBot на компьютере, где он работает.",
@@ -103,6 +105,7 @@ export const messages = {
   "error.team.folderUnavailable": "Эта папка недоступна на компьютере хоста.",
   "error.team.memoryReviewUnsupported": "Это подключение не поддерживает проверку памяти.",
   "error.team.promptCacheTtlUnsupported": "Это подключение не поддерживает время кэша промптов.",
+  "error.team.modelVisibilityUnsupported": "Это подключение не поддерживает список моделей.",
   "error.team.providerDefaultUnsupported": "Это подключение не поддерживает провайдера по умолчанию.",
   "error.team.attachmentNameRequired": "Нужно безопасное имя вложения.",
   "error.team.attachmentNotFound": "Вложение не найдено.",

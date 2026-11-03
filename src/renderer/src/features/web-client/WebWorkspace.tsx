@@ -9,6 +9,7 @@ import {
   type AppInfo,
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_TASK_ACTIONS_CAPABILITY,
+  CHANNEL_TASK_CANCEL_CAPABILITY,
   type ChannelSummary,
   type ClientAgentModelOption,
   canAdministerServer,
@@ -47,6 +48,7 @@ import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { channelForThread } from "@openbot/team-client/channel-notifications";
@@ -62,6 +64,7 @@ import {
   getHostAgentMemoryLimit,
   getHostAuditLog,
   getHostMemoryReview,
+  getHostModelVisibility,
   getHostPromptCacheTtl,
   getHostReleaseStatus,
   getHostTimezone,
@@ -71,6 +74,7 @@ import {
   setHostAgentAccess,
   setHostAgentMemoryLimit,
   setHostMemoryReview,
+  setHostModelVisibility,
   setHostPromptCacheTtl,
   setHostTimezone,
   setHostUpdateSettings,
@@ -204,6 +208,7 @@ import {
   showServerUpdate,
 } from "../servers/server-update-flow";
 import { licenseContactUs, trackLicenseEvent } from "../settings/license-analytics";
+import type { HostModelVisibilityCalls } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlCalls } from "../settings/provider-prompt-cache";
 import { createCommunityCardVisibility } from "../sidebar/community-card";
 import { isReaderAuthor } from "../team/reader-identity";
@@ -264,9 +269,9 @@ const PHONE_QUERY = "(max-width: 720px)";
 /** The account whose queue edit the browser may hold under `QUEUE_EDIT_STORAGE_KEY`. */
 const QUEUE_EDIT_ACCOUNT_KEY = "openbot.web.queue-edit-account";
 
-function newAgentAvatar(): Pick<FirstAgentDraft, "avatarSeed" | "avatarHue"> {
+function newAgentAvatar(): Pick<FirstAgentDraft, "avatarSeed" | "avatarHue" | "avatarColor"> {
   const { avatarSeed, avatarHue } = createFirstAgentDraft();
-  return { avatarSeed, avatarHue };
+  return { avatarSeed, avatarHue, avatarColor: null };
 }
 
 /**
@@ -553,6 +558,33 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const current = server();
     return current?.state === "incompatible" ? current : null;
   });
+  const connectionShown = () => !noHost() && workspace.state.status !== "online" && !blockedServer();
+  const connectionPhase = () =>
+    serverWorkspacePhase({
+      hostedSleep: workspace.state.hostedSleep,
+      updating: hostUpdating(),
+      blocked: workspace.state.recovery?.phase === "suspended",
+      loading: workspace.state.status === "connecting",
+      hasContent: workspace.state.workspaceLoaded,
+    });
+  // As on desktop, the first load covers the whole window. A server that sleeps, updates or fails
+  // shows its screen in the pane only.
+  const fullWindowLoading = () =>
+    connectionShown() &&
+    !workspace.state.workspaceLoaded &&
+    !workspace.state.hostOffline &&
+    // The status is "offline" before the first attempt too; only a reported failure ends the cover.
+    !(workspace.state.status === "offline" && workspace.state.connectionError) &&
+    (connectionPhase() === "loading" || connectionPhase() === "connecting");
+  // The full-window screen stays after the load ends, so its crew hop out before it goes. It mounts in
+  // the first render, so the account screen in WebApp hands the pile to it and does not hop alone.
+  const [loadingCover, setLoadingCover] = createSignal<boolean>(untrack(fullWindowLoading));
+  createEffect(
+    () => fullWindowLoading() && !loadingCover(),
+    (show) => {
+      if (show) setLoadingCover(true);
+    },
+  );
   // A phone shows the sidebar as a full pane, so it is never compact there.
   const phoneQuery = window.matchMedia?.(PHONE_QUERY);
   const [phone, setPhone] = createSignal(phoneQuery?.matches ?? false);
@@ -736,6 +768,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     eventsEnabled() && workspace.state.capabilities.includes(ROUTINE_RECOVERY_CAPABILITY);
   // The same owner or admin asks such a host to send a test event to a webhook routine.
   const webhookTestsEnabled = () => eventsEnabled() && workspace.state.capabilities.includes(WEBHOOK_TESTS_CAPABILITY);
+  // The same owner or admin gives a webhook routine a secret that the sender made.
+  const webhookSenderSecretEnabled = () =>
+    eventsEnabled() && workspace.state.capabilities.includes(WEBHOOK_SENDER_SECRET_CAPABILITY);
   const providerAdmin = createWebProviderSettings({
     server: () => (workspace.runtime.admin ? server() : undefined),
     request: hostRequest,
@@ -786,6 +821,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => workspace.state.capabilities.includes(SIDE_QUESTION_CAPABILITY),
     webhookTestsEnabled,
     () => workspace.state.capabilities.includes(BROWSER_PROFILES_CAPABILITY),
+    webhookSenderSecretEnabled,
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
@@ -1178,6 +1214,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setPromptCacheTtl: async (ttl, serverId) =>
       runTeamEffect(setHostPromptCacheTtl(hostRequest(serverId), ttl).pipe(Effect.mapError((error) => error.cause))),
   };
+  const hostModelVisibilityCalls: HostModelVisibilityCalls = {
+    getModelVisibility: async (provider, serverId) =>
+      runTeamEffect(
+        getHostModelVisibility(hostRequest(serverId), provider).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    setModelVisibility: async (change, serverId) =>
+      runTeamEffect(
+        setHostModelVisibility(hostRequest(serverId), change).pipe(Effect.mapError((error) => error.cause)),
+      ),
+  };
   const hostAgentAccessCalls: HostAgentAccessCalls = {
     getAgentAccess: async (serverId) =>
       runTeamEffect(getHostAgentAccess(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -1260,6 +1306,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     eventsEnabled,
     routineRecoveryEnabled,
     webhookTestsEnabled,
+    webhookSenderSecretEnabled,
   );
   const channelsSupported = () =>
     workspace.state.status === "online" &&
@@ -1300,6 +1347,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     supported: channelsSupported,
     deletionSupported: () => canAdministerServer(workspace.state.host?.role),
     taskActionsSupported: () => workspace.state.capabilities.includes(CHANNEL_TASK_ACTIONS_CAPABILITY),
+    taskCancelSupported: () => workspace.state.capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
+    pictureSupported: () => false,
     beforeOpen: () => {
       setCreating(false);
       // Not `showAgents`: the list restores the saved channel after a host connects, and that must
@@ -1400,6 +1449,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     (...args) => hostRequest()(...args),
     routineRecoveryEnabled,
     webhookTestsEnabled,
+    webhookSenderSecretEnabled,
   );
   // Asks to move the connected host's routines after this device's time zone changed.
   createRoutineTimezonePrompt(() => {
@@ -1797,6 +1847,34 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const unavailable = async (): Promise<never> => {
     throw new Error(t("webClient.error.desktopOnly"));
   };
+  const connectionDetail = () =>
+    workspace.state.hostedSleep !== "sleeping" && !workspace.state.hostedIssue && !hostUpdating()
+      ? (workspace.state.connectionError ?? null)
+      : null;
+  const connectionNotice = (cover = false) => (
+    <ServerConnectionNotice
+      name={workspace.state.host?.name ?? t("webClient.notice.findingHosts")}
+      initial={cover || !workspace.state.workspaceLoaded}
+      ready={cover ? !fullWindowLoading() : undefined}
+      onExited={cover ? () => setLoadingCover(false) : undefined}
+      fullWindow={fullWindowLoading()}
+      issue={workspace.state.hostedIssue}
+      start={workspace.state.hostedStart}
+      updateVersion={workspace.state.hostRestart?.version ?? null}
+      detail={connectionDetail()?.message ?? null}
+      reference={connectionDetail()?.reference ?? null}
+      phase={connectionPhase()}
+      remainingSeconds={
+        workspace.state.recovery?.phase === "waiting" || workspace.state.recovery?.phase === "cooldown"
+          ? workspace.state.recovery.remainingSeconds
+          : 0
+      }
+      busy={workspace.state.status === "connecting" || !workspace.state.host}
+      onRetry={() => void workspace.run(workspace.reconnect)}
+      onManage={() => setBillingOpen(true)}
+      upsell={offlineUpsell()}
+    />
+  );
   return (
     <ConversationControllerProvider controller={controller}>
       <ChannelsControllerProvider controller={channels}>
@@ -1861,41 +1939,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               initialLoading={hostOffline()}
               connection={
                 <>
-                  <Show when={!noHost() && workspace.state.status !== "online" && !blockedServer()}>
-                    <ServerConnectionNotice
-                      name={workspace.state.host?.name ?? t("webClient.notice.findingHosts")}
-                      initial={!workspace.state.workspaceLoaded}
-                      issue={workspace.state.hostedIssue}
-                      start={workspace.state.hostedStart}
-                      updateVersion={workspace.state.hostRestart?.version ?? null}
-                      detail={
-                        workspace.state.hostedSleep !== "sleeping" && !workspace.state.hostedIssue && !hostUpdating()
-                          ? (workspace.state.connectionError?.message ?? null)
-                          : null
-                      }
-                      reference={
-                        workspace.state.hostedSleep !== "sleeping" && !workspace.state.hostedIssue && !hostUpdating()
-                          ? (workspace.state.connectionError?.reference ?? null)
-                          : null
-                      }
-                      phase={serverWorkspacePhase({
-                        hostedSleep: workspace.state.hostedSleep,
-                        updating: hostUpdating(),
-                        blocked: workspace.state.recovery?.phase === "suspended",
-                        loading: workspace.state.status === "connecting",
-                        hasContent: workspace.state.workspaceLoaded,
-                      })}
-                      remainingSeconds={
-                        workspace.state.recovery?.phase === "waiting" || workspace.state.recovery?.phase === "cooldown"
-                          ? workspace.state.recovery.remainingSeconds
-                          : 0
-                      }
-                      busy={workspace.state.status === "connecting" || !workspace.state.host}
-                      onRetry={() => void workspace.run(workspace.reconnect)}
-                      onManage={() => setBillingOpen(true)}
-                      upsell={offlineUpsell()}
-                    />
-                  </Show>
+                  <Show when={connectionShown() && !fullWindowLoading()}>{connectionNotice()}</Show>
                   <Show when={workspace.state.status === "online" && workspace.state.panelsFailed}>
                     <ServerPanelLoadNotice
                       busy={workspace.state.panelsLoading}
@@ -2154,6 +2198,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                             label: t("sidebar.empty.firstAgent"),
                             avatarSeed: agentAvatar().avatarSeed,
                             avatarHue: agentAvatar().avatarHue,
+                            avatarColor: agentAvatar().avatarColor ?? null,
                             onSelect: startCreate,
                           }
                         : undefined
@@ -2346,6 +2391,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
                         memoryReview={{ calls: hostMemoryReviewCalls }}
                         hostPromptCacheTtl={{ calls: hostPromptCacheTtlCalls }}
+                        hostModelVisibility={{ calls: hostModelVisibilityCalls }}
                         agentAccess={{ calls: hostAgentAccessCalls, listAgents: () => workspace.runtime.listAgents() }}
                         serverAudit={{ calls: hostServerAuditCalls, listAgents: () => workspace.runtime.listAgents() }}
                         browserProfiles={browserProfileSettings()}
@@ -2507,7 +2553,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   liveStatus={status()}
                   // A new form starts empty, with the avatar that the first-agent row showed.
                   initialDraft={{ ...createFirstAgentDraft(), ...untrack(agentAvatar) }}
-                  onDraftChange={({ avatarSeed, avatarHue }) => setAgentAvatar({ avatarSeed, avatarHue })}
+                  onDraftChange={({ avatarSeed, avatarHue, avatarColor }) =>
+                    setAgentAvatar({ avatarSeed, avatarHue, avatarColor })
+                  }
                   onClose={() => setCreating(false)}
                   onSaved={async () => {
                     await workspace.refresh();
@@ -2536,6 +2584,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         eventsServerId: () => undefined,
                         routineRecovery: () => false,
                         webhookTests: () => false,
+                        webhookSenderSecret: () => false,
                       },
                       approvals: () => workspace.state.approvals,
                       takeovers: () => workspace.state.takeovers,
@@ -2822,6 +2871,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 <ProviderSignInDialogs api={providerSettings()?.connection} opener="composer" />
               </Show>
             </WorkspaceFrame>
+            <Show when={loadingCover()}>{connectionNotice(true)}</Show>
           </div>
         </Show>
       </ChannelsControllerProvider>

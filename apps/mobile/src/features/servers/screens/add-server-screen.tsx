@@ -23,6 +23,7 @@ import { useLiveServerRecovery } from "@/features/workspace/context/server-recov
 import { ErrorReference } from "@/shared/components/error-reference";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { readClipboardText } from "@/shared/lib/clipboard";
 import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
@@ -349,7 +350,7 @@ function PasteInviteButton({ disabled, onPaste }: { disabled: boolean; onPaste: 
       icon={<ClipboardPaste size={18} strokeWidth={1.8} color={foreground} />}
       label={t("mobile.server.join.paste")}
       onPress={() => {
-        void readClipboardLink().then(
+        void readClipboardText().then(
           (value) => {
             if (value) onPaste(value);
           },
@@ -358,12 +359,6 @@ function PasteInviteButton({ disabled, onPaste }: { disabled: boolean; onPaste: 
       }}
     />
   );
-}
-
-async function readClipboardLink(): Promise<string> {
-  const text = (await Clipboard.getStringAsync()).trim();
-  if (text) return text;
-  return ((await Clipboard.getUrlAsync()) ?? "").trim();
 }
 
 /**

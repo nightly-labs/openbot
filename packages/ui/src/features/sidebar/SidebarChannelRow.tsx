@@ -77,7 +77,13 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
         }}
       >
         <span class="agent-row-avatar">
-          <ChannelAvatar members={rowProps.channel.members} agents={props.agents} layout="cluster" />
+          <ChannelAvatar
+            members={rowProps.channel.members}
+            agents={props.agents}
+            layout="cluster"
+            icon={rowProps.channel.icon}
+            imageUrl={rowProps.channel.imageUrl}
+          />
           <Show
             when={channelWait()}
             fallback={
@@ -94,11 +100,11 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
         <span class="agent-row-copy">
           <span class="agent-row-heading">
             <span class="agent-row-title">
-              <strong>{rowProps.channel.name}</strong>
+              <strong dir="auto">{rowProps.channel.name}</strong>
               <Show when={title()}>
                 {(label) => (
                   <Badge class="agent-role-badge" title={label()}>
-                    <span>{label()}</span>
+                    <span dir="auto">{label()}</span>
                   </Badge>
                 )}
               </Show>
@@ -107,7 +113,9 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
               {(current) => <SidebarWaitChip reason={current().reason} />}
             </Show>
           </span>
-          <span class="agent-row-preview">{preview()}</span>
+          <span class="agent-row-preview" dir="auto">
+            {preview()}
+          </span>
         </span>
         <Show when={rowProps.channel.unreadCount > 0}>
           <span class="sr-only">{t("sidebar.channel.unread", { count: rowProps.channel.unreadCount })}</span>

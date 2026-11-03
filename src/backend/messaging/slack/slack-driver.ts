@@ -166,6 +166,24 @@ class SlackAdapter implements MessagingAdapter {
       );
   });
 
+  /** Adds one reaction by its Slack name, for a workflow's Slack output. */
+  readonly addEmoji = Effect.fnUntraced(function* (
+    this: SlackAdapter,
+    target: MessageTarget,
+    messageId: string,
+    emoji: string,
+  ) {
+    yield* this.#api
+      .call("reactions.add", { channel: target.platformChannelId, timestamp: messageId, name: emoji })
+      .pipe(
+        Effect.catch((failure) =>
+          failure.cause instanceof SlackApiError && failure.cause.code === "already_reacted"
+            ? Effect.void
+            : Effect.fail(failure),
+        ),
+      );
+  });
+
   readonly postAnswer = Effect.fnUntraced(function* (
     this: SlackAdapter,
     target: MessageTarget,

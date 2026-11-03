@@ -7,7 +7,7 @@ import {
   type HostStatus,
   IPC_ENDPOINTS,
 } from "@openbot/contracts/ipc";
-import { createFormat, resolveLocale, translateFor } from "@openbot/i18n";
+import { createFormat, localeDirection, resolveLocale, translateFor } from "@openbot/i18n";
 import { localizeSourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
@@ -144,6 +144,7 @@ import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setWindowAppearance } from "./window-appearance";
+import { placeWindowButtons } from "./window-buttons";
 
 const logger = createOpenBotLogger("main");
 
@@ -230,7 +231,9 @@ const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, proces
 const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
 if (serverMode || hostedServer || localServerChild) hideExceptionErrorBox();
-if (serverMode || hostedServer) keepWindowsHidden();
+// A local server keeps a main window that never loads. A second launch on its profile, a deep link or
+// an MCP sign-in showed it as an empty window next to the desktop app.
+if (serverMode || hostedServer || localServerChild) keepWindowsHidden();
 // A local server has no window, so it has no Dock tile either.
 if (localServerChild && process.platform === "darwin") app.dock?.hide();
 const inviteLinkOptions = {
@@ -468,6 +471,7 @@ const windows = createMainWindowController({
   keepRunningInBackground: () => services?.appBehavior.keepRunningInBackground ?? false,
   getServices: () => services,
   getTranslate: () => services?.language.translate ?? translateFor(resolveLocale("system", app.getLocale())),
+  getLayoutDirection: () => localeDirection(services?.language.locale ?? resolveLocale("system", app.getLocale())),
   onRendererLoadStarted: () => {
     deepLinkReceiverReady = false;
     filePreviewPages.clear();
@@ -627,6 +631,7 @@ function registerIpcHandlers({
   teamStore,
   serverTimezone,
   promptCacheTtl,
+  modelVisibility,
   remoteSessionReuse,
   externalLinkPreference,
   externalLinks,
@@ -840,6 +845,7 @@ function registerIpcHandlers({
       memoryReview,
       machineAlerts,
       promptCacheTtl,
+      modelVisibility,
       agentAccess,
       serverAudit,
       localServerId: () => teamStore.getIdentity()?.serverId,
@@ -906,6 +912,7 @@ function registerIpcHandlers({
         openUrl: (url) => openHttpLink(url, openLink),
       }),
       openExternal: openLink,
+      modelVisibility,
     }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView, localSignIn }),
   });
@@ -1258,6 +1265,8 @@ if (!hasSingleInstanceLock) {
       });
       services = built;
       performance.mark("openbot:services-built");
+      // The first window opens before the saved language is read, with the system's direction.
+      placeWindowButtons(BrowserWindow.getAllWindows());
       // A server has nobody to read the warning; a development build runs no `app.asar`.
       if (app.isPackaged && !serverMode && !hostedServer && !localServerChild) {
         teardown.push(0, "app archive watch", watchAppArchive(process.resourcesPath, built.language.translate));
@@ -1491,6 +1500,7 @@ if (!hasSingleInstanceLock) {
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appLanguagePreference, preference);
         }
+        placeWindowButtons(BrowserWindow.getAllWindows());
       });
       applyAppIconColor(logoColor.preference.color);
       logoColor.subscribe((preference) => {

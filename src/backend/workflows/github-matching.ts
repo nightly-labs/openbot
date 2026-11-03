@@ -13,8 +13,10 @@ import {
   WORKFLOW_GITHUB_EVENTS,
   type WorkflowGitHubEvent,
   type WorkflowGitHubItem,
+  type WorkflowGraph,
   type WorkflowNode,
   workflowGitHubEventItemKind,
+  workflowGitHubTriggerRepositories,
   workflowListField,
 } from "@openbot/contracts/ipc";
 import {
@@ -301,19 +303,39 @@ export function githubFilterRefuses(node: WorkflowNode, facts: GitHubEventFacts)
   return false;
 }
 
-/** The repository of a GitHub trigger, or null when it has none. */
-export function githubTriggerRepository(node: WorkflowNode): string | null {
-  if (node.kind !== "trigger" || node.fields.trigger !== "github") return null;
-  const repository = node.fields.repository;
-  return isGitHubRepositoryName(repository) ? repository : null;
+/** The repositories of a GitHub trigger, in its order; empty when it has none or is not one. */
+export function githubTriggerRepositories(node: WorkflowNode): string[] {
+  if (node.kind !== "trigger" || node.fields.trigger !== "github") return [];
+  return workflowGitHubTriggerRepositories(node.fields);
 }
 
-/** Whether a GitHub trigger starts on this event of its repository. */
+/**
+ * The graph without a repository list that an older client left behind: one that changed `repository` and
+ * kept `repositories`. The host removes it on each save, so a later change back to its first name does not
+ * watch the old list again.
+ */
+export function withoutStaleGitHubRepositories(graph: WorkflowGraph): WorkflowGraph {
+  const stale = (node: WorkflowNode) =>
+    node.kind === "trigger" &&
+    node.fields.trigger === "github" &&
+    node.fields.repositories !== undefined &&
+    workflowListField(node.fields.repositories)[0] !== node.fields.repository;
+  if (!graph.nodes.some(stale)) return graph;
+  return {
+    ...graph,
+    nodes: graph.nodes.map((node) =>
+      stale(node)
+        ? { ...node, fields: Object.fromEntries(Object.entries(node.fields).filter(([key]) => key !== "repositories")) }
+        : node,
+    ),
+  };
+}
+
+/** Whether a GitHub trigger starts on this event of one of its repositories. */
 export function githubTriggerMatches(node: WorkflowNode, facts: GitHubEventFacts): boolean {
-  const repository = githubTriggerRepository(node);
+  const repository = facts.repository.toLowerCase();
   return (
-    repository !== null &&
-    repository.toLowerCase() === facts.repository.toLowerCase() &&
+    githubTriggerRepositories(node).some((name) => name.toLowerCase() === repository) &&
     isOneOf(WORKFLOW_GITHUB_EVENTS, node.fields.event) &&
     facts.events.includes(node.fields.event)
   );

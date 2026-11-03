@@ -60,6 +60,7 @@ export const messages = {
   "error.team.providersUnsupported": "Diese Verbindung unterstützt keine Anbietereinstellungen.",
   "error.team.providerNotManaged": "OpenBot verwaltet die CLI dieses Anbieters nicht.",
   "error.team.channelsUnsupported": "Diese Verbindung unterstützt keine Kanalchats.",
+  "error.team.channelPictureUnsupported": "Diese Verbindung unterstützt keine Kanalbilder.",
   "error.team.channelDeleteUnsupported": "Diese Verbindung unterstützt das Löschen von Kanälen nicht.",
   "error.team.channelTaskCancelUnsupported": "Diese Verbindung unterstützt das Abbrechen von Kanalaufgaben nicht.",
   "error.team.membersCannotDeleteChannels": "Mitglieder können keine Kanäle löschen.",
@@ -68,6 +69,7 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Diese Verbindung unterstützt keine geteilten Daten.",
   "error.team.agentInstallUnsupported": "Diese Verbindung unterstützt das Hinzufügen von Agenten nicht.",
   "error.team.agentHideUnsupported": "Diese Verbindung unterstützt das Ausblenden von Agenten nicht.",
+  "error.team.agentColorsUnsupported": "Diese Verbindung unterstützt keine Agentenfarben.",
   "error.team.sidebarFoldersUnsupported": "Diese Verbindung unterstützt keine Ordner in Ordnern.",
   "error.team.agentNotificationLevelsUnsupported":
     "Dieser Server kann keine eigene Benachrichtigungsstufe pro Agent speichern. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
@@ -106,6 +108,7 @@ export const messages = {
   "error.team.folderUnavailable": "Dieser Ordner ist auf dem Host-Computer nicht verfügbar.",
   "error.team.memoryReviewUnsupported": "Diese Verbindung unterstützt die Erinnerungsprüfung nicht.",
   "error.team.promptCacheTtlUnsupported": "Diese Verbindung unterstützt die Prompt-Cache-Dauer nicht.",
+  "error.team.modelVisibilityUnsupported": "Diese Verbindung unterstützt die Modellliste nicht.",
   "error.team.providerDefaultUnsupported": "Diese Verbindung unterstützt den Standardanbieter nicht.",
   "error.team.attachmentNameRequired": "Ein sicherer Anhangsname ist erforderlich.",
   "error.team.attachmentNotFound": "Anhang nicht gefunden.",

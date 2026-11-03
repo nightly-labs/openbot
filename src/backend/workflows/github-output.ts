@@ -20,7 +20,7 @@ import { isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { extractJsonObject, StructuredOutputError } from "../structured-output";
 import { EXTERNAL_EVENT_END, EXTERNAL_EVENT_START } from "../webhook-trigger";
-import { githubObjectKey, githubTriggerRepository } from "./github-matching";
+import { githubObjectKey, githubTriggerRepositories } from "./github-matching";
 import {
   GITHUB_BODY_LIMIT,
   type WorkflowGitHubChange,
@@ -60,7 +60,7 @@ export function githubOutputPlan(
   const action = node.fields.action;
   if (!isOneOf(WORKFLOW_GITHUB_ACTIONS, action))
     return { kind: "failed", error: sourceText("error.workflow.githubActionMissing") };
-  const repository = outputRepository(node, graph, triggerNodeId);
+  const repository = outputRepository(node, graph, triggerNodeId, runItem);
   if (!repository) return { kind: "failed", error: sourceText("error.workflow.githubRepositoryMissing") };
 
   let number: number | null = null;
@@ -251,12 +251,22 @@ export function githubOutputText(change: WorkflowGitHubChange, result: WorkflowG
   return number === null ? change.repository : `${change.repository}#${number}`;
 }
 
-/** The output's repository; "trigger", or none, names the repository of the trigger that started the run. */
-function outputRepository(node: WorkflowNode, graph: WorkflowGraph | null, triggerNodeId: string | null) {
+/**
+ * The output's repository. "trigger", or none, names the repository of the event that started the run,
+ * when it is one of the trigger's; otherwise the trigger's first repository.
+ */
+function outputRepository(
+  node: WorkflowNode,
+  graph: WorkflowGraph | null,
+  triggerNodeId: string | null,
+  runItem: WorkflowGitHubItem | null,
+) {
   const repository = fieldText(node, "repository");
   if (repository && repository !== "trigger") return isGitHubRepositoryName(repository) ? repository : null;
   const trigger = graph?.nodes.find((candidate) => candidate.id === triggerNodeId);
-  return trigger ? githubTriggerRepository(trigger) : null;
+  const repositories = trigger ? githubTriggerRepositories(trigger) : [];
+  const eventRepository = runItem?.repository.toLowerCase();
+  return repositories.find((name) => name.toLowerCase() === eventRepository) ?? repositories[0] ?? null;
 }
 
 /**
