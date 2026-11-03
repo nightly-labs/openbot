@@ -331,6 +331,8 @@ export const messages = {
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description":
     "Collega un numero WhatsApp a questo computer. Il WhatsApp Orchestrator interpella l'agente giusto e risponde.",
+  "connector.whatsapp.descriptionHost":
+    "Collega un numero WhatsApp a questo server. Il WhatsApp Orchestrator interpella l'agente giusto e risponde.",
   "connector.whatsapp.statusConnected": "Connesso",
   "connector.whatsapp.statusAttention": "Richiede attenzione",
   "connector.whatsapp.summaryConnected": {
@@ -357,6 +359,8 @@ export const messages = {
     "Le persone che autorizzi raggiungono OpenBot. Le altre ricevono un codice da darti.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp ha rimosso questo computer dai dispositivi collegati. Collega di nuovo il numero.",
+  "connector.whatsapp.helpLoggedOutHost":
+    "WhatsApp ha rimosso questo server dai dispositivi collegati. Collega di nuovo il numero.",
   "connector.whatsapp.helpError":
     "OpenBot non riesce a raggiungere WhatsApp su questo numero. Riconnettiti, oppure disconnetti il numero.",
   "connector.whatsapp.retryAt": "WhatsApp ha chiesto a OpenBot di aspettare. Nuovo tentativo alle {time}.",
@@ -386,6 +390,8 @@ export const messages = {
   "connector.whatsapp.stepAgent": "Agente",
   "connector.whatsapp.connectTitle": "Collega WhatsApp",
   "connector.whatsapp.connectDescription": "Seleziona il numero, poi collega questo computer da WhatsApp sul telefono.",
+  "connector.whatsapp.connectDescriptionHost":
+    "Seleziona il numero, poi collega questo server da WhatsApp sul telefono.",
   "connector.whatsapp.kindLabel": "Numero",
   "connector.whatsapp.kindPersonal": "Il mio numero personale",
   "connector.whatsapp.kindPersonalDescription":

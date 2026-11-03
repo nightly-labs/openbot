@@ -296,6 +296,13 @@ export const messages = {
   "routine.webhook.regenerateDescription": "当前密钥将立即失效。在发送方改用新密钥之前，用它签名的请求都会被拒绝。",
   "routine.webhook.regenerateConfirm": "重新生成",
   "routine.webhook.regenerateFailed": "无法重新生成签名密钥。",
+  "routine.webhook.useSenderSecret": "使用发送方的密钥",
+  "routine.webhook.senderSecretTitle": "使用发送方的签名密钥？",
+  "routine.webhook.senderSecretDescription":
+    "部分发送方（如 Composio 和 Svix）会自己生成签名密钥。请粘贴到这里。当前密钥会立即失效。",
+  "routine.webhook.senderSecretLabel": "发送方密钥",
+  "routine.webhook.senderSecretConfirm": "使用密钥",
+  "routine.webhook.senderSecretFailed": "无法保存发送方的密钥。",
   "routine.webhook.statusFailed": "无法检查主机是否已连接到中继。",
   "routine.webhook.stepDone": "完成",
   "routine.webhook.stepUrl": "把端点复制到发送方服务",

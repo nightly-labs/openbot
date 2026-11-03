@@ -16,7 +16,11 @@ import {
   type TelegramRouteChat,
   telegramRouteChatKey,
 } from "@openbot/contracts/signal-protocol/telegram-route";
-import { WEBHOOK_ROUTE_TTL_SECONDS, type WebhookRoute } from "@openbot/contracts/signal-protocol/webhook-route";
+import {
+  WEBHOOK_ROUTE_TTL_SECONDS,
+  type WebhookRoute,
+  type WebhookSignatureFormat,
+} from "@openbot/contracts/signal-protocol/webhook-route";
 import { Context, Effect, Fiber, Layer, Result, Schema } from "effect";
 import { IngressQueue, queueRouteKey, type RouteWaker } from "./ingress-queue";
 import {
@@ -130,6 +134,8 @@ interface AuthenticatedPeer {
   discordSession: string | null;
   // `ingress` only: opaque generic webhook route IDs whose requests this socket receives.
   webhookRoutes: string[];
+  // `ingress` only: the signature formats that the host checks in addition to `X-OpenBot-Signature`.
+  webhookFormats: ReadonlySet<string>;
   // `ingress` only: the GitHub repositories whose events this socket receives (`githubRepositoryKey`).
   githubRepositories: string[];
   // The TURN credentials of the last `turn-refresh`, and when Signal made them.
@@ -230,9 +236,11 @@ export interface WebhookDelivery {
   deliveryId: string;
   signature: string;
   body: Uint8Array;
+  /** Absent for an `X-OpenBot-Signature` request. */
+  format?: WebhookSignatureFormat;
 }
 
-export interface WebhookDeliveryResponse {
+interface WebhookDeliveryResponse {
   status: WebhookDeliveryStatus;
 }
 
@@ -292,6 +300,8 @@ const DEFAULT_INGRESS_DELIVERY_LIMITS: IngressDeliveryLimits = {
 };
 
 const UNAVAILABLE = { status: 503 } as const;
+/** An older host refuses the signature of this format, so the request cannot authenticate. */
+const REFUSED_FORMAT = { status: 401 } as const;
 
 const MAXIMUM_RATE_WINDOWS = 100_000;
 const RATE_WINDOW_MILLISECONDS = 60_000;
@@ -845,12 +855,27 @@ export class SignalService {
     return socketId !== undefined && this.#peers.has(socketId);
   }
 
+  /** Whether the host that holds this route checks signatures of `format`. An older host does not. */
+  webhookRouteAccepts(routeId: string, format: WebhookSignatureFormat): boolean {
+    const socketId = this.#webhookRoutes.get(routeId);
+    const peer = socketId === undefined ? undefined : this.#peers.get(socketId);
+    return peer?.webhookFormats.has(format) === true;
+  }
+
   /**
    * Passes one generic webhook to the host and waits for its commit acknowledgement. It resolves 503
    * in the same cases as a Slack delivery.
    */
-  readonly deliverWebhook = Effect.fn("Signal.deliverWebhook")((routeId: string, delivery: WebhookDelivery) =>
-    this.#deliver("webhook", this.#webhookRoutes.get(routeId), delivery.body, (requestId, bodyBase64) => ({
+  readonly deliverWebhook = Effect.fn("Signal.deliverWebhook")((routeId: string, delivery: WebhookDelivery) => {
+    const socketId = this.#webhookRoutes.get(routeId);
+    // The route can move to another socket while Signal reads the body. Check the socket that gets the frame.
+    if (
+      delivery.format &&
+      socketId !== undefined &&
+      this.#peers.get(socketId)?.webhookFormats.has(delivery.format) === false
+    )
+      return Effect.succeed<WebhookDeliveryResponse>(REFUSED_FORMAT);
+    return this.#deliver("webhook", socketId, delivery.body, (requestId, bodyBase64) => ({
       type: "webhook-delivery",
       version: 1,
       requestId,
@@ -859,13 +884,14 @@ export class SignalService {
       deliveryId: delivery.deliveryId,
       signature: delivery.signature,
       bodyBase64,
+      ...(delivery.format ? { format: delivery.format } : {}),
     })).pipe(
       Effect.map(
         (result): WebhookDeliveryResponse =>
           result?.type === "webhook-delivery-result" ? { status: result.status } : UNAVAILABLE,
       ),
-    ),
-  );
+    );
+  });
 
   /**
    * The rate limit of the GitHub route: by installation for a signed event, by address for a refused
@@ -1403,6 +1429,7 @@ export class SignalService {
           discordGuilds: discordRoute.guilds.map((guild) => guild.id),
           discordSession: null,
           webhookRoutes: webhookRoute.routes.map((route) => route.id),
+          webhookFormats: new Set(message.peer === "ingress" ? (message.webhookFormats ?? []) : []),
           githubRepositories: githubRoute.repositories.map((repository) =>
             githubRepositoryKey(repository.installationId, repository.id),
           ),

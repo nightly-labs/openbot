@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "De database van OpenBot heeft de integriteitscontrole niet doorstaan.",
   "error.backend.webhookRouteLimit": "Een host kan maximaal {limit} webhookroutines hebben.",
   "error.backend.webhookSettingsInvalid": "Controleer de webhookinstellingen en probeer het opnieuw.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Plak het volledige ondertekeningsgeheim van de afzender. Het heeft 16 tot 1024 tekens en geen spaties.",
   "error.backend.webhookRouteUnavailable":
     "De openbare webhookroute is niet klaar. Controleer de verbinding met de host en probeer het opnieuw.",
   "error.backend.webhookTestUnavailable":

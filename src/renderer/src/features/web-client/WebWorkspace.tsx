@@ -47,7 +47,9 @@ import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
+import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { channelForThread } from "@openbot/team-client/channel-notifications";
 import {
@@ -168,6 +170,7 @@ import { createChannelsController } from "../channels/channels-controller";
 import { globalSearchChannels } from "../channels/global-search-channels";
 import { createConnectorRegistry, createConnectorSet } from "../connectors/connector-registry";
 import { hostMessagingApi } from "../connectors/host-messaging-port";
+import { hostWhatsAppPort } from "../connectors/whatsapp-connector";
 import { Conversation, createConversationController } from "../conversation/Conversation";
 import { clearStoredQueueEdit } from "../conversation/composer-draft";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
@@ -248,6 +251,7 @@ import { createWebServerSettings } from "./web-server-settings";
 import { webTasksSource } from "./web-tasks";
 import { createWebUsagePort } from "./web-usage-port";
 import { webVaultCalls } from "./web-vault";
+import { webHostWhatsApp } from "./web-whatsapp-connector";
 
 const CONNECTING_STATUS: AgentStatus = {
   phase: "starting",
@@ -766,6 +770,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     eventsEnabled() && workspace.state.capabilities.includes(ROUTINE_RECOVERY_CAPABILITY);
   // The same owner or admin asks such a host to send a test event to a webhook routine.
   const webhookTestsEnabled = () => eventsEnabled() && workspace.state.capabilities.includes(WEBHOOK_TESTS_CAPABILITY);
+  // The same owner or admin gives a webhook routine a secret that the sender made.
+  const webhookSenderSecretEnabled = () =>
+    eventsEnabled() && workspace.state.capabilities.includes(WEBHOOK_SENDER_SECRET_CAPABILITY);
   const providerAdmin = createWebProviderSettings({
     server: () => (workspace.runtime.admin ? server() : undefined),
     request: hostRequest,
@@ -816,6 +823,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => workspace.state.capabilities.includes(SIDE_QUESTION_CAPABILITY),
     webhookTestsEnabled,
     () => workspace.state.capabilities.includes(BROWSER_PROFILES_CAPABILITY),
+    webhookSenderSecretEnabled,
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
@@ -1000,6 +1008,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.capabilities.includes(DISCORD_ACCESS_CAPABILITY),
   );
   onCleanup(webMessaging.dispose);
+  const webWhatsApp = webHostWhatsApp(hostRequest);
+  const whatsappPort = hostWhatsAppPort(
+    () => remoteAdminServer(server(), WHATSAPP_CONNECTOR_CAPABILITY)?.id,
+    () => webWhatsApp,
+  );
   const connectors = createConnectorRegistry(server, {
     computer: {},
     server: createConnectorSet(
@@ -1011,6 +1024,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           () => connectorTarget()?.id,
           () => webMessaging.api,
         ),
+        whatsapp: () => whatsappPort,
       },
       { agents: workspace.profiles, hostName: () => server()?.name },
     ),
@@ -1300,6 +1314,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     eventsEnabled,
     routineRecoveryEnabled,
     webhookTestsEnabled,
+    webhookSenderSecretEnabled,
   );
   const channelsSupported = () =>
     workspace.state.status === "online" &&
@@ -1441,6 +1456,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     (...args) => hostRequest()(...args),
     routineRecoveryEnabled,
     webhookTestsEnabled,
+    webhookSenderSecretEnabled,
   );
   // Asks to move the connected host's routines after this device's time zone changed.
   createRoutineTimezonePrompt(() => {
@@ -2574,6 +2590,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         eventsServerId: () => undefined,
                         routineRecovery: () => false,
                         webhookTests: () => false,
+                        webhookSenderSecret: () => false,
                       },
                       approvals: () => workspace.state.approvals,
                       takeovers: () => workspace.state.takeovers,

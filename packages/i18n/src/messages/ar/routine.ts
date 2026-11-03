@@ -379,6 +379,13 @@ export const messages = {
     "يتوقف السر الحالي عن العمل فورًا. تُرفض الطلبات الموقّعة به حتى يستخدم المرسل السر الجديد.",
   "routine.webhook.regenerateConfirm": "إعادة الإنشاء",
   "routine.webhook.regenerateFailed": "تعذّرت إعادة إنشاء سر التوقيع.",
+  "routine.webhook.useSenderSecret": "استخدام سر المُرسِل",
+  "routine.webhook.senderSecretTitle": "هل تريد استخدام سر التوقيع الخاص بالمُرسِل؟",
+  "routine.webhook.senderSecretDescription":
+    "بعض المُرسِلين، مثل Composio وSvix، يُنشئون سر التوقيع الخاص بهم. الصقه هنا. يتوقف السر الحالي عن العمل فورًا.",
+  "routine.webhook.senderSecretLabel": "سر المُرسِل",
+  "routine.webhook.senderSecretConfirm": "استخدام السر",
+  "routine.webhook.senderSecretFailed": "تعذّر حفظ سر المُرسِل.",
   "routine.webhook.statusFailed": "تعذّر التحقق مما إذا كان المضيف متصلًا بالمرحّل.",
   "routine.webhook.stepDone": "تم",
   "routine.webhook.stepUrl": "انسخ نقطة النهاية إلى الخدمة المرسِلة",

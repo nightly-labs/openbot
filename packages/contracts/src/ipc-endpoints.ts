@@ -306,6 +306,7 @@ import type {
   ListEventRoutinesInput,
   SaveEventRoutineInput,
   SaveEventRoutineResult,
+  SetWebhookSecretInput,
   WebhookSecret,
   WebhookTestResult,
 } from "./ipc-events";
@@ -1180,6 +1181,40 @@ export const IPC_ENDPOINTS = {
     hostSetDiscordAccess: scopedRequest<HostSetDiscordAccessInput, DiscordAccess, "required">()(
       "messaging:host-set-discord-access",
     ),
+    // The WhatsApp numbers of a joined server with `whatsapp-connector-v1`. The host's session gets
+    // the QR code or the pairing code, and this computer shows it. The orchestrator starts on the
+    // host's default provider and model.
+    hostGetWhatsAppOverview: scopedQuery<WhatsAppOverview, "required">()("messaging:host-get-whatsapp-overview"),
+    hostStartWhatsAppLink: scopedRequest<StartWhatsAppLinkInput, WhatsAppLinkState, "required">()(
+      "messaging:host-start-whatsapp-link",
+    ),
+    hostGetWhatsAppLinkState: scopedQuery<WhatsAppLinkState, "required">()("messaging:host-get-whatsapp-link-state"),
+    hostCancelWhatsAppLink: scopedQuery<void, "required">()("messaging:host-cancel-whatsapp-link"),
+    hostDisconnectWhatsAppNumber: scopedRequest<MessagingWorkspaceInput, void, "required">()(
+      "messaging:host-disconnect-whatsapp-number",
+    ),
+    hostReconnectWhatsAppNumber: scopedRequest<MessagingWorkspaceInput, void, "required">()(
+      "messaging:host-reconnect-whatsapp-number",
+    ),
+    hostSetWhatsAppEnabled: scopedRequest<SetMessagingEnabledInput, void, "required">()(
+      "messaging:host-set-whatsapp-enabled",
+    ),
+    hostAddWhatsAppOrchestrator: scopedQuery<AddMessagingOrchestratorResult, "required">()(
+      "messaging:host-add-whatsapp-orchestrator",
+    ),
+    hostListWhatsAppGroups: scopedRequest<MessagingWorkspaceInput, WhatsAppGroupList, "required">()(
+      "messaging:host-list-whatsapp-groups",
+    ),
+    hostAddWhatsAppSender: scopedRequest<WhatsAppSenderInput, void, "required">()("messaging:host-add-whatsapp-sender"),
+    hostRemoveWhatsAppSender: scopedRequest<RemoveWhatsAppSenderInput, void, "required">()(
+      "messaging:host-remove-whatsapp-sender",
+    ),
+    hostAnswerWhatsAppRequest: scopedRequest<AnswerWhatsAppRequestInput, void, "required">()(
+      "messaging:host-answer-whatsapp-request",
+    ),
+    hostSetWhatsAppOwnNumber: scopedRequest<SetWhatsAppOwnNumberInput, void, "required">()(
+      "messaging:host-set-whatsapp-own-number",
+    ),
   },
   // The server name, logo, timezone, agent memory limit and app update of one server's host. `host.updateIdentity` and `update`
   // reach this computer only; these take the server, so a remote admin reaches the host. The
@@ -1994,6 +2029,7 @@ export const IPC_ENDPOINTS = {
     deleteRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:delete-routine"),
     testRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:test-routine"),
     rotateSecret: scopedRequest<EventRoutineRef, WebhookSecret, "required">()("events:rotate-secret"),
+    setSecret: scopedRequest<SetWebhookSecretInput, void, "required">()("events:set-secret"),
     sendTestEvent: scopedRequest<EventRoutineRef, WebhookTestResult, "required">()("events:send-test-event"),
     listActivity: scopedRequest<ListEventActivityInput, EventActivity[], "required">()("events:list-activity"),
     listRoutineRuns: scopedRequest<ListEventRoutineRunsInput, EventRoutineRun[], "required">()(

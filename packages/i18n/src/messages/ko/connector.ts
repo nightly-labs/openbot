@@ -293,6 +293,8 @@ export const messages = {
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description":
     "WhatsApp 번호를 이 컴퓨터에 연결하세요. WhatsApp 오케스트레이터가 알맞은 에이전트에게 물어보고 답해요.",
+  "connector.whatsapp.descriptionHost":
+    "WhatsApp 번호를 이 서버에 연결하세요. WhatsApp 오케스트레이터가 알맞은 에이전트에게 물어보고 답해요.",
   "connector.whatsapp.statusConnected": "연결됨",
   "connector.whatsapp.statusAttention": "확인 필요",
   "connector.whatsapp.summaryConnected": { other: "번호 {count}개 · WhatsApp 오케스트레이터가 답변" },
@@ -308,6 +310,7 @@ export const messages = {
   "connector.whatsapp.dedicatedNote":
     "허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp이 연결된 기기에서 이 컴퓨터를 삭제했어요. 번호를 다시 연결해 주세요.",
+  "connector.whatsapp.helpLoggedOutHost": "WhatsApp이 연결된 기기에서 이 서버를 삭제했어요. 번호를 다시 연결해 주세요.",
   "connector.whatsapp.helpError":
     "OpenBot이 이 번호로 WhatsApp에 접근할 수 없어요. 다시 연결하거나 번호 연결을 해제해 주세요.",
   "connector.whatsapp.retryAt": "WhatsApp이 OpenBot에 기다리라고 요청했어요. {time}에 다시 시도해요.",
@@ -337,6 +340,7 @@ export const messages = {
   "connector.whatsapp.stepAgent": "에이전트",
   "connector.whatsapp.connectTitle": "WhatsApp 연결",
   "connector.whatsapp.connectDescription": "번호를 선택한 다음 휴대폰의 WhatsApp에서 이 컴퓨터를 연결하세요.",
+  "connector.whatsapp.connectDescriptionHost": "번호를 선택한 다음 휴대폰의 WhatsApp에서 이 서버를 연결하세요.",
   "connector.whatsapp.kindLabel": "번호",
   "connector.whatsapp.kindPersonal": "내 개인 번호",
   "connector.whatsapp.kindPersonalDescription": "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요.",

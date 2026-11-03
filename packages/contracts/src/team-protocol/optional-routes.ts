@@ -91,7 +91,9 @@ import { STORAGE_DISK_CODECS } from "./storage-disk-v1";
 import { VAULT_IMPORT_CODECS } from "./vault-import-v1";
 import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
+import { WEBHOOK_SENDER_SECRET_CODECS } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
+import { WHATSAPP_CONNECTOR_CODECS } from "./whatsapp-connector-v1";
 import { WORKFLOWS_GITHUB_CODECS } from "./workflows-github-v1";
 import { WORKFLOWS_CODECS } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CODECS } from "./workspace-directory-v1";
@@ -159,6 +161,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...ROUTINE_RECOVERY_CODECS,
   ...ROUTINE_RESULTS_CODECS,
   ...WEBHOOK_TESTS_CODECS,
+  ...WEBHOOK_SENDER_SECRET_CODECS,
   ...STORAGE_DISK_CODECS,
   ...MACHINE_RESOURCES_CODECS,
   ...PROVIDER_ACCOUNTS_CODECS,
@@ -171,6 +174,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_ACCESS_CODECS,
   ...AGENT_HIDDEN_CODECS,
   ...AGENT_COLORS_CODECS,
+  ...WHATSAPP_CONNECTOR_CODECS,
   ...AGENT_NOTIFICATION_LEVELS_CODECS,
   ...SIDEBAR_PINS_CODECS,
   ...AGENT_PLAN_CARD_CODECS,
