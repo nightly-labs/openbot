@@ -189,6 +189,12 @@ export function createWebConversationRuntime(
   const browserProfiles = adminRequest ? webBrowserProfileCalls(adminRequest, onHostEvent) : undefined;
   const listLevels = remote.listAgentNotificationLevels;
   return {
+    onSkillsChanged: onHostEvent
+      ? (listener) =>
+          onHostEvent((event) => {
+            if (event.type === "skills-changed") listener(event.agentId);
+          })
+      : undefined,
     agent: {
       ...messageLinks,
       importAttachmentData: async (data, serverId) => {

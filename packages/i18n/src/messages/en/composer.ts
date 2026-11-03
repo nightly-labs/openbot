@@ -34,6 +34,7 @@ export const messages = defineMessages("composer", {
   "composer.picker.badge.marketplace": "Marketplace",
   "composer.picker.badge.channel": "Channel",
   "composer.picker.skillLabel": "Insert skill or MCP server",
+  "composer.picker.channelAgentLabel": "Choose an agent or MCP server",
   "composer.picker.mentionLabel": "Insert mention",
   "composer.picker.noSkills": "This agent has no skills.",
   "composer.picker.noSkillMatch": "No skill matches “{query}”.",

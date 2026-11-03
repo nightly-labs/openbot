@@ -46,12 +46,12 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
+import { skillsPort } from "../../skills-port";
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
 import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
-import { installedSkillsRequestKey } from "./installed-skills-source";
 import { currentConversationTarget } from "./stores/composer-store";
 
 // Module scope: the composer remounts on navigation, and a dismissed notice must stay dismissed.
@@ -138,6 +138,7 @@ export function ConversationComposer() {
   const [pickerOpen, setPickerOpen] = createSignal(false);
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
   const [chosenChannelSkillAgentId, setChosenChannelSkillAgentId] = createSignal<string>();
+  const [channelSkillsRevision, setChannelSkillsRevision] = createSignal(0);
   const [channelSkillLoad, setChannelSkillLoad] = createStore<{
     skills: InstalledSkill[];
     loading: boolean;
@@ -162,19 +163,38 @@ export function ConversationComposer() {
   };
   let channelSkillsRequest = 0;
   createEffect(
-    () =>
-      `${installedSkillsRequestKey(channelSkillAgent()?.id, props.server, props.skillsMarketplaceOpen === true)}\0${props.server?.connectionSequence ?? 0}`,
-    (key) => {
+    () => ({ agentId: channelSkillAgent()?.id, runtime: props.runtime }),
+    ({ agentId, runtime }) => {
+      if (!channel || !agentId) return;
+      const changed = (changedId: string) => {
+        if (changedId === agentId) setChannelSkillsRevision((revision) => revision + 1);
+      };
+      if (runtime) return runtime.onSkillsChanged?.(changed) ?? runtime.admin?.skills.onChanged?.(changed);
+      return skillsPort().agent.onEvent((event) => {
+        if (event.type === "skills-changed") changed(event.agentId);
+      });
+    },
+  );
+  createEffect(
+    () => ({
+      agentId: channelSkillAgent()?.id,
+      runtime: conversationRuntime(props),
+      supported:
+        props.server?.kind !== "remote" || props.server.compatibility?.capabilities.includes("installed-skills"),
+      visible: props.skillsMarketplaceOpen !== true,
+      connectionSequence: props.server?.connectionSequence ?? 0,
+      revision: channelSkillsRevision(),
+    }),
+    ({ agentId, runtime, supported, visible }) => {
       const request = ++channelSkillsRequest;
-      const [, agentId, support, visibility] = key.split("\0");
       setChannelSkillLoad((state) => {
         state.skills = [];
         state.failed = false;
-        state.loading = Boolean(agentId && support === "supported" && visibility !== "hidden");
+        state.loading = Boolean(agentId && supported && visible);
       });
-      if (!channel || !agentId || support !== "supported" || visibility === "hidden") return;
-      void conversationRuntime(props)
-        .agent.listInstalledSkills(agentId)
+      if (!channel || !agentId || !supported || !visible) return;
+      void runtime.agent
+        .listInstalledSkills(agentId)
         .then((skills) => {
           if (request !== channelSkillsRequest) return;
           setChannelSkillLoad((state) => {

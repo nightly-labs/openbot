@@ -35,6 +35,7 @@ export const messages = {
   "composer.picker.badge.marketplace": "市场",
   "composer.picker.badge.channel": "频道",
   "composer.picker.skillLabel": "插入技能或 MCP 服务器",
+  "composer.picker.channelAgentLabel": "选择助手或 MCP 服务器",
   "composer.picker.mentionLabel": "插入提及",
   "composer.picker.noSkills": "该助手没有技能。",
   "composer.picker.noSkillMatch": "没有技能匹配“{query}”。",

@@ -170,7 +170,13 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
       .filter((reference) => reference.kind === "skill")
       .map((reference) => reference.id);
     try {
-      if (skillRecipient === null) return { error: t("channel.error.skillAddress") };
+      if (
+        skillRecipient === null ||
+        (skillRecipient &&
+          (!page()?.channel.members.some((member) => member.agentId === skillRecipient) ||
+            env.hiddenAgentIds().has(skillRecipient)))
+      )
+        return { error: t("channel.error.skillAddress") };
       if (skillRecipient) {
         const skills = await env.listInstalledSkills(skillRecipient);
         if (
@@ -291,7 +297,8 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     /** The agents that a mention can name: the members. A hidden agent gets no work here either. */
     mentionAgents: () => {
       const members = new Set(page()?.channel.members.map((member) => member.agentId));
-      return channels.agents().filter((agent) => members.has(agent.id));
+      const hidden = env.hiddenAgentIds();
+      return channels.agents().filter((agent) => members.has(agent.id) && !hidden.has(agent.id));
     },
     activeTurnId: () => activeRuns()[0] ?? null,
     prompt,
