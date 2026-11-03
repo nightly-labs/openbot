@@ -45,7 +45,7 @@ notes first. This is not legal advice: get a legal review before a release that 
   vendor under its own (`vendor/tsconfig.json`). The repository's type checks read the vendor only
   through `vendor/baileys/types/`.
 - `bun scripts/whatsapp-signal-e2e.ts`: the vectors, conversations between in-process parties, and,
-  when the black-box oracle of the spec author is in `/tmp/wa-oracle`, conversations with it.
+  when `OPENBOT_WA_ORACLE` names the black-box oracle of the spec author, conversations with it.
 - `bun scripts/messaging-whatsapp-e2e.ts`: the connector against a fake WhatsApp socket.
 
 Only a live test with real phones proves that the Signal code works with WhatsApp. Run one before a

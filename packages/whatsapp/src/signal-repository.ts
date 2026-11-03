@@ -231,9 +231,10 @@ export function makeOpenBotSignalRepository(
         const value = Number(device);
         if (Number.isInteger(value) && value >= 0) devices.add(value);
       }
+      // A hosted device (99) has its own servers, as in Baileys' `lid-mapping.ts`.
       const pairs = [...devices].map((device) => ({
-        pn: addressToString(jidToAddress(jidEncode(from.user, from.server, device))),
-        lid: addressToString(jidToAddress(jidEncode(to.user, to.server, device))),
+        pn: addressToString(jidToAddress(jidEncode(from.user, device === 99 ? "hosted" : from.server, device))),
+        lid: addressToString(jidToAddress(jidEncode(to.user, device === 99 ? "hosted.lid" : to.server, device))),
       }));
 
       return keys.transaction(async () => {

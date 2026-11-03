@@ -79,18 +79,6 @@ const config: KnipConfig = {
         // `@openbot/team-client` imports it, and the main bundle keeps it external through this
         // entry. Bundled, a JSDoc `import` line in it takes the `__dirname` shim of electron-vite.
         "@noble/hashes",
-        // The vendored Baileys in `@openbot/whatsapp` imports these at runtime. The main bundle keeps
-        // them external, so electron-builder packs them only from these root entries.
-        "@cacheable/node-cache",
-        "@hapi/boom",
-        "@noble/curves",
-        "async-mutex",
-        "long",
-        "lru-cache",
-        "music-metadata",
-        "p-queue",
-        "pino",
-        "protobufjs",
       ],
       // Scripts start other scripts by path (`bun scripts/<name>.ts`), relative to the repository
       // root. Every file in scripts/ is already an entry.

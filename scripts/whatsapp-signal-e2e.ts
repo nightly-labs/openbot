@@ -5,8 +5,8 @@
 //    (as receiver and as byte-exact sender), out-of-order delivery, forward limit and sender keys.
 // 2. Parties that run through `makeOpenBotSignalRepository` with the Baileys transaction layer over
 //    an in-memory key store that stores values as the OpenBot auth store does (BufferJSON).
-// 3. When `/tmp/wa-oracle/oracle.mjs` exists, a differential conversation against that reference
-//    implementation in both directions. CI has no oracle, so the report marks it as skipped.
+// 3. When `OPENBOT_WA_ORACLE` names a reference implementation, a differential conversation against
+//    it in both directions. CI has no oracle, so the report marks it as skipped.
 //
 // `bun scripts/whatsapp-signal-e2e.ts`. Writes .openbot-build/whatsapp-signal-e2e.json and exits
 // non-zero when a check fails.
@@ -76,7 +76,8 @@ import signatureVectors from "../packages/whatsapp/test-vectors/signatures.json"
 import x25519Vectors from "../packages/whatsapp/test-vectors/x25519.json";
 
 const REPORT = resolve(import.meta.dirname, "../.openbot-build/whatsapp-signal-e2e.json");
-const ORACLE = "/tmp/wa-oracle/oracle.mjs";
+/** The reference oracle, only from an explicit path: a fixed path in `/tmp` could hold anyone's file. */
+const ORACLE = process.env.OPENBOT_WA_ORACLE ?? "";
 const log = createOpenBotLogger("whatsapp-signal-e2e");
 
 type BaileysLogger = SocketConfig["logger"];
@@ -650,7 +651,8 @@ async function checkRepositoryParties(): Promise<void> {
     await alice.repo.injectE2ESession({ jid: pnJid, session: bundleOf(frank, 1) });
     assert.equal(alice.store.has("session", "15550000006.2"), true);
     await alice.repo.lidMapping.storeLIDPNMappings([{ lid: "100000000000006@lid", pn: "15550000006@s.whatsapp.net" }]);
-    alice.store.set({ "device-list": { "15550000006": ["0", "2"] } });
+    // Device 99 is a hosted device, on its own servers; it has no session here.
+    alice.store.set({ "device-list": { "15550000006": ["0", "2", "99"] } });
     const result = await alice.repo.migrateSession("15550000006@s.whatsapp.net", "100000000000006@lid");
     assert.deepEqual(result, { migrated: 1, skipped: 0, total: 1 });
     assert.equal(alice.store.has("session", "15550000006.2"), false);
@@ -777,8 +779,8 @@ function oracle(command: string, input: { [key: string]: OracleValue }, state?: 
 }
 
 async function checkOracleDifferential(): Promise<"ran" | "skipped"> {
-  if (!existsSync(ORACLE)) {
-    log.info(`SKIP differential: ${ORACLE} does not exist`);
+  if (!ORACLE || !existsSync(ORACLE)) {
+    log.info(`SKIP differential: ${ORACLE ? `${ORACLE} does not exist` : "OPENBOT_WA_ORACLE is not set"}`);
     return "skipped";
   }
   const dir = await mkdtemp(join(tmpdir(), "openbot-wa-oracle-"));
