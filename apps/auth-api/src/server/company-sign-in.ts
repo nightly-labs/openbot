@@ -35,6 +35,7 @@ export const WEB_RETURN_PATH = "/api/browser/company/return";
 const DOMAIN_RECORD_PREFIX = "_openbot";
 const DOMAIN_RECORD_VALUE_PREFIX = "openbot-domain-verification=";
 const CALLBACK_PATH = "/v1/auth/company/callback";
+const GOOGLE_ISSUER = "https://accounts.google.com";
 /** Mail services that no company owns. Their addresses keep email codes. */
 const SHARED_MAIL_DOMAINS = new Set([
   "gmail.com",
@@ -728,7 +729,9 @@ export class CompanySignInService {
       redirectUri: new URL(CALLBACK_PATH, requestUrl).toString(),
     });
     const domains = storedDomains(flow.domains_json);
-    if (!domains.includes(emailDomain(identity.email))) {
+    const companyManaged =
+      metadata.issuer !== GOOGLE_ISSUER || (identity.hostedDomain !== null && domains.includes(identity.hostedDomain));
+    if (!domains.includes(emailDomain(identity.email)) || !companyManaged) {
       return yield* new CompanySignInError(
         403,
         "company_email_domain_mismatch",
@@ -875,7 +878,7 @@ export class CompanySignInService {
       nonce: string;
       redirectUri: string;
     },
-  ): Effect.fn.Return<{ subject: string; email: string }, CompanySignInFailure> {
+  ): Effect.fn.Return<{ subject: string; email: string; hostedDomain: string | null }, CompanySignInFailure> {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
       code: input.code,
@@ -946,7 +949,9 @@ export class CompanySignInService {
         "The provider did not give a verified email address.",
       );
     }
-    return { subject: claims.sub, email };
+    // Each Google account has the same issuer. Only `hd` shows that a Workspace of the company manages the account.
+    const hostedDomain = isString(claims.hd) ? claims.hd.toLowerCase() : null;
+    return { subject: claims.sub, email, hostedDomain };
   });
 
   readonly #startFlow = Effect.fn("CompanySignIn.startFlow")(function* (

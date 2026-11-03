@@ -851,9 +851,12 @@ starts a test sign-in at the provider. Only a test that passes saves the values.
   and an Entra ID tenant domain. The discovery document can give an issuer on the same origin, such as
   the tenant ID form; that issuer is saved and checked in tokens. Entra ID `common` and
   `organizations` are refused, because their issuer is a placeholder that no token has.
+- All Google accounts have the issuer `https://accounts.google.com`. For it, the token must also have
+  an `hd` claim (the Workspace domain) that is one of the domains. A personal Google account with a
+  company email has no `hd`, and is refused.
 - The client secret is encrypted with `COMPANY_SIGN_IN_SECRET` (32 bytes or more). Never change this
   value: it makes the saved secrets unreadable. Without it, the routes answer 503
-  `company_sign_in_not_configured`.
+  `company_sign_in_not_configured`, and everyone signs in with an email code.
 - When the connection is on, an email code for its domains answers 409 `company_sign_in_required`,
   and the client goes to company sign-in.
 
