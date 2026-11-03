@@ -301,6 +301,11 @@ jobs:
       - name: Check subscription voice auth and delegation
         run: bun scripts/subscription-voice-e2e.ts
 
+      - name: Check mobile voice handoffs and collapsed history
+        run: |
+          bun scripts/mobile-live-controller-e2e.ts
+          bun scripts/mobile-voice-history-e2e.ts
+
       - name: Upload the Team API routes E2E report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -310,6 +315,8 @@ jobs:
             .openbot-build/team-api-routes-e2e/
             .openbot-build/agent-access-e2e/
             .openbot-build/subscription-voice-e2e/
+            .openbot-build/mobile-live-controller-e2e/
+            .openbot-build/mobile-voice-history-e2e/
           if-no-files-found: ignore
 
   reverse-actions-e2e:

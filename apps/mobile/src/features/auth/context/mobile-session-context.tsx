@@ -27,6 +27,7 @@ import {
   updateMobileProfile,
   validateMobileSession,
 } from "@/features/auth/api/mobile-auth";
+import { voiceCallHistory } from "@/features/chat/model/voice-call-history-native";
 import { deleteAgentAvatars } from "@/features/workspace/model/agent-avatar-cache";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
 import { deleteWorkspaceCaches } from "@/features/workspace/model/workspace-cache";
@@ -70,7 +71,10 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       queryClient.removeQueries({ queryKey: queryKeys.hostedServerPlans() });
     }
     // Sign-out, and a session that the account service refused or that expired, delete the phone's copy.
-    if (sessionRef.current && !session) void deleteWorkspaceCaches();
+    if (sessionRef.current && !session) {
+      void deleteWorkspaceCaches();
+      void voiceCallHistory.selectOwner(null);
+    }
     mobileAnalytics.setUser(session?.user ?? null);
     sessionRef.current = session;
     setSessionState(session);

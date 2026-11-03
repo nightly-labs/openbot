@@ -12,7 +12,19 @@ The voice model has no direct MCP or filesystem access. Its small talk and choic
 request help are model behavior; this port does not promise that every spoken word came from
 the agent. Do not treat speech alone as proof that an action completed.
 
-Delegated requests and agent answers remain ordinary chat messages. Each delegation carries a
+Delegated requests and agent answers remain ordinary chat messages. On the phone that made a
+subscription call, they appear under a collapsed **Voice call** row. **View details** restores the
+original messages. Questions, approvals, failures and unrelated typed messages stay visible; search
+opens matching call details. The phone keeps bounded encrypted call and delivery IDs, without
+text or audio, scoped to its signed-in account. Sign-out removes those IDs. Other clients keep
+the normal chat view.
+
+A handoff can include a brief spoken acknowledgement. The microphone keeps listening while the
+main agent works. A completed spoken acknowledgement does not discard its pending agent answer;
+that delivery-correlated answer returns to the same call. Another tool request is not accepted
+while the first one is pending. Explicit interruption and end retain their normal behavior.
+
+Each delegation carries a
 bounded context handoff: available voice transcripts plus model-supplied context and agent results.
 The handoff is stored separately from the visible request. Calls start with the selected agent's
 name, role, instructions, essential memories and recent permitted chat, within a bounded budget.

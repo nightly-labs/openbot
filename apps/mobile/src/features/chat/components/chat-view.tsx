@@ -11,7 +11,7 @@ import { type ParamListBase, useNavigation } from "expo-router/react-navigation"
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AppState, Keyboard, useColorScheme, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
@@ -22,6 +22,7 @@ import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { MobileConversationAnalytics } from "@/features/analytics/conversation";
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { channelRecipient } from "@/features/channels/model/channel-draft";
 import type { ApprovalDecision } from "@/features/chat/components/chat-approval-card";
@@ -74,6 +75,8 @@ import { type OutboxMessage, outboxChatKey, outboxChatMessage, outboxRowId, outb
 import type { OutboxDraft, OutboxStore } from "../model/outbox-store";
 import { queueReceiptMessages, queueRowsWithHeldEdit } from "../model/queue-edit-draft";
 import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
+import { voiceCallHistory } from "../model/voice-call-history-native";
+import { presentVoiceCalls } from "../model/voice-call-presentation";
 import { voiceAccent, voicePalette } from "../model/voice-palette";
 import { rememberImageDimensions } from "./attachment-preview";
 import {
@@ -249,6 +252,21 @@ export function ChatView({
 }: ChatViewProps) {
   const { t, errorMessage } = useText();
   const workspace = useMobileWorkspaceReader();
+  const { session } = useMobileSession();
+  const callOwner = session
+    ? `${session.apiUrl}
+${session.user.id}`
+    : null;
+  const callTarget = JSON.stringify([target.serverId, target.id, threadId]);
+  const callRecords = useSyncExternalStore(voiceCallHistory.subscribe, voiceCallHistory.snapshot);
+  const activeCall = useRef<string | null>(null);
+  const callOwnerRef = useRef(callOwner);
+  callOwnerRef.current = callOwner;
+  const [expandedCalls, setExpandedCalls] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    void voiceCallHistory.selectOwner(callOwner);
+  }, [callOwner]);
+
   const browserViewAvailable = useMobileWorkspaceSelector(
     (current) => current.browserViewSupport(target.serverId).view,
   );
@@ -591,13 +609,23 @@ export function ChatView({
         ? {
             agentId: target.id,
             status: () => workspace().realtimeVoiceStatus(target.serverId),
-            connect: (sdp: string) => workspace().connectRealtimeVoice({ agentId: target.id, sdp }, target.serverId),
+            connect: async (sdp: string) => {
+              const answer = await workspace().connectRealtimeVoice({ agentId: target.id, sdp }, target.serverId);
+              if (answer.sessionId && callOwnerRef.current === callOwner) {
+                activeCall.current = answer.sessionId;
+                voiceCallHistory.begin(callTarget, answer.sessionId);
+              }
+              return answer;
+            },
             poll: (input) => workspace().pollRealtimeVoice(input, target.serverId),
             reply: (input) => workspace().replyRealtimeVoice(input, target.serverId),
-            end: (input) => workspace().endRealtimeVoice(input, target.serverId),
+            end: (input) => {
+              if (activeCall.current === input.sessionId) activeCall.current = null;
+              return workspace().endRealtimeVoice(input, target.serverId);
+            },
           }
         : null,
-    [target.kind, target.id, target.serverId, workspace],
+    [target.kind, target.id, target.serverId, workspace, callTarget, callOwner],
   );
   // Hands-free, as the voice pane on desktop: the agent hears a pause as the end of a turn, and its
   // reply is read aloud. In a channel the leader answers, or the member the words name.
@@ -611,8 +639,54 @@ export function ChatView({
     channel: liveChannel,
     deliveries: queue?.deliveries ?? NO_DELIVERIES,
     outboxMessages,
-    send: (text) => (writable ? deliver(text, null, []) : null),
+    send: (text) => {
+      if (!writable) return null;
+      const message = deliver(text, null, []);
+      if (activeCall.current) voiceCallHistory.bind(activeCall.current, message.clientMessageId);
+      return message;
+    },
   });
+  useEffect(() => {
+    voiceCallHistory.resolve(
+      callTarget,
+      outboxMessages,
+      conversation?.messages ?? [],
+      queue?.deliveries ?? NO_DELIVERIES,
+    );
+  }, [callTarget, outboxMessages, conversation, queue?.deliveries]);
+  const failedCallRows = useMemo(
+    () =>
+      new Set(
+        outboxMessages
+          .filter((message) => message.state === "failed" || message.error || message.returned || message.stopped)
+          .map(outboxRowId),
+      ),
+    [outboxMessages],
+  );
+  const visibleCallMessages = useMemo(
+    () =>
+      presentVoiceCalls(
+        messages,
+        callRecords.filter((call) => call.target === callTarget),
+        conversation?.messages ?? [],
+        messageAliases,
+        expandedCalls,
+        focusMessageId,
+        failedCallRows,
+      ),
+    [messages, callRecords, callTarget, conversation, messageAliases, expandedCalls, focusMessageId, failedCallRows],
+  );
+  const callReferenceMessages = useMemo(() => [...referenceMessages, ...messages], [referenceMessages, messages]);
+  const toggleVoiceCall = useCallback(
+    (id: string) =>
+      setExpandedCalls((current) => {
+        const next = new Set(current);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+    [],
+  );
   // The agent who speaks in a voice conversation: the agent of the chat, or the channel's leader, who
   // gives out the channel's tasks.
   const voiceAgent =
@@ -1052,9 +1126,10 @@ export function ChatView({
               onRespondApproval={respondToApproval}
               fieldBackground={fieldBackground}
               foreground={foreground}
-              messages={messages}
+              messages={visibleCallMessages}
               messageAliases={messageAliases}
-              referenceMessages={referenceMessages}
+              onToggleVoiceCall={toggleVoiceCall}
+              referenceMessages={callReferenceMessages}
               hasOlder={hasOlder}
               olderLoading={olderLoading}
               olderError={olderError}

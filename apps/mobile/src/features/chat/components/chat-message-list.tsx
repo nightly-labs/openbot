@@ -100,6 +100,7 @@ import { ChatMessageActions } from "./chat-message-actions";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
 import { ChatSelectableText } from "./chat-selectable-text";
+import { ChatVoiceCallMarker } from "./chat-voice-call-marker";
 import { HistoryShownContext } from "./use-history-shown";
 import { useReplyHaptics } from "./use-reply-haptics";
 
@@ -232,6 +233,7 @@ function ChatBubble({
 }
 
 interface ChatMessageListProps {
+  onToggleVoiceCall?: (callId: string) => void;
   target: ChatTarget;
   /** False while the chat opens on Android: the list has only its latest rows until the chat is in place. */
   rowsShown: boolean;
@@ -455,7 +457,7 @@ const MessageRow = memo(function MessageRow({
   revealed,
   shared,
 }: {
-  message: VisibleMessage;
+  message: Exclude<VisibleMessage, { kind: "voice-call" }>;
   /** The first message of the chat, sent from this phone: it rises from the composer. */
   isFirstUser: boolean;
   arriving: boolean;
@@ -780,6 +782,7 @@ const MessageRow = memo(function MessageRow({
  * changes, so the rows read the rest from this context and render again when it changes.
  */
 interface RowContextValue {
+  onToggleVoiceCall?: (callId: string) => void;
   shared: MessageRowShared;
   arrivals: ReadonlySet<string>;
   revealedIds: ReadonlySet<string>;
@@ -802,6 +805,8 @@ const RowContext = createContext<RowContextValue | null>(null);
 function ChatRow({ message }: { message: VisibleMessage }) {
   const row = useContext(RowContext);
   if (!row) return null;
+  if (message.kind === "voice-call")
+    return <ChatVoiceCallMarker expanded={message.expanded} onPress={() => row.onToggleVoiceCall?.(message.callId)} />;
   const response = row.responseIds.has(message.id);
   const turn = row.turnSummaries?.get(message.id);
   const openTurn = row.onOpenTurn;
@@ -934,6 +939,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   activeTurnId,
   turnSummaries,
   onOpenTurn,
+  onToggleVoiceCall,
   questionForm,
   onSelectQuestion,
   activityAccessory,
@@ -1260,6 +1266,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       selectingMessageId,
       turnSummaries,
       onOpenTurn,
+      onToggleVoiceCall,
     }),
     [
       shared,
@@ -1276,6 +1283,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       selectingMessageId,
       turnSummaries,
       onOpenTurn,
+      onToggleVoiceCall,
     ],
   );
   const activitySpec = (activity?: MobileAgentActivity): ChatActivitySpec | null => {

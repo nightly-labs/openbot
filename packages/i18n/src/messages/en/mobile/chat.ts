@@ -1,6 +1,9 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("mobile.chat", {
+  "mobile.chat.voiceCall.title": "Voice call",
+  "mobile.chat.voiceCall.showDetails": "View details",
+  "mobile.chat.voiceCall.hideDetails": "Hide details",
   "mobile.chat.dictation.microphoneOffTitle": "Microphone access is off",
   "mobile.chat.dictation.microphoneOffMessage":
     "To dictate a message, allow OpenBot to use the microphone and speech recognition in Settings.",

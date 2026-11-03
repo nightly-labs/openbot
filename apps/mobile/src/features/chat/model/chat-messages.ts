@@ -31,6 +31,7 @@ export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStat
 export type ChatPlanStepState = "pending" | "active" | "done";
 
 export type ChatMessage =
+  | { id: string; kind: "voice-call"; callId: string; expanded: boolean }
   | {
       id: string;
       kind: "channel-routing";

@@ -234,7 +234,7 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
  * The steps of the conversation. They read the newest input and recognizer through the getters, and
  * keep their own copies of the state: a state read shows a write only after the next render.
  */
-function createController({
+export function createController({
   input,
   dictation,
   setState,
@@ -586,7 +586,12 @@ function createController({
         );
       },
       spoken: () => {
-        if (realtime === call && open && !exiting) listen();
+        if (realtime !== call || !open || exiting) return;
+        // Small talk and acknowledgements can finish while the accepted agent request is running.
+        // Keep its delivery correlation until the final answer arrives or the caller interrupts.
+        stopSpeaking();
+        setCaption("");
+        setPhase(pending ? "thinking" : "listening");
       },
       failed: () => {
         if (realtime !== call || !open || exiting) return;
