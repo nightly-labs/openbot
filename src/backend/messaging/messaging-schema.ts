@@ -84,7 +84,7 @@ export const MESSAGING_ALLOWED_ROLES_SCHEMA_SQL = `
   );
 `;
 
-// Shared by migration v48 and the separate new-database schema. IF NOT EXISTS throughout.
+// Shared by migration v51 and the separate new-database schema. IF NOT EXISTS throughout.
 //
 // The WhatsApp contacts and groups that can give work in one connection, beside the owner's own chat.
 // `sender_id` is the phone number in digits for a contact and the group JID for a group. The name is

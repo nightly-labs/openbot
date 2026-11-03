@@ -118,7 +118,7 @@ function agentTables(db: DatabaseSync): unknown[] {
 
 /**
  * The rows that migration 47 must keep: every table except the task table, which becomes the thread table.
- * Migration 48 adds an empty sender table after it.
+ * Migration 51 adds an empty sender table after it.
  */
 function withoutTasks(rows: Record<string, unknown[]>): Record<string, unknown[]> {
   const {

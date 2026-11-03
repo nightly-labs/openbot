@@ -643,7 +643,7 @@ is one linked number (`workspace_id` is the number in digits).
   The owner's own chat always counts. On the owner's personal number (the default) nobody else counts
   unless the owner allowed them, and OpenBot never writes to anyone first. On a number used only by
   OpenBot, an unknown direct sender gets one pairing code; at most three requests wait, for an hour,
-  in memory. Groups count only when allowed (migration 48, `projection_messaging_allowed_senders`).
+  in memory. Groups count only when allowed (migration 51, `projection_messaging_allowed_senders`).
 - **Messages.** `whatsapp-events.ts` turns a message into an `InboundMessage`: a direct chat is
   keyed by the phone number (LID forms are mapped through `remoteJidAlt`, `participantAlt` and the
   LID mapping), is one conversation (`dm`), and in a group a mention starts a conversation keyed by
