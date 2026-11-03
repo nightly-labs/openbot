@@ -158,6 +158,13 @@ import {
 import { ConnectionWaits } from "@/features/workspace/model/connection-waits";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
+import {
+  drawerSnapshot,
+  forgetDrawerSnapshots,
+  rememberDrawerValues,
+  restoreDrawerSnapshot,
+  startDrawerSnapshots,
+} from "@/features/workspace/model/drawer-snapshot";
 import { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
 import {
   dropApproval,
@@ -359,6 +366,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     () => createWorkspaceCache(`${session.apiUrl}:${session.user.id}`),
     [session.apiUrl, session.user.id],
   );
+  // Before the cache read below, so the drawer values of another account do not show.
+  useEffect(() => {
+    startDrawerSnapshots(`${session.apiUrl}:${session.user.id}`);
+    return () => startDrawerSnapshots(null);
+  }, [session.apiUrl, session.user.id]);
   /** The last agent list of each server, as the host sent it, for the phone's cache. */
   const cachedSummaries = useRef(new Map<string, RemoteAgent[]>());
   /** Servers whose cache this run read, once each. */
@@ -463,6 +475,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         ])
           queryClient.removeQueries({ queryKey });
       }
+      forgetDrawerSnapshots(serverIds);
       setSidebarByServer((current) => withoutKeys(current, serverIds));
       setHostHidden((current) => withoutKeys(current, serverIds));
       setAgents((current) => current.filter((agent) => !serverIds.has(agent.serverId)));
@@ -772,6 +785,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           hidden: hostHiddenRef.current[serverId] ?? null,
           sidebar: sidebarByServerRef.current[serverId]?.layout ?? null,
           conversations: agents.flatMap((agent) => conversationStore.cachedPage(agent.id) ?? []),
+          drawer: drawerSnapshot(serverId),
         })
         .catch(() => undefined);
     },
@@ -787,7 +801,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       void workspaceCache
         .read(id)
         .then((cached) => {
-          if (!cached || removedServers.current.has(id) || cachedSummaries.current.has(id)) return;
+          if (!cached || removedServers.current.has(id)) return;
+          if (cached.drawer) restoreDrawerSnapshot(id, cached.drawer);
+          if (cachedSummaries.current.has(id)) return;
           if (cached.hidden)
             applyHostHidden(
               id,
@@ -1264,6 +1280,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           setMemberCountByServer((current) =>
             current[serverId] === members ? current : { ...current, [serverId]: members },
           );
+          rememberDrawerValues(serverId, { memberCount: members });
           void queryClient.invalidateQueries({ queryKey: queryKeys.serverMembers(queryScope, serverId) });
           void queryClient.invalidateQueries({ queryKey: queryKeys.serverInvites(queryScope, serverId) });
         }

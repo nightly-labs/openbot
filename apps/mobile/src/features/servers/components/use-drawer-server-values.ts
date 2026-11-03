@@ -1,6 +1,7 @@
 import { isAgentTaskOpen } from "@openbot/team-client/agent-tasks";
 import { addCalendarDays, calendarDayOf } from "@openbot/team-client/routine-calendar-dates";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { lastUsageDays } from "@/features/agents/components/usage-range-picker";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useServerThreadReads } from "@/features/chat/components/use-agent-thread-reads";
@@ -9,6 +10,11 @@ import {
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  DRAWER_ROUTINE_RUNS,
+  rememberDrawerValues,
+  useDrawerSnapshot,
+} from "@/features/workspace/model/drawer-snapshot";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
@@ -46,15 +52,17 @@ export interface DrawerServerValues {
   memberCount: number | null;
 }
 
-/** The member count of a server, from the host's presence event. */
+/** The member count of a server, from the host's presence event, else from the last start. */
 export function useDrawerMemberCount(serverId: string): number | null {
-  return useMobileWorkspaceSelector((current) => current.memberCountByServer[serverId] ?? null);
+  const cached = useDrawerSnapshot(serverId).memberCount ?? null;
+  return useMobileWorkspaceSelector((current) => current.memberCountByServer[serverId] ?? cached);
 }
 
 /**
  * The values beside the server rows of the drawer. They come from the host, read when the drawer
  * opens and refreshed by its events. The member count comes from the host's presence event, not
- * from the account service.
+ * from the account service. Until the host answers, each value is the last one that the phone kept,
+ * so the drawer does not change after a start.
  */
 export function useDrawerServerValues(server: MobileServer | undefined, open: boolean): DrawerServerValues {
   const { t, format } = useText();
@@ -62,7 +70,9 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
   const { loadRoutineCalendar, loadHostAnalytics } = useMobileWorkspaceActions();
   const serverId = server?.id ?? "";
   const memberCount = useDrawerMemberCount(serverId);
-  const enabled = open && server?.state === "online";
+  const cached = useDrawerSnapshot(serverId);
+  const online = server?.state === "online";
+  const enabled = open && online;
 
   // The key starts at the hour, so it stays the same while the drawer opens and closes. The read itself
   // starts at the time of the read.
@@ -90,36 +100,41 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
 
   const now = Date.now();
   const timeZone = phoneTimeZone(now);
-  let nextRoutine: string | null = null;
+  let routineRuns: string[] | undefined;
   if (routines.data) {
     const active = new Set(
       routines.data.routines.filter((routine) => routine.active && routine.owner.kind === "agent").map((r) => r.id),
     );
-    const next = routines.data.runs
+    routineRuns = routines.data.runs
       .filter(
         (run) =>
           (run.status === "scheduled" || run.status === "queued") &&
           active.has(run.routineId) &&
           Date.parse(run.at) >= now,
       )
-      .sort((left, right) => Date.parse(left.at) - Date.parse(right.at))[0];
-    if (next) {
-      const at = new Date(next.at);
-      const day = calendarDayOf(at, timeZone);
-      const today = calendarDayOf(new Date(now), timeZone);
-      const time = format.date(at, { hour: "numeric", minute: "2-digit", timeZone });
-      nextRoutine =
-        day === today
-          ? t("mobile.server.routines.todayAt", { time })
-          : day === addCalendarDays(today, 1)
-            ? t("mobile.server.routines.tomorrowAt", { time })
-            : t("mobile.server.routines.dayAt", {
-                day: format.date(at, { weekday: "short", timeZone }),
-                time,
-              });
-    }
+      .map((run) => run.at)
+      .sort((left, right) => Date.parse(left) - Date.parse(right))
+      .slice(0, DRAWER_ROUTINE_RUNS);
   }
-  const cost = usage.data?.totals.estimatedCostUsd ?? null;
+  let nextRoutine: string | null = null;
+  const next = (routineRuns ?? cached.routineRuns)?.find((at) => Date.parse(at) >= now);
+  if (next) {
+    const at = new Date(next);
+    const day = calendarDayOf(at, timeZone);
+    const today = calendarDayOf(new Date(now), timeZone);
+    const time = format.date(at, { hour: "numeric", minute: "2-digit", timeZone });
+    nextRoutine =
+      day === today
+        ? t("mobile.server.routines.todayAt", { time })
+        : day === addCalendarDays(today, 1)
+          ? t("mobile.server.routines.tomorrowAt", { time })
+          : t("mobile.server.routines.dayAt", {
+              day: format.date(at, { weekday: "short", timeZone }),
+              time,
+            });
+  }
+  const usageUsd = usage.data ? (usage.data.totals.estimatedCostUsd ?? null) : undefined;
+  const cost = usageUsd === undefined ? (cached.usageUsd ?? null) : usageUsd;
   // A large amount drops its cents: the row has room for a short value.
   const digits = cost !== null && cost >= 100 ? 0 : 2;
   // The threads with agent messages that the person has not read, else the threads that run. The host
@@ -128,15 +143,30 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
     (task) => isAgentTaskOpen(task) && (threadReads?.get(task.id)?.unreadCount ?? 0) > 0,
   ).length;
   const working = serverTasks.tasks.filter((task) => isAgentTaskOpen(task) && task.state === "running").length;
+  // An online host has sent its capabilities. Until it is online and its lists are read, the drawer
+  // shows the counts of the last start.
+  const tasksKnown = online && (!serverTasks.supported || (enabled && serverTasks.ready));
+  const tasks = tasksKnown ? (serverTasks.supported ? { unread, working } : null) : cached.tasks;
+
+  const runsKey = routineRuns?.join("\n");
+  const tasksSupported = serverTasks.supported;
+  useEffect(() => {
+    if (!serverId) return;
+    rememberDrawerValues(serverId, {
+      ...(runsKey === undefined ? null : { routineRuns: runsKey ? runsKey.split("\n") : [] }),
+      ...(usageUsd === undefined ? null : { usageUsd }),
+      ...(tasksKnown ? { tasks: tasksSupported ? { unread, working } : null } : null),
+    });
+  }, [serverId, runsKey, usageUsd, tasksKnown, tasksSupported, unread, working]);
   return {
-    tasks: serverTasks.supported
+    tasks: tasks
       ? {
-          value: unread
-            ? t("mobile.server.drawer.threadsUnread", { count: unread })
-            : working
-              ? t("mobile.server.drawer.threadsWorking", { count: working })
+          value: tasks.unread
+            ? t("mobile.server.drawer.threadsUnread", { count: tasks.unread })
+            : tasks.working
+              ? t("mobile.server.drawer.threadsWorking", { count: tasks.working })
               : null,
-          needsYou: unread > 0,
+          needsYou: tasks.unread > 0,
         }
       : null,
     nextRoutine,
