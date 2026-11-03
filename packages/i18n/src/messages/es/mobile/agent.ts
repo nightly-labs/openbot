@@ -353,7 +353,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "No disponible ahora · omitido",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} nunca cambia después de empezar a escribir. Vuelve a {model} cuando termina el límite, o 10 minutos después de un error del proveedor.",
+    "Si un límite de uso detiene a {name} después de empezar a trabajar, {name} continúa el mismo trabajo con el primer modelo disponible del orden. Vuelve a {model} cuando termina el límite, o 10 minutos después de un error del proveedor.",
   "mobile.agent.busyMessage.label": "Mientras trabaja",
   "mobile.agent.busyMessage.footer":
     "Qué ocurre con un mensaje que envías mientras el agente trabaja. En cola lo guarda hasta que termina el turno. Orientar se lo da al agente durante el turno.",

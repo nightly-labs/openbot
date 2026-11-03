@@ -91,7 +91,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "現在使用できません · スキップ",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} は書き始めた後は切り替えません。上限が解除されると、またはプロバイダーのエラーから 10 分後に {model} に戻ります。",
+    "作業の開始後に利用上限で {name} が止まると、{name} は順序の中で最初に使えるモデルで同じ作業を続けます。上限が解除されると、またはプロバイダーのエラーから 10 分後に {model} に戻ります。",
   "agentSettings.groups.brain": "頭脳",
   "agentSettings.groups.knows": "知識",
   "agentSettings.groups.does": "実行",

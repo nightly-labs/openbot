@@ -95,7 +95,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Non disponibile ora · saltato",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} non cambia mai dopo aver iniziato a scrivere. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
+    "Se un limite di utilizzo ferma {name} dopo l'inizio del lavoro, {name} continua lo stesso lavoro con il primo modello disponibile nell'ordine. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
   "agentSettings.groups.brain": "Cervello",
   "agentSettings.groups.knows": "Cosa sa",
   "agentSettings.groups.does": "Cosa fa",

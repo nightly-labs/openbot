@@ -70,6 +70,8 @@ export interface DrainHooks {
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
   /** Whether a ready automatic backup can take this agent's work after a usage limit. */
   mayFailOver(agentId: string): boolean;
+  /** Whether a ready backup in the agent's order continues work that a usage limit stopped after it started. */
+  mayContinueOnBackup(agentId: string): boolean;
   /**
    * Starts the move of this agent to another model for a usage limit, if one is due: back to its own
    * model, or to a backup model during a hold. True when a move started; the move schedules the drain
@@ -1016,7 +1018,7 @@ export class DrainScheduler {
             // A ready backup continues earlier work in the same assignment, so the work is not lost.
             if (
               context.resumeAfterUsageLimit &&
-              this.#hooks.mayFailOver(delivery.recipientAgentId) &&
+              this.#hooks.mayContinueOnBackup(delivery.recipientAgentId) &&
               (yield* this.#hooks.requeueChannelDelivery(delivery.id, true))
             ) {
               yield* this.#mailbox.restoreQueued(delivery.id).pipe(toDeliveryStartFailed);
