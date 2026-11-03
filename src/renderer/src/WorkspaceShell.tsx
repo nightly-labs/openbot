@@ -240,9 +240,9 @@ export function WorkspaceShell(props: {
     },
   );
   createEffect(
-    () => !fullWindowLoading(),
-    (loaded) => {
-      if (loaded) props.onStartupReady?.();
+    () => (fullWindowLoading() ? undefined : props.onStartupReady),
+    (onStartupReady) => {
+      onStartupReady?.();
     },
   );
   const connectionNotice = (cover = false, screen = true) => (

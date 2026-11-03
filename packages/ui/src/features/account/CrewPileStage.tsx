@@ -238,9 +238,9 @@ export function CrewPileStage(props: CrewPileStageProps) {
   });
 
   createEffect(
-    () => [props.hop, player()] as const,
-    ([hop, playing]) => {
-      if (hop && playing) props.onHop?.(playing.hopOut());
+    () => [props.hop, player(), props.onHop] as const,
+    ([hop, playing, onHop]) => {
+      if (hop && playing) onHop?.(playing.hopOut());
     },
   );
 

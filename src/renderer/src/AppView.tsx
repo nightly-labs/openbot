@@ -17,6 +17,9 @@ import { AccountLogin, FirstRunFlow, InitialSetup, LanguageStep } from "./lazy-v
 import { usePlatform } from "./platform";
 import { WorkspaceShell } from "./WorkspaceShell";
 
+// A server switch mounts this gate again. Only the first splash of a start or a reload plays through.
+let startupSplashPlayed = false;
+
 /** The placeholder every lazy view below falls back to while its code loads. */
 function LoadingScreen() {
   const { t } = useText();
@@ -54,6 +57,7 @@ export function AppAccessGate() {
   const { joinRemoteDuringSetup } = useServerSelection();
   const started = () => setup.setupLoaded() && platform.appInfo() !== null;
   const [splashShown, setSplashShown] = createSignal(true);
+  const splashPlaysThrough = !startupSplashPlayed;
   // The splash lets the workspace mount its heavy views before the crew hop out.
   const [splashOpen, setSplashOpen] = createSignal(false);
   const splashMoving = () => splashShown() && !splashOpen();
@@ -195,9 +199,12 @@ export function AppAccessGate() {
         <AppLoadingScreen
           label={t("app.loading")}
           ready={splashReady()}
-          quickExit={false}
+          quickExit={!splashPlaysThrough}
           onMountViews={() => setSplashOpen(true)}
-          onExited={() => setSplashShown(false)}
+          onExited={() => {
+            startupSplashPlayed = true;
+            setSplashShown(false);
+          }}
         />
       </Show>
     </>

@@ -262,12 +262,18 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
         unstyled: true,
         closeButton: false,
         class: "server-connection-toast-host",
-        onDismiss: () => setToastClosed(true),
+        // A `toast.dismiss` call also calls this. Only a toast that is still wanted was closed by the user.
+        onDismiss: () => {
+          if (toastShown) setToastClosed(true);
+        },
       });
     },
   );
   // A write to the Toaster from a scope cleanup stops the reactive system, so it waits for a microtask.
-  onCleanup(() => queueMicrotask(() => toast.dismiss(toastId)));
+  onCleanup(() => {
+    toastShown = false;
+    queueMicrotask(() => toast.dismiss(toastId));
+  });
   return (
     <>
       <Show
