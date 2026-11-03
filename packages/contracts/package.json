@@ -78,6 +78,7 @@
     "./team-protocol/browser-view-v1": "./src/team-protocol/browser-view-v1.ts",
     "./team-protocol/mcp-sign-in-app-v1": "./src/team-protocol/mcp-sign-in-app-v1.ts",
     "./team-protocol/mcp-sign-in-v1": "./src/team-protocol/mcp-sign-in-v1.ts",
+    "./team-protocol/message-delete-v1": "./src/team-protocol/message-delete-v1.ts",
     "./team-protocol/provider-account-relay-v1": "./src/team-protocol/provider-account-relay-v1.ts",
     "./team-protocol/provider-account-relay-v2": "./src/team-protocol/provider-account-relay-v2.ts",
     "./team-protocol/provider-account-relays": "./src/team-protocol/provider-account-relays.ts",

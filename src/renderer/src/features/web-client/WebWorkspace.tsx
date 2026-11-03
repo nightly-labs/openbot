@@ -23,6 +23,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { PricingOrder } from "@openbot/contracts/license";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
+import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_FAST_MODE_ROUTES } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
@@ -41,6 +42,7 @@ import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
+import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-question-v1";
@@ -84,6 +86,7 @@ import {
 import { clearAgentContext, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { classifyFailure } from "@openbot/telemetry";
 import { hasVisibleToasts, toast } from "@openbot/ui";
+import type { AgentMessage } from "@openbot/ui/data";
 import { accountUsageProviderRows } from "@openbot/ui/features/account/account-usage-view";
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
@@ -180,6 +183,7 @@ import type {
   ConversationThreads,
   PromptAnswerOptions,
 } from "../conversation/conversation-types";
+import { createAgentMessageDeleteAccess, readerCanDeleteMessage } from "../conversation/message-delete-access";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import type { FilesPort } from "../files/files-port";
 import { hostSetupProviderProps } from "../onboarding/host-setup-provider-props";
@@ -1238,6 +1242,40 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setAgentAccess: async (change, serverId) =>
       runTeamEffect(setHostAgentAccess(hostRequest(serverId), change).pipe(Effect.mapError((error) => error.cause))),
   };
+  /** Whether the reader is the sender `senderId` of a message on the connected host. */
+  const isOwnAgentChatSender = (senderId: string) =>
+    isReaderAuthor(senderId, {
+      memberId: workspace.state.memberId,
+      accountUserId: props.accountId,
+      onOwnComputer: false,
+    });
+  const messageDeleteSupported = () => workspace.state.capabilities.includes(MESSAGE_DELETE_CAPABILITY);
+  const deletesAnyAgentMessage = createAgentMessageDeleteAccess({
+    deletesAny: () => canAdministerServer(workspace.state.host?.role),
+    levelsServerId: () => {
+      const hostId = server()?.id;
+      if (!hostId || workspace.state.status !== "online" || canAdministerServer(workspace.state.host?.role))
+        return null;
+      return messageDeleteSupported() && workspace.state.capabilities.includes(AGENT_ACCESS_CAPABILITY) ? hostId : null;
+    },
+    readLevels: (serverId) => hostAgentAccessCalls.getAgentAccess(serverId),
+    onLevelsChanged: (_serverId, listener) =>
+      workspace.onHostEvent((event) => {
+        if (event.type === "agent-access-changed") listener();
+      }),
+  });
+  /** Whether the reader may delete `message` in the open agent's chat or side threads. */
+  const canDeleteAgentMessage = (message: AgentMessage) =>
+    readerCanDeleteMessage(message, {
+      deleteAny: deletesAnyAgentMessage(workspace.state.selectedId ?? undefined),
+      isOwnSender: isOwnAgentChatSender,
+    });
+  const deleteOpenAgentMessage = (messageId: string) => {
+    const agentId = workspace.state.selectedId;
+    return agentId ? workspace.deleteMessage(agentId, messageId) : Promise.resolve();
+  };
+  /** The Delete action of the open agent's chat. A host without `message-delete-v1` has none. */
+  const agentDeleteMessageAction = () => (messageDeleteSupported() ? deleteOpenAgentMessage : undefined);
   const hostServerAuditCalls: HostServerAuditCalls = {
     getAuditLog: async (serverId) =>
       runTeamEffect(getHostAuditLog(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -1355,6 +1393,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     supported: channelsSupported,
     deletionSupported: () => canAdministerServer(workspace.state.host?.role),
     taskCancelSupported: () => workspace.state.capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
+    messageDeletionSupported: () => workspace.state.capabilities.includes(MESSAGE_DELETE_CAPABILITY),
+    deletesAnyMessage: () => canAdministerServer(workspace.state.host?.role),
     pictureSupported: () => false,
     beforeOpen: () => {
       setCreating(false);
@@ -2681,6 +2721,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onCloseBrowserTab={(tabId) => workspace.runtime.closeBrowserTab(tabId)}
                         onOpenRemoteDesktop={unavailable}
                         onStop={channelView.onStop}
+                        onDeleteMessage={channelView.deleteMessageAction()}
+                        canDeleteMessage={channelView.canDeleteMessage}
                       />
                     );
                   }}
@@ -2794,13 +2836,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   server={server()}
                   presence={workspace.state.presence ?? { serverId: server()?.id ?? null, members: [], updatedAt: "" }}
                   currentUserEmail={props.accountEmail ?? ""}
-                  isOwnSender={(senderId) =>
-                    isReaderAuthor(senderId, {
-                      memberId: workspace.state.memberId,
-                      accountUserId: props.accountId,
-                      onOwnComputer: false,
-                    })
-                  }
+                  isOwnSender={isOwnAgentChatSender}
                   browserEnabled={browserEnabled()}
                   remoteDesktopEnabled={false}
                   remoteDesktopSessionActive={false}
@@ -2832,6 +2868,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     return workspace.send(id, text, attachments, replyTo, clientMessageId);
                   }}
                   onMarkRead={workspace.markRead}
+                  onDeleteMessage={agentDeleteMessageAction()}
+                  canDeleteMessage={canDeleteAgentMessage}
                   onLoadOlder={() => void workspace.older()}
                   onLoadLatest={workspace.refresh}
                   onSearchMessages={async (query) => {

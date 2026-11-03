@@ -315,6 +315,20 @@ Automatic text and selection changes stay pending until the turn completes succe
 checks ownership, revisions, user choices, and capacity again. Agent tools cannot change or delete
 a user-controlled selection. The user can release that control without changing its inclusion.
 
+The optional `message-delete-v1` capability (protocol 9 only) adds three POST routes that delete one
+message and return an empty acknowledgement: `/v1/messages/delete` (`agentId`, `messageId`),
+`/v1/messages/delete-task` (`agentId`, `taskId`, `messageId`) and `/v1/channels/messages/delete`
+(`channelId`, `messageId`). The host always advertises it to a protocol 9 peer, because every host
+that has the routes can delete. `src/main/team-api/route-message-delete.ts` owns the authorization.
+In an agent chat, the agent must be visible to the member (else 404), and the member needs `chat` on
+the agent to delete their own messages; `manage` lets them delete any message. In a channel, each
+member deletes their own messages, and owners and admins delete any message. A host without channels
+answers the channel route with 400 `channelsUnsupported`, as it answers each channel route. A refusal
+from the service gets 403 (not the member's message), 404 (no shown message with that ID) or 409 (the
+message is in a running turn), with the host's sentence. A delete removes the message from the host's
+history, search and attachments; the provider session can still remember it. The host sends its
+usual change events (`conversation-invalidated` and `channels-changed`), so other members refresh.
+
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 
 Protocol support has no fixed time or release limit. Removal is an exceptional architecture decision. It requires a security issue, data-loss risk, semantics that cannot be kept, or technical cost that cannot be contained in an adapter. The decision must also include a changelog entry, update instructions, tests for old-client/new-host and new-client/old-host directions, and clear blocking UI.

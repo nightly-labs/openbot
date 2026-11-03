@@ -78,6 +78,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "Это подключение не поддерживает обновление агентов.",
   "error.team.contextResetUnsupported": "Это подключение не поддерживает начало нового чата.",
   "error.team.contextCompactUnsupported": "Это подключение не поддерживает сжатие контекста.",
+  "error.team.messageDeleteUnsupported": "Это подключение не поддерживает удаление сообщений.",
   "error.team.workspaceDirectoryUnsupported": "Это подключение не поддерживает показ папок.",
   "error.team.conversationFileSearchUnsupported": "Это подключение не поддерживает поиск файлов.",
   "error.team.sideQuestionUnsupported": "Это подключение не поддерживает побочные вопросы.",

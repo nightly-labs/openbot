@@ -20,7 +20,7 @@ import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
-import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
@@ -221,6 +221,15 @@ export function ConversationTimeline() {
     if (channel || !onMarkUnread || !isIncomingAgentMessage(message) || message.streaming) return;
     return () => void onMarkUnread(message.id);
   };
+  /** The message that the delete dialog asks about. */
+  const [deleteTargetId, setDeleteTargetId] = createSignal<string | null>(null);
+  /** A message that the host stores can be deleted, when the reader may delete it. */
+  const deleteAction = (message: AgentMessage) => {
+    if (!props.onDeleteMessage || message.streaming || message.id.startsWith(PENDING_SEND_ID_PREFIX)) return;
+    if (props.canDeleteMessage && !props.canDeleteMessage(message)) return;
+    return () => setDeleteTargetId(message.id);
+  };
+  const deleteMessage = (messageId: string) => props.onDeleteMessage?.(messageId) ?? Promise.resolve();
   /** A finished message of an agent chat can start work in a channel. A channel message stays where it is. */
   const sendToChannelAction = (message: AgentMessage) => {
     const target = props.sendToChannel;
@@ -1343,6 +1352,7 @@ export function ConversationTimeline() {
                                       sendToChannel={sendToChannelAction(message() ?? initialMessage)}
                                       onBranch={branchAction(message() ?? initialMessage)}
                                       branchDisabled={Boolean(props.activeTurnId)}
+                                      onDelete={deleteAction(message() ?? initialMessage)}
                                     />
                                   )
                             }
@@ -1481,6 +1491,11 @@ export function ConversationTimeline() {
           </div>
         </Show>
       </div>
+      <DeleteMessageDialog
+        messageId={deleteTargetId()}
+        onDelete={deleteMessage}
+        onClose={() => setDeleteTargetId(null)}
+      />
     </>
   );
 }

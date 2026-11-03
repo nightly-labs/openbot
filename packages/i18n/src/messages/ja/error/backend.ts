@@ -211,6 +211,10 @@ export const messages = {
     "開いている待機は、このコンピューター上のエージェントでのみ使用できます。",
   "error.backend.markUnreadRemoteUnsupported":
     "メッセージを未読にする操作は、このコンピューター上のエージェントでのみ使用できます。",
+  "error.backend.messageDeleteUnsupported": "このサーバーはメッセージの削除に対応していません。",
+  "error.backend.messageDeleteNotFound": "このメッセージはチャットにありません。",
+  "error.backend.messageDeleteBusy": "このメッセージは実行中のターンの一部です。ターンが終わってから削除してください。",
+  "error.backend.messageDeleteForbidden": "削除できるのは自分が送信したメッセージだけです。",
   "error.backend.routineFlowHandoffFailed": "ルーティンはこのエージェントに作業を渡せませんでした。",
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",

@@ -88,6 +88,7 @@ export function createWebChannelsPort(
       respondToPrompt: (input) => remote.answer(input),
       respondToBrowserTakeover: (input) => remote.respondToTakeover(input),
       respondToBrowserSecret: (input) => remote.respondToBrowserSecret?.(input) ?? unavailable(),
+      deleteChannelMessage: (input) => remote.deleteMessage?.({ kind: "channel", ...input }) ?? unavailable(),
     },
     get eventRoutines() {
       return eventsEnabled() ? eventRoutines : undefined;

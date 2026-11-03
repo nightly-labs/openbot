@@ -509,6 +509,24 @@ change, because the remote client cannot see it. The channel threads of the agen
 (`ChannelStore.contextThreadsForAgent`) are retired too, and their work steps are saved. A channel
 turn also carries its own self-contained context packet. The instance transfer file keeps `taskLimit`.
 
+## Deleted chat messages
+
+`AgentService.deleteConversationMessage` (`src/backend/agent/message-deletion.ts`) deletes one shown
+message from an agent's own chat or, with `taskId`, from a side thread. Without `deleteAny`, a person
+can delete only a user message that they sent: its `senderMember.id` is their member id, or it has no
+`senderMember` for the user of this computer. A message of the running turn, a streaming message and
+a queued, starting or running delivery are `busy`.
+
+The delete removes the mailbox copy first (`MailboxStore.deleteShownMessage`): a person's message loses
+its delivery to the agent, and the message, its reactions, idempotency keys and unused files go when no
+other delivery remains. A teammate's and a routine's message stay in the mailbox for the other chat and
+the run. Then one `conversation.message-deleted` event removes the projection row and adds a row to
+`projection_deleted_thread_messages` (migration 55). Each read mark on the message moves to the message
+before it. Earlier events of the thread lose the message (`scrubDeletedMessageEvents`), so the event
+log and a replay keep no copy of its text. The record keeps the message out of each later write,
+provider history import, mailbox sync, replay and live publish. The record goes with its thread. The
+provider session, the thread summary text, the event `detail` and usage records are not changed.
+
 ## Agent communication policy
 
 The shared developer instructions keep routine teammate exchanges internal by default. Agents

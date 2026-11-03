@@ -209,6 +209,10 @@ export const messages = {
   "error.backend.agentWaitRemoteUnsupported": "Open wachtpunten zijn alleen beschikbaar voor agents op deze computer.",
   "error.backend.markUnreadRemoteUnsupported":
     "Een bericht als ongelezen markeren is alleen beschikbaar voor agents op deze computer.",
+  "error.backend.messageDeleteUnsupported": "Deze server ondersteunt het verwijderen van berichten niet.",
+  "error.backend.messageDeleteNotFound": "Dit bericht staat niet in de chat.",
+  "error.backend.messageDeleteBusy": "Dit bericht hoort bij een lopende beurt. Verwijder het als de beurt klaar is.",
+  "error.backend.messageDeleteForbidden": "Je kunt alleen berichten verwijderen die je zelf hebt verzonden.",
   "error.backend.routineFlowHandoffFailed": "De routine kon het werk niet aan deze agent doorgeven.",
   "error.backend.mcpServerLimit": "OpenBot bewaart maximaal {limit} MCP-servers.",
   "error.backend.mcpServerNameTaken": "Er bestaat al een MCP-server met de naam {name}.",

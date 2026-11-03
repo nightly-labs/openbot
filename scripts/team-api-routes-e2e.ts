@@ -8,7 +8,7 @@
 // over the real service and store,
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // direct-message isolation, agents hidden from an older
-// protocol, the queue routes, the attachment and file routes with their size limits, and the error
+// protocol, the queue routes, message delete (`message-delete-v1`) under the agent roles, the attachment and file routes with their size limits, and the error
 // codes. Writes .openbot-build/team-api-routes-e2e/report.json.
 // Run: `bun run test:team-api-routes` (the preload gives the server's import graph an `electron`).
 import assert from "node:assert/strict";
@@ -28,6 +28,7 @@ import {
   type AttachmentDataInput,
   type BitwardenConnectorStatus,
   type CentralAuthUser,
+  CHANNEL_CHATS_CAPABILITY,
   type CustomAgentResult,
   type CustomAgentSummary,
   type CustomProviderResult,
@@ -116,6 +117,7 @@ import {
   machineAlertEvent,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
+import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_DEFAULT_ROUTES,
@@ -157,9 +159,11 @@ import { AgentLifecycleFailed } from "../src/backend/agent-service";
 import { BrowserProfileStore } from "../src/backend/browser-profiles/browser-profile-store";
 import type { BrowserTabSession } from "../src/backend/browser-state";
 import { runCauseEffect } from "../src/backend/effect-boundary";
+import { MessageDeleteRefused } from "../src/backend/message-delete";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
 import { TeamChatStore } from "../src/backend/team-chat-store";
+import type { AgentAccessState } from "../src/main/agent-access-store";
 import { createAgentFolders } from "../src/main/agent-folders";
 import { createAgentHostSettings } from "../src/main/agent-host-settings";
 import { createAgentInstructionsFiles } from "../src/main/agent-instructions-files";
@@ -172,6 +176,7 @@ import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preferenc
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import { SidebarPinStore } from "../src/main/sidebar-pin-store";
 import type {
+  TeamApiAgentAccess,
   TeamApiAgents,
   TeamApiAgentTasks,
   TeamApiBrowser,
@@ -392,6 +397,17 @@ const NO_STATUS: AgentStatus = {
 
 let hidden: HiddenAgentsSnapshot = { agents: [{ agentId: "agent-pi", hiddenAt: new Date(0).toISOString() }] };
 
+// The roles of this host. Empty roles give every member `manage`, as a host without roles does; the
+// message delete checks set "everyone" to a lower level for one agent.
+let accessLevels: AgentAccessState = { revision: 0, everyone: {}, roles: [] };
+const agentAccess: TeamApiAgentAccess = {
+  get: () => accessLevels,
+  levels: () => accessLevels,
+  subscribe: () => () => undefined,
+  set: unused("agentAccess.set"),
+  copyAgent: unused("agentAccess.copyAgent"),
+};
+
 const fakeAgents: TeamApiAgents = {
   on: () => undefined,
   off: () => undefined,
@@ -531,6 +547,16 @@ const fakeAgents: TeamApiAgents = {
   listWorkspaceDirectory: unused("listWorkspaceDirectory"),
   sendMessage: unused("sendMessage"),
   setMessageReaction: unused("setMessageReaction"),
+  // A member owns `message-of-<member id>`. `message-gone` is not shown and `message-busy` is in a
+  // running turn, as the agent service answers them.
+  deleteConversationMessage: (input, access) => {
+    record("deleteConversationMessage", input, access);
+    if (input.messageId === "message-gone") return Effect.fail(new MessageDeleteRefused({ reason: "not-found" }));
+    if (input.messageId === "message-busy") return Effect.fail(new MessageDeleteRefused({ reason: "busy" }));
+    if (!access.deleteAny && input.messageId !== `message-of-${access.memberId}`)
+      return Effect.fail(new MessageDeleteRefused({ reason: "forbidden" }));
+    return Effect.void;
+  },
   clearAgentContext: unused("clearAgentContext"),
   compactAgentContext: (agentId) => Effect.sync(() => record("compactAgentContext", agentId)),
   compactTaskContext: (input) => {
@@ -958,6 +984,7 @@ try {
     store,
     agents: fakeAgents,
     agentTasks: fakeAgentTasks,
+    agentAccess,
     mailbox,
     browser,
     chat: new TeamChatStore(database),
@@ -2882,6 +2909,154 @@ try {
         errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("compactAgentContext").length === 1,
       [summary(missing), summary(hidden)],
+    );
+  }
+
+  // ---- Delete a message (message-delete-v1) ----
+  {
+    const deleteCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, MESSAGE_DELETE_CAPABILITY];
+    const deletes = () => callsOf("deleteConversationMessage");
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises message-delete-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(MESSAGE_DELETE_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(MESSAGE_DELETE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "message-1" },
+    });
+    check(
+      "the delete routes without the capability get 400 messageDeleteUnsupported, and delete nothing",
+      errorIs(unsupported, 400, sourceText("error.team.messageDeleteUnsupported")) && deletes().length === 0,
+      summary(unsupported),
+    );
+    const chat = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "message-1" },
+      capabilities: deleteCapabilities,
+    });
+    const task = await call("POST", MESSAGE_DELETE_ROUTES.task, {
+      token: bobToken,
+      json: { agentId: "agent-ada", taskId: "task-1", messageId: "message-2" },
+      capabilities: deleteCapabilities,
+    });
+    check(
+      "a member who manages the agent deletes any message of its chat and of one of its tasks, with an empty answer",
+      chat.status === 200 &&
+        isDeepStrictEqual(chat.body, {}) &&
+        task.status === 200 &&
+        isDeepStrictEqual(task.body, {}) &&
+        isDeepStrictEqual(deletes(), [
+          [
+            { agentId: "agent-ada", messageId: "message-1" },
+            { memberId: bobId, deleteAny: true },
+          ],
+          [
+            { agentId: "agent-ada", taskId: "task-1", messageId: "message-2" },
+            { memberId: bobId, deleteAny: true },
+          ],
+        ]),
+      [summary(chat), summary(task), deletes()],
+    );
+    const busy = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "message-busy" },
+      capabilities: deleteCapabilities,
+    });
+    const gone = await call("POST", MESSAGE_DELETE_ROUTES.task, {
+      token: bobToken,
+      json: { agentId: "agent-ada", taskId: "task-1", messageId: "message-gone" },
+      capabilities: deleteCapabilities,
+    });
+    check(
+      "a refused delete gets 409 for a running turn and 404 for a message that is not shown, with the host's sentence",
+      errorIs(busy, 409, sourceText("error.backend.messageDeleteBusy")) &&
+        errorIs(gone, 404, sourceText("error.backend.messageDeleteNotFound")),
+      [summary(busy), summary(gone)],
+    );
+    accessLevels = { revision: 1, everyone: { "agent-ada": "chat" }, roles: [] };
+    const before = deletes().length;
+    const others = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "message-of-someone" },
+      capabilities: deleteCapabilities,
+    });
+    const own = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: `message-of-${bobId}` },
+      capabilities: deleteCapabilities,
+    });
+    const admin = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: adaToken,
+      json: { agentId: "agent-ada", messageId: "message-of-someone" },
+      capabilities: deleteCapabilities,
+    });
+    check(
+      "with chat on the agent, a member gets 403 for another message and deletes their own; an admin deletes any",
+      errorIs(others, 403, sourceText("error.backend.messageDeleteForbidden")) &&
+        own.status === 200 &&
+        admin.status === 200 &&
+        isDeepStrictEqual(deletes().slice(before), [
+          [
+            { agentId: "agent-ada", messageId: "message-of-someone" },
+            { memberId: bobId, deleteAny: false },
+          ],
+          [
+            { agentId: "agent-ada", messageId: `message-of-${bobId}` },
+            { memberId: bobId, deleteAny: false },
+          ],
+          [
+            { agentId: "agent-ada", messageId: "message-of-someone" },
+            { memberId: adaId, deleteAny: true },
+          ],
+        ]),
+      [summary(others), summary(own), summary(admin)],
+    );
+    accessLevels = { revision: 2, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewOnly = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: `message-of-${bobId}` },
+      capabilities: deleteCapabilities,
+    });
+    accessLevels = { revision: 3, everyone: {}, roles: [] };
+    check(
+      "a member who can only view the agent gets 403 agentViewOnly, and the host deletes nothing",
+      errorIs(viewOnly, 403, sourceText("error.team.agentViewOnly")) && deletes().length === before + 3,
+      summary(viewOnly),
+    );
+    const missing = await call("POST", MESSAGE_DELETE_ROUTES.agent, {
+      token: bobToken,
+      json: { agentId: "agent-none", messageId: "message-1" },
+      capabilities: deleteCapabilities,
+    });
+    const hiddenAgent = await call("POST", MESSAGE_DELETE_ROUTES.task, {
+      token: bobToken,
+      json: { agentId: "agent-pi", taskId: "task-1", messageId: "message-1" },
+      capabilities: deleteCapabilities,
+      protocol: 6,
+    });
+    check(
+      "an unknown agent, and an agent that the client protocol does not show, get 404 and delete nothing",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        deletes().length === before + 3,
+      [summary(missing), summary(hiddenAgent)],
+    );
+    // This host has no channel service, so the channel route answers as every channel route does.
+    // `channel-notifications-e2e.ts` runs the real channel service.
+    const channel = await call("POST", MESSAGE_DELETE_ROUTES.channel, {
+      token: bobToken,
+      json: { channelId: "channel-1", messageId: "message-1" },
+      capabilities: [...deleteCapabilities, CHANNEL_CHATS_CAPABILITY],
+    });
+    check(
+      "the channel delete route on a host without channels gets 400 channelsUnsupported",
+      errorIs(channel, 400, sourceText("error.team.channelsUnsupported")),
+      summary(channel),
     );
   }
 
