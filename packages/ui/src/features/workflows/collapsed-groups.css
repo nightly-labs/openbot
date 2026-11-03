@@ -1,0 +1,30 @@
+/* All workflows: the fold button in a group title (Running now, the issue groups) and its caret. */
+.wfo-fold {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.wfo-fold:focus-visible {
+  border-radius: var(--openbot-radius-sm, 4px);
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.wfo-caret {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+}
+
+.wfo-caret[data-open] {
+  transform: rotate(90deg);
+}

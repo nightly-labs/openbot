@@ -14,11 +14,17 @@ import { ImageNode } from "@openbot/ui/features/workflows/WorkflowImageNode";
 import { LlmNode } from "@openbot/ui/features/workflows/WorkflowLlmNode";
 import { NoteNode } from "@openbot/ui/features/workflows/WorkflowNoteNode";
 import { OutputNode } from "@openbot/ui/features/workflows/WorkflowOutputNode";
+import type { OverviewWorkflow } from "@openbot/ui/features/workflows/WorkflowOverview";
+import { WorkflowOverview } from "@openbot/ui/features/workflows/WorkflowOverview";
+import { WorkflowOverviewSettings } from "@openbot/ui/features/workflows/WorkflowOverviewSettings";
 import { PromptNode } from "@openbot/ui/features/workflows/WorkflowPromptNode";
 import { TextNode } from "@openbot/ui/features/workflows/WorkflowTextNode";
 import { TriggerNode } from "@openbot/ui/features/workflows/WorkflowTriggerNode";
 import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
+import { createSignal } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import type { IssueStats } from "../src/features/workflows/WorkflowIssueStats";
+import { WorkflowIssueStats } from "../src/features/workflows/WorkflowIssueStats";
 import { NodeGallery } from "./workflow-node-gallery";
 import {
   AGENT_RESULT,
@@ -382,4 +388,107 @@ export const Locked: Story = {
       <NoteNode id="note" text="Locked so that nobody moves the sources by mistake." />
     </NodeGallery>
   ),
+};
+
+/** The story overview: three groups, a running step, and issue numbers over the story repo. */
+const OVERVIEW_WORKFLOWS: OverviewWorkflow[] = [
+  {
+    id: "judge",
+    title: "Patch review",
+    steps: 3,
+    trigger: "schedule",
+    nextDueAt: todayAt(15, 30),
+    run: { id: "run-1", number: 12, status: "approval", startedAt: todayAt(14, 2), endedAt: null },
+    step: "Reviewer",
+    tone: "judge",
+  },
+  {
+    id: "glm-build",
+    title: "GLM nightly build",
+    steps: 5,
+    trigger: "schedule",
+    nextDueAt: todayAt(23, 0),
+    run: { id: "run-2", number: 9, status: "failed", startedAt: todayAt(9, 14), endedAt: todayAt(9, 51) },
+    step: null,
+    tone: "violet",
+  },
+  {
+    id: "conflict-sweep",
+    title: "Conflict sweep",
+    steps: 2,
+    trigger: "manual",
+    nextDueAt: null,
+    run: null,
+    step: null,
+    tone: "conflict",
+  },
+];
+
+const OVERVIEW_ISSUES: IssueStats = {
+  generatedAt: todayAt(13, 45),
+  refreshMs: 300_000,
+  repo: "example/product",
+  open: {
+    total: 24,
+    forOwner: 5,
+    untagged: [{ number: 431, title: "Settings screen loses its tabs on a narrow window" }],
+    labels: [
+      { name: "needs-plan", count: 3, opened24h: 1, closed24h: 0 },
+      { name: "in-review", count: 6, opened24h: 2, closed24h: 4 },
+      { name: "test-red", count: 1, opened24h: 1, closed24h: 0 },
+    ],
+  },
+  closed: {
+    windowHours: 170,
+    total: 19,
+    priorities: [
+      { key: "P0", done: 2, dropped: 0, days: [3, 1, 4, 2, 0, 2, 1] },
+      { key: "P1", done: 6, dropped: 1, days: [5, 3, 2, 4, 1, 3, 2] },
+      { key: "none", done: 4, dropped: 0, days: [1, 0, 2, 1, 0, 1, 0] },
+    ],
+  },
+};
+
+/** The overview as one page, with its settings dialog open over it. */
+function OverviewStory() {
+  const [settingsOpen, setSettingsOpen] = createSignal(true);
+  return (
+    <>
+      <WorkflowOverview
+        workflows={OVERVIEW_WORKFLOWS}
+        starting={new Set<string>()}
+        readOnly={false}
+        onOpen={() => undefined}
+        onRun={() => undefined}
+        onStop={() => undefined}
+        onSettings={() => setSettingsOpen(true)}
+        top={<WorkflowIssueStats stats={OVERVIEW_ISSUES} error={null} loading={false} />}
+      />
+      <WorkflowOverviewSettings
+        open={settingsOpen()}
+        onOpenChange={setSettingsOpen}
+        project={null}
+        onProjectChange={() => undefined}
+        reportedProject="example/product"
+        colorRules={[
+          { pattern: "*judge*", tone: "judge" },
+          { pattern: "*glm*", tone: "violet" },
+          { pattern: "*build*", tone: "build" },
+        ]}
+        onColorRulesChange={() => undefined}
+        usageRows={[
+          { id: "zai-1", name: "Z.ai Plan 1", summary: "5-hour 86% left" },
+          { id: "zai-2", name: "Z.ai Plan 2", summary: "5-hour 92% left, Weekly 99% left" },
+        ]}
+        hiddenUsageRows={[]}
+        onHiddenUsageRowsChange={() => undefined}
+      />
+    </>
+  );
+}
+
+/** Every workflow on one page, and the settings that name the project, the colours and the rings. */
+export const Overview: Story = {
+  parameters: { layout: "fullscreen" },
+  render: () => <OverviewStory />,
 };

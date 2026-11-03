@@ -12,6 +12,7 @@ export type WindowPage =
   | "tasks"
   | "schedule"
   | "workflows"
+  | "all-workflows"
   | "usage"
   | "marketplace"
   | "settings"
@@ -137,9 +138,13 @@ const context = createSimpleContext({
         const serverId = activeServerId();
         if (serverId) usage.openSchedule(serverId, source);
       },
-      openWorkflows(source: HTMLElement | null) {
+      openWorkflows(source: HTMLElement | null, workflowId?: string) {
         const serverId = activeServerId();
-        if (serverId) usage.openWorkflows(serverId, source);
+        if (serverId) usage.openWorkflows(serverId, source, workflowId);
+      },
+      openAllWorkflows(source: HTMLElement | null) {
+        const serverId = activeServerId();
+        if (serverId) usage.openAllWorkflows(serverId, source);
       },
       openUsage(source: HTMLElement | null) {
         const serverId = activeServerId();

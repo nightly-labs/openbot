@@ -1,0 +1,157 @@
+/* All workflows: the GitHub issue groups above the workflow cards. Reuses the .wfo-group / .wfo-group-title
+   look; everything here is prefixed wfoi- so it never meets a rule of workflows.css. */
+
+/* The fold button and caret (.wfo-fold, .wfo-caret) come from collapsed-groups.css. */
+.wfoi-summary {
+  color: var(--openbot-text-muted);
+  font-weight: normal;
+}
+
+.wfoi-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.wfoi-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--openbot-space-1);
+  padding: 0 var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-secondary);
+  background: var(--openbot-bg-control);
+  font: inherit;
+  font-size: var(--openbot-text-sm);
+}
+
+button.wfoi-chip:not(:disabled) {
+  cursor: pointer;
+}
+
+button.wfoi-chip:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 1px;
+}
+
+.wfoi-chip[data-tone="owner"] {
+  color: var(--openbot-accent-text);
+  background: var(--openbot-accent-soft);
+}
+
+.wfoi-chip[data-tone="bad"] {
+  color: var(--openbot-danger-text);
+  background: var(--openbot-danger-soft);
+}
+
+.wfoi-stamp {
+  margin-left: auto;
+}
+
+.wfoi-untagged {
+  margin: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  list-style: none;
+}
+
+.wfoi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  align-items: stretch;
+  gap: var(--openbot-space-2);
+}
+
+.wfoi-grid-priority {
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+
+.wfoi-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0 var(--openbot-space-2);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-surface);
+}
+
+.wfoi-card[data-tone="owner"] {
+  border-color: var(--openbot-accent-text);
+}
+
+.wfoi-card[data-tone="bad"] {
+  border-color: var(--openbot-danger-text);
+}
+
+/* The cards and the owner chip are links to the matching GitHub search. */
+a.wfoi-card,
+a.wfoi-chip,
+.wfoi-untagged a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.wfoi-card:hover,
+a.wfoi-chip:hover {
+  border-color: var(--openbot-border-focus);
+}
+
+a.wfoi-card:focus-visible,
+a.wfoi-chip:focus-visible,
+.wfoi-untagged a:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.wfoi-untagged a {
+  text-decoration: underline;
+}
+
+.wfoi-name {
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfoi-count {
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.wfoi-delta {
+  grid-column: 1 / -1;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.wfoi-bars {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: flex-end;
+  gap: 3px;
+  height: 28px;
+  margin-top: var(--openbot-space-1);
+}
+
+.wfoi-bar {
+  flex: 1;
+  min-height: 2px;
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-success-text);
+  opacity: 0.75;
+}
+
+.wfoi-priority[data-priority="P0"] .wfoi-name,
+.wfoi-priority[data-priority="P1"] .wfoi-name {
+  font-weight: var(--openbot-weight-medium);
+}
