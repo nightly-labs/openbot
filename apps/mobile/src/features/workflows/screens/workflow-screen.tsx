@@ -14,7 +14,7 @@ import { type WorkflowStepMenu, workflowStepRows } from "@/features/workflows/co
 import { useWorkflowCommands } from "@/features/workflows/model/use-workflow-commands";
 import { useWorkflowStepActions } from "@/features/workflows/model/use-workflow-step-actions";
 import { useWorkflowDetail, useWorkflowGitHubHistory, useWorkflowRuns } from "@/features/workflows/model/use-workflows";
-import { triggerDeliveries } from "@/features/workflows/model/workflow-github";
+import { githubTrigger as githubTriggerSettings, triggerDeliveries } from "@/features/workflows/model/workflow-github";
 import { workflowOutline } from "@/features/workflows/model/workflow-outline";
 import { latestSteps, stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
 import {
@@ -233,7 +233,8 @@ export function WorkflowScreen() {
                 {githubTrigger && !workflow.needsNewerApp ? (
                   <SettingsRow
                     disclosure={false}
-                    disabled={starting}
+                    // As on desktop, the trigger needs a repository to find its newest item.
+                    disabled={starting || !githubTriggerSettings(githubTrigger).repository}
                     supportingText={t("mobile.workflow.github.runLastEventHint")}
                     onPress={() => void startAndOpen(() => commands.runLastEvent(workflowId, githubTrigger.id))}
                   >
