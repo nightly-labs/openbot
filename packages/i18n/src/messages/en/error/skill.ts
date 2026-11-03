@@ -45,6 +45,7 @@ export const messages = defineMessages("error.skill", {
     "{name} was installed before exact-version tracking. Update or repair it before publishing.",
   "error.skill.tooManySkills": "An agent can have up to {limit} skills.",
   "error.skill.unmanagedExists": "An unmanaged skill already exists at {path}.",
+  "error.skill.managedSlug": "OpenBot gives every agent its own {slug} skill. Give this skill a different name.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md is larger than 64 KB. Shorten it before publishing.",
   "error.skill.localNoRevisions": "Local skill has no published revisions.",
   "error.skill.localNameTaken": "A local skill with this name already exists. Revise it instead.",
