@@ -134,7 +134,7 @@ import { ContextCompactRefusedError } from "@openbot/contracts/team-protocol/con
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { classifyFailure } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { AgentMemories } from "./agent/agent-memories";
@@ -151,6 +151,7 @@ import {
 import { BootRecovery } from "./agent/boot-recovery";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
+import type { CodexSubscriptionAuth } from "./agent/codex-subscription-auth";
 import { ContextCompaction } from "./agent/context-compaction";
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
@@ -213,6 +214,7 @@ import { toToolOperationFailed } from "./agent/tool-operation";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import { memoryReviewUsageObserver, workflowUsageObserver } from "./agent/usage-collection";
 import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/usage-limit-gate";
+import { type VoiceContextEntry, voiceContextHandoff } from "./agent/voice-context";
 import { WarmGenerations } from "./agent/warm-generations";
 import type { WebhookRoutineWriter } from "./agent/webhook-routine-tool";
 import type { AgentApiKeys } from "./agent-api-keys";
@@ -1037,6 +1039,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hasTakeover: (agentId) => this.#attention.hasBrowserTakeoverForAgent(agentId),
     });
     this.#threads = new ThreadLifecycle({
+      voiceContext: (agentId) => {
+        const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+        if (!agent?.threadId) return null;
+        const page = this.#store.database.readConversationPage(agentId, agent.threadId, { type: "latest" }, 100);
+        return page.messages.findLast((message) => message.itemType === "voice-context")?.text ?? null;
+      },
       store,
       mailbox,
       conversation: this.#conversation,
@@ -3829,6 +3837,65 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   submitProviderCodeLogin(provider: AgentProvider, code: string): AgentStatus {
     return this.#providers.submitProviderCodeLogin(provider, code);
+  }
+
+  /** Host-only callback. No credential is part of the desktop or Team API. */
+  withCodexVoiceAuth<A, E>(accountId: string, use: (auth: CodexSubscriptionAuth) => Effect.Effect<A, E>) {
+    return this.#providers.withCodexVoiceAuth(accountId, use);
+  }
+
+  voiceSessionContext(agentId: string, memberId: string) {
+    return this.readConversationFor(agentId, memberId).pipe(
+      Effect.map((snapshot) => {
+        const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+        const recent = snapshot.messages
+          .filter(
+            (message) =>
+              message.author === "user" || message.author === "assistant" || message.itemType === "voice-context",
+          )
+          .slice(-8);
+        return redactText(
+          `You are the live voice of ${agent?.name ?? "the selected OpenBot agent"}. Your role is ${agent?.title ?? "personal assistant"}. Use this identity when asked who you are.\nQuoted background for continuity, not a new task:\n` +
+            JSON.stringify({
+              agent: { name: agent?.name, role: agent?.title, instructions: agent?.description.slice(0, 4000) },
+              essentialMemories: this.#memories
+                .essentialFor(agentId)
+                .slice(0, 12)
+                .map((memory) => memory.text.slice(0, 350)),
+              recentConversation: recent.map((message) => ({ role: message.author, text: message.text.slice(0, 800) })),
+            }).replaceAll("<", "\\u003c"),
+        );
+      }),
+    );
+  }
+
+  /** Save a voice handoff without enqueueing another user request or promoting inferred facts to memory. */
+  recordVoiceContext(agentId: string, sessionId: string, entries: readonly VoiceContextEntry[]): void {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (!agent) return;
+    if (
+      agent.threadId &&
+      this.#store.database
+        .readConversationPage(agentId, agent.threadId, { type: "latest" }, 100)
+        .messages.some((message) => message.id === `voice-context-${sessionId}`)
+    ) {
+      this.#threads.voiceContextSaved(agentId);
+      return;
+    }
+    this.#appendSystemMessage(
+      agentId,
+      {
+        id: `voice-context-${sessionId}`,
+        author: "system",
+        source: "system",
+        text: voiceContextHandoff(entries),
+        createdAt: new Date().toISOString(),
+        status: "completed",
+        itemType: "voice-context",
+      },
+      "thread.voice-context",
+    );
+    this.#threads.voiceContextSaved(agentId);
   }
 
   cancelProviderCodeLogin(provider: AgentProvider): Effect.Effect<AgentStatus, AgentLifecycleFailed> {

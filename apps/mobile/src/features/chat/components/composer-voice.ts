@@ -123,8 +123,8 @@ export function liveVoice(live: LiveConversation, name: string, t: MobileTransla
           live.muted && live.phase === "listening" ? "mobile.chat.liveVoice.phase.muted" : LIVE_PHASES[live.phase],
         ),
       }),
-      // An error says why the conversation waits; otherwise the words heard, or the part read.
-      caption: live.error ?? (live.caption || (hearing ? t("mobile.chat.liveVoice.speakNow") : "")),
+      // Speech text stays in context, without appearing in the call bar.
+      caption: live.error ?? "",
     },
   };
 }

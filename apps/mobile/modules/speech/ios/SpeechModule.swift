@@ -2,6 +2,7 @@ import AVFoundation
 import ExpoModulesCore
 import SherpaOnnxC
 import UIKit
+import WebRTC
 
 /// The files of the Supertonic 3 export, as `@openbot/contracts/speech-models` downloads them.
 private let supertonicFiles = (
@@ -484,6 +485,38 @@ private final class SpeechPlayer {
 }
 
 public class SpeechModule: Module {
+  private let liveAudioLock = NSLock()
+  private var previousWebRTCConfiguration: RTCAudioSessionConfiguration?
+
+  /// WebRTC applies this configuration when it activates its audio unit. Do not configure the
+  /// active session here: a synchronous JS call can deadlock against WebRTC's audio-session lock.
+  private func startLiveAudio() {
+    liveAudioLock.lock()
+    defer { liveAudioLock.unlock() }
+    guard previousWebRTCConfiguration == nil else { return }
+    let defaults = RTCAudioSessionConfiguration.webRTC()
+    // webRTC() returns a shared object. Copy its fields so restoration keeps the original.
+    let configuration = RTCAudioSessionConfiguration()
+    configuration.category = defaults.category
+    configuration.categoryOptions = defaults.categoryOptions.union(.defaultToSpeaker)
+    configuration.mode = defaults.mode
+    configuration.sampleRate = defaults.sampleRate
+    configuration.ioBufferDuration = defaults.ioBufferDuration
+    configuration.inputNumberOfChannels = defaults.inputNumberOfChannels
+    configuration.outputNumberOfChannels = defaults.outputNumberOfChannels
+    previousWebRTCConfiguration = defaults
+    RTCAudioSessionConfiguration.setWebRTC(configuration)
+  }
+
+  private func endLiveAudio() {
+    liveAudioLock.lock()
+    defer { liveAudioLock.unlock() }
+    guard let defaults = previousWebRTCConfiguration else { return }
+    previousWebRTCConfiguration = nil
+    // WebRTC owns activation, deactivation and the active session's configuration.
+    RTCAudioSessionConfiguration.setWebRTC(defaults)
+  }
+
   private let synthesis = DispatchQueue(label: "run.openbot.speech.synthesis", qos: .userInitiated)
   private var voice: SupertonicVoice?
   /// Only `recognitionQueue` reads and writes it.
@@ -523,6 +556,9 @@ public class SpeechModule: Module {
 
   public func definition() -> ModuleDefinition {
     Name("OpenBotSpeech")
+
+    Function("startLiveAudio") { self.startLiveAudio() }
+    Function("endLiveAudio") { self.endLiveAudio() }
 
     Events("onSpeechStart", "onSpeechDone", "onSpeechError", "onCaptureLevel", "onCaptureAudio", "onCaptureText", "onCaptureEnd")
 
@@ -694,6 +730,7 @@ public class SpeechModule: Module {
     }
 
     OnDestroy {
+      self.endLiveAudio()
       self.lock.lock()
       self.generation += 1
       self.lock.unlock()

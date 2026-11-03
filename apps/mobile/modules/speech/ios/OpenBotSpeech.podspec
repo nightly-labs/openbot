@@ -42,6 +42,7 @@ Pod::Spec.new do |s|
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
+  s.dependency 'JitsiWebRTC', '~> 155.0.0'
 
   s.source_files = "*.swift"
   s.vendored_frameworks = 'vendor/SherpaOnnxC.xcframework'

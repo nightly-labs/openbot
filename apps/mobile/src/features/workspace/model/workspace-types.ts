@@ -86,6 +86,12 @@ import type {
   OnePasswordConnectorStatus,
   QueuedMessageReceipt,
   QueueSnapshot,
+  RealtimeVoiceAnswer,
+  RealtimeVoiceCall,
+  RealtimeVoiceOffer,
+  RealtimeVoicePoll,
+  RealtimeVoiceReply,
+  RealtimeVoiceStatus,
   RemoteAgentImportResult,
   RemoteInstanceTransferResult,
   RenameWorkflowInput,
@@ -262,6 +268,16 @@ type MobileBrowserTabAction =
   | { type: "close"; tabId: string };
 
 export interface MobileWorkspaceContextValue {
+  /** A disabled status for hosts without the optional live voice capability. */
+  realtimeVoiceStatus: (serverId: string) => Promise<RealtimeVoiceStatus>;
+  setRealtimeVoiceEnabled: (serverId: string, enabled: boolean) => Promise<RealtimeVoiceStatus>;
+  selectRealtimeVoice: (serverId: string, voice: string) => Promise<RealtimeVoiceStatus>;
+  supportsRealtimeVoice: (serverId: string) => boolean;
+  supportsRealtimeVoiceSelection: (serverId: string) => boolean;
+  connectRealtimeVoice: (input: RealtimeVoiceOffer, serverId: string) => Promise<RealtimeVoiceAnswer>;
+  pollRealtimeVoice: (input: RealtimeVoiceCall, serverId: string) => Promise<RealtimeVoicePoll>;
+  replyRealtimeVoice: (input: RealtimeVoiceReply, serverId: string) => Promise<void>;
+  endRealtimeVoice: (input: RealtimeVoiceCall, serverId: string) => Promise<void>;
   browserViewSupport: (serverId: string) => MobileBrowserViewSupport;
   /** Null when the server is not connected, or its peer page is not ready yet. */
   openBrowserView: (

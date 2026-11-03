@@ -2,8 +2,12 @@ import {
   type AgentEvent,
   type CreateAgentInput,
   canAdministerServer,
+  DISABLED_REALTIME_VOICE,
   isQueuedMessageReceipt,
   MCP_SERVERS_CAPABILITY,
+  parseRealtimeVoiceAnswer,
+  parseRealtimeVoicePoll,
+  parseRealtimeVoiceStatus,
   type RespondToApprovalInput,
   type SidebarLayoutSnapshot,
   type SidebarPin,
@@ -45,6 +49,12 @@ import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/p
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notifications-android-v1";
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notifications-v1";
+import {
+  REALTIME_VOICE_CAPABILITY,
+  REALTIME_VOICE_ROUTES,
+  REALTIME_VOICE_SELECTION_CAPABILITY,
+  REALTIME_VOICE_SELECTION_ROUTE,
+} from "@openbot/contracts/team-protocol/realtime-voice-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
@@ -1650,6 +1660,41 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return host.hostId;
       },
       ...hostRequests.actions,
+      realtimeVoiceStatus: async (serverId) => {
+        // During quiet resume the UI is online before the peer's capabilities have arrived.
+        await connectionWaits.whenConnected(serverId);
+        return hasCapability(serverCapabilities.current, serverId, REALTIME_VOICE_CAPABILITY)
+          ? request("POST", REALTIME_VOICE_ROUTES.status, parseRealtimeVoiceStatus, {}, serverId)
+          : DISABLED_REALTIME_VOICE;
+      },
+      setRealtimeVoiceEnabled: (serverId, enabled) =>
+        request("POST", REALTIME_VOICE_ROUTES.settings, parseRealtimeVoiceStatus, { enabled }, serverId),
+      selectRealtimeVoice: (serverId, voice) => {
+        if (!hasCapability(serverCapabilities.current, serverId, REALTIME_VOICE_SELECTION_CAPABILITY))
+          throw new Error(sourceText("error.voice.realtime.disabled"));
+        return request("POST", REALTIME_VOICE_SELECTION_ROUTE, parseRealtimeVoiceStatus, { voice }, serverId);
+      },
+      supportsRealtimeVoice: (serverId) =>
+        hasCapability(serverCapabilities.current, serverId, REALTIME_VOICE_CAPABILITY),
+      supportsRealtimeVoiceSelection: (serverId) =>
+        hasCapability(serverCapabilities.current, serverId, REALTIME_VOICE_SELECTION_CAPABILITY),
+      connectRealtimeVoice: (input, serverId) => {
+        if (!hasCapability(serverCapabilities.current, serverId, REALTIME_VOICE_CAPABILITY))
+          throw new Error(sourceText("error.voice.realtime.disabled"));
+        return request(
+          "POST",
+          REALTIME_VOICE_ROUTES.connect,
+          parseRealtimeVoiceAnswer,
+          { agentId: input.agentId, sdp: input.sdp },
+          serverId,
+        );
+      },
+      pollRealtimeVoice: (input, serverId) =>
+        request("POST", REALTIME_VOICE_ROUTES.poll, parseRealtimeVoicePoll, { ...input }, serverId),
+      replyRealtimeVoice: (input, serverId) =>
+        request("POST", REALTIME_VOICE_ROUTES.reply, () => undefined, { ...input }, serverId),
+      endRealtimeVoice: (input, serverId) =>
+        request("POST", REALTIME_VOICE_ROUTES.end, () => undefined, { ...input }, serverId),
       loadAgentAnalytics: async (input, serverId) => {
         if (!agentsRef.current.some((agent) => agent.id === input.agentId && agent.serverId === serverId))
           throw new Error(currentText().t("mobile.workspace.error.agentNotOnHost"));
@@ -1922,6 +1967,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     browser,
     workflows,
     hostRequests,
+    connectionWaits,
     request,
     teamApi,
     queryClient,

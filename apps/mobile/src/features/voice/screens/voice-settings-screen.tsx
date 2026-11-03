@@ -17,6 +17,7 @@ import {
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { DictationLanguageSection } from "../components/dictation-language-section";
+import { LiveVoiceSettings } from "../components/live-voice-settings";
 import { useVoicePreview } from "../components/use-voice-preview";
 import { elevenLabsVoiceParts } from "../model/elevenlabs";
 import { clearElevenLabsVoices, loadElevenLabsVoices, useElevenLabsVoices } from "../model/elevenlabs-voices";
@@ -428,6 +429,7 @@ export function VoiceSettingsScreen() {
   if (!speechNative)
     return (
       <SettingsContent>
+        <LiveVoiceSettings />
         <SettingsNote>{t("mobile.settings.voice.unavailable")}</SettingsNote>
       </SettingsContent>
     );
@@ -445,12 +447,14 @@ export function VoiceSettingsScreen() {
   if (!canRecognize)
     return (
       <SettingsContent>
+        <LiveVoiceSettings />
         {speaking}
         <DictationLanguageSection />
       </SettingsContent>
     );
   return (
     <SettingsContent>
+      <LiveVoiceSettings />
       <UsageSegments
         options={[
           { value: "listening", label: t("mobile.settings.voice.tab.listening") },

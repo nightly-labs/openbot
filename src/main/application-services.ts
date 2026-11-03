@@ -42,6 +42,11 @@ import { localSkillTools } from "./local-skill-tools";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 import { PushNotificationStore } from "./push-notification-store";
 import { DESKTOP_USE_MS } from "./push-notifications";
+import {
+  createRealtimeVoicePreferenceStore,
+  RealtimeVoiceService,
+  takeRealtimeVoiceApiKey,
+} from "./realtime-voice-service";
 import { RemoteWorkflowError, toRemoteWorkflowError } from "./remote-service-effects";
 /**
  * The composition root. Every long-lived service the desktop app owns is built here, in one
@@ -455,6 +460,7 @@ const TEARDOWN_ORDER = {
   /** Before the remote servers: each child detaches from its entry when it stops. */
   localServers: 57,
   remoteServers: 60,
+  realtimeVoice: 72,
   voice: 70,
   speech: 71,
   remoteDesktop: 80,
@@ -645,6 +651,7 @@ export interface ApplicationServices {
   agentImport: AgentImportService;
   hermesImport: HermesImportService;
   instanceTransfer: InstanceTransferService;
+  realtimeVoice: RealtimeVoiceService;
   voice: VoiceTranscriptionService;
   speech: VoiceSpeechService;
   voiceServer: VoiceServerService;
@@ -925,6 +932,7 @@ export async function createApplicationServices({
   prepareForUpdateInstall,
   quitting,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
+  const realtimeVoiceApiKey = takeRealtimeVoiceApiKey();
   // First, so the provider lines of the whole startup reach the file.
   teardown.push(
     TEARDOWN_ORDER.providerLog,
@@ -2458,7 +2466,23 @@ export async function createApplicationServices({
   const providerHostSignIns = process.platform === "linux" ? providerSignIns : undefined;
   const pushNotificationStore = new PushNotificationStore(join(app.getPath("userData"), PUSH_NOTIFICATION_FILE));
   await runCauseEffect(pushNotificationStore.load());
+  const realtimePreferences = createRealtimeVoicePreferenceStore(join(app.getPath("userData"), "realtime-voice.json"));
+  await runCauseEffect(realtimePreferences.load());
+  const realtimeVoice = new RealtimeVoiceService({
+    preferences: realtimePreferences,
+    context: (agentId, principal) => service.voiceSessionContext(agentId, principal),
+    mode: process.env.OPENBOT_REALTIME_AUTH === "api-key" ? "api-key" : "subscription",
+    enabled: process.env.OPENBOT_REALTIME_ENABLED === "1",
+    accountId: process.env.OPENBOT_REALTIME_CODEX_ACCOUNT ?? "default",
+    withSubscriptionAuth: (accountId, use) => service.withCodexVoiceAuth(accountId, use),
+    saveContext: (agentId, sessionId, entries) => service.recordVoiceContext(agentId, sessionId, entries),
+    ...(realtimeVoiceApiKey ? { apiKey: realtimeVoiceApiKey } : {}),
+    ...(process.env.OPENBOT_REALTIME_MODEL ? { model: process.env.OPENBOT_REALTIME_MODEL } : {}),
+    ...(process.env.OPENBOT_REALTIME_VOICE ? { voice: process.env.OPENBOT_REALTIME_VOICE } : {}),
+  });
+  teardown.push(TEARDOWN_ORDER.realtimeVoice, "Live voice handshakes", () => runCauseEffect(realtimeVoice.close()));
   const host = new HostService({
+    realtimeVoice,
     appVersion: app.getVersion(),
     store: teamStore,
     agents: service,
@@ -3438,6 +3462,7 @@ export async function createApplicationServices({
     voice,
     speech,
     voiceServer,
+    realtimeVoice,
     dynamicIsland,
     cuaDriver,
     computerUseHighlight,

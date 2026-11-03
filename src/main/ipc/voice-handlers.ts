@@ -1,3 +1,8 @@
+import { parseRealtimeVoiceEnabled, parseRealtimeVoiceOffer } from "@openbot/contracts/ipc";
+import type { HostService } from "../host-service";
+import type { RealtimeVoiceService } from "../realtime-voice-service";
+import type { RemoteServerManager } from "../remote-server-manager";
+import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 // The speech recognition models (Parakeet and Whisper turbo on this computer, ElevenLabs Scribe in
 // the cloud), their settings, and dictation. Also the speech model that reads replies aloud, and the
 // user's own OpenAI-compatible voice server, which can take either route.
@@ -14,6 +19,7 @@ import type {
   VoiceStream,
   VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
+import { parseRealtimeVoiceCall, parseRealtimeVoiceReply } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -36,15 +42,21 @@ import {
 } from "./voice-inputs";
 
 export interface VoiceIpcDependencies {
+  realtime: RealtimeVoiceService;
+  host: Pick<HostService, "channelActor" | "channelPersonAgentLevel">;
+  remoteServers: RemoteServerManager;
   voice: VoiceTranscriptionService;
   speech: VoiceSpeechService;
   /** The user's own server. While one of its routes is on, it replaces the model on this computer. */
   server: VoiceServerService;
   /** Keeps a voice turn's recording as an attachment draft. Voice turns go to this computer's host only. */
-  service: Pick<AgentService, "prepareVoiceRecording">;
+  service: Pick<AgentService, "prepareVoiceRecording" | "listAgents">;
 }
 
 export function voiceIpcHandlers({
+  realtime,
+  host,
+  remoteServers,
   voice,
   speech,
   server,
@@ -52,6 +64,55 @@ export function voiceIpcHandlers({
 }: VoiceIpcDependencies): Pick<IpcGroupHandlers, "voice"> {
   return {
     voice: {
+      pollRealtime: scopedHandler(parseRealtimeVoiceCall, {
+        local: (input) => {
+          const actor = host.channelActor();
+          return runCauseEffect(
+            realtime.poll(input, actor.id, () =>
+              ["chat", "manage"].includes(host.channelPersonAgentLevel(actor.id, input.agentId)),
+            ),
+          );
+        },
+        remote: (input, serverId) => runCauseEffect(remoteServers.pollRealtimeVoice(serverId, input)),
+      }),
+      replyRealtime: scopedHandler(parseRealtimeVoiceReply, {
+        local: (input) => {
+          const actor = host.channelActor();
+          return runCauseEffect(
+            realtime.reply(input, actor.id, () =>
+              ["chat", "manage"].includes(host.channelPersonAgentLevel(actor.id, input.agentId)),
+            ),
+          );
+        },
+        remote: (input, serverId) => runCauseEffect(remoteServers.replyRealtimeVoice(serverId, input)),
+      }),
+      endRealtime: scopedHandler(parseRealtimeVoiceCall, {
+        local: (input) => runCauseEffect(realtime.end(input, host.channelActor().id)),
+        remote: (input, serverId) => runCauseEffect(remoteServers.endRealtimeVoice(serverId, input)),
+      }),
+      setRealtimeEnabled: scopedHandler(parseRealtimeVoiceEnabled, {
+        local: (input) => runCauseEffect(realtime.setEnabled(input.enabled)),
+        remote: (input, serverId) => runCauseEffect(remoteServers.setRealtimeVoiceEnabled(serverId, input.enabled)),
+      }),
+      getRealtimeStatus: scopedQueryHandler({
+        local: () => realtime.status(),
+        remote: (serverId) => runCauseEffect(remoteServers.getRealtimeVoiceStatus(serverId)),
+      }),
+      connectRealtime: scopedHandler(parseRealtimeVoiceOffer, {
+        local: (offer) => {
+          const actor = host.channelActor();
+          return runCauseEffect(
+            realtime.connect(
+              offer,
+              actor.id,
+              () =>
+                service.listAgents().some((agent) => agent.id === offer.agentId) &&
+                ["chat", "manage"].includes(host.channelPersonAgentLevel(actor.id, offer.agentId)),
+            ),
+          );
+        },
+        remote: (offer, serverId) => runCauseEffect(remoteServers.connectRealtimeVoice(serverId, offer)),
+      }),
       getModelStatus: handler((): Promise<VoiceModelStatus> => runCauseEffect(voice.getModelStatus())),
       getModelStatuses: handler((): Promise<VoiceModelStatus[]> => runCauseEffect(voice.getModelStatuses())),
       // The server's model is ready on the server: nothing on this computer is downloaded for it.

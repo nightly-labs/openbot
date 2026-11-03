@@ -56,8 +56,6 @@ function VoiceConversationPane() {
           agent={agent()}
           phase={conversation.phase()}
           muted={conversation.muted()}
-          heard={conversation.heard()}
-          said={conversation.said()}
           levels={conversation.levels()}
           error={conversation.error()}
           onToggleMute={conversation.toggleMute}

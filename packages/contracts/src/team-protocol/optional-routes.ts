@@ -72,6 +72,7 @@ import { PROVIDERS_V5_CODECS } from "./providers-v5";
 import { PROVIDERS_V8_CODECS } from "./providers-v8";
 import { ANDROID_PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-android-v1";
 import { PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-v1";
+import { REALTIME_VOICE_CODECS } from "./realtime-voice-v1";
 import { ROUTINE_FLOWS_CODECS } from "./routine-flows-v1";
 import { ROUTINE_RECOVERY_CODECS } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CODECS } from "./routine-results-v1";
@@ -94,6 +95,7 @@ import { WORKSPACE_DIRECTORY_CODECS } from "./workspace-directory-v1";
 export type { OptionalRouteCodec } from "./admin-wire";
 
 const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
+  ...REALTIME_VOICE_CODECS,
   ...AGENT_ADMIN_CODECS,
   ...AGENT_MEMORIES_CODECS,
   ...SKILLS_ADMIN_CODECS,

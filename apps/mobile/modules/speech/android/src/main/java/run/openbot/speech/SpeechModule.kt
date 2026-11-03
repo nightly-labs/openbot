@@ -1,6 +1,10 @@
 package run.openbot.speech
 
 import android.Manifest
+import android.content.Context
+import android.media.AudioManager
+import android.media.AudioDeviceInfo
+import android.os.Build
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -42,6 +46,43 @@ private fun pathOf(location: String): String =
  * while one plays. A stop makes the parts that wait or play stale.
  */
 class SpeechModule : Module() {
+  private var liveAudioManager: AudioManager? = null
+  private var liveAudioMode: Int? = null
+  private var liveSpeaker = false
+  private var liveVolumeStream: Int? = null
+
+  private fun startLiveAudio() {
+    if (liveAudioMode != null) return
+    val manager = appContext.reactContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+    liveAudioManager = manager
+    liveAudioMode = manager.mode
+    liveSpeaker = manager.isSpeakerphoneOn
+    liveVolumeStream = appContext.currentActivity?.volumeControlStream
+    manager.mode = AudioManager.MODE_IN_COMMUNICATION
+    if (Build.VERSION.SDK_INT >= 31) {
+      val devices = manager.availableCommunicationDevices
+      val external = devices.firstOrNull { it.type != AudioDeviceInfo.TYPE_BUILTIN_EARPIECE && it.type != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+      val output = external ?: devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+      if (output != null) manager.setCommunicationDevice(output)
+    } else if (!manager.isBluetoothScoOn && !manager.isWiredHeadsetOn) {
+      manager.isSpeakerphoneOn = true
+    }
+    appContext.currentActivity?.let { activity -> activity.runOnUiThread { activity.volumeControlStream = AudioManager.STREAM_VOICE_CALL } }
+  }
+
+  private fun endLiveAudio() {
+    val previousMode = liveAudioMode ?: return
+    liveAudioMode = null
+    val manager = liveAudioManager ?: return
+    liveAudioManager = null
+    if (Build.VERSION.SDK_INT >= 31) {
+      manager.clearCommunicationDevice()
+    } else manager.isSpeakerphoneOn = liveSpeaker
+    if (manager.mode == AudioManager.MODE_IN_COMMUNICATION) manager.mode = previousMode
+    liveVolumeStream?.let { stream -> appContext.currentActivity?.let { activity -> activity.runOnUiThread { activity.volumeControlStream = stream } } }
+    liveVolumeStream = null
+  }
+
   private val synthesis = Executors.newSingleThreadExecutor()
   private val parts = LinkedBlockingQueue<SpeechPart>()
   private val generation = AtomicInteger(0)
@@ -62,6 +103,8 @@ class SpeechModule : Module() {
 
   override fun definition() = ModuleDefinition {
     Name("OpenBotSpeech")
+    Function("startLiveAudio") { startLiveAudio() }
+    Function("endLiveAudio") { endLiveAudio() }
 
     Events("onSpeechStart", "onSpeechDone", "onSpeechError", "onCaptureLevel", "onCaptureAudio", "onCaptureText", "onCaptureEnd")
 
@@ -239,6 +282,7 @@ class SpeechModule : Module() {
     }
 
     OnDestroy {
+      endLiveAudio()
       generation.incrementAndGet()
       parts.clear()
       parts.put(SpeechPart(null, FloatArray(0), 0, -1))

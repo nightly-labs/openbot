@@ -7,6 +7,7 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 export interface SpeechPort {
   voice: Pick<
     OpenBotDesktopApi["voice"],
+    | "getRealtimeStatus"
     | "getSpeechSettings"
     | "getSpeechModelStatus"
     | "downloadSpeechModel"

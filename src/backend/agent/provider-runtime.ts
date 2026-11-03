@@ -81,6 +81,11 @@ import { captureBrowser } from "./browser-capture";
 import { startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
 import { CodexLoginFlow, toCodexLoginFailed } from "./codex-login";
+import {
+  type CodexSubscriptionAuth,
+  readCodexSubscriptionAuth,
+  subscriptionAuthFailure,
+} from "./codex-subscription-auth";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { ModelCatalog } from "./model-catalog";
 import { startMuseDeviceLogin } from "./muse-login";
@@ -915,6 +920,43 @@ export class ProviderRuntime implements ProviderPort {
     const driver = requireProviderDriver(provider);
     if (driver.createProfileClient) return driver.createProfileClient(cli, this.#requestTimeoutMs, context);
     return driver.createClient(cli, this.#requestTimeoutMs, context);
+  }
+
+  /** Codex owns OAuth refresh. Voice does not create a thread or run a provider turn. */
+  withCodexVoiceAuth<A, E>(accountId: string, use: (auth: CodexSubscriptionAuth) => Effect.Effect<A, E>) {
+    return Effect.gen({ self: this }, function* () {
+      yield* this.ensureProvider("codex").pipe(Effect.mapError(subscriptionAuthFailure));
+      const owner = this.#clients.get("codex");
+      return yield* Effect.acquireUseRelease(
+        Effect.try({
+          try: () => {
+            if (accountId !== DEFAULT_PROVIDER_ACCOUNT_ID && !this.hasProviderAccount("codex", accountId))
+              throw subscriptionAuthFailure();
+            return this.createProfileClient("codex", accountId);
+          },
+          catch: subscriptionAuthFailure,
+        }),
+        (client) =>
+          Effect.gen({ self: this }, function* () {
+            yield* Effect.try({ try: () => client.start(), catch: subscriptionAuthFailure });
+            yield* this.#initializeProviderClient(client, 8_000).pipe(Effect.mapError(subscriptionAuthFailure));
+            const auth = yield* readCodexSubscriptionAuth(client);
+            return yield* use({
+              ...auth,
+              stillCurrent: () => {
+                const current =
+                  !this.#off.has("codex") &&
+                  owner !== undefined &&
+                  this.#clients.get("codex") === owner &&
+                  (accountId === DEFAULT_PROVIDER_ACCOUNT_ID || this.hasProviderAccount("codex", accountId));
+                if (current) this.#lastUsed.set("codex", Date.now());
+                return current;
+              },
+            });
+          }),
+        (client) => client.stop().pipe(Effect.ignore),
+      );
+    });
   }
 
   preferredProvider(): AgentProvider {

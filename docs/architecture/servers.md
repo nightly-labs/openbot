@@ -1,5 +1,33 @@
 # Servers, storage, and billing
 
+## Realtime voice
+
+`src/main/realtime-voice-service.ts` owns optional voice calls and `codex-live-bridge.ts` adapts
+subscription GPT-Live signalling and its authenticated sideband. The default route obtains a
+ChatGPT OAuth token through a host-only Codex RPC callback; Codex owns refresh and account storage.
+An API-key login is rejected and there is no automatic API billing fallback. The API mode is a
+separate explicit setting. Its host key is removed from the environment before child processes start.
+
+`realtime-voice-v1` is an optional V9 capability. Scoped IPC and authenticated Team requests carry
+SDP and opaque call handles. Subscription calls belong to one authenticated member and agent.
+Poll and reply operations recheck chat access; a reply is bound to the original delegation and is
+idempotent. The host closes abandoned calls after 30 seconds and all calls after 15 minutes. Existing
+protocol adapters keep their meaning. No OAuth token or upstream call ID reaches clients.
+
+Clients send a GPT-Live delegation through the ordinary agent message queue exactly once. Raw
+transcript events update captions and context; they are not a second dispatch trigger. Delivery
+and turn IDs select the real agent answer. All actual tools, memory and approvals stay with the
+normal agent. GPT-Live small talk and delegation selection remain model behavior.
+
+The host collects bounded transcript/context entries. Delegations include that context, labelled
+as quoted history. End, disconnect, expiry and shutdown save a handoff through AgentService into
+its existing SQLite conversation without starting a task. A recent handoff is supplied when the
+provider next starts or resumes; loaded sessions are marked for refresh. No migration, agent reset,
+new transcript database or automatic factual-memory promotion is involved. A storage failure stays
+pending for retry and causes subsequent call startup/end/shutdown to fail rather than claim a save.
+
+See [live voice configuration](../realtime-voice.md) for settings, privacy and device checks.
+
 ## Storage and files
 
 Three surfaces show what a host keeps on disk: Server Settings > Storage (scope `host`), Agent

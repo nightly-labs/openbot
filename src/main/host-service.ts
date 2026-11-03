@@ -102,6 +102,7 @@ interface MemberAuditActor {
 type ForwardedApiOptions = ConstructorParameters<typeof TeamApiServer>[0];
 
 interface HostServiceOptions {
+  realtimeVoice?: ForwardedApiOptions["realtimeVoice"];
   channels?: ChannelService;
   mcpServers?: ForwardedApiOptions["mcpServers"];
   mcpSignIns?: ForwardedApiOptions["mcpSignIns"];
@@ -423,6 +424,7 @@ export class HostService extends EventEmitter<HostEvents> {
           })
         : undefined;
     this.#api = new TeamApiServer({
+      ...(options.realtimeVoice === undefined ? {} : { realtimeVoice: options.realtimeVoice }),
       appVersion: options.appVersion,
       store: options.store,
       agents: options.agents,

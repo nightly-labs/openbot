@@ -141,6 +141,7 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
+import { REALTIME_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/realtime-voice-v1";
 import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   withLegacyReasoningEfforts,
@@ -280,6 +281,7 @@ import { routeProviderSignOut } from "./team-api/route-provider-sign-out";
 import { routeProviderUsageReset } from "./team-api/route-provider-usage-reset";
 import { routeProviders } from "./team-api/route-providers";
 import { routePushNotifications } from "./team-api/route-push-notifications";
+import { routeRealtimeVoice } from "./team-api/route-realtime-voice";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutineResults } from "./team-api/route-routine-results";
@@ -1037,6 +1039,7 @@ export class TeamApiServer {
         )) === "handled"
       )
         return;
+      if ((await routeRealtimeVoice(context, this.#options.realtimeVoice, this.#options.agents)) === "handled") return;
       if ((await routeSidebarPins(context, this.#options.sidebarPins, hidden)) === "handled") return;
       if ((await routeAgentTasks(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreads(context, this.#options.agentTasks, hidden)) === "handled") return;
@@ -2208,6 +2211,7 @@ export class TeamApiServer {
           if (capability === MEMORY_REVIEW_CAPABILITY) return this.#options.admin?.memoryReview !== undefined;
           if (capability === PROMPT_CACHE_TTL_CAPABILITY) return this.#options.admin?.promptCacheTtl !== undefined;
           if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;
+          if (capability === REALTIME_VOICE_CAPABILITY) return this.#options.realtimeVoice !== undefined;
           if (capability === AGENT_ACCESS_CAPABILITY) return this.#options.agentAccess !== undefined;
           if (capability === SERVER_AUDIT_CAPABILITY) return this.#options.serverAudit !== undefined;
           if (capability === HOST_UPDATE_CAPABILITY || capability === HOST_MEMBER_UPDATE_CAPABILITY)

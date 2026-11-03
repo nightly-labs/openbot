@@ -35,6 +35,8 @@ import type {
   LoginServerInput,
   MarkConversationReadInput,
   MarkDirectReadInput,
+  RealtimeVoiceCall,
+  RealtimeVoiceReply,
   RemoteDesktopSession,
   SendDirectMessageInput,
   ServerNotificationLevel,
@@ -50,11 +52,13 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   type AgentNotificationLevelsSnapshot,
+  DISABLED_REALTIME_VOICE,
   decodeRemoteAgentImportPreview,
   decodeRemoteInstanceTransferPreview,
   EMPTY_AGENT_NOTIFICATION_LEVELS,
   LOCAL_SERVER_ID,
   REMOTE_DESKTOP_SETUP_CAPABILITY,
+  type RealtimeVoiceOffer,
   type RemoteDesktopTestInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -70,6 +74,7 @@ import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { INSTANCE_TRANSFER_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { REALTIME_VOICE_CAPABILITY, REALTIME_VOICE_ROUTES } from "@openbot/contracts/team-protocol/realtime-voice-v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
@@ -86,6 +91,11 @@ import type { CentralAuthOperationError } from "./central-auth-effects";
 import { contentDispositionFileName } from "./content-disposition";
 import type { HostedServerDesktopService } from "./hosted-server-service";
 import type { PreferenceFileFailure } from "./preference-file";
+import {
+  decodeRealtimeVoiceAnswerFromHost,
+  decodeRealtimeVoicePollFromHost,
+  decodeRealtimeVoiceStatusFromHost,
+} from "./realtime-voice-decoding";
 import {
   decodeAgentNotificationLevelsFromHost,
   decodeAgentSummary,
@@ -684,6 +694,51 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#rememberLevels(serverId, snapshot);
     return snapshot;
   }).bind(this);
+
+  readonly getRealtimeVoiceStatus = Effect.fn("RemoteManager.getRealtimeVoiceStatus")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+  ) {
+    if (!this.supportsCapability(serverId, REALTIME_VOICE_CAPABILITY)) return { ...DISABLED_REALTIME_VOICE };
+    return yield* this.request(serverId, REALTIME_VOICE_ROUTES.status, decodeRealtimeVoiceStatusFromHost, {
+      method: "POST",
+      body: {},
+    });
+  }).bind(this);
+
+  setRealtimeVoiceEnabled(serverId: string, enabled: boolean) {
+    return this.request(serverId, REALTIME_VOICE_ROUTES.settings, decodeRealtimeVoiceStatusFromHost, {
+      method: "POST",
+      body: { enabled },
+    });
+  }
+
+  readonly connectRealtimeVoice = Effect.fn("RemoteManager.connectRealtimeVoice")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    offer: RealtimeVoiceOffer,
+  ) {
+    if (!this.supportsCapability(serverId, REALTIME_VOICE_CAPABILITY))
+      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.voice.realtime.disabled")) });
+    return yield* this.request(serverId, REALTIME_VOICE_ROUTES.connect, decodeRealtimeVoiceAnswerFromHost, {
+      method: "POST",
+      body: { agentId: offer.agentId, sdp: offer.sdp },
+      timeoutMs: 25_000,
+    });
+  }).bind(this);
+
+  pollRealtimeVoice(serverId: string, input: RealtimeVoiceCall) {
+    return this.request(serverId, REALTIME_VOICE_ROUTES.poll, decodeRealtimeVoicePollFromHost, {
+      method: "POST",
+      body: { ...input },
+    });
+  }
+  replyRealtimeVoice(serverId: string, input: RealtimeVoiceReply) {
+    return this.request(serverId, REALTIME_VOICE_ROUTES.reply, acceptEmpty, { method: "POST", body: { ...input } });
+  }
+  endRealtimeVoice(serverId: string, input: RealtimeVoiceCall) {
+    return this.request(serverId, REALTIME_VOICE_ROUTES.end, acceptEmpty, { method: "POST", body: { ...input } });
+  }
 
   #levelsUnsupported() {
     return new RemoteWorkflowError({ cause: new Error(sourceText("error.team.agentNotificationLevelsUnsupported")) });

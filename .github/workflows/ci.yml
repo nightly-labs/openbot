@@ -295,12 +295,21 @@ jobs:
       - name: Run the Team API routes E2E test
         run: bun run test:team-api-routes
 
+      - name: Check agent access and Realtime voice permissions
+        run: bun scripts/agent-access-e2e.ts
+
+      - name: Check subscription voice auth and delegation
+        run: bun scripts/subscription-voice-e2e.ts
+
       - name: Upload the Team API routes E2E report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: team-api-routes-e2e
-          path: .openbot-build/team-api-routes-e2e/
+          path: |
+            .openbot-build/team-api-routes-e2e/
+            .openbot-build/agent-access-e2e/
+            .openbot-build/subscription-voice-e2e/
           if-no-files-found: ignore
 
   reverse-actions-e2e:

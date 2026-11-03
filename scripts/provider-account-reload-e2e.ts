@@ -62,6 +62,7 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
       result = { account: value.email === null ? null : { type: "chatgpt", email: value.email } };
       break;
     }
+    case "getAuthStatus": result = { authMethod: "chatgpt", authToken: "fixture." + Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "fixture-voice-account" } })).toString("base64url") + ".signature" }; break;
     case "account/rateLimits/read": result = { rateLimits: null, rateLimitsByLimitId: null }; break;
     case "model/list": result = { data: [{ model: "gpt-5.5", displayName: "GPT-5.5" }] }; break;
     case "plugin/list": result = { marketplaces: [] }; break;
@@ -210,7 +211,7 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
       initial.list().map((account) => readFile(join(initial.home(account), "fixture-account.json"), "utf8")),
     );
 
-    for (const name of ["cold start", "reload", "CLI version change", "on-demand start"] as const) {
+    for (const name of ["voice on-demand", "cold start", "reload", "CLI version change", "on-demand start"] as const) {
       if (name === "CLI version change") {
         for (const provider of providersToCheck) {
           const executable = join(root, `${provider}-updated.cjs`);
@@ -222,7 +223,15 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
       const loaded = new ProviderAccountStore(accountsPath, accountsRoot);
       await runCauseEffect(loaded.load());
       runtime = createRuntime(loaded);
-      if (name === "on-demand start") {
+      if (name === "voice on-demand") {
+        const voice = await runCauseEffect(
+          runtime.withCodexVoiceAuth("default", (auth) =>
+            Effect.succeed({ accountId: auth.accountId, current: auth.stillCurrent?.() }),
+          ),
+        );
+        assert.deepEqual(voice, { accountId: "fixture-voice-account", current: true });
+        await runCauseEffect(runtime.ensureProvider("claude"));
+      } else if (name === "on-demand start") {
         for (const provider of providersToCheck) await runCauseEffect(runtime.ensureProvider(provider));
       } else {
         await runCauseEffect(runtime.start());

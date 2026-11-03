@@ -42,6 +42,9 @@ docker exec -it openbot openbot mobile-connect
 
 See [Phone app](self-hosted-server.md#phone-app).
 
+This fork also supports optional [live voice through the host's ChatGPT subscription](realtime-voice.md).
+It needs clients that include the feature; the published upstream image does not include it.
+
 The options in both examples are necessary:
 
 | Option | Why |

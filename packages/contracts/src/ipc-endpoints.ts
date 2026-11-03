@@ -10,6 +10,15 @@ import type {
   ResetAgentSessionSettingInput,
   SetAgentSessionSettingInput,
 } from "./ipc-agent-session-settings";
+import type {
+  RealtimeVoiceAnswer,
+  RealtimeVoiceCall,
+  RealtimeVoiceEnabled,
+  RealtimeVoiceOffer,
+  RealtimeVoicePoll,
+  RealtimeVoiceReply,
+  RealtimeVoiceStatus,
+} from "./ipc-realtime-voice";
 import type { ServerAuditLog } from "./ipc-server-audit";
 // The one channel list. Each endpoint holds its wire value, the group it belongs to, and whether it
 // is a request the renderer invokes or an event the main process sends. That is what lets a
@@ -833,6 +842,12 @@ export const IPC_ENDPOINTS = {
     event: event<ProviderRuntimeSnapshot>()("provider-runtimes:event"),
   },
   voice: {
+    getRealtimeStatus: scopedQuery<RealtimeVoiceStatus>()("voice:get-realtime-status"),
+    setRealtimeEnabled: scopedRequest<RealtimeVoiceEnabled, RealtimeVoiceStatus>()("voice:set-realtime-enabled"),
+    connectRealtime: scopedRequest<RealtimeVoiceOffer, RealtimeVoiceAnswer>()("voice:connect-realtime"),
+    pollRealtime: scopedRequest<RealtimeVoiceCall, RealtimeVoicePoll>()("voice:poll-realtime"),
+    replyRealtime: scopedRequest<RealtimeVoiceReply, void>()("voice:reply-realtime"),
+    endRealtime: scopedRequest<RealtimeVoiceCall, void>()("voice:end-realtime"),
     /** The status of the model in use. */
     getModelStatus: request<undefined, VoiceModelStatus>()("voice:get-model-status"),
     /** One status for each model in `VOICE_MODELS`, in the same order. */

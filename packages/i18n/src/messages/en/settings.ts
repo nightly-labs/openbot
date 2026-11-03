@@ -1,6 +1,11 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("settings", {
+  "settings.voice.realtime.section": "Live voice calls",
+  "settings.voice.realtime.title": "Enable live voice",
+  "settings.voice.realtime.description":
+    "Use the ChatGPT sign-in on {server} for live voice calls. Turning this off ends active calls. A server administrator can change this setting.",
+  "settings.voice.realtime.local": "this computer",
   // The language setting itself.
   "settings.language.title": "Language",
   "settings.language.description": "OpenBot shows menus, buttons and messages in this language.",

@@ -6,6 +6,7 @@ import {
   latestTurnAnswer,
   type QueueDelivery,
 } from "@openbot/contracts/ipc";
+import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { useEffect, useId, useRef, useState } from "react";
 import { BackHandler } from "react-native";
@@ -20,6 +21,12 @@ import {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import {
+  createNativeRealtimeVoice,
+  type NativeRealtimeVoice,
+  nativeRealtimeVoiceAvailable,
+  type RealtimeVoicePort,
+} from "@/features/voice/model/realtime-voice";
 import { REPLY_VOICE_FAILURE_TEXT, type ReplyReading, streamReply } from "@/features/voice/model/reply-voice";
 import { speechNative } from "@/features/voice/model/speech-native";
 import { haptics } from "@/shared/lib/haptics";
@@ -62,6 +69,7 @@ export interface LiveChannel {
 }
 
 interface LiveConversationInput {
+  realtime?: RealtimeVoicePort | null;
   /** The chat is in front and the user can write here. */
   enabled: boolean;
   /** The agent's server is connected. */
@@ -72,13 +80,15 @@ interface LiveConversationInput {
   conversation: { messages: readonly ConversationMessage[]; activeTurnId: string | null } | null;
   /** The channel; null in an agent chat. */
   channel: LiveChannel | null;
-  deliveries: readonly Pick<QueueDelivery, "messageId" | "turnId">[];
+  deliveries: readonly Pick<QueueDelivery, "id" | "messageId" | "turnId">[];
   outboxMessages: readonly OutboxMessage[];
   /** Sends what the user said. Null when the chat could not take it. */
   send: (text: string) => OutboxMessage | null;
 }
 
 interface LiveConversationState {
+  realtime: boolean;
+  permissionPending: boolean;
   open: boolean;
   phase: LiveConversationPhase;
   muted: boolean;
@@ -90,6 +100,8 @@ interface LiveConversationState {
 }
 
 const CLOSED: LiveConversationState = {
+  realtime: false,
+  permissionPending: false,
   open: false,
   phase: "starting",
   muted: false,
@@ -100,6 +112,7 @@ const CLOSED: LiveConversationState = {
 };
 
 export interface LiveConversation extends LiveConversationState {
+  realtimeReady: boolean;
   /** The phone can listen and speak. */
   available: boolean;
   /** The voice that is heard now, from 0 to 1: the user's while listening, a pulse while speaking. */
@@ -122,8 +135,24 @@ export interface LiveConversation extends LiveConversationState {
  */
 export function useLiveConversation(input: LiveConversationInput): LiveConversation {
   const [state, setState] = useState(CLOSED);
-  const inputRef = useRef(input);
-  inputRef.current = input;
+  const [realtimeReady, setRealtimeReady] = useState(false);
+  const inputRef = useRef({ ...input, realtimeReady });
+  inputRef.current = { ...input, realtimeReady };
+  useEffect(() => {
+    let current = true;
+    setRealtimeReady(false);
+    if (!input.realtime || !input.online || !input.focused || !input.foreground || !nativeRealtimeVoiceAvailable())
+      return;
+    void input.realtime
+      .status()
+      .then((status) => {
+        if (current) setRealtimeReady(status.enabled);
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [input.realtime, input.online, input.focused, input.foreground]);
   const presence = useSharedValue(0);
   const speechLevel = useSharedValue(0);
   const dictationRef = useRef<VoiceDictation | null>(null);
@@ -137,13 +166,14 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
     }),
   );
   const dictation = useVoiceDictation({
-    enabled: input.enabled && input.online && state.open && !state.exit,
+    enabled: input.enabled && input.online && state.open && !state.exit && !state.realtime,
     onDraft: controller.hear,
     onSpeaking: controller.speaking,
   });
   dictationRef.current = dictation;
   const { conversation, channel, deliveries, outboxMessages } = input;
-  const available = dictation.available && Boolean(speechNative) && (conversation !== null || channel !== null);
+  const available =
+    realtimeReady || (dictation.available && Boolean(speechNative) && (conversation !== null || channel !== null));
 
   useEffect(() => {
     controller.followReply({ conversation, channel, deliveries, outboxMessages });
@@ -160,10 +190,10 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
   // The conversation belongs to the chat in front of an active app: a screen above the chat, or the
   // app in the background, ends it, as closing the pane does on desktop. Android reports the app as
   // in the background while its permission dialog is open, so the first start must not end itself.
-  const asking = dictation.phase === "starting";
+  const asking = dictation.phase === "starting" || state.permissionPending;
   useEffect(() => {
-    if (state.open && (!input.focused || (!input.foreground && !asking))) controller.end();
-  }, [controller, state.open, input.focused, input.foreground, asking]);
+    if (state.open && (!input.enabled || !input.focused || (!input.foreground && !asking))) controller.end();
+  }, [controller, state.open, input.enabled, input.focused, input.foreground, asking]);
 
   // The user speaks hands-free, and a screen lock would put the app in the background.
   const keepAwakeTag = useId();
@@ -189,6 +219,7 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
 
   return {
     ...state,
+    realtimeReady,
     available,
     level: state.phase === "speaking" ? speechLevel : dictation.level,
     presence,
@@ -210,7 +241,7 @@ function createController({
   presence,
   speechLevel,
 }: {
-  input: () => LiveConversationInput;
+  input: () => LiveConversationInput & { realtimeReady: boolean };
   dictation: () => VoiceDictation | null;
   setState: (change: (current: LiveConversationState) => LiveConversationState) => void;
   presence: SharedValue<number>;
@@ -236,6 +267,8 @@ function createController({
   let previousRecognizerPhase: VoiceDictation["phase"] = "idle";
   let startedAt = 0;
   let turns = 0;
+  let realtime: NativeRealtimeVoice | null = null;
+  let usesRealtime = false;
 
   const update = (change: Partial<LiveConversationState>) => setState((current) => ({ ...current, ...change }));
   const setPhase = (next: LiveConversationPhase) => {
@@ -281,6 +314,7 @@ function createController({
     // The next words go to the channel, so the leader listens again.
     setSpeaker(null);
     if (muted || !open) return;
+    if (usesRealtime) return;
     sessionListened = false;
     if (!dictation()?.start("")) setMuted(true);
   }
@@ -334,6 +368,13 @@ function createController({
    * texts join in order, so the text only grows. The phase turns to speaking when the first part plays.
    */
   function readAnswer(answer: ConversationMessage, complete: boolean): void {
+    if (usesRealtime) {
+      // The provider reads one final, delivery-correlated answer. It never executes agent work.
+      if (!complete) return;
+      pending = null;
+      realtime?.speak(speechTextFromMarkdown(answer.text));
+      return;
+    }
     if (!reading) {
       const own = generation;
       reading = streamReply({
@@ -396,7 +437,13 @@ function createController({
     }
     if (!conversation) return;
     current.messageId = outboxMessage?.messageId ?? current.messageId;
-    current.turnId ??= current.messageId ? liveReplyTurn(conversation.messages, deliveries, current.messageId) : null;
+    current.turnId ??= current.messageId
+      ? usesRealtime
+        ? (conversation.messages.find((message) => message.id === current.messageId)?.turnId ??
+          deliveries.find((delivery) => delivery.id === current.messageId)?.turnId ??
+          null)
+        : liveReplyTurn(conversation.messages, deliveries, current.messageId)
+      : null;
     const turnId = current.turnId;
     const active = turnId !== null && conversation.activeTurnId === turnId;
     const answer = turnId ? latestTurnAnswer(conversation.messages, turnId) : undefined;
@@ -481,6 +528,8 @@ function createController({
   function connection(online: boolean): void {
     if (!open || exiting) return;
     if (!online && phase !== "offline") {
+      realtime?.close();
+      realtime = null;
       drop();
       dictation()?.cancel();
       setPhase("offline");
@@ -488,7 +537,89 @@ function createController({
       update({ error: currentText().t("mobile.chat.liveVoice.offline") });
     } else if (online && phase === "offline") {
       update({ error: null });
+      if (usesRealtime) void startRealtime();
+      else listen();
+    }
+  }
+
+  async function startRealtime(): Promise<void> {
+    const port = input().realtime;
+    if (!port || !open || exiting) return;
+    setPhase("starting");
+    update({ permissionPending: true });
+    const own = generation;
+    const call: NativeRealtimeVoice = createNativeRealtimeVoice({
+      port,
+      microphoneReady: () => {
+        if (realtime === call && open && !exiting) update({ permissionPending: false });
+      },
+      transcript: (text, delegated) => {
+        if (realtime !== call || !open || exiting || muted) return false;
+        if (delegated) {
+          if (pending || reading) return false;
+          listen();
+          deliver(text);
+          return true;
+        }
+        if (phase === "thinking" || phase === "speaking") {
+          call.interrupt();
+          listen();
+        }
+        if (phase === "listening") deliver(text);
+      },
+      speechStarted: () => {
+        if (realtime !== call || !open || exiting || muted) return;
+        if (phase === "thinking" || phase === "speaking") listen();
+      },
+      speaking: (text) => {
+        if (realtime !== call || !open || exiting) return;
+        setPhase("speaking");
+        setCaption(text);
+        speechLevel.set(
+          withRepeat(
+            withTiming(0.55, { duration: SPEAKING_PULSE_MS, easing: Easing.inOut(Easing.ease) }),
+            -1,
+            true,
+            undefined,
+            ReduceMotion.System,
+          ),
+        );
+      },
+      spoken: () => {
+        if (realtime === call && open && !exiting) listen();
+      },
+      failed: () => {
+        if (realtime !== call || !open || exiting) return;
+        realtime = null;
+        drop();
+        setMuted(true);
+        setPhase("offline");
+        update({ error: currentText().t("mobile.chat.liveVoice.realtimeFailed"), permissionPending: false });
+      },
+      expired: () => {
+        if (realtime !== call || !open || exiting) return;
+        realtime = null;
+        drop();
+        setMuted(true);
+        setPhase("offline");
+        update({ error: currentText().t("mobile.chat.liveVoice.realtimeFailed"), permissionPending: false });
+      },
+    });
+    realtime = call;
+    try {
+      await call.start();
+      if (realtime !== call || !open || exiting || own !== generation) {
+        call.close();
+        return;
+      }
+      call.mute(muted);
       listen();
+    } catch {
+      if (realtime !== call || !open || exiting) return;
+      realtime = null;
+      setMuted(true);
+      setPhase("offline");
+      update({ error: currentText().t("mobile.chat.liveVoice.realtimeFailed"), permissionPending: false });
     }
   }
 
@@ -523,13 +654,15 @@ function createController({
     connection,
     start(): void {
       const { conversation, channel, enabled, online } = input();
-      if (open || !speechNative || (!conversation && !channel) || !enabled) return;
+      if (open || (!conversation && !channel) || !enabled) return;
+      usesRealtime = Boolean(input().realtimeReady && input().realtime && conversation);
+      if (!usesRealtime && !speechNative) return;
       open = true;
       exiting = false;
       muted = false;
       startedAt = performance.now();
       turns = 0;
-      setState(() => ({ ...CLOSED, open: true }));
+      setState(() => ({ ...CLOSED, open: true, realtime: usesRealtime }));
       void haptics.impact("light");
       mobileAnalytics.track("voice_conversation_action", {
         action: "start",
@@ -539,7 +672,8 @@ function createController({
       // The composer turns into the call bar on this progress.
       presence.set(withTiming(1, { duration: OPEN_MS, easing: EASE_OUT, reduceMotion: ReduceMotion.System }));
       // Started while the server is away, it waits for the server as it would after a disconnect.
-      if (online) listen();
+      if (online && usesRealtime) void startRealtime();
+      else if (online) listen();
       else {
         phase = "listening";
         connection(false);
@@ -548,6 +682,11 @@ function createController({
     toggleMute(): void {
       if (!open || exiting) return;
       setMuted(!muted);
+      if (usesRealtime) {
+        realtime?.mute(muted);
+        if (muted) setCaption("");
+        return;
+      }
       void haptics.selection();
       if (phase !== "listening") return;
       if (muted) {
@@ -564,11 +703,14 @@ function createController({
     interrupt(): void {
       if (!open || exiting || (phase !== "thinking" && phase !== "speaking")) return;
       void haptics.impact("light");
+      realtime?.interrupt();
       listen();
     },
     end(): void {
       if (!open || exiting) return;
       exiting = true;
+      realtime?.close();
+      realtime = null;
       drop();
       dictation()?.cancel();
       update({ exit: "cancel" });
@@ -588,6 +730,8 @@ function createController({
       );
     },
     dispose(): void {
+      realtime?.close();
+      realtime = null;
       if (open) stopSpeaking();
       generation += 1;
       clearTimers();

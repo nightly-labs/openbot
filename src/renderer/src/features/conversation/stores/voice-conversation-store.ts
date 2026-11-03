@@ -15,6 +15,7 @@ import {
 import { EMPTY_DRAFT } from "../composer-draft";
 import type { ConversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationTarget } from "../conversation-types";
+import { createRealtimeVoiceConversation } from "../realtime-voice-conversation";
 import { voiceCaptureError, voiceTranscriptionError } from "../voice-status";
 import type { VoiceSend } from "./composer-actions";
 
@@ -60,6 +61,7 @@ function quietLevels(): number[] {
 type VoiceConversationStep = "starting" | "listening" | "transcribing" | "waiting";
 
 interface VoiceConversationState {
+  realtime: boolean;
   phase: VoiceConversationStep;
   /** The microphone stays off until the user unmutes it. */
   muted: boolean;
@@ -114,6 +116,7 @@ interface Turn {
 export function createVoiceConversation(deps: VoiceConversationDeps) {
   const target = { agentId: deps.agentId, serverId: deps.serverId };
   const [state, setState] = createStore<VoiceConversationState>({
+    realtime: false,
     phase: "starting",
     muted: false,
     offline: false,
@@ -139,6 +142,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   const serverKind = deps.serverId === LOCAL_SERVER_ID ? "local" : "remote";
   // True when the user's own voice server takes the dictation.
   let ownServer = false;
+  let realtime = false;
+  const realtimeConversation = createRealtimeVoiceConversation(deps);
   const transcription = () => {
     if (ownServer) return "server";
     return streamed ? "cloud" : "local";
@@ -160,13 +165,19 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   }
 
   const stopReplyEnd = onDictatedReplyEnd((agent) => {
-    if (agent.serverId === deps.serverId && agent.agentId === deps.agentId && step === "waiting") resumeListening();
+    if (!realtime && agent.serverId === deps.serverId && agent.agentId === deps.agentId && step === "waiting")
+      resumeListening();
   });
 
   /** No reply comes while the server is away, so the pane stops listening until it is back. */
   createEffect(deps.serverOnline, (next) => {
     if (next === online) return;
     online = next;
+    if (realtime) {
+      if (next) void realtimeConversation.start();
+      else realtimeConversation.offline();
+      return;
+    }
     if (!next) {
       generation += 1;
       releaseTurn();
@@ -184,14 +195,28 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       draft.offline = false;
       draft.error = null;
     });
-    if (ready && step === "listening") void listen();
+    if (!ready) void start();
+    else if (step === "listening") void listen();
   });
 
   async function start(): Promise<void> {
+    if (disposed || !online) return;
     const own = generation;
     const analytics = desktopAnalytics.scope();
     const startingAt = performance.now();
     try {
+      const status = await deps.voice.getRealtimeStatus?.(deps.serverId);
+      if (own !== generation || disposed || !online) return;
+      if (status?.enabled && deps.voice.connectRealtime) {
+        realtime = true;
+        ready = true;
+        setState((draft) => {
+          draft.realtime = true;
+        });
+        if (muted) realtimeConversation.toggleMute();
+        await realtimeConversation.start();
+        return;
+      }
       const speech = speechPort().voice;
       const server = await speech.getServer();
       // The user's own server reads the replies, so the speech model is not necessary.
@@ -633,6 +658,10 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   }
 
   function toggleMute(): void {
+    if (realtime) {
+      realtimeConversation.toggleMute();
+      return;
+    }
     setMuted(!muted);
     desktopAnalytics.track("voice_conversation_action", {
       action: muted ? "mute" : "unmute",
@@ -668,6 +697,10 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
 
   /** Stops the reply, or the wait for it, and listens again. The agent's turn goes on. */
   function interrupt(): void {
+    if (realtime) {
+      realtimeConversation.interrupt();
+      return;
+    }
     if (step !== "waiting" && step !== "transcribing") return;
     desktopAnalytics.track("voice_conversation_action", {
       action: "interrupt",
@@ -684,11 +717,13 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   function dispose(): void {
     if (disposed) return;
     disposed = true;
+    realtimeConversation.dispose();
+    window.removeEventListener("pagehide", dispose);
     desktopAnalytics.track("voice_conversation_action", {
       action: "end",
       server_kind: serverKind,
       result: "succeeded",
-      ...(ready ? { transcription: transcription() } : {}),
+      ...(ready && !realtime ? { transcription: transcription() } : {}),
       duration_ms: elapsedMs(startedAt),
       turn_count: sentTurns,
     });
@@ -698,6 +733,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     dropDictatedReply(target);
   }
   onCleanup(dispose);
+  window.addEventListener("pagehide", dispose);
 
   /** What the pane shows: the reply speaks while its words play, and the agent thinks until then. */
   const reading = () => {
@@ -705,6 +741,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     return current?.serverId === deps.serverId && current.agentId === deps.agentId ? current : null;
   };
   function phase(): VoicePanelPhase {
+    if (state.realtime) return realtimeConversation.phase();
     if (state.offline) return "offline";
     if (state.phase === "starting" || state.phase === "listening") return state.phase;
     if (state.phase === "waiting" && reading()) return "speaking";
@@ -715,11 +752,16 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
 
   return {
     phase,
-    muted: () => state.muted,
-    heard: () => state.heard,
-    error: () => state.error,
-    said: () => reading()?.part ?? "",
-    levels: () => (phase() === "speaking" ? (reading()?.levels ?? state.levels) : state.levels),
+    muted: () => (state.realtime ? realtimeConversation.muted() : state.muted),
+    heard: () => (state.realtime ? realtimeConversation.heard() : state.heard),
+    error: () => (state.realtime ? realtimeConversation.error() : state.error),
+    said: () => (state.realtime ? realtimeConversation.said() : (reading()?.part ?? "")),
+    levels: () =>
+      state.realtime
+        ? realtimeConversation.levels()
+        : phase() === "speaking"
+          ? (reading()?.levels ?? state.levels)
+          : state.levels,
     toggleMute,
     interrupt,
   };

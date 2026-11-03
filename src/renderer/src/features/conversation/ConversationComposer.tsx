@@ -45,6 +45,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
+import { realtimeVoiceStatus, refreshRealtimeVoiceStatus } from "../speech/realtime-voice-status";
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
 import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
@@ -149,6 +150,19 @@ export function ConversationComposer() {
       openSideQuestion(text);
     };
   };
+  createEffect(
+    () => (voiceConversationAvailable() ? (props.server?.id ?? "local") : undefined),
+    (serverId) => {
+      if (!serverId) return;
+      const refresh = () => {
+        void refreshRealtimeVoiceStatus(serverId).catch(() => undefined);
+      };
+      refresh();
+      window.addEventListener("focus", refresh);
+      return () => window.removeEventListener("focus", refresh);
+    },
+  );
+  const callEnabled = () => realtimeVoiceStatus(props.server?.id ?? "local")?.enabled === true;
   const openVoiceConversation = () => (voiceConversationAvailable() ? () => openSidePanelPane("voice") : undefined);
   // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
@@ -756,6 +770,7 @@ export function ConversationComposer() {
                   elapsedSeconds={voiceElapsedSeconds()}
                   modelProgress={voiceModelProgress()}
                   blocked={!props.agent || !agentReady()}
+                  onCall={callEnabled() && voiceConversationAvailable() ? () => openSidePanelPane("voice") : undefined}
                   onStart={() => void startVoiceRecording()}
                   onCancel={cancelVoiceRecording}
                   onFinish={stopVoiceRecording}

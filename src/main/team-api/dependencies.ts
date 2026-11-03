@@ -23,6 +23,7 @@ import type { PreferenceFileFailure } from "../preference-file";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
+import type { RealtimeVoiceService } from "../realtime-voice-service";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { RequestedUpdate } from "../requested-update";
 import type { ServerAuditStore } from "../server-audit-store";
@@ -550,6 +551,7 @@ export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "l
 export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
 
 export interface TeamApiOptions {
+  realtimeVoice?: RealtimeVoiceService;
   /** `events-v1`: admin-only event source and routine management. */
   events?: HostEventsApi | undefined;
   channels?: ChannelService | undefined;

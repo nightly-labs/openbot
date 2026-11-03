@@ -162,10 +162,6 @@
   line-height: var(--openbot-leading-xl);
 }
 
-.voice-panel-caption[data-empty] {
-  color: var(--openbot-text-muted);
-}
-
 .voice-panel-error {
   color: var(--openbot-danger);
   font-size: var(--openbot-text-md);

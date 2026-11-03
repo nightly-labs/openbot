@@ -8,7 +8,16 @@ const { join } = require("node:path");
 const GOOGLE_SERVICES_FILE = "./google-services.json";
 
 /** @param {{ config: import('expo/config').ExpoConfig }} context */
-module.exports = ({ config }) =>
-  existsSync(join(__dirname, GOOGLE_SERVICES_FILE))
+module.exports = ({ config }) => {
+  if (process.env.OPENBOT_ANDROID_VARIANT === "voice") {
+    return {
+      ...config,
+      name: "OpenBot Voice",
+      android: { ...config.android, package: "run.openbot.mobile.voice" },
+      updates: { ...config.updates, enabled: false },
+    };
+  }
+  return existsSync(join(__dirname, GOOGLE_SERVICES_FILE))
     ? { ...config, android: { ...config.android, googleServicesFile: GOOGLE_SERVICES_FILE } }
     : config;
+};

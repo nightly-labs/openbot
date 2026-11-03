@@ -7,15 +7,17 @@
 //     sends them again. Every turn keeps the framing of external input.
 // No provider, account or network is used. `bun run test:turn-input`.
 // Writes .openbot-build/turn-input-e2e/report.json with the characters of each turn input.
+
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, latestTurnAnswer } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { getString, isRecord } from "../src/backend/protocol";
+import { VoiceReplyTracker } from "../src/renderer/src/features/speech/voice-reply-tracker";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/turn-input-e2e");
 const root = await mkdtemp(join(tmpdir(), "openbot-turn-input-"));
@@ -72,6 +74,7 @@ const answer = (message) => {
     case "config/batchWrite": return write({ id: message.id, result: {} });
     case "thread/start": return write({ id: message.id, result: { thread: { id: "thread-" + (++threads), turns: [] } } });
     case "thread/resume": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
+    case "thread/archive": return write({ id: message.id, result: {} });
     case "thread/unsubscribe": return write({ id: message.id, result: { status: "Unsubscribed" } });
     case "thread/turns/list":
     case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
@@ -129,6 +132,8 @@ interface TurnReport {
 const report: {
   queuedMessages?: { turnStarts: number; mergedTurnCharacters: number; sharedTurnId: boolean; passed: boolean };
   messaging?: { turns: TurnReport[]; passed: boolean };
+  voiceReply?: { correlated: boolean; lateAcknowledgement: boolean };
+  voiceContext?: { persistedOnce: boolean; nextTurnReceivedContext: boolean; publicThreadPreserved: boolean };
   passed: boolean;
   error?: string;
 } = { passed: false };
@@ -305,6 +310,101 @@ try {
   );
   assert.ok(messagingStarts[2]?.text.includes("Hotfixes ship on any day."), "the new saved fact is missing");
   report.messaging.passed = true;
+
+  // Voice can return contextual handoff text without a literal transcript. It must survive in the
+  // chat and reach a previously loaded provider session, without starting a task of its own.
+  const publicThread = store.list().find((entry) => entry.id === agent.id)?.threadId;
+  const beforeVoice = turnStarts().length;
+  const context = [
+    {
+      role: "user",
+      kind: "delegation-context",
+      text: "Vegetarian dinners; shopping is Friday. Exact voice words were not returned.",
+    },
+  ] satisfies import("../src/backend/agent/voice-context").VoiceContextEntry[];
+  agents.recordVoiceContext(agent.id, "voice-fixture", context);
+  agents.recordVoiceContext(agent.id, "voice-fixture", context);
+  assert.ok(publicThread);
+  const saved = database
+    .readConversationPage(agent.id, publicThread, { type: "latest" }, 100)
+    .messages.filter((message) => message.itemType === "voice-context");
+  assert.equal(saved.length, 1, "A retried context save duplicated the handoff.");
+  const continued = await runCauseEffect(
+    agents.sendMessage({ agentId: agent.id, text: "Continue with the dinner plan." }),
+  );
+  const continuedDelivery = continued.deliveries[0]?.id;
+  assert.ok(continuedDelivery);
+  assert.equal(await waitFor("the post-voice turn", () => settled(continuedDelivery)), "completed");
+  assert.equal(turnStarts().length, beforeVoice + 1, "Saving context started extra agent work.");
+  const protocol = readFileSync(logPath, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  assert.ok(
+    protocol.some(
+      (entry) =>
+        isRecord(entry) &&
+        (entry.method === "thread/start" || entry.method === "thread/resume") &&
+        isRecord(entry.params) &&
+        typeof entry.params.developerInstructions === "string" &&
+        entry.params.developerInstructions.includes("Vegetarian dinners; shopping is Friday."),
+    ),
+    "The resumed provider did not receive the saved voice context.",
+  );
+  assert.equal(store.list().find((entry) => entry.id === agent.id)?.threadId, publicThread);
+  report.voiceContext = { persistedOnce: true, nextTurnReceivedContext: true, publicThreadPreserved: true };
+
+  // The production reply tracker consumes real queue/turn events from the real service and SQLite.
+  for (const late of [false, true]) {
+    const answers: string[] = [];
+    let ended = false;
+    const completedTurns = new Set<string>();
+    const tracker = new VoiceReplyTracker({
+      completed: (event) => {
+        const current = store.list().find((candidate) => candidate.id === agent.id);
+        assert.ok(current?.threadId);
+        const page = database.readConversationPage(agent.id, current.threadId, { type: "latest" }, 50);
+        answers.push(latestTurnAnswer(page.messages, event.turnId)?.text ?? "");
+        ended = true;
+      },
+      cancelled: () => {
+        throw new Error("The spoken request was unexpectedly cancelled.");
+      },
+    });
+    const forward = (event: import("@openbot/contracts/ipc").AgentEvent) => {
+      if (event.type === "queue-changed" && event.snapshot.agentId === agent.id)
+        tracker.queue(event.snapshot.deliveries);
+      else if (event.type === "turn-completed" && event.agentId === agent.id) {
+        completedTurns.add(event.turnId);
+        tracker.complete(event);
+      }
+    };
+    agents.on("event", forward);
+    try {
+      const receipt = await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "A voice request." }));
+      const delivery = receipt.deliveries[0];
+      assert.ok(delivery);
+      const stored = mailbox.getDelivery(delivery.id);
+      assert.ok(stored);
+      assert.notEqual(
+        delivery.id,
+        stored.delivery.messageId,
+        "Fixture must distinguish receipt delivery ID from mailbox message ID.",
+      );
+      if (late)
+        await waitFor("reply completion before send acknowledgement", () => {
+          const turnId = mailbox.getDelivery(delivery.id)?.delivery.turnId;
+          return turnId && completedTurns.has(turnId);
+        });
+      tracker.acknowledge(delivery.id);
+      await waitFor("the correlated voice answer", () => ended, 2_000);
+      assert.deepEqual(answers, ["Done."], "The call missed or duplicated the normal agent answer.");
+    } finally {
+      agents.off("event", forward);
+    }
+  }
+  report.voiceReply = { correlated: true, lateAcknowledgement: true };
+
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

@@ -122,6 +122,7 @@ export { default as PanelTop } from "lucide-solid/icons/panel-top";
 export { default as Pause } from "lucide-solid/icons/pause";
 export { default as Pencil } from "lucide-solid/icons/pencil";
 export { default as PencilLine } from "lucide-solid/icons/pencil-line";
+export { default as Phone } from "lucide-solid/icons/phone";
 export { default as PictureInPicture2 } from "lucide-solid/icons/picture-in-picture-2";
 export { default as Pin } from "lucide-solid/icons/pin";
 export { default as PinOff } from "lucide-solid/icons/pin-off";

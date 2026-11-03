@@ -66,7 +66,13 @@ export interface ConversationRuntime {
     | "finishStream"
     | "cancelStream"
     | "onStreamTranscript"
-  >;
+  > &
+    Partial<
+      Pick<
+        OpenBotDesktopApi["voice"],
+        "getRealtimeStatus" | "connectRealtime" | "pollRealtime" | "replyRealtime" | "endRealtime"
+      >
+    >;
   openUrl: OpenBotDesktopApi["openUrl"];
   /** Asks the connected host a side question. Absent, the host does not serve `side-question-v1`. */
   askSideQuestion?: ((input: AskSideQuestionInput) => Promise<string>) | undefined;

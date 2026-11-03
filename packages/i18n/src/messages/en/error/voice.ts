@@ -32,4 +32,10 @@ export const messages = defineMessages("error.voice", {
   "error.voice.server.invalidAnswer": "{host} did not send an OpenAI-compatible answer.",
   "error.voice.server.invalidAudio": "{host} sent audio that OpenBot cannot play. Use a server that sends WAV.",
   "error.voice.server.tooLarge": "The answer from {host} is too large.",
+  "error.voice.realtime.disabled": "Live voice is not enabled on this server.",
+  "error.voice.realtime.failed": "The live voice connection could not start.",
+  "error.voice.realtime.busy": "A live voice connection is already starting. Try again.",
+  "error.voice.realtime.invalid": "The live voice request is invalid.",
+  "error.voice.realtime.subscriptionRequired":
+    "Connect a ChatGPT subscription account on this server for live voice. API billing is not used.",
 });

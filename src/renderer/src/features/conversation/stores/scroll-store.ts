@@ -82,6 +82,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       deps.props.messages.filter(
         (message) =>
           message.kind !== "thinking" &&
+          message.itemType !== "voice-context" &&
           !(message.kind === "memory-changes" && answeredTurns().has(message.turnId)) &&
           !silentAgentAnswer(message),
       ),
@@ -155,7 +156,10 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   );
   /* Every row anchors the count, but only some rows add to it. */
   const timelineRows = createMemo(() =>
-    deps.props.messages.map((message) => ({ id: message.id, countable: countableTimelineMessage(message) })),
+    deps.props.messages.map((message) => ({
+      id: message.id,
+      countable: message.itemType !== "voice-context" && countableTimelineMessage(message),
+    })),
   );
 
   function clearNewMessages(): void {

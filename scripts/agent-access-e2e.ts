@@ -1,3 +1,12 @@
+import { spawnSync } from "node:child_process";
+import { REALTIME_VOICE_SDP_LIMIT } from "@openbot/contracts/ipc";
+import {
+  REALTIME_VOICE_CAPABILITY,
+  REALTIME_VOICE_ROUTES,
+  REALTIME_VOICE_SELECTION_CAPABILITY,
+  REALTIME_VOICE_SELECTION_ROUTE,
+} from "@openbot/contracts/team-protocol/realtime-voice-v1";
+import { RealtimeVoiceService, takeRealtimeVoiceApiKey } from "../src/main/realtime-voice-service";
 // Checks member access to agents through the agent-access-v1 Team API contract. A real
 // `TeamApiServer` runs on loopback with the real team, agent, mailbox, sidebar and roles stores on a
 // temporary profile. The owner sets roles; a member signs in as a current desktop client does. The
@@ -59,6 +68,26 @@ const HOST_VERSION = "0.0.0-e2e";
 const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
 const STEP_DEADLINE_MS = 30_000;
+const REALTIME_KEY = "e2e-realtime-host-secret-never-return";
+const OFFER = "v=0\r\no=fixture-offer\r\n";
+const ANSWER = "v=0\r\no=fixture-answer\r\n";
+let providerCalls = 0;
+let providerReply = async () => new Response(ANSWER);
+const realtimeFetch: typeof fetch = Object.assign(
+  async (url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    providerCalls += 1;
+    assert.equal(String(url), "https://api.openai.com/v1/realtime/calls");
+    assert.equal(init?.redirect, "error");
+    assert.equal(new Headers(init?.headers).get("Authorization"), `Bearer ${REALTIME_KEY}`);
+    assert.ok(init?.body instanceof FormData);
+    const session = record(JSON.parse(String(init.body.get("session"))), "provider session");
+    assert.equal(session.tools, undefined, "The audio interface must not have tools.");
+    const input = record(record(session.audio, "audio").input, "audio input");
+    assert.equal(record(input.turn_detection, "VAD").create_response, false);
+    return providerReply();
+  },
+  { preconnect: fetch.preconnect },
+);
 
 // The main process imports Electron for its windows and IPC. No check here opens a window.
 plugin({
@@ -207,6 +236,7 @@ interface Host {
   access: InstanceType<typeof AgentAccessStore>;
   audit: InstanceType<typeof ServerAuditStore>;
   port: number;
+  realtime: RealtimeVoiceService;
 }
 
 let host: Host | null = null;
@@ -236,7 +266,9 @@ async function startHost(): Promise<Host> {
   assert.equal(await runCauseEffect(access.load()), true, "The roles file did not load.");
   if (!team.getIdentity()) await runCauseEffect(team.configure("E2E Host", OWNER.username, OWNER.password));
   const agents = new AgentService({ store: agentStore, mailbox, browser: agentBrowser, sidebarLayout: sidebar });
+  const realtime = new RealtimeVoiceService({ mode: "api-key", apiKey: REALTIME_KEY, fetch: realtimeFetch });
   const server = new TeamApiServer({
+    realtimeVoice: realtime,
     store: team,
     agents,
     mailbox,
@@ -248,7 +280,7 @@ async function startHost(): Promise<Host> {
     serverAudit: audit,
   });
   const port = await Effect.runPromise(server.start());
-  return { database, agents, server, team, access, audit, port };
+  return { database, agents, server, team, access, audit, port, realtime };
 }
 
 async function stopHost(): Promise<void> {
@@ -257,6 +289,7 @@ async function stopHost(): Promise<void> {
   host = null;
   await Effect.runPromise(stopping.server.stop()).catch(() => undefined);
   await runCauseEffect(stopping.agents.stop()).catch(() => undefined);
+  await runCauseEffect(stopping.realtime.close());
   stopping.database.close();
 }
 
@@ -693,6 +726,169 @@ try {
     assert.equal(stored.roles[0]?.agents[copy], "chat", "The role did not get the copy.");
     assert.ok(!(await listedIds(setup.memberToken)).includes(copy), "The member sees the copy.");
     return { copy: stored.everyone[copy], role: stored.roles[0]?.agents[copy] };
+  });
+
+  await step("live voice: host key is removed before subprocess launch", async () => {
+    const prior = process.env.OPENBOT_REALTIME_API_KEY;
+    try {
+      process.env.OPENBOT_REALTIME_API_KEY = REALTIME_KEY;
+      assert.equal(takeRealtimeVoiceApiKey(), REALTIME_KEY);
+      const child = spawnSync(
+        process.execPath,
+        ["-e", "process.stdout.write(String(process.env.OPENBOT_REALTIME_API_KEY === undefined))"],
+        { encoding: "utf8" },
+      );
+      assert.equal(child.status, 0);
+      assert.equal(child.stdout, "true", "A child process inherited the host-only key.");
+    } finally {
+      if (prior === undefined) delete process.env.OPENBOT_REALTIME_API_KEY;
+      else process.env.OPENBOT_REALTIME_API_KEY = prior;
+    }
+    return { childKeyAbsent: true };
+  });
+
+  await step("live voice: real host enforces current roles, bounds and private provider failures", async () => {
+    const voiceAgent = (
+      await runCauseEffect(
+        current().agents.createAgentProfile({
+          name: "Voice",
+          description: "Voice",
+          avatarSeed: "voice",
+          avatarHue: null,
+        }),
+      )
+    ).id;
+    const levels = current().access.get(current().team.getIdentity()?.serverId ?? "");
+    let revision = levels.revision;
+    const setVoiceLevel = async (level: "chat" | "view" | "none") => {
+      const saved = await setAccess(ownerToken, {
+        revision,
+        everyone: { ...levels.everyone, [voiceAgent]: level },
+        roles: levels.roles,
+      });
+      assert.equal(saved.status, 200);
+      revision += 1;
+    };
+    const connect = (agentId: string, token = setup.memberToken, sdp = OFFER) =>
+      call("POST", REALTIME_VOICE_ROUTES.connect, { token, protocol: TEAM_PROTOCOL_V9, body: { agentId, sdp } });
+    await setVoiceLevel("chat");
+    const status = await call("POST", REALTIME_VOICE_ROUTES.status, {
+      token: setup.memberToken,
+      protocol: TEAM_PROTOCOL_V9,
+      body: {},
+    });
+    assert.equal(status.status, 200);
+    assert.equal(record(status.body, "voice status").enabled, true);
+    const setting = (token: string, enabled: unknown) =>
+      call("POST", REALTIME_VOICE_ROUTES.settings, { token, protocol: TEAM_PROTOCOL_V9, body: { enabled } });
+    assert.equal((await setting(setup.memberToken, false)).status, 403);
+    assert.equal((await setting(ownerToken, "false")).status, 400);
+    assert.equal((await setting(ownerToken, false)).status, 200);
+    assert.ok((await connect(voiceAgent)).status >= 400);
+    assert.equal((await setting(ownerToken, true)).status, 200);
+    const selectVoice = (token: string, voice: string, capabilities?: readonly string[]) =>
+      call("POST", REALTIME_VOICE_SELECTION_ROUTE, {
+        token,
+        protocol: TEAM_PROTOCOL_V9,
+        body: { voice },
+        capabilities,
+      });
+    assert.equal((await selectVoice(setup.memberToken, "cedar")).status, 403);
+    assert.equal((await selectVoice(ownerToken, "cove")).status, 400);
+    assert.equal(
+      (
+        await selectVoice(
+          ownerToken,
+          "cedar",
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter(
+            (capability) => capability !== REALTIME_VOICE_SELECTION_CAPABILITY,
+          ),
+        )
+      ).status,
+      400,
+    );
+    const selectedVoice = await selectVoice(ownerToken, "cedar");
+    assert.equal(selectedVoice.status, 200);
+    assert.equal(record(selectedVoice.body, "saved voice").voice, "cedar");
+    assert.equal((await setting(ownerToken, false)).status, 200);
+    const enabledAgain = await setting(ownerToken, true);
+    assert.equal(record(enabledAgain.body, "voice after toggle").voice, "cedar");
+    const allowed = await connect(voiceAgent);
+    assert.equal(allowed.status, 200, JSON.stringify(allowed.body));
+    assert.deepEqual(allowed.body, { sdp: ANSWER });
+    const beforeDenied = providerCalls;
+    await setVoiceLevel("view");
+    assert.equal((await connect(voiceAgent)).status, 403);
+    await setVoiceLevel("none");
+    assert.ok([403, 404].includes((await connect(voiceAgent)).status));
+    const tooLarge = await connect(voiceAgent, setup.memberToken, `v=0${"x".repeat(REALTIME_VOICE_SDP_LIMIT)}`);
+    assert.equal(tooLarge.status, 400);
+    assert.equal(providerCalls, beforeDenied, "An unauthorized or oversized offer reached OpenAI.");
+    const old = await call("POST", REALTIME_VOICE_ROUTES.status, {
+      token: setup.memberToken,
+      protocol: TEAM_PROTOCOL_V7,
+      body: {},
+    });
+    assert.equal(old.status, 400);
+    assert.equal(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V7).includes(REALTIME_VOICE_CAPABILITY), false);
+    const noAuth = await call("POST", REALTIME_VOICE_ROUTES.status, { protocol: TEAM_PROTOCOL_V9, body: {} });
+    assert.equal(noAuth.status, 401);
+    await setVoiceLevel("chat");
+    providerReply = async () => new Response(REALTIME_KEY, { status: 500 });
+    const failed = await connect(voiceAgent, ownerToken);
+    assert.ok(failed.status >= 400);
+    assert.equal(JSON.stringify(failed.body).includes(REALTIME_KEY), false);
+    providerReply = async () =>
+      new Response("x", { headers: { "content-length": String(REALTIME_VOICE_SDP_LIMIT + 1) } });
+    assert.ok((await connect(voiceAgent, ownerToken)).status >= 400);
+    providerReply = async () => {
+      await setVoiceLevel("none");
+      return new Response(ANSWER);
+    };
+    const revoked = await connect(voiceAgent);
+    assert.ok(revoked.status >= 400, "A handshake returned SDP after access was revoked.");
+    assert.equal(JSON.stringify(revoked.body).includes(ANSWER), false);
+    providerReply = async () => new Response(ANSWER);
+    assert.equal(JSON.stringify(status.body).includes(REALTIME_KEY), false);
+    return {
+      chatAllowed: true,
+      viewAndHiddenDenied: true,
+      revokedAnswerWithheld: true,
+      providerErrorsPrivate: true,
+      oversizedRejected: true,
+      oldProtocolDisabled: true,
+      unauthenticated: noAuth.status,
+    };
+  });
+
+  await step("voice context: an incomplete handoff persists once across host restart", async () => {
+    const agent = await runCauseEffect(
+      current().agents.createAgentProfile({
+        name: "Voice context",
+        description: "Voice context",
+        avatarSeed: "voice-context",
+        avatarHue: null,
+      }),
+    );
+    const entries = [
+      { role: "user", kind: "delegation-context", text: "A contextual summary, not exact spoken words." },
+    ] satisfies import("../src/backend/agent/voice-context").VoiceContextEntry[];
+    current().agents.recordVoiceContext(agent.id, "handoff-retry", entries);
+    current().agents.recordVoiceContext(agent.id, "handoff-retry", entries);
+    await stopHost();
+    host = await startHost();
+    const ownerId = current()
+      .team.listMembers()
+      .find((member) => member.role === "owner")?.id;
+    assert.ok(ownerId);
+    const conversation = await runCauseEffect(current().agents.readConversationFor(agent.id, ownerId));
+    const notes = conversation.messages.filter((message) => message.itemType === "voice-context");
+    assert.equal(notes.length, 1);
+    assert.ok(notes[0]?.text.includes("not exact spoken words"));
+    const startup = await runCauseEffect(current().agents.voiceSessionContext(agent.id, ownerId));
+    assert.ok(startup.includes('"name":"Voice context"'));
+    assert.ok(startup.includes("not exact spoken words"));
+    return { persistedOnce: true, labelledContext: true };
   });
 
   report.passed = true;

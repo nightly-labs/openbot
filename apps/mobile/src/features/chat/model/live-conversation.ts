@@ -16,13 +16,13 @@ const SENTENCE = /[^.!?…。！？]+(?:[.!?…。！？]+|$)/gu;
  */
 export function liveReplyTurn(
   messages: readonly ConversationMessage[],
-  deliveries: readonly Pick<QueueDelivery, "messageId" | "turnId">[],
+  deliveries: readonly Pick<QueueDelivery, "id" | "messageId" | "turnId">[],
   messageId: string,
 ): string | null {
   const index = messages.findIndex((message) => message.id === messageId);
   const own = messages[index]?.turnId;
   if (own) return own;
-  const delivery = deliveries.find((item) => item.messageId === messageId);
+  const delivery = deliveries.find((item) => item.id === messageId);
   // The agent messages after a queued message belong to the turn it waits for.
   if (delivery) return delivery.turnId;
   if (index < 0) return null;

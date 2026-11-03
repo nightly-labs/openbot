@@ -658,6 +658,7 @@ function registerIpcHandlers({
   voice,
   speech,
   voiceServer,
+  realtimeVoice,
   dynamicIsland,
   cuaDriver,
   computerUsePermissionHelp,
@@ -723,7 +724,7 @@ function registerIpcHandlers({
     ...macAutomationIpcHandlers({ platform: process.platform }),
     ...backgroundProcessIpcHandlers({ platform: process.platform, agents: () => service.listAgents() }),
     ...providerIpcHandlers({ service, providerRuntimes, credentials: providerCredentials, openLink }),
-    ...voiceIpcHandlers({ voice, speech, server: voiceServer, service }),
+    ...voiceIpcHandlers({ voice, speech, server: voiceServer, service, realtime: realtimeVoice, host, remoteServers }),
     ...accountIpcHandlers({ centralAuth, host }),
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({

@@ -1,6 +1,7 @@
 import {
   DEFAULT_SPEECH_SETTINGS,
   DEFAULT_VOICE_SETTINGS,
+  DISABLED_REALTIME_VOICE,
   ELEVENLABS_VOICE_MODEL_ID,
   type OpenBotDesktopApi,
   SPEECH_MODEL_ID,
@@ -15,6 +16,7 @@ import {
   type VoiceSettings,
   type VoiceStreamTranscript,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { clone, type Listener, type MockRuntime } from "./mock-support";
 
 export interface MockVoiceOptions {
@@ -129,7 +131,19 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
       schedule(() => advance(5), 200);
     });
 
+  let realtimeEnabled = false;
   const voice: OpenBotDesktopApi["voice"] = {
+    getRealtimeStatus: async () => ({ ...DISABLED_REALTIME_VOICE, enabled: realtimeEnabled }),
+    setRealtimeEnabled: async ({ enabled }) => {
+      realtimeEnabled = enabled;
+      return { ...DISABLED_REALTIME_VOICE, enabled };
+    },
+    pollRealtime: async () => ({ active: false, delegation: null }),
+    replyRealtime: async () => undefined,
+    endRealtime: async () => undefined,
+    connectRealtime: async () => {
+      throw new Error(sourceText("error.voice.realtime.disabled"));
+    },
     getModelStatus: async () => status(settings.modelId),
     getModelStatuses: async () => VOICE_MODEL_IDS.map(status),
     prepareModel: () => download(settings.modelId),

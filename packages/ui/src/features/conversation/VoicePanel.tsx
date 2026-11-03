@@ -31,10 +31,6 @@ export interface VoicePanelProps {
   phase: VoicePanelPhase;
   /** The microphone is off until the user unmutes it. */
   muted: boolean;
-  /** What the user said in this turn, so far. */
-  heard: string;
-  /** The part of the reply that plays now. */
-  said: string;
   /** The latest loudness readings of the voice that is heard now, from 0 to 1, oldest first. */
   levels: readonly number[];
   /** Why the conversation stopped listening. */
@@ -48,8 +44,8 @@ export interface VoicePanelProps {
 /**
  * A conversation by voice in the side panel. The agent listens until you stop speaking, sends what you
  * said to the chat, and reads its reply aloud; then it listens again. The agent's face grows with the
- * voice that is heard, a waveform under it moves with your voice or the agent's, and the captions show
- * what you say and what it says.
+ * voice that is heard, and a waveform under it moves with your voice or the agent's.
+ * Transcript text is kept by the controller for context, without appearing in the call panel.
  */
 export function VoicePanel(props: VoicePanelProps) {
   const { t } = useText();
@@ -83,29 +79,15 @@ export function VoicePanel(props: VoicePanelProps) {
         >
           <VoiceWaveform levels={props.levels} />
         </div>
-        <div class="voice-panel-captions">
-          <Show
-            when={props.error}
-            fallback={
-              <Show
-                when={props.phase === "speaking"}
-                fallback={
-                  <p class="voice-panel-caption" data-empty={props.heard ? undefined : ""}>
-                    {props.heard || (hearing() ? t("conversation.voice.speakNow") : "")}
-                  </p>
-                }
-              >
-                <p class="voice-panel-caption">{props.said}</p>
-              </Show>
-            }
-          >
-            {(error) => (
+        <Show when={props.error}>
+          {(error) => (
+            <div class="voice-panel-captions">
               <p class="voice-panel-caption voice-panel-error" role="alert">
                 {error()}
               </p>
-            )}
-          </Show>
-        </div>
+            </div>
+          )}
+        </Show>
       </div>
       <div class="voice-panel-controls">
         <Button

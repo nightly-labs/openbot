@@ -19,6 +19,7 @@ import {
   type VoiceRecordingSummary,
 } from "./speech-playback";
 import { speechPort } from "./speech-port";
+import { VoiceReplyTracker } from "./voice-reply-tracker";
 import { voiceServer } from "./voice-server";
 
 /** A dictated message that is not sent within this time does not make its reply spoken. */
@@ -30,18 +31,12 @@ interface DictatedMessage {
   dictatedAt: number;
   /** The language of the dictation, for a reply whose own words do not show one. */
   language: SpeechLanguage;
-  /** The user turn that delivers the message, once it starts or the message steers a running one. */
-  turnId: string | undefined;
-  /** The send that carries the message started. */
+  tracker: VoiceReplyTracker;
   sending: boolean;
-  /** The id that the host gave the message, once the send returns. */
-  messageId: string | undefined;
-  /** The turns that took this agent's messages, by message id, from its queue. A steered message starts no turn. */
-  deliveryTurns: Map<string, string>;
-  /** The turn that ended while the request continues. The queue shows it until the next turn starts. */
-  continuedTurnId: string | undefined;
   /** A voice conversation reads its replies also when the setting is off. */
   always: boolean;
+  /** A voice call captures its own speaker, so a later call cannot take this reply. */
+  speaker: DictatedReplySink | undefined;
 }
 
 /** What started a reading: a voice conversation, a dictated message, or the Read aloud control. */
@@ -62,6 +57,26 @@ let spoken: SpeechAgent | undefined;
 const loading = new Set<SpeechAgent>();
 /** Told when the reply to a dictated message was read, was not read, or will not come. */
 const replyEndListeners = new Set<(agent: SpeechAgent) => void>();
+type DictatedReplySpeaker = (text: string) => Promise<void>;
+interface DictatedReplySink {
+  speak: DictatedReplySpeaker;
+  end: () => void;
+}
+const replySpeakers = new Map<string, DictatedReplySink>();
+
+/** Overrides only correlated dictated replies for this agent on this server. */
+export function registerDictatedReplySpeaker(
+  agent: SpeechAgent,
+  speak: DictatedReplySpeaker,
+  end: () => void,
+): () => void {
+  const key = agentKey(agent);
+  const sink = { speak, end };
+  replySpeakers.set(key, sink);
+  return () => {
+    if (replySpeakers.get(key) === sink) replySpeakers.delete(key);
+  };
+}
 
 function isSpoken(agent: SpeechAgent): boolean {
   return spoken?.serverId === agent.serverId && spoken.agentId === agent.agentId;
@@ -73,17 +88,24 @@ function isSpoken(agent: SpeechAgent): boolean {
  * sent: its turn can start first.
  */
 export function noteDictatedMessage(agent: SpeechAgent, transcript: string, options?: { always: boolean }): void {
-  dictated.set(agentKey(agent), {
+  const speaker = options?.always ? replySpeakers.get(agentKey(agent)) : undefined;
+  const message: DictatedMessage = {
     dictatedAt: Date.now(),
     language: speechLanguageOf(transcript, "en") ?? "en",
-    turnId: undefined,
     sending: false,
-    messageId: undefined,
-    deliveryTurns: new Map(),
-    continuedTurnId: undefined,
     always: options?.always ?? false,
-  });
-  void warmSpeech(options?.always ?? false);
+    speaker,
+    tracker: new VoiceReplyTracker({
+      completed: (event) => finishDictatedTurn(agent, message, event),
+      cancelled: () => {
+        if (dictated.get(agentKey(agent)) !== message) return;
+        dictated.delete(agentKey(agent));
+        replyEnded(agent, message);
+      },
+    }),
+  };
+  dictated.set(agentKey(agent), message);
+  if (!speaker) void warmSpeech(options?.always ?? false);
 }
 
 /** Loads the voice while the agent writes its reply, so the reading does not wait for it. */
@@ -101,24 +123,20 @@ async function warmSpeech(always: boolean): Promise<void> {
  * Call when a send to this agent starts. When it carries the dictated message, returns the call that
  * takes the id the host gave the message, so a message that steers the running turn finds its turn.
  */
-export function claimDictatedSend(agent: SpeechAgent): ((messageId: string) => void) | undefined {
+export function claimDictatedSend(agent: SpeechAgent): ((deliveryId: string) => void) | undefined {
   const message = dictated.get(agentKey(agent));
   if (!message || message.sending) return undefined;
   message.sending = true;
-  return (messageId) => {
-    message.messageId = messageId;
-    takeDeliveryTurn(message);
+  return (deliveryId) => {
+    if (dictated.get(agentKey(agent)) !== message) return;
+    message.tracker.acknowledge(deliveryId);
   };
-}
-
-function takeDeliveryTurn(message: DictatedMessage): void {
-  if (!message.turnId && message.messageId) message.turnId = message.deliveryTurns.get(message.messageId);
 }
 
 /** The dictated message was not sent. */
 export function forgetDictatedMessage(agent: SpeechAgent): void {
   const key = agentKey(agent);
-  if (!dictated.get(key)?.turnId) dictated.delete(key);
+  if (!dictated.get(key)?.tracker.turnId) dictated.delete(key);
 }
 
 /** The reply to the dictated message of this agent is not read, also when its turn started. */
@@ -142,7 +160,8 @@ export function onDictatedReplyEnd(listener: (agent: SpeechAgent) => void): () =
   return () => replyEndListeners.delete(listener);
 }
 
-function replyEnded(agent: SpeechAgent): void {
+function replyEnded(agent: SpeechAgent, message?: DictatedMessage): void {
+  message?.speaker?.end();
   for (const listener of replyEndListeners) listener(agent);
 }
 
@@ -153,18 +172,10 @@ function replyEnded(agent: SpeechAgent): void {
  */
 export function readDictatedReplies(event: AgentEvent, serverId: string): void {
   if (event.type === "queue-changed") {
-    const message = dictated.get(agentKey({ serverId, agentId: event.snapshot.agentId }));
-    if (!message || message.turnId) return;
-    // A steer that is not confirmed yet can fail, and the message then starts its own turn.
-    for (const delivery of event.snapshot.deliveries)
-      if (
-        delivery.turnId &&
-        delivery.turnId !== message.continuedTurnId &&
-        delivery.status === "running" &&
-        delivery.sender.kind === "user"
-      )
-        message.deliveryTurns.set(delivery.messageId, delivery.turnId);
-    takeDeliveryTurn(message);
+    const agent = { serverId, agentId: event.snapshot.agentId };
+    const message = dictated.get(agentKey(agent));
+    if (!message) return;
+    message.tracker.queue(event.snapshot.deliveries);
     return;
   }
   if (event.type !== "turn-started" && event.type !== "turn-completed") return;
@@ -174,25 +185,26 @@ export function readDictatedReplies(event: AgentEvent, serverId: string): void {
     if (event.origin === "routine" || event.origin === "agent") return;
     if (isSpoken(agent)) stopSpokenReply();
     const message = dictated.get(key);
-    if (!message || message.turnId) return;
+    if (!message || message.tracker.turnId) return;
     if (Date.now() - message.dictatedAt > DICTATION_LIFETIME_MS) {
       dictated.delete(key);
-      replyEnded(agent);
-    } else message.turnId = event.turnId;
+      replyEnded(agent, message);
+    } else if (!message.speaker) message.tracker.adoptTurn(event.turnId);
     return;
   }
   const message = dictated.get(key);
-  if (!message || message.turnId !== event.turnId) return;
-  if (event.status === "completed" && event.continues) {
-    // The request continues in a new turn; its answer is the one to read.
-    message.continuedTurnId = event.turnId;
-    message.turnId = undefined;
-    message.deliveryTurns.clear();
-    return;
-  }
-  dictated.delete(key);
+  if (message?.sending) message.tracker.complete(event);
+}
+
+function finishDictatedTurn(
+  agent: SpeechAgent,
+  message: DictatedMessage,
+  event: Extract<AgentEvent, { type: "turn-completed" }>,
+): void {
+  if (dictated.get(agentKey(agent)) !== message) return;
+  dictated.delete(agentKey(agent));
   if (event.status === "completed" && !event.quiet) void readReply(agent, event.turnId, message);
-  else replyEnded(agent);
+  else replyEnded(agent, message);
 }
 
 async function readReply(agent: SpeechAgent, turnId: string, message: DictatedMessage): Promise<void> {
@@ -209,6 +221,10 @@ async function readReply(agent: SpeechAgent, turnId: string, message: DictatedMe
     if (!loading.has(own)) return;
     loading.delete(own);
     const answer = latestTurnAnswer(page.messages, turnId);
+    if (message.speaker) {
+      await message.speaker.speak(answer?.text ? speechTextFromMarkdown(answer.text) : "");
+      return;
+    }
     await speak(
       answer?.text ?? "",
       { ...agent, messageId: answer?.id ?? null },
@@ -225,7 +241,7 @@ async function readReply(agent: SpeechAgent, turnId: string, message: DictatedMe
     reportReadFailure(error);
   } finally {
     loading.delete(own);
-    replyEnded(agent);
+    replyEnded(agent, message);
   }
 }
 

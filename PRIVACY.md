@@ -881,6 +881,23 @@ Network traffic can also occur when:
   text. Nothing else is sent: no conversation, file or agent instruction. ElevenLabs handles the
   audio and the text under its own policy and the user's ElevenLabs plan. The local models send
   nothing;
+- the host administrator enables live OpenAI voice and the user opens a voice conversation.
+  Subscription mode uses the host's selected Codex ChatGPT account. Codex owns account storage
+  and token refresh. The host obtains the OAuth token through Codex's private local connection,
+  sends it with the account ID, SDP offer and voice settings to `chatgpt.com`, and uses it for an
+  authenticated control connection at `api.openai.com/v1/live`. Tokens never go to clients or chat.
+  API billing is a separate explicit setting; subscription failure does not select it. In API mode,
+  the host sends the offer to `api.openai.com/v1/realtime/calls` using its API key. In both modes the
+  client sends microphone audio directly to OpenAI over WebRTC and receives text and reply audio.
+  SDP can contain network addresses. Subscription calls also send the selected agent's name, role,
+  instructions, essential memories and bounded recent chat context to OpenAI when the call starts.
+  Internal handoffs are hidden from the chat timeline. Delegated requests use the selected agent's ordinary chat
+  queue; its answer is sent to OpenAI for speech. OpenAI handles the received data under the policy
+  for the selected service. Normal chat and a bounded voice context handoff remain on the host. The handoff distinguishes
+  available transcripts, voice-model context and agent answers; exact words may be unavailable.
+  The agent receives that recent context on its next turn. Call audio and a second browser
+  transcript database are not saved. Mute stops microphone transmission and End releases local media and
+  the host control connection. Neither action recalls data already received by OpenAI;
 - the user sets up a voice server in **Settings → Voice**. OpenBot sends requests only to the address
   that the user enters, with the user's API key when there is one. To connect, it lists the server's
   models and voices. When the server does dictation, OpenBot sends the recorded audio, the chosen

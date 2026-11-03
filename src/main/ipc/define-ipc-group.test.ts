@@ -1,8 +1,12 @@
 // @vitest-environment node
-
 import {
   DEFAULT_SPEECH_SETTINGS,
+  DISABLED_REALTIME_VOICE,
   type DraftAttachment,
+  parseRealtimeVoiceCall,
+  parseRealtimeVoiceEnabled,
+  parseRealtimeVoiceOffer,
+  parseRealtimeVoiceReply,
   type SpeechModelStatus,
   type VoiceModelStatus,
   type VoiceSettings,
@@ -11,7 +15,9 @@ import {
 } from "@openbot/contracts/ipc";
 import type { IpcMainInvokeEvent } from "electron";
 import { describe, expect, it, vi } from "vitest";
+import { agentRequest, agentScope } from "./agent-inputs";
 import { eventPayloadHandler, handler, payloadHandler, registerIpcGroup } from "./define-ipc-group";
+import { scopedHandler } from "./scoped-handler";
 import {
   parseSpeechInput,
   parseSpeechSettings,
@@ -69,6 +75,18 @@ function registerVoice(
   withEvent = false,
 ): void {
   registerIpcGroup("voice", {
+    setRealtimeEnabled: scopedHandler(parseRealtimeVoiceEnabled, {
+      local: () => ({ ...DISABLED_REALTIME_VOICE }),
+      remote: () => ({ ...DISABLED_REALTIME_VOICE }),
+    }),
+    getRealtimeStatus: payloadHandler(agentScope, () => ({ ...DISABLED_REALTIME_VOICE })),
+    pollRealtime: scopedHandler(parseRealtimeVoiceCall, {
+      local: () => ({ active: false, delegation: null }),
+      remote: () => ({ active: false, delegation: null }),
+    }),
+    replyRealtime: scopedHandler(parseRealtimeVoiceReply, { local: () => undefined, remote: () => undefined }),
+    endRealtime: scopedHandler(parseRealtimeVoiceCall, { local: () => undefined, remote: () => undefined }),
+    connectRealtime: payloadHandler(agentRequest(parseRealtimeVoiceOffer), () => ({ sdp: "v=0\r\n" })),
     getModelStatus: handler(() => READY),
     getModelStatuses: handler(() => [READY]),
     prepareModel: handler(() => READY),

@@ -32,6 +32,7 @@
       "predictiveBackGestureEnabled": false,
       "permissions": ["android.permission.CAMERA"],
       "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO",
@@ -39,6 +40,7 @@
       ]
     },
     "plugins": [
+      "@config-plugins/react-native-webrtc",
       "./plugins/with-rocketsim",
       "./plugins/with-workspace-bundle-inputs",
       "expo-router",
@@ -116,7 +118,8 @@
           "android": {
             "usesCleartextTraffic": true,
             "enableMinifyInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "# WebRTC 155.0.1 ships an unused Dav1d JNI wrapper without its optional video decoder.\n-dontwarn org.webrtc.Dav1dDecoder$Natives"
           }
         }
       ],

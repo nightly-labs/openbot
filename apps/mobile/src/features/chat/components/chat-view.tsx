@@ -43,6 +43,7 @@ import {
   presentChatMessages,
 } from "@/features/chat/model/chat-messages";
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
+import type { RealtimeVoicePort } from "@/features/voice/model/realtime-voice";
 import { replyVoiceReady } from "@/features/voice/model/reply-voice";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
@@ -584,9 +585,24 @@ export function ChatView({
     onSend: sendMessage,
   });
   const writable = canSend && !readOnly && !notice;
+  const realtimeVoice = useMemo<RealtimeVoicePort | null>(
+    () =>
+      target.kind === "agent"
+        ? {
+            agentId: target.id,
+            status: () => workspace().realtimeVoiceStatus(target.serverId),
+            connect: (sdp: string) => workspace().connectRealtimeVoice({ agentId: target.id, sdp }, target.serverId),
+            poll: (input) => workspace().pollRealtimeVoice(input, target.serverId),
+            reply: (input) => workspace().replyRealtimeVoice(input, target.serverId),
+            end: (input) => workspace().endRealtimeVoice(input, target.serverId),
+          }
+        : null,
+    [target.kind, target.id, target.serverId, workspace],
+  );
   // Hands-free, as the voice pane on desktop: the agent hears a pause as the end of a turn, and its
   // reply is read aloud. In a channel the leader answers, or the member the words name.
   const live = useLiveConversation({
+    realtime: realtimeVoice,
     enabled: isFocused && writable,
     online: serverOnline,
     focused: isFocused,
@@ -614,7 +630,7 @@ export function ChatView({
     live.available || live.open
       ? {
           ...liveVoice(live, voiceAgent?.name ?? target.name, t),
-          start: () => (replyVoiceReady() ? live.start() : router.push("/settings/voice")),
+          start: () => (live.realtimeReady || replyVoiceReady() ? live.start() : router.push("/settings/voice")),
         }
       : dictationVoice(voice, t);
   const voiceOpen = voice.stage !== "closed" || live.open;

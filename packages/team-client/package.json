@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./voice-subscription": "./src/voice-subscription.ts",
     ".": "./src/index.ts",
     "./ed25519": "./src/ed25519.ts",
     "./host-key-handover": "./src/host-key-handover.ts",

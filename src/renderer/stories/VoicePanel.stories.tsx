@@ -10,8 +10,6 @@ const SPEECH = [
   0, 0, 0.05, 0.3, 0.55, 0.4, 0.7, 0.5, 0.2, 0.05, 0, 0, 0.1, 0.45, 0.8, 0.6, 0.35, 0.6, 0.9, 0.5, 0.25, 0.4, 0.65, 0.5,
 ];
 
-const QUESTION = "What should I put first in the launch post?";
-
 const meta = {
   title: "Conversation/VoicePanel",
   component: VoicePanel,
@@ -19,8 +17,6 @@ const meta = {
     agent: STORY_AGENT,
     phase: "listening",
     muted: false,
-    heard: "",
-    said: "",
     levels: QUIET,
     error: null,
     onToggleMute: fn(),
@@ -53,16 +49,15 @@ export const Starting: Story = { args: { phase: "starting" } };
 
 export const Listening: Story = {};
 
-export const Hearing: Story = { args: { heard: QUESTION, levels: SPEECH } };
+export const Hearing: Story = { args: { levels: SPEECH } };
 
 export const Muted: Story = { args: { muted: true } };
 
-export const Thinking: Story = { args: { phase: "thinking", heard: QUESTION } };
+export const Thinking: Story = { args: { phase: "thinking" } };
 
 export const Speaking: Story = {
   args: {
     phase: "speaking",
-    said: "Start with the one change a reader can try today, then say why it matters.",
     levels: SPEECH,
   },
 };

@@ -23,6 +23,9 @@ type CaptureMode = "transcribe" | "stream";
 declare class SpeechModule extends NativeModule<SpeechEvents> {
   /** A `file://` URI of the directory for downloaded voice models, which the device does not back up. */
   modelRoot(): string;
+  /** Native live-call routing, restored when the call ends. */
+  startLiveAudio?(): void;
+  endLiveAudio?(): void;
   /** Loads Supertonic 3 from its model directory. The same directory keeps the loaded model. */
   load(directory: string, threads: number): Promise<void>;
   unload(): Promise<void>;

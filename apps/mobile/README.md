@@ -658,3 +658,22 @@ Live Activity, voice, agent template and opt-out events, `entry_point` on pairin
 The file queue holds at most 1,000 reports, 1 MiB, and seven days, and sends only after a local
 write succeeds. Foreground and host reconnection trigger retries. Opt-out and account changes
 clear this queue. See [the analytics contract](../../ANALYTICS.md#reliable-error-reports).
+
+### Private Android voice build
+
+Set `OPENBOT_ANDROID_VARIANT=voice` for prebuild and the Android build. The standalone app uses
+`run.openbot.mobile.voice` and the name OpenBot Voice, so it can be installed beside the official app.
+This variant disables Expo updates and omits the official Firebase file because it belongs to a
+different Android package. Android push notifications are unavailable in this private build.
+The account service and server sign-in remain the normal OpenBot service.
+
+Generate with `bunx expo prebuild --platform android --no-install`, then build `:app:assembleRelease`
+in the generated Android project. Keep the variant variable set for both commands. Local generated
+release signing uses the development key; distribute this APK privately. Do not submit it to Play.
+
+WebRTC 155.0.1's Android AAR includes an unused `Dav1dDecoderJni` class but omits the
+`Dav1dDecoder` and `Dav1dDecoder$Natives` classes. No other class in its Java archive references
+that JNI wrapper; the software video factory uses its native factory instead. The build properties
+include R8's exact generated missing-class rule for that optional AV1 video interface. All other R8
+checks and shrinking remain enabled. Voice requests audio only. Remove this rule when the upstream
+AAR includes the interface or removes the orphan wrapper.

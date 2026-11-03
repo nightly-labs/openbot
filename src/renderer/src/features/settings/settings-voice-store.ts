@@ -1,6 +1,8 @@
 import {
   ELEVENLABS_VOICE_MODEL_ID,
   isSpeechLanguage,
+  type RealtimeVoiceStatus,
+  type ServerSummary,
   type SpeechModelStatus,
   type SpeechSettings,
   type SpeechVoice,
@@ -16,10 +18,13 @@ import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { serverRoleCanAdminister } from "../servers/server-capabilities";
+import { noteRealtimeVoiceStatus, refreshRealtimeVoiceStatus } from "../speech/realtime-voice-status";
 import { readAloud, stopSpeech } from "../speech/speech-playback";
 import { voicePort } from "./voice-port";
 
 interface SettingsVoiceState {
+  realtime: { status: RealtimeVoiceStatus | null; busy: boolean; canManage: boolean; hostName: string };
   /** One status for each model in `VOICE_MODELS`, or null before main answers. */
   statuses: Record<VoiceModelId, VoiceModelStatus | null>;
   settings: VoiceSettings | null;
@@ -52,8 +57,12 @@ type FailureKey =
  * The Voice tab's view of the dictation models and settings. It is created by the settings page,
  * so a download that runs keeps its row while another tab is open.
  */
-export function createSettingsVoiceStore(active: () => boolean) {
+export function createSettingsVoiceStore(
+  active: () => boolean,
+  selectedServer: () => ServerSummary | undefined = () => undefined,
+) {
   const [state, setState] = createStore<SettingsVoiceState>({
+    realtime: { status: null, busy: false, canManage: false, hostName: "" },
     statuses: { ...EMPTY_STATUSES },
     settings: null,
     speech: { status: null, settings: null, listening: false },
@@ -103,6 +112,65 @@ export function createSettingsVoiceStore(active: () => boolean) {
       stopServer();
     };
   });
+
+  createEffect(
+    () => ({ active: active(), server: selectedServer() }),
+    ({ active, server }) => {
+      if (!active) return;
+      const id = server?.id ?? "local";
+      const supported =
+        !server || server.kind === "local" || server.compatibility?.capabilities.includes("realtime-voice-v1");
+      setState((draft) => {
+        draft.realtime = {
+          status: null,
+          busy: false,
+          canManage:
+            supported === true &&
+            (!server || serverRoleCanAdminister(server)) &&
+            (!server || server.kind === "local" || server.state === "online"),
+          hostName: server?.name ?? currentText().t("settings.voice.realtime.local"),
+        };
+      });
+      if (!supported) return;
+      let alive = true;
+      void refreshRealtimeVoiceStatus(id)
+        .then((status) => {
+          if (alive)
+            setState((draft) => {
+              draft.realtime.status = status;
+            });
+        })
+        .catch((error: unknown) => {
+          if (alive) fail(error, "settings.voice.loadFailed");
+        });
+      return () => {
+        alive = false;
+      };
+    },
+  );
+
+  async function setRealtimeEnabled(enabled: boolean): Promise<void> {
+    if (!state.realtime.canManage || state.realtime.busy || !state.realtime.status) return;
+    const id = selectedServer()?.id ?? "local";
+    setState((draft) => {
+      draft.realtime.busy = true;
+    });
+    try {
+      const status = await voicePort().voice.setRealtimeEnabled({ enabled }, id);
+      noteRealtimeVoiceStatus(id, status);
+      if ((selectedServer()?.id ?? "local") === id)
+        setState((draft) => {
+          draft.realtime.status = status;
+        });
+    } catch (error) {
+      fail(error, "settings.voice.saveFailed");
+    } finally {
+      if ((selectedServer()?.id ?? "local") === id)
+        setState((draft) => {
+          draft.realtime.busy = false;
+        });
+    }
+  }
 
   function fail(error: unknown, fallback: FailureKey): void {
     const { t, errorMessage } = currentText();
@@ -296,6 +364,7 @@ export function createSettingsVoiceStore(active: () => boolean) {
 
   return {
     state,
+    setRealtimeEnabled,
     download,
     cancel,
     remove,

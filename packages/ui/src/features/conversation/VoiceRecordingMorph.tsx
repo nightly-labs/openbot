@@ -1,6 +1,6 @@
 import { VOICE_AUDIO_LIMITS } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, Check, LoaderCircle, Mic, X } from "@openbot/ui";
+import { Button, Check, LoaderCircle, Mic, Phone, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createUniqueId, For, Show } from "solid-js";
 import { useText } from "../../text";
@@ -130,6 +130,7 @@ export function ComposerVoiceControls(props: {
   modelProgress: number | null;
   /** The microphone cannot start a recording now. It is always disabled outside the idle phase. */
   blocked: boolean;
+  onCall?: (() => void) | undefined;
   onStart: () => void;
   onCancel: () => void;
   onFinish: () => void;
@@ -143,6 +144,19 @@ export function ComposerVoiceControls(props: {
         <span class="voice-model-progress" role="status">
           {t("composer.voice.progress", { progress: props.modelProgress ?? 0 })}
         </span>
+      </Show>
+      <Show when={props.onCall}>
+        <Button
+          variant="ghost"
+          type="button"
+          class="dictation-button"
+          aria-label={t("composer.voice.call")}
+          title={t("composer.voice.call")}
+          disabled={props.blocked || props.phase !== "idle"}
+          onClick={() => props.onCall?.()}
+        >
+          <Phone aria-hidden="true" />
+        </Button>
       </Show>
       <VoiceRecordingMorph
         recording={props.phase === "recording"}

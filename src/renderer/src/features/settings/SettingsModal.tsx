@@ -151,7 +151,10 @@ export function SettingsModal(props: SettingsModalProps) {
     trackLicenseEvent,
   );
   const hostedServers = createSettingsHostedServersStore(props, () => activeTab() === "billing");
-  const voice = createSettingsVoiceStore(() => props.open && activeTab() === "voice");
+  const voice = createSettingsVoiceStore(
+    () => props.open && activeTab() === "voice",
+    () => props.servers?.find((server) => server.active),
+  );
   const notificationLevels = createNotificationLevelsStore({
     visible: () => props.open && activeTab() === "notifications",
     servers: () => props.servers ?? [],

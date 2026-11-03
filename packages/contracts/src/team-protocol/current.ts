@@ -91,6 +91,7 @@ import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-andr
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { QUIET_TURN_CAPABILITY } from "./quiet-turn-v1";
+import { REALTIME_VOICE_CAPABILITY, REALTIME_VOICE_SELECTION_CAPABILITY } from "./realtime-voice-v1";
 import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
@@ -235,6 +236,8 @@ export {
   PROVIDERS_V8_CAPABILITY,
   PUSH_NOTIFICATIONS_CAPABILITY,
   QUIET_TURN_CAPABILITY,
+  REALTIME_VOICE_CAPABILITY,
+  REALTIME_VOICE_SELECTION_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
@@ -275,6 +278,8 @@ export {
 };
 
 export const TEAM_CURRENT_CAPABILITIES = [
+  REALTIME_VOICE_CAPABILITY,
+  REALTIME_VOICE_SELECTION_CAPABILITY,
   BROWSER_SECRET_CAPABILITY,
   ...TEAM_PROTOCOL_V9_CAPABILITIES,
   "remote-desktop-setup",
@@ -562,6 +567,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== SERVER_AUDIT_CAPABILITY &&
     capability !== AGENT_FAST_MODE_CAPABILITY &&
     capability !== CONTEXT_COMPACT_CAPABILITY &&
+    capability !== REALTIME_VOICE_CAPABILITY &&
+    capability !== REALTIME_VOICE_SELECTION_CAPABILITY &&
     capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
     capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY,
 );
@@ -571,6 +578,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
  * leaves these out of the compatibility list of an older peer (`teamCapabilitiesVisibleToProtocol`).
  */
 export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<TeamCurrentCapability>([
+  REALTIME_VOICE_CAPABILITY,
+  REALTIME_VOICE_SELECTION_CAPABILITY,
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NEW_CHAT_CAPABILITY,
@@ -704,6 +713,8 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== SERVER_AUDIT_CAPABILITY &&
       capability !== AGENT_FAST_MODE_CAPABILITY &&
       capability !== CONTEXT_COMPACT_CAPABILITY &&
+      capability !== REALTIME_VOICE_CAPABILITY &&
+      capability !== REALTIME_VOICE_SELECTION_CAPABILITY &&
       capability !== AGENT_INSTRUCTIONS_CAPABILITY &&
       capability !== TEAM_UI_BLOCK_VAULT_CAPABILITY,
   );

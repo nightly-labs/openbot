@@ -253,6 +253,11 @@ import {
   decodeTelegramOverviewReply,
 } from "./messaging-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
+import {
+  decodeRealtimeVoiceAnswerFromMain,
+  decodeRealtimeVoicePollFromMain,
+  decodeRealtimeVoiceStatusFromMain,
+} from "./realtime-voice-decoding";
 import { decodeRoutineFlowCanvas, decodeRoutineFlowLink } from "./routine-flow-decoding";
 import {
   decodeRoutineResultDeliveries,
@@ -797,6 +802,12 @@ const openbotApi: OpenBotDesktopApi = {
     resend: decodeVoid,
   }),
   voice: bridgeGroup(IPC_ENDPOINTS.voice, {
+    getRealtimeStatus: decodeRealtimeVoiceStatusFromMain,
+    setRealtimeEnabled: decodeRealtimeVoiceStatusFromMain,
+    connectRealtime: decodeRealtimeVoiceAnswerFromMain,
+    pollRealtime: decodeRealtimeVoicePollFromMain,
+    replyRealtime: decodeVoid,
+    endRealtime: decodeVoid,
     getModelStatus: decodeVoiceModelStatus,
     getModelStatuses: decodeVoiceModelStatuses,
     downloadModel: decodeVoiceModelStatus,
