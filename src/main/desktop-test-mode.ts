@@ -37,6 +37,7 @@ export const admitDesktopTest = Effect.fn("DesktopTest.admit")(function* (
     // No recursive creation: EEXIST rejects files, symlinks and previous runs atomically.
     filesystem.createDirectory(paths.root);
     filesystem.createDirectory(paths.profile);
+    filesystem.createDirectory(join(paths.profile, "crashes"));
     filesystem.createDirectory(paths.workspaces);
     filesystem.createDirectory(paths.temporary);
     return paths;

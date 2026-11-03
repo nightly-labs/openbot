@@ -34,8 +34,29 @@ describe("desktop test admission", () => {
         },
       }),
     );
-    expect(writes).toEqual([root, `${root}/profile`, `${root}/workspaces`, `${root}/tmp`]);
-    expect(paths).toEqual({ root, profile: writes[1], workspaces: writes[2], temporary: writes[3] });
+    expect(writes).toEqual([root, `${root}/profile`, `${root}/profile/crashes`, `${root}/workspaces`, `${root}/tmp`]);
+    expect(paths).toEqual({ root, profile: writes[1], workspaces: writes[3], temporary: writes[4] });
+  });
+  it("creates all Electron path targets before admission returns", () => {
+    const created = new Set<string>();
+    const paths = Effect.runSync(
+      admitDesktopTest(root, false, {
+        temporaryRoot: () => "/private/tmp",
+        createDirectory: (path: string) => {
+          created.add(path);
+        },
+      }),
+    );
+    // The mocked setter enforces Electron's documented existing-directory precondition.
+    const setPath = (_name: string, path: string) => {
+      if (!created.has(path)) throw new Error(`Directory was not admitted: ${path}`);
+    };
+    expect(() => {
+      setPath("userData", paths.profile);
+      setPath("sessionData", paths.profile);
+      setPath("crashDumps", `${paths.profile}/crashes`);
+      setPath("temp", paths.temporary);
+    }).not.toThrow();
   });
   it.each([
     "",
