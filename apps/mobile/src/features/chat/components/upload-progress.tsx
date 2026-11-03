@@ -18,8 +18,8 @@ import { useText } from "@/shared/lib/text";
 // Between two reported percents the value glides for this long, so it never ticks.
 const GLIDE = 180;
 const EASE_OUT = cubicBezier(0.23, 1, 0.32, 1);
-/** How long a finished upload needs to settle. Its owner keeps the upload view mounted this long. */
-export const UPLOAD_SETTLE_MS = GLIDE + 220;
+/** How long a finished upload needs to settle. `useUploadReveal` keeps the upload view this long. */
+const UPLOAD_SETTLE_MS = GLIDE + 220;
 /** How far the blurred copy is blurred. Enough to hide detail, not so much that the shape goes. */
 export const UPLOAD_BLUR_RADIUS = 24;
 
