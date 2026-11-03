@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useProviderAccountName } from "@/features/agents/components/agent-runtime-fields";
 import { type ProviderAdmin, providerAccountStateKey } from "@/features/servers/model/provider-admin";
+import { useOpenSignIn } from "@/features/servers/model/use-open-sign-in";
 import { useProviderAdmin, useServerProviderAccounts } from "@/features/servers/model/use-server-providers";
 import {
   SettingsContent,
@@ -84,6 +85,7 @@ function AccountPage({
   const name = accountName(account, index);
   const [label, setLabel] = useState(account.label ?? "");
   const [pending, setPending] = useState<"rename" | "remove" | null>(null);
+  const openSignIn = useOpenSignIn();
   const [error, setError] = useState<string | null>(null);
   const locked = useRef(false);
   // A removed account leaves the page before the list without it shows, so the page does not say "gone".
@@ -166,10 +168,7 @@ function AccountPage({
             disabled={pending !== null}
             onPress={() =>
               // The sign-in page runs the relayed sign-in and comes back here when it ends.
-              router.push({
-                pathname: "/server-settings/provider-sign-in",
-                params: { serverId, provider, method: "relay", account: account.id },
-              })
+              openSignIn({ serverId, provider, method: "relay", account: account.id })
             }
           >
             <Typography.Paragraph className="text-accent">
