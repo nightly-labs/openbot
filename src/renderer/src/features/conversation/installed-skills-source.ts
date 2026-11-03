@@ -3,16 +3,14 @@ import { serverCanAdminister } from "../servers/server-capabilities";
 import type { AgentSkillsMode } from "./AgentSkillsModal";
 import type { ConversationRuntime } from "./conversation-runtime";
 
-/** Separates the agent ids in a request key. An agent id holds no control character. */
-export const SKILL_AGENT_ID_SEPARATOR = "\u0001";
-
+/** `agentKey` is the agent id, or the joined ids of the agents of a channel. */
 export function installedSkillsRequestKey(
-  agentIds: readonly string[],
+  agentKey: string,
   server: ServerSummary | undefined,
   marketplaceOpen: boolean,
 ): string {
   const supported = server?.kind !== "remote" || server.compatibility?.capabilities.includes("installed-skills");
-  return `${server?.id ?? "local"}\0${agentIds.join(SKILL_AGENT_ID_SEPARATOR)}\0${supported ? "supported" : "unsupported"}\0${marketplaceOpen ? "hidden" : "visible"}`;
+  return `${server?.id ?? "local"}\0${agentKey}\0${supported ? "supported" : "unsupported"}\0${marketplaceOpen ? "hidden" : "visible"}`;
 }
 
 /** What the agent's skills settings offer. A web client (`runtime`) shows them to a host admin only. */

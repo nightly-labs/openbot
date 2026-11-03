@@ -2,7 +2,10 @@ import type { InstalledSkill } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ConversationProps } from "../conversation-types";
-import { installedSkillsRequestKey, SKILL_AGENT_ID_SEPARATOR } from "../installed-skills-source";
+import { installedSkillsRequestKey } from "../installed-skills-source";
+
+/** Separates the agent ids in a request key. An agent id holds no control character. */
+const SKILL_AGENT_ID_SEPARATOR = "\u0001";
 
 export interface SkillsStoreDeps {
   props: ConversationProps;
@@ -47,11 +50,7 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
     setInstalledSkills(mergedSkills(agentIds.map((agentId) => skillsByAgent.get(agentId) ?? [])));
   const agentIdsKey = createMemo(() => skillAgentIds(deps.props).join(SKILL_AGENT_ID_SEPARATOR));
   const installedSkillsSource = createMemo(() =>
-    installedSkillsRequestKey(
-      agentIdsKey() ? agentIdsKey().split(SKILL_AGENT_ID_SEPARATOR) : [],
-      deps.props.server,
-      deps.props.skillsMarketplaceOpen === true,
-    ),
+    installedSkillsRequestKey(agentIdsKey(), deps.props.server, deps.props.skillsMarketplaceOpen === true),
   );
   createEffect(
     () => `${deps.props.server?.id ?? "local"}\0${deps.props.server?.connectionSequence ?? 0}`,
