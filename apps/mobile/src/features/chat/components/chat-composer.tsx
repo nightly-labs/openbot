@@ -192,7 +192,7 @@ interface ChatComposerProps {
    */
   dictation?: ComposerDictation;
   /** The agent's colour for the filled voice controls, the glyph colour on it, and the glass tint. */
-  voiceAccent?: { fill: string; glyph: string; tint: string };
+  voiceAccent?: { fill: string; glyph: string; tint: string; lightGlyph?: boolean };
   /** The agent's avatar in the call bar of a live conversation. */
   voiceAvatar?: ReactNode;
   /** The agent's colours for the glow in the call bar. */
@@ -837,9 +837,11 @@ export const ChatComposer = memo(function ChatComposer({
   // The agent's own colour for Send, Stop and the dictation controls; a channel keeps the action colour.
   const accentFill = voiceAccent?.fill ?? String(action);
   // In dark mode the glyphs on the main control take the text colour, as the other composer glyphs do,
-  // whatever the agent's colour is. In light mode they take the colour with the higher contrast.
+  // while a white glyph still reads on the agent's colour. A very light colour keeps the dark glyph. In
+  // light mode they take the colour with the higher contrast.
   const dark = useColorScheme() === "dark";
-  const accentGlyph = dark ? String(foreground) : (voiceAccent?.glyph ?? String(actionForeground));
+  const accentGlyph =
+    dark && (voiceAccent?.lightGlyph ?? true) ? String(foreground) : (voiceAccent?.glyph ?? String(actionForeground));
 
   function requestSend(): void {
     if (disabled || preparing) return;
