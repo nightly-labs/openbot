@@ -129,12 +129,18 @@ import type {
   VaultSaveInput,
   VaultState,
   WorkflowDetail,
+  WorkflowGitHubCatalog,
+  WorkflowGitHubHistory,
+  WorkflowGitHubRepositoryOptions,
+  WorkflowGraph,
   WorkflowRunDetail,
   WorkflowRunPage,
   WorkflowSaveResult,
   WorkflowStep,
   WorkflowSummary,
   WorkflowTriggerInput,
+  WorkflowVersion,
+  WorkflowVersionInput,
   WorkflowWebhookSecret,
 } from "@openbot/contracts/ipc";
 import type {
@@ -786,12 +792,31 @@ export interface MobileWorkspaceContextValue {
   /** The newest runs of a workflow, or the runs older than `before`. */
   loadWorkflowRuns: (workflowId: string, serverId: string, before?: string) => Promise<WorkflowRunPage>;
   loadWorkflowRun: (runId: string, serverId: string) => Promise<WorkflowRunDetail>;
-  startWorkflowRun: (workflowId: string, serverId: string) => Promise<WorkflowRunDetail>;
+  /** With `fromNodeId`, runs that step and the steps after it, with the newest results of the steps before it. */
+  startWorkflowRun: (workflowId: string, serverId: string, fromNodeId?: string) => Promise<WorkflowRunDetail>;
   stopWorkflowRun: (runId: string, serverId: string) => Promise<void>;
+  /** Runs one step alone, outside a run, with the newest results of the steps before it. */
+  runWorkflowStep: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowStep>;
+  stopWorkflowStep: (stepId: string, serverId: string) => Promise<void>;
   retryWorkflowStep: (stepId: string, serverId: string) => Promise<WorkflowStep>;
   decideWorkflowStep: (input: DecideWorkflowStepInput, serverId: string) => Promise<void>;
   /** A new webhook secret, which the host shows once. Only an owner or admin can make one. */
   rotateWorkflowWebhookSecret: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowWebhookSecret>;
+  /** The saved versions of a workflow, newest first. */
+  loadWorkflowVersions: (workflowId: string, serverId: string) => Promise<WorkflowVersion[]>;
+  loadWorkflowVersionGraph: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowGraph>;
+  /** Makes a version the current graph. The host keeps the graph before it as a version. */
+  restoreWorkflowVersion: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowDetail>;
+  /** True when the host advertises `workflows-github-v1`: it runs GitHub triggers and outputs. */
+  canUseWorkflowGitHub: (serverId: string) => boolean;
+  /** The repositories of the host's GitHub connection. Only an owner or admin reads them. */
+  loadWorkflowGitHubCatalog: (serverId: string) => Promise<WorkflowGitHubCatalog>;
+  /** The labels and people of one repository. Only an owner or admin reads them. */
+  loadWorkflowGitHubOptions: (repository: string, serverId: string) => Promise<WorkflowGitHubRepositoryOptions>;
+  /** The newest events of the GitHub triggers of a workflow, and the items of their runs. */
+  loadWorkflowGitHubHistory: (workflowId: string, serverId: string) => Promise<WorkflowGitHubHistory>;
+  /** Runs a GitHub trigger with the newest item that matches it. */
+  runWorkflowGitHubLastEvent: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowRunDetail>;
   /** The tasks of one agent. The host answers 404 for an agent that this member cannot see. */
   loadAgentTasks: (agentId: string, serverId: string) => Promise<AgentTasksSnapshot>;
   loadAgentTaskConversation: (input: AgentTaskInput, serverId: string) => Promise<ConversationSnapshot>;
@@ -894,6 +919,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canReadThreads"
   | "canAttachThreadFiles"
   | "canUseWorkflows"
+  | "canUseWorkflowGitHub"
   | "canReadServerStorage"
   | "canSetAgentNotificationLevel";
 

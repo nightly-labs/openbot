@@ -490,6 +490,9 @@ function AuthenticatedStack() {
         <Stack.Screen name="server-workflows/workflow" options={largeTitlePage} />
         <Stack.Screen name="server-workflows/runs" options={largeTitlePage} />
         <Stack.Screen name="server-workflows/run" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/versions" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/version" options={largeTitlePage} />
+        <Stack.Screen name="server-workflows/github-events" options={largeTitlePage} />
         <Stack.Screen
           name="workflow-editor"
           // One sheet for the editor: its pages are in the stack of `workflow-editor/_layout.tsx`.
