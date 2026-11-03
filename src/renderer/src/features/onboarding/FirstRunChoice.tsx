@@ -12,7 +12,7 @@ export interface FirstRunChoiceProps {
   disabled: boolean;
   /** The user started free and setup ends when the free provider is ready. */
   loading: boolean;
-  /** Why "Start free" still waits, or why the free provider failed. Empty when nothing blocks it. */
+  /** Why "Use free models" still waits, or why the free provider failed. Empty when nothing blocks it. */
   reason: string;
   onStartFree: () => void;
   /** Opens the list of plan providers. */
@@ -30,7 +30,7 @@ export interface FirstRunChoiceProps {
 const PLAN_LOGOS: readonly ProviderLogoVariant[] = ["codex", "claude", "grok"];
 
 /**
- * The first question of first run: start free now, or connect a subscription the user already has.
+ * The first question of first run: use free models now, or connect an AI subscription the user already has.
  * The two answers are rows of one grouped list, with the same weight.
  */
 export function FirstRunChoice(props: FirstRunChoiceProps) {
