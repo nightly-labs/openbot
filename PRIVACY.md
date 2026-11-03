@@ -948,7 +948,8 @@ Network traffic can also occur when:
   `Check for updates`. It asks `api.github.com` for Codex and Kimi, `registry.npmjs.org` for Claude,
   OpenCode and Cline, `x.ai/cli` for Grok, and `raw.githubusercontent.com/agentclientprotocol/registry` and
   `dl.google.com` (for the download size) for Gemini, and the same registry and
-  `downloads.cursor.com` (for the download size) for Cursor, and it reads a list of blocked
+  `downloads.cursor.com` (for the download size) for Cursor, `static.devin.ai` (the manifest, and the
+  download size) for Devin, and it reads a list of blocked
   versions from `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
   conversation or file data;
 - an agent shows a visual reply, an agent checks its page with `html_preview`, or a user opens an
@@ -1432,6 +1433,18 @@ set `telemetry = false` in `~/.kimi/config.toml`, or set `KIMI_DISABLE_TELEMETRY
 environment that starts OpenBot, the CLI sends anonymous usage events to
 `telemetry-logs.kimi.com`. OpenBot does not change this setting. Moonshot AI's terms for Kimi Code
 apply. Team members see the host's Kimi agents when their app supports Kimi.
+
+### Devin
+
+OpenBot downloads the Devin CLI from `static.devin.ai` when you select Download on the Devin row.
+OpenBot starts the CLI as a local process. Prompts, attachments, and tool results go to that
+process, and the CLI sends them to Cognition (`app.devin.ai` and `api.devin.ai`). Sign in opens
+Devin's sign-in page on `app.devin.ai` in your browser. The CLI keeps its login and session files
+in `~/.local/share/devin`, its settings in `~/.config/devin`, and its plans in `~/.devin`, or in the
+XDG folders that you set. OpenBot does not read, copy, or upload these files; it reads only the
+change time of `credentials.toml`, to see a sign-in. When it starts, the CLI reads feature flags and
+sends product analytics events to Cognition. OpenBot does not change these settings. Cognition's
+terms for Devin apply. Team members see the host's Devin agents when their app supports Devin.
 ### Hermes
 
 OpenBot does not download Hermes Agent. It starts the `hermes` that you installed, with `hermes acp`,

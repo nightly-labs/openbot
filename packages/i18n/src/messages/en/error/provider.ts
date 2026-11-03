@@ -259,6 +259,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.kimiNotStarted": "Kimi could not start. Run `kimi --version` in a terminal.",
   "error.provider.kimiVersionUnreadable": "Unable to read the Kimi CLI version.",
   "error.provider.kimiSignIn": "Sign in with Kimi Code to use Kimi.",
+  "error.provider.devinSignIn": "Sign in with Devin to use Devin.",
   "error.provider.hermesMissing": "Hermes Agent is not installed. Install it, then try again.",
   "error.provider.hermesNotStarted": "Hermes Agent could not start. Run `hermes --version` in a terminal.",
   "error.provider.hermesVersionUnreadable": "Unable to read the Hermes Agent version.",

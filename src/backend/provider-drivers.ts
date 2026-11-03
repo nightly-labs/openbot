@@ -18,6 +18,7 @@ import {
   CURSOR_ACP_FLAVOR,
   customAgentFlavor,
   DEFAULT_ACP_FLAVOR,
+  DEVIN_ACP_FLAVOR,
   HERMES_ACP_FLAVOR,
   KIMI_ACP_FLAVOR,
 } from "./acp-flavor";
@@ -45,6 +46,7 @@ import {
   resolveClineCli,
   resolveCodexCli,
   resolveCursorCli,
+  resolveDevinCli,
   resolveGrokCli,
   resolveHermesCli,
   resolveKimiCli,
@@ -79,6 +81,8 @@ import {
   cursorConfinedEnv,
   cursorStatePaths,
   customAgentStatePaths,
+  devinDataDirectory,
+  devinStatePaths,
   hermesHome,
   hermesStatePaths,
   kimiStatePaths,
@@ -391,6 +395,23 @@ function confineKimiTarget(
   agentEnvironment: Readonly<Record<string, string>> | undefined,
 ): SpawnTarget {
   const state = kimiStatePaths({ ...process.env, ...agentEnvironment });
+  for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
+  return confineSpawnTarget(target, confinement, state);
+}
+
+/** `devin acp` serves the Agent Client Protocol on stdio. */
+const DEVIN_ARGV: readonly string[] = ["acp"];
+
+/**
+ * The sandbox lets a Devin process write in its state folders, not create them, so OpenBot makes
+ * them. The agent's own environment can move them with the XDG variables.
+ */
+function confineDevinTarget(
+  target: SpawnTarget,
+  confinement: ProcessConfinement,
+  agentEnvironment: Readonly<Record<string, string>> | undefined,
+): SpawnTarget {
+  const state = devinStatePaths({ ...process.env, ...agentEnvironment });
   for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
   return confineSpawnTarget(target, confinement, state);
 }
@@ -1159,6 +1180,48 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "kimi", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "devin",
+    // The ACP `devin-browser` method opens Devin's page in the system browser, and waits until the
+    // page sends the sign-in back to the CLI. `devin auth login` asks for a terminal.
+    signIn: { kind: "acp-authenticate", methodId: "devin-browser", argv: DEVIN_ARGV, timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    // Devin CLI 3000.11.234 writes its sign-in in `credentials.toml`.
+    signInFiles: () => [join(devinDataDirectory(), "credentials.toml")],
+    signOut: { argv: ["auth", "logout"], env: () => ({}), timeoutMs: 30_000 },
+    resolveCli: resolveDevinCli,
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "devin",
+        flavor: DEVIN_ACP_FLAVOR,
+        argv: DEVIN_ARGV,
+        env: {},
+        ...(confinement
+          ? { confine: (target) => confineDevinTarget(target, confinement, context.agentEnvironment?.()) }
+          : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        signInMessage: sourceText("error.provider.devinSignIn"),
+        noModelsWhenSignedOut: true,
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpEndpoint: context.mcpEndpoint,
+        history: context.history?.("devin"),
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "devin",
+        flavor: DEVIN_ACP_FLAVOR,
+        argv: DEVIN_ARGV,
+        profileGeneration: true,
+        env: {},
+        signInMessage: sourceText("error.provider.devinSignIn"),
+        noModelsWhenSignedOut: true,
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "devin", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
   {

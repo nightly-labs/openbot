@@ -775,9 +775,9 @@ function isMinimumVersion(version: string, minimum: readonly number[]): boolean 
   return true;
 }
 
-/** Resolves native RPC providers through the same explicit/managed/system precedence. */
+/** Resolves the native providers through the same explicit/managed/system precedence. */
 const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
-  provider: "pi" | "muse",
+  provider: "pi" | "muse" | "devin",
   input: { systemCandidates?: string[]; bundledExecutable?: string | null | undefined } = {},
 ): Effect.fn.Return<AgentCliInfo, ProviderClientOperationError> {
   const candidates = yield* cliCandidates(provider, input.systemCandidates, input.bundledExecutable ?? null);
@@ -789,7 +789,12 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
     const attempt = yield* Effect.result(
       Effect.gen(function* () {
         const { stdout, launch } = yield* readCliVersion(candidate, provider);
-        const version = provider === "pi" ? parsePiVersion(stdout) : parseMuseVersion(stdout);
+        const version =
+          provider === "pi"
+            ? parsePiVersion(stdout)
+            : provider === "muse"
+              ? parseMuseVersion(stdout)
+              : parseDevinVersion(stdout);
         if (provider === "pi" && !isMinimumVersion(version, [1, 1, 0]))
           throw new CodexCliError(sourceText("error.provider.piOutdated", { version }), "outdated");
         return { executable: candidate.executable, version, source: candidate.source, ...launch };
@@ -819,6 +824,10 @@ export const resolveMuseCli = (input?: {
   systemCandidates?: string[];
   bundledExecutable?: string | null | undefined;
 }) => resolveNativeCli("muse", input);
+export const resolveDevinCli = (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null | undefined;
+}) => resolveNativeCli("devin", input);
 
 export function parsePiVersion(output: string): string {
   const match = output.trim().match(/(?:^|\s)v?(\d+\.\d+\.\d+)(?:[-+][\w.-]+)?(?:\s|$)/u);
@@ -831,6 +840,14 @@ export function parseMuseVersion(output: string): string {
   if (!match)
     throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Muse" }), "invalid");
   return match[0];
+}
+
+/** Devin CLI 3000.11.234 prints `devin 3000.11.234 (92c83011d113)`. */
+export function parseDevinVersion(output: string): string {
+  const match = output.match(/\bdevin[ \t]+v?(\d+\.\d+\.\d+)\b/iu) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
+  if (!match)
+    throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Devin" }), "invalid");
+  return match[1] ?? match[0];
 }
 
 export function isVersion(value: string): boolean {

@@ -272,6 +272,7 @@ export const messages = {
   "error.provider.kimiNotStarted": "Impossibile avviare Kimi. Esegui `kimi --version` in un terminale.",
   "error.provider.kimiVersionUnreadable": "Impossibile leggere la versione della CLI di Kimi.",
   "error.provider.kimiSignIn": "Accedi con Kimi Code per usare Kimi.",
+  "error.provider.devinSignIn": "Accedi con Devin per usare Devin.",
   "error.provider.hermesMissing": "Hermes Agent non è installato. Installalo e riprova.",
   "error.provider.hermesNotStarted": "Impossibile avviare Hermes Agent. Esegui `hermes --version` in un terminale.",
   "error.provider.hermesVersionUnreadable": "Impossibile leggere la versione di Hermes Agent.",

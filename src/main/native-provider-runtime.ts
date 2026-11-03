@@ -1,15 +1,15 @@
-import { chmod, copyFile, mkdir, rename } from "node:fs/promises";
+import { chmod, copyFile, mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
-import { parseMuseVersion, parsePiVersion } from "../backend/cli";
+import { parseDevinVersion, parseMuseVersion, parsePiVersion } from "../backend/cli";
 import { sha256File } from "../backend/file-hash";
 import { assertSafeArchive, extractArchive, extractZipTree, rejectNonRegularFiles } from "./provider-runtime-archive";
 import type { ProviderRuntimeDescriptor, ProviderStageContext } from "./provider-runtime-descriptors";
 import { ProviderRuntimeFailure, runtimeIO } from "./provider-runtime-effects";
 
 /** Native provider archives share staging and verification, not their wire protocols. */
-export function nativeProviderRuntime(runtime: "pi" | "muse"): ProviderRuntimeDescriptor {
+export function nativeProviderRuntime(runtime: "pi" | "muse" | "devin"): ProviderRuntimeDescriptor {
   return {
     runtime,
     spec: (target, lock) => {
@@ -33,6 +33,15 @@ export function nativeProviderRuntime(runtime: "pi" | "muse"): ProviderRuntimeDe
       if (runtime === "muse") {
         yield* runtimeIO(() => mkdir(join(staging, "bin"), { recursive: true }));
         yield* runtimeIO(() => copyFile(downloadedPath, join(staging, "bin", spec.executableName)));
+      } else if (runtime === "devin") {
+        // Devin's archives hold only `bin/` and `share/`. OpenBot runs only `bin/devin`.
+        if (spec.target === "win32-x64") yield* extractZipTree(downloadedPath, staging, "bin", message);
+        else {
+          yield* assertSafeArchive(downloadedPath, ["bin", "share"], message);
+          yield* extractArchive(downloadedPath, staging);
+          yield* runtimeIO(() => rm(join(staging, "share"), { recursive: true, force: true }));
+          yield* rejectNonRegularFiles(join(staging, "bin"));
+        }
       } else {
         if (spec.target === "win32-x64") {
           yield* runtimeIO(() => mkdir(join(staging, "bin"), { recursive: true }));
@@ -57,6 +66,6 @@ export function nativeProviderRuntime(runtime: "pi" | "muse"): ProviderRuntimeDe
           return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.nativeChecksum")) });
       }
     }),
-    parseVersion: runtime === "pi" ? parsePiVersion : parseMuseVersion,
+    parseVersion: { pi: parsePiVersion, muse: parseMuseVersion, devin: parseDevinVersion }[runtime],
   };
 }

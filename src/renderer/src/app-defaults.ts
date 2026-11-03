@@ -53,6 +53,7 @@ export const FALLBACK_PROVIDER_RUNTIMES: ProviderRuntimeSnapshot = {
     kimi: NO_PROVIDER_RUNTIME,
     pi: NO_PROVIDER_RUNTIME,
     muse: NO_PROVIDER_RUNTIME,
+    devin: NO_PROVIDER_RUNTIME,
   },
   toolRuntimes: { bun: NO_PROVIDER_RUNTIME },
 };

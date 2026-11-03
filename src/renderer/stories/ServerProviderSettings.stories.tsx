@@ -51,6 +51,7 @@ const providerRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   kimi: { phase: "not-downloaded", progress: null, message: null, version: null },
   pi: { phase: "not-downloaded", progress: null, message: null, version: null },
   muse: { phase: "not-downloaded", progress: null, message: null, version: null },
+  devin: { phase: "not-downloaded", progress: null, message: null, version: null },
 };
 
 /** Four connected runtimes, one of which has a newer version waiting. */
@@ -147,6 +148,7 @@ const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   kimi: { phase: "ready", progress: 100, message: null, version: "1.52.0" },
   pi: { phase: "ready", progress: 100, message: null, version: "3.0.68" },
   muse: { phase: "ready", progress: 100, message: null, version: "3.0.68" },
+  devin: { phase: "ready", progress: 100, message: null, version: "3000.11.234" },
 };
 
 /** The Providers section of Server settings, with the providers of this computer. */
