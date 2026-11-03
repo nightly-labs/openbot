@@ -534,8 +534,10 @@ export function createConversationViewScope(props: ConversationProps) {
     const file = sidePanel().files.at(-1);
     if (thread) openPanelThread(thread);
     else if (pane) openSidePanelPane(pane);
-    else if (file) openSidePanelFile(file.key);
-    else setActiveRightPanel("side-panel");
+    else if (file) {
+      setActiveRightPanel("side-panel");
+      openSidePanelFile(file.key);
+    } else setActiveRightPanel("side-panel");
   }
   /** Closes the tab of a side thread in the side panel. The thread stays in the thread list. */
   function closePanelThread(id: string) {
