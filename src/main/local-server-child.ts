@@ -68,7 +68,7 @@ export function formatLocalServerCommand(command: LocalServerCommand): string {
 }
 
 /** Null for a line that is not a command, so a stray line does nothing. */
-export function parseLocalServerCommand(line: string): LocalServerCommand | null {
+function parseLocalServerCommand(line: string): LocalServerCommand | null {
   try {
     return decodeLocalServerCommand(JSON.parse(line));
   } catch {
@@ -77,7 +77,7 @@ export function parseLocalServerCommand(line: string): LocalServerCommand | null
 }
 
 /** How this server meets the owner's devices once the parent registered it. */
-export interface LocalServerPublisher {
+interface LocalServerPublisher {
   publish(machineToken: string): Effect.Effect<void, RemoteWorkflowError>;
   unpublish(): Effect.Effect<void, RemoteWorkflowError>;
 }

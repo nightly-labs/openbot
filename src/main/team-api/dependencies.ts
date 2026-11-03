@@ -377,14 +377,14 @@ export interface ProviderDefaultSetting {
 }
 
 /** A server on this computer, as `local-servers-v1` sends it. */
-export interface TeamApiLocalServer {
+interface TeamApiLocalServer {
   serverId: string;
   name: string;
   /** Registered for the owner's account, so the owner's devices list it. */
   published: boolean;
 }
 
-export interface TeamApiLocalServerList {
+interface TeamApiLocalServerList {
   servers: TeamApiLocalServer[];
   limit: number;
 }

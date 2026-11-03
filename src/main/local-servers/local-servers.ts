@@ -113,7 +113,7 @@ interface RunningChild {
 }
 
 /** The account of the desktop app, for which each server is registered while it is signed in. */
-export interface LocalServerAccount {
+interface LocalServerAccount {
   /** The signed-in account, or null. */
   accountId(): string | null;
   register(input: {
