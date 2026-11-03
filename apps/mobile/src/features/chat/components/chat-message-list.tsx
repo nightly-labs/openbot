@@ -87,6 +87,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { chatDayLabels } from "../model/chat-day-markers";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
 import { isStreamingReply } from "../model/reply-reveal";
@@ -802,6 +803,8 @@ interface RowContextValue {
   selectingMessageId: string | null;
   turnSummaries: ReadonlyMap<string, TurnStepsSummary> | undefined;
   onOpenTurn: ((turnId: string) => void) | undefined;
+  /** The day and time above each message that opens a day. */
+  dayLabels: ReadonlyMap<string, string>;
 }
 
 const RowContext = createContext<RowContextValue | null>(null);
@@ -812,12 +815,18 @@ function ChatRow({ message }: { message: VisibleMessage }) {
   const response = row.responseIds.has(message.id);
   const turn = row.turnSummaries?.get(message.id);
   const openTurn = row.onOpenTurn;
+  const day = row.dayLabels.get(message.id);
   return (
     <Animated.View
       style={[ROW_STYLE, response ? row.responseStyle : undefined]}
       accessibilityElementsHidden={response && !row.responseVisible}
       importantForAccessibility={response && !row.responseVisible ? "no-hide-descendants" : "auto"}
     >
+      {day ? (
+        <Typography.Paragraph type="body-xs" align="center" className="pb-3 pt-1 text-muted">
+          {day}
+        </Typography.Paragraph>
+      ) : null}
       {turn && openTurn ? (
         <ChatTurnStepsRow summary={turn} muted={row.shared.themeMuted} onPress={() => openTurn(turn.turnId)} />
       ) : null}
@@ -974,7 +983,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   focusMessageId = null,
   onFocusPlaced,
 }: ChatMessageListProps) {
-  const { t, sourceText } = useText();
+  const { t, format, sourceText } = useText();
   const isFocused = useIsFocused();
   const agentsById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
   const messagesById = useMemo(
@@ -1072,6 +1081,8 @@ export const ChatMessageList = memo(function ChatMessageList({
     () => groupExchangeMarkers(messages.filter((message) => message.kind !== "thinking")),
     [messages],
   );
+  // One pass over the loaded rows when they change; the rows read their label from the context.
+  const dayLabels = useMemo(() => chatDayLabels(visibleMessages, { t, format }), [visibleMessages, t, format]);
   // Every image of the loaded messages, in chat order, for the viewer's carousel.
   const images = useMemo(() => conversationImages(visibleMessages), [visibleMessages]);
   // On Android the first commit of the chat has no rows, so the open animation starts at once. The
@@ -1265,6 +1276,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       selectingMessageId,
       turnSummaries,
       onOpenTurn,
+      dayLabels,
     }),
     [
       shared,
@@ -1281,6 +1293,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       selectingMessageId,
       turnSummaries,
       onOpenTurn,
+      dayLabels,
     ],
   );
   const activitySpec = (activity?: MobileAgentActivity): ChatActivitySpec | null => {
