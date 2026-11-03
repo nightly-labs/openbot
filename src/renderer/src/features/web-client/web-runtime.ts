@@ -218,7 +218,7 @@ interface WebConnectOptions {
 }
 
 /** The message that `message-delete-v1` deletes: in the chat of an agent, or in a channel. */
-export type WebMessageDelete =
+type WebMessageDelete =
   | { kind: "agent"; agentId: string; messageId: string }
   | { kind: "channel"; channelId: string; messageId: string };
 

@@ -37,7 +37,7 @@ import { revokeRoutineWebhooks } from "./webhook-route-store";
 const SHOWN_MESSAGE_SQL = "json_extract(message_json, '$.deleted') IS NOT 1";
 
 /** The row that replaces a deleted channel message. `deleted` is internal and never sent. */
-export function deletedChannelMessage(entry: ChannelMessage): ChannelMessage & { deleted: true } {
+function deletedChannelMessage(entry: ChannelMessage): ChannelMessage & { deleted: true } {
   return {
     id: entry.id,
     channelId: entry.channelId,

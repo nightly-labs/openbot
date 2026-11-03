@@ -15,7 +15,7 @@ export interface MessageDeletionOptions {
 }
 
 /** The event that records the delete of one shown message. */
-export const MESSAGE_DELETED_EVENT = "conversation.message-deleted";
+const MESSAGE_DELETED_EVENT = "conversation.message-deleted";
 
 interface DeletionTarget {
   agentId: string;
