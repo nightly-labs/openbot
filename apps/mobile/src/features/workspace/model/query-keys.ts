@@ -204,22 +204,24 @@ export const queryKeys = {
   workflowList: (scope: QueryScope, serverId: string) => [...queryKeys.serverWorkflows(scope, serverId), "list"],
   /**
    * A workflow, its newest runs, all its runs page by page, a run that is older than the first page,
-   * its versions, the graph of one version, and the events of its GitHub triggers.
+   * its versions, and the events of its GitHub triggers.
    */
   workflow: (
     scope: QueryScope,
     serverId: string,
     workflowId: string,
-    ...part:
-      | []
-      | ["detail"]
-      | ["runs"]
-      | ["history"]
-      | ["run", runId: string]
-      | ["versions"]
-      | ["version", versionId: string]
-      | ["github-history"]
+    ...part: [] | ["detail"] | ["runs"] | ["history"] | ["run", runId: string] | ["versions"] | ["github-history"]
   ) => [...queryKeys.serverWorkflows(scope, serverId), "workflow", workflowId, ...part],
+  /**
+   * The graph of one version. A version does not change, so the key is outside `workflow(...)`: a
+   * `workflows-changed` event does not read it again.
+   */
+  workflowVersionGraph: (scope: QueryScope, serverId: string, workflowId: string, versionId: string) => [
+    ...queryKeys.serverWorkflows(scope, serverId),
+    "version-graph",
+    workflowId,
+    versionId,
+  ],
   /** The repositories of the host's GitHub connection, and the labels and people of one of them. */
   workflowGitHubCatalog: (scope: QueryScope, serverId: string) => [
     ...queryKeys.serverWorkflows(scope, serverId),

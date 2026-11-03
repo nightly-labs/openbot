@@ -103,7 +103,7 @@ export function useWorkflowVersionGraph(serverId: string, workflowId: string, ve
   const { loadWorkflowVersionGraph } = useMobileWorkspaceActions();
   const { ready } = useWorkflowsAvailable(serverId);
   return useQuery({
-    queryKey: queryKeys.workflow(queryScope, serverId, workflowId, "version", versionId),
+    queryKey: queryKeys.workflowVersionGraph(queryScope, serverId, workflowId, versionId),
     enabled: ready && Boolean(workflowId) && Boolean(versionId),
     retry: false,
     staleTime: Number.POSITIVE_INFINITY,
