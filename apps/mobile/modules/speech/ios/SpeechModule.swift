@@ -218,6 +218,7 @@ private final class SpeechCapture {
     guard audio.recordPermission == .granted else { throw CaptureError.permission }
     try audio.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP])
     try audio.setActive(true)
+    allowHapticsWhileRecording()
     engine = AVAudioEngine()
     let input = engine.inputNode
     let hardware = input.inputFormat(forBus: 0)
@@ -601,6 +602,12 @@ public class SpeechModule: Module {
       }
     }
 
+    /// Lets haptics play while the microphone records. The phone recognizer opens its own session,
+    /// which iOS starts with haptics silenced, so JavaScript calls this when that recognizer listens.
+    Function("allowHapticsWhileRecording") {
+      allowHapticsWhileRecording()
+    }
+
     /// Closes the microphone, sends the text of the speech that is left, then `onCaptureEnd`.
     Function("finishCapture") {
       let capture = self.capture
@@ -706,4 +713,11 @@ public class SpeechModule: Module {
       self.recognitionQueue.sync { self.recognizer = nil }
     }
   }
+}
+
+/// iOS silences haptics while an audio session records, so the detents of a hold on the mic and the
+/// tick of the lock would not play while the user speaks. A failure keeps the silence; nothing else
+/// depends on it.
+func allowHapticsWhileRecording() {
+  try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(true)
 }
