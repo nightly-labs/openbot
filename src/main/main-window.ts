@@ -707,7 +707,10 @@ export function createComputerUseHighlightWindow(bounds: Rectangle): BrowserWind
  * sandboxed, context-isolated, no window may be opened from it, and no navigation away from the
  * renderer's own origin.
  */
-export function createComputerUsePermissionHelpWindow(translate: AppTranslate): BrowserWindow {
+export function createComputerUsePermissionHelpWindow(
+  translate: AppTranslate,
+  getLayoutDirection: () => LayoutDirection,
+): BrowserWindow {
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   const width = 340;
   // The card the user drags out of it, the two steps, and nothing else: a window taller than its
@@ -743,6 +746,7 @@ export function createComputerUsePermissionHelpWindow(translate: AppTranslate): 
   // the steps to nobody.
   window.setAlwaysOnTop(true, "floating");
   followAppearance(window, MAIN_WINDOW_DARK_BACKGROUND);
+  followWindowButtonSide(window, getLayoutDirection);
   // The fixed height fits the contents only at 100%; the main window zoom would clip the steps.
   window.webContents.setZoomMode("isolated");
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

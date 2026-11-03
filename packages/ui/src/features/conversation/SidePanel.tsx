@@ -142,6 +142,8 @@ interface ThreadHold {
   away: boolean;
   /** The place of the tab in the thread tabs when the pointer lets it go. */
   target: number;
+  /** The page reads right to left, so the chat is right of the panel. Read once, when the hold starts. */
+  rightToLeft: boolean;
 }
 
 /**
@@ -198,10 +200,10 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
      * The chat is at the inline start of the panel: left of it, or right of it right to left. A
      * maximized panel covers the chat, so it has no chat to drop on.
      */
-    const overChat = (x: number) => {
+    const overChat = (x: number, rightToLeft: boolean) => {
       if (props.maximized || root === undefined) return false;
       const bounds = root.getBoundingClientRect();
-      return getComputedStyle(root).direction === "rtl" ? x > bounds.right : x < bounds.left;
+      return rightToLeft ? x > bounds.right : x < bounds.left;
     };
     /**
      * Moves the held tab with the pointer, and the other thread tabs make room. A tab can be much
@@ -258,7 +260,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
         current.moving = true;
         element.setAttribute("data-dragging", "");
       }
-      current.away = overChat(event.clientX);
+      current.away = overChat(event.clientX, current.rightToLeft);
       // Over the chat, the tab goes back to its place, faded, and a copy follows the pointer.
       tabOf(current.thread.id)?.setAttribute("data-dragged", current.away ? "away" : "");
       if (current.away) {
@@ -308,6 +310,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
         moving: false,
         away: false,
         target: 0,
+        rightToLeft: getComputedStyle(element).direction === "rtl",
       };
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onEnd);

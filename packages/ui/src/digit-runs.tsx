@@ -1,5 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import { createMemo, For, Show } from "solid-js";
+import { hasRightToLeftLetter } from "./content-direction";
 
 interface DigitRun {
   /** Digits and the separators between them, or the words and spaces around them. */
@@ -10,8 +11,6 @@ interface DigitRun {
 }
 
 const NUMBER = /\p{Nd}(?:[\p{Nd}.,\p{Zs}٫٬]*\p{Nd})?/gu;
-const RIGHT_TO_LEFT_LETTER =
-  /(?=\p{L})[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}]/u;
 
 function digitRuns(text: string): { runs: DigitRun[]; rightToLeft: boolean } {
   const runs: DigitRun[] = [];
@@ -22,7 +21,7 @@ function digitRuns(text: string): { runs: DigitRun[]; rightToLeft: boolean } {
     end = match.index + match[0].length;
   }
   if (end < text.length) runs.push({ text: text.slice(end), start: end, number: false });
-  const rightToLeft = RIGHT_TO_LEFT_LETTER.test(text);
+  const rightToLeft = hasRightToLeftLetter(text);
   return { runs: rightToLeft ? runs.reverse() : runs, rightToLeft };
 }
 

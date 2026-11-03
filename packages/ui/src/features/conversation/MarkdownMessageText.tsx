@@ -6,11 +6,11 @@ import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
 import { createMemo, For, Show } from "solid-js";
+import { textDirection } from "../../content-direction";
 import { useText } from "../../text";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
 import { CodeBlock } from "./CodeBlock";
 import { CodePreview } from "./CodePreview";
-import { textDirection } from "./content-direction";
 import type { MessageCodeBlock } from "./DataTable";
 import { MathFormula } from "./MathFormula";
 import { linkTitle, MessageLink, RichMessageText, type RichMessageTextProps, safeBrowserUrl } from "./RichMessageText";
@@ -687,7 +687,7 @@ function MarkdownInline(props: {
               <MessageLink
                 url={url}
                 title={token.title || linkTitle(token.text, url)}
-                isolate={token.text === token.href}
+                isolate={linkTitle(token.text, token.href) === undefined}
                 favicon={props.content.linkFavicons !== false}
                 onOpenLink={props.content.onOpenLink}
               >
@@ -830,7 +830,7 @@ function tokenDirection(token: Token): "ltr" | "rtl" | undefined {
   if (tokenIs(token, "list")) return tokensDirection(token.items);
   if (tokenIs(token, "table"))
     return tokensDirection([...token.header, ...token.rows.flat()].flatMap((cell) => cell.tokens));
-  if (tokenIs(token, "link") && token.text === token.href) return undefined;
+  if (tokenIs(token, "link") && linkTitle(token.text, token.href) === undefined) return undefined;
   if ("tokens" in token && token.tokens) return tokensDirection(token.tokens);
   return "text" in token && typeof token.text === "string" ? textDirection(token.text) : undefined;
 }

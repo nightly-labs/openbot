@@ -12,3 +12,18 @@ export function textDirection(text: string): "ltr" | "rtl" | undefined {
   if (!letter) return undefined;
   return RTL_LETTER.test(letter) ? "rtl" : "ltr";
 }
+
+/** The direction of the first of `texts` that has a letter, such as the cells of a table in reading order. */
+export function firstTextDirection(texts: Iterable<string>): "ltr" | "rtl" | undefined {
+  for (const text of texts) {
+    const direction = textDirection(text);
+    if (direction) return direction;
+  }
+  return undefined;
+}
+
+/** The text has a letter of a right-to-left script. Arabic-Indic digits are not letters. */
+export function hasRightToLeftLetter(text: string): boolean {
+  for (const character of text) if (LETTER.test(character) && RTL_LETTER.test(character)) return true;
+  return false;
+}

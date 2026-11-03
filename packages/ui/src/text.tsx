@@ -93,9 +93,11 @@ export function TextProvider(props: ParentProps<TextProviderProps>): JSX.Element
   );
   // Kobalte reads its layout direction from this locale, not from `<html dir>`. Without it, menus,
   // submenus, tabs and sliders keep the direction of `navigator.language` in the Arabic interface.
+  // The format locale has the language of the interface, so it has the same direction, and the
+  // numbers of sliders and progress bars agree with `format`.
   return (
     <TextContext value={value}>
-      <ControlLocaleProvider locale={props.locale}>{props.children}</ControlLocaleProvider>
+      <ControlLocaleProvider locale={formatLocale()}>{props.children}</ControlLocaleProvider>
     </TextContext>
   );
 }
