@@ -57,7 +57,7 @@ import {
   Zap,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { GitHubMark } from "../settings/brand-marks";
 import { GitHubConnectDialog } from "../settings/GitHubConnectorPanel";
@@ -287,19 +287,20 @@ function useRepositoryChoices() {
 /** The labels and people of the repositories, as the host reads them. A name in more than one shows once. */
 function useRepositoryOptions(repositories: () => readonly string[]) {
   const board = useBoard();
-  const all = () => repositories().map((name) => board.github()?.options(name));
-  const labels = () => {
-    const byName = new Map<string, { name: string; color: string }>();
+  const all = createMemo(() => repositories().map((name) => board.github()?.options(name)));
+  /** The labels by their name in lower case. */
+  const labels = createMemo(() => {
+    const byKey = new Map<string, { name: string; color: string }>();
     for (const options of all())
       for (const label of options?.labels ?? []) {
         const key = label.name.toLowerCase();
-        if (!byName.has(key)) byName.set(key, label);
+        if (!byKey.has(key)) byKey.set(key, label);
       }
-    return [...byName.values()];
-  };
+    return byKey;
+  });
   return {
-    labels: () => labels().map((label) => label.name),
-    tone: (name: string) => labelTone(labels().find((label) => label.name === name)?.color),
+    labels: () => [...labels().values()].map((label) => label.name),
+    tone: (name: string) => labelTone(labels().get(name.toLowerCase())?.color),
     people: () => [...new Set(all().flatMap((options) => options?.people ?? []))],
     /** The host still reads them. */
     loading: () => all().some((options) => options === undefined),
@@ -312,6 +313,8 @@ const withValues = (options: readonly string[], values: readonly string[]) => [
   ...options,
 ];
 
+const sameNames = (before: readonly string[], after: readonly string[]) =>
+  before.length === after.length && before.every((name, index) => name === after[index]);
 const repositoryOwner = (fullName: string) => fullName.slice(0, Math.max(fullName.indexOf("/"), 0));
 const repositoryName = (fullName: string) => fullName.slice(fullName.indexOf("/") + 1);
 
@@ -338,10 +341,12 @@ function RepositoriesRow(props: {
       ? [{ icon: () => <TriangleAlert aria-hidden="true" />, text: t("workflow.github.noEvents") }]
       : []),
   ];
-  const groups = (): PickerGroup<string>[] => {
+  // A repository that the App no longer reaches stays in the list, so the user can turn it off. The rows
+  // change only when the catalog or these names change: a check keeps its row and the keyboard focus.
+  const unknown = createMemo(() => props.values.filter((fullName) => !entry(fullName)), { equals: sameNames });
+  const groups = createMemo((): PickerGroup<string>[] => {
     const known = props.github?.catalog()?.repositories.map((repository) => repository.fullName) ?? [];
-    // A repository that the App no longer reaches stays in the list, so the user can turn it off.
-    const names = [...props.values.filter((fullName) => !entry(fullName)), ...known];
+    const names = [...unknown(), ...known];
     return [...new Set(names.map(repositoryOwner))].map((owner) => ({
       label: owner,
       options: names
@@ -354,7 +359,7 @@ function RepositoriesRow(props: {
           chips: chips(fullName),
         })),
     }));
-  };
+  });
   const shown = () => (props.values.length > 0 ? props.values.join(", ") : t("workflow.github.chooseRepository"));
   const single = () => (props.values.length === 1 ? props.values[0] : undefined);
   return (

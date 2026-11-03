@@ -164,6 +164,9 @@ function PickerShell<T extends string>(props: {
             (event) => {
               if (!field || event.target === field) return;
               if (event.key.length !== 1 || event.metaKey || event.ctrlKey || event.altKey) return;
+              // Space turns a check row on or off.
+              const checkRow = event.target instanceof HTMLElement && event.target.role === "menuitemcheckbox";
+              if (event.key === " " && checkRow) return;
               event.stopPropagation();
               field.focus();
             },

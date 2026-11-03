@@ -13,8 +13,8 @@
 // own label; a restart while a comment is on its way does not post it again, but sends a label again;
 // "Run with last event" starts a run with the newest matching item. A trigger with two repositories starts
 // on an event of the second one and its output comments there; a list that an older client left behind,
-// whose first line is not `repository`, is not watched. No app, provider, account, Signal or
-// network is started.
+// whose first line is not `repository`, is not watched; a waiting event of a repository that the user
+// removed does not start. No app, provider, account, Signal or network is started.
 //
 // Run: bun scripts/github-workflow-e2e.ts
 // Writes .openbot-build/github-workflow-e2e/report.json and exits non-zero on a failure.
@@ -413,6 +413,28 @@ try {
   );
   const stale = await send(comment("acme/before-b", 1, "ana").body);
   check("a list whose first line is not `repository` is not watched", stale.status === 404, stale);
+  // An event that waits for the run of its item does not start after the user removes its repository.
+  const dropGraph = withRepositories(graphOf("acme/drop-a", "approval"), "acme/drop-a\nacme/drop-b");
+  const drop = await run(workflows.create({ title: "Drop", graph: dropGraph }));
+  const dropRun = await startedRun(drop.summary.id, comment("acme/drop-b", 1, "ana").body);
+  const dropWaiting = await send(comment("acme/drop-b", 1, "ben").body);
+  const dropDetail = await run(workflows.get(drop.summary.id));
+  await run(
+    workflows.saveGraph({
+      workflowId: drop.summary.id,
+      baseRevision: dropDetail.revision,
+      graph: withRepositories(dropDetail.graph, "acme/drop-a"),
+    }),
+  );
+  const dropApproval = (await run(workflows.run(dropRun))).steps.find((step) => step.status === "approval");
+  await run(workflows.decide({ stepId: dropApproval?.id ?? "", approved: true }));
+  await run(workflows.sweep());
+  const dropRow = await delivery(drop.summary.id, dropWaiting.deliveryId);
+  check(
+    "a waiting event of a repository that the trigger no longer watches does not start",
+    dropRow?.outcome !== "started" && dropRow?.reason === "refused",
+    dropRow,
+  );
 
   const hold = await run(
     workflows.create({

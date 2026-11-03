@@ -1500,8 +1500,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const detail = store.detail(workflowId);
           for (const delivery of github.waiting(workflowId)) {
             if (github.runOpen(workflowId, delivery.item)) continue;
+            // An event of a repository that the trigger no longer watches does not start a run.
+            const repository = delivery.item.repository.toLowerCase();
             const trigger = detail?.graph.nodes.find(
-              (node) => node.id === delivery.nodeId && githubTriggerRepositories(node).length > 0,
+              (node) =>
+                node.id === delivery.nodeId &&
+                githubTriggerRepositories(node).some((name) => name.toLowerCase() === repository),
             );
             if (!detail || !trigger) github.endWaiting(delivery, { reason: "refused" });
             else if (delivery.causedByBot && chainTooLong(delivery.item))
