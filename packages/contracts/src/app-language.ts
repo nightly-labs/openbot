@@ -21,6 +21,7 @@ export const APP_LANGUAGES = [
   "pt",
   "ru",
   "tr",
+  "uk",
   "zh",
 ] as const;
 

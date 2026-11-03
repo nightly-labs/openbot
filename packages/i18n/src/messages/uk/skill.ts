@@ -1,0 +1,71 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/skill";
+
+export const messages = {
+  "skill.title": "Навички",
+  "skill.close": "Закрити навички",
+  "skill.detailsDescription": "Відомості про навичку {name}",
+  "skill.assignedDescription": "Призначені навички: {name}",
+  "skill.addFromMarketplace": "Додати з каталогу",
+  "skill.limitReached": "Цей агент досяг ліміту в {limit} навичок. Видаліть навичку, перш ніж додавати іншу.",
+  "skill.managedOnHost": "Навичками цього агента керують на хості.",
+  "skill.loading": "Завантаження навичок…",
+  "skill.loadingDetails": "Завантаження відомостей…",
+  "skill.emptyEnabled": "У цього агента немає увімкнених навичок.",
+  "skill.emptyAssigned": "Цей агент поки що не має призначених навичок.",
+  "skill.folderSkill": "OpenBot не встановлював цю навичку. Змініть або видаліть її тут: {location}.",
+  "skill.moreFor": "Ще для {name}",
+  "skill.update": "Оновити",
+  "skill.updateName": "Оновити {name}",
+  "skill.enableName": "Увімкнути {name}",
+  "skill.repair": "Виправити",
+  "skill.uninstall": "Видалити",
+  "skill.version": "v{version}",
+  "skill.versionUpdate": "v{installed} · доступна v{available}",
+
+  "skill.loadFailed": "Не вдалося завантажити навички.",
+  "skill.loadDetailsFailed": "Не вдалося завантажити відомості про навичку.",
+  "skill.enableFailed": "Не вдалося увімкнути навичку.",
+  "skill.disableFailed": "Не вдалося вимкнути навичку.",
+  "skill.removeFailed": "Не вдалося видалити навичку.",
+  "skill.updateFailed": "Не вдалося оновити навичку.",
+
+  "skill.confirm.replaceTitle": "Замінити локальні зміни?",
+  "skill.confirm.removeTitle": "Видалити цю навичку?",
+  "skill.confirm.replaceBody":
+    "Під час оновлення навички локальні файли замінюються останнім пакетом навички. Ваші правки в папці цієї навички буде втрачено.",
+  "skill.confirm.removeModifiedBody":
+    "Ця навичка має локальні зміни в робочому просторі агента. Видалення зітре ці файли. Початкові повідомлення чату залишаться.",
+  "skill.confirm.removeBody": "OpenBot видалить цю навичку в агента. Історію чату буде збережено.",
+  "skill.confirm.replace": "Замінити навичку",
+  "skill.confirm.remove": "Видалити навичку",
+
+  "skill.unavailable.readOnly": "Віддалені навички доступні лише для читання.",
+  "skill.unavailable.add": "Додайте цю навичку, щоб спробувати її.",
+  "skill.unavailable.repair": "Виправте цю навичку, щоб спробувати її.",
+  "skill.unavailable.updateVersion": "Оновіть цю навичку, щоб спробувати цю версію.",
+  "skill.unavailable.updateRevision": "Оновіть цю навичку, щоб спробувати цю ревізію.",
+  "skill.unavailable.saving": "Дочекайтеся, доки навичку буде збережено, а потім спробуйте її.",
+  "skill.unavailable.composer": "Поле введення агента недоступне.",
+
+  "skill.toolbar.source": "Джерело навичок",
+  "skill.toolbar.all": "Усі",
+  "skill.toolbar.local": "Локальні",
+  "skill.toolbar.enabled": "Увімкнені",
+  "skill.toolbar.create": "Створити навичку",
+
+  "skill.local.loadFailed": "Не вдалося завантажити локальні навички.",
+  "skill.local.toggleFailed": "Не вдалося змінити стан навички.",
+  "skill.local.addFailed": "Не вдалося додати локальну навичку.",
+  "skill.local.back": "Назад до локальних навичок",
+  "skill.local.added": "Додано",
+  "skill.local.add": "Додати навичку",
+  "skill.local.loading": "Завантаження локальних навичок…",
+  "skill.local.empty": "Локальних навичок поки що немає.",
+
+  "skill.preview.label": "Попередній перегляд: {name}",
+  "skill.preview.creator": "Автор: {name}",
+  "skill.preview.examplePrompt": "Допоможіть мені використати цю навичку.",
+  "skill.preview.try": "Спробувати навичку",
+  "skill.preview.linkFailed": "Не вдалося відкрити посилання.",
+} as const satisfies PartialTranslation<typeof source>;

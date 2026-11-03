@@ -32,6 +32,7 @@ const LABELS: Record<AppLanguage, AppLanguageOption> = {
   pt: { id: "pt", label: "Português (Brasil)", lang: "pt-BR" },
   ru: { id: "ru", label: "Русский", lang: "ru" },
   tr: { id: "tr", label: "Türkçe", lang: "tr" },
+  uk: { id: "uk", label: "Українська", lang: "uk" },
   zh: { id: "zh", label: "简体中文", lang: "zh-CN" },
 };
 
