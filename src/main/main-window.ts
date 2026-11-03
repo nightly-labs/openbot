@@ -857,6 +857,7 @@ let windowsKeptHidden = false;
  * A server (`OPENBOT_SERVER=1` or a hosted server) shows no window. Its windows are on a virtual
  * display that has no viewer and no GPU, so a shown window drew each frame in software for nobody
  * (#4482). A hidden window draws nothing, and its renderer runs as in the background on a desktop.
+ * A local server on this computer also shows no window: its main window never loads.
  */
 export function keepWindowsHidden(): void {
   windowsKeptHidden = true;
