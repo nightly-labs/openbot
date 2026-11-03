@@ -250,6 +250,8 @@ function VoiceSideGlyph({ icon, color }: { icon: ComposerVoice["trailing"]["icon
 /** How long a handoff focus keeps asking for the keyboard, and how often. */
 const FOCUS_RETRY_MS = 1500;
 const FOCUS_RETRY_INTERVAL_MS = 100;
+/** How long a reply waits for the software keyboard to start rising before it opens the composer. */
+const REPLY_KEYBOARD_WAIT_MS = 400;
 
 export const ChatComposer = memo(function ChatComposer({
   sendLabel,
@@ -718,6 +720,18 @@ export const ChatComposer = memo(function ChatComposer({
     ],
   }));
   const [focused, setFocused] = useState(false);
+  // A hardware keyboard gives focus with no software keyboard, so no progress comes to open the
+  // reply row. When the keyboard has not started to rise by then, open the composer on its own.
+  useEffect(() => {
+    if (!focused || !replyActive) return;
+    const timer = setTimeout(() => {
+      if (replyHold.get() > 0 || keyboardProgress.get() > 0) return;
+      replyHold.set(
+        withTiming(1, { duration: shapeDuration, easing: SHAPE_EASING_FN, reduceMotion: ReduceMotion.System }),
+      );
+    }, REPLY_KEYBOARD_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [focused, replyActive, replyHold, keyboardProgress, shapeDuration]);
 
   useLayoutEffect(() => {
     // Selecting a file is a draft edit even when TextInput never receives focus.
