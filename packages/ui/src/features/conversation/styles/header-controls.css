@@ -577,20 +577,16 @@
   grid-column: 1 / -1;
 }
 
-/* The shape of the row tags (default, Free, New), in the danger colors. */
+/* A Badge, at the height of the row tags (default, Free, New) so the heading keeps its height. */
 .provider-model-limit {
-  overflow: hidden;
+  display: block;
   justify-self: start;
   max-width: 100%;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-danger-soft);
+  height: auto;
   padding: 1px var(--openbot-space-1-5);
   color: var(--openbot-danger-text);
-  font-size: var(--openbot-text-sm);
-  font-weight: 500;
   line-height: 15px;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* The runtime status: a filled block with no border, as the search field. */

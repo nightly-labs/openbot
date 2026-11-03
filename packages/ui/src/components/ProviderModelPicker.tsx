@@ -31,6 +31,7 @@ import {
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { planLimitWindowKind } from "@openbot/team-client/plan-limits";
 import {
+  Badge,
   Button,
   Input,
   Listbox,
@@ -151,6 +152,9 @@ const RAIL_TOOLTIP = {
   closeDelay: 0,
   skipDelayDuration: 300,
 } as const;
+
+/** The longest delay that `setTimeout` keeps. A longer one runs at once. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 /** When a spent window gives its quota back, in seconds. A window with no reset never does. */
 function resetTime(window: AccountUsageWindow | undefined): number {
@@ -425,7 +429,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     },
     (resetsAt) => {
       if (resetsAt === null) return;
-      const timer = window.setTimeout(() => setNow(Date.now()), Math.max(0, resetsAt * 1_000 - Date.now()));
+      // A month is longer than the longest delay that a timer takes. The picker is not open that long.
+      const delay = Math.min(MAX_TIMER_DELAY_MS, Math.max(0, resetsAt * 1_000 - Date.now()));
+      const timer = window.setTimeout(() => setNow(Date.now()), delay);
       return () => window.clearTimeout(timer);
     },
   );
@@ -687,7 +693,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                             data-state={status().state}
                             aria-label={spentLabel(
                               `${name()}: ${railSummary(provider, status())}`,
-                              entrySpentWindow(key),
+                              status().state === "available" ? entrySpentWindow(key) : undefined,
                             )}
                             onClick={(event) => {
                               const target = event.currentTarget;
@@ -1009,7 +1015,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                       >
                         <strong>{entryName(key)}</strong>
                         <Show when={headingSpent()}>
-                          {(window) => <small class="provider-model-limit">{spentChipText(window())}</small>}
+                          {(window) => (
+                            <Badge as="small" variant="destructive-light" class="provider-model-limit">
+                              {spentChipText(window())}
+                            </Badge>
+                          )}
                         </Show>
                         <span>
                           {account() && status().state === "available"
