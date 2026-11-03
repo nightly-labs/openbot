@@ -9,6 +9,7 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, Show } from "solid-js";
 import { useAccountUsagePolling } from "./features/account/account-usage-polling";
+import { AgentSwitchShortcut } from "./features/agents/AgentSwitchShortcut";
 import { useAgents } from "./features/agents/agents-context";
 import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
 import { useChannels } from "./features/channels/channels-context";
@@ -285,6 +286,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
           sidebarHidden={tasksAgentsHidden()}
           left={
             <Show when={!chatWindow}>
+              <AgentSwitchShortcut />
               <WorkspaceServerRail />
               <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
             </Show>
