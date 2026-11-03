@@ -46,6 +46,7 @@ import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-p
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notifications-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import {
   SIDEBAR_FOLDERS_CAPABILITY,
@@ -1985,6 +1986,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
       canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
       canManageServerRoles: (serverId) => administers(serverId, AGENT_ACCESS_CAPABILITY),
+      canReadServerAudit: (serverId) => administers(serverId, SERVER_AUDIT_CAPABILITY),
       hasAgentAccessLimits: (serverId) => {
         const server = servers.find((candidate) => candidate.id === serverId);
         return Boolean(

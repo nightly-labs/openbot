@@ -130,6 +130,7 @@ export const queryKeys = {
   serverTimezone: (scope: QueryScope, serverId: string) => ["server-timezone", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
   serverRoles: (scope: QueryScope, serverId: string) => ["server-roles", ...scope, serverId],
+  serverAudit: (scope: QueryScope, serverId: string) => ["server-audit", ...scope, serverId],
   serverConnector: (scope: QueryScope, serverId: string, connector: string) => [
     "server-connector",
     ...scope,

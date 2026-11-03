@@ -99,6 +99,7 @@ import type {
   RoutineResultDestination,
   RoutineResultRoutineInput,
   SaveWorkflowGraphInput,
+  ServerAuditLog,
   ServerNotificationLevel,
   SetAgentMemoryInclusionInput,
   SetAgentNotificationLevelInput,
@@ -402,6 +403,10 @@ export interface MobileWorkspaceContextValue {
   loadServerRoles: (serverId: string) => Promise<AgentAccessSnapshot>;
   /** Replaces all roles. The host refuses a change made from an earlier revision. */
   setServerRoles: (change: AgentAccessChange, serverId: string) => Promise<AgentAccessSnapshot>;
+  /** An owner or admin of an online host that serves `server-audit-v1`. The host checks the role again. */
+  canReadServerAudit: (serverId: string) => boolean;
+  /** The changes to the members, roles and agent access of the server, newest first. */
+  loadServerAuditLog: (serverId: string) => Promise<ServerAuditLog>;
   /**
    * An owner or admin of an online host that serves `connectors-v1`: its Slack, Discord, Telegram and
    * GitHub connections. The host checks the role again.
@@ -912,6 +917,7 @@ type MobileWorkspaceStateKey =
   | "canManageServerTimezone"
   | "canManageAgentMemoryLimit"
   | "canManageServerRoles"
+  | "canReadServerAudit"
   | "hasAgentAccessLimits"
   | "canManageConnectors"
   | "canManageOnePasswordConnector"

@@ -97,6 +97,7 @@ import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/pro
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
@@ -131,6 +132,7 @@ import {
   getHostAgentAccess,
   getHostAgentBrowserProfile,
   getHostAgentMemoryLimit,
+  getHostAuditLog,
   getHostReleaseStatus,
   getHostTimezone,
   getHostUpdateStatus,
@@ -331,6 +333,7 @@ type HostRequestActions = Pick<
   | "setAgentMemoryLimit"
   | "loadServerRoles"
   | "setServerRoles"
+  | "loadServerAuditLog"
   | "loadAgentNotificationLevels"
   | "setAgentNotificationLevel"
   | "setOwnServerNotificationLevel"
@@ -505,6 +508,9 @@ export function createHostRequestActions({
   /** The roles that set the agents of each member are an optional admin route set. */
   const rolesAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_ACCESS_CAPABILITY, "mobile.server.roles.unsupported");
+  /** The audit log of the access changes is an optional admin route set. */
+  const auditAdmin = (serverId: string) =>
+    capabilityApi(serverId, SERVER_AUDIT_CAPABILITY, "mobile.server.audit.unsupported");
   /** Each member reads and sets only their own levels, so the host does not check a role. */
   const notificationLevelsApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY, "mobile.agent.notificationLevel.unsupported");
@@ -585,6 +591,7 @@ export function createHostRequestActions({
       runTeamRequest(setHostAgentMemoryLimit(memoryLimitAdmin(serverId), limit)),
     loadServerRoles: async (serverId) => runTeamRequest(getHostAgentAccess(rolesAdmin(serverId))),
     setServerRoles: async (change, serverId) => runTeamRequest(setHostAgentAccess(rolesAdmin(serverId), change)),
+    loadServerAuditLog: async (serverId) => runTeamRequest(getHostAuditLog(auditAdmin(serverId))),
     loadAgentNotificationLevels: async (serverId) =>
       runTeamRequest(listAgentNotificationLevels(notificationLevelsApi(serverId))),
     setAgentNotificationLevel: async (input, serverId) =>
