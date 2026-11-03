@@ -19,7 +19,7 @@ import {
  * Cloudflare runs that Worker near the mail host, because some Cloudflare locations cannot open a
  * socket to it (#4578).
  */
-export interface EmailRelay {
+interface EmailRelay {
   fetch(request: Request): Promise<Response>;
 }
 

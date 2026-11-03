@@ -19,8 +19,8 @@ import { Effect, Result } from "effect";
 import { createEmailRelayHandler } from "../src/server/email-relay-handler";
 import {
   EMAIL_CODE_DELIVERY_BUDGET_MS,
-  type EmailRelay,
   type SmtpConnector,
+  type SmtpEmailConfig,
   sendPrivateEmailCode,
 } from "../src/server/smtp-email-delivery";
 
@@ -139,7 +139,7 @@ function serveSmtp(socket: Socket, behavior: Exclude<Behavior, "silent">, stats:
   });
 }
 
-function relayWorker(route: Route, connector: SmtpConnector): EmailRelay | undefined {
+function relayWorker(route: Route, connector: SmtpConnector): SmtpEmailConfig["relay"] {
   if (route === "direct") return undefined;
   if (route === "relay_unreachable") return { fetch: () => Promise.reject(new Error("relay unreachable")) };
   // A thrown exception in a Worker answers 500 with an HTML page.
