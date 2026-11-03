@@ -18,8 +18,9 @@ import { readThemePalettes, watchThemePalettes } from "./theme-palette-files";
 type StoredAppearancePreference = Pick<AppAppearancePreference, "appearance" | "transparentWindow" | "palette"> & {
   /**
    * False until the user picks a theme in Settings: a light, dark or system choice, or a palette.
-   * While it is false, the first palette shows, also one that appears after the start: the Omarchy
-   * installer can write its palette while OpenBot runs. A change to another field keeps it false.
+   * While it is false, `palette` is the palette that shows: the first one, also one that appears after
+   * the start, as the Omarchy installer can write its palette while OpenBot runs. It stays until its
+   * file goes, so a new file does not replace it. A change to another field keeps it false.
    */
   themeChosen: boolean;
 };
@@ -94,7 +95,7 @@ export class AppearanceService {
   }
 
   get preference(): AppAppearancePreference {
-    const wanted = this.#preference.themeChosen ? this.#preference.palette : (this.#palettes[0]?.id ?? null);
+    const wanted = this.#preference.palette;
     const palette = this.#palettes.some((item) => item.id === wanted) ? wanted : null;
     return {
       appearance: this.#preference.appearance,
@@ -116,6 +117,7 @@ export class AppearanceService {
     return Effect.gen({ self: this }, function* () {
       this.#preference = yield* readAppearancePreference(this.#path);
       this.#palettes = yield* readThemePalettes(this.#paletteDirectory);
+      this.#showFirstPalette();
       return this.preference;
     });
   }
@@ -153,6 +155,7 @@ export class AppearanceService {
         const palettes = yield* readThemePalettes(this.#paletteDirectory);
         if (sameThemePalettes(palettes, this.#palettes)) return;
         this.#palettes = palettes;
+        this.#showFirstPalette();
         this.#notify();
       }),
     );
@@ -174,6 +177,17 @@ export class AppearanceService {
       this.#notify();
       return this.preference;
     }).pipe(Effect.uninterruptible);
+  }
+
+  /**
+   * While no theme is chosen, the palette that shows stays until its file goes. Then the first palette
+   * shows. Settings shows it as selected, so a click on it is no change and cannot fix it.
+   */
+  #showFirstPalette(): void {
+    if (this.#preference.themeChosen) return;
+    const shown = this.#preference.palette;
+    if (this.#palettes.some((item) => item.id === shown)) return;
+    this.#preference = { ...this.#preference, palette: this.#palettes[0]?.id ?? null };
   }
 
   #notify(): void {
