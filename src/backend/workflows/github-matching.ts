@@ -36,9 +36,11 @@ export interface GitHubEventFacts {
   item: WorkflowGitHubItem;
   /** The login that caused the event. */
   actor: string;
+  /** Whether the actor is a bot account. */
+  actorIsBot: boolean;
   /**
-   * Whether the author is a bot account: the author of the item, comment or review, not the actor. A check
-   * suite names no author, so its actor counts.
+   * Whether the author is a bot account. For a comment or a review, it is their author; for every other
+   * event, the item's author. A check suite names no author, so it is false there.
    */
   authorIsBot: boolean;
   /** Whether the actor is the OpenBot GitHub App's own bot. */
@@ -109,6 +111,7 @@ export function githubEventFacts(name: string, body: unknown, bot: string | null
   const base = {
     repository: fullName,
     actor,
+    actorIsBot: isBotAccount(sender),
     causedByBot: botLogin !== null && actor.toLowerCase() === botLogin,
   };
   const mentions = (value: unknown) => bot !== null && isString(value) && mentionPattern(bot).test(value);
@@ -250,7 +253,7 @@ export function githubEventFacts(name: string, body: unknown, bot: string | null
       ...base,
       events: ["pr.checksFailed"],
       item,
-      authorIsBot: isBotAccount(sender),
+      authorIsBot: false,
       association: null,
       labels: [],
       label: null,
@@ -274,7 +277,8 @@ export function githubFilterRefuses(node: WorkflowNode, facts: GitHubEventFacts)
   const event = node.fields.event;
   const filters = new Set(workflowListField(node.fields.filters));
   const labels = workflowListField(node.fields.labels).map((label) => label.toLowerCase());
-  if (filters.has("notBot") && facts.authorIsBot) return true;
+  // A bot that acts on a person's item is refused too, so that two bots cannot start runs on each other.
+  if (filters.has("notBot") && (facts.actorIsBot || facts.authorIsBot)) return true;
   if (filters.has("firstTime") && !isOneOf(FIRST_TIME_ASSOCIATIONS, facts.association)) return true;
   if (filters.has("title")) {
     const wanted = (isString(node.fields.titleText) ? node.fields.titleText : "").trim().toLowerCase();

@@ -2,8 +2,8 @@
 // temporary profile. The events go through `receiveGitHubDelivery`, as the ingress socket gives them: a
 // comment starts a run; a second comment on the same issue waits and starts when the first run ends; a
 // comment on another issue runs at the same time; the same delivery again records nothing; a bot that is
-// not OpenBot's and OpenBot's own bot are refused by "not a bot"; a person's label on a bot's issue is
-// refused by "not a bot", which checks the author and not the actor;
+// not OpenBot's and OpenBot's own bot are refused by "not a bot"; "not a bot" also refuses a person's
+// label on a bot's issue and a bot's label on a person's issue;
 // the fourth run of a chain that OpenBot's bot caused on one issue is skipped (`chain`); an event of a
 // repository that no trigger watches gets 404 and a body that is not JSON gets 400; two close times
 // offline are one gap. A fake GitHub API takes the changes of GitHub outputs: a comment output posts
@@ -306,6 +306,25 @@ try {
   const labelSent = await send(JSON.stringify(botIssue), undefined, "issues");
   const labelRow = await delivery(labeled.summary.id, labelSent.deliveryId);
   check("\"not a bot\" refuses a person's label on a bot's issue", labelRow?.reason === "filter", labelRow);
+  const personIssue = {
+    ...botIssue,
+    sender: { login: "github-actions[bot]", type: "Bot" },
+    issue: { ...botIssue.issue, number: 4, user: { login: "ana", type: "User" } },
+  };
+  const botLabelSent = await send(JSON.stringify(personIssue), undefined, "issues");
+  const botLabelRow = await delivery(labeled.summary.id, botLabelSent.deliveryId);
+  check("\"not a bot\" refuses a bot's label on a person's issue", botLabelRow?.reason === "filter", botLabelRow);
+  const personLabelSent = await send(
+    JSON.stringify({ ...personIssue, sender: { login: "ben", type: "User" } }),
+    undefined,
+    "issues",
+  );
+  const personLabelRow = await delivery(labeled.summary.id, personLabelSent.deliveryId);
+  check(
+    "\"not a bot\" lets a person's label on a person's issue start a run",
+    personLabelRow?.outcome === "started",
+    personLabelRow,
+  );
 
   const unwatched = await send(comment("acme/other", 1, "ana").body);
   check("an event of a repository that no trigger watches gets 404", unwatched.status === 404, unwatched);
