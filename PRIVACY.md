@@ -1017,6 +1017,17 @@ graph, or ID.
   the list. The computer keeps the newest 50 deliveries of each trigger, without the event body: the
   delivery ID, event name, item number, time, and whether it started a run. An event that arrives
   while the computer is offline is lost; the history shows the gap.
+- **Discord triggers** start a run from a mention of the OpenBot Discord app. The trigger's output, and
+  the run that keeps it, has the message text, the author, and the name, type, size and Discord
+  address of each file of the message and of the message that it replies to. These addresses expire
+  after about a day.
+- **GitHub outputs** make the change through the OpenBot GitHub App: a comment, a label, a person, a
+  review, a close or a new issue. The text goes to GitHub. When a Discord mention started the run, a
+  new issue or a comment also keeps those files: the computer downloads each file of up to 25 MB, and
+  up to 50 MB for each change, from Discord and commits it to the `openbot-attachments` branch of the target repository,
+  under `discord/<message ID>/`. The text links the files there. Everyone who can read the repository
+  can read them, also after the issue or the comment is deleted; delete that branch to delete
+  them. A file that the computer cannot copy is linked at its Discord address.
 
 Members of a joined server can read, change, and run a workflow when they can see and use each
 agent in it (`workflows-v1`). The graph and the step text then go to their computer. Only owners

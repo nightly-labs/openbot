@@ -119,7 +119,7 @@ import { BrowserProfileStore } from "../backend/browser-profiles/browser-profile
 import { runCauseEffect } from "../backend/effect-boundary";
 import { MailboxStore } from "../backend/mailbox-store";
 import { McpOAuth } from "../backend/mcp-oauth-provider";
-import { discordDriver } from "../backend/messaging/discord/discord-driver";
+import { discordDriver, downloadDiscordAttachment } from "../backend/messaging/discord/discord-driver";
 import { MessagingOperationFailed, MessagingService } from "../backend/messaging/messaging-service";
 import { slackDriver } from "../backend/messaging/slack/slack-driver";
 import { telegramDriver } from "../backend/messaging/telegram/telegram-driver";
@@ -1916,6 +1916,8 @@ export async function createApplicationServices({
   const githubRest = createGitHubRest({
     fetch: (url, init) => fetch(url, init),
     tokens: (repository) => githubConnector.repositoryTokens(repository),
+    // The files of a Discord mention, which a new issue or a comment keeps in the repository.
+    download: (url, maxBytes) => downloadDiscordAttachment(url, maxBytes),
   });
   const workflowGitHub = workflowGitHubDirectory(() => githubConnector.workflowCatalog(), githubRest);
   const workflowRuntime = await Effect.runPromise(

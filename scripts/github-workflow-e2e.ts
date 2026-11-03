@@ -141,6 +141,7 @@ try {
   let createdId = 9_000;
   const hung = new Set<string>();
   const githubApi: WorkflowGitHubApi = {
+    attachFiles: (change) => Effect.succeed({ ...change, files: null }),
     change: (change) =>
       Effect.suspend(() => {
         changes.push(change);
