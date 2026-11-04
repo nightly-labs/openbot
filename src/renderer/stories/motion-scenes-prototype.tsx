@@ -357,6 +357,7 @@ const YARN = {
 function YarnScene(props: { phase: LinkPhase; tosses: number }) {
   const [tossing, setTossing] = createSignal(false);
   const [serverState, setServerState] = createSignal<PlushState>("asleep");
+  const serverFace = (): { expression?: "heureux" } => (props.phase === "online" ? { expression: "heureux" } : {});
   let you: HTMLElement | undefined;
   let tossTimer: ReturnType<typeof setTimeout> | undefined;
   let wakeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -422,7 +423,7 @@ function YarnScene(props: { phase: LinkPhase; tosses: number }) {
         <PlushBot
           character="nexo"
           state={serverState()}
-          expression={props.phase === "online" ? "heureux" : undefined}
+          {...serverFace()}
           size={36}
           autoPause={false}
           paused={prefersReducedMotion()}
