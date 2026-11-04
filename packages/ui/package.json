@@ -238,6 +238,7 @@
     "./features/settings/WhatsAppIntegrationPanel": "./src/features/settings/WhatsAppIntegrationPanel.tsx",
     "./features/settings/AppearanceSelect": "./src/features/settings/AppearanceSelect.tsx",
     "./features/settings/LanguageSelect": "./src/features/settings/LanguageSelect.tsx",
+    "./features/marketplace/AgentUpdateDialog": "./src/features/marketplace/AgentUpdateDialog.tsx",
     "./features/marketplace/Marketplace": "./src/features/marketplace/Marketplace.tsx",
     "./features/marketplace/MarketplaceAgentsDialog": "./src/features/marketplace/MarketplaceAgentsDialog.tsx",
     "./features/marketplace/PluginIcon": "./src/features/marketplace/PluginIcon.tsx",

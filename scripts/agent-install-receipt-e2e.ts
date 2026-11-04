@@ -31,6 +31,8 @@ interface ScenarioOptions {
   skillFailure?: boolean;
   /** Start from a saved copy of an older version, so the install is an update. */
   update?: boolean;
+  /** The saved copy has local changes in a skill of the listing and in a skill the listing dropped. */
+  modifiedSkills?: boolean;
   receiptAttempts?: number;
 }
 
@@ -40,6 +42,7 @@ interface ScenarioState {
   agents: Map<string, AgentSummary>;
   routines: Map<string, RoutineInput>;
   skillInstalls: string[];
+  skillUninstalls: string[];
   receipts: string[];
 }
 
@@ -97,6 +100,8 @@ const detail: MarketplaceAgentDetail = {
   ],
 };
 const timezone = "UTC";
+/** A skill that an older version of the listing had, and the newest one dropped. */
+const DROPPED_SKILL_ID = "receipt-dropped-skill";
 const report: { status: "running" | "pass" | "fail"; cases: CaseReport[] } = { status: "running", cases: [] };
 
 function summary(id: string, workspace: string, values: Partial<AgentSummary>): AgentSummary {
@@ -153,6 +158,7 @@ async function scenario(
   const agents = new Map<string, AgentSummary>();
   const routines = new Map<string, RoutineInput>();
   const skillInstalls: string[] = [];
+  const skillUninstalls: string[] = [];
   const receipts: string[] = [];
   let phase = "service setup";
   let receiptAttempts = 0;
@@ -164,7 +170,7 @@ async function scenario(
     ): Effect.Effect<T, CentralAuthOperationError> {
       return Effect.gen(function* () {
         if (init.method === "GET") {
-          assert.equal(path, `/v1/marketplace/agents/${detail.id}`);
+          assert.equal(path, `/v1/marketplace/agents/${detail.id}/listing`);
           return decode(detail);
         }
         assert.equal(init.method, "POST");
@@ -228,13 +234,25 @@ async function scenario(
         for (const [id, routine] of routines) if (routine.agentId === agentId) routines.delete(id);
       }),
   };
+  const changed = (skillId: string) => ({
+    skillId,
+    slug: skillId,
+    name: skillId,
+    installedVersion: 1,
+    availableVersion: 2,
+    state: "modified" as const,
+  });
   const skillStore: SkillStore = {
+    listInstalled: () =>
+      Effect.succeed(
+        options.modifiedSkills ? [changed(detail.skills[0]?.skillId ?? ""), changed(DROPPED_SKILL_ID)] : [],
+      ),
     listPublishable: () => Effect.succeed([]),
     installVersion: ({ skillId, versionId }) =>
       options.skillFailure
         ? Effect.fail(new SkillMarketplaceFailure({ cause: "test-skill" }))
         : Effect.sync(() => void skillInstalls.push(`${skillId}@${versionId}`)),
-    uninstall: () => Effect.void,
+    uninstall: ({ skillId }) => Effect.sync(() => void skillUninstalls.push(skillId)),
   };
   try {
     const auth = new ReceiptAuth({
@@ -253,7 +271,7 @@ async function scenario(
           listingId: detail.id,
           versionId: "receipt-listing-version-1",
           version: 1,
-          skillIds: [],
+          skillIds: options.modifiedSkills ? [DROPPED_SKILL_ID] : [],
           routineIds: [oldRoutineId],
         },
       });
@@ -270,7 +288,7 @@ async function scenario(
     }
     phase = "install";
     const result = await Effect.runPromiseExit(service.install(input));
-    const state: ScenarioState = { service, result, agents, routines, skillInstalls, receipts };
+    const state: ScenarioState = { service, result, agents, routines, skillInstalls, skillUninstalls, receipts };
     phase = "case checks";
     await check(state, input);
     phase = "receipt attempt count check";
@@ -349,6 +367,18 @@ await scenario("update sends no receipt", { update: true, receiptAttempts: 0 }, 
   assert.equal(state.routines.size, detail.routines.length);
   assert.deepEqual(state.receipts, []);
 });
+await scenario(
+  "update keeps changed skills",
+  { update: true, modifiedSkills: true, receiptAttempts: 0 },
+  async (state, input) => {
+    // #4907: a skill with local changes made the whole update fail. It now stays as the user left it.
+    assert.ok(Exit.isSuccess(state.result));
+    const agent = assertSaved(state, input.agentId ?? "");
+    assert.equal(agent.marketplaceSource?.versionId, detail.versionId);
+    assert.deepEqual(state.skillInstalls, []);
+    assert.deepEqual(state.skillUninstalls, []);
+  },
+);
 await scenario("receipt defect", { receiptDefect: true }, async (state) => {
   assert.ok(Exit.hasDies(state.result));
   keptAfterReceiptError(state);

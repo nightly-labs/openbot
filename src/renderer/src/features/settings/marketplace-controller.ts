@@ -7,6 +7,7 @@ import type {
   MacAutomationTarget,
   MarketplaceAgentDetail,
   MarketplaceAgentQuery,
+  MarketplaceAgentSkill,
   MarketplaceAgentSummary,
   MarketplaceSkillDetail,
   MarketplaceSkillQuery,
@@ -134,6 +135,17 @@ export interface PendingSkillConfirm {
   settle: (confirmed: boolean) => void;
 }
 
+/**
+ * The question before an agent update that meets skills with local changes. `settle` gets the ids
+ * of the skills to replace, or null when the user cancels.
+ */
+export interface PendingAgentUpdate {
+  agentName: string;
+  changed: readonly { skillId: string; name: string }[];
+  othersCount: number;
+  settle: (replaceSkillIds: string[] | null) => void;
+}
+
 /** A remove of one change, and whether its copy has local changes. */
 interface ChangeRemoval {
   agentId: string;
@@ -258,6 +270,44 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     return canUpdate() && (copy.marketplaceSource?.version ?? 0) < listing.version ? "update" : "added";
   }
 
+  const [agentUpdate, setAgentUpdate] = createSignal<PendingAgentUpdate | null>(null);
+  /**
+   * Before an update: asks about the skills of the listing whose copy on the agent has local changes,
+   * and replaces the ones the user picks. The update keeps the others. Null when the user cancels.
+   */
+  async function replaceChangedSkills(
+    listing: MarketplaceAgentDetail | MarketplaceAgentSummary,
+    copy: MarketplaceAgentRow,
+  ): Promise<string[] | null> {
+    const detail = "skills" in listing ? listing : await calls().agents.getListing(listing.id);
+    const installed = await skillCalls().listInstalled(copy.id);
+    const changedIds = new Set(installed.filter((skill) => skill.state === "modified").map((skill) => skill.skillId));
+    const changed = detail.skills.filter((skill) => changedIds.has(skill.skillId));
+    if (changed.length === 0) return [];
+    untrack(agentUpdate)?.settle(null);
+    const replaceIds = await new Promise<string[] | null>((resolve) =>
+      setAgentUpdate({
+        agentName: copy.name,
+        changed: changed.map(({ skillId, name }) => ({ skillId, name })),
+        othersCount: detail.skills.length - changed.length,
+        settle: (ids) => {
+          setAgentUpdate(null);
+          resolve(ids);
+        },
+      }),
+    );
+    if (!replaceIds) return null;
+    const replace: MarketplaceAgentSkill[] = changed.filter((skill) => replaceIds.includes(skill.skillId));
+    for (const skill of replace)
+      await skillCalls().install({
+        agentId: copy.id,
+        skillId: skill.skillId,
+        versionId: skill.versionId,
+        replaceModified: true,
+      });
+    return replaceIds;
+  }
+
   async function addAgent(listing: MarketplaceAgentDetail | MarketplaceAgentSummary, update = false) {
     const copy = update ? installation(listing) : undefined;
     if (copy && "versionId" in listing && copy.marketplaceSource?.versionId === listing.versionId) return true;
@@ -266,17 +316,25 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     const serverId = copy ? (props.hostServerId ? props.agentUpdateServerId : undefined) : props.agentServerId;
     const analytics = desktopAnalytics.scope();
     mark(key, true);
-    const agent = await run(() =>
-      calls().addAgent(
-        {
-          listingId: listing.id,
-          ...(copy ? { agentId: copy.id } : {}),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-          receiptId: crypto.randomUUID(),
-        },
-        serverId,
-      ),
-    );
+    // A cancel ends the update before anything changed. A failed read or replace is the update's failure.
+    const choice = copy ? await run(() => replaceChangedSkills(listing, copy)) : [];
+    if (choice === null) {
+      mark(key, false);
+      return false;
+    }
+    const agent =
+      choice &&
+      (await run(() =>
+        calls().addAgent(
+          {
+            listingId: listing.id,
+            ...(copy ? { agentId: copy.id } : {}),
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+            receiptId: crypto.randomUUID(),
+          },
+          serverId,
+        ),
+      ));
     analytics.track("marketplace_action", {
       entity: "agent",
       action: copy ? "update" : "install",
@@ -1423,6 +1481,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   const stopDialogs = () => {
     untrack(connecting)?.settle(null);
     untrack(skillConfirm)?.settle(false);
+    untrack(agentUpdate)?.settle(null);
     setUninstalling(null);
   };
   createEffect(
@@ -1434,6 +1493,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   onCleanup(() => {
     untrack(connecting)?.settle(null);
     untrack(skillConfirm)?.settle(false);
+    untrack(agentUpdate)?.settle(null);
   });
 
   const model: MarketplaceModel = {
@@ -1530,6 +1590,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     connecting,
     uninstalling,
     skillConfirm,
+    agentUpdate,
     uninstallPlan,
     uninstallPlugin,
     uninstallBusy: (plugin: MarketplacePluginDetail) => Boolean(busy[`app:${plugin.slug}`]),
