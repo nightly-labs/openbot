@@ -9,7 +9,10 @@ import type { AppTranslate } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { app, type BrowserWindow, dialog, shell } from "electron";
-import { electronUpdaterCacheRoot } from "./application-services";
+import { runCauseEffect } from "../backend/effect-boundary";
+import { DOWNLOAD_URL } from "./app-archive-watch";
+import { electronUpdaterCacheRoot, UPDATE_PREFERENCE_FILE } from "./application-services";
+import { readUpdatePreference } from "./update-preference-store";
 import {
   isNixStoreInstall,
   isValidSemver,
@@ -20,7 +23,6 @@ import {
 import { listSiblingOpenBotInstances } from "./update-sibling-instances";
 
 const logger = createOpenBotLogger("update");
-const DOWNLOAD_URL = "https://openbot.run/download";
 const GUIDE_URL =
   "https://github.com/nightly-labs/openbot/blob/main/docs/TROUBLESHOOTING.md#openbot-says-a-newer-version-saved-your-data";
 
@@ -39,17 +41,21 @@ export async function recoverFromNewerDatabase(options: NewerDatabaseRecoveryOpt
   const updater = await createRecoveryUpdater(options.beforeInstall);
   if (updater) {
     const progress = new AbortController();
-    void showUpdating(options, progress.signal);
-    const installed = await installLatest(updater);
+    const quit = { chosen: false };
+    void showUpdating(options, progress.signal, quit);
+    await installLatest(updater, quit);
     progress.abort();
-    if (installed) return;
+    if (quit.chosen) return;
     await Effect.runPromise(updater.stop());
   }
   await showUpdateRequired(options.translate);
   app.quit();
 }
 
-/** The updater of an installed desktop copy, as `createApplicationServices` builds it. */
+/**
+ * The updater of an installed desktop copy, as `createApplicationServices` builds it. `null` when
+ * this copy cannot update itself, or when the user turned off automatic downloads.
+ */
 async function createRecoveryUpdater(beforeInstall: () => Promise<void>): Promise<UpdateService | null> {
   const currentVersion = app.getVersion();
   if (
@@ -61,6 +67,10 @@ async function createRecoveryUpdater(beforeInstall: () => Promise<void>): Promis
   ) {
     return null;
   }
+  const preference = await runCauseEffect(
+    readUpdatePreference(join(app.getPath("userData"), UPDATE_PREFERENCE_FILE)),
+  ).catch(() => null);
+  if (!preference?.autoDownload) return null;
   let adapter: UpdateAdapter | undefined;
   try {
     const updaterModule = await import("electron-updater");
@@ -87,31 +97,49 @@ async function createRecoveryUpdater(beforeInstall: () => Promise<void>): Promis
   });
 }
 
-/** Checks, downloads and installs. `false` when no newer release is ready or the install failed. */
-async function installLatest(updater: UpdateService): Promise<boolean> {
-  updater.start(false);
-  const ready = new Promise<boolean>((resolve) => {
-    const settle = (status: UpdateStatus) => {
-      if (status.phase === "ready") resolve(true);
-      else if (status.phase === "up-to-date" || status.phase === "unsupported" || status.phase === "error") {
-        resolve(false);
-      } else return;
-      updater.off("status", settle);
+/** Resolves with the first status in `phases`. `cancel` removes the listener. */
+function nextPhase(updater: UpdateService, phases: readonly UpdateStatus["phase"][]) {
+  let cancel = () => {};
+  const status = new Promise<UpdateStatus>((resolve) => {
+    const listener = (next: UpdateStatus) => {
+      if (!phases.includes(next.phase)) return;
+      cancel();
+      resolve(next);
     };
-    updater.on("status", settle);
+    cancel = () => updater.off("status", listener);
+    updater.on("status", listener);
   });
+  return { status, cancel };
+}
+
+/**
+ * Checks, downloads and installs. The install quits the app, so this returns only when no newer
+ * release is ready, when the install failed, or when the user chose Quit before the install.
+ */
+async function installLatest(updater: UpdateService, quit: { readonly chosen: boolean }): Promise<void> {
+  updater.start(false);
+  // Subscribed before the check: a download that ends at once must not be missed.
+  const downloaded = nextPhase(updater, ["ready", "up-to-date", "unsupported", "error"]);
   // With automatic download on, the check starts the download of an available release.
   const checked = await Effect.runPromise(updater.checkForUpdates());
   logger.info(`An older OpenBot started over newer data. Update check: ${checked.phase}.`);
-  if (checked.phase !== "available" && checked.phase !== "downloading" && checked.phase !== "ready") return false;
-  if (!(await ready)) return false;
+  if (checked.phase !== "available" && checked.phase !== "downloading" && checked.phase !== "ready") {
+    downloaded.cancel();
+    return;
+  }
+  const outcome = checked.phase === "ready" ? checked : await downloaded.status;
+  downloaded.cancel();
+  if (outcome.phase !== "ready" || quit.chosen) return;
+  // `quitAndInstall` can return without quitting and report the failure as an error status later.
+  const installFailed = nextPhase(updater, ["error"]);
   try {
     await Effect.runPromise(updater.installUpdate());
-    return true;
   } catch (error) {
+    installFailed.cancel();
     logger.error("The update over newer data did not install:", toLogValue(error));
-    return false;
+    return;
   }
+  await installFailed.status;
 }
 
 /**
@@ -119,7 +147,11 @@ async function installLatest(updater: UpdateService): Promise<boolean> {
  * open behind it. On macOS a box with no visible window blocks the main process, and with it the
  * download, so there it shows only on the window.
  */
-async function showUpdating(options: NewerDatabaseRecoveryOptions, signal: AbortSignal): Promise<void> {
+async function showUpdating(
+  options: NewerDatabaseRecoveryOptions,
+  signal: AbortSignal,
+  quit: { chosen: boolean },
+): Promise<void> {
   const { window, translate } = options;
   const parent = window && !window.isDestroyed() ? window : null;
   if (!parent && process.platform === "darwin") return;
@@ -134,7 +166,9 @@ async function showUpdating(options: NewerDatabaseRecoveryOptions, signal: Abort
   };
   await (parent ? dialog.showMessageBox(parent, box) : dialog.showMessageBox(box));
   // The user chose Quit. The abort at the end of the update also closes the box.
-  if (!signal.aborted) app.quit();
+  if (signal.aborted) return;
+  quit.chosen = true;
+  app.quit();
 }
 
 async function showUpdateRequired(translate: AppTranslate): Promise<void> {

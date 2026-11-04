@@ -204,9 +204,9 @@ An older OpenBot started after a newer one opened your data, for example from an
 second installation. An older OpenBot cannot read data that a newer one updated, so it stops before
 it writes anything. Your data is intact.
 
-Do not follow the reset steps below, and do not move the folder. When in-app updates are available,
-OpenBot installs the latest version and opens again. If it cannot, install the latest version from
-[openbot.run/download](https://openbot.run/download).
+Do not follow the reset steps below, and do not move the folder. When in-app updates and automatic
+downloads are on, OpenBot installs the latest version and opens again. Otherwise, or when the
+update fails, install the latest version from [openbot.run/download](https://openbot.run/download).
 
 Then remove the older copy. On Windows, look for a second OpenBot in Settings → Apps, and pin the
 new OpenBot again if a taskbar or desktop shortcut opens the old one. Older versions show the
