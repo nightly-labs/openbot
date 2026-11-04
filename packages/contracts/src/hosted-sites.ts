@@ -38,7 +38,7 @@ export const HOSTED_SITE_ACCOUNT_LIMIT = 300;
  * with no plan, `account` when the account has `HOSTED_SITE_ACCOUNT_LIMIT` active sites. The account server
  * sends `limitReason` in a site list only for these cases; an older one never sends it.
  */
-export const HOSTED_SITE_LIMIT_REASONS = ["shared", "account"] as const;
+const HOSTED_SITE_LIMIT_REASONS = ["shared", "account"] as const;
 export type HostedSiteLimitReason = (typeof HOSTED_SITE_LIMIT_REASONS)[number];
 
 /** The `limitReason` of a site list response, or null when the account server sends none. */
