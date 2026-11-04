@@ -4,7 +4,7 @@ import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
-import { markdownPlainText } from "@openbot/contracts/markdown-preview-text";
+import { markdownPlainText, markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -67,7 +67,6 @@ import { CHAT_ROW_GAP, type ChatMotion } from "@/features/chat/components/use-ch
 import { useFoldScrollAnchor } from "@/features/chat/components/use-fold-scroll-anchor";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
-import { chatMarkdownPlainText } from "@/features/chat/model/chat-markdown-parser";
 import {
   type ChatBubbleMessage,
   type ChatMessage,
@@ -1091,7 +1090,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     if (!questionForm?.question || !promptId || announcedPromptId.current === promptId) return;
     announcedPromptId.current = promptId;
     AccessibilityInfo.announceForAccessibility(
-      t("mobile.chat.question.inputRequired", { question: chatMarkdownPlainText(questionForm.question.question) }),
+      t("mobile.chat.question.inputRequired", { question: markdownPreviewText(questionForm.question.question) }),
     );
   }, [questionForm?.messageId, questionForm?.question, t]);
   const announcedApprovals = useRef(new Set<string>());

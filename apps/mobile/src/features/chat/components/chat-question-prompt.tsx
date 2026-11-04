@@ -28,6 +28,7 @@ function QuestionText({ question, variant }: { question: string; variant: "title
       color={variant === "secondary" ? String(secondaryColor) : undefined}
       compact={variant === "secondary"}
       fontWeight={variant === "title" ? "500" : undefined}
+      inline
       finished
       selectable={false}
     />

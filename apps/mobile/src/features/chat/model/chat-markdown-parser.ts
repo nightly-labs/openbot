@@ -162,27 +162,11 @@ export function parseFinishedChatMarkdown(body: string) {
   return tokens;
 }
 
-const SPACED_TOKENS = new Set(["paragraph", "heading", "list_item", "blockquote", "code", "space", "br", "blockMath"]);
-
-function plainText(tokens: readonly Token[]): string {
-  return tokens
-    .map((token) => {
-      const text =
-        token.type === "list"
-          ? plainText(token.items)
-          : token.type === "agentMention" || token.type === "skillMention"
-            ? `@${chatTagReferences(token.raw)[0]?.name ?? ""}`
-            : "tokens" in token && token.tokens
-              ? plainText(token.tokens)
-              : "text" in token && typeof token.text === "string"
-                ? token.text
-                : token.raw;
-      return SPACED_TOKENS.has(token.type) ? `${text} ` : text;
-    })
-    .join("");
-}
-
-/** The text of Markdown with no syntax, such as a link's label without its address, for a screen reader. */
-export function chatMarkdownPlainText(body: string): string {
-  return plainText(parseFinishedChatMarkdown(body)).replace(/\s+/g, " ").trim();
+/**
+ * Markdown as one paragraph of inline tokens, such as the question of an agent: links, emphasis and
+ * code, but no list or heading. `1. Which branch?` stays a sentence, as on desktop.
+ */
+export function parseInlineChatMarkdown(body: string): Token[] {
+  const tokens = new markdown.Lexer(markdown.defaults).inlineTokens(body);
+  return [{ type: "paragraph", raw: body, text: body, tokens }];
 }
