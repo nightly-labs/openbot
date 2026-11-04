@@ -1,6 +1,6 @@
 // Checks issue #4995 on the real Codex driver and `ProviderRuntime`, with a fake Codex app-server.
-// 1. A launch gives Codex the long start timeout: a first `initialize` that takes longer than the
-//    request timeout connects on the same process. A stop at the request timeout made Codex keep
+// 1. A launch of two providers gives Codex the long start timeout: a first `initialize` that takes
+//    longer than the request timeout connects on the same process. A stop at the request timeout made Codex keep
 //    the lease of its state database backfill for 15 minutes.
 // 2. A start that exits with "timed out waiting for state db backfill" shows
 //    `error.provider.codexStateBusy`, not the CLI's words.
@@ -30,6 +30,9 @@ process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_FAKE_CODEX_LOG = logPath;
 process.env.OPENBOT_FAKE_CODEX_MODE = modePath;
 delete process.env.OPENBOT_CODEX_PATH;
+// A second provider that is on makes the launch a start of several providers, as on a hosted server.
+// Its CLI path names no file, so it fails at once and starts no process.
+process.env.OPENBOT_OPENCODE_PATH = join(root, "no-opencode");
 mkdirSync(home, { recursive: true });
 
 const { ConversationRuntime } = await import("../src/backend/agent/conversation-runtime");
@@ -101,7 +104,7 @@ interface ProtocolLine {
 
 interface Report {
   passed: boolean;
-  slowLaunch?: { state: string | null; message: string | null; starts: number };
+  slowLaunch?: { state: string | null; message: string | null; starts: number; opencodeState: string | null };
   busyStart?: { state: string | null; message: string | null };
   busyUpdate?: { succeeded: boolean; error: string | null; message: string | null; starts: number };
   error?: string;
@@ -133,7 +136,9 @@ async function installFakeCodex(directory: string): Promise<string> {
 function runtime(executable: string) {
   const store = new AgentStore(join(root, "profile"), home, new OpenBotDatabase(join(root, "profile")));
   const providers = new ProviderRuntime({
-    offProviders: BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id).filter((id) => id !== "codex"),
+    offProviders: BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id).filter(
+      (id) => id !== "codex" && id !== "opencode",
+    ),
     conversation: new ConversationRuntime(
       store,
       () => undefined,
@@ -188,6 +193,7 @@ try {
     state: slowRow?.state ?? null,
     message: slowRow?.message ?? null,
     starts: protocol().filter((line) => line.start).length,
+    opencodeState: slow.providers.status().providers?.find((row) => row.id === "opencode")?.state ?? null,
   };
   await stopAll(slow.providers);
 
@@ -229,7 +235,9 @@ try {
     report.busyStart.state === "error" &&
     report.busyStart.message === busyText &&
     report.busyUpdate.succeeded &&
-    report.busyUpdate.message === busyText;
+    report.busyUpdate.message === busyText &&
+    // One start for the failed start, and one for the new copy.
+    report.busyUpdate.starts === 2;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {

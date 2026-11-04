@@ -2442,7 +2442,7 @@ export class ProviderRuntime implements ProviderPort {
       });
     const disposals = this.#disposals;
     const accountEnvironment = own.account ? this.#providerAccounts?.environment(own.account) : undefined;
-    const slowStartTimeoutMs = this.#slowStarts.get(provider);
+    const slowStartTimeoutMs = this.#slowStarts.get(provider) ?? this.#defaultStartTimeoutMs(provider);
     const { client } = yield* this.#authenticateClient(provider, cli, {
       ...(slowStartTimeoutMs === undefined ? {} : { startTimeoutMs: slowStartTimeoutMs }),
       ...(own.confinement ? { confinement: own.confinement } : {}),
@@ -3431,15 +3431,12 @@ export class ProviderRuntime implements ProviderPort {
             this.#bindClient(candidate);
             candidate.start();
           });
-          // A connect of several providers waits for all of them, as a launch does. Codex is the
-          // exception: its first start after a restore can read its state database for more than the
-          // request timeout. A stop in that step holds the database for 15 minutes, and each start
-          // in that time fails (#4995).
+          // A connect of several providers waits for all of them, as a launch does, so it does not use
+          // the wait learned from one slow start. `startTimeoutMs` stays the wait that a timeout doubles:
+          // the default of `#defaultStartTimeoutMs` is not one that the computer showed it needs.
           startTimeoutMs =
-            options.startTimeoutMs ??
-            (requestedProviders.length === 1 ? this.#slowStarts.get(provider) : undefined) ??
-            (provider === "codex" ? this.#longStartTimeoutMs : undefined);
-          yield* this.#initializeProviderClient(candidate, startTimeoutMs);
+            options.startTimeoutMs ?? (requestedProviders.length === 1 ? this.#slowStarts.get(provider) : undefined);
+          yield* this.#initializeProviderClient(candidate, startTimeoutMs ?? this.#defaultStartTimeoutMs(provider));
           logger.info("A provider answered initialize.", { provider, durationMs: stageMs() });
           stage = "account";
           stageStartedAt = performance.now();
@@ -3852,6 +3849,16 @@ export class ProviderRuntime implements ProviderPort {
   /** The wait of a start that may unpack the CLI: the learned wait of a slow provider, else `#longStartTimeoutMs`. */
   #longStartWaitMs(provider: AgentProvider): number {
     return this.#slowStarts.get(provider) ?? this.#longStartTimeoutMs;
+  }
+
+  /**
+   * The `initialize` wait of a start that has no wait of its own. Codex gets the long wait on each
+   * start path: its first start after a restore can read its state database for longer than the
+   * request timeout, and a stop in that step holds the database for 15 minutes, so each start in that
+   * time fails (#4995).
+   */
+  #defaultStartTimeoutMs(provider: AgentProvider): number | undefined {
+    return provider === "codex" ? this.#longStartTimeoutMs : undefined;
   }
 
   /**

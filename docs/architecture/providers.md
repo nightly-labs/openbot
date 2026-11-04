@@ -365,9 +365,11 @@ Codex keeps a lease on its state database backfill for 15 minutes, and a process
 the backfill keeps it. Each Codex start in that time exits with "timed out waiting for state db
 backfill", for any version. `ProviderRuntime` replaces that exit text with
 `error.provider.codexStateBusy`, and an update whose new copy fails this way keeps the copy. Codex
-gets `LONG_START_TIMEOUT_MS` at launch, also when the launch starts all providers, because a stop in
-the request timeout during a slow backfill (the first start after a hosted server's restore) starts
-the lease.
+gets `LONG_START_TIMEOUT_MS` on each start that has no wait of its own: at launch, also when the
+launch starts all providers, and for an agent's own process. A stop in the request timeout during a
+slow backfill (the first start after a hosted server's restore) starts the lease. At launch this
+default is not a learned wait: a timeout after it gives the next start `LONG_START_TIMEOUT_MS` again,
+not twice that time.
 
 Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
 other one, while the agent status beside it describes whichever server is open. The store therefore
