@@ -1298,15 +1298,15 @@ export class ChannelService {
   ): Effect.fn.Return<void, ChannelOperationError> {
     for (const candidate of yield* channelSync(() => this.store.tasks(channelId))) {
       if (this.#stopped || this.#deletedChannels.has(channelId)) return;
+      // One row each, not every task of the channel again: a long channel holds thousands of
+      // finished tasks, and the whole list for each of them blocked the main process for minutes.
+      const candidateTask = yield* channelSync(() => this.store.task(channelId, candidate.id));
+      if (candidateTask?.state !== "queued") continue;
       let channel = yield* channelSync(() => this.store.get(channelId));
       if (channel.archived) return;
-      const candidateTask = (yield* channelSync(() => this.store.tasks(channelId))).find(
-        (item) => item.id === candidate.id,
-      );
-      if (candidateTask?.state !== "queued") continue;
       let task = candidateTask;
       const rootId = task.rootTaskId;
-      const root = (yield* channelSync(() => this.store.tasks(channelId))).find((item) => item.id === rootId);
+      const root = yield* channelSync(() => this.store.task(channelId, rootId));
       if (root && (root.state === "paused" || root.state === "failed" || root.state === "cancelled")) continue;
       if (!task.ownerAgentId) {
         // One eligible member is not a decision. Routing costs a full turn of the lead's own model,
