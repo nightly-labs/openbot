@@ -21,6 +21,8 @@ export interface AcpParams {
   text?: string;
   interjectionId?: string;
   content?: { type: string; text?: string; mimeType?: string }[];
+  /** `initialize`. OpenCode reads the `_meta` key that asks for its subagents' sessions. */
+  clientCapabilities?: { _meta?: { "opencode/child-session-updates"?: boolean } };
 }
 
 export interface AcpRequest {

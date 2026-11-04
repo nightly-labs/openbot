@@ -86,7 +86,8 @@ const START_FAILED_CODE = "delivery_start_failed";
 
 /**
  * The agent events that `notificationForAgentEvent` can show. Desktop, web and phone pass only these,
- * so each surface notifies about the same kinds.
+ * so each surface notifies about the same kinds. A `subagent-failed` event is local, so only the
+ * desktop of the host passes it, in addition to these.
  */
 export function agentEventCanNotify(event: AgentEvent | TeamRealtimeEvent): boolean {
   switch (event.type) {
@@ -142,6 +143,7 @@ export function agentEventAgentId(event: AgentEvent): string | null {
   switch (event.type) {
     case "prompt":
     case "turn-completed":
+    case "subagent-failed":
       return event.agentId;
     case "approval":
       return event.approval.agentId;
@@ -225,6 +227,13 @@ function notificationSubject(
     return { body: translate("notification.needsBrowserStep"), agentId, threadId };
   }
   if (level !== "all") return null;
+  if (event.type === "subagent-failed") {
+    const task = preview && plainPreview(preview.redact(event.title));
+    const body = task
+      ? translate("notification.subagentFailedFor", { task })
+      : translate("notification.subagentFailed");
+    return { body, agentId: event.agentId, threadId: event.threadId };
+  }
   if (event.type === "error" && event.agentId && agentEventCanNotify(event))
     return { body: translate("notification.failed"), agentId: event.agentId, threadId: null };
   // A quiet routine run posted nothing, so there is nothing to look at. A turn that continues its

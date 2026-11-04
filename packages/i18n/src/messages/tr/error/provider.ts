@@ -271,6 +271,8 @@ export const messages = {
   "error.provider.kimiVersionUnreadable": "Kimi CLI sürümü okunamıyor.",
   "error.provider.kimiSignIn": "Kimi'yi kullanmak için Kimi Code ile oturum açın.",
   "error.provider.devinSignIn": "Devin'i kullanmak için Devin ile oturum açın.",
+  "error.provider.copilotSignIn":
+    "GitHub Copilot'ı kullanmak için GitHub ile oturum açın veya COPILOT_GITHUB_TOKEN ayarlayın.",
   "error.provider.hermesMissing": "Hermes Agent yüklü değil. Yükleyin ve yeniden deneyin.",
   "error.provider.hermesNotStarted":
     "Hermes Agent başlatılamadı. Bir terminalde `hermes --version` komutunu çalıştırın.",
@@ -293,6 +295,8 @@ export const messages = {
     "Gemini oturum açma sayfasını tarayıcınızda açamadı. Varsayılan tarayıcınızı kontrol edin, ardından yeniden bağlanın.",
   "error.provider.acpSignInFailed": "Oturum açma tamamlanmadı.",
   "error.provider.acpSignInFailedReason": "Oturum açma tamamlanmadı: {reason}",
+  "error.provider.acpSignOutFailed": "Oturum kapatma tamamlanmadı.",
+  "error.provider.acpSignOutFailedReason": "Oturum kapatma tamamlanmadı: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Bu sağlayıcı bu bilgisayarda bu oturum açma yöntemini sunmuyor. Sağlayıcıyı güncelleyin, ardından tekrar deneyin.",
   "error.provider.httpsSignInLinkOnly": "Tarayıcıda yalnızca HTTPS oturum açma bağlantıları açılabilir.",

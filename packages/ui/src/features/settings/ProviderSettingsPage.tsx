@@ -608,6 +608,7 @@ const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
   "muse",
   "cursor",
   "devin",
+  "copilot",
 ]);
 
 /** The confirmation text of a Disconnect of the provider's own sign-in. */

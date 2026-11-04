@@ -79,7 +79,7 @@ export const messages = {
   "mobile.settings.animations.all": "アニメーション",
   "mobile.settings.animations.agentFaces": "エージェントの表情アニメーション",
   "mobile.settings.animations.agentFacesFooter":
-    "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動きません。",
+    "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動かず、ようこそ画面と空のホーム画面のキャラクターも浮遊しなくなります。",
   "mobile.settings.animations.composerResize": "コンパクトなメッセージ欄",
   "mobile.settings.animations.composerResizeFooter":
     "キーボードを閉じている間、メッセージ欄は小さなバーになります。オフにすると、メッセージ欄は常に元のサイズのままです。",

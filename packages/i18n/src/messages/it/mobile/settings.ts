@@ -77,7 +77,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animazioni",
   "mobile.settings.animations.agentFaces": "Volti degli agenti animati",
   "mobile.settings.animations.agentFacesFooter":
-    "Gli avatar degli agenti muovono il volto mentre gli agenti lavorano e riposano. Se è disattivato, i volti restano fermi.",
+    "Gli avatar degli agenti muovono il volto mentre gli agenti lavorano e riposano. Se è disattivato, i volti restano fermi e i personaggi della schermata di benvenuto e della home vuota smettono di fluttuare.",
   "mobile.settings.animations.composerResize": "Campo messaggio compatto",
   "mobile.settings.animations.composerResizeFooter":
     "Il campo messaggio diventa una piccola barra quando la tastiera è chiusa. Se è disattivato, il campo resta a dimensione piena.",
