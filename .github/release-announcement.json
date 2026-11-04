@@ -1,10 +1,10 @@
 {
-  "version": "0.60.0",
+  "version": "0.61.0",
   "highlights": [
-    "Talk to your agents from WhatsApp: link a number under Marketplace → Apps → WhatsApp.",
-    "Start a workflow when someone mentions OpenBot in Slack or in a Telegram group, and send its result back there.",
-    "OpenBot is now available in Arabic, with a right-to-left layout.",
-    "Turn models off for each provider, and find the newest models first in the model picker.",
-    "Owners and admins can see an Audit log of member, role and agent access changes in Server settings."
+    "Delete a message in a chat or a channel: right-click it and select Delete.",
+    "Agents can build, change and run workflows, and you watch them add each step on the canvas.",
+    "Talk to a Codex agent in real time with Codex live voice, in Settings → Voice.",
+    "Devin and GitHub Copilot are new providers.",
+    "Each routine now runs in its own thread, so it no longer waits for the chat or other routines."
   ]
 }
