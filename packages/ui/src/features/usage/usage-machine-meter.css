@@ -47,14 +47,6 @@
   color: var(--openbot-danger-text);
 }
 
-.usage-machine-item[data-tone="warning"] .usage-machine-ring {
-  --ui-radial-progress-color: var(--openbot-warning);
-}
-
-.usage-machine-item[data-tone="danger"] .usage-machine-ring {
-  --ui-radial-progress-color: var(--openbot-danger);
-}
-
 /* The open motion of the filter selects beside it: it moves down 8px and grows from 95%. */
 .ui-popover-menu-surface.usage-machine-popover {
   animation: ui-select-content-in var(--openbot-duration-dialog) var(--openbot-ease-out) both;
