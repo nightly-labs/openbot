@@ -20,6 +20,7 @@ import Check from "lucide-react-native/icons/check";
 import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
+import { useCSSVariable } from "uniwind";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
@@ -31,7 +32,6 @@ import { useText } from "@/shared/lib/text";
 const DEFAULT_HOLD_MS = 800;
 /** The height at which a long draft stops, in points. "Show all" opens the rest in the card. */
 const PREVIEW_MAX_HEIGHT = 240;
-const MARKDOWN_LINK = /\[[^\]\n]+\]\(\S+\)/u;
 
 const BUTTON_VARIANT = {
   primary: "primary",
@@ -61,18 +61,19 @@ export function choiceBlockOf(prompt: ConversationQuestionPrompt, uiBlock: Conve
   return spec.multiple || !question.options?.length ? spec : null;
 }
 
-/** A question text. A Markdown link opens, as on desktop; other text keeps the title look. */
-export function QuestionTitle({ text, className }: { text: string; className?: string }) {
-  if (!MARKDOWN_LINK.test(text))
-    return (
-      <Typography weight="medium" className={className}>
-        {text}
-      </Typography>
-    );
+/** The text of a question. An agent can write Markdown in it, such as a link. */
+export function QuestionText({ question, variant }: { question: string; variant: "title" | "body" | "secondary" }) {
+  const secondaryColor = useCSSVariable("--openbot-text-secondary");
   return (
-    <View className={className}>
-      <ChatMarkdown body={text} color={undefined} finished animationEnabled={false} linkFavicons={false} />
-    </View>
+    <ChatMarkdown
+      body={question}
+      color={variant === "secondary" ? String(secondaryColor) : undefined}
+      compact={variant === "secondary"}
+      fontWeight={variant === "title" ? "500" : undefined}
+      inline
+      finished
+      selectable={false}
+    />
   );
 }
 
@@ -468,7 +469,9 @@ export function ChatChoicePrompt({
       accessibilityLabel={t("mobile.chat.question.form")}
     >
       <View className="flex-row items-center gap-2">
-        <QuestionTitle text={spec.title} className="min-w-0 flex-1" />
+        <View className="min-w-0 flex-1">
+          <QuestionText question={spec.title} variant="title" />
+        </View>
         <Button
           variant="ghost"
           size="sm"

@@ -98,6 +98,7 @@ export const messages = {
   "workflow.model.providerModels": "{name} のモデル",
   "workflow.model.effort": "推論レベル: {name}",
   "workflow.model.effortRange": "{from}～{to}",
+  "workflow.model.auto": "自動",
 
   "workflow.llm.title": "LLM",
   "workflow.llm.name": "LLM ステップ",

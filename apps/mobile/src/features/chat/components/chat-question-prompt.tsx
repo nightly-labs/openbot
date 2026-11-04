@@ -16,7 +16,7 @@ import {
   choiceBlockOf,
   confirmBlockOf,
   PromptStatus,
-  QuestionTitle,
+  QuestionText,
 } from "@/features/chat/components/chat-ui-block-cards";
 import { ChatVaultRequest } from "@/features/chat/components/chat-vault-request";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
@@ -24,6 +24,7 @@ import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
 import { vaultRequestOf } from "@/features/chat/model/vault-request";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 export function ChatQuestionPrompt({
   serverId,
@@ -63,7 +64,7 @@ export function ChatQuestionPrompt({
         {confirm ? (
           <ConfirmBody spec={confirm} compact selectValue={answeredSelect(prompt, null, t)} />
         ) : (
-          <Typography>{prompt.questions[0]?.question}</Typography>
+          <QuestionText question={prompt.questions[0]?.question ?? ""} variant="body" />
         )}
         <Button variant="ghost" onPress={onActivate}>
           <Button.Label>{t("mobile.chat.question.answerForm")}</Button.Label>
@@ -101,9 +102,7 @@ export function ChatQuestionPrompt({
         ) : (
           prompt.questions.map((item) => (
             <View key={item.id} className="gap-1">
-              <Typography type="body-sm" className="text-text-secondary">
-                {item.question}
-              </Typography>
+              <QuestionText question={item.question} variant="secondary" />
               {resolution.status === "answered" ? (
                 <Typography>
                   {/* The options of a choice with more than one answer come as lines; show them as a list. */}
@@ -133,7 +132,9 @@ export function ChatQuestionPrompt({
       accessibilityLabel={t("mobile.chat.question.form")}
     >
       <View className="flex-row items-center gap-2">
-        <QuestionTitle text={question.question} className="min-w-0 flex-1" />
+        <View className="min-w-0 flex-1">
+          <QuestionText question={question.question} variant="title" />
+        </View>
         <Button
           variant="ghost"
           size="sm"
@@ -158,7 +159,7 @@ export function ChatQuestionPrompt({
             isDisabled={disabled || index === 0}
             onPress={() => setIndex(index - 1)}
           >
-            <ChevronLeft color={String(muted)} size={18} />
+            <ChevronLeft color={String(muted)} size={18} style={MIRROR_IN_RTL} />
           </Button>
           <Button
             variant="ghost"
@@ -168,7 +169,7 @@ export function ChatQuestionPrompt({
             isDisabled={disabled || index === prompt.questions.length - 1}
             onPress={() => setIndex(index + 1)}
           >
-            <ChevronRight color={String(muted)} size={18} />
+            <ChevronRight color={String(muted)} size={18} style={MIRROR_IN_RTL} />
           </Button>
         </View>
       ) : null}

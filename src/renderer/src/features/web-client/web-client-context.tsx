@@ -154,6 +154,8 @@ interface WebWorkspaceState {
   otherTab: boolean;
   recovery: RemoteRecoveryStatus | null;
   workspaceLoaded: boolean;
+  /** The host answered once. A saved frame sets `workspaceLoaded` before that, so the first-load screen waits for this. */
+  synced: boolean;
   panelsFailed: boolean;
   panelsLoading: boolean;
   agentStatus: AgentStatus | null;
@@ -238,6 +240,7 @@ export function createWebWorkspace(
     otherTab: false,
     recovery: null,
     workspaceLoaded: false,
+    synced: false,
     panelsFailed: false,
     panelsLoading: false,
     agentStatus: null,
@@ -876,6 +879,7 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.host = null;
             draft.workspaceLoaded = false;
+            draft.synced = false;
             draft.memberId = null;
             draft.selectedId = null;
             draft.agents = [];
@@ -994,6 +998,7 @@ export function createWebWorkspace(
     setState((draft) => {
       draft.revocationRevision += 1;
       draft.workspaceLoaded = false;
+      draft.synced = false;
       draft.agents = [];
       draft.agentsLoaded = false;
       draft.conversations = {};
@@ -1104,6 +1109,7 @@ export function createWebWorkspace(
       if (!sameHost) draft.otherTab = false;
       if (!sameHost) {
         draft.workspaceLoaded = false;
+        draft.synced = false;
         draft.agentStatus = null;
         draft.models = [];
       }
@@ -1204,6 +1210,7 @@ export function createWebWorkspace(
         draft.agentsLoaded = true;
         draft.agentsFromFrame = false;
         draft.workspaceLoaded = true;
+        draft.synced = true;
         draft.agentStatus = agentStatus;
         draft.models = models;
         draft.connectionError = null;
