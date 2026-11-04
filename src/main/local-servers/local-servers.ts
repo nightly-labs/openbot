@@ -161,7 +161,10 @@ export interface LocalServersOptions {
   /** The provider CLI store of this app. A child has its own user data, but not its own copy of each CLI. */
   runtimeRoot: string;
   cipher: TokenCipher;
-  remoteServers: Pick<RemoteServerManager, "setThisComputerServers" | "attachLocalServer" | "detachLocalServer">;
+  remoteServers: Pick<
+    RemoteServerManager,
+    "setThisComputerServers" | "setRegisteredThisComputerServers" | "attachLocalServer" | "detachLocalServer"
+  >;
   account: LocalServerAccount;
   /** This executable, and the app path when it is not packaged. */
   command: { executable: string; args: readonly string[] };
@@ -239,6 +242,7 @@ export class LocalServers {
         for (const id of this.#published) this.#send(id, { type: "unpublish" });
         this.#published.clear();
         this.#publishedAccountId = null;
+        this.#announcePublished();
       }
       if (accountId === null) return;
       yield* this.#removeDeletedHosts();
@@ -375,6 +379,15 @@ export class LocalServers {
     ]);
   }
 
+  /** The servers registered for the signed-in account: their members and invitations go to the account service. */
+  #announcePublished(): void {
+    this.#options.remoteServers.setRegisteredThisComputerServers(
+      this.#registry.servers.flatMap((entry) =>
+        entry.serverId && this.#published.has(entry.id) ? [entry.serverId] : [],
+      ),
+    );
+  }
+
   /** Writes the account directory of a server to its child, after this app changed one of its members. */
   sendMembers(serverId: string): void {
     const entry = this.#registry.findByServerId(serverId);
@@ -467,6 +480,7 @@ export class LocalServers {
             this.#send(entry.id, { type: "publish", machineToken });
             this.#published.add(entry.id);
             this.#publishedAccountId = accountId;
+            this.#announcePublished();
           }),
         ),
         Effect.catch(({ cause }) =>
@@ -622,6 +636,7 @@ export class LocalServers {
       this.#running.delete(entry.id);
       // The next child gets its machine token again when it starts.
       this.#published.delete(entry.id);
+      this.#announcePublished();
     }
     if (running.stopping || this.#stopped) return;
     this.#options.log.warn(`A server on this computer stopped (code ${code ?? "none"}, signal ${signal ?? "none"}).`);
@@ -691,6 +706,7 @@ export class LocalServers {
       if (this.#running.get(entry.id) === running) {
         this.#running.delete(entry.id);
         this.#published.delete(entry.id);
+        this.#announcePublished();
       }
     }
     if (only && this.#running.has(entry.id)) return;

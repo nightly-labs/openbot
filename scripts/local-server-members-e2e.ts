@@ -128,10 +128,11 @@ try {
   });
 
   const owner = await step("The account lists the server with its owner", async () => {
-    // The registration runs after the start, so the account can answer "not found" for a short time.
+    // The registration runs after the start. Until then the child's own Team API answers, with its
+    // password owner and no email.
     await until("The account listing the server", REGISTER_DEADLINE_MS, async () =>
       (await page.evaluate((id) => window.openbot.servers.listMembers(id), server.id)).some(
-        (member) => member.role === "owner",
+        (member) => member.role === "owner" && member.email !== null,
       ),
     );
     const members = await page.evaluate((id) => window.openbot.servers.listMembers(id), server.id);

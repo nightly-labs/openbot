@@ -1153,8 +1153,9 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
   owner's phone acts as the owner. A sign-out or another account sends `unpublish`. A sign-in, and
   each start, registers again. A start on this computer does not wait for the account service.
 - **Members and invitations.** The child has no account session, so the desktop app sends the member
-  and invitation calls of such a server to the account service with its own session
-  (`RemoteTeamDirectory`, `isThisComputer`), as for a WebRTC server. Invited people join over WebRTC.
+  and invitation calls of a registered server to the account service with its own session
+  (`RemoteTeamDirectory`, `isRegisteredThisComputer`), as for a WebRTC server. Before the
+  registration, they go to the child's Team API, which lists its owner. Invited people join over WebRTC.
   The child reads its members through the desktop app: it writes the line
   `OPENBOT_LOCAL_SERVER_REQUEST members` to stdout, and the desktop app answers on the control pipe
   with `members` (the account directory) or `members-unavailable` (not registered, or the read

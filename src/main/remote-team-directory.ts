@@ -55,11 +55,11 @@ export interface RemoteTeamDirectoryOptions {
   request: RemoteRequestFn;
   transport: RemoteControlPlaneTransport | null;
   /**
-   * A server that this app runs as its child process. The desktop app registered it for the account
-   * and is its owner, so its team goes to the account service like a WebRTC server: the child has no
+   * A server that this app runs as its child process and registered for the signed-in account. This
+   * app is its owner, so its team goes to the account service like a WebRTC server: the child has no
    * account session of its own.
    */
-  isThisComputer: (serverId: string) => boolean;
+  isRegisteredThisComputer: (serverId: string) => boolean;
   /** A development stack: its account service is `http://localhost:<port>`, which invitations otherwise refuse. */
   allowLocalDevelopmentApiUrl: boolean;
   // Read through a callback rather than held, so an account that gains email delivery later is not
@@ -76,7 +76,7 @@ export class RemoteTeamDirectory {
   readonly #servers: RemoteTeamDirectoryOptions["servers"];
   readonly #request: RemoteRequestFn;
   readonly #transport: RemoteControlPlaneTransport | null;
-  readonly #isThisComputer: RemoteTeamDirectoryOptions["isThisComputer"];
+  readonly #isRegisteredThisComputer: RemoteTeamDirectoryOptions["isRegisteredThisComputer"];
   readonly #allowLocalDevelopmentApiUrl: boolean;
   readonly #sendInviteEmail: RemoteTeamDirectoryOptions["sendInviteEmail"];
 
@@ -84,7 +84,7 @@ export class RemoteTeamDirectory {
     this.#servers = options.servers;
     this.#request = options.request;
     this.#transport = options.transport;
-    this.#isThisComputer = options.isThisComputer;
+    this.#isRegisteredThisComputer = options.isRegisteredThisComputer;
     this.#allowLocalDevelopmentApiUrl = options.allowLocalDevelopmentApiUrl;
     this.#sendInviteEmail = options.sendInviteEmail;
   }
@@ -269,6 +269,6 @@ export class RemoteTeamDirectory {
 
   #controlPlaneFor(serverId: string): RemoteControlPlaneTransport | null {
     const server = this.#servers.require(serverId);
-    return server.transport === "webrtc-v2" || this.#isThisComputer(server.id) ? this.#transport : null;
+    return server.transport === "webrtc-v2" || this.#isRegisteredThisComputer(server.id) ? this.#transport : null;
   }
 }

@@ -102,6 +102,7 @@ function servers(
     },
     remoteServers: {
       setThisComputerServers: () => undefined,
+      setRegisteredThisComputerServers: () => undefined,
       attachLocalServer: attach,
       detachLocalServer: () => Effect.void,
     },

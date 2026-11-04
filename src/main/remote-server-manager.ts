@@ -308,6 +308,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   #keyChangedAt = new Map<string, number>();
   /** The local servers that this app runs as its child processes. See `local-servers/`. */
   #thisComputerServers: ReadonlySet<string> = new Set();
+  /** The servers on this computer that are registered for the signed-in account. */
+  #registeredThisComputerServers: ReadonlySet<string> = new Set();
   /** Gives a server on this computer its new members after a change here. */
   #thisComputerMembersChanged: (serverId: string) => void = () => undefined;
   readonly #hostedServers: HostedServerWakeHooks | null;
@@ -432,7 +434,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       servers: this.#store,
       request: (serverId, path, decoder, init) => this.#client.request(serverId, path, decoder, init),
       transport: this.#webrtcTransport,
-      isThisComputer: (serverId) => this.#thisComputerServers.has(serverId),
+      isRegisteredThisComputer: (serverId) => this.#registeredThisComputerServers.has(serverId),
       allowLocalDevelopmentApiUrl: this.#allowLocalDevelopmentInvites,
       sendInviteEmail: (input) => {
         if (!this.#centralAccount.sendTeamInviteEmail)
@@ -1147,6 +1149,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   setThisComputerServers(serverIds: Iterable<string>): void {
     this.#thisComputerServers = new Set(serverIds);
     this.#emitChanged();
+  }
+
+  /**
+   * Before a server is registered, or while the app is signed out, its members and invitations stay
+   * with the server's own Team API, which lists its owner without an account.
+   */
+  setRegisteredThisComputerServers(serverIds: Iterable<string>): void {
+    this.#registeredThisComputerServers = new Set(serverIds);
   }
 
   setThisComputerMembersListener(listener: (serverId: string) => void): void {
