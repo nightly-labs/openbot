@@ -729,6 +729,16 @@
       "method": "comment",
       "url": "https://github.com/nightly-labs/openbot/pull/4585#issuecomment-6619682000",
       "text": "I have read the OpenBot Contributor Assignment Agreement 1.0 and I agree to it."
+    },
+    {
+      "login": "Specstreamai",
+      "userId": 333137486,
+      "version": "1.0",
+      "signedAt": "2026-11-04T04:06:40Z",
+      "pullRequest": 4837,
+      "method": "checkbox",
+      "url": "https://github.com/nightly-labs/openbot/pull/4837",
+      "text": "- [x] I have read the [OpenBot Contributor Assignment Agreement](https://github.com/nightly-labs/openbot/blob/main/CLA.md) 1.0 and I agree to it."
     }
   ]
 }
