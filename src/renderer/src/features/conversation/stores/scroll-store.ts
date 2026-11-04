@@ -56,6 +56,8 @@ export interface ScrollStoreDeps {
   setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   /** The user's messages the host has not drawn yet. They follow the transcript. */
   pendingMessages: () => AgentMessage[];
+  /** The row key of each sent message whose pending row drew it first, by host message id. */
+  handedOverRowKeys: () => ReadonlyMap<string, string>;
   elements: ScrollElements;
   sticky: ScrollStickyState;
 }
@@ -149,12 +151,23 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     return expandRoutineRunGroups(rows, messages, routineRunTurns(), openRoutineRuns());
   });
   /*
-   * A row finds its message by id. The virtualizer gives a row its new index one tick after the list
-   * changes, so a lookup by index draws the neighbouring message in the row for that tick.
+   * A sent message keeps the row of its pending copy. A new row would mount empty at an estimated
+   * height and load its images again, and the chat would jump and blink.
    */
-  const timelineIndexById = createMemo(
-    () => new Map<VirtualItem["key"], number>(timelineMessages().map((message, index) => [message.id, index])),
-  );
+  const rowKey = (message: AgentMessage): string => deps.handedOverRowKeys().get(message.id) ?? message.id;
+  /*
+   * A row finds its message by its key, and other callers by the message id. The virtualizer gives a
+   * row its new index one tick after the list changes, so a lookup by index draws the neighbouring
+   * message in the row for that tick.
+   */
+  const timelineIndexById = createMemo(() => {
+    const indexes = new Map<VirtualItem["key"], number>();
+    timelineMessages().forEach((message, index) => {
+      indexes.set(message.id, index);
+      indexes.set(rowKey(message), index);
+    });
+    return indexes;
+  });
   /* Every row anchors the count, but only some rows add to it. */
   const timelineRows = createMemo(() =>
     deps.props.messages.map((message) => ({ id: message.id, countable: countableTimelineMessage(message) })),
@@ -210,8 +223,16 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     count: () => timelineMessages().length,
     getScrollElement: () => deps.elements.scrollElement() ?? null,
     estimateSize: () => rowEstimate,
-    getItemKey: (index) => timelineMessages()[index]?.id ?? index,
-    keyVersion: () => `${timelineMessages()[0]?.id ?? ""}:${timelineMessages().at(-1)?.id ?? ""}`,
+    getItemKey: (index) => {
+      const message = timelineMessages()[index];
+      return message ? rowKey(message) : index;
+    },
+    keyVersion: () => {
+      const messages = timelineMessages();
+      const first = messages[0];
+      const last = messages.at(-1);
+      return `${first ? rowKey(first) : ""}:${last ? rowKey(last) : ""}`;
+    },
     scrollMargin: virtualScrollMargin,
     stickToLatest: deps.sticky.getStickToLatest,
     onChange: (instance) => {
