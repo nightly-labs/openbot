@@ -49,7 +49,7 @@ export function DynamicIslandBridge() {
     failedTurns,
     setFailedTurns,
   } = useTurns();
-  const { agentUnreadReplies, conversations } = useConversation();
+  const { unreadReplies, conversations } = useConversation();
   const { selectAgent, openAgentMessage } = useNavigation();
   /** The handoff this bridge published, so it never consumes or clears its own. */
   let publishedAction: DynamicIslandAction | null = null;
@@ -62,7 +62,7 @@ export function DynamicIslandBridge() {
         agents: agentList(),
         activeTurns: activeTurns(),
         queues: queues(),
-        unreadReplies: agentUnreadReplies(),
+        unreadReplies: unreadReplies(),
         unreadMessageIds: Object.fromEntries(
           Object.entries(conversations).map(([agentId, conversation]) => [
             agentId,

@@ -507,8 +507,10 @@ the route for a joined server); the phone marks it while the thread screen is in
 dot on the agent's name for an open thread with unread agent messages. The desktop reads the marks
 with `listTaskReads` (`agent:tasks:reads` over IPC, or the `reads` route for a joined server). It shows
 a dot on the tab and the menu row of an idle thread with unread agent messages, and adds those
-messages to the unread count of the agent's sidebar row and the Dynamic Island (`agentUnreadReplies`
-in `conversation-context.tsx`). "Mark all read" still reads only the agent's chat. The host sends no event when
+messages to the unread count of the agent's sidebar row (`agentUnreadReplies` in
+`conversation-context.tsx`). The Dynamic Island keeps the chat-only count: it shows and opens a
+message of the agent's chat, and a side thread's messages are not in it. "Mark all read" still reads
+only the agent's chat. The host sends no event when
 a mark moves; a client reads the marks again when `agent-tasks-changed` arrives or a screen that
 shows them opens. The optional `agent-thread-files-v1` capability
 (`packages/contracts/src/team-protocol/agent-thread-files-v1.ts`, host route `routeAgentThreadFiles` in

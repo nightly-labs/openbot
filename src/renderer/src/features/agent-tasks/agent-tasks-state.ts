@@ -92,6 +92,8 @@ export function createAgentTasks(options: AgentTasksOptions) {
   const unreadRequests = new Map<string, number>();
   /** The message that each thread's read mark last moved to, so a redraw does not send the same mark again. */
   const readMarks = new Map<string, string>();
+  /** The threads whose mark move did not answer yet. A list read can be older than the move. */
+  const marking = new Set<string>();
 
   /**
    * Stores a thread list. A conversation of a thread that the list no longer has goes with it. A task
@@ -250,7 +252,13 @@ export function createAgentTasks(options: AgentTasksOptions) {
       .then((reads) => {
         if (!scopeIsCurrent() || unreadRequests.get(agentId) !== request) return;
         setState((current) => {
-          current.unread[agentId] = Object.fromEntries(reads.map((read) => [read.taskId, read.unreadCount]));
+          const previous = current.unread[agentId] ?? {};
+          current.unread[agentId] = Object.fromEntries(
+            reads.map((read) => [
+              read.taskId,
+              marking.has(read.taskId) ? (previous[read.taskId] ?? 0) : read.unreadCount,
+            ]),
+          );
         });
       })
       .catch(() => undefined);
@@ -454,7 +462,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
   /**
    * Moves the person's read mark of a side thread to the message that they see. The member's other
    * devices read the mark, so the phone no longer shows the thread as unread. The thread shows as
-   * read at once. A failure keeps the old mark: the next message moves it.
+   * read at once. A failure keeps the old mark and shows its count again: the next message moves it.
    */
   function markTaskRead(agentId: string, taskId: string, throughMessageId: string): void {
     if (!readable() || readMarks.get(taskId) === throughMessageId) return;
@@ -462,15 +470,20 @@ export function createAgentTasks(options: AgentTasksOptions) {
     // A list read that started before this mark has the old count.
     nextUnreadRequest(agentId);
     setUnread(agentId, taskId, 0);
+    marking.add(taskId);
     void port()
       .markTaskRead({ agentId, taskId, throughMessageId })
       .then((read) => {
+        if (readMarks.get(taskId) !== throughMessageId) return;
+        marking.delete(taskId);
         // A message that arrived after the mark stays unread.
-        if (scopeIsCurrent() && readMarks.get(taskId) === throughMessageId)
-          setUnread(agentId, taskId, read.unreadCount);
+        if (scopeIsCurrent()) setUnread(agentId, taskId, read.unreadCount);
       })
       .catch(() => {
-        if (readMarks.get(taskId) === throughMessageId) readMarks.delete(taskId);
+        if (readMarks.get(taskId) !== throughMessageId) return;
+        marking.delete(taskId);
+        readMarks.delete(taskId);
+        if (scopeIsCurrent()) loadUnread(agentId);
       });
   }
 

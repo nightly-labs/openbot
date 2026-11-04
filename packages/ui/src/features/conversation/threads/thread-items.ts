@@ -52,7 +52,7 @@ export function threadLists(input: ThreadListsInput): ThreadLists {
       updatedAt: task.updatedAt,
       status: agentTaskThreadStatus(task, input.waitsFor(task)),
     };
-    if (task.state !== "closed" && input.unread) item.unread = input.unread(task);
+    if (input.unread) item.unread = input.unread(task);
     if (task.state === "closed") archived.push(item);
     else {
       items.set(task.id, item);
