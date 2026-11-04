@@ -128,7 +128,7 @@ import { recoverFromNewerDatabase } from "./newer-database-recovery";
 import { startMainLog } from "./provider-log";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
-import { sendToRenderer } from "./renderer-ipc";
+import { sendToRenderer, whenRendererCanReceive } from "./renderer-ipc";
 import { RoutineWake } from "./routine-wake";
 import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
@@ -1534,10 +1534,19 @@ if (!hasSingleInstanceLock) {
       reconcileDynamicIsland();
       await windows.loadRenderer(mainWindow);
       performance.mark("openbot:renderer-loaded");
-      // `sendToRenderer` dropped the server changes made while the window loaded: the host list and
-      // the connection of the selected server. The renderer can have read the list before them.
-      forwardServers(remoteServers.list());
-      // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
+      // `sendToRenderer` dropped the changes made while the window loaded: the host list, the
+      // connection of the selected server, and the account. The renderer can read each one before
+      // it changes. A window that read the account as `loading` kept its loading screen until the
+      // next account change. Send the current values again when the window can receive them. The
+      // startup does not wait for this.
+      void whenRendererCanReceive(mainWindow)
+        .then(() => {
+          forwardServers(remoteServers.list());
+          sendToRenderer(mainWindow, IPC_ENDPOINTS.auth.event, built.centralAuth.getState());
+        })
+        .catch((error) => logger.error("Unable to send the startup state to the window:", toLogValue(error)));
+      // Starts the other servers. The window drops their events until `did-stop-loading`. Their
+      // changes to the host list before that time reach the window with the send above.
       await Effect.runPromise(remoteServers.startEventConnections());
       screen.on("display-added", reconcileDynamicIsland);
       screen.on("display-removed", reconcileDynamicIsland);
