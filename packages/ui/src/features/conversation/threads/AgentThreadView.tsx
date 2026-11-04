@@ -236,8 +236,16 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     const element = scroller;
     const list = element?.firstElementChild;
     if (!element || !list) return fades.stop;
+    let lastTop = element.scrollTop;
+    let lastHeight = element.scrollHeight;
+    // The scroll event of the view's own follow can come after more text, far from the new end (#5002).
+    // That follow moves the view down, so only a move up, with no shorter content, stops the follow.
     const onScroll = () => {
-      atEnd = element.scrollHeight - element.scrollTop - element.clientHeight < STICK_DISTANCE;
+      const { scrollTop, scrollHeight } = element;
+      if (scrollHeight - scrollTop - element.clientHeight < STICK_DISTANCE) atEnd = true;
+      else if (scrollTop < lastTop && scrollHeight >= lastHeight) atEnd = false;
+      lastTop = scrollTop;
+      lastHeight = scrollHeight;
     };
     const follow = new ResizeObserver(() => {
       if (atEnd) element.scrollTop = element.scrollHeight;
