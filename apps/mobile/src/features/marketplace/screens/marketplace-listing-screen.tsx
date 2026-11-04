@@ -25,6 +25,7 @@ import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { loadMarketplaceAgent, loadMarketplaceSkill } from "../api/marketplace-catalog";
 import {
   HeroChips,
@@ -527,7 +528,9 @@ function AppPage({
                   style={{ borderCurve: "continuous" }}
                 >
                   <Typography.Paragraph className="min-w-0 flex-1">{prompt.text}</Typography.Paragraph>
-                  {connected ? <ArrowRight color={String(muted)} size={18} strokeWidth={2} /> : null}
+                  {connected ? (
+                    <ArrowRight color={String(muted)} size={18} strokeWidth={2} style={MIRROR_IN_RTL} />
+                  ) : null}
                 </View>
               </TryPressable>
             ))}

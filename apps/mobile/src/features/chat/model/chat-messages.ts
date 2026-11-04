@@ -68,6 +68,11 @@ export type ChatMessage =
       speaker?: ChannelMessage["author"];
       /** Another person who wrote this message in an agent chat. The reader's own messages have none. */
       sender?: ConversationMessageSender;
+      /**
+       * The host records the reader as the sender. A member can delete these messages. A message from
+       * before senders were kept shows as the reader's own but is not `mine`.
+       */
+      mine?: boolean;
       superseded?: boolean;
       body: string;
       streaming: boolean;
@@ -390,14 +395,15 @@ export function projectChatMessages(
       let bubble = cached?.readerKey === readerKey ? cached.bubble : undefined;
       if (!bubble) {
         const sender = message.author === "user" ? message.senderMember : undefined;
-        const otherMember =
-          sender !== undefined && reader !== null && sender.id !== reader && sender.id !== readerAccount;
+        const ownSender = sender !== undefined && (sender.id === reader || sender.id === readerAccount);
+        const otherMember = sender !== undefined && reader !== null && !ownSender;
         bubble = projectPlan(message) ?? {
           id: message.id,
           kind: "message",
           // Another person's message stays a person's bubble, on the right, and adds their name.
           author: message.author === "user" ? "user" : "agent",
           ...(otherMember ? { sender } : {}),
+          ...(ownSender ? { mine: true } : {}),
           body: message.exchange ? "" : message.text,
           streaming: message.status === "streaming",
           status: message.status,
@@ -583,6 +589,7 @@ function projectChannelMessage(
     id: entry.id,
     kind: "message",
     author: self ? "user" : "agent",
+    ...(self ? { mine: true } : {}),
     speaker: entry.author,
     superseded: entry.superseded,
     body: entry.message.text,

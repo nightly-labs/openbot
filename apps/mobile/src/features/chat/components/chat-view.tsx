@@ -59,6 +59,7 @@ import { showsOnline } from "@/features/workspace/model/server-status";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { END_X } from "@/shared/lib/text-direction";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 import { mentionDraft } from "../model/chat-mentions";
@@ -121,6 +122,18 @@ export interface ChatViewProps {
   branchPoints?: ReadonlySet<string>;
   /** Copies the chat through a host message into a new thread. Absent for a chat that cannot branch. */
   onBranch?: (messageId: string) => Promise<void>;
+  /** Deletes a host message for everyone. Absent where the host cannot delete messages. */
+  deleteMessage?: (messageId: string) => Promise<void>;
+  /** The reader can delete the messages of others too, not only the ones that they sent. */
+  deletesAnyMessage?: boolean;
+  /**
+   * The open channels that the text of a message can go to, in an agent's own chat. Keep the list
+   * stable while it stays the same. Absent where a message cannot go to a channel.
+   */
+  sendToChannel?: {
+    channels: readonly { id: string; name: string }[];
+    onSend: (channelId: string, text: string) => void;
+  };
   questionForm?: QuestionPromptController;
   /** Opens the form of an open question, in a channel where several agents can ask. */
   onSelectQuestion?: (messageId: string) => void;
@@ -227,6 +240,9 @@ export function ChatView({
   stopTurn,
   branchPoints,
   onBranch,
+  deleteMessage,
+  deletesAnyMessage = false,
+  sendToChannel,
   questionForm,
   onSelectQuestion,
   needsAction = false,
@@ -501,13 +517,13 @@ export function ChatView({
   useEffect(() => {
     if (answersQuestion) setAnswerFocusVersion((version) => version + 1);
   }, [answersQuestion]);
-  // Another screen, such as Agent info > Skills or a share from another app, can put text and files
-  // in this composer and close itself. Only a chat in front takes it: a chat under that screen is not
-  // the one the user returns to.
+  // Another screen, such as Agent info > Skills, a share from another app, or Send to channel on a
+  // message, can put text and files in this composer and close itself. Only a chat in front takes it:
+  // a chat under that screen is not the one the user returns to.
   const composerRequest = useComposerRequest((state) => state.request);
   useEffect(() => {
-    if (!isFocused || !composerRequest || target.kind !== "agent") return;
-    const request = takeComposerRequest(target.serverId, target.id);
+    if (!isFocused || !composerRequest) return;
+    const request = takeComposerRequest({ kind: target.kind, serverId: target.serverId, id: target.id });
     if (!request) return;
     const files = request.files ?? [];
     void composerAttachments
@@ -517,8 +533,9 @@ export function ChatView({
   const composerFocus = useComposerRequest((state) => state.focus);
   const [handoffFocusVersion, setHandoffFocusVersion] = useState(0);
   useEffect(() => {
-    if (!isFocused || !composerFocus || target.kind !== "agent") return;
-    if (takeComposerFocus(target.serverId, target.id)) setHandoffFocusVersion((version) => version + 1);
+    if (!isFocused || !composerFocus) return;
+    if (takeComposerFocus({ kind: target.kind, serverId: target.serverId, id: target.id }))
+      setHandoffFocusVersion((version) => version + 1);
   }, [isFocused, composerFocus, target.kind, target.serverId, target.id]);
   const lastUserId =
     messages.findLast((message) => message.kind === "message" && message.author === "user")?.id ?? null;
@@ -705,13 +722,15 @@ export function ChatView({
     () =>
       Gesture.Pan()
         .enabled(!isIOS)
-        .hitSlop({ left: 0, width: CHAT_BACK_EDGE_WIDTH })
-        .activeOffsetX(12)
-        .failOffsetX(-8)
+        // From the start edge toward the middle: the left edge, or the right edge in a right-to-left
+        // layout, as a stack screen goes back. The gesture measures in screen points.
+        .hitSlop(END_X === 1 ? { left: 0, width: CHAT_BACK_EDGE_WIDTH } : { right: 0, width: CHAT_BACK_EDGE_WIDTH })
+        .activeOffsetX(12 * END_X)
+        .failOffsetX(-8 * END_X)
         .failOffsetY([-16, 16])
         .onEnd((event) => {
           if (menuOpenValue.get()) return;
-          if (event.translationX < 48 && event.velocityX < 650) return;
+          if (event.translationX * END_X < 48 && event.velocityX * END_X < 650) return;
           scheduleOnRN(voiceOpenValue.get() ? leaveVoiceMode : leaveConversation);
         }),
     [menuOpenValue, voiceOpenValue, leaveVoiceMode, leaveConversation],
@@ -920,7 +939,6 @@ export function ChatView({
   latestSend.current = sendMessage;
   const send = useCallback((value: string) => latestSend.current(value), []);
   const cancelReply = useCallback(() => setReplyTarget(null), []);
-  const dismissStarter = useCallback(() => setShowStarter(false), []);
   const respondToApproval = useCallback(
     (approval: PendingApproval, decision: ApprovalDecision) =>
       workspace().respondToApproval(target.serverId, { requestId: approval.requestId, decision }),
@@ -936,6 +954,15 @@ export function ChatView({
   const branchMessage = useCallback(
     (message: ChatBubbleMessage) => void onBranch?.(hostMessageIds.get(message.id) ?? message.id),
     [onBranch, hostMessageIds],
+  );
+  const onSendToChannel = sendToChannel?.onSend;
+  const sendMessageToChannel = useCallback(
+    (message: ChatBubbleMessage, channelId: string) => onSendToChannel?.(channelId, message.body),
+    [onSendToChannel],
+  );
+  const deleteListMessage = useCallback(
+    async (message: ChatBubbleMessage) => deleteMessage?.(hostMessageIds.get(message.id) ?? message.id),
+    [deleteMessage, hostMessageIds],
   );
   // Select text starts the selection, and a second tap on it ends the selection.
   const selectText = useCallback((message: ChatBubbleMessage) => {
@@ -1032,7 +1059,6 @@ export function ChatView({
               browserRequests={chatBrowserRequests}
               serverName={server?.name ?? ""}
               onRespondApproval={respondToApproval}
-              fieldBackground={fieldBackground}
               foreground={foreground}
               messages={messages}
               messageAliases={messageAliases}
@@ -1045,18 +1071,19 @@ export function ChatView({
               onBranch={onBranch && !readOnly ? branchMessage : undefined}
               branchPoints={branchPoints}
               onReact={canReact && !readOnly ? react : undefined}
+              onDeleteMessage={deleteMessage && !readOnly ? deleteListMessage : undefined}
+              deletesAnyMessage={deletesAnyMessage}
+              sendChannels={sendToChannel?.channels}
+              onSendToChannel={sendToChannel && !readOnly ? sendMessageToChannel : undefined}
               selectingMessageId={selection?.message.id ?? null}
               onSelectText={selectText}
               onSelectionChange={changeSelection}
               onDismissSelection={dismissSelection}
               muted={muted}
-              raised={raised}
               showStarter={
                 showStarter && serverOnline && canSend && ready && !activity && projectedMessages.length === 0
               }
               topInset={insets.top}
-              onDismissStarter={dismissStarter}
-              onSelectStarter={send}
               onRetryHistory={fetchHistory}
               focusMessageId={focusMessageId}
               onFocusPlaced={onFocusPlaced}

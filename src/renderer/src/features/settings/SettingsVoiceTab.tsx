@@ -1,5 +1,7 @@
 import {
   AUTOMATIC_VOICE_LANGUAGE,
+  CODEX_LIVE_VOICES,
+  type CodexLiveVoice,
   ELEVENLABS_VOICE_MODEL_ID,
   SPEECH_MODEL,
   SPEECH_SPEEDS,
@@ -40,6 +42,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, createStore, For, Show } from "solid-js";
+import type { CodexLiveAccess } from "../speech/codex-live-access";
 import type { SettingsVoiceStore } from "./settings-voice-store";
 import { shortModel, VoiceServerDialog, voiceServerHost } from "./VoiceServerDialog";
 
@@ -147,9 +150,15 @@ function flagFor(language: VoiceLanguage): string {
   return "🌐";
 }
 
+/** `automatic` lets OpenAI choose the voice of live voice. */
+type LiveVoiceChoice = CodexLiveVoice | "automatic";
+
 interface SettingsVoiceTabProps {
   store: SettingsVoiceStore;
   selectMount: HTMLElement | undefined;
+  codexLiveAccess?: CodexLiveAccess | undefined;
+  /** Opens the Providers section of this computer, where Codex signs in. */
+  onConnectCodex?: (() => void) | undefined;
 }
 
 export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
@@ -217,6 +226,11 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
       number: voice.slice(1),
     });
 
+  const liveVoice = (): LiveVoiceChoice => speech().settings?.codexLiveVoice ?? "automatic";
+  /** The voices' own names, which stay the same in each language. */
+  const liveVoiceName = (voice: LiveVoiceChoice) =>
+    voice === "automatic" ? t("settings.voice.language.automatic") : voice.charAt(0).toUpperCase() + voice.slice(1);
+
   const LanguageLabel = (labelProps: { language: VoiceLanguage | undefined }) => (
     <Show when={labelProps.language}>
       {(language) => (
@@ -229,7 +243,10 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
 
   return (
     <>
-      <SettingsSection data-settings-row="settings.voice.models.title" title={t("settings.voice.models.title")}>
+      <SettingsSection
+        data-settings-row="settings.voice.dictation.section"
+        title={t("settings.voice.dictation.section")}
+      >
         <ItemGroup class="settings-modal-card">
           <For each={VOICE_MODELS}>
             {(model) => {
@@ -352,14 +369,9 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
               );
             }}
           </For>
-        </ItemGroup>
-      </SettingsSection>
-
-      <SettingsSection title={t("settings.voice.language.section")}>
-        <ItemGroup class="settings-modal-card">
-          <Item data-settings-row="settings.voice.language.title" class="settings-modal-row">
+          <Item data-settings-row="settings.voice.language.section" class="settings-modal-row">
             <ItemContent>
-              <ItemTitle>{t("settings.voice.language.title")}</ItemTitle>
+              <ItemTitle>{t("settings.voice.language.section")}</ItemTitle>
               <ItemDescription>
                 {t(fixedLanguage()?.description ?? "settings.voice.language.description")}
               </ItemDescription>
@@ -378,7 +390,7 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                   </SelectItem>
                 )}
               >
-                <SelectTrigger size="sm" aria-label={t("settings.voice.language.title")}>
+                <SelectTrigger size="sm" aria-label={t("settings.voice.language.section")}>
                   <SelectValue<VoiceLanguage>>
                     {(state) => <LanguageLabel language={state.selectedOption()} />}
                   </SelectValue>
@@ -533,6 +545,68 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
               </Select>
             </ItemActions>
           </Item>
+        </ItemGroup>
+      </SettingsSection>
+
+      <SettingsSection title={t("settings.voice.live.section")}>
+        <ItemGroup class="settings-modal-card">
+          <Show
+            when={props.codexLiveAccess !== "signIn"}
+            fallback={
+              <Item data-settings-row="settings.voice.speech.codexLive.title" class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.voice.speech.codexLive.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.voice.live.signIn")}</ItemDescription>
+                </ItemContent>
+                <Show when={props.onConnectCodex}>
+                  {(connect) => (
+                    <ItemActions>
+                      <Button variant="outline" size="sm" type="button" onClick={() => connect()()}>
+                        {t("settings.voice.server.connect")}
+                      </Button>
+                    </ItemActions>
+                  )}
+                </Show>
+              </Item>
+            }
+          >
+            <SwitchField
+              data-settings-row="settings.voice.speech.codexLive.title"
+              checked={speech().settings?.codexLive ?? false}
+              disabled={!speech().settings}
+              onChange={(checked) => props.store.setCodexLive(checked)}
+              label={t("settings.voice.speech.codexLive.title")}
+              description={t("settings.voice.speech.codexLive.description")}
+            />
+            <Item class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{t("settings.voice.speech.voice.title")}</ItemTitle>
+              </ItemContent>
+              <ItemActions>
+                <Select<LiveVoiceChoice>
+                  class="settings-modal-select"
+                  options={["automatic", ...CODEX_LIVE_VOICES]}
+                  value={liveVoice()}
+                  onChange={(next) => next && props.store.setCodexLiveVoice(next === "automatic" ? null : next)}
+                  disabled={!speech().settings?.codexLive}
+                  placement="bottom-end"
+                  itemComponent={(selectProps) => (
+                    <SelectItem item={selectProps.item}>{liveVoiceName(selectProps.item.rawValue)}</SelectItem>
+                  )}
+                >
+                  <SelectTrigger size="sm" aria-label={t("settings.voice.speech.voice.title")}>
+                    <SelectValue<LiveVoiceChoice>>
+                      {(state) => {
+                        const voice = state.selectedOption();
+                        return voice && liveVoiceName(voice);
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent mount={props.selectMount} />
+                </Select>
+              </ItemActions>
+            </Item>
+          </Show>
         </ItemGroup>
       </SettingsSection>
 

@@ -24,6 +24,8 @@ export const messages = {
   "status.agent.screenCaptureWindow": "{name} penceresini yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureRegion":
     "{x}, {y} konumundaki {width} × {height} noktalık ekran alanını yakala ve görüntüyü ajanın modeline gönder.",
+  "status.agent.workflowDelete":
+    "{title} iş akışını çalıştırmaları ve sürümleriyle birlikte silin. Açık adımları durur.",
   "status.agent.screenCaptureProgress": "Ekranı yakalamak için izin isteniyor…",
   "status.agent.screenCaptureReviewing": "Ekran görüntüsü inceleniyor…",
   "status.agent.browserOpening": "Web sayfası açılıyor…",

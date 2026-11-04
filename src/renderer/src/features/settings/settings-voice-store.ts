@@ -1,4 +1,5 @@
 import {
+  type CodexLiveVoice,
   ELEVENLABS_VOICE_MODEL_ID,
   isSpeechLanguage,
   type SpeechModelStatus,
@@ -260,6 +261,15 @@ export function createSettingsVoiceStore(active: () => boolean) {
       void saveServer({ address: server.address, apiKey: null, routes: { ...server.routes, dictation: false } });
   }
 
+  /** Voice conversations with Codex agents use Codex live voice. Nothing is downloaded for it. */
+  function setCodexLive(codexLive: boolean): void {
+    void saveSpeech({ codexLive });
+  }
+
+  function setCodexLiveVoice(codexLiveVoice: CodexLiveVoice | null): void {
+    void saveSpeech({ codexLiveVoice });
+  }
+
   /** Turning it on downloads the model, as the first dictation does, unless the server reads replies. */
   function setReadReplies(readReplies: boolean): void {
     void saveSpeech({ readReplies }).then((saved) => {
@@ -308,6 +318,8 @@ export function createSettingsVoiceStore(active: () => boolean) {
     cancelSpeech,
     removeSpeech,
     setReadReplies,
+    setCodexLive,
+    setCodexLiveVoice,
     setSpeechVoice: (voice: SpeechVoice) =>
       void saveSpeech({ voice }).then((saved) =>
         desktopAnalytics.track("speech_settings_action", {

@@ -4,8 +4,7 @@ import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
-import { markdownPlainText } from "@openbot/contracts/markdown-preview-text";
-import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { markdownInlinePlainText, markdownPlainText } from "@openbot/contracts/markdown-preview-text";
 import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import type { LucideIcon } from "lucide-react-native";
@@ -20,7 +19,6 @@ import CornerUpRight from "lucide-react-native/icons/corner-up-right";
 import GitFork from "lucide-react-native/icons/git-fork";
 import LoaderCircle from "lucide-react-native/icons/loader-circle";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
-import X from "lucide-react-native/icons/x";
 import {
   type ComponentProps,
   createContext,
@@ -78,7 +76,7 @@ import {
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { useAgentColorMessages } from "@/features/settings/model/message-color";
-import { canReadAloud, stopReadAloud } from "@/features/voice/model/message-reading";
+import { stopReadAloud } from "@/features/voice/model/message-reading";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
@@ -88,6 +86,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { chatDayLabels } from "../model/chat-day-markers";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
@@ -149,12 +148,6 @@ const ADAPTIVE_RENDER = { enterVelocity: 1.5, exitVelocity: 0.5 };
 // not move the messages that the reader sees.
 const KEEP_VISIBLE_POSITION = { data: true, size: true };
 const FOLLOW_END = { animated: false, on: { dataChange: true, itemLayout: true, footerLayout: true, layout: true } };
-
-const STARTER_OPTIONS = [
-  { id: "plan", label: "mobile.chat.starter.planLabel", detail: "mobile.chat.starter.planDetail" },
-  { id: "research", label: "mobile.chat.starter.researchLabel", detail: "mobile.chat.starter.researchDetail" },
-  { id: "solve", label: "mobile.chat.starter.solveLabel", detail: "mobile.chat.starter.solveDetail" },
-] as const satisfies readonly { id: string; label: MobileTextKey; detail: MobileTextKey }[];
 
 const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
   .easing(Easing.bezier(0.23, 1, 0.32, 1))
@@ -271,7 +264,6 @@ interface ChatMessageListProps {
   browserRequests?: readonly BrowserTakeoverRequest[];
   serverName?: string;
   onRespondApproval?: (approval: PendingApproval, decision: ApprovalDecision) => Promise<void>;
-  fieldBackground: ViewStyle["backgroundColor"];
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
   messages: ChatMessage[];
@@ -282,15 +274,19 @@ interface ChatMessageListProps {
   olderError: boolean;
   onLoadOlder: () => void;
   muted: ViewStyle["backgroundColor"];
-  raised: ViewStyle["backgroundColor"];
   showStarter: boolean;
   topInset: number;
-  onDismissStarter: () => void;
-  onSelectStarter: (value: string) => void;
   onRetryHistory: () => void;
   onReply?: (message: ChatBubbleMessage) => void;
   /** Copies the conversation through a message of `branchPoints` into a new thread. */
   onBranch?: (message: ChatBubbleMessage) => void;
+  /** Deletes a message for everyone. Absent where the host cannot delete messages. */
+  onDeleteMessage?: (message: ChatBubbleMessage) => Promise<void>;
+  /** The reader can delete the messages of others too, not only the ones that they sent. */
+  deletesAnyMessage?: boolean;
+  /** The open channels that the text of a message can go to. Keep the list stable while it stays the same. */
+  sendChannels?: readonly { id: string; name: string }[];
+  onSendToChannel?: (message: ChatBubbleMessage, channelId: string) => void;
   /** The messages that offer a branch. Keep the set stable while its ids stay the same. */
   branchPoints?: ReadonlySet<string>;
   /**
@@ -358,6 +354,11 @@ interface MessageRowShared {
   replyHaptics: ReturnType<typeof useReplyHaptics>;
   canReply: boolean;
   canReact: boolean;
+  /** The host deletes messages. A message that the reader did not send also needs `deletesAny`. */
+  canDelete: boolean;
+  deletesAny: boolean;
+  /** The open channels that the text of a message can go to. Empty where it cannot go to one. */
+  sendChannels: readonly { id: string; name: string }[];
   canSelectText: boolean;
   canSelectQuestion: boolean;
   /** The messages that offer a branch. Empty where the chat cannot branch. */
@@ -369,6 +370,8 @@ interface MessageRowShared {
     branch: (message: ChatBubbleMessage) => void;
     selectQuestion: (messageId: string) => void;
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
+    delete: (message: ChatBubbleMessage) => Promise<void>;
+    sendToChannel: (message: ChatBubbleMessage, channelId: string) => void;
     selectText: (message: ChatBubbleMessage) => void;
     selectionChange: (selected: string) => void;
     /** The row of the selected message. A tap outside it ends the selection. */
@@ -561,7 +564,16 @@ const MessageRow = memo(function MessageRow({
           onReply: shared.canReply ? () => shared.actions.reply(bubble) : undefined,
           onBranch: shared.branchPoints.has(bubble.id) ? () => shared.actions.branch(bubble) : undefined,
           onSelectText: selectable ? () => shared.actions.selectText(bubble) : undefined,
-          readAloudId: canReadAloud && bubble.author === "agent" ? bubble.id : undefined,
+          onDelete:
+            shared.canDelete && (shared.deletesAny || bubble.mine) ? () => shared.actions.delete(bubble) : undefined,
+          sendToChannel:
+            shared.sendChannels.length > 0 && bubble.body.trim()
+              ? {
+                  channels: shared.sendChannels,
+                  onSend: (channelId) => shared.actions.sendToChannel(bubble, channelId),
+                }
+              : undefined,
+          readAloudId: bubble.author === "agent" ? bubble.id : undefined,
         }
       : null,
   );
@@ -807,11 +819,12 @@ const MessageRow = memo(function MessageRow({
     >
       {message.replyToMessageId ? (
         <View className={`flex-row items-center gap-1 ${message.author === "user" ? "self-end" : "self-start"}`}>
-          <CornerUpRight size={14} color={themeMuted} />
+          <CornerUpRight size={14} color={themeMuted} style={MIRROR_IN_RTL} />
           <Typography.Paragraph
             type="body-xs"
             numberOfLines={1}
             className="shrink text-muted"
+            style={lineDirectionStyle(replyPreview)}
             accessibilityLabel={t("mobile.chat.reply.to", { text: replyPreview })}
           >
             {replyPreview}
@@ -1004,6 +1017,7 @@ function sameListProps(previous: ChatMessageListProps, next: ChatMessageListProp
 const NO_APPROVALS: readonly PendingApproval[] = [];
 const NO_BROWSER_REQUESTS: readonly BrowserTakeoverRequest[] = [];
 const NO_IDS: ReadonlySet<string> = new Set();
+const NO_CHANNELS: readonly { id: string; name: string }[] = [];
 
 export const ChatMessageList = memo(function ChatMessageList({
   upload,
@@ -1031,7 +1045,6 @@ export const ChatMessageList = memo(function ChatMessageList({
   browserRequests = NO_BROWSER_REQUESTS,
   serverName = "",
   onRespondApproval,
-  fieldBackground,
   foreground,
   historyState,
   messages,
@@ -1042,14 +1055,15 @@ export const ChatMessageList = memo(function ChatMessageList({
   olderError,
   onLoadOlder,
   muted,
-  raised,
   showStarter,
   topInset,
-  onDismissStarter,
-  onSelectStarter,
   onRetryHistory,
   onReply,
   onBranch,
+  onDeleteMessage,
+  deletesAnyMessage = false,
+  sendChannels = NO_CHANNELS,
+  onSendToChannel,
   branchPoints = NO_IDS,
   branchDivider = null,
   onOpenBranchSource,
@@ -1088,7 +1102,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     if (!questionForm?.question || !promptId || announcedPromptId.current === promptId) return;
     announcedPromptId.current = promptId;
     AccessibilityInfo.announceForAccessibility(
-      t("mobile.chat.question.inputRequired", { question: questionForm.question.question }),
+      t("mobile.chat.question.inputRequired", { question: markdownInlinePlainText(questionForm.question.question) }),
     );
   }, [questionForm?.messageId, questionForm?.question, t]);
   const announcedApprovals = useRef(new Set<string>());
@@ -1218,17 +1232,30 @@ export const ChatMessageList = memo(function ChatMessageList({
     onReply,
     onBranch,
     onReact,
+    onDeleteMessage,
+    onSendToChannel,
     onSelectText,
     onSelectionChange,
     onSelectQuestion,
   });
-  actionHandlers.current = { onReply, onBranch, onReact, onSelectText, onSelectionChange, onSelectQuestion };
+  actionHandlers.current = {
+    onReply,
+    onBranch,
+    onReact,
+    onDeleteMessage,
+    onSendToChannel,
+    onSelectText,
+    onSelectionChange,
+    onSelectQuestion,
+  };
   const actions = useMemo<MessageRowShared["actions"]>(
     () => ({
       reply: (message) => actionHandlers.current.onReply?.(message),
       branch: (message) => actionHandlers.current.onBranch?.(message),
       selectQuestion: (messageId) => actionHandlers.current.onSelectQuestion?.(messageId),
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
+      delete: async (message) => actionHandlers.current.onDeleteMessage?.(message),
+      sendToChannel: (message, channelId) => actionHandlers.current.onSendToChannel?.(message, channelId),
       selectText: (message) => actionHandlers.current.onSelectText?.(message),
       selectionChange: (selected) => actionHandlers.current.onSelectionChange?.(selected),
       selectionArea: (view) => {
@@ -1268,6 +1295,8 @@ export const ChatMessageList = memo(function ChatMessageList({
   // `actionHandlers`, so only their presence keeps `shared`, and every row, from rendering again.
   const canReply = Boolean(onReply);
   const canReact = Boolean(onReact);
+  const canDelete = Boolean(onDeleteMessage);
+  const shownSendChannels = onSendToChannel ? sendChannels : NO_CHANNELS;
   const canSelectText = Boolean(onSelectText);
   const canSelectQuestion = Boolean(onSelectQuestion);
   const shownBranchPoints = onBranch ? branchPoints : NO_IDS;
@@ -1299,6 +1328,9 @@ export const ChatMessageList = memo(function ChatMessageList({
       replyHaptics,
       canReply,
       canReact,
+      canDelete,
+      deletesAny: deletesAnyMessage,
+      sendChannels: shownSendChannels,
       canSelectText,
       canSelectQuestion,
       branchPoints: shownBranchPoints,
@@ -1327,6 +1359,9 @@ export const ChatMessageList = memo(function ChatMessageList({
       replyHaptics,
       canReply,
       canReact,
+      canDelete,
+      deletesAnyMessage,
+      shownSendChannels,
       canSelectText,
       canSelectQuestion,
       shownBranchPoints,
@@ -1615,62 +1650,10 @@ export const ChatMessageList = memo(function ChatMessageList({
                     </View>
                   ) : null}
                   {showStarter ? (
-                    <View
-                      className="gap-4 rounded-[26px] p-4"
-                      style={{ backgroundColor: fieldBackground, borderCurve: "continuous" }}
-                    >
-                      <View className="flex-row items-start gap-3">
-                        <View className="min-w-0 flex-1 gap-1">
-                          <Typography.Heading type="h4">{t("mobile.chat.starter.title")}</Typography.Heading>
-                          <Typography.Paragraph className="text-text-secondary">
-                            {t("mobile.chat.starter.body")}
-                          </Typography.Paragraph>
-                        </View>
-                        <Pressable
-                          accessibilityLabel={t("mobile.chat.starter.dismiss")}
-                          accessibilityRole="button"
-                          hitSlop={8}
-                          onPress={() => {
-                            void haptics.selection();
-                            onDismissStarter();
-                          }}
-                        >
-                          <X color={String(muted)} size={21} strokeWidth={1.8} />
-                        </Pressable>
-                      </View>
-
-                      <View className="overflow-hidden rounded-[18px]" style={{ backgroundColor: raised }}>
-                        {STARTER_OPTIONS.map((option, index) => (
-                          <Pressable
-                            key={option.id}
-                            accessibilityRole="button"
-                            accessibilityState={{ disabled: !canSend }}
-                            disabled={!canSend}
-                            className="flex-row gap-3 px-3 py-3"
-                            style={({ pressed }) => ({
-                              borderBottomColor: index < STARTER_OPTIONS.length - 1 ? String(muted) : "transparent",
-                              borderBottomWidth: index < STARTER_OPTIONS.length - 1 ? 0.5 : 0,
-                              opacity: !canSend ? 0.45 : pressed ? 0.55 : 1,
-                            })}
-                            onPress={() => onSelectStarter(t(option.label))}
-                          >
-                            <View className="size-7 items-center justify-center rounded-lg bg-control">
-                              <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                                {String.fromCharCode(65 + index)}
-                              </Typography.Paragraph>
-                            </View>
-                            <View className="min-w-0 flex-1">
-                              <Typography.Paragraph weight="medium">{t(option.label)}</Typography.Paragraph>
-                              <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                                {t(option.detail)}
-                              </Typography.Paragraph>
-                            </View>
-                          </Pressable>
-                        ))}
-                      </View>
-
-                      <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                        {t("mobile.chat.starter.orAnswer")}
+                    <View className="gap-1 px-1 py-4">
+                      <Typography.Heading type="h4">{t("mobile.chat.starter.title")}</Typography.Heading>
+                      <Typography.Paragraph className="text-text-secondary">
+                        {t("mobile.chat.starter.body")}
                       </Typography.Paragraph>
                     </View>
                   ) : null}

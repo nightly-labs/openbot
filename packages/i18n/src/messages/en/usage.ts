@@ -70,4 +70,6 @@ export const messages = defineMessages("usage", {
   "usage.panel.loading": "Loading usage…",
   "usage.panel.unsupported": "This host does not support agent analytics. Update the host to use this view.",
   "usage.panel.loadFailed": "Could not load usage. Check the connection and date range.",
+  "usage.machine.label": "Machine use. CPU: {cpu}, memory: {memory}",
+  "usage.machine.openStorage": "Open Storage. Disk: {percent}, {detail}",
 });

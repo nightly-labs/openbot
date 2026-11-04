@@ -96,6 +96,20 @@ export class MobileConversationStore {
     for (const listener of this.#listeners.get(agentId) ?? []) listener();
   }
 
+  /**
+   * Takes a message that a member deleted out of the loaded window and the replies' references. A
+   * latest page keeps the older loaded messages, so the host's change event alone leaves it shown.
+   */
+  removeMessage(agentId: string, messageId: string) {
+    this.flush();
+    const current = this.get(agentId);
+    if (!current) return;
+    const messages = current.messages.filter((message) => message.id !== messageId);
+    if (messages.length === current.messages.length && !(messageId in current.references)) return;
+    const { [messageId]: _removed, ...references } = current.references;
+    this.#publish(agentId, { ...current, messages, references });
+  }
+
   cancelRequests() {
     this.markStale();
     this.#loads.clear();

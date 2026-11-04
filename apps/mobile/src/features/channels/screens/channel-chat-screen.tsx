@@ -4,6 +4,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ChatView } from "@/features/chat/components/chat-view";
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
+import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
@@ -127,6 +128,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   }, [store, serverId, channelId, olderLoading]);
   // The phone keeps a message while the server is offline and sends it when it is back.
   const canSend = Boolean(channel) && !archived;
+  const messageDelete = useMessageDelete(serverId, { kind: "channel", channelId });
   const [selectedPromptId, selectPrompt] = useState<string | null>(null);
   const pendingPrompts = messages.filter((message) => message.kind === "question" && !message.prompt.resolution);
   const activePrompt = pendingPrompts.find((message) => message.id === selectedPromptId) ?? pendingPrompts[0];
@@ -163,6 +165,8 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       historyLoadFailed={Boolean(state.error) || (!state.loading && !channel)}
       canSend={canSend}
       readOnly={archived}
+      deleteMessage={messageDelete.deleteMessage}
+      deletesAnyMessage={messageDelete.deletesAny}
       notice={archived ? t("mobile.channel.chat.deletedNotice") : null}
       activities={activities}
       activeTurnId={null}

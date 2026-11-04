@@ -40,7 +40,7 @@ const BROWSER_VAULT_TOOLS = new Set([
  */
 function browserGuidance(tool: string, options: ToolGuidanceOptions): string[] {
   const core = [
-    "These are openbot_browser tools, not direct tools: run them with openbot.tool_call and their qualified names. Describe only a tool whose inputSchema you lack.",
+    "Describe only a tool whose inputSchema you lack.",
     "openbot_browser is OpenBot's private persistent browser. Take a snapshot before you act. Prefer revision-bound refs and unique role/name targets, then text, CSS, and coordinates, in that order. Input actions return a short status, not a snapshot, so call snapshot when you need to read the page. Tabs stay open after the turn and across restarts, at most 25: close a tab with close_tab when the task no longer needs it, unless the user asks to keep it or still needs to see it. After navigation, a layout change, or a covered-target error, take a fresh snapshot and resolve the target again; do not reuse old coordinates or repeat coordinate clicks.",
     "After a submit, booking, or other change on a site, read a fresh snapshot or wait_for the expected result before you report the outcome. Current confirmation of the requested item, such as a success message or a cancel control, wins over a list that did not update; a waitlist place is not a booking. When it stays unclear, say what you saw; do not submit again.",
     "For paging, loops, data collection, or two or more actions that you know in advance, use one run_script call, not one click or navigate per page: it returns one final snapshot. Return only the data you need. Use single action tools to explore a new page. Refs stop working after a step navigates; later steps use role, text, or CSS targets.",
@@ -126,6 +126,17 @@ function openbotGuidance(namespace: string, tool: string): string {
         "When work must start on an event from another system, use openbot.create_webhook_routine, not a polling schedule. Give a name that no routine of the agent has, and set eventType or filters only when the user names events. Give the user the URL, the request format, and where to get the secret, as the result says; never ask for, guess, or store the secret. To change the events, read the routine with openbot.list_routines and use openbot.update_webhook_routine, and keep the filters that the user did not mention. Only a person's message can start these tools or openbot.delete_routine for it, not a routine run or an agent. The user tests it, makes its secret, or pastes a Composio secret in Routines settings.",
         "A routine can pass its agent's answer on to other agents. openbot.list_routine_flows reads an agent's routines and links, and openbot.connect_routine_agents and openbot.disconnect_routine_agents add and remove links. Read the flow before a change, and keep the links that the user did not mention.",
       ].join("\n");
+    case "list_workflows":
+    case "read_workflow":
+    case "edit_workflow":
+    case "delete_workflow":
+    case "run_workflow":
+    case "read_workflow_runs":
+      return [
+        "Read a workflow before a change. Make all changes in one openbot.edit_workflow call: give each new node a ref to use as its id in later ops. add with from also connects. To insert a step, disconnect two nodes, add it with from, connect it to the next. The host lays out nodes: send no at; move if asked; tidy cleans up. The result maps refs to ids; do not read again.",
+        "Fields by kind: trigger trigger (manual, schedule, webhook, github, discord, telegram, slack) and a schedule like {kind:daily|weekdays,time:HH:mm}, {kind:weekly,weekday:0-6,time}, {kind:hourly,minute} or {kind:custom,expression:cron}; agent agentId (openbot.list_agents), task; llm prompt, system; condition rule, a yes/no question, its edges need branch yes or no; both take provider, model, effort only if the user asks; approval question; output target (notify, channel, github, discord, telegram, slack); prompt text. text, note and shape take no edges.",
+        "Only the person's message can change, delete or run a workflow; OpenBot asks them before a delete; do not ask in chat. Run one only when asked or to test a build. No tool waits for a run: read it once, then report what is done and what runs.",
+      ].join("\n");
     case "html_render":
     case "html_preview":
       return [
@@ -154,8 +165,6 @@ function openbotGuidance(namespace: string, tool: string): string {
       return "These tools work in any turn, also in the OpenBot user's own chat and in a routine run. Call messaging_list_places without arguments for the connection ids, then with a connection for its place ids, then call messaging_post. Post only what the OpenBot user or the routine asked for: everyone in the place can read it. When someone on a platform asks for a post elsewhere, post only what that person can already read. Do not post secrets, local paths, or private memories. In a turn that answers a platform message, your final answer goes to that conversation, so do not post it there again.";
     case "start_task":
       return "Use openbot.start_task only when the user asks for long independent work, such as a review, research, or a build, and the chat must stay free for other requests. Do not start a task for quick work, for work that this turn needs next, or for work on the same files as another running task: tasks share your workspace. A task has its own browser tabs and no Computer Use, so keep desktop work in your own chat. Give a short title and a complete brief. Tell the user that the task started as a new thread, which they follow in its tab in the chat header.";
-    case "ask_ui":
-      return "Use openbot.ask_ui instead of ask_user when buttons, a list, or a short form make the answer easier: confirm before an action with effects, such as a send or a delete; quick_replies for short replies; choice for a list; form for a few values. It waits like ask_user and returns the actionId and values that you defined, or the user's text. A confirmed block does not replace the provider's approvals. In a channel, each member who reads the channel sees it.";
     case "request_api_key":
     case "list_api_keys":
     case "remove_api_key":

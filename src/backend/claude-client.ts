@@ -44,16 +44,16 @@ import {
 } from "./agent/plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
 import {
-  type ClaudeSubagentState,
-  endClaudeSubagentTurn,
+  endSubagentTurn,
   foldClaudeSubagentCall,
   foldClaudeSubagentMessage,
   foldClaudeSubagentResult,
   foldClaudeTaskMessage,
-  newClaudeSubagentState,
+  newSubagentState,
   SUBAGENTS_UPDATED_METHOD,
   type SubagentChange,
-  stopClaudeSubagents,
+  type SubagentState,
+  stopSubagents,
 } from "./agent/subagent-updates";
 import { claudeBridgedToolName, VISIBLE_TOOL_DEFINITIONS } from "./agent/tool-catalog";
 import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
@@ -152,9 +152,12 @@ const CLAUDE_NATIVE_SCHEDULING = [
 /**
  * Claude tools that duplicate an OpenBot feature, which OpenBot does not show: `ListAgents` finds the
  * user's other Claude sessions for `SendMessage`, past the teammate rules, and `Workflow` runs a
- * background agent fleet. Their schemas cost about 1.9k tokens in each request.
+ * background agent fleet. Their schemas cost about 1.9k tokens in each request. The
+ * `workflow-authoring` skill documents only that `Workflow` tool. A request for an OpenBot workflow
+ * matched it, and its 17 KB reference went into the context before the agent searched for the
+ * OpenBot workflow tools.
  */
-const CLAUDE_DUPLICATE_TOOLS = ["ListAgents", "Workflow"];
+const CLAUDE_DUPLICATE_TOOLS = ["ListAgents", "Workflow", "Skill(workflow-authoring)"];
 
 interface ClientEvents {
   notification: [notification: AppServerNotification];
@@ -249,7 +252,7 @@ interface ThreadRuntime {
   /** The plan Claude keeps with its todo and task tools, which OpenBot shows as a task list. */
   plan: ClaudePlanState;
   /** The subagents of the `Agent` tool, which can outlive their turn when they run in the background. */
-  subagents: ClaudeSubagentState;
+  subagents: SubagentState;
   /** Background subagents and commands that outlive their turn. Stopping the process ends them (#1870). */
   backgroundTasks: number;
   /**
@@ -503,7 +506,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     runtime.query.close();
     yield* removeClaudeMcpConfig(runtime.mcpConfigFile);
     // A background subagent ends with the process (#1870).
-    for (const change of stopClaudeSubagents(runtime.subagents, new Date().toISOString()))
+    for (const change of stopSubagents(runtime.subagents, new Date().toISOString()))
       this.#emitSubagents(runtime, change);
     // The consumer rejects when the query ends in the middle of a turn. The runtime is already gone
     // from the map, so there is nothing left to report it against.
@@ -1042,7 +1045,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       idleRelease: null,
       idleSince: 0,
       plan: newClaudePlanState(),
-      subagents: newClaudeSubagentState(),
+      subagents: newSubagentState(),
       backgroundTasks: 0,
       nextTurnId: null,
       streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
@@ -1900,7 +1903,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         params: { threadId: runtime.id, turnId: turn.id, message: claudeTurnError(error) },
       });
     }
-    this.#emitSubagents(runtime, endClaudeSubagentTurn(runtime.subagents, turn.id, new Date().toISOString()));
+    this.#emitSubagents(runtime, endSubagentTurn(runtime.subagents, turn.id, new Date().toISOString()));
     this.emit("notification", {
       method: "turn/completed",
       params: { threadId: runtime.id, turn: { id: turn.id, status } },

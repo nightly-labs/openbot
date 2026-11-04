@@ -1,4 +1,10 @@
-import type { AccountUsage, AccountUsageLimit, AvatarImageInput, CentralAuthState } from "@openbot/contracts/ipc";
+import type {
+  AccountUsage,
+  AccountUsageLimit,
+  AvatarColor,
+  AvatarImageInput,
+  CentralAuthState,
+} from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal, createStore, flush, onCleanup, onSettled } from "solid-js";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "../../analytics";
@@ -194,6 +200,11 @@ const Auth = createSimpleContext({
       applyCentralAuthState(await accountPort().auth.updateName(name));
     }
 
+    /** Saves the chat color on the account. Members of each server of the user see it. */
+    async function setChatColor(color: AvatarColor | null): Promise<void> {
+      applyCentralAuthState(await accountPort().auth.updateChatColor(color));
+    }
+
     const accountUsage = () => accountUsageState.data;
     const accountUsageRefreshRevision = () => accountUsageState.refreshRevision;
     const accountUsageTargetKey = () => accountUsageState.targetKey;
@@ -316,6 +327,7 @@ const Auth = createSimpleContext({
       logoutCentralAccount,
       updateAccountName,
       updateAccountAvatar,
+      setChatColor,
       createMobileConnect,
       cancelMobileConnect: () => trackMobileConnect("cancelled", () => accountPort().auth.cancelMobileConnect()),
       getMobileConnectLink: () => accountPort().auth.getMobileConnectLink(),

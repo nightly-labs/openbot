@@ -414,6 +414,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:provider-exit-session
 
+      - name: Run the ACP subagent card E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:acp-subagents
+
+      - name: Run the Codex subagent steps E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-subagent-steps
+
+      - name: Run the subagent status and failure alert E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:subagent-status
+
       - name: Run the hung Codex app-server E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-hung-app-server
@@ -453,6 +465,10 @@ jobs:
       - name: Run the agent channel creation E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-channel-create
+
+      - name: Run the agent workflow gate E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-workflow-gate
 
       - name: Run the agent profile accounts E2E test
         if: ${{ !cancelled() }}
@@ -534,6 +550,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-slack
 
+      - name: Run the workflow agent tools E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-agent-tools
+
       - name: Run the Discord files to GitHub E2E test
         if: ${{ !cancelled() }}
         run: bun run test:discord-github-files
@@ -590,6 +610,9 @@ jobs:
             .openbot-build/provider-update-after-app-upgrade-e2e/
             .openbot-build/provider-runtime-remove-e2e/
             .openbot-build/provider-exit-session-e2e/
+            .openbot-build/acp-subagents-e2e/
+            .openbot-build/codex-subagent-steps-e2e/
+            .openbot-build/subagent-status-e2e/
             .openbot-build/codex-hung-app-server-e2e/
             .openbot-build/codex-missing-rollout-e2e/
             .openbot-build/codex-usage-metering-e2e/
@@ -600,6 +623,7 @@ jobs:
             .openbot-build/agent-webhook-routine-e2e/
             .openbot-build/agent-channel-manage-e2e/
             .openbot-build/agent-channel-create-e2e/
+            .openbot-build/agent-workflow-gate-e2e/
             .openbot-build/agent-profile-accounts-e2e/
             .openbot-build/browser-profile-agents-e2e/
             .openbot-build/claude-usage-resume-e2e/
@@ -619,6 +643,7 @@ jobs:
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/
             .openbot-build/workflow-slack-e2e/
+            .openbot-build/workflow-agent-tools-e2e/
             .openbot-build/discord-github-files-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/

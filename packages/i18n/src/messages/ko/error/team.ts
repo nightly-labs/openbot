@@ -66,6 +66,7 @@ export const messages = {
   "error.team.agentInstallUnsupported": "이 연결에서는 에이전트 추가를 지원하지 않아요.",
   "error.team.agentHideUnsupported": "이 연결에서는 에이전트 숨기기를 지원하지 않아요.",
   "error.team.agentColorsUnsupported": "이 연결에서는 에이전트 색상을 지원하지 않아요.",
+  "error.team.chatColorsUnsupported": "이 연결에서는 채팅 색상을 지원하지 않아요.",
   "error.team.sidebarFoldersUnsupported": "이 연결에서는 폴더 안의 폴더를 지원하지 않아요.",
   "error.team.agentNotificationLevelsUnsupported":
     "이 서버는 에이전트별 알림 수준을 저장할 수 없어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",

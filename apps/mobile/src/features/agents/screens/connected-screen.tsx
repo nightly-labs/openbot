@@ -103,6 +103,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { BAR_BUTTON_SIZE, NATIVE_BAR_HEIGHT, useBarTop } from "@/shared/lib/native-bar";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -771,7 +772,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         glass={buttonGlass}
         onPress={openDrawer}
       >
-        <PanelLeft color={iconColor} size={22} strokeWidth={2} />
+        <PanelLeft color={iconColor} size={22} strokeWidth={2} style={MIRROR_IN_RTL} />
       </HeaderIconButton>
       <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} fill={pane} />
     </View>
@@ -831,7 +832,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
           glass={buttonGlass}
           onPress={openDrawer}
         >
-          <PanelLeft color={iconColor} size={22} strokeWidth={2} />
+          <PanelLeft color={iconColor} size={22} strokeWidth={2} style={MIRROR_IN_RTL} />
         </HeaderIconButton>
       }
       pinnedAgents={pinnedAgents}

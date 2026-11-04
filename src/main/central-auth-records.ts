@@ -1,6 +1,11 @@
 import { type HostKeyHandover, optionalHostKeyHandovers } from "@openbot/contracts/host-key-handover";
 import { inviteUseCount, isPermanentInvite } from "@openbot/contracts/invite-links";
-import type { CentralAuthUser, MobileConnectedDevice } from "@openbot/contracts/ipc";
+import {
+  type AvatarColor,
+  type CentralAuthUser,
+  isAvatarColor,
+  type MobileConnectedDevice,
+} from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 
@@ -60,6 +65,8 @@ export interface RemoteMemberRecord {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  /** The member's account chat color. Missing: the account service is older and sends none. */
+  chatColor?: AvatarColor | null;
   role: "owner" | "admin" | "member";
   status: "active" | "revoked";
   createdAt: number;
@@ -94,7 +101,17 @@ export function decodeCentralAuthUser(value: unknown): CentralAuthUser {
     name,
     avatarUrl,
     analyticsEnabled,
+    ...optionalChatColor(record.chatColor),
   };
+}
+
+/**
+ * The account chat color of a user or a member. An account service from before chat colors sends
+ * none, and the field stays missing. A value that is not a color counts as no color.
+ */
+function optionalChatColor(value: unknown): { chatColor?: AvatarColor | null } {
+  if (value === undefined) return {};
+  return { chatColor: isAvatarColor(value) ? value : null };
 }
 
 export function decodeTicketResponse(value: unknown): { ticket: string; expiresAt: number } {
@@ -270,6 +287,7 @@ function decodeRemoteMember(value: unknown): RemoteMemberRecord {
     email: requiredString(record, "email"),
     name: record.name,
     avatarUrl: record.avatarUrl,
+    ...optionalChatColor(record.chatColor),
     role: record.role,
     status: record.status,
     createdAt: record.createdAt,

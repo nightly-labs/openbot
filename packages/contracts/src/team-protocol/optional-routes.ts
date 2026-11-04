@@ -35,6 +35,7 @@ import { BROWSER_PROFILES_CODECS } from "./browser-profiles-v1";
 import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
 import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
+import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
 import { COMPUTER_ACTIVITY_CODECS } from "./computer-activity-v1";
 import { CONNECTORS_CODECS } from "./connectors-v1";
 import { CONTEXT_COMPACT_CODECS } from "./context-compact-v1";
@@ -175,6 +176,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_ACCESS_CODECS,
   ...AGENT_HIDDEN_CODECS,
   ...AGENT_COLORS_CODECS,
+  ...CHAT_COLORS_CODECS,
   ...WHATSAPP_CONNECTOR_CODECS,
   ...MESSAGE_DELETE_CODECS,
   ...AGENT_NOTIFICATION_LEVELS_CODECS,

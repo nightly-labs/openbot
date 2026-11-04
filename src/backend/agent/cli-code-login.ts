@@ -287,11 +287,14 @@ function deviceCodeEvent(text: string): CliCodePrompt | null {
 }
 
 /**
- * The code at the end of an "Enter this code in your browser: CODE" line (Cline) or an "If prompted,
- * enter code: CODE" line (Hermes) that has ended.
+ * The code at the end of an "Enter this code in your browser: CODE" line (Cline), an "If prompted,
+ * enter code: CODE" line (Hermes) or a "visit PAGE and enter code CODE" line (GitHub Copilot) that
+ * has ended.
  */
 function codeOnEnterLine(text: string): string | null {
-  return text.match(/enter (?:this )?code[^:\n]*:[ \t]*([A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*)[ \t]*\n/i)?.[1] ?? null;
+  return (
+    text.match(/enter (?:this )?code(?:[^:\n]*:)?[ \t]*([A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*)[ \t]*\n/i)?.[1] ?? null
+  );
 }
 
 const ESC = 0x1b;

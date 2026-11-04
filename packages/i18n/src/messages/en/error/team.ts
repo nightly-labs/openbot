@@ -66,6 +66,7 @@ export const messages = defineMessages("error.team", {
   "error.team.agentInstallUnsupported": "Adding agents is not supported by this connection.",
   "error.team.agentHideUnsupported": "Hiding agents is not supported by this connection.",
   "error.team.agentColorsUnsupported": "Agent colors are not supported by this connection.",
+  "error.team.chatColorsUnsupported": "Chat colors are not supported by this connection.",
   "error.team.sidebarFoldersUnsupported": "Folders in folders are not supported by this connection.",
   "error.team.agentNotificationLevelsUnsupported":
     "This server cannot keep your own notification level for each agent. Update OpenBot on the computer that runs it.",

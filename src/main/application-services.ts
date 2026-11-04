@@ -234,7 +234,12 @@ import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
 import { ozonePlatformArguments } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
-import { type LocalServerChildEnvironment, startLocalServerChild } from "./local-server-child";
+import {
+  formatLocalServerMembersRequest,
+  type LocalServerChildEnvironment,
+  LocalServerMembers,
+  startLocalServerChild,
+} from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
 import { LocalServers } from "./local-servers/local-servers";
 import { createLoginItem } from "./login-item";
@@ -1870,6 +1875,7 @@ export async function createApplicationServices({
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     routineFlowTools: () => routineFlowRuntime,
+    workflowTools: () => workflowRuntime,
     // `events` is built later, after the account service and the relay.
     webhookRoutines: () => agentWebhookRoutineWriter(events),
     approvalAutomation,
@@ -2000,7 +2006,7 @@ export async function createApplicationServices({
       telegramSend: (connectionId, send) => service.messaging.telegramSend(connectionId, send),
       slackSend: (connectionId, send) => service.messaging.slackSend(connectionId, send),
       // An agent event, so this window, joined clients and the web app hear it the same way.
-      changed: (workflowId) => service.notifyWorkflowsChanged(workflowId),
+      changed: (workflowId, agentId) => service.notifyWorkflowsChanged(workflowId, agentId),
       rearm: () => service.armRoutines(),
       timezone: () => serverTimezone.effective(),
       runEnded: (end) => service.notifyWorkflowRunEnded(end),
@@ -2531,6 +2537,8 @@ export async function createApplicationServices({
   // Development only: a shorter or longer time without input before a phone notifies, to test it.
   const awaySeconds = app.isPackaged ? Number.NaN : Number(process.env.OPENBOT_DEV_AWAY_SECONDS);
   const awayAfterMs = Number.isInteger(awaySeconds) && awaySeconds > 0 ? awaySeconds * 1_000 : DESKTOP_USE_MS;
+  // A server on this computer has no account session: the desktop app reads its directory for it.
+  const localServerMembers = new LocalServerMembers(() => process.stdout.write(formatLocalServerMembersRequest()));
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -2745,7 +2753,9 @@ export async function createApplicationServices({
     createRemoteInvite: (hostId, input) => centralAuth.createRemoteInvite(hostId, input).pipe(toRemoteWorkflowError),
     listRemoteInvites: (hostId) => centralAuth.listRemoteInvites(hostId).pipe(toRemoteWorkflowError),
     revokeRemoteInvite: (inviteId) => centralAuth.revokeRemoteInvite(inviteId).pipe(toRemoteWorkflowError),
-    listRemoteMembers: (hostId) => centralAuth.listRemoteMembers(hostId).pipe(toRemoteWorkflowError),
+    listRemoteMembers: localServerChild
+      ? () => localServerMembers.list()
+      : (hostId) => centralAuth.listRemoteMembers(hostId).pipe(toRemoteWorkflowError),
     updateRemoteMember: (hostId, membershipId, role, reactivate) =>
       centralAuth.updateRemoteMember(hostId, membershipId, role, reactivate).pipe(toRemoteWorkflowError),
     removeRemoteMember: (hostId, membershipId) =>
@@ -2753,6 +2763,7 @@ export async function createApplicationServices({
     updateRemoteHostLogo: (hostId, image, version) =>
       centralAuth.updateRemoteHostLogo(hostId, image, version).pipe(toRemoteWorkflowError),
     localDevelopmentHost: developmentRemoteRole === "host",
+    passwordOwner: localServerChild !== null,
     logDirectory: join(app.getPath("userData"), "logs", "remote"),
     removeLegacyRemoteDesktopCredential: () =>
       Effect.tryPromise({
@@ -2803,6 +2814,12 @@ export async function createApplicationServices({
         height: display.size.height,
         primary: display.id === primaryId,
       }));
+    },
+    // Electron bounds are in DIP; Sunshine reports a Windows display's origin in physical pixels.
+    getRemoteDesktopDisplayScreenOrigin: (displayId) => {
+      if (process.platform !== "win32") return undefined;
+      const display = screen.getAllDisplays().find((candidate) => String(candidate.id) === displayId);
+      return display ? screen.dipToScreenPoint({ x: display.bounds.x, y: display.bounds.y }) : undefined;
     },
     // A member's paste in the remote desktop replaces this computer's clipboard, as a copy they make
     // on it does.
@@ -3064,6 +3081,7 @@ export async function createApplicationServices({
             },
             register: (input) => centralAuth.registerRemoteHost(input).pipe(Effect.asVoid, toRemoteWorkflowError),
             credential: (hostId) => centralAuth.hostSiteCredential(hostId)?.machineToken ?? null,
+            listMembers: (hostId) => centralAuth.listRemoteMembers(hostId).pipe(toRemoteWorkflowError),
             // A host that the account service no longer has, or that another account owns, is not this
             // account's to remove: either way it is gone from this account's list. Any other failure,
             // such as an expired session, keeps the id for the next sign-in.
@@ -3088,6 +3106,8 @@ export async function createApplicationServices({
     centralAuth.on("changed", () => {
       Effect.runFork(localServers.accountChanged());
     });
+    // A member change on the desktop app reaches the server's own copy of its members.
+    remoteServers.setThisComputerMembersListener((serverId) => localServers.sendMembers(serverId));
     // Before `remoteServers.initialize()`: the account's directory sync keeps only the entries of the
     // servers on this computer that it knows.
     await Effect.runPromise(localServers.load());
@@ -3122,6 +3142,7 @@ export async function createApplicationServices({
         teamStore,
         host,
         writeReady: (line) => process.stdout.write(line),
+        members: localServerMembers,
         readCommands: (onLine) => {
           if (localServerControl) createInterface({ input: localServerControl }).on("line", onLine);
         },

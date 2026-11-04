@@ -416,6 +416,8 @@ private enum CaptureError: Error {
 private final class SpeechPlayer {
   private let engine = AVAudioEngine()
   private let node = AVAudioPlayerNode()
+  /// Changes the speed of the parts and keeps their pitch.
+  private let timePitch = AVAudioUnitTimePitch()
   private var format: AVAudioFormat?
   /// The parts that are scheduled, in order. The first one plays.
   private var scheduled: [String] = []
@@ -427,6 +429,12 @@ private final class SpeechPlayer {
     self.onStart = onStart
     self.onDone = onDone
     engine.attach(node)
+    engine.attach(timePitch)
+  }
+
+  /// Runs on `queue`. Applies at once, also to the part that plays now.
+  func setSpeed(_ speed: Float) {
+    timePitch.rate = speed
   }
 
   /// Runs on `queue`. A part of a stopped reply is dropped by its caller.
@@ -473,7 +481,9 @@ private final class SpeechPlayer {
       // A new sample rate, such as a reply of the other voice engine, needs a new connection.
       node.stop()
       engine.disconnectNodeOutput(node)
-      engine.connect(node, to: engine.mainMixerNode, format: format)
+      engine.disconnectNodeOutput(timePitch)
+      engine.connect(node, to: timePitch, format: format)
+      engine.connect(timePitch, to: engine.mainMixerNode, format: format)
       self.format = format
     }
     if !engine.isRunning {
@@ -689,6 +699,12 @@ public class SpeechModule: Module {
         }
       }
       self.enqueue(SpeechPart(id: id, samples: samples, sampleRate: Double(sampleRate)), generation: own)
+    }
+
+    /// Plays every part at this speed, also the part that plays now. 1 is normal speed.
+    Function("setSpeed") { (speed: Double) in
+      let player = self.player
+      player.queue.async { player.setSpeed(Float(speed)) }
     }
 
     /// Stops the part that plays and drops the parts that wait.

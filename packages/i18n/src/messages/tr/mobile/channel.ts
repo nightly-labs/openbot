@@ -14,6 +14,7 @@ export const messages = {
   "mobile.channel.list.deleteFailedBody": "Bu kanal silinemedi. Tekrar deneyin.",
   "mobile.channel.list.open": "{name} kanalını aç",
   "mobile.channel.list.openWithTitle": "{name} kanalını aç, {title}",
+  "mobile.channel.avatar.more": "+{count}",
   "mobile.channel.list.unread": {
     one: "{count} okunmamış mesaj",
     other: "{count} okunmamış mesaj",

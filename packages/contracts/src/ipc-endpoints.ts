@@ -70,7 +70,7 @@ import type {
   BrowseAgentFoldersInput,
   ChooseAgentFolderInput,
 } from "./ipc-agent-folders";
-import type { ClientAgentModelOption } from "./ipc-agent-identity";
+import type { AvatarColor, ClientAgentModelOption } from "./ipc-agent-identity";
 import type {
   AgentImportPreview,
   AgentImportResult,
@@ -543,6 +543,10 @@ import type {
   SpeechModelStatus,
   SpeechSettings,
   VoiceApiKeyInput,
+  VoiceLiveEvent,
+  VoiceLiveSession,
+  VoiceLiveStart,
+  VoiceLiveStop,
   VoiceModelRequest,
   VoiceModelStatus,
   VoiceServerConnection,
@@ -920,6 +924,14 @@ export const IPC_ENDPOINTS = {
     probeServer: request<VoiceServerConnection, VoiceServerProbe>()("voice:probe-server"),
     setServer: request<VoiceServerSave, VoiceServerSettings | null>()("voice:set-server"),
     serverSettings: event<VoiceServerSettings | null>()("voice:server-settings"),
+    /**
+     * Starts Codex live voice in the chat of a Codex agent on this computer. Answers the WebRTC answer
+     * when OpenAI accepted the offer. A new session ends the one before it.
+     */
+    startLive: request<VoiceLiveStart, VoiceLiveSession>()("voice:start-live"),
+    /** Ends a live voice session. It does nothing when the session ended already. */
+    stopLive: request<VoiceLiveStop, void>()("voice:stop-live"),
+    liveEvent: event<VoiceLiveEvent>()("voice:live-event"),
   },
   dynamicIsland: {
     getPreference: request<undefined, DynamicIslandPreference>()("dynamic-island:get-preference"),
@@ -1436,6 +1448,7 @@ export const IPC_ENDPOINTS = {
     verifyEmailCode: request<VerifyEmailCodeInput, CentralAuthState>()("auth:verify-email-code"),
     updateName: request<string, CentralAuthState>()("auth:update-name"),
     updateAvatar: request<AvatarImageInput | null, CentralAuthState>()("auth:update-avatar"),
+    updateChatColor: request<AvatarColor | null, CentralAuthState>()("auth:update-chat-color"),
     createMobileConnect: request<undefined, MobileConnectTicket>()("auth:create-mobile-connect"),
     cancelMobileConnect: request<undefined, void>()("auth:cancel-mobile-connect"),
     getMobileConnectLink: request<undefined, MobileConnectLink | null>()("auth:get-mobile-connect-link"),

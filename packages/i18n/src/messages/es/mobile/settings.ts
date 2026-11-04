@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Predeterminado del sistema",
   "mobile.settings.language.footer":
     "El valor predeterminado del sistema sigue el primer idioma de los ajustes del teléfono. El texto aún no traducido se muestra en inglés.",
+  "mobile.settings.language.restartTitle": "¿Reiniciar OpenBot?",
+  "mobile.settings.language.restartBody":
+    "Este idioma se lee en la otra dirección. Las pantallas cambian de dirección cuando OpenBot se inicia de nuevo. Si las pantallas siguen viéndose mal después del reinicio, cierra OpenBot en el selector de apps y vuelve a abrirlo.",
+  "mobile.settings.language.restartNow": "Reiniciar ahora",
+  "mobile.settings.language.restartFailed":
+    "OpenBot no pudo reiniciarse. Las pantallas cambian de dirección la próxima vez que abras OpenBot.",
   "mobile.settings.dictation.language": "Idioma del dictado",
   "mobile.settings.about.development": "Desarrollo",
   "mobile.settings.about.openFailed": "No se pudo abrir el enlace. Vuelve a intentarlo.",
@@ -75,7 +81,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animaciones",
   "mobile.settings.animations.agentFaces": "Caras de agentes animadas",
   "mobile.settings.animations.agentFacesFooter":
-    "Los avatares de los agentes mueven la cara mientras los agentes trabajan y descansan. Si esta opción está desactivada, las caras se quedan quietas.",
+    "Los avatares de los agentes mueven la cara mientras los agentes trabajan y descansan. Si esta opción está desactivada, las caras se quedan quietas y los personajes de la pantalla de bienvenida y de la pantalla de inicio vacía dejan de flotar.",
   "mobile.settings.animations.composerResize": "Campo de mensaje compacto",
   "mobile.settings.animations.composerResizeFooter":
     "El campo de mensaje se convierte en una barra pequeña mientras el teclado está cerrado. Si esta opción está desactivada, el campo mantiene su tamaño completo.",
