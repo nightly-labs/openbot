@@ -188,7 +188,7 @@ When no agents have loaded and the selected server is connecting or offline, the
 already loaded remain visible during reconnection.
 
 The phone keeps an encrypted copy of the agents, hidden agents, sections, latest chat pages,
-capabilities and last drawer values (`drawer-snapshot.ts`) of each server (`workspace-cache.ts`),
+channels with the latest 50 messages of each opened channel, capabilities and last drawer values (`drawer-snapshot.ts`) of each server (`workspace-cache.ts`),
 and writes it when a server load ends and when the app goes to the background. It also keeps the
 last server list of the account service. After a start, the servers of that list connect at once,
 before the account service answers; a server whose key is not the key that the phone trusts waits
