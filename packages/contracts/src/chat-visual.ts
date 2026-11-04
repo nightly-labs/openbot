@@ -395,7 +395,7 @@ addEventListener("DOMContentLoaded",report);
 addEventListener("load",report);
 const fields=new Set(["INPUT","TEXTAREA","SELECT"]);
 addEventListener("keydown",(event)=>{
-if(!event.isTrusted||event.isComposing)return;
+if(!event.isTrusted||event.isComposing||event.getModifierState("AltGraph"))return;
 const escape=event.key==="Escape"&&displayMode==="fullscreen";
 if(!escape&&!event.metaKey&&!event.ctrlKey)return;
 const target=event.composedPath()[0];
