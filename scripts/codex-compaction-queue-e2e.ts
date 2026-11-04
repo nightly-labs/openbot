@@ -4,7 +4,8 @@
 // `turn/start` with `ActiveTurnNotSteerable { turn_kind: Compact }` while a compaction turn runs.
 // Four cases: a compaction that ends by itself, one that runs past the start deadline and ends by
 // itself (#3466), one that the run deadline stops, and one that does not stop, so that OpenBot sends
-// a turn that Codex refuses. Then a side thread: the runtime snapshot carries its context, and
+// a turn that Codex refuses. Then a turn end that fails after it reserved a compaction does not hold
+// the next message (#4960). Then a side thread: the runtime snapshot carries its context, and
 // `compactTaskContext` compacts its session and not the agent's own chat (#3503), and a side thread
 // deleted while it compacts does not hold the agent's own chat. Last, a usage
 // report that Codex sends while the stop ends it does not reach the closed database (#3808).
@@ -43,6 +44,7 @@ const { AgentStore } = await import("../src/backend/agent-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { StoredStateFailure } = await import("../src/backend/stored-state-effects");
 
 /**
  * A Codex app-server with the methods that the service calls. Each normal turn reports 90% of the
@@ -353,6 +355,48 @@ try {
     else assert.equal(result.refusedStarts, 0, `${entry.name}: Codex refused a start`);
     result.passed = true;
   }
+
+  // The end of a turn reserves the compaction, then saves the turn, and only then asks Codex. A save
+  // that failed between the two kept the hold until a restart, and each next message waited (#4960).
+  await writeFile(controlPath, JSON.stringify({ compactionMs: 200, ignoreInterrupt: false }));
+  const updatePreview = store.updatePreview;
+  let previewFailures = 0;
+  store.updatePreview = (id, preview) => {
+    // Each turn of the fake Codex answers "Done."; the message itself is the preview of a send.
+    if (preview !== "Done." || previewFailures > 0) return updatePreview(id, preview);
+    previewFailures += 1;
+    return Effect.fail(new StoredStateFailure({ cause: new Error("disk I/O error") }));
+  };
+  const held = await runCauseEffect(
+    agents.createAgent({
+      name: "Failed turn end",
+      description: "Checks the queue after a turn end that failed.",
+      avatarSeed: "compaction-failed-end",
+      avatarHue: null,
+      initialMessage: "First message.",
+    }),
+  );
+  await waitFor("the failed turn end", () => {
+    const busy = agents
+      .listQueue(held.id)
+      .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
+    return previewFailures === 1 && !busy;
+  });
+  store.updatePreview = updatePreview;
+  const heldReceipt = await runCauseEffect(agents.sendMessage({ agentId: held.id, text: "Second message." }));
+  const heldDeliveryId = heldReceipt.deliveries[0]?.id;
+  assert.ok(heldDeliveryId, "failed turn end: no delivery");
+  const heldStatus = () => mailbox.getDelivery(heldDeliveryId)?.delivery.status ?? "missing";
+  const failedTurnEnd = {
+    previewFailures,
+    nextMessageStatus: await waitFor(
+      "the next message after the failed turn end",
+      () => (["completed", "failed", "interrupted"].includes(heldStatus()) ? heldStatus() : null),
+      30_000,
+    ).catch(() => heldStatus()),
+  };
+  Object.assign(report, { failedTurnEnd });
+  assert.equal(failedTurnEnd.nextMessageStatus, "completed", "failed turn end: the compaction hold stayed");
 
   // A side thread shows its own context, and Compact compacts only its session (#3503).
   await writeFile(controlPath, JSON.stringify({ compactionMs: 200, ignoreInterrupt: false }));
