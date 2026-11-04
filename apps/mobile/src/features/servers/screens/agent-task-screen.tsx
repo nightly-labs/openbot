@@ -363,13 +363,14 @@ function AgentTaskChat({
   const messageDelete = useMessageDelete(serverId, { kind: "agent", agentId, taskId });
   const removeMessage = messageDelete.deleteMessage;
   // The host deletes only from an open task. Its thread does not follow the agent's chat events.
-  const deleteMessage =
-    removeMessage && !isDraft && !closed
-      ? (message: ChatBubbleMessage) =>
-          removeMessage(message.id).then(() =>
-            queryClient.invalidateQueries({ queryKey: queryKeys.agentTaskConversation(queryScope, serverId, taskId) }),
-          )
-      : undefined;
+  const deleteTaskMessage = useCallback(
+    async (message: ChatBubbleMessage) => {
+      await removeMessage?.(message.id);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.agentTaskConversation(queryScope, serverId, taskId) });
+    },
+    [removeMessage, queryClient, queryScope, serverId, taskId],
+  );
+  const deleteMessage = removeMessage && !isDraft && !closed ? deleteTaskMessage : undefined;
   const voice = useVoiceMode({
     enabled: isFocused && canSend,
     focused: isFocused,
