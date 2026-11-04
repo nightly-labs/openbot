@@ -695,7 +695,6 @@ export interface ApplicationServices {
   centralAuthInitialization: Effect.Effect<CentralAuthState, RemoteWorkflowError>;
 }
 
-/** How the driver's own state reads as the capability the Team API projects. */
 let userDataSecretStorage: SecretStorage | null = null;
 
 /** The secret storage of userData. Made at first use, when userData has its final path. */
@@ -713,6 +712,7 @@ function safeStorageCipher(
   return secretStorage().cipher(() => sourceText(unavailableKey));
 }
 
+/** How the driver's own state reads as the capability the Team API projects. */
 function computerUseCapability(state: ComputerUseState): CapabilityState {
   if (state.status === "ready") return "ready";
   if (state.status === "permissions-required") return "setup-required";
@@ -1031,7 +1031,7 @@ export async function createApplicationServices({
     mobileConnectApiUrl: readMobileConnectApiUrl(process.env.OPENBOT_MOBILE_AUTH_API_URL, centralAuthApiUrl),
     storagePath: join(app.getPath("userData"), CENTRAL_AUTH_FILE),
     ...safeStorageCipher("error.app.macSecureStorageUnavailable"),
-    usesKeyFile: () => secretStorage().usesKeyFile(),
+    keyringChanged: () => secretStorage().madeKeyFile(),
     // The system browser, where the user is signed in to the company. The language loads below.
     companySignInBrowser: { open: (url) => shell.openExternal(url), language: () => language },
   });

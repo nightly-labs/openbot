@@ -93,8 +93,8 @@ interface CentralAuthManagerOptions {
   encrypt: (value: string) => Buffer;
   decrypt: (value: Buffer) => string;
   canPersist?: () => boolean;
-  /** True when the Linux keyring failed and a key file of OpenBot keeps the secrets. */
-  usesKeyFile?: () => boolean;
+  /** True when the Linux keyring failed in this process and a key file of OpenBot now keeps the secrets. */
+  keyringChanged?: () => boolean;
   fetch?: AuthFetcher;
   startupRetryWindowMs?: number;
   startupRequestTimeoutMs?: number;
@@ -213,7 +213,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       ...options,
       mobileConnectApiUrl: options.mobileConnectApiUrl ?? options.apiUrl,
       canPersist: options.canPersist ?? (() => true),
-      usesKeyFile: options.usesKeyFile ?? (() => false),
+      keyringChanged: options.keyringChanged ?? (() => false),
       fetch: fetcher,
       startupRetryWindowMs: options.startupRetryWindowMs ?? STARTUP_RETRY_WINDOW_MS,
       startupRequestTimeoutMs: options.startupRequestTimeoutMs ?? STARTUP_REQUEST_TIMEOUT_MS,
@@ -1450,7 +1450,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
           const failure = storedSessionFailure(stage, error);
           logger.warn("The stored account session could not be restored.", failure);
           // The Linux keyring lost its key, so the sign-in screen tells why it shows again.
-          keyringChanged = failure.stage === "decrypt" && this.#options.usesKeyFile();
+          keyringChanged = failure.stage === "decrypt" && this.#options.keyringChanged();
         }
       }
     } else {

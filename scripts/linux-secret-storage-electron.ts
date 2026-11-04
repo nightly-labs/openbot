@@ -19,7 +19,7 @@ interface StepReport {
   format?: string;
   value?: string;
   error?: string;
-  usesKeyFile?: boolean;
+  madeKeyFile?: boolean;
   keyFileMode?: string | null;
 }
 
@@ -65,7 +65,7 @@ void app.whenReady().then(() => {
   } catch (error) {
     result.error = error instanceof Error ? error.message : String(error);
   }
-  result.usesKeyFile = storage.usesKeyFile();
+  result.madeKeyFile = storage.madeKeyFile();
   result.keyFileMode = existsSync(keyPath) ? (statSync(keyPath).mode & 0o777).toString(8) : null;
   writeFileSync(argument("ready-file"), JSON.stringify(result));
   app.quit();

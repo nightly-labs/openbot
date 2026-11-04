@@ -9,6 +9,7 @@ import { chmodSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } f
 import { dirname } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
 import { app, safeStorage } from "electron";
+import { isMissingFileError } from "../backend/file-errors";
 
 export const SECRET_STORAGE_KEY_FILE = "secret-storage.key";
 
@@ -29,12 +30,8 @@ export interface SecretStorageCipher {
 export interface SecretStorage {
   /** A cipher that throws `unavailableMessage()` when nothing can encrypt. */
   cipher: (unavailableMessage: () => string) => SecretStorageCipher;
-  /** True when the keyring failed on this computer and the key file keeps new secrets. */
-  usesKeyFile: () => boolean;
-}
-
-function isMissingFile(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
+  /** True when the keyring failed in this process and OpenBot made the key file for it. */
+  madeKeyFile: () => boolean;
 }
 
 function isExistingFile(error: unknown): boolean {
@@ -47,25 +44,23 @@ function isExistingFile(error: unknown): boolean {
  */
 export function createSecretStorage(options: { keyPath: string; platform?: NodeJS.Platform }): SecretStorage {
   const linux = (options.platform ?? process.platform) === "linux";
-  // `undefined`: not read yet. `null`: no key file, so the keyring keeps the secrets.
-  let key: Buffer | null | undefined;
+  let madeKeyFile = false;
 
+  /**
+   * The key file, or null when there is none and the keyring keeps the secrets. Not kept in memory:
+   * a user who deletes the file goes back to the keyring, and no new secret uses the deleted key.
+   */
   function readKey(): Buffer | null {
-    if (key !== undefined) return key;
     let text: string;
     try {
       text = readFileSync(options.keyPath, "utf8");
     } catch (error) {
-      if (isMissingFile(error)) {
-        key = null;
-        return key;
-      }
+      if (isMissingFileError(error)) return null;
       throw error;
     }
     const value = Buffer.from(text.trim(), "base64");
     if (value.length !== KEY_BYTES) throw new Error("The secret storage key file is not valid.");
-    key = value;
-    return key;
+    return value;
   }
 
   /** Makes the key file. A file that another process made first wins, so no key replaces another. */
@@ -85,9 +80,9 @@ export function createSecretStorage(options: { keyPath: string; platform?: NodeJ
     } finally {
       rmSync(temporaryPath, { force: true });
     }
-    key = undefined;
     const created = readKey();
     if (!created) throw new Error("The secret storage key file was not made.");
+    madeKeyFile = true;
     // The backend name only: it tells a locked keyring from a missing one in a report.
     logger.warn("The system keyring did not keep the secrets. OpenBot keeps new secrets in its own key file.", {
       reason,
@@ -118,7 +113,15 @@ export function createSecretStorage(options: { keyPath: string; platform?: NodeJ
   };
 
   const encrypt = (value: string, unavailableMessage: () => string): Buffer => {
-    const fileKey = keyForWrite();
+    let fileKey: Buffer | null;
+    try {
+      fileKey = keyForWrite();
+    } catch (error) {
+      logger.warn("The secret storage key file could not be used.", {
+        error: error instanceof Error ? error.name : typeof error,
+      });
+      throw new Error(unavailableMessage());
+    }
     if (!fileKey) {
       if (!safeStorage.isEncryptionAvailable()) throw new Error(unavailableMessage());
       return safeStorage.encryptString(value);
@@ -161,13 +164,6 @@ export function createSecretStorage(options: { keyPath: string; platform?: NodeJ
       encrypt: (value) => encrypt(value, unavailableMessage),
       decrypt,
     }),
-    usesKeyFile: () => {
-      if (!linux) return false;
-      try {
-        return readKey() !== null;
-      } catch {
-        return false;
-      }
-    },
+    madeKeyFile: () => madeKeyFile,
   };
 }

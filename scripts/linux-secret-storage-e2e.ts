@@ -77,7 +77,7 @@ interface StepResult extends Step {
   format?: string;
   readValue?: string;
   error?: string;
-  usesKeyFile?: boolean;
+  madeKeyFile?: boolean;
   keyFileMode?: string | null;
 }
 
@@ -118,6 +118,7 @@ try {
     assert.equal(write?.format, "obk1", "no keyring: the key file encrypts");
     assert.equal(write?.keyFileMode, "600", "no keyring: only the user reads the key file");
     assert.equal(read?.readValue, "secret-without-keyring", "no keyring: the secret opens after a restart");
+    assert.equal(read?.madeKeyFile, false, "no keyring: a restart uses the same key file");
   }
 
   if (hasKeyring) {
@@ -134,13 +135,15 @@ try {
     assert.equal(write?.format, "v11", "keyring: safeStorage encrypts");
     assert.equal(write?.keyFileMode, null, "keyring: no key file");
     assert.equal(sameKeyring?.readValue, "secret-in-keyring", "keyring: the secret opens after a restart");
-    assert.equal(sameKeyring?.usesKeyFile, false, "keyring: still no key file");
+    assert.equal(sameKeyring?.keyFileMode, null, "keyring: still no key file");
     assert.equal(newKeyring?.readValue, undefined, "new keyring: the old secret does not open");
     assert.ok(newKeyring?.error, "new keyring: the read fails");
-    assert.equal(newKeyring?.usesKeyFile, true, "new keyring: the key file is made");
+    assert.equal(newKeyring?.madeKeyFile, true, "new keyring: the key file is made");
     assert.equal(newKeyring?.keyFileMode, "600", "new keyring: only the user reads the key file");
     assert.equal(rewrite?.format, "obk1", "after the reset: the key file encrypts");
     assert.equal(anotherKeyring?.readValue, "secret-after-reset", "after the reset: the secret opens after a restart");
+    // The sign-in screen tells of a keyring change only on the start that made the key file.
+    assert.equal(anotherKeyring?.madeKeyFile, false, "after the reset: the key file is not made again");
 
     // 4. A hosted server: its keyring stays from start to start.
     const hosted = { keyring: "hosted-keyring", switches: ["--password-store=gnome-libsecret"] };
@@ -157,12 +160,13 @@ try {
     assert.equal(legacy?.format, "v11", "hosted: the older release used the keyring");
     assert.equal(legacy?.keyFileBeforeReady, false, "hosted: no key file before ready");
     assert.equal(upgrade?.readValue, "hosted-session", "hosted: the upgrade opens the secret");
-    assert.equal(upgrade?.usesKeyFile, false, "hosted: the upgrade makes no key file");
+    assert.equal(upgrade?.keyFileMode, null, "hosted: the upgrade makes no key file");
     assert.equal(restart?.readValue, "hosted-session", "hosted: the secret opens after a restart");
-    assert.equal(restart?.usesKeyFile, false, "hosted: still no key file");
+    assert.equal(restart?.keyFileMode, null, "hosted: still no key file");
     assert.ok(direct?.error, "hosted: a start with no keyring cannot open the secret");
-    assert.equal(direct?.usesKeyFile, true, "hosted: a start with no keyring makes the key file");
+    assert.equal(direct?.madeKeyFile, true, "hosted: a start with no keyring makes the key file");
     assert.equal(service?.readValue, "hosted-session", "hosted: the keyring secret still opens after it");
+    assert.equal(service?.madeKeyFile, false, "hosted: the service start makes no key file");
     assert.equal(serviceWrite?.format, "obk1", "hosted: new secrets use the key file");
     assert.equal(serviceRead?.readValue, "hosted-new-secret", "hosted: the new secret opens after a restart");
   } else {
@@ -223,19 +227,24 @@ async function launch(step: Step, userData: string, blob: string): Promise<StepR
       )
     : spawn(electronPath, electronArguments, { env: base, stdio: ["ignore", log, log] });
   closeSync(log);
-  const exited = new Promise<void>((done) => child.once("exit", () => done()));
-  const deadline = Date.now() + READY_TIMEOUT_MS;
-  while (!existsSync(readyFile)) {
-    if (child.exitCode !== null || child.signalCode !== null) throw new Error(`${step.name}: Electron stopped early`);
-    if (Date.now() > deadline) {
+  // The step writes the ready file and then quits, so the exit is the signal.
+  const exited = new Promise<void>((done, fail) => {
+    child.once("error", fail);
+    child.once("exit", () => done());
+  });
+  const timeout = new AbortController();
+  const timedOut = sleep(READY_TIMEOUT_MS, "timeout", { signal: timeout.signal }).catch(() => "aborted");
+  try {
+    if ((await Promise.race([exited, timedOut])) === "timeout") {
       child.kill("SIGKILL");
-      throw new Error(`${step.name}: Electron was not ready`);
+      throw new Error(`${step.name}: Electron did not stop`);
     }
-    await sleep(50);
+  } finally {
+    timeout.abort();
   }
-  await exited;
+  if (!existsSync(readyFile)) throw new Error(`${step.name}: Electron stopped with no ready file`);
   const ready = JSON.parse(readFileSync(readyFile, "utf8"));
-  if (!isDynamicRecord(ready) || typeof ready.backend !== "string" || typeof ready.usesKeyFile !== "boolean")
+  if (!isDynamicRecord(ready) || typeof ready.backend !== "string" || typeof ready.madeKeyFile !== "boolean")
     throw new Error(`${step.name}: the ready file is not valid`);
   return {
     ...step,
@@ -247,7 +256,7 @@ async function launch(step: Step, userData: string, blob: string): Promise<StepR
     ...(typeof ready.format === "string" ? { format: ready.format } : {}),
     ...(typeof ready.value === "string" ? { readValue: ready.value } : {}),
     ...(typeof ready.error === "string" ? { error: ready.error } : {}),
-    usesKeyFile: ready.usesKeyFile,
+    madeKeyFile: ready.madeKeyFile,
     keyFileMode: typeof ready.keyFileMode === "string" ? ready.keyFileMode : null,
   };
 }
