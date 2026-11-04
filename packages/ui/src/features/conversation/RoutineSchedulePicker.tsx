@@ -66,15 +66,56 @@ function rowFits(picker: HTMLElement): boolean {
   ).every(Boolean);
 }
 
+/** The width of each row when it was last fitted. */
+const fitWidths = new WeakMap<HTMLElement, number>();
+
 /**
- * Gives the row the most space that still shows every label whole. The step depends on the
+ * Gives each row the most space that still shows every label whole. The step depends on the
  * labels, not only on the width: "Daily on Weekdays at 7 AM" needs less room than an hourly row.
+ * All rows that wait move one step at a time: a row that changes its step before another row
+ * reads its labels lays out the page again, and a chat can open with many routine cards.
  */
-function fitRow(picker: HTMLElement) {
+function fitRows(pickers: Iterable<HTMLElement>) {
+  const connected = [...pickers].filter((picker) => picker.isConnected);
+  let pending = connected;
   for (const fit of ROW_FITS) {
-    picker.dataset.fit = fit;
-    if (rowFits(picker)) return;
+    for (const picker of pending) {
+      if (picker.dataset.fit !== fit) picker.dataset.fit = fit;
+    }
+    pending = pending.filter((picker) => !rowFits(picker));
+    if (pending.length === 0) break;
   }
+  // The last step read the labels, so these reads lay out nothing.
+  for (const picker of connected) fitWidths.set(picker, picker.clientWidth);
+}
+
+const queuedFits = new Set<HTMLElement>();
+
+function queueFit(picker: HTMLElement) {
+  if (queuedFits.size === 0) {
+    queueMicrotask(() => {
+      const pickers = [...queuedFits];
+      queuedFits.clear();
+      fitRows(pickers);
+    });
+  }
+  queuedFits.add(picker);
+}
+
+// One observer for all rows, so the rows that a resize changes fit in one pass.
+let fitObserver: ResizeObserver | undefined;
+
+function observeFit(picker: HTMLElement) {
+  fitObserver ??= new ResizeObserver((entries) => {
+    for (const { target } of entries) {
+      if (target instanceof HTMLElement && target.clientWidth !== fitWidths.get(target)) queueFit(target);
+    }
+  });
+  fitObserver.observe(picker);
+  return () => {
+    fitObserver?.unobserve(picker);
+    fitWidths.delete(picker);
+  };
 }
 
 /**
@@ -104,21 +145,15 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
   createEffect(
     () => [props.schedule, props.density],
     () => {
-      if (picker) fitRow(picker);
+      if (picker) queueFit(picker);
     },
   );
   onSettled(() => {
     const element = picker;
     if (!element) return;
-    let width = element.clientWidth;
-    const observer = new ResizeObserver(() => {
-      if (element.clientWidth === width) return;
-      width = element.clientWidth;
-      fitRow(element);
-    });
-    observer.observe(element);
-    void document.fonts?.ready.then(() => fitRow(element));
-    return () => observer.disconnect();
+    // Loaded fonts change no label, and the effect above already fitted the row.
+    if (document.fonts && document.fonts.status !== "loaded") void document.fonts.ready.then(() => queueFit(element));
+    return observeFit(element);
   });
 
   return (
