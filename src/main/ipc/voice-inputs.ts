@@ -1,4 +1,5 @@
 import {
+  isCodexLiveVoice,
   isSpeechLanguage,
   isSpeechSpeed,
   isSpeechVoice,
@@ -10,9 +11,12 @@ import {
   type SpeechSettings,
   VOICE_API_KEY_MAX_LENGTH,
   VOICE_AUDIO_LIMITS,
+  VOICE_LIVE_LIMITS,
   VOICE_SERVER_LIMITS,
   VOICE_STREAM_LIMITS,
   type VoiceApiKeyInput,
+  type VoiceLiveStart,
+  type VoiceLiveStop,
   type VoiceModelRequest,
   type VoiceServerConnection,
   type VoiceServerSave,
@@ -118,11 +122,33 @@ export function parseSpeechSettings(input: unknown): SpeechSettings {
     !isObject(input) ||
     typeof input.readReplies !== "boolean" ||
     !isSpeechVoice(input.voice) ||
-    !isSpeechSpeed(input.speed)
+    !isSpeechSpeed(input.speed) ||
+    typeof input.codexLive !== "boolean" ||
+    !(input.codexLiveVoice === null || isCodexLiveVoice(input.codexLiveVoice))
   ) {
     throw new Error("Speech settings need a known voice and speed.");
   }
-  return { readReplies: input.readReplies, voice: input.voice, speed: input.speed };
+  return {
+    readReplies: input.readReplies,
+    voice: input.voice,
+    speed: input.speed,
+    codexLive: input.codexLive,
+    codexLiveVoice: input.codexLiveVoice,
+  };
+}
+
+/** A Codex live voice start: the agent and the renderer's WebRTC offer. */
+export function parseVoiceLiveStart(input: unknown): VoiceLiveStart {
+  if (!isObject(input) || !isString(input.agentId) || !input.agentId || !isString(input.sdp) || !input.sdp)
+    throw new Error("Live voice needs an agent and an offer.");
+  if (input.sdp.length > VOICE_LIVE_LIMITS.maximumSdpLength) throw new Error("The live voice offer is too long.");
+  return { agentId: input.agentId, sdp: input.sdp };
+}
+
+export function parseVoiceLiveStop(input: unknown): VoiceLiveStop {
+  if (!isObject(input) || !isString(input.sessionId) || !input.sessionId)
+    throw new Error("Live voice needs a session.");
+  return { sessionId: input.sessionId };
 }
 
 export function parseSpeechInput(input: unknown): SpeechInput {

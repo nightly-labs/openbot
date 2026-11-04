@@ -123,14 +123,18 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     descriptionKey: "settings.tab.voice.description",
     icon: Mic,
     rows: [
-      { titleKey: "settings.voice.models.title" },
-      { titleKey: "settings.voice.language.title", descriptionKey: "settings.voice.language.description" },
+      { titleKey: "settings.voice.dictation.section" },
+      { titleKey: "settings.voice.language.section", descriptionKey: "settings.voice.language.description" },
       {
         titleKey: "settings.voice.speech.readReplies.title",
         descriptionKey: "settings.voice.speech.readReplies.description",
       },
       { titleKey: "settings.voice.speech.voice.title" },
       { titleKey: "settings.voice.speech.speed.title" },
+      {
+        titleKey: "settings.voice.speech.codexLive.title",
+        descriptionKey: "settings.voice.speech.codexLive.description",
+      },
     ],
   },
   {

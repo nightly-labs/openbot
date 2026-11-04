@@ -2002,6 +2002,8 @@ export function createConversationViewScope(props: ConversationProps) {
    * server gets the text only.
    */
   const voiceConversationAvailable = () => !channel && !props.runtime;
+  // A transcribed conversation sends its turns through this view, so it ends with the view.
+  onCleanup(() => controller.voiceSessions.end("transcribed"));
   /** Starts a voice conversation with an agent. It ends with the owner that calls this. */
   const startVoiceConversation = (agentId: string) =>
     createVoiceConversation({

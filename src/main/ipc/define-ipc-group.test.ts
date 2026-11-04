@@ -16,6 +16,8 @@ import {
   parseSpeechInput,
   parseSpeechSettings,
   parseVoiceApiKey,
+  parseVoiceLiveStart,
+  parseVoiceLiveStop,
   parseVoiceModelRequest,
   parseVoiceServerConnection,
   parseVoiceServerSave,
@@ -97,6 +99,8 @@ function registerVoice(
     getServer: handler(() => null),
     probeServer: payloadHandler(parseVoiceServerConnection, () => ({ ok: false, field: "address", message: "" })),
     setServer: payloadHandler(parseVoiceServerSave, () => null),
+    startLive: payloadHandler(parseVoiceLiveStart, () => ({ sessionId: "live-1", sdp: "answer" })),
+    stopLive: payloadHandler(parseVoiceLiveStop, () => undefined),
   });
 }
 
