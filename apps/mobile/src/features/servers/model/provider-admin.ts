@@ -12,16 +12,17 @@ import {
   type CustomAgentSummary,
   type CustomProviderResult,
   type CustomProviderSummary,
+  type DownloadableProviderId,
   decodeRegistryEntries,
   decodeRegistryInstallResult,
   decodeRegistryOperations,
   type HostProviderAccounts,
+  INSTALLER_PROVIDERS,
   isAgentStatus,
   isKeyOnlyProvider,
   isLocalOnlyProvider,
   loopbackCallback,
   MANAGED_RUNTIME_PROVIDERS,
-  type ManagedProviderId,
   type ProviderApiKeyStatus,
   type ProviderCodeLoginStart,
   type ProviderRuntimeSnapshot,
@@ -145,10 +146,12 @@ function providerSignInMethod(provider: AgentProviderId, capabilities: readonly 
   return capabilities.includes(SIGN_IN_RELAY_CAPABILITY) && isOneOf(SIGN_IN_RELAY_PROVIDERS, provider) ? "relay" : null;
 }
 
-function runtimeProviders(capabilities: readonly string[]): readonly ManagedProviderId[] {
+function runtimeProviders(capabilities: readonly string[]): readonly DownloadableProviderId[] {
   // `providers-v8` lists every runtime of the host as a row; a row that a host before Kimi does not
   // send reads as not downloaded, and the page lists that provider only when the host status names it.
-  if (capabilities.includes(PROVIDERS_V8_CAPABILITY)) return MANAGED_RUNTIME_PROVIDERS;
+  // An installer provider has a row only while the host can install it, so the row shows Download
+  // only then.
+  if (capabilities.includes(PROVIDERS_V8_CAPABILITY)) return [...MANAGED_RUNTIME_PROVIDERS, ...INSTALLER_PROVIDERS];
   if (capabilities.includes(PROVIDERS_V5_CAPABILITY)) return PROVIDERS_V5_RUNTIME_PROVIDERS;
   if (capabilities.includes(PROVIDERS_V4_CAPABILITY)) return PROVIDERS_V4_RUNTIME_PROVIDERS;
   if (capabilities.includes(PROVIDERS_RUNTIMES_V2_CAPABILITY)) return V2_RUNTIME_PROVIDERS;
@@ -170,7 +173,7 @@ export interface ProviderRow {
   name: string;
   status: AgentProviderStatus | undefined;
   /** Absent when the host's route set does not download this provider. */
-  runtime: (ProviderRuntimeStatus & { provider: ManagedProviderId }) | undefined;
+  runtime: (ProviderRuntimeStatus & { provider: DownloadableProviderId }) | undefined;
   /** Installed, idle, and the host has a different version. */
   updatable: boolean;
   signIn: ProviderSignInMethod | null;
@@ -332,11 +335,11 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
     capabilities,
     readStatus: (): Promise<AgentStatus> => request("GET", TEAM_API_ROUTES.agents.status, decodeAgentStatus),
     readRuntimes: (): Promise<ProviderRuntimeSnapshot> => runTeamRequest(getProviderRuntimes(request, runtimeRoutes)),
-    download: (provider: ManagedProviderId) =>
+    download: (provider: DownloadableProviderId) =>
       runTeamRequest(downloadProviderRuntime(request, provider, runtimeRoutes)),
     /** The host asks for the newest version of each runtime that it manages. */
     checkUpdates: () => runTeamRequest(checkProviderRuntimeUpdates(request, runtimeRoutes)),
-    cancelDownload: (provider: ManagedProviderId) =>
+    cancelDownload: (provider: DownloadableProviderId) =>
       runTeamRequest(cancelProviderRuntime(request, provider, runtimeRoutes)),
     startCodeSignIn: (provider: AgentProviderId): Promise<ProviderCodeLoginStart> =>
       runTeamRequest(startProviderCodeLogin(request, provider, signInRoutes)),
