@@ -8,6 +8,7 @@ import {
   type AgentEvent,
   type AgentSummary,
   AnalyticsInputError,
+  CONVERSATION_VOICE_CONTEXT_ITEM_TYPE,
   canAdministerServer,
   type DirectConversationPage,
   type DirectConversationPageAnchor,
@@ -1541,7 +1542,11 @@ export class TeamApiServer {
         (!connection.capabilities.has("routine-event-markers") ||
           !connection.capabilities.has("routine-run-event-markers") ||
           !connection.capabilities.has("hosted-site-event-markers") ||
-          event.snapshot.messages.some((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE))
+          event.snapshot.messages.some(
+            (message) =>
+              message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE ||
+              message.itemType === CONVERSATION_VOICE_CONTEXT_ITEM_TYPE,
+          ))
       ) {
         // The payloads are shared between clients, so the key holds what the roles allow too.
         const key = `${blockedKey}:${eventProtocol(connection.capabilities)}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;

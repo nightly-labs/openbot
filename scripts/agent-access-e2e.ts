@@ -1035,7 +1035,12 @@ try {
       JSON.stringify({
         type: "agent-event-scope",
         includeConversations: true,
-        capabilities: [BROWSER_USER_CONTROL_CAPABILITY],
+        capabilities: [
+          BROWSER_USER_CONTROL_CAPABILITY,
+          "routine-event-markers",
+          "routine-run-event-markers",
+          "hosted-site-event-markers",
+        ],
       }),
     );
     await scoped;
