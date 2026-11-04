@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "الافتراضي للنظام",
   "mobile.settings.language.footer":
     "يتبع الافتراضي للنظام اللغة الأولى في إعدادات هاتفك. يظهر النص غير المترجم بعد باللغة الإنجليزية.",
+  "mobile.settings.language.restartTitle": "إعادة تشغيل OpenBot؟",
+  "mobile.settings.language.restartBody":
+    "تُقرأ هذه اللغة في الاتجاه الآخر. تغيّر الشاشات اتجاهها عند تشغيل OpenBot مرة أخرى. إذا بقيت الشاشات غير صحيحة بعد إعادة التشغيل، فأغلق OpenBot من مبدّل التطبيقات وافتحه مرة أخرى.",
+  "mobile.settings.language.restartNow": "إعادة التشغيل الآن",
+  "mobile.settings.language.restartFailed":
+    "تعذّرت إعادة تشغيل OpenBot. تغيّر الشاشات اتجاهها في المرة التالية التي تفتح فيها OpenBot.",
   "mobile.settings.dictation.language": "لغة الإملاء",
   "mobile.settings.about.development": "التطوير",
   "mobile.settings.about.openFailed": "تعذّر فتح الرابط. أعد المحاولة.",

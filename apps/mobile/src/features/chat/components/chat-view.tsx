@@ -59,6 +59,7 @@ import { showsOnline } from "@/features/workspace/model/server-status";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { END_X } from "@/shared/lib/text-direction";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 import { mentionDraft } from "../model/chat-mentions";
@@ -705,13 +706,15 @@ export function ChatView({
     () =>
       Gesture.Pan()
         .enabled(!isIOS)
-        .hitSlop({ left: 0, width: CHAT_BACK_EDGE_WIDTH })
-        .activeOffsetX(12)
-        .failOffsetX(-8)
+        // From the start edge toward the middle: the left edge, or the right edge in a right-to-left
+        // layout, as a stack screen goes back. The gesture measures in screen points.
+        .hitSlop(END_X === 1 ? { left: 0, width: CHAT_BACK_EDGE_WIDTH } : { right: 0, width: CHAT_BACK_EDGE_WIDTH })
+        .activeOffsetX(12 * END_X)
+        .failOffsetX(-8 * END_X)
         .failOffsetY([-16, 16])
         .onEnd((event) => {
           if (menuOpenValue.get()) return;
-          if (event.translationX < 48 && event.velocityX < 650) return;
+          if (event.translationX * END_X < 48 && event.velocityX * END_X < 650) return;
           scheduleOnRN(voiceOpenValue.get() ? leaveVoiceMode : leaveConversation);
         }),
     [menuOpenValue, voiceOpenValue, leaveVoiceMode, leaveConversation],

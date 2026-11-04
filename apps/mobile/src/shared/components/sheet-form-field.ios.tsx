@@ -8,6 +8,7 @@ import { View } from "react-native";
 
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
 import { APP_FONT } from "@/shared/lib/app-font";
+import { layoutDirection, textDirection } from "@/shared/lib/text-direction";
 
 export function SheetFormField({
   autoCapitalize,
@@ -64,7 +65,9 @@ export function SheetFormField({
             modifiers={[accessibilityLabel(label)]}
             multiline={multiline}
             numberOfLines={multiline ? 4 : 1}
-            textAlign={textAlign}
+            // SwiftUI aligns to the leading or trailing side of the layout. Text in the other
+            // direction than the layout goes to the trailing side.
+            textAlign={textAlign ?? (textDirection(value, layoutDirection()) === layoutDirection() ? "left" : "right")}
             autoCapitalize={autoCapitalize}
             autoCorrect={autoCorrect}
             autoFocus={autoFocus}

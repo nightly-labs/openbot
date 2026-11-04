@@ -468,6 +468,8 @@ export const messages = {
   "mobile.server.settings.aiSection": "الذكاء الاصطناعي والأدوات",
   "mobile.server.settings.dataSection": "البيانات",
   "mobile.server.settings.maintenanceSection": "الصيانة",
+  "mobile.server.settings.peopleSection": "الأشخاص",
+  "mobile.server.settings.moveSection": "الاستيراد والنقل",
   "mobile.server.settings.general": "عام",
   "mobile.server.settings.timezone": "المنطقة الزمنية",
   "mobile.server.settings.timezoneAutomatic": "تلقائي",

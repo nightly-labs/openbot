@@ -40,6 +40,14 @@ import { graphemes } from "@/shared/lib/graphemes";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference } from "@/shared/lib/motion";
 import { currentText, useText } from "@/shared/lib/text";
+import {
+  type DirectionMark,
+  directionMark,
+  layoutDirection,
+  type TextDirection,
+  textDirection,
+  textDirectionStyle,
+} from "@/shared/lib/text-direction";
 import { parseFinishedChatMarkdown, parseStreamingChatMarkdown } from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
 import { createReplyReveal, finishedReplyReveal } from "../model/reply-reveal";
@@ -97,6 +105,37 @@ interface TextPresentation {
   fontScale: number;
   t: MobileTranslate;
   linkFavicons: boolean;
+  /** The layout direction of the view that holds the block. A list item or a quote can change it. */
+  direction: TextDirection;
+}
+
+/** Each block reads in the direction of its own first letter, in an app of either direction. */
+function blockDirectionStyle(source: string, presentation: TextPresentation): TextStyle {
+  return textDirectionStyle(textDirection(source, presentation.direction), presentation.direction);
+}
+
+/** The mark that gives an Android block the direction of `blockDirectionStyle`. */
+function blockDirectionMark(source: string, presentation: TextPresentation): DirectionMark {
+  return directionMark(source, textDirection(source, presentation.direction));
+}
+
+/**
+ * The `textAlign` of a table cell in a view of the table's direction. Markdown left and right are
+ * sides of the screen, but React Native swaps them in a right-to-left view. A column with no
+ * alignment starts at the start of the table, so all its cells line up.
+ */
+function cellAlignment(
+  align: "left" | "center" | "right" | null | undefined,
+  table: TextDirection,
+): TextStyle["textAlign"] {
+  if (align === "center") return "center";
+  if (!align) return "left";
+  return (align === "left") === (table === "ltr") ? "left" : "right";
+}
+
+/** The presentation of the blocks in a list item or a quote that has its own direction. */
+function withDirection(presentation: TextPresentation, direction: TextDirection): TextPresentation {
+  return direction === presentation.direction ? presentation : { ...presentation, direction };
 }
 
 /** The font size of a text type, in points, which inline math is sized against. */
@@ -526,8 +565,10 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
     }
   }
   const source = (run: Token[]) => run.map((token) => token.raw).join("");
+  // The words are items of a wrapping row, so the row runs in the direction of the paragraph.
+  const direction = textDirection(source(tokens), presentation.direction);
   return (
-    <View className="min-w-0 gap-1">
+    <View className="min-w-0 gap-1" style={{ direction }}>
       {sourceEntries(lines, (line) => line.map(source).join("")).map(({ value: line, offset: lineOffset }) => (
         // Multiline chips must participate in flex layout, not sit inside a fixed-height native text line.
         <View key={lineOffset} className="min-w-0 flex-row flex-wrap items-center gap-y-1">
@@ -544,6 +585,8 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
                 style={[
                   CHAT_TEXT_STYLES[presentation.type],
                   textContainerStyle(source(run), presentation),
+                  // The space after a word stays on the side of the next word.
+                  textDirectionStyle(direction, direction),
                   { maxWidth: "100%" },
                 ]}
               >
@@ -598,8 +641,13 @@ const MarkdownBlock = memo(function MarkdownBlock({
     return (
       <Text
         selectable={presentation.selectable}
-        style={[CHAT_TEXT_STYLES[presentation.type], textContainerStyle(token.raw, presentation)]}
+        style={[
+          CHAT_TEXT_STYLES[presentation.type],
+          textContainerStyle(token.raw, presentation),
+          blockDirectionStyle(token.raw, presentation),
+        ]}
       >
+        {blockDirectionMark(token.raw, presentation)}
         {token.tokens ? inline(token.tokens, presentation) : token.text}
       </Text>
     );
@@ -612,8 +660,13 @@ const MarkdownBlock = memo(function MarkdownBlock({
         selectable={presentation.selectable}
         accessibilityRole="header"
         dynamicTypeRamp={CHAT_HEADING_RAMP[level]}
-        style={[CHAT_TEXT_STYLES[level], textContainerStyle(token.raw, presentation)]}
+        style={[
+          CHAT_TEXT_STYLES[level],
+          textContainerStyle(token.raw, presentation),
+          blockDirectionStyle(token.text, presentation),
+        ]}
       >
+        {blockDirectionMark(token.text, presentation)}
         {inline(token.tokens, heading)}
       </Text>
     );
@@ -657,32 +710,52 @@ const MarkdownBlock = memo(function MarkdownBlock({
     );
   }
   if (tokenIs(token, "blockquote")) {
+    // The line is at the start of the quote, so it moves to the right of a right-to-left quote. A
+    // quote with no letter keeps the direction of the text around it.
+    const direction = textDirection(token.text, presentation.direction);
     return (
-      <View className="border-l-2 border-separator pl-3">
-        <MarkdownBlocks tokens={token.tokens} presentation={presentation} inList={inList} />
+      <View className="border-separator" style={{ direction, borderStartWidth: 2, paddingStart: 12 }}>
+        <MarkdownBlocks tokens={token.tokens} presentation={withDirection(presentation, direction)} inList={inList} />
       </View>
     );
   }
   if (tokenIs(token, "list")) {
+    // An item with no letter, such as a number, keeps the direction of the list, so its mark stays
+    // on the side of the other marks.
+    const listDirection = textDirection(token.raw, presentation.direction);
     return (
       <View className="gap-1.5">
-        {sourceEntries(token.items, (item) => item.raw).map(({ value: item, offset: itemOffset }, itemIndex) => (
-          <View key={itemOffset} className="flex-row items-start gap-2">
-            <Text style={[CHAT_TEXT_STYLES[presentation.type], presentation.style]}>
-              {item.task ? (item.checked ? "☑" : "☐") : token.ordered ? `${Number(token.start) + itemIndex}.` : "•"}
-            </Text>
-            <View className="min-w-0 shrink">
-              <MarkdownBlocks tokens={item.tokens} inList presentation={presentation} />
+        {sourceEntries(token.items, (item) => item.raw).map(({ value: item, offset: itemOffset }, itemIndex) => {
+          // The mark is at the start of the item, so it moves to the right of a right-to-left item.
+          const direction = textDirection(item.text, listDirection);
+          return (
+            <View key={itemOffset} className="flex-row items-start gap-2" style={{ direction }}>
+              <Text
+                style={[
+                  CHAT_TEXT_STYLES[presentation.type],
+                  presentation.style,
+                  textDirectionStyle(direction, direction),
+                ]}
+              >
+                {item.task ? (item.checked ? "☑" : "☐") : token.ordered ? `${Number(token.start) + itemIndex}.` : "•"}
+              </Text>
+              <View className="min-w-0 shrink">
+                <MarkdownBlocks tokens={item.tokens} inList presentation={withDirection(presentation, direction)} />
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
     );
   }
   if (tokenIs(token, "table")) {
+    // The columns run in the direction of the header, so an English table in an Arabic chat keeps
+    // its first column at the left. Each cell reads in the direction of its own text.
+    const tableDirection = textDirection(token.header.map((cell) => cell.text).join(" "), presentation.direction);
+    const cellPresentation = withDirection(presentation, tableDirection);
     return (
       <ScrollView horizontal alwaysBounceHorizontal={false} style={{ flexGrow: 0, flexShrink: 0 }}>
-        <View>
+        <View style={{ direction: tableDirection }}>
           {sourceEntries([token.header, ...token.rows], (row) => row.map((cell) => cell.text).join("|")).map(
             ({ value: row, offset: rowOffset }) => (
               <View key={rowOffset} className="flex-row border-b border-separator">
@@ -693,10 +766,15 @@ const MarkdownBlock = memo(function MarkdownBlock({
                       style={[
                         CHAT_TEXT_STYLES[presentation.type],
                         textContainerStyle(cell.text, presentation),
-                        { textAlign: cell.align ?? "left", fontWeight: cell.header ? "600" : "400" },
+                        {
+                          writingDirection: textDirection(cell.text, tableDirection),
+                          textAlign: cellAlignment(cell.align, tableDirection),
+                        },
+                        { fontWeight: cell.header ? "600" : "400" },
                       ]}
                     >
-                      {inline(cell.tokens, presentation)}
+                      {blockDirectionMark(cell.text, cellPresentation)}
+                      {inline(cell.tokens, cellPresentation)}
                     </Text>
                   </View>
                 ))}
@@ -709,7 +787,11 @@ const MarkdownBlock = memo(function MarkdownBlock({
   }
   if (token.type === "hr") return <View className="h-px bg-separator" />;
   return (
-    <Text selectable={presentation.selectable} style={[CHAT_TEXT_STYLES[presentation.type], presentation.style]}>
+    <Text
+      selectable={presentation.selectable}
+      style={[CHAT_TEXT_STYLES[presentation.type], presentation.style, blockDirectionStyle(token.raw, presentation)]}
+    >
+      {blockDirectionMark(token.raw, presentation)}
       {token.raw}
     </Text>
   );
@@ -774,6 +856,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       finished,
       animateTail,
       linkFavicons,
+      direction: layoutDirection(),
     }),
     [linkFavicons, selectable, compact, color, codeColor, agents, fontScale, t, streaming, finished, animateTail],
   );
