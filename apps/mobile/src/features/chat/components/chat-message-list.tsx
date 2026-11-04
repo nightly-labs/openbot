@@ -5,7 +5,6 @@ import { expandAttachmentReferences } from "@openbot/contracts/attachment-refere
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import { markdownInlinePlainText, markdownPlainText } from "@openbot/contracts/markdown-preview-text";
-import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import type { LucideIcon } from "lucide-react-native";
@@ -20,7 +19,6 @@ import CornerUpRight from "lucide-react-native/icons/corner-up-right";
 import GitFork from "lucide-react-native/icons/git-fork";
 import LoaderCircle from "lucide-react-native/icons/loader-circle";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
-import X from "lucide-react-native/icons/x";
 import {
   type ComponentProps,
   createContext,
@@ -151,12 +149,6 @@ const ADAPTIVE_RENDER = { enterVelocity: 1.5, exitVelocity: 0.5 };
 const KEEP_VISIBLE_POSITION = { data: true, size: true };
 const FOLLOW_END = { animated: false, on: { dataChange: true, itemLayout: true, footerLayout: true, layout: true } };
 
-const STARTER_OPTIONS = [
-  { id: "plan", label: "mobile.chat.starter.planLabel", detail: "mobile.chat.starter.planDetail" },
-  { id: "research", label: "mobile.chat.starter.researchLabel", detail: "mobile.chat.starter.researchDetail" },
-  { id: "solve", label: "mobile.chat.starter.solveLabel", detail: "mobile.chat.starter.solveDetail" },
-] as const satisfies readonly { id: string; label: MobileTextKey; detail: MobileTextKey }[];
-
 const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
   .easing(Easing.bezier(0.23, 1, 0.32, 1))
   .withInitialValues({ opacity: 0, transform: [{ translateY: 12 }] })
@@ -272,7 +264,6 @@ interface ChatMessageListProps {
   browserRequests?: readonly BrowserTakeoverRequest[];
   serverName?: string;
   onRespondApproval?: (approval: PendingApproval, decision: ApprovalDecision) => Promise<void>;
-  fieldBackground: ViewStyle["backgroundColor"];
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
   messages: ChatMessage[];
@@ -283,11 +274,8 @@ interface ChatMessageListProps {
   olderError: boolean;
   onLoadOlder: () => void;
   muted: ViewStyle["backgroundColor"];
-  raised: ViewStyle["backgroundColor"];
   showStarter: boolean;
   topInset: number;
-  onDismissStarter: () => void;
-  onSelectStarter: (value: string) => void;
   onRetryHistory: () => void;
   onReply?: (message: ChatBubbleMessage) => void;
   /** Copies the conversation through a message of `branchPoints` into a new thread. */
@@ -1057,7 +1045,6 @@ export const ChatMessageList = memo(function ChatMessageList({
   browserRequests = NO_BROWSER_REQUESTS,
   serverName = "",
   onRespondApproval,
-  fieldBackground,
   foreground,
   historyState,
   messages,
@@ -1068,11 +1055,8 @@ export const ChatMessageList = memo(function ChatMessageList({
   olderError,
   onLoadOlder,
   muted,
-  raised,
   showStarter,
   topInset,
-  onDismissStarter,
-  onSelectStarter,
   onRetryHistory,
   onReply,
   onBranch,
@@ -1666,62 +1650,10 @@ export const ChatMessageList = memo(function ChatMessageList({
                     </View>
                   ) : null}
                   {showStarter ? (
-                    <View
-                      className="gap-4 rounded-[26px] p-4"
-                      style={{ backgroundColor: fieldBackground, borderCurve: "continuous" }}
-                    >
-                      <View className="flex-row items-start gap-3">
-                        <View className="min-w-0 flex-1 gap-1">
-                          <Typography.Heading type="h4">{t("mobile.chat.starter.title")}</Typography.Heading>
-                          <Typography.Paragraph className="text-text-secondary">
-                            {t("mobile.chat.starter.body")}
-                          </Typography.Paragraph>
-                        </View>
-                        <Pressable
-                          accessibilityLabel={t("mobile.chat.starter.dismiss")}
-                          accessibilityRole="button"
-                          hitSlop={8}
-                          onPress={() => {
-                            void haptics.selection();
-                            onDismissStarter();
-                          }}
-                        >
-                          <X color={String(muted)} size={21} strokeWidth={1.8} />
-                        </Pressable>
-                      </View>
-
-                      <View className="overflow-hidden rounded-[18px]" style={{ backgroundColor: raised }}>
-                        {STARTER_OPTIONS.map((option, index) => (
-                          <Pressable
-                            key={option.id}
-                            accessibilityRole="button"
-                            accessibilityState={{ disabled: !canSend }}
-                            disabled={!canSend}
-                            className="flex-row gap-3 px-3 py-3"
-                            style={({ pressed }) => ({
-                              borderBottomColor: index < STARTER_OPTIONS.length - 1 ? String(muted) : "transparent",
-                              borderBottomWidth: index < STARTER_OPTIONS.length - 1 ? 0.5 : 0,
-                              opacity: !canSend ? 0.45 : pressed ? 0.55 : 1,
-                            })}
-                            onPress={() => onSelectStarter(t(option.label))}
-                          >
-                            <View className="size-7 items-center justify-center rounded-lg bg-control">
-                              <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                                {String.fromCharCode(65 + index)}
-                              </Typography.Paragraph>
-                            </View>
-                            <View className="min-w-0 flex-1">
-                              <Typography.Paragraph weight="medium">{t(option.label)}</Typography.Paragraph>
-                              <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                                {t(option.detail)}
-                              </Typography.Paragraph>
-                            </View>
-                          </Pressable>
-                        ))}
-                      </View>
-
-                      <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                        {t("mobile.chat.starter.orAnswer")}
+                    <View className="gap-1 px-1 py-4">
+                      <Typography.Heading type="h4">{t("mobile.chat.starter.title")}</Typography.Heading>
+                      <Typography.Paragraph className="text-text-secondary">
+                        {t("mobile.chat.starter.body")}
                       </Typography.Paragraph>
                     </View>
                   ) : null}
