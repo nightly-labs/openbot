@@ -10,9 +10,8 @@ export const messages = {
     "Systemstandard verwendet die erste Sprache in den Telefoneinstellungen. Noch nicht übersetzter Text erscheint auf Englisch.",
   "mobile.settings.language.restartTitle": "OpenBot neu starten?",
   "mobile.settings.language.restartBody":
-    "Diese Sprache liest sich in die andere Richtung. Die Ansichten wechseln die Richtung, wenn OpenBot neu startet.",
-  "mobile.settings.language.restartNow": "Neu starten",
-  "mobile.settings.language.restartLater": "Später",
+    "Diese Sprache liest sich in die andere Richtung. Die Ansichten wechseln die Richtung, wenn OpenBot neu startet. Wenn die Ansichten nach dem Neustart noch falsch aussehen, schließe OpenBot im App-Umschalter und öffne es erneut.",
+  "mobile.settings.language.restartNow": "Jetzt neu starten",
   "mobile.settings.language.restartFailed":
     "OpenBot konnte nicht neu starten. Die Ansichten wechseln die Richtung, wenn du OpenBot das nächste Mal öffnest.",
   "mobile.settings.dictation.language": "Diktiersprache",

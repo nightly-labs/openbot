@@ -8,9 +8,9 @@ export const messages = {
   "mobile.settings.language.system": "跟随系统",
   "mobile.settings.language.footer": "“跟随系统”会使用手机设置中的首选语言。尚未翻译的文案将以英文显示。",
   "mobile.settings.language.restartTitle": "重启 OpenBot？",
-  "mobile.settings.language.restartBody": "该语言的阅读方向相反。OpenBot 下次启动时，界面会切换方向。",
-  "mobile.settings.language.restartNow": "重启",
-  "mobile.settings.language.restartLater": "稍后",
+  "mobile.settings.language.restartBody":
+    "该语言的阅读方向相反。OpenBot 下次启动时，界面会切换方向。如果重启后界面仍不正常，请在应用切换器中关闭 OpenBot，然后重新打开。",
+  "mobile.settings.language.restartNow": "立即重启",
   "mobile.settings.language.restartFailed": "无法重启 OpenBot。下次打开 OpenBot 时，界面会切换方向。",
   "mobile.settings.dictation.language": "听写语言",
   "mobile.settings.about.development": "开发",

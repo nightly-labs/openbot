@@ -8,6 +8,7 @@ import { View } from "react-native";
 
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
 import { APP_FONT } from "@/shared/lib/app-font";
+import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 
 export function SheetFormField({
   autoCapitalize,
@@ -76,7 +77,7 @@ export function SheetFormField({
             returnKeyType={returnKeyType}
             secureTextEntry={secureTextEntry}
             selectionColor={foreground}
-            style={{ height, paddingHorizontal: 16 }}
+            style={{ height, paddingHorizontal: 16, ...(textAlign ? undefined : fieldDirectionStyle(value)) }}
             textStyle={{ color: String(foreground), fontFamily: APP_FONT, fontSize: 16 }}
             value={nativeValue}
             onChangeText={onChangeText}

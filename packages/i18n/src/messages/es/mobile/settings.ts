@@ -10,9 +10,8 @@ export const messages = {
     "El valor predeterminado del sistema sigue el primer idioma de los ajustes del teléfono. El texto aún no traducido se muestra en inglés.",
   "mobile.settings.language.restartTitle": "¿Reiniciar OpenBot?",
   "mobile.settings.language.restartBody":
-    "Este idioma se lee en la otra dirección. Las pantallas cambian de dirección cuando OpenBot se inicia de nuevo.",
-  "mobile.settings.language.restartNow": "Reiniciar",
-  "mobile.settings.language.restartLater": "Más tarde",
+    "Este idioma se lee en la otra dirección. Las pantallas cambian de dirección cuando OpenBot se inicia de nuevo. Si las pantallas siguen viéndose mal después del reinicio, cierra OpenBot en el selector de apps y vuelve a abrirlo.",
+  "mobile.settings.language.restartNow": "Reiniciar ahora",
   "mobile.settings.language.restartFailed":
     "OpenBot no pudo reiniciarse. Las pantallas cambian de dirección la próxima vez que abras OpenBot.",
   "mobile.settings.dictation.language": "Idioma del dictado",

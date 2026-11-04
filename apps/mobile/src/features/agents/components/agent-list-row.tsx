@@ -33,7 +33,7 @@ import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspa
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
-import { lineDirectionStyle } from "@/shared/lib/text-direction";
+import { END_X, lineDirectionStyle } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
@@ -56,7 +56,11 @@ function AgentRowTextReveal({ active, children }: PropsWithChildren<{ active: bo
   const blurStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.get(), [0, 0.35, 0.8, 1], [0.72, 0.58, 0.1, 0]),
   }));
-  const maskProps = useAnimatedProps(() => ({ width: width.get() * progress.get() }));
+  // The text shows from its start: from the right in a right-to-left layout. The mask counts from the left.
+  const maskProps = useAnimatedProps(() => ({
+    x: END_X === 1 ? 0 : width.get() * (1 - progress.get()),
+    width: width.get() * progress.get(),
+  }));
 
   if (!active) return children;
 
@@ -71,13 +75,13 @@ function AgentRowTextReveal({ active, children }: PropsWithChildren<{ active: bo
         maskElement={
           <Svg height="100%" width="100%">
             <Defs>
-              <LinearGradient id={gradientId} x1="0" x2="1" y1="0" y2="0">
+              <LinearGradient id={gradientId} x1={END_X === 1 ? "0" : "1"} x2={END_X === 1 ? "1" : "0"} y1="0" y2="0">
                 <Stop offset="0" stopColor="#000" stopOpacity="1" />
                 <Stop offset="0.82" stopColor="#000" stopOpacity="1" />
                 <Stop offset="1" stopColor="#000" stopOpacity="0" />
               </LinearGradient>
             </Defs>
-            <AnimatedRect animatedProps={maskProps} fill={`url(#${gradientId})`} height="100%" x="0" y="0" />
+            <AnimatedRect animatedProps={maskProps} fill={`url(#${gradientId})`} height="100%" y="0" />
           </Svg>
         }
       >

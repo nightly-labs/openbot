@@ -10,9 +10,8 @@ export const messages = {
     "Sistem varsayılanı, telefon ayarlarınızdaki ilk dili takip eder. Henüz çevrilmemiş metinler İngilizce gösterilir.",
   "mobile.settings.language.restartTitle": "OpenBot yeniden başlatılsın mı?",
   "mobile.settings.language.restartBody":
-    "Bu dil ters yönde okunur. Ekranlar, OpenBot yeniden başladığında yön değiştirir.",
-  "mobile.settings.language.restartNow": "Yeniden başlat",
-  "mobile.settings.language.restartLater": "Daha sonra",
+    "Bu dil ters yönde okunur. Ekranlar, OpenBot yeniden başladığında yön değiştirir. Yeniden başlatmadan sonra ekranlar hâlâ yanlış görünüyorsa OpenBot'u uygulama değiştiricide kapatıp yeniden açın.",
+  "mobile.settings.language.restartNow": "Şimdi yeniden başlat",
   "mobile.settings.language.restartFailed":
     "OpenBot yeniden başlatılamadı. Ekranlar, OpenBot'u bir sonraki açışınızda yön değiştirir.",
   "mobile.settings.dictation.language": "Dikte dili",

@@ -40,7 +40,14 @@ import { graphemes } from "@/shared/lib/graphemes";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference } from "@/shared/lib/motion";
 import { currentText, useText } from "@/shared/lib/text";
-import { layoutDirection, type TextDirection, textDirection, textDirectionStyle } from "@/shared/lib/text-direction";
+import {
+  type DirectionMark,
+  directionMark,
+  layoutDirection,
+  type TextDirection,
+  textDirection,
+  textDirectionStyle,
+} from "@/shared/lib/text-direction";
 import { parseFinishedChatMarkdown, parseStreamingChatMarkdown } from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
 import { createReplyReveal, finishedReplyReveal } from "../model/reply-reveal";
@@ -105,6 +112,25 @@ interface TextPresentation {
 /** Each block reads in the direction of its own first letter, in an app of either direction. */
 function blockDirectionStyle(source: string, presentation: TextPresentation): TextStyle {
   return textDirectionStyle(textDirection(source, presentation.direction), presentation.direction);
+}
+
+/** The mark that gives an Android block the direction of `blockDirectionStyle`. */
+function blockDirectionMark(source: string, presentation: TextPresentation): DirectionMark {
+  return directionMark(source, textDirection(source, presentation.direction));
+}
+
+/**
+ * The `textAlign` of a table cell in a view of the table's direction. Markdown left and right are
+ * sides of the screen, but React Native swaps them in a right-to-left view. A column with no
+ * alignment starts at the start of the table, so all its cells line up.
+ */
+function cellAlignment(
+  align: "left" | "center" | "right" | null | undefined,
+  table: TextDirection,
+): TextStyle["textAlign"] {
+  if (align === "center") return "center";
+  if (!align) return "left";
+  return (align === "left") === (table === "ltr") ? "left" : "right";
 }
 
 /** The presentation of the blocks in a list item or a quote that has its own direction. */
@@ -540,7 +566,7 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
   }
   const source = (run: Token[]) => run.map((token) => token.raw).join("");
   // The words are items of a wrapping row, so the row runs in the direction of the paragraph.
-  const direction = textDirection(source(tokens));
+  const direction = textDirection(source(tokens), presentation.direction);
   return (
     <View className="min-w-0 gap-1" style={{ direction }}>
       {sourceEntries(lines, (line) => line.map(source).join("")).map(({ value: line, offset: lineOffset }) => (
@@ -621,6 +647,7 @@ const MarkdownBlock = memo(function MarkdownBlock({
           blockDirectionStyle(token.raw, presentation),
         ]}
       >
+        {blockDirectionMark(token.raw, presentation)}
         {token.tokens ? inline(token.tokens, presentation) : token.text}
       </Text>
     );
@@ -639,6 +666,7 @@ const MarkdownBlock = memo(function MarkdownBlock({
           blockDirectionStyle(token.text, presentation),
         ]}
       >
+        {blockDirectionMark(token.text, presentation)}
         {inline(token.tokens, heading)}
       </Text>
     );
@@ -682,8 +710,9 @@ const MarkdownBlock = memo(function MarkdownBlock({
     );
   }
   if (tokenIs(token, "blockquote")) {
-    // The line is at the start of the quote, so it moves to the right of a right-to-left quote.
-    const direction = textDirection(token.text);
+    // The line is at the start of the quote, so it moves to the right of a right-to-left quote. A
+    // quote with no letter keeps the direction of the text around it.
+    const direction = textDirection(token.text, presentation.direction);
     return (
       <View className="border-separator" style={{ direction, borderStartWidth: 2, paddingStart: 12 }}>
         <MarkdownBlocks tokens={token.tokens} presentation={withDirection(presentation, direction)} inList={inList} />
@@ -691,11 +720,14 @@ const MarkdownBlock = memo(function MarkdownBlock({
     );
   }
   if (tokenIs(token, "list")) {
+    // An item with no letter, such as a number, keeps the direction of the list, so its mark stays
+    // on the side of the other marks.
+    const listDirection = textDirection(token.raw, presentation.direction);
     return (
       <View className="gap-1.5">
         {sourceEntries(token.items, (item) => item.raw).map(({ value: item, offset: itemOffset }, itemIndex) => {
           // The mark is at the start of the item, so it moves to the right of a right-to-left item.
-          const direction = textDirection(item.text);
+          const direction = textDirection(item.text, listDirection);
           return (
             <View key={itemOffset} className="flex-row items-start gap-2" style={{ direction }}>
               <Text
@@ -717,9 +749,13 @@ const MarkdownBlock = memo(function MarkdownBlock({
     );
   }
   if (tokenIs(token, "table")) {
+    // The columns run in the direction of the header, so an English table in an Arabic chat keeps
+    // its first column at the left. Each cell reads in the direction of its own text.
+    const tableDirection = textDirection(token.header.map((cell) => cell.text).join(" "), presentation.direction);
+    const cellPresentation = withDirection(presentation, tableDirection);
     return (
       <ScrollView horizontal alwaysBounceHorizontal={false} style={{ flexGrow: 0, flexShrink: 0 }}>
-        <View>
+        <View style={{ direction: tableDirection }}>
           {sourceEntries([token.header, ...token.rows], (row) => row.map((cell) => cell.text).join("|")).map(
             ({ value: row, offset: rowOffset }) => (
               <View key={rowOffset} className="flex-row border-b border-separator">
@@ -730,13 +766,15 @@ const MarkdownBlock = memo(function MarkdownBlock({
                       style={[
                         CHAT_TEXT_STYLES[presentation.type],
                         textContainerStyle(cell.text, presentation),
-                        blockDirectionStyle(cell.text, presentation),
-                        // A column that the Markdown aligns keeps its alignment.
-                        cell.align ? { textAlign: cell.align } : null,
+                        {
+                          writingDirection: textDirection(cell.text, tableDirection),
+                          textAlign: cellAlignment(cell.align, tableDirection),
+                        },
                         { fontWeight: cell.header ? "600" : "400" },
                       ]}
                     >
-                      {inline(cell.tokens, presentation)}
+                      {blockDirectionMark(cell.text, cellPresentation)}
+                      {inline(cell.tokens, cellPresentation)}
                     </Text>
                   </View>
                 ))}
@@ -753,6 +791,7 @@ const MarkdownBlock = memo(function MarkdownBlock({
       selectable={presentation.selectable}
       style={[CHAT_TEXT_STYLES[presentation.type], presentation.style, blockDirectionStyle(token.raw, presentation)]}
     >
+      {blockDirectionMark(token.raw, presentation)}
       {token.raw}
     </Text>
   );

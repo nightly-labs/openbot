@@ -60,7 +60,13 @@ import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
-import { layoutDirection, MIRROR_IN_RTL, physicalTextDirectionStyle, textDirection } from "@/shared/lib/text-direction";
+import {
+  END_X,
+  layoutDirection,
+  MIRROR_IN_RTL,
+  physicalTextDirectionStyle,
+  textDirection,
+} from "@/shared/lib/text-direction";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { applyMarkdownListEdit, markdownListReturn } from "../model/composer-lists";
 import { largePastedText } from "../model/composer-paste";
@@ -585,7 +591,7 @@ export const ChatComposer = memo(function ChatComposer({
       transform: [
         // The row scales about its centre, which the dictation mic moves left of the main control. This
         // keeps the main control where a row of the main control alone would put it.
-        { translateX: x + (VOICE_CONTROL_SHIFT_X - x) * voiced + micSlack * (1 - scale) },
+        { translateX: END_X * (x + (VOICE_CONTROL_SHIFT_X - x) * voiced + micSlack * (1 - scale)) },
         { translateY: y + (VOICE_CONTROL_SHIFT_Y - y) * voiced },
         { scale },
       ],
@@ -626,14 +632,14 @@ export const ChatComposer = memo(function ChatComposer({
     const open = voiceSplit.get();
     return {
       opacity: sideOpacity(open),
-      transform: [{ translateX: -VOICE_SIDE_OFFSET * open }, { scale: 0.5 + 0.5 * open }],
+      transform: [{ translateX: -END_X * VOICE_SIDE_OFFSET * open }, { scale: 0.5 + 0.5 * open }],
     };
   });
   const sendSideStyle = useAnimatedStyle(() => {
     const open = voiceSplit.get();
     return {
       opacity: sideOpacity(open),
-      transform: [{ translateX: VOICE_SIDE_OFFSET * open }, { scale: 0.5 + 0.5 * open }],
+      transform: [{ translateX: END_X * VOICE_SIDE_OFFSET * open }, { scale: 0.5 + 0.5 * open }],
     };
   });
   const plusStyle = useAnimatedStyle(() => {
@@ -647,7 +653,7 @@ export const ChatComposer = memo(function ChatComposer({
       transform: [
         // The card centres while it is narrow, so follow its left edge in, and
         // out to it by the same slack the control on the far side takes.
-        { translateX: (cardWidth - width) / 2 - interpolate(progress, [0, 1], [restControlShift, 0]) },
+        { translateX: END_X * ((cardWidth - width) / 2 - interpolate(progress, [0, 1], [restControlShift, 0])) },
         { translateY: interpolate(progress, [0, 1], [restControlOffset, 0]) },
         { scale: interpolate(progress, [0, 1], [REST_CONTROL_SCALE, 1]) },
       ],
@@ -696,15 +702,22 @@ export const ChatComposer = memo(function ChatComposer({
   // truncates instead of starting under a control.
   const openTextOffset = leadingInset - FIELD_INSET;
   const restTextOffset = placeholderWidth > 0 ? restLeadingInset - FIELD_INSET : openTextOffset;
+  // A draft that reads in the other direction than the layout, such as English in Arabic, aligns
+  // to the end of the field, where the controls are. Then the field slides away from the controls,
+  // not from the plus.
+  const fieldOpenOffset =
+    textDirection(displayText, layoutDirection()) === layoutDirection() ? openTextOffset : FIELD_INSET - trailingInset;
   const fieldSlideStyle = useAnimatedStyle(() => ({
     height: fieldHeightValue.get(),
     transform: [
       {
-        translateX: interpolate(
-          expansion.get(),
-          [0, 1],
-          [restTextOffset, interpolate(stackedValue.get(), [0, 1], [openTextOffset, 0])],
-        ),
+        translateX:
+          END_X *
+          interpolate(
+            expansion.get(),
+            [0, 1],
+            [restTextOffset, interpolate(stackedValue.get(), [0, 1], [fieldOpenOffset, 0])],
+          ),
       },
     ],
   }));
@@ -713,11 +726,13 @@ export const ChatComposer = memo(function ChatComposer({
   const placeholderStyle = useAnimatedStyle(() => ({
     transform: [
       {
-        translateX: interpolate(
-          expansion.get(),
-          [0, 1],
-          [restTextOffset, interpolate(stackedValue.get(), [0, 1], [openTextOffset, 0])],
-        ),
+        translateX:
+          END_X *
+          interpolate(
+            expansion.get(),
+            [0, 1],
+            [restTextOffset, interpolate(stackedValue.get(), [0, 1], [openTextOffset, 0])],
+          ),
       },
     ],
   }));
@@ -794,9 +809,10 @@ export const ChatComposer = memo(function ChatComposer({
   const restingPlus = resizes && !hasDraft && !focused && !replyActive;
   const plusDrawn = CONTROL_SIZE * (restingPlus ? REST_CONTROL_SCALE : 1);
   const plusInset = (CONTROL_SIZE - plusDrawn) / 2;
+  // `left` is from the start edge: React Native swaps it in a right-to-left layout.
   const attachmentAnchor = {
     left:
-      insets.left +
+      (END_X === 1 ? insets.left : insets.right) +
       BAR_INSET +
       TOOLBAR_PADDING +
       plusInset +

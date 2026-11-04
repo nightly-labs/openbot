@@ -92,8 +92,12 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   const drawerShownOnUI = useSharedValue(false);
   const drawerProgress = useSharedValue(0);
   // The surface stays in view at the right, clear of a right inset (the iPhone Duo rail).
-  const drawerWidth = Math.min(360, Math.max(280, width - insets.right - 52));
-  const drawerSideInset = Math.max(insets.left, 18);
+  // The drawer is at the start edge: the left, or the right in a right-to-left layout. The insets
+  // are sides of the screen, so they are picked for that edge.
+  const startInset = DRAWER_SIDE === 1 ? insets.left : insets.right;
+  const endInset = DRAWER_SIDE === 1 ? insets.right : insets.left;
+  const drawerWidth = Math.min(360, Math.max(280, width - endInset - 52));
+  const drawerSideInset = Math.max(startInset, 18);
   const surfaceCornerRadius = Math.max(DRAWER_SURFACE_MIN_RADIUS, insets.top, insets.right, insets.bottom, insets.left);
 
   const drawerOpenOnUI = useSharedValue(false);
@@ -338,7 +342,8 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
                       : [
                           {
                             borderCurve: "continuous",
-                            boxShadow: "-12px 0 32px rgba(0, 0, 0, 0.28)",
+                            // The shadow falls on the drawer, at the start edge of the surface.
+                            boxShadow: `${-12 * DRAWER_SIDE}px 0 32px rgba(0, 0, 0, 0.28)`,
                           },
                           surfaceStyle,
                         ]

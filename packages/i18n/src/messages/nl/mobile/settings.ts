@@ -10,9 +10,8 @@ export const messages = {
     "Systeemstandaard volgt de eerste taal in de instellingen van je telefoon. Tekst die nog niet is vertaald, wordt in het Engels getoond.",
   "mobile.settings.language.restartTitle": "OpenBot opnieuw starten?",
   "mobile.settings.language.restartBody":
-    "Deze taal lees je in de andere richting. De schermen draaien om wanneer OpenBot opnieuw start.",
-  "mobile.settings.language.restartNow": "Opnieuw starten",
-  "mobile.settings.language.restartLater": "Later",
+    "Deze taal lees je in de andere richting. De schermen draaien om wanneer OpenBot opnieuw start. Zien de schermen er na de herstart nog verkeerd uit, sluit OpenBot dan in de appkiezer en open het opnieuw.",
+  "mobile.settings.language.restartNow": "Nu opnieuw starten",
   "mobile.settings.language.restartFailed":
     "OpenBot kon niet opnieuw starten. De schermen draaien om wanneer je OpenBot de volgende keer opent.",
   "mobile.settings.dictation.language": "Dicteertaal",
