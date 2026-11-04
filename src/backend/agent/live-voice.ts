@@ -16,7 +16,7 @@ const ANSWER_TIMEOUT_MS = 20_000;
 /** How Codex reports that OpenAI refused the call: `unexpected status 401 Unauthorized: …`. */
 const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
 
-export class LiveVoiceFailed extends Schema.TaggedError<LiveVoiceFailed>()("LiveVoiceFailed", {
+class LiveVoiceFailed extends Schema.TaggedError<LiveVoiceFailed>()("LiveVoiceFailed", {
   cause: Schema.Defect(),
 }) {}
 

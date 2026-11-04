@@ -60,5 +60,3 @@ export function createVoiceSessions(sidePanels: Store<SidePanelsState>) {
     },
   };
 }
-
-export type VoiceSessions = ReturnType<typeof createVoiceSessions>;
