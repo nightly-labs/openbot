@@ -2435,7 +2435,7 @@ export class ChannelService {
     const fiber = Effect.runSync(
       Effect.forkIn(
         this.#history.summarizeAhead(channelId, lead, fallbacks).pipe(
-          // The next packet summarizes again and reports its own failure.
+          // The next packet summarizes again. When that fails too, the packet gives the newest messages.
           Effect.catch((failure) =>
             Effect.sync(() =>
               logger.warn("A channel summary after a turn failed.", {

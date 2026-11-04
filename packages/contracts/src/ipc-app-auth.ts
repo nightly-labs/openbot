@@ -17,6 +17,11 @@ export interface AppInfo {
   analyticsCaptureUrl?: string;
   /** The random analytics ID of this install, for events that do not go with the account. */
   analyticsInstallId?: string;
+  /**
+   * True when Chromium draws the windows on the CPU: hardware acceleration is off, or the GPU is
+   * blocked or missing, as on a server, a remote desktop or a computer whose GPU failed.
+   */
+  softwareRendering?: boolean;
 }
 
 /** The phase list is the source of truth: `UpdatePhase` is derived from it. */
@@ -236,9 +241,15 @@ export interface CentralAuthIssue {
   reference?: string;
 }
 
+export type CentralAuthSignedOutReason = "keyring_changed";
+
 export type CentralAuthState =
   | { status: "loading" }
-  | { status: "signed_out" }
+  /**
+   * `keyring_changed`: the Linux keyring did not open the saved sign-in, so OpenBot now keeps its
+   * secrets in its own key file and the user signs in one more time.
+   */
+  | { status: "signed_out"; reason?: CentralAuthSignedOutReason }
   | { status: "signing_in" }
   | {
       status: "code_sent";

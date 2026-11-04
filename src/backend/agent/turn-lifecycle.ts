@@ -1078,7 +1078,11 @@ export class TurnLifecycle {
       const mayRunAgain =
         failover !== undefined && !limited && status === "failed" && running !== undefined && !running.acted;
       const shouldCompact =
-        !refused && !limited && !mayRunAgain && !routineSession && this.#compaction.reserve(agentId, threadId);
+        !refused &&
+        !limited &&
+        !mayRunAgain &&
+        !routineSession &&
+        this.#compaction.reserve(agentId, threadId, false, turnId);
       this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
       const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
       snapshot.activeTurnId = null;
@@ -1388,11 +1392,15 @@ export class TurnLifecycle {
     (completion, agentId, threadId, turnId, status) =>
       // The turn is already out of `#runningTurns`, so a step above that fails must not leave its
       // deliveries running: nothing else would end them, and the agent's queue would wait (#2214).
+      // Nor a compaction that it reserved and did not ask for: its hold has no deadline (#4960).
       completion.pipe(
         Effect.onError((cause) =>
-          Cause.hasInterruptsOnly(cause)
-            ? Effect.void
-            : this.settleOrphanedTurn(agentId, threadId, turnId, status === "failed" ? "failed" : "interrupted"),
+          Effect.andThen(
+            Effect.sync(() => this.#compaction.dropReservation(agentId, threadId, turnId)),
+            Cause.hasInterruptsOnly(cause)
+              ? Effect.void
+              : this.settleOrphanedTurn(agentId, threadId, turnId, status === "failed" ? "failed" : "interrupted"),
+          ),
         ),
         Effect.ensuring(
           Effect.andThen(

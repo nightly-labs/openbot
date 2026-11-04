@@ -7,7 +7,7 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
-## [1.4.6] - In review
+## [1.4.6] - 2026-11-04 (iOS)
 
 ### Added
 

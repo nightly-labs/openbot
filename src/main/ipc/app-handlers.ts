@@ -172,6 +172,10 @@ export function appIpcHandlers({
         }
         // electron-vite starts a script, so Electron reports its own version in development.
         const version = app.isPackaged ? app.getVersion() : developmentVersion;
+        // Each state other than `enabled*` (such as `disabled_software` or `unavailable_software`)
+        // composites on the CPU. This covers the GPU switch of `linux-gpu-mode.ts` and a GPU that
+        // Chromium blocks, such as the llvmpipe driver of a server or a remote desktop.
+        const softwareRendering = !app.getGPUFeatureStatus().gpu_compositing.startsWith("enabled");
         return {
           name: app.getName(),
           version,
@@ -179,6 +183,7 @@ export function appIpcHandlers({
           variant: appVariant,
           ...(analyticsCaptureUrl ? { analyticsCaptureUrl } : {}),
           ...(analyticsInstallId ? { analyticsInstallId } : {}),
+          ...(softwareRendering ? { softwareRendering } : {}),
         };
       }),
       getSetupState: handler(() => runCauseEffect(readSetupState(setupFile))),
