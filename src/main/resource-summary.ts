@@ -25,6 +25,26 @@ export type ResourceProvider = (typeof RESOURCE_PROVIDERS)[number];
 const GONE_REASONS = ["crashed", "oom", "killed", "abnormal_exit", "launch_failed", "other"] as const;
 export type GoneReason = (typeof GONE_REASONS)[number];
 
+/**
+ * The process type of a child process that ended. OpenBot's utility processes go by their group, and
+ * Chromium's network service has its own value. Electron's other utility services are
+ * `utility_other`; a zygote, a sandbox helper, a plugin or an unknown process is `other`.
+ */
+const CHILD_TYPES = ["gpu", "database_host", "voice_host", "network", "utility_other", "other"] as const;
+export type ChildType = (typeof CHILD_TYPES)[number];
+
+/**
+ * When the minute that holds a main-loop delay started: in the first two minutes after the app or a
+ * wake from sleep started, in the first hour, or later.
+ */
+const LOOP_PHASES = ["startup", "resume", "first_hour", "later"] as const;
+export type LoopPhase = (typeof LOOP_PHASES)[number];
+const LOOP_SETTLE_MS = 2 * 60_000;
+const LOOP_FIRST_HOUR_MS = 60 * 60_000;
+
+/** A minute whose longest main-loop delay is at least this long counts as a stall. */
+export const MAIN_LOOP_STALL_MS = 1_000;
+
 /** A statement slower than this counts as slow. */
 export const SLOW_DATABASE_STATEMENT_MS = 100;
 
@@ -39,11 +59,13 @@ export const RESOURCE_ENUMS = {
   cpu_class: CPU_CLASSES,
   arch: ARCHITECTURES,
   host_kind: HOST_KINDS,
+  main_loop_delay_max_phase: LOOP_PHASES,
 } as const;
 
 type GroupPropertyName = `${ProcessGroup}_rss_mb_p95` | `${ProcessGroup}_cpu_pct_p95`;
 type ProviderPropertyName = `provider_${ResourceProvider}_rss_mb_p95` | `provider_${ResourceProvider}_cpu_pct_p95`;
 type GonePropertyName = `gone_${GoneReason}_count`;
+type ChildGonePropertyName = `child_gone_${ChildType}_count`;
 
 export const RESOURCE_PROPERTY_NAMES = [
   "total_rss_mb_p95",
@@ -57,12 +79,16 @@ export const RESOURCE_PROPERTY_NAMES = [
   ]),
   "main_loop_delay_ms_p95",
   "main_loop_delay_ms_max",
+  "main_loop_delay_max_phase",
+  "main_loop_delay_max_turn_active",
+  "main_loop_stall_count",
   "db_request_ms_p95",
   "db_request_ms_max",
   "db_request_count",
   "db_slow_request_count",
   "renderer_gone_count",
   "child_gone_count",
+  ...CHILD_TYPES.map((type): ChildGonePropertyName => `child_gone_${type}_count`),
   ...GONE_REASONS.map((reason): GonePropertyName => `gone_${reason}_count`),
   "active_turn_count_max",
   "browser_tab_count_max",
@@ -233,6 +259,11 @@ const ResourceDaySchema = Schema.Struct({
   /** Metric → the largest value seen. */
   peaks: Counts,
   counters: Counts,
+  /**
+   * The minute of the longest main-loop delay. Missing in a file from an older version. The phase is
+   * any string here, so a value from a newer version does not reject the file; the event checks it.
+   */
+  mainLoopPeak: Schema.optional(Schema.Struct({ phase: Schema.String, turnActive: Schema.Boolean })),
 });
 /** The day that the monitor changes in place. The decoded file has the same shape, read-only. */
 export interface ResourceDay {
@@ -242,6 +273,7 @@ export interface ResourceDay {
   histograms: Record<string, Record<string, number>>;
   peaks: Record<string, number>;
   counters: Record<string, number>;
+  mainLoopPeak?: { phase: string; turnActive: boolean };
 }
 
 const ResourceSummaryFile = Schema.Struct({
@@ -319,6 +351,8 @@ export const METRIC = {
 export const COUNTER = {
   rendererGone: "gone.renderer",
   childGone: "gone.child",
+  childType: (type: ChildType) => `gone.child_type.${type}`,
+  mainLoopStall: "loop.stalls",
   goneReason: (reason: GoneReason) => `gone.reason.${reason}`,
   databaseRequests: "db.requests",
   databaseSlow: "db.slow",
@@ -339,6 +373,9 @@ export function resourceEventProperties(day: ResourceDay, device: DeviceClass): 
     total_cpu_pct_max: roundWhole(day.peaks[METRIC.cpu("total")]),
     main_loop_delay_ms_p95: roundWhole(percentile(day, METRIC.mainLoop, 0.95)),
     main_loop_delay_ms_max: roundWhole(day.peaks[METRIC.mainLoop]),
+    main_loop_delay_max_phase: LOOP_PHASES.find((phase) => phase === day.mainLoopPeak?.phase),
+    main_loop_delay_max_turn_active: day.mainLoopPeak?.turnActive,
+    main_loop_stall_count: day.counters[COUNTER.mainLoopStall] ?? 0,
     db_request_ms_p95: roundWhole(percentile(day, METRIC.database, 0.95)),
     db_request_ms_max: roundWhole(day.peaks[METRIC.database]),
     db_request_count: day.counters[COUNTER.databaseRequests] ?? 0,
@@ -363,11 +400,25 @@ export function resourceEventProperties(day: ResourceDay, device: DeviceClass): 
     properties[`provider_${provider}_rss_mb_p95`] = roundMb(percentile(day, METRIC.providerRss(provider), 0.95));
     properties[`provider_${provider}_cpu_pct_p95`] = roundWhole(percentile(day, METRIC.providerCpu(provider), 0.95));
   }
+  for (const type of CHILD_TYPES) {
+    const count = day.counters[COUNTER.childType(type)];
+    if (count) properties[`child_gone_${type}_count`] = count;
+  }
   for (const reason of GONE_REASONS) {
     const count = day.counters[COUNTER.goneReason(reason)];
     if (count) properties[`gone_${reason}_count`] = count;
   }
   return Object.fromEntries(Object.entries(properties).filter(([, value]) => value !== undefined));
+}
+
+/**
+ * The phase of a main-loop window from its start, in milliseconds after the process started.
+ * `resumedAtMs` is the last wake from sleep on the same clock.
+ */
+export function loopPhase(windowStartedAtMs: number, resumedAtMs: number | null): LoopPhase {
+  if (windowStartedAtMs < LOOP_SETTLE_MS) return "startup";
+  if (resumedAtMs !== null && windowStartedAtMs - resumedAtMs < LOOP_SETTLE_MS) return "resume";
+  return windowStartedAtMs < LOOP_FIRST_HOUR_MS ? "first_hour" : "later";
 }
 
 /** Electron's `details.reason`, in the closed set above. `null` for a clean exit. */

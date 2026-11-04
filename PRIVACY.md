@@ -296,8 +296,11 @@ The local host also records how the agents are used:
 - **Resource use.** At most once a day, the host sends a summary of the previous day: the memory and
   CPU use of OpenBot's process groups (main, windows, browser tabs, GPU, the database and voice
   processes) and of each provider's CLI and its child processes, by provider id; the main process
-  responsiveness; agent database statement times and counts; counts of processes that stopped
-  unexpectedly, by reason; and the computer's memory and processor class, architecture, and whether
+  responsiveness, with the number of minutes that had a delay of 1 second or more, and for the
+  longest delay whether it came in the first minutes after the start or a wake from sleep, in the
+  first hour or later, and whether an agent turn ran; agent database statement times and counts;
+  counts of processes that stopped unexpectedly, by reason and by process type (such as GPU,
+  database, voice or network); and the computer's memory and processor class, architecture, and whether
   it is a server. Memory is rounded to 50 MB. Process IDs, program names, command lines and paths
   are not sent. A day that ends while analytics is off is sent with the install ID, and is not sent
 when there is no install ID.
@@ -829,7 +832,8 @@ server can change it.
   and the outcome word. A connection step does not name the server. The failure's error text goes only to the redacted log. The trace holds no payloads,
   messages, URLs, paths, or identifiers, and it goes through log redaction before it is written. It
   is kept to two files of 2 MB each and is never sent. It also records the exit of a renderer or
-  helper process with its reason word, and the reason that OpenBot quit (such as
+  helper process with its reason word and process type, each main-process delay of 1 second or more
+  with the phase word described above, and the reason that OpenBot quit (such as
   `main_window_closed` or `quit`).
 - `~/Library/Application Support/OpenBot/logs/main/main.log` holds the redacted lines of the main
   process: startup failures, uncaught errors, the reason that OpenBot quit, and why an update check,
@@ -841,7 +845,7 @@ server can change it.
   Dumps are never uploaded or added to a diagnostics export. Crashpad deletes old dumps by itself.
   Do not attach a dump to a public issue.
 - `~/Library/Application Support/OpenBot/logs/resources.ndjson` holds one line a minute: the memory
-  and CPU use of each OpenBot process group and provider id, the main process delay, the number of
+  and CPU use of each OpenBot process group and provider id, the main process delay and its phase, the number of
   agent database statements, active turns and browser tabs. It holds no process IDs, program names,
   command lines or paths. It is kept to two files of 1 MB each and is never sent.
   `~/Library/Application Support/OpenBot/openbot-resource-summary-v1.json` holds the totals of

@@ -1073,11 +1073,19 @@ function sanitizeHostEvent(name: HostEventName, properties: HostProperties): Hos
 
 function sanitizeHostProperty(name: HostEventName, key: string, value: unknown): HostPropertyValue | undefined {
   if (name === "system_resources") {
-    if (key === "ram_class" || key === "cpu_class" || key === "arch" || key === "host_kind") {
+    if (
+      key === "ram_class" ||
+      key === "cpu_class" ||
+      key === "arch" ||
+      key === "host_kind" ||
+      key === "main_loop_delay_max_phase"
+    ) {
       const allowed: readonly string[] = RESOURCE_ENUMS[key];
       return isString(value) && allowed.includes(value) ? value : undefined;
     }
-    if (key === "provider_tree_supported") return isBoolean(value) ? value : undefined;
+    if (key === "provider_tree_supported" || key === "main_loop_delay_max_turn_active") {
+      return isBoolean(value) ? value : undefined;
+    }
     return boundedCount(value, 10_000_000);
   }
   if (key === "cause_code" || key === "severity" || key === "operation") {

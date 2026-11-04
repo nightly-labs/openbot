@@ -105,7 +105,11 @@ shutdown, and a damaged file starts a new day. `HostAnalytics.checkResources()` 
 as `system_resources` and marks it handled in the file before the send, so a crash cannot send it
 twice. The file keeps the handled day for the diagnostics export until a newer day replaces it.
 Nothing leaves the process with a PID, a command or a path: the summary keys are group names,
-provider ids and reason words, and the analytics allowlist checks each value again.
+provider ids and reason words, and the analytics allowlist checks each value again. The day also
+keeps the phase of the longest main-loop delay (`mainLoopPeak`, optional so older files still
+decode; the phase is any string in the file and the event drops a value outside its enum), and
+child exits by process type. A minute with a delay of 1 s or more writes a `stall` span to the
+trace.
 
 ## Agent usage analytics
 
