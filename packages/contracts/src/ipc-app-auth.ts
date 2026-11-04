@@ -17,6 +17,11 @@ export interface AppInfo {
   analyticsCaptureUrl?: string;
   /** The random analytics ID of this install, for events that do not go with the account. */
   analyticsInstallId?: string;
+  /**
+   * True when Chromium draws the windows on the CPU: hardware acceleration is off, or the GPU is
+   * blocked or missing, as on a server, a remote desktop or a computer whose GPU failed.
+   */
+  softwareRendering?: boolean;
 }
 
 /** The phase list is the source of truth: `UpdatePhase` is derived from it. */
