@@ -352,6 +352,7 @@ interface MessageRowShared {
   listWidth: number;
   actions: {
     reply: (message: ChatBubbleMessage) => void;
+    bringEditIntoView: (message: ChatBubbleMessage) => void;
     rewrite: (message: ChatBubbleMessage, text: string, requestId: string) => Promise<void>;
     selectQuestion: (messageId: string) => void;
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
@@ -854,6 +855,7 @@ const MessageRow = memo(function MessageRow({
                   editRequestId.current = Crypto.randomUUID();
                   setEditError(null);
                   setEditing(true);
+                  actions.bringEditIntoView(message);
                 }
               : undefined
           }
@@ -1209,9 +1211,16 @@ export const ChatMessageList = memo(function ChatMessageList({
   const hasRows = rows.length > 0;
   const onReady = useCallback(() => onListReady(hasRows), [onListReady, hasRows]);
   const selectionArea = useRef<ViewInstance | null>(null);
+  const bringEditIntoView = (message: ChatBubbleMessage) => {
+    const index = chatRowIndex(rows, message.id);
+    if (index < 0) return;
+    // The editor grows and takes focus on the next frame. Place its row below the floating header.
+    requestAnimationFrame(() => void motion.openAt(index));
+  };
   const actionHandlers = useRef({
     onReply,
     onRewrite,
+    bringEditIntoView,
     onReact,
     onSelectText,
     onSelectionChange,
@@ -1221,6 +1230,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   actionHandlers.current = {
     onReply,
     onRewrite,
+    bringEditIntoView,
     onReact,
     onSelectText,
     onSelectionChange,
@@ -1230,6 +1240,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   const actions = useMemo<MessageRowShared["actions"]>(
     () => ({
       reply: (message) => actionHandlers.current.onReply?.(message),
+      bringEditIntoView: (message) => actionHandlers.current.bringEditIntoView(message),
       rewrite: (message, text, requestId) =>
         actionHandlers.current.onRewrite?.(message, text, requestId) ??
         Promise.reject(new Error(currentText().t("mobile.chat.message.editFailed"))),
