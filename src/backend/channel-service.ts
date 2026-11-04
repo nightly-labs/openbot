@@ -91,6 +91,8 @@ export interface ChannelHooks {
    * packet leave out the messages that the session read: a compaction resets what it read.
    */
   reportsCompactions?(agentId: string): boolean;
+  /** Whether the agent's provider streams text as the answer before it knows that it is not a step. */
+  provisionalAnswers?(agentId: string): boolean;
   /** The thread's snapshot when main has it in memory, which a streaming turn always has. */
   loadedSnapshot?(threadId: string): ConversationSnapshot | undefined;
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
@@ -2534,6 +2536,11 @@ export class ChannelService {
       return history.get(id) ?? undefined;
     };
     const messages: ChannelMessage[] = [];
+    let provisional: boolean | undefined;
+    const provisionalAnswers = () => {
+      provisional ??= this.hooks.provisionalAnswers?.(snapshot.agentId) === true;
+      return provisional;
+    };
     const active = assignments.find((item) => item.agentId === snapshot.agentId && activeAssignment(item));
     for (let message of turnId === undefined
       ? snapshot.messages
@@ -2570,6 +2577,17 @@ export class ChannelService {
         !message.text.trim() &&
         !message.attachments?.length &&
         !message.questionPrompt
+      )
+        continue;
+      // OpenCode's text before a tool call streams as the answer and becomes a step only at that
+      // call. Copied while it streamed, each such note showed as the member's message and then
+      // folded (#4844). The agent's own chat still streams it; the channel gets it when it completes.
+      if (
+        !original &&
+        message.author === "assistant" &&
+        message.status === "streaming" &&
+        message.itemType === "final_answer" &&
+        provisionalAnswers()
       )
         continue;
       const task = tasks.get(assignment.taskId);
