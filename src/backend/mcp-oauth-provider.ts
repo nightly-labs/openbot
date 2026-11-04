@@ -52,6 +52,7 @@ import { sourceText } from "@openbot/i18n/source";
 import type { Logger } from "@openbot/logging";
 import { z } from "zod";
 import { runCauseEffect } from "./effect-boundary";
+import { GOOGLE_MCP_SCOPES, type GoogleSignIn, isGoogleSignInApp, withGoogleTokenBroker } from "./google-mcp-sign-in";
 import { readLimitedBody } from "./limited-body";
 import {
   type AddressLookup,
@@ -160,6 +161,11 @@ export interface McpOAuthOptions {
   logger?: Pick<Logger, "warn">;
   /** Resolves the host names of OAuth endpoints. See `secureOAuthFetch`. */
   lookup?: AddressLookup;
+  /**
+   * The OpenBot Google sign-in app. A Google MCP server with no sign-in app of the user's gets it, and
+   * its token requests go through Signal. See `google-mcp-sign-in.ts`.
+   */
+  googleSignIn?: GoogleSignIn;
 }
 
 /**
@@ -296,7 +302,9 @@ export class McpOAuth implements McpOAuthAuthority {
   constructor(options: McpOAuthOptions) {
     const refusal = describeUnusableRedirectUrl(options.redirectUrl);
     if (refusal) throw new Error(refusal);
-    this.#options = options;
+    this.#options = options.googleSignIn
+      ? { ...options, storage: withGoogleSignInApp(options.storage, options.googleSignIn) }
+      : options;
   }
 
   /**
@@ -402,8 +410,9 @@ export class McpOAuth implements McpOAuthAuthority {
 
   /** The fetch of one exchange for this server. */
   #fetch(key: string, signal: AbortSignal): FetchLike {
-    const { lookup } = this.#options;
-    return secureOAuthFetch({ signal, resource: mcpOAuthServerUrl(key), ...(lookup ? { lookup } : {}) });
+    const { lookup, googleSignIn } = this.#options;
+    const fetch = secureOAuthFetch({ signal, resource: mcpOAuthServerUrl(key), ...(lookup ? { lookup } : {}) });
+    return googleSignIn ? withGoogleTokenBroker(fetch, googleSignIn, signal) : fetch;
   }
 
   readonly #awaitRefresh = Effect.fn("McpOAuth.awaitRefresh")((exchange: Fiber.Fiber<void>) =>
@@ -682,6 +691,8 @@ export class McpOAuth implements McpOAuthAuthority {
   signInApp(url: string): McpOAuthAppSummary | null {
     const key = mcpOAuthAccountKey(url);
     const app = key ? this.#options.storage.read(key)?.app : undefined;
+    // The OpenBot Google sign-in app is not one the user saved: the form stays empty for theirs.
+    if (key && app && isGoogleSignInApp(mcpOAuthServerUrl(key), app)) return null;
     return app ? { clientId: app.clientId, secretSaved: app.clientSecret !== undefined, scope: app.scope ?? "" } : null;
   }
 
@@ -733,7 +744,8 @@ export class McpOAuth implements McpOAuthAuthority {
   ): Effect.fn.Return<boolean, McpOperationError> {
     const key = mcpOAuthAccountKey(url);
     const record = key ? this.#options.storage.read(key) : null;
-    if (!key || !record?.app) return false;
+    // The OpenBot Google sign-in app is not one the user saved, so there is nothing of theirs to remove.
+    if (!key || !record?.app || isGoogleSignInApp(mcpOAuthServerUrl(key), record.app)) return false;
     this.#invalidate(key);
     yield* this.#options.storage.write(key, record.discovery ? { discovery: record.discovery } : {});
     return true;
@@ -1412,6 +1424,30 @@ function withOfflineAccess(authorizationUrl: URL, metadata: OAuthDiscoveryState[
   url.searchParams.set("scope", `${scope} offline_access`);
   if (!url.searchParams.has("prompt")) url.searchParams.set("prompt", "consent");
   return url;
+}
+
+/**
+ * The store as the sign-in sees it: while this host can ask Signal, a Google MCP server with no sign-in
+ * app of the user's has the OpenBot Google sign-in app. The record shape does not change, so an older
+ * build reads the file as before. A write that copies the record keeps the app on file, so the app on
+ * file always gets the current client ID and scope: a build with a new client, or with more scopes,
+ * uses them at the next sign-in.
+ */
+function withGoogleSignInApp(storage: McpOAuthStorage, google: GoogleSignIn): McpOAuthStorage {
+  return {
+    read: (key) => {
+      const record = storage.read(key);
+      // Each account of a Google server, `#account-…` or not, signs in with the same app and scopes.
+      const server = mcpOAuthServerUrl(key);
+      const scope = Object.hasOwn(GOOGLE_MCP_SCOPES, server) ? GOOGLE_MCP_SCOPES[server] : undefined;
+      if (!scope || !google.available()) return record;
+      const app = record?.app;
+      if (app && !isGoogleSignInApp(server, app)) return record;
+      return { ...record, app: { ...app, clientId: google.clientId, scope } };
+    },
+    write: (key, record) => storage.write(key, record),
+    clear: (key) => storage.clear(key),
+  };
 }
 
 /**
