@@ -22,6 +22,7 @@
   height: 7px;
   border-radius: var(--openbot-radius-pill);
   background: url("../../assets/plush/ball-lilac.webp") center / contain no-repeat;
+  transform-origin: 50% 100%;
   animation: none;
 }
 
@@ -35,7 +36,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .agent-row-agent-status-working .agent-row-thinking-dots i {
-    animation: agent-row-ball-hop 960ms linear infinite;
+    animation: agent-row-ball-hop 960ms cubic-bezier(0.5, 0, 0.5, 1) infinite;
   }
 
   .agent-row-agent-status-working .agent-row-thinking-dots i:nth-child(2) {
@@ -47,21 +48,30 @@
   }
 }
 
-/* A low hop: the ball slows as it rises and speeds up as it falls, then rests. A squash on a 7px
-   ball is less than one pixel and looks like a jiggle, so the ball keeps its shape. */
+/* A low hop with a soft squash, so each ball stays inside the pill border. */
 @keyframes agent-row-ball-hop {
-  0% {
-    translate: 0 0;
-    animation-timing-function: cubic-bezier(0.25, 0.6, 0.45, 1);
-  }
-
-  22% {
-    translate: 0 -1.75px;
-    animation-timing-function: cubic-bezier(0.55, 0, 0.75, 0.4);
-  }
-
-  44%,
+  0%,
+  62%,
   100% {
     translate: 0 0;
+    scale: 1 1;
+  }
+
+  8% {
+    scale: 1.1 0.9;
+  }
+
+  26% {
+    translate: 0 -1.75px;
+    scale: 0.94 1.06;
+  }
+
+  44% {
+    translate: 0 0;
+    scale: 1.08 0.92;
+  }
+
+  54% {
+    scale: 0.98 1.02;
   }
 }
