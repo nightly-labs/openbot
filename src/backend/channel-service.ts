@@ -2888,9 +2888,9 @@ export class ChannelService {
     if (tool !== "channel_assign" && tool !== "channel_transfer")
       return yield* channelFailure(new Error("Unknown channel tool."));
     // The agent can correct these arguments, so it gets the reason as a result. Codex replaces a
-    // failed tool request with "dynamic tool request failed" (#4728).
-    const refuse = (reason: string) => {
-      logger.warn("A channel handoff was refused.", { channelId, agentId, tool, reason });
+    // failed tool request with "dynamic tool request failed" (#4728). The log keeps a fixed reason.
+    const refuse = (reason: string, logReason = reason) => {
+      logger.warn("A channel handoff was refused.", { channelId, agentId, tool, reason: logReason });
       return { accepted: false, reason };
     };
     if (
@@ -2910,12 +2910,22 @@ export class ChannelService {
       );
     const recipientAgentId = args.recipientAgentId;
     const recipient = yield* Effect.result(channelSync(() => this.requireAvailableMember(channel, recipientAgentId)));
-    if (Result.isFailure(recipient))
+    if (Result.isFailure(recipient)) {
+      if (this.hooks.hidden?.(recipientAgentId))
+        return refuse("This member is hidden and takes no new work. Choose another channel member.");
+      if (!this.hooks.agents().some((agent) => agent.id === recipientAgentId))
+        return refuse("Set recipientAgentId to the agent id of an available channel member.");
+      // The agent exists but is not a member. Only a person can add it, so the agent must not retry.
+      const name = this.memberName(recipientAgentId);
+      const available = this.eligibleMembers(channel)
+        .filter((id) => id !== agentId)
+        .slice(0, 20)
+        .map((id) => `${this.memberName(id)} (${id})`);
       return refuse(
-        this.hooks.hidden?.(recipientAgentId)
-          ? "This member is hidden and takes no new work. Choose another channel member."
-          : "Set recipientAgentId to the agent id of an available channel member.",
+        `${name} (${recipientAgentId}) is not a member of this channel. Available members: ${available.join(", ") || "none"}. If the task needs ${name}, ask a person in this channel to add it, then end your turn.`,
+        "The recipient is not a member of this channel.",
       );
+    }
     if (args.recipientAgentId === agentId) return refuse("Choose another channel member.");
     const sourceMessageIds = args.sourceMessageIds;
     if (sourceMessageIds.some((id) => !this.store.message(channelId, id)))
