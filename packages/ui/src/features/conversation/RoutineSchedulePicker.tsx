@@ -97,6 +97,12 @@ function queueFit(picker: HTMLElement) {
       const pickers = [...queuedFits];
       queuedFits.clear();
       fitRows(pickers);
+      // The fit laid out the labels, and that can start to load a font they use. Its width changes no row width.
+      if (document.fonts?.status === "loading") {
+        void document.fonts.ready.then(() => {
+          for (const picker of pickers) queueFit(picker);
+        });
+      }
     });
   }
   queuedFits.add(picker);
@@ -112,10 +118,7 @@ function observeFit(picker: HTMLElement) {
     }
   });
   fitObserver.observe(picker);
-  return () => {
-    fitObserver?.unobserve(picker);
-    fitWidths.delete(picker);
-  };
+  return () => fitObserver?.unobserve(picker);
 }
 
 /**
@@ -151,8 +154,6 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
   onSettled(() => {
     const element = picker;
     if (!element) return;
-    // Loaded fonts change no label, and the effect above already fitted the row.
-    if (document.fonts && document.fonts.status !== "loaded") void document.fonts.ready.then(() => queueFit(element));
     return observeFit(element);
   });
 
