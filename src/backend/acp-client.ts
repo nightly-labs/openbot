@@ -444,6 +444,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   get contextCompaction(): "handoff" | "unsupported" {
     return this.#flavor.contextCompaction ?? "unsupported";
   }
+  /**
+   * An agent whose prompt stays open for background work (Antigravity) is left out: its answer can
+   * wait minutes for the end of the prompt, and a channel would show it only then.
+   */
+  get provisionalAnswers(): boolean {
+    return this.#flavor.streamAnswerBeforePromptReturns === true && !this.#flavor.promptOpenForBackgroundTasks;
+  }
   get provider(): AgentProvider {
     return this.options.provider;
   }
@@ -2160,14 +2167,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
       // `promptId` names this result: a delivery that runs again keeps its turn ID.
-      if (response.usage)
+      const usage = this.#flavor.promptUsage ? this.#flavor.promptUsage(response) : response.usage;
+      if (usage)
         this.emit("notification", {
           method: "openbot/usage",
           params: {
             threadId: thread.id,
             turnId: turn.id,
             promptId: randomUUID(),
-            usage: response.usage,
+            usage,
             ...(turn.reportedCost === null ? {} : { cost: turn.reportedCost }),
           },
         });

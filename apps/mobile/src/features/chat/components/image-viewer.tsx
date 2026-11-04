@@ -652,7 +652,9 @@ export function ImageViewer({
         )}
         <GestureDetector gesture={gesture}>
           <View
-            style={StyleSheet.absoluteFill}
+            // The pictures are placed in screen points, from the chat's thumbnails and the fingers. A
+            // right-to-left layout would swap their `left` but not their transforms.
+            style={[StyleSheet.absoluteFill, { direction: "ltr" }]}
             collapsable={false}
             accessible
             accessibilityViewIsModal
@@ -792,6 +794,8 @@ export function ImageViewer({
                   bottom: insets.bottom,
                   height: THUMB_SIZE + STRIP_OFFSET * 2,
                   paddingVertical: STRIP_OFFSET,
+                  // The strip follows the pages, which stay left to right.
+                  direction: "ltr",
                 },
                 stripStyle,
               ]}

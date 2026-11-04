@@ -14,6 +14,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { haptics } from "@/shared/lib/haptics";
+import { END_X, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 /** How long a touch and hold lasts before the sheet opens. */
 const HOLD_MS = 500;
@@ -51,9 +52,11 @@ export function ChatMessageGesture({
   onHold?: () => void;
 }>) {
   const muted = useThemeColor("muted");
-  // The swipe distance toward the middle of the chat, in points. A bubble at the end moves left.
+  // The swipe distance toward the middle of the chat, in points. A bubble at the end moves left, or
+  // right in a right-to-left layout: React Native swaps the sides of the layout, not the gestures and
+  // the transforms.
   const offset = useSharedValue(0);
-  const direction = align === "end" ? -1 : 1;
+  const direction = (align === "end" ? -1 : 1) * END_X;
   // The press of a touch and hold. It runs on the UI thread, so a press renders nothing in React.
   const pressScale = useSharedValue(1);
   const bubbleStyle = useAnimatedStyle(() => ({
@@ -119,7 +122,7 @@ export function ChatMessageGesture({
           className={`absolute bottom-0 top-0 justify-center ${align === "end" ? "right-0" : "left-0"}`}
           style={iconStyle}
         >
-          <Reply color={muted} size={22} />
+          <Reply color={muted} size={22} style={MIRROR_IN_RTL} />
         </Animated.View>
       ) : null}
       <GestureDetector gesture={gesture}>

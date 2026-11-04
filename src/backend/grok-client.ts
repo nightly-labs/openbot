@@ -4,7 +4,7 @@ import { type DynamicRecord, isNumber } from "@openbot/contracts/runtime-values"
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
-import { DEFAULT_ACP_FLAVOR } from "./acp-flavor";
+import { GROK_ACP_FLAVOR } from "./acp-flavor";
 import type { GrokCliInfo } from "./cli";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
 import { confineSpawnTarget, grokStatePaths, type ProcessConfinement } from "./process-confinement";
@@ -26,7 +26,7 @@ export class GrokAgentClient extends AcpAgentClient {
   ) {
     super(cli, requestTimeoutMs, {
       provider: "grok",
-      flavor: DEFAULT_ACP_FLAVOR,
+      flavor: GROK_ACP_FLAVOR,
       ...(confinement
         ? {
             confine: (target) =>

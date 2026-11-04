@@ -353,6 +353,7 @@
     "./features/sidebar/SidebarTopbar": "./src/features/sidebar/SidebarTopbar.tsx",
     "./features/sidebar/SidebarViewSwitch": "./src/features/sidebar/SidebarViewSwitch.tsx",
     "./features/sidebar/sidebar-views.css": "./src/features/sidebar/sidebar-views.css",
+    "./features/sidebar/sidebar-working-badge.css": "./src/features/sidebar/sidebar-working-badge.css",
     "./features/sidebar/createSidebarDragEngine": "./src/features/sidebar/createSidebarDragEngine.ts",
     "./features/sidebar/duplicate-section": "./src/features/sidebar/duplicate-section.ts",
     "./features/sidebar/sidebar-agent-order": "./src/features/sidebar/sidebar-agent-order.ts",

@@ -195,6 +195,12 @@ export interface SaveSetupInput {
   preferredModel: AgentModelId | null;
 }
 
+/**
+ * The default provider of a joined server's host (`provider-default-v1`). A provider that this build
+ * does not know reads as none.
+ */
+export type HostDefaultProvider = Pick<AppSetupState, "preferredProvider" | "preferredModel">;
+
 export interface AnalyticsPreference {
   enabled: boolean;
 }
