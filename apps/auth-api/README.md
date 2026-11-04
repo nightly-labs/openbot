@@ -261,9 +261,11 @@ code.
 
 `/v1/sites` takes two optional headers: `OpenBot-Host-Id` and `OpenBot-Host-Token`, the machine token
 of a registered server. With them, a request sees only that server's sites, and a new site counts
-against the server plan's limit. A wrong token gets 401 `host_unauthorized`. Without them, a new site
-goes into the account's unlinked bucket of one site; `GET /v1/sites?scope=unlinked` lists only that
-bucket. `GET /v1/sites` returns `{ sites, limit, used }`.
+against the server's limit: a `server_site_limits` row, else its plan's limit, else the account's shared
+pool (3 sites for each license user, else 1), within an account cap of 300. A wrong token gets 401
+`host_unauthorized`. Without them, a new site goes into the account's unlinked bucket of one site;
+`GET /v1/sites?scope=unlinked` lists only that bucket. `GET /v1/sites` returns `{ sites, limit, used }`, plus an optional `limitReason`: `shared` for a
+server in the shared pool, `account` when the account cap is full.
 
 ## Authentication data retention
 

@@ -17,9 +17,11 @@ import {
   isAgentApproval,
   isBrowserTakeoverRequest,
 } from "./ipc-approvals";
-import { isIdentifier } from "./ipc-bounded-values";
+import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import type { BrowserControlState, BrowserTab } from "./ipc-browser";
+import { type AgentChatColorEntry, isChatColors, type MemberChatColorEntry } from "./ipc-chat-colors";
 import { type AgentPromptQuestion, isAgentPromptQuestion, isConversationMessage } from "./ipc-conversation-messages";
+import { CONVERSATION_SUBAGENT_TITLE_LIMIT } from "./ipc-conversation-subagents";
 import {
   type ConversationPage,
   type ConversationSnapshot,
@@ -85,6 +87,8 @@ export type AgentEvent =
   | { type: "hidden-agents-changed"; agents: HiddenAgent[] }
   /** The whole list of exact agent colours, in the `agent-colors-v1` wire shape. */
   | { type: "agent-colors-changed"; agents: AgentColorEntry[] }
+  /** The whole list of agent and member chat colours, in the `chat-colors-v1` wire shape. */
+  | { type: "chat-colors-changed"; agents: AgentChatColorEntry[]; members: MemberChatColorEntry[] }
   /**
    * The user's own notification levels on this server changed on one of their devices. Only the
    * connections of that member get it (`agent-notification-levels-v1`), with all of their levels.
@@ -185,6 +189,19 @@ export type AgentEvent =
       provider: AgentProviderId;
       resetsAt: number | null;
       agentCount: number;
+    }
+  /**
+   * A subagent of a turn failed, once per subagent. `title` is the task the card shows. Local only:
+   * the released Team API event adapters do not carry it, and a remote client reads the failure in the
+   * subagent list of the conversation (`subagents-v1`).
+   */
+  | {
+      type: "subagent-failed";
+      agentId: string;
+      threadId: string;
+      turnId: string;
+      subagentId: string;
+      title: string;
     };
 
 export function isAgentEvent(value: unknown): value is AgentEvent {
@@ -229,6 +246,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isHiddenAgentsSnapshot({ agents: value.agents });
     case "agent-colors-changed":
       return isAgentColors({ agents: value.agents });
+    case "chat-colors-changed":
+      return isChatColors({ agents: value.agents, members: value.members });
     case "agent-notification-levels-changed":
       return isAgentNotificationLevelsSnapshot({ server: value.server, agents: value.agents });
     case "sidebar-pins-changed":
@@ -362,6 +381,14 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.message) &&
         (value.provider === undefined || isAgentProvider(value.provider)) &&
         (value.model === undefined || isString(value.model))
+      );
+    case "subagent-failed":
+      return (
+        isIdentifier(value.agentId) &&
+        isIdentifier(value.threadId) &&
+        isIdentifier(value.turnId) &&
+        isIdentifier(value.subagentId) &&
+        isBoundedString(value.title, CONVERSATION_SUBAGENT_TITLE_LIMIT)
       );
     case "usage-limit-reached":
       return (

@@ -72,4 +72,6 @@ export const messages = {
   "usage.panel.unsupported":
     "Bu ana makine ajan analizlerini desteklemiyor. Bu görünümü kullanmak için ana makineyi güncelleyin.",
   "usage.panel.loadFailed": "Kullanım yüklenemedi. Bağlantıyı ve tarih aralığını kontrol edin.",
+  "usage.machine.label": "Makine kullanımı. CPU: {cpu}, bellek: {memory}",
+  "usage.machine.openStorage": "Depolamayı aç. Disk: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -161,3 +161,12 @@ export function parseFinishedChatMarkdown(body: string) {
   parsedBodies.set(body, tokens);
   return tokens;
 }
+
+/**
+ * Markdown as one paragraph of inline tokens, such as the question of an agent: links, emphasis and
+ * code, but no list or heading. `1. Which branch?` stays a sentence, as on desktop.
+ */
+export function parseInlineChatMarkdown(body: string): Token[] {
+  const tokens = new markdown.Lexer(markdown.defaults).inlineTokens(body);
+  return [{ type: "paragraph", raw: body, text: body, tokens }];
+}

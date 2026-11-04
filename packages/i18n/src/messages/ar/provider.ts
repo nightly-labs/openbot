@@ -139,6 +139,7 @@ export const messages = {
   "provider.picker.noModels": "لا تتوفر نماذج من {name}.",
   "provider.picker.customEmpty":
     "أضف نقطة نهاية متوافقة مع OpenAI — خادم نماذج على هذا الحاسوب، أو أي خدمة لها عنوان URL أساسي ومفتاح.",
+  "provider.picker.customPending": "لم يتم تحميل نماذج نقاط النهاية بعد. يقرأها المزوّد بعد توقف مهمته الحالية.",
   "provider.picker.defaultModelLabel": "{name}، الافتراضي",
   "provider.picker.usageLimit": "تم بلوغ حد الاستخدام",
   "provider.picker.usageLimitWindow": "حد {window}",

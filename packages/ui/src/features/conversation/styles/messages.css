@@ -225,6 +225,18 @@
   );
 }
 
+/*
+ * A chat color tints the bubble: the reader's own, an agent's, or another person's. The author sets
+ * it in Settings or in the agent settings, and everyone in the chat sees the same tint.
+ */
+.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content {
+  background: color-mix(in srgb, var(--message-chat-color) 22%, var(--openbot-bg-surface));
+}
+
+.message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content {
+  background: color-mix(in srgb, var(--message-chat-color) 22%, var(--openbot-bg-surface-raised));
+}
+
 .message-action-button {
   display: grid;
   width: 24px;

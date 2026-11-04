@@ -44,6 +44,9 @@ const DRIVERS: readonly DriverCase[] = [
   { provider: "cline", missing: "protocol" },
   { provider: "kimi", missing: "kimi", modelSet: "kimi" },
   { provider: "devin", missing: "devin" },
+  // GitHub Copilot CLI 1.0.105 refuses a signed-out session with `-32000`, as the fake does. Its
+  // missing-session error is not confirmed: that needs a signed-in account.
+  { provider: "copilot", missing: "protocol" },
   { provider: "grok", missing: "protocol" },
   { provider: "hermes", missing: "hermes" },
   {

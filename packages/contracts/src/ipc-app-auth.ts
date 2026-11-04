@@ -1,5 +1,5 @@
 import type { ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
-import type { AgentModelId } from "./ipc-agent-identity";
+import type { AgentModelId, AvatarColor } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
 import { integerInRange, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
 import { decodeRecord, nullableNumber, requiredBoolean, requiredNumber, requiredString } from "./ipc-decoding";
@@ -221,6 +221,11 @@ export interface CentralAuthUser {
    * never answered, or the account service is older.
    */
   analyticsEnabled?: boolean | null;
+  /**
+   * The tint of the user's own chat bubbles, which members of each server of the user see. Null or
+   * missing: no chat color, or the account service is older.
+   */
+  chatColor?: AvatarColor | null;
 }
 
 export interface CentralAuthIssue {

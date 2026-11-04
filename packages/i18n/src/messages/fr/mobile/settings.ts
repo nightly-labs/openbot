@@ -79,7 +79,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animations",
   "mobile.settings.animations.agentFaces": "Visages animés des agents",
   "mobile.settings.animations.agentFacesFooter":
-    "Les avatars des agents bougent leur visage pendant que les agents travaillent et se reposent. Désactivé, les visages restent immobiles.",
+    "Les avatars des agents bougent leur visage pendant que les agents travaillent et se reposent. Désactivé, les visages restent immobiles et les personnages de l’écran d’accueil et de l’accueil vide ne flottent plus.",
   "mobile.settings.animations.composerResize": "Champ de message compact",
   "mobile.settings.animations.composerResizeFooter":
     "Le champ de message devient une petite barre quand le clavier est fermé. Désactivé, le champ garde sa taille complète.",

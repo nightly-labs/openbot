@@ -309,6 +309,15 @@ and check its SHA-256 against the manifest `sha256`. Set `url`, `assetSha256`, `
 `bin/devin` (`bin/devin.exe` on Windows). `share/` holds only documentation, so it is not in
 `files`.
 
+## Pin the GitHub Copilot CLI
+
+`native-runtime.lock.json` pins the GitHub Copilot CLI by hand. Read the tag of
+`https://api.github.com/repos/github/copilot-cli/releases/latest` and set `version` without its
+`v`. For each target, download `copilot-<target>.tar.gz` (`copilot-win32-x64.zip` on Windows) from
+that release, and check its SHA-256 against the asset `digest`. Set `url`, `assetSha256`,
+`downloadBytes`, `installedBytes` (the size of the extracted `copilot` or `copilot.exe`) and the
+SHA-256 of `bin/copilot` (`bin/copilot.exe` on Windows).
+
 ## Pin the OpenCode CLI
 
 `native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode

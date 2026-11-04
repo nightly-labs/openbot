@@ -95,6 +95,11 @@ export const ORDER_METADATA = {
 export const LICENSE_INCLUDED_USERS = 2;
 /** The largest license that the app sells. A larger team contacts sales. */
 export const LICENSE_MAX_USERS = 10;
+/**
+ * The active hosted sites that a license gives for each user. The sites are one pool for the owner's
+ * servers that have no plan, so more servers do not give more sites.
+ */
+export const LICENSE_SITES_PER_USER = 3;
 /** The license terms allow this many devices for each user. The app does not count them. */
 export const LICENSE_DEVICES_PER_USER = 3;
 /** Yearly billing takes this share off a license. The bundle discount comes off after it. */

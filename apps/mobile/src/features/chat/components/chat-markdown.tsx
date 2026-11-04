@@ -48,7 +48,11 @@ import {
   textDirection,
   textDirectionStyle,
 } from "@/shared/lib/text-direction";
-import { parseFinishedChatMarkdown, parseStreamingChatMarkdown } from "../model/chat-markdown-parser";
+import {
+  parseFinishedChatMarkdown,
+  parseInlineChatMarkdown,
+  parseStreamingChatMarkdown,
+} from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
 import { createReplyReveal, finishedReplyReveal } from "../model/reply-reveal";
 import { ChatCodeBlock } from "./chat-code-block";
@@ -810,9 +814,15 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   agents = NO_AGENTS,
   finished = false,
   linkFavicons = true,
+  fontWeight,
+  inline: inlineOnly = false,
 }: {
   body: string;
   color: ColorValue | undefined;
+  /** The weight of the text, such as the medium title of a question card. Bold text stays bold. */
+  fontWeight?: TextStyle["fontWeight"];
+  /** Only inline Markdown, in one paragraph: a line that starts with `1.` or `#` stays text. */
+  inline?: boolean;
   compact?: boolean;
   streaming?: boolean;
   /** The text will not change, so its parse is shared across mounts. */
@@ -830,8 +840,13 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   const textReveal = useMotionPreference("textReveal");
   const { fontScale } = useWindowDimensions();
   const tokens = useMemo(
-    () => (finished ? parseFinishedChatMarkdown(body) : parseStreamingChatMarkdown(body)),
-    [body, finished],
+    () =>
+      inlineOnly
+        ? parseInlineChatMarkdown(body)
+        : finished
+          ? parseFinishedChatMarkdown(body)
+          : parseStreamingChatMarkdown(body),
+    [body, finished, inlineOnly],
   );
   const reveal = useMemo(
     () => (finished ? finishedReplyReveal(tokens) : createReplyReveal(tokens)),
@@ -846,7 +861,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     () => ({
       selectable,
       type: compact ? "body-sm" : "body",
-      style: { color: color ?? codeColor },
+      style: fontWeight ? { color: color ?? codeColor, fontWeight } : { color: color ?? codeColor },
       codeColor,
       agents,
       mentionOffset: 4 * fontScale,
@@ -858,7 +873,20 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       linkFavicons,
       direction: layoutDirection(),
     }),
-    [linkFavicons, selectable, compact, color, codeColor, agents, fontScale, t, streaming, finished, animateTail],
+    [
+      linkFavicons,
+      selectable,
+      compact,
+      color,
+      fontWeight,
+      codeColor,
+      agents,
+      fontScale,
+      t,
+      streaming,
+      finished,
+      animateTail,
+    ],
   );
   return (
     <StreamRevealProvider>

@@ -137,6 +137,8 @@ export const messages = {
   "provider.picker.noModels": "У {name} нет доступных моделей.",
   "provider.picker.customEmpty":
     "Добавьте эндпоинт, совместимый с OpenAI: сервер моделей на этом компьютере или любой сервис с базовым URL и ключом.",
+  "provider.picker.customPending":
+    "Модели ваших эндпоинтов ещё не загружены. Провайдер прочитает их, когда завершится текущая задача.",
   "provider.picker.defaultModelLabel": "{name}, по умолчанию",
   "provider.picker.usageLimit": "Лимит использования исчерпан",
   "provider.picker.usageLimitWindow": "Лимит ({window})",

@@ -2,7 +2,7 @@ import { agentTemplateIdFromWebAppSearch, WEB_APP_AGENT_TEMPLATE_PARAM } from "@
 import { companySignInErrorKey, WEB_APP_COMPANY_SIGN_IN_ERROR_PARAM } from "@openbot/contracts/company-sign-in";
 import { type FirstTouch, readFirstTouch } from "@openbot/contracts/first-touch";
 import { inviteUrlFromWebAppSearch, WEB_APP_INVITE_FIELDS } from "@openbot/contracts/invite-links";
-import type { AppVariant, CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
+import { type AppVariant, type CentralAuthState, type CentralAuthUser, isAvatarColor } from "@openbot/contracts/ipc";
 import {
   type MarketplaceListingLink,
   marketplaceListingFromWebAppSearch,
@@ -340,6 +340,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       name: isString(value.user.name) ? value.user.name : null,
       avatarUrl: isString(value.user.avatarUrl) ? value.user.avatarUrl : null,
       analyticsEnabled: isBoolean(value.user.analyticsEnabled) ? value.user.analyticsEnabled : null,
+      chatColor: isAvatarColor(value.user.chatColor) ? value.user.chatColor : null,
     };
   }
   /**
@@ -569,6 +570,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
                   accountEmail={state.account?.email ?? ""}
                   accountName={state.account?.name ?? null}
                   accountAvatarUrl={state.account?.avatarUrl ?? null}
+                  accountChatColor={state.account?.chatColor ?? null}
                   accountFetch={accountFetch}
                   onSessionCheck={checkSession}
                   accountSessionEnded={() => sessionEnded}

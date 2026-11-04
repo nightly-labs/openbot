@@ -15,6 +15,10 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
   indexTitle: "Compare OpenBot with other AI agent apps",
   indexDescription:
     "How AI agent apps compare: OpenBot against other apps, coding agents against each other, and where agents run, which models they use and what they cost.",
+  indexSocialImage: {
+    path: "/social/compare.jpg",
+    alt: "Better together. OpenBot agents around a glass arch",
+  },
   feedTitle: "OpenBot comparisons",
   backLabel: "All comparisons",
   moreTitle: "More comparisons",

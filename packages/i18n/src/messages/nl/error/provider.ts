@@ -269,6 +269,7 @@ export const messages = {
   "error.provider.kimiVersionUnreadable": "Kan de versie van Kimi CLI niet lezen.",
   "error.provider.kimiSignIn": "Log in met Kimi Code om Kimi te gebruiken.",
   "error.provider.devinSignIn": "Log in met Devin om Devin te gebruiken.",
+  "error.provider.copilotSignIn": "Log in met GitHub of stel COPILOT_GITHUB_TOKEN in om GitHub Copilot te gebruiken.",
   "error.provider.hermesMissing": "Hermes Agent is niet geïnstalleerd. Installeer het en probeer het opnieuw.",
   "error.provider.hermesNotStarted": "Hermes Agent kon niet starten. Voer `hermes --version` uit in een terminal.",
   "error.provider.hermesVersionUnreadable": "De versie van Hermes Agent kan niet worden gelezen.",
@@ -290,6 +291,8 @@ export const messages = {
     "Gemini kon de inlogpagina niet in je browser openen. Controleer je standaardbrowser en verbind daarna opnieuw.",
   "error.provider.acpSignInFailed": "Het inloggen is niet voltooid.",
   "error.provider.acpSignInFailedReason": "Het inloggen is niet voltooid: {reason}",
+  "error.provider.acpSignOutFailed": "Het uitloggen is niet voltooid.",
+  "error.provider.acpSignOutFailedReason": "Het uitloggen is niet voltooid: {reason}",
   "error.provider.acpSignInMethodMissing":
     "Deze aanbieder biedt deze inlog niet aan op deze computer. Werk de aanbieder bij en probeer het opnieuw.",
   "error.provider.httpsSignInLinkOnly": "Alleen HTTPS-inloglinks kunnen in de browser worden geopend.",

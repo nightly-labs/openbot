@@ -1,16 +1,8 @@
 import type { UiBlockStatus } from "@openbot/contracts/ui-blocks";
-import type { AppTextKey } from "@openbot/i18n";
-import { Badge, Button, Check, CircleCheck, Clock3, LoaderCircle, X } from "@openbot/ui";
+import { Badge, Button, CircleCheck, Clock3, LoaderCircle, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createUniqueId, Match, Show, Switch } from "solid-js";
 import { useText } from "../../../text";
-
-const STATUS_LABEL = {
-  pending: "uiBlock.status.pending",
-  answered: "uiBlock.status.answered",
-  expired: "uiBlock.status.expired",
-  closed: "uiBlock.status.closed",
-} as const satisfies Record<UiBlockStatus, AppTextKey>;
 
 export interface UiBlockCardProps {
   title?: string | undefined;
@@ -37,18 +29,21 @@ export interface UiBlockCardProps {
 export function UiBlockOutcome(props: { status: UiBlockStatus; outcome?: string | undefined }) {
   const { t } = useText();
   const text = () =>
-    props.outcome ??
-    (props.status === "expired"
-      ? t("uiBlock.outcome.expired")
-      : props.status === "closed"
-        ? t("uiBlock.outcome.closed")
-        : "");
+    // A blank outcome, such as a form of secret fields, still says that the block was answered.
+    (props.outcome?.trim() ? props.outcome : undefined) ??
+    (props.status === "answered"
+      ? t("uiBlock.status.answered")
+      : props.status === "expired"
+        ? t("uiBlock.outcome.expired")
+        : props.status === "closed"
+          ? t("uiBlock.outcome.closed")
+          : "");
   return (
     <Show when={props.status !== "pending" && text() !== ""}>
       <p class="ui-block-outcome" data-status={props.status}>
         <Switch>
           <Match when={props.status === "answered"}>
-            <CircleCheck aria-hidden="true" />
+            <CircleCheck class="ui-block-outcome-check" aria-hidden="true" />
           </Match>
           <Match when={props.status === "expired"}>
             <Clock3 aria-hidden="true" />
@@ -100,13 +95,13 @@ export function UiBlockFooter(props: {
 }
 
 /**
- * The frame of a blocking block: title, subtitle, a badge for the status, the body, and, once the
- * block is answered, expired or closed, the outcome line.
+ * The frame of a blocking block: title, subtitle, a badge while it waits, the body, and, once the
+ * block is answered, expired or closed, the outcome line. A closed block says its state once, in
+ * the outcome line, so it has no badge.
  */
 export function UiBlockCard(props: UiBlockCardProps) {
   const { t } = useText();
   const titleId = createUniqueId();
-  const statusLabel = () => t(STATUS_LABEL[props.status]);
   return (
     <article
       class={["conversation-interaction-card", "ui-block-card", props.class]}
@@ -128,22 +123,12 @@ export function UiBlockCard(props: UiBlockCardProps) {
             <p class="ui-block-subtitle">{props.subtitle}</p>
           </Show>
         </div>
-        <Badge
-          variant={
-            props.status === "pending" ? "warning-light" : props.status === "answered" ? "success-light" : "secondary"
-          }
-          class="conversation-interaction-status ui-block-status"
-        >
-          <Switch>
-            <Match when={props.status === "pending"}>
-              <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-            </Match>
-            <Match when={props.status === "answered"}>
-              <Check data-icon="inline-start" aria-hidden="true" />
-            </Match>
-          </Switch>
-          {statusLabel()}
-        </Badge>
+        <Show when={props.status === "pending"}>
+          <Badge variant="warning-light" class="conversation-interaction-status ui-block-status">
+            <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
+            {t("uiBlock.status.pending")}
+          </Badge>
+        </Show>
       </header>
       <div class="ui-block-body">{props.children}</div>
       <UiBlockFooter status={props.status} error={props.error} onSkip={props.onSkip} busy={props.busy} />
