@@ -1,5 +1,5 @@
 import type { ConversationQuestionPrompt } from "@openbot/contracts/ipc";
-import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
+import { type ConversationUiBlock, UI_CHOICE_QUESTION_ID } from "@openbot/contracts/ui-blocks";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
@@ -97,7 +97,7 @@ export function ChatQuestionPrompt({
         </View>
         {/* A closed form keeps what it asked, as on desktop, so the person can still read the draft. */}
         {confirm ? (
-          <ConfirmBody spec={confirm} selectValue={answeredSelect(prompt, resolution, t)} />
+          <ConfirmBody spec={confirm} closed selectValue={answeredSelect(prompt, resolution, t)} />
         ) : (
           prompt.questions.map((item) => (
             <View key={item.id} className="gap-1">
@@ -105,7 +105,12 @@ export function ChatQuestionPrompt({
                 {item.question}
               </Typography>
               {resolution.status === "answered" ? (
-                <Typography>{promptAnswerLabel(item, resolution, t)}</Typography>
+                <Typography>
+                  {/* The options of a choice with more than one answer come as lines; show them as a list. */}
+                  {item.id === UI_CHOICE_QUESTION_ID
+                    ? promptAnswerLabel(item, resolution, t).split("\n").filter(Boolean).join(", ")
+                    : promptAnswerLabel(item, resolution, t)}
+                </Typography>
               ) : item.options?.length ? (
                 <Typography type="body-sm">{item.options.map((option) => option.label).join(", ")}</Typography>
               ) : null}

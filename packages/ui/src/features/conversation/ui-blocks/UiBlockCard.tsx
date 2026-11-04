@@ -29,7 +29,8 @@ export interface UiBlockCardProps {
 export function UiBlockOutcome(props: { status: UiBlockStatus; outcome?: string | undefined }) {
   const { t } = useText();
   const text = () =>
-    props.outcome ??
+    // A blank outcome, such as a form of secret fields, still says that the block was answered.
+    (props.outcome?.trim() ? props.outcome : undefined) ??
     (props.status === "answered"
       ? t("uiBlock.status.answered")
       : props.status === "expired"

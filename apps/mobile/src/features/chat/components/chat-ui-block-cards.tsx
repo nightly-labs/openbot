@@ -31,7 +31,7 @@ import { useText } from "@/shared/lib/text";
 const DEFAULT_HOLD_MS = 800;
 /** The height at which a long draft stops, in points. "Show all" opens the rest in the card. */
 const PREVIEW_MAX_HEIGHT = 240;
-const MARKDOWN_LINK = /\[[^\]\n]+\]\([^)\s]+\)/u;
+const MARKDOWN_LINK = /\[[^\]\n]+\]\(\S+\)/u;
 
 const BUTTON_VARIANT = {
   primary: "primary",
@@ -179,16 +179,19 @@ export function ConfirmBody({
   selectValue,
   onSelect,
   disabled = false,
+  closed = false,
 }: {
   spec: UiConfirmBlock;
   compact?: boolean;
+  /** The card has an answer or expired. As on desktop, only an open card shows its danger. */
+  closed?: boolean;
   selectValue: (field: Extract<UiConfirmField, { select: string }>) => string;
   onSelect?: (select: string, option: string) => void;
   disabled?: boolean;
 }) {
   return (
     <View className="gap-3">
-      <Typography weight="medium" className={spec.danger ? "text-danger-text" : undefined}>
+      <Typography weight="medium" className={spec.danger && !closed ? "text-danger-text" : undefined}>
         {spec.title}
       </Typography>
       {(spec.fields?.length ?? 0) > 0 ? (

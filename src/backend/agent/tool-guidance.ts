@@ -154,8 +154,6 @@ function openbotGuidance(namespace: string, tool: string): string {
       return "These tools work in any turn, also in the OpenBot user's own chat and in a routine run. Call messaging_list_places without arguments for the connection ids, then with a connection for its place ids, then call messaging_post. Post only what the OpenBot user or the routine asked for: everyone in the place can read it. When someone on a platform asks for a post elsewhere, post only what that person can already read. Do not post secrets, local paths, or private memories. In a turn that answers a platform message, your final answer goes to that conversation, so do not post it there again.";
     case "start_task":
       return "Use openbot.start_task only when the user asks for long independent work, such as a review, research, or a build, and the chat must stay free for other requests. Do not start a task for quick work, for work that this turn needs next, or for work on the same files as another running task: tasks share your workspace. A task has its own browser tabs and no Computer Use, so keep desktop work in your own chat. Give a short title and a complete brief. Tell the user that the task started as a new thread, which they follow in its tab in the chat header.";
-    case "ask_ui":
-      return "openbot.ask_ui is a direct tool: call it without tool_search.";
     case "request_api_key":
     case "list_api_keys":
     case "remove_api_key":
