@@ -1,7 +1,8 @@
 import type { MachineMetrics, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { UsageMachineMeter } from "@openbot/ui/features/usage/UsageMachineMeter";
-import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
+import { createMemo, createSignal, Show, untrack } from "solid-js";
+import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { canManageStorage } from "../files/storage-usage";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServerSettings } from "../servers/server-settings";
@@ -9,8 +10,8 @@ import { useServers } from "../servers/servers-context";
 
 /** Memory and CPU change fast, and the host reads CPU since the reading before. */
 const MACHINE_REFRESH_MS = 60_000;
-/** A timer can fire a little early, so a reading this close to the interval is due. */
-const MACHINE_REFRESH_SLACK_MS = 1_000;
+/** The poll compares the age often, so a reading is at most this much later than the minute. */
+const MACHINE_REFRESH_CHECK_MS = 10_000;
 
 type MachinePort = Pick<OpenBotDesktopApi["storage"], "getMachineMetrics">;
 
@@ -35,34 +36,26 @@ export function UsageMachine(props: { serverId: string }) {
   });
   const [reading, setReading] = createSignal<{ serverId: string; metrics: MachineMetrics } | null>(null);
 
-  createEffect(target, (serverId) => {
-    if (!serverId) return;
-    let current = true;
-    let lastReadAt = 0;
-    const read = () => {
-      lastReadAt = Date.now();
-      machinePort()
-        .getMachineMetrics(serverId)
-        .then(
-          (metrics) => {
-            if (current) setReading(metrics ? { serverId, metrics } : null);
-          },
-          // The meter keeps the last reading. The next minute asks again.
-          () => undefined,
-        );
-    };
-    const readWhenDue = () => {
-      if (document.hidden || Date.now() - lastReadAt < MACHINE_REFRESH_MS - MACHINE_REFRESH_SLACK_MS) return;
-      read();
-    };
-    untrack(read);
-    const timer = window.setInterval(readWhenDue, MACHINE_REFRESH_MS);
-    document.addEventListener("visibilitychange", readWhenDue);
-    return () => {
-      current = false;
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", readWhenDue);
-    };
+  function refresh(serverId: string): void {
+    machinePort()
+      .getMachineMetrics(serverId)
+      .then(
+        (metrics) => {
+          // An answer for a server that the panel no longer shows is dropped.
+          if (untrack(target) === serverId) setReading(metrics ? { serverId, metrics } : null);
+        },
+        // A failed read shows no meter, so an old reading does not look live. The next poll asks again.
+        () => {
+          if (untrack(target) === serverId) setReading(null);
+        },
+      );
+  }
+  createUsageRefreshPoll({
+    target,
+    refresh,
+    refreshAtStart: true,
+    refreshMs: MACHINE_REFRESH_MS,
+    checkMs: MACHINE_REFRESH_CHECK_MS,
   });
 
   /** A reading of a server that the panel showed before does not show. */

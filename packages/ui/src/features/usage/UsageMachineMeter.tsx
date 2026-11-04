@@ -29,7 +29,7 @@ const HEADER_METRICS = ["cpu", "memory"] as const satisfies readonly MachineMetr
 /**
  * The machine use of a server in the Usage header: a ring and a percentage for CPU and memory. A
  * click shows each one with its size, then the disk, whose row opens Storage. The colours follow the
- * default alert levels, as Storage shows them.
+ * default machine alert levels. When the host can read neither CPU nor memory, the meter shows nothing.
  */
 export function UsageMachineMeter(props: UsageMachineMeterProps) {
   const { t } = useText();
@@ -37,69 +37,72 @@ export function UsageMachineMeter(props: UsageMachineMeterProps) {
   const percent = (metric: MachineMetric) => machineMetricPercent(props.metrics, metric);
   const percentText = useMetricPercentText();
   const detail = useMachineMetricDetail();
+  const known = () => HEADER_METRICS.some((metric) => percent(metric) !== null);
   return (
-    // As the filter selects beside it: centred under the trigger.
-    <Popover.Root open={open()} onOpenChange={setOpen} placement="bottom" gutter={8}>
-      <Popover.Trigger
-        class={buttonVariants({ variant: "ghost", size: "sm", class: "usage-machine-trigger" })}
-        aria-label={t("usage.machine.label", {
-          cpu: percentText(props.metrics, "cpu"),
-          memory: percentText(props.metrics, "memory"),
-        })}
-      >
-        <For each={HEADER_METRICS}>
-          {(metric) => {
-            const Icon = MACHINE_METRIC_ICONS[metric];
-            return (
-              <Show when={percent(metric) !== null}>
-                <span class="usage-machine-item" data-tone={metricTone(props.metrics, metric)}>
-                  <Icon class="usage-machine-icon" />
-                  <RadialProgress
-                    class="usage-machine-ring"
-                    aria-hidden="true"
-                    value={percent(metric) ?? 0}
-                    tone={ringTone(metricTone(props.metrics, metric))}
-                  />
-                  <span class="usage-machine-value">{percentText(props.metrics, metric)}</span>
-                </span>
-              </Show>
-            );
-          }}
-        </For>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content class="ui-popover-menu-surface context-meter-popover usage-machine-popover">
-          <header class="context-meter-header">
-            <Popover.Title class="context-meter-title">{t("files.machine.title")}</Popover.Title>
-          </header>
+    <Show when={known()}>
+      {/* As the filter selects beside it: centred under the trigger. */}
+      <Popover.Root open={open()} onOpenChange={setOpen} placement="bottom" gutter={8}>
+        <Popover.Trigger
+          class={buttonVariants({ variant: "ghost", size: "sm", class: "usage-machine-trigger" })}
+          aria-label={t("usage.machine.label", {
+            cpu: percentText(props.metrics, "cpu"),
+            memory: percentText(props.metrics, "memory"),
+          })}
+        >
           <For each={HEADER_METRICS}>
-            {(metric) => (
-              <div class="usage-machine-detail" data-tone={metricTone(props.metrics, metric)}>
-                <MetricDetail metrics={props.metrics} metric={metric} />
-              </div>
-            )}
+            {(metric) => {
+              const Icon = MACHINE_METRIC_ICONS[metric];
+              return (
+                <Show when={percent(metric) !== null}>
+                  <span class="usage-machine-item" data-tone={metricTone(props.metrics, metric)}>
+                    <Icon class="usage-machine-icon" />
+                    <RadialProgress
+                      class="usage-machine-ring"
+                      aria-hidden="true"
+                      value={percent(metric) ?? 0}
+                      tone={ringTone(metricTone(props.metrics, metric))}
+                    />
+                    <span class="usage-machine-value">{percentText(props.metrics, metric)}</span>
+                  </span>
+                </Show>
+              );
+            }}
           </For>
-          <footer class="context-meter-footer">
-            <Button
-              variant="ghost"
-              type="button"
-              class="context-meter-action usage-machine-detail usage-machine-storage"
-              data-tone={metricTone(props.metrics, "disk")}
-              aria-label={t("usage.machine.openStorage", {
-                percent: percentText(props.metrics, "disk"),
-                detail: detail(props.metrics, "disk"),
-              })}
-              onClick={() => {
-                setOpen(false);
-                props.onOpenStorage();
-              }}
-            >
-              <MetricDetail metrics={props.metrics} metric="disk" inButton />
-            </Button>
-          </footer>
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Content class="ui-popover-menu-surface context-meter-popover usage-machine-popover">
+            <header class="context-meter-header">
+              <Popover.Title class="context-meter-title">{t("files.machine.title")}</Popover.Title>
+            </header>
+            <For each={HEADER_METRICS}>
+              {(metric) => (
+                <div class="usage-machine-detail" data-tone={metricTone(props.metrics, metric)}>
+                  <MetricDetail metrics={props.metrics} metric={metric} />
+                </div>
+              )}
+            </For>
+            <footer class="context-meter-footer">
+              <Button
+                variant="ghost"
+                type="button"
+                class="context-meter-action usage-machine-detail usage-machine-storage"
+                data-tone={metricTone(props.metrics, "disk")}
+                aria-label={t("usage.machine.openStorage", {
+                  percent: percentText(props.metrics, "disk"),
+                  detail: detail(props.metrics, "disk"),
+                })}
+                onClick={() => {
+                  setOpen(false);
+                  props.onOpenStorage();
+                }}
+              >
+                <MetricDetail metrics={props.metrics} metric="disk" inButton />
+              </Button>
+            </footer>
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
+    </Show>
   );
 }
 
