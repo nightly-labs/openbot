@@ -1117,7 +1117,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#thisComputerMembersChanged = listener;
   }
 
-  /** The child cannot read the account directory, so a change made here must reach it. */
+  /**
+   * The child cannot read the account directory, so a change made here must reach it. Also after a
+   * failure: the account service can have changed the member before a later step failed.
+   */
   #membersChanged(serverId: string): Effect.Effect<void> {
     return Effect.sync(() => {
       if (this.#thisComputerServers.has(serverId)) this.#thisComputerMembersChanged(serverId);
@@ -1778,12 +1781,12 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   updateMember(serverId: string, input: UpdateTeamMemberInput): Effect.Effect<TeamMemberSummary, RemoteWorkflowError> {
-    return this.#owned(this.#team.updateMember(serverId, input).pipe(Effect.tap(() => this.#membersChanged(serverId))));
+    return this.#owned(this.#team.updateMember(serverId, input).pipe(Effect.ensuring(this.#membersChanged(serverId))));
   }
 
   removeMember(serverId: string, memberId: string): Effect.Effect<void, RemoteWorkflowError> {
     return this.#owned(
-      this.#team.removeMember(serverId, memberId).pipe(Effect.tap(() => this.#membersChanged(serverId))),
+      this.#team.removeMember(serverId, memberId).pipe(Effect.ensuring(this.#membersChanged(serverId))),
     );
   }
 
