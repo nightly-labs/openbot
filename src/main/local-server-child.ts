@@ -15,6 +15,7 @@
 
 import { Socket } from "node:net";
 import { isAbsolute } from "node:path";
+import type { Readable } from "node:stream";
 import { Effect, Schema, Semaphore } from "effect";
 import type { HostService } from "./host-service";
 import { RemoteWorkflowError } from "./remote-service-effects";
@@ -26,16 +27,25 @@ export const LOCAL_SERVER_OWNER_USERNAME = "owner";
 export const LOCAL_SERVER_READY_PREFIX = "OPENBOT_LOCAL_SERVER_READY ";
 
 /**
- * The pipe from the desktop app: its commands, and its end when the app stops. Not standard input:
- * on Windows, Electron replaces `process.stdin` with a stream that only ends (#4868).
+ * The pipe from the desktop app on Windows: there Electron replaces `process.stdin` with a stream that
+ * only ends (#4868). On the other systems the pipe is standard input, which the processes that this
+ * server starts do not inherit.
  */
 export const LOCAL_SERVER_CONTROL_FD = 3;
 
-/** Null when the parent gave no control pipe, so that this process cannot know when the app stops. */
-export function openLocalServerControl(): Socket | null {
+/**
+ * The pipe from the desktop app: its commands, and its end when the app stops. Null when the parent
+ * gave no pipe, so that this process cannot know when the app stops.
+ */
+export function openLocalServerControl(
+  platform: NodeJS.Platform,
+  onFailure: (cause: unknown) => void,
+): Readable | null {
+  if (platform !== "win32") return process.stdin;
   try {
     return new Socket({ fd: LOCAL_SERVER_CONTROL_FD, readable: true, writable: false });
-  } catch {
+  } catch (error) {
+    onFailure(error);
     return null;
   }
 }

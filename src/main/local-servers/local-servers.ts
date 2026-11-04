@@ -20,7 +20,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { Writable } from "node:stream";
+import { Readable, Writable } from "node:stream";
 import { LOCAL_SERVER_LIMIT, type ServerSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
@@ -104,9 +104,9 @@ function parseReadyLine(line: string): LocalServerReady | null {
   }
 }
 
-/** The parent's end of the child's control pipe (`LOCAL_SERVER_CONTROL_FD`). */
-function controlPipe(child: ChildProcess): Writable | null {
-  const stream = child.stdio[LOCAL_SERVER_CONTROL_FD];
+/** The parent's end of the child's control pipe: `LOCAL_SERVER_CONTROL_FD` on Windows, else standard input. */
+function controlPipe(child: ChildProcess, platform: NodeJS.Platform): Writable | null {
+  const stream = platform === "win32" ? child.stdio[LOCAL_SERVER_CONTROL_FD] : child.stdin;
   return stream instanceof Writable ? stream : null;
 }
 
@@ -365,7 +365,7 @@ export class LocalServers {
   /** Writes one command to the child's control pipe. A child that is gone gets nothing. */
   #send(id: string, command: LocalServerCommand): void {
     const running = this.#running.get(id);
-    const control = running && !running.stopping ? controlPipe(running.child) : null;
+    const control = running && !running.stopping ? controlPipe(running.child, this.#options.platform) : null;
     if (!control?.writable) return;
     control.write(formatLocalServerCommand(command));
   }
@@ -466,9 +466,9 @@ export class LocalServers {
         [...this.#options.command.args, `--user-data-dir=${paths.userData}`],
         {
           env: childEnvironment(entry, paths.agentRoot, this.#options.runtimeRoot, secret),
-          // The control pipe carries only the account commands, and it closes when OpenBot ends. Not
-          // standard input: on Windows, Electron gives the child a `process.stdin` that only ends (#4868).
-          stdio: ["ignore", "pipe", "pipe", "pipe"],
+          // The control pipe carries only the account commands, and it closes when OpenBot ends. On
+          // Windows it is fd 3: Electron gives the child a `process.stdin` that only ends (#4868).
+          stdio: this.#options.platform === "win32" ? ["ignore", "pipe", "pipe", "pipe"] : ["pipe", "pipe", "pipe"],
           windowsHide: true,
         },
       ),
@@ -486,7 +486,10 @@ export class LocalServers {
     child.stderr?.resume();
     // A command can reach a child that stopped before its exit event: the closed pipe then fails the
     // write. The exit handler deals with the child, so the write error is dropped.
-    controlPipe(child)?.on("error", () => undefined);
+    const control = controlPipe(child, this.#options.platform);
+    control?.on("error", () => undefined);
+    // The parent's end of fd 3 is also readable. Reading it to its end closes it when the child exits.
+    if (control instanceof Readable && control.readable) control.resume();
     child.once("error", (error: Error) => {
       Deferred.doneUnsafe(ready, Exit.fail(new LocalServerFailure({ cause: error })));
     });
@@ -669,7 +672,9 @@ function terminate(child: ChildProcess, platform: NodeJS.Platform): Effect.Effec
       clearTimeout(timer);
       resume(Effect.void);
     });
-    controlPipe(child)?.end();
+    // On Windows, `end()` leaves a pipe that is also readable open, so the child would not see its end.
+    const control = controlPipe(child, platform);
+    control?.end(() => control.destroy());
     // On Windows a signal ends the process at once, so the closed pipe is the only request there.
     if (platform !== "win32") child.kill("SIGTERM");
   });

@@ -1100,7 +1100,7 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
 - **Connection entry.** The server is an HTTPS entry in `openbot-remote-servers-v1.json`. The
   directory sync keeps it. While the child is stopped, the entry has the address
   `http://127.0.0.1:0` and no token, so a client never reaches an old port.
-- **Lifetime.** The child ends when its control pipe (fd 3) closes. It is not stdin: on Windows,
+- **Lifetime.** The child ends when its control pipe closes: stdin, or fd 3 on Windows, where
   Electron replaces `process.stdin` with a stream that only ends (#4868). Teardown step 57 stops
   all children before the joined-server connections close (step 60). The sibling scan before an
   update leaves out the child PIDs. After an unexpected exit, the desktop starts the child again

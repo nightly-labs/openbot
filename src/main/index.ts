@@ -224,7 +224,11 @@ const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, proces
 // Always taken, so the owner password leaves the environment also when the flag is refused.
 const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
-const localServerControl = localServerChild ? openLocalServerControl() : null;
+const localServerControl = localServerChild
+  ? openLocalServerControl(process.platform, (cause) =>
+      logger.error("The local server has no control pipe from the desktop app:", toLogValue(cause)),
+    )
+  : null;
 if (serverMode || hostedServer || localServerChild) hideExceptionErrorBox();
 // A local server keeps a main window that never loads. A second launch on its profile, a deep link or
 // an MCP sign-in showed it as an empty window next to the desktop app.
@@ -407,10 +411,7 @@ const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
       localServerControl.once("end", quitAfterSignal);
       localServerControl.once("error", quitAfterSignal);
       localServerControl.resume();
-    } else {
-      logger.error("The local server has no control pipe from the desktop app.");
-      quitAfterSignal();
-    }
+    } else quitAfterSignal();
   }
 }
 
