@@ -41,6 +41,12 @@ export interface BrowserHostTab {
    */
   filledCard?: boolean;
   /**
+   * The origins whose agent code can run in the current document: the agent ran `evaluate` in it,
+   * a scripted page of a connected tab could reach it, or it loaded under a service worker after a
+   * script. A main-frame navigation replaces the document and clears this.
+   */
+  scriptedOrigins?: Set<string>;
+  /**
    * A session of this tab and its popups only, kept in memory: a sign-in page that the host opened
    * for someone else. Such a tab is not saved, and its cookies go when it closes.
    */

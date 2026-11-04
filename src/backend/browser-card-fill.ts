@@ -30,11 +30,14 @@ export interface BrowserCardFieldDescription {
   placeholder: string;
   /** The field's form sends its fields in the page address. */
   sendsGet: boolean;
+  /** No service worker controls the field's frame, so no page code came from Cache Storage. */
+  uncontrolled: boolean;
 }
 
 export function parseCardFieldDescription(value: unknown): BrowserCardFieldDescription | null {
   if (!isDynamicRecord(value)) return null;
-  const { connected, secure, origin, tag, type, multiple, disabled, maxLength, placeholder, sendsGet } = value;
+  const { connected, secure, origin, tag, type, multiple, disabled, maxLength, placeholder, sendsGet, uncontrolled } =
+    value;
   if (
     !isBoolean(connected) ||
     !isBoolean(secure) ||
@@ -45,10 +48,11 @@ export function parseCardFieldDescription(value: unknown): BrowserCardFieldDescr
     !isBoolean(disabled) ||
     !isNumber(maxLength) ||
     !isString(placeholder) ||
-    !isBoolean(sendsGet)
+    !isBoolean(sendsGet) ||
+    !isBoolean(uncontrolled)
   )
     return null;
-  return { connected, secure, origin, tag, type, multiple, disabled, maxLength, placeholder, sendsGet };
+  return { connected, secure, origin, tag, type, multiple, disabled, maxLength, placeholder, sendsGet, uncontrolled };
 }
 
 /**
@@ -69,6 +73,7 @@ export const CARD_FIELD_DESCRIPTION_FUNCTION = `function() {
     maxLength: typeof this.maxLength === 'number' ? this.maxLength : -1,
     placeholder: this.getAttribute('placeholder') ?? '',
     sendsGet: !!form && ((form.getAttribute('method') ?? '').trim().toLowerCase() === 'get' || [...form.elements].some(sendsGet)),
+    uncontrolled: navigator.serviceWorker?.controller === null,
   };
 }`;
 
