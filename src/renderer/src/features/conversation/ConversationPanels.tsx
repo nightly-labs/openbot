@@ -421,6 +421,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           }}
           onToggleMaximized={() => setSidePanelMaximized(!sidePanel().maximized)}
           onCollapse={toggleSidePanel}
+          onNewBrowserTab={() => void openBrowserAddress(BROWSER_NEW_TAB_URL, true)}
         />
       </Show>
 

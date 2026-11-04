@@ -248,6 +248,12 @@
   display: none;
 }
 
+/* The browser header holds only New tab when its title and close button hide. Add in the tab row
+ * lists New tab, so the browser pane has no row of its own. */
+.side-panel-docked .browser-preview-header {
+  display: none;
+}
+
 /* The settings header is three fixed columns, so its title stays in the middle without the button. */
 .side-panel-docked .settings-panel-header > .side-panel-pane-close {
   display: inline-flex;
