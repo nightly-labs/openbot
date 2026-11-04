@@ -41,7 +41,7 @@ export const SERVICE_STEPS = [
   "updates",
   "host-update",
 ] as const;
-export type ServiceStep = (typeof SERVICE_STEPS)[number];
+type ServiceStep = (typeof SERVICE_STEPS)[number];
 
 /** Milliseconds after the main process started, at two significant digits. */
 export interface StartupProperties {
@@ -75,7 +75,7 @@ function decodeSavedStart(value: unknown): SavedStart | null {
   return { version: 1, appVersion: value.appVersion, startedAt: value.startedAt };
 }
 
-export function startKind(saved: SavedStart | null, appVersion: string, bootedAt: number): StartKind {
+function startKind(saved: SavedStart | null, appVersion: string, bootedAt: number): StartKind {
   if (!saved) return "unknown";
   if (saved.appVersion !== appVersion) return "updated";
   return saved.startedAt < bootedAt ? "cold" : "warm";
