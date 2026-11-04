@@ -154,6 +154,12 @@ const CLAUDE_NATIVE_SCHEDULING = [
  */
 const CLAUDE_DUPLICATE_TOOLS = ["ListAgents", "Workflow"];
 /**
+ * The claude.ai Artifact tools. The CLI adds them when the entrypoint is not `sdk-*`, as with
+ * `OPENBOT_CLAUDE_CLIENT`, for accounts that have Artifacts. They publish pages to the user's
+ * claude.ai account, outside OpenBot, and their schemas cost about 13k tokens in each request.
+ */
+const CLAUDE_AI_ARTIFACT_TOOLS = ["Artifact", "ArtifactComments", "ArtifactData"];
+/**
  * Names OpenBot to Claude. Without `CLAUDE_CODE_ENTRYPOINT` the SDK labels each request `sdk-ts`, and
  * Claude's 5-hour window counts `sdk-*` requests about twice as heavily (anthropics/claude-code#97074).
  */
@@ -922,7 +928,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             : {}),
           ...(config.profileGeneration
             ? { tools: [] }
-            : { disallowedTools: [...CLAUDE_NATIVE_SCHEDULING, ...CLAUDE_DUPLICATE_TOOLS] }),
+            : {
+                disallowedTools: [...CLAUDE_NATIVE_SCHEDULING, ...CLAUDE_DUPLICATE_TOOLS, ...CLAUDE_AI_ARTIFACT_TOOLS],
+              }),
           settingSources: config.profileGeneration
             ? []
             : config.workspaceOnly
