@@ -154,6 +154,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} czeka na ciebie",
   "chat.awaiting.limited": "{name} czeka na limit użycia",
   "chat.awaiting.dismiss": "Ukryj tę listę",
+  "chat.awaiting.stop": "Zatrzymaj",
   "chat.waits.label": "Otwarte oczekiwania",
   "chat.waits.title": {
     one: "{count} otwarte oczekiwanie",

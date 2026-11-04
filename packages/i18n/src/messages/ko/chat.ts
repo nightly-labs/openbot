@@ -104,6 +104,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name}에게 확인이 필요해요",
   "chat.awaiting.limited": "{name}이(가) 사용 한도를 기다리는 중",
   "chat.awaiting.dismiss": "이 목록 숨기기",
+  "chat.awaiting.stop": "중지",
   "chat.waits.label": "진행 중인 대기",
   "chat.waits.title": { other: "진행 중인 대기 {count}건" },
   "chat.waits.active": "{state}: {note}",

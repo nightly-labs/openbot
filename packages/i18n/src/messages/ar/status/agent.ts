@@ -16,6 +16,7 @@ export const messages = {
   "status.agent.channelRoutineCreated": "أنشأ {agent} المهمة الدورية {routine}. بطلب من {person}.",
   "status.agent.channelRoutineUpdated": "غيّر {agent} المهمة الدورية {routine}. بطلب من {person}.",
   "status.agent.channelRoutineDeleted": "حذف {agent} المهمة الدورية {routine}. بطلب من {person}.",
+  "status.agent.channelTaskCancelled": "ألغى {agent} المهمة «{task}» ومهامها الفرعية. بطلب من {person}.",
   "status.agent.screenCaptureScreen": "التقاط الشاشة الرئيسية وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureChannel":
     "تظهر الصورة في القناة {channel}، ويمكن لكل عضو في هذا الخادم يقرأ القناة رؤيتها.",

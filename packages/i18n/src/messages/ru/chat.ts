@@ -149,6 +149,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} ждёт вас",
   "chat.awaiting.limited": "{name} ждёт сброса лимита",
   "chat.awaiting.dismiss": "Скрыть этот список",
+  "chat.awaiting.stop": "Остановить",
   "chat.waits.label": "Открытые ожидания",
   "chat.waits.title": {
     one: "{count} открытое ожидание",

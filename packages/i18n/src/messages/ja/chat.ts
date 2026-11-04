@@ -104,6 +104,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} があなたを待っています",
   "chat.awaiting.limited": "{name} は使用上限の解除を待っています",
   "chat.awaiting.dismiss": "この一覧を非表示",
+  "chat.awaiting.stop": "停止",
   "chat.waits.label": "未完了の待機",
   "chat.waits.title": { other: "未完了の待機 {count} 件" },
   "chat.waits.active": "{state}: {note}",

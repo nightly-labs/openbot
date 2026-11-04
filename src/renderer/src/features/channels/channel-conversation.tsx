@@ -248,6 +248,18 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
         name: (id) => (id ? agentName(id) : t("sidebar.section.unassigned")),
       });
     },
+    // The existing Stop of a task. The stopped-task card above the composer then offers Continue,
+    // Reassign and Cancel for it.
+    stopAwaitingReply: (taskId) => {
+      if (!env.connectionReady() || readOnly()) return;
+      void channels.command({
+        type: "stop",
+        operationId: crypto.randomUUID(),
+        channelId,
+        taskId,
+        recipientAgentId: null,
+      });
+    },
     HeaderTitle: (props) => <ChannelHeaderTitle channelId={channelId} onOpenSettings={props.onOpenSettings} />,
     SettingsPane: (props) => (
       <ChannelSettingsPane
