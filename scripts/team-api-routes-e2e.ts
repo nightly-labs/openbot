@@ -598,6 +598,7 @@ const fakeAgentTasks: TeamApiAgentTasks = {
   deleteTask: unused("deleteTask"),
   listTaskReads: unused("listTaskReads"),
   markTaskRead: unused("markTaskRead"),
+  rewriteMessage: unused("rewriteMessage"),
   branchTask: unused("branchTask"),
 };
 

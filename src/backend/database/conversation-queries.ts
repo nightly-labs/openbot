@@ -67,9 +67,65 @@ const ARCHIVED_SIDE_THREAD_EXCLUSION = `${CHANNEL_THREAD_EXCLUSION}
  */
 export class ConversationQueries {
   readonly #core: DatabaseCore;
+  readonly #rewindCache = new Map<
+    string,
+    { sequence: number | null; ids: ReadonlySet<string>; turnIds: ReadonlySet<string> }
+  >();
 
   constructor(options: ConversationQueriesOptions) {
     this.#core = options.core;
+  }
+
+  /** Mailbox copies removed by a rewind must not return to the active chat after a restart. */
+  rewoundMessageIds(threadId: string): ReadonlySet<string> {
+    return this.#rewoundHistory(threadId).ids;
+  }
+
+  /** Providers can give an old reply a different item ID; its removed turn must still stay archived. */
+  rewoundTurnIds(threadId: string): ReadonlySet<string> {
+    return this.#rewoundHistory(threadId).turnIds;
+  }
+
+  #rewoundHistory(threadId: string) {
+    const latest = databaseRow(
+      this.#core.connection
+        .prepare(
+          "SELECT sequence FROM orchestration_events WHERE aggregate_type = 'thread' AND aggregate_id = ? AND event_type = 'thread.rewound' ORDER BY sequence DESC LIMIT 1",
+        )
+        .get(threadId),
+    );
+    const sequence = latest ? requiredNumberColumn(latest, "sequence") : null;
+    const cached = this.#rewindCache.get(threadId);
+    if (cached?.sequence === sequence) return cached;
+    const rows = databaseRows(
+      this.#core.connection
+        .prepare(
+          "SELECT payload_json FROM orchestration_events WHERE aggregate_type = 'thread' AND aggregate_id = ? AND event_type = 'thread.rewound'",
+        )
+        .all(threadId),
+    );
+    const ids = new Set<string>();
+    const turnIds = new Set<string>();
+    for (const row of rows) {
+      const payload = JSON.parse(requiredStringColumn(row, "payload_json"));
+      if (!isDynamicRecord(payload) || !isDynamicRecord(payload.detail)) continue;
+      const { removedMessageIds, priorMessages } = payload.detail;
+      const removed = new Set<string>();
+      if (Array.isArray(removedMessageIds))
+        for (const id of removedMessageIds) {
+          if (!isString(id)) continue;
+          removed.add(id);
+          ids.add(id);
+        }
+      if (Array.isArray(priorMessages))
+        for (const message of priorMessages) {
+          if (isDynamicRecord(message) && isString(message.id) && removed.has(message.id) && isString(message.turnId))
+            turnIds.add(message.turnId);
+        }
+    }
+    const history = { sequence, ids, turnIds };
+    this.#rewindCache.set(threadId, history);
+    return history;
   }
 
   readConversation(agentId: string, threadId: string | null): ConversationSnapshot {

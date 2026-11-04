@@ -202,6 +202,7 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "Не удалось открыть ссылку",
   "mobile.chat.markdown.linkFailedMessage": "Вместо этого можно выделить и скопировать ссылку.",
   "mobile.chat.message.reply": "Ответить",
+  "mobile.chat.message.sendEdit": "Отправить",
   "mobile.chat.message.branch": "Ответвить отсюда",
   "mobile.chat.message.branchFailed": "Не удалось создать ответвление чата.",
   "mobile.chat.message.actions": "Действия с сообщением",

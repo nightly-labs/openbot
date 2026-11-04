@@ -186,6 +186,16 @@ export interface SendMessageInput {
   voiceRecordingDraftId?: string;
 }
 
+/** Sends edited text after the active conversation is cut before a finished user message. */
+export interface RewriteMessageInput {
+  agentId: string;
+  taskId: string | null;
+  messageId: string;
+  text: string;
+  /** A retry from the same sender returns the first queued delivery. */
+  requestId: string;
+}
+
 /**
  * Deletes one message from the chat of an agent, or of one open side task of the agent. The host
  * removes it from its history and view; the provider session of the agent can still remember it.

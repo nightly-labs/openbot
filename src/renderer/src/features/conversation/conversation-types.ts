@@ -132,6 +132,8 @@ export interface ConversationProps {
   channel?: ConversationChannelSource | undefined;
   contextState?: AgentContextState | undefined;
   runtime?: ConversationRuntime | undefined;
+  /** A joined host must advertise the rewrite route before its chat shows Edit. */
+  rewriteAvailable?: boolean | undefined;
   notice?: JSX.Element | undefined;
   onOpenUsage?: ((trigger: HTMLButtonElement) => void) | undefined;
   onOpenMarketplace?: (() => void) | undefined;

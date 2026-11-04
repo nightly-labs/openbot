@@ -13,7 +13,7 @@ import { AppState, Keyboard, Pressable, useColorScheme, View } from "react-nativ
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import {
   asksForSecret,
@@ -145,6 +145,7 @@ function AgentTaskChat({
   const { t, errorMessage } = useText();
   const { serverId, id: agentId } = target;
   const queryScope = useQueryScope();
+  const accountUserId = useMobileSession().session?.user.id ?? null;
   const queryClient = useQueryClient();
   const isDraft = taskId === DRAFT_THREAD_ID;
   const threadMenu = useChatThreadMenu(target, taskId);
@@ -162,6 +163,8 @@ function AgentTaskChat({
     loadAgentTasks,
     loadAgentTaskConversation,
     sendAgentTaskMessage,
+    rewriteMessage,
+    canRewriteThreads,
     respondToTaskPrompt,
     respondToApproval,
     respondToBrowserTakeover,
@@ -186,8 +189,11 @@ function AgentTaskChat({
   });
   const task = list.data?.tasks.find((item) => item.id === taskId);
   const messages = useMemo(
-    () => (conversation.data ? projectChatMessages(conversation.data.messages) : NO_MESSAGES),
-    [conversation.data],
+    () =>
+      conversation.data
+        ? projectChatMessages(conversation.data.messages, server?.membershipId ?? null, accountUserId)
+        : NO_MESSAGES,
+    [conversation.data, server?.membershipId, accountUserId],
   );
   const activeTurnId = task?.activeTurnId ?? null;
   const branching = useBranchThread({
@@ -578,6 +584,19 @@ function AgentTaskChat({
           messages={messages}
           turnSummaries={turnSummaries}
           onOpenTurn={isDraft ? undefined : openTurn}
+          onRewrite={
+            !isDraft && canSend && canRewriteThreads(serverId) && task?.state === "idle"
+              ? async (message, text, requestId) => {
+                  await rewriteMessage({ agentId, taskId, messageId: message.id, text, requestId }, serverId);
+                  await Promise.all([
+                    queryClient.invalidateQueries({
+                      queryKey: queryKeys.agentTaskConversation(queryScope, serverId, taskId),
+                    }),
+                    queryClient.invalidateQueries({ queryKey: queryKeys.agentTasks(queryScope, serverId, agentId) }),
+                  ]);
+                }
+              : undefined
+          }
           messageAliases={NO_ALIASES}
           referenceMessages={NO_MESSAGES}
           hasOlder={false}

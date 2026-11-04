@@ -390,6 +390,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:turn-input
 
+      - name: Run the historical question rewrite E2E tests
+        if: ${{ !cancelled() }}
+        run: |
+          bun scripts/thread-rewind-e2e.ts
+          bun scripts/thread-rewrite-service-e2e.ts
+
       - name: Run the zero-filled settings file E2E test
         if: ${{ !cancelled() }}
         run: bun run test:zero-filled-settings
@@ -585,6 +591,8 @@ jobs:
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
             .openbot-build/turn-input-e2e/
+            .openbot-build/thread-rewind-e2e/
+            .openbot-build/thread-rewrite-service-e2e/
             .openbot-build/zero-filled-settings-e2e/
             .openbot-build/provider-update-busy-e2e/
             .openbot-build/provider-update-after-app-upgrade-e2e/

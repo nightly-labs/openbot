@@ -84,6 +84,11 @@ import {
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_THREAD_REPLIES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
+import {
+  AGENT_THREAD_REWRITE_CAPABILITY,
+  AGENT_THREAD_REWRITE_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-rewrite-v1";
+
 import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import {
@@ -164,6 +169,7 @@ import {
   parseReadConversationPage,
   parseRenameAgentTask,
   parseReorderQueue,
+  parseRewriteMessage,
   parseRunQueuedMessageAsTask,
   parseSearchConversationFiles,
   parseSearchConversationMessages,
@@ -865,6 +871,25 @@ export function agentIpcHandlers({
               method: "POST",
               // The host uses this computer's zone for a routine the agent creates from the message.
               body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+            }),
+          );
+        },
+      }),
+      rewriteMessage: scopedHandler(parseRewriteMessage, {
+        local: (input) => runCauseEffect(service.rewriteMessage(input, host.conversationSender(), "host")),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_REWRITE_CAPABILITY))
+            throw new Error(sourceText("error.backend.threadRemoteUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_THREAD_REWRITE_ROUTES.rewrite, decodeQueuedMessageReceipt, {
+              method: "POST",
+              body: {
+                agentId: input.agentId,
+                taskId: input.taskId,
+                messageId: input.messageId,
+                text: input.text,
+                requestId: input.requestId,
+              },
             }),
           );
         },

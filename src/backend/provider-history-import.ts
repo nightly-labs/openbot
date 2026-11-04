@@ -18,6 +18,8 @@ import type {
 /** The synchronous database boundary needed by the bounded provider-history importer. */
 interface ProviderHistoryImportDatabase {
   readonly connection: DatabaseSync;
+  rewoundMessageIds(threadId: string): ReadonlySet<string>;
+  rewoundTurnIds(threadId: string): ReadonlySet<string>;
   ensureProviderHistoryImport(input: {
     sessionId: string;
     threadId: string;
@@ -238,13 +240,23 @@ function importCompletedTurn(
               input.provider,
             )
           : [...pageMessages];
+      // Keep raw provider history, but never restore a removed turn to the active conversation.
+      // Read these at every page: a rewrite can commit while this streaming import yields.
+      const removedIds = input.database.rewoundMessageIds(input.publicThreadId);
+      const removedTurns = input.database.rewoundTurnIds(input.publicThreadId);
+      const activeMessages = reconciled.filter(
+        (message) =>
+          !removedTurns.has(fragment.turnId) &&
+          !removedIds.has(message.id) &&
+          !(message.turnId && removedTurns.has(message.turnId)),
+      );
       yield* providerSync(() =>
         input.database.importProviderHistoryMessages({
           sessionId: input.sessionId,
           turnId: fragment.turnId,
           agentId: input.agentId,
           threadId: input.publicThreadId,
-          messages: reconciled,
+          messages: activeMessages,
           ...(last === undefined ? {} : { throughItemIndex: last.itemIndex }),
           complete,
           detail: {
@@ -254,7 +266,7 @@ function importCompletedTurn(
           },
         }),
       );
-      importedCount += reconciled.length;
+      importedCount += activeMessages.length;
       if (last) afterIndex = last.itemIndex;
       if (page.length === 0) complete = true;
       yield* Effect.yieldNow;

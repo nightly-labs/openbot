@@ -200,6 +200,7 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "Impossibile aprire il link",
   "mobile.chat.markdown.linkFailedMessage": "Puoi selezionare e copiare il link.",
   "mobile.chat.message.reply": "Rispondi",
+  "mobile.chat.message.sendEdit": "Invia",
   "mobile.chat.message.branch": "Ramifica da qui",
   "mobile.chat.message.branchFailed": "Impossibile ramificare la chat.",
   "mobile.chat.message.actions": "Azioni del messaggio",

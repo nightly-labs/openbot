@@ -269,6 +269,18 @@ export class OpenBotDatabase {
     return this.#conversationWrites.persistConversation(snapshot, eventType, payload, commandId);
   }
 
+  rewindConversation(agentId: string, threadId: string, messageId: string): ConversationSnapshot {
+    return this.#conversationWrites.rewindConversation(agentId, threadId, messageId);
+  }
+
+  rewoundMessageIds(threadId: string): ReadonlySet<string> {
+    return this.#conversations.rewoundMessageIds(threadId);
+  }
+
+  rewoundTurnIds(threadId: string): ReadonlySet<string> {
+    return this.#conversations.rewoundTurnIds(threadId);
+  }
+
   /** Writes one message of a thread, for a caller that knows only that message changed. */
   persistStreamingMessage(input: {
     snapshot: ConversationSnapshot;

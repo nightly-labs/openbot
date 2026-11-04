@@ -844,6 +844,14 @@ export function createConversationViewScope(props: ConversationProps) {
     flush();
     setThreadFocusRequest((current) => current + 1);
   };
+  const rewriteThreadMessage = async (taskId: string, messageId: string, text: string, requestId: string) => {
+    const agent = props.agent;
+    if (!agent) throw new Error(currentText().t("chat.rewrite.failed"));
+    await conversationRuntime(props).agent.rewriteMessage(
+      { agentId: agent.id, taskId, messageId, text, requestId },
+      props.server?.id ?? "local",
+    );
+  };
   /** Dictates into the open side thread's draft. */
   const startThreadVoiceRecording = () => {
     const key = threadComposer.openDraftKey();
@@ -2025,6 +2033,7 @@ export function createConversationViewScope(props: ConversationProps) {
     threadComposer,
     threadFocusRequest,
     branchThread,
+    rewriteThreadMessage,
     threadVoiceLiveText,
     threadVoiceOwned,
     replyJump,

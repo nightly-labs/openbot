@@ -196,6 +196,7 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "링크를 열 수 없어요",
   "mobile.chat.markdown.linkFailedMessage": "대신 링크를 선택해서 복사할 수 있어요.",
   "mobile.chat.message.reply": "답장",
+  "mobile.chat.message.sendEdit": "보내기",
   "mobile.chat.message.branch": "여기서 분기",
   "mobile.chat.message.branchFailed": "채팅을 분기할 수 없어요.",
   "mobile.chat.message.actions": "메시지 작업",

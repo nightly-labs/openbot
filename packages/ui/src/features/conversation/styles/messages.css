@@ -1084,6 +1084,12 @@ button.chat-action-target:active,
   width: 100%;
 }
 
+.message-entry.message-entry-editing .ui-bubble,
+.message-entry.message-entry-editing .ui-bubble > .ui-bubble-content {
+  width: 100%;
+  max-width: 100%;
+}
+
 .image-generation {
   display: grid;
   min-width: 0;
@@ -1476,4 +1482,36 @@ button.chat-action-target:active,
 .pending-send-error::before {
   content: "·";
   margin-inline-end: var(--openbot-space-1);
+}
+
+.message-rewrite {
+  display: grid;
+  gap: var(--openbot-space-3);
+  width: 100%;
+  min-width: 0;
+}
+
+.message-rewrite textarea {
+  width: 100%;
+  field-sizing: content;
+  min-height: calc(var(--openbot-leading-lg) * 3);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  resize: none;
+}
+
+.message-entry-editing .ui-bubble:focus-within > .ui-bubble-content {
+  border-color: var(--openbot-border-focus);
+}
+
+.message-rewrite-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
 }

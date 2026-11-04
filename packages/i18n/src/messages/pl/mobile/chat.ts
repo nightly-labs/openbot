@@ -203,6 +203,7 @@ export const messages = {
   "mobile.chat.markdown.linkFailedTitle": "Nie udało się otworzyć linku",
   "mobile.chat.markdown.linkFailedMessage": "Możesz zaznaczyć i skopiować link.",
   "mobile.chat.message.reply": "Odpowiedz",
+  "mobile.chat.message.sendEdit": "Wyślij",
   "mobile.chat.message.branch": "Odgałęź stąd",
   "mobile.chat.message.branchFailed": "Nie udało się utworzyć odgałęzienia czatu.",
   "mobile.chat.message.actions": "Akcje wiadomości",

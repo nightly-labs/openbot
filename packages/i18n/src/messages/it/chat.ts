@@ -348,6 +348,7 @@ export const messages = {
   "chat.menu.copy": "Copia messaggio",
   "chat.menu.react": "Reagisci",
   "chat.menu.branch": "Ramifica da qui",
+  "chat.rewrite.send": "Invia",
   "chat.menu.markUnread": "Segna come non letto",
   "chat.menu.sendToChannel": "Invia al canale",
   "chat.menu.chooseChannel": "Scegli un canale",

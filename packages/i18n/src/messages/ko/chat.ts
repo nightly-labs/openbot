@@ -333,6 +333,7 @@ export const messages = {
   "chat.menu.copy": "메시지 복사",
   "chat.menu.react": "반응",
   "chat.menu.branch": "여기서 분기",
+  "chat.rewrite.send": "보내기",
   "chat.menu.markUnread": "읽지 않음으로 표시",
   "chat.menu.sendToChannel": "채널로 보내기",
   "chat.menu.chooseChannel": "채널 선택",

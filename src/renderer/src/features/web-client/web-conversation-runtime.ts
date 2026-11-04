@@ -23,7 +23,12 @@ import {
   uninstallAgentSkill,
   unpublishAgentTemplate,
 } from "@openbot/team-client/team-admin-requests";
-import { listInstalledSkills, type TeamApiRequest, teamAgentRoutinesApi } from "@openbot/team-client/team-api-requests";
+import {
+  listInstalledSkills,
+  rewriteAgentThreadMessage,
+  type TeamApiRequest,
+  teamAgentRoutinesApi,
+} from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
 import { onCleanup } from "solid-js";
@@ -292,6 +297,13 @@ export function createWebConversationRuntime(
         // The edit belongs to the host that queued the message. This client talks only to the connected one.
         if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
         return remote.editQueue(input);
+      },
+      rewriteMessage: async (input, serverId) => {
+        if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
+        if (!adminRequest) return unavailable();
+        return runTeamEffect(
+          rewriteAgentThreadMessage(adminRequest(), input).pipe(Effect.mapError((error) => error.cause)),
+        );
       },
       // The skills store asks only a host that serves `installed-skills`, and the MCP store only as an admin.
       listInstalledSkills: async (agentId) =>

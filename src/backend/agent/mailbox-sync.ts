@@ -74,18 +74,21 @@ export class MailboxSync {
   }
 
   syncMailboxMessages(snapshot: ConversationSnapshot, mailboxMessages?: readonly ConversationMessage[]): void {
+    this.restoreMessageSenders(snapshot);
     if (this.#conversation.isExecutionThread(snapshot.threadId)) return;
     const fromCreatedAt = snapshot.messages[0]?.createdAt;
     const mailboxCopies =
       mailboxMessages ??
       this.#mailbox.conversationMessages(snapshot.agentId, fromCreatedAt === undefined ? {} : { fromCreatedAt });
+    const rewoundIds = snapshot.threadId ? this.#database.rewoundMessageIds(snapshot.threadId) : new Set<string>();
     // A teammate's or a routine's message stays in the mailbox after a person deletes it from this
     // chat, so the record of the delete keeps it out.
     const deleted = snapshot.threadId
       ? this.#database.deletedConversationMessageIds(snapshot.threadId)
       : new Set<string>();
-    const incomingMailboxMessages =
-      deleted.size === 0 ? mailboxCopies : mailboxCopies.filter((message) => !deleted.has(message.id));
+    const visibleMailboxMessages = mailboxCopies.filter(
+      (message) => !deleted.has(message.id) && !rewoundIds.has(message.id),
+    );
     // A deleted message keeps its entry here, so its provider copy also leaves the chat.
     const incomingMessages = new Map(
       mailboxCopies.flatMap((message) =>
@@ -97,7 +100,7 @@ export class MailboxSync {
       if (message && isMailboxMessageCopy(message, incomingMessages)) snapshot.messages.splice(index, 1);
     }
     const indexes = new Map(snapshot.messages.map((message, index) => [message.id, index]));
-    for (const mailboxMessage of incomingMailboxMessages) {
+    for (const mailboxMessage of visibleMailboxMessages) {
       const index = indexes.get(mailboxMessage.id);
       if (index !== undefined) snapshot.messages[index] = mailboxMessage;
       else {
@@ -111,6 +114,23 @@ export class MailboxSync {
       message.reaction = message.reactions.find((reaction) => reaction.actor.kind === "user")?.emoji ?? null;
     }
     sortConversationMessages(snapshot.messages);
+  }
+
+  /** Old conversation projections can omit a sender that the original mailbox record still proves. */
+  restoreMessageSenders(
+    snapshot: Pick<ConversationSnapshot, "agentId" | "messages">,
+    taskId: string | null = null,
+  ): void {
+    const missing = snapshot.messages.filter((message) => message.author === "user" && !message.senderMember);
+    const senders = this.#mailbox.messageSenders(
+      snapshot.agentId,
+      taskId,
+      new Set(missing.map((message) => message.id)),
+    );
+    for (const message of missing) {
+      const sender = senders.get(message.id);
+      if (sender) message.senderMember = sender;
+    }
   }
 
   reconcilePersistedMailboxMessages(agent: AgentSummary): void {

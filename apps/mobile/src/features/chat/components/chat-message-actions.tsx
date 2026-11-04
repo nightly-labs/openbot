@@ -20,6 +20,7 @@ export interface MessageActionsInput {
   /** Unset where a reaction cannot be saved. `null` removes the reader's reaction. */
   onReact?: (emoji: string | null) => Promise<void>;
   onReply?: () => void;
+  onEdit?: () => void;
   /** Unset where the message has no branch: it is not the last answer of a finished turn. */
   onBranch?: () => void;
   onSelectText?: () => void;
@@ -68,6 +69,7 @@ export function useMessageActions(input: MessageActionsInput | null) {
           readAloudId: input.readAloudId,
           onReact: react,
           onReply: input.onReply,
+          onEdit: input.onEdit,
           onBranch: input.onBranch,
           onSelectText: input.onSelectText,
         })

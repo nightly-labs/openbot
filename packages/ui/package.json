@@ -153,6 +153,7 @@
     "./features/conversation/MarkdownMessageText": "./src/features/conversation/MarkdownMessageText.tsx",
     "./features/conversation/MessageNavigation": "./src/features/conversation/MessageNavigation.tsx",
     "./features/conversation/MessageRendering": "./src/features/conversation/MessageRendering.tsx",
+    "./features/conversation/MessageRewriteForm": "./src/features/conversation/MessageRewriteForm.tsx",
     "./features/conversation/PendingSendStatus": "./src/features/conversation/PendingSendStatus.tsx",
     "./features/conversation/QueuePanel": "./src/features/conversation/QueuePanel.tsx",
     "./features/conversation/ReplyQuote": "./src/features/conversation/ReplyQuote.tsx",

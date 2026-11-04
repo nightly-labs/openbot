@@ -1,14 +1,17 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { isDeepStrictEqual } from "node:util";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
 import { type DatabaseCore, deleteReceiptsOf } from "./database-core";
 import {
   databaseRow,
   databaseRows,
+  decodeConversationMessageJson,
   optionalStringColumn,
   requiredNumberColumn,
   requiredStringColumn,
@@ -49,6 +52,47 @@ export class ConversationWriter {
   constructor(options: ConversationWriterOptions) {
     this.#core = options.core;
     this.#roster = options.roster;
+  }
+
+  /** Replaces the active conversation with the prefix before a finished user message. */
+  rewindConversation(agentId: string, threadId: string, messageId: string): ConversationSnapshot {
+    const db = this.#core.connection;
+    const thread = databaseRow(
+      db
+        .prepare(
+          "SELECT active_turn_id, last_event_sequence FROM projection_threads WHERE thread_id = ? AND agent_id = ?",
+        )
+        .get(threadId, agentId),
+    );
+    if (!thread) throw new Error(sourceText("error.backend.threadNotFound"));
+    if (thread.active_turn_id !== null) throw new Error(sourceText("error.backend.rewriteSourceBusy"));
+    const priorMessages = databaseRows(
+      db
+        .prepare(
+          "SELECT message_json FROM projection_thread_messages WHERE thread_id = ? ORDER BY created_at, ordinal, message_id",
+        )
+        .all(threadId),
+    ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
+    // A queued question can predate the preceding answer. Cut in the order the conversation uses.
+    sortConversationMessages(priorMessages);
+    const boundary = priorMessages.findIndex((message) => message.id === messageId);
+    if (boundary < 0 || priorMessages[boundary]?.author !== "user" || priorMessages[boundary]?.status !== "completed")
+      throw new Error(sourceText("error.backend.rewriteMessageMissing"));
+    return this.persistConversation(
+      {
+        agentId,
+        threadId,
+        activeTurnId: null,
+        revision: requiredNumberColumn(thread, "last_event_sequence"),
+        messages: priorMessages.slice(0, boundary),
+      },
+      "thread.rewound",
+      {
+        beforeMessageId: messageId,
+        priorMessages,
+        removedMessageIds: priorMessages.slice(boundary).map((message) => message.id),
+      },
+    );
   }
 
   persistConversation(
@@ -936,7 +980,7 @@ function pruneConversationSnapshots(db: DatabaseSync, threadId: string, retained
   // is: the snapshot carries that message's text too. Leaving them would let the flushes of an
   // interrupted turn stay in the log for the life of the thread.
   const supersededEvents = `
-    aggregate_type = 'thread' AND aggregate_id = ? AND sequence < ?
+    aggregate_type = 'thread' AND aggregate_id = ? AND sequence < ? AND event_type <> 'thread.rewound'
       AND (json_type(payload_json, '$.snapshot') = 'object'
         OR json_type(payload_json, '$.streamedMessage') = 'object')`;
   db.prepare(

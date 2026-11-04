@@ -350,6 +350,7 @@ export const messages = {
   "chat.menu.copy": "Mesajı kopyala",
   "chat.menu.react": "Tepki ver",
   "chat.menu.branch": "Buradan dallandır",
+  "chat.rewrite.send": "Gönder",
   "chat.menu.markUnread": "Okunmadı olarak işaretle",
   "chat.menu.sendToChannel": "Kanala gönder",
   "chat.menu.chooseChannel": "Kanal seçin",

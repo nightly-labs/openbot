@@ -64,6 +64,8 @@ export interface ChatMessageRowProps {
   actions?: JSX.Element;
   /** Draws the right-click menu, a `MessageMenu`. Without it, right-click keeps the native menu. */
   menu?: (() => JSX.Element) | undefined;
+  /** Replaces only the message text while its attachments and extra content stay in place. */
+  textEditor?: (() => JSX.Element) | undefined;
   /** Extra content inside the bubble, under the body: a question prompt, a note about the message. */
   children?: JSX.Element;
   class?: string | undefined;
@@ -120,6 +122,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       "message-entry-user": person(),
       "message-entry-agent": !person(),
       "message-entry-with-author": props.showAuthor === true && !person(),
+      "message-entry-editing": Boolean(props.textEditor),
     },
     props.class,
   ];
@@ -171,6 +174,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       frame={frame}
       animate={props.animate}
       message={props.message}
+      textEditor={props.textEditor}
       referencedMessage={props.referencedMessage}
       referencedAuthorName={props.referencedAuthorName}
       onOpenReference={props.onOpenReference}
@@ -306,14 +310,16 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
           </Show>
         </div>
         {/* The actions and the time stand under the bubble. A named author shows the time beside the name. */}
-        <div class="message-action-row">
-          {props.actions}
-          <Show when={!props.showAuthor || own()}>
-            <time class="message-time" datetime={props.message.createdAt}>
-              {props.message.time}
-            </time>
-          </Show>
-        </div>
+        <Show when={!props.textEditor}>
+          <div class="message-action-row">
+            {props.actions}
+            <Show when={!props.showAuthor || own()}>
+              <time class="message-time" datetime={props.message.createdAt}>
+                {props.message.time}
+              </time>
+            </Show>
+          </div>
+        </Show>
       </MessageContent>
     </>
   );

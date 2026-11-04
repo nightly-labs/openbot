@@ -46,6 +46,7 @@ import { AGENT_THREAD_BRANCHES_CAPABILITY } from "@openbot/contracts/team-protoc
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
+import { AGENT_THREAD_REWRITE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-rewrite-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { BROWSER_PAGE_STATE_CAPABILITY } from "@openbot/contracts/team-protocol/browser-page-state-v1";
 import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-events-v1";
@@ -246,6 +247,7 @@ import { routeAgentNotificationLevels } from "./team-api/route-agent-notificatio
 import { routeAgentPublish } from "./team-api/route-agent-publish";
 import { routeAgentSessionSettings } from "./team-api/route-agent-session-settings";
 import { routeAgentTasks } from "./team-api/route-agent-tasks";
+import { routeAgentThreadRewrite } from "./team-api/route-agent-thread-rewrite";
 import {
   routeAgentThreadBranches,
   routeAgentThreadFiles,
@@ -1060,6 +1062,11 @@ export class TeamApiServer {
       if ((await routeAgentThreadFiles(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadReplies(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadBranches(context, this.#options.agentTasks, hidden)) === "handled") return;
+      if (
+        (await routeAgentThreadRewrite(context, { tasks: this.#options.agentTasks, hiddenAgentIds: hidden })) ===
+        "handled"
+      )
+        return;
       if ((await routeSkillsAdmin(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeSharedTables(context, this.#options.admin)) === "handled") return;
       if ((await routeAgentInstall(context, this.#options.admin, hidden, newAgentHidden)) === "handled") return;
@@ -2232,6 +2239,7 @@ export class TeamApiServer {
           if (capability === AGENT_THREAD_FILES_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_REPLIES_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_BRANCHES_CAPABILITY) return this.#options.agentTasks !== undefined;
+          if (capability === AGENT_THREAD_REWRITE_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_HOST_SETTINGS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_BACKUP_MODELS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_TASK_LIMIT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;

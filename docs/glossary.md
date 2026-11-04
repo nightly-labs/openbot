@@ -51,6 +51,9 @@ table, IPC channel or product string, or when a term in the code disagrees with 
   thread; closing it does not change the thread. A **branch** is a side thread that starts with a
   copy of another thread through one finished turn (`AgentTaskBranch`, `branch_*` columns). It is
   not a git branch.
+- **thread rewind**: a change to the active conversation of an existing thread from a finished
+  user turn. The former conversation stays private. The thread keeps its identity, and workspace
+  files stay as they are. It is not a **branch** or a thread **archive**.
 - **role**: a custom role of a server that sets which agents its members can use, and at which
   level (`AgentAccessRole`, `agent-access-v1`, `openbot-agent-access-v1.json`). The **Everyone** role
   applies to every member. It is not the team role (`TeamRole`: owner, admin, member), which the UI

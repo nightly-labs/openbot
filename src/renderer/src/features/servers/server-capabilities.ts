@@ -97,6 +97,7 @@ export function serverSupportsCapability(
       capability === "agent-threads-v1" ||
       capability === "agent-thread-reads-v1" ||
       capability === "agent-thread-branches-v1" ||
+      capability === "agent-thread-rewrite-v1" ||
       capability === "agent-thread-replies-v1" ||
       capability === "channel-task-cancel-v1" ||
       capability === "side-question-v1" ||

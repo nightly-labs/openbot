@@ -61,6 +61,7 @@ import {
   type ReorderQueueInput,
   type RespondToApprovalInput,
   type RespondToBrowserTakeoverInput,
+  type RewriteMessageInput,
   remoteBrowserSecretResponse,
   type SetAgentMemoryInclusionInput,
   type StartAgentTaskInput,
@@ -86,6 +87,7 @@ import {
 import { AGENT_THREAD_FILES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
+import { AGENT_THREAD_REWRITE_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-rewrite-v1";
 import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
@@ -351,6 +353,22 @@ export const branchAgentThread = Effect.fn("TeamClient.branchAgentThread")(funct
 ): Effect.fn.Return<AgentTask, TeamRequestError> {
   return yield* teamCall(() =>
     request("POST", AGENT_THREAD_BRANCHES_ROUTES.branch, decodeAgentTask, { agentId, taskId, messageId, requestId }),
+  );
+});
+
+/** Rewrites one completed user message on a host with `agent-thread-rewrite-v1`. */
+export const rewriteAgentThreadMessage = Effect.fn("TeamClient.rewriteAgentThreadMessage")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, messageId, text, requestId }: RewriteMessageInput,
+): Effect.fn.Return<QueuedMessageReceipt, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", AGENT_THREAD_REWRITE_ROUTES.rewrite, decodeTaskReceipt, {
+      agentId,
+      taskId,
+      messageId,
+      text,
+      requestId,
+    }),
   );
 });
 
