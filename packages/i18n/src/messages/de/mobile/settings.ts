@@ -8,6 +8,12 @@ export const messages = {
   "mobile.settings.language.system": "Systemstandard",
   "mobile.settings.language.footer":
     "Systemstandard verwendet die erste Sprache in den Telefoneinstellungen. Noch nicht übersetzter Text erscheint auf Englisch.",
+  "mobile.settings.language.restartTitle": "OpenBot neu starten?",
+  "mobile.settings.language.restartBody":
+    "Diese Sprache liest sich in die andere Richtung. Die Ansichten wechseln die Richtung, wenn OpenBot neu startet. Wenn die Ansichten nach dem Neustart noch falsch aussehen, schließe OpenBot im App-Umschalter und öffne es erneut.",
+  "mobile.settings.language.restartNow": "Jetzt neu starten",
+  "mobile.settings.language.restartFailed":
+    "OpenBot konnte nicht neu starten. Die Ansichten wechseln die Richtung, wenn du OpenBot das nächste Mal öffnest.",
   "mobile.settings.dictation.language": "Diktiersprache",
   "mobile.settings.about.development": "Entwicklung",
   "mobile.settings.about.openFailed": "Der Link konnte nicht geöffnet werden. Versuche es erneut.",
@@ -75,7 +81,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animationen",
   "mobile.settings.animations.agentFaces": "Animierte Agentengesichter",
   "mobile.settings.animations.agentFacesFooter":
-    "Die Gesichter der Agenten-Avatare bewegen sich, während die Agenten arbeiten und ruhen. Wenn dies aus ist, bleiben die Gesichter still.",
+    "Die Gesichter der Agenten-Avatare bewegen sich, während die Agenten arbeiten und ruhen. Wenn dies aus ist, bleiben die Gesichter still, und die Figuren auf dem Willkommensbildschirm und dem leeren Startbildschirm schweben nicht mehr.",
   "mobile.settings.animations.composerResize": "Kompaktes Nachrichtenfeld",
   "mobile.settings.animations.composerResizeFooter":
     "Das Nachrichtenfeld wird zu einer kleinen Leiste, solange die Tastatur geschlossen ist. Wenn dies aus ist, bleibt das Feld in voller Größe.",

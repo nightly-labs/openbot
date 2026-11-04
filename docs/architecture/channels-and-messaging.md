@@ -263,9 +263,11 @@ from the stored channel when its turn comes, and the actor id `agent:<agentId>`.
 comes from the tool call id, so a retried call makes no second channel. Members must exist and not
 be hidden, and the lead must be a member; an icon removes an image, as in the channel settings.
 These changes write no `channel-change` note. Inside a channel task, both tools are refused, so only
-a person's request changes the channel there. As for webhook routines, they also need a turn of only
-this computer's user's messages, outside an execution thread: an external chat, a routine run or an
-agent message can carry text from outside, and the Team API checks a team member's agent access.
+a person's request changes the channel there. They also need a turn of only this computer's user's
+messages, in the agent's own chat or in a side thread that the person opened or branched (no routine,
+messaging link or channel): an external chat, a routine run or an agent message can carry text from
+outside, and the Team API checks a team member's agent access. Webhook routines still need the
+agent's own chat.
 
 Channel work holds only the agent that does it. An agent runs one main-lane turn at a time: its chat,
 a channel delivery or a messaging delivery. While the agent has an active assignment,
@@ -396,8 +398,10 @@ the capability only when its channel service is connected. When a host does not 
 
 Mobile shows channels only on a host that advertises `channel-chats-v1`, and Delete and Restore only
 with `channel-delete-v1`, and Cancel task only with `channel-task-cancel-v1`. It uses the same host channel IDs and commands. The host database stores
-channel settings, members, messages, memories, routines, and read positions. Mobile keeps only an
-in-memory view. Reconnect loads the host list again. `channels-changed` events refresh the list and
+channel settings, members, messages, memories, routines, and read positions. Mobile keeps the channel
+list and the latest 50 messages of each opened channel in its encrypted workspace copy
+(`workspace-cache.ts`) and shows them after a start, before the host answers. The host list then
+replaces them. Reconnect loads the host list again. `channels-changed` events refresh the list and
 open channel history, with one request sequence per host and one pending refresh for an event burst.
 Closing a channel retains a short message window (up to 50 messages), as single chats do,
 and releases larger windows. Only open channels refresh their history. Server removal discards its cached channels and late

@@ -326,6 +326,9 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "Wczytaj modele",
   "mobile.agent.runtime.loadingModels": "Wczytywanie modeli…",
   "mobile.agent.runtime.noModels": "Brak dostępnych modeli dla tego dostawcy.",
+  "mobile.agent.runtime.usageLimit": "Osiągnięto limit użycia",
+  "mobile.agent.runtime.usageLimitWindow": "Limit ({window})",
+  "mobile.agent.runtime.usageLimitResets": "{limit} · Reset {time}",
   "mobile.agent.access.title": "Dostęp",
   "mobile.agent.access.label": "Dostęp agenta",
   "mobile.agent.access.workspace": "Tylko obszar roboczy",
@@ -380,7 +383,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "Chwilowo niedostępny · pominięto",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} nigdy się nie przełącza po tym, jak zacznie pisać. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
+    "Gdy limit użycia zatrzyma agenta {name} po rozpoczęciu pracy, {name} kontynuuje tę samą pracę na pierwszym dostępnym modelu z kolejności. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
   "mobile.agent.busyMessage.label": "Podczas pracy",
   "mobile.agent.busyMessage.footer":
     "Co dzieje się z wiadomością wysłaną, gdy agent pracuje. Kolejka trzyma ją do końca tury. Pokieruj przekazuje ją agentowi w trakcie tury.",

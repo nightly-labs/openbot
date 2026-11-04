@@ -70,6 +70,7 @@ import {
   isApprovalAutomationPreference,
   isAppThemePalette,
   isAppThemePaletteId,
+  isAvatarColor,
   isBusyMessageMode,
   isCodexLiveVoice,
   isCustomAgentCheckResult,
@@ -299,7 +300,15 @@ function decodeCentralAuthUser(value: unknown): CentralAuthUser {
     name: nullableString(user, "name"),
     avatarUrl: nullableString(user, "avatarUrl"),
     ...optionalAnalyticsEnabled(user),
+    ...optionalChatColor(user),
   };
+}
+
+function optionalChatColor(user: DynamicRecord): Pick<CentralAuthUser, "chatColor"> {
+  const { chatColor } = user;
+  if (chatColor === undefined) return {};
+  if (chatColor !== null && !isAvatarColor(chatColor)) throw new Error("Invalid chatColor.");
+  return { chatColor };
 }
 
 function optionalAnalyticsEnabled(user: DynamicRecord): Pick<CentralAuthUser, "analyticsEnabled"> {

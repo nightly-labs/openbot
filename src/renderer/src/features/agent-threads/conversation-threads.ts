@@ -178,6 +178,9 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     onBranch: tasks.canBranch()
       ? (sourceTaskId, messageId) => tabs.branch(agentId, sourceTaskId, messageId)
       : undefined,
+    onDeleteMessage: tasks.canDeleteMessage()
+      ? (taskId, messageId) => tasks.deleteTaskMessage(agentId, taskId, messageId)
+      : undefined,
     branchSource,
     routineThread: (routineId) => {
       const task = routineTask(list, routineId);

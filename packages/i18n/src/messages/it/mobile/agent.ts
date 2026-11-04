@@ -303,6 +303,9 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "Riprova a caricare i modelli",
   "mobile.agent.runtime.loadingModels": "Caricamento dei modelli…",
   "mobile.agent.runtime.noModels": "Nessun modello disponibile per questo provider.",
+  "mobile.agent.runtime.usageLimit": "Limite di utilizzo raggiunto",
+  "mobile.agent.runtime.usageLimitWindow": "Limite ({window})",
+  "mobile.agent.runtime.usageLimitResets": "{limit} · Si azzera il {time}",
   "mobile.agent.access.title": "Accesso",
   "mobile.agent.access.label": "Accesso dell'agente",
   "mobile.agent.access.workspace": "Solo workspace",
@@ -352,7 +355,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "Non disponibile ora · saltato",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} non cambia mai dopo aver iniziato a scrivere. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
+    "Se un limite di utilizzo ferma {name} dopo l'inizio del lavoro, {name} continua lo stesso lavoro con il primo modello disponibile nell'ordine. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
   "mobile.agent.busyMessage.label": "Durante il lavoro",
   "mobile.agent.busyMessage.footer":
     "Cosa fa un messaggio inviato mentre l'agente lavora. Coda lo tiene fino alla fine del turno. Indirizza lo consegna all'agente durante il turno.",

@@ -24,6 +24,8 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Сделать снимок окна {name} и отправить изображение модели агента.",
   "status.agent.screenCaptureRegion":
     "Сделать снимок области экрана {x}, {y}, {width} × {height} точек и отправить изображение модели агента.",
+  "status.agent.workflowDelete":
+    "Удалить рабочий процесс {title} вместе с его запусками и версиями. Его открытые шаги остановятся.",
   "status.agent.screenCaptureProgress": "Запрос снимка экрана…",
   "status.agent.screenCaptureReviewing": "Просмотр снимка экрана…",
   "status.agent.browserOpening": "Открытие веб-страницы…",

@@ -21,6 +21,7 @@ import {
 import { currentText } from "@openbot/ui/text";
 import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
+import { formatMessageTime } from "../../../app-message-projection";
 import { groupAgentMessageMarkers, markOpenAgentMessages } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
@@ -77,16 +78,17 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const answeredTurns = createMemo(
     () => new Set(deps.props.messages.flatMap((message) => (isTurnAnswer(message) ? [message.turnId] : []))),
   );
-  const shownMessages = createMemo(() =>
-    summarizeHostedSiteMessages(
-      deps.props.messages.filter(
-        (message) =>
-          message.kind !== "thinking" &&
-          !(message.kind === "memory-changes" && answeredTurns().has(message.turnId)) &&
-          !silentAgentAnswer(message),
-      ),
-    ),
-  );
+  const shownMessages = createMemo(() => {
+    const shown = deps.props.messages.filter(
+      (message) =>
+        message.kind !== "thinking" &&
+        !(message.kind === "memory-changes" && answeredTurns().has(message.turnId)) &&
+        !silentAgentAnswer(message),
+    );
+    // A channel row has the id of its channel entry and an author of its own, so this is for an agent's chat.
+    const questionTurnId = deps.props.channel ? undefined : deps.props.prompt?.turnId;
+    return summarizeHostedSiteMessages(withQuestionContext(shown, deps.props.messages, questionTurnId));
+  });
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));
   /* The messages of a routine run follow its row and open and close with it. */
   const drawnMessages = createMemo(() => [
@@ -344,4 +346,48 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     jumpToUnreadMessages,
     jumpToLatestMessage,
   };
+}
+
+/** The ids Claude and the ACP agents give a turn's thinking, beside its narration, as `REASONING_ID` in the backend. */
+const THINKING_ITEM_ID = /:(?:reasoning|thought(?::\d+)?)$/u;
+
+/**
+ * The rows, with the agent's last words before the question that waits as a message at the end of
+ * its turn. Those words are narration, which the steps hold, but the question is often about them,
+ * such as a draft to approve (#4897). After the answer they are only in the steps again.
+ */
+function withQuestionContext(
+  shown: AgentMessage[],
+  messages: readonly AgentMessage[],
+  turnId: string | undefined,
+): AgentMessage[] {
+  if (!turnId) return shown;
+  const thinking = messages.find((message) => message.kind === "thinking" && message.turnId === turnId);
+  const context = thinking ? lastNarration(thinking) : null;
+  if (!context) return shown;
+  const turnEnd = shown.findLastIndex((message) => message.turnId === turnId) + 1;
+  const at = turnEnd > 0 ? turnEnd : shown.length;
+  return [...shown.slice(0, at), context, ...shown.slice(at)];
+}
+
+function lastNarration(thinking: AgentMessage): AgentMessage | null {
+  const items = thinking.items ?? [];
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const id = thinking.itemIds?.[index];
+    const body = items[index] ?? "";
+    if (!id || !body.trim() || THINKING_ITEM_ID.test(id)) continue;
+    const createdAt = thinking.itemCreatedAt?.[index];
+    return {
+      id,
+      ...(thinking.turnId === undefined ? {} : { turnId: thinking.turnId }),
+      author: "agent",
+      body,
+      time: createdAt ? formatMessageTime(createdAt) : thinking.time,
+      ...(createdAt ? { createdAt } : {}),
+      // Still a step of the turn: the timeline gives it no stored-message actions.
+      itemType: "commentary",
+      kind: "text",
+    };
+  }
+  return null;
 }

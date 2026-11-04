@@ -372,6 +372,8 @@ export const messages = {
   "connector.telegram.close": "إغلاق",
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description": "اربط رقم WhatsApp بهذا الحاسوب. يسأل WhatsApp Orchestrator الوكيل المناسب ويجيب.",
+  "connector.whatsapp.descriptionHost":
+    "اربط رقم WhatsApp بهذا الخادم. يسأل WhatsApp Orchestrator الوكيل المناسب ويجيب.",
   "connector.whatsapp.statusConnected": "متصل",
   "connector.whatsapp.statusAttention": "يحتاج إلى انتباه",
   "connector.whatsapp.summaryConnected": {
@@ -407,6 +409,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote": "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot.",
   "connector.whatsapp.dedicatedNote": "يصل الأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
   "connector.whatsapp.helpLoggedOut": "أزال WhatsApp هذا الحاسوب من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
+  "connector.whatsapp.helpLoggedOutHost": "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "connector.whatsapp.helpError":
     "لا يستطيع OpenBot الوصول إلى WhatsApp على هذا الرقم. أعد الربط، أو اقطع اتصال الرقم.",
   "connector.whatsapp.retryAt": "طلب WhatsApp من OpenBot الانتظار. سيحاول مرة أخرى في {time}.",
@@ -434,6 +437,7 @@ export const messages = {
   "connector.whatsapp.stepAgent": "الوكيل",
   "connector.whatsapp.connectTitle": "ربط WhatsApp",
   "connector.whatsapp.connectDescription": "اختر الرقم، ثم اربط هذا الحاسوب من WhatsApp على هاتفك.",
+  "connector.whatsapp.connectDescriptionHost": "اختر الرقم، ثم اربط هذا الخادم من WhatsApp على هاتفك.",
   "connector.whatsapp.kindLabel": "الرقم",
   "connector.whatsapp.kindPersonal": "رقمي الشخصي",
   "connector.whatsapp.kindPersonalDescription": "يجيب OpenBot فقط عن دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم.",

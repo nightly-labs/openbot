@@ -193,6 +193,9 @@ function SettingsModalStory(props: {
             account={account()}
             onUpdateAccountName={updateAccountName}
             onUpdateAccountAvatar={updateAccountAvatar}
+            onSetChatColor={async (chatColor) => {
+              setAccount((current) => ({ ...current, chatColor }));
+            }}
             onCreateMobileConnect={createMobileConnect}
             onCancelMobileConnect={async () => {
               window.clearTimeout(scanTimer);
@@ -234,6 +237,7 @@ const meta = {
     account: storyAccount,
     onUpdateAccountName: fn(async () => undefined),
     onUpdateAccountAvatar: fn(async () => undefined),
+    onSetChatColor: fn(async () => undefined),
     onCreateMobileConnect: fn(async () => ({
       qrData:
         "openbot://mobile-connect?api=https%3A%2F%2Fapi.openbot.run&ticket=storybook-mobile-ticket_1234567890abcdef",

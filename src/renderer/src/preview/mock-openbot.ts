@@ -1707,6 +1707,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       removeAccount: async (input) => {
         await api.removeProviderAccount(input);
       },
+      // The preview host's default is the one of this computer.
+      hostDefaultProvider: async () => ({
+        preferredProvider: setupState.preferredProvider,
+        preferredModel: setupState.preferredModel,
+      }),
+      setHostDefaultProvider: async (input) => {
+        const { preferredProvider, preferredModel } = await api.saveSetup(input);
+        return { preferredProvider, preferredModel };
+      },
       usageResets: (provider) => api.providerUsageResets(provider),
       resetUsage: (input) => api.resetProviderUsage(input),
       signOut: async (provider) => {
@@ -2427,6 +2436,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           allowAutomation,
           allowNewChat,
           quickAcknowledgement,
+          chatColor,
           ...updates
         } = input;
         const updated: ClientAgentSummary = { ...current, ...updates };
@@ -2446,6 +2456,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         else if (busyMessageMode) updated.busyMessageMode = busyMessageMode;
         if (taskLimit === null) delete updated.taskLimit;
         else if (taskLimit) updated.taskLimit = taskLimit;
+        if (chatColor === null) delete updated.chatColor;
+        else if (chatColor) updated.chatColor = chatColor;
         agents = agents.map((agent) => (agent.id === updated.id ? updated : agent));
         emitAgentEvent({ type: "agents-changed", agents });
         emitTasks(updated.id);
@@ -2717,6 +2729,23 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         conversationReads.set(input.agentId, { unreadCount: 0, firstUnreadMessageId: null, throughMessageId });
         emitAgentEvent({ type: "conversation-invalidated", agentId: input.agentId, revision });
         return clone(conversationReadState(input.agentId));
+      },
+      deleteConversationMessage: async (input) => {
+        if (input.taskId !== undefined) {
+          const task = findTask(input.agentId, input.taskId);
+          const conversation = taskConversation(task);
+          if (!conversation.messages.some((message) => message.id === input.messageId))
+            throw new Error(sourceText("error.backend.messageDeleteNotFound"));
+          conversation.messages = conversation.messages.filter((message) => message.id !== input.messageId);
+          conversation.revision += 1;
+          emitAgentEvent({ type: "agent-task-conversation", taskId: task.id, snapshot: clone(conversation) });
+          return;
+        }
+        if (!getSnapshot(input.agentId).messages.some((message) => message.id === input.messageId))
+          throw new Error(sourceText("error.backend.messageDeleteNotFound"));
+        updateSnapshot(input.agentId, (snapshot) => {
+          snapshot.messages = snapshot.messages.filter((message) => message.id !== input.messageId);
+        });
       },
       chooseAttachments: async (_input) => [],
       importAttachmentData: async (data) =>

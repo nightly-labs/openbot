@@ -1,5 +1,5 @@
 import type { ConversationQuestionPrompt } from "@openbot/contracts/ipc";
-import type { ConversationUiBlock, UiConfirmBlock, UiConfirmValueField } from "@openbot/contracts/ui-blocks";
+import { type ConversationUiBlock, UI_CHOICE_QUESTION_ID } from "@openbot/contracts/ui-blocks";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
@@ -7,173 +7,24 @@ import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import MessageSquareText from "lucide-react-native/icons/message-square-text";
 import X from "lucide-react-native/icons/x";
-import { useEffect, useState } from "react";
 import { View } from "react-native";
+import {
+  answeredSelect,
+  ChatChoicePrompt,
+  ChatConfirmPrompt,
+  ConfirmBody,
+  choiceBlockOf,
+  confirmBlockOf,
+  PromptStatus,
+  QuestionText,
+} from "@/features/chat/components/chat-ui-block-cards";
 import { ChatVaultRequest } from "@/features/chat/components/chat-vault-request";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
 import { vaultRequestOf } from "@/features/chat/model/vault-request";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-
-type ConfirmPlan = Omit<UiConfirmBlock, "fields"> & { fields: UiConfirmValueField[] };
-
-/**
- * A confirm block with one question and no choices, such as the plan card before a long task. The
- * fallback question puts its title and steps in one text, so the card draws them from the block.
- * The answer still goes through the fallback question, whose options are the action labels.
- */
-function confirmPlan(prompt: ConversationQuestionPrompt, uiBlock: ConversationUiBlock | undefined) {
-  const spec = uiBlock?.spec;
-  if (spec?.type !== "confirm" || prompt.questions.length !== 1) return null;
-  const fields: UiConfirmValueField[] = [];
-  for (const field of spec.fields ?? []) {
-    if ("select" in field) return null;
-    fields.push(field);
-  }
-  return { ...spec, fields } satisfies ConfirmPlan;
-}
-
-function ConfirmPlanBody({ plan, compact = false }: { plan: ConfirmPlan; compact?: boolean }) {
-  return (
-    <View className="gap-3">
-      <Typography weight="medium">{plan.title}</Typography>
-      {plan.fields.length > 0 ? (
-        <View className="gap-2.5">
-          {plan.fields.map((field, index) => (
-            <View key={`${field.label}\n${field.value}`} className="flex-row gap-3">
-              <View
-                className="h-6 w-6 items-center justify-center rounded-full bg-control"
-                style={{ borderCurve: "continuous" }}
-              >
-                <Typography type="body-xs" weight="medium" className="text-text-secondary">
-                  {String(index + 1)}
-                </Typography>
-              </View>
-              <View className="min-w-0 flex-1 gap-0.5">
-                <Typography type="body-xs" weight="medium" className="text-text-secondary">
-                  {field.label}
-                </Typography>
-                <Typography type="body-sm" numberOfLines={compact ? 2 : undefined}>
-                  {field.value}
-                </Typography>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      {plan.preview && !compact ? (
-        <Typography type="body-sm" className="text-text-secondary">
-          {plan.preview}
-        </Typography>
-      ) : null}
-    </View>
-  );
-}
-
-/** Whole seconds until `at`, counted down once a second. Zero without a time or after it. */
-function useSecondsLeft(at: string | undefined): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const deadline = at ? Date.parse(at) : Number.NaN;
-    if (!Number.isFinite(deadline)) return;
-    setNow(Date.now());
-    // The timer stops at the deadline: after it the label shows the plain action until the host answers.
-    const timer = setInterval(() => {
-      const current = Date.now();
-      setNow(current);
-      if (current >= deadline) clearInterval(timer);
-    }, 1_000);
-    return () => clearInterval(timer);
-  }, [at]);
-  return at ? Math.max(0, Math.ceil((Date.parse(at) - now) / 1_000)) : 0;
-}
-
-/**
- * A plan waiting for an answer: the plan in the card, and its actions as pills under it, as the
- * approval card does. As on desktop, it has no "Reply in the chat". The action that the host presses when nobody answers
- * counts down, as on desktop. Only a host with `ui-block-auto-answer-v1` sends that time.
- */
-function ChatPlanPrompt({
-  plan,
-  uiBlock,
-  controller,
-  canSend,
-}: {
-  plan: ConfirmPlan;
-  uiBlock: ConversationUiBlock | undefined;
-  controller: QuestionPromptController;
-  canSend: boolean;
-}) {
-  const { t } = useText();
-  const muted = useThemeColor("muted");
-  const { disabled, pending, failedAnswers, answer, submit } = controller;
-  const autoAnswer = uiBlock?.state.autoAnswer?.done ? undefined : uiBlock?.state.autoAnswer;
-  const secondsLeft = useSecondsLeft(autoAnswer?.at);
-  return (
-    <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
-      <View
-        className="max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] bg-control/60 px-4 py-3"
-        style={{ borderCurve: "circular" }}
-      >
-        <View className="min-w-0 flex-1 pt-1">
-          <ConfirmPlanBody plan={plan} />
-        </View>
-        <Button
-          variant="ghost"
-          size="sm"
-          isIconOnly
-          accessibilityLabel={t("mobile.chat.question.cancelForm")}
-          isDisabled={disabled}
-          onPress={() => void submit({})}
-        >
-          <X color={String(muted)} size={18} />
-        </Button>
-      </View>
-      <View className="flex-row flex-wrap gap-2">
-        {plan.actions.map((action) => (
-          <Button
-            key={action.id}
-            size="sm"
-            variant="tertiary"
-            className="rounded-full"
-            isDisabled={disabled}
-            onPress={() => {
-              void haptics.selection();
-              answer([action.label]);
-            }}
-          >
-            <Button.Label className="font-sans font-semibold">
-              {autoAnswer?.actionId === action.id && secondsLeft > 0
-                ? t("mobile.chat.question.autoAction", { action: action.label, seconds: secondsLeft })
-                : action.label}
-            </Button.Label>
-          </Button>
-        ))}
-      </View>
-      {pending ? (
-        <Typography type="body-xs" accessibilityLiveRegion="polite">
-          {t("mobile.chat.question.sending")}
-        </Typography>
-      ) : null}
-      {!canSend ? (
-        <Typography type="body-xs" className="text-text-secondary">
-          {t("mobile.chat.question.reconnect")}
-        </Typography>
-      ) : null}
-      {failedAnswers ? (
-        <View className="flex-row items-center gap-2">
-          <Typography type="body-xs" className="flex-1" accessibilityRole="alert">
-            {t("mobile.chat.question.sendFailed")}
-          </Typography>
-          <Button variant="ghost" size="sm" isDisabled={disabled} onPress={() => void submit(failedAnswers)}>
-            <Button.Label>{t("common.retry")}</Button.Label>
-          </Button>
-        </View>
-      ) : null}
-    </View>
-  );
-}
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 export function ChatQuestionPrompt({
   serverId,
@@ -205,11 +56,16 @@ export function ChatQuestionPrompt({
         onActivate={onActivate}
       />
     );
-  const plan = confirmPlan(prompt, uiBlock);
+  const confirm = confirmBlockOf(prompt, uiBlock);
+  const choice = choiceBlockOf(prompt, uiBlock);
   if (!prompt.resolution && !controller && onActivate) {
     return (
       <View className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3">
-        {plan ? <ConfirmPlanBody plan={plan} compact /> : <Typography>{prompt.questions[0]?.question}</Typography>}
+        {confirm ? (
+          <ConfirmBody spec={confirm} compact selectValue={answeredSelect(prompt, null, t)} />
+        ) : (
+          <QuestionText question={prompt.questions[0]?.question ?? ""} variant="body" />
+        )}
         <Button variant="ghost" onPress={onActivate}>
           <Button.Label>{t("mobile.chat.question.answerForm")}</Button.Label>
         </Button>
@@ -228,7 +84,7 @@ export function ChatQuestionPrompt({
           {resolution.status === "answered" ? <Check color={String(muted)} size={18} /> : null}
           <Typography type="body-sm" className="text-text-secondary">
             {resolution.status === "answered"
-              ? plan && prompt.questions[0]
+              ? confirm && prompt.questions[0]
                 ? uiBlock?.state.autoAnswer?.done
                   ? t("mobile.chat.question.autoAnswered", {
                       outcome: promptAnswerLabel(prompt.questions[0], resolution, t),
@@ -240,26 +96,34 @@ export function ChatQuestionPrompt({
                 : t("mobile.chat.question.formExpired")}
           </Typography>
         </View>
-        {plan ? (
-          <ConfirmPlanBody plan={plan} compact />
-        ) : resolution.status === "answered" ? (
+        {/* A closed form keeps what it asked, as on desktop, so the person can still read the draft. */}
+        {confirm ? (
+          <ConfirmBody spec={confirm} closed selectValue={answeredSelect(prompt, resolution, t)} />
+        ) : (
           prompt.questions.map((item) => (
             <View key={item.id} className="gap-1">
-              <Typography type="body-sm" className="text-text-secondary">
-                {item.question}
-              </Typography>
-              <Typography>{promptAnswerLabel(item, resolution, t)}</Typography>
+              <QuestionText question={item.question} variant="secondary" />
+              {resolution.status === "answered" ? (
+                <Typography>
+                  {/* The options of a choice with more than one answer come as lines; show them as a list. */}
+                  {item.id === UI_CHOICE_QUESTION_ID
+                    ? promptAnswerLabel(item, resolution, t).split("\n").filter(Boolean).join(", ")
+                    : promptAnswerLabel(item, resolution, t)}
+                </Typography>
+              ) : item.options?.length ? (
+                <Typography type="body-sm">{item.options.map((option) => option.label).join(", ")}</Typography>
+              ) : null}
             </View>
           ))
-        ) : null}
+        )}
       </View>
     );
   }
 
   if (!controller?.question) return null;
-  if (plan) return <ChatPlanPrompt plan={plan} uiBlock={uiBlock} controller={controller} canSend={canSend} />;
-  const { question, index, disabled, pending, failedAnswers, setIndex, answer, submit, replyInChat, setReplyInChat } =
-    controller;
+  if (confirm) return <ChatConfirmPrompt spec={confirm} uiBlock={uiBlock} controller={controller} canSend={canSend} />;
+  if (choice) return <ChatChoicePrompt spec={choice} controller={controller} canSend={canSend} />;
+  const { question, index, disabled, setIndex, answer, submit, replyInChat, setReplyInChat } = controller;
 
   return (
     <View
@@ -268,9 +132,9 @@ export function ChatQuestionPrompt({
       accessibilityLabel={t("mobile.chat.question.form")}
     >
       <View className="flex-row items-center gap-2">
-        <Typography weight="medium" className="min-w-0 flex-1">
-          {question.question}
-        </Typography>
+        <View className="min-w-0 flex-1">
+          <QuestionText question={question.question} variant="title" />
+        </View>
         <Button
           variant="ghost"
           size="sm"
@@ -295,7 +159,7 @@ export function ChatQuestionPrompt({
             isDisabled={disabled || index === 0}
             onPress={() => setIndex(index - 1)}
           >
-            <ChevronLeft color={String(muted)} size={18} />
+            <ChevronLeft color={String(muted)} size={18} style={MIRROR_IN_RTL} />
           </Button>
           <Button
             variant="ghost"
@@ -305,7 +169,7 @@ export function ChatQuestionPrompt({
             isDisabled={disabled || index === prompt.questions.length - 1}
             onPress={() => setIndex(index + 1)}
           >
-            <ChevronRight color={String(muted)} size={18} />
+            <ChevronRight color={String(muted)} size={18} style={MIRROR_IN_RTL} />
           </Button>
         </View>
       ) : null}
@@ -394,26 +258,7 @@ export function ChatQuestionPrompt({
           </Typography>
         </Button>
       </View>
-      {pending ? (
-        <Typography type="body-xs" accessibilityLiveRegion="polite">
-          {t("mobile.chat.question.sending")}
-        </Typography>
-      ) : null}
-      {!canSend ? (
-        <Typography type="body-xs" className="text-text-secondary">
-          {t("mobile.chat.question.reconnect")}
-        </Typography>
-      ) : null}
-      {failedAnswers ? (
-        <View className="flex-row items-center gap-2">
-          <Typography type="body-xs" className="flex-1" accessibilityRole="alert">
-            {t("mobile.chat.question.sendFailed")}
-          </Typography>
-          <Button variant="ghost" size="sm" isDisabled={disabled} onPress={() => void submit(failedAnswers)}>
-            <Button.Label>{t("common.retry")}</Button.Label>
-          </Button>
-        </View>
-      ) : null}
+      <PromptStatus controller={controller} canSend={canSend} />
     </View>
   );
 }

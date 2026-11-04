@@ -59,6 +59,12 @@ import {
 import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
+import {
+  handleWorkflowTool,
+  WORKFLOW_CHANGE_TOOL_NAMES,
+  WORKFLOW_TOOL_NAMES,
+  type WorkflowTools,
+} from "../workflows/workflow-tools";
 import { AgentInterruptTool } from "./agent-interrupt-tool";
 import type { AgentMemories } from "./agent-memories";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approval-automation";
@@ -213,6 +219,7 @@ export interface OpenBotToolRouterOptions {
   sidebarLayout: AgentSidebar | null;
   localSkillTools?: (() => LocalSkillTools) | undefined;
   routineFlowTools?: (() => RoutineFlowTools) | undefined;
+  workflowTools?: (() => WorkflowTools) | undefined;
   approvalAutomation?: ApprovalAutomationPolicy | undefined;
   /** Draws pages for `html_preview`; null where no window can draw one. */
   visualPreview?: ChatVisualPreviewHost | null | undefined;
@@ -256,6 +263,7 @@ export class OpenBotToolRouter {
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #localSkillTools: (() => LocalSkillTools) | undefined;
   readonly #routineFlowTools: (() => RoutineFlowTools) | undefined;
+  readonly #workflowTools: (() => WorkflowTools) | undefined;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #visualPreview: ChatVisualPreviewHost | null;
   readonly #screenCapture: ScreenCaptureHost | null;
@@ -291,6 +299,7 @@ export class OpenBotToolRouter {
     this.#sidebarLayout = options.sidebarLayout;
     this.#localSkillTools = options.localSkillTools;
     this.#routineFlowTools = options.routineFlowTools;
+    this.#workflowTools = options.workflowTools;
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#visualPreview = options.visualPreview ?? null;
     this.#screenCapture = options.screenCapture ?? null;
@@ -532,14 +541,19 @@ export class OpenBotToolRouter {
                 if (!(error instanceof z.ZodError)) logger.warn("An OpenBot tool failed.", { tool, error: message });
                 return openBotToolFailure(message);
               });
-            const correctable =
+            const correctableTool =
               PROFILE_TOOL_NAMES.has(tool) ||
               CHANNEL_AGENT_TOOL_NAMES.has(tool) ||
               tool === "list_channels" ||
               tool === "attach_files_to_response";
-            const response = this.#handleOpenBotTool(toolRequest.params).pipe(
-              Effect.catch((failure) => (correctable ? correctableFailure(failure.cause) : Effect.fail(failure))),
-              Effect.catchDefect((defect) => (correctable ? correctableFailure(defect) : Effect.die(defect))),
+            // A workflow tool reports its own correctable failures; only bad arguments reach this point.
+            const correctable = (cause: unknown) =>
+              correctableTool || (WORKFLOW_TOOL_NAMES.has(tool) && cause instanceof z.ZodError);
+            const response = this.#handleOpenBotTool(client, toolRequest, toolRequest.params).pipe(
+              Effect.catch((failure) =>
+                correctable(failure.cause) ? correctableFailure(failure.cause) : Effect.fail(failure),
+              ),
+              Effect.catchDefect((defect) => (correctable(defect) ? correctableFailure(defect) : Effect.die(defect))),
               Effect.tap((result) => Effect.sync(() => client.respond(toolRequest.id, result))),
             );
             // Both store a file and then add the message that names it.
@@ -770,6 +784,8 @@ export class OpenBotToolRouter {
 
   readonly #handleOpenBotTool = Effect.fn("OpenBotToolRouter.handleOpenBotTool")(function* (
     this: OpenBotToolRouter,
+    client: AgentClient,
+    request: AppServerRequest,
     params: DynamicToolCallParams,
   ) {
     const senderAgentId = this.#conversation.agentForThread(params.threadId);
@@ -875,21 +891,9 @@ export class OpenBotToolRouter {
     }
     if (CHANNEL_AGENT_TOOL_NAMES.has(params.tool)) {
       if (channelId) return channelAgentToolInChannelTask();
-      // As for webhook routines: an external chat, a routine run or an agent message can carry text
-      // from outside, such as a webhook body. A message steered into a run shares the run's turn. A
-      // team member's message is refused too: the Team API checks that member's agent access.
-      const deliveries = this.#mailbox.findDeliveriesByTurn(senderAgentId, params.turnId);
-      const remote = (messageId: string) => {
-        const member = this.#mailbox.senderMember(messageId);
-        return member !== undefined && (this.#channels.hooks.remotePerson?.(member.id) ?? false);
-      };
-      const requested =
-        deliveries.length > 0 &&
-        deliveries.every(({ delivery }) => delivery.sender.kind === "user" && !remote(delivery.messageId)) &&
-        !this.#conversation.isExecutionThread(executionThreadId);
-      if (!requested)
+      if (!this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId))
         return openBotToolFailure(
-          "Only a person's message in your own OpenBot chat can create or change a channel. Ask the user to request it there.",
+          "Only a person's message, in your OpenBot chat or a thread they opened, can create or change a channel. Ask the user to request it there.",
         );
       return yield* handleChannelAgentTool(params, senderAgentId, {
         channels: this.#channels,
@@ -1062,6 +1066,55 @@ export class OpenBotToolRouter {
       new Set(this.#hooks.listAgents().map((agent) => agent.id)),
     );
     if (flowResult) return flowResult;
+
+    if (
+      WORKFLOW_CHANGE_TOOL_NAMES.has(params.tool) &&
+      !this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId)
+    )
+      return openBotToolFailure(
+        "Only a person's message, in your OpenBot chat or a thread they opened, can change, delete or run a workflow. Ask the user to request it there.",
+      );
+    // A read gives every workflow, its webhook URLs and its run outputs. The Team API hides these
+    // from a member by agent access and admin rights, so a member's message does not get them here.
+    if (WORKFLOW_TOOL_NAMES.has(params.tool) && this.#fromRemoteMember(senderAgentId, params.turnId))
+      return openBotToolFailure("A team member's message cannot read workflows. Ask the member to use Workflows.");
+    // The agent list is read only for a workflow tool, not on each OpenBot tool call.
+    if (WORKFLOW_TOOL_NAMES.has(params.tool)) {
+      const workflowResult = yield* handleWorkflowTool(
+        params.tool,
+        params.arguments,
+        this.#workflowTools?.() ?? null,
+        senderAgentId,
+        // A call that comes again starts no second run.
+        `${params.threadId}:${params.turnId}:${params.callId}`,
+        new Set(this.#hooks.listAgents().map((agent) => agent.id)),
+        (title) =>
+          this.#attention
+            .awaitToolApproval(
+              client,
+              request,
+              {
+                requestId: request.id,
+                agentId: senderAgentId,
+                threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
+                turnId: params.turnId,
+                kind: "permissions",
+                command: null,
+                cwd: null,
+                reason: sourceText("status.agent.workflowDelete", { title }),
+                grantRoot: null,
+                permissions: null,
+              },
+              // A delete loses the run history, so Full access does not answer for the user.
+              { alwaysAsk: true },
+            )
+            .pipe(
+              Effect.map((decision) => decision === "accept"),
+              toToolOperationFailed,
+            ),
+      );
+      if (workflowResult) return workflowResult;
+    }
 
     // An isolated channel keeps what its members learn in it (#4332). The fact becomes a channel
     // memory, which only the packets of this channel show, so the agent's own chats do not get it.
@@ -1433,6 +1486,39 @@ export class OpenBotToolRouter {
       eventType: "mcp.sign_in_requested",
       detail: { mcpServerId: config.id },
     });
+  }
+
+  /**
+   * Whether only a person in this computer's own chat asked for the turn. As for webhook routines: an
+   * external chat, a routine or workflow run, or an agent message can carry text from outside, such
+   * as a webhook body. A message steered into a run shares the run's turn. A team member's message is
+   * refused too: the Team API checks that member's agent access. The agent's own chat counts, and so
+   * does a side thread that the person opened, or branched, and that takes no routine runs. A channel
+   * task and a Slack or Telegram message also arrive as `user`, so a thread linked to either does not.
+   */
+  #requestedByPerson(agentId: string, turnId: string, executionThreadId: string): boolean {
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    return (
+      deliveries.length > 0 &&
+      deliveries.every(({ delivery }) => delivery.sender.kind === "user" && !this.#remoteMember(delivery.messageId)) &&
+      (!this.#conversation.isExecutionThread(executionThreadId) ||
+        (this.#tasks.isPersonThread(agentId, executionThreadId) &&
+          !this.#messaging.store.linkForThread(executionThreadId) &&
+          !this.#channels.store.channelForThread(executionThreadId)))
+    );
+  }
+
+  /** Whether a team member on another computer sent this message. */
+  #remoteMember(messageId: string): boolean {
+    const member = this.#mailbox.senderMember(messageId);
+    return member !== undefined && (this.#channels.hooks.remotePerson?.(member.id) ?? false);
+  }
+
+  /** Whether a team member on another computer sent a message of this turn. */
+  #fromRemoteMember(agentId: string, turnId: string): boolean {
+    return this.#mailbox
+      .findDeliveriesByTurn(agentId, turnId)
+      .some(({ delivery }) => this.#remoteMember(delivery.messageId));
   }
 
   /** Adds the note that an agent changed the Vault. `text` names the item, never a secret. */

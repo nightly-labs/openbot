@@ -25,6 +25,8 @@ export const messages = {
   "status.agent.screenCaptureWindow": "ウィンドウ {name} をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.screenCaptureRegion":
     "画面の {x}, {y}, {width} × {height} ポイントの領域をキャプチャし、その画像をエージェントのモデルに送信します。",
+  "status.agent.workflowDelete":
+    "ワークフロー {title} を実行履歴とバージョンごと削除します。実行中のステップは停止します。",
   "status.agent.screenCaptureProgress": "画面のキャプチャを要求しています…",
   "status.agent.screenCaptureReviewing": "画面のキャプチャを確認しています…",
   "status.agent.browserOpening": "Web ページを開いています…",

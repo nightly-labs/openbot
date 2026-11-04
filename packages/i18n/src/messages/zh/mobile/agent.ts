@@ -292,6 +292,9 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "重试加载模型",
   "mobile.agent.runtime.loadingModels": "正在加载模型…",
   "mobile.agent.runtime.noModels": "该服务商没有可用模型。",
+  "mobile.agent.runtime.usageLimit": "已达用量上限",
+  "mobile.agent.runtime.usageLimitWindow": "{window}上限",
+  "mobile.agent.runtime.usageLimitResets": "{limit} · {time} 重置",
   "mobile.agent.access.title": "访问权限",
   "mobile.agent.access.label": "助手权限",
   "mobile.agent.access.workspace": "仅工作区",
@@ -336,7 +339,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "当前不可用 · 已跳过",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} 在开始输出后不会切换。额度重置后会回到 {model}；出现服务商错误时，则在 10 分钟后回到 {model}。",
+    "{name} 开始工作后若因用量上限停止，会用顺序中第一个可用的模型继续同一项工作。额度重置后会回到 {model}；出现服务商错误时，则在 10 分钟后回到 {model}。",
   "mobile.agent.busyMessage.label": "工作期间",
   "mobile.agent.busyMessage.footer":
     "当助手正在工作时你发消息会发生什么。“排队”会保留消息直到本轮对话结束；“引导”会在本轮对话中把消息交给助手。",

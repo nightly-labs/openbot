@@ -97,7 +97,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Gerade nicht verfügbar · übersprungen",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} wechselt nie, nachdem das Schreiben begonnen hat. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
+    "Stoppt ein Nutzungslimit {name} nach Beginn der Arbeit, setzt {name} dieselbe Arbeit mit dem ersten verfügbaren Modell der Reihenfolge fort. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
   "agentSettings.groups.brain": "Gehirn",
   "agentSettings.groups.knows": "Wissen",
   "agentSettings.groups.does": "Aufgaben",

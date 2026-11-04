@@ -19,6 +19,7 @@ import type {
   BrowserPreview,
   BrowserTab,
   CancelQueuedMessageInput,
+  ChatColors,
   ClientAgentModelOption,
   ClientAgentSummary,
   ConversationPage,
@@ -98,8 +99,10 @@ import {
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -142,8 +145,10 @@ import {
   listAgentNotificationLevels,
   listHiddenAgents,
   readAgentColors,
+  readChatColors,
   readSidebarPins,
   seedSidebarPins,
+  setAgentChatColor,
   setAgentColor,
   setAgentHidden,
   setAgentNotificationLevel,
@@ -216,6 +221,11 @@ interface WebConnectOptions {
   early?: WebEarlyReads;
 }
 
+/** The message that `message-delete-v1` deletes: in the chat of an agent, or in a channel. */
+type WebMessageDelete =
+  | { kind: "agent"; agentId: string; messageId: string }
+  | { kind: "channel"; channelId: string; messageId: string };
+
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
   /** The status connections of the hosts that this tab has not opened. */
@@ -262,6 +272,11 @@ export interface WebWorkspaceRuntime {
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   /** This member's read state for each agent, keyed by agent id. Invalid entries are left out. */
   conversationReads(): Promise<Record<string, ConversationReadState>>;
+  /**
+   * Deletes one message of an agent's chat or of a channel, with `message-delete-v1`. A host
+   * without it refuses before a request goes out.
+   */
+  deleteMessage?: (input: WebMessageDelete) => Promise<void>;
   /** Tells a hosted server that this tab has focus. Send it only to a host with `focus-use-v1`. */
   focusUse(): Promise<void>;
   /** Resolves to the conversation message the host stored: the delivery id of the receipt. */
@@ -305,6 +320,8 @@ export interface WebWorkspaceRuntime {
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
   /** The exact colours of the agents on the host. A host without `agent-colors-v1` has none. */
   listAgentColors?: () => Promise<AgentColors>;
+  /** The chat colours of the agents and members on the host. A host without `chat-colors-v1` has none. */
+  listChatColors?: () => Promise<ChatColors>;
   /** The user's own pinned chats on the open host, for all of their devices. Needs `sidebar-pins-v1`. */
   sidebarPins?: {
     read: () => Promise<SidebarPinsSnapshot>;
@@ -691,8 +708,22 @@ export function createWebWorkspaceRuntime(
     if (!connectedHost) throw new Error(currentText().t("webClient.error.hostNotConnected"));
     return connectedHost;
   }
+  async function listChatColors(): Promise<ChatColors> {
+    if (!capabilities.includes(CHAT_COLORS_CAPABILITY)) return { agents: [], members: [] };
+    return runTeamEffect(readChatColors(teamApi).pipe(Effect.mapError((error) => error.cause)));
+  }
   async function listMembers(): Promise<TeamMemberSummary[]> {
-    return (await runTeamEffect(directory.listMembers(requireHost().hostId))).map(toTeamMember);
+    // The account service has no chat colours. A failed read from the host gives the members without them.
+    const [members, colors] = await Promise.all([
+      runTeamEffect(directory.listMembers(requireHost().hostId)),
+      listChatColors().catch(() => undefined),
+    ]);
+    const chatColors = new Map(colors?.members.map((entry) => [entry.memberId, entry.color]));
+    return members.map((member) => {
+      const summary = toTeamMember(member);
+      const chatColor = chatColors.get(summary.id);
+      return chatColor ? { ...summary, chatColor } : summary;
+    });
   }
   const admin: WebAdminRuntime = {
     request: teamApi,
@@ -1108,6 +1139,17 @@ export function createWebWorkspaceRuntime(
     async focusUse() {
       await request("POST", FOCUS_USE_ROUTES.ping);
     },
+    async deleteMessage(input) {
+      if (!capabilities.includes(MESSAGE_DELETE_CAPABILITY))
+        throw new Error(currentText().t("error.team.messageDeleteUnsupported"));
+      if (input.kind === "agent")
+        await request("POST", MESSAGE_DELETE_ROUTES.agent, { agentId: input.agentId, messageId: input.messageId });
+      else
+        await request("POST", MESSAGE_DELETE_ROUTES.channel, {
+          channelId: input.channelId,
+          messageId: input.messageId,
+        });
+    },
     async conversationReads() {
       const value = await request("GET", TEAM_API_ROUTES.agents.conversationReads);
       const reads: Record<string, ConversationReadState> = {};
@@ -1256,6 +1298,7 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(AGENT_COLORS_CAPABILITY)) return { agents: [] };
       return runTeamEffect(readAgentColors(teamApi).pipe(Effect.mapError((error) => error.cause)));
     },
+    listChatColors,
     sidebarPins: {
       read: () => runTeamEffect(readSidebarPins(teamApi).pipe(Effect.mapError((error) => error.cause))),
       set: (items) => runTeamEffect(setSidebarPins(teamApi, items).pipe(Effect.mapError((error) => error.cause))),
@@ -1374,10 +1417,27 @@ export function createWebWorkspaceRuntime(
         backupModels: _backupModels,
         leaveUsageLimit: _leaveUsageLimit,
         avatarColor,
+        chatColor,
         ...fields
       } = input;
       if (providerAccountId !== undefined && !capabilities.includes(PROVIDER_ACCOUNTS_CAPABILITY))
         throw new Error(currentText().t("error.team.providersUnsupported"));
+      // The released agent route does not carry the chat colour, so it goes on `chat-colors-v1` first.
+      // Without the capability, a change of only the chat colour fails. With other fields, they change
+      // and the chat colour stays.
+      const chatColors = capabilities.includes(CHAT_COLORS_CAPABILITY);
+      if (
+        chatColor !== undefined &&
+        !chatColors &&
+        Object.entries(input).every(([key, value]) => key === "agentId" || key === "chatColor" || value === undefined)
+      )
+        throw new Error(currentText().t("error.team.chatColorsUnsupported"));
+      if (chatColors && chatColor !== undefined)
+        await runTeamEffect(
+          setAgentChatColor(teamApi, { agentId: input.agentId, color: chatColor }).pipe(
+            Effect.mapError((error) => error.cause),
+          ),
+        );
       // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on its
       // own route first. That route also sets the nearest hue, so the profile change then leaves the hue
       // out: on the released route a hue removes the colour. A removed colour keeps the hue, which then

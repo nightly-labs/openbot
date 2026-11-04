@@ -16,6 +16,7 @@ import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import HtmlPreview from "./html-preview.dom";
 import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
@@ -100,7 +101,7 @@ export const ChatCodePreview = memo(function ChatCodePreview({
               {t("mobile.chat.preview.lines", { count: lineCount })}
             </Typography.Paragraph>
           </View>
-          <ChevronRight size={18} color={String(muted)} />
+          <ChevronRight size={18} color={String(muted)} style={MIRROR_IN_RTL} />
         </View>
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {streaming ? (
@@ -126,14 +127,14 @@ function CodeExcerpt({ text }: { text: string }) {
     .filter(({ line }) => line.trim())
     .slice(0, EXCERPT_LINES);
   return (
-    <View className="gap-0.5 px-3 py-2.5">
+    <View className="gap-0.5 px-3 py-2.5" style={CODE_LAYOUT_STYLE}>
       {excerpt.map(({ line, row }, index) => (
         <Typography.Code
           key={row}
           numberOfLines={1}
           className="bg-transparent p-0 text-muted"
           // The last line fades, so the excerpt reads as the start of a longer block.
-          style={{ fontSize: 12, lineHeight: 17, opacity: index === EXCERPT_LINES - 1 ? 0.45 : 1 }}
+          style={[CODE_TEXT_STYLE, { fontSize: 12, lineHeight: 17, opacity: index === EXCERPT_LINES - 1 ? 0.45 : 1 }]}
         >
           {line}
         </Typography.Code>

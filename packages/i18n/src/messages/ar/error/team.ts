@@ -66,6 +66,8 @@ export const messages = {
   "error.team.sharedDataUnsupported": "البيانات المشتركة غير مدعومة في هذا الاتصال.",
   "error.team.agentInstallUnsupported": "إضافة الوكلاء غير مدعومة في هذا الاتصال.",
   "error.team.agentHideUnsupported": "إخفاء الوكلاء غير مدعوم في هذا الاتصال.",
+  "error.team.agentColorsUnsupported": "هذا الاتصال لا يدعم ألوان الوكلاء.",
+  "error.team.chatColorsUnsupported": "ألوان الدردشة غير مدعومة في هذا الاتصال.",
   "error.team.sidebarFoldersUnsupported": "المجلدات داخل المجلدات غير مدعومة في هذا الاتصال.",
   "error.team.agentNotificationLevelsUnsupported":
     "لا يمكن لهذا الخادم حفظ مستوى الإشعارات الخاص بك لكل وكيل. حدّث OpenBot على الحاسوب الذي يشغّله.",
@@ -76,6 +78,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "تحديث الوكلاء غير مدعوم في هذا الاتصال.",
   "error.team.contextResetUnsupported": "بدء دردشة جديدة غير مدعوم في هذا الاتصال.",
   "error.team.contextCompactUnsupported": "ضغط السياق غير مدعوم في هذا الاتصال.",
+  "error.team.messageDeleteUnsupported": "لا يدعم هذا الاتصال حذف الرسائل.",
   "error.team.workspaceDirectoryUnsupported": "عرض المجلدات غير مدعوم في هذا الاتصال.",
   "error.team.conversationFileSearchUnsupported": "البحث في الملفات غير مدعوم في هذا الاتصال.",
   "error.team.sideQuestionUnsupported": "الأسئلة الجانبية غير مدعومة في هذا الاتصال.",

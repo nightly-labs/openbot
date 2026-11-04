@@ -17,7 +17,9 @@ import {
   type CreateRoutineInput,
   type DeleteAgentMemoryInput,
   type DeleteChannelMemoryInput,
+  type DeleteChannelMessageInput,
   type DeleteChannelRoutineInput,
+  type DeleteConversationMessageInput,
   type DeleteRoutineInput,
   type DownloadAttachmentsInput,
   type EditQueuedMessageInput,
@@ -662,6 +664,23 @@ export function parseMarkConversationUnread(value: unknown): MarkConversationUnr
   };
 }
 
+export function parseDeleteConversationMessage(value: unknown): DeleteConversationMessageInput {
+  if (!isObject(value)) throw new Error("Invalid message delete request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
+  };
+}
+
+export function parseDeleteChannelMessage(value: unknown): DeleteChannelMessageInput {
+  if (!isObject(value)) throw new Error("Invalid message delete request.");
+  return {
+    channelId: requireString(value.channelId, "channelId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+  };
+}
+
 export function parseUpdateAgent(value: unknown): UpdateAgentInput {
   if (!isObject(value)) throw new Error("Invalid agent update request.");
   if (value.role !== undefined) throw new Error("Invalid role.");
@@ -769,6 +788,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
   if (value.avatarColor !== undefined) {
     if (value.avatarColor !== null && !isAvatarColor(value.avatarColor)) throw new Error("Invalid avatar color.");
     result.avatarColor = value.avatarColor;
+  }
+  if (value.chatColor !== undefined) {
+    if (value.chatColor !== null && !isAvatarColor(value.chatColor)) throw new Error("Invalid chat color.");
+    result.chatColor = value.chatColor;
   }
   return result;
 }

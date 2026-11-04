@@ -211,6 +211,11 @@ export const messages = {
     "Le attese aperte sono disponibili solo per gli agenti su questo computer.",
   "error.backend.markUnreadRemoteUnsupported":
     "Segnare un messaggio come non letto è disponibile solo per gli agenti su questo computer.",
+  "error.backend.messageDeleteUnsupported": "Questo server non supporta l’eliminazione dei messaggi.",
+  "error.backend.messageDeleteNotFound": "Questo messaggio non è nella chat.",
+  "error.backend.messageDeleteBusy":
+    "Questo messaggio fa parte di un turno in corso. Eliminalo quando il turno finisce.",
+  "error.backend.messageDeleteForbidden": "Puoi eliminare solo i messaggi che hai inviato.",
   "error.backend.routineFlowHandoffFailed": "La routine non è riuscita a passare il lavoro a questo agente.",
   "error.backend.mcpServerLimit": "OpenBot conserva fino a {limit} server MCP.",
   "error.backend.mcpServerNameTaken": "Esiste già un server MCP chiamato {name}.",

@@ -315,6 +315,9 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "Modelleri tekrar dene",
   "mobile.agent.runtime.loadingModels": "Modeller yükleniyor…",
   "mobile.agent.runtime.noModels": "Bu sağlayıcı için kullanılabilir model yok.",
+  "mobile.agent.runtime.usageLimit": "Kullanım sınırına ulaşıldı",
+  "mobile.agent.runtime.usageLimitWindow": "{window} sınırı",
+  "mobile.agent.runtime.usageLimitResets": "{limit} · {time} tarihinde sıfırlanır",
   "mobile.agent.access.title": "Erişim",
   "mobile.agent.access.label": "Ajan erişimi",
   "mobile.agent.access.workspace": "Yalnızca çalışma alanı",
@@ -364,7 +367,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "Şu an uygun değil · atlandı",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} yazmaya başladıktan sonra asla model değiştirmez. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
+    "Bir kullanım sınırı {name} işe başladıktan sonra onu durdurursa, {name} aynı işe sıradaki ilk kullanılabilir modelle devam eder. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "mobile.agent.busyMessage.label": "Çalışırken",
   "mobile.agent.busyMessage.footer":
     "Ajan çalışırken gönderdiğiniz bir mesajın ne olacağı. Kuyruk, mesajı tur bitene kadar tutar. Yönlendir, mesajı tur sırasında ajana verir.",

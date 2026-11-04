@@ -210,6 +210,11 @@ export const messages = {
   "error.backend.agentWaitRemoteUnsupported": "As esperas abertas só estão disponíveis para agentes neste computador.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marcar uma mensagem como não lida só está disponível para agentes neste computador.",
+  "error.backend.messageDeleteUnsupported": "Este servidor não permite excluir mensagens.",
+  "error.backend.messageDeleteNotFound": "Esta mensagem não está no chat.",
+  "error.backend.messageDeleteBusy":
+    "Esta mensagem faz parte de um turno em andamento. Exclua-a quando o turno terminar.",
+  "error.backend.messageDeleteForbidden": "Você só pode excluir as mensagens que enviou.",
   "error.backend.routineFlowHandoffFailed": "A rotina não conseguiu passar o trabalho para este agente.",
   "error.backend.mcpServerLimit": "O OpenBot mantém até {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Já existe um servidor MCP chamado {name}.",

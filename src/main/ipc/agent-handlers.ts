@@ -12,6 +12,7 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -91,6 +92,7 @@ import {
   CONTEXT_COMPACT_ROUTES,
 } from "@openbot/contracts/team-protocol/context-compact-v1";
 import { CONTEXT_RESET_CAPABILITY, CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
+import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
@@ -108,6 +110,7 @@ import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { HostService } from "../host-service";
+import { runMessageDelete } from "../message-delete-refusal";
 import { type MessageLinkRelay, openHttpLink } from "../message-link-relay";
 import type { ModelVisibility } from "../model-visibility";
 import {
@@ -147,6 +150,8 @@ import {
   parseCancelQueuedMessage,
   parseChannelId,
   parseCreateAgent,
+  parseDeleteChannelMessage,
+  parseDeleteConversationMessage,
   parseInterrupt,
   parseMarkAgentTaskRead,
   parseMarkConversationRead,
@@ -262,6 +267,16 @@ export function agentIpcHandlers({
   const remoteCompact = async (serverId: string, path: string, body: AgentTaskInput | { agentId: string }) => {
     if (!remoteServers.supportsCapability(serverId, CONTEXT_COMPACT_CAPABILITY))
       throw new Error(sourceText("error.team.contextCompactUnsupported"));
+    await runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
+  };
+  // The message-delete-v1 codec has already checked the empty reply. The host says why it refuses.
+  const remoteMessageDelete = async (
+    serverId: string,
+    path: string,
+    body: { agentId: string; taskId?: string; messageId: string } | { channelId: string; messageId: string },
+  ) => {
+    if (!remoteServers.supportsCapability(serverId, MESSAGE_DELETE_CAPABILITY))
+      throw new Error(sourceText("error.backend.messageDeleteUnsupported"));
     await runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
   };
   const remoteThreadRequest = (serverId: string, path: string, body: AgentTaskInput & { title?: string }) => {
@@ -446,7 +461,8 @@ export function agentIpcHandlers({
       }),
       listAgents: scopedQueryHandler({
         local: () => service.listAgents(),
-        // The released agent list has no exact colour, so `agent-colors-v1` gives it on its own route.
+        // The released agent list has no exact colour and no chat colour, so `agent-colors-v1` and
+        // `chat-colors-v1` give them on their own routes.
         remote: (serverId) =>
           runCauseEffect(
             Effect.all(
@@ -454,6 +470,8 @@ export function agentIpcHandlers({
                 remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
                 // A failed read keeps the last colours. An agent without a colour shows its hue.
                 remoteServers.readAgentColors(serverId).pipe(Effect.catch(() => Effect.void)),
+                // A failed read keeps the last chat colours.
+                remoteServers.readChatColors(serverId).pipe(Effect.catch(() => Effect.void)),
               ],
               { concurrency: "unbounded" },
             ).pipe(Effect.map(([agents]) => remoteServers.withAgentColors(serverId, agents))),
@@ -505,6 +523,15 @@ export function agentIpcHandlers({
             }),
           );
         },
+      }),
+      // The user of this computer can delete any message of a local channel.
+      deleteChannelMessage: scopedHandler(parseDeleteChannelMessage, {
+        local: (input) => runMessageDelete(service.channels.deleteMessage(input, { memberId: null, deleteAny: true })),
+        remote: (input, serverId) =>
+          remoteMessageDelete(serverId, MESSAGE_DELETE_ROUTES.channel, {
+            channelId: input.channelId,
+            messageId: input.messageId,
+          }),
       }),
       setChannelImage: scopedHandler(parseSetChannelImage, {
         local: (input) => runCauseEffect(service.channels.setImage(input.channelId, input.image)),
@@ -675,12 +702,28 @@ export function agentIpcHandlers({
           }
           // The released agent route does not carry the account, so it changes on its own route after
           // the rest: a provider change on the host returns the agent to the new provider's own sign-in.
-          const { providerAccountId, avatarColor, ...fields } = input;
+          const { providerAccountId, avatarColor, chatColor, ...fields } = input;
           if (
             providerAccountId !== undefined &&
             !remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNTS_CAPABILITY)
           )
             throw new Error(sourceText("error.team.providersUnsupported"));
+          // The released agent route does not carry the chat colour, so it goes on `chat-colors-v1` first.
+          // Without the capability, a change of only the chat colour fails. With other fields, they change
+          // and the chat colour stays.
+          const chatColors = remoteServers.supportsCapability(serverId, CHAT_COLORS_CAPABILITY);
+          if (
+            chatColor !== undefined &&
+            !chatColors &&
+            Object.entries(input).every(
+              ([key, value]) => key === "agentId" || key === "chatColor" || value === undefined,
+            )
+          )
+            throw new Error(sourceText("error.team.chatColorsUnsupported"));
+          if (chatColors && chatColor !== undefined)
+            await runCauseEffect(
+              remoteServers.setAgentChatColor(serverId, { agentId: input.agentId, color: chatColor }),
+            );
           // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on
           // its own route first. That route also sets the nearest hue, so the profile change then leaves
           // the hue out: on the released route a hue removes the colour. A removed colour keeps the hue,
@@ -792,6 +835,22 @@ export function agentIpcHandlers({
         remote: () => {
           throw new Error(sourceText("error.backend.markUnreadRemoteUnsupported"));
         },
+      }),
+      // The user of this computer can delete any message of a local agent.
+      deleteConversationMessage: scopedHandler(parseDeleteConversationMessage, {
+        local: (input) =>
+          runMessageDelete(service.deleteConversationMessage(input, { memberId: null, deleteAny: true })),
+        remote: (input, serverId) =>
+          input.taskId === undefined
+            ? remoteMessageDelete(serverId, MESSAGE_DELETE_ROUTES.agent, {
+                agentId: input.agentId,
+                messageId: input.messageId,
+              })
+            : remoteMessageDelete(serverId, MESSAGE_DELETE_ROUTES.task, {
+                agentId: input.agentId,
+                taskId: input.taskId,
+                messageId: input.messageId,
+              }),
       }),
       sendMessage: scopedHandler(parseSendMessage, {
         local: (input) => runCauseEffect(service.sendMessage(input, host.conversationSender())),

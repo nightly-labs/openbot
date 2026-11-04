@@ -366,6 +366,8 @@ export const messages = {
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description":
     "Bir WhatsApp numarasını bu bilgisayara bağlayın. WhatsApp Düzenleyicisi doğru ajana sorar ve yanıtlar.",
+  "connector.whatsapp.descriptionHost":
+    "Bir WhatsApp numarasını bu sunucuya bağlayın. WhatsApp Düzenleyicisi doğru ajana sorar ve yanıtlar.",
   "connector.whatsapp.statusConnected": "Bağlandı",
   "connector.whatsapp.statusAttention": "Dikkat gerekiyor",
   // {count} bağlı WhatsApp numaralarının sayısıdır.
@@ -391,6 +393,7 @@ export const messages = {
   "connector.whatsapp.dedicatedNote":
     "İzin verdiğiniz kişiler OpenBot'a ulaşır. Diğer kişiler size iletmeleri için bir kod alır.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp bu bilgisayarı bağlı cihazlardan kaldırdı. Numarayı yeniden bağlayın.",
+  "connector.whatsapp.helpLoggedOutHost": "WhatsApp bu sunucuyu bağlı cihazlardan kaldırdı. Numarayı yeniden bağlayın.",
   "connector.whatsapp.helpError":
     "OpenBot bu numarada WhatsApp'a ulaşamıyor. Yeniden bağlanın veya numaranın bağlantısını kesin.",
   "connector.whatsapp.retryAt": "WhatsApp OpenBot'tan beklemesini istedi. {time} saatinde tekrar deneyecek.",
@@ -423,6 +426,8 @@ export const messages = {
   "connector.whatsapp.connectTitle": "WhatsApp'ı bağlayın",
   "connector.whatsapp.connectDescription":
     "Numarayı seçin, ardından telefonunuzdaki WhatsApp'tan bu bilgisayarı bağlayın.",
+  "connector.whatsapp.connectDescriptionHost":
+    "Numarayı seçin, ardından telefonunuzdaki WhatsApp'tan bu sunucuyu bağlayın.",
   "connector.whatsapp.kindLabel": "Numara",
   "connector.whatsapp.kindPersonal": "Kişisel numaram",
   "connector.whatsapp.kindPersonalDescription":

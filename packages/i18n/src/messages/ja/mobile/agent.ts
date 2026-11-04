@@ -306,6 +306,9 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "モデルを再読み込み",
   "mobile.agent.runtime.loadingModels": "モデルを読み込んでいます…",
   "mobile.agent.runtime.noModels": "このプロバイダーで利用できるモデルはありません。",
+  "mobile.agent.runtime.usageLimit": "使用量の上限に達しました",
+  "mobile.agent.runtime.usageLimitWindow": "{window}の上限",
+  "mobile.agent.runtime.usageLimitResets": "{limit} · {time} にリセット",
   "mobile.agent.access.title": "アクセス",
   "mobile.agent.access.label": "エージェントのアクセス",
   "mobile.agent.access.workspace": "ワークスペースのみ",
@@ -355,7 +358,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "現在使用できません · スキップ",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name} は書き始めた後は切り替えません。上限が解除されると、またはプロバイダーのエラーから 10 分後に {model} に戻ります。",
+    "作業の開始後に利用上限で {name} が止まると、{name} は順序の中で最初に使えるモデルで同じ作業を続けます。上限が解除されると、またはプロバイダーのエラーから 10 分後に {model} に戻ります。",
   "mobile.agent.busyMessage.label": "作業中",
   "mobile.agent.busyMessage.footer":
     "エージェントの作業中に送信したメッセージの扱いです。「キュー」ではターンが終わるまで保持します。「方向を修正」ではターン中にエージェントに渡します。",

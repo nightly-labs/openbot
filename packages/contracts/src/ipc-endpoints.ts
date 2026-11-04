@@ -70,7 +70,7 @@ import type {
   BrowseAgentFoldersInput,
   ChooseAgentFolderInput,
 } from "./ipc-agent-folders";
-import type { ClientAgentModelOption } from "./ipc-agent-identity";
+import type { AvatarColor, ClientAgentModelOption } from "./ipc-agent-identity";
 import type {
   AgentImportPreview,
   AgentImportResult,
@@ -160,6 +160,7 @@ import type {
   ComputerUseState,
   ExportResult,
   ExternalDestination,
+  HostDefaultProvider,
   HostUpdateSettingsChange,
   HostUpdateStatus,
   IdleRestartTarget,
@@ -249,6 +250,7 @@ import type {
   ChannelPage,
   ChannelReadInput,
   ChannelSummary,
+  DeleteChannelMessageInput,
   SetChannelImageInput,
 } from "./ipc-chat-channels";
 import type {
@@ -259,6 +261,7 @@ import type {
   ConversationSearchPage,
   ConversationSnapshot,
   ConversationWithReadState,
+  DeleteConversationMessageInput,
   MarkConversationReadInput,
   MarkConversationUnreadInput,
   OpenMessageLinkInput,
@@ -1069,6 +1072,12 @@ export const IPC_ENDPOINTS = {
       "provider-admin:account-sign-in-status",
     ),
     cancelAccountSignIn: scopedRequest<AgentProviderId, void, "required">()("provider-admin:cancel-account-sign-in"),
+    // The provider that a new agent of a joined server's host starts on (`provider-default-v1`).
+    // This computer's own is `app.saveSetup`.
+    hostDefaultProvider: scopedQuery<HostDefaultProvider, "required">()("provider-admin:host-default-provider"),
+    setHostDefaultProvider: scopedRequest<SaveSetupInput, HostDefaultProvider, "required">()(
+      "provider-admin:set-host-default-provider",
+    ),
     renameAccount: scopedRequest<RenameProviderAccountInput, void, "required">()("provider-admin:rename-account"),
     removeAccount: scopedRequest<RemoveProviderAccountInput, void, "required">()("provider-admin:remove-account"),
     // The usage reset credits of a joined server's host's accounts, and the reset that spends one
@@ -1192,6 +1201,40 @@ export const IPC_ENDPOINTS = {
     ),
     hostSetDiscordAccess: scopedRequest<HostSetDiscordAccessInput, DiscordAccess, "required">()(
       "messaging:host-set-discord-access",
+    ),
+    // The WhatsApp numbers of a joined server with `whatsapp-connector-v1`. The host's session gets
+    // the QR code or the pairing code, and this computer shows it. The orchestrator starts on the
+    // host's default provider and model.
+    hostGetWhatsAppOverview: scopedQuery<WhatsAppOverview, "required">()("messaging:host-get-whatsapp-overview"),
+    hostStartWhatsAppLink: scopedRequest<StartWhatsAppLinkInput, WhatsAppLinkState, "required">()(
+      "messaging:host-start-whatsapp-link",
+    ),
+    hostGetWhatsAppLinkState: scopedQuery<WhatsAppLinkState, "required">()("messaging:host-get-whatsapp-link-state"),
+    hostCancelWhatsAppLink: scopedQuery<void, "required">()("messaging:host-cancel-whatsapp-link"),
+    hostDisconnectWhatsAppNumber: scopedRequest<MessagingWorkspaceInput, void, "required">()(
+      "messaging:host-disconnect-whatsapp-number",
+    ),
+    hostReconnectWhatsAppNumber: scopedRequest<MessagingWorkspaceInput, void, "required">()(
+      "messaging:host-reconnect-whatsapp-number",
+    ),
+    hostSetWhatsAppEnabled: scopedRequest<SetMessagingEnabledInput, void, "required">()(
+      "messaging:host-set-whatsapp-enabled",
+    ),
+    hostAddWhatsAppOrchestrator: scopedQuery<AddMessagingOrchestratorResult, "required">()(
+      "messaging:host-add-whatsapp-orchestrator",
+    ),
+    hostListWhatsAppGroups: scopedRequest<MessagingWorkspaceInput, WhatsAppGroupList, "required">()(
+      "messaging:host-list-whatsapp-groups",
+    ),
+    hostAddWhatsAppSender: scopedRequest<WhatsAppSenderInput, void, "required">()("messaging:host-add-whatsapp-sender"),
+    hostRemoveWhatsAppSender: scopedRequest<RemoveWhatsAppSenderInput, void, "required">()(
+      "messaging:host-remove-whatsapp-sender",
+    ),
+    hostAnswerWhatsAppRequest: scopedRequest<AnswerWhatsAppRequestInput, void, "required">()(
+      "messaging:host-answer-whatsapp-request",
+    ),
+    hostSetWhatsAppOwnNumber: scopedRequest<SetWhatsAppOwnNumberInput, void, "required">()(
+      "messaging:host-set-whatsapp-own-number",
     ),
   },
   // The server name, logo, timezone, agent memory limit and app update of one server's host. `host.updateIdentity` and `update`
@@ -1405,6 +1448,7 @@ export const IPC_ENDPOINTS = {
     verifyEmailCode: request<VerifyEmailCodeInput, CentralAuthState>()("auth:verify-email-code"),
     updateName: request<string, CentralAuthState>()("auth:update-name"),
     updateAvatar: request<AvatarImageInput | null, CentralAuthState>()("auth:update-avatar"),
+    updateChatColor: request<AvatarColor | null, CentralAuthState>()("auth:update-chat-color"),
     createMobileConnect: request<undefined, MobileConnectTicket>()("auth:create-mobile-connect"),
     cancelMobileConnect: request<undefined, void>()("auth:cancel-mobile-connect"),
     getMobileConnectLink: request<undefined, MobileConnectLink | null>()("auth:get-mobile-connect-link"),
@@ -1480,6 +1524,8 @@ export const IPC_ENDPOINTS = {
     readChannel: scopedRequest<ChannelReadInput, ChannelPage>()("agent:channels:read"),
     channelCommand: scopedRequest<ChannelCommand, Channel>()("agent:channels:command"),
     deleteChannel: scopedRequest<string, void>()("agent:channels:delete"),
+    // A joined server takes it through `message-delete-v1`.
+    deleteChannelMessage: scopedRequest<DeleteChannelMessageInput, void>()("agent:channels:delete-message"),
     // Only this computer keeps a channel image. A joined server has no route for it.
     setChannelImage: scopedRequest<SetChannelImageInput, Channel>()("agent:channels:set-image"),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
@@ -1530,6 +1576,10 @@ export const IPC_ENDPOINTS = {
     ),
     sendMessage: scopedRequest<SendMessageInput, QueuedMessageReceipt>()("agent:send-message"),
     setMessageReaction: scopedRequest<SetMessageReactionInput, void>()("agent:set-message-reaction"),
+    // A joined server takes it through `message-delete-v1`.
+    deleteConversationMessage: scopedRequest<DeleteConversationMessageInput, void>()(
+      "agent:delete-conversation-message",
+    ),
     listQueue: scopedRequest<string, QueueSnapshot>()("agent:list-queue"),
     listWaits: scopedRequest<string, AgentWaitsSnapshot>()("agent:list-waits"),
     cancelWait: scopedRequest<CancelAgentWaitInput, void>()("agent:cancel-wait"),

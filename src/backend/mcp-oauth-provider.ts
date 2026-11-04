@@ -867,8 +867,12 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * Except a server that lists only `client_secret_post`. A request with no method asks for the RFC
    * 7591 default, `client_secret_basic`, and Make refuses that registration with a 400: "No supported
    * Token Endpoint Auth Method provided."
+   *
+   * `application_type` is `native`: OpenID Dynamic Client Registration takes a missing value as
+   * `web`, and a server that follows it refuses the loopback `http` address with "web redirect_uris
+   * must only use the https scheme". The SDK schema does not name the field, but sends it.
    */
-  get clientMetadata(): OAuthClientMetadata {
+  get clientMetadata(): OAuthClientMetadata & { application_type: "native" } {
     const scope = this.#record().app?.scope;
     const methods = this.#discoveryState?.authorizationServerMetadata?.token_endpoint_auth_methods_supported;
     return {
@@ -876,6 +880,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       client_uri: "https://openbot.run",
       logo_uri: "https://openbot.run/icon-512x512.png",
       redirect_uris: [this.#options.redirectUrl],
+      application_type: "native",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
       ...tokenEndpointAuthMethod(methods),

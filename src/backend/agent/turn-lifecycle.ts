@@ -66,6 +66,7 @@ import {
 import type { ProviderRuntime } from "./provider-runtime";
 import { isNoUpdateAnswer, settleQuietRoutineTurn } from "./routine-quiet-runs";
 import {
+  foldCodexChildItem,
   foldCodexSubagentItem,
   SUBAGENTS_UPDATED_METHOD,
   stopRunningSubagents,
@@ -162,6 +163,11 @@ export interface TurnHooks {
   turnModel(agentId: string, turnId: string): string | null;
   /** Whether a provider error moves this agent to a backup model: it switches without asking and has a ready one. */
   mayFailOver(agentId: string): boolean;
+  /**
+   * Whether a ready backup continues work that a usage limit stopped after it started. An agent set
+   * to ask uses its order too: the turn already started, so there is no moment to ask.
+   */
+  mayContinueOnBackup(agentId: string): boolean;
   /**
    * Gives a channel task back to its channel's queue after a spent plan refused its turn. False
    * when the delivery is not an active channel assignment that can go back.
@@ -322,6 +328,16 @@ export class TurnLifecycle {
    * update. It is the only clock that moves while a turn works, and it is lost on restart.
    */
   readonly #lastEventAt = new Map<string, number>();
+  /**
+   * The running Codex subagents, under their own thread id, with the turn whose list shows them.
+   * Codex sends the items of these threads too, and OpenBot knows no agent for them.
+   */
+  readonly #codexChildren = new Map<string, { agentId: string; threadId: string; turnId: string }>();
+  /**
+   * The turns of each agent whose subagents still run. A background subagent keeps its turn here after
+   * the turn ended. Boot recovery stops every subagent, so nothing here outlives the process.
+   */
+  readonly #subagentTurns = new Map<string, Set<string>>();
 
   constructor(options: TurnLifecycleOptions) {
     this.#store = options.store;
@@ -345,10 +361,23 @@ export class TurnLifecycle {
     return this.#failedTurns;
   }
 
+  /** The newest turn with running subagents of each agent in `agentIds`. */
+  subagentTurns(agentIds: ReadonlySet<string>): Array<{ agentId: string; turnId: string }> {
+    const turns: Array<{ agentId: string; turnId: string }> = [];
+    for (const [agentId, turnIds] of this.#subagentTurns) {
+      const turnId = [...turnIds].at(-1);
+      if (turnId && agentIds.has(agentId)) turns.push({ agentId, turnId });
+    }
+    return turns;
+  }
+
   forgetAgent(agentId: string): void {
     this.fileHistory.forgetAgent(agentId);
     this.#failedTurns.delete(agentId);
+    this.#subagentTurns.delete(agentId);
     this.#lastEventAt.delete(agentId);
+    for (const [childId, parent] of this.#codexChildren)
+      if (parent.agentId === agentId) this.#codexChildren.delete(childId);
   }
 
   /** When this running turn sent `turn/started`, in epoch milliseconds. Null for a turn that is not running. */
@@ -398,6 +427,7 @@ export class TurnLifecycle {
     this.#endedTurns.clear();
     this.#refusedRetries.clear();
     this.#lastEventAt.clear();
+    this.#codexChildren.clear();
     this.#itemTurns.clear();
     this.#traces.clear();
     this.#observedCompactions.clear();
@@ -607,6 +637,10 @@ export class TurnLifecycle {
       }
       case "item/started":
       case "item/completed": {
+        if (threadId && !agentId) {
+          this.#applyCodexChildItem(threadId, getRecord(params, "item"));
+          return;
+        }
         if (!threadId || !agentId) return;
         const turnId = getString(params, "turnId");
         const item = getRecord(params, "item");
@@ -1063,13 +1097,13 @@ export class TurnLifecycle {
         return;
       }
       const channelTurn = !taskTurn && this.#conversation.isExecutionThread(snapshot.threadId);
-      // After work started, only a ready automatic backup continues it. A turn refused before
+      // After work started, only a ready backup in the agent's order continues it. A turn refused before
       // work still waits for the reset when no backup is ready. A continuation that a backup refused
       // before work keeps the earlier provider's work.
       const carriesWork =
         running !== undefined &&
         (running.acted || deliveries.some((context) => context.resumeAfterUsageLimit !== undefined));
-      let continuing = limited && carriesWork && deliveries.length > 0 && this.#hooks.mayFailOver(agentId);
+      let continuing = limited && carriesWork && deliveries.length > 0 && this.#hooks.mayContinueOnBackup(agentId);
       if (continuing) {
         for (const { delivery, channelId } of deliveries) {
           if (channelId && !(yield* this.#hooks.requeueChannelDelivery(delivery.id, true))) {
@@ -1098,6 +1132,9 @@ export class TurnLifecycle {
       // A foreground subagent ends with its turn. A background one works on and reports later.
       const subagents = snapshot.messages.find((message) => message.id === `${turnId}:subagents`);
       stopRunningSubagents(subagents?.subagents, new Date().toISOString(), { background: false });
+      if (this.#trackSubagents(agentId, turnId, subagents?.subagents)) this.#hooks.emitRuntimeSnapshot();
+      for (const [childId, parent] of this.#codexChildren)
+        if (parent.turnId === turnId) this.#codexChildren.delete(childId);
       for (const message of snapshot.messages) {
         if (this.#itemTurns.get(message.id) !== turnId || message.status !== "streaming") continue;
         message.status = normalizeCompletionStatus(repeatable || failedOver ? "interrupted" : status);
@@ -1419,6 +1456,8 @@ export class TurnLifecycle {
         if (message.turnId !== turnId && this.#itemTurns.get(message.id) !== turnId) continue;
         // As at the normal end, a foreground subagent ends with its turn.
         stopRunningSubagents(message.subagents, now, { background: false });
+        if (message.subagents && this.#trackSubagents(agentId, turnId, message.subagents))
+          this.#hooks.emitRuntimeSnapshot();
         message.status = status;
         markIncompleteImageGeneration(message, status);
         changedIds.add(message.id);
@@ -1694,9 +1733,41 @@ export class TurnLifecycle {
     message.subagents = subagents;
     // A new step replaces the last one in the event log, so a long run does not keep a copy of the
     // list for each step. A new subagent or a new state keeps its own event.
-    if (previous && subagentStates(previous) === subagentStates(subagents))
+    if (previous && subagentStates(previous) === subagentStates(subagents)) {
       this.#conversation.emitReplacedMessage(snapshot, id, "turn.subagents-updated");
-    else this.#conversation.emitConversation(snapshot);
+      return;
+    }
+    this.#conversation.emitConversation(snapshot);
+    if (this.#trackSubagents(agentId, turnId, subagents)) this.#hooks.emitRuntimeSnapshot();
+    const publicThreadId = snapshot.threadId;
+    if (!publicThreadId) return;
+    const failedBefore = new Set(previous?.filter((subagent) => subagent.status === "failed").map(({ id }) => id));
+    for (const subagent of subagents)
+      if (subagent.status === "failed" && !failedBefore.has(subagent.id))
+        this.#hooks.emit({
+          type: "subagent-failed",
+          agentId,
+          threadId: publicThreadId,
+          turnId,
+          subagentId: subagent.id,
+          title: subagent.title,
+        });
+  }
+
+  /**
+   * Notes whether a turn's subagents still run, so that their agent shows as at work. Returns true when
+   * the turns of the agent changed.
+   */
+  #trackSubagents(agentId: string, turnId: string, subagents: readonly ConversationSubagent[] | undefined): boolean {
+    const running = subagents?.some((subagent) => subagent.status === "running") === true;
+    const turns = this.#subagentTurns.get(agentId);
+    if (running === (turns?.has(turnId) === true)) return false;
+    if (running) this.#subagentTurns.set(agentId, (turns ?? new Set()).add(turnId));
+    else if (turns) {
+      turns.delete(turnId);
+      if (turns.size === 0) this.#subagentTurns.delete(agentId);
+    }
+    return true;
   }
 
   /** Codex reports its subagents as tool items of the parent thread. */
@@ -1705,7 +1776,26 @@ export class TurnLifecycle {
     const current = snapshot.messages.find((candidate) => candidate.id === `${turnId}:subagents`)?.subagents ?? [];
     const subagents = foldCodexSubagentItem(current, item, new Date().toISOString());
     const clamped = subagents && clampConversationSubagents(subagents);
-    if (clamped) this.#applySubagents(agentId, threadId, turnId, clamped);
+    if (!clamped) return;
+    for (const subagent of clamped)
+      if (subagent.status === "running") this.#codexChildren.set(subagent.id, { agentId, threadId, turnId });
+      else this.#codexChildren.delete(subagent.id);
+    this.#applySubagents(agentId, threadId, turnId, clamped);
+  }
+
+  /**
+   * An item of a Codex subagent's own thread becomes a step of that subagent. Items that came
+   * before `spawnAgent` named the thread are not shown. The subagent's work keeps its agent active.
+   */
+  #applyCodexChildItem(childThreadId: string, item: DynamicRecord | null): void {
+    const parent = this.#codexChildren.get(childThreadId);
+    if (!parent || !item) return;
+    this.#lastEventAt.set(parent.agentId, Date.now());
+    const snapshot = this.#conversation.ensureSnapshot(parent.agentId, parent.threadId);
+    const current = snapshot.messages.find((candidate) => candidate.id === `${parent.turnId}:subagents`)?.subagents;
+    const subagents = current && foldCodexChildItem(current, childThreadId, item);
+    const clamped = subagents && clampConversationSubagents(subagents);
+    if (clamped) this.#applySubagents(parent.agentId, parent.threadId, parent.turnId, clamped);
   }
 
   #clearPlan(agentId: string, threadId: string, turnId: string): void {

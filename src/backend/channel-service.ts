@@ -22,6 +22,7 @@ import {
   type CreateChannelMemoryInput,
   channelRoutingConversationEventItemType,
   type DeleteChannelMemoryInput,
+  type DeleteChannelMessageInput,
   type QueueHold,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
@@ -55,6 +56,7 @@ import {
 import { ChannelMemoryStore } from "./channel-memory-store";
 import { type ChannelAssignment, type ChannelContext, ChannelStore } from "./channel-store";
 import type { DeliveryContext, MailboxStore } from "./mailbox-store";
+import { type MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import type { OpenBotDatabase } from "./openbot-database";
 import { extractJsonObject, StructuredOutputError } from "./structured-output";
 
@@ -89,6 +91,8 @@ export interface ChannelHooks {
    * packet leave out the messages that the session read: a compaction resets what it read.
    */
   reportsCompactions?(agentId: string): boolean;
+  /** Whether the agent's provider streams text as the answer before it knows that it is not a step. */
+  provisionalAnswers?(agentId: string): boolean;
   /** The thread's snapshot when main has it in memory, which a streaming turn always has. */
   loadedSnapshot?(threadId: string): ConversationSnapshot | undefined;
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
@@ -194,7 +198,7 @@ export class ChannelService {
   #scope = Scope.makeUnsafe();
   readonly #pumps = new Map<string, Fiber.Fiber<void>>();
   readonly #commands = new Map<string, Deferred.Deferred<void>>();
-  readonly #commandFibers = new Set<Fiber.Fiber<Channel | void, ChannelOperationError>>();
+  readonly #commandFibers = new Set<Fiber.Fiber<Channel | void, ChannelOperationError | MessageDeleteRefused>>();
   readonly #interrupts = new Set<Fiber.Fiber<void>>();
   readonly #events = new Set<Fiber.Fiber<void>>();
   /**
@@ -334,7 +338,10 @@ export class ChannelService {
   });
 
   readonly #serialize = Effect.fn("ChannelService.serialize")(
-    <A extends Channel | void>(channelId: string, operation: Effect.Effect<A, ChannelOperationError>) =>
+    <A extends Channel | void, E extends ChannelOperationError | MessageDeleteRefused = ChannelOperationError>(
+      channelId: string,
+      operation: Effect.Effect<A, E>,
+    ) =>
       Effect.uninterruptibleMask((restore) =>
         Effect.gen({ self: this }, function* () {
           const prior = this.#commands.get(channelId);
@@ -476,6 +483,44 @@ export class ChannelService {
         }).pipe(Effect.ensuring(Effect.sync(() => this.#deletedChannels.delete(channelId))));
       }),
     ),
+  );
+
+  /**
+   * Deletes one message from the channel view and history. Members that already read it can still
+   * remember it. A message that an open task still uses, or that still streams, is `busy`.
+   */
+  readonly deleteMessage = Effect.fn("ChannelService.deleteMessage")(
+    (input: DeleteChannelMessageInput, access: MessageDeleteAccess) =>
+      this.#serialize(
+        input.channelId,
+        Effect.gen({ self: this }, function* () {
+          if (this.#deletedChannels.has(input.channelId))
+            return yield* new MessageDeleteRefused({ reason: "not-found" });
+          const message = yield* channelSync(() => this.store.message(input.channelId, input.messageId));
+          if (!message) return yield* new MessageDeleteRefused({ reason: "not-found" });
+          if (!access.deleteAny && !(message.author.kind === "member" && message.author.id === access.memberId))
+            return yield* new MessageDeleteRefused({ reason: "forbidden" });
+          const tasks = yield* channelSync(() => this.store.tasks(input.channelId));
+          if (
+            message.message.status === "streaming" ||
+            // A message of a running task, such as its plan or result, can still change.
+            tasks.some(
+              (task) =>
+                !terminal(task) &&
+                (task.id === message.taskId ||
+                  task.requestMessageId === message.id ||
+                  task.sourceMessageIds.includes(message.id)),
+            )
+          )
+            return yield* new MessageDeleteRefused({ reason: "busy" });
+          const channel = yield* channelSync(() => this.store.get(input.channelId));
+          yield* channelSync(() => this.store.deleteMessage(channel, message));
+          yield* this.mailbox
+            .deleteChannelMessageCopy(input.channelId, message.id)
+            .pipe(Effect.mapError(channelFailure));
+          this.publish(input.channelId);
+        }),
+      ),
   );
 
   private readonly apply = Effect.fn("ChannelService.apply")(function* (
@@ -1253,15 +1298,15 @@ export class ChannelService {
   ): Effect.fn.Return<void, ChannelOperationError> {
     for (const candidate of yield* channelSync(() => this.store.tasks(channelId))) {
       if (this.#stopped || this.#deletedChannels.has(channelId)) return;
+      // One row each, not every task of the channel again: a long channel holds thousands of
+      // finished tasks, and the whole list for each of them blocked the main process for minutes.
+      const candidateTask = yield* channelSync(() => this.store.task(channelId, candidate.id));
+      if (candidateTask?.state !== "queued") continue;
       let channel = yield* channelSync(() => this.store.get(channelId));
       if (channel.archived) return;
-      const candidateTask = (yield* channelSync(() => this.store.tasks(channelId))).find(
-        (item) => item.id === candidate.id,
-      );
-      if (candidateTask?.state !== "queued") continue;
       let task = candidateTask;
       const rootId = task.rootTaskId;
-      const root = (yield* channelSync(() => this.store.tasks(channelId))).find((item) => item.id === rootId);
+      const root = yield* channelSync(() => this.store.task(channelId, rootId));
       if (root && (root.state === "paused" || root.state === "failed" || root.state === "cancelled")) continue;
       if (!task.ownerAgentId) {
         // One eligible member is not a decision. Routing costs a full turn of the lead's own model,
@@ -2491,6 +2536,11 @@ export class ChannelService {
       return history.get(id) ?? undefined;
     };
     const messages: ChannelMessage[] = [];
+    let provisional: boolean | undefined;
+    const provisionalAnswers = () => {
+      provisional ??= this.hooks.provisionalAnswers?.(snapshot.agentId) === true;
+      return provisional;
+    };
     const active = assignments.find((item) => item.agentId === snapshot.agentId && activeAssignment(item));
     for (let message of turnId === undefined
       ? snapshot.messages
@@ -2527,6 +2577,17 @@ export class ChannelService {
         !message.text.trim() &&
         !message.attachments?.length &&
         !message.questionPrompt
+      )
+        continue;
+      // OpenCode's text before a tool call streams as the answer and becomes a step only at that
+      // call. Copied while it streamed, each such note showed as the member's message and then
+      // folded (#4844). The agent's own chat still streams it; the channel gets it when it completes.
+      if (
+        !original &&
+        message.author === "assistant" &&
+        message.status === "streaming" &&
+        message.itemType === "final_answer" &&
+        provisionalAnswers()
       )
         continue;
       const task = tasks.get(assignment.taskId);
@@ -2845,9 +2906,9 @@ export class ChannelService {
     if (tool !== "channel_assign" && tool !== "channel_transfer")
       return yield* channelFailure(new Error("Unknown channel tool."));
     // The agent can correct these arguments, so it gets the reason as a result. Codex replaces a
-    // failed tool request with "dynamic tool request failed" (#4728).
-    const refuse = (reason: string) => {
-      logger.warn("A channel handoff was refused.", { channelId, agentId, tool, reason });
+    // failed tool request with "dynamic tool request failed" (#4728). The log keeps a fixed reason.
+    const refuse = (reason: string, logReason = reason) => {
+      logger.warn("A channel handoff was refused.", { channelId, agentId, tool, reason: logReason });
       return { accepted: false, reason };
     };
     if (
@@ -2867,12 +2928,21 @@ export class ChannelService {
       );
     const recipientAgentId = args.recipientAgentId;
     const recipient = yield* Effect.result(channelSync(() => this.requireAvailableMember(channel, recipientAgentId)));
-    if (Result.isFailure(recipient))
+    if (Result.isFailure(recipient)) {
+      if (this.hooks.hidden?.(recipientAgentId))
+        return refuse("This member is hidden and takes no new work. Choose another channel member.");
+      if (!this.hooks.agents().some((agent) => agent.id === recipientAgentId))
+        return refuse("Set recipientAgentId to the agent id of an available channel member.");
+      // The agent exists but is not a member. Only a person can add it, so the agent must not retry.
+      const name = this.memberName(recipientAgentId);
+      const others = this.eligibleMembers(channel).filter((id) => id !== agentId);
+      const available = others.slice(0, 20).map((id) => `${this.memberName(id)} (${id})`);
+      if (others.length > available.length) available.push(`${others.length - available.length} more`);
       return refuse(
-        this.hooks.hidden?.(recipientAgentId)
-          ? "This member is hidden and takes no new work. Choose another channel member."
-          : "Set recipientAgentId to the agent id of an available channel member.",
+        `${name} (${recipientAgentId}) is not a member of this channel. Available members: ${available.join(", ") || "none"}. If the task needs ${name}, ask a person in this channel to add it, then end your turn.`,
+        "The recipient is not a member of this channel.",
       );
+    }
     if (args.recipientAgentId === agentId) return refuse("Choose another channel member.");
     const sourceMessageIds = args.sourceMessageIds;
     if (sourceMessageIds.some((id) => !this.store.message(channelId, id)))

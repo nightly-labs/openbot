@@ -20,6 +20,7 @@
 @import "@openbot/ui/features/agents/first-agent-setup.css";
 @import "./styles/app-shell.css";
 @import "@openbot/ui/features/sidebar/sidebar-views.css";
+@import "@openbot/ui/features/sidebar/sidebar-working-badge.css";
 @import "./features/account/account-update-island.css";
 @import "@openbot/ui/features/servers/join-server-dialog.css";
 @import "@openbot/ui/features/servers/add-server-dialog.css";
@@ -40,6 +41,7 @@
 @import "@openbot/ui/features/workflows/workflow-nodes.css";
 @import "@openbot/ui/features/workflows/workflows.css";
 @import "@openbot/ui/features/usage/agent-usage-report.css";
+@import "@openbot/ui/features/usage/usage-machine-meter.css";
 @import "./features/usage/usage.css";
 @import "./features/schedule/schedule.css";
 @import "@openbot/ui/features/tasks/tasks.css";
@@ -66,6 +68,7 @@
 @import "./features/servers/server-mcp.css";
 @import "./features/servers/server-company-sign-in.css";
 @import "@openbot/ui/features/marketplace/marketplace.css";
+@import "@openbot/ui/features/settings/chat-color-picker.css";
 @import "@openbot/ui/features/settings/logo-color-picker.css";
 @import "@openbot/ui/features/settings/sound-choice-select.css";
 @import "@openbot/ui/features/settings/notification-matrix.css";

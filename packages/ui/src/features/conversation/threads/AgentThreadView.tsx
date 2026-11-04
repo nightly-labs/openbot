@@ -34,7 +34,7 @@ import { ComposerReplyPreview } from "@openbot/ui/features/conversation/Composer
 import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
-import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { type TextValue, useText } from "@openbot/ui/text";
@@ -162,6 +162,8 @@ export interface AgentThreadViewProps {
   waitsForAnswer?: boolean | undefined;
   /** Another card that the thread shows, such as a question or a browser takeover. The app builds it. */
   attention?: JSX.Element | undefined;
+  /** The card that the app draws in the place of a message row, such as an MCP sign-in. Undefined keeps the row. */
+  messageCard?: ((message: AgentMessage) => JSX.Element | undefined) | undefined;
   /** The steps of the finished turn above an answer, or undefined for a message that has none. */
   stepsAbove?: ((messageId: string) => AgentStep[] | undefined) | undefined;
   /** The time that the turn of an answer took, and how many of its steps failed. */
@@ -183,6 +185,13 @@ export interface AgentThreadViewProps {
    * offers it. Missing where the host cannot branch.
    */
   onBranch?: ((messageId: string) => void) | undefined;
+  /**
+   * Deletes a message of the thread, after the reader confirms. Missing where the host cannot delete
+   * messages. `canDeleteMessage` says which messages offer it.
+   */
+  onDeleteMessage?: ((messageId: string) => Promise<void>) | undefined;
+  /** Whether the reader can delete a message. Without it, every message that is not streaming can. */
+  canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
   /** Where the thread came from, when it is a branch. A line shows after the copied messages. */
   branchSource?: AgentThreadBranchSource | undefined;
   /** Makes the draft a reply to a message of the thread. Missing where the host cannot take a reply in a thread. */
@@ -296,6 +305,14 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     if (!onBranch || !branchPoints().has(message.id)) return undefined;
     return () => onBranch(message.id);
   };
+  /** The message that the delete dialog asks about. */
+  const [deleteTargetId, setDeleteTargetId] = createSignal<string | null>(null);
+  const deleteAction = (message: AgentMessage) => {
+    if (!props.onDeleteMessage || message.streaming) return undefined;
+    if (props.canDeleteMessage && !props.canDeleteMessage(message)) return undefined;
+    return () => setDeleteTargetId(message.id);
+  };
+  const deleteMessage = (messageId: string) => props.onDeleteMessage?.(messageId) ?? Promise.resolve();
   const title = () => props.task?.title ?? t("conversation.threads.new");
   const placeholder = () =>
     props.task
@@ -370,6 +387,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         onCopy={() => onCopy(message)}
         onBranch={branchAction(message)}
         branchDisabled={branchBusy()}
+        onDelete={deleteAction(message)}
       />
     );
   }
@@ -430,42 +448,52 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             </p>
           </Show>
           <For each={props.messages.filter(shownInThread)} keyed={(message) => message.id}>
-            {(message) => (
-              <div class="virtual-chat-row">
-                <Show when={props.stepsAbove?.(message().id)}>
-                  {(steps) => (
-                    <AgentStepsDisclosure
-                      steps={steps()}
-                      defaultOpen={props.stepsOpenByDefault ?? false}
-                      facts={props.factsAbove?.(message().id)}
-                    />
-                  )}
-                </Show>
-                <ChatMessageRow
-                  message={message()}
-                  author={author(message())}
-                  agents={props.agents}
-                  skills={props.skills}
-                  onSelectAgent={() => undefined}
-                  onOpenLink={props.onOpenLink}
-                  onPreview={props.onPreview}
-                  onAttachmentAction={props.onAttachmentAction}
-                  mediaSource={props.mediaSource}
-                  downloads={props.downloads}
-                  onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
-                  macWindowControls={props.macWindowControls}
-                  referencedMessage={referenced(message())}
-                  onOpenReference={() => {
-                    const id = message().replyToMessageId;
-                    if (id) showMessage(id);
-                  }}
-                  actions={messageActions(message())}
-                  menu={messageMenu(message())}
-                  data-chat-search-message={message().id}
-                />
-                <Show when={branchDividerAfter(message().id)}>{(source) => <BranchDivider source={source()} />}</Show>
-              </div>
-            )}
+            {(message) => {
+              const card = createMemo(() => props.messageCard?.(message()));
+              return (
+                <div class="virtual-chat-row">
+                  <Show when={props.stepsAbove?.(message().id)}>
+                    {(steps) => (
+                      <AgentStepsDisclosure
+                        steps={steps()}
+                        defaultOpen={props.stepsOpenByDefault ?? false}
+                        facts={props.factsAbove?.(message().id)}
+                      />
+                    )}
+                  </Show>
+                  <Show
+                    when={card()}
+                    fallback={
+                      <ChatMessageRow
+                        message={message()}
+                        author={author(message())}
+                        agents={props.agents}
+                        skills={props.skills}
+                        onSelectAgent={() => undefined}
+                        onOpenLink={props.onOpenLink}
+                        onPreview={props.onPreview}
+                        onAttachmentAction={props.onAttachmentAction}
+                        mediaSource={props.mediaSource}
+                        downloads={props.downloads}
+                        onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
+                        macWindowControls={props.macWindowControls}
+                        referencedMessage={referenced(message())}
+                        onOpenReference={() => {
+                          const id = message().replyToMessageId;
+                          if (id) showMessage(id);
+                        }}
+                        actions={messageActions(message())}
+                        menu={messageMenu(message())}
+                        data-chat-search-message={message().id}
+                      />
+                    }
+                  >
+                    {card()}
+                  </Show>
+                  <Show when={branchDividerAfter(message().id)}>{(source) => <BranchDivider source={source()} />}</Show>
+                </div>
+              );
+            }}
           </For>
           <Show when={running()}>
             {(task) => (
@@ -614,6 +642,11 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           </div>
         </form>
       </div>
+      <DeleteMessageDialog
+        messageId={deleteTargetId()}
+        onDelete={deleteMessage}
+        onClose={() => setDeleteTargetId(null)}
+      />
     </>
   );
 }

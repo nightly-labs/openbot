@@ -37,9 +37,10 @@ export interface WorkflowHost {
   workflows: BoundWorkflowsApi;
   /**
    * Calls `changed` with the workflow that changed, or null when all can be stale: the server came
-   * back, or the agent levels changed.
+   * back, or the agent levels changed. `agentId`: the agent whose tool call made or saved the
+   * workflow. Only this computer names it; a joined server does not.
    */
-  onChanged(changed: (workflowId: string | null) => void): () => void;
+  onChanged(changed: (workflowId: string | null, agentId?: string) => void): () => void;
   /** Only this computer keeps messaging places; a joined server gives none. */
   places(): Promise<WorkflowPlace[]>;
   /** Only this computer runs Discord triggers and outputs; a joined server gives none. */
@@ -102,7 +103,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     onChanged(changed) {
       const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {
         if (scoped.serverId !== serverId) return;
-        if (scoped.event.type === "workflows-changed") changed(scoped.event.workflowId);
+        if (scoped.event.type === "workflows-changed") changed(scoped.event.workflowId, scoped.event.agentId);
         else if (scoped.event.type === "agent-access-changed") changed(null);
       });
       const reconnect = window.openbot.servers.onEvent((servers) => {

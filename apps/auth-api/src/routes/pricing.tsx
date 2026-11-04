@@ -3,8 +3,8 @@ import { PricingPage } from "../components/pricing/PricingPage";
 import { pricingPageText } from "../components/pricing/pricing-page-text";
 import { loadPageText } from "../lib/page-text";
 import { readPricingOffer } from "../lib/pricing-offer";
-import { PRICING_ROUTE } from "../lib/pricing-page";
-import { OPENBOT_SOCIAL_IMAGE_ALT, OPENBOT_SOCIAL_IMAGE_URL, OPENBOT_X_HANDLE } from "../lib/site-metadata";
+import { PRICING_ROUTE, PRICING_SOCIAL_IMAGE } from "../lib/pricing-page";
+import { OPENBOT_X_HANDLE, pageSocialImageMeta } from "../lib/site-metadata";
 
 export const Route = createFileRoute("/pricing")({
   loader: async ({ context }) => {
@@ -17,6 +17,7 @@ export const Route = createFileRoute("/pricing")({
     const url = new URL(PRICING_ROUTE, match.context.siteUrl).toString();
     const text = loaderData?.text;
     if (!text) return { links: [{ rel: "canonical", href: url }] };
+    const image = pageSocialImageMeta(PRICING_SOCIAL_IMAGE, match.context.siteUrl);
     return {
       meta: [
         { title: text.title },
@@ -27,14 +28,12 @@ export const Route = createFileRoute("/pricing")({
         { property: "og:url", content: url },
         { property: "og:title", content: text.title },
         { property: "og:description", content: text.description },
-        { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-        { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+        ...image.openGraph,
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:site", content: OPENBOT_X_HANDLE },
         { name: "twitter:title", content: text.title },
         { name: "twitter:description", content: text.description },
-        { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-        { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+        ...image.twitter,
       ],
       links: [{ rel: "canonical", href: url }],
     };
