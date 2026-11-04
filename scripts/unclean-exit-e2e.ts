@@ -62,7 +62,7 @@ interface RunReport {
   electronPid: number;
   marker?: RunMarkerFile | null;
   uncleanLogLines?: number;
-  uncleanLogLine?: string;
+  uncleanLogLine?: string | null;
   captureEvents?: Captured[];
   capturedEventNames?: (string | null)[];
 }
@@ -273,7 +273,7 @@ try {
     run: 2,
     electronPid: second.electronPid,
     uncleanLogLines: countLines(secondLog, UNCLEAN_LINE),
-    uncleanLogLine: secondLog.split("\n").find((line) => line.includes(UNCLEAN_LINE)),
+    uncleanLogLine: secondLog.split("\n").find((line) => line.includes(UNCLEAN_LINE)) ?? null,
     captureEvents: uncleanEvents(),
     capturedEventNames: captured.filter((event) => event.run === 2).map((event) => event.name),
   });
