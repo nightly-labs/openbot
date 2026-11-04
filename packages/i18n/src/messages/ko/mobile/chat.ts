@@ -202,6 +202,8 @@ export const messages = {
   "mobile.chat.message.copy": "메시지 복사",
   "mobile.chat.message.readAloud": "소리 내어 읽기",
   "mobile.chat.message.stopReading": "읽기 중지",
+  "mobile.chat.message.readAloudSpeed": "재생 속도: {speed}×",
+  "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "메시지를 읽을 수 없습니다",
   "mobile.chat.message.selectText": "텍스트 선택",
   "mobile.chat.message.text": "메시지 텍스트",

@@ -207,6 +207,8 @@ export const messages = {
   "mobile.chat.message.copy": "Nachricht kopieren",
   "mobile.chat.message.readAloud": "Vorlesen",
   "mobile.chat.message.stopReading": "Vorlesen beenden",
+  "mobile.chat.message.readAloudSpeed": "Wiedergabegeschwindigkeit: {speed}×",
+  "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Nachricht konnte nicht vorgelesen werden",
   "mobile.chat.message.selectText": "Text auswählen",
   "mobile.chat.message.text": "Nachrichtentext",

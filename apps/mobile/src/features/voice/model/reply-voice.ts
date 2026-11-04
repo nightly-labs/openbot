@@ -1,8 +1,10 @@
 import {
   isSpeechLanguage,
   SPEECH_LIMITS,
+  SPEECH_SPEEDS,
   SPEECH_VOICES,
   type SpeechLanguage,
+  type SpeechSpeed,
   type SpeechVoice,
 } from "@openbot/contracts/ipc";
 import { speechLanguageOf } from "@openbot/contracts/speech-language";
@@ -86,6 +88,30 @@ if (speechNative) {
     for (const listener of listeners) listener.error(id);
   });
 }
+
+/** The build can change the reply speed: an app binary from before it plays at normal speed only. */
+export const canChangeReplySpeed = speechNative?.setSpeed !== undefined;
+
+/** The order in which a speed button goes through the speeds, as on desktop: from normal speed up, then the slower ones. */
+const SPEED_CYCLE: readonly SpeechSpeed[] = [
+  ...SPEECH_SPEEDS.filter((speed) => speed >= 1),
+  ...SPEECH_SPEEDS.filter((speed) => speed < 1),
+];
+
+/** The speed after `speed` in the cycle of a speed button. */
+export function nextReplySpeed(speed: SpeechSpeed): SpeechSpeed {
+  return SPEED_CYCLE[(SPEED_CYCLE.indexOf(speed) + 1) % SPEED_CYCLE.length] ?? 1;
+}
+
+// The native player keeps the speed, so a change applies at once to the part that plays now.
+let nativeSpeed: SpeechSpeed = 1;
+function applySpeed({ speed }: { speed: SpeechSpeed }): void {
+  if (speed === nativeSpeed) return;
+  nativeSpeed = speed;
+  speechNative?.setSpeed?.(speed);
+}
+applySpeed(useVoiceSettings.getState());
+useVoiceSettings.subscribe(applySpeed);
 
 function elevenLabsFailure(code: ElevenLabsError["code"]): ReplyVoiceFailure {
   if (code === "invalid-key" || code === "network") return code;

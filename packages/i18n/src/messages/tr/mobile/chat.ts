@@ -204,6 +204,8 @@ export const messages = {
   "mobile.chat.message.copy": "Mesajı kopyala",
   "mobile.chat.message.readAloud": "Sesli oku",
   "mobile.chat.message.stopReading": "Okumayı durdur",
+  "mobile.chat.message.readAloudSpeed": "Oynatma hızı: {speed}×",
+  "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Mesaj sesli okunamadı",
   "mobile.chat.message.selectText": "Metni seç",
   "mobile.chat.message.text": "Mesaj metni",

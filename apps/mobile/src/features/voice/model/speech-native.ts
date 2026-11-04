@@ -33,6 +33,11 @@ declare class SpeechModule extends NativeModule<SpeechEvents> {
   /** Stops the part that plays and drops the parts that wait. */
   stop(): void;
   /**
+   * Plays every part at this speed, also the part that plays now. 1 is normal speed; the pitch stays
+   * the same. Optional: an app binary from before it does not have it.
+   */
+  setSpeed?(speed: number): void;
+  /**
    * Loads Parakeet from its model directory. The same directory keeps the loaded model. Optional: an
    * app binary from before speech recognition does not have it.
    */

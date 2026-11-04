@@ -1,6 +1,6 @@
 import { MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
 import { router } from "expo-router";
-import { Typography } from "heroui-native";
+import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Copy from "lucide-react-native/icons/copy";
 import SmilePlus from "lucide-react-native/icons/face-slightly-smiling-plus";
@@ -10,9 +10,11 @@ import Square from "lucide-react-native/icons/square";
 import TextCursor from "lucide-react-native/icons/text-cursor";
 import Volume2 from "lucide-react-native/icons/volume-2";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { toggleReadAloud, useReadingAloud } from "@/features/voice/model/message-reading";
+import { canChangeReplySpeed, nextReplySpeed } from "@/features/voice/model/reply-voice";
+import { saveVoiceSettings, useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -47,6 +49,8 @@ export function MessageActionsScreen() {
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   const [moreEmoji, setMoreEmoji] = useState(false);
   const reading = useReadingAloud(request?.readAloudId ?? "");
+  const speed = useVoiceSettings((state) => state.speed);
+  const speedReady = useVoiceSettings((state) => state.ready);
   const { copy } = useCopyMessage(request?.copyText ?? "");
   // Runs when the sheet has closed. A selection that starts while the sheet is on screen ends when
   // the sheet takes the focus with it.
@@ -160,6 +164,25 @@ export function MessageActionsScreen() {
               leading={reading ? <Square size={ICON_SIZE} color={icon} /> : <Volume2 size={ICON_SIZE} color={icon} />}
               disclosure={false}
               onPress={() => run(() => toggleReadAloud(readAloudId, request.copyText))}
+              trailing={
+                canChangeReplySpeed && speedReady ? (
+                  // Changes the speed and keeps the sheet open, so the user can press again.
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="rounded-full"
+                    accessibilityLabel={t("mobile.chat.message.readAloudSpeed", { speed: format.number(speed) })}
+                    onPress={() => {
+                      void haptics.selection();
+                      void saveVoiceSettings({ speed: nextReplySpeed(speed) }).catch(() =>
+                        Alert.alert(t("mobile.settings.saveFailed")),
+                      );
+                    }}
+                  >
+                    {t("mobile.chat.message.readAloudSpeedValue", { speed: format.number(speed) })}
+                  </Button>
+                ) : undefined
+              }
             >
               <Typography>
                 {reading ? t("mobile.chat.message.stopReading") : t("mobile.chat.message.readAloud")}
