@@ -15,6 +15,7 @@ import { QuitShortcutHint } from "./features/window/QuitShortcutHint";
 import { useI18n } from "./i18n-context";
 import { AccountLogin, FirstRunFlow, InitialSetup, LanguageStep } from "./lazy-views";
 import { usePlatform } from "./platform";
+import { reportWorkspaceReady } from "./renderer-timing";
 import { WorkspaceShell } from "./WorkspaceShell";
 
 // A server switch mounts this gate again. Only the first splash of a start or a reload plays through.
@@ -92,6 +93,10 @@ export function AppAccessGate() {
   // A startup mark for `dev:bench`: the first moment the app can leave the splash.
   createEffect(started, (ready) => {
     if (ready) performance.mark("openbot:app-started");
+  });
+  // For the `system_startup` summary: main reads the time of the main window's first workspace load.
+  createEffect(workspaceReady, (ready) => {
+    if (ready && platform.chatWindow === null) reportWorkspaceReady();
   });
 
   return (

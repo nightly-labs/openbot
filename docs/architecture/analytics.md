@@ -106,7 +106,21 @@ shutdown, and a damaged file starts a new day. `HostAnalytics.checkResources()` 
 as `system_resources` and marks it handled in the file before the send, so a crash cannot send it
 twice. The file keeps the handled day for the diagnostics export until a newer day replaces it.
 Nothing leaves the process with a PID, a command or a path: the summary keys are group names,
-provider ids and reason words, and the analytics allowlist checks each value again.
+provider ids and reason words, and the analytics allowlist checks each value again. The day also
+keeps the phase of the longest main-loop delay (`mainLoopPeak`, optional so older files still
+decode; the phase is any string in the file and the event drops a value outside its enum), and
+child exits by process type. A minute with a delay of 1 s or more writes a `stall` span to the
+trace.
+
+App windows (`src/renderer/src/renderer-timing.ts`) count long tasks and input delays with
+`PerformanceObserver` and send the counts at most once a minute over `app:report-renderer-timing`.
+The main handler decodes bounded counts only; `ResourceMonitor` buffers them and adds them to the day
+at the next sample. The same channel carries the main window's `workspaceReady` flag:
+`StartupTiming` (`src/main/startup-timing.ts`) reads the time on the main clock and sends one
+`system_startup` per main process from the `openbot:*` startup marks. It keeps the last start in
+`startup-history.json` to tell a cold start from a warm one. Turn timing comes from the drain
+scheduler and `TurnLifecycle`, which keep the queue pick, the provider start and the first output of
+each turn until `HostAnalytics` takes them at `turn-completed`.
 
 ## Agent usage analytics
 

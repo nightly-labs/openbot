@@ -1155,6 +1155,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       return clone(analyticsPreference);
     },
     onAnalyticsPreference: () => () => undefined,
+    reportRendererTiming: async () => undefined,
     getApprovalAutomation: async () => clone(approvalAutomation),
     onApprovalAutomation: (listener) => {
       approvalAutomationListeners.add(listener);

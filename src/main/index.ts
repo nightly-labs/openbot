@@ -695,6 +695,7 @@ function registerIpcHandlers({
   machineAlerts,
   trace,
   resourceMonitor,
+  startup,
   routineFlows,
   workflows,
   workflowGitHub,
@@ -738,10 +739,15 @@ function registerIpcHandlers({
       analyticsCaptureUrl,
       analyticsInstallId,
       getMainWindow: getDialogParent,
+      isMainWindow: (sender) => {
+        const window = windowHolder.current;
+        return window !== null && !window.isDestroyed() && window.webContents === sender;
+      },
       openChatWindow: windows.openChatWindow,
       chatWindowTargets: windows.chatWindowTargets,
       trace,
       resources: resourceMonitor,
+      startup,
     }),
     ...dynamicIslandIpcHandlers({ dynamicIsland }),
     ...browserDockIpcHandlers({ browserDock }),
@@ -1534,6 +1540,7 @@ if (!hasSingleInstanceLock) {
       reconcileDynamicIsland();
       await windows.loadRenderer(mainWindow);
       performance.mark("openbot:renderer-loaded");
+      built.startup?.rendererLoaded();
       // After the first window, so the new process does not compete with the start for the CPU.
       Effect.runFork(built.prewarmAgentDatabase);
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.

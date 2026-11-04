@@ -338,6 +338,7 @@ import { SignalIngress } from "./signal-ingress";
 import { SkillMarketplaceService } from "./skill-marketplace-service";
 import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-dev-callback-server";
 import { SpeechPreferenceStore } from "./speech-preference-store";
+import { StartupTiming } from "./startup-timing";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
@@ -453,6 +454,7 @@ const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
 const TEARDOWN_ORDER = {
   // First, so a process that the teardown ends does not count as a crash.
   resourceMonitor: 9,
+  startupTiming: 9.5,
   updater: 10,
   idleRestart: 11,
   hostUpdateCoordinator: 12,
@@ -687,6 +689,8 @@ export interface ApplicationServices {
   prewarmAgentDatabase: Effect.Effect<void>;
   trace: TraceFile;
   resourceMonitor: ResourceMonitor;
+  /** Null for a local server child: its parent desktop reports the start. */
+  startup: StartupTiming | null;
   machineAlerts: MachineAlertMonitor;
   teamStore: TeamStore;
   /**
@@ -962,6 +966,8 @@ export async function createApplicationServices({
   prepareForUpdateInstall,
   quitting,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
+  // The start of the first `openbot:services.*` step, for the `system_startup` summary.
+  performance.mark("openbot:services.start");
   // First, so the provider lines of the whole startup reach the file.
   teardown.push(
     TEARDOWN_ORDER.providerLog,
@@ -2954,6 +2960,7 @@ export async function createApplicationServices({
         envKey: (name) => Boolean(process.env[name]?.trim()),
       }),
     resolveTurnUsage: (agentId, turnId, since) => service.getTurnUsage(agentId, turnId, since),
+    resolveTurnTiming: (turnId) => service.takeTurnTiming(turnId),
     resolveMcpServer: (name) => {
       const configs = service.listMcpServers().filter((server) => isReportedMcpServerName(server.name, name));
       if (configs.length === 0) return null;
@@ -2995,6 +3002,19 @@ export async function createApplicationServices({
   analytics.flushPending();
   service.on("failure", (failure) => analytics.handleFailure(failure));
   resourceMonitor.start(() => analytics.checkResources());
+  const startup = localServerChild
+    ? null
+    : new StartupTiming({
+        userDataPath: app.getPath("userData"),
+        appVersion: app.getVersion(),
+        server: hostedServer !== null || serverModeEnvironment !== null,
+        send: (properties) => analytics.handleStartup(properties),
+      });
+  if (startup) {
+    // Not awaited: the summary goes much later, and a start not read by then gives `unknown`.
+    Effect.runFork(startup.recordStart());
+    teardown.push(TEARDOWN_ORDER.startupTiming, "the startup timing", () => startup.dispose());
+  }
   const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
   // Development only: a network round trip added to the WebRTC client, for `bun run perf:remote`.
   const developmentRoundTripMs = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_RTT_MS) || 0);
@@ -3678,6 +3698,7 @@ export async function createApplicationServices({
     prewarmAgentDatabase: tables.prewarm(),
     trace,
     resourceMonitor,
+    startup,
     machineAlerts,
     teamStore,
     appliedAccount: signedInState,

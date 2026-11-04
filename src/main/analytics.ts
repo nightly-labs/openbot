@@ -28,12 +28,14 @@ import { Effect, Exit, Scope } from "effect";
 import { parse as parseDomain } from "tldts";
 import type { FailureSignal } from "../backend/agent/failure-signal";
 import type { ToolUsageSignal } from "../backend/agent/thread-items";
+import type { TurnTiming } from "../backend/agent/turn-lifecycle";
 import type { BrowserSiteVisit } from "../backend/browser-host";
 import type { TurnModelUsage } from "../backend/database/agent-usage";
 import type { WorkflowRunEnd } from "../backend/workflows/workflows";
 import { type AnalyticsOperationFailure, analyticsIO, analyticsSync } from "./analytics-effects";
 import { PROVIDER_AUTH_KINDS, type ProviderAuthKind } from "./analytics-provider-auth";
 import { localDay, RESOURCE_ENUMS, RESOURCE_PROPERTY_NAMES, type ResourceProperties } from "./resource-summary";
+import { SERVICE_STEPS, START_KINDS, type StartupProperties } from "./startup-timing";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
@@ -54,6 +56,27 @@ const MAX_TOOL_ROWS_PER_TURN = 32;
 const MAX_TURN_TOKENS = 10_000_000_000;
 // Usage rows carry the time of the provider's turn start, which can precede the host event.
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
+/** The turn timing values and the `system_turn_completed` properties that carry them. */
+const TURN_TIMING_PROPERTIES = [
+  ["queueWaitMs", "queue_wait_ms"],
+  ["startMs", "start_ms"],
+  ["providerStartMs", "provider_start_ms"],
+  ["firstOutputMs", "first_output_ms"],
+] as const satisfies readonly (readonly [keyof TurnTiming, string])[];
+const MAX_QUEUE_WAIT_MS = 7 * ACTIVE_TURN_TTL_MS;
+/** The marks are times after the process started. A start that waits longer than a day is not one. */
+const MAX_STARTUP_MS = 24 * 60 * 60_000;
+const STARTUP_PROPERTY_NAMES = [
+  "start_kind",
+  "host_kind",
+  "when_ready_ms",
+  "window_ready_ms",
+  "services_ready_ms",
+  "renderer_loaded_ms",
+  "workspace_ready_ms",
+  "slowest_service_step",
+  "slowest_service_step_ms",
+] as const satisfies readonly (keyof StartupProperties)[];
 // A turn uses its agent's model and sometimes a few more, such as a Claude subagent's model.
 const MAX_TOKEN_ROWS_PER_TURN = 8;
 const TOKEN_PROPERTIES = [
@@ -134,6 +157,7 @@ type HostEventName =
   | "system_workflow_run"
   | "system_inventory"
   | "system_resources"
+  | "system_startup"
   | "hosted_site_action";
 /**
  * Events that go only when the user links analytics to their account: the sites they visit, the
@@ -173,6 +197,8 @@ export interface HostAnalyticsOptions {
    * the Usage report reads. An empty list means the provider reported none.
    */
   resolveTurnUsage?: (agentId: string, turnId: string, since: string) => readonly TurnModelUsage[];
+  /** Where the time of a finished turn went, in milliseconds. Each value is null when it is not known. */
+  resolveTurnTiming?: (turnId: string) => TurnTiming | null;
   /**
    * The user's MCP servers that a provider reports under `name`: `null` when there is none, else the
    * catalog plugin slug they all share, or `slug: null` for the user's own server.
@@ -228,6 +254,7 @@ const HOST_ALLOWLIST = {
     "status",
     "provider_auth",
     "duration_ms",
+    ...TURN_TIMING_PROPERTIES.map(([, property]) => property),
     "token_usage",
     "uncached_input_tokens",
     "cached_input_tokens",
@@ -291,6 +318,7 @@ const HOST_ALLOWLIST = {
     "computer_use_enabled",
   ],
   system_resources: RESOURCE_PROPERTY_NAMES,
+  system_startup: STARTUP_PROPERTY_NAMES,
   hosted_site_action: ["action", "entry_point", "result", "failure_code"],
 } as const satisfies Record<HostEventName, readonly string[]>;
 
@@ -317,6 +345,7 @@ export class HostAnalytics {
   readonly #resolveAgent: HostAnalyticsOptions["resolveAgent"];
   readonly #resolveProviderAuth: HostAnalyticsOptions["resolveProviderAuth"];
   readonly #resolveTurnUsage: HostAnalyticsOptions["resolveTurnUsage"];
+  readonly #resolveTurnTiming: HostAnalyticsOptions["resolveTurnTiming"];
   readonly #resolveMcpServer: NonNullable<HostAnalyticsOptions["resolveMcpServer"]>;
   readonly #resolveRoutineRun: NonNullable<HostAnalyticsOptions["resolveRoutineRun"]>;
   readonly #resolveInventory: HostAnalyticsOptions["resolveInventory"];
@@ -350,6 +379,7 @@ export class HostAnalytics {
     this.#resolveAgent = options.resolveAgent;
     this.#resolveProviderAuth = options.resolveProviderAuth;
     this.#resolveTurnUsage = options.resolveTurnUsage;
+    this.#resolveTurnTiming = options.resolveTurnTiming;
     this.#resolveMcpServer = options.resolveMcpServer ?? (() => null);
     this.#resolveRoutineRun = options.resolveRoutineRun ?? (() => null);
     this.#resolveInventory = options.resolveInventory;
@@ -432,6 +462,7 @@ export class HostAnalytics {
               ? {}
               : {
                   duration_ms: Math.max(0, Math.round(performance.now() - activeTurn.startedAt)),
+                  ...this.#turnTiming(event.turnId),
                   ...(usage ? tokenProperties(sumTokens(usage)) : {}),
                 }),
           },
@@ -519,6 +550,12 @@ export class HostAnalytics {
     if (!this.#reports) return;
     const subject = this.#trackingEnabled ? normalizeAnalyticsIdentity(this.#resolveOwner()) : this.#install;
     Effect.runFork(this.#reports.configure(this.#trackingEnabled || subject !== null, subject?.id ?? null));
+  }
+
+  /** One summary per main process. It waits for the owner like other events when there is none yet. */
+  handleStartup(properties: StartupProperties): void {
+    if (this.#closed) return;
+    this.#track("system_startup", properties);
   }
 
   /** Only the local service emits this signal. Remote clients never send host reports. */
@@ -982,6 +1019,21 @@ export class HostAnalytics {
     }
   }
 
+  #turnTiming(turnId: string): Record<string, number> {
+    let timing: TurnTiming | null = null;
+    try {
+      timing = this.#resolveTurnTiming?.(turnId) ?? null;
+    } catch {
+      return {};
+    }
+    const properties: Record<string, number> = {};
+    for (const [key, property] of TURN_TIMING_PROPERTIES) {
+      const value = timing?.[key];
+      if (isNumber(value) && Number.isFinite(value)) properties[property] = Math.max(0, Math.round(value));
+    }
+    return properties;
+  }
+
   #pruneActiveTurns(now: number): void {
     for (const [turnId, turn] of this.#activeTurns) {
       if (now - turn.startedAt <= ACTIVE_TURN_TTL_MS) continue;
@@ -1072,12 +1124,26 @@ function sanitizeHostEvent(name: HostEventName, properties: HostProperties): Hos
 }
 
 function sanitizeHostProperty(name: HostEventName, key: string, value: unknown): HostPropertyValue | undefined {
+  if (name === "system_startup") {
+    if (key === "start_kind") return isOneOf(START_KINDS, value) ? value : undefined;
+    if (key === "host_kind") return isOneOf(["desktop", "server"] as const, value) ? value : undefined;
+    if (key === "slowest_service_step") return isOneOf(SERVICE_STEPS, value) ? value : undefined;
+    return boundedCount(value, MAX_STARTUP_MS);
+  }
   if (name === "system_resources") {
-    if (key === "ram_class" || key === "cpu_class" || key === "arch" || key === "host_kind") {
+    if (
+      key === "ram_class" ||
+      key === "cpu_class" ||
+      key === "arch" ||
+      key === "host_kind" ||
+      key === "main_loop_delay_max_phase"
+    ) {
       const allowed: readonly string[] = RESOURCE_ENUMS[key];
       return isString(value) && allowed.includes(value) ? value : undefined;
     }
-    if (key === "provider_tree_supported") return isBoolean(value) ? value : undefined;
+    if (key === "provider_tree_supported" || key === "main_loop_delay_max_turn_active") {
+      return isBoolean(value) ? value : undefined;
+    }
     return boundedCount(value, 10_000_000);
   }
   if (key === "cause_code" || key === "severity" || key === "operation") {
@@ -1168,6 +1234,11 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
   }
   if (key === "duration_ms") {
     return isNumber(value) && Number.isFinite(value) && value >= 0 && value <= ACTIVE_TURN_TTL_MS ? value : undefined;
+  }
+  if (name === "system_turn_completed") {
+    // A usage-limit hold keeps a message in the queue for hours, so its wait has a wider bound.
+    if (key === "queue_wait_ms") return boundedCount(value, MAX_QUEUE_WAIT_MS);
+    if (TURN_TIMING_PROPERTIES.some(([, property]) => property === key)) return boundedCount(value, ACTIVE_TURN_TTL_MS);
   }
   if (key === "has_secret_prompt") return isBoolean(value) ? value : undefined;
   return undefined;

@@ -82,7 +82,7 @@ export type ReportContext = Pick<Report, "surface" | "app_version" | "platform" 
  * Change a value only together with ANALYTICS.md.
  */
 export const ANALYTICS_GENERATIONS = {
-  desktop_host: 11,
+  desktop_host: 12,
   desktop: 12,
   web: 2,
   mobile: 4,
