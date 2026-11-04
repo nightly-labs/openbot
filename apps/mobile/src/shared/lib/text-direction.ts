@@ -109,7 +109,7 @@ export function lineDirectionStyle(text: string): TextStyle {
  * The style of an iOS text field or native text view, where `textAlign` left and right do not change
  * with the layout direction.
  */
-export function physicalTextDirectionStyle(direction: TextDirection): TextStyle {
+function physicalTextDirectionStyle(direction: TextDirection): TextStyle {
   return { writingDirection: direction, textAlign: direction === "rtl" ? "right" : "left" };
 }
 
