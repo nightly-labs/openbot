@@ -318,7 +318,7 @@ export function SettingsModal(props: SettingsModalProps) {
         </Tabs.Content>
 
         <Tabs.Content value="voice" class="settings-modal-tab-panel" data-tab="voice">
-          <SettingsVoiceTab store={voice} selectMount={modalElement} />
+          <SettingsVoiceTab accountId={props.account.id} store={voice} selectMount={modalElement} />
         </Tabs.Content>
 
         <Show when={dynamicIslandShown()}>

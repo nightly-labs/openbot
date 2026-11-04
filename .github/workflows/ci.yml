@@ -303,6 +303,7 @@ jobs:
 
       - name: Check mobile voice handoffs and collapsed history
         run: |
+          bun scripts/device-voice-consent-e2e.ts
           bun scripts/mobile-live-controller-e2e.ts
           bun scripts/mobile-voice-history-e2e.ts
 
@@ -315,6 +316,7 @@ jobs:
             .openbot-build/team-api-routes-e2e/
             .openbot-build/agent-access-e2e/
             .openbot-build/subscription-voice-e2e/
+            .openbot-build/device-voice-consent-e2e/
             .openbot-build/mobile-live-controller-e2e/
             .openbot-build/mobile-voice-history-e2e/
           if-no-files-found: ignore

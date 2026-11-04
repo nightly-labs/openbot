@@ -122,6 +122,7 @@ export const messages = {
   "conversation.voice.label": "{name} との音声会話",
   "conversation.voice.phase.starting": "開始中",
   "conversation.voice.phase.listening": "聞いています",
+  "conversation.voice.speakNow": "話してください",
   "conversation.voice.phase.muted": "ミュート中",
   "conversation.voice.phase.thinking": "考えています",
   "conversation.voice.phase.speaking": "話しています",

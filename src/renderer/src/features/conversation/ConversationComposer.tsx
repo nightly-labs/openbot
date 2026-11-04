@@ -43,6 +43,8 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
+import { useAuth } from "../account/account-context";
+import { realtimeVoiceOptedIn } from "../speech/realtime-voice-preference";
 import { realtimeVoiceStatus, refreshRealtimeVoiceStatus } from "../speech/realtime-voice-status";
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
@@ -164,7 +166,10 @@ export function ConversationComposer() {
       return () => window.removeEventListener("focus", refresh);
     },
   );
-  const callEnabled = () => realtimeVoiceStatus(props.server?.id ?? "local")?.enabled === true;
+  const voiceAccount = useAuth();
+  const callEnabled = () =>
+    realtimeVoiceOptedIn(voiceAccount.signedInAccount()?.id) &&
+    realtimeVoiceStatus(props.server?.id ?? "local")?.enabled === true;
   const openVoiceConversation = () => (voiceConversationAvailable() ? () => openSidePanelPane("voice") : undefined);
   // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());

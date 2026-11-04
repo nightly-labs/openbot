@@ -129,8 +129,8 @@ export function liveVoice(live: LiveConversation, name: string, t: MobileTransla
               : LIVE_PHASES[live.phase],
         ),
       }),
-      // Speech text stays in context, without appearing in the call bar.
-      caption: live.error ?? "",
+      // Realtime transcripts stay in context. Local conversations keep their captions.
+      caption: live.error ?? (live.realtime ? "" : live.caption),
     },
   };
 }

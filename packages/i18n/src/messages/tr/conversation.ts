@@ -125,6 +125,7 @@ export const messages = {
   "conversation.voice.label": "{name} ile sesli konuşma",
   "conversation.voice.phase.starting": "Başlatılıyor",
   "conversation.voice.phase.listening": "Dinliyor",
+  "conversation.voice.speakNow": "Şimdi konuş",
   "conversation.voice.phase.muted": "Sessiz",
   "conversation.voice.phase.thinking": "Düşünüyor",
   "conversation.voice.phase.speaking": "Konuşuyor",

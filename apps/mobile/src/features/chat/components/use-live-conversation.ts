@@ -21,6 +21,7 @@ import {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import {
   createNativeRealtimeVoice,
   type NativeRealtimeVoice,
@@ -29,6 +30,7 @@ import {
 } from "@/features/voice/model/realtime-voice";
 import { REPLY_VOICE_FAILURE_TEXT, type ReplyReading, streamReply } from "@/features/voice/model/reply-voice";
 import { speechNative } from "@/features/voice/model/speech-native";
+import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText } from "@/shared/lib/text";
 import { type LiveConversationPhase, liveReplyTurn } from "../model/live-conversation";
@@ -141,14 +143,25 @@ export interface LiveConversation extends LiveConversationState {
  * stops the reply instead.
  */
 export function useLiveConversation(input: LiveConversationInput): LiveConversation {
+  const { session } = useMobileSession();
+  const optedIn = useVoiceSettings((state) =>
+    Boolean(session && state.liveVoiceAccounts[`${session.apiUrl}\n${session.user.id}`]),
+  );
   const [state, setState] = useState(CLOSED);
   const [realtimeReady, setRealtimeReady] = useState(false);
-  const inputRef = useRef({ ...input, realtimeReady });
-  inputRef.current = { ...input, realtimeReady };
+  const inputRef = useRef({ ...input, realtimeOptedIn: optedIn, realtimeReady: optedIn && realtimeReady });
+  inputRef.current = { ...input, realtimeOptedIn: optedIn, realtimeReady: optedIn && realtimeReady };
   useEffect(() => {
     let current = true;
     setRealtimeReady(false);
-    if (!input.realtime || !input.online || !input.focused || !input.foreground || !nativeRealtimeVoiceAvailable())
+    if (
+      !optedIn ||
+      !input.realtime ||
+      !input.online ||
+      !input.focused ||
+      !input.foreground ||
+      !nativeRealtimeVoiceAvailable()
+    )
       return;
     void input.realtime
       .status()
@@ -159,7 +172,7 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
     return () => {
       current = false;
     };
-  }, [input.realtime, input.online, input.focused, input.foreground]);
+  }, [optedIn, input.realtime, input.online, input.focused, input.foreground]);
   const presence = useSharedValue(0);
   const speechLevel = useSharedValue(0);
   const dictationRef = useRef<VoiceDictation | null>(null);
@@ -249,7 +262,7 @@ export function createController({
   presence,
   speechLevel,
 }: {
-  input: () => LiveConversationInput & { realtimeReady: boolean };
+  input: () => LiveConversationInput & { realtimeOptedIn: boolean; realtimeReady: boolean };
   dictation: () => VoiceDictation | null;
   setState: (change: (current: LiveConversationState) => LiveConversationState) => void;
   presence: SharedValue<number>;
@@ -675,7 +688,7 @@ export function createController({
     start(): void {
       const { conversation, channel, enabled, online } = input();
       if (open || (!conversation && !channel) || !enabled) return;
-      usesRealtime = Boolean(input().realtimeReady && input().realtime && conversation);
+      usesRealtime = Boolean(input().realtimeOptedIn && input().realtimeReady && input().realtime && conversation);
       if (!usesRealtime && !speechNative) return;
       open = true;
       exiting = false;

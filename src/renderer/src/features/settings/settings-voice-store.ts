@@ -1,7 +1,6 @@
 import {
   ELEVENLABS_VOICE_MODEL_ID,
   isSpeechLanguage,
-  type RealtimeVoiceStatus,
   type ServerSummary,
   type SpeechModelStatus,
   type SpeechSettings,
@@ -18,20 +17,12 @@ import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { serverRoleCanAdminister } from "../servers/server-capabilities";
-import { noteRealtimeVoiceStatus } from "../speech/realtime-voice-status";
 import { readAloud, stopSpeech } from "../speech/speech-playback";
 import { changeSpeechSpeed, speechSpeed, updateSpeechSettings } from "../speech/speech-speed";
+import { createRealtimeVoiceSettingsStore } from "./realtime-voice-settings-store";
 import { voicePort } from "./voice-port";
 
 interface SettingsVoiceState {
-  realtime: {
-    configured: boolean;
-    status: RealtimeVoiceStatus | null;
-    busy: boolean;
-    canManage: boolean;
-    hostName: string;
-  };
   /** One status for each model in `VOICE_MODELS`, or null before main answers. */
   statuses: Record<VoiceModelId, VoiceModelStatus | null>;
   settings: VoiceSettings | null;
@@ -69,12 +60,12 @@ export function createSettingsVoiceStore(
   selectedServer: () => ServerSummary | undefined = () => undefined,
 ) {
   const [state, setState] = createStore<SettingsVoiceState>({
-    realtime: { configured: false, status: null, busy: false, canManage: false, hostName: "" },
     statuses: { ...EMPTY_STATUSES },
     settings: null,
     speech: { status: null, settings: null, listening: false },
     server: null,
   });
+  const realtime = createRealtimeVoiceSettingsStore(active, selectedServer);
   const setServer = (server: VoiceServerSettings | null) =>
     setState((draft) => {
       draft.server = server;
@@ -119,96 +110,6 @@ export function createSettingsVoiceStore(
       stopServer();
     };
   });
-
-  createEffect(
-    () => ({ active: active(), server: selectedServer() }),
-    ({ active, server }) => {
-      if (!active) return;
-      const id = server?.id ?? "local";
-      const supported =
-        !server ||
-        server.kind === "local" ||
-        server.compatibility?.capabilities.includes("realtime-voice-agent-settings-v1");
-      setState((draft) => {
-        draft.realtime = {
-          configured: false,
-          status: null,
-          busy: false,
-          canManage:
-            supported === true &&
-            (!server || serverRoleCanAdminister(server)) &&
-            (!server || server.kind === "local" || server.state === "online"),
-          hostName: server?.name ?? currentText().t("settings.voice.realtime.local"),
-        };
-      });
-      if (!supported) return;
-      let alive = true;
-      void voicePort()
-        .voice.getRealtimeSettings({ agentId: null }, id)
-        .then((settings) => {
-          const status = { enabled: settings.enabled, model: settings.model, voice: settings.defaultVoice };
-          noteRealtimeVoiceStatus(id, status);
-          if (alive)
-            setState((draft) => {
-              draft.realtime.status = status;
-              draft.realtime.configured = settings.configured;
-              draft.realtime.canManage = draft.realtime.canManage && settings.canManage;
-            });
-        })
-        .catch(() => {});
-      return () => {
-        alive = false;
-      };
-    },
-  );
-
-  async function setRealtimeEnabled(enabled: boolean): Promise<void> {
-    if (!state.realtime.canManage || state.realtime.busy || !state.realtime.status) return;
-    const id = selectedServer()?.id ?? "local";
-    setState((draft) => {
-      draft.realtime.busy = true;
-    });
-    try {
-      const status = await voicePort().voice.setRealtimeEnabled({ enabled }, id);
-      noteRealtimeVoiceStatus(id, status);
-      if ((selectedServer()?.id ?? "local") === id)
-        setState((draft) => {
-          draft.realtime.status = status;
-        });
-    } catch (error) {
-      fail(error, "settings.voice.saveFailed");
-    } finally {
-      if ((selectedServer()?.id ?? "local") === id)
-        setState((draft) => {
-          draft.realtime.busy = false;
-        });
-    }
-  }
-
-  async function setRealtimeDefaultVoice(voice: string): Promise<void> {
-    if (!state.realtime.canManage || state.realtime.busy) return;
-    const id = selectedServer()?.id ?? "local";
-    setState((s) => {
-      s.realtime.busy = true;
-    });
-    try {
-      const settings = await voicePort().voice.setRealtimeVoice({ agentId: null, voice }, id);
-      const status = { enabled: settings.enabled, model: settings.model, voice: settings.defaultVoice };
-      noteRealtimeVoiceStatus(id, status);
-      if ((selectedServer()?.id ?? "local") === id)
-        setState((s) => {
-          s.realtime.status = status;
-          s.realtime.configured = settings.configured;
-        });
-    } catch (error) {
-      fail(error, "settings.voice.saveFailed");
-    } finally {
-      if ((selectedServer()?.id ?? "local") === id)
-        setState((s) => {
-          s.realtime.busy = false;
-        });
-    }
-  }
 
   function fail(error: unknown, fallback: FailureKey): void {
     const { t, errorMessage } = currentText();
@@ -402,8 +303,7 @@ export function createSettingsVoiceStore(
 
   return {
     state,
-    setRealtimeEnabled,
-    setRealtimeDefaultVoice,
+    realtime,
     download,
     cancel,
     remove,

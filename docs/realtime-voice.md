@@ -54,10 +54,7 @@ is not proof of the exact words the user heard after an interruption.
 
 ## Host configuration
 
-Sign into Codex with ChatGPT on the selected OpenBot host. In **Settings → Voice → Live voice calls**,
-turn on **Enable live voice**. This saves on the selected host and takes effect immediately. Only
-server administrators can change it; turning it off ends active calls. The phone button beside
-the dictation microphone starts a call when live voice is enabled.
+Sign into Codex with ChatGPT on the selected OpenBot host. Use **Server settings → General → Live voice calls** to allow calls and select the shared default voice. Only server owners and admins see these host controls. Then each user can enable **Use ChatGPT voice on this device** in **Settings → Voice**. This account-and-device choice starts off and never changes another user or device. The notice states that agent calls send microphone audio and conversation context to OpenAI. Without this choice, the existing voice conversation uses the local recognizer and reply voice, with captions. Channels keep that local path. The telephone button beside dictation appears only after this device opts in and the host allows calls.
 
 These host environment values provide defaults before a preference is saved:
 
@@ -147,24 +144,16 @@ for the distinction between subscription GPT-Live and Platform Realtime.
 
 ## Mobile live-call settings
 
-On iOS and Android, Settings → Voice shows Live voice calls for the selected server. An owner or
-admin can enable or disable calls and select the voice for the next call. These are host settings,
-shared by members and clients. Turning calls off ends current calls; changing the voice leaves a
-current call running. The host saves the choice in `realtime-voice.json`. Old enabled-only files
-remain valid, and the desktop toggle retains the selected voice.
+On iOS and Android, **Settings → Voice** has the personal **Use ChatGPT voice on this device** switch. It starts off for each account and device. Turning it on does not enable a host or change another member's settings. The existing local voice path remains available when it is off, including captions.
 
-Voice selection needs the additive `realtime-voice-selection-v1` capability (protocol 9). The
-original `realtime-voice-v1` routes are unchanged. A phone connected to an older voice host can
-still use its toggle, but its voice picker stays disabled until the host is updated. The host
-checks the caller's current admin role and the voice list for its authentication mode. No
-subscription credential or API key reaches the phone.
+Owners and admins use **Server settings → General → Live voice calls** for host availability and the shared default voice. Members do not see these host controls. Agent settings retain the per-agent voice override. Changing a voice affects the next call. Host availability is separate from device consent; a host cannot opt in a client. The existing capability-gated wire routes and their authorization rules remain unchanged.
 
 The iOS speech module adds `defaultToSpeaker` to WebRTC's default configuration before microphone
 capture, retains Bluetooth/headset support, and restores the prior WebRTC default when the call
 ends, fails or the module is destroyed. WebRTC applies the configuration and owns activation and
 deactivation. The module does not take WebRTC's active audio-session lock from a synchronous JS
 call; doing so can block JavaScript during cleanup while the audio unit activates. Both native platforms use the same call transport and
-agent-context exchange; neither shows transcript captions.
+agent-context exchange; realtime calls hide transcript captions, while local voice conversations retain them.
 
 The voice lists use the ported OpenClaw subscription profile at `6d172664c829`
 (`extensions/openai/realtime-quicksilver.ts`). Subscription voices and API Realtime voices are
@@ -177,7 +166,7 @@ settings does not start a sign-in or request a subscription token. The host repo
 availability flag, not provider credentials or account details. A connected provider does not
 establish upstream voice entitlement; the existing authenticated call handshake still checks it.
 
-The Voice settings picker is the server default. Agent settings provide an independent voice or
+The picker in Server settings is the server default. Agent settings provide an independent voice or
 **Use server default**. Resetting an agent removes its override and follows later default changes.
 A different chat provider does not change the agent's voice. Choices apply to the next call and do
 not interrupt an active call. The host saves the default and agent-ID map together in the existing

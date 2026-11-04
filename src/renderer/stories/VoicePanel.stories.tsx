@@ -18,6 +18,8 @@ const meta = {
     agent: STORY_AGENT,
     phase: "listening",
     muted: false,
+    heard: "",
+    said: "",
     levels: QUIET,
     error: null,
     onToggleMute: fn(),
@@ -58,7 +60,7 @@ export const Starting: Story = { args: { phase: "starting" } };
 
 export const Listening: Story = {};
 
-export const Hearing: Story = { args: { levels: SPEECH } };
+export const Hearing: Story = { args: { levels: SPEECH, heard: "Can you help me plan tomorrow?" } };
 
 export const Muted: Story = { args: { muted: true } };
 
@@ -67,6 +69,7 @@ export const Thinking: Story = { args: { phase: "thinking" } };
 export const Speaking: Story = {
   args: {
     phase: "speaking",
+    said: "You have two appointments tomorrow.",
     levels: SPEECH,
   },
 };
@@ -79,5 +82,15 @@ export const ServerOffline: Story = {
   args: {
     phase: "offline",
     error: "The server is not connected. The conversation continues when it connects again.",
+  },
+};
+
+export const RealtimeWithoutCaptions: Story = {
+  args: {
+    phase: "speaking",
+    hideCaptions: true,
+    heard: "Hidden user transcript",
+    said: "Hidden assistant transcript",
+    levels: SPEECH,
   },
 };

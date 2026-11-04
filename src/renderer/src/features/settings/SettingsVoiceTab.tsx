@@ -1,7 +1,6 @@
 import {
   AUTOMATIC_VOICE_LANGUAGE,
   ELEVENLABS_VOICE_MODEL_ID,
-  realtimeVoiceChoices,
   SPEECH_MODEL,
   SPEECH_SPEEDS,
   SPEECH_VOICES,
@@ -41,6 +40,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, createStore, For, Show } from "solid-js";
+import { realtimeVoiceOptedIn, setRealtimeVoiceOptIn } from "../speech/realtime-voice-preference";
 import type { SettingsVoiceStore } from "./settings-voice-store";
 import { shortModel, VoiceServerDialog, voiceServerHost } from "./VoiceServerDialog";
 
@@ -150,6 +150,7 @@ function flagFor(language: VoiceLanguage): string {
 
 interface SettingsVoiceTabProps {
   store: SettingsVoiceStore;
+  accountId: string;
   selectMount: HTMLElement | undefined;
 }
 
@@ -230,52 +231,15 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
 
   return (
     <>
-      <Show when={props.store.state.realtime.configured}>
+      <Show when={props.store.realtime.state.configured || realtimeVoiceOptedIn(props.accountId)}>
         <SettingsSection title={t("settings.voice.realtime.section")}>
           <ItemGroup class="settings-modal-card">
             <SwitchField
-              data-settings-row="settings.voice.realtime.title"
-              checked={props.store.state.realtime.status?.enabled ?? false}
-              disabled={
-                !props.store.state.realtime.status ||
-                !props.store.state.realtime.canManage ||
-                props.store.state.realtime.busy
-              }
-              onChange={(enabled) => void props.store.setRealtimeEnabled(enabled)}
-              label={t("settings.voice.realtime.title")}
-              description={t("settings.voice.realtime.description", { server: props.store.state.realtime.hostName })}
+              checked={realtimeVoiceOptedIn(props.accountId)}
+              onChange={(enabled) => setRealtimeVoiceOptIn(props.accountId, enabled)}
+              label={t("settings.voice.realtime.deviceEnabled")}
+              description={t("settings.voice.realtime.deviceDescription")}
             />
-            <Item class="settings-modal-row">
-              <ItemContent>
-                <ItemTitle>{t("settings.voice.realtime.defaultVoice")}</ItemTitle>
-              </ItemContent>
-              <ItemActions>
-                <Select<string>
-                  class="settings-modal-select"
-                  options={[...realtimeVoiceChoices(props.store.state.realtime.status?.model ?? "gpt-live-1-codex")]}
-                  value={props.store.state.realtime.status?.voice ?? null}
-                  disabled={!props.store.state.realtime.canManage || props.store.state.realtime.busy}
-                  onChange={(voice) => {
-                    if (voice) void props.store.setRealtimeDefaultVoice(voice);
-                  }}
-                  itemComponent={(item) => (
-                    <SelectItem item={item.item}>
-                      {item.item.rawValue.charAt(0).toUpperCase() + item.item.rawValue.slice(1)}
-                    </SelectItem>
-                  )}
-                >
-                  <SelectTrigger size="sm" aria-label={t("settings.voice.realtime.defaultVoice")}>
-                    <SelectValue<string>>
-                      {(value) => {
-                        const voice = value.selectedOption();
-                        return voice ? voice.charAt(0).toUpperCase() + voice.slice(1) : "";
-                      }}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent mount={props.selectMount} />
-                </Select>
-              </ItemActions>
-            </Item>
           </ItemGroup>
         </SettingsSection>
       </Show>

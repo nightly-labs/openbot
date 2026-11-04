@@ -1,6 +1,12 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("mobile.settings", {
+  "mobile.settings.voice.live.deviceEnabled": "Use ChatGPT voice on this device",
+  "mobile.settings.voice.live.deviceDescription":
+    "Use the server’s ChatGPT subscription for agent calls. Microphone audio and conversation context go to OpenAI. Off by default; applies only to your account on this device.",
+  "mobile.settings.voice.live.serverEnabled": "Allow ChatGPT voice calls",
+  "mobile.settings.voice.live.serverDescription":
+    "Availability and the default voice apply to everyone on {server}. Each user must also enable ChatGPT voice on their own device.",
   "mobile.settings.saveFailed": "Could not save this setting. Try again.",
   "mobile.settings.language.title": "Language",
   "mobile.settings.language.row": "App language",
@@ -178,16 +184,11 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.voice.title": "Voice",
   "mobile.settings.voice.sample": "Hello. This is how I will read my replies to you.",
   "mobile.settings.voice.live.title": "Live voice calls",
-  "mobile.settings.voice.live.enabled": "Enable live voice calls",
-  "mobile.settings.voice.live.footer":
-    "Calls use the Codex provider on {server} and each agent’s context. This is the default voice; choose a different voice in an agent’s settings. Voice changes apply to the next call.",
   "mobile.settings.voice.live.agentFooter":
     "Choose this agent’s voice or use the server default. Changes apply to the next call.",
   "mobile.settings.voice.live.useDefault": "Use server default ({voice})",
   "mobile.settings.voice.live.defaultVoice": "Default voice",
-  "mobile.settings.voice.live.admin": "A server owner or admin can change these settings.",
   "mobile.settings.voice.live.update": "Update this server to select a live-call voice.",
-  "mobile.settings.voice.live.nativeRequired": "This app build does not include live voice calls.",
   "mobile.settings.voice.live.offline": "Connect to this server to change live voice settings.",
   "mobile.settings.voice.voice": "Voice",
   "mobile.settings.voice.listen": "Listen",

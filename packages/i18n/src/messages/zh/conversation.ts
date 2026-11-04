@@ -120,6 +120,7 @@ export const messages = {
   "conversation.voice.label": "与 {name} 的语音对话",
   "conversation.voice.phase.starting": "正在启动",
   "conversation.voice.phase.listening": "正在聆听",
+  "conversation.voice.speakNow": "现在可以说话",
   "conversation.voice.phase.muted": "已静音",
   "conversation.voice.phase.thinking": "正在思考",
   "conversation.voice.phase.speaking": "正在说话",

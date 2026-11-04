@@ -28,6 +28,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
+import { LiveVoiceSettings } from "@/features/voice/components/live-voice-settings";
 import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { useLiveServerRecovery } from "@/features/workspace/context/server-recovery-countdown";
 import { queryKeys } from "@/features/workspace/model/query-keys";
@@ -78,6 +79,7 @@ export function ServerSettingsGeneralScreen() {
     <ServerSettingsPage>
       {(server) => (
         <>
+          {server.role === "owner" || server.role === "admin" ? <LiveVoiceSettings host={server} /> : null}
           <SettingsSection footer={server.connectionMessage ? sourceText(server.connectionMessage) : undefined}>
             <SettingsRow disclosure={false} trailing={<ServerStatusLabel server={server} />}>
               <Typography.Paragraph>{t("mobile.server.settings.status")}</Typography.Paragraph>

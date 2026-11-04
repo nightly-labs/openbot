@@ -32,6 +32,8 @@ import {
 import { actionToast } from "../../action-toast";
 import { createScopeGuard } from "../../scope-lifetime";
 import { appendVoiceTranscript } from "../../voice-recording";
+import { useAuth } from "../account/account-context";
+import { realtimeVoiceOptedIn } from "../speech/realtime-voice-preference";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import type { ChatSearchMatch } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
@@ -2003,9 +2005,11 @@ export function createConversationViewScope(props: ConversationProps) {
    */
   const voiceConversationAvailable = () => !channel && !props.runtime;
   /** Starts a voice conversation with an agent. It ends with the owner that calls this. */
+  const voiceAccount = useAuth();
   const startVoiceConversation = (agentId: string) =>
     createVoiceConversation({
       agentId,
+      realtimeEnabled: () => realtimeVoiceOptedIn(voiceAccount.signedInAccount()?.id),
       serverId: props.server?.id ?? "local",
       voice: conversationRuntime(props).voice,
       submit: (draft, target, submittedSnapshot, voice) =>

@@ -31,6 +31,10 @@ export interface VoicePanelProps {
   phase: VoicePanelPhase;
   /** The microphone is off until the user unmutes it. */
   muted: boolean;
+  heard: string;
+  said: string;
+  /** Realtime calls retain transcripts for context without showing them. */
+  hideCaptions?: boolean;
   /** The latest loudness readings of the voice that is heard now, from 0 to 1, oldest first. */
   levels: readonly number[];
   /** Why the conversation stopped listening. */
@@ -49,7 +53,7 @@ export interface VoicePanelProps {
  * A conversation by voice in the side panel. The agent listens until you stop speaking, sends what you
  * said to the chat, and reads its reply aloud; then it listens again. The agent's face grows with the
  * voice that is heard, and a waveform under it moves with your voice or the agent's.
- * Transcript text is kept by the controller for context, without appearing in the call panel.
+ * Local calls show captions. Realtime calls can hide them while keeping their context.
  */
 export function VoicePanel(props: VoicePanelProps) {
   const { t, format } = useText();
@@ -84,15 +88,31 @@ export function VoicePanel(props: VoicePanelProps) {
         >
           <VoiceWaveform levels={props.levels} />
         </div>
-        <Show when={props.error}>
-          {(error) => (
-            <div class="voice-panel-captions">
+        <div class="voice-panel-captions">
+          <Show
+            when={props.error}
+            fallback={
+              <Show when={!props.hideCaptions}>
+                <Show
+                  when={props.phase === "speaking"}
+                  fallback={
+                    <p class="voice-panel-caption" data-empty={props.heard ? undefined : ""}>
+                      {props.heard || (hearing() ? t("conversation.voice.speakNow") : "")}
+                    </p>
+                  }
+                >
+                  <p class="voice-panel-caption">{props.said}</p>
+                </Show>
+              </Show>
+            }
+          >
+            {(error) => (
               <p class="voice-panel-caption voice-panel-error" role="alert">
                 {error()}
               </p>
-            </div>
-          )}
-        </Show>
+            )}
+          </Show>
+        </div>
       </div>
       <div class="voice-panel-controls">
         <Show when={props.onCycleSpeed}>

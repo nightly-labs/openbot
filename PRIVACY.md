@@ -935,7 +935,10 @@ Network traffic can also occur when:
   text. Nothing else is sent: no conversation, file or agent instruction. ElevenLabs handles the
   audio and the text under its own policy and the user's ElevenLabs plan. The local models send
   nothing;
-- the host administrator enables live OpenAI voice and the user opens a voice conversation.
+- the host administrator allows live OpenAI voice and the user enables **Use ChatGPT voice on this device**
+  in **Settings → Voice** before opening an agent call. This account-specific device choice starts off and
+  is not synced. Server availability alone does not send microphone audio to OpenAI. Local voice
+  conversations keep the selected recognizer, reply voice and captions.
   Subscription mode uses the host's selected Codex ChatGPT account. Codex owns account storage
   and token refresh. The host obtains the OAuth token through Codex's private local connection,
   sends it with the account ID, SDP offer and voice settings to `chatgpt.com`, and uses it for an

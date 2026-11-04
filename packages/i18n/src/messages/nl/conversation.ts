@@ -124,6 +124,7 @@ export const messages = {
   "conversation.voice.label": "Spraakgesprek met {name}",
   "conversation.voice.phase.starting": "Starten",
   "conversation.voice.phase.listening": "Luisteren",
+  "conversation.voice.speakNow": "Spreek nu",
   "conversation.voice.phase.muted": "Gedempt",
   "conversation.voice.phase.thinking": "Denken",
   "conversation.voice.phase.speaking": "Spreken",

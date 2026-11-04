@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { liveVoice } from "../../../apps/mobile/src/features/chat/components/composer-voice";
 import { createController } from "../../../apps/mobile/src/features/chat/components/use-live-conversation";
 import { callOptions, spoken } from "./controller-native";
 
@@ -10,6 +11,7 @@ const delivery = {
 };
 const input = {
   realtimeReady: true,
+  realtimeOptedIn: true,
   realtime: {},
   enabled: true,
   online: true,
@@ -47,11 +49,49 @@ assert.equal(spoken.length, 1, "A completed answer was sent twice.");
 controller.dispose();
 controller.followReply();
 assert.equal(spoken.length, 1, "A late answer escaped after call cleanup.");
+let localStarts = 0;
+input.realtimeOptedIn = false;
+const local = createController({
+  input: () => input,
+  dictation: () => ({
+    start() {
+      localStarts++;
+      return true;
+    },
+    cancel() {},
+  }),
+  setState: (update) => (state = update(state)),
+  presence: value(),
+  speechLevel: value(),
+});
+local.start();
+assert.equal(state.realtime, false, "A ready host overrode device consent.");
+assert.equal(localStarts, 1, "The existing local recognizer did not start.");
+local.hear("Local speech remains captioned.");
+assert.equal(state.caption, "Local speech remains captioned.");
+assert.equal(
+  liveVoice(state, "Fixture", (key) => key).bar.caption,
+  state.caption,
+  "The local call bar hid its caption.",
+);
+assert.equal(
+  liveVoice({ ...state, realtime: true }, "Fixture", (key) => key).bar.caption,
+  "",
+  "The cloud call bar exposed transcript text.",
+);
+assert.equal(
+  liveVoice({ ...state, realtime: true, error: "Call failed" }, "Fixture", (key) => key).bar.caption,
+  "Call failed",
+  "The cloud call bar hid its error.",
+);
+local.dispose();
 process.stdout.write(
-  JSON.stringify({
+  `${JSON.stringify({
     passed: true,
+    localWithoutConsent: true,
+    localCaptionsRetained: true,
     acknowledgementRetainsPendingReply: true,
     answerReturnedOnce: true,
     cleanupRejectsLateReply: true,
-  }) + "\n",
+  })}\n`,
 );

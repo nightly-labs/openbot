@@ -8,7 +8,7 @@ import { build } from "bun";
 const output = resolve(".openbot-build/mobile-live-controller-e2e");
 await mkdir(output, { recursive: true });
 const native = resolve("scripts/fixtures/mobile-voice/controller-native.js");
-const inert = `export const activateKeepAwakeAsync=async()=>{},deactivateKeepAwake=async()=>{},BackHandler={},speechNative={},haptics={impact:async()=>{},selection:async()=>{}},mobileAnalytics={track(){}},currentText=()=>({t:key=>key}),REPLY_VOICE_FAILURE_TEXT={},streamReply=()=>({stop(){},update(){}}),useVoiceDictation=()=>({}),cancelAnimation=()=>{},Easing={bezier:()=>({}),inOut:x=>x,ease:{}},ReduceMotion={System:0},useSharedValue=()=>({set(){}}),withRepeat=x=>x,withTiming=(x,_options,done)=>{done?.(true);return x},scheduleOnRN=fn=>fn();`;
+const inert = `export const useMobileSession=()=>({session:null}),useVoiceSettings=()=>false,activateKeepAwakeAsync=async()=>{},deactivateKeepAwake=async()=>{},BackHandler={},speechNative={},haptics={impact:async()=>{},selection:async()=>{}},mobileAnalytics={track(){}},currentText=()=>({t:key=>key}),REPLY_VOICE_FAILURE_TEXT={},streamReply=()=>({stop(){},update(){}}),useVoiceDictation=()=>({}),cancelAnimation=()=>{},Easing={bezier:()=>({}),inOut:x=>x,ease:{}},ReduceMotion={System:0},useSharedValue=()=>({set(){}}),withRepeat=x=>x,withTiming=(x,_options,done)=>{done?.(true);return x},scheduleOnRN=fn=>fn();`;
 await build({
   entrypoints: ["scripts/fixtures/mobile-voice/controller-driver.js"],
   outdir: output,
@@ -24,7 +24,7 @@ await build({
         b.onResolve(
           {
             filter:
-              /^(expo-keep-awake|react-native|react-native-reanimated|react-native-worklets|@\/features\/analytics\/mobile-analytics|@\/features\/voice\/model\/(reply-voice|speech-native)|@\/shared\/lib\/(haptics|text))$/,
+              /^(expo-keep-awake|react-native|react-native-reanimated|react-native-worklets|@\/features\/auth\/context\/mobile-session-context|@\/features\/analytics\/mobile-analytics|@\/features\/voice\/model\/(reply-voice|speech-native|voice-settings)|@\/shared\/lib\/(haptics|text))$/,
           },
           (args) => ({ path: args.path, namespace: "native-fixture" }),
         );

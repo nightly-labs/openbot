@@ -1,10 +1,13 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("settings", {
+  "settings.voice.realtime.deviceEnabled": "Use ChatGPT voice on this device",
+  "settings.voice.realtime.deviceDescription":
+    "Use the server’s ChatGPT subscription for agent calls. Microphone audio and conversation context go to OpenAI. Off by default; applies only to your account on this device.",
+  "settings.voice.realtime.serverEnabled": "Allow ChatGPT voice calls",
+  "settings.voice.realtime.serverDescription":
+    "Availability and the default voice apply to everyone on {server}. Each user must also enable ChatGPT voice on their own device.",
   "settings.voice.realtime.section": "Live voice calls",
-  "settings.voice.realtime.title": "Enable live voice",
-  "settings.voice.realtime.description":
-    "Use the Codex provider on {server} for live voice calls. This is the default voice; choose a different voice in an agent’s settings. Voice changes apply to the next call. Turning this off ends active calls.",
   "settings.voice.realtime.defaultVoice": "Default voice",
   "settings.voice.realtime.agentVoice": "Voice",
   "settings.voice.realtime.useDefault": "Use server default ({voice})",

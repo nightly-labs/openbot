@@ -123,6 +123,7 @@ export const messages = {
   "conversation.voice.label": "{name}과(와)의 음성 대화",
   "conversation.voice.phase.starting": "시작 중",
   "conversation.voice.phase.listening": "듣는 중",
+  "conversation.voice.speakNow": "지금 말씀하세요",
   "conversation.voice.phase.muted": "음소거됨",
   "conversation.voice.phase.thinking": "생각 중",
   "conversation.voice.phase.speaking": "말하는 중",

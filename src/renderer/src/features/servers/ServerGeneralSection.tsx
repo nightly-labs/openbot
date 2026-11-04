@@ -25,7 +25,8 @@ import { actionToast } from "../../action-toast";
 import { ServerMemoryLimitSetting } from "./ServerMemoryLimitSetting";
 import { ServerMemoryReviewSetting } from "./ServerMemoryReviewSetting";
 import { ServerTimezoneSetting } from "./ServerTimezoneSetting";
-import { serverCanAdminister } from "./server-capabilities";
+import { ServerVoiceSettings } from "./ServerVoiceSettings";
+import { serverCanAdminister, serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
 /**
@@ -249,6 +250,9 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
   function Panel() {
     return (
       <>
+        <Show when={serverRoleCanAdminister(host.props.server)}>
+          <ServerVoiceSettings server={host.props.server} menuMount={host.menuMount()} />
+        </Show>
         <SettingsSection title={t("server.settings.identity")}>
           <Input
             ref={(element) => (logoInput = element)}

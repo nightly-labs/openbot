@@ -26,6 +26,7 @@ export interface ElevenLabsVoice {
 }
 
 interface VoiceSettings {
+  liveVoiceAccounts: Record<string, boolean>;
   engine: VoiceEngine;
   recognition: RecognitionEngine;
   supertonicVoice: SpeechVoice;
@@ -33,6 +34,7 @@ interface VoiceSettings {
 }
 
 const DEFAULT_SETTINGS: VoiceSettings = {
+  liveVoiceAccounts: {},
   engine: "supertonic",
   recognition: "system",
   supertonicVoice: "F1",
@@ -60,7 +62,12 @@ function decodeSettings(raw: string | null): VoiceSettings {
   }
   if (!isDynamicRecord(value)) return DEFAULT_SETTINGS;
   const voice = value.elevenLabsVoice;
+  const liveVoiceAccounts: Record<string, boolean> = {};
+  if (isDynamicRecord(value.liveVoiceAccounts))
+    for (const [accountId, enabled] of Object.entries(value.liveVoiceAccounts))
+      if (enabled === true) liveVoiceAccounts[accountId] = true;
   return {
+    liveVoiceAccounts,
     engine: value.engine === "elevenlabs" ? "elevenlabs" : "supertonic",
     recognition: isRecognitionEngine(value.recognition) ? value.recognition : DEFAULT_SETTINGS.recognition,
     supertonicVoice: isSpeechVoice(value.supertonicVoice) ? value.supertonicVoice : DEFAULT_SETTINGS.supertonicVoice,
@@ -86,11 +93,14 @@ export async function loadVoiceSettings(): Promise<void> {
 
 /** Applies at once, also when storage fails; the caller reports the failure. */
 export async function saveVoiceSettings(change: Partial<VoiceSettings>): Promise<void> {
-  const { engine, recognition, supertonicVoice, elevenLabsVoice } = { ...useVoiceSettings.getState(), ...change };
-  useVoiceSettings.setState({ engine, recognition, supertonicVoice, elevenLabsVoice });
+  const { engine, recognition, supertonicVoice, elevenLabsVoice, liveVoiceAccounts } = {
+    ...useVoiceSettings.getState(),
+    ...change,
+  };
+  useVoiceSettings.setState({ engine, recognition, supertonicVoice, elevenLabsVoice, liveVoiceAccounts });
   await SecureStore.setItemAsync(
     SETTINGS_KEY,
-    JSON.stringify({ engine, recognition, supertonicVoice, elevenLabsVoice }),
+    JSON.stringify({ engine, recognition, supertonicVoice, elevenLabsVoice, liveVoiceAccounts }),
   );
 }
 

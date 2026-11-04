@@ -75,6 +75,7 @@ interface VoiceConversationState {
 }
 
 export interface VoiceConversationDeps {
+  realtimeEnabled?: () => boolean;
   agentId: string;
   serverId: string;
   voice: ConversationRuntime["voice"];
@@ -205,9 +206,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     const analytics = desktopAnalytics.scope();
     const startingAt = performance.now();
     try {
-      const status = await deps.voice.getRealtimeStatus?.(deps.serverId);
+      const status = deps.realtimeEnabled?.() ? await deps.voice.getRealtimeStatus?.(deps.serverId) : null;
       if (own !== generation || disposed || !online) return;
-      if (status?.enabled && deps.voice.connectRealtime) {
+      if (deps.realtimeEnabled?.() && status?.enabled && deps.voice.connectRealtime) {
         realtime = true;
         ready = true;
         setState((draft) => {
@@ -752,6 +753,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
 
   return {
     phase,
+    realtime: () => state.realtime,
     muted: () => (state.realtime ? realtimeConversation.muted() : state.muted),
     heard: () => (state.realtime ? realtimeConversation.heard() : state.heard),
     error: () => (state.realtime ? realtimeConversation.error() : state.error),

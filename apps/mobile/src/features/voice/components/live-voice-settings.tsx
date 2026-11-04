@@ -3,20 +3,26 @@ import { useFocusEffect } from "expo-router";
 import { Typography } from "heroui-native";
 import { useCallback, useRef, useState } from "react";
 import { useUniwind } from "uniwind";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { useMobileWorkspaceActions, useMobileWorkspaceSelector } from "@/features/workspace/context/workspace-store";
 import { showsOnline } from "@/features/workspace/model/server-status";
-import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
 import { nativeRealtimeVoiceAvailable } from "../model/realtime-voice";
+import { saveVoiceSettings, useVoiceSettings } from "../model/voice-settings";
 
-/** Live calls belong to the selected host; dictation and reply playback belong to this phone. */
-export function LiveVoiceSettings({ agent }: { agent?: MobileAgent }) {
+/** Personal consent stays on this phone. Host defaults are edited only in Server settings. */
+export function LiveVoiceSettings({ agent, host }: { agent?: MobileAgent; host?: MobileServer }) {
+  const { session } = useMobileSession();
+  const preferences = useVoiceSettings();
+  const owner = session ? `${session.apiUrl}\n${session.user.id}` : null;
   const { t } = useText();
   const { theme } = useUniwind();
-  const server = useMobileWorkspaceSelector((workspace) =>
-    agent ? workspace.servers.find((server) => server.id === agent.serverId) : workspace.activeServer,
+  const server = useMobileWorkspaceSelector(
+    (workspace) =>
+      host ?? (agent ? workspace.servers.find((server) => server.id === agent.serverId) : workspace.activeServer),
   );
   const actions = useMobileWorkspaceActions();
   const [status, setStatus] = useState<RealtimeVoiceSettings | null>(null);
@@ -59,28 +65,48 @@ export function LiveVoiceSettings({ agent }: { agent?: MobileAgent }) {
       if (own === generation.current) setSaving(false);
     }
   };
-  if (!server || !status?.configured) return null;
+  const optedIn = Boolean(owner && preferences.liveVoiceAccounts[owner]);
+  if (!agent && !host && !status?.configured && !optedIn) return null;
+  if ((agent || host) && (!server || !status?.configured || (host && !status.canManage))) return null;
+  if (!agent && !host)
+    return (
+      <SettingsSection
+        title={t("mobile.settings.voice.live.title")}
+        footer={t("mobile.settings.voice.live.deviceDescription")}
+      >
+        <SettingsRow>
+          <SettingsSwitch
+            label={t("mobile.settings.voice.live.deviceEnabled")}
+            value={optedIn}
+            disabled={!owner || !preferences.ready || !nativeRealtimeVoiceAvailable()}
+            dark={theme === "dark"}
+            onValueChange={(enabled) => {
+              if (owner)
+                void saveVoiceSettings({
+                  liveVoiceAccounts: { ...preferences.liveVoiceAccounts, [owner]: enabled },
+                }).catch(() => setError(true));
+            }}
+          />
+        </SettingsRow>
+        {error ? <SettingsNote>{t("mobile.settings.saveFailed")}</SettingsNote> : null}
+      </SettingsSection>
+    );
+  if (!server || !status) return null;
   const selection = actions.supportsRealtimeVoiceSelection(server.id);
-  const disabled =
-    !online ||
-    !status ||
-    saving ||
-    !status.canManage ||
-    !actions.supportsRealtimeVoice(server.id) ||
-    !nativeRealtimeVoiceAvailable();
+  const disabled = !online || !status || saving || !status.canManage || !actions.supportsRealtimeVoice(server.id);
   return (
     <SettingsSection
       title={t("mobile.settings.voice.live.title")}
       footer={
         agent
           ? t("mobile.settings.voice.live.agentFooter")
-          : t("mobile.settings.voice.live.footer", { server: server.name })
+          : t("mobile.settings.voice.live.serverDescription", { server: server.name })
       }
     >
       {!agent ? (
         <SettingsRow>
           <SettingsSwitch
-            label={t("mobile.settings.voice.live.enabled")}
+            label={t("mobile.settings.voice.live.serverEnabled")}
             value={status?.enabled ?? false}
             disabled={disabled}
             dark={theme === "dark"}
@@ -133,11 +159,7 @@ export function LiveVoiceSettings({ agent }: { agent?: MobileAgent }) {
           </Typography.Paragraph>
         </SettingsRow>
       ) : null}
-      {!status.canManage && !agent ? <SettingsNote>{t("mobile.settings.voice.live.admin")}</SettingsNote> : null}
       {status && !selection ? <SettingsNote>{t("mobile.settings.voice.live.update")}</SettingsNote> : null}
-      {!nativeRealtimeVoiceAvailable() ? (
-        <SettingsNote>{t("mobile.settings.voice.live.nativeRequired")}</SettingsNote>
-      ) : null}
       {!online ? <SettingsNote>{t("mobile.settings.voice.live.offline")}</SettingsNote> : null}
       {error ? (
         <Typography.Paragraph accessibilityRole="alert" className="px-4 text-danger-text">

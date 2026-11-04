@@ -122,6 +122,7 @@ export const messages = defineMessages("conversation", {
   "conversation.voice.label": "Voice conversation with {name}",
   "conversation.voice.phase.starting": "Starting",
   "conversation.voice.phase.listening": "Listening",
+  "conversation.voice.speakNow": "Speak now",
   "conversation.voice.phase.muted": "Muted",
   "conversation.voice.phase.thinking": "Thinking",
   "conversation.voice.phase.speaking": "Speaking",

@@ -123,6 +123,7 @@ export const messages = {
   "conversation.voice.label": "Conversa por voz com {name}",
   "conversation.voice.phase.starting": "Iniciando",
   "conversation.voice.phase.listening": "Ouvindo",
+  "conversation.voice.speakNow": "Fale agora",
   "conversation.voice.phase.muted": "Mudo",
   "conversation.voice.phase.thinking": "Pensando",
   "conversation.voice.phase.speaking": "Falando",

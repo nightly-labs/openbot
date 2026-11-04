@@ -127,6 +127,7 @@ export const messages = {
   "conversation.voice.label": "محادثة صوتية مع {name}",
   "conversation.voice.phase.starting": "جارٍ البدء",
   "conversation.voice.phase.listening": "يستمع",
+  "conversation.voice.speakNow": "تحدّث الآن",
   "conversation.voice.phase.muted": "مكتوم",
   "conversation.voice.phase.thinking": "يفكّر",
   "conversation.voice.phase.speaking": "يتحدث",

@@ -57,6 +57,9 @@ function VoiceConversationPane() {
           agent={agent()}
           phase={conversation.phase()}
           muted={conversation.muted()}
+          heard={conversation.heard()}
+          said={conversation.said()}
+          hideCaptions={conversation.realtime()}
           levels={conversation.levels()}
           error={conversation.error()}
           onToggleMute={conversation.toggleMute}
