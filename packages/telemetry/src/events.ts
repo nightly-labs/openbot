@@ -226,16 +226,8 @@ export function classifyFailure(error: unknown): CauseCode {
   const message = error instanceof Error ? error.message : typeof error === "string" ? error : record?.message;
   if (typeof message !== "string") return "unknown";
   if (/\binvalid upload request\b/iu.test(message)) return "invalid_upload_request";
-  // Before the status: a 400 or 413 that names the context is a context that is too long.
-  if (
-    /\b(?:context[ _-]?(?:length|window)[ _-]?exceeded|context[ _-]overflow|maximum context length|prompt is too long|too many (?:input )?tokens|input token count\b.{0,80}\bexceeds)\b/iu.test(
-      message,
-    )
-  )
-    return "context_too_long";
-  // OpenRouter's 403: "<model> requires moderation. Your input was flagged for …".
-  if (/\b(?:content[ _-]?filter(?:ed)?|requires moderation|was flagged|safety (?:filter|block))\b/iu.test(message))
-    return "content_blocked";
+  // The limit and outage rules come first, so a text that names a limit and a size, such as "rate
+  // limit: too many tokens per minute", keeps the cause that a backup model can pass.
   if (
     /\b(?:401 unauthorized|invalid[ _]api[ _]key|api key not valid|API_KEY_INVALID|not authenticated|UNAUTHENTICATED|authentication failed|authentication_error|token (?:has )?expired|sign in again|log in again)\b/iu.test(
       message,
@@ -261,35 +253,49 @@ export function classifyFailure(error: unknown): CauseCode {
     )
   )
     return "usage_limit";
-  if (
-    /\b(?:model[ _]not[ _]found|unknown model|no such model|not a valid model|no endpoints found|model\b.{0,60}\b(?:not found|does not exist|is unavailable|is not supported))\b/iu.test(
-      message,
-    )
-  )
-    return "model_not_found";
   if (/\b(?:timed? out|ETIMEDOUT|gateway time-?out|deadline exceeded|DEADLINE_EXCEEDED)\b/iu.test(message))
     return "timeout";
+  // A tool's MCP server that does not connect is not a provider network failure.
   if (
-    /\b(?:fetch failed|failed to fetch|network request failed|connection error|socket hang up|stream disconnected|error sending request|(?:unable to|failed to|could not|cannot) connect|ECONNRESET|ECONNREFUSED|ECONNABORTED|ENOTFOUND|EAI_AGAIN)\b/iu.test(
+    /\b(?:fetch failed|failed to fetch|network request failed|connection error|socket hang up|stream disconnected|error sending request|(?:unable to|failed to|could not|cannot) connect(?!\s+to\s+(?:the\s+)?MCP\b)|ECONNRESET|ECONNREFUSED|ECONNABORTED|ENOTFOUND|EAI_AGAIN)\b/iu.test(
       message,
     )
   )
     return "network";
   if (/\b(?:ENOSPC|SQLITE_FULL|disk full)\b/iu.test(message)) return "storage";
   if (/\b(?:EACCES|permission denied|403 forbidden)\b/iu.test(message)) return "permission";
-  if (/\b(?:empty response|no visible content|reasoning_only)\b/iu.test(message)) return "empty_answer";
-  if (/\b(?:turn|request|operation) (?:was )?cancell?ed\b/iu.test(message)) return "cancelled";
-  // An outage: Claude's "API Error: 529 … overloaded_error", OpenAI's "server_error", or Google's
-  // UNAVAILABLE status in capitals.
+  // An outage: Claude's "API Error: 529 … overloaded_error", OpenAI's "server_error", Google's
+  // UNAVAILABLE status in capitals, or a 5xx status that the text names as a status.
   if (
     /\b(?:service unavailable|bad gateway|internal server error|overloaded(?:_error)?|server_error|api_error|server had an error|high demand|temporarily unavailable|upstream connect error)\b/iu.test(
       message,
     ) ||
-    /\bUNAVAILABLE\b/u.test(message)
+    /\bUNAVAILABLE\b/u.test(message) ||
+    /\b(?:API Error|status(?: code)?|HTTP(?:\/[\d.]+)?)\W{0,4}5\d\d\b/iu.test(message)
   )
     return "provider_unavailable";
-  // A status that the text names as a status, such as "(status 402)" or "HTTP 413".
-  const status = /\b(?:API Error|status(?: code)?|HTTP(?:\/[\d.]+)?)\W{0,4}(0|[1-5]\d\d)\b/iu.exec(message)?.[1];
+  // Before the status: a 400 or 413 that names the context is a context that is too long. "Too many
+  // tokens, please wait" is Vertex's rate limit.
+  if (
+    /\b(?:context[ _-]?(?:length|window)[ _-]?exceeded|context[ _-]overflow|maximum context length|prompt is too long|too many (?:input )?tokens(?![^.]{0,40}\b(?:wait|per (?:minute|second|day)))|input token count\b.{0,80}\bexceeds)\b/iu.test(
+      message,
+    )
+  )
+    return "context_too_long";
+  // OpenRouter's 403: "<model> requires moderation. Your input was flagged for …".
+  if (/\b(?:content[ _-]?filter(?:ed)?|requires moderation|was flagged|safety (?:filter|block))\b/iu.test(message))
+    return "content_blocked";
+  if (
+    /\b(?:model[ _]not[ _]found|unknown model|no such model|not a valid model|no endpoints found|model\b[^.,;:\n]{0,60}\b(?:not found|does not exist|is not supported))\b/iu.test(
+      message,
+    )
+  )
+    return "model_not_found";
+  if (/\b(?:empty response|no visible content|reasoning_only)\b/iu.test(message)) return "empty_answer";
+  if (/\b(?:turn|request|operation) (?:was )?cancell?ed\b/iu.test(message)) return "cancelled";
+  // A status that the text names as a status, such as "(status 402)" or "HTTP 413". Status 0 only
+  // counts in structured data: "exited with status 0" is not a network failure.
+  const status = /\b(?:API Error|status(?: code)?|HTTP(?:\/[\d.]+)?)\W{0,4}([1-4]\d\d)\b/iu.exec(message)?.[1];
   const statusCause = status === undefined ? null : httpStatusCause(Number(status));
   if (statusCause) return statusCause;
   if (/\b(?:invalid[ _]request(?:_error)?|bad request|INVALID_ARGUMENT)\b/iu.test(message)) return "invalid_request";

@@ -3103,7 +3103,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           this.options.customEndpoint?.(thread.currentModelId) ?? null,
         ) ?? detail;
       // A fixed code, so analytics and failover need not read the cause again from the sentence.
-      const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor);
+      const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message);
       this.emit("notification", {
         method: "error",
         params: { threadId: thread.id, turnId: turn.id, message, causeCode },
@@ -3443,29 +3443,34 @@ function failureDetail(error: RequestError): string | null {
 /**
  * The cause of a failed turn, from structured fields first: the flavor's own field, an HTTP status
  * in the error's data, the stop reason, and the protocol's error code. The text decides only when
- * those name none.
+ * those name none. The flavor's sentence counts after the raw text: a flavor can read a field that
+ * the generic rules do not know, such as Antigravity's `code: 429`.
  */
-function acpFailureCause(error: unknown, flavor: AcpFlavor): CauseCode {
-  if (error instanceof RequestError) return acpRequestCause(error, flavor);
+function acpFailureCause(error: unknown, flavor: AcpFlavor, sentence: string): CauseCode {
+  if (error instanceof RequestError) return acpRequestCause(error, flavor, sentence);
   const flavored = flavor.failureCause?.(error) ?? null;
   if (flavored) return flavored;
   // The stop reasons of a turn that ended before the model answered in full.
   if (error === "max_tokens" || error === "max_turn_requests") return "turn_limit";
   if (error === "refusal") return "content_blocked";
-  const cause = classifyFailure(error);
+  const cause = textCause(classifyFailure(error), sentence);
   return cause === "unknown" && error instanceof AgentProcessExitError ? "provider_exited" : cause;
 }
 
-function acpRequestCause(error: RequestError, flavor: AcpFlavor): CauseCode {
+function acpRequestCause(error: RequestError, flavor: AcpFlavor, sentence: string): CauseCode {
   if (error.code === -32000) return "authentication";
   const status = dataHttpStatus(error.data);
   const structured = flavor.failureCause?.(error) ?? (status === null ? null : httpStatusCause(status));
-  const cause = structuredCause(structured, classifyFailure(failureText(error)));
+  const cause = structuredCause(structured, textCause(classifyFailure(failureText(error)), sentence));
   if (cause !== "unknown") return cause;
   if (error.code === -32600 || error.code === -32601 || error.code === -32602) return "invalid_request";
   if (error.code === -32002) return "not_found";
   // An error inside the agent that it names no reason for.
   return error.code === -32603 ? "provider_internal_error" : "unknown";
+}
+
+function textCause(raw: CauseCode, sentence: string): CauseCode {
+  return raw === "unknown" ? classifyFailure(sentence) : raw;
 }
 
 /** The HTTP status that the agent's error data names, such as Grok 1.0.67's `http_status`. */
