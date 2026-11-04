@@ -2401,13 +2401,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.workflow.modelBusy"));
+      const starting = this.#startingChoice()?.provider ?? this.#providers.preferredProvider();
       const provider =
         input.provider ??
-        workflowProvider(
-          this.#startingChoice()?.provider ?? this.#providers.preferredProvider(),
-          this.#preference(),
-          this.getStatus().providers ?? [],
-        );
+        (input.model === null
+          ? workflowProvider(
+              starting,
+              this.#preference(),
+              this.getStatus().providers ?? [],
+              this.#endpoints.available(),
+            )
+          : starting);
       yield* this.#providers.ensureProvider(provider);
       const models = this.#endpoints.available();
       const model =

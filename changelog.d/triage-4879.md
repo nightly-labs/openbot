@@ -1,5 +1,6 @@
 ### Fixed
 
-- A workflow Condition step, and an LLM step with no model, now use a connected provider when you did
-  not choose a default provider and ChatGPT is not connected. Before, the step failed with "Connect
-  ChatGPT to continue". A default provider that you chose stays the provider of these steps.
+- A workflow Condition step now runs on a connected provider when ChatGPT is not connected and your
+  default is ChatGPT with no model chosen. Before, the step failed with "Connect ChatGPT to
+  continue". Another default provider, or a default model that you chose, stays the provider of the
+  step.
