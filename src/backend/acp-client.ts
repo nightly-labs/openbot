@@ -2278,7 +2278,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
       const resumed =
         attempt === 1
-          ? yield* Effect.result(this.#resendPreparation(thread, params))
+          ? yield* Effect.result(
+              this.#resumeWithTurnSettings(thread, thread.restore, params).pipe(
+                this.#backgroundTimeout("session/resume"),
+              ),
+            )
           : Result.fail(providerFailure(new Error("The prompt got no update after it was sent again.")));
       if (thread.activeTurn !== turn || turn.completing || turn.stopped)
         return Result.succeed({ stopReason: "cancelled" } satisfies PromptResponse);
@@ -2305,18 +2309,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
   });
 
-  /** Rebuilds a session's harness with `session/resume`, with the model and settings of the turn. */
-  readonly #resendPreparation = Effect.fn("AcpAgentClient.resendPreparation")(function* (
+  /**
+   * Rebuilds a session's harness with `session/resume` and `restore`. The session that opens again
+   * has the model of the thread, then the settings of this turn.
+   */
+  readonly #resumeWithTurnSettings = Effect.fn("AcpAgentClient.resumeWithTurnSettings")(function* (
     this: AcpAgentClient,
     thread: AcpThread,
+    restore: AcpSessionRestore,
     params: unknown,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     const model = thread.currentModelId;
     const restored = yield* this.#restoreSessionEffect(
       () => this.#sessionConnection(thread),
-      { sessionId: thread.id, ...thread.restore },
+      { sessionId: thread.id, ...restore },
       "resume",
-    ).pipe(this.#backgroundTimeout("session/resume"));
+    );
+    thread.restore = restore;
     thread.configOptions = restored.configOptions ?? thread.configOptions;
     thread.currentModelId = currentModelFromSessionSetup(restored) ?? thread.currentModelId;
     yield* this.#configuration.applyConfig(thread, model, null, this.#models);
@@ -2375,19 +2384,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       },
     ]);
     const restore = { ...thread.restore, mcpServers: thread.restore.mcpServers.filter((entry) => entry !== server) };
-    const model = thread.currentModelId;
-    const restored = yield* this.#restoreSessionEffect(
-      () => this.#sessionConnection(thread),
-      { sessionId: thread.id, ...restore },
-      "resume",
-    );
-    thread.restore = restore;
-    thread.configOptions = restored.configOptions ?? thread.configOptions;
-    thread.currentModelId = currentModelFromSessionSetup(restored) ?? thread.currentModelId;
-    // The session that opens again has the model of the thread, then the settings of this turn.
-    yield* this.#configuration.applyConfig(thread, model, null, this.#models);
-    yield* this.#applyTurnSettings(thread, params);
-    this.#publishSessionSettings(thread);
+    yield* this.#resumeWithTurnSettings(thread, restore, params);
     turn.text = "";
     turn.sdkFailureAt = null;
     turn.receivedOutput = false;
