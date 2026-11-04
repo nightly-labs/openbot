@@ -196,6 +196,12 @@ try {
       !(search.guidance ?? []).some((text) => text.includes("Manage scheduled work")),
     { ready, guidance: search.guidance },
   );
+  const mixed = discoverTools(params("tool_search", { queries: ["workflow", "openbot_browser.snapshot"] }));
+  check(
+    "a workflow search keeps the schema of a tool that another query names exactly",
+    mixed.tools.some((tool) => tool.name === "openbot_browser.snapshot" && "inputSchema" in tool),
+    mixed.tools.map((tool) => tool.name),
+  );
   // Claude called a found tool directly, and then sent its name as `tool`. Each refusal cost a model step.
   check(
     "a workflow search says to run the tools with tool_call, and has no browser note",

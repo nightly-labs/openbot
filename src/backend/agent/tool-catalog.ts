@@ -226,7 +226,9 @@ export function discoverTools(params: DynamicToolCallParams) {
     );
     const workflowSearch = [...terms].some((term) => WORKFLOW_WORDS.has(term));
     if (workflowSearch) {
-      ready.clear();
+      // A tool that a query names exactly keeps its schema; other ready results, such as routines, go.
+      for (const entry of ready)
+        if (!matches.some((match) => match.entry === entry && match.exact)) ready.delete(entry);
       for (const entry of WORKFLOW_TOOLS) {
         if (!found.some((result) => result.entry === entry)) found.push({ entry, strong: true });
         ready.add(entry);
