@@ -444,6 +444,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   get contextCompaction(): "handoff" | "unsupported" {
     return this.#flavor.contextCompaction ?? "unsupported";
   }
+  get provisionalAnswers(): boolean {
+    return this.#flavor.streamAnswerBeforePromptReturns === true;
+  }
   get provider(): AgentProvider {
     return this.options.provider;
   }
