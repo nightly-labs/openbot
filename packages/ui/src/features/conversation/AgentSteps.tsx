@@ -190,6 +190,11 @@ export function AgentStepsDisclosure(props: {
   defaultOpen: boolean;
   trace?: AgentStepsTrace | undefined;
   facts?: AgentStepsFacts | undefined;
+  /**
+   * False when the row opens only the trace, never the list. A channel answer shows its steps
+   * in the trace, so its row stays one line. Give a trace with it.
+   */
+  list?: boolean | undefined;
 }) {
   const text = useText();
   const duration = useDuration();
@@ -201,11 +206,12 @@ export function AgentStepsDisclosure(props: {
   const [traceOpenedAt, setTraceOpenedAt] = createSignal<number | null>(null);
   // A long chat has a row for each turn, so a row builds its trace dialog when it first opens.
   const [traceUsed, setTraceUsed] = createSignal(false);
-  const open = () => choice() ?? props.defaultOpen;
+  const open = () => props.list !== false && (choice() ?? props.defaultOpen);
   // The step that the user picked in the trace. A new object each time scrolls to it again.
   const [focus, setFocus] = createSignal<{ id: string } | null>(null);
   const isStep = (id: string) => props.steps.some((step) => step.id === id);
-  const canSelectSpan = (id: string) => isStep(id) || (props.trace?.canSelectSpan?.(id) ?? false);
+  const canSelectSpan = (id: string) =>
+    (props.list !== false && isStep(id)) || (props.trace?.canSelectSpan?.(id) ?? false);
   /** Closes the trace and shows the step in the list, or lets the chat show it. */
   const selectSpan = (id: string) => {
     setTraceOpenedAt(null);
