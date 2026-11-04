@@ -24,6 +24,8 @@ export const messages = {
   "status.agent.screenCaptureWindow": "창 {name}을(를) 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureRegion":
     "화면의 {x}, {y} 위치에서 {width} × {height} 포인트 영역을 캡처해서 이미지를 에이전트의 모델에 보내요.",
+  "status.agent.workflowDelete":
+    "워크플로 {title}을(를) 실행 기록 및 버전과 함께 삭제합니다. 진행 중인 단계는 중지됩니다.",
   "status.agent.screenCaptureProgress": "화면 캡처를 요청하는 중…",
   "status.agent.screenCaptureReviewing": "화면 캡처를 확인하는 중…",
   "status.agent.browserOpening": "웹 페이지를 여는 중…",

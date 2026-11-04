@@ -471,6 +471,15 @@ export class AgentTasks implements TaskLanes {
     return [...agentIds];
   });
 
+  /**
+   * A side thread of this agent that the person opened or branched. A routine thread and a thread
+   * that the agent started with `start_task` are not.
+   */
+  isPersonThread(agentId: string, threadId: string): boolean {
+    const thread = this.#store.taskForThread(threadId);
+    return thread?.agentId === agentId && thread.origin === "user" && thread.routineId === null;
+  }
+
   isBranchThread(threadId: string): boolean {
     return Boolean(this.#store.taskForThread(threadId)?.branch);
   }

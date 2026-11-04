@@ -538,7 +538,8 @@ export function getRecord(record: unknown, key: string): DynamicRecord | null {
 export function bridgedToolName(item: ThreadItem): string | null {
   const tool = getString(item, "tool") ?? getString(item, "name");
   if (tool !== "tool_call" && tool !== "mcp__openbot__tool_call") return null;
-  return getString(getRecord(item, "arguments"), "name");
+  const args = getRecord(item, "arguments");
+  return getString(args, "name") ?? getString(args, "tool");
 }
 
 export function getArray(record: unknown, key: string): unknown[] {
