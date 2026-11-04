@@ -1021,8 +1021,7 @@ textarea {
   /* A side panel's header continues the top row at the chat header's height, so the lines meet. The
    * window card draws the line. */
   .app-frame-edge .settings-panel-header,
-  .app-frame-edge .file-preview-header,
-  .app-frame-edge .browser-preview-header {
+  .app-frame-edge .file-preview-header {
     height: var(--left-header-height);
     border-bottom: 0;
     background: transparent;
