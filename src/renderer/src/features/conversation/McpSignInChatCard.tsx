@@ -41,8 +41,11 @@ export function McpSignInChatCard(props: McpSignInChatCardProps) {
           ? () => props.onSignIn?.(document.activeElement instanceof HTMLElement ? document.activeElement : null)
           : undefined
       }
+      // The card shows "sent" during the send, so a second click sends nothing. A failed send shows Continue again.
       onContinue={async () => {
-        if (await props.onContinue(t("chat.mcpSignIn.message", { name: props.config.name }))) setSent(true);
+        if (sent()) return;
+        setSent(true);
+        if (!(await props.onContinue(t("chat.mcpSignIn.message", { name: props.config.name })))) setSent(false);
       }}
     />
   );
