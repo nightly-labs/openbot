@@ -2,7 +2,7 @@
 
 import { AGENT_REASONING_EFFORTS, type AgentModelId, type AgentReasoningEffort } from "@openbot/contracts/ipc";
 import { Button, CircleCheck, Play, Split, Textarea } from "@openbot/ui";
-import { For, Show, untrack } from "solid-js";
+import { createMemo, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { BRANCH_NAME, resultValue, useBoard } from "./workflow-board";
 import { defaultWorkflowModel } from "./workflow-model";
@@ -39,8 +39,8 @@ export function ConditionNode(props: { id: string; rule?: string }) {
     untrack(() => props.rule ?? ""),
   );
   const models = () => board.catalogs().models;
-  // A condition saved before it had a model has none, and the host chooses one for each run.
-  // The pills then show the model of a new step, with the Auto tag, until the user chooses one.
+  // A condition saved before it had a model has none, and the host chooses the model and effort of
+  // each run. The model pill then says Auto, and the effort pill shows when the user chooses a model.
   const [model] = useField<AgentModelId>(() => props.id, "model", "", asString);
   const [provider] = useField<WfProvider | "">(() => props.id, "provider", "", asProvider);
   const [effort, setEffort] = useField<AgentReasoningEffort | "">(
@@ -49,11 +49,11 @@ export function ConditionNode(props: { id: string; rule?: string }) {
     "",
     oneOf(AGENT_REASONING_EFFORTS),
   );
-  const unsaved = () => !model();
-  const host = () => defaultWorkflowModel(board.catalogs());
-  const shown = () => (unsaved() ? host() : modelOption(models(), model()));
-  const shownEffort = (): AgentReasoningEffort =>
-    (!unsaved() && effort()) || shown()?.defaultReasoningEffort || "medium";
+  const chosen = () => modelOption(models(), model());
+  /** The provider tab that the model menu opens on: the one of the step, else the one of a new step. */
+  const tab = createMemo(
+    (): WfProvider => provider() || chosen()?.provider || defaultWorkflowModel(board.catalogs())?.provider || "codex",
+  );
   const [locked, setLocked] = useLocked(() => props.id);
   const run = useStepRun(untrack(() => props.id));
   const taken = () => (run.running() ? undefined : resultValue(board.shown(props.id)));
@@ -90,33 +90,30 @@ export function ConditionNode(props: { id: string; rule?: string }) {
           onValueChange={setRule}
         />
         <div class="wfn-field-foot wfn-condition-foot">
-          <span class="wfn-condition-model">
-            <ModelPill
-              provider={(unsaved() ? host()?.provider : provider() || shown()?.provider) ?? "codex"}
-              value={unsaved() ? (host()?.id ?? "") : model()}
-              unsaved={unsaved()}
-              disabled={locked()}
-              onChange={(next, nextProvider) => {
-                const options = modelOption(models(), next);
-                const current = effort();
-                const keep = !unsaved() && current !== "" && options?.supportedReasoningEfforts.includes(current);
-                board.setFields(props.id, {
-                  model: next,
-                  provider: nextProvider,
-                  ...(keep ? {} : { effort: options?.defaultReasoningEffort ?? "medium" }),
-                });
-              }}
-            />
-            <Show when={unsaved()}>
-              <span class="wfn-auto-tag">{t("workflow.model.auto")}</span>
-            </Show>
-          </span>
-          <EffortPill
-            efforts={unsaved() ? [] : (shown()?.supportedReasoningEfforts ?? [])}
-            value={shownEffort()}
+          <ModelPill
+            provider={tab()}
+            value={model()}
+            placeholder={t("workflow.model.auto")}
             disabled={locked()}
-            onChange={setEffort}
+            onChange={(next, nextProvider) => {
+              const options = modelOption(models(), next);
+              const current = effort();
+              const keep = current !== "" && options?.supportedReasoningEfforts.includes(current);
+              board.setFields(props.id, {
+                model: next,
+                provider: nextProvider,
+                ...(keep ? {} : { effort: options?.defaultReasoningEffort ?? "medium" }),
+              });
+            }}
           />
+          <Show when={model()}>
+            <EffortPill
+              efforts={chosen()?.supportedReasoningEfforts ?? []}
+              value={effort() || chosen()?.defaultReasoningEffort || "medium"}
+              disabled={locked()}
+              onChange={setEffort}
+            />
+          </Show>
         </div>
       </Field>
       <For each={BRANCHES}>
