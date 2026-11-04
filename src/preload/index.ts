@@ -713,6 +713,7 @@ const openbotApi: OpenBotDesktopApi = {
     getAnalyticsDefault: decodeAnalyticsPreference,
     analyticsPreference: decodeAnalyticsPreference,
     setAnalyticsPreference: decodeAnalyticsPreference,
+    reportRendererTiming: decodeVoid,
     getApprovalAutomation: decodeApprovalAutomationPreference,
     approvalAutomation: decodeApprovalAutomationPreference,
     getBusyMessageModePreference: decodeBusyMessageModePreference,

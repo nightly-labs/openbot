@@ -218,6 +218,21 @@ export interface AnalyticsPreference {
   enabled: boolean;
 }
 
+/**
+ * Renderer timing for host analytics: counts and milliseconds only. The renderer sends it at most
+ * once a minute, and once when the main window's workspace finished its first load.
+ */
+export interface RendererTimingReport {
+  /** The main window's workspace finished its first load. Main times it on its own clock. */
+  workspaceReady?: true;
+  /** Renderer tasks of more than 200 ms since the last report. */
+  longTasks: number;
+  /** Key presses and pointer presses since the last report. */
+  inputs: number;
+  /** The input delay of each of those inputs that the browser timed (16 ms or more of handling), in ms. */
+  inputDelaysMs: number[];
+}
+
 export interface SetAnalyticsPreferenceInput {
   enabled: boolean;
   /** True when the user chose this value. Only a choice is sent to the account; a default is not. */

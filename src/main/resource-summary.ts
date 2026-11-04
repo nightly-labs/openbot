@@ -86,6 +86,8 @@ export const RESOURCE_PROPERTY_NAMES = [
   "db_request_ms_max",
   "db_request_count",
   "db_slow_request_count",
+  "renderer_long_task_count",
+  "renderer_input_delay_ms_p95",
   "renderer_gone_count",
   "child_gone_count",
   ...CHILD_TYPES.map((type): ChildGonePropertyName => `child_gone_${type}_count`),
@@ -301,11 +303,12 @@ function quantize(value: number): number {
   return Math.round(value / step) * step;
 }
 
-export function recordValue(day: ResourceDay, metric: string, value: number): void {
-  if (!Number.isFinite(value) || value < 0) return;
+/** `count` adds the same value that many times, such as the inputs that the browser did not time. */
+export function recordValue(day: ResourceDay, metric: string, value: number, count = 1): void {
+  if (!Number.isFinite(value) || value < 0 || count < 1) return;
   const histogram = day.histograms[metric] ?? {};
   const key = String(quantize(value));
-  histogram[key] = (histogram[key] ?? 0) + 1;
+  histogram[key] = (histogram[key] ?? 0) + count;
   day.histograms[metric] = histogram;
   recordPeak(day, metric, value);
 }
@@ -343,6 +346,7 @@ export const METRIC = {
   providerCpu: (provider: ResourceProvider) => `cpu_pct.provider.${provider}`,
   mainLoop: "loop_ms.main",
   database: "db_ms",
+  rendererInput: "renderer_input_ms",
   activeTurns: "count.active_turns",
   browserTabs: "count.browser_tabs",
   providerProcesses: "count.provider_processes",
@@ -356,6 +360,7 @@ export const COUNTER = {
   goneReason: (reason: GoneReason) => `gone.reason.${reason}`,
   databaseRequests: "db.requests",
   databaseSlow: "db.slow",
+  rendererLongTasks: "renderer.long_tasks",
 } as const;
 
 const MB_STEP = 50;
@@ -380,6 +385,8 @@ export function resourceEventProperties(day: ResourceDay, device: DeviceClass): 
     db_request_ms_max: roundWhole(day.peaks[METRIC.database]),
     db_request_count: day.counters[COUNTER.databaseRequests] ?? 0,
     db_slow_request_count: day.counters[COUNTER.databaseSlow] ?? 0,
+    renderer_long_task_count: day.counters[COUNTER.rendererLongTasks] ?? 0,
+    renderer_input_delay_ms_p95: roundWhole(percentile(day, METRIC.rendererInput, 0.95)),
     renderer_gone_count: day.counters[COUNTER.rendererGone] ?? 0,
     child_gone_count: day.counters[COUNTER.childGone] ?? 0,
     active_turn_count_max: roundWhole(day.peaks[METRIC.activeTurns]),

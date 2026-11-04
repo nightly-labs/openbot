@@ -34,6 +34,7 @@ import {
   providerForAgent,
 } from "./thread-items";
 import type { ThreadLifecycle } from "./thread-lifecycle";
+import type { DeliveryStart } from "./turn-lifecycle";
 import { TurnSlots } from "./turn-slots";
 import type { UsageLimitGate } from "./usage-limit-gate";
 import { checkAgentFolders, codexSandboxPolicy, workspaceWritableRoots } from "./workspace-sandbox";
@@ -80,6 +81,11 @@ export interface DrainHooks {
   turnEnded(turnId: string): boolean;
   /** Forgets the end of an earlier turn with this id: a requeued delivery starts again under the same turn id. */
   turnRestarting(turnId: string): void;
+  /**
+   * When the drain took these deliveries from the queue, and how long their provider process took to
+   * start (null when it was already running). Before `turn/start`, so the turn's start can read it.
+   */
+  deliveriesStarting(deliveryIds: readonly string[], start: DeliveryStart): void;
   /** Starts the new chat that the agent asked for, if it did. The agent's own chat has nothing to start. */
   startRequestedNewChat(agentId: string): Effect.Effect<void>;
   /** Drops that request: a turn in the agent's own chat starts first, so the agent's notes do not cover it. */
@@ -680,6 +686,7 @@ export class DrainScheduler {
     // The model this start asks for. The agent can move to another one while `turn/start` waits, and
     // a plan limit belongs to the model the provider refused.
     let requestedModel: string | null = null;
+    const pickedAt = Date.now();
     yield* Effect.gen({ self: this }, function* () {
       for (const item of batch) yield* this.#mailbox.markStarting(item.delivery.id).pipe(toDeliveryStartFailed);
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
@@ -715,7 +722,13 @@ export class DrainScheduler {
       yield* drainStep(requireServedModel);
       yield* this.#threads.applyPendingRuntimeRefresh(agent, new Set(batch.map((item) => item.delivery.id)));
       releaseRuntimeRefresh = this.#threads.holdRuntimeRefresh(agent.id, taskId !== null);
+      const providerRunning = this.#providers.agentClientRunning(agent);
+      const providerStartedAt = Date.now();
       const client = yield* this.#providers.ensureAgentClient(agent).pipe(toDeliveryStartFailed);
+      this.#hooks.deliveriesStarting(
+        batch.map((item) => item.delivery.id),
+        { pickedAt, providerStartMs: providerRunning ? null : Date.now() - providerStartedAt },
+      );
       const messaging = this.#messaging;
       const channels = this.#channels;
       const taskThreadId = taskId === null ? null : this.#tasks.threadId(taskId);

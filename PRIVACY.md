@@ -300,10 +300,20 @@ The local host also records how the agents are used:
   longest delay whether it came in the first minutes after the start or a wake from sleep, in the
   first hour or later, and whether an agent turn ran; agent database statement times and counts;
   counts of processes that stopped unexpectedly, by reason and by process type (such as GPU,
-  database, voice or network); and the computer's memory and processor class, architecture, and whether
+  database, voice or network); the number of tasks over 200 ms in the app windows, and how long the
+  windows waited before they handled a key press or a click (the windows count these and send no
+  key, target or position); and the computer's memory and processor class, architecture, and whether
   it is a server. Memory is rounded to 50 MB. Process IDs, program names, command lines and paths
   are not sent. A day that ends while analytics is off is sent with the install ID, and is not sent
 when there is no install ID.
+- **Startup time.** Once per start, the host sends how long the start took, rounded: until the
+  window could show, until the services were ready, and until the workspace loaded; the name of the
+  slowest startup step from a fixed list; and whether it was the first start since the computer
+  booted, a later one, or the first start of a new version. To know this, the app keeps the time and
+  version of its last start in a local file that is not sent. Paths and names are not sent.
+- **Turn times.** When a turn completes, the host sends how long the message waited in the queue, how
+  long the provider took to start the turn and, when it had to start, its process, and how long until
+  the first output. These are times only; the messages are not sent.
 - **Token counts.** When a turn completes, the host sends the token counts that the provider
   reported for that turn: uncached input, cached input, cache write, output, and their total. These
   come from the same records as the Usage view. When the provider reported no usage, the host sends

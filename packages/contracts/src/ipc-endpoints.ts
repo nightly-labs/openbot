@@ -168,6 +168,7 @@ import type {
   MacAutomationTarget,
   MacPermissionId,
   ProviderRuntimeSnapshot,
+  RendererTimingReport,
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
   SetCompanySignInEnabledInput,
@@ -694,6 +695,8 @@ export const IPC_ENDPOINTS = {
     // Main follows the account's answer from another device, so it tells the window.
     analyticsPreference: event<AnalyticsPreference>()("app:analytics-preference"),
     setAnalyticsPreference: request<SetAnalyticsPreferenceInput, AnalyticsPreference>()("app:set-analytics-preference"),
+    // Host analytics only: `system_startup` and the renderer part of `system_resources`.
+    reportRendererTiming: request<RendererTimingReport, void>()("app:report-renderer-timing"),
     getApprovalAutomation: request<undefined, ApprovalAutomationPreference>()("app:get-approval-automation"),
     // A remote owner or admin can change a grant from a phone or the web client, so main tells the
     // window instead of the window only reading the value at start.

@@ -54,6 +54,7 @@ import {
   parseExternalLinkPreference,
   parseRemoteNetworkRoutePreference,
   parseRemoteSessionReusePreference,
+  parseRendererTimingReport,
   parseSetup,
 } from "./app-inputs";
 import { stringPayload } from "./validation";
@@ -91,6 +92,7 @@ const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { openHttpLink } from "../message-link-relay";
 import type { ResourceMonitor } from "../resource-monitor";
+import type { StartupTiming } from "../startup-timing";
 import type { TraceFile } from "../trace-file";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 
@@ -128,6 +130,8 @@ export interface AppIpcDependencies {
   chatWindowTargets: () => ChatWindowTarget[];
   trace: TraceFile;
   resources: ResourceMonitor;
+  /** Null for a local server child, which reports no start. */
+  startup: StartupTiming | null;
 }
 
 export function appIpcHandlers({
@@ -162,6 +166,7 @@ export function appIpcHandlers({
   chatWindowTargets,
   trace,
   resources,
+  startup,
 }: AppIpcDependencies): Pick<IpcGroupHandlers, "app" | "maintenance"> {
   return {
     app: {
@@ -203,6 +208,11 @@ export function appIpcHandlers({
       setAnalyticsPreference: payloadHandler(parseAnalyticsPreference, (parsed) =>
         runCauseEffect(analyticsPreferences.set(parsed.enabled, parsed.chosen === true)),
       ),
+      // Any window can call it: the payload is bounded counts, and main times the workspace load itself.
+      reportRendererTiming: payloadHandler(parseRendererTimingReport, (report) => {
+        if (report.workspaceReady) startup?.workspaceReady();
+        resources.observeRendererTiming(report);
+      }),
       getApprovalAutomation: handler(() => approvalAutomation.current()),
       getBusyMessageModePreference: handler(() => busyMessageMode.get()),
       setBusyMessageModePreference: payloadHandler(parseBusyMessageModePreference, (parsed) =>

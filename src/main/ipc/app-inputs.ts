@@ -30,6 +30,7 @@ import type {
   PublishHostedSiteInput,
   RemoteNetworkRoutePreference,
   RemoteSessionReusePreference,
+  RendererTimingReport,
   ReplaceHostedSiteInput,
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
@@ -103,6 +104,32 @@ export function parseAnalyticsPreference(input: unknown): SetAnalyticsPreference
   if (!isDynamicRecord(input) || !isBoolean(input.enabled)) throw new Error("Analytics preference is required.");
   if (input.chosen !== undefined && !isBoolean(input.chosen)) throw new Error("Analytics choice is not valid.");
   return { enabled: input.enabled, ...(input.chosen ? { chosen: true } : {}) };
+}
+
+const MAX_LONG_TASKS = 10_000;
+const MAX_INPUTS = 100_000;
+const MAX_INPUT_DELAYS = 64;
+const MAX_INPUT_DELAY_MS = 600_000;
+
+function isCount(value: unknown, max: number): value is number {
+  return isNumber(value) && Number.isSafeInteger(value) && value >= 0 && value <= max;
+}
+
+/** Counts and delays only. Each value has a bound, so one window cannot fill the daily summary. */
+export function parseRendererTimingReport(input: unknown): RendererTimingReport {
+  if (!isDynamicRecord(input)) throw new Error("Renderer timing is required.");
+  const { workspaceReady, longTasks, inputs, inputDelaysMs } = input;
+  if (workspaceReady !== undefined && workspaceReady !== true) throw new Error("Workspace ready is not valid.");
+  if (!isCount(longTasks, MAX_LONG_TASKS) || !isCount(inputs, MAX_INPUTS))
+    throw new Error("Renderer timing is not valid.");
+  if (
+    !Array.isArray(inputDelaysMs) ||
+    inputDelaysMs.length > Math.min(MAX_INPUT_DELAYS, inputs) ||
+    !inputDelaysMs.every((delay) => isCount(delay, MAX_INPUT_DELAY_MS))
+  ) {
+    throw new Error("Input delays are not valid.");
+  }
+  return { ...(workspaceReady ? { workspaceReady } : {}), longTasks, inputs, inputDelaysMs: [...inputDelaysMs] };
 }
 
 export function parseBusyMessageModePreference(input: unknown): BusyMessageModePreference {

@@ -56,6 +56,9 @@ const PS_TIMEOUT_MS = 5_000;
 const PS_MAX_BUFFER = 8 * 1024 * 1024;
 const MAX_ACTIVE_TURNS = 1_000;
 const MAX_PENDING_GONE = 1_000;
+/** Bounds on the renderer reports between two samples. A window reports at most once a minute. */
+const MAX_PENDING_RENDERER_COUNT = 1_000_000;
+const MAX_PENDING_INPUT_DELAYS = 1_000;
 /** The histogram's timer interval. Each recorded delay includes it, so it is subtracted. */
 const LOOP_RESOLUTION_MS = 20;
 // The `serviceName` that `agent-database-host-process.ts` and the voice `*-host-process.ts` files
@@ -115,6 +118,12 @@ export class ResourceMonitor implements AnalyticsResourceSource {
    * The trace gets each exit at once: a main process that stops within the minute would lose it.
    */
   #gone: { kind: "renderer" | "child"; reason: GoneReason; type: ChildType | null }[] = [];
+  /** Renderer reports since the last sample: long tasks, inputs, and the delays the browser timed. */
+  #rendererTiming: { longTasks: number; inputs: number; inputDelaysMs: number[] } = {
+    longTasks: 0,
+    inputs: 0,
+    inputDelaysMs: [],
+  };
   /**
    * The main-loop window that the next sample closes: when it started in `performance.now()` time
    * (milliseconds after the process started), and whether a turn ran in it.
@@ -164,6 +173,16 @@ export class ResourceMonitor implements AnalyticsResourceSource {
         ),
       ),
     );
+  }
+
+  /** Counts from an app window since its last report. The next sample adds them to the day. */
+  observeRendererTiming(report: { longTasks: number; inputs: number; inputDelaysMs: readonly number[] }): void {
+    if (this.#closed) return;
+    const pending = this.#rendererTiming;
+    pending.longTasks = Math.min(MAX_PENDING_RENDERER_COUNT, pending.longTasks + report.longTasks);
+    pending.inputs = Math.min(MAX_PENDING_RENDERER_COUNT, pending.inputs + report.inputs);
+    const room = MAX_PENDING_INPUT_DELAYS - pending.inputDelaysMs.length;
+    if (room > 0) pending.inputDelaysMs.push(...report.inputDelaysMs.slice(0, room));
   }
 
   observeAgentEvent(event: AgentEvent): void {
@@ -281,6 +300,15 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       addCount(day, COUNTER.goneReason(reason));
     }
     this.#gone = [];
+  }
+
+  /** An input that the browser did not time took less than 16 ms to handle; it counts as no delay. */
+  #countRendererTiming(day: ResourceDay): void {
+    const { longTasks, inputs, inputDelaysMs } = this.#rendererTiming;
+    if (longTasks > 0) addCount(day, COUNTER.rendererLongTasks, longTasks);
+    for (const delay of inputDelaysMs) recordValue(day, METRIC.rendererInput, delay);
+    recordValue(day, METRIC.rendererInput, 0, inputs - inputDelaysMs.length);
+    this.#rendererTiming = { longTasks: 0, inputs: 0, inputDelaysMs: [] };
   }
 
   readonly #load = Effect.fn("ResourceMonitor.load")(function* (this: ResourceMonitor) {
@@ -416,6 +444,8 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       addCount(day, COUNTER.databaseRequests, statements.length);
       addCount(day, COUNTER.databaseSlow, statements.filter((ms) => ms > SLOW_DATABASE_STATEMENT_MS).length);
     }
+
+    this.#countRendererTiming(day);
 
     const providerProcesses = sum(trees.map((tree) => tree.processCount));
     recordPeak(day, METRIC.activeTurns, this.#activeTurns.size);

@@ -2348,6 +2348,14 @@ export class ProviderRuntime implements ProviderPort {
     return own !== null && current.key === this.#confinedKey(providerForAgent(agent), own);
   }
 
+  /** True when `ensureAgentClient` would return a process that runs now, without starting one. */
+  agentClientRunning(agent: AgentSummary): boolean {
+    const provider = providerForAgent(agent);
+    if (!this.#clients.has(provider)) return false;
+    const own = this.#ownProcessFor(agent);
+    return own === null || this.#confined.get(agent.id)?.key === this.#confinedKey(provider, own);
+  }
+
   /**
    * The process for this agent's next turn, started when it is needed. Call it only while the agent
    * runs no turn: it stops the agent's own process when that process no longer matches the agent.

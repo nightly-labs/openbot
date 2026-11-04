@@ -111,6 +111,16 @@ decode; the phase is any string in the file and the event drops a value outside 
 child exits by process type. A minute with a delay of 1 s or more writes a `stall` span to the
 trace.
 
+App windows (`src/renderer/src/renderer-timing.ts`) count long tasks and input delays with
+`PerformanceObserver` and send the counts at most once a minute over `app:report-renderer-timing`.
+The main handler decodes bounded counts only; `ResourceMonitor` buffers them and adds them to the day
+at the next sample. The same channel carries the main window's `workspaceReady` flag:
+`StartupTiming` (`src/main/startup-timing.ts`) reads the time on the main clock and sends one
+`system_startup` per main process from the `openbot:*` startup marks. It keeps the last start in
+`startup-history.json` to tell a cold start from a warm one. Turn timing comes from the drain
+scheduler and `TurnLifecycle`, which keep the queue pick, the provider start and the first output of
+each turn until `HostAnalytics` takes them at `turn-completed`.
+
 ## Agent usage analytics
 
 `AgentUsage` owns local numeric usage records, cumulative counter checkpoints, and activity counts.
