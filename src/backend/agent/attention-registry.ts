@@ -1342,9 +1342,10 @@ export class AttentionRegistry {
     params: DynamicToolCallParams,
     requestedByPerson: () => boolean,
   ) {
-    // The password is redacted from the logs before anything can fail, also when the call is refused.
+    // The password is redacted from the logs before anything can fail, also when the call is refused. A
+    // short password is redacted only when the Vault saves it: an unsaved short value would hide unrelated text.
     const raw = decodePasswordArgument(params.arguments);
-    if (Option.isSome(raw)) registerSecretValue(raw.value.password, { allowShort: true });
+    if (Option.isSome(raw)) registerSecretValue(raw.value.password);
     const call = yield* attentionStep(() => parseBrowserToolCall("save_vault_item", params.arguments));
     if (call.tool !== "save_vault_item")
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault save request.") });

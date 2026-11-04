@@ -690,9 +690,10 @@ export class OpenBotToolRouter {
     agentId: string,
     params: DynamicToolCallParams,
   ) {
-    // The key is redacted from the logs before anything can fail, also when the call is refused.
+    // The key is redacted from the logs before anything can fail, also when the call is refused. A short
+    // key is redacted only when the Vault saves it: an unsaved short value would hide unrelated text.
     const raw = secretKeyArgument.safeParse(params.arguments);
-    if (raw.success) registerSecretValue(raw.data.key, { allowShort: true });
+    if (raw.success) registerSecretValue(raw.data.key);
     const parsed = saveApiKeyToolSchema.safeParse(params.arguments);
     if (!parsed.success)
       return openBotToolFailure(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);
