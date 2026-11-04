@@ -400,7 +400,19 @@ export class OpenBotToolRouter {
               client.respond(request.id, openBotToolFailure(sourceText("error.agent.historyUnavailable")));
               return;
             }
-            const result = yield* this.#history.call(scope.agentId, scope.threadId, params.tool, params.arguments).pipe(
+            // A taskId reads a side thread of the same agent. A thread of another agent reads as unknown.
+            const taskId = isRecord(params.arguments) ? params.arguments.taskId : undefined;
+            const targetThreadId =
+              taskId === undefined
+                ? scope.threadId
+                : typeof taskId === "string" && this.#tasks.has(scope.agentId, taskId)
+                  ? this.#tasks.require(scope.agentId, taskId).threadId
+                  : null;
+            if (targetThreadId === null) {
+              client.respond(request.id, openBotToolFailure(sourceText("error.backend.threadNotFound")));
+              return;
+            }
+            const result = yield* this.#history.call(scope.agentId, targetThreadId, params.tool, params.arguments).pipe(
               Effect.catch(() => Effect.succeed(openBotToolFailure(sourceText("error.agent.historyUnavailable")))),
               Effect.catchDefect(() =>
                 Effect.succeed(openBotToolFailure(sourceText("error.agent.historyUnavailable"))),

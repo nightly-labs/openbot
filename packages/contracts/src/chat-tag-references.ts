@@ -3,13 +3,15 @@
  * model, in the same way a skill tag is, and it changes no tool the provider is given. `quote` is
  * text the user selected in a message of the same chat: its name is that text and its id is the
  * message id. A quote of a file that the side panel shows has a file quote id in place of the
- * message id (see `fileQuoteId`).
+ * message id (see `fileQuoteId`). `tab` is a browser tab of the agent, by tab id, and `thread` is
+ * one of its side threads, by task id. Both stay in the message as a name: the provider reads the
+ * current title and state of each when the message is delivered.
  *
  * An app that predates a kind does not match its marker, so it shows the marker text rather than
  * the name. Message bodies are stored as written, so an older app reading a newer message is a
  * real case, and it stays readable.
  */
-export type ChatTagKind = "agent" | "skill" | "mcp" | "quote";
+export type ChatTagKind = "agent" | "skill" | "mcp" | "quote" | "tab" | "thread";
 
 export interface ChatTagReference {
   kind: ChatTagKind;
@@ -19,7 +21,7 @@ export interface ChatTagReference {
   end: number;
 }
 
-const CHAT_TAG_REFERENCE_PATTERN = /@\[([^\]\r\n]+)\]\((agent|skill|mcp|quote)(\+uri)?:([^)\r\n]+)\)/gu;
+const CHAT_TAG_REFERENCE_PATTERN = /@\[([^\]\r\n]+)\]\((agent|skill|mcp|quote|tab|thread)(\+uri)?:([^)\r\n]+)\)/gu;
 
 /*
  * Quoted text is any text, and Markdown reads the marker as a link. A bracket, a backslash, a
@@ -120,14 +122,15 @@ export function leadingAddress(value: string): { mentions: ChatTagReference[]; e
 }
 
 function chatTagKind(value: string | undefined): ChatTagKind {
-  if (value === "skill" || value === "mcp" || value === "quote") return value;
+  if (value === "skill" || value === "mcp" || value === "quote" || value === "tab" || value === "thread") return value;
   return "agent";
 }
 
 /**
  * The text with each marker as words. `resolveName` gives the current name of an agent, skill or
- * MCP server. For a quote it gives the whole replacement: a one-line preview uses it to keep the
- * quote out of a block quote. `fileHeadings` names the file and lines above a file quote. Only a
+ * MCP server. For a quote, a tab or a thread it gives the whole replacement: a one-line preview uses
+ * it to keep the quote out of a block quote, and a provider prompt uses it to add the id and state
+ * of a tab or a thread. Without it, a tab or a thread is its name. `fileHeadings` names the file and lines above a file quote. Only a
  * provider prompt asks for it: the heading is English, and a person reads the other results.
  */
 export function expandChatTagReferences(
@@ -157,6 +160,7 @@ export function expandChatTagReferences(
         text.quoteEnd = offset + marker.length;
         return expanded;
       }
+      if (kind === "tab" || kind === "thread") return resolveName?.(reference) ?? name;
       const resolvedName = resolveName?.(reference) ?? name;
       return expandedChatTag(kind, resolvedName);
     },
@@ -200,7 +204,7 @@ function fileQuoteHeading(file: FileQuoteTarget): string {
 }
 
 /** What the provider reads in place of a marker. A name alone would not say what it names. */
-function expandedChatTag(kind: Exclude<ChatTagKind, "quote">, name: string): string {
+function expandedChatTag(kind: "agent" | "skill" | "mcp", name: string): string {
   if (kind === "agent") return `@${name}`;
   return kind === "mcp" ? `${name} (MCP server)` : `${name} (skill)`;
 }

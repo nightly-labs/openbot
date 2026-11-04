@@ -438,6 +438,8 @@ export interface ConversationThreads {
   side: SideThreads;
   /** The open side thread, or null for a new thread. Undefined while the agent's own chat is open. */
   open: AgentTask | null | undefined;
+  /** All side threads of the agent that the host lists, also the closed ones. */
+  tasks: readonly AgentTask[];
   /** How many side threads of the agent can run at the same time. */
   limit: number;
   /** The side threads that run a turn now. */

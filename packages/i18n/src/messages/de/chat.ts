@@ -438,4 +438,8 @@ export const messages = {
   "chat.compaction.failed": "Kontext konnte nicht komprimiert werden",
   "chat.compaction.tokens": "{before} → {after} Tokens",
   "chat.compaction.continues": "Nachrichten in der Warteschlange werden weiter verarbeitet.",
+  "chat.reference.kind.tab": "Browser-Tab",
+  "chat.reference.kind.thread": "Thread",
+  "chat.reference.open.tab": "Browser-Tab {name} anzeigen",
+  "chat.reference.open.thread": "Thread {name} öffnen",
 } as const satisfies PartialTranslation<typeof source>;

@@ -580,4 +580,8 @@ export const messages = {
   "chat.compaction.failed": "تعذّر ضغط السياق",
   "chat.compaction.tokens": "{before} → {after} رمز",
   "chat.compaction.continues": "تتابع الرسائل في قائمة الانتظار.",
+  "chat.reference.kind.tab": "علامة تبويب المتصفح",
+  "chat.reference.kind.thread": "سلسلة",
+  "chat.reference.open.tab": "إظهار علامة تبويب المتصفح {name}",
+  "chat.reference.open.thread": "فتح السلسلة {name}",
 } as const satisfies PartialTranslation<typeof source>;
