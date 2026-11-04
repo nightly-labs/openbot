@@ -1,3 +1,4 @@
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentTask, AgentTasksSnapshot, RespondToPromptInput } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,7 +13,6 @@ import { AppState, Keyboard, Pressable, useColorScheme, View } from "react-nativ
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import {
@@ -364,8 +364,8 @@ function AgentTaskChat({
   const secretQuestion = !secretRequest && !voiceOpen && questionForm.question?.isSecret ? questionForm : undefined;
   const dark = useColorScheme() === "dark";
   const palette = useMemo(
-    () => voicePalette([getBloubAvatarColor(target.avatarSeed, target.avatarHue)], dark),
-    [target.avatarSeed, target.avatarHue, dark],
+    () => voicePalette([avatarHeadColor(target.avatarSeed, target.avatarHue, target.avatarColor)], dark),
+    [target.avatarSeed, target.avatarHue, target.avatarColor, dark],
   );
   const accent = useMemo(() => voiceAccent(palette), [palette]);
 

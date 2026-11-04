@@ -305,6 +305,13 @@ export const messages = defineMessages("routine", {
     "The current secret stops working immediately. Requests signed with it are rejected until the sender uses the new secret.",
   "routine.webhook.regenerateConfirm": "Regenerate",
   "routine.webhook.regenerateFailed": "Could not regenerate the signing secret.",
+  "routine.webhook.useSenderSecret": "Use the sender's secret",
+  "routine.webhook.senderSecretTitle": "Use the sender's signing secret?",
+  "routine.webhook.senderSecretDescription":
+    "Some senders, such as Composio and Svix, make their own signing secret. Paste it here. The current secret stops working immediately.",
+  "routine.webhook.senderSecretLabel": "Sender's secret",
+  "routine.webhook.senderSecretConfirm": "Use secret",
+  "routine.webhook.senderSecretFailed": "Could not save the sender's secret.",
   "routine.webhook.statusFailed": "Could not check whether the host is connected to the relay.",
   "routine.webhook.stepDone": "Done",
   "routine.webhook.stepUrl": "Copy the endpoint into the sending service",

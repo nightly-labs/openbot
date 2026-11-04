@@ -1,6 +1,7 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_FAST_MODE_ROUTES } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
@@ -47,6 +48,7 @@ import { STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-di
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
+import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 
 /**
  * POST routes that a client sends with no user action: polls, previews, mark-read, and reads that use
@@ -75,10 +77,13 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PROVIDER_DEFAULT_ROUTES.settings,
   LOCAL_SERVERS_ROUTES.list,
   DISCORD_ACCESS_ROUTES.access,
+  WHATSAPP_CONNECTOR_ROUTES.overview,
+  WHATSAPP_CONNECTOR_ROUTES.linkState,
   LIVE_ACTIVITY_PUSH_ROUTES.register,
   LIVE_ACTIVITY_PUSH_ROUTES.remove,
   AGENT_NOTIFICATION_LEVELS_ROUTES.read,
   SIDEBAR_PINS_ROUTES.read,
+  AGENT_COLORS_ROUTES.read,
   SERVER_AUDIT_ROUTES.read,
   PUSH_NOTIFICATIONS_ROUTES.register,
   PUSH_NOTIFICATIONS_ROUTES.remove,

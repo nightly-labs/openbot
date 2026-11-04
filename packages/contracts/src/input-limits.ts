@@ -76,6 +76,8 @@ export const INPUT_LIMITS = {
   routineCalendarDays: 44,
   routineCron: 255,
   messageText: 100_000,
+  // A longer text paste becomes a `pasted-text.txt` attachment, so the message keeps all of it.
+  pastedText: 4_000,
   directMessageText: 20_000,
   // A side question carries its earlier questions and answers, because nothing on the host keeps them.
   sideQuestionTurns: 20,

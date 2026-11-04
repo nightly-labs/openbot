@@ -34,7 +34,7 @@ import { ComposerReplyPreview } from "@openbot/ui/features/conversation/Composer
 import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
-import { MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
+import { DeleteMessageDialog, MessageActions, MessageMenu } from "@openbot/ui/features/conversation/MessageRendering";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { type TextValue, useText } from "@openbot/ui/text";
@@ -126,9 +126,13 @@ export interface AgentThreadViewProps {
   /** The download state of attachments from a joined server. */
   downloads?: AttachmentDownloads | undefined;
   onDraftChange: (text: string) => void;
-  /** Receives pasted files. Without it, a file paste does nothing here. */
+  /** Receives pasted files and long text pastes, as `ComposerEditor` says. Without it, a file paste does nothing here. */
   onPasteFiles?:
-    | ((files: File[], selection: ComposerSelection) => undefined | Promise<ComposerPasteResult | undefined>)
+    | ((
+        files: File[],
+        selection: ComposerSelection,
+        text?: string,
+      ) => undefined | Promise<ComposerPasteResult | undefined>)
     | undefined;
   onOpenDraftAttachment?: ((attachment: DraftAttachment) => void) | undefined;
   /** Opens the file picker. Without it, the "+" menu has no image or context item. */
@@ -179,6 +183,13 @@ export interface AgentThreadViewProps {
    * offers it. Missing where the host cannot branch.
    */
   onBranch?: ((messageId: string) => void) | undefined;
+  /**
+   * Deletes a message of the thread, after the reader confirms. Missing where the host cannot delete
+   * messages. `canDeleteMessage` says which messages offer it.
+   */
+  onDeleteMessage?: ((messageId: string) => Promise<void>) | undefined;
+  /** Whether the reader can delete a message. Without it, every message that is not streaming can. */
+  canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
   /** Where the thread came from, when it is a branch. A line shows after the copied messages. */
   branchSource?: AgentThreadBranchSource | undefined;
   /** Makes the draft a reply to a message of the thread. Missing where the host cannot take a reply in a thread. */
@@ -292,6 +303,14 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     if (!onBranch || !branchPoints().has(message.id)) return undefined;
     return () => onBranch(message.id);
   };
+  /** The message that the delete dialog asks about. */
+  const [deleteTargetId, setDeleteTargetId] = createSignal<string | null>(null);
+  const deleteAction = (message: AgentMessage) => {
+    if (!props.onDeleteMessage || message.streaming) return undefined;
+    if (props.canDeleteMessage && !props.canDeleteMessage(message)) return undefined;
+    return () => setDeleteTargetId(message.id);
+  };
+  const deleteMessage = (messageId: string) => props.onDeleteMessage?.(messageId) ?? Promise.resolve();
   const title = () => props.task?.title ?? t("conversation.threads.new");
   const placeholder = () =>
     props.task
@@ -366,6 +385,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         onCopy={() => onCopy(message)}
         onBranch={branchAction(message)}
         branchDisabled={branchBusy()}
+        onDelete={deleteAction(message)}
       />
     );
   }
@@ -610,6 +630,11 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           </div>
         </form>
       </div>
+      <DeleteMessageDialog
+        messageId={deleteTargetId()}
+        onDelete={deleteMessage}
+        onClose={() => setDeleteTargetId(null)}
+      />
     </>
   );
 }

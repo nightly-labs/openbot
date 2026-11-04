@@ -1,5 +1,6 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
+  type AvatarColor,
   assertStorageUsageScope,
   CHANNEL_CHATS_CAPABILITY,
   canAdministerServer,
@@ -39,6 +40,12 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import {
+  AGENT_COLORS_CAPABILITY,
+  AGENT_COLORS_ROUTES,
+  type AgentColorsSnapshot,
+  decodeAgentColorsSnapshot,
+} from "@openbot/contracts/team-protocol/agent-colors-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -465,6 +472,32 @@ export async function writeHostAgentHidden(
   input: SetAgentHiddenInput,
 ): Promise<HiddenAgent[]> {
   return (await runTeamRequest(setAgentHidden(request, input))).agents;
+}
+
+/** A host that serves `agent-colors-v1` keeps an exact colour beside the hue of each agent. */
+export function hostKeepsAgentColors(capabilities: readonly string[] | undefined): boolean {
+  return capabilities?.includes(AGENT_COLORS_CAPABILITY) ?? false;
+}
+
+/** The agents with a colour on a host that serves `agent-colors-v1`, or null for an older host. */
+export async function readHostAgentColors(
+  request: TeamApiRequest,
+  capabilities: readonly string[],
+): Promise<AgentColorsSnapshot["agents"] | null> {
+  if (!hostKeepsAgentColors(capabilities)) return null;
+  return (await request("POST", AGENT_COLORS_ROUTES.read, decodeAgentColorsSnapshot, {})).agents;
+}
+
+/**
+ * Sets or removes (`null`) the colour of one agent. The host also sets the nearest hue, and answers
+ * with all of its colours.
+ */
+export async function writeHostAgentColor(
+  request: TeamApiRequest,
+  agentId: string,
+  color: AvatarColor | null,
+): Promise<AgentColorsSnapshot["agents"]> {
+  return (await request("POST", AGENT_COLORS_ROUTES.set, decodeAgentColorsSnapshot, { agentId, color })).agents;
 }
 
 /** Workspace actions that only send host requests and read advertised capabilities. */

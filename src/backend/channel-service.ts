@@ -13,6 +13,7 @@ import {
   CHANNEL_PARALLEL_LIMIT,
   type Channel,
   type ChannelCommand,
+  type ChannelDraft,
   type ChannelMemory,
   type ChannelMessage,
   type ChannelRoutingConversationEventAction,
@@ -21,6 +22,7 @@ import {
   type CreateChannelMemoryInput,
   channelRoutingConversationEventItemType,
   type DeleteChannelMemoryInput,
+  type DeleteChannelMessageInput,
   type QueueHold,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
@@ -54,6 +56,7 @@ import {
 import { ChannelMemoryStore } from "./channel-memory-store";
 import { type ChannelAssignment, type ChannelContext, ChannelStore } from "./channel-store";
 import type { DeliveryContext, MailboxStore } from "./mailbox-store";
+import { type MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import type { OpenBotDatabase } from "./openbot-database";
 import { extractJsonObject, StructuredOutputError } from "./structured-output";
 
@@ -193,7 +196,7 @@ export class ChannelService {
   #scope = Scope.makeUnsafe();
   readonly #pumps = new Map<string, Fiber.Fiber<void>>();
   readonly #commands = new Map<string, Deferred.Deferred<void>>();
-  readonly #commandFibers = new Set<Fiber.Fiber<Channel | void, ChannelOperationError>>();
+  readonly #commandFibers = new Set<Fiber.Fiber<Channel | void, ChannelOperationError | MessageDeleteRefused>>();
   readonly #interrupts = new Set<Fiber.Fiber<void>>();
   readonly #events = new Set<Fiber.Fiber<void>>();
   /**
@@ -278,8 +281,8 @@ export class ChannelService {
     },
   );
 
-  /** The open channels, for an agent that chooses where to send a request (`list_channels`). */
-  handoffTargets(): Array<{
+  /** The open channels, or with `archivedOnly` the archived ones, for an agent that chooses a channel (`list_channels`). */
+  handoffTargets(archivedOnly = false): Array<{
     id: string;
     name: string;
     title: string;
@@ -290,7 +293,7 @@ export class ChannelService {
     const archived = this.store.archivedIds();
     return this.store
       .ids()
-      .filter((id) => !archived.has(id))
+      .filter((id) => archived.has(id) === archivedOnly)
       .map((id) => this.store.get(id))
       .map((channel) => ({
         id: channel.id,
@@ -316,8 +319,6 @@ export class ChannelService {
       sourcePaths: string[];
     },
   ) {
-    const senderName =
-      this.hooks.agents().find((agent) => agent.id === input.senderAgentId)?.name ?? input.senderAgentId;
     const command: ChannelHandoffCommand = {
       type: "handoff",
       operationId: input.operationId,
@@ -327,7 +328,7 @@ export class ChannelService {
       sourcePaths: input.sourcePaths,
       senderAgentId: input.senderAgentId,
     };
-    const actor = { id: channelHandoffAuthorId(input.senderAgentId), name: senderName };
+    const actor = this.agentActor(input.senderAgentId);
     return yield* this.#serialize(
       input.channelId,
       Effect.suspend(() => this.apply(command, actor)),
@@ -335,7 +336,10 @@ export class ChannelService {
   });
 
   readonly #serialize = Effect.fn("ChannelService.serialize")(
-    <A extends Channel | void>(channelId: string, operation: Effect.Effect<A, ChannelOperationError>) =>
+    <A extends Channel | void, E extends ChannelOperationError | MessageDeleteRefused = ChannelOperationError>(
+      channelId: string,
+      operation: Effect.Effect<A, E>,
+    ) =>
       Effect.uninterruptibleMask((restore) =>
         Effect.gen({ self: this }, function* () {
           const prior = this.#commands.get(channelId);
@@ -381,6 +385,51 @@ export class ChannelService {
       }).pipe(Effect.uninterruptible),
     ),
   );
+
+  /**
+   * A channel that an agent creates or changes from its own chat (`create_channel`, `update_channel`).
+   * `draftOf` gets the channel as it is stored when this save's turn in the command queue comes, or
+   * null when it does not exist, so it never undoes a command that waited before it. It throws to
+   * refuse the change, and a change of a channel that is gone. A retried call finds its receipt and
+   * changes nothing again.
+   */
+  readonly agentSave = Effect.fn("ChannelService.agentSave")(
+    (
+      input: { channelId: string; operationId: string; agentId: string; create: boolean },
+      draftOf: (stored: Channel | null) => ChannelDraft,
+    ) =>
+      this.#serialize(
+        input.channelId,
+        Effect.gen({ self: this }, function* () {
+          const stored = (yield* channelSync(() => this.store.exists(input.channelId)))
+            ? yield* channelSync(() => this.store.get(input.channelId))
+            : null;
+          const actor = this.agentActor(input.agentId);
+          // A retried call that already committed gets its channel back. The draft is not checked
+          // again: an agent that the user hid after the first attempt must not turn it into a failure.
+          const done =
+            (yield* channelSync(() =>
+              this.store.database.commandResult(`channels:${actor.id}:${input.operationId}`),
+            )) !== undefined;
+          const draft: ChannelDraft = done && stored ? stored : yield* channelSync(() => draftOf(stored));
+          return yield* this.apply(
+            {
+              type: "save",
+              operationId: input.operationId,
+              channelId: input.channelId,
+              draft,
+              ...(input.create ? {} : { update: true }),
+            },
+            actor,
+          );
+        }),
+      ),
+  );
+
+  /** The actor of a command that an agent sends from its own chat, as `send_to_channel` writes it. */
+  agentActor(agentId: string): { id: string; name: string } {
+    return { id: channelHandoffAuthorId(agentId), name: this.memberName(agentId) };
+  }
 
   readonly deleteChannel = Effect.fn("ChannelService.deleteChannel")((channelId: string) =>
     this.#serialize(
@@ -432,6 +481,44 @@ export class ChannelService {
         }).pipe(Effect.ensuring(Effect.sync(() => this.#deletedChannels.delete(channelId))));
       }),
     ),
+  );
+
+  /**
+   * Deletes one message from the channel view and history. Members that already read it can still
+   * remember it. A message that an open task still uses, or that still streams, is `busy`.
+   */
+  readonly deleteMessage = Effect.fn("ChannelService.deleteMessage")(
+    (input: DeleteChannelMessageInput, access: MessageDeleteAccess) =>
+      this.#serialize(
+        input.channelId,
+        Effect.gen({ self: this }, function* () {
+          if (this.#deletedChannels.has(input.channelId))
+            return yield* new MessageDeleteRefused({ reason: "not-found" });
+          const message = yield* channelSync(() => this.store.message(input.channelId, input.messageId));
+          if (!message) return yield* new MessageDeleteRefused({ reason: "not-found" });
+          if (!access.deleteAny && !(message.author.kind === "member" && message.author.id === access.memberId))
+            return yield* new MessageDeleteRefused({ reason: "forbidden" });
+          const tasks = yield* channelSync(() => this.store.tasks(input.channelId));
+          if (
+            message.message.status === "streaming" ||
+            // A message of a running task, such as its plan or result, can still change.
+            tasks.some(
+              (task) =>
+                !terminal(task) &&
+                (task.id === message.taskId ||
+                  task.requestMessageId === message.id ||
+                  task.sourceMessageIds.includes(message.id)),
+            )
+          )
+            return yield* new MessageDeleteRefused({ reason: "busy" });
+          const channel = yield* channelSync(() => this.store.get(input.channelId));
+          yield* channelSync(() => this.store.deleteMessage(channel, message));
+          yield* this.mailbox
+            .deleteChannelMessageCopy(input.channelId, message.id)
+            .pipe(Effect.mapError(channelFailure));
+          this.publish(input.channelId);
+        }),
+      ),
   );
 
   private readonly apply = Effect.fn("ChannelService.apply")(function* (

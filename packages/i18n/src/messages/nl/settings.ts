@@ -541,6 +541,7 @@ export const messages = {
   "settings.voice.speech.readReplies.title": "Lees antwoorden voor",
   "settings.voice.speech.readReplies.description":
     "Als je een bericht dicteert, wordt het antwoord voorgelezen. Dicteer opnieuw om het te stoppen.",
+  "settings.voice.speech.speed.title": "Snelheid",
   "settings.voice.speech.voice.title": "Stem",
   "settings.voice.speech.voice.female": "Vrouwenstem {number}",
   "settings.voice.speech.voice.male": "Mannenstem {number}",

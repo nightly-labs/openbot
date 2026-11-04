@@ -221,6 +221,8 @@ export const messages = {
   "workflow.row.agentCanChoose": "에이전트 선택 범위",
   "workflow.row.whoChooses": "선택 주체",
   "workflow.github.repository": "저장소",
+  "workflow.github.repositories": "저장소",
+  "workflow.github.noEvents": "이벤트 없음",
   "workflow.github.chooseRepository": "저장소 선택",
   "workflow.github.searchRepositories": "저장소 검색",
   "workflow.github.events.issues": "이슈",

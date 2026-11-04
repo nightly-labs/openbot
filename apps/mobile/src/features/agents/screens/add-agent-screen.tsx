@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AvatarHue, CreateAgentInput } from "@openbot/contracts/ipc";
+import type { CreateAgentInput } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { router, Stack } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -7,7 +7,7 @@ import { Typography } from "heroui-native";
 import X from "lucide-react-native/icons/x";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
-import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
+import { AgentAppearancePicker, type AgentColorValue } from "@/features/agents/components/agent-appearance-picker";
 import { AgentRuntimeFields } from "@/features/agents/components/agent-runtime-fields";
 import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
 import { agentInitialMessage } from "@/features/agents/model/agent-initial-message";
@@ -33,7 +33,7 @@ export function AddAgentScreen() {
   const [description, setDescription] = useState("");
   const [runtime, setRuntime] = useState<AgentRuntimeChoice>({});
   const [avatarSeed, setAvatarSeed] = useState(() => `mobile:${Crypto.randomUUID().replaceAll("-", "")}`);
-  const [avatarHue, setAvatarHue] = useState<AvatarHue | null>(null);
+  const [avatarColor, setAvatarColor] = useState<AgentColorValue>({ hue: null, color: null });
   const [initialAvatarSeed] = useState(avatarSeed);
   const pending = useRef(false);
   const [finished, setFinished] = useState(false);
@@ -45,7 +45,8 @@ export function AddAgentScreen() {
     name.trim() ||
       description.trim() ||
       avatarSeed !== initialAvatarSeed ||
-      avatarHue !== null ||
+      avatarColor.hue !== null ||
+      avatarColor.color !== null ||
       runtime.provider !== undefined,
   );
   // Discard turns prevention off before it repeats the action, so the hook does not warn.
@@ -79,7 +80,8 @@ export function AddAgentScreen() {
         description: description.trim(),
         initialMessage: agentInitialMessage(description),
         avatarSeed,
-        avatarHue,
+        avatarHue: avatarColor.hue,
+        avatarColor: avatarColor.color,
         ...(workspace().activeServer.id === serverId ? runtime : {}),
       });
       void haptics.notification("success");
@@ -137,7 +139,8 @@ export function AddAgentScreen() {
       />
       <AgentAppearancePicker
         seed={avatarSeed}
-        hue={avatarHue}
+        hue={avatarColor.hue}
+        color={avatarColor.color}
         name={name}
         colorGlow
         nameField={
@@ -154,7 +157,7 @@ export function AddAgentScreen() {
         }
         disabled={saving}
         onSeedChange={setAvatarSeed}
-        onHueChange={setAvatarHue}
+        onColorChange={setAvatarColor}
       />
 
       <SheetFormField

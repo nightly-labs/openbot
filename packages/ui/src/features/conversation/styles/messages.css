@@ -589,6 +589,12 @@
   color: var(--openbot-text-muted);
 }
 
+/* The link to the routine's own thread, where the run's answer and work are. */
+.ui-button.chat-action-routine-thread {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+}
+
 .chat-action-history-toggle svg {
   transition: transform var(--chat-action-history-close) var(--openbot-ease-out);
 }

@@ -1,11 +1,17 @@
 import type { AgentProviderId } from "@openbot/contracts/ipc";
 import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
 
-/** The plan providers that most users have. They fill the plan rows that owned providers leave. */
-const POPULAR_PROVIDERS: readonly AgentProviderId[] = ["codex", "claude", "grok"];
+/**
+ * The plan providers that most users have. They come first among the providers that the user has,
+ * and they fill the plan rows that those providers leave.
+ */
+const POPULAR_PROVIDERS: readonly AgentProviderId[] = ["codex", "claude", "antigravity"];
 /** Always in the list, as the last row: the way in for a user with no plan. */
 export const FREE_PROVIDER: AgentProviderId = "opencode";
-/** The number of plan rows before the free row. Owned providers can make the list longer. */
+/**
+ * The number of plan rows before the free row, also when the user has more providers. The others
+ * are in "More providers". Only a provider that the user chooses there, or a saved choice, adds a row.
+ */
 const PLAN_ROWS = 3;
 
 export interface OnboardingProviderRows {
@@ -24,14 +30,27 @@ function userHasProvider(option: ProviderPickerOption): boolean {
   return option.state === "available" || option.state === "sign-in-required" || option.state === "outdated";
 }
 
+/** Popular providers first, in `POPULAR_PROVIDERS` order; the others keep their order. */
+function popularFirst(options: readonly ProviderPickerOption[]): ProviderPickerOption[] {
+  const rank = (option: ProviderPickerOption) => {
+    const index = POPULAR_PROVIDERS.indexOf(option.id);
+    return index === -1 ? POPULAR_PROVIDERS.length : index;
+  };
+  return [...options].sort((left, right) => rank(left) - rank(right));
+}
+
 /**
  * The provider rows of the first-run list.
  *
- * Providers that the user has are never hidden, and come first. Popular providers fill the plan
- * rows up to `PLAN_ROWS`, and the free provider is always last. `kept` holds the rows that must
- * stay in the list in their order: the rows the user saw when they first used the list, and each
- * provider that they chose from "More providers". Thus a row does not move or go away under the
- * pointer when a download finishes or a sign-in changes the state of a provider.
+ * The list has `PLAN_ROWS` plan rows. Providers that the user has come first: the connected ones,
+ * then the ones that need a sign-in or an update, each with the popular ones first. Popular providers fill
+ * the rows that are left, and the free provider is always last. The other providers are in "More
+ * providers", the ones that the user has first, in the same order.
+ *
+ * `kept` holds the rows that must stay in the list in their order: the rows the user saw when they
+ * first used the list, and each provider that they chose from "More providers". Thus a row does not
+ * move or go away under the pointer when a download finishes or a sign-in changes the state of a
+ * provider.
  *
  * Without `includeFree`, the list has plan rows only, and the free provider is the last provider in
  * "More providers". The user chose to connect a plan, and can still find it there.
@@ -42,12 +61,14 @@ export function onboardingProviderRows(
   includeFree = true,
 ): OnboardingProviderRows {
   const plans = options.filter((option) => option.id !== FREE_PROVIDER);
-  const owned = plans.filter(userHasProvider);
+  const connected = popularFirst(plans.filter((option) => option.state === "available"));
+  const notReady = popularFirst(plans.filter((option) => userHasProvider(option) && option.state !== "available"));
   const popular = POPULAR_PROVIDERS.flatMap((id) => {
     const option = plans.find((candidate) => candidate.id === id);
     return option && !userHasProvider(option) ? [option] : [];
   });
-  const ruled = [...owned, ...popular].slice(0, Math.max(owned.length, PLAN_ROWS));
+  const owned = [...connected, ...notReady];
+  const ruled = [...owned, ...popular].slice(0, PLAN_ROWS);
   const keptRows = kept.flatMap((id) => plans.filter((option) => option.id === id));
   const listedPlans = [...keptRows, ...ruled.filter((option) => !kept.includes(option.id))];
   const listedIds = new Set(listedPlans.map((option) => option.id));
@@ -56,8 +77,9 @@ export function onboardingProviderRows(
   return {
     listed: includeFree ? [...listedPlans, ...free] : listedPlans,
     hidden: [
-      ...hidden.filter((option) => !option.freeModels),
-      ...hidden.filter((option) => option.freeModels),
+      ...owned.filter((option) => !listedIds.has(option.id)),
+      ...hidden.filter((option) => !userHasProvider(option) && !option.freeModels),
+      ...hidden.filter((option) => !userHasProvider(option) && option.freeModels),
       ...(includeFree ? [] : free),
     ],
   };

@@ -33,6 +33,7 @@ const RESULT_TABLES = {
   workflow_webhook_receipts: [],
   workflows: [],
   projection_messaging_allowed_senders: [],
+  projection_deleted_thread_messages: [],
 };
 
 function databaseAt(version: number): DatabaseSync {
@@ -122,7 +123,7 @@ describe("routine result migration", () => {
       const before = contents(db);
       migrateOpenBotDatabase(db);
       expect(contents(db)).toEqual({ ...before, ...RESULT_TABLES });
-      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 53 });
+      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 55 });
       expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -147,9 +148,9 @@ describe("routine result migration", () => {
   it("rejects newer and incomplete migration histories before it creates the tables", () => {
     const db = databaseAtWithSeed(36);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(54,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(56,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=54; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=56; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(resultTables(db)).toEqual([]);

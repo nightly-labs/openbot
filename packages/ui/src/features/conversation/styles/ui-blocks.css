@@ -189,7 +189,7 @@
   overflow-wrap: anywhere;
 }
 
-/* A long draft scrolls, so the user can read all of it before an answer. */
+/* A long draft stops at a fixed height. "Show all" under it opens the rest. */
 .ui-block-preview {
   max-height: 16em;
   overflow-y: auto;
@@ -204,6 +204,24 @@
 
 .ui-block-preview[data-expanded="true"] {
   max-height: none;
+}
+
+/* A cut-off draft does not scroll, so the chat is the only part that scrolls. `clip` also stops
+   focus, find and selection from scrolling the box to a place that the user cannot scroll back from. */
+.ui-block-preview[data-clamped="true"] {
+  position: relative;
+  overflow: clip;
+}
+
+/* The fade over the last line shows that the draft goes on. The border stays. */
+.ui-block-preview[data-clamped="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2.5em;
+  background: linear-gradient(to bottom, transparent, var(--openbot-bg-surface-raised));
+  pointer-events: none;
 }
 
 /* The control that opens the rest of a long draft sits under it, at the start of the line. */

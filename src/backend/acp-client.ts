@@ -343,6 +343,11 @@ export interface AcpProviderOptions {
    */
   allowNoModels?: boolean;
   /**
+   * An agent that lists no model is signed out. Devin CLI 3000.11.234 opens a session without an
+   * account, and lists its models only when it is signed in.
+   */
+  noModelsWhenSignedOut?: boolean;
+  /**
    * The folder of the session that model discovery opens and closes. The app's own working folder
    * when absent. A custom agent gets an empty folder, because an unknown agent can write where its
    * session starts.
@@ -1249,6 +1254,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       this.#models = providerResult(discovery);
+      if (this.#models.length === 0 && this.options.noModelsWhenSignedOut) {
+        this.#signedIn = false;
+        return;
+      }
       if (this.#models.length === 0 && !this.options.allowNoModels) {
         throw new Error(sourceText("error.provider.acpNoModels"));
       }
@@ -3185,11 +3194,16 @@ function isSessionNotFound(error: unknown, sessionId: string, flavor: AcpFlavor)
  * an ACP agent throws, the SDK puts the thrown message in `data.details` (#1193). Grok sends a string
  * `data`, such as "session/resume does not support additionalDirectories" (#1729), or `data.detail`.
  * Grok 1.0.67 moves that string to `data.message` when it adds the turn's usage or an HTTP status (#2980).
+ * Kimi CLI 1.52.0 fails a prompt with "Internal error" and the reason in `data.error`.
  */
 function failureDetail(error: RequestError): string | null {
   const data = error.data;
   const detail =
-    typeof data === "string" ? data : isRecord(data) ? (data.details ?? data.detail ?? data.message) : undefined;
+    typeof data === "string"
+      ? data
+      : isRecord(data)
+        ? (data.details ?? data.detail ?? data.message ?? data.error)
+        : undefined;
   return typeof detail === "string" && detail ? detail : null;
 }
 

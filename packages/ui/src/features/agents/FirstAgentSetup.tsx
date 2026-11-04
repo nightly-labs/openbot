@@ -6,6 +6,7 @@ import type {
   AgentProviderId,
   AgentReasoningEffort,
   AgentStatus,
+  AvatarColor,
   AvatarHue,
   ClientAgentModelOption,
   CustomAgentSummary,
@@ -16,17 +17,17 @@ import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Button, Field, Input, Textarea } from "@openbot/ui";
 import { createSignal, For, onSettled, Show } from "solid-js";
 import {
-  AVATAR_HUE_CHOICES,
+  AVATAR_COLOR_CHOICES,
   avatarHeadColor,
-  avatarHueSwatch,
   avatarSeedForFace,
+  isAvatarColorChoice,
   type SupportedAvatarSilhouetteId,
 } from "../../bloub-avatar";
 import { ProviderModelPicker } from "../../components/ProviderModelPicker";
 import { currentText, useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "./AgentAvatar";
-import { AVATAR_HUE_LABEL } from "./avatar-hue-label";
+import { avatarColorChoiceLabel } from "./avatar-hue-label";
 import { InstructionsLimit, instructionsTooLong } from "./InstructionsLimit";
 
 export interface FirstAgentDraft {
@@ -34,6 +35,8 @@ export interface FirstAgentDraft {
   purpose: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /** The exact colour, which wins over `avatarHue`. Absent or null: `avatarHue` is the colour. */
+  avatarColor?: AvatarColor | null | undefined;
   suggestionId: string | null;
   provider: AgentProviderId;
   model: AgentModelId;
@@ -188,7 +191,8 @@ function matchesSuggestion(draft: FirstAgentDraft, suggestion: FirstAgentSuggest
     draft.name === t(suggestion.nameKey) &&
     draft.purpose === t(suggestion.purposeKey) &&
     draft.avatarSeed === suggestion.avatarSeed &&
-    draft.avatarHue === suggestion.avatarHue
+    draft.avatarHue === suggestion.avatarHue &&
+    (draft.avatarColor ?? null) === null
   );
 }
 
@@ -316,6 +320,10 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
     }, 0);
   }
 
+  function automaticColor(): boolean {
+    return props.value.avatarHue === null && (props.value.avatarColor ?? null) === null;
+  }
+
   function updateDraft(updates: Partial<FirstAgentDraft>): void {
     if (props.submitting) return;
     const next = { ...props.value, ...updates };
@@ -333,6 +341,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
       purpose: t(suggestion.purposeKey),
       avatarSeed: suggestion.avatarSeed,
       avatarHue: suggestion.avatarHue,
+      avatarColor: null,
       suggestionId: suggestion.id,
       provider: props.value.provider,
       model: props.value.model,
@@ -370,7 +379,12 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
           data-avatar-seed={props.value.avatarSeed}
           data-avatar-hue={props.value.avatarHue ?? "automatic"}
         >
-          <AgentAvatar seed={props.value.avatarSeed} hue={props.value.avatarHue} motion="idle" />
+          <AgentAvatar
+            seed={props.value.avatarSeed}
+            hue={props.value.avatarHue}
+            color={props.value.avatarColor ?? null}
+            motion="idle"
+          />
           <h1 aria-live="polite">{displayName()}</h1>
         </div>
         <Show when={props.mode === "additional" && props.onCancel}>
@@ -407,6 +421,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
             <AgentAvatar
               seed={props.value.avatarSeed}
               hue={props.value.avatarHue}
+              color={props.value.avatarColor ?? null}
               motion="idle"
               animationOffset={0.4}
             />
@@ -421,28 +436,30 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                 size="sm"
                 class="first-agent-color-choice"
                 aria-label={t("agent.setup.colorAutomatic")}
-                aria-pressed={props.value.avatarHue === null ? "true" : "false"}
+                aria-pressed={automaticColor() ? "true" : "false"}
                 data-cuelume-tap="select"
-                onClick={() => updateDraft({ avatarHue: null })}
+                onClick={() => updateDraft({ avatarHue: null, avatarColor: null })}
               >
                 <span
                   class="first-agent-color-swatch"
                   style={{ background: avatarHeadColor(props.value.avatarSeed, null) }}
                 />
               </Button>
-              <For each={AVATAR_HUE_CHOICES}>
+              <For each={AVATAR_COLOR_CHOICES}>
                 {(option) => (
                   <Button
                     variant="ghost"
                     type="button"
                     size="sm"
                     class="first-agent-color-choice"
-                    aria-label={t("agent.setup.colorOption", { color: t(AVATAR_HUE_LABEL[option.hue]) })}
-                    aria-pressed={props.value.avatarHue === option.hue ? "true" : "false"}
+                    aria-label={t("agent.setup.colorOption", { color: t(avatarColorChoiceLabel(option)) })}
+                    aria-pressed={
+                      isAvatarColorChoice(option, props.value.avatarHue, props.value.avatarColor) ? "true" : "false"
+                    }
                     data-cuelume-tap="select"
-                    onClick={() => updateDraft({ avatarHue: option.hue })}
+                    onClick={() => updateDraft({ avatarHue: option.hue, avatarColor: option.color })}
                   >
-                    <span class="first-agent-color-swatch" style={{ background: avatarHueSwatch(option.hue) }} />
+                    <span class="first-agent-color-swatch" style={{ background: option.swatch }} />
                   </Button>
                 )}
               </For>
@@ -467,6 +484,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                     <AgentAvatar
                       seed={seed}
                       hue={props.value.avatarHue}
+                      color={props.value.avatarColor ?? null}
                       motion="idle"
                       animationOffset={index() * 0.16}
                       eyeScale={FACE_CHOICE_EYE_SCALE}

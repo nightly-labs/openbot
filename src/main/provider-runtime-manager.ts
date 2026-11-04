@@ -301,6 +301,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       kimi: emptyStatus(unsupportedMessage),
       pi: emptyStatus(unsupportedMessage),
       muse: emptyStatus(unsupportedMessage),
+      devin: emptyStatus(unsupportedMessage),
       bun: emptyStatus(unsupportedMessage),
     };
   }

@@ -66,6 +66,7 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Paylaşılan veriler bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentInstallUnsupported": "Ajan ekleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentHideUnsupported": "Ajan gizleme bu bağlantı tarafından desteklenmiyor.",
+  "error.team.agentColorsUnsupported": "Ajan renkleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentNotificationLevelsUnsupported":
     "Bu sunucu her ajan için kendi bildirim düzeyinizi saklayamıyor. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
@@ -76,6 +77,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "Ajan güncelleme bu bağlantı tarafından desteklenmiyor.",
   "error.team.contextResetUnsupported": "Yeni bir sohbet başlatma bu bağlantı tarafından desteklenmiyor.",
   "error.team.contextCompactUnsupported": "Bu bağlantı bağlamı sıkıştırmayı desteklemiyor.",
+  "error.team.messageDeleteUnsupported": "Bu bağlantı mesaj silmeyi desteklemiyor.",
   "error.team.workspaceDirectoryUnsupported": "Klasörleri gösterme bu bağlantı tarafından desteklenmiyor.",
   "error.team.conversationFileSearchUnsupported": "Dosya arama bu bağlantı tarafından desteklenmiyor.",
   "error.team.sideQuestionUnsupported": "Yan sorular bu bağlantı tarafından desteklenmiyor.",

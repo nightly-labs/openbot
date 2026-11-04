@@ -21,7 +21,6 @@ export interface ConnectorTransports {
   onePassword?: () => OnePasswordConnectorPort;
   bitwarden?: () => BitwardenConnectorPort;
   messaging?: MessagingApi;
-  /** Only this computer has it: a number links by a code on its screen. */
   whatsapp?: () => WhatsAppPort;
 }
 

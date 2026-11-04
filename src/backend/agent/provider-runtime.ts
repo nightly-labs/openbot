@@ -46,7 +46,8 @@ import {
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
 import { causeHelpers } from "../effect-boundary";
-import type { SignInRegion } from "../kimi-region";
+import { isPythonKimiCli, type SignInRegion } from "../kimi-region";
+import { readKimiUsage } from "../kimi-usage";
 import { McpHandoffLog } from "./../mcp-handoff-log";
 import { providerMcpServerName } from "./../mcp-provider-shapes";
 import { customProvidersOn, openCodeSignInMessage } from "./../opencode-config";
@@ -89,6 +90,7 @@ import { defaultUsageModel, ProviderAccountFailed, ProviderAccounts } from "./pr
 import {
   createAcpRequestEchoReader,
   isAcpHandlerDiagnostic,
+  isGitSpawnDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
   isMcpSubsystemDiagnostic,
@@ -185,6 +187,7 @@ const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = [
   "cursor",
   "cline",
   "kimi",
+  "devin",
   "hermes",
   "acp",
 ];
@@ -977,6 +980,16 @@ export class ProviderRuntime implements ProviderPort {
           } else if (provider === "cursor") {
             // Cursor's usage is two HTTPS requests with the CLI's token, so do not start the CLI for it.
             usage = normalizeAccountUsage(yield* readCursorUsage().pipe(toProviderOperationFailed, deadline));
+          } else if (provider === "kimi") {
+            // Kimi's usage is one HTTPS request with the CLI's token. Only a turn refreshes that token, so
+            // a started CLI adds nothing, and a poll that starts it keeps it from going idle. The CLI
+            // version selects the token's folder: with no client in this run, there is no reading yet.
+            const cli = this.#cli.get(provider);
+            if (!cli) return null;
+            const env = { ...process.env, ...this.#credentials.agentEnvironment?.() };
+            usage = normalizeAccountUsage(
+              yield* readKimiUsage(isPythonKimiCli(cli), env).pipe(toProviderOperationFailed, deadline),
+            );
           } else {
             // Starting a provider that has no usage reading only to get nothing back cost a cold
             // start on every dock poll.
@@ -3655,6 +3668,10 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("A provider reported a failed usage reading.", { provider: client.provider, message });
         return;
       }
+      if (client.provider === "grok" && isGitSpawnDiagnostic(message)) {
+        stderrLogger.warn("A provider could not start git.", { provider: client.provider, message });
+        return;
+      }
       if (isAcpHandlerDiagnostic(message)) {
         stderrLogger.warn("A provider logged a request that it answered with an error.", {
           provider: client.provider,
@@ -3664,10 +3681,12 @@ export class ProviderRuntime implements ProviderPort {
       }
       // The usage notice reports the limit only for a provider with a usage reading. Another
       // provider's line goes on to the error below, or nothing on screen would name the limit.
-      // Cursor's line goes on too: its reading has no on-demand or team limit.
+      // Cursor's line goes on too: its reading has no on-demand or team limit. Kimi's line goes on
+      // because an account with no Kimi Code plan has no reading.
       if (
         isUsageLimitDiagnostic(message) &&
         client.provider !== "cursor" &&
+        client.provider !== "kimi" &&
         agentProviderDescriptor(client.provider).reportsUsage
       ) {
         stderrLogger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });

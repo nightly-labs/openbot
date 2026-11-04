@@ -4,6 +4,10 @@ import {
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RECOVERY_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-recovery-v1";
+import {
+  WEBHOOK_SENDER_SECRET_CAPABILITY,
+  WEBHOOK_SENDER_SECRET_ROUTES,
+} from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY, WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -14,6 +18,7 @@ import {
   parseListEventRoutineRuns,
   parseListEventRoutines,
   parseSaveEventRoutine,
+  parseSetWebhookSecret,
 } from "../host-events-inputs";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -55,7 +60,9 @@ export async function routeEvents(
     ? ROUTINE_RECOVERY_CAPABILITY
     : path === WEBHOOK_TESTS_ROUTES.send
       ? WEBHOOK_TESTS_CAPABILITY
-      : EVENTS_CAPABILITY;
+      : path === WEBHOOK_SENDER_SECRET_ROUTES.set
+        ? WEBHOOK_SENDER_SECRET_CAPABILITY
+        : EVENTS_CAPABILITY;
   if ((capability === EVENTS_CAPABILITY && !EVENT_ROUTE_PATHS.has(path)) || method !== "POST") return "unmatched";
   if (!events || !capabilities.has(capability)) {
     throw new HttpError(400, sourceText("error.backend.eventsUnavailable"));
@@ -101,6 +108,9 @@ export async function routeEvents(
       return json(200, {});
     case EVENTS_ROUTES.rotateSecret:
       return json(200, await runEventsEffect(events.rotateSecret(input(parseEventRoutineRef))));
+    case WEBHOOK_SENDER_SECRET_ROUTES.set:
+      await runEventsEffect(events.setSecret(input(parseSetWebhookSecret)));
+      return json(200, {});
     case WEBHOOK_TESTS_ROUTES.send:
       return json(200, await runEventsEffect(events.sendTestEvent(input(parseEventRoutineRef))));
     case EVENTS_ROUTES.listActivity:

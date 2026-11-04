@@ -221,6 +221,8 @@ export const messages = {
   "workflow.row.agentCanChoose": "Ajan seçebilir",
   "workflow.row.whoChooses": "Kim seçer",
   "workflow.github.repository": "Depo",
+  "workflow.github.repositories": "Depolar",
+  "workflow.github.noEvents": "Olay yok",
   "workflow.github.chooseRepository": "Depo seç",
   "workflow.github.searchRepositories": "Depolarda ara",
   "workflow.github.events.issues": "Sorunlar",

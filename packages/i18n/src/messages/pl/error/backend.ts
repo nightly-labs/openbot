@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "Baza danych OpenBot nie przeszła kontroli integralności.",
   "error.backend.webhookRouteLimit": "Host może mieć maksymalnie {limit} rutyn typu webhook.",
   "error.backend.webhookSettingsInvalid": "Sprawdź ustawienia webhooka i spróbuj ponownie.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Wklej pełny sekret podpisu od nadawcy. Ma od 16 do 1024 znaków i nie zawiera spacji.",
   "error.backend.webhookRouteUnavailable":
     "Publiczna trasa webhooka nie jest gotowa. Sprawdź połączenie z hostem i spróbuj ponownie.",
   "error.backend.browserViewRemoteOnly": "Podgląd przeglądarki na żywo jest tylko dla zdalnego hosta.",
@@ -201,6 +203,10 @@ export const messages = {
   "error.backend.agentWaitRemoteUnsupported": "Otwarte oczekiwania są dostępne tylko dla agentów na tym komputerze.",
   "error.backend.markUnreadRemoteUnsupported":
     "Oznaczanie wiadomości jako nieprzeczytanej jest dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.messageDeleteUnsupported": "Ten serwer nie obsługuje usuwania wiadomości.",
+  "error.backend.messageDeleteNotFound": "Tej wiadomości nie ma w czacie.",
+  "error.backend.messageDeleteBusy": "Ta wiadomość należy do trwającej tury. Usuń ją po zakończeniu tury.",
+  "error.backend.messageDeleteForbidden": "Możesz usuwać tylko wiadomości, które wysłałeś.",
   "error.backend.routineFlowHandoffFailed": "Rutyna nie mogła przekazać pracy temu agentowi.",
   "error.backend.mcpServerLimit": "OpenBot przechowuje maksymalnie {limit} serwerów MCP.",
   "error.backend.mcpServerNameTaken": "Serwer MCP o nazwie {name} już istnieje.",

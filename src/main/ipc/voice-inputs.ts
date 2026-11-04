@@ -1,5 +1,6 @@
 import {
   isSpeechLanguage,
+  isSpeechSpeed,
   isSpeechVoice,
   isVoiceLanguage,
   isVoiceModelId,
@@ -113,10 +114,15 @@ export function parseVoiceStreamAudio(input: unknown): VoiceStreamAudio {
 }
 
 export function parseSpeechSettings(input: unknown): SpeechSettings {
-  if (!isObject(input) || typeof input.readReplies !== "boolean" || !isSpeechVoice(input.voice)) {
-    throw new Error("Speech settings need a known voice.");
+  if (
+    !isObject(input) ||
+    typeof input.readReplies !== "boolean" ||
+    !isSpeechVoice(input.voice) ||
+    !isSpeechSpeed(input.speed)
+  ) {
+    throw new Error("Speech settings need a known voice and speed.");
   }
-  return { readReplies: input.readReplies, voice: input.voice };
+  return { readReplies: input.readReplies, voice: input.voice, speed: input.speed };
 }
 
 export function parseSpeechInput(input: unknown): SpeechInput {

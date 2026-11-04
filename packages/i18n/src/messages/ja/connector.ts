@@ -331,6 +331,8 @@ export const messages = {
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description":
     "WhatsApp の番号をこのコンピューターにリンクします。WhatsApp Orchestrator が適切なエージェントに依頼して回答します。",
+  "connector.whatsapp.descriptionHost":
+    "WhatsApp の番号をこのサーバーにリンクします。WhatsApp Orchestrator が適切なエージェントに依頼して回答します。",
   "connector.whatsapp.statusConnected": "接続済み",
   "connector.whatsapp.statusAttention": "対応が必要",
   "connector.whatsapp.summaryConnected": {
@@ -353,6 +355,8 @@ export const messages = {
     "許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp がこのコンピューターをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
+  "connector.whatsapp.helpLoggedOutHost":
+    "WhatsApp がこのサーバーをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "connector.whatsapp.helpError":
     "OpenBot はこの番号で WhatsApp に接続できません。再接続するか、番号を切断してください。",
   "connector.whatsapp.retryAt": "WhatsApp から待機するよう求められました。{time} に再試行します。",
@@ -383,6 +387,8 @@ export const messages = {
   "connector.whatsapp.connectTitle": "WhatsApp をリンク",
   "connector.whatsapp.connectDescription":
     "番号を選んでから、スマートフォンの WhatsApp でこのコンピューターをリンクします。",
+  "connector.whatsapp.connectDescriptionHost":
+    "番号を選んでから、スマートフォンの WhatsApp でこのサーバーをリンクします。",
   "connector.whatsapp.kindLabel": "番号",
   "connector.whatsapp.kindPersonal": "自分の個人番号",
   "connector.whatsapp.kindPersonalDescription":

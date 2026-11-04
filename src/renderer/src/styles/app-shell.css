@@ -2694,6 +2694,18 @@ textarea {
   white-space: nowrap;
 }
 
+.avatar-editor-heading-end {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+/* The heading is upper case. The style tabs keep the case of other tabs. */
+.avatar-style-tabs {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .avatar-editor-actions {
   display: flex;
   align-items: center;
@@ -2894,10 +2906,12 @@ textarea {
   padding: 4px 10px 12px;
 }
 
-/* Automatic and the eight colours fit one row. */
+/* Automatic and the 17 colours fill two rows of nine. A column is narrower than the button
+   padding, so the tile has none; with it, each tile overflowed onto the next one's ring. */
 .avatar-color-choice {
   width: 100%;
   height: 32px;
+  padding: 0;
 }
 
 .avatar-color-swatch {

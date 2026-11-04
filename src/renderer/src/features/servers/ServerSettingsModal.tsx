@@ -22,7 +22,6 @@ import {
   Blocks,
   Button,
   CalendarClock,
-  ChevronRight,
   Download,
   Globe2,
   HardDrive,
@@ -60,6 +59,7 @@ import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../se
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
+import { type CompanySignInCalls, createServerCompanySignInSection } from "./ServerCompanySignInSection";
 import { ServerDesktopPanel } from "./ServerDesktopPanel";
 import { createServerGeneralSection } from "./ServerGeneralSection";
 import { type ServerImportDetail, type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
@@ -101,6 +101,8 @@ export interface ServerSettingsModalProps {
    * Members section first asks to add a user to it. Absent on surfaces with no account license.
    */
   license?: Pick<LicenseCalls, "getState" | "setUsers" | "changePlan"> | undefined;
+  /** Company sign-in for the owner of a published server. Absent where the app cannot manage it. */
+  companySignIn?: CompanySignInCalls | undefined;
   /** Opens the contact page when a full license already has the most users that the app sells. */
   onContactUs?: () => void;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
@@ -381,6 +383,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
     roles,
   );
+  const companySignIn = createServerCompanySignInSection(
+    host,
+    () => props.companySignIn,
+    () => props.open && section() === "members",
+  );
   const hostedSites = createSettingsHostedSitesStore(
     {
       get open() {
@@ -436,6 +443,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         setSection(untrack(availableInitialSection) ?? "general");
         general.resetForServer();
         members.resetForServer();
+        companySignIn.resetForServer();
         roles.resetForServer();
         audit.resetForServer();
       }
@@ -527,19 +535,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         class="server-settings-modal-shell"
         page={props.page}
         open={props.open}
-        title={
-          <Show when={crumbDetail()} fallback={t(sections[section()].title)}>
-            {(detail) => (
-              <span class="settings-modal-crumbs">
-                <Button type="button" variant="ghost" class="settings-modal-crumb-parent" onClick={detail().back}>
-                  {t(sections[section()].title)}
-                </Button>
-                <ChevronRight class="settings-modal-crumb-separator" aria-hidden="true" />
-                <span class="settings-modal-crumb-current">{detail().title}</span>
-              </span>
-            )}
-          </Show>
-        }
+        title={t(sections[section()].title)}
+        crumb={crumbDetail()}
         description={t(sections[section()].description)}
         contentKey={`${props.server.id}:${section()}`}
         restoreFocusTarget={props.restoreFocusTarget}
@@ -762,6 +759,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         </Show>
         <Tabs.Content value="members" class="settings-modal-tab-panel server-settings-panel" data-tab="members">
           <members.Panel />
+          <companySignIn.Panel />
         </Tabs.Content>
         <Show when={roles.available()}>
           <Tabs.Content value="roles" class="settings-modal-tab-panel server-settings-panel" data-tab="roles">

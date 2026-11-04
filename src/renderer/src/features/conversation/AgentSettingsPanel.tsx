@@ -67,6 +67,8 @@ interface AgentSettingsPanelProps
   routineSelectionRequest?: RoutineSelectionRequest | null | undefined;
   onRoutineSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   onOpenRoutineRun?: ((messageId: string) => void) | undefined;
+  /** Opens the side thread where a routine runs. Resolves false when the routine has no thread. */
+  onOpenRoutineThread?: ((routineId: string) => Promise<boolean>) | undefined;
   skillsMode?: AgentSkillsMode | undefined;
   /** The joined server that runs the agent, for the `host` skills mode. */
   skillsServerId?: string | undefined;
@@ -598,6 +600,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             selectionRequest={props.routineSelectionRequest}
             onSelectionRequestHandled={props.onRoutineSelectionRequestHandled}
             onOpenRun={props.onOpenRoutineRun}
+            onOpenThread={props.onOpenRoutineThread}
           />
         </div>
       </Show>

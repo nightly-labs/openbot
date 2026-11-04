@@ -1203,7 +1203,8 @@
     animation-delay: 18ms;
   }
 
-  .account-login[data-transition="forward"] .account-login-form[data-auth-panel="code"] {
+  .account-login[data-transition="forward"]
+    .account-login-form:is([data-auth-panel="code"], [data-auth-panel="company"]) {
     animation: account-login-panel-forward var(--openbot-duration-overlay) 32ms var(--openbot-ease-out) both;
   }
 

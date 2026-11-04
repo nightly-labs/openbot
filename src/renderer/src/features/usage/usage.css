@@ -208,3 +208,8 @@
   min-height: 0;
   flex: 1;
 }
+/* The first load covers the whole window: the page rail, the server rail and the sidebar too. The frame
+ * is a size container, so the screen is a child of the window and not of the frame. */
+.app-window > .app-loading {
+  position: fixed;
+}

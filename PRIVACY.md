@@ -397,6 +397,7 @@ The service stores:
   records, install counts, and the skill bundle and icon in R2.
 - reports about a hosted site: the hostname, the reason, the optional details text, a keyed hash of
   the source address (of its /64 for IPv6) for each day, the review state and the creation time.
+- company sign-in, when a server owner sets it up: see [Company sign-in](#company-sign-in).
 
 The service does not store plaintext one-time codes, account session tokens, or team authentication
 tickets in D1. It returns a new plaintext secret only to the client that requested it. The desktop
@@ -463,6 +464,8 @@ Cloudflare runs a maintenance task once each day. The task removes:
 - account sessions after they are revoked (older already-expired sessions are also removed);
 - team authentication tickets after they expire or are consumed;
 - rate-limit records after their 15-minute window ends.
+- company sign-in flows after their 10-minute life ends, and company sign-in codes after they
+  expire or are used.
 
 These technical records are normally removed within 24 hours after they become inactive. A failed
 maintenance run can keep them until a later successful run. The task logs only aggregate deletion
@@ -584,6 +587,50 @@ sent to the agent as a message. The phone then reads the agent's reply aloud wit
   or an analytics event. Remove key in **Settings → Voice** deletes it.
 
 The chosen voice settings are kept on the phone. OpenBot does not store the reply audio.
+
+## Company sign-in
+
+A server owner can connect the company's OpenID Connect provider, such as Microsoft Entra ID, Okta
+or Google Workspace, in Members → Company sign-in. Then people with an email at the company domains
+sign in at the company provider in place of an email code.
+
+The account service stores in D1:
+
+- the connection of the server: the issuer URL, the client ID, the client secret, the time of the
+  last passed test, whether it is on, the account of the owner who saved it, and creation and update
+  times. The client secret is encrypted with a key that only the account service has;
+- the company domains and the server that each domain belongs to;
+- for each person who signed in at the provider: the issuer, the provider's subject ID, the OpenBot
+  account and the link time. The service does not keep the provider's tokens or other claims;
+- the hash of the SCIM token, and its creation time. The token shows once;
+- for each person that the provider manages through SCIM: the server, the OpenBot account, the
+  provider's external ID, whether the person is on, and the update time;
+- sign-in flows in progress, for 10 minutes: the hash of the state, the values of the connection at
+  the start, the PKCE verifier, the nonce, the return address, and the app's challenge;
+- one-time codes as hashes, for 2 minutes, with the account and the session that they gave.
+
+During a sign-in or a test, the person's browser opens the provider's sign-in page with the client
+ID, the return address, the state, the nonce and the PKCE challenge. The provider receives what the
+person types there. The account service then connects to the provider: it reads the provider's
+discovery document and signing keys, and sends the code, the client ID and the client secret to the
+provider's token endpoint. From the ID token, it uses only the subject ID and the email address. On
+a production account service, a test also asks Cloudflare DNS over HTTPS (`cloudflare-dns.com`) for
+the TXT record `_openbot.<domain>` of each domain.
+
+A person who signs in this way gets an OpenBot account for the email address, or the account that
+already has it, and joins the server as a member with no invitation, while the server has a free
+seat. A person whom the owner removed, or who left, stays out.
+
+The web app at `/app` keeps the state and the verifier of a sign-in in an HttpOnly cookie
+(`__Host-openbot-company`) for 10 minutes. The return removes it.
+
+With SCIM, the company's provider sends the email address, the external ID and the on or off state of
+each person to `/scim/v2/Users`. The service does not store other SCIM attributes. Turning a person
+off, or deleting them, ends every session of their account and removes them from the server. Turning
+them on again adds them to the server again.
+
+Removing the connection removes its domains and its SCIM users, and stops SCIM. Deleting the server
+removes the connection. Deleting an account removes its provider links and SCIM records.
 
 ## Email delivery and infrastructure providers
 
@@ -948,7 +995,8 @@ Network traffic can also occur when:
   `Check for updates`. It asks `api.github.com` for Codex and Kimi, `registry.npmjs.org` for Claude,
   OpenCode and Cline, `x.ai/cli` for Grok, and `raw.githubusercontent.com/agentclientprotocol/registry` and
   `dl.google.com` (for the download size) for Gemini, and the same registry and
-  `downloads.cursor.com` (for the download size) for Cursor, and it reads a list of blocked
+  `downloads.cursor.com` (for the download size) for Cursor, `static.devin.ai` (the manifest, and the
+  download size) for Devin, and it reads a list of blocked
   versions from `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
   conversation or file data;
 - an agent shows a visual reply, an agent checks its page with `html_preview`, or a user opens an
@@ -1241,6 +1289,12 @@ restrict or block a number that it sees as automated.
 - **Given to the WhatsApp Orchestrator.** Every new WhatsApp request goes first to the orchestrator
   agent, which runs on its provider like any other agent and passes the work to a teammate with the
   facts it needs.
+- **Managed from another computer.** An owner or admin of a joined server can link and manage the
+  host's numbers from their own computer or the browser client. The host sends that client the QR code
+  or pairing code of a link, the numbers and their names, the allowed contacts and groups, the pairing
+  requests that wait, and the list of the number's groups, over the encrypted connection of the
+  server. The QR code holds the one-use secret of that link. The stored keys of the device do not
+  leave the host.
 - **Sent to WhatsApp.** The agents' answers and the files they attach, short status posts, reactions,
   and approval requests with the command, folder and reason the provider gave, redacted. On a number
   used only by OpenBot, a person whom the owner did not allow gets one message with a pairing code.
@@ -1426,12 +1480,33 @@ Moonshot AI: `api.kimi.ai` for a global account, or `api.kimi.com` for a mainlan
 Sign in runs `kimi login`, which opens Kimi's sign-in page in your browser: `auth.kimi.ai` for
 Connect, or `auth.kimi.com` when you select the kimi.com (China) item in the row's ⋯ menu. The CLI
 keeps its login, device ID, session files, and settings in `~/.kimi`, or in `$KIMI_SHARE_DIR`.
-OpenBot reads only the API address in `config.toml` on this computer, to start the CLI with the
+OpenBot reads the API address in `config.toml` on this computer, to start the CLI with the
 region of its login. OpenBot does not copy or upload these files. Unless you
 set `telemetry = false` in `~/.kimi/config.toml`, or set `KIMI_DISABLE_TELEMETRY=1` in the
 environment that starts OpenBot, the CLI sends anonymous usage events to
 `telemetry-logs.kimi.com`. OpenBot does not change this setting. Moonshot AI's terms for Kimi Code
 apply. Team members see the host's Kimi agents when their app supports Kimi.
+
+To show the Kimi Code plan usage in Usage, OpenBot reads the CLI's API address and the name of its
+token in `config.toml`, and the CLI's access token in `credentials`: in `~/.kimi` or
+`$KIMI_SHARE_DIR` for Kimi CLI 1.x, and in `~/.kimi-code` or `$KIMI_CODE_HOME` for Kimi Code 2.x.
+OpenBot sends the token only to Moonshot AI (`api.kimi.ai`, `api.kimi.com`, or `KIMI_CODE_BASE_URL`
+when you set it for the CLI), in the same usage request that the CLI's `/usage` command sends. The
+request contains no conversation, file, or model data. OpenBot does not store, log, or send the
+token or the usage to its maintainer.
+
+### Devin
+
+OpenBot downloads the Devin CLI from `static.devin.ai` when you select Download on the Devin row.
+OpenBot starts the CLI as a local process. Prompts, attachments, and tool results go to that
+process, and the CLI sends them to Cognition (`app.devin.ai` and `api.devin.ai`). Sign in opens
+Devin's sign-in page on `app.devin.ai` in your browser. The CLI keeps its login and session files
+in `~/.local/share/devin`, its settings in `~/.config/devin`, and its plans in `~/.devin`, or in the
+XDG folders that you set. OpenBot does not read, copy, or upload these files; it reads only the
+change time of `credentials.toml`, to see a sign-in. When it starts, the CLI reads feature flags and
+sends product analytics events to Cognition. OpenBot does not change these settings. Cognition's
+terms for Devin apply. Team members see the host's Devin agents when their app supports Devin.
+
 ### Hermes
 
 OpenBot does not download Hermes Agent. It starts the `hermes` that you installed, with `hermes acp`,

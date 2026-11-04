@@ -325,6 +325,8 @@ export const messages = {
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description":
     "Koppel een WhatsApp-nummer aan deze computer. De WhatsApp Orchestrator vraagt de juiste agent en antwoordt.",
+  "connector.whatsapp.descriptionHost":
+    "Koppel een WhatsApp-nummer aan deze server. De WhatsApp Orchestrator vraagt de juiste agent en antwoordt.",
   "connector.whatsapp.statusConnected": "Verbonden",
   "connector.whatsapp.statusAttention": "Aandacht nodig",
   "connector.whatsapp.summaryConnected": {
@@ -350,6 +352,8 @@ export const messages = {
     "De mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp heeft deze computer uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
+  "connector.whatsapp.helpLoggedOutHost":
+    "WhatsApp heeft deze server uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
   "connector.whatsapp.helpError":
     "OpenBot kan WhatsApp op dit nummer niet bereiken. Verbind opnieuw of koppel het nummer los.",
   "connector.whatsapp.retryAt": "WhatsApp vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
@@ -380,6 +384,8 @@ export const messages = {
   "connector.whatsapp.connectTitle": "Koppel WhatsApp",
   "connector.whatsapp.connectDescription":
     "Kies het nummer en koppel deze computer daarna vanuit WhatsApp op je telefoon.",
+  "connector.whatsapp.connectDescriptionHost":
+    "Kies het nummer en koppel deze server daarna vanuit WhatsApp op je telefoon.",
   "connector.whatsapp.kindLabel": "Nummer",
   "connector.whatsapp.kindPersonal": "Mijn persoonlijke nummer",
   "connector.whatsapp.kindPersonalDescription":

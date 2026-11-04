@@ -222,6 +222,8 @@ export const messages = defineMessages("workflow", {
   "workflow.row.whoChooses": "Who chooses",
 
   "workflow.github.repository": "Repository",
+  "workflow.github.repositories": "Repositories",
+  "workflow.github.noEvents": "No events",
   "workflow.github.chooseRepository": "Choose repository",
   "workflow.github.searchRepositories": "Search repositories",
   "workflow.github.events.issues": "Issues",

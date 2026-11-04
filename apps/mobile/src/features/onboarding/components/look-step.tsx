@@ -1,5 +1,5 @@
-import { AVATAR_HUE_CHOICES, avatarHueSwatch } from "@openbot/brand/bloub-avatar";
-import type { AvatarHue } from "@openbot/contracts/ipc";
+import { AVATAR_COLOR_CHOICES, type AvatarColorChoice, isAvatarColorChoice } from "@openbot/brand/bloub-avatar";
+import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
@@ -12,7 +12,7 @@ import Animated, { ReduceMotion, type SharedValue, withSpring, withTiming } from
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 
-import { HUE_LABELS } from "@/features/agents/components/agent-appearance-picker";
+import { type AgentColorValue, avatarColorChoiceLabel } from "@/features/agents/components/agent-appearance-picker";
 import { createAvatarCandidates } from "@/features/agents/model/avatar-candidates";
 import { OnboardingIconButton, OnboardingPillButton } from "@/features/onboarding/components/onboarding-buttons";
 import { HeroSlot } from "@/features/onboarding/components/onboarding-hero";
@@ -35,31 +35,39 @@ const THROW = { duration: 170, easing: SPLASH_EASE_OUT, reduceMotion: ReduceMoti
 const SETTLE = { duration: 400, dampingRatio: 0.8, reduceMotion: ReduceMotion.Never };
 // The next look comes in from this share of the screen, on the other side.
 const ENTER_FROM = 0.6;
-// Nine colours fit one row on a 320 pt wide phone.
+// Nine colours fit one row on a 375 pt wide phone.
 const SWATCH_SIZE = 28;
+// The colours show in two rows of nine; the automatic colour ends the second row.
+const COLOR_ROWS: readonly (readonly AvatarColorChoice[])[] = [
+  AVATAR_COLOR_CHOICES.slice(0, 9),
+  AVATAR_COLOR_CHOICES.slice(9),
+];
 const ARROW_SIZE = 44;
 
 /**
  * The look of an agent made from scratch. The character itself is the control: drag it aside and
  * it flies off, and the next look comes in from the other side. Arrows do the same with a tap, and
- * Surprise me draws new looks. The colours sit in one row below.
+ * Surprise me draws new looks. The colours sit in two rows below.
  */
 export function LookStep({
   motion,
   seed,
   hue,
+  color,
   drag,
   onSeedChange,
-  onHueChange,
+  onColorChange,
   onPulse,
 }: {
   motion: OnboardingMotion;
   seed: string;
   hue: AvatarHue | null;
+  /** The agent's `avatarColor`. It wins over `hue`. */
+  color: AvatarColor | null;
   /** The hero's swipe offset, shared with the hero above the steps. */
   drag: SharedValue<number>;
   onSeedChange: (seed: string) => void;
-  onHueChange: (hue: AvatarHue | null) => void;
+  onColorChange: (value: AgentColorValue) => void;
   /** Plays the hero's squash, when a new look appears in place. */
   onPulse: () => void;
 }) {
@@ -169,45 +177,47 @@ export function LookStep({
         </View>
         <Animated.View entering={popEntering(motion, STAGGER_MS * 3)} className="items-center gap-6 px-6 pb-3">
           <View
-            className="w-full flex-row items-center justify-between"
+            className="w-full gap-3"
             accessibilityRole="radiogroup"
             accessibilityLabel={t("mobile.agent.appearance.color")}
           >
-            {AVATAR_HUE_CHOICES.map((option) => {
-              // A stored hue 100 or 280 shows as its same-colour choice.
-              const checked = hue !== null && avatarHueSwatch(hue) === avatarHueSwatch(option.hue);
-              return (
-                <Swatch
-                  key={option.hue}
-                  label={t(HUE_LABELS[option.hue])}
-                  checked={checked}
-                  ring={String(foreground)}
-                  motion={motion}
-                  onPress={() => {
-                    void haptics.selection();
-                    onHueChange(option.hue);
-                  }}
-                >
-                  <View className="size-full rounded-full" style={{ backgroundColor: avatarHueSwatch(option.hue) }} />
-                </Swatch>
-              );
-            })}
-            <Swatch
-              label={t("mobile.agent.appearance.automatic")}
-              checked={hue === null}
-              ring={String(foreground)}
-              motion={motion}
-              onPress={() => {
-                void haptics.selection();
-                onHueChange(null);
-              }}
-            >
-              <View className="size-full items-center justify-center rounded-full bg-grouped">
-                <Typography type="body-xs" className="font-semibold">
-                  {t("mobile.agent.appearance.automaticShort")}
-                </Typography>
+            {COLOR_ROWS.map((row, index) => (
+              <View key={row[0]?.swatch ?? index} className="w-full flex-row items-center justify-between">
+                {row.map((choice) => (
+                  <Swatch
+                    key={choice.swatch}
+                    label={t(avatarColorChoiceLabel(choice))}
+                    checked={isAvatarColorChoice(choice, hue, color)}
+                    ring={String(foreground)}
+                    motion={motion}
+                    onPress={() => {
+                      void haptics.selection();
+                      onColorChange({ hue: choice.hue, color: choice.color });
+                    }}
+                  >
+                    <View className="size-full rounded-full" style={{ backgroundColor: choice.swatch }} />
+                  </Swatch>
+                ))}
+                {index === COLOR_ROWS.length - 1 ? (
+                  <Swatch
+                    label={t("mobile.agent.appearance.automatic")}
+                    checked={hue === null && color === null}
+                    ring={String(foreground)}
+                    motion={motion}
+                    onPress={() => {
+                      void haptics.selection();
+                      onColorChange({ hue: null, color: null });
+                    }}
+                  >
+                    <View className="size-full items-center justify-center rounded-full bg-grouped">
+                      <Typography type="body-xs" className="font-semibold">
+                        {t("mobile.agent.appearance.automaticShort")}
+                      </Typography>
+                    </View>
+                  </Swatch>
+                ) : null}
               </View>
-            </Swatch>
+            ))}
           </View>
         </Animated.View>
       </View>

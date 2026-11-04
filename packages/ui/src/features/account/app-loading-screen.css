@@ -1,13 +1,14 @@
 /*
- * The app loading screen. In the `pile` scene, a small simulation sets the transform of each plush;
- * CSS only places the pit, sets the grab cursor and fades the screen. When the app is ready, the crew
- * hop out, and the screen fades after them. When the app is ready very soon, the screen only fades.
- * The component sets --app-loading-at, the age of the run, so a second screen does not show again.
+ * The app loading screen. In the `pile` scene, Web Animations from a recorded simulation move each
+ * plush; CSS only places the pit over the whole screen and fades the screen. When the app is ready,
+ * the crew hop out while the screen fades. When the app is ready very soon, the screen only fades.
+ * The component sets --app-loading-at, the age of the run, so a second screen does not show again,
+ * and --app-loading-exit-delay, the time before the fade, which waits for the rest of the rain.
  */
 
 .app-loading {
-  --app-loading-exit-delay: 0ms;
   --app-loading-at: 0s;
+  --app-loading-exit-delay: 300ms;
   position: absolute;
   z-index: var(--openbot-layer-dialog);
   inset: 0;
@@ -25,17 +26,25 @@
   gap: 28px;
 }
 
-/* The frame takes the scaled size of the pit, so the text under it stays in the layout. */
-.app-loading-pit-frame {
-  position: relative;
-  flex: 0 0 auto;
+/* The crew fill the screen. */
+.app-loading[data-scene="pile"] .app-loading-stage {
+  position: absolute;
+  inset: 0;
+  justify-content: center;
 }
 
+.app-loading-pit-frame {
+  position: absolute;
+  inset: 0;
+}
+
+/* The pit keeps its floor on the bottom of the screen, also when the window changes size. */
 .app-loading-pit {
   position: absolute;
-  top: 0;
-  left: 0;
-  transform-origin: 0 0;
+  bottom: 0;
+  left: 50%;
+  translate: -50% 0;
+  transform-origin: 50% 100%;
 }
 
 .app-loading-plush {
@@ -43,30 +52,15 @@
   top: 0;
   left: 0;
   visibility: hidden;
-  cursor: grab;
-  touch-action: none;
+  pointer-events: none;
   user-select: none;
   will-change: transform;
-  -webkit-app-region: no-drag;
-}
-
-.app-loading-plush:active {
-  cursor: grabbing;
 }
 
 .app-loading-squash {
   width: 100%;
   height: 100%;
   will-change: transform;
-}
-
-/* The simulation squashes the lead, so its own breath does not run. */
-.app-loading-lead {
-  --ui-plush-size: 100%;
-}
-
-.app-loading-lead .ui-plush-body {
-  animation: none;
 }
 
 .app-loading-status {
@@ -87,14 +81,14 @@
 
 /* The fade also runs with reduced motion: its animationend removes the screen. */
 .app-loading:is([data-phase="fade"], [data-phase="exit"]) {
-  animation: app-loading-exit var(--openbot-duration-overlay) var(--openbot-ease-in-out) var(--app-loading-exit-delay)
-    forwards;
+  animation: app-loading-exit var(--openbot-duration-overlay) var(--openbot-ease-in-out) forwards;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* The crew hop out before the screen fades. */
+  /* The app fades in while the crew hop out. The heavy views mounted before the hop. */
   .app-loading[data-phase="exit"] {
-    --app-loading-exit-delay: 480ms;
+    animation-duration: 1100ms;
+    animation-delay: var(--app-loading-exit-delay);
   }
 
   /* The stage waits before it shows, so a fast load does not flash the crew. */
@@ -159,6 +153,50 @@
   display: flex;
   gap: var(--openbot-space-2);
   -webkit-app-region: no-drag;
+}
+/* The toast of a long first load, like the GitHub star toast: a raised card with the 1px ring only. */
+.server-connection-toast-host {
+  width: var(--width);
+}
+.server-connection-toast {
+  position: relative;
+  display: grid;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-4) var(--openbot-space-3) var(--openbot-space-3) var(--openbot-space-4);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: 0 0 0 1px var(--openbot-border);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-sans);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+.server-connection-toast-close {
+  position: absolute;
+  top: var(--openbot-space-2);
+  right: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+}
+/* The end padding keeps the title clear of the close button. */
+.server-connection-toast-title {
+  padding-right: var(--openbot-space-6);
+  font-weight: var(--openbot-weight-semibold);
+}
+.server-connection-toast-body {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  font-variant-numeric: tabular-nums;
+  text-wrap: pretty;
+}
+/* Retry is last, in the corner. A long label in a translation moves the buttons to a new line. */
+.server-connection-toast-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--openbot-space-1-5);
+  margin-top: var(--openbot-space-1);
 }
 .server-connection-content {
   position: relative;

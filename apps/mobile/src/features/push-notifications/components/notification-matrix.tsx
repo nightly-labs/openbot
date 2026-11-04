@@ -285,6 +285,7 @@ function ServerLevels({
                               agentId={agent.id}
                               serverId={agent.serverId}
                               hue={agent.avatarHue}
+                              color={agent.avatarColor}
                               seed={agent.avatarSeed}
                               size={AVATAR_SIZE}
                               animateIdle={false}

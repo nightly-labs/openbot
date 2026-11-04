@@ -422,6 +422,7 @@
     "expo@58.0.17": "patches/expo@58.0.17.patch",
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "dmg-builder@26.18.0": "patches/dmg-builder@26.18.0.patch",
+    "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch",
     "lucide-solid@1.33.0": "patches/lucide-solid@1.33.0.patch",
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
     "@react-native-masked-view/masked-view@0.3.2": "patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch",
@@ -437,7 +438,7 @@
     "@kobalte/core": "2.0.0-alpha.0",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
-    "@norbert_bodziony/bloub": "0.6.3",
+    "@norbert_bodziony/bloub": "0.6.4",
     "@openpanel/web": "1.4.2",
     "@paper-design/shaders": "0.0.80",
     "@solidjs/signals": "2.0.0-rc.18",
@@ -1096,7 +1097,7 @@
 
     "@noble/hashes": ["@noble/hashes@2.4.0", "", {}, "sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA=="],
 
-    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.6.3", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-PIj4jjWBaqxYmCjOAa95pbNrzFpyGHGjJmbHEBAs2oLoVqB4xRM77HI+B4jpE6IgeYu7xuFTowCqCn0SH0w/KQ=="],
+    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.6.4", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-hTM+ObqsM0crCdbxU/uDIhFZj0AQPhHRlavqolZR4NmFibdyK/Z/8Z1Wdak5nJYSBW/7k047KfGkzAbhpFNZxg=="],
 
     "@nothing-but/utils": ["@nothing-but/utils@0.17.0", "", {}, "sha512-TuCHcHLOqDL0SnaAxACfuRHBNRgNJcNn9X0GiH5H3YSDBVquCr3qEIG3FOQAuMyZCbu9w8nk2CHhOsn7IvhIwQ=="],
 

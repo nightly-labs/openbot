@@ -1,5 +1,6 @@
 import {
   type AgentEvent,
+  type AvatarColor,
   type CreateAgentInput,
   canAdministerServer,
   isQueuedMessageReceipt,
@@ -14,6 +15,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { agentColorsEvent } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
@@ -132,9 +134,12 @@ import {
 import { createBrowserActions } from "@/features/workspace/context/browser-actions";
 import {
   createHostRequestActions,
+  hostKeepsAgentColors,
   hostOwnsHide,
+  readHostAgentColors,
   readHostHiddenAgents,
   requestAgentAvatar,
+  writeHostAgentColor,
   writeHostAgentHidden,
 } from "@/features/workspace/context/host-request-actions";
 import {
@@ -261,8 +266,8 @@ const EMPTY_SERVER: MobileServer = {
 
 /**
  * The reads that make a server usable, chosen by its capabilities. Each connection reads the hidden
- * list again, because the events of an interrupted connection are lost. A failed hidden read keeps
- * the last list and does not stop the connection.
+ * list and the colours again, because the events of an interrupted connection are lost. A failed
+ * hidden or colour read keeps the last values and does not stop the connection.
  */
 function startWorkspaceReads(client: RemoteTeamTransportRef, capabilities: readonly string[]) {
   // With `sidebar-folders-v1`, the layout has the parent of each folder; the phone shows its path.
@@ -277,14 +282,24 @@ function startWorkspaceReads(client: RemoteTeamTransportRef, capabilities: reado
     (method, path, decode, body) => client.request(method, path, decode, body),
     capabilities,
   ).catch(() => undefined);
+  // The colours load with the agents too, so an agent does not show its hue for a moment.
+  const colors = readHostAgentColors(
+    (method, path, decode, body) => client.request(method, path, decode, body),
+    capabilities,
+  ).catch(() => undefined);
   // Reads that start before the compatibility check can lose their reader when the check fails.
   sections?.catch(() => undefined);
   agents.catch(() => undefined);
-  return { sections, agents, hidden };
+  return { sections, agents, hidden, colors };
 }
 
 function sameCapabilities(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((capability) => b.includes(capability));
+}
+
+/** The colours of one host as the list that the cache keeps, or null when the host sent none. */
+function colorList(colors: Readonly<Record<string, AvatarColor>> | undefined) {
+  return colors ? Object.entries(colors).map(([agentId, color]) => ({ agentId, color })) : null;
 }
 
 /** The record without `keys`, or the same record when it has none of them. */
@@ -419,6 +434,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
    * device of the server shows it. A server without the capability has no entry.
    */
   const [hostHidden, setHostHidden] = useState<Record<string, string[]>>({});
+  /** The `avatarColor` of each agent, by server, from a host with `agent-colors-v1`. */
+  const hostColors = useRef<Record<string, Readonly<Record<string, AvatarColor>>>>({});
   const hostHiddenRef = useRef(hostHidden);
   hostHiddenRef.current = hostHidden;
   // The local list stays: it is the only list of an older host, and an agent hidden on this phone
@@ -462,6 +479,31 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       return ids === current[serverId] ? current : { ...current, [serverId]: ids };
     });
   }, []);
+  /**
+   * Puts the whole colour list of a host in place, and gives each agent of the host its colour. Null
+   * drops the list of a host without the capability.
+   */
+  const applyHostColors = useCallback(
+    (serverId: string, colors: readonly { agentId: string; color: AvatarColor }[] | null) => {
+      if (removedServers.current.has(serverId)) return;
+      const byAgent: Record<string, AvatarColor> = {};
+      for (const entry of colors ?? []) byAgent[entry.agentId] = entry.color;
+      if (colors === null) hostColors.current = withoutKeys(hostColors.current, new Set([serverId]));
+      else hostColors.current = { ...hostColors.current, [serverId]: byAgent };
+      setAgents((current) => {
+        let changed = false;
+        const next = current.map((agent) => {
+          if (agent.serverId !== serverId) return agent;
+          const avatarColor = byAgent[agent.id] ?? null;
+          if (agent.avatarColor === avatarColor) return agent;
+          changed = true;
+          return { ...agent, avatarColor };
+        });
+        return changed ? next : current;
+      });
+    },
+    [],
+  );
   const pinnedAgentIds = (activeServerId ? preferences[activeServerId]?.pinned : null) ?? NO_IDS;
   const hiddenChannelIds = (activeServerId ? preferences[activeServerId]?.hiddenChannels : null) ?? NO_IDS;
   const pinnedChannelIds = (activeServerId ? preferences[activeServerId]?.pinnedChannels : null) ?? NO_IDS;
@@ -503,6 +545,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       forgetDrawerSnapshots(serverIds);
       setSidebarByServer((current) => withoutKeys(current, serverIds));
       setHostHidden((current) => withoutKeys(current, serverIds));
+      hostColors.current = withoutKeys(hostColors.current, serverIds);
       setAgents((current) => current.filter((agent) => !serverIds.has(agent.serverId)));
       for (const id of removedAgentIds) conversationStore.remove(id);
       liveState.update("unreadAgentIds", (current) => current.filter((id) => !removedAgentIds.has(id)));
@@ -801,7 +844,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         );
         const next = [
           ...current.filter((agent) => agent.serverId !== serverId),
-          ...summaries.map((agent) => replaceEqualDeep(previous.get(agent.id), projectAgent(serverId, agent))),
+          ...summaries.map((agent) =>
+            replaceEqualDeep(
+              previous.get(agent.id),
+              projectAgent(serverId, agent, hostColors.current[serverId]?.[agent.id] ?? null),
+            ),
+          ),
         ];
         return next.length === current.length && next.every((agent, index) => agent === current[index])
           ? current
@@ -888,6 +936,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         .write(serverId, {
           agents,
           hidden: hostHiddenRef.current[serverId] ?? null,
+          colors: colorList(hostColors.current[serverId]),
           sidebar: sidebarByServerRef.current[serverId]?.layout ?? null,
           conversations: agents.flatMap((agent) => conversationStore.cachedPage(agent.id) ?? []),
           capabilities: serverCapabilities.current.get(serverId) ?? keptCapabilities.current.get(serverId) ?? null,
@@ -917,6 +966,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               id,
               cached.hidden.map((agentId) => ({ agentId })),
             );
+          if (cached.colors) applyHostColors(id, cached.colors);
           if (cached.sidebar) applySidebarLayout(id, cached.sidebar);
           replaceServerAgents(id, cached.agents);
           for (const page of cached.conversations) conversationStore.restore(page);
@@ -926,7 +976,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         })
         .catch(() => undefined);
     }
-  }, [servers, workspaceCache, applyHostHidden, applySidebarLayout, replaceServerAgents, conversationStore]);
+  }, [
+    servers,
+    workspaceCache,
+    applyHostHidden,
+    applyHostColors,
+    applySidebarLayout,
+    replaceServerAgents,
+    conversationStore,
+  ]);
 
   const loadConversation = useCallback(
     async (agentId: string, serverId = activeServerIdRef.current, refresh = false, attach = false) => {
@@ -1112,9 +1170,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const [summaries] = await Promise.all([
         step(
           "agents",
-          Promise.all([reads.agents, reads.hidden]).then(([summaries, hiddenAgents]) => {
+          Promise.all([reads.agents, reads.hidden, reads.colors]).then(([summaries, hiddenAgents, colors]) => {
             if (context.isCurrent()) {
               if (hiddenAgents !== undefined) applyHostHidden(serverId, hiddenAgents);
+              if (colors !== undefined) applyHostColors(serverId, colors);
               replaceServerAgents(serverId, summaries);
             }
             return summaries;
@@ -1156,6 +1215,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       persistServer,
       replaceServerAgents,
       applyHostHidden,
+      applyHostColors,
       preferenceStore,
       readRefresh,
       conversationStore,
@@ -1365,6 +1425,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         applyHostHidden(serverId, event.agents);
         return;
       }
+      const colors = agentColorsEvent(event);
+      if (colors) {
+        applyHostColors(serverId, colors.agents);
+        return;
+      }
       // The user changed their pins on another device. A pending change of this phone goes first.
       if (event.type === "sidebar-pins-changed") {
         if (!preferencesRef.current[serverId]?.pinsPending) applyHostSidebarPins(serverId, event.items);
@@ -1484,6 +1549,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       channelStore,
       applySidebarLayout,
       applyHostHidden,
+      applyHostColors,
       loadConversation,
       replaceServerAgents,
       conversationStore,
@@ -1836,27 +1902,50 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               }
             : {}),
         });
+        const serverId = currentActiveServer().id;
         setAgents((current) => [
           ...current.filter((agent) => agent.id !== created.id),
-          projectAgent(currentActiveServer().id, created),
+          projectAgent(serverId, created, null),
         ]);
+        // The create route has no colour. The agent keeps the nearest hue when the colour is not set.
+        if (input.avatarColor && hostKeepsAgentColors(serverCapabilities.current.get(serverId))) {
+          await writeHostAgentColor(teamApi(serverId), created.id, input.avatarColor).then(
+            (colors) => applyHostColors(serverId, colors),
+            () => supportLog.add("warn", "app", "The new agent's colour was not saved."),
+          );
+        }
         return created.id;
       },
       updateAgent: async (input: UpdateAgentInput, serverId = activeServerIdRef.current ?? undefined) => {
         if (!serverId || !agentsRef.current.some((agent) => agent.id === input.agentId && agent.serverId === serverId))
           throw new Error(currentText().t("mobile.workspace.error.agentUnavailableOnHost"));
-        const updated = await request(
-          "PATCH",
-          TEAM_API_ROUTES.agent.one(input.agentId),
-          decodeAgent,
-          updateAgentPayload(input),
-          serverId,
+        const { avatarColor, avatarHue, ...other } = input;
+        // On the released route, a hue without a colour also clears the colour.
+        const color = avatarColor !== undefined ? avatarColor : avatarHue === undefined ? undefined : null;
+        // A host with `agent-colors-v1` keeps the colour, and sets the hue from it. An older host gets
+        // only the hue, which the picker gives as the nearest hue of the colour.
+        const colorRoute = color !== undefined && hostKeepsAgentColors(serverCapabilities.current.get(serverId));
+        const payload = updateAgentPayload(
+          colorRoute && color !== null ? other : { ...other, ...(avatarHue === undefined ? {} : { avatarHue }) },
         );
-        setAgents((current) =>
-          current.map((agent) =>
-            agent.id === updated.id && agent.serverId === serverId ? projectAgent(serverId, updated) : agent,
-          ),
-        );
+        if (!colorRoute || Object.keys(payload).length > 1) {
+          const updated = await request(
+            "PATCH",
+            TEAM_API_ROUTES.agent.one(input.agentId),
+            decodeAgent,
+            payload,
+            serverId,
+          );
+          setAgents((current) =>
+            current.map((agent) =>
+              agent.id === updated.id && agent.serverId === serverId
+                ? projectAgent(serverId, updated, hostColors.current[serverId]?.[updated.id] ?? null)
+                : agent,
+            ),
+          );
+        }
+        if (colorRoute && color !== undefined && (color !== null || hostColors.current[serverId]?.[input.agentId]))
+          applyHostColors(serverId, await writeHostAgentColor(teamApi(serverId), input.agentId, color));
       },
       setAgentAvatar: async (agentId, image, serverId) => {
         if (!agentsRef.current.some((agent) => agent.id === agentId && agent.serverId === serverId))
@@ -1877,7 +1966,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         }
         setAgents((current) =>
           current.map((agent) =>
-            agent.id === updated.id && agent.serverId === serverId ? projectAgent(serverId, updated) : agent,
+            agent.id === updated.id && agent.serverId === serverId
+              ? projectAgent(serverId, updated, hostColors.current[serverId]?.[updated.id] ?? null)
+              : agent,
           ),
         );
       },
@@ -2103,6 +2194,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     markAllRead,
     updatePreferences,
     changeHostHidden,
+    applyHostColors,
     pushSidebarPins,
     preferenceStore,
   ]);
