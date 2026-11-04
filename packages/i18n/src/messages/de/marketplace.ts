@@ -420,6 +420,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "Welche Todoist-Aufgaben sind heute fällig?",
   "marketplace.plugin.todoist.prompt.capture": "Füge diese To-dos meinem Todoist-Eingang hinzu.",
   "marketplace.plugin.todoist.prompt.overdue": "Verschiebe meine überfälligen Todoist-Aufgaben auf morgen.",
+  "marketplace.plugin.ticktick.tagline": "Aufgaben, Listen, Gewohnheiten und Fokus",
+  "marketplace.plugin.ticktick.description":
+    "Mit TickTick können Agenten Aufgaben suchen und filtern, Aufgaben hinzufügen und ändern sowie Listen, Abschnitte, Ordner, Tags und Kommentare verwalten. Agenten können auch Gewohnheiten und Fokus-Einträge lesen und ändern und Termine aus den mit TickTick verbundenen Kalendern lesen. Jeder Nutzer meldet sich im Browser bei seinem eigenen TickTick-Konto an. Agenten erhalten Lese- und Schreibzugriff: Sie können Aufgaben erledigen, verschieben und löschen sowie Tags und Fokus-Einträge löschen.",
+  "marketplace.plugin.ticktick.app":
+    "Aufgaben, Listen, Gewohnheiten und Fokus-Einträge über den MCP-Server von TickTick mit Anmeldung im Browser.",
+  "marketplace.plugin.ticktick.prompt.today": "Welche TickTick-Aufgaben sind heute fällig?",
+  "marketplace.plugin.ticktick.prompt.capture": "Füge diese Aufgabenpunkte meinem TickTick-Eingang hinzu.",
+  "marketplace.plugin.ticktick.prompt.week": "Welche TickTick-Aufgaben habe ich letzte Woche erledigt?",
   "marketplace.plugin.trello.tagline": "Boards, Listen und Karten",
   "marketplace.plugin.trello.description":
     "Mit Trello durchsuchen und lesen Agenten Boards, Listen, Karten, Checklisten und Kommentare, erstellen Boards und Karten, verschieben Listen und Karten, markieren Karten als erledigt und fügen Checklisten, Kommentare und Labels hinzu. Agenten können auch Karten im Trello-Eingang des Nutzers lesen und hinzufügen und Planner-Termine lesen, die aus einem verbundenen Google- oder Outlook-Kalender kommen können. Jeder Nutzer meldet sich im Browser bei seinem eigenen Trello-Konto an und wählt die Workspaces auf einer Zustimmungsseite. Agenten haben in diesen Workspaces dieselben Rechte wie der Nutzer. Sie können Karten und Listen archivieren, aber der Server kann nichts endgültig löschen.",

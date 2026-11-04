@@ -408,6 +408,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "Quali attività di Todoist scadono oggi?",
   "marketplace.plugin.todoist.prompt.capture": "Aggiungi queste azioni alla mia Posta in arrivo di Todoist.",
   "marketplace.plugin.todoist.prompt.overdue": "Sposta a domani le mie attività scadute di Todoist.",
+  "marketplace.plugin.ticktick.tagline": "Attività, liste, abitudini e concentrazione",
+  "marketplace.plugin.ticktick.description":
+    "TickTick permette agli agenti di cercare e filtrare le attività, aggiungere e modificare attività e gestire liste, sezioni, cartelle, tag e commenti. Gli agenti possono anche leggere e modificare abitudini e sessioni di concentrazione, e leggere gli eventi dei calendari collegati a TickTick. Ogni utente accede al proprio account TickTick nel browser. Gli agenti hanno accesso in lettura e scrittura: possono completare, spostare ed eliminare attività, ed eliminare tag e sessioni di concentrazione.",
+  "marketplace.plugin.ticktick.app":
+    "Attività, liste, abitudini e sessioni di concentrazione, tramite il server MCP di TickTick con accesso nel browser.",
+  "marketplace.plugin.ticktick.prompt.today": "Quali attività di TickTick scadono oggi?",
+  "marketplace.plugin.ticktick.prompt.capture": "Aggiungi questi punti d'azione alla mia Posta in arrivo di TickTick.",
+  "marketplace.plugin.ticktick.prompt.week": "Quali attività di TickTick ho completato la settimana scorsa?",
   "marketplace.plugin.trello.tagline": "Bacheche, liste e schede",
   "marketplace.plugin.trello.description":
     "Trello permette agli agenti di cercare e leggere bacheche, liste, schede, checklist e commenti, creare bacheche e schede, spostare liste e schede, segnare le schede come completate e aggiungere checklist, commenti ed etichette. Gli agenti possono anche leggere e aggiungere schede nella Posta in arrivo di Trello dell’utente e leggere gli eventi del Planner, che possono venire da un calendario Google o Outlook collegato. Ogni utente accede al proprio account Trello dal browser e sceglie gli spazi di lavoro in una schermata di consenso. Gli agenti hanno gli stessi permessi dell’utente in quegli spazi di lavoro. Possono archiviare schede e liste, ma il server non può eliminare nulla in modo definitivo.",

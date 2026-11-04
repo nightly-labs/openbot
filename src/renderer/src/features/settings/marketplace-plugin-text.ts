@@ -369,6 +369,18 @@ const PLUGIN_TEXT = {
       "prompt-overdue": "marketplace.plugin.todoist.prompt.overdue",
     },
   },
+  ticktick: {
+    tagline: "marketplace.plugin.ticktick.tagline",
+    description: "marketplace.plugin.ticktick.description",
+    apps: {
+      "app-ticktick-mcp": "marketplace.plugin.ticktick.app",
+    },
+    prompts: {
+      "prompt-today": "marketplace.plugin.ticktick.prompt.today",
+      "prompt-capture": "marketplace.plugin.ticktick.prompt.capture",
+      "prompt-week": "marketplace.plugin.ticktick.prompt.week",
+    },
+  },
   trello: {
     tagline: "marketplace.plugin.trello.tagline",
     description: "marketplace.plugin.trello.description",

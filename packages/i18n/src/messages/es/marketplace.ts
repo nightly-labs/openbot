@@ -414,6 +414,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "¿Qué tareas de Todoist vencen hoy?",
   "marketplace.plugin.todoist.prompt.capture": "Añade estas tareas pendientes a mi bandeja de entrada de Todoist.",
   "marketplace.plugin.todoist.prompt.overdue": "Pasa mis tareas vencidas de Todoist a mañana.",
+  "marketplace.plugin.ticktick.tagline": "Tareas, listas, hábitos y concentración",
+  "marketplace.plugin.ticktick.description":
+    "TickTick permite a los agentes buscar y filtrar tareas, añadir y cambiar tareas, y gestionar listas, secciones, carpetas, etiquetas y comentarios. Los agentes también pueden leer y cambiar hábitos y registros de concentración, y leer eventos de los calendarios conectados a TickTick. Cada usuario inicia sesión en su propia cuenta de TickTick en el navegador. Los agentes obtienen acceso de lectura y escritura: pueden completar, mover y eliminar tareas, y eliminar etiquetas y registros de concentración.",
+  "marketplace.plugin.ticktick.app":
+    "Tareas, listas, hábitos y registros de concentración, a través del servidor MCP de TickTick con inicio de sesión en el navegador.",
+  "marketplace.plugin.ticktick.prompt.today": "¿Qué tareas de TickTick vencen hoy?",
+  "marketplace.plugin.ticktick.prompt.capture": "Añade estos puntos de acción a mi bandeja de entrada de TickTick.",
+  "marketplace.plugin.ticktick.prompt.week": "¿Qué tareas de TickTick completé la semana pasada?",
   "marketplace.plugin.trello.tagline": "Tableros, listas y tarjetas",
   "marketplace.plugin.trello.description":
     "Trello permite a los agentes buscar y leer tableros, listas, tarjetas, listas de comprobación y comentarios, crear tableros y tarjetas, mover listas y tarjetas, marcar tarjetas como completadas y añadir listas de comprobación, comentarios y etiquetas. Los agentes también pueden leer y añadir tarjetas en la Bandeja de entrada de Trello del usuario y leer los eventos del Planner, que pueden venir de un calendario de Google u Outlook conectado. Cada usuario inicia sesión en su propia cuenta de Trello desde el navegador y elige los espacios de trabajo en una pantalla de consentimiento. Los agentes tienen los mismos permisos que el usuario en esos espacios de trabajo. Pueden archivar tarjetas y listas, pero el servidor no puede eliminar nada de forma permanente.",

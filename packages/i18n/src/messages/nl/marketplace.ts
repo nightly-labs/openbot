@@ -397,6 +397,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "Welke Todoist-taken moeten vandaag af?",
   "marketplace.plugin.todoist.prompt.capture": "Zet deze actiepunten in mijn Todoist-inbox.",
   "marketplace.plugin.todoist.prompt.overdue": "Verzet mijn achterstallige Todoist-taken naar morgen.",
+  "marketplace.plugin.ticktick.tagline": "Taken, lijsten, gewoonten en focus",
+  "marketplace.plugin.ticktick.description":
+    "Met TickTick kunnen agents taken zoeken en filteren, taken toevoegen en wijzigen, en lijsten, secties, mappen, tags en opmerkingen beheren. Agents kunnen ook gewoonten en focusrecords lezen en wijzigen, en afspraken lezen uit de agenda's die aan TickTick gekoppeld zijn. Elke gebruiker meldt zich in de browser aan bij een eigen TickTick-account. Agents krijgen lees- en schrijftoegang: ze kunnen taken afronden, verplaatsen en verwijderen, en tags en focusrecords verwijderen.",
+  "marketplace.plugin.ticktick.app":
+    "Taken, lijsten, gewoonten en focusrecords, via de MCP-server van TickTick met aanmelding in de browser.",
+  "marketplace.plugin.ticktick.prompt.today": "Welke TickTick-taken zijn vandaag aan de beurt?",
+  "marketplace.plugin.ticktick.prompt.capture": "Zet deze actiepunten in mijn TickTick-inbox.",
+  "marketplace.plugin.ticktick.prompt.week": "Welke TickTick-taken heb ik vorige week afgerond?",
   "marketplace.plugin.trello.tagline": "Borden, lijsten en kaarten",
   "marketplace.plugin.trello.description":
     "Met Trello kunnen agents borden, lijsten, kaarten, checklists en opmerkingen zoeken en lezen, borden en kaarten maken, lijsten en kaarten verplaatsen, kaarten als klaar markeren, en checklists, opmerkingen en labels toevoegen. Agents kunnen ook kaarten in de Trello-inbox van de gebruiker lezen en toevoegen, en Planner-events lezen, die uit een gekoppelde Google- of Outlook-agenda kunnen komen. Elke gebruiker logt via de browser in met een eigen Trello-account en kiest de werkruimten op een toestemmingsscherm. Agents krijgen dezelfde rechten als de gebruiker in die werkruimten. Ze kunnen kaarten en lijsten archiveren, maar de server kan niets definitief verwijderen.",
