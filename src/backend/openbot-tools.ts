@@ -6,7 +6,7 @@ import {
   CHAT_VISUAL_TITLE_LIMIT,
 } from "@openbot/contracts/chat-visual";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { API_KEY_NAME_PATTERN, CONNECTOR_IDS } from "@openbot/contracts/ipc";
+import { API_KEY_NAME_PATTERN, CONNECTOR_IDS, VAULT_API_KEY_LIMIT, VAULT_NOTES_LIMIT } from "@openbot/contracts/ipc";
 import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import pluginCatalog from "../../resources/plugin-catalog/catalog.json";
@@ -283,6 +283,18 @@ export const requestApiKeyToolSchema = z.strictObject({
 });
 
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
+
+export const saveApiKeyToolSchema = z.strictObject({
+  name: apiKeyNameSchema,
+  key: z.string().trim().min(1).max(VAULT_API_KEY_LIMIT).describe("The key, token or password, exactly as you got it."),
+  notes: z
+    .string()
+    .max(VAULT_NOTES_LIMIT)
+    .optional()
+    .describe(
+      "What the key is for, such as the account or the project. Never a secret. Omit it to keep the saved notes.",
+    ),
+});
 
 export const sendToChannelToolSchema = z.strictObject({
   channelId: z.string().min(1).max(INPUT_LIMITS.identifier),
@@ -690,6 +702,16 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       'List the API keys you can use, from request_api_key or the Vault ("source":"vault"): the name and the file path of each. Values are never shown.',
     shape: {},
+  },
+  {
+    name: "save_api_key",
+    description: [
+      "Save an API key, token or password that you already have, such as one that the user pasted in the chat, in the OpenBot Vault.",
+      "Every agent can then use it: list_api_keys gives its file path. A Vault key with the same name gets the new value, and your own key with this name from request_api_key is deleted.",
+      'The result is JSON: {"status":"added"|"updated","name","path"}. It never holds the key.',
+      "Do not repeat the key in your answer or in another tool argument. It does not work in an external chat.",
+    ].join(" "),
+    shape: saveApiKeyToolSchema.shape,
   },
   {
     name: "remove_api_key",

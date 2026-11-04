@@ -127,6 +127,14 @@ value is registered for log redaction when it is saved and at startup, and the s
 secret field value. `list_api_keys` and `remove_api_key` are the reverse actions, and deleting the agent
 deletes its folder. The form is refused in Slack, Discord and Telegram chats.
 
+When the agent already has a secret, such as one that the user pasted in the chat, `openbot.save_api_key`
+saves it in the encrypted Vault as an `apiKey` item for every agent (`VaultItems.saveApiKey`), and
+`openbot_browser.save_vault_item kind=login` saves a website password (`VaultItems.saveLogin`). Both
+register the value for log redaction when the call arrives, refuse an external chat, and return no
+secret. `save_api_key` replaces a Vault key with the same name and deletes the agent's own key with
+that name, because the agent's own key wins in `list_api_keys`. The value is in the provider's
+transcript because the agent sent it; OpenBot keeps no tool arguments in its trace.
+
 `password-vault-router.ts` joins metadata from both managers and prefixes Bitwarden ids with
 `bitwarden:`. Existing 1Password ids stay unchanged. A failed list stops automatic account selection
 rather than hiding a source and selecting a different account. Main returns only connection state

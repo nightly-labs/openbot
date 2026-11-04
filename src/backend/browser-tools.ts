@@ -1,5 +1,10 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { BROWSER_TAKEOVER_REASONS, VAULT_TEXT_LIMIT, type VaultContactFields } from "@openbot/contracts/ipc";
+import {
+  BROWSER_TAKEOVER_REASONS,
+  VAULT_PASSWORD_LIMIT,
+  VAULT_TEXT_LIMIT,
+  type VaultContactFields,
+} from "@openbot/contracts/ipc";
 import { UI_BLOCK_LIMITS, UI_VAULT_REQUEST_KINDS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import { advertisedJsonSchema } from "./agent/advertised-json-schema";
@@ -276,13 +281,19 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "save_vault_item",
     description:
-      "Add contact info to the OpenBot Vault, or change a saved item. A contact without id is new; with id, it changes. A login or a card needs its id from list_vault_items (not from list_logins). A login changes only its username; a card changes only fields that are not secret. You cannot set a password, a website, a card number or a security code. An omitted field keeps its value. Returns the id, kind and name, never a secret.",
+      "Add contact info or a login to the OpenBot Vault, or change a saved item. A contact without id is new; with id, it changes. A login without id is new: give website, username and password, such as a password that the user pasted in the chat; a saved login for that site and username gets the new password. With an id from list_vault_items (not from list_logins), a login changes its username and password, and a card changes only fields that are not secret. You cannot set a card number or a security code. An omitted field keeps its value. Returns the id, kind and name, never a secret. Do not repeat a password after you save it. A password does not work in an external chat.",
     shape: {
       kind: z.enum(["contact", "login", "card"]),
-      id: identifier.optional().describe("The item to change. Omit it to add a contact."),
+      id: identifier.optional().describe("The item to change. Omit it to add a contact or a login."),
       label: vaultText.describe("Contact or card: a short name, such as Home or Work card."),
       ...vaultContactShape,
+      website: vaultText.describe("New login: the HTTPS website, such as example.com."),
       username: vaultText.describe("Login: the username or email."),
+      password: z
+        .string()
+        .max(VAULT_PASSWORD_LIMIT)
+        .optional()
+        .describe("Login: the password, exactly as you got it. It is never returned."),
       nameOnCard: vaultText.describe("Card: the name on the card."),
       expMonth: z.number().int().min(1).max(12).optional().describe("Card: the expiry month."),
       expYear: z.number().int().min(2000).max(2099).optional().describe("Card: the four-digit expiry year."),
