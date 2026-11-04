@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { router, useGlobalSearchParams, useSegments } from "expo-router";
 import { Stack } from "expo-router/stack";
 import { useThemeColor } from "heroui-native/hooks";
@@ -10,7 +11,7 @@ import { ChatListPaneProvider } from "@/features/agents/components/chat-list-pan
 import { createChatNavigationGate } from "@/features/agents/model/chat-navigation-gate";
 import { ConnectedScreen } from "@/features/agents/screens/connected-screen";
 import { whenUnlocked } from "@/features/app-lock/model/app-lock";
-import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { AudioWaveformHost } from "@/features/chat/components/audio-waveform-host";
 import { MermaidRendererHost } from "@/features/chat/components/mermaid-renderer-host";
 import { OutboxProvider } from "@/features/chat/context/outbox-context";
@@ -28,6 +29,7 @@ import {
   MobileWorkspaceProvider,
   useMobileWorkspaceReader,
 } from "@/features/workspace/context/mobile-workspace-context";
+import { taskOfThread } from "@/features/workspace/model/task-cache";
 import { AdaptiveSplit, useSplitLayout } from "@/shared/components/adaptive-split";
 import { androidBackOptions } from "@/shared/components/android-header-button";
 import { headerFontOptions } from "@/shared/lib/app-font";
@@ -37,6 +39,11 @@ import { useText } from "@/shared/lib/text";
 
 /** How long a notification tap waits for the channel list of its server before it opens the agent chat. */
 const NOTIFICATION_CHANNEL_WAIT_MS = 8_000;
+/**
+ * How long a notification tap waits for the thread list of its agent. A tap on a reply of an agent chat
+ * that the phone has not loaded reads the list too, so the wait is short.
+ */
+const NOTIFICATION_THREAD_WAIT_MS = 3_000;
 
 /**
  * Android: autoFocus focuses the name field of a form sheet while the sheet opens, and Android does
@@ -133,9 +140,22 @@ function AuthenticatedStack() {
   useEffect(() => setQuickActionNavigator(openQuickAction), [openQuickAction]);
   useEffect(() => setShareSheetOpener(() => whenUnlocked(() => router.push("/share"))), []);
   const workspace = useMobileWorkspaceReader();
+  const queryClient = useQueryClient();
+  const queryScope = useQueryScope();
+  /** Opens a screen from a notification on top of the main screen, as `openFromOutside` opens a chat. */
+  const openScreen = useCallback(
+    (open: () => void) =>
+      whenUnlocked(() => {
+        closeDrawer();
+        if (router.canDismiss()) router.dismissAll();
+        navigationGate.request(open, () => onChatList.current);
+      }),
+    [closeDrawer, navigationGate],
+  );
   /**
-   * A prompt, an approval or a takeover on a channel thread opens the channel, as on desktop. A tap
-   * at a cold start comes before the server connects, so it waits a short time for the channel list.
+   * A notification from a channel thread opens the channel, and one from a side thread opens that
+   * thread, as on desktop. A tap at a cold start comes before the server connects, so it waits a
+   * short time for the channel list.
    */
   const openFromNotification = useCallback(
     ({ agentId, serverId, threadId }: NotificationTarget) => {
@@ -145,25 +165,39 @@ function AuthenticatedStack() {
       }
       void workspace()
         .channelStore.whenListed(serverId, NOTIFICATION_CHANNEL_WAIT_MS)
-        .then((state) => {
+        .then(async (state) => {
           const channel = state.channels.find(
             (item) => !item.archived && item.threads?.some((thread) => thread.threadId === threadId),
           );
-          if (!channel) {
+          if (channel) {
+            openScreen(() =>
+              router.push({ pathname: "/channel/[channelId]", params: { channelId: channel.id, serverId } }),
+            );
+            return;
+          }
+          const current = workspace();
+          // A reply in the agent's own chat, whose chat the phone knows, opens at once.
+          const ownChat = current.conversationStore.get(agentId)?.threadId === threadId;
+          const task =
+            !ownChat && current.canUseTasks(serverId)
+              ? await taskOfThread(
+                  queryClient,
+                  queryScope,
+                  serverId,
+                  agentId,
+                  threadId,
+                  () => workspace().loadAgentTasks(agentId, serverId),
+                  NOTIFICATION_THREAD_WAIT_MS,
+                )
+              : null;
+          if (!task) {
             openFromOutside(agentId);
             return;
           }
-          whenUnlocked(() => {
-            closeDrawer();
-            if (router.canDismiss()) router.dismissAll();
-            navigationGate.request(
-              () => router.push({ pathname: "/channel/[channelId]", params: { channelId: channel.id, serverId } }),
-              () => onChatList.current,
-            );
-          });
+          openScreen(() => router.push({ pathname: "/task/[taskId]", params: { serverId, agentId, taskId: task.id } }));
         });
     },
-    [workspace, openFromOutside, closeDrawer, navigationGate],
+    [workspace, queryClient, queryScope, openFromOutside, openScreen],
   );
   useNotificationTaps(openFromNotification, () => openChat.current);
 

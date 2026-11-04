@@ -7,18 +7,21 @@
 // It checks that a finished agent reply in a channel notifies and that the click opens the channel,
 // that a prompt on a channel thread names the channel and a prompt on the agent's own thread does
 // not, and that only the peer with the capability gets `threads`, the preview author and status and
-// the UI blocks, while the released peer reads its wire with the frozen channels-v1 codec.
+// the UI blocks, while the released peer reads its wire with the frozen channels-v1 codec. The real
+// phone notification service reads the same channel list as the channel list route gives it to a
+// member, and sends a finished reply only to a phone with channel-attention-v1 at the level "all".
 // Run: `bun scripts/channel-notifications-e2e.ts`.
 // Writes .openbot-build/channel-notifications-e2e/report.json.
 
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type AgentEvent,
+  CHANNEL_CHATS_CAPABILITY,
   type ChannelMessage,
   type ChannelTask,
   decodeChannelPage,
@@ -39,8 +42,11 @@ import { CHANNEL_ROUTES, channelResponse } from "@openbot/contracts/team-protoco
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { createFormat, translateFor } from "@openbot/i18n";
+import { encodeLiveActivityBytes, LIVE_ACTIVITY_SECRET_BYTES } from "@openbot/team-client/live-activity-seal";
+import { pushNotificationKeys } from "@openbot/team-client/push-notification-seal";
 import { plugin } from "bun";
 import { Effect } from "effect";
+import { openSealedLiveActivity } from "../apps/mobile/src/features/live-activity/model/live-activity-open";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { AgentService } from "../src/backend/agent-service";
 import { AgentStore } from "../src/backend/agent-store";
@@ -48,6 +54,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { SidebarLayoutStore } from "../src/backend/sidebar-layout-store";
+import type { NotificationRelayRequest } from "../src/main/push-notifications";
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/channel-notifications-e2e");
@@ -159,6 +166,8 @@ const { createRendererForwarders } = await import("../src/main/renderer-forwarde
 const { HostService } = await import("../src/main/host-service");
 const { TeamApiServer } = await import("../src/main/team-api-server");
 const { TeamStore } = await import("../src/main/team-store");
+const { PushNotificationService } = await import("../src/main/push-notifications");
+const { memberChannelList } = await import("../src/main/team-api/route-channels");
 const { BrowserWindow } = await import("electron");
 const mainWindow = new BrowserWindow();
 
@@ -173,7 +182,7 @@ const report: { passed: boolean; unverified: string[]; steps: Step[] } = {
   passed: false,
   unverified: [
     "A remote host's channel list. This check reads the local host; the forwarder reads a remote list through the same decoder that the Team API steps use.",
-    "Phone push. A channel reply sends no phone notification, as before channels were deprecated.",
+    "Phone push through Apple or Google. The phone steps record the relay request and open it with the phone keys.",
   ],
   steps: [],
 };
@@ -649,6 +658,118 @@ try {
         "The page has no UI block.",
       );
       return attentionKeys(list, page);
+    },
+  );
+
+  await step(
+    "A finished channel reply sends a phone push only to a phone with channel-attention-v1 at the level all",
+    async () => {
+      const PHONE_MEMBER = "phone-member";
+      const sends: NotificationRelayRequest[] = [];
+      let reads = 0;
+      const waiters = new Set<() => void>();
+      const wake = () => {
+        for (const waiter of waiters) waiter();
+      };
+      const until = (ready: () => boolean) =>
+        new Promise<void>((resolveReady) => {
+          const check = () => {
+            if (!ready()) return;
+            waiters.delete(check);
+            resolveReady();
+          };
+          waiters.add(check);
+          check();
+        });
+      assert.ok(agents);
+      const phones = new PushNotificationService({
+        agents,
+        store: { list: () => [], replace: () => Effect.void },
+        send: (request) =>
+          Effect.sync(() => {
+            sends.push(request);
+            wake();
+            return "sent" as const;
+          }),
+        hiddenAgentIds: () => new Set(),
+        memberActive: () => true,
+        lastUseElsewhere: () => null,
+        atHostComputer: () => false,
+        liveActivityShows: () => false,
+        // As the host gives it: the list of the channel route for this member.
+        listChannels: (memberId, _protocol, capabilities) => {
+          reads += 1;
+          wake();
+          return capabilities.has(CHANNEL_CHATS_CAPABILITY)
+            ? memberChannelList(channels, { id: memberId, role: "member" }, new Set())
+            : null;
+        },
+        randomBytes: (size) => new Uint8Array(randomBytes(size)),
+      });
+      const secret = randomBytes(LIVE_ACTIVITY_SECRET_BYTES);
+      const register = (sessionId: string, capabilities: readonly string[], level: "all" | "needs-me") =>
+        phones.register(
+          sessionId,
+          { memberId: PHONE_MEMBER, protocol: TEAM_PROTOCOL_V8, capabilities: new Set(capabilities) },
+          {
+            platform: "android",
+            value: {
+              serverId: LOCAL_SERVER_ID,
+              token: `${sessionId}-token`.padEnd(40, "x"),
+              secret: encodeLiveActivityBytes(secret),
+              locale: "en",
+              away: true,
+              level,
+              mutedUntil: null,
+              preview: true,
+              sound: "default",
+            },
+          },
+        );
+      try {
+        phones.start();
+        register("phone-attention", V8_PEER_CAPABILITIES, "all");
+        register("phone-released", released, "all");
+        register("phone-needs-me", V8_PEER_CAPABILITIES, "needs-me");
+        // The first read of each phone with the capability is the list that the reply is compared with.
+        await until(() => reads >= 2);
+        const text = "The release notes are ready for review.";
+        channels.store.update(channels.store.get(channel.id), {
+          messages: [agentMessage(channel.id, agent, text, { createdAt: new Date(Date.now() + 60_000).toISOString() })],
+        });
+        agents.emit("event", {
+          type: "channels-changed",
+          channelId: channel.id,
+          revision: channels.store.get(channel.id).revision,
+        });
+        // The second pass reads both lists, and its sends start before it ends.
+        await until(() => reads >= 4 && sends.length > 0);
+        await new Promise((settled) => setImmediate(settled));
+        assert.deepEqual(
+          sends.map((request) => request.push.sessionId),
+          ["phone-attention"],
+          "A phone without channel-attention-v1 or at needs-me got the channel reply.",
+        );
+        const keys = pushNotificationKeys(secret);
+        const [request] = sends;
+        assert.ok(request);
+        const opened = openSealedLiveActivity(
+          request.push.sealed,
+          encodeLiveActivityBytes(keys.seal),
+          encodeLiveActivityBytes(keys.tag),
+        );
+        assert.ok(opened, "The phone cannot open the push.");
+        const content = JSON.parse(opened);
+        assert.equal(content.title, channelTitle);
+        assert.equal(content.body, text);
+        assert.equal(content.kind, "reply");
+        assert.equal(content.agentId, agent.id);
+        // The phone opens the channel whose thread this is.
+        assert.equal(content.threadId, threadId);
+        return { sessions: sends.map((sent) => sent.push.sessionId), content };
+      } finally {
+        await Effect.runPromise(phones.dispose());
+      }
     },
   );
 

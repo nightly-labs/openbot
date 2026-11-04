@@ -350,6 +350,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:push-notification-away
 
+      - name: Run the channel notification E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:channel-notifications
+
       - name: Run the computer activity phone notification E2E test
         if: ${{ !cancelled() }}
         run: bun run test:computer-activity
@@ -595,6 +599,7 @@ jobs:
             .openbot-build/server-mute-e2e/
             .openbot-build/desktop-notifications-e2e/
             .openbot-build/push-notification-away-e2e/
+            .openbot-build/channel-notifications-e2e/
             .openbot-build/computer-activity-e2e/
             .openbot-build/notification-summary-e2e/
             .openbot-build/routine-pause-resume-e2e/

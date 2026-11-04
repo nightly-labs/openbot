@@ -16,7 +16,7 @@ export interface PushNotificationKeys {
   tag: Uint8Array;
 }
 
-export type PushNotificationKind = "reply" | "failed" | "input" | "approval" | "browser";
+export type PushNotificationKind = "reply" | "failed" | "input" | "approval" | "browser" | "usage-limit";
 
 /** What the extension shows, and what the app opens when the user taps the notification. */
 export interface PushNotificationContent {

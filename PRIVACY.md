@@ -1675,8 +1675,10 @@ host.
 ## iPhone notifications
 
 The iPhone app can show a notification when an agent finishes a task, stops with an error, or needs
-an answer, an approval, or a step in the browser, while the app is not on screen. The host does not
-send one while the member uses a desktop app or the computer that it runs on. For this, it keeps in
+an answer, an approval, or a step in the browser, while the app is not on screen. This includes the
+end of the work of a channel with an agent reply that the member has not read, and a provider plan
+limit that stops the agents, with its reset time. The host does not send one while the member uses a
+desktop app or the computer that it runs on. For this, it keeps in
 memory the time of the last send, answer or typing of each session, and on its own computer it reads
 whether the OpenBot window has focus and how long the computer has had no input. The desktop app also
 tells each joined server that shows its events on the desktop, after input, how many seconds ago the
@@ -1698,9 +1700,9 @@ keeps these values in a file that only the user of that computer can read, so it
 after a restart. It removes them when the phone removes them, when the member is removed or
 disabled, and when the account service or Apple refuses the phone.
 
-Each notification contains the agent name and a short text. With previews on, the text is the first
-sentences of the agent reply, the question, or the command or reason of an approval, at most 200
-characters, with secrets and email addresses hidden as in desktop notifications. With previews off, it only says what
+Each notification contains the agent name (for a plan limit, the provider name), the channel name for
+an event in a channel, and a short text. With previews on, the text is the first sentences of the agent reply, the question, or the
+command or reason of an approval, at most 200 characters, with secrets and email addresses hidden as in desktop notifications. With previews off, it only says what
 happened, such as "Finished working.". The host seals the notification with keys made from the
 secret, as it seals a Live Activity update, and sends it to the OpenBot account service with the
 account session of the phone. The account service sends nothing when that session has ended, when

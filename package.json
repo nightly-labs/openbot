@@ -332,6 +332,7 @@
     "test:team-session-revoke": "bun scripts/team-session-revoke-e2e.ts",
     "test:server-mute": "bun scripts/server-mute-e2e.ts",
     "test:desktop-notifications": "bun scripts/desktop-notifications-e2e.ts",
+    "test:channel-notifications": "bun scripts/channel-notifications-e2e.ts",
     "test:push-notification-away": "bun scripts/push-notification-away-e2e.ts",
     "test:computer-activity": "bun scripts/computer-activity-e2e.ts",
     "test:notification-summary": "bun scripts/notification-summary-e2e.ts",

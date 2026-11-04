@@ -2,7 +2,9 @@
 // owner's phone tells the owner when mute or the level keeps the desktop quiet. Events go through the
 // real notification forwarder, with an Electron `Notification` that records what it shows and closes,
 // and through the real phone notification service, with a send that records what it sends. The
-// level and the mute are set on a real `RemoteServerManager` on a temporary profile. Only the local
+// level and the mute are set on a real `RemoteServerManager` on a temporary profile. A provider plan
+// limit shows the same notice on the desktop and on the owner's phone, with the time zone of the reset
+// time on the phone. Only the local
 // server is used, so no remote host or account is needed. A run in a routine thread notifies on both,
 // and a click on its desktop notification opens the routine thread.
 // Run: `bun scripts/desktop-notifications-e2e.ts`.
@@ -22,8 +24,11 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import { createFormat, translateFor } from "@openbot/i18n";
+import { encodeLiveActivityBytes } from "@openbot/team-client/live-activity-seal";
+import { pushNotificationKeys } from "@openbot/team-client/push-notification-seal";
 import { plugin } from "bun";
 import { Effect } from "effect";
+import { openSealedLiveActivity } from "../apps/mobile/src/features/live-activity/model/live-activity-open";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { AgentService } from "../src/backend/agent-service";
 import { AgentStore } from "../src/backend/agent-store";
@@ -212,6 +217,22 @@ const ownLevels = new Map<string, ServerNotificationLevel>();
 /** The owner's level of the whole server, for all of their devices, or `null` for the level of each device. */
 let ownServerLevel: ServerNotificationLevel | null = null;
 const sentWaiters: (() => void)[] = [];
+/** The secret of the owner's phone, which opens what the phone gets. */
+const phoneSecret = crypto.getRandomValues(new Uint8Array(32));
+
+/** The title and the text of a send, opened with the keys of the phone as the phone opens it. */
+function phoneNotice(request: NotificationRelayRequest | undefined): { title: string; body: string; kind: string } {
+  assert.ok(request, "The phone got nothing.");
+  const keys = pushNotificationKeys(phoneSecret);
+  const text = openSealedLiveActivity(
+    request.push.sealed,
+    encodeLiveActivityBytes(keys.seal),
+    encodeLiveActivityBytes(keys.tag),
+  );
+  assert.ok(text, "The phone cannot open the send.");
+  const { title, body, kind } = JSON.parse(text);
+  return { title, body, kind };
+}
 const phone = new PushNotificationService({
   agents: {
     on: (_name, listener) => hostEvents.on("event", listener),
@@ -241,7 +262,7 @@ const phone = new PushNotificationService({
   lastUseElsewhere: () => null,
   // As `hostComputerInUse` decides for the owner with recent input and the window not focused.
   atHostComputer: (memberId, event) =>
-    memberId === OWNER_ID && desktopShowsAgentEvent(event, localServer(), true, ownLevels),
+    memberId === OWNER_ID && event !== "channel-reply" && desktopShowsAgentEvent(event, localServer(), true, ownLevels),
   // The host reads the owner's levels from the same store as the desktop app of its computer.
   memberLevels: (memberId) =>
     memberId === OWNER_ID ? { server: ownServerLevel, agents: ownLevels } : { server: null, agents: new Map() },
@@ -293,7 +314,7 @@ try {
         value: {
           serverId: "phone-server-id",
           token: "e2e-token-".padEnd(40, "x"),
-          secret: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"),
+          secret: encodeLiveActivityBytes(phoneSecret),
           locale: "en",
           away: true,
           level: "all",
@@ -509,6 +530,59 @@ try {
     assert.equal(await count("nothing", [finished]), 0, "The agent level opened a server set to Nothing.");
     ownLevels.clear();
     return { sent: sent.length };
+  });
+
+  await step("A usage limit shows the same notice on the desktop and the owner's phone", async () => {
+    const limit = (resetsAt: number | null): AgentEvent => ({
+      type: "usage-limit-reached",
+      agentId,
+      provider: "codex",
+      resetsAt,
+      agentCount: 2,
+    });
+    // The desktop shows it at every level but Nothing, also when the agent's own level is Nothing.
+    await setLevel("needs-me");
+    ownLevels.set(agentId, "nothing");
+    const from = shown.length;
+    desktop(limit(null));
+    ownLevels.clear();
+    const [onDesktop] = shown.slice(from);
+    assert.ok(onDesktop, "The desktop did not show the usage limit.");
+    // The desktop shows it, so the phone stays quiet.
+    assert.equal(await phoneCount([limit(null)]), 0, "The phone repeated what the desktop showed.");
+    // With the desktop muted, the phone tells the owner, also when the agent's own level is Nothing.
+    await setLevel("needs-me", true);
+    const before = sent.length;
+    ownLevels.set(agentId, "nothing");
+    const delivered = phoneSends(limit(null));
+    ownLevels.clear();
+    await delivered;
+    const onPhone = phoneNotice(sent[before]);
+    assert.deepEqual(
+      { title: onPhone.title, body: onPhone.body },
+      { title: onDesktop.title, body: onDesktop.body },
+      "The phone notice is not the desktop notice.",
+    );
+    assert.equal(onPhone.kind, "usage-limit");
+    // The phone can be in another time zone than the host, so its reset time names the zone.
+    const resetsAt = Math.floor(Date.now() / 1000) + 3600;
+    const zone = new Intl.DateTimeFormat("en", { timeZoneName: "short" })
+      .formatToParts(new Date(resetsAt * 1000))
+      .find((part) => part.type === "timeZoneName")?.value;
+    assert.ok(zone);
+    const withReset = sent.length;
+    await phoneSends(limit(resetsAt));
+    const timed = phoneNotice(sent[withReset]);
+    assert.ok(timed.body.includes(zone), `The reset time has no time zone: ${timed.body}`);
+    // The owner's level Nothing for all devices keeps the phone quiet. The phone decides when the
+    // event comes, so the level goes back before the barrier.
+    const quiet = sent.length;
+    ownServerLevel = "nothing";
+    hostEvents.emit("event", limit(null));
+    ownServerLevel = null;
+    await phoneSends(browserStep(95));
+    assert.equal(sent.length - quiet - 1, 0, "The level Nothing sent a usage limit.");
+    return { desktop: onDesktop.body, phone: onPhone.body, withReset: timed.body };
   });
 
   report.passed = true;

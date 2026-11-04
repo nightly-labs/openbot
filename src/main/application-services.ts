@@ -2740,6 +2740,14 @@ export async function createApplicationServices({
       if (!Notification.isSupported()) return false;
       // Read when an event arrives, after the manager below exists.
       const local = remoteServers.list().find((server) => server.id === LOCAL_SERVER_ID);
+      // The desktop notifies a channel reply at the server level "all" (`notifyChannelReplies`).
+      if (event === "channel-reply")
+        return (
+          notificationPreference.get().desktopNotifications &&
+          local !== undefined &&
+          !local.notificationsMuted &&
+          local.notificationLevel === "all"
+        );
       return desktopShowsAgentEvent(
         event,
         local,

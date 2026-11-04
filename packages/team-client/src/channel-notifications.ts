@@ -22,7 +22,8 @@ export interface ChannelNotificationOptions {
   redact: ((text: string) => string) | null;
 }
 
-type SettledReply = ChannelPreview & { author: { kind: "agent"; id: string } };
+/** The newest message of a channel when it is an agent reply that ended the work of the channel. */
+export type ChannelReply = ChannelPreview & { author: { kind: "agent"; id: string } };
 
 /**
  * The newest message of a channel when it is an agent reply and the work of the channel has ended:
@@ -30,7 +31,7 @@ type SettledReply = ChannelPreview & { author: { kind: "agent"; id: string } };
  * ask a question on the way, or pass work to other agents, so only the end of the work is a reply to
  * tell.
  */
-function settledReply(channel: ChannelSummary): SettledReply | null {
+function settledReply(channel: ChannelSummary): ChannelReply | null {
   const last = channel.lastMessage;
   if ((channel.openTasks ?? channel.activeTasks) > 0 || last?.author?.kind !== "agent") return null;
   if (last.status !== "completed" && last.status !== "failed") return null;
@@ -48,7 +49,7 @@ function settledReply(channel: ChannelSummary): SettledReply | null {
 export function newChannelReplies(
   previous: readonly ChannelSummary[] | null,
   next: readonly ChannelSummary[],
-): { channel: ChannelSummary; reply: SettledReply }[] {
+): { channel: ChannelSummary; reply: ChannelReply }[] {
   if (previous === null) return [];
   const before = new Map(previous.map((channel) => [channel.id, settledReply(channel)] as const));
   return next.flatMap((channel) => {
@@ -73,17 +74,31 @@ export function channelReplyNotifications(
 ): ChannelNotificationContent[] {
   if (options.level !== "all") return [];
   return newChannelReplies(previous, next).flatMap(({ channel, reply }) => {
-    const agentId = reply.author.id;
-    const agent = options.agents.find((candidate) => candidate.id === agentId);
-    if (!agent?.notifications) return [];
-    const body =
-      reply.status === "failed"
-        ? options.translate("notification.failed")
-        : (options.redact && plainPreview(options.redact(reply.text))) ||
-          options.translate("notification.channelMessage");
-    const title = options.translate("notification.channelTitle", { agent: agent.name, channel: channel.name });
-    return [{ title, body, channelId: channel.id, agentId }];
+    const content = channelReplyNotification(channel, reply, options);
+    return content ? [content] : [];
   });
+}
+
+/**
+ * The notification of one new reply (see `newChannelReplies`), or null when the level or the agent's
+ * own switch keeps it quiet. A reply notifies only at "all".
+ */
+export function channelReplyNotification(
+  channel: Pick<ChannelSummary, "id" | "name">,
+  reply: ChannelReply,
+  options: ChannelNotificationOptions,
+): ChannelNotificationContent | null {
+  if (options.level !== "all") return null;
+  const agentId = reply.author.id;
+  const agent = options.agents.find((candidate) => candidate.id === agentId);
+  if (!agent?.notifications) return null;
+  const body =
+    reply.status === "failed"
+      ? options.translate("notification.failed")
+      : (options.redact && plainPreview(options.redact(reply.text))) ||
+        options.translate("notification.channelMessage");
+  const title = options.translate("notification.channelTitle", { agent: agent.name, channel: channel.name });
+  return { title, body, channelId: channel.id, agentId };
 }
 
 /** The channel that owns `threadId` in a channel list, from the threads of channel-attention-v1. */

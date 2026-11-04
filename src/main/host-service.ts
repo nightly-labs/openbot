@@ -41,6 +41,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   type AgentAccessLevel,
+  CHANNEL_CHATS_CAPABILITY,
   conversationMessageSender,
   isAvatarColor,
   type ServerAuditName,
@@ -72,6 +73,7 @@ import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import { memberAuditChanges, memberAuditName, type ServerAuditStore } from "./server-audit-store";
 import { OWNER_PIN_KEY, type SidebarPinStore } from "./sidebar-pin-store";
 import type { TeamApiAgentNotificationLevels, TeamApiSidebarPins } from "./team-api/dependencies";
+import { memberChannelList } from "./team-api/route-channels";
 import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -218,8 +220,12 @@ interface HostServiceOptions {
   ) => Effect.Effect<"sent" | "gone", RemoteWorkflowError>;
   /** The phones that get notifications, kept for the next start. */
   pushNotificationStore?: PushNotificationStore;
-  /** Whether the owner uses the desktop app on this computer now and sees the event there, so the owner's phone stays quiet. */
-  hostComputerInUse?: (event: AgentEvent) => boolean;
+  /**
+   * Whether the owner uses the desktop app on this computer now and sees the event there, so the
+   * owner's phone stays quiet. `channel-reply` is a channel reply, which the desktop notifies from
+   * its channel list.
+   */
+  hostComputerInUse?: (event: AgentEvent | "channel-reply") => boolean;
   /** How long after the member's last use of another app or computer a phone notifies. `DESKTOP_USE_MS` when not set. */
   awayAfterMs?: number;
   verifyRemoteSessionTicket?: (ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>;
@@ -433,6 +439,12 @@ export class HostService extends EventEmitter<HostEvents> {
             liveActivityShows: (sessionId, subject, alert, startedAt) =>
               this.#liveActivityPush?.showsEvent(sessionId, subject, alert, startedAt) ?? false,
             channelForThread: (threadId) => this.channelForThread(threadId),
+            listChannels: (memberId, protocol, capabilities) => {
+              const channels = options.channels;
+              const member = options.store.getMember(memberId);
+              if (!channels || !member || !capabilities.has(CHANNEL_CHATS_CAPABILITY)) return null;
+              return memberChannelList(channels, member, this.#api.hiddenAgentIds(protocol, capabilities, member));
+            },
             logger,
           })
         : undefined;

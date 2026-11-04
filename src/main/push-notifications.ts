@@ -2,6 +2,7 @@ import {
   type AgentEvent,
   type AgentSummary,
   type AgentTurnCompletedEvent,
+  type ChannelSummary,
   type ConversationMessage,
   latestTurnAnswer,
   type ServerNotificationLevel,
@@ -14,7 +15,7 @@ import {
   type NotificationSound,
 } from "@openbot/contracts/notification-relay";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
-import { resolveLocale, translateFor } from "@openbot/i18n";
+import { type AppFormat, createFormat, resolveLocale, translateFor } from "@openbot/i18n";
 import { redactText, toLogValue } from "@openbot/logging";
 import {
   type AgentNotificationChannel,
@@ -22,7 +23,13 @@ import {
   agentEventRequestThread,
   agentNotificationLevel,
   notificationForAgentEvent,
+  notificationForUsageLimit,
 } from "@openbot/team-client/agent-notifications";
+import {
+  type ChannelReply,
+  channelReplyNotification,
+  newChannelReplies,
+} from "@openbot/team-client/channel-notifications";
 import {
   decodeLiveActivityBytes,
   LIVE_ACTIVITY_NONCE_BYTES,
@@ -67,6 +74,24 @@ const HELD_EVENT_LIMIT = 20;
 const HELD_FLUSH_DELAY_MS = 3_000;
 /** A notification that the account service, Apple or Google did not take is sent again after these times. */
 const RESEND_DELAYS_MS = [10_000, 60_000] as const;
+/**
+ * A streaming reply changes the channels many times a second. Their lists are read once in this time,
+ * which is enough to see the end of the work of a channel.
+ */
+const CHANNEL_READ_DELAY_MS = 1_000;
+
+/**
+ * The work of a channel ended with an agent reply that the member of one phone has not read, as the
+ * desktop finds it (`newChannelReplies`). It goes to that phone only.
+ */
+interface ChannelReplyEvent {
+  type: "channel-reply";
+  channel: ChannelSummary;
+  reply: ChannelReply;
+}
+
+/** An event that can notify a phone: an agent event, or the reply of a channel. */
+type PushEvent = AgentEvent | ChannelReplyEvent;
 
 /** One notification for the relay route of its platform. */
 export type NotificationRelayRequest =
@@ -101,8 +126,11 @@ interface PushNotificationOptions {
     server: ServerNotificationLevel | null;
     agents: ReadonlyMap<string, ServerNotificationLevel>;
   };
-  /** Whether the member is at the computer of this host, where the desktop app shows the event. */
-  atHostComputer(memberId: string, event: AgentEvent): boolean;
+  /**
+   * Whether the member is at the computer of this host, where the desktop app shows the event. A
+   * `channel-reply` is a channel reply, which the desktop notifies from its channel list.
+   */
+  atHostComputer(memberId: string, event: AgentEvent | "channel-reply"): boolean;
   /**
    * Whether the session's phone shows a Live Activity of this host that shows this event, in place of
    * a notification. With `alert`, the activity lights up the screen and plays the sound.
@@ -116,6 +144,15 @@ interface PushNotificationOptions {
   ): boolean;
   /** The channel whose execution thread `threadId` is, or `null` for an agent's own thread. */
   channelForThread?(threadId: string): AgentNotificationChannel | null;
+  /**
+   * The channel list of the member's phone with this protocol and these capabilities, as the channel
+   * list route gives it, with the member's read state. `null` when this host has no channels.
+   */
+  listChannels?(
+    memberId: string,
+    protocol: number,
+    capabilities: ReadonlySet<string>,
+  ): readonly ChannelSummary[] | null;
   randomBytes(size: number): Uint8Array;
   now?: () => number;
   logger?: { warn(message: string, ...values: unknown[]): void };
@@ -135,7 +172,7 @@ export interface PushNotificationSubject {
 }
 
 interface HeldEvent {
-  event: AgentEvent;
+  event: PushEvent;
   at: number;
 }
 
@@ -148,12 +185,18 @@ interface Registration {
   /** Events that came while the phone looked on screen, oldest first. */
   held: HeldEvent[];
   flushTimer: ReturnType<typeof setTimeout> | null;
+  /**
+   * The channel list of the phone when it was last read, to find the replies that are new since then.
+   * `null` before the first read, and for a phone without channel-attention-v1, which has no channel view.
+   */
+  channels: readonly ChannelSummary[] | null;
 }
 
 /**
  * Sends a notification to a member's iPhone or Android phone when an agent that the member can see
  * finishes, fails, cannot start a message, or waits for input, an approval or a browser step, while
- * the app is not on screen.
+ * the app is not on screen. This includes the end of the work of a channel with an agent reply that the
+ * member has not read, and a provider plan limit that stops the agents, as on desktop.
  * It decides as the desktop does (`notificationForAgentEvent`): the member's level, the agent's own
  * switch, and no notification for a quiet routine run. It sends nothing while the member uses a
  * desktop app or the computer that it runs on, and no answer to a message while an iPhone shows the Live Activity, which shows the
@@ -172,8 +215,10 @@ export class PushNotificationService {
   readonly #awayAfterMs: number;
   readonly #listener = (event: AgentEvent) => {
     this.#releaseAnswered(event);
-    Effect.runFork(this.#deliver(event).pipe(Effect.forkIn(this.#scope, { startImmediately: true })));
+    if (event.type === "channels-changed") this.#scheduleChannelRead();
+    this.#run(this.#deliver(event));
   };
+  #channelTimer: ReturnType<typeof setTimeout> | null = null;
   #scope = Scope.makeUnsafe();
   #listening = false;
   /** Between `start` and `dispose`. A request that comes later must not save a list without the other phones. */
@@ -218,6 +263,8 @@ export class PushNotificationService {
       if (!this.#registrations.has(stored.sessionId)) this.#add(stored, false);
     }
     this.#listen();
+    // The saved phones need the channel list that a later reply is compared with.
+    if (this.#registrations.size > 0) this.#scheduleChannelRead();
   }
 
   register(sessionId: string, viewer: PushNotificationViewer, target: PushTarget): void {
@@ -233,6 +280,8 @@ export class PushNotificationService {
     // The app on screen showed the kept events. A phone that goes away gets those it did not see.
     if (registration && target.value.away) this.#scheduleFlush(registration);
     else if (registration) this.#dropHeld(registration);
+    // A new phone needs the channel list that a later reply is compared with.
+    if (registration && !registration.channels) this.#scheduleChannelRead();
     // A phone that signs in again gets a new session. The old one would notify it a second time.
     const token = target.value.token;
     for (const [other, registration] of this.#registrations) {
@@ -275,6 +324,8 @@ export class PushNotificationService {
     this.#running = false;
     if (this.#listening) this.#options.agents.off("event", this.#listener);
     this.#listening = false;
+    if (this.#channelTimer) clearTimeout(this.#channelTimer);
+    this.#channelTimer = null;
     for (const registration of this.#registrations.values()) this.#dropHeld(registration);
     this.#registrations.clear();
     this.#computerInput.clear();
@@ -294,30 +345,35 @@ export class PushNotificationService {
       connected,
       held: previous?.held ?? [],
       flushTimer: null,
+      channels: previous?.channels ?? null,
     });
     return true;
   }
 
   /**
    * Sends `event` to each phone that is away, or only to `only`. A phone that looks on screen keeps
-   * the event, because iOS can suspend the app before it says that it goes away.
+   * the event, because iOS can suspend the app before it says that it goes away. A kept event that
+   * goes out later (`flushed`) is not kept again.
    */
   #deliver = Effect.fn("PushNotifications.deliver")(function* (
     this: PushNotificationService,
-    received: AgentEvent,
+    received: PushEvent,
     only?: Registration,
+    flushed = only !== undefined,
   ) {
     // A routine thread's turn notifies as a turn of the chat does. Its answer is in the routine thread.
     const routineTaskId = received.type === "routine-thread-turn-completed" ? received.taskId : null;
     const event = received.type === "routine-thread-turn-completed" ? received.turn : received;
     const subject = eventSubject(event);
     if (!subject) return;
+    // The desktop notifies a channel reply from its channel list.
+    const desktopEvent = event.type === "channel-reply" ? "channel-reply" : event;
     const now = this.#now();
     const targets = (only ? [only] : [...this.#registrations.values()]).filter((registration) => {
       const { value, memberId, protocol, sessionId } = registration.stored;
       // While the app is on screen, it shows the event itself.
       if (!value.away && registration.connected) {
-        if (!only) this.#hold(registration, received, now);
+        if (!flushed) this.#hold(registration, received, now);
         return false;
       }
       if (value.mutedUntil !== null && value.mutedUntil * 1_000 > now) return false;
@@ -329,12 +385,16 @@ export class PushNotificationService {
         return false;
       // A member at a desktop app sees the event there, and the phone would only repeat it.
       const used = this.#lastUseElsewhere(memberId, sessionId);
-      return !((used !== null && now - used < this.#awayAfterMs) || this.#options.atHostComputer(memberId, event));
+      return !(
+        (used !== null && now - used < this.#awayAfterMs) ||
+        this.#options.atHostComputer(memberId, desktopEvent)
+      );
     });
     if (!targets.length) return;
     const agents = this.#options.agents.listAgents();
     // A prompt, an approval or a takeover on a channel thread names the channel, as on desktop.
-    const requestThread = agentEventRequestThread(event);
+    const requestThread =
+      event.type === "channel-reply" || event.type === "usage-limit-reached" ? null : agentEventRequestThread(event);
     const channel = requestThread ? (this.#options.channelForThread?.(requestThread) ?? null) : null;
     let answer: string | null | undefined;
     for (const registration of targets) {
@@ -342,7 +402,56 @@ export class PushNotificationService {
       const { value, memberId, sessionId } = stored;
       const translate = translateFor(resolveLocale("system", value.locale));
       const chosen = this.#options.memberLevels?.(memberId);
+      if (event.type === "usage-limit-reached") {
+        // As on desktop: the notice is about the provider account, so the level of the agent does not
+        // silence it, and the Live Activity does not show it. The time zone shows with the reset time,
+        // because the phone can be in another one than this computer.
+        const notice = notificationForUsageLimit(
+          event,
+          agents,
+          translate,
+          withTimeZone(createFormat(resolveLocale("system", value.locale))),
+          chosen?.server ?? value.level,
+        );
+        if (!notice || (stored.platform !== "android" && stored.value.token === null)) continue;
+        const content: PushNotificationContent = {
+          serverId: value.serverId,
+          agentId: notice.agentId,
+          threadId: notice.threadId,
+          kind: subject.kind,
+          title: notice.title,
+          body: notice.body,
+        };
+        yield* this.#send(registration, content, notice.body).pipe(
+          Effect.forkIn(this.#scope, { startImmediately: true }),
+        );
+        continue;
+      }
       const level = agentNotificationLevel(chosen?.server ?? value.level, chosen?.agents ?? null, subject.agentId);
+      if (event.type === "channel-reply") {
+        // The level and the switch of the agent apply as on desktop: a reply notifies only at "all".
+        const options = { agents, translate, level, redact: null };
+        const fixed = channelReplyNotification(event.channel, event.reply, options);
+        if (!fixed) continue;
+        // The Live Activity shows the replies of the agents' own chats only, so the notification goes.
+        if (stored.platform !== "android" && stored.value.token === null) continue;
+        const notice = value.preview
+          ? (channelReplyNotification(event.channel, event.reply, { ...options, redact: redactText }) ?? fixed)
+          : fixed;
+        const content: PushNotificationContent = {
+          serverId: value.serverId,
+          agentId: notice.agentId,
+          // The thread of the agent in the channel. The phone opens the channel of that thread.
+          threadId: event.channel.threads?.find((thread) => thread.agentId === notice.agentId)?.threadId ?? null,
+          kind: subject.kind,
+          title: notice.title,
+          body: notice.body,
+        };
+        yield* this.#send(registration, content, fixed.body).pipe(
+          Effect.forkIn(this.#scope, { startImmediately: true }),
+        );
+        continue;
+      }
       // A phone from before channel-attention-v1 has no channel view, so its title names the agent only.
       const eventChannel = registration.capabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY) ? channel : null;
       // The fixed text, as the desktop shows it without a preview.
@@ -391,6 +500,45 @@ export class PushNotificationService {
       yield* this.#send(registration, content, fixed.body).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
     }
   });
+
+  /**
+   * Reads the channel list of each phone with channel-attention-v1 a short time after a channel
+   * changed, and sends each reply that is new to that phone only. The first read of a phone is the
+   * list that later replies are compared with.
+   */
+  #scheduleChannelRead(): void {
+    if (this.#channelTimer || !this.#running || !this.#options.listChannels) return;
+    this.#channelTimer = setTimeout(() => {
+      this.#channelTimer = null;
+      if (this.#running) this.#readChannels();
+    }, CHANNEL_READ_DELAY_MS);
+  }
+
+  #readChannels(): void {
+    const listChannels = this.#options.listChannels;
+    if (!listChannels) return;
+    for (const registration of this.#registrations.values()) {
+      const { memberId, protocol } = registration.stored;
+      if (!registration.capabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY)) continue;
+      let next: readonly ChannelSummary[] | null;
+      try {
+        next = listChannels(memberId, protocol, registration.capabilities);
+      } catch (error) {
+        this.#options.logger?.warn("Channels for push notifications were not read:", toLogValue(error));
+        continue;
+      }
+      const previous = registration.channels;
+      registration.channels = next;
+      if (!next) continue;
+      for (const { channel, reply } of newChannelReplies(previous, next)) {
+        this.#run(this.#deliver({ type: "channel-reply", channel, reply }, registration, false));
+      }
+    }
+  }
+
+  #run(effect: Effect.Effect<void>): void {
+    Effect.runFork(effect.pipe(Effect.forkIn(this.#scope, { startImmediately: true })));
+  }
 
   /** The answer of a turn in the agent's own chat or in a routine thread, or `null` when it has none. */
   #answer = Effect.fn("PushNotifications.answer")(function* (
@@ -454,7 +602,7 @@ export class PushNotificationService {
   });
 
   /** Keeps an event for a phone that looks on screen, in case iOS suspended it before it said so. */
-  #hold(registration: Registration, event: AgentEvent, now: number): void {
+  #hold(registration: Registration, event: PushEvent, now: number): void {
     const held = registration.held.filter((item) => now - item.at < HELD_EVENT_MS);
     held.push({ event, at: now });
     registration.held = held.slice(-HELD_EVENT_LIMIT);
@@ -513,11 +661,23 @@ export class PushNotificationService {
     // suspended the app before it showed them, so the events that the host cannot judge go out too.
     const sawScreen = registration.connected;
     for (const { event } of held) {
-      const unseen = heldEventUnseen(event, snapshot, reads, agents);
+      const unseen =
+        event.type === "channel-reply"
+          ? this.#channelReplyUnseen(registration, event)
+          : heldEventUnseen(event, snapshot, reads, agents);
       if (unseen === false || (unseen === null && sawScreen)) continue;
       yield* this.#deliver(event, registration);
     }
   });
+
+  /** Whether the channel of a reply is still unread. A channel that left the list has nothing to see. */
+  #channelReplyUnseen(registration: Registration, event: ChannelReplyEvent): boolean | null {
+    const { memberId, protocol } = registration.stored;
+    const channels = this.#options.listChannels?.(memberId, protocol, registration.capabilities);
+    if (!channels) return null;
+    const channel = channels.find((item) => item.id === event.channel.id);
+    return channel !== undefined && !channel.archived && channel.unreadCount > 0;
+  }
 
   #save(): void {
     const registrations = [...this.#registrations.values()].map((registration) => registration.stored);
@@ -541,6 +701,11 @@ export class PushNotificationService {
     this.#options.agents.on("event", this.#listener);
     this.#listening = true;
   }
+}
+
+/** `format` with the time zone after each time, as "3:00 PM CET". */
+function withTimeZone(format: AppFormat): AppFormat {
+  return { ...format, date: (value, options) => format.date(value, { ...options, timeZoneName: "short" }) };
 }
 
 function soundOf(value: StoredPushRegistration["value"]): NotificationSound | null {
@@ -576,6 +741,9 @@ function heldEventUnseen(
 ): boolean | null {
   // As for a reply in another thread of the chat below.
   if (event.type === "error" || event.type === "routine-thread-turn-completed") return null;
+  // A limit that still holds: a later turn that ran ends it. A host without the list cannot know.
+  if (event.type === "usage-limit-reached")
+    return snapshot.usageLimits ? snapshot.usageLimits.some((limit) => limit.agentId === event.agentId) : null;
   if (event.type !== "turn-completed") return true;
   if (event.status !== "completed") {
     return snapshot.failedTurns.some((failed) => failed.agentId === event.agentId && failed.turnId === event.turnId);
@@ -586,7 +754,7 @@ function heldEventUnseen(
 }
 
 /** The request that a kept event waits for, or `null` for an event that waits for nothing. */
-function heldRequest(event: AgentEvent): { agentId: string; requestId: string | number } | null {
+function heldRequest(event: PushEvent): { agentId: string; requestId: string | number } | null {
   switch (event.type) {
     case "prompt":
       return { agentId: event.agentId, requestId: event.requestId };
@@ -599,8 +767,14 @@ function heldRequest(event: AgentEvent): { agentId: string; requestId: string | 
   }
 }
 
-/** The agent and the kind of an event that can notify. `notificationForAgentEvent` decides the rest. */
-function eventSubject(event: AgentEvent): PushNotificationSubject | null {
+/**
+ * The agent and the kind of an event that can notify. `notificationForAgentEvent` and
+ * `channelReplyNotification` decide the rest.
+ */
+function eventSubject(event: AgentEvent | ChannelReplyEvent): PushNotificationSubject | null {
+  if (event.type === "channel-reply")
+    return { agentId: event.reply.author.id, kind: event.reply.status === "failed" ? "failed" : "reply" };
+  if (event.type === "usage-limit-reached") return { agentId: event.agentId, kind: "usage-limit" };
   if (!agentEventCanNotify(event)) return null;
   switch (event.type) {
     case "turn-completed":

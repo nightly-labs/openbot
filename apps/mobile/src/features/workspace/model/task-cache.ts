@@ -1,5 +1,6 @@
 import type {
   AgentEvent,
+  AgentTask,
   AgentTasksSnapshot,
   ConversationMessage,
   ConversationSnapshot,
@@ -153,4 +154,38 @@ export function taskThreadMessages(
     queryClient.getQueryData<ConversationSnapshot>(queryKeys.agentTaskConversation(scope, serverId, task.id))
       ?.messages ?? []
   );
+}
+
+/**
+ * The side thread that runs on `threadId`, as a notification names it, or null for the agent's own
+ * chat. The cached list of the agent can miss a thread that the agent started while iOS suspended
+ * the app, so a thread that it does not have is read again from the host. A read that fails, or that
+ * takes longer than `waitMs`, gives null, and the agent chat opens.
+ */
+export async function taskOfThread(
+  queryClient: QueryClient,
+  scope: QueryScope,
+  serverId: string,
+  agentId: string,
+  threadId: string,
+  load: () => Promise<AgentTasksSnapshot>,
+  waitMs: number,
+): Promise<AgentTask | null> {
+  const queryKey = queryKeys.agentTasks(scope, serverId, agentId);
+  const cached = queryClient.getQueryData<AgentTasksSnapshot>(queryKey);
+  const known = cached?.tasks.find((task) => task.threadId === threadId);
+  if (known) return known;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), waitMs);
+  });
+  const read = queryClient
+    .fetchQuery({ queryKey, queryFn: load, staleTime: 0, retry: false })
+    .then((snapshot) => snapshot.tasks.find((task) => task.threadId === threadId) ?? null)
+    .catch(() => null);
+  try {
+    return await Promise.race([read, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }

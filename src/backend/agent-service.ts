@@ -5268,7 +5268,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #emit(event: AgentEvent): void {
     recordAgentRestartActivity(event);
-    if (this.channels?.event(event) || this.messaging?.event(event, this.#scope) || this.#tasks?.event(event)) return;
+    if (this.channels?.event(event) || this.messaging?.event(event, this.#scope) || this.#tasks?.event(event)) {
+      // A client sees the work of a channel, a messaging thread or a side thread only in the runtime
+      // snapshot: the island and the Live Activity show it as work of the agent. The start and the end
+      // of a turn there send a new one, so the work does not show before it starts or after it ends.
+      if (event.type === "turn-started" || event.type === "turn-completed") this.#emitRuntimeSnapshot();
+      return;
+    }
     this.emit("event", event);
   }
 

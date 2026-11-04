@@ -16,6 +16,12 @@ waits 5 seconds and has priority 5. An unchanged state is sent again every 10 mi
 date moves on; a host that sleeps stops this, and the view then shows that it is out of date. An idle
 state ends the activity.
 
+The work of an agent in a channel, a messaging thread or a side thread is in the runtime snapshot
+only (`work`, from the mailbox deliveries), because their services consume the turn events. So
+`AgentService` sends a new `runtime-snapshot` when one of these turns starts or ends, and the island
+and the Live Activity of the desktop and the phone show that work when it starts and stop when it
+ends. A reply there is not a message of the island, which shows the agents' own chats only.
+
 `live-activity-seal.ts` seals the props with keys derived from a secret that the phone makes for
 that host (an HMAC of the phone secret and the server ID). The
 host sends the sealed text to `POST /v2/remote/hosts/:hostId/live-activity` with its machine
@@ -55,10 +61,28 @@ parts to other agents thus notifies once, at its end. The desktop reads the agen
 notification only when a reply is new, and it reads no channel list for a server whose replies
 cannot notify. The title of a prompt, an approval or
 a takeover on a channel thread names the agent and the channel (`notification.channelTitle`), and a
-click opens the channel. The phone gets no channel reply notification. For a phone that sends
+click opens the channel. For a phone that sends
 `channel-attention-v1`, the host names the channel in the title of a prompt, an approval or a
 takeover on a channel thread (`PushNotificationService` reads `HostService.channelForThread`), and a
-tap opens the channel. An older phone gets the agent name as the title, as before.
+tap opens the channel. An older phone gets the agent name as the title, as before. The host also
+sends such a phone the channel replies, by the same rule as the desktop (`newChannelReplies`,
+`channelReplyNotification`): after a `channels-changed` event, at most once a second, it reads the
+channel list of each phone as the channel list route gives it to that member (`memberChannelList`,
+with the member's read state and hidden agents), and compares it with the list it read before. The
+first read of a phone is only its baseline. A new reply goes to that phone only, at the level `all`,
+with the agent and the channel in the title, and the thread of the agent in that channel as its
+`threadId`, so a tap opens the channel. An older phone gets no channel reply.
+
+Side threads notify as on desktop. `AgentTasks` consumes the `turn-completed` event of a side
+thread, so neither the desktop nor the phone notifies its reply or failure. A routine thread sends
+`routine-thread-turn-completed`, which both notify. A prompt, an approval or a takeover in a side
+thread notifies both, and a tap on the phone opens that thread (the phone finds the task of that
+thread in its thread list, or reads the list again).
+
+A provider plan limit (`usage-limit-reached`) notifies the phone as it notifies the desktop
+(`notificationForUsageLimit`): at every level of the server but `nothing`, also when the level of the
+agent is `nothing`, with the `usage-limit` kind. The Live Activity does not show it. The reset time
+names its time zone, because the phone can be in another one than the host.
 
 The phone registers with every connected server that supports `push-notifications-v1`
 (`POST /v1/push-notifications/registration`): the APNs token of the app, the secret of that host (the
@@ -436,7 +460,8 @@ the agent in the browser header is a glass button with a menu that switches to t
 member. The Deleted channels sheet restores a channel (`restore`) for the people who
 can delete one. The phone has no local notifications of channel replies: a host sends a notification
 only while the phone is away (see iPhone notifications). A tap on a notification whose thread is a
-channel thread opens the channel, when the phone has the channel list of that server.
+channel thread opens the channel, when the phone has the channel list of that server. A tap on a
+notification whose thread is a side thread opens that thread.
 
 Mobile channel settings use one native sheet with a nested stack for memories and routines. The
 memory and routine editors share their controls with agent settings and use channel API operations.

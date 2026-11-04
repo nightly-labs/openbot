@@ -4,6 +4,7 @@ import {
   CHANNEL_TASK_CANCEL_CAPABILITY,
   type ChannelCommand,
   type ChannelMessage,
+  type ChannelSummary,
   canAdministerServer,
   isReleasedRoutineSchedule,
   parseChannelCommand,
@@ -66,14 +67,8 @@ export async function routeChannels(
   if (!list && !read && !command && !remove && !settings) return "unmatched";
   if (!channels || !capabilities.has(CHANNEL_CHATS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.channelsUnsupported"));
-  // The agents that hide a whole channel. Owners and admins keep every channel: on an older
-  // client, the agents of a provider that its protocol does not know are hidden from them too.
-  const channelHiddenAgentIds: ReadonlySet<string> = canAdministerServer(member.role) ? new Set() : hiddenAgentIds;
-  if (list)
-    return json(
-      200,
-      channels.store.list(member.id).filter((channel) => seesChannel(channel.members, channelHiddenAgentIds)),
-    );
+  const channelHiddenAgentIds = channelHidingAgentIds(member, hiddenAgentIds);
+  if (list) return json(200, memberChannelList(channels, member, hiddenAgentIds));
   if (read) {
     const input = parseChannelRead(channelRequest(url.pathname, await readJson(request)));
     requireVisibleChannel(channels, input.channelId, channelHiddenAgentIds);
@@ -108,6 +103,30 @@ export async function routeChannels(
       ),
     ),
   );
+}
+
+/**
+ * The agents that hide a whole channel. Owners and admins keep every channel: on an older client, the
+ * agents of a provider that its protocol does not know are hidden from them too.
+ */
+function channelHidingAgentIds(
+  member: Pick<TeamApiRequestContext["member"], "role">,
+  hiddenAgentIds: ReadonlySet<string>,
+): ReadonlySet<string> {
+  return canAdministerServer(member.role) ? new Set() : hiddenAgentIds;
+}
+
+/**
+ * The channel list of a member, with the member's read state, as the list route gives it. The phone
+ * notifications of this host read it too, so a reply notifies only from a channel that the phone lists.
+ */
+export function memberChannelList(
+  channels: ChannelService,
+  member: Pick<TeamApiRequestContext["member"], "id" | "role">,
+  hiddenAgentIds: ReadonlySet<string>,
+): ChannelSummary[] {
+  const hiding = channelHidingAgentIds(member, hiddenAgentIds);
+  return channels.store.list(member.id).filter((channel) => seesChannel(channel.members, hiding));
 }
 
 /**
