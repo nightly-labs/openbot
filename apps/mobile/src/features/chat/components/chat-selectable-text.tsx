@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { type ColorValue, TextInput, type TextInputInstance, useWindowDimensions } from "react-native";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
-import { layoutDirection, physicalTextDirectionStyle, textDirection } from "@/shared/lib/text-direction";
+import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 import { CHAT_TEXT_STYLES } from "./chat-text-styles";
 
 /** The body text of a message. */
@@ -82,7 +82,7 @@ export function ChatSelectableText({
         // An Android field finds the direction of each paragraph from its text. An iOS field
         // takes it from the first paragraph, as the message text does in most messages. Text with
         // no letter keeps the layout direction, as the message text does.
-        ...(isIOS ? physicalTextDirectionStyle(textDirection(text, layoutDirection())) : undefined),
+        ...fieldDirectionStyle(text),
       }}
     />
   );

@@ -1,7 +1,7 @@
 import { useThemeColor } from "heroui-native/hooks";
 import Reply from "lucide-react-native/icons/reply";
 import { type PropsWithChildren, useMemo, useRef, useState } from "react";
-import { I18nManager, View } from "react-native";
+import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
@@ -14,7 +14,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { haptics } from "@/shared/lib/haptics";
-import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import { END_X, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 /** How long a touch and hold lasts before the sheet opens. */
 const HOLD_MS = 500;
@@ -56,7 +56,7 @@ export function ChatMessageGesture({
   // right in a right-to-left layout: React Native swaps the sides of the layout, not the gestures and
   // the transforms.
   const offset = useSharedValue(0);
-  const direction = (align === "end" ? -1 : 1) * (I18nManager.isRTL ? -1 : 1);
+  const direction = (align === "end" ? -1 : 1) * END_X;
   // The press of a touch and hold. It runs on the UI thread, so a press renders nothing in React.
   const pressScale = useSharedValue(1);
   const bubbleStyle = useAnimatedStyle(() => ({

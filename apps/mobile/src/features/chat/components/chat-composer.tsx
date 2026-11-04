@@ -57,16 +57,10 @@ import {
 } from "@/shared/lib/composer-metrics";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
-import { isAndroid, isIOS } from "@/shared/lib/platform";
+import { isAndroid } from "@/shared/lib/platform";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
-import {
-  END_X,
-  layoutDirection,
-  MIRROR_IN_RTL,
-  physicalTextDirectionStyle,
-  textDirection,
-} from "@/shared/lib/text-direction";
+import { END_X, fieldDirectionStyle, layoutDirection, MIRROR_IN_RTL, textDirection } from "@/shared/lib/text-direction";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { applyMarkdownListEdit, markdownListReturn } from "../model/composer-lists";
 import { largePastedText } from "../model/composer-paste";
@@ -1274,9 +1268,7 @@ export const ChatComposer = memo(function ChatComposer({
                         textAlignVertical: "top",
                         // An Android field finds the direction of each paragraph from its text. An
                         // iOS field reads in the direction of the draft, and of the app when it is empty.
-                        ...(isIOS
-                          ? physicalTextDirectionStyle(textDirection(displayText, layoutDirection()))
-                          : undefined),
+                        ...fieldDirectionStyle(displayText),
                       }}
                       onSelectionChange={({ nativeEvent }) =>
                         setCursor(
