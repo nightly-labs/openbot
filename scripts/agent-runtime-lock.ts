@@ -8,7 +8,7 @@ const nativeProviderArtifactSchema = z.object({
   assetSha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
   installedBytes: z.number().int().positive(),
-  executable: z.enum(["pi", "pi.exe", "muse", "muse.exe", "devin", "devin.exe"]),
+  executable: z.enum(["pi", "pi.exe", "muse", "muse.exe", "devin", "devin.exe", "copilot", "copilot.exe"]),
   files: z.record(z.string().min(1), sha256Schema),
 });
 const nativeProviderLockSchema = z.object({
@@ -305,6 +305,12 @@ const agentRuntimeLockSchema = z.object({
    * downloads the CLI on the user's computer and does not ship it in a release.
    */
   devin: nativeProviderLockSchema,
+  /**
+   * GitHub's Copilot CLI, from the GitHub releases of `github/copilot-cli`. Its licence lets an app
+   * include it only unchanged, so OpenBot downloads the CLI on the user's computer and does not ship
+   * it in a release.
+   */
+  copilot: nativeProviderLockSchema,
   cline: z.object({
     registry: z.literal("https://registry.npmjs.org"),
     repository: z.literal("https://github.com/cline/cline"),

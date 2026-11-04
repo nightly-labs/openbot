@@ -21,7 +21,7 @@ import { ProviderRuntimeFailure, runtimeIO, runtimeSync } from "./provider-runti
  * users with the next OpenBot release. Providers ship faster than that, so the update offer now
  * follows upstream. The lock still names the version a first install uses when no source answers.
  *
- * Every download keeps a hash from its source: GitHub's asset `digest` for Codex, Pi and Kimi, the
+ * Every download keeps a hash from its source: GitHub's asset `digest` for Codex, Pi, Kimi and Copilot, the
  * Meta and Cognition manifests for Muse and Devin, and npm's `dist.integrity` for Claude, OpenCode
  * and Cline. x.ai publishes no hash for Grok, so a Grok release is trusted on TLS alone, and so are
  * Antigravity and Cursor from the ACP registry. Bun is a tool runtime rather than a provider, and
@@ -97,6 +97,35 @@ const LATEST_RELEASES: Record<
       version,
       packageVersion: version,
       url: `https://github.com/earendil-works/pi/releases/download/v${version}/${assetName}`,
+      archiveDigest: { algorithm: "sha256" as const, hex: asset.digest.slice(7) },
+      downloadBytes: asset.size,
+    };
+  }),
+  copilot: Effect.fn("ProviderRelease.copilot")(function* ({ target, lock, fetch }: LatestReleaseContext) {
+    const pinned = providerRuntimeDescriptor("copilot").spec(target, lock);
+    const release = yield* fetchJsonEffect(fetch, "https://api.github.com/repos/github/copilot-cli/releases/latest", {
+      Accept: "application/vnd.github+json",
+    });
+    const version = isString(release.tag_name) ? versionFromTag(release.tag_name, "v") : null;
+    const assetName = `copilot-${target}.${target === "win32-x64" ? "zip" : "tar.gz"}`;
+    const asset = Array.isArray(release.assets)
+      ? release.assets.find((entry: unknown) => isDynamicRecord(entry) && entry.name === assetName)
+      : null;
+    if (
+      !version ||
+      !isDynamicRecord(asset) ||
+      !isString(asset.digest) ||
+      !/^sha256:[a-f0-9]{64}$/u.test(asset.digest) ||
+      !isNumber(asset.size) ||
+      asset.size <= 0
+    )
+      return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.nativeArchiveInvalid")) });
+    return {
+      ...pinned,
+      source: "latest" as const,
+      version,
+      packageVersion: version,
+      url: `https://github.com/github/copilot-cli/releases/download/v${version}/${assetName}`,
       archiveDigest: { algorithm: "sha256" as const, hex: asset.digest.slice(7) },
       downloadBytes: asset.size,
     };

@@ -58,6 +58,9 @@ export function providerAuthKind(agent: AgentSummary, facts: ProviderAuthFacts):
     case "devin":
       // Devin signs in only with a Devin account, and takes no API key.
       return facts.account("devin") ? "subscription" : "unknown";
+    case "copilot":
+      // Copilot runs only on a Copilot plan, from a GitHub sign-in or a GitHub token.
+      return facts.account("copilot") ? "subscription" : "unknown";
     case "cline":
       return model.startsWith("cline-free/") ? "free" : "unknown";
     case "hermes":

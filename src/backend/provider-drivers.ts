@@ -45,6 +45,7 @@ import {
   resolveClaudeCli,
   resolveClineCli,
   resolveCodexCli,
+  resolveCopilotCli,
   resolveCursorCli,
   resolveDevinCli,
   resolveGrokCli,
@@ -77,8 +78,10 @@ import { readOpenCodeGoUsage } from "./opencode-usage";
 import { PiAgentClient } from "./pi-client";
 import {
   antigravityStatePaths,
+  COPILOT_CONFINED_ENV,
   clineStatePaths,
   confineSpawnTarget,
+  copilotStatePaths,
   cursorConfinedEnv,
   cursorStatePaths,
   customAgentStatePaths,
@@ -109,6 +112,11 @@ interface ProviderCliCommand {
    * default answer instead of waiting. Only for a `device` or `link` sign-in, which reads no code.
    */
   readonly closeInput?: true;
+  /**
+   * `argv` starts the CLI's ACP server, which signs out with ACP `logout`: for a CLI that has a
+   * `logout` method and no sign-out command. Only for a sign-out.
+   */
+  readonly acpLogout?: true;
 }
 
 /**
@@ -404,6 +412,15 @@ function confineWithState(
 
 /** `devin acp` serves the Agent Client Protocol on stdio. */
 const DEVIN_ARGV: readonly string[] = ["acp"];
+
+/**
+ * GitHub Copilot CLI 1.0.105 updates itself unless told not to. OpenBot owns the version, so every
+ * process gets the variable: `copilot login` rejects the `--no-auto-update` flag.
+ */
+const COPILOT_ENV: Readonly<Record<string, string>> = { COPILOT_AUTO_UPDATE: "false" };
+
+/** `copilot --acp` serves the Agent Client Protocol on stdio. */
+const COPILOT_ARGV: readonly string[] = ["--acp", "--no-auto-update"];
 
 /**
  * What a client needs from the app at spawn, beyond its own CLI: the stored secrets, and the user's
@@ -1218,6 +1235,63 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "devin", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "copilot",
+    // `copilot login` opens GitHub's sign-in page in the system browser, and waits for the page to
+    // call back on 127.0.0.1. GitHub Copilot CLI 1.0.105 keeps the token in the system keychain.
+    signIn: {
+      kind: "cli-command",
+      command: { argv: ["login"], env: () => ({ ...COPILOT_ENV }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    },
+    // With `--device-code`, the CLI prints the page and the code, and waits until the user approves it.
+    codeSignIn: {
+      kind: "cli",
+      flow: "device",
+      command: {
+        argv: ["login", "--device-code"],
+        env: () => ({ ...COPILOT_ENV }),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+        closeInput: true,
+      },
+    },
+    // The CLI has no `logout` command; its ACP server has a `logout` method.
+    signOut: { argv: COPILOT_ARGV, env: () => ({ ...COPILOT_ENV }), timeoutMs: 30_000, acpLogout: true },
+    resolveCli: resolveCopilotCli,
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "copilot",
+        flavor: DEFAULT_ACP_FLAVOR,
+        argv: COPILOT_ARGV,
+        env: { ...COPILOT_ENV },
+        ...(confinement
+          ? {
+              confine: (target) =>
+                confineWithState(target, confinement, copilotStatePaths, context.agentEnvironment?.()),
+            }
+          : {}),
+        // A confined process cannot write the CLI's shared package cache, so it unpacks its own.
+        extraEnv: () => ({ ...context.agentEnvironment?.(), ...(confinement ? COPILOT_CONFINED_ENV : {}) }),
+        signInMessage: sourceText("error.provider.copilotSignIn"),
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpEndpoint: context.mcpEndpoint,
+        history: context.history?.("copilot"),
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "copilot",
+        flavor: DEFAULT_ACP_FLAVOR,
+        argv: COPILOT_ARGV,
+        profileGeneration: true,
+        env: { ...COPILOT_ENV },
+        signInMessage: sourceText("error.provider.copilotSignIn"),
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "copilot", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
   {
