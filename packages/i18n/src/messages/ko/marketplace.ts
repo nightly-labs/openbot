@@ -248,6 +248,17 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "이 결제를 조회하고 왜 실패했는지 설명해 줘.",
   "marketplace.plugin.stripe.prompt.customer": "이 고객의 청구서와 미납 잔액을 요약해 줘.",
   "marketplace.plugin.stripe.prompt.link": "Pro 요금제의 월 49 결제 링크 초안을 작성해 줘.",
+  "marketplace.plugin.revenuecat.tagline": "구독, 상품, 페이월",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat을 사용하면 에이전트가 인앱 구독 설정을 읽고 변경할 수 있습니다. 대상은 앱, 상품, 엔타이틀먼트, 오퍼링, 패키지, 페이월, 실험입니다. 에이전트는 고객과 구매 내역을 조회하고 차트와 지표를 읽을 수도 있습니다. RevenueCat 비밀 API 키는 하나의 Authorization 헤더에 들어갑니다. 키는 하나의 프로젝트에 접근합니다. 읽기 전용 키로는 에이전트가 읽기만 할 수 있습니다. 쓰기 키로는 에이전트가 상품을 App Store 심사에 제출하고, 고객에게 엔타이틀먼트를 부여하고, 패키지, 타기팅 규칙, 웹훅을 삭제할 수 있습니다.",
+  "marketplace.plugin.revenuecat.app":
+    "RevenueCat의 MCP 서버와 비밀 API 키로 사용하는 상품, 엔타이틀먼트, 오퍼링, 페이월, 지표.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "내 RevenueCat 프로젝트에는 어떤 오퍼링과 패키지가 있나요?",
+  "marketplace.plugin.revenuecat.prompt.revenue": "이번 달 RevenueCat 매출과 활성 구독은 어떻게 바뀌었나요?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "이 RevenueCat 고객에게는 어떤 엔타이틀먼트가 있고, 언제 만료되나요?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "RevenueCat 대시보드에서 프로젝트의 API keys를 열고 비밀 API 키를 만드세요. 데이터를 보기만 하려면 읽기 전용 키로 충분합니다.",
   "marketplace.plugin.posthog.tagline": "제품 분석 및 플래그",
   "marketplace.plugin.posthog.description":
     "PostHog를 사용하면 에이전트가 이벤트와 퍼널을 쿼리하고, 기능 플래그를 살펴보고, 릴리스 후 무엇이 바뀌었는지 요약할 수 있어요. 프로젝트 설정의 개인 API 키를 Authorization 헤더 하나에 넣어요.",

@@ -3,7 +3,11 @@ import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { AccessDeniedError, UnauthorizedClientError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
+import {
+  AccessDeniedError,
+  InvalidClientError,
+  UnauthorizedClientError,
+} from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -598,9 +602,17 @@ function isAccessRefusal(status: number | null): boolean {
 /**
  * The SDK keeps the status only when the refusal body is not an OAuth error. A body such as
  * `{"error":"access_denied"}` arrives as its error class, with the status gone.
+ *
+ * RevenueCat answers each registration it did not approve with 400 `invalid_client` ("The client
+ * is not registered."). Only a failed registration reaches this check, so that code is the refusal.
  */
 function isRegistrationRefusal(error: unknown): boolean {
-  if (error instanceof AccessDeniedError || error instanceof UnauthorizedClientError) return true;
+  if (
+    error instanceof AccessDeniedError ||
+    error instanceof UnauthorizedClientError ||
+    error instanceof InvalidClientError
+  )
+    return true;
   return isAccessRefusal(httpStatus(error));
 }
 

@@ -286,6 +286,16 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "ابحث عن هذه الدفعة واشرح سبب فشلها.",
   "marketplace.plugin.stripe.prompt.customer": "لخّص فواتير هذا العميل ورصيده المستحق.",
   "marketplace.plugin.stripe.prompt.link": "صُغ رابط دفع لخطة Pro بسعر 49 شهريًا.",
+  "marketplace.plugin.revenuecat.tagline": "الاشتراكات والمنتجات وجدران الدفع",
+  "marketplace.plugin.revenuecat.description":
+    "يتيح RevenueCat للوكلاء قراءة إعداد اشتراكاتك داخل التطبيق وتغييره: التطبيقات والمنتجات والاستحقاقات والعروض والحزم وجدران الدفع والتجارب. ويمكن للوكلاء أيضًا البحث عن العملاء ومشترياتهم، وقراءة الرسوم البيانية والمقاييس. يوضع مفتاح API سري من RevenueCat في ترويسة Authorization واحدة. يصل المفتاح إلى مشروع واحد. بمفتاح للقراءة فقط، يمكن للوكلاء القراءة فقط. وبمفتاح كتابة، يمكن للوكلاء إرسال المنتجات إلى مراجعة App Store، ومنح العملاء استحقاقات، وحذف الحزم وقواعد الاستهداف وخطافات الويب.",
+  "marketplace.plugin.revenuecat.app":
+    "المنتجات والاستحقاقات والعروض وجدران الدفع والمقاييس، عبر خادم MCP الخاص بـ RevenueCat بمفتاح API سري.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "ما العروض والحزم الموجودة في مشروعي على RevenueCat؟",
+  "marketplace.plugin.revenuecat.prompt.revenue": "كيف تغيرت إيراداتي واشتراكاتي النشطة في RevenueCat هذا الشهر؟",
+  "marketplace.plugin.revenuecat.prompt.customer": "ما الاستحقاقات التي يملكها عميل RevenueCat هذا، ومتى تنتهي؟",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "في لوحة تحكم RevenueCat، افتح API keys في مشروعك وأنشئ مفتاح API سريًا. يكفي مفتاح للقراءة فقط لعرض البيانات.",
   "marketplace.plugin.posthog.tagline": "تحليلات المنتج والأعلام",
   "marketplace.plugin.posthog.description":
     "يتيح PostHog للوكلاء الاستعلام عن الأحداث ومسارات التحويل، وفحص أعلام الميزات، وتلخيص ما تغيّر بعد الإصدار. يوضع مفتاح API شخصي من إعدادات المشروع في ترويسة Authorization واحدة.",

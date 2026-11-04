@@ -27,6 +27,7 @@
     "context7",
     "huggingface",
     "stripe",
+    "revenuecat",
     "posthog",
     "airtable",
     "firecrawl",

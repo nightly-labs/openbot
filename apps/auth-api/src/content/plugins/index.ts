@@ -21,6 +21,7 @@ import { PRISMA_PLUGIN_GUIDE } from "./prisma";
 import { RAILWAY_PLUGIN_GUIDE } from "./railway";
 import { RENDER_PLUGIN_GUIDE } from "./render";
 import { RESEND_PLUGIN_GUIDE } from "./resend";
+import { REVENUECAT_PLUGIN_GUIDE } from "./revenuecat";
 import { SENTRY_PLUGIN_GUIDE } from "./sentry";
 import { STRIPE_PLUGIN_GUIDE } from "./stripe";
 import { TODOIST_PLUGIN_GUIDE } from "./todoist";
@@ -47,6 +48,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   resend: RESEND_PLUGIN_GUIDE,
   sentry: SENTRY_PLUGIN_GUIDE,
   stripe: STRIPE_PLUGIN_GUIDE,
+  revenuecat: REVENUECAT_PLUGIN_GUIDE,
   vercel: VERCEL_PLUGIN_GUIDE,
   todoist: TODOIST_PLUGIN_GUIDE,
   trello: TRELLO_PLUGIN_GUIDE,

@@ -291,6 +291,17 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Bu ödemeyi bul ve neden başarısız olduğunu açıkla.",
   "marketplace.plugin.stripe.prompt.customer": "Bu müşterinin faturalarını ve ödenmemiş bakiyesini özetle.",
   "marketplace.plugin.stripe.prompt.link": "Pro planı için aylık 49 tutarında bir ödeme bağlantısı taslağı hazırla.",
+  "marketplace.plugin.revenuecat.tagline": "Abonelikler, ürünler ve paywall'lar",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat, ajanların uygulama içi aboneliklerinizin ayarlarını okumasını ve değiştirmesini sağlar: uygulamalar, ürünler, entitlement'lar, offering'ler, paketler, paywall'lar ve deneyler. Ajanlar müşterileri ve satın alımlarını da arayabilir, grafikleri ve metrikleri okuyabilir. Gizli bir RevenueCat API anahtarı tek bir Authorization başlığına girer. Anahtar bir projeye erişir. Salt okunur bir anahtarla ajanlar yalnızca okuyabilir. Yazma anahtarıyla ajanlar ürünleri App Store incelemesine gönderebilir, müşterilere entitlement verebilir ve paketleri, hedefleme kurallarını ve webhook'ları silebilir.",
+  "marketplace.plugin.revenuecat.app":
+    "Gizli bir API anahtarıyla RevenueCat'in MCP sunucusu üzerinden ürünler, entitlement'lar, offering'ler, paywall'lar ve metrikler.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "RevenueCat projemde hangi offering'ler ve paketler var?",
+  "marketplace.plugin.revenuecat.prompt.revenue": "Bu ay RevenueCat gelirim ve aktif aboneliklerim nasıl değişti?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Bu RevenueCat müşterisinin hangi entitlement'ları var ve ne zaman sona eriyorlar?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "RevenueCat panelinde projenizin API keys sayfasını açın ve gizli bir API anahtarı oluşturun. Verileri görmek için salt okunur bir anahtar yeterlidir.",
   "marketplace.plugin.posthog.tagline": "Ürün analitiği ve bayraklar",
   "marketplace.plugin.posthog.description":
     "PostHog, ajanların olayları ve hunileri sorgulamasına, özellik bayraklarını incelemesine ve bir sürümden sonra neyin değiştiğini özetlemesine olanak tanır. Proje ayarlarındaki kişisel API anahtarı tek bir Authorization başlığına girer.",

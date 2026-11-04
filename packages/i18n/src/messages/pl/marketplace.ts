@@ -286,6 +286,17 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Znajdź tę płatność i wyjaśnij, dlaczego się nie powiodła.",
   "marketplace.plugin.stripe.prompt.customer": "Podsumuj faktury tego klienta i saldo do zapłaty.",
   "marketplace.plugin.stripe.prompt.link": "Utwórz szkic linku płatności dla planu Pro za 49 miesięcznie.",
+  "marketplace.plugin.revenuecat.tagline": "Subskrypcje, produkty i paywalle",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat pozwala agentom czytać i zmieniać konfigurację subskrypcji w aplikacji: aplikacje, produkty, uprawnienia (entitlements), oferty, pakiety, paywalle i eksperymenty. Agenci mogą też wyszukiwać klientów i ich zakupy oraz czytać wykresy i metryki. Tajny klucz API RevenueCat trafia do jednego nagłówka Authorization. Klucz daje dostęp do jednego projektu. Z kluczem tylko do odczytu agenci mogą tylko czytać. Z kluczem do zapisu agenci mogą wysyłać produkty do weryfikacji w App Store, przyznawać klientom uprawnienia oraz usuwać pakiety, reguły targetowania i webhooki.",
+  "marketplace.plugin.revenuecat.app":
+    "Produkty, uprawnienia, oferty, paywalle i metryki przez serwer MCP RevenueCat z tajnym kluczem API.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Jakie oferty i pakiety ma mój projekt w RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "Jak w tym miesiącu zmieniły się moje przychody i aktywne subskrypcje w RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.customer": "Jakie uprawnienia ma ten klient RevenueCat i kiedy wygasają?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "W panelu RevenueCat otwórz API keys w swoim projekcie i utwórz tajny klucz API. Klucz tylko do odczytu wystarczy, aby przeglądać dane.",
   "marketplace.plugin.posthog.tagline": "Analityka produktu i flagi",
   "marketplace.plugin.posthog.description":
     "PostHog pozwala agentom wykonywać zapytania o zdarzenia i lejki, sprawdzać flagi funkcji oraz podsumowywać zmiany po wydaniu. Osobisty klucz API z ustawień projektu trafia do jednego nagłówka Authorization.",

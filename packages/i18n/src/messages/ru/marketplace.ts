@@ -292,6 +292,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Найдите этот платёж и объясните, почему он не прошёл.",
   "marketplace.plugin.stripe.prompt.customer": "Кратко опишите счета этого клиента и его задолженность.",
   "marketplace.plugin.stripe.prompt.link": "Составьте платёжную ссылку на тариф Pro за 49 в месяц.",
+  "marketplace.plugin.revenuecat.tagline": "Подписки, продукты и пейволы",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat позволяет агентам читать и изменять настройки подписок в приложении: приложения, продукты, entitlements, offerings, пакеты, пейволы и эксперименты. Агенты также могут искать клиентов и их покупки, читать графики и метрики. Секретный API-ключ RevenueCat передаётся в одном заголовке Authorization. Ключ даёт доступ к одному проекту. С ключом только для чтения агенты могут только читать. С ключом для записи агенты могут отправлять продукты на проверку в App Store, выдавать клиентам entitlements и удалять пакеты, правила таргетинга и вебхуки.",
+  "marketplace.plugin.revenuecat.app":
+    "Продукты, entitlements, offerings, пейволы и метрики через MCP-сервер RevenueCat с секретным API-ключом.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Какие offerings и пакеты есть в моём проекте RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "Как в этом месяце изменились мой доход и активные подписки в RevenueCat?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Какие entitlements есть у этого клиента RevenueCat и когда они истекают?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "В панели RevenueCat откройте API keys в своём проекте и создайте секретный API-ключ. Для просмотра данных достаточно ключа только для чтения.",
   "marketplace.plugin.posthog.tagline": "Продуктовая аналитика и флаги",
   "marketplace.plugin.posthog.description":
     "PostHog позволяет агентам запрашивать события и воронки, проверять флаги функций и кратко описывать, что изменилось после релиза. Персональный API-ключ из настроек проекта передаётся в одном заголовке Authorization.",

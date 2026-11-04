@@ -261,6 +261,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Zoek deze betaling op en leg uit waarom die mislukte.",
   "marketplace.plugin.stripe.prompt.customer": "Vat de facturen en het openstaande saldo van deze klant samen.",
   "marketplace.plugin.stripe.prompt.link": "Stel een betaallink op voor het Pro-abonnement van 49 per maand.",
+  "marketplace.plugin.revenuecat.tagline": "Abonnementen, producten en paywalls",
+  "marketplace.plugin.revenuecat.description":
+    "Met RevenueCat kunnen agents de instellingen van je in-app-abonnementen lezen en wijzigen: apps, producten, entitlements, offerings, pakketten, paywalls en experimenten. Agents kunnen ook klanten en hun aankopen opzoeken, en grafieken en statistieken lezen. Een geheime RevenueCat-API-sleutel gaat in één Authorization-header. De sleutel geeft toegang tot één project. Met een alleen-lezensleutel kunnen agents alleen lezen. Met een schrijfsleutel kunnen agents producten ter beoordeling naar de App Store sturen, klanten entitlements geven en pakketten, targetingregels en webhooks verwijderen.",
+  "marketplace.plugin.revenuecat.app":
+    "Producten, entitlements, offerings, paywalls en statistieken, via de MCP-server van RevenueCat met een geheime API-sleutel.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Welke offerings en pakketten heeft mijn RevenueCat-project?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "Hoe zijn mijn RevenueCat-omzet en actieve abonnementen deze maand veranderd?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Welke entitlements heeft deze RevenueCat-klant, en wanneer verlopen ze?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "Open in het RevenueCat-dashboard API keys in je project en maak een geheime API-sleutel. Een alleen-lezensleutel is genoeg om gegevens te bekijken.",
   "marketplace.plugin.posthog.tagline": "Productanalyse en flags",
   "marketplace.plugin.posthog.description":
     "Met PostHog kunnen agents events en funnels opvragen, feature flags inspecteren en samenvatten wat er na een release veranderde. Een persoonlijke API-sleutel uit de projectinstellingen gaat in één Authorization-header.",

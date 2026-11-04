@@ -293,6 +293,18 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.stripe.prompt.payment": "Look up this payment and explain why it failed.",
   "marketplace.plugin.stripe.prompt.customer": "Summarize this customer's invoices and outstanding balance.",
   "marketplace.plugin.stripe.prompt.link": "Draft a payment link for the Pro plan at 49 per month.",
+  "marketplace.plugin.revenuecat.tagline": "Subscriptions, products and paywalls",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat lets agents read and change the setup of your in-app subscriptions: apps, products, entitlements, offerings, packages, paywalls and experiments. Agents can also look up customers and their purchases, and read charts and metrics. A RevenueCat secret API key goes into one Authorization header. The key reaches one project. With a read-only key, agents can only read. With a write key, agents can submit products to the App Store for review, grant entitlements to customers, and delete packages, targeting rules and webhooks.",
+  "marketplace.plugin.revenuecat.app":
+    "Products, entitlements, offerings, paywalls and metrics, over RevenueCat's MCP server with a secret API key.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Which offerings and packages does my RevenueCat project have?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "How did my RevenueCat revenue and active subscriptions change this month?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Which entitlements does this RevenueCat customer have, and when do they expire?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "In the RevenueCat dashboard, open API keys in your project and create a secret API key. A read-only key is enough to view data.",
   "marketplace.plugin.posthog.tagline": "Product analytics and flags",
   "marketplace.plugin.posthog.description":
     "PostHog lets agents query events and funnels, inspect feature flags, and summarize what changed after a release. A personal API key from the project settings goes into one Authorization header.",

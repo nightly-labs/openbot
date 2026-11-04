@@ -259,6 +259,18 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "Consulte este pagamento e explique por que ele falhou.",
   "marketplace.plugin.stripe.prompt.customer": "Resuma as faturas deste cliente e o saldo em aberto.",
   "marketplace.plugin.stripe.prompt.link": "Rascunhe um link de pagamento para o plano Pro a 49 por mês.",
+  "marketplace.plugin.revenuecat.tagline": "Assinaturas, produtos e paywalls",
+  "marketplace.plugin.revenuecat.description":
+    "O RevenueCat permite que os agentes leiam e alterem a configuração das suas assinaturas no app: apps, produtos, entitlements, offerings, pacotes, paywalls e experimentos. Os agentes também podem consultar clientes e suas compras, e ler gráficos e métricas. Uma chave de API secreta do RevenueCat vai em um cabeçalho Authorization. A chave dá acesso a um projeto. Com uma chave somente leitura, os agentes só podem ler. Com uma chave de escrita, os agentes podem enviar produtos para revisão na App Store, conceder entitlements a clientes e excluir pacotes, regras de segmentação e webhooks.",
+  "marketplace.plugin.revenuecat.app":
+    "Produtos, entitlements, offerings, paywalls e métricas, pelo servidor MCP do RevenueCat com uma chave de API secreta.",
+  "marketplace.plugin.revenuecat.prompt.offerings": "Quais offerings e pacotes meu projeto do RevenueCat tem?",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "Como minha receita e minhas assinaturas ativas no RevenueCat mudaram este mês?",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "Quais entitlements este cliente do RevenueCat tem, e quando eles expiram?",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "No painel do RevenueCat, abra API keys no seu projeto e crie uma chave de API secreta. Uma chave somente leitura basta para ver os dados.",
   "marketplace.plugin.posthog.tagline": "Analytics de produto e flags",
   "marketplace.plugin.posthog.description":
     "O PostHog permite que agentes consultem eventos e funis, inspecionem feature flags e resumam o que mudou depois de um release. Uma chave de API pessoal das configurações do projeto vai em um header Authorization.",
