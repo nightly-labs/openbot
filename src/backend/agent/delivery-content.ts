@@ -85,6 +85,75 @@ export interface DeliveryPromptSources {
   wokenWaits?: readonly AgentWait[];
   /** The prompt a channel task or an external message sends in place of the delivery text. */
   executionText?: string | undefined;
+  /** The current state of the tabs and threads that the message tags. */
+  tags?: TagReferenceSource | undefined;
+}
+
+/** What a tagged thread is doing, in the words the provider reads. */
+type TaggedThreadState = "working" | "queued" | "done" | "failed" | "stopped" | "idle";
+
+/**
+ * The tabs and side threads of the recipient agent, read when a message that tags them is delivered.
+ * Null: the agent has no such tab or thread now.
+ */
+export interface TagReferenceSource {
+  tab(tabId: string): { title: string; url: string } | null;
+  /** `detail` is the progress of a working thread, the error of a failed one, or the start of its last answer. */
+  thread(taskId: string): { title: string; state: TaggedThreadState; detail: string | null } | null;
+}
+
+const TAG_TITLE_LIMIT = 80;
+const TAG_URL_LIMIT = 60;
+const TAG_DETAIL_LIMIT = 300;
+
+/**
+ * Text from a page, a person or an agent, as one short line in quotes. The title of a page is not
+ * trusted, so it cannot end the quote or start a new line of the prompt.
+ */
+function tagLine(text: string, limit: number): string {
+  const line = redactText(text).replace(/\s+/gu, " ").replaceAll('"', "'").trim();
+  const characters = Array.from(line);
+  return characters.length <= limit
+    ? line
+    : `${characters
+        .slice(0, limit - 1)
+        .join("")
+        .trimEnd()}…`;
+}
+
+/** The address without the scheme and `www.`, as the tab row of the picker shows it. */
+function tagUrl(url: string): string {
+  return tagLine(url.replace(/^[a-z][a-z\d+.-]*:\/\/(www\.)?/iu, "").replace(/\/$/u, ""), TAG_URL_LIMIT);
+}
+
+/**
+ * The provider text of a tab or a thread tag: its id under the name of the tool parameter that takes
+ * it (`tabId` of openbot_browser, `taskId` of history_read), and its current state in one line. The
+ * names say how to use the id, so the instructions need no rule for tags. A tag that repeats in the message gives the title only. Without a source
+ * (a provider handoff of an older message) the id alone follows the title.
+ */
+function taggedReference(
+  reference: { kind: "tab" | "thread"; id: string; name: string },
+  source: TagReferenceSource | undefined,
+  seen: Set<string>,
+): string {
+  const key = `${reference.kind}:${reference.id}`;
+  const repeat = seen.has(key);
+  seen.add(key);
+  if (reference.kind === "tab") {
+    const tab = source ? source.tab(reference.id) : { title: reference.name, url: "" };
+    const title = `"${tagLine(tab?.title || reference.name, TAG_TITLE_LIMIT)}"`;
+    if (!tab) return `${title} (closed browser tab)`;
+    if (repeat) return title;
+    const url = tab.url ? `, ${tagUrl(tab.url)}` : "";
+    return `${title} (browser tabId ${reference.id}${url})`;
+  }
+  const thread = source ? source.thread(reference.id) : { title: reference.name, state: null, detail: null };
+  const title = `"${tagLine(thread?.title || reference.name, TAG_TITLE_LIMIT)}"`;
+  if (!thread) return `${title} (deleted thread)`;
+  if (repeat) return title;
+  const detail = thread.detail ? `: ${tagLine(thread.detail, TAG_DETAIL_LIMIT)}` : "";
+  return `${title} (thread taskId ${reference.id}${thread.state ? `, ${thread.state}${detail}` : ""})`;
 }
 
 const TEAMMATE_HEADER = "Message from OpenBot teammate";
@@ -177,7 +246,13 @@ function escapeRegExp(value: string): string {
 export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryPromptSources): DeliveryInputItem[] {
   const { delivery, managedAttachments } = context;
   const { agentNames, snapshot } = sources;
-  const displayText = displayMessageReferences(delivery.text, delivery.attachments, agentNames);
+  // A teammate's tags name the sender's tabs and threads, not the recipient's. They keep the name and
+  // id only, so `isTeammatePromptOf` can find the message in the prompt again.
+  const fromTeammate = delivery.sender.kind === "agent" && delivery.sender.agentId !== delivery.recipientAgentId;
+  const displayText = displayMessageReferences(delivery.text, delivery.attachments, agentNames, {
+    fileHeadings: true,
+    tags: fromTeammate ? undefined : sources.tags,
+  });
   let text = sources.executionText ?? (displayText || "The user shared attached local files.");
   if (delivery.sender.kind === "user" && delivery.replyToMessageId) {
     const referenced = snapshot.messages.find((message) => message.id === delivery.replyToMessageId);
@@ -185,7 +260,10 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       `The user is replying to message ${delivery.replyToMessageId}.`,
       "--- referenced message ---",
       referenced
-        ? displayMessageReferences(referenced.text, referenced.attachments ?? [], agentNames)
+        ? displayMessageReferences(referenced.text, referenced.attachments ?? [], agentNames, {
+            fileHeadings: true,
+            tags: sources.tags,
+          })
         : "(The referenced message is unavailable.)",
       "--- user reply ---",
       displayText || "(The reply contains attachments only.)",
@@ -350,19 +428,25 @@ export function displayMessageReferences(
   text: string,
   attachments: Array<{ id: string; name: string }>,
   agentNames: ReadonlyMap<string, string>,
-  options: { fileHeadings: boolean } = { fileHeadings: true },
+  options: { fileHeadings: boolean; tags?: TagReferenceSource | undefined } = { fileHeadings: true },
 ): string {
   const names = new Map(attachments.map((attachment) => [attachment.id, attachment.name]));
+  const seen = new Set<string>();
   return expandAttachmentReferences(
     expandChatTagReferences(
       text,
-      (reference) =>
-        reference.kind === "agent"
-          ? agentNames.get(reference.id)
-          : reference.kind === "skill" && options.fileHeadings
-            ? homeSkillTagName(reference.id, reference.name)
-            : undefined,
-      options,
+      (reference) => {
+        if (reference.kind === "agent") return agentNames.get(reference.id);
+        // A person reads the name of a tab or a thread. A provider prompt also gets its id and state.
+        if (reference.kind === "tab" || reference.kind === "thread")
+          return options.fileHeadings
+            ? taggedReference({ kind: reference.kind, id: reference.id, name: reference.name }, options.tags, seen)
+            : undefined;
+        return reference.kind === "skill" && options.fileHeadings
+          ? homeSkillTagName(reference.id, reference.name)
+          : undefined;
+      },
+      { fileHeadings: options.fileHeadings },
     ),
     (reference) => names.get(reference.attachmentId),
   );

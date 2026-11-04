@@ -140,6 +140,12 @@ export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTar
   userControlTabFor(params: DynamicToolCallParams): string | null;
   /** Ends when nobody controls the tab: a release, a tab close or the host shutdown. */
   awaitUserControlRelease(tabId: string): Effect.Effect<void>;
+  /** Lets another thread of the tab's owner agent use the tab. A tab of another agent does not change. */
+  shareTab(tabId: string, target: { agentId: string; threadId: string }): void;
+  /** A deleted thread can use no tab. */
+  unshareThread(threadId: string): void;
+  /** The scrubbed title and address of a tab this agent owns, or null. */
+  agentTab(tabId: string, agentId: string): { title: string; url: string } | null;
 }
 
 export interface TurnHooks {

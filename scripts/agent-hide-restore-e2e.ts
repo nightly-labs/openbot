@@ -157,6 +157,9 @@ const agentBrowser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 const teamBrowser: TeamApiBrowser = {
   listTabs: () => [],

@@ -232,11 +232,12 @@
   fill-opacity: 0;
 }
 
-.ui-action-menu [class~="lucide-chart-area"] > path:first-child,
-.ui-action-menu [class~="lucide-bell-off"] > path:nth-child(3),
-.ui-action-menu [class~="lucide-app-window"] > path,
-.ui-action-menu [class~="lucide-bot"] > *,
-.ui-action-menu [class~="lucide-calendar-clock"] > * {
+/* Class selectors, not [class~=]: Chrome restyles every descendant on each class change for an attribute selector before a combinator. */
+.ui-action-menu .lucide-chart-area > path:first-child,
+.ui-action-menu .lucide-bell-off > path:nth-child(3),
+.ui-action-menu .lucide-app-window > path,
+.ui-action-menu .lucide-bot > *,
+.ui-action-menu .lucide-calendar-clock > * {
   fill: none;
 }
 
@@ -249,7 +250,7 @@
 }
 
 /* Cut-outs: the window bar, and the lights on the server racks. */
-.ui-action-menu :is(:hover, [data-highlighted], [aria-expanded="true"]) > [class~="lucide-app-window"] > path,
+.ui-action-menu :is(:hover, [data-highlighted], [aria-expanded="true"]) > .lucide-app-window > path,
 .ui-action-menu
   :is(:hover, [data-highlighted], [aria-expanded="true"])
   > .ui-glyph-20:has(> rect + rect + circle)

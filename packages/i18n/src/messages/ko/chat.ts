@@ -420,4 +420,8 @@ export const messages = {
   "chat.compaction.failed": "컨텍스트를 압축할 수 없어요",
   "chat.compaction.tokens": "{before} → {after} 토큰",
   "chat.compaction.continues": "대기 중인 메시지는 계속 처리돼요.",
+  "chat.reference.kind.tab": "브라우저 탭",
+  "chat.reference.kind.thread": "스레드",
+  "chat.reference.open.tab": "브라우저 탭 {name} 표시",
+  "chat.reference.open.thread": "스레드 {name} 열기",
 } as const satisfies PartialTranslation<typeof source>;

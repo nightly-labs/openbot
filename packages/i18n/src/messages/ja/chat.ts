@@ -407,4 +407,8 @@ export const messages = {
   "chat.compaction.failed": "コンテキストを圧縮できませんでした",
   "chat.compaction.tokens": "{before} → {after} トークン",
   "chat.compaction.continues": "キュー内のメッセージは続行されます。",
+  "chat.reference.kind.tab": "ブラウザーのタブ",
+  "chat.reference.kind.thread": "スレッド",
+  "chat.reference.open.tab": "ブラウザーのタブ {name} を表示",
+  "chat.reference.open.thread": "スレッド {name} を開く",
 } as const satisfies PartialTranslation<typeof source>;

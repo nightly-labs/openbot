@@ -152,6 +152,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       onMove: (id, index) => tabs.moveSide(agentId, id, index),
     },
     open,
+    tasks: list,
     limit: snapshot?.limit ?? 1,
     running: list.filter(isAgentTaskActive).length,
     conversation: open ? tasks.conversation(open.id) : undefined,

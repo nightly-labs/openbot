@@ -420,4 +420,8 @@ export const messages = {
   "chat.compaction.failed": "Não foi possível compactar o contexto",
   "chat.compaction.tokens": "{before} → {after} tokens",
   "chat.compaction.continues": "As mensagens na fila continuam.",
+  "chat.reference.kind.tab": "Aba do navegador",
+  "chat.reference.kind.thread": "Tópico",
+  "chat.reference.open.tab": "Mostrar aba do navegador {name}",
+  "chat.reference.open.thread": "Abrir tópico {name}",
 } as const satisfies PartialTranslation<typeof source>;
