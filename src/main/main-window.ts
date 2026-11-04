@@ -16,6 +16,7 @@ import {
   type CentralAuthState,
   type ChatWindowTarget,
   type ComputerUseHighlightPlacement,
+  type HostStatus,
   IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   type MacPermissionId,
@@ -51,6 +52,7 @@ import type { HighlightDisplay } from "./computer-use-highlight-window";
 import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
+import { withLocalHostSummary } from "./ipc/team-handlers";
 import { preventPanelActivation } from "./mac-panel-activation";
 import {
   createMainWindowBoundsRecorder,
@@ -93,6 +95,7 @@ const RELOADABLE_RENDERER_EXITS: ReadonlySet<RenderProcessGoneDetails["reason"]>
 interface MainWindowApplicationServices {
   browser: BrowserHost;
   centralAuth: { getState(): CentralAuthState };
+  host: { getStatus(): HostStatus };
   remoteServers: RemoteServerManager;
   interfaceSize: InterfaceSizeService;
 }
@@ -336,10 +339,17 @@ export function createMainWindowController({
     });
     // `sendToRenderer` drops an event while the page loads, and the page still counts as loading in
     // `did-finish-load`. A page that read `loading` and then missed the settled account would show
-    // the connecting screen until a restart.
+    // the connecting screen until a restart. A page that read a server before it came online would
+    // keep it offline and not load its workspace (#5004).
     window.webContents.on("did-stop-loading", () => {
       const services = getServices();
-      if (services) sendToRenderer(window, IPC_ENDPOINTS.auth.event, services.centralAuth.getState());
+      if (!services) return;
+      sendToRenderer(window, IPC_ENDPOINTS.auth.event, services.centralAuth.getState());
+      sendToRenderer(
+        window,
+        IPC_ENDPOINTS.servers.event,
+        withLocalHostSummary(services.remoteServers.list(), services.host.getStatus()),
+      );
     });
 
     return window;
