@@ -297,6 +297,7 @@ export const messages = {
   "mobile.agent.runtime.effort.xhigh": "매우 높음",
   "mobile.agent.runtime.effort.max": "최대",
   "mobile.agent.runtime.effort.ultra": "울트라",
+  "mobile.agent.runtime.fast": "빠르게",
   "mobile.agent.runtime.retryModels": "모델 다시 시도",
   "mobile.agent.runtime.loadingModels": "모델 불러오는 중…",
   "mobile.agent.runtime.noModels": "이 제공자에서 사용할 수 있는 모델이 없어요.",

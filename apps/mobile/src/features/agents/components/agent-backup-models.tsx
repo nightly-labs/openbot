@@ -21,6 +21,7 @@ import { Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { type AgentHostFieldsProps, useAgentHostRecord } from "@/features/agents/components/agent-host-fields";
 import { useProviderAccountName, useProviderAccounts } from "@/features/agents/components/agent-runtime-fields";
+import { cursorModelSelected, cursorModelSpeedLabel } from "@/features/agents/model/cursor-model-speed";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { ProviderMark } from "@/features/servers/components/provider-mark";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -111,6 +112,32 @@ function choiceKey(choice: AgentModelChoice): string {
   return `${choice.provider}\u0000${choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID}\u0000${choice.model}`;
 }
 
+function listedModel(
+  models: readonly AgentModelOption[] | undefined,
+  provider: AgentModelChoice["provider"],
+  id: string,
+): AgentModelOption | undefined {
+  return models?.find((candidate) =>
+    provider === "cursor"
+      ? candidate.provider === provider && cursorModelSelected(candidate.id, id)
+      : candidate.provider === provider && candidate.id === id,
+  );
+}
+
+function listedModelName(model: AgentModelOption | undefined, fallback: string, fastLabel: string): string {
+  if (!model) return fallback;
+  return model.provider === "cursor" ? cursorModelSpeedLabel(model.name, model.id, fastLabel) : model.name;
+}
+
+/** A Cursor speed row is the same choice when the saved id still matches that speed. */
+function choiceAlreadyListed(saved: AgentModelChoice, listed: AgentModelChoice): boolean {
+  if (sameAgentModelChoice(saved, listed)) return true;
+  if (listed.provider !== "cursor" || saved.provider !== "cursor") return false;
+  const savedAccount = saved.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+  const listedAccount = listed.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+  return savedAccount === listedAccount && cursorModelSelected(listed.model, saved.model);
+}
+
 /** Builds the options from the host's models and accounts, with the same rules as desktop. */
 function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, accounts: HostProviderAccounts | null) {
   const { t } = useText();
@@ -120,8 +147,8 @@ function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, 
     const providerAccounts = accounts?.providers.find((entry) => entry.provider === choice.provider)?.accounts;
     const accountIndex = providerAccounts?.findIndex((candidate) => candidate.id === accountId) ?? -1;
     const account = providerAccounts?.[accountIndex];
-    const model = models?.find((candidate) => candidate.provider === choice.provider && candidate.id === choice.model);
-    const modelName = model?.name ?? choice.model;
+    const model = listedModel(models, choice.provider, choice.model);
+    const modelName = listedModelName(model, choice.model, t("mobile.agent.runtime.fast"));
     const showsAccount = providerAccounts !== undefined && providerAccounts.length > 1;
     return {
       key: choiceKey(choice),
@@ -152,7 +179,7 @@ function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, 
           model: model.id,
           ...(accountId === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: accountId }),
         };
-        return exclude.some((other) => sameAgentModelChoice(other, choice)) ? [] : [option(choice)];
+        return exclude.some((other) => choiceAlreadyListed(other, choice)) ? [] : [option(choice)];
       });
     });
   return { option, all };
@@ -166,6 +193,7 @@ function useBackupModelEditor(props: BackupModelsProps) {
   const { agent, available } = props;
   const workspace = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
+  const { t } = useText();
   const { canManage, current, enabled, failed, retry, error, save } = useAgentBackupModels(props);
   const { accounts } = useProviderAccounts(agent, available);
   const models = useQuery({
@@ -191,10 +219,8 @@ function useBackupModelEditor(props: BackupModelsProps) {
           ...(ownAccount === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: ownAccount }),
         }
       : null);
-  const ownModel = own
-    ? (models.data?.find((candidate) => candidate.provider === own.provider && candidate.id === own.model)?.name ??
-      own.model)
-    : (agent.model ?? "");
+  const ownListed = own ? listedModel(models.data, own.provider, own.model) : undefined;
+  const ownModel = own ? listedModelName(ownListed, own.model, t("mobile.agent.runtime.fast")) : (agent.model ?? "");
 
   return {
     canManage,

@@ -294,6 +294,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.runtime.effort.xhigh": "Extra high",
   "mobile.agent.runtime.effort.max": "Max",
   "mobile.agent.runtime.effort.ultra": "Ultra",
+  "mobile.agent.runtime.fast": "Fast",
   "mobile.agent.runtime.retryModels": "Retry models",
   "mobile.agent.runtime.loadingModels": "Loading models…",
   "mobile.agent.runtime.noModels": "No models available for this provider.",

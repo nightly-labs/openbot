@@ -14,6 +14,7 @@ import { Button, Typography } from "heroui-native";
 import { Platform } from "react-native";
 import { useUniwind } from "uniwind";
 import { AgentFastModeField, type AgentHostFieldsProps } from "@/features/agents/components/agent-host-fields";
+import { cursorModelSelected, cursorModelSpeedLabel } from "@/features/agents/model/cursor-model-speed";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
@@ -134,8 +135,14 @@ export function AgentRuntimeFields({
     retry: false,
   });
   const options = models.data?.filter((option) => option.provider === provider) ?? [];
-  const selected = options.find((option) => option.id === model);
+  const selected =
+    provider === "cursor"
+      ? options.find((option) => cursorModelSelected(option.id, model ?? ""))
+      : options.find((option) => option.id === model);
+  const pickerValue = selected?.id ?? model ?? "";
   const enabled = available && !saving && options.length > 0;
+  const modelLabel = (id: string, name: string) =>
+    provider === "cursor" ? cursorModelSpeedLabel(name, id, t("mobile.agent.runtime.fast")) : name;
   const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
   return (
     <>
@@ -213,7 +220,7 @@ export function AgentRuntimeFields({
           <SettingsRow
             trailing={
               <SettingsPicker<string>
-                value={model ?? ""}
+                value={pickerValue}
                 options={[
                   ...(!selected
                     ? [
@@ -225,7 +232,7 @@ export function AgentRuntimeFields({
                     : []),
                   ...options.map((option) => ({
                     value: option.id,
-                    label: pickerLabel(option.name, option.id === model),
+                    label: pickerLabel(modelLabel(option.id, option.name), option.id === pickerValue),
                   })),
                 ]}
                 enabled={enabled}
@@ -233,7 +240,7 @@ export function AgentRuntimeFields({
                 label={t("mobile.agent.runtime.model")}
                 onChange={(id) => {
                   const next = options.find((option) => option.id === id);
-                  if (!next) return;
+                  if (!next || (selected && next.id === selected.id)) return;
                   onChange({
                     model: next.id,
                     reasoningEffort:

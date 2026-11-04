@@ -1307,10 +1307,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #initializeConnection(
     connection: ClientSideConnection,
   ): Effect.Effect<InitializeResponse, ProviderClientOperationError> {
+    const clientCapabilities = {
+      ...OPENBOT_ACP_CLIENT_CAPABILITIES,
+      ...this.#flavor.clientCapabilities,
+    };
     return providerCall(() =>
       connection.initialize({
         protocolVersion: 1,
-        clientCapabilities: OPENBOT_ACP_CLIENT_CAPABILITIES,
+        clientCapabilities,
         clientInfo: this.#flavor.clientInfo ?? OPENBOT_ACP_CLIENT_INFO,
       }),
     );

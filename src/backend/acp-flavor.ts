@@ -20,6 +20,11 @@ export interface AcpFlavor {
   /** The `clientInfo` that `initialize` sends. Absent: `OPENBOT_ACP_CLIENT_INFO`. */
   clientInfo?: { name: string; title: string; version: string };
   /**
+   * Extra `clientCapabilities` on `initialize`. Cursor reads `_meta.parameterizedModelPicker`
+   * there. Absent: the shared capabilities only.
+   */
+  clientCapabilities?: { _meta?: { parameterizedModelPicker?: true } };
+  /**
    * Whether an error names this missing session. `null` gives the decision to the protocol's
    * `-32002` rule. Another error code or another session must never replace a provider session.
    */
@@ -180,6 +185,10 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   // finds no OpenBot tools (#3058).
   mcpServersLoadWithSession: true,
   enableMcpServers: enableCursorMcpServers,
+  // Cursor lists one default variant per model until the client asks for parameters. For Composer
+  // and Grok that default is fast, so the normal speed never arrives. Cursor 2026.10 reads this
+  // flag and then sends the model plus a separate fast choice.
+  clientCapabilities: { _meta: { parameterizedModelPicker: true } },
 };
 
 /**
