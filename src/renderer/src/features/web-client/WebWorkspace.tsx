@@ -571,12 +571,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       updating: hostUpdating(),
       blocked: workspace.state.recovery?.phase === "suspended",
       loading: workspace.state.status === "connecting",
-      hasContent: workspace.state.workspaceLoaded,
+      hasContent: workspace.state.synced,
     });
   // As on desktop, the first load covers the whole window. A server that sleeps, updates or fails
   // shows its screen in the pane only.
   const fullWindowLoading = () =>
     connectionShown() &&
+    // A saved frame stays on screen: the chat shows its history loader until the host answers.
     !workspace.state.workspaceLoaded &&
     !workspace.state.hostOffline &&
     // The status is "offline" before the first attempt too; only a reported failure ends the cover.
@@ -1898,10 +1899,20 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.hostedSleep !== "sleeping" && !workspace.state.hostedIssue && !hostUpdating()
       ? (workspace.state.connectionError ?? null)
       : null;
+  /**
+   * A saved frame is on screen and the host did not answer yet. The chat shows the loader of its history
+   * from the start, so the connect and the history load are one screen. A failure shows the notice.
+   */
+  const frameConnecting = () =>
+    connectionShown() &&
+    workspace.state.workspaceLoaded &&
+    !workspace.state.synced &&
+    agentChatOpen() &&
+    (connectionPhase() === "loading" || (connectionPhase() === "connecting" && !workspace.state.connectionError));
   const connectionNotice = (cover = false) => (
     <ServerConnectionNotice
       name={workspace.state.host?.name ?? t("webClient.notice.findingHosts")}
-      initial={cover || !workspace.state.workspaceLoaded}
+      initial={cover || !workspace.state.synced}
       ready={cover ? !fullWindowLoading() : undefined}
       onExited={cover ? () => setLoadingCover(false) : undefined}
       fullWindow={fullWindowLoading()}
@@ -1986,17 +1997,22 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               initialLoading={hostOffline()}
               connection={
                 <>
-                  <Show when={connectionShown() && !fullWindowLoading()}>{connectionNotice()}</Show>
+                  <Show when={connectionShown() && !fullWindowLoading() && !frameConnecting()}>
+                    {connectionNotice()}
+                  </Show>
                   <Show when={workspace.state.status === "online" && workspace.state.panelsFailed}>
                     <ServerPanelLoadNotice
                       busy={workspace.state.panelsLoading}
                       onRetry={() => void workspace.retryPanels()}
                     />
                   </Show>
-                  <Show when={workspace.state.status === "online" && agentChatOpen()}>
+                  <Show when={(workspace.state.status === "online" || frameConnecting()) && agentChatOpen()}>
                     <ConversationLoadNotice
                       name={workspace.selected()?.name ?? ""}
-                      loading={!workspace.conversation()?.page && workspace.conversation()?.loading === true}
+                      loading={
+                        frameConnecting() ||
+                        (!workspace.conversation()?.page && workspace.conversation()?.loading === true)
+                      }
                       error={workspace.conversation()?.error ?? null}
                       onRetry={() => {
                         const id = workspace.state.selectedId;
