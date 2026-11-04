@@ -104,6 +104,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} sizi bekliyor",
   "chat.awaiting.limited": "{name} kullanım sınırını bekliyor",
   "chat.awaiting.dismiss": "Bu listeyi gizle",
+  "chat.awaiting.stop": "Durdur",
   "chat.waits.label": "Açık beklemeler",
   "chat.waits.title": { one: "{count} açık bekleme", other: "{count} açık bekleme" },
   "chat.waits.active": "{state}: {note}",

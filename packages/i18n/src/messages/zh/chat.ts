@@ -104,6 +104,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} 需要你处理",
   "chat.awaiting.limited": "{name} 正在等待用量限额恢复",
   "chat.awaiting.dismiss": "隐藏该列表",
+  "chat.awaiting.stop": "停止",
   "chat.waits.label": "未结等待",
   "chat.waits.title": { one: "{count} 个未结等待", other: "{count} 个未结等待" },
   "chat.waits.active": "{state}：{note}",

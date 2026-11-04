@@ -95,7 +95,8 @@
 }
 
 .awaiting-replies-open,
-.awaiting-replies-steer {
+.awaiting-replies-steer,
+.awaiting-replies-stop {
   flex: 0 0 auto;
 }
 

@@ -51,6 +51,7 @@ import {
   channelRoutineTool,
   channelWorkOwners,
   isChannelRoutineTool,
+  PERSON_CANCEL_REQUIRED,
   PERSON_REQUEST_REQUIRED,
 } from "./channel-management";
 import { ChannelMemoryStore } from "./channel-memory-store";
@@ -532,21 +533,7 @@ export class ChannelService {
   ): Effect.fn.Return<Channel, ChannelOperationError> {
     const operationId = `${actor.id}:${command.operationId}`;
     const receipt = yield* channelSync(() => this.store.database.commandResult(`channels:${operationId}`));
-    if (receipt !== undefined) {
-      const channel = yield* channelSync(() => this.store.get(command.channelId));
-      const assignments = (yield* channelSync(() => this.store.assignments(channel.id))).filter(activeAssignment);
-      const superseded = (yield* channelSync(() => this.store.tasks(channel.id))).filter((task) =>
-        assignments.some(
-          (assignment) =>
-            assignment.taskId === task.id &&
-            assignment.taskRevision !== task.revision &&
-            assignment.pendingRevision !== task.revision,
-        ),
-      );
-      yield* this.interruptTasks(channel.id, superseded);
-      yield* this.wake(channel.id);
-      return channel;
-    }
+    if (receipt !== undefined) return yield* this.#finishCommitted(command.channelId);
     const known = this.hooks.agents();
     if (command.type === "save") {
       const existing = (yield* channelSync(() => this.store.exists(command.channelId)))
@@ -885,22 +872,7 @@ export class ChannelService {
       // Cancel is the way out of a stopped run; Stop is the one for active work.
       if (selected.state !== "paused" && selected.state !== "failed")
         return yield* channelFailure(new Error(sourceText("error.backend.channelTaskNotStopped")));
-      const cancelled = descendants(tasks, selected.rootTaskId);
-      const result = yield* channelSync(() =>
-        this.store.update(
-          channel,
-          {
-            tasks: cancelled.map(
-              (task): ChannelTask => ({ ...task, state: "cancelled", error: null, revision: task.revision + 1 }),
-            ),
-          },
-          operationId,
-        ),
-      );
-      this.publish(channel.id);
-      yield* this.interruptTasks(channel.id, cancelled);
-      yield* this.wake(channel.id);
-      return result;
+      return yield* this.#cancelTasks(channel, descendants(tasks, selected.rootTaskId), operationId);
     }
     if (command.type === "reassign") {
       if (!command.recipientAgentId)
@@ -2797,6 +2769,165 @@ export class ChannelService {
     };
   });
 
+  /**
+   * A command that was saved before: its change is in the database, but the turns that it stopped
+   * can still run if the first call ended before it interrupted them. Stop those turns and wake the
+   * channel again, then give the channel as it is.
+   */
+  readonly #finishCommitted = Effect.fn("ChannelService.finishCommitted")(function* (
+    this: ChannelService,
+    channelId: string,
+  ) {
+    const channel = yield* channelSync(() => this.store.get(channelId));
+    const assignments = (yield* channelSync(() => this.store.assignments(channel.id))).filter(activeAssignment);
+    const superseded = (yield* channelSync(() => this.store.tasks(channel.id))).filter((task) =>
+      assignments.some(
+        (assignment) =>
+          assignment.taskId === task.id &&
+          assignment.taskRevision !== task.revision &&
+          assignment.pendingRevision !== task.revision,
+      ),
+    );
+    yield* this.interruptTasks(channel.id, superseded);
+    yield* this.wake(channel.id);
+    return channel;
+  });
+
+  /** Cancels the tasks in one saved change, with the notes, then stops their turns. */
+  readonly #cancelTasks = Effect.fn("ChannelService.cancelTasks")(function* (
+    this: ChannelService,
+    channel: Channel,
+    cancelled: ChannelTask[],
+    operationId: string,
+    messages: ChannelMessage[] = [],
+  ) {
+    const result = yield* channelSync(() =>
+      this.store.update(
+        channel,
+        {
+          tasks: cancelled.map(
+            (task): ChannelTask => ({ ...task, state: "cancelled", error: null, revision: task.revision + 1 }),
+          ),
+          ...(messages.length ? { messages } : {}),
+        },
+        operationId,
+      ),
+    );
+    this.publish(channel.id);
+    yield* this.interruptTasks(channel.id, cancelled);
+    yield* this.wake(channel.id);
+    return result;
+  });
+
+  /**
+   * `channel_cancel`: a member ends a whole run that it owns, at a person's request, as Cancel does
+   * for a stopped run. Active work ends too: the turns stop and queued deliveries are cancelled. The
+   * run of the caller's own task is refused, because the cancel would interrupt the turn that makes
+   * this call. A run that a task of another open run depends on is refused too: that task would
+   * wait for ever. The messages stay, and the note names the member and the person who asked.
+   */
+  readonly #cancelOwnRun = Effect.fn("ChannelService.cancelOwnRun")(function* (
+    this: ChannelService,
+    channelId: string,
+    callerTask: ChannelTask,
+    agentId: string,
+    operationId: string,
+    person: { id: string; name: string },
+    args: DynamicRecord,
+  ): Effect.fn.Return<unknown, ChannelOperationError> {
+    // The agent can correct these, so it gets the reason as a result (#4728). The log keeps a fixed reason.
+    const refuse = (reason: string, logReason: string) => {
+      logger.warn("A channel cancel was refused.", { channelId, agentId, reason: logReason });
+      return { accepted: false, reason };
+    };
+    if (!isString(args.taskId) || !args.taskId) return refuse("Provide the taskId of the run to cancel.", "no task id");
+    const taskId = args.taskId;
+    const receipt = `${agentId}:${operationId}`;
+    let result: unknown;
+    yield* this.#serialize(
+      channelId,
+      Effect.gen({ self: this }, function* () {
+        // A retried call finds its receipt here, in the queue, so a copy that waited behind the first
+        // is not refused for the run that the first ended. The turns that it did not stop stop now.
+        if ((yield* channelSync(() => this.store.database.commandResult(`channels:${receipt}`))) !== undefined) {
+          yield* this.#finishCommitted(channelId);
+          result = { accepted: true };
+          return;
+        }
+        // Archive does not wait in the queue, so the channel is read again at this change's turn.
+        const channel = yield* channelSync(() => this.store.get(channelId));
+        if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
+        const tasks = yield* channelSync(() => this.store.tasks(channelId));
+        const selected = tasks.find((item) => item.id === taskId);
+        if (!selected) {
+          result = refuse(
+            "No task in this channel has that id. Use the taskId of the request message of the run.",
+            "unknown task",
+          );
+          return;
+        }
+        const root = tasks.find((item) => item.id === selected.rootTaskId);
+        if (!root || terminal(root)) {
+          result = refuse("That run has already ended.", "run ended");
+          return;
+        }
+        if (root.ownerAgentId !== agentId) {
+          result = refuse(
+            "You can cancel only a run that you own. A person can stop other work with the channel controls.",
+            "not the owner",
+          );
+          return;
+        }
+        if (root.id === callerTask.rootTaskId) {
+          result = refuse(
+            "This is the run of your current task. Do not cancel it: finish the task or end your turn.",
+            "own run",
+          );
+          return;
+        }
+        const cancelled = descendants(tasks, root.id);
+        const ids = new Set(cancelled.map((item) => item.id));
+        if (
+          tasks.some(
+            (item) =>
+              !ids.has(item.id) && !terminal(item) && item.dependencies.some((dependency) => ids.has(dependency)),
+          )
+        ) {
+          result = refuse(
+            "A task of another run depends on this run. Ask a person to stop and cancel it with the channel controls.",
+            "dependent run",
+          );
+          return;
+        }
+        const agent = { id: agentId, name: this.memberName(agentId) };
+        // The first line with text, cut by characters, so that an emoji is not split.
+        const request = [...(root.instruction.trim().split("\n", 1)[0]?.trim() ?? "")];
+        const note = this.message(
+          channelId,
+          callerTask.id,
+          { kind: "agent", ...agent },
+          sourceText("status.agent.channelTaskCancelled", {
+            agent: agent.name,
+            person: person.name,
+            task: request.length > 80 ? `${request.slice(0, 79).join("")}…` : request.join(""),
+          }),
+          undefined,
+          CHANNEL_CHANGE_ITEM_TYPE,
+        );
+        yield* this.#cancelTasks(channel, cancelled, receipt, [
+          { ...note, message: { ...note.message, source: "system" } },
+        ]);
+        result = {
+          accepted: true,
+          cancelledTaskIds: [...ids],
+          instruction:
+            "The run is cancelled. Its running turns are stopped, and its queued subtasks will not start. Go on with your current task.",
+        };
+      }),
+    );
+    return result;
+  });
+
   readonly tool = Effect.fn("ChannelService.tool")(function* (
     this: ChannelService,
     channelId: string,
@@ -2818,6 +2949,11 @@ export class ChannelService {
     if (!task || task.revision !== assignment.taskRevision || task.state !== "running")
       return yield* channelFailure(new Error("The channel task has changed."));
     if (!isDynamicRecord(args)) return yield* channelFailure(new Error("Provide channel tool arguments."));
+    if (tool === "channel_cancel") {
+      const person = channelRequester(task, tasks, (messageId) => this.store.message(channelId, messageId));
+      if (!person) return yield* channelFailure(new Error(PERSON_CANCEL_REQUIRED));
+      return yield* this.#cancelOwnRun(channelId, task, agentId, `tool:${turnId}:${callId}`, person, args);
+    }
     if (CHANNEL_MANAGEMENT_TOOLS.has(tool)) {
       const person = channelRequester(task, tasks, (messageId) => this.store.message(channelId, messageId));
       if (!person) return yield* channelFailure(new Error(PERSON_REQUEST_REQUIRED));

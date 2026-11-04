@@ -181,6 +181,7 @@ export const messages = {
   "chat.awaiting.needsYou": "{name} يحتاج إليك",
   "chat.awaiting.limited": "{name} ينتظر انتهاء حد الاستخدام",
   "chat.awaiting.dismiss": "إخفاء هذه القائمة",
+  "chat.awaiting.stop": "إيقاف",
   "chat.waits.label": "الانتظارات المفتوحة",
   "chat.waits.title": {
     zero: "لا انتظارات مفتوحة",

@@ -113,6 +113,8 @@ export interface ConversationChannelSource {
   interactionAgentName: () => string | undefined;
   /** The agents that a lead asked and that did not reply yet. */
   awaitingReplies: () => readonly AwaitingReplyItem[];
+  /** Stops the sub-task of an awaiting row, with the run below it. It does nothing while the channel is read-only. */
+  stopAwaitingReply?: ((taskId: string) => void) | undefined;
   HeaderTitle: (props: { onOpenSettings: () => void }) => JSX.Element;
   SettingsPane: (props: ConversationChannelSettingsPaneProps) => JSX.Element;
   /** Shows above the composer: the stopped tasks, and why the channel cannot work. */

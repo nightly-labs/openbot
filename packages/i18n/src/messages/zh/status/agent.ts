@@ -16,6 +16,7 @@ export const messages = {
   "status.agent.channelRoutineCreated": "{agent} 已创建自动化任务 {routine}，这是 {person} 的请求。",
   "status.agent.channelRoutineUpdated": "{agent} 已修改自动化任务 {routine}，这是 {person} 的请求。",
   "status.agent.channelRoutineDeleted": "{agent} 已删除自动化任务 {routine}，这是 {person} 的请求。",
+  "status.agent.channelTaskCancelled": "{agent} 已取消任务“{task}”及其子任务，这是 {person} 的请求。",
   "status.agent.screenCaptureScreen": "截取主屏幕，并把图像发送给助手的模型。",
   "status.agent.screenCaptureChannel": "图像会显示在频道 {channel} 中，该服务器上每位阅读该频道的成员都能看到。",
   "status.agent.screenCaptureDisplay": "截取显示器 {name}，并把图像发送给助手的模型。",
