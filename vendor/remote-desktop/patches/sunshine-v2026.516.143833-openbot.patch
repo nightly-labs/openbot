@@ -1198,7 +1198,7 @@ index f95d49f9..c85fcf15 100644
    }
  }
 diff --git a/src/confighttp.cpp b/src/confighttp.cpp
-index 2f703dbc..c9fb7f58 100644
+index 2f703dbc..504bcd79 100644
 --- a/src/confighttp.cpp
 +++ b/src/confighttp.cpp
 @@ -1,3 +1,7 @@
@@ -1329,7 +1329,7 @@ index 2f703dbc..c9fb7f58 100644
        send_response(response, output_tree);
      } catch (std::exception &e) {
        BOOST_LOG(warning) << "SavePin: "sv << e.what();
-@@ -1356,6 +1435,64 @@ namespace confighttp {
+@@ -1356,6 +1435,79 @@ namespace confighttp {
      }
    }
  
@@ -1382,11 +1382,26 @@ index 2f703dbc..c9fb7f58 100644
 +    nlohmann::json output_tree;
 +    output_tree["displays"] = nlohmann::json::array();
 +    const auto display_names = platf::display_names(platf::mem_type_e::system);
++#ifdef _WIN32
++    // On Windows, output_name takes the display device id, not the GDI name of the capture output.
++    const auto devices = display_device::enumerate_devices();
++#endif
 +    for (const auto &display_name : display_names) {
-+      output_tree["displays"].push_back({
++      nlohmann::json display = {
 +        {"id", display_name},
 +        {"name", display_name},
++      };
++#ifdef _WIN32
++      const auto device = std::find_if(devices.begin(), devices.end(), [&display_name](const auto &candidate) {
++        return candidate.m_display_name == display_name;
 +      });
++      if (device != devices.end() && !device->m_device_id.empty() && device->m_info) {
++        display["id"] = device->m_device_id;
++        display["x"] = device->m_info->m_origin_point.m_x;
++        display["y"] = device->m_info->m_origin_point.m_y;
++      }
++#endif
++      output_tree["displays"].push_back(display);
 +    }
 +    send_response(response, output_tree);
 +  }
@@ -1394,7 +1409,7 @@ index 2f703dbc..c9fb7f58 100644
    /**
     * @brief Reset the display device persistence.
     * @param response The HTTP response object.
-@@ -1778,8 +1915,14 @@ namespace confighttp {
+@@ -1778,8 +1930,14 @@ namespace confighttp {
      server.resource["^/api/covers/upload$"]["POST"] = uploadCover;
      server.resource["^/api/csrf-token$"]["GET"] = getCSRFToken;
      server.resource["^/api/password$"]["POST"] = savePassword;
