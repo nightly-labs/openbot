@@ -297,14 +297,16 @@ if (hasSingleInstanceLock) {
   // them, a window that disappeared on Windows left nothing to tell a crash from a quit (#2675).
   crashReporter.start({ uploadToServer: false });
   // After the crash reporter: the next start counts the dumps written after this run's last sign of life.
-  ({ marker: runMarker, previous: previousUncleanExit } = RunMarker.start({
-    userDataPath: app.getPath("userData"),
-    crashDumpsPath: app.getPath("crashDumps"),
-    appVersion: app.getVersion(),
-    server: hostedServer !== null || serverMode !== null,
-    now: Date.now(),
-    bootedAt: Date.now() - uptime() * 1_000,
-  }));
+  // The desktop stops a local server child with SIGKILL after a grace period, so the child has no marker.
+  if (!localServerChild)
+    ({ marker: runMarker, previous: previousUncleanExit } = RunMarker.start({
+      userDataPath: app.getPath("userData"),
+      crashDumpsPath: app.getPath("crashDumps"),
+      appVersion: app.getVersion(),
+      server: hostedServer !== null || serverMode !== null,
+      now: Date.now(),
+      bootedAt: Date.now() - uptime() * 1_000,
+    }));
   if (previousUncleanExit)
     logger.warn(
       `The previous run did not quit cleanly (${previousUncleanExit.phase}, ${previousUncleanExit.uptime_class}, ${previousUncleanExit.crash_dump_count} crash dumps).`,

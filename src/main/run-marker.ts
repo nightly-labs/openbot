@@ -1,4 +1,4 @@
-import { type Dirent, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { type Dirent, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Effect, Option, Schema } from "effect";
 
@@ -168,12 +168,19 @@ export class RunMarker {
     this.#write();
   }
 
-  /** A failed write only loses this sign: the next start then reads an older state or nothing. */
+  /**
+   * A failed write only loses this sign: the next start then reads an older state or nothing. The
+   * rename replaces the file in one step, so a kill during the write never leaves a torn marker.
+   */
   #write(): void {
     const content = `${JSON.stringify(this.#record)}\n`;
+    const temporaryPath = `${this.#path}.tmp`;
     Effect.runSync(
       Effect.try({
-        try: () => writeFileSync(this.#path, content, { mode: 0o600 }),
+        try: () => {
+          writeFileSync(temporaryPath, content, { mode: 0o600 });
+          renameSync(temporaryPath, this.#path);
+        },
         catch: (cause) => new RunMarkerFailure({ cause }),
       }).pipe(Effect.ignore),
     );

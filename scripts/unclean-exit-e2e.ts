@@ -262,7 +262,7 @@ try {
     "a system_unclean_exit event",
     () => (uncleanEvents().length > 0 ? uncleanEvents() : null),
     EVENT_TIMEOUT_MS,
-  ).catch(() => []);
+  );
   // A second flush must not send it again: wait for the renderer's open event, which comes later.
   await waitFor(
     "the desktop_app_opened event of run 2",
@@ -278,7 +278,9 @@ try {
     capturedEventNames: captured.filter((event) => event.run === 2).map((event) => event.name),
   });
   assert.equal(countLines(secondLog, UNCLEAN_LINE), 1, "Run 2 logs the unclean exit once.");
-  assert.ok(sent.length <= 1, "Run 2 sends the unclean exit at most once.");
+  assert.equal(uncleanEvents().length, 1, "Run 2 sends the unclean exit once.");
+  assert.equal(sent[0]?.properties.phase, "running", "A kill of the main process has the running phase.");
+  assert.equal(sent[0]?.properties.host_kind, "desktop", "The dev app is a desktop host.");
 
   // Clean quit, then run 3. The supervisor stops the other services when the app ends.
   process.kill(second.electronPid, "SIGTERM");
