@@ -37,7 +37,7 @@ import {
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgent, MobileBrowserViewSupport } from "@/features/workspace/model/workspace-types";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
-import { ToolbarMenuItems } from "@/shared/components/toolbar-menu-items";
+import { toolbarMenuItems } from "@/shared/components/toolbar-menu-items";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { NATIVE_BAR_HEIGHT } from "@/shared/lib/native-bar";
@@ -523,6 +523,7 @@ function BrowserView({
               agentId={agent.id}
               serverId={agent.serverId}
               hue={agent.avatarHue}
+              color={agent.avatarColor}
               seed={agent.avatarSeed}
               size={28}
             />
@@ -539,6 +540,7 @@ function BrowserView({
           agentId={agent.id}
           serverId={agent.serverId}
           hue={agent.avatarHue}
+          color={agent.avatarColor}
           seed={agent.avatarSeed}
           size={28}
         />
@@ -749,7 +751,7 @@ function BrowserView({
               onPress={openHelp}
             />
             <Stack.Toolbar.Menu icon="ellipsis" accessibilityLabel={t("mobile.browser.options")}>
-              <ToolbarMenuItems actions={options} onPressAction={runOption} />
+              {toolbarMenuItems(options, runOption)}
             </Stack.Toolbar.Menu>
           </Stack.Toolbar>
         </>

@@ -2572,8 +2572,9 @@ textarea {
 }
 
 /* The plush body is a picture, not a path, so the same ring follows its edge as four offset shadows
-   in the surface colour. They sit on the whole drawing, in pixels, so the width matches the stroke. */
-.bloub-avatar-svg:has(> g > image) {
+   in the surface colour. They sit on the whole drawing, in pixels, so the width matches the stroke.
+   Bloub nests the body in groups whose depth changes between versions, so any image selects it. */
+.bloub-avatar-svg:has(image) {
   --agent-avatar-ring-color: var(--agent-avatar-outline, transparent);
   --agent-avatar-ring-width: var(--agent-avatar-outline-width, 1.5px);
 
@@ -2692,6 +2693,18 @@ textarea {
 
 .avatar-editor-heading > span {
   white-space: nowrap;
+}
+
+.avatar-editor-heading-end {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+/* The heading is upper case. The style tabs keep the case of other tabs. */
+.avatar-style-tabs {
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .avatar-editor-actions {
@@ -2894,10 +2907,12 @@ textarea {
   padding: 4px 10px 12px;
 }
 
-/* Automatic and the eight colours fit one row. */
+/* Automatic and the 17 colours fill two rows of nine. A column is narrower than the button
+   padding, so the tile has none; with it, each tile overflowed onto the next one's ring. */
 .avatar-color-choice {
   width: 100%;
   height: 32px;
+  padding: 0;
 }
 
 .avatar-color-swatch {

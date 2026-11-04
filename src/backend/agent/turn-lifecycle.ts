@@ -163,6 +163,11 @@ export interface TurnHooks {
   /** Whether a provider error moves this agent to a backup model: it switches without asking and has a ready one. */
   mayFailOver(agentId: string): boolean;
   /**
+   * Whether a ready backup continues work that a usage limit stopped after it started. An agent set
+   * to ask uses its order too: the turn already started, so there is no moment to ask.
+   */
+  mayContinueOnBackup(agentId: string): boolean;
+  /**
    * Gives a channel task back to its channel's queue after a spent plan refused its turn. False
    * when the delivery is not an active channel assignment that can go back.
    */
@@ -174,6 +179,8 @@ export interface TurnHooks {
   quietRoutineDelivery(deliveryId: string): boolean;
   /** The task whose thread this is, or null for any other thread. */
   taskForThread(threadId: string): string | null;
+  /** Whether this public thread is the side thread of a routine, which takes that routine's runs. */
+  isRoutineThread(threadId: string): boolean;
   /** Whether this task's thread exists and is not archived. */
   taskOpen(taskId: string): boolean;
   /** The error of a task turn. It shows in the task's panel, not in the agent's own chat. */
@@ -832,14 +839,16 @@ export class TurnLifecycle {
         // with nothing on screen; Gemini keeps the banner, because an API key sign-in, a runtime
         // before 1.4.1 and a Claude or GPT model have no reading. Cursor keeps it too: an on-demand
         // budget and a team limit are not in its reading. OpenCode keeps it because only a Go key
-        // has a reading, and the free models failed with nothing on screen. A plan window holds the
-        // queue until its reset for every provider.
+        // has a reading, and the free models failed with nothing on screen. Kimi keeps it because an
+        // account with no Kimi Code plan has no reading. A plan window holds the queue until its
+        // reset for every provider.
         if (
           error?.codexErrorInfo === "usageLimitExceeded" ||
           (isUsageLimitDiagnostic(message) &&
             ((source.provider !== "antigravity" &&
               source.provider !== "cursor" &&
               source.provider !== "opencode" &&
+              source.provider !== "kimi" &&
               agentProviderDescriptor(source.provider).reportsUsage) ||
               isPlanLimitDiagnostic(message))) ||
           (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))
@@ -957,7 +966,7 @@ export class TurnLifecycle {
     this.#noUpdateTurns.add(turnId);
     // A failed run is never quiet, so its answer must still be written.
     if (this.#reportedFailures.has(turnId)) return "shown";
-    return this.#quietRoutineTurn(threadId, deliveries) ? "quiet" : "shown";
+    return this.#quietRoutineTurn(agentId, threadId, deliveries) ? "quiet" : "shown";
   }
 
   /**
@@ -971,11 +980,16 @@ export class TurnLifecycle {
     return true;
   }
 
-  /** Only a turn that runs nothing but quiet routine runs, outside a channel or messaging thread. */
-  #quietRoutineTurn(threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
+  /**
+   * Only a turn that runs nothing but quiet routine runs, in the agent's own chat or in a routine's
+   * side thread: not in a channel, a messaging thread or another task.
+   */
+  #quietRoutineTurn(agentId: string, threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
+    const publicThreadId = threadId === null ? null : this.#conversation.publicThreadId(agentId, threadId);
     return (
       deliveries.length > 0 &&
-      !this.#conversation.isExecutionThread(threadId) &&
+      (!this.#conversation.isExecutionThread(publicThreadId) ||
+        (publicThreadId !== null && this.#hooks.isRoutineThread(publicThreadId))) &&
       deliveries.every(
         ({ delivery }) => delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id),
       )
@@ -1054,13 +1068,13 @@ export class TurnLifecycle {
         return;
       }
       const channelTurn = !taskTurn && this.#conversation.isExecutionThread(snapshot.threadId);
-      // After work started, only a ready automatic backup continues it. A turn refused before
+      // After work started, only a ready backup in the agent's order continues it. A turn refused before
       // work still waits for the reset when no backup is ready. A continuation that a backup refused
       // before work keeps the earlier provider's work.
       const carriesWork =
         running !== undefined &&
         (running.acted || deliveries.some((context) => context.resumeAfterUsageLimit !== undefined));
-      let continuing = limited && carriesWork && deliveries.length > 0 && this.#hooks.mayFailOver(agentId);
+      let continuing = limited && carriesWork && deliveries.length > 0 && this.#hooks.mayContinueOnBackup(agentId);
       if (continuing) {
         for (const { delivery, channelId } of deliveries) {
           if (channelId && !(yield* this.#hooks.requeueChannelDelivery(delivery.id, true))) {
@@ -1187,7 +1201,7 @@ export class TurnLifecycle {
       const quiet =
         outcome === "completed" &&
         reportedFailure === undefined &&
-        this.#quietRoutineTurn(snapshot.threadId, deliveries) &&
+        this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries) &&
         settleQuietRoutineTurn(snapshot, turnId, noUpdateCalled);
       const latestAssistant = latestTurnAnswer(snapshot.messages, turnId);
       // A routine run that answered only the no-update marker, also a Test run that shows it in the
@@ -1196,8 +1210,9 @@ export class TurnLifecycle {
         latestAssistant !== undefined &&
         deliveries.some(({ delivery }) => delivery.sender.kind === "routine") &&
         isNoUpdateAnswer(latestAssistant.text);
-      // Before the deliveries end: until then they hold the chat's lane, so no turn of the chat
-      // starts before the digest is in its handoff.
+      // Before the deliveries end: until then they hold their lane, so no later turn of that lane
+      // starts before the digest is in its handoff. A chat turn that starts at the same time keeps
+      // the digest for its next turn (see `ThreadLifecycle.deletePendingHandoff`).
       const routineDelivery = deliveries[0]?.delivery.id;
       if (routineSession && routineDelivery && outcome === "completed" && !quiet && !markerAnswer && latestAssistant)
         yield* this.#hooks.routineAnswered(agentId, routineDelivery, latestAssistant.text);

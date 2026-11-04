@@ -72,6 +72,12 @@
   height: 72px;
 }
 
+/* The fur paints past the avatar box and over the color row. Only the box takes the pointer, so a
+   click there reaches the color under it. */
+.first-agent-live-avatar .agent-avatar > svg {
+  pointer-events: none;
+}
+
 .first-agent-avatar-fieldset {
   min-width: 0;
   margin: 0;
@@ -79,15 +85,18 @@
   padding: 0;
 }
 
-.first-agent-color-options,
-.first-agent-face-options {
-  display: flex;
-  align-items: center;
+/* The automatic color and 17 colors: two full rows of 9, as in the agent settings. */
+.first-agent-color-options {
+  display: grid;
+  grid-template-columns: repeat(9, 28px);
   justify-content: center;
   gap: var(--openbot-space-1);
 }
 
 .first-agent-face-options {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: var(--openbot-space-0-5);
 }
 
@@ -121,7 +130,6 @@
   background: var(--openbot-hover);
 }
 
-.first-agent-color-choice[aria-pressed="true"],
 .first-agent-face-choice[aria-pressed="true"] {
   border-color: var(--openbot-accent-text);
   box-shadow: 0 0 0 2px var(--openbot-accent-soft);
@@ -133,6 +141,12 @@
   height: 18px;
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-pill);
+}
+
+/* The swatch draws its own ring, so the ring and the dot share one box and stay concentric. */
+.first-agent-color-choice[aria-pressed="true"] .first-agent-color-swatch {
+  outline: 1px solid var(--openbot-accent-text);
+  outline-offset: 4px;
 }
 
 .first-agent-face-choice .agent-avatar {

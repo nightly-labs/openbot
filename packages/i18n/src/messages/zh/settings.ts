@@ -533,6 +533,7 @@ export const messages = {
   "settings.voice.speech.model.description": "在这台电脑上朗读回复，支持 31 种语言。",
   "settings.voice.speech.readReplies.title": "朗读回复",
   "settings.voice.speech.readReplies.description": "你用听写发送消息时，会朗读回复。再次听写即可停止朗读。",
+  "settings.voice.speech.speed.title": "语速",
   "settings.voice.speech.voice.title": "声音",
   "settings.voice.speech.voice.female": "女声 {number}",
   "settings.voice.speech.voice.male": "男声 {number}",

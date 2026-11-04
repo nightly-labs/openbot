@@ -28,8 +28,61 @@ export function legacyReasoningEffort(effort: AgentReasoningEffort): LegacyAgent
   return effort === "ultra" ? "max" : effort;
 }
 
+/**
+ * The hues that released apps and Team API peers know. Do not change this list: released decoders
+ * refuse another value. A new agent colour is an `AvatarColor`, not a new hue.
+ */
 export const AVATAR_HUES = [0, 30, 55, 100, 150, 185, 215, 245, 280, 320] as const;
 export type AvatarHue = (typeof AVATAR_HUES)[number];
+
+/**
+ * An agent colour as `#rrggbb` in lower case. It is any colour, so a new preset or a brand colour needs
+ * no new wire value. An agent with a colour also keeps the nearest hue (`nearestAvatarHue`) in
+ * `avatarHue`, which released apps and peers read.
+ */
+export type AvatarColor = `#${string}`;
+
+const AVATAR_COLOR_PATTERN = /^#[0-9a-f]{6}$/;
+
+export function isAvatarColor(value: unknown): value is AvatarColor {
+  return isString(value) && AVATAR_COLOR_PATTERN.test(value);
+}
+
+/** Saturation under this limit has no clear hue, so such a colour gets the automatic hue. */
+const NEUTRAL_SATURATION = 0.15;
+
+/**
+ * The hue that a released app or peer draws for a colour: the nearest of `AVATAR_HUES` on the colour
+ * wheel, or null (automatic) for grey, black and white.
+ */
+export function nearestAvatarHue(color: AvatarColor): AvatarHue | null {
+  const red = Number.parseInt(color.slice(1, 3), 16) / 255;
+  const green = Number.parseInt(color.slice(3, 5), 16) / 255;
+  const blue = Number.parseInt(color.slice(5, 7), 16) / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const delta = max - min;
+  const lightness = (max + min) / 2;
+  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
+  if (saturation < NEUTRAL_SATURATION) return null;
+  const sector =
+    max === red
+      ? ((green - blue) / delta + 6) % 6
+      : max === green
+        ? (blue - red) / delta + 2
+        : (red - green) / delta + 4;
+  const angle = sector * 60;
+  let nearest: AvatarHue = AVATAR_HUES[0];
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const hue of AVATAR_HUES) {
+    const distance = Math.min(Math.abs(angle - hue), 360 - Math.abs(angle - hue));
+    if (distance < nearestDistance) {
+      nearest = hue;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
 
 // Square brackets are in the set because a provider CLI puts them there: the Claude CLI reports its
 // 1M-context Fable variant as `claude-fable-5-1[1m]`, and every id this guard sees was minted by a

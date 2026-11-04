@@ -363,11 +363,18 @@
   padding: 9px 7px;
 }
 
+/* Many providers or accounts scroll here, so the add button below stays in the panel. The padding
+ * keeps the focus outline inside the scroll box. */
 .provider-model-rail-tabs {
   display: flex;
+  min-height: 0;
   flex-direction: column;
   align-items: center;
   gap: var(--openbot-space-1);
+  overflow-y: auto;
+  scrollbar-width: none;
+  margin: -2px;
+  padding: 2px;
 }
 
 /* Opens the provider settings, to connect a provider that the rail leaves out. */
@@ -558,6 +565,31 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A spent plan window: the chip shares the first line with the provider name, and the version stays
+ * on the second. The chip shortens with an ellipsis, so the heading keeps its height. */
+.provider-model-heading-limited {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--openbot-space-1-5);
+}
+
+.provider-model-heading-limited > span {
+  grid-column: 1 / -1;
+}
+
+/* A Badge, at the height of the row tags (default, Free, New) so the heading keeps its height. */
+.provider-model-limit {
+  display: block;
+  justify-self: start;
+  max-width: 100%;
+  height: auto;
+  padding: 1px var(--openbot-space-1-5);
+  color: var(--openbot-danger-text);
+  line-height: 15px;
+  text-overflow: ellipsis;
 }
 
 /* The runtime status: a filled block with no border, as the search field. */

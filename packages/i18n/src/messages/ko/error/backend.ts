@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "OpenBot 데이터베이스가 무결성 검사에 실패했어요.",
   "error.backend.webhookRouteLimit": "호스트 하나에는 웹훅 루틴을 최대 {limit}개까지 둘 수 있어요.",
   "error.backend.webhookSettingsInvalid": "웹훅 설정을 확인한 후 다시 시도해 주세요.",
+  "error.backend.webhookSenderSecretInvalid":
+    "보낸 쪽의 서명 시크릿 전체를 붙여 넣으세요. 16~1024자이며 공백이 없습니다.",
   "error.backend.webhookRouteUnavailable":
     "공개 웹훅 경로가 아직 준비되지 않았어요. 호스트 연결을 확인한 후 다시 시도해 주세요.",
   "error.backend.webhookTestUnavailable":
@@ -193,6 +195,10 @@ export const messages = {
   "error.backend.agentWaitRemoteUnsupported": "열린 대기는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.markUnreadRemoteUnsupported":
     "메시지를 읽지 않음으로 표시하는 기능은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.messageDeleteUnsupported": "이 서버는 메시지 삭제를 지원하지 않아요.",
+  "error.backend.messageDeleteNotFound": "이 메시지는 채팅에 없어요.",
+  "error.backend.messageDeleteBusy": "이 메시지는 실행 중인 턴의 일부예요. 턴이 끝나면 삭제하세요.",
+  "error.backend.messageDeleteForbidden": "내가 보낸 메시지만 삭제할 수 있어요.",
   "error.backend.routineFlowHandoffFailed": "루틴이 이 에이전트에게 작업을 넘기지 못했어요.",
   "error.backend.mcpServerLimit": "OpenBot은 MCP 서버를 최대 {limit}개까지 유지해요.",
   "error.backend.mcpServerNameTaken": "{name}(이)라는 MCP 서버가 이미 있어요.",

@@ -55,6 +55,8 @@ interface AuthServiceOptions {
   analytics?: AccountAnalytics;
   /** Saves the first website visit that a sign-in on the web sends. */
   attribution?: AccountAttribution;
+  /** True when the email's domain signs in at its company provider, which then replaces email codes. */
+  usesCompanySignIn?: (email: string) => Effect.Effect<boolean, AuthOperationError>;
 }
 
 export interface EmailSignInStart {
@@ -82,6 +84,7 @@ class AuthDependencies extends Context.Service<
     profileChanged: (userId: string) => Effect.Effect<void, RemoteFailure>;
     analytics: AccountAnalytics;
     attribution: AccountAttribution | null;
+    usesCompanySignIn: (email: string) => Effect.Effect<boolean, AuthOperationError>;
   }
 >()("@openbot/auth-api/AuthDependencies") {}
 
@@ -114,6 +117,7 @@ export class AuthService {
       profileChanged: options.profileChanged ?? (() => Effect.void),
       analytics: options.analytics ?? NO_ACCOUNT_ANALYTICS,
       attribution: options.attribution ?? null,
+      usesCompanySignIn: options.usesCompanySignIn ?? (() => Effect.succeed(false)),
     });
   }
 
@@ -137,6 +141,13 @@ export class AuthService {
         );
       }
       const email = yield* authValidate(() => normalizeEmail(emailInput));
+      if (yield* dependencies.usesCompanySignIn(email)) {
+        return yield* new AuthServiceError(
+          409,
+          "company_sign_in_required",
+          "This email signs in with your company account.",
+        );
+      }
       const now = dependencies.now();
       if (idempotencyKey !== undefined && !isUuidV4(idempotencyKey)) {
         return yield* new AuthServiceError(

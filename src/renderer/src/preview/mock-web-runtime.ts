@@ -1,4 +1,5 @@
 import { CHANNEL_CHATS_CAPABILITY } from "@openbot/contracts/ipc";
+import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import type { WebRuntimeFactory } from "../features/web-client/web-client-context";
 import type { WebRuntimeEvents, WebWorkspaceRuntime } from "../features/web-client/web-runtime";
@@ -59,6 +60,7 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
         "sidebar-layout",
         CHANNEL_CHATS_CAPABILITY,
         ROUTINE_FLOWS_CAPABILITY,
+        MESSAGE_DELETE_CAPABILITY,
       ];
     },
     disconnect: async () => {
@@ -75,6 +77,10 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
       agent.readConversationPage({ agentId, limit: 50, anchor: { type: "around", messageId } }),
     markRead: (agentId, throughMessageId) => agent.markConversationRead({ agentId, throughMessageId }),
     conversationReads: () => agent.listConversationReads(),
+    deleteMessage: (input) =>
+      input.kind === "agent"
+        ? agent.deleteConversationMessage({ agentId: input.agentId, messageId: input.messageId })
+        : agent.deleteChannelMessage({ channelId: input.channelId, messageId: input.messageId }),
     // The preview host is not a hosted server.
     focusUse: async () => undefined,
     send: async (agentId, text, attachmentDraftIds, replyToMessageId, clientMessageId) => {

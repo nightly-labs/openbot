@@ -138,6 +138,11 @@ export const messages = {
   "provider.picker.customEmpty":
     "Добавьте эндпоинт, совместимый с OpenAI: сервер моделей на этом компьютере или любой сервис с базовым URL и ключом.",
   "provider.picker.defaultModelLabel": "{name}, по умолчанию",
+  "provider.picker.usageLimit": "Лимит использования исчерпан",
+  "provider.picker.usageLimitWindow": "Лимит ({window})",
+  "provider.picker.usageLimitResets": "{limit} · Сброс: {time}",
+  "provider.picker.usageLimitLabel": "{name}, лимит использования исчерпан",
+  "provider.picker.usageLimitResetsLabel": "{name}, лимит использования исчерпан, сброс: {time}",
   "provider.picker.effort": "Усилие",
   "provider.picker.effortLabel": "Уровень усилий агента",
   "provider.picker.effortFixed": "{effort}, задаёт {provider}",

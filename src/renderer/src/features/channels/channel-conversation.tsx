@@ -18,6 +18,7 @@ import type {
   PromptAnswerOptions,
   SendMessageResult,
 } from "../conversation/conversation-types";
+import { readerCanDeleteMessage } from "../conversation/message-delete-access";
 import {
   ChannelAboveComposer,
   ChannelEmptyState,
@@ -261,6 +262,12 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     EmptyState: () => <ChannelEmptyState channelId={channelId} />,
   };
 
+  const deleteMessage = (messageId: string) => channels.deleteMessage(channelId, messageId);
+  /** Whether the reader may delete `message`: their own, or any message for this computer or an admin. */
+  const canDeleteMessage = (message: AgentMessage) =>
+    !readOnly() &&
+    readerCanDeleteMessage(message, { deleteAny: channels.deletesAnyMessage(), isOwnSender: env.isOwnSender });
+
   return {
     source,
     loaded: () => page() !== null,
@@ -308,5 +315,8 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
       return respond(() => channels.port().agent.respondToBrowserTakeover({ requestId, decision }));
     },
     onStop: () => void stopWork(),
+    /** The Delete action of the channel. A host without `message-delete-v1` has none. */
+    deleteMessageAction: () => (channels.messageDeletionSupported() ? deleteMessage : undefined),
+    canDeleteMessage,
   };
 }

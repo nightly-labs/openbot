@@ -124,6 +124,7 @@ const PROVIDER_DESCRIPTION_KEYS: Readonly<Record<string, AppTextKey>> = {
   "Cursor plan or API key": "onboarding.provider.cursorPlan",
   "Free models with a Cline account": "onboarding.provider.clineAccount",
   "Kimi models with a Kimi Code account": "onboarding.provider.kimiAccount",
+  "Many models with a Devin account": "onboarding.provider.devinAccount",
   "Mercury models with an Inception API key": "onboarding.provider.inceptionKey",
   "DeepSeek models with a DeepSeek API key": "onboarding.provider.deepseekKey",
   "Many models with an OpenRouter API key": "onboarding.provider.openrouterKey",

@@ -378,7 +378,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "غير متاح الآن · مُتخطى",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "لا ينتقل {name} أبدًا بعد أن يبدأ الكتابة. يعود إلى {model} عند انتهاء الحد، أو بعد 10 دقائق من خطأ المزوّد.",
+    "عندما يوقف حدّ الاستخدام {name} بعد أن يبدأ العمل، يتابع {name} العمل نفسه على أول نموذج متاح في الترتيب. يعود إلى {model} عند انتهاء الحد، أو بعد 10 دقائق من خطأ المزوّد.",
   "mobile.agent.busyMessage.label": "أثناء العمل",
   "mobile.agent.busyMessage.footer":
     "ما تفعله الرسالة عندما ترسلها أثناء عمل الوكيل. «قائمة الانتظار» تحتفظ بها حتى ينتهي الدور. «توجيه» تعطيها للوكيل أثناء الدور.",

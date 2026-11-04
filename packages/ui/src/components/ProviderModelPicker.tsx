@@ -1,5 +1,7 @@
 import { ProviderLogo } from "@openbot/brand";
 import type {
+  AccountUsage,
+  AccountUsageWindow,
   AgentModelId,
   AgentProviderId,
   AgentProviderStatus,
@@ -26,7 +28,9 @@ import {
   providerDisplayName,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
+import { planLimitWindowKind, spentUsageWindow } from "@openbot/team-client/plan-limits";
 import {
+  Badge,
   Button,
   Input,
   Listbox,
@@ -48,6 +52,7 @@ import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { cx } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
+import { formatUsageReset, usageWindowLabel } from "../features/account/account-usage-view";
 import { currentText, type TextValue, useText } from "../text";
 import { createScrollFades } from "./createScrollFades";
 import { providerAccountName } from "./provider-accounts";
@@ -104,6 +109,11 @@ interface ProviderModelPickerProps {
   /** The agent's account. Absent or unknown means the provider's own sign-in. */
   providerAccountId?: string | null | undefined;
   /**
+   * The plan readings that the Usage rings show. A model that a spent window limits gets a mark;
+   * without a reading, no model does. The picker does not ask the provider again.
+   */
+  accountUsage?: AccountUsage | null | undefined;
+  /**
    * The agent's provider when this build does not know it. The host still runs the agent, so the
    * picker shows its model, and it cannot open until OpenBot is updated.
    */
@@ -141,6 +151,14 @@ const RAIL_TOOLTIP = {
   closeDelay: 0,
   skipDelayDuration: 300,
 } as const;
+
+/** The longest delay that `setTimeout` keeps. A longer one runs at once. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+/** When a spent window gives its quota back, in seconds. A window with no reset never does. */
+function resetTime(window: AccountUsageWindow | undefined): number {
+  return window?.resetsAt ?? Number.POSITIVE_INFINITY;
+}
 
 /** The part of the interface text that the provider helpers below read. */
 type PickerText = Pick<TextValue, "t" | "sourceText">;
@@ -347,6 +365,75 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     // OpenCode is what serves a custom endpoint, so its trouble is this tab's trouble.
     return status.state === "available" ? customSummary() : providerStatusLabel(status.state, t);
   };
+  /**
+   * A window that ended gives the quota back, and its reading stays as it was until something asks
+   * the provider again. So the clock is part of the state. It moves when the picker opens and at the
+   * next reset while it is open.
+   */
+  const [now, setNow] = createSignal(Date.now());
+  /** The spent plan window that limits a model of a rail entry now. Each account has its own quota. */
+  const spentWindow = (rail: RailId, accountId: string | null, model: string): AccountUsageWindow | undefined => {
+    if (rail === CUSTOM_RAIL) return undefined;
+    const spent = spentUsageWindow(
+      props.accountUsage?.limits,
+      rail,
+      accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID,
+      model,
+      now(),
+    );
+    return spent?.covers ? spent.window : undefined;
+  };
+  /** The spent window of each model of a rail entry, in the order of the models. */
+  const entrySpentWindows = (key: RailKey): (AccountUsageWindow | undefined)[] => {
+    const rail = railOf(key);
+    if (rail === CUSTOM_RAIL || !props.accountUsage) return [];
+    const accountId = key === rail ? null : key.slice(rail.length + 1);
+    return railModelOptions(rail).map((model) => spentWindow(rail, accountId, model.id));
+  };
+  /**
+   * The spent window of a rail entry when one limits every model of the entry: the one that resets
+   * first, as that is when a model can run again.
+   */
+  const entrySpentWindow = (key: RailKey): AccountUsageWindow | undefined => {
+    const windows = entrySpentWindows(key);
+    let first: AccountUsageWindow | undefined;
+    for (const window of windows) {
+      if (!window) return undefined;
+      if (!first || resetTime(window) < resetTime(first)) first = window;
+    }
+    return first;
+  };
+  /** The chip beside the provider name: the spent window and its reset. */
+  const spentChipText = (window: AccountUsageWindow): string => {
+    const limit =
+      planLimitWindowKind(window.windowDurationMins).kind === "limit"
+        ? t("provider.picker.usageLimit")
+        : t("provider.picker.usageLimitWindow", { window: usageWindowLabel(window.windowDurationMins, text) });
+    const time = formatUsageReset(window.resetsAt, text);
+    return time ? t("provider.picker.usageLimitResets", { limit, time }) : limit;
+  };
+  /** A row or tab name with its spent window, for a screen reader. The rows and the tabs show no mark. */
+  const spentLabel = (name: string, window: AccountUsageWindow | undefined): string => {
+    if (!window) return name;
+    const time = formatUsageReset(window.resetsAt, text);
+    return time
+      ? t("provider.picker.usageLimitResetsLabel", { name, time })
+      : t("provider.picker.usageLimitLabel", { name });
+  };
+  createEffect(
+    () => {
+      if (!open()) return null;
+      const next = Math.min(...visibleKeys().flatMap((key) => entrySpentWindows(key).map(resetTime)));
+      return Number.isFinite(next) ? next : null;
+    },
+    (resetsAt) => {
+      if (resetsAt === null) return;
+      // A month is longer than the longest delay that a timer takes. The picker is not open that long.
+      const delay = Math.min(MAX_TIMER_DELAY_MS, Math.max(0, resetsAt * 1_000 - Date.now()));
+      const timer = window.setTimeout(() => setNow(Date.now()), delay);
+      return () => window.clearTimeout(timer);
+    },
+  );
 
   createEffect(
     () => ({ key: activeKey(), open: open(), visible: visibleKeys(), rail: railProvider() }),
@@ -389,6 +476,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   function setPickerOpen(next: boolean): void {
     if (props.disabled) return;
     if (next) {
+      setNow(Date.now());
       setOpenedKeys(untrack(() => railKeys().filter(entryUsable)));
       const key = activeKey();
       setRailProvider(visibleKeys().includes(key) ? key : (visibleKeys()[0] ?? CUSTOM_RAIL));
@@ -602,7 +690,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               },
                             ]}
                             data-state={status().state}
-                            aria-label={`${name()}: ${railSummary(provider, status())}`}
+                            aria-label={spentLabel(
+                              `${name()}: ${railSummary(provider, status())}`,
+                              status().state === "available" ? entrySpentWindow(key) : undefined,
+                            )}
                             onClick={(event) => {
                               const target = event.currentTarget;
                               selectRailProvider(key);
@@ -759,11 +850,12 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                             item={item}
                             type="button"
                             class={["provider-model-option", { "provider-model-option-selected": isSelected() }]}
-                            aria-label={
+                            aria-label={spentLabel(
                               model.id === railDefaultModel(provider)
                                 ? t("provider.picker.defaultModelLabel", { name: label() })
-                                : label()
-                            }
+                                : label(),
+                              spentWindow(provider, accountId(), model.id),
+                            )}
                             disabled={!modelEnabled(model)}
                             onClick={() => {
                               if (!isSelected()) selectModel(model, accountId(), key);
@@ -804,6 +896,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 const modelEnabled = (model: PickerModel) =>
                   modelAvailable(model) && (accountId() === null || available());
                 const effortLocked = () => !available();
+                /** A spent window that limits every model of the tab: a chip beside the provider name. */
+                const headingSpent = createMemo(() => (available() ? entrySpentWindow(key) : undefined));
                 const modelOption = (model: PickerModel | undefined) =>
                   model &&
                   props.modelOptions.find((option) => option.provider === model.provider && option.id === model.id);
@@ -912,8 +1006,20 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     aria-label={t("provider.picker.models", { name: entryName(key) })}
                   >
                     <div class="provider-model-heading">
-                      <div class="provider-model-heading-text">
+                      <div
+                        class={[
+                          "provider-model-heading-text",
+                          { "provider-model-heading-limited": Boolean(headingSpent()) },
+                        ]}
+                      >
                         <strong>{entryName(key)}</strong>
+                        <Show when={headingSpent()}>
+                          {(window) => (
+                            <Badge as="small" variant="destructive-light" class="provider-model-limit">
+                              {spentChipText(window())}
+                            </Badge>
+                          )}
+                        </Show>
                         <span>
                           {account() && status().state === "available"
                             ? (account()?.account.email ?? railHeadingSummary(provider, status()))

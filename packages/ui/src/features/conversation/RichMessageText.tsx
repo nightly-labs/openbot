@@ -199,9 +199,9 @@ export function RichMessageText(props: RichMessageTextProps) {
           }
           if (part.unavailableKind) {
             return (
-              <span class="message-tag-unavailable" dir="auto">
+              <span class="message-tag-unavailable">
                 <span class="sr-only">{t(UNAVAILABLE_TAG_LABELS[part.unavailableKind])} </span>
-                {part.text}
+                <span dir="auto">{part.text}</span>
               </span>
             );
           }

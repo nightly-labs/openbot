@@ -12,6 +12,10 @@ import {
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RECOVERY_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-recovery-v1";
+import {
+  WEBHOOK_SENDER_SECRET_CAPABILITY,
+  WEBHOOK_SENDER_SECRET_ROUTES,
+} from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY, WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { Effect } from "effect";
@@ -23,6 +27,7 @@ import {
   parseListEventRoutineRuns,
   parseListEventRoutines,
   parseSaveEventRoutine,
+  parseSetWebhookSecret,
 } from "../host-events-inputs";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -33,7 +38,11 @@ import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 interface EventsRemoteServers {
   supportsCapability(
     serverId: string,
-    capability: typeof EVENTS_CAPABILITY | typeof ROUTINE_RECOVERY_CAPABILITY | typeof WEBHOOK_TESTS_CAPABILITY,
+    capability:
+      | typeof EVENTS_CAPABILITY
+      | typeof ROUTINE_RECOVERY_CAPABILITY
+      | typeof WEBHOOK_TESTS_CAPABILITY
+      | typeof WEBHOOK_SENDER_SECRET_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -98,6 +107,14 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
       rotateSecret: scopedHandler(parseEventRoutineRef, {
         local: (input) => runCauseEffect(events.rotateSecret(input)),
         remote: (input, serverId) => remote(serverId, EVENTS_ROUTES.rotateSecret, decodeWebhookSecret, input),
+      }),
+      setSecret: scopedHandler(parseSetWebhookSecret, {
+        local: (input) => runCauseEffect(events.setSecret(input)),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WEBHOOK_SENDER_SECRET_CAPABILITY))
+            throw new Error(sourceText("error.backend.eventsUnavailable"));
+          return remote(serverId, WEBHOOK_SENDER_SECRET_ROUTES.set, acceptEmpty, input);
+        },
       }),
       sendTestEvent: scopedHandler(parseEventRoutineRef, {
         local: (input) => runCauseEffect(events.sendTestEvent(input)),

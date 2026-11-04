@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "فشلت قاعدة بيانات OpenBot في فحص السلامة.",
   "error.backend.webhookRouteLimit": "يمكن أن يحتوي المضيف على {limit} مهام دورية webhook كحد أقصى.",
   "error.backend.webhookSettingsInvalid": "تحقق من إعدادات webhook وحاول مرة أخرى.",
+  "error.backend.webhookSenderSecretInvalid":
+    "الصق سر التوقيع الكامل من المُرسِل. يحتوي على 16 إلى 1024 حرفًا بدون مسافات.",
   "error.backend.webhookRouteUnavailable": "مسار webhook العام غير جاهز. تحقق من اتصال المضيف وحاول مرة أخرى.",
   "error.backend.webhookTestUnavailable":
     "لا يمكن للمضيف استقبال الحدث التجريبي الآن. تأكد من تسجيل الدخول، ثم حاول مرة أخرى.",
@@ -186,6 +188,10 @@ export const messages = {
     "لا يوقظ الانتظار إلا تشغيل إحدى مهامك الدورية، وليس لديك أي مهمة دورية. أنشئ واحدة باستخدام openbot.create_routine، ثم افتح الانتظار.",
   "error.backend.agentWaitRemoteUnsupported": "الانتظارات المفتوحة متاحة فقط للوكلاء على هذا الحاسوب.",
   "error.backend.markUnreadRemoteUnsupported": "تمييز رسالة كغير مقروءة متاح فقط للوكلاء على هذا الحاسوب.",
+  "error.backend.messageDeleteUnsupported": "لا يدعم هذا الخادم حذف الرسائل.",
+  "error.backend.messageDeleteNotFound": "هذه الرسالة ليست في المحادثة.",
+  "error.backend.messageDeleteBusy": "هذه الرسالة جزء من دور قيد التشغيل. احذفها عند انتهاء الدور.",
+  "error.backend.messageDeleteForbidden": "يمكنك حذف الرسائل التي أرسلتها فقط.",
   "error.backend.routineFlowHandoffFailed": "تعذّر على المهمة الدورية تمرير العمل إلى هذا الوكيل.",
   "error.backend.mcpServerLimit": "يحتفظ OpenBot بـ {limit} خوادم MCP كحد أقصى.",
   "error.backend.mcpServerNameTaken": "يوجد بالفعل خادم MCP باسم {name}.",

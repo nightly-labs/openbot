@@ -97,7 +97,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Şu an uygun değil · atlandı",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} yazmaya başladıktan sonra asla model değiştirmez. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
+    "Bir kullanım sınırı {name} işe başladıktan sonra onu durdurursa, {name} aynı işe sıradaki ilk kullanılabilir modelle devam eder. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "agentSettings.groups.brain": "Beyin",
   "agentSettings.groups.knows": "Bilgi",
   "agentSettings.groups.does": "Görevler",
@@ -128,6 +128,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "Kimliğe sıfırla",
   "agentSettings.avatar.shape": "Şekil",
   "agentSettings.avatar.shuffle": "Rastgele yüz",
+  "agentSettings.avatar.style": "Avatar stili",
+  "agentSettings.avatar.stylePlush": "Peluş",
+  "agentSettings.avatar.styleFlat": "Düz",
   "agentSettings.avatar.shapes": "Avatar şekilleri",
   "agentSettings.avatar.shapeOption": "Şekil {number}",
   "agentSettings.avatar.eyes": "Gözler",

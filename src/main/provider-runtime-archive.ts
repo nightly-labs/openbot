@@ -134,10 +134,11 @@ export const extractZipFiles = Effect.fn("ProviderArchive.extractZipFiles")(func
     (handle) => runtimeIO(() => handle.close()).pipe(Effect.orDie),
   );
 });
+/** Extracts the entries under `root`, or under any of the roots in a list. `""` extracts each entry. */
 export const extractZipTree = Effect.fn("ProviderArchive.extractZipTree")(function* (
   archive: string,
   destination: string,
-  root: string,
+  root: string | readonly string[],
   message: string,
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   yield* Effect.acquireUseRelease(
@@ -160,12 +161,13 @@ export const extractZipTree = Effect.fn("ProviderArchive.extractZipTree")(functi
   );
 });
 
-function isZipTreeName(name: string, root: string): boolean {
+function isZipTreeName(name: string, root: string | readonly string[]): boolean {
   if (name.includes("\0") || name.includes("\\")) return false;
   const parts = name.replace(/\/$/u, "").split("/");
+  const roots: readonly string[] = typeof root === "string" ? [root] : root;
   // A `:` names an NTFS stream on Windows, which would write beside the file rather than into it.
   return (
-    (root === "" || parts[0] === root) &&
+    (roots.includes("") || roots.includes(parts[0] ?? "")) &&
     parts.every((part) => part && part !== "." && part !== ".." && !part.includes(":"))
   );
 }

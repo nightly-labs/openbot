@@ -23,7 +23,6 @@ import {
   AlertDescription,
   AlertIcon,
   Button,
-  ChevronRight,
   Tabs,
   TriangleAlert,
 } from "@openbot/ui";
@@ -186,6 +185,7 @@ export function SettingsModal(props: SettingsModalProps) {
   const visibleNavItems = () => navItems.filter((item) => settingsTabShown(item.value, dynamicIslandShown()));
 
   const title = () => i18n.t(navItem(activeTab()).titleKey);
+  const agentsCrumb = () => (activeTab() === "agents" ? agents.crumb() : null);
   const description = () => i18n.t(navItem(activeTab()).descriptionKey);
 
   const tabsProps = {
@@ -249,19 +249,8 @@ export function SettingsModal(props: SettingsModalProps) {
         class="app-settings-modal-shell"
         page={props.page}
         open={props.open}
-        title={
-          <Show when={activeTab() === "agents" && agents.crumb()} fallback={title()}>
-            {(detail) => (
-              <span class="settings-modal-crumbs">
-                <Button type="button" variant="ghost" class="settings-modal-crumb-parent" onClick={detail().back}>
-                  {title()}
-                </Button>
-                <ChevronRight class="settings-modal-crumb-separator" aria-hidden="true" />
-                <span class="settings-modal-crumb-current">{detail().title}</span>
-              </span>
-            )}
-          </Show>
-        }
+        title={title()}
+        crumb={agentsCrumb()}
         description={description()}
         contentKey={`${activeTab()}:${agents.crumb()?.title ?? ""}`}
         restoreFocusTarget={props.restoreFocusTarget}

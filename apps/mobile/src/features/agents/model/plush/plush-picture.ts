@@ -1,8 +1,8 @@
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
-import type { AvatarHue } from "@openbot/contracts/ipc";
+import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { ImageFormat, Skia } from "@shopify/react-native-skia";
 import { Directory, File, Paths } from "expo-file-system";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { loadPlushArt } from "./plush-assets";
 import { drawPlush } from "./plush-draw";
 import { plushGeometry, plushRestFrame } from "./plush-frames";
@@ -24,6 +24,8 @@ const EVICT_EVERY = 50;
 export interface PlushPictureSpec {
   seed: string;
   hue: AvatarHue | null;
+  /** The agent's `avatarColor`. It wins over `hue`. */
+  color: AvatarColor | null;
   mood: AvatarMood;
   /** The width of the picture in pixels. */
   pixels: number;
@@ -41,14 +43,14 @@ export function nameHash(value: string): string {
 /** The name of a picture. It changes with the face, the colour, the size and the style. */
 export function plushPictureName(spec: PlushPictureSpec): string {
   const geometry = plushGeometry(spec.seed, spec.mood);
-  const color = getBloubAvatarColor(spec.seed, spec.hue);
+  const color = avatarHeadColor(spec.seed, spec.hue, spec.color);
   return `${nameHash(`${PLUSH_STYLE}|${geometry.key}|${color}|${spec.pixels}|${spec.saturation}`)}.png`;
 }
 
 /** Draws the still plush of `spec` as base64 PNG data. */
 export async function renderPlushPicture(spec: PlushPictureSpec): Promise<string> {
   const geometry = plushGeometry(spec.seed, spec.mood);
-  const art = await loadPlushArt(geometry.shape, getBloubAvatarColor(spec.seed, spec.hue), spec.pixels);
+  const art = await loadPlushArt(geometry.shape, avatarHeadColor(spec.seed, spec.hue, spec.color), spec.pixels);
   const surface = Skia.Surface.Make(spec.pixels, spec.pixels);
   if (!surface) throw new Error("The plush surface is unavailable.");
   drawPlush(surface.getCanvas(), plushRestFrame(geometry), art, spec.pixels, spec.saturation);

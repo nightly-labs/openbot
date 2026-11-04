@@ -34,6 +34,13 @@ export const messages = {
   "mobile.agent.appearance.hue.indigo": "남색",
   "mobile.agent.appearance.hue.violet": "보라",
   "mobile.agent.appearance.hue.magenta": "마젠타",
+  "mobile.agent.appearance.hue.pink": "분홍",
+  "mobile.agent.appearance.hue.sky": "하늘색",
+  "mobile.agent.appearance.hue.navy": "네이비",
+  "mobile.agent.appearance.hue.wine": "와인색",
+  "mobile.agent.appearance.hue.brown": "갈색",
+  "mobile.agent.appearance.hue.sand": "모래색",
+  "mobile.agent.appearance.hue.grey": "회색",
   "mobile.agent.menu.deleteFailed": "에이전트를 삭제할 수 없어요",
   "mobile.agent.menu.duplicateFailed": "에이전트를 복제할 수 없어요",
   "mobile.agent.menu.hideFailed": "에이전트를 숨길 수 없어요",
@@ -341,7 +348,7 @@ export const messages = {
   "mobile.agent.backupModels.unavailable": "지금 사용할 수 없음 · 건너뜀",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.note":
-    "{name}은(는) 글을 쓰기 시작한 뒤에는 전환하지 않아요. 한도가 끝나거나 제공자 오류 후 10분이 지나면 {model}(으)로 돌아가요.",
+    "작업을 시작한 뒤 사용 한도로 {name}이(가) 멈추면, 순서에서 처음으로 사용 가능한 모델로 같은 작업을 이어가요. 한도가 끝나거나 제공자 오류 후 10분이 지나면 {model}(으)로 돌아가요.",
   "mobile.agent.busyMessage.label": "작업 중일 때",
   "mobile.agent.busyMessage.footer":
     "에이전트가 작업하는 중에 메시지를 보낼 때의 동작이에요. 대기열은 턴이 끝날 때까지 메시지를 보관해요. 방향 지시는 턴이 진행되는 동안 에이전트에게 메시지를 전달해요.",

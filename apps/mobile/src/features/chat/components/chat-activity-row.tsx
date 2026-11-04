@@ -72,7 +72,7 @@ export interface ChatActivitySpec {
   key: string;
   label: string;
   accessibilityLabel: string;
-  agent?: Pick<MobileAgent, "id" | "serverId" | "avatarHue" | "avatarSeed">;
+  agent?: Pick<MobileAgent, "id" | "serverId" | "avatarHue" | "avatarSeed" | "avatarColor">;
   mood: AvatarMood;
   online: boolean;
   animateAvatar: boolean;
@@ -125,6 +125,7 @@ export function ChatActivityRow({
               agentId={spec.agent.id}
               serverId={spec.agent.serverId}
               hue={spec.agent.avatarHue}
+              color={spec.agent.avatarColor}
               seed={spec.agent.avatarSeed}
               size={36}
               disconnected={!spec.online}

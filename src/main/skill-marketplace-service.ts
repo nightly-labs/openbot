@@ -440,6 +440,11 @@ export class SkillMarketplaceService {
       const owned = new Set(Object.values(lock.skills).flatMap(entryFolders));
       for (const folder of folders.keys()) {
         if (owned.has(folder)) continue;
+        // OpenBot writes its own skill to this folder in every workspace, so only an older install can own it.
+        if (MANAGED_SKILL_SLUGS.has(folder))
+          return yield* new SkillMarketplaceFailure({
+            cause: new Error(sourceText("error.skill.managedSlug", { slug: folder })),
+          });
         for (const target of [
           ...targetDirectories(agent.workspacePath, folder),
           disabledDirectory(agent.workspacePath, folder),

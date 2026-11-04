@@ -620,8 +620,8 @@ export function githubTriage(): StoryWorkflow {
 }
 
 /**
- * The GitHub of the node stories: connected, with one repository that the bot can change and one that
- * it can only read. The buttons do nothing.
+ * The GitHub of the node stories: connected, with repositories of two owners. The bot can change some,
+ * can only read one, and GitHub sends no events from one. The buttons do nothing.
  */
 export const STORY_GITHUB: WorkflowGitHubCanvas = {
   catalog: () => ({
@@ -629,6 +629,13 @@ export const STORY_GITHUB: WorkflowGitHubCanvas = {
     repositories: [
       { fullName: TRIAGE_REPOSITORY, private: false, canWrite: true, events: true },
       { fullName: "openbot-preview/docs", private: true, canWrite: false, events: true },
+      {
+        fullName: "openbot-preview/desktop-release-pipeline-and-installers",
+        private: true,
+        canWrite: true,
+        events: true,
+      },
+      { fullName: "openbot-preview-labs/team-api-gateway", private: true, canWrite: true, events: false },
     ],
   }),
   history: () => EMPTY_GITHUB_HISTORY,

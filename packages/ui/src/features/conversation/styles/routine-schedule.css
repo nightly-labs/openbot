@@ -639,9 +639,20 @@ code.routine-webhook-secret {
   justify-self: center;
 }
 
-.routine-webhook-field > .ui-icon-button {
+.routine-webhook-field > .ui-icon-button,
+.routine-webhook-actions > .ui-icon-button {
   width: var(--openbot-control-sm);
   height: var(--openbot-control-sm);
+}
+
+/* The secret row can have two actions. They share the last column, which grows to fit them. */
+.routine-webhook-field:has(> .routine-webhook-actions) {
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr) minmax(var(--openbot-control-sm), auto);
+}
+
+.routine-webhook-actions {
+  display: flex;
+  align-items: center;
 }
 
 /* The Events row is a ghost Button; two classes keep the row layout over the button styles. */

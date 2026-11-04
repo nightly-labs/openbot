@@ -18,6 +18,7 @@ const DESCRIPTION_KEYS: Partial<Record<AgentProviderId, AppTextKey>> = {
   cursor: "onboarding.provider.cursorPlan",
   cline: "onboarding.provider.clineAccount",
   kimi: "onboarding.provider.kimiAccount",
+  devin: "onboarding.provider.devinAccount",
 };
 
 interface MoreProvidersStoryProps {

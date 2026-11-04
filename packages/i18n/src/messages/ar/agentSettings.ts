@@ -127,7 +127,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "غير متاح الآن · تم التخطي",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "لا يبدّل {name} النموذج أبدًا بعد أن يبدأ بالكتابة. ويعود إلى {model} عند انتهاء الحد، أو بعد 10 دقائق من خطأ المزوّد.",
+    "عندما يوقف حدّ الاستخدام {name} بعد أن يبدأ العمل، يتابع {name} العمل نفسه على أول نموذج متاح في الترتيب. ويعود إلى {model} عند انتهاء الحد، أو بعد 10 دقائق من خطأ المزوّد.",
   "agentSettings.groups.brain": "العقل",
   "agentSettings.groups.knows": "المعرفة",
   "agentSettings.groups.does": "القدرات",
@@ -159,6 +159,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "إعادة الضبط حسب المعرّف",
   "agentSettings.avatar.shape": "الشكل",
   "agentSettings.avatar.shuffle": "وجه عشوائي",
+  "agentSettings.avatar.style": "نمط الصورة الرمزية",
+  "agentSettings.avatar.stylePlush": "قطيفة",
+  "agentSettings.avatar.styleFlat": "مسطّح",
   "agentSettings.avatar.shapes": "أشكال الصورة الرمزية",
   "agentSettings.avatar.shapeOption": "الشكل {number}",
   "agentSettings.avatar.eyes": "العينان",

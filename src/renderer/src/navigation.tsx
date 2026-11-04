@@ -255,7 +255,12 @@ const Navigation = createSimpleContext({
       else if (entry.kind === "channel") void channels.open(entry.id);
       else void selectDirectMember(entry.id);
     }
-    const goBack = () => goInHistory(-1);
+    /** Back first leaves an open settings detail page, such as Providers › ChatGPT, for its list. */
+    const goBack = () => {
+      const pageBack = windowPage.pageBack();
+      if (pageBack) pageBack.back();
+      else goInHistory(-1);
+    };
     const goForward = () => goInHistory(1);
 
     /** A dialog or menu over the chat keeps its keys and mouse buttons. */
@@ -297,7 +302,7 @@ const Navigation = createSimpleContext({
       globalSearchOpener: () => globalSearchOpener,
       searchGlobalMessages,
       selectGlobalSearchMessage,
-      chatHistory: { previous: history.previous, next: history.next, goBack, goForward },
+      chatHistory: { previous: history.previous, next: history.next, pageBack: windowPage.pageBack, goBack, goForward },
     };
   },
 });

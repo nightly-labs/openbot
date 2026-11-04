@@ -1,3 +1,4 @@
+import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
@@ -9,13 +10,15 @@ import { useSetupProviderProps } from "./features/onboarding/setup-provider-prop
 import { useServerScope } from "./features/servers/server-scope";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useSettings } from "./features/settings/settings-context";
-import { StartupSplash } from "./features/startup/StartupSplash";
 import { WhatsNewOverlay } from "./features/updates/WhatsNewOverlay";
 import { QuitShortcutHint } from "./features/window/QuitShortcutHint";
 import { useI18n } from "./i18n-context";
 import { AccountLogin, FirstRunFlow, InitialSetup, LanguageStep } from "./lazy-views";
 import { usePlatform } from "./platform";
 import { WorkspaceShell } from "./WorkspaceShell";
+
+// A server switch mounts this gate again. Only the first splash of a start or a reload plays through.
+let startupSplashPlayed = false;
 
 /** The placeholder every lazy view below falls back to while its code loads. */
 function LoadingScreen() {
@@ -41,6 +44,7 @@ function LoadingScreen() {
  * gate has already ruled out.
  */
 export function AppAccessGate() {
+  const { t } = useText();
   const platform = usePlatform();
   const i18n = useI18n();
   const auth = useAuth();
@@ -53,6 +57,17 @@ export function AppAccessGate() {
   const { joinRemoteDuringSetup } = useServerSelection();
   const started = () => setup.setupLoaded() && platform.appInfo() !== null;
   const [splashShown, setSplashShown] = createSignal(true);
+  // A chat window is a new page too, but it fades as soon as it is ready.
+  const splashPlaysThrough = !startupSplashPlayed && platform.chatWindow === null;
+  // The splash lets the workspace mount its heavy views before the crew hop out.
+  const [splashOpen, setSplashOpen] = createSignal(false);
+  const splashMoving = () => splashShown() && !splashOpen();
+  // The splash also covers the first load of the workspace, which then shows no screen of its own.
+  // On a start or a reload, the crew rain in once and hop out when the workspace is ready.
+  const [workspaceReady, setWorkspaceReady] = createSignal(false);
+  const workspaceShown = () =>
+    !!auth.visibleSignedInAccount() && (setup.setupState()?.completed === true || !scope.connection.hasContent);
+  const splashReady = () => started() && (!workspaceShown() || workspaceReady());
   const languageStep = createLanguageStep();
   // Only a settled sign-out: a code in flight or a retry keeps the sign-in screen it belongs to.
   // The language button reopens the wheel from an error too, so that state does not hide it.
@@ -87,6 +102,7 @@ export function AppAccessGate() {
                     onRequestEmailCode={auth.requestEmailCode}
                     onVerifyEmailCode={auth.verifyEmailCode}
                     onReset={auth.logoutCentralAccount}
+                    onOpenCompanySignIn={auth.openCompanySignIn}
                     language={i18n.locale()}
                     onChangeLanguage={languageStep.reopen}
                   />
@@ -105,7 +121,16 @@ export function AppAccessGate() {
             <Show
               when={setup.setupState()?.completed}
               fallback={
-                <Show when={scope.connection.hasContent} fallback={<WorkspaceShell account={account} />}>
+                <Show
+                  when={scope.connection.hasContent}
+                  fallback={
+                    <WorkspaceShell
+                      account={account}
+                      behindSplash={splashMoving}
+                      onStartupReady={() => setWorkspaceReady(true)}
+                    />
+                  }
+                >
                   <Show when={!setup.setupReadFailed()} fallback={<SetupReadError />}>
                     <Show
                       when={setup.pendingInviteUrl().trim()}
@@ -150,7 +175,11 @@ export function AppAccessGate() {
                 </Show>
               }
             >
-              <WorkspaceShell account={account} />
+              <WorkspaceShell
+                account={account}
+                behindSplash={splashMoving}
+                onStartupReady={() => setWorkspaceReady(true)}
+              />
             </Show>
           )}
         </Show>
@@ -165,11 +194,19 @@ export function AppAccessGate() {
       />
       <QuitShortcutHint />
       <Show when={splashShown()}>
-        {/* Before `appInfo` loads, the build's own mode picks the logo colour. */}
-        <StartupSplash
-          variant={platform.appInfo()?.variant ?? (import.meta.env.DEV ? "dev" : "production")}
-          ready={started()}
-          onExited={() => setSplashShown(false)}
+        {/*
+          The same pile as the loading screen of a server, so a server that is still loading continues it.
+          A start or a reload always shows the crew, also when the app is ready at once.
+        */}
+        <AppLoadingScreen
+          label={t("app.loading")}
+          ready={splashReady()}
+          quickExit={!splashPlaysThrough}
+          onMountViews={() => setSplashOpen(true)}
+          onExited={() => {
+            startupSplashPlayed = true;
+            setSplashShown(false);
+          }}
         />
       </Show>
     </>

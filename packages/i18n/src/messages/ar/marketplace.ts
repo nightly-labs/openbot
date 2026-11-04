@@ -130,6 +130,7 @@ export const messages = {
   "marketplace.app.slackTagline": "الإشارات والرسائل المباشرة في Slack",
   "marketplace.app.discordTagline": "الإشارات والرسائل المباشرة في Discord",
   "marketplace.app.telegramTagline": "المجموعات والدردشات المباشرة في Telegram",
+  "marketplace.app.whatsappTagline": "دردشتك الخاصة والأشخاص الذين تسمح لهم في WhatsApp",
   "marketplace.app.bitwardenTagline": "سجّل الدخول إلى المواقع ببيانات دخول من مجلد مشترك",
   "marketplace.app.onePasswordCategory": "إدارة بيانات الدخول والاعتماد",
   "marketplace.app.yourApps": "تطبيقاتك",

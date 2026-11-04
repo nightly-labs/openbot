@@ -96,7 +96,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Indisponível agora · ignorado",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} nunca troca depois de começar a escrever. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
+    "Quando um limite de uso para {name} depois de começar a trabalhar, {name} continua o mesmo trabalho no primeiro modelo disponível da ordem. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
   "agentSettings.groups.brain": "Cérebro",
   "agentSettings.groups.knows": "Sabe",
   "agentSettings.groups.does": "Faz",
@@ -127,6 +127,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "Redefinir com base no ID",
   "agentSettings.avatar.shape": "Forma",
   "agentSettings.avatar.shuffle": "Rosto aleatório",
+  "agentSettings.avatar.style": "Estilo do avatar",
+  "agentSettings.avatar.stylePlush": "Pelúcia",
+  "agentSettings.avatar.styleFlat": "Plano",
   "agentSettings.avatar.shapes": "Formas do avatar",
   "agentSettings.avatar.shapeOption": "Forma {number}",
   "agentSettings.avatar.eyes": "Olhos",

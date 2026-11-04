@@ -730,6 +730,7 @@ function ServerSettings() {
           onRotateHostKey={server().kind === "local" ? rotateHostKey : undefined}
           onCreateInvite={createServerInvite}
           license={appPort().license}
+          companySignIn={appPort().auth}
           onContactUs={() => void appPort().openExternal("hosted-server-contact")}
           onUpdateMember={updateServerMember}
           onRemoveMember={removeServerMember}

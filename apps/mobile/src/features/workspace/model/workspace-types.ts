@@ -38,14 +38,17 @@ import type {
   AgentTemplatePublication,
   ApplyAgentImportInput,
   ApplyInstanceTransferInput,
+  AvatarColor,
   AvatarHue,
   AvatarImageInput,
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
+  BranchAgentTaskInput,
   BrowserProfileList,
   BrowserProfileSummary,
   ClearableStorageCategory,
   ClearBrowserDataInput,
+  ConnectorMessagingPlatform,
   ConversationFileSearchPage,
   ConversationSearchPage,
   ConversationSnapshot,
@@ -82,7 +85,6 @@ import type {
   McpSignInState,
   McpTestResult,
   MessagingOverview,
-  MessagingPlatform,
   OnePasswordConnectorStatus,
   QueuedMessageReceipt,
   QueueSnapshot,
@@ -230,6 +232,11 @@ export interface MobileAgent {
   avatarUrl?: string | null;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /**
+   * The exact colour, which wins over `avatarHue`. Only a host with `agent-colors-v1` gives it, through
+   * its own route; else it is null.
+   */
+  avatarColor: AvatarColor | null;
   /** The Marketplace listing the agent was added from, and the listing version it has. */
   marketplaceSource?: { listingId: string; version: number } | undefined;
 }
@@ -525,7 +532,7 @@ export interface MobileWorkspaceContextValue {
   loadAgentBrowserProfile: (agentId: string, serverId: string) => Promise<AgentBrowserProfile>;
   /** The host closes the open tabs of the agent. */
   updateAgentBrowserProfile: (input: UpdateAgentBrowserProfileInput, serverId: string) => Promise<AgentBrowserProfile>;
-  loadMessagingConnections: (platform: MessagingPlatform, serverId: string) => Promise<MessagingOverview>;
+  loadMessagingConnections: (platform: ConnectorMessagingPlatform, serverId: string) => Promise<MessagingOverview>;
   /** The platform's page that the phone opens. The host opens no page. */
   connectMessaging: (input: HostMessagingConnectInput, serverId: string) => Promise<MessagingConnectorPage>;
   /** Sends the sealed grant of a Slack or Discord install to the host that started it. */
@@ -597,6 +604,10 @@ export interface MobileWorkspaceContextValue {
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
   /** Creates an agent on the active server and returns its id. */
   createAgent: (input: CreateAgentInput) => Promise<string>;
+  /**
+   * Changes an agent. A host with `agent-colors-v1` gets `avatarColor` through its colour route, and
+   * sets the hue itself. An older host gets only `avatarHue`, the nearest hue of the colour.
+   */
   updateAgent: (input: UpdateAgentInput, serverId?: string) => Promise<void>;
   setAgentAvatar: (agentId: string, image: RemoteFileUpload | null, serverId: string) => Promise<void>;
   loadAgentAvatar: (agentId: string, avatarUrl: string, serverId: string) => Promise<string>;
@@ -831,6 +842,8 @@ export interface MobileWorkspaceContextValue {
   canReadThreads: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-files-v1`: a message in a thread can carry files. */
   canAttachThreadFiles: (serverId: string) => boolean;
+  /** True when the host advertises `agent-thread-branches-v1`: a member who can message an agent can branch its chats. */
+  canBranchThreads: (serverId: string) => boolean;
   /** True when the host advertises `workflows-v1`. The host shows each member the workflows of their agents. */
   canUseWorkflows: (serverId: string) => boolean;
   listWorkflows: (serverId: string) => Promise<WorkflowSummary[]>;
@@ -887,6 +900,11 @@ export interface MobileWorkspaceContextValue {
   renameAgentThread: (input: AgentTaskInput & { title: string }, serverId: string) => Promise<void>;
   /** Deletes a thread, its conversation, its files and its queued messages for good. */
   deleteAgentThread: (input: AgentTaskInput, serverId: string) => Promise<void>;
+  /**
+   * Copies the agent's chat (`taskId` null) or a thread through the turn of `messageId` into a new
+   * thread. No turn starts. A retry with the same `requestId` answers the same thread.
+   */
+  branchAgentThread: (input: BranchAgentTaskInput, serverId: string) => Promise<AgentTask>;
   /** The person's read mark of each open thread of the agent. The member's devices share it. */
   loadAgentThreadReads: (agentId: string, serverId: string) => Promise<AgentTaskReadState[]>;
   /** Moves the person's read mark of a thread to a message that they see. */
@@ -970,6 +988,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canEditThreads"
   | "canReadThreads"
   | "canAttachThreadFiles"
+  | "canBranchThreads"
   | "canUseWorkflows"
   | "canUseWorkflowGitHub"
   | "canReadServerStorage"

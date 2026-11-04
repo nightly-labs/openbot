@@ -447,6 +447,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
   const [compactLayoutPresentation, setCompactLayoutPresentation] = createSignal(initialPresentation);
   const [outgoingPresentation, setOutgoingPresentation] = createSignal<DynamicIslandPresentation>();
   const [modeTransitioning, setModeTransitioning] = createSignal(false);
+  const [hovered, setHovered] = createSignal(false);
   let transitionRoot: HTMLDivElement | undefined;
   let modeAnimations: Animation[] = [];
   let modeTransitionVersion = 0;
@@ -649,6 +650,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
         }}
         hoverBehavior={config().badge ? "expand" : "grow"}
         hoverContentMotion={OPENBOT_COMPACT_HOVER_MOTION}
+        onHoverChange={setHovered}
         pointerToggle={config().badge ? false : undefined}
         class={[
           "openbot-dynamic-island",
@@ -681,9 +683,9 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
             slot="compact-trailing"
             presentation={visiblePresentation()}
             outgoingPresentation={outgoingPresentation()}
-            renderOutgoing={(presentation) => <CompactTrailing presentation={presentation} />}
+            renderOutgoing={(presentation) => <CompactTrailing presentation={presentation} hovered={hovered()} />}
           >
-            <CompactTrailing presentation={visiblePresentation()} />
+            <CompactTrailing presentation={visiblePresentation()} hovered={hovered()} />
           </IslandModeSwap>
         }
         expandedContent={
@@ -802,13 +804,13 @@ function CompactLeading(props: {
   );
 }
 
-function CompactTrailing(props: { presentation: DynamicIslandPresentation }): JSX.Element {
+function CompactTrailing(props: { presentation: DynamicIslandPresentation; hovered: boolean }): JSX.Element {
   return (
     <IslandContentSwap contentKey={props.presentation.mode} class="dynamic-island-surface-compact-swap">
       <Switch>
         <Match when={statusMode(props.presentation.mode)}>{(mode) => <CompactStatusBadge mode={mode()} />}</Match>
         <Match when={props.presentation.mode === "idle"}>
-          <IdleGreetingEmoji />
+          <IdleGreetingEmoji moving={props.hovered} />
         </Match>
       </Switch>
     </IslandContentSwap>
@@ -896,7 +898,12 @@ function IdleGreetingCard(props: { emoji: IdleGreetingEmoji }): JSX.Element {
   );
 }
 
-function IdleGreetingEmoji(): JSX.Element {
+/**
+ * The greetings change every few seconds, and each one moves only while a pointer is on the island. A
+ * motion makes the island window draw a frame on every display refresh, and the island is on screen
+ * all day: moving at rest cost about a fifth of a core, in the renderers and the GPU process.
+ */
+function IdleGreetingEmoji(props: { moving: boolean }): JSX.Element {
   const [index, setIndex] = createSignal(0);
   const [activeSlot, setActiveSlot] = createSignal<0 | 1>(0);
   const [firstEmoji, setFirstEmoji] = createSignal<IdleGreetingEmoji>(IDLE_GREETING_EMOJIS[0]);
@@ -906,16 +913,28 @@ function IdleGreetingEmoji(): JSX.Element {
   // Each layer keeps its motion until it shows again, so the one that fades out keeps its last pose.
   const motions: [Animation[], Animation[]] = [[], []];
 
-  function playMotion(slot: 0 | 1, emoji: IdleGreetingEmoji): void {
+  function playMotion(slot: 0 | 1, emoji: IdleGreetingEmoji, moving: boolean): void {
     for (const motion of motions[slot]) motion.cancel();
     motions[slot] = [];
     const layer = layers[slot];
-    if (!layer || prefersReducedMotion()) return;
+    if (!layer || !moving || prefersReducedMotion()) return;
     motions[slot] = playIdleGreetingMotion(IDLE_GREETING_NAMES[emoji], layer);
   }
 
+  // A pointer that reaches the island starts the motion of the greeting on show, unless it still moves.
+  // A pointer that leaves lets a motion end, so the greeting does not jump to rest.
+  createEffect(
+    () => props.moving,
+    (moving) => {
+      // A pending greeting change starts its own motion on the next frame.
+      if (!moving || animationFrame !== undefined) return;
+      const slot = untrack(activeSlot);
+      if (motions[slot].some((motion) => motion.playState === "running")) return;
+      playMotion(slot, untrack(slot === 0 ? firstEmoji : secondEmoji), true);
+    },
+  );
+
   onSettled(() => {
-    playMotion(0, IDLE_GREETING_EMOJIS[0]);
     const timer = setInterval(() => {
       const nextIndex = (index() + 1) % IDLE_GREETING_EMOJIS.length;
       const nextEmoji = IDLE_GREETING_EMOJIS[nextIndex] ?? IDLE_GREETING_EMOJIS[0];
@@ -923,9 +942,10 @@ function IdleGreetingEmoji(): JSX.Element {
       if (nextSlot === 0) setFirstEmoji(nextEmoji);
       else setSecondEmoji(nextEmoji);
       animationFrame = requestAnimationFrame(() => {
+        animationFrame = undefined;
         setIndex(nextIndex);
         setActiveSlot(nextSlot);
-        playMotion(nextSlot, nextEmoji);
+        playMotion(nextSlot, nextEmoji, props.moving);
       });
     }, IDLE_GREETING_INTERVAL);
     return () => {

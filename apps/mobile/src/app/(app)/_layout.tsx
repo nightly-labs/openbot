@@ -543,6 +543,17 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="message-actions"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.6],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
           name="queued-messages"
           options={{
             contentStyle: { backgroundColor: sheetBackground },

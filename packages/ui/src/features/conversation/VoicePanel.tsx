@@ -43,6 +43,10 @@ export interface VoicePanelProps {
   /** Stops the reply, or the wait for it, and listens again. */
   onInterrupt: () => void;
   onEnd: () => void;
+  /** The speed of the reply, where 1 is normal speed. */
+  speed?: number | undefined;
+  /** Changes to the next speed. Without it, the panel has no speed button. */
+  onCycleSpeed?: (() => void) | undefined;
 }
 
 /**
@@ -52,7 +56,8 @@ export interface VoicePanelProps {
  * what you say and what it says.
  */
 export function VoicePanel(props: VoicePanelProps) {
-  const { t } = useText();
+  const { t, format } = useText();
+  const speed = () => format.number(props.speed ?? 1);
   const hearing = () => props.phase === "listening" && !props.muted;
   const level = () => props.levels.at(-1) ?? 0;
   const scale = () => {
@@ -108,6 +113,21 @@ export function VoicePanel(props: VoicePanelProps) {
         </div>
       </div>
       <div class="voice-panel-controls">
+        <Show when={props.onCycleSpeed}>
+          {(cycleSpeed) => (
+            <Button
+              variant="secondary"
+              size="icon-lg"
+              type="button"
+              class="voice-panel-control voice-panel-speed"
+              aria-label={t("chat.voice.speedLabel", { speed: speed() })}
+              title={t("chat.voice.speed")}
+              onClick={() => cycleSpeed()()}
+            >
+              {t("chat.voice.speedValue", { speed: speed() })}
+            </Button>
+          )}
+        </Show>
         <Button
           variant={props.muted ? "default" : "secondary"}
           size="icon-lg"

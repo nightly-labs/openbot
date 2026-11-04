@@ -1440,7 +1440,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="source"] {
   --file-reference-color: var(--openbot-file-blue);
   --file-reference-soft: var(--openbot-file-blue-soft);
@@ -1451,7 +1452,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="script"] {
   --file-reference-color: var(--openbot-file-yellow);
   --file-reference-soft: var(--openbot-file-yellow-soft);
@@ -1462,7 +1464,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="markup"] {
   --file-reference-color: var(--openbot-file-orange);
   --file-reference-soft: var(--openbot-file-orange-soft);
@@ -1473,7 +1476,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="style"] {
   --file-reference-color: var(--openbot-file-teal);
   --file-reference-soft: var(--openbot-file-teal-soft);
@@ -1484,7 +1488,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="data"] {
   --file-reference-color: var(--openbot-file-green);
   --file-reference-soft: var(--openbot-file-green-soft);
@@ -1495,7 +1500,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="document"] {
   --file-reference-color: var(--openbot-file-red);
   --file-reference-soft: var(--openbot-file-red-soft);
@@ -1506,7 +1512,8 @@
   .composer-file-reference,
   .attachment-file-visual,
   .files-file-visual,
-  .composer-attachment-preview
+  .composer-attachment-preview,
+  .side-panel-file-badge
 )[data-file-tone="media"] {
   --file-reference-color: var(--openbot-file-pink);
   --file-reference-soft: var(--openbot-file-pink-soft);
