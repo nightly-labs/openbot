@@ -315,6 +315,18 @@ export type SpeechLanguage = (typeof SPEECH_LANGUAGES)[number];
 export const SPEECH_SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
 export type SpeechSpeed = (typeof SPEECH_SPEEDS)[number];
 
+/** The order in which a speed button goes through the speeds: from normal speed up, then the slower ones. */
+const SPEECH_SPEED_CYCLE: readonly SpeechSpeed[] = [
+  ...SPEECH_SPEEDS.filter((speed) => speed >= 1),
+  ...SPEECH_SPEEDS.filter((speed) => speed < 1),
+];
+
+/** The speed after `speed` on a speed button: 1×, 1.25×, 1.5×, 2×, 0.75×, then 1× again. */
+export function nextSpeechSpeed(speed: number): SpeechSpeed {
+  const index = SPEECH_SPEED_CYCLE.findIndex((step) => step === speed);
+  return SPEECH_SPEED_CYCLE[(index + 1) % SPEECH_SPEED_CYCLE.length] ?? 1;
+}
+
 export interface SpeechSettings {
   /** Read the reply to a dictated message aloud. */
   readReplies: boolean;

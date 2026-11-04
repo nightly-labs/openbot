@@ -1,8 +1,8 @@
+import { nextSpeechSpeed } from "@openbot/contracts/ipc";
 import { VoicePanel } from "@openbot/ui/features/conversation/VoicePanel";
 import { createSignal, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { SPEED_CYCLE } from "../src/features/speech/speech-speed";
 import { STORY_AGENT } from "./fixtures";
 
 const QUIET = new Array(24).fill(0);
@@ -45,7 +45,7 @@ const meta = {
           }}
           speed={speed()}
           onCycleSpeed={() => {
-            setSpeed(SPEED_CYCLE[(SPEED_CYCLE.findIndex((step) => step === speed()) + 1) % SPEED_CYCLE.length] ?? 1);
+            setSpeed(nextSpeechSpeed(speed()));
             args.onCycleSpeed?.();
           }}
         />

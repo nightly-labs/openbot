@@ -1,4 +1,4 @@
-import { MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
+import { MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS, nextSpeechSpeed } from "@openbot/contracts/ipc";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { toggleReadAloud, useReadingAloud } from "@/features/voice/model/message-reading";
-import { canChangeReplySpeed, nextReplySpeed } from "@/features/voice/model/reply-voice";
+import { canChangeReplySpeed } from "@/features/voice/model/reply-voice";
 import { saveVoiceSettings, useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
@@ -26,6 +26,8 @@ const ICON_SIZE = 22;
 const PRESSED = { transform: [{ scale: 0.92 }] };
 /** The cell of the button that shows the other emoji. */
 const MORE = "more";
+/** The accessibility action of the Read aloud row that changes the speed. */
+const SPEED_ACTION = "speed";
 
 /**
  * Always two rows with the same columns: six reactions, the first five of the others and the More
@@ -71,6 +73,12 @@ export function MessageActionsScreen() {
   };
   const icon = String(foreground);
   const readAloudId = request.copyText ? request.readAloudId : undefined;
+  const showSpeed = canChangeReplySpeed && speedReady;
+  const speedLabel = t("mobile.chat.message.readAloudSpeed", { speed: format.number(speed) });
+  const changeSpeed = () => {
+    void haptics.selection();
+    void saveVoiceSettings({ speed: nextSpeechSpeed(speed) }).catch(() => Alert.alert(t("mobile.settings.saveFailed")));
+  };
   const sent = request.createdAt
     ? format.date(new Date(request.createdAt), { dateStyle: "medium", timeStyle: "short" })
     : undefined;
@@ -165,24 +173,23 @@ export function MessageActionsScreen() {
               disclosure={false}
               onPress={() => run(() => toggleReadAloud(readAloudId, request.copyText))}
               trailing={
-                canChangeReplySpeed && speedReady ? (
+                showSpeed ? (
                   // Changes the speed and keeps the sheet open, so the user can press again.
                   <Button
                     size="sm"
                     variant="secondary"
                     className="rounded-full"
-                    accessibilityLabel={t("mobile.chat.message.readAloudSpeed", { speed: format.number(speed) })}
-                    onPress={() => {
-                      void haptics.selection();
-                      void saveVoiceSettings({ speed: nextReplySpeed(speed) }).catch(() =>
-                        Alert.alert(t("mobile.settings.saveFailed")),
-                      );
-                    }}
+                    accessibilityLabel={speedLabel}
+                    onPress={changeSpeed}
                   >
                     {t("mobile.chat.message.readAloudSpeedValue", { speed: format.number(speed) })}
                   </Button>
                 ) : undefined
               }
+              accessibilityActions={showSpeed ? [{ name: SPEED_ACTION, label: speedLabel }] : undefined}
+              onAccessibilityAction={(event) => {
+                if (event.nativeEvent.actionName === SPEED_ACTION) changeSpeed();
+              }}
             >
               <Typography>
                 {reading ? t("mobile.chat.message.stopReading") : t("mobile.chat.message.readAloud")}
