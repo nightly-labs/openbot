@@ -66,14 +66,17 @@ export async function routeChannels(
   if (!list && !read && !command && !remove && !settings) return "unmatched";
   if (!channels || !capabilities.has(CHANNEL_CHATS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.channelsUnsupported"));
+  // The agents that hide a whole channel. Owners and admins keep every channel: on an older
+  // client, the agents of a provider that its protocol does not know are hidden from them too.
+  const channelHiddenAgentIds: ReadonlySet<string> = canAdministerServer(member.role) ? new Set() : hiddenAgentIds;
   if (list)
     return json(
       200,
-      channels.store.list(member.id).filter((channel) => seesChannel(channel.members, hiddenAgentIds)),
+      channels.store.list(member.id).filter((channel) => seesChannel(channel.members, channelHiddenAgentIds)),
     );
   if (read) {
     const input = parseChannelRead(channelRequest(url.pathname, await readJson(request)));
-    requireVisibleChannel(channels, input.channelId, hiddenAgentIds);
+    requireVisibleChannel(channels, input.channelId, channelHiddenAgentIds);
     const page = channels.store.page(input.channelId, input.beforeSequence);
     return json(200, { ...page, messages: page.messages.filter((item) => !hiddenAuthor(item, hiddenAgentIds)) });
   }
@@ -86,9 +89,9 @@ export async function routeChannels(
     await runCauseEffect(channels.deleteChannel(channelId(body)));
     return empty(204);
   }
-  if (settings) return routeChannelSettings(context, agents, channels, hiddenAgentIds);
+  if (settings) return routeChannelSettings(context, agents, channels, channelHiddenAgentIds);
   const input = parseChannelCommand(channelRequest(url.pathname, await readJson(request)));
-  requireVisibleChannel(channels, input.channelId, hiddenAgentIds);
+  requireVisibleChannel(channels, input.channelId, channelHiddenAgentIds);
   if (input.type === "archive" && !canAdministerServer(member.role))
     throw new HttpError(403, sourceText("error.team.membersCannotArchiveChannels"));
   // A restore undoes a delete, so only the people who can delete a channel can restore it.
