@@ -175,6 +175,15 @@
   --openbot-chart-storage-downloads: #9085e9;
   --openbot-chart-storage-runtimes: #c98500;
   --openbot-chart-storage-app: var(--openbot-text-dim);
+  /* The felt sidebar badges. The fills are the colours of the felt art at its edge (light at the
+     top, dark at the bottom), under `assets/plush/felt-pill-lilac.webp` darkened to plum and
+     `felt-x-ball.webp`. They are art colours, so both themes use them. The digits are cream yarn. */
+  --openbot-felt-plum-top: rgb(112 80 131);
+  --openbot-felt-plum-bottom: rgb(74 40 92);
+  --openbot-felt-raspberry-top: rgb(245 32 112);
+  --openbot-felt-raspberry-bottom: rgb(180 6 65);
+  --openbot-felt-cream: #f6efe2;
+  --openbot-felt-cream-stroke: #efe4d2;
   --openbot-logo-production: #d6adf2;
   --openbot-logo-eye: #040007;
   /* The eyes of the release logo. The logo color setting changes it with `--openbot-logo-production`;
