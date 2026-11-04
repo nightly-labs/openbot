@@ -928,16 +928,27 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         : null;
     const plugins = [skillPlugin, homeSkillPlugin].filter((plugin) => plugin !== null);
     const launchPath = yield* cliLaunchPath(this.#cli.executable, this.#cli.source);
-    // `stop()` may have run during the await: a query created now would outlive the client.
-    if (!this.#running) return yield* providerFailure(new Error("Claude Agent SDK is not running."));
-    if (handoff) this.#reportMcpDrops?.(this.provider, handoff.dropped);
+    const openBotServers = handoff ? this.#createOpenBotServers(threadId) : {};
+    const nodeOptions = this.#agentEnvironment?.().NODE_OPTIONS;
     const mcpConfigFile =
       handoff && stateDirectory && Object.keys(handoff.servers).length > 0
-        ? yield* writeClaudeMcpConfig(stateDirectory, threadId, handoff.servers)
+        ? yield* writeClaudeMcpConfig(stateDirectory, threadId, handoff.servers).pipe(
+            // The file is for a long command line: a state folder that cannot hold it must not stop the session.
+            Effect.catch((error) =>
+              Effect.sync(() => {
+                queryLogger.warn("Claude gets its MCP servers on the command line.", { error: error.cause });
+                return null;
+              }),
+            ),
+          )
         : null;
-    const mcpServers = handoff
-      ? { ...(mcpConfigFile ? {} : handoff.servers), ...this.#createOpenBotServers(threadId) }
-      : {};
+    // `stop()` may have run during the awaits: a query created now would outlive the client.
+    if (!this.#running) {
+      yield* removeClaudeMcpConfig(mcpConfigFile);
+      return yield* providerFailure(new Error("Claude Agent SDK is not running."));
+    }
+    if (handoff) this.#reportMcpDrops?.(this.provider, handoff.dropped);
+    const mcpServers = handoff ? { ...(mcpConfigFile ? {} : handoff.servers), ...openBotServers } : {};
     const extraArgs: Record<string, string | null> = {
       // The developer instructions carry the profile and the memories, and `thread/resume` above
       // restarts the query when they change. A recorded prompt would be sent instead of them on
@@ -948,7 +959,6 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // The CLI loads this file and the SDK's own `--mcp-config` value together.
       ...(mcpConfigFile ? { "mcp-config": mcpConfigFile } : {}),
     };
-    const nodeOptions = this.#agentEnvironment?.().NODE_OPTIONS;
     const claudeQuery = yield* providerSync(() =>
       this.#createQuery({
         prompt: input,
@@ -1040,12 +1050,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     };
     runtime.consume = yield* Effect.forkIn(this.#consume(runtime), this.#scope, { startImmediately: true });
     // The CLI reads the file once at its start and keeps the servers in memory, also to reconnect one.
-    if (mcpConfigFile)
+    const initialization = mcpConfigFile ? claudeQuery.initializationResult?.() : undefined;
+    if (initialization)
       yield* Effect.forkIn(
-        providerCall(async () => claudeQuery.initializationResult?.()).pipe(
-          Effect.ignore,
-          Effect.andThen(removeClaudeMcpConfig(mcpConfigFile)),
-        ),
+        providerCall(() => initialization).pipe(Effect.ignore, Effect.andThen(removeClaudeMcpConfig(mcpConfigFile))),
         this.#scope,
       );
     this.#threads.add(runtime);
