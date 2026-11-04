@@ -21,7 +21,7 @@ import {
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { type CauseCode, classifyFailure } from "@openbot/telemetry";
+import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
@@ -915,6 +915,10 @@ export class TurnLifecycle {
         // an exhausted plan included, into the renderer's generic sentence under the usage notice.
         const error = getRecord(params, "error");
         const message = getString(params, "message") ?? getString(error, "message") ?? "";
+        // An ACP or Pi client names the cause that it read from structured fields, before the
+        // error became a sentence for the user. The other clients leave it to the error.
+        const reportedCause = isRecord(params) && isCauseCode(params.causeCode) ? params.causeCode : null;
+        const causeCode = reportedCause ?? classifyFailure(error ?? message);
         if (notification.method === "warning" && isNonActionableCodexWarning(message)) {
           // No banner, but the log keeps the reason, such as a closed WebSocket.
           logger.info("A provider warning needs no action.", {
@@ -965,7 +969,7 @@ export class TurnLifecycle {
             turnId: errorTurnId,
             provider: source.provider,
             model: agentId && errorTurnId ? this.#hooks.turnModel(agentId, errorTurnId) : null,
-            causeCode: classifyFailure(error ?? message),
+            causeCode,
             severity: notification.method === "warning" ? ("warning" as const) : ("error" as const),
           };
           yield* this.#providers.refreshUsageAfterLimit(source);
@@ -986,7 +990,7 @@ export class TurnLifecycle {
           return;
         }
         const context = {
-          causeCode: classifyFailure(error ?? message),
+          causeCode,
           provider: source.provider,
           model: agentId && errorTurnId ? this.#hooks.turnModel(agentId, errorTurnId) : null,
           turnId: errorTurnId,

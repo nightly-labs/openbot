@@ -102,6 +102,9 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     return error.code === -32002 && (error.data.sessionId === sessionId || error.data.uri === `session ${sessionId}`);
   },
   turnFailure: (error, detail) => geminiRequestFailure(error, detail),
+  // Antigravity 1.4.5 ends a turn whose quota is spent with the stop reason `refusal`
+  // (`_to_acp_stop_reason` of QUOTA_EXHAUSTED).
+  failureCause: (error) => (error === "refusal" ? "usage_limit" : null),
   sdkHarness: {
     failedSession: (stderrLine) => GEMINI_SDK_FAILURE.exec(stderrLine)?.[1],
     answerIsFailure: GEMINI_EXECUTION_ERROR_ANSWER,

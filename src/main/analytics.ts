@@ -18,6 +18,7 @@ import { isBoolean, isDynamicRecord, isFunction, isNumber, isOneOf, isString } f
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import {
   ANALYTICS_GENERATIONS,
+  type CauseCode,
   classifyFailure,
   operationForCode,
   type ReportQueue,
@@ -258,6 +259,8 @@ const HOST_ALLOWLIST = {
     ...AGENT_PROPERTY_NAMES,
     "origin",
     "status",
+    "failure_code",
+    "cause_code",
     "provider_auth",
     "duration_ms",
     ...TURN_TIMING_PROPERTIES.map(([, property]) => property),
@@ -353,6 +356,8 @@ type ActiveTurn = {
   owner: AnalyticsSubject | null;
   ownerResolutionPending: boolean;
   tools: Map<string, ToolUseRow>;
+  /** The error that ended the turn, as `handleFailure` classified it. A failed turn sends it. */
+  failure?: { failureCode: string; causeCode: CauseCode };
 };
 
 export class HostAnalytics {
@@ -475,6 +480,10 @@ export class HostAnalytics {
             ...this.#agentProperties(event.agentId),
             origin,
             status: normalizedTurnStatus(event.status),
+            // A failed turn with no failure signal sends neither code.
+            ...(event.status === "failed" && activeTurn?.failure
+              ? { failure_code: activeTurn.failure.failureCode, cause_code: activeTurn.failure.causeCode }
+              : {}),
             ...this.#providerAuth(event.agentId),
             ...(activeTurn === undefined
               ? {}
@@ -578,14 +587,15 @@ export class HostAnalytics {
 
   /** Only the local service emits this signal. Remote clients never send host reports. */
   handleFailure(failure: FailureSignal): void {
-    if (!this.#reports) return;
-    this.#configureReports();
     const candidates = [...this.#activeTurns.values()].filter((turn) => turn.agentId === failure.agentId);
     const turn = failure.turnId
       ? this.#activeTurns.get(failure.turnId)
       : candidates.length === 1
         ? candidates[0]
         : undefined;
+    if (turn && (failure.severity ?? "error") === "error") noteTurnFailure(turn, failure);
+    if (!this.#reports) return;
+    this.#configureReports();
     if (turn?.owner && turn.owner.id !== this.#currentSubject()?.id) return;
     const properties = turn?.properties ?? (failure.agentId ? this.#agentProperties(failure.agentId) : {});
     const provider =
@@ -1383,6 +1393,12 @@ function hostedSiteFailureCode(value: string): string {
 
 function normalizedTurnStatus(value: string): string {
   return ["completed", "failed", "interrupted", "cancelled"].includes(value) ? value : "other";
+}
+
+/** Keeps the last error of a turn, but a later `unknown` does not hide a known cause. */
+function noteTurnFailure(turn: ActiveTurn, failure: FailureSignal): void {
+  if (failure.causeCode === "unknown" && turn.failure && turn.failure.causeCode !== "unknown") return;
+  turn.failure = { failureCode: systemFailureCode(failure.code), causeCode: failure.causeCode };
 }
 
 function systemFailureCode(value: string): string {
