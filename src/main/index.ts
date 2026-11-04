@@ -739,6 +739,10 @@ function registerIpcHandlers({
       analyticsCaptureUrl,
       analyticsInstallId,
       getMainWindow: getDialogParent,
+      isMainWindow: (sender) => {
+        const window = windowHolder.current;
+        return window !== null && !window.isDestroyed() && window.webContents === sender;
+      },
       openChatWindow: windows.openChatWindow,
       chatWindowTargets: windows.chatWindowTargets,
       trace,

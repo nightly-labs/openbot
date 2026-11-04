@@ -222,6 +222,15 @@ export interface AnalyticsPreference {
  * Renderer timing for host analytics: counts and milliseconds only. The renderer sends it at most
  * once a minute, and once when the main window's workspace finished its first load.
  */
+/** The bounds of one renderer timing report. The renderer keeps to them and main rejects a report outside them. */
+export const RENDERER_TIMING_LIMITS = {
+  longTasks: 10_000,
+  inputs: 100_000,
+  /** Timed inputs in one report. Inputs past this count are left out of `inputs` too. */
+  inputDelays: 64,
+  inputDelayMs: 600_000,
+} as const;
+
 export interface RendererTimingReport {
   /** The main window's workspace finished its first load. Main times it on its own clock. */
   workspaceReady?: true;

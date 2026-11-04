@@ -71,6 +71,7 @@ import {
   isRemoteNetworkRoute,
   isSkillCategory,
   MAC_AUTOMATION_TARGETS,
+  RENDERER_TIMING_LIMITS,
 } from "@openbot/contracts/ipc";
 import {
   type DynamicRecord,
@@ -106,11 +107,6 @@ export function parseAnalyticsPreference(input: unknown): SetAnalyticsPreference
   return { enabled: input.enabled, ...(input.chosen ? { chosen: true } : {}) };
 }
 
-const MAX_LONG_TASKS = 10_000;
-const MAX_INPUTS = 100_000;
-const MAX_INPUT_DELAYS = 64;
-const MAX_INPUT_DELAY_MS = 600_000;
-
 function isCount(value: unknown, max: number): value is number {
   return isNumber(value) && Number.isSafeInteger(value) && value >= 0 && value <= max;
 }
@@ -120,12 +116,12 @@ export function parseRendererTimingReport(input: unknown): RendererTimingReport 
   if (!isDynamicRecord(input)) throw new Error("Renderer timing is required.");
   const { workspaceReady, longTasks, inputs, inputDelaysMs } = input;
   if (workspaceReady !== undefined && workspaceReady !== true) throw new Error("Workspace ready is not valid.");
-  if (!isCount(longTasks, MAX_LONG_TASKS) || !isCount(inputs, MAX_INPUTS))
+  if (!isCount(longTasks, RENDERER_TIMING_LIMITS.longTasks) || !isCount(inputs, RENDERER_TIMING_LIMITS.inputs))
     throw new Error("Renderer timing is not valid.");
   if (
     !Array.isArray(inputDelaysMs) ||
-    inputDelaysMs.length > Math.min(MAX_INPUT_DELAYS, inputs) ||
-    !inputDelaysMs.every((delay) => isCount(delay, MAX_INPUT_DELAY_MS))
+    inputDelaysMs.length > Math.min(RENDERER_TIMING_LIMITS.inputDelays, inputs) ||
+    !inputDelaysMs.every((delay) => isCount(delay, RENDERER_TIMING_LIMITS.inputDelayMs))
   ) {
     throw new Error("Input delays are not valid.");
   }

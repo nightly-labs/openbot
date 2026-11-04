@@ -180,9 +180,11 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     if (this.#closed) return;
     const pending = this.#rendererTiming;
     pending.longTasks = Math.min(MAX_PENDING_RENDERER_COUNT, pending.longTasks + report.longTasks);
-    pending.inputs = Math.min(MAX_PENDING_RENDERER_COUNT, pending.inputs + report.inputs);
-    const room = MAX_PENDING_INPUT_DELAYS - pending.inputDelaysMs.length;
-    if (room > 0) pending.inputDelaysMs.push(...report.inputDelaysMs.slice(0, room));
+    const kept = report.inputDelaysMs.slice(0, Math.max(0, MAX_PENDING_INPUT_DELAYS - pending.inputDelaysMs.length));
+    pending.inputDelaysMs.push(...kept);
+    // An input whose delay is dropped is not counted, so it does not show as a 0 ms input in the p95.
+    const dropped = report.inputDelaysMs.length - kept.length;
+    pending.inputs = Math.min(MAX_PENDING_RENDERER_COUNT, pending.inputs + report.inputs - dropped);
   }
 
   observeAgentEvent(event: AgentEvent): void {

@@ -296,7 +296,7 @@ export function emptyDay(day: string): ResourceDay {
  * Two significant digits: exact below 100, then steps of 10, 100 and so on. This keeps a day's
  * histogram to a few hundred keys a metric, whatever the range.
  */
-function quantize(value: number): number {
+export function quantize(value: number): number {
   if (!Number.isFinite(value) || value <= 0) return 0;
   if (value < 100) return Math.round(value);
   const step = 10 ** (Math.floor(Math.log10(value)) - 1);

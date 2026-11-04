@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { readPreferenceFile, writePreferenceFile } from "./preference-file";
+import { quantize } from "./resource-summary";
 
 const STARTUP_FILE = "startup-history.json";
 /** Without the workspace's first load, the summary goes this long after the renderer loaded. */
@@ -10,7 +11,11 @@ const WORKSPACE_WAIT_MS = 2 * 60_000;
 
 /**
  * `warm`: OpenBot started earlier since the computer booted. `cold`: the first start since the boot.
- * `updated`: the first start of this app version. `unknown`: no earlier start is saved.
+ * `updated`: the first start of this app version. `unknown`: no earlier start is saved, or the saved
+ * start was not read before the summary went.
+ *
+ * The boot time comes from the system uptime. Windows Fast Startup resumes the kernel instead of a
+ * full boot, so the uptime continues and a start after a shut down can show as `warm`.
  */
 export const START_KINDS = ["warm", "cold", "updated", "unknown"] as const;
 export type StartKind = (typeof START_KINDS)[number];
@@ -76,21 +81,17 @@ export function startKind(saved: SavedStart | null, appVersion: string, bootedAt
   return saved.startedAt < bootedAt ? "cold" : "warm";
 }
 
-/** Two significant digits: exact below 100, then steps of 10, 100 and so on. */
-function roundMs(value: number): number {
-  if (value < 100) return Math.round(value);
-  const step = 10 ** (Math.floor(Math.log10(value)) - 1);
-  return Math.round(value / step) * step;
-}
-
 function markMs(name: string): number | undefined {
   const value = performance.getEntriesByName(`openbot:${name}`, "mark")[0]?.startTime;
   return value === undefined || !Number.isFinite(value) || value < 0 ? undefined : value;
 }
 
-/** The longest step between the `openbot:services.*` marks. The first step starts at `when-ready`. */
+/**
+ * The longest step between the `openbot:services.*` marks. The first step starts at
+ * `services.start`, the top of `createApplicationServices`, so it does not include the window.
+ */
 function slowestServiceStep(): { step: ServiceStep; ms: number } | null {
-  let previous = markMs("when-ready");
+  let previous = markMs("services.start") ?? markMs("when-ready");
   let slowest: { step: ServiceStep; ms: number } | null = null;
   for (const step of SERVICE_STEPS) {
     const end = markMs(`services.${step}`);
@@ -119,7 +120,10 @@ export class StartupTiming {
     this.#options = options;
   }
 
-  /** Reads the last start and saves this one. A file that cannot be read or saved gives `unknown`. */
+  /**
+   * Reads the last start and saves this one. A file that cannot be read or saved gives `unknown`.
+   * Not on the startup path: the summary goes much later, at the workspace's first load.
+   */
   readonly recordStart = Effect.fn("StartupTiming.recordStart")(function* (this: StartupTiming) {
     const path = join(this.#options.userDataPath, STARTUP_FILE);
     const saved = yield* readPreferenceFile(path, decodeSavedStart).pipe(Effect.catch(() => Effect.succeed(null)));
@@ -174,11 +178,11 @@ export class StartupTiming {
       ["renderer_loaded_ms", markMs("renderer-loaded")],
       ["workspace_ready_ms", this.#workspaceReadyMs ?? undefined],
     ];
-    for (const [key, value] of values) if (value !== undefined) properties[key] = roundMs(value);
+    for (const [key, value] of values) if (value !== undefined) properties[key] = quantize(value);
     const slowest = slowestServiceStep();
     if (slowest) {
       properties.slowest_service_step = slowest.step;
-      properties.slowest_service_step_ms = roundMs(slowest.ms);
+      properties.slowest_service_step_ms = quantize(slowest.ms);
     }
     this.#options.send(properties);
   }

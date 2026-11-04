@@ -964,6 +964,8 @@ export async function createApplicationServices({
   prepareForUpdateInstall,
   quitting,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
+  // The start of the first `openbot:services.*` step, for the `system_startup` summary.
+  performance.mark("openbot:services.start");
   // First, so the provider lines of the whole startup reach the file.
   teardown.push(
     TEARDOWN_ORDER.providerLog,
@@ -3007,7 +3009,8 @@ export async function createApplicationServices({
         send: (properties) => analytics.handleStartup(properties),
       });
   if (startup) {
-    await Effect.runPromise(startup.recordStart());
+    // Not awaited: the summary goes much later, and a start not read by then gives `unknown`.
+    Effect.runFork(startup.recordStart());
     teardown.push(TEARDOWN_ORDER.startupTiming, "the startup timing", () => startup.dispose());
   }
   const connectTrace = new RemoteConnectTrace((span) => trace.record(span));

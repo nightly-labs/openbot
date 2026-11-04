@@ -1,3 +1,4 @@
+import { RENDERER_TIMING_LIMITS } from "@openbot/contracts/ipc";
 import { appPort } from "./app-port";
 
 /** Tasks longer than this count. The browser reports tasks from 50 ms. */
@@ -5,10 +6,6 @@ const LONG_TASK_MS = 200;
 /** The browser times an input only when its handling takes at least this long. */
 const EVENT_THRESHOLD_MS = 16;
 const REPORT_INTERVAL_MS = 60_000;
-const MAX_LONG_TASKS = 10_000;
-const MAX_INPUTS = 100_000;
-const MAX_INPUT_DELAYS = 64;
-const MAX_INPUT_DELAY_MS = 600_000;
 const INPUTS = ["pointerdown", "keydown"] as const;
 
 // The DOM library of TypeScript does not declare the Event Timing option yet.
@@ -20,6 +17,8 @@ const eventTimingInit: PerformanceObserverInit & { durationThreshold: number } =
 let longTasks = 0;
 let inputs = 0;
 let inputDelaysMs: number[] = [];
+/** Timed inputs past the delay limit. They leave the input count too, so they do not show as 0 ms. */
+let droppedDelays = 0;
 let started = false;
 
 function supports(type: string): boolean {
@@ -32,16 +31,18 @@ function isInputTiming(entry: PerformanceEntry): entry is PerformanceEventTiming
 
 function report(workspaceReady: boolean): void {
   if (!workspaceReady && longTasks === 0 && inputs === 0) return;
+  // The browser can time an input before the capture listener counts it.
+  const delays = inputDelaysMs.slice(0, inputs);
   const payload = {
     ...(workspaceReady ? { workspaceReady: true as const } : {}),
     longTasks,
-    inputs,
-    // The browser can time an input before the capture listener counts it.
-    inputDelaysMs: inputDelaysMs.slice(0, inputs),
+    inputs: Math.max(delays.length, inputs - droppedDelays),
+    inputDelaysMs: delays,
   };
   longTasks = 0;
   inputs = 0;
   inputDelaysMs = [];
+  droppedDelays = 0;
   void appPort()
     .reportRendererTiming(payload)
     .catch(() => undefined);
@@ -57,21 +58,26 @@ export function startRendererTiming(): void {
   if (supports("longtask")) {
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        if (entry.duration > LONG_TASK_MS) longTasks = Math.min(MAX_LONG_TASKS, longTasks + 1);
+        if (entry.duration > LONG_TASK_MS) longTasks = Math.min(RENDERER_TIMING_LIMITS.longTasks, longTasks + 1);
       }
     }).observe({ type: "longtask" });
   }
   if (supports("event")) {
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        if (!isInputTiming(entry) || inputDelaysMs.length >= MAX_INPUT_DELAYS) continue;
+        if (!isInputTiming(entry)) continue;
+        if (inputDelaysMs.length >= RENDERER_TIMING_LIMITS.inputDelays) {
+          droppedDelays += 1;
+          continue;
+        }
         const delay = Math.round(entry.processingStart - entry.startTime);
-        if (Number.isFinite(delay)) inputDelaysMs.push(Math.min(MAX_INPUT_DELAY_MS, Math.max(0, delay)));
+        if (Number.isFinite(delay))
+          inputDelaysMs.push(Math.min(RENDERER_TIMING_LIMITS.inputDelayMs, Math.max(0, delay)));
       }
     }).observe(eventTimingInit);
   }
   const countInput = () => {
-    inputs = Math.min(MAX_INPUTS, inputs + 1);
+    inputs = Math.min(RENDERER_TIMING_LIMITS.inputs, inputs + 1);
   };
   for (const name of INPUTS) window.addEventListener(name, countInput, { capture: true, passive: true });
   window.setInterval(() => report(false), REPORT_INTERVAL_MS);
