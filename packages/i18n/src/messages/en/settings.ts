@@ -564,6 +564,7 @@ export const messages = defineMessages("settings", {
   "settings.voice.speech.readReplies.title": "Read replies aloud",
   "settings.voice.speech.readReplies.description":
     "When you dictate a message, the reply is read aloud. Dictate again to stop it.",
+  "settings.voice.speech.speed.title": "Speed",
   "settings.voice.speech.voice.title": "Voice",
   "settings.voice.speech.voice.female": "Female voice {number}",
   "settings.voice.speech.voice.male": "Male voice {number}",

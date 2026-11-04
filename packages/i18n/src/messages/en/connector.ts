@@ -361,6 +361,8 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description":
     "Link a WhatsApp number to this computer. The WhatsApp Orchestrator asks the right agent and answers.",
+  "connector.whatsapp.descriptionHost":
+    "Link a WhatsApp number to this server. The WhatsApp Orchestrator asks the right agent and answers.",
   "connector.whatsapp.statusConnected": "Connected",
   "connector.whatsapp.statusAttention": "Needs attention",
   // {count} is the number of linked WhatsApp numbers.
@@ -385,6 +387,8 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.ownNumberNote": "Your “Message yourself” chat and the people you allow reach OpenBot.",
   "connector.whatsapp.dedicatedNote": "The people you allow reach OpenBot. Other people get a code to give you.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp removed this computer from the linked devices. Link the number again.",
+  "connector.whatsapp.helpLoggedOutHost":
+    "WhatsApp removed this server from the linked devices. Link the number again.",
   "connector.whatsapp.helpError": "OpenBot cannot reach WhatsApp on this number. Reconnect, or disconnect the number.",
   "connector.whatsapp.retryAt": "WhatsApp asked OpenBot to wait. It tries again at {time}.",
   "connector.whatsapp.pause": "Pause",
@@ -414,6 +418,7 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.stepAgent": "Agent",
   "connector.whatsapp.connectTitle": "Link WhatsApp",
   "connector.whatsapp.connectDescription": "Select the number, then link this computer from WhatsApp on your phone.",
+  "connector.whatsapp.connectDescriptionHost": "Select the number, then link this server from WhatsApp on your phone.",
   "connector.whatsapp.kindLabel": "Number",
   "connector.whatsapp.kindPersonal": "My personal number",
   "connector.whatsapp.kindPersonalDescription":

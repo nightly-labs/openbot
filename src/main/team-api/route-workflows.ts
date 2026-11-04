@@ -85,15 +85,15 @@ function placeOutputs(graph: WorkflowGraph): Map<string, string> {
 }
 
 /**
- * The settings of each GitHub or Discord trigger and output, by node. Their changes act as the host's
- * GitHub App bot or speak in the host's Discord servers, so only an owner or admin can add or change one
- * (`workflows-github-v1`).
+ * The settings of each GitHub, Discord, Telegram or Slack trigger and output, by node. Their changes act
+ * as the host's GitHub App bot or speak in the host's Discord servers, Telegram chats or Slack workspaces,
+ * so only an owner or admin can add or change one (`workflows-github-v1`).
  */
 function adminNodes(graph: WorkflowGraph): Map<string, string> {
   const nodes = new Map<string, string>();
   for (const node of graph.nodes) {
     const kind = node.kind === "trigger" ? node.fields.trigger : node.kind === "output" ? node.fields.target : null;
-    if (kind !== "github" && kind !== "discord") continue;
+    if (kind !== "github" && kind !== "discord" && kind !== "telegram" && kind !== "slack") continue;
     const fields = Object.keys(node.fields)
       .sort()
       .map((key) => [key, node.fields[key] ?? null]);

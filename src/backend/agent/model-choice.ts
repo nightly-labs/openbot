@@ -103,7 +103,12 @@ export function creationModel(
 
 /** Whether the development defaults stand in for `preference`: a development build, and no choice beyond the built-in provider. */
 export function developmentDefaultsApply(preference: ProviderPreference, developmentDefaults: boolean): boolean {
-  return developmentDefaults && preference.provider === DEFAULT_AGENT_PROVIDER && preference.model === null;
+  return developmentDefaults && builtInDefault(preference);
+}
+
+/** Whether `preference` is the built-in provider with no model chosen beside it. */
+function builtInDefault(preference: ProviderPreference): boolean {
+  return preference.provider === DEFAULT_AGENT_PROVIDER && preference.model === null;
 }
 
 /**
@@ -146,4 +151,32 @@ export function startingChoice(
     if (model) return { provider, model };
   }
   return null;
+}
+
+/**
+ * The provider of a workflow step that names no provider and no model, given the starting choice
+ * `starting`. A step is one generation and cannot wait for a sign-in. So when the starting choice is
+ * the built-in default with no model chosen, and that provider is off or cannot run (signed out,
+ * missing, outdated or failed), the first provider in picker order that can run and lists a model
+ * takes its place. Another preferred provider, or a model chosen beside the built-in one, stays, and
+ * the step's error names it.
+ */
+export function workflowProvider(
+  starting: AgentProvider,
+  preference: ProviderPreference,
+  providers: readonly AgentProviderStatus[],
+  models: readonly AgentModelOption[],
+): AgentProvider {
+  if (starting !== DEFAULT_AGENT_PROVIDER || !builtInDefault(preference)) return starting;
+  const row = providers.find((candidate) => candidate.id === starting);
+  // A provider that starts or runs keeps the step. A missing Codex reports "error", not "not-installed".
+  if (!row || (!row.off && (row.state === "available" || row.state === "checking" || row.state === "not-started")))
+    return starting;
+  return (
+    PICKER_PROVIDERS.find(
+      (provider) =>
+        providers.some((candidate) => candidate.id === provider && candidate.state === "available") &&
+        models.some((model) => model.provider === provider),
+    ) ?? starting
+  );
 }

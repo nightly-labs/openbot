@@ -32,7 +32,12 @@
 
 /* The arrow lines up with the content edge, not its hit area. */
 .tasks-page-header .ui-icon-button {
-  margin-left: calc(-1 * var(--openbot-space-2));
+  margin-inline-start: calc(-1 * var(--openbot-space-2));
+}
+
+/* Back and the agents panel toggle follow the reading direction. */
+.tasks-page-header svg:is([class~="lucide-arrow-left"], [class~="lucide-panel-left"]):dir(rtl) {
+  transform: scaleX(-1);
 }
 
 .tasks-page-header h2 {
@@ -87,7 +92,7 @@
 }
 
 .tasks-page-composer-agent .tasks-page-agent.ui-button {
-  margin-left: calc(-1 * var(--openbot-space-1));
+  margin-inline-start: calc(-1 * var(--openbot-space-1));
 }
 
 /* As the header model switcher: the face of a newly chosen agent springs in, and the chevron turns. */
@@ -210,7 +215,7 @@
   padding: 0 var(--openbot-space-2);
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-regular);
-  text-align: left;
+  text-align: start;
   --task-list-glyph: 14px;
 }
 
@@ -289,7 +294,8 @@ li[data-arrived] > .tasks-page-row {
 
 .tasks-page-side-content {
   position: absolute;
-  inset: 0 auto 0 0;
+  inset-block: 0;
+  inset-inline: 0 auto;
   display: flex;
   width: 420px;
   --browser-panel-width: 100%;

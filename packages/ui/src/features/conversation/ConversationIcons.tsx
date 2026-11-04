@@ -163,7 +163,11 @@ export function BrowserControlIcon() {
 
 export function BrowserBackIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current ui-rtl-mirror"
+    >
       <path d="m12 4-6 6 6 6" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   );
@@ -171,7 +175,11 @@ export function BrowserBackIcon() {
 
 export function BrowserForwardIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current ui-rtl-mirror"
+    >
       <path d="m8 4 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   );

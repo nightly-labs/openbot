@@ -452,6 +452,7 @@ function AgentStack({ agents, serverId }: { agents: MobileAgent[]; serverId: str
             agentId={agent.id}
             serverId={serverId}
             hue={agent.avatarHue}
+            color={agent.avatarColor}
             seed={agent.avatarSeed}
             size={AVATAR_SIZE}
             animateIdle={false}

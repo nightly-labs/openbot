@@ -692,6 +692,7 @@ export function ThreadTabs(props: ThreadHeaderProps) {
             }
             class="agent-threads-rename"
             size="sm"
+            dir="auto"
             aria-label={t("conversation.threads.name")}
             maxlength={INPUT_LIMITS.agentTaskTitle}
             defaultValue={edit().title}

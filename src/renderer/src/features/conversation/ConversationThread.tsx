@@ -177,6 +177,13 @@ export function ConversationThread() {
     if (!threads.onBranch || !taskId) return undefined;
     return (messageId: string) => void branchThread(taskId, messageId);
   };
+  /** Deletes a message of the open thread. A new thread has no message to delete. */
+  const deleteMessage = (threads: ConversationThreads) => {
+    const remove = threads.onDeleteMessage;
+    const taskId = threads.open?.id;
+    if (!remove || !taskId) return undefined;
+    return (messageId: string) => remove(taskId, messageId);
+  };
   /** Replies to a message of the open thread. A new thread has no message to reply to. */
   const reply = (threads: ConversationThreads) => {
     if (!threads.acceptsReplies || !threads.open) return undefined;
@@ -260,7 +267,7 @@ export function ConversationThread() {
               threadComposer.removeAttachment(threadComposer.openDraftKey(), attachment.id)
             }
             onDraftChange={(text) => threadComposer.setText(threadComposer.openDraftKey(), text)}
-            onPasteFiles={(files, selection) => threadComposer.pasteFiles(files, selection)}
+            onPasteFiles={(files, selection, text) => threadComposer.pasteFiles(files, selection, undefined, text)}
             onOpenDraftAttachment={(attachment) =>
               canPreviewAttachment(attachment)
                 ? void previewAttachment(attachment)
@@ -294,6 +301,8 @@ export function ConversationThread() {
             onCopyMessage={(message) => void copyMessage(message)}
             copiedMessageId={copiedMessageId()}
             onBranch={branch(current().threads)}
+            onDeleteMessage={deleteMessage(current().threads)}
+            canDeleteMessage={props.canDeleteMessage}
             branchSource={branchSource(current().threads, current().agent.name)}
             focusMessage={focusMessage(current().threads)}
             onReply={reply(current().threads)}

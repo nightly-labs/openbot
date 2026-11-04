@@ -240,6 +240,7 @@ export const messages = {
   "error.provider.kimiNotStarted": "Kimi 无法启动。请在终端中运行 `kimi --version`。",
   "error.provider.kimiVersionUnreadable": "无法读取 Kimi CLI 版本。",
   "error.provider.kimiSignIn": "请使用 Kimi Code 登录以使用 Kimi。",
+  "error.provider.devinSignIn": "请使用 Devin 登录以使用 Devin。",
   "error.provider.hermesMissing": "未安装 Hermes Agent。请安装后重试。",
   "error.provider.hermesNotStarted": "无法启动 Hermes Agent。请在终端中运行 `hermes --version`。",
   "error.provider.hermesVersionUnreadable": "无法读取 Hermes Agent 的版本。",

@@ -111,6 +111,11 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
           if (selectAgent(agentId)) agentThreads.startNew(agentId);
         }
       : undefined;
+  /** What Back opens: the list of an open settings detail page, or else the previous chat. */
+  const backTarget = (): { name: string } | null => {
+    const pageBack = chatHistory.pageBack();
+    return pageBack ? { name: pageBack.name } : chatName(chatHistory.previous());
+  };
   /** The name of a chat as its sidebar row shows it. */
   const chatName = (entry: ChatHistoryEntry | undefined): { name: string } | null => {
     if (!entry) return null;
@@ -278,7 +283,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
           if (server) openServerSettings(server.id, trigger);
         }}
         chatHistory={{
-          back: chatName(chatHistory.previous()),
+          back: backTarget(),
           forward: chatName(chatHistory.next()),
           keys: chatHistoryKeys(platform.appInfo()?.platform === "darwin"),
           onBack: chatHistory.goBack,
@@ -416,6 +421,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
                 label: t("sidebar.empty.firstAgent"),
                 avatarSeed: agentSetupDraft().avatarSeed,
                 avatarHue: agentSetupDraft().avatarHue,
+                avatarColor: agentSetupDraft().avatarColor ?? null,
                 onSelect: () => {
                   channels.close();
                   openAgentSetup();

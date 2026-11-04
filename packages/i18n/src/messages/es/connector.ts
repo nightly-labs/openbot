@@ -337,6 +337,8 @@ export const messages = {
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description":
     "Vincula un número de WhatsApp a este equipo. El Orquestador de WhatsApp consulta al agente adecuado y responde.",
+  "connector.whatsapp.descriptionHost":
+    "Vincula un número de WhatsApp a este servidor. El Orquestador de WhatsApp consulta al agente adecuado y responde.",
   "connector.whatsapp.statusConnected": "Conectado",
   "connector.whatsapp.statusAttention": "Requiere atención",
   "connector.whatsapp.summaryConnected": {
@@ -363,6 +365,8 @@ export const messages = {
     "Las personas que permitas pueden contactar con OpenBot. Las demás reciben un código para dártelo.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp quitó este equipo de los dispositivos vinculados. Vuelve a vincular el número.",
+  "connector.whatsapp.helpLoggedOutHost":
+    "WhatsApp quitó este servidor de los dispositivos vinculados. Vuelve a vincular el número.",
   "connector.whatsapp.helpError":
     "OpenBot no puede acceder a WhatsApp en este número. Vuelve a conectar o desconecta el número.",
   "connector.whatsapp.retryAt": "WhatsApp pidió a OpenBot que esperara. Lo intentará de nuevo a las {time}.",
@@ -393,6 +397,8 @@ export const messages = {
   "connector.whatsapp.connectTitle": "Vincular WhatsApp",
   "connector.whatsapp.connectDescription":
     "Selecciona el número y luego vincula este equipo desde WhatsApp en tu teléfono.",
+  "connector.whatsapp.connectDescriptionHost":
+    "Selecciona el número y luego vincula este servidor desde WhatsApp en tu teléfono.",
   "connector.whatsapp.kindLabel": "Número",
   "connector.whatsapp.kindPersonal": "Mi número personal",
   "connector.whatsapp.kindPersonalDescription":

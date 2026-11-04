@@ -30,7 +30,8 @@
 }
 
 .agent-activity-steps {
-  padding: 0 0 var(--openbot-space-2) var(--openbot-space-6);
+  padding-block: 0 var(--openbot-space-2);
+  padding-inline: var(--openbot-space-6) 0;
 }
 
 .agent-steps-chevron {
@@ -64,14 +65,14 @@
   max-width: 100%;
   align-items: center;
   gap: var(--openbot-space-2);
-  margin-left: calc(-1 * var(--openbot-space-1-5));
+  margin-inline-start: calc(-1 * var(--openbot-space-1-5));
   border-radius: var(--openbot-radius-sm);
   padding: var(--openbot-space-0-5) var(--openbot-space-1-5);
   color: inherit;
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-regular);
   line-height: var(--openbot-leading-md);
-  text-align: left;
+  text-align: start;
 }
 
 /* The open list is not a lit toggle, so the header has no fill. */
@@ -128,8 +129,8 @@
 .agent-steps-viewport {
   max-height: 220px;
   overflow: hidden;
-  padding-left: var(--openbot-space-3);
-  border-left: 1px solid var(--openbot-border);
+  padding-inline-start: var(--openbot-space-3);
+  border-inline-start: 1px solid var(--openbot-border);
 }
 
 .agent-steps-viewport[data-scrolls] {
@@ -138,7 +139,7 @@
 
 .agent-steps-panel > .agent-steps-viewport {
   min-height: 0;
-  margin-left: var(--openbot-space-3);
+  margin-inline-start: var(--openbot-space-3);
 }
 
 .agent-steps-list {
@@ -215,4 +216,13 @@
   .agent-step {
     animation: none;
   }
+}
+
+/* In RTL the right chevron points left, so the open row turns it the other way to point down. */
+:dir(rtl) svg[class~="lucide-chevron-right"].agent-steps-chevron {
+  transform: scaleX(-1);
+}
+
+:dir(rtl) .agent-steps-header[aria-expanded="true"] svg[class~="lucide-chevron-right"].agent-steps-chevron {
+  rotate: -90deg;
 }

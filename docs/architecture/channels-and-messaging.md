@@ -254,6 +254,19 @@ writes a `channel-change` note in the same commit, with the agent as author and 
 names the agent, the change and the person. Clients show it as an activity row, and it is not
 unread and not in the model packet.
 
+From its own chats, an agent can make and change channels: `create_channel` and `update_channel`
+(`agent/channel-agent-tools.ts`). They set the name, title, instructions, members, lead, isolated
+memory and picture (an icon on a hue, or an image file that `loadAvatarFile` reads before any
+write), and archive or restore. `list_channels` with `archived: true` lists the archived channels.
+The change is a `save` through the command queue (`ChannelService.agentSave`), with the draft read
+from the stored channel when its turn comes, and the actor id `agent:<agentId>`. A new channel's id
+comes from the tool call id, so a retried call makes no second channel. Members must exist and not
+be hidden, and the lead must be a member; an icon removes an image, as in the channel settings.
+These changes write no `channel-change` note. Inside a channel task, both tools are refused, so only
+a person's request changes the channel there. As for webhook routines, they also need a turn of only
+this computer's user's messages, outside an execution thread: an external chat, a routine run or an
+agent message can carry text from outside, and the Team API checks a team member's agent access.
+
 Channel work holds only the agent that does it. An agent runs one main-lane turn at a time: its chat,
 a channel delivery or a messaging delivery. While the agent has an active assignment,
 `ChannelService.mayDrain` holds its other main-lane requests. The work of other agents does not hold
@@ -489,7 +502,9 @@ must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the con
   is one, and a basic group finds the chain in an in-memory reply map, which a restart forgets. A
   mention starts or continues a conversation; a reply without a mention continues only a linked one.
   Telegram has no history API, so `TelegramChatState` keeps the names and last messages it saw, in
-  memory. One Telegram Orchestrator (`telegram-orchestrator.ts`) answers every chat.
+  memory. One Telegram Orchestrator (`telegram-orchestrator.ts`) answers every chat. A new
+  conversation in a group goes first to the workflows' Telegram triggers; a message that starts a run
+  does not go to the orchestrator ([events.md](events.md#workflow-telegram-triggers)).
 
 The code has two halves. `MessagingThreads` (`src/backend/messaging/`) is built by `AgentService`
 beside `ChannelService` and knows no platform. `MessagingService` is built in the main process and
@@ -521,6 +536,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   it, so each one is its own conversation. `MessagingThreads.event` takes that thread's conversation
   and turn events, so the public chat, the renderer and Team peers never see them. Approvals still
   reach the host.
+- **Workflows.** Before a channel mention that is not in a linked thread goes to the orchestrator,
+  `MessagingService` gives it to `Workflows.receiveSlack`. A matched Slack trigger takes the mention,
+  and no agent conversation starts. A Slack output replies, posts or reacts through
+  `MessagingThreads.slackSend`. See [Workflow Slack triggers](events.md#workflow-slack-triggers).
 - **Deliveries.** An external message is a mailbox message from `user` with a `messaging` origin
   (link, author, platform message). No new sender kind, so the frozen Team protocol codecs are
   unchanged. The queue and the public chat hide it like channel work. A request the agent sends from

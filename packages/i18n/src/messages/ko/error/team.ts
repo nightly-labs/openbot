@@ -65,6 +65,7 @@ export const messages = {
   "error.team.sharedDataUnsupported": "이 연결에서는 공유 데이터를 지원하지 않아요.",
   "error.team.agentInstallUnsupported": "이 연결에서는 에이전트 추가를 지원하지 않아요.",
   "error.team.agentHideUnsupported": "이 연결에서는 에이전트 숨기기를 지원하지 않아요.",
+  "error.team.agentColorsUnsupported": "이 연결에서는 에이전트 색상을 지원하지 않아요.",
   "error.team.sidebarFoldersUnsupported": "이 연결에서는 폴더 안의 폴더를 지원하지 않아요.",
   "error.team.agentNotificationLevelsUnsupported":
     "이 서버는 에이전트별 알림 수준을 저장할 수 없어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
@@ -75,6 +76,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "이 연결에서는 에이전트 업데이트를 지원하지 않아요.",
   "error.team.contextResetUnsupported": "이 연결에서는 새 채팅 시작을 지원하지 않아요.",
   "error.team.contextCompactUnsupported": "이 연결에서는 컨텍스트 압축을 지원하지 않아요.",
+  "error.team.messageDeleteUnsupported": "이 연결은 메시지 삭제를 지원하지 않아요.",
   "error.team.workspaceDirectoryUnsupported": "이 연결에서는 폴더 표시를 지원하지 않아요.",
   "error.team.conversationFileSearchUnsupported": "이 연결에서는 파일 검색을 지원하지 않아요.",
   "error.team.sideQuestionUnsupported": "이 연결에서는 사이드 질문을 지원하지 않아요.",

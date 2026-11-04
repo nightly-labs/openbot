@@ -45,6 +45,7 @@ export function HiddenChatsScreen() {
           agentId={agent.id}
           serverId={agent.serverId}
           hue={agent.avatarHue}
+          color={agent.avatarColor}
           seed={agent.avatarSeed}
           size={46}
           animateIdle={false}

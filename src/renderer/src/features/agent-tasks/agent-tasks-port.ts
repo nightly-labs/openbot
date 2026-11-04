@@ -27,6 +27,8 @@ export interface AgentTasksPort
   runQueuedMessageAsTask?: OpenBotDesktopApi["agent"]["runQueuedMessageAsTask"];
   /** Missing where the server cannot branch a conversation. The branch actions then do not show. */
   branchTask?: OpenBotDesktopApi["agent"]["branchTask"];
+  /** Deletes one message of a thread. Missing where the server cannot delete messages. */
+  deleteTaskMessage?: ((input: { agentId: string; taskId: string; messageId: string }) => Promise<void>) | undefined;
 }
 
 /**
@@ -48,6 +50,7 @@ export function agentTasksPort(): AgentTasksPort {
     reopenTask: (input, serverId) => agent.reopenTask(input, serverId),
     renameTask: (input) => agent.renameTask(input),
     deleteTask: (input, serverId) => agent.deleteTask(input, serverId),
+    deleteTaskMessage: (input) => agent.deleteConversationMessage(input),
     markTaskRead: (input) => agent.markTaskRead(input),
   };
 }

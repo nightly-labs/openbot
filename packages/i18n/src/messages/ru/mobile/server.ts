@@ -439,6 +439,8 @@ export const messages = {
   "mobile.server.settings.aiSection": "ИИ и инструменты",
   "mobile.server.settings.dataSection": "Данные",
   "mobile.server.settings.maintenanceSection": "Обслуживание",
+  "mobile.server.settings.peopleSection": "Люди",
+  "mobile.server.settings.moveSection": "Импорт и перенос",
   "mobile.server.settings.general": "Общие",
   "mobile.server.settings.timezone": "Часовой пояс",
   "mobile.server.settings.timezoneAutomatic": "Автоматически",

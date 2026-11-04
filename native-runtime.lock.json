@@ -1897,5 +1897,62 @@
         }
       }
     }
+  },
+  "devin": {
+    "version": "3000.11.234",
+    "license": "Proprietary",
+    "licenseUrl": "https://cognition.com/legal/platform-terms-of-service",
+    "artifacts": {
+      "darwin-arm64": {
+        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-aarch64-apple-darwin.tar.gz",
+        "assetSha256": "35f17a21e53a49435e42fb9627731726aa8ef7fa63e5c3d9d43d0cc5ca43edaf",
+        "downloadBytes": 66339270,
+        "installedBytes": 195170062,
+        "executable": "devin",
+        "files": {
+          "bin/devin": "cd6a8c9d7d95d8a46fb3fb5504e29ffbf3f392fbc772a25e619091cbd64124a2"
+        }
+      },
+      "darwin-x64": {
+        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-x86_64-apple-darwin.tar.gz",
+        "assetSha256": "55ef4f2d2b2c82b5258b7516eb1126549e6f10d6b418035676237bcc18e93e46",
+        "downloadBytes": 72567510,
+        "installedBytes": 206371518,
+        "executable": "devin",
+        "files": {
+          "bin/devin": "0cb525bdcfe811f36f198e672f48e03182c4c9d3fe6f6d6aa747c68dee8fa449"
+        }
+      },
+      "linux-x64": {
+        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-x86_64-unknown-linux.tar.gz",
+        "assetSha256": "201370cddd2924294e3ca6b46fd8ece49b5763953b644a1dd823fce5490cb41a",
+        "downloadBytes": 73715879,
+        "installedBytes": 218112262,
+        "executable": "devin",
+        "files": {
+          "bin/devin": "9be67fc1ec19bc29e95f7329b21dc3b678ddc595bc943fd11ee05d0cd94d2d82"
+        }
+      },
+      "linux-arm64": {
+        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-aarch64-unknown-linux.tar.gz",
+        "assetSha256": "438ca7f8280b3ef0747afc406e827d9e182156000277a1660358ac4fbd04156e",
+        "downloadBytes": 68561126,
+        "installedBytes": 195837886,
+        "executable": "devin",
+        "files": {
+          "bin/devin": "e8bf5931b36843ddc11ec8b818afc8f913299d66a78468c10e46d41c596753ef"
+        }
+      },
+      "win32-x64": {
+        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-x86_64-pc-windows.zip",
+        "assetSha256": "de01a37364c3c09389e20b699e993962296e5b8e1bea60aa48c95cc57dd228e3",
+        "downloadBytes": 72549950,
+        "installedBytes": 214219358,
+        "executable": "devin.exe",
+        "files": {
+          "bin/devin.exe": "7b05e174855313e31a4f48fc97b71f383821bb34eb563d5769515092ecef3b8e"
+        }
+      }
+    }
   }
 }

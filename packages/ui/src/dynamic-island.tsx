@@ -44,6 +44,8 @@ export interface DynamicIslandProps {
   extendedHoverArea?: boolean | undefined;
   suppressInitialHover?: boolean | undefined;
   hoverContentMotion?: DynamicIslandHoverContentMotion;
+  /** Called when a pointer starts or stops hovering the island, after the hover exit delay. */
+  onHoverChange?: ((hovering: boolean) => void) | undefined;
   pointerToggle?: boolean | undefined;
   sharedMotion?: DynamicIslandSharedMotion;
   /**
@@ -137,7 +139,11 @@ export function DynamicIsland(props: DynamicIslandProps): JSX.Element {
   let pointerInside = false;
   let initialHoverReady = !local.suppressInitialHover;
   let hoverOpenedState: Exclude<DynamicIslandViewState, "compact"> | null = null;
-  const [isHovering, setIsHovering] = createSignal(false);
+  const [isHovering, setHoverSignal] = createSignal(false);
+  function setIsHovering(hovering: boolean): void {
+    setHoverSignal(hovering);
+    local.onHoverChange?.(hovering);
+  }
 
   const viewState = () => local.state;
   const isExpanded = () => viewState() === "expanded";

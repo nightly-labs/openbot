@@ -146,6 +146,8 @@
   display: flex;
   height: var(--openbot-space-2);
   gap: var(--openbot-space-0-5);
+  /* A meter: the script places the compaction tick with a physical `left`, so the bar stays LTR. */
+  direction: ltr;
 }
 
 .context-usage-segment {

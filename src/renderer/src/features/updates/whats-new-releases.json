@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.60.0",
+    "date": "2026-11-03",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Talk to your agents from WhatsApp. Link a number under Marketplace → Apps → WhatsApp. A separate number is safer, because WhatsApp can block numbers that it sees as automated.",
+          "Start a workflow when someone mentions OpenBot in Slack or in a Telegram group, and send its result back there.",
+          "Use OpenBot in Arabic. The layout mirrors from right to left.",
+          "Turn models off in Server settings → Providers. The model picker shows the newest models first, and older models are under a fold.",
+          "Server settings has an Audit log of member, role and agent access changes.",
+          "Company sign-in: a server owner can connect Microsoft Entra ID, Okta, Google Workspace or another OpenID Connect provider in Members → Company sign-in. People with a company email then join with no invitation.",
+          "Give a channel a picture or an icon in channel settings.",
+          "A channel can keep its own memories, and an agent can send a task to a channel from your direct chat.",
+          "Side threads have Reply on each message.",
+          "Downloads and uploads of a joined server show their progress, and a failed upload has a Retry button."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Chat messages use more of a wide window.",
+          "Each file that you open from a chat gets its own tab in the side panel.",
+          "A text paste of more than 4,000 characters becomes a pasted-text.txt attachment, so the message keeps all of the text.",
+          "OpenBot is free for personal use, and first run says so."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Sign-in codes reach users in all regions.",
+          "A white window after a crash loads again by itself.",
+          "When Claude cannot reach its server, the chat shows the retries.",
+          "An agent with backup models moves to the next one when a credit balance or quota is spent before it starts to write."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.59.0",
     "date": "2026-11-02",
     "notices": [],

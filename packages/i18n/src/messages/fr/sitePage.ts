@@ -83,6 +83,9 @@ export const messages = {
   "sitePage.pricing.description":
     "Des serveurs hébergés et une licence pour les équipes. OpenBot est gratuit pour un usage personnel sur votre propre ordinateur.",
   "sitePage.pricing.heading": "Tarifs",
+  "sitePage.pricing.personal.title": "L’usage personnel est gratuit",
+  "sitePage.pricing.personal.body":
+    "Toutes les fonctionnalités, sur votre propre ordinateur, avec les forfaits d’IA que vous payez déjà. Sans serveur ni licence.",
   "sitePage.pricing.enterprise.title": "Entreprise",
   "sitePage.pricing.enterprise.body":
     "Des serveurs plus grands, plus de {count} membres ou tout autre besoin. Avec un support entreprise.",

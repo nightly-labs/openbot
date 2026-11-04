@@ -7,6 +7,7 @@ import {
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import type {
   AccountUsage,
+  AgentColors,
   AgentEvent,
   AgentNotificationLevelsSnapshot,
   AgentStatus,
@@ -76,6 +77,7 @@ import {
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -98,6 +100,7 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -139,8 +142,10 @@ import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery
 import {
   listAgentNotificationLevels,
   listHiddenAgents,
+  readAgentColors,
   readSidebarPins,
   seedSidebarPins,
+  setAgentColor,
   setAgentHidden,
   setAgentNotificationLevel,
   setAgentProviderAccount,
@@ -212,6 +217,11 @@ interface WebConnectOptions {
   early?: WebEarlyReads;
 }
 
+/** The message that `message-delete-v1` deletes: in the chat of an agent, or in a channel. */
+type WebMessageDelete =
+  | { kind: "agent"; agentId: string; messageId: string }
+  | { kind: "channel"; channelId: string; messageId: string };
+
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
   /** The status connections of the hosts that this tab has not opened. */
@@ -258,6 +268,11 @@ export interface WebWorkspaceRuntime {
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   /** This member's read state for each agent, keyed by agent id. Invalid entries are left out. */
   conversationReads(): Promise<Record<string, ConversationReadState>>;
+  /**
+   * Deletes one message of an agent's chat or of a channel, with `message-delete-v1`. A host
+   * without it refuses before a request goes out.
+   */
+  deleteMessage?: (input: WebMessageDelete) => Promise<void>;
   /** Tells a hosted server that this tab has focus. Send it only to a host with `focus-use-v1`. */
   focusUse(): Promise<void>;
   /** Resolves to the conversation message the host stored: the delivery id of the receipt. */
@@ -299,6 +314,8 @@ export interface WebWorkspaceRuntime {
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
   /** Hides or restores an agent, and returns the host's hidden list. Needs `agent-hidden-v1`. */
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
+  /** The exact colours of the agents on the host. A host without `agent-colors-v1` has none. */
+  listAgentColors?: () => Promise<AgentColors>;
   /** The user's own pinned chats on the open host, for all of their devices. Needs `sidebar-pins-v1`. */
   sidebarPins?: {
     read: () => Promise<SidebarPinsSnapshot>;
@@ -1102,6 +1119,17 @@ export function createWebWorkspaceRuntime(
     async focusUse() {
       await request("POST", FOCUS_USE_ROUTES.ping);
     },
+    async deleteMessage(input) {
+      if (!capabilities.includes(MESSAGE_DELETE_CAPABILITY))
+        throw new Error(currentText().t("error.team.messageDeleteUnsupported"));
+      if (input.kind === "agent")
+        await request("POST", MESSAGE_DELETE_ROUTES.agent, { agentId: input.agentId, messageId: input.messageId });
+      else
+        await request("POST", MESSAGE_DELETE_ROUTES.channel, {
+          channelId: input.channelId,
+          messageId: input.messageId,
+        });
+    },
     async conversationReads() {
       const value = await request("GET", TEAM_API_ROUTES.agents.conversationReads);
       const reads: Record<string, ConversationReadState> = {};
@@ -1246,6 +1274,10 @@ export function createWebWorkspaceRuntime(
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    async listAgentColors() {
+      if (!capabilities.includes(AGENT_COLORS_CAPABILITY)) return { agents: [] };
+      return runTeamEffect(readAgentColors(teamApi).pipe(Effect.mapError((error) => error.cause)));
+    },
     sidebarPins: {
       read: () => runTeamEffect(readSidebarPins(teamApi).pipe(Effect.mapError((error) => error.cause))),
       set: (items) => runTeamEffect(setSidebarPins(teamApi, items).pipe(Effect.mapError((error) => error.cause))),
@@ -1323,9 +1355,20 @@ export function createWebWorkspaceRuntime(
       return value;
     },
     async createAgent(input) {
-      const value = await request("POST", TEAM_API_ROUTES.agents.all, { ...input });
+      // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.
+      const { avatarColor, ...profile } = input;
+      const value = await request("POST", TEAM_API_ROUTES.agents.all, { ...profile });
       if (!isClientAgentSummary(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
+      const agent: ClientAgentSummary = value;
+      if (!avatarColor || !capabilities.includes(AGENT_COLORS_CAPABILITY)) return agent;
+      // The agent exists, so a failed colour change does not fail the create: the agent keeps its hue.
+      const colored = await runTeamEffect(
+        setAgentColor(teamApi, { agentId: agent.id, color: avatarColor }).pipe(Effect.mapError((error) => error.cause)),
+      ).then(
+        (colors) => colors.agents.some((entry) => entry.agentId === agent.id),
+        () => false,
+      );
+      return colored ? { ...agent, avatarColor } : agent;
     },
     async duplicateAgent(agentId) {
       if (!capabilities.includes("agent-duplication")) throw new Error(currentText().t("webClient.error.duplication"));
@@ -1348,9 +1391,30 @@ export function createWebWorkspaceRuntime(
       // The released agent route ignores the account, so it goes on `provider-accounts-v1` after the
       // profile: a provider change there returns the agent to the new provider's own sign-in.
       // Backup models stay on the host computer: the Team API does not carry them.
-      const { providerAccountId, backupModels: _backupModels, leaveUsageLimit: _leaveUsageLimit, ...profile } = input;
+      const {
+        providerAccountId,
+        backupModels: _backupModels,
+        leaveUsageLimit: _leaveUsageLimit,
+        avatarColor,
+        ...fields
+      } = input;
       if (providerAccountId !== undefined && !capabilities.includes(PROVIDER_ACCOUNTS_CAPABILITY))
         throw new Error(currentText().t("error.team.providersUnsupported"));
+      // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on its
+      // own route first. That route also sets the nearest hue, so the profile change then leaves the hue
+      // out: on the released route a hue removes the colour. A removed colour keeps the hue, which then
+      // sets the colour that the user chose. The released route removes the colour only when the hue
+      // changes, so a removed colour always goes on the colour route. Without the capability, only the
+      // hue goes.
+      const colors = capabilities.includes(AGENT_COLORS_CAPABILITY);
+      const { avatarHue: _avatarHue, ...withoutHue } = fields;
+      const profile = colors && avatarColor ? withoutHue : fields;
+      if (colors && avatarColor !== undefined)
+        await runTeamEffect(
+          setAgentColor(teamApi, { agentId: input.agentId, color: avatarColor }).pipe(
+            Effect.mapError((error) => error.cause),
+          ),
+        );
       await request("PATCH", TEAM_API_ROUTES.agent.one(input.agentId), { ...profile });
       if (providerAccountId === undefined) return;
       await runTeamEffect(

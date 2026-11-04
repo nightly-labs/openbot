@@ -55,7 +55,7 @@
 /* The row layout overlaps its faces. `:where` keeps the cluster out at no weight, so a surface
    that sets its own overlap wins. */
 .channel-avatar:where(:not(.channel-avatar-cluster)) .agent-avatar + .agent-avatar {
-  margin-left: calc(-1 * var(--openbot-space-4));
+  margin-inline-start: calc(-1 * var(--openbot-space-4));
 }
 /* One member is the channel's whole face. Two sit side by side, and three read as a triangle; a
    count of two digits takes the third place. */

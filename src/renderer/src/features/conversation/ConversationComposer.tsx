@@ -3,11 +3,9 @@ import { supportedAttachmentExtensions } from "@openbot/contracts/attachment-fil
 import {
   type AccountUsageLimit,
   type AgentWait,
-  accountUsageCoversModel,
   canPreviewAttachment,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type QueueSnapshot,
-  usageQuotaForModel,
 } from "@openbot/contracts/ipc";
 import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
@@ -17,6 +15,7 @@ import {
   TEAM_ZIP_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
+import { spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { Button, Input } from "@openbot/ui";
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
@@ -275,35 +274,20 @@ export function ConversationComposer() {
   /** A reading of another account of the same provider says nothing about the quota this agent uses. */
   const agentUsageLimit = (limit: AccountUsageLimit) =>
     limit.id === props.agent?.provider && (limit.accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID) === agentAccountId();
-  /**
-   * The first plan window that is spent and has not ended yet. `usedPercent` is what the provider
-   * reports, so it can pass 100 slightly. A spent plan does not say whether paid credits remain.
-   */
+  /** The first plan window that is spent and has not ended yet. It does not say whether paid credits remain. */
   const usageExhausted = createMemo(() => {
     const provider = props.agent?.provider;
     // The usage of a provider that this build does not know has no notice.
     if (!provider || !isKnownAgentProvider(provider)) return null;
-    for (const limit of props.accountUsage?.limits ?? []) {
-      if (!agentUsageLimit(limit)) continue;
-      // A provider that names quota groups limits each group apart: only the agent's model's group
-      // can stop it, and a model that no group lists has no notice.
-      const model = props.agent?.model;
-      const quota = usageQuotaForModel(limit, model);
-      if (!quota) continue;
-      for (const window of ["primary", "secondary"] as const) {
-        const plan = quota[window];
-        if (!plan || plan.usedPercent < 100) continue;
-        if (plan.resetsAt !== null && plan.resetsAt * 1_000 <= now()) continue;
-        return {
-          provider,
-          resetsAt: plan.resetsAt,
-          // A named group is the model's own quota.
-          covers: quota !== limit || accountUsageCoversModel(provider, model),
-          key: JSON.stringify([window, plan.windowDurationMins, plan.resetsAt]),
-        };
-      }
-    }
-    return null;
+    const spent = spentUsageWindow(props.accountUsage?.limits, provider, agentAccountId(), props.agent?.model, now());
+    if (!spent) return null;
+    const { slot, window, covers } = spent;
+    return {
+      provider,
+      resetsAt: window.resetsAt,
+      covers,
+      key: JSON.stringify([slot, window.windowDurationMins, window.resetsAt]),
+    };
   });
   const usageNoticeAccount = () => {
     const status = props.agentStatus.providers?.find((provider) => provider.id === props.agent?.provider);
@@ -689,7 +673,7 @@ export function ConversationComposer() {
               sendShortcut={deviceSendShortcut(props.platform)}
               onPickerOpenChange={setPickerOpen}
               dictation={{ text: voiceLiveText(), final: voicePhase() === "transcribing" }}
-              onPasteFiles={pasteFiles}
+              onPasteFiles={(files, selection, text) => pasteFiles(files, selection, undefined, text)}
               onCopyAttachments={(clipboard, text, attachments, remaining) => {
                 const copied = copyComposerSelection(clipboard, text, attachments, props.runtime?.previewAttachment);
                 if (remaining !== undefined) releaseCutAttachments(attachments, remaining, copied);

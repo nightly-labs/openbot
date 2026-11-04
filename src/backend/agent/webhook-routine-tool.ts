@@ -59,6 +59,8 @@ const WEBHOOK_REQUEST_FORMAT = {
     "413": "the body is too large",
     "503": "the host is offline or busy; retry later",
   },
+  standardWebhooks:
+    "The URL also accepts Standard Webhooks requests, such as Composio and Svix send: webhook-id, webhook-timestamp and webhook-signature headers, and a JSON object body with a type field. The whole body becomes data, so filters can read /metadata/trigger_slug. The person pastes the sender's signing secret in the routine's settings.",
 };
 
 /**

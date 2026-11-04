@@ -37,6 +37,7 @@ import type { DiscordDelivery } from "./discord-api";
 import type { GitHubDeliveryStatus } from "./github-route";
 import type { TelegramCallFailure, TelegramCallMethod, TelegramCallParams, TelegramCallResult } from "./telegram-route";
 import type { RemoteMemberRole } from "./ticket";
+import type { WebhookSignatureFormat } from "./webhook-route";
 
 export const SIGNAL_PROTOCOL_VERSION = 1;
 export type SignalProtocolVersion = typeof SIGNAL_PROTOCOL_VERSION;
@@ -160,6 +161,10 @@ export type SignalClientMessage =
       // `ingress` only, and optional: the host's queue key (`./ingress-queue.ts`). With it, Signal
       // keeps the events of a route for this host while the host starts.
       queueKey?: string;
+      // `ingress` only, and optional: the webhook signature formats that this host checks in addition
+      // to `X-OpenBot-Signature` (`./webhook-route.ts`). An older Signal ignores it, and Signal ignores
+      // a format that it does not know.
+      webhookFormats?: string[];
     }
   // An `ingress` socket's Bot API call, sent only to a Signal whose `ready` named the `telegram`
   // capability. Signal answers with one `telegram-call-result` of the same `requestId`.
@@ -313,5 +318,8 @@ export type SignalServerMessage =
       deliveryId: string;
       signature: string;
       bodyBase64: string;
+      // Absent for an `X-OpenBot-Signature` request. Present only when the host named the format in
+      // its `ingress` hello.
+      format?: WebhookSignatureFormat;
     }
   | SignalRelayMessage;

@@ -1,5 +1,6 @@
 import { win32 } from "node:path";
-import type { LoadSessionResponse, NewSessionRequest, RequestError } from "@agentclientprotocol/sdk";
+import type { LoadSessionResponse, NewSessionRequest, PromptResponse, RequestError } from "@agentclientprotocol/sdk";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
 
@@ -131,10 +132,20 @@ export interface AcpFlavor {
    * `session/resume`, and this tells from a successful load reply that the session is missing.
    */
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
+  /** The usage of this prompt alone, for an agent that sends it in the `_meta` of the prompt result, not in `usage`. */
+  promptUsage?(response: PromptResponse): DynamicRecord | null;
 }
 
-/** The protocol's own behavior: Grok and Cline. */
+/** The protocol's own behavior: Cline. */
 export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
+
+/**
+ * Grok CLI 1.0.22 and 1.0.70 send no `usage` in the `session/prompt` result and no `usage_update`.
+ * The result's `_meta.usage` holds the tokens and the cost of this prompt's model calls (#4827).
+ */
+export const GROK_ACP_FLAVOR: AcpFlavor = {
+  promptUsage: (response) => (isRecord(response._meta) && isRecord(response._meta.usage) ? response._meta.usage : null),
+};
 
 /**
  * Hermes Agent 0.21.5 answers a `session/resume` of a missing session with a new session, and the
@@ -186,6 +197,15 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
     isRecord(error.data) &&
     typeof error.data.details === "string" &&
     error.data.details.includes("config.toml"),
+};
+
+/**
+ * Devin CLI 3000.11.234 refuses `session/load` of a session that it does not have with -32016 and
+ * `{ "cognition.ai/errorKind": "session_not_found" }`. Only that kind counts.
+ */
+export const DEVIN_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: (error) =>
+    error.code === -32016 ? isRecord(error.data) && error.data["cognition.ai/errorKind"] === "session_not_found" : null,
 };
 
 /**

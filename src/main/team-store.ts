@@ -990,7 +990,12 @@ export class TeamStore {
       );
       const closed: string[] = [];
       for (const [tokenHash, session] of this.#remoteSessions) {
-        if (activeRoles.get(session.member.id) === session.member.role) continue;
+        if (activeRoles.get(session.member.id) === session.member.role) {
+          // A session that opened before its member was known has the account id as its name.
+          const stored = state.members.find((member) => member.id === session.member.id);
+          if (stored) session.member = { ...publicMember(stored), role: session.member.role, disabled: false };
+          continue;
+        }
         this.#remoteSessions.delete(tokenHash);
         closed.push(session.sessionId);
       }

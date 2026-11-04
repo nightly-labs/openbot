@@ -352,6 +352,13 @@ export const messages = {
     "Текущий секрет перестанет работать сразу. Запросы, подписанные им, будут отклоняться, пока отправитель не начнёт использовать новый секрет.",
   "routine.webhook.regenerateConfirm": "Создать заново",
   "routine.webhook.regenerateFailed": "Не удалось создать секрет подписи заново.",
+  "routine.webhook.useSenderSecret": "Использовать секрет отправителя",
+  "routine.webhook.senderSecretTitle": "Использовать секрет подписи отправителя?",
+  "routine.webhook.senderSecretDescription":
+    "Некоторые отправители, например Composio и Svix, создают свой секрет подписи. Вставьте его сюда. Текущий секрет сразу перестанет работать.",
+  "routine.webhook.senderSecretLabel": "Секрет отправителя",
+  "routine.webhook.senderSecretConfirm": "Использовать",
+  "routine.webhook.senderSecretFailed": "Не удалось сохранить секрет отправителя.",
   "routine.webhook.statusFailed": "Не удалось проверить, подключён ли хост к ретранслятору.",
 
   "routine.settings.instruction": "Инструкция",

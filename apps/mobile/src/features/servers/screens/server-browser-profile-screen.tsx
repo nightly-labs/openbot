@@ -139,8 +139,7 @@ export function ServerBrowserProfileScreen() {
     void perform(async () => {
       created = await profiles.create(trimmed);
       // The create route takes only the name, so a color that the host did not give saves after it.
-      if (hue !== undefined && avatarHueSwatch(hue) !== avatarHueSwatch(created.hue))
-        await profiles.recolor(created.id, hue);
+      if (hue !== undefined && hue !== created.hue) await profiles.recolor(created.id, hue);
       if (assignTo) await assignment.choose({ kind: "profile", profileId: created.id });
     }).then((saved) => {
       if (!created) return;
@@ -156,7 +155,7 @@ export function ServerBrowserProfileScreen() {
   }
 
   function recolor(current: BrowserProfileSummary, hue: AvatarHue): void {
-    if (avatarHueSwatch(hue) === avatarHueSwatch(current.hue)) return;
+    if (hue === current.hue) return;
     void haptics.selection();
     void perform(() => profiles.recolor(current.id, hue));
   }
@@ -249,8 +248,7 @@ export function ServerBrowserProfileScreen() {
           accessibilityLabel={t("mobile.server.browserProfiles.color")}
         >
           {AVATAR_HUE_CHOICES.map((option) => {
-            // A stored hue 100 or 280 shows as its same-color choice.
-            const checked = avatarHueSwatch(shownHue) === avatarHueSwatch(option.hue);
+            const checked = shownHue === option.hue;
             return (
               <Button
                 key={option.hue}
@@ -290,6 +288,7 @@ export function ServerBrowserProfileScreen() {
                     agentId={agent.id}
                     serverId={agent.serverId}
                     hue={agent.avatarHue}
+                    color={agent.avatarColor}
                     seed={agent.avatarSeed}
                     size={32}
                     animateIdle={false}

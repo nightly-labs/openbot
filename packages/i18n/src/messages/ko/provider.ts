@@ -122,6 +122,11 @@ export const messages = {
   "provider.picker.customEmpty":
     "OpenAI 호환 엔드포인트를 추가하세요. 이 컴퓨터의 모델 서버나 기본 URL과 키가 있는 서비스면 돼요.",
   "provider.picker.defaultModelLabel": "{name}, 기본",
+  "provider.picker.usageLimit": "사용 한도에 도달했어요",
+  "provider.picker.usageLimitWindow": "{window} 한도",
+  "provider.picker.usageLimitResets": "{limit} · {time} 초기화",
+  "provider.picker.usageLimitLabel": "{name}, 사용 한도에 도달했어요",
+  "provider.picker.usageLimitResetsLabel": "{name}, 사용 한도에 도달했어요, {time} 초기화",
   "provider.picker.effort": "강도",
   "provider.picker.effortLabel": "에이전트 추론 강도",
   "provider.picker.effortFixed": "{effort} ({provider}에서 고정)",

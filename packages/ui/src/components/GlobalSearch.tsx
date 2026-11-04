@@ -486,12 +486,12 @@ function ResultIcon(props: { icon: typeof Settings }) {
 function NamedRow(props: { name: string; detail?: string | undefined; time?: string | undefined; query: string }) {
   return (
     <>
-      <Combobox.ItemLabel class="global-search-result-title">
+      <Combobox.ItemLabel class="global-search-result-title" dir="auto">
         <Highlighted text={props.name} query={props.query} />
       </Combobox.ItemLabel>
       <Show when={props.detail}>
         {(detail) => (
-          <span class="global-search-result-detail">
+          <span class="global-search-result-detail" dir="auto">
             <Highlighted text={detail()} query={props.query} />
           </span>
         )}
@@ -507,11 +507,13 @@ function MessageResultRow(props: { result: MessageResult; query: string }) {
   const { t } = useText();
   return (
     <>
-      <span class="global-search-result-title">{props.result.agent.name}</span>
+      <span class="global-search-result-title" dir="auto">
+        {props.result.agent.name}
+      </span>
       <Show when={props.result.message.author === "you"}>
         <span class="global-search-result-author">{t("conversation.globalSearch.you")}</span>
       </Show>
-      <Combobox.ItemLabel class="global-search-result-detail">
+      <Combobox.ItemLabel class="global-search-result-detail" dir="auto">
         <Highlighted text={snippetAround(messagePreview(props.result.message), props.query)} query={props.query} />
       </Combobox.ItemLabel>
       <span class="global-search-result-time">{props.result.message.time}</span>

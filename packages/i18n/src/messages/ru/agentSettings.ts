@@ -118,7 +118,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Сейчас недоступна · пропущена",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "После начала ответа {name} не переключает модель. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
+    "Если лимит использования остановит {name} после начала работы, {name} продолжит ту же работу на первой доступной модели из списка. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "agentSettings.groups.brain": "Мозг",
   "agentSettings.groups.knows": "Знает",
   "agentSettings.groups.does": "Делает",
@@ -151,6 +151,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "Сбросить до ID",
   "agentSettings.avatar.shape": "Форма",
   "agentSettings.avatar.shuffle": "Случайное лицо",
+  "agentSettings.avatar.style": "Стиль аватара",
+  "agentSettings.avatar.stylePlush": "Плюш",
+  "agentSettings.avatar.styleFlat": "Плоский",
   "agentSettings.avatar.shapes": "Формы аватара",
   "agentSettings.avatar.shapeOption": "Форма {number}",
   "agentSettings.avatar.eyes": "Глаза",

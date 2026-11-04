@@ -90,6 +90,10 @@ export const messages = defineMessages("sitePage", {
   "sitePage.pricing.description":
     "Hosted servers and a license for teams. OpenBot is free for personal use on your own computer.",
   "sitePage.pricing.heading": "Pricing",
+  // The first block of the pricing page, above the order form.
+  "sitePage.pricing.personal.title": "Personal use is free",
+  "sitePage.pricing.personal.body":
+    "Every feature, on your own computer, with the AI plans you already pay for. No server and no license.",
   "sitePage.pricing.enterprise.title": "Enterprise",
   // {count} is the largest number of members that the page sells, such as 25.
   "sitePage.pricing.enterprise.body":
