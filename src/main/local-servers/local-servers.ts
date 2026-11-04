@@ -14,6 +14,10 @@
 // control pipe, so the child meets the owner's devices on Signal and sends their notifications. A
 // sign-out tells each child to stop that. A deleted server is removed from the account; until the
 // account service confirms it, the registry keeps its id, so the directory sync does not list it.
+//
+// The child has no account session, so it cannot read its members from the account directory. It
+// asks on stdout, and this process writes the list to its control pipe. After this app changes a
+// member of the server, it writes the new list without a request.
 
 import { type ChildProcess, type SpawnOptions, spawn as spawnProcess } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -26,10 +30,12 @@ import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { Deferred, Duration, Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import { causeHelpers } from "../../backend/effect-boundary";
+import type { RemoteMemberRecord } from "../central-auth-records";
 import {
   formatLocalServerCommand,
   LOCAL_SERVER_CONTROL_FD,
   LOCAL_SERVER_ENVIRONMENT,
+  LOCAL_SERVER_MEMBERS_REQUEST,
   LOCAL_SERVER_OWNER_USERNAME,
   LOCAL_SERVER_READY_PREFIX,
   type LocalServerCommand,
@@ -132,6 +138,8 @@ interface LocalServerAccount {
   }): Effect.Effect<void, RemoteWorkflowError>;
   /** The machine token of a registered server. Never logged. */
   credential(hostId: string): string | null;
+  /** The members of a registered server, from the account directory. */
+  listMembers(hostId: string): Effect.Effect<RemoteMemberRecord[], RemoteWorkflowError>;
   /** Removes a deleted server. A server that the account service refuses for good counts as removed. */
   remove(hostId: string): Effect.Effect<void, RemoteWorkflowError>;
 }
@@ -153,7 +161,10 @@ export interface LocalServersOptions {
   /** The provider CLI store of this app. A child has its own user data, but not its own copy of each CLI. */
   runtimeRoot: string;
   cipher: TokenCipher;
-  remoteServers: Pick<RemoteServerManager, "setThisComputerServers" | "attachLocalServer" | "detachLocalServer">;
+  remoteServers: Pick<
+    RemoteServerManager,
+    "setThisComputerServers" | "setRegisteredThisComputerServers" | "attachLocalServer" | "detachLocalServer"
+  >;
   account: LocalServerAccount;
   /** This executable, and the app path when it is not packaged. */
   command: { executable: string; args: readonly string[] };
@@ -179,6 +190,11 @@ export class LocalServers {
   /** The registry ids of the children that have a machine token, and the account it belongs to. */
   readonly #published = new Set<string>();
   #publishedAccountId: string | null = null;
+  /**
+   * The registry ids of the children whose account directory is being read, one read at a time each.
+   * `true`: a request or a change came while it ran, so another read follows, as the list can be old.
+   */
+  readonly #memberReads = new Map<string, boolean>();
   /** One account step at a time, so a publish cannot reach a child after the unpublish of a sign-out. */
   readonly #accountSteps = Semaphore.makeUnsafe(1);
   #stopped = false;
@@ -226,6 +242,7 @@ export class LocalServers {
         for (const id of this.#published) this.#send(id, { type: "unpublish" });
         this.#published.clear();
         this.#publishedAccountId = null;
+        this.#announcePublished();
       }
       if (accountId === null) return;
       yield* this.#removeDeletedHosts();
@@ -362,6 +379,68 @@ export class LocalServers {
     ]);
   }
 
+  /** The servers registered for the signed-in account: their members and invitations go to the account service. */
+  #announcePublished(): void {
+    this.#options.remoteServers.setRegisteredThisComputerServers(
+      this.#registry.servers.flatMap((entry) =>
+        entry.serverId && this.#published.has(entry.id) ? [entry.serverId] : [],
+      ),
+    );
+  }
+
+  /** Writes the account directory of a server to its child, after this app changed one of its members. */
+  sendMembers(serverId: string): void {
+    const entry = this.#registry.findByServerId(serverId);
+    if (entry) this.#readMembers(entry.id);
+  }
+
+  /**
+   * Reads the account directory of a server and writes it to the child. A child that is not registered
+   * for the signed-in account, or a read that fails, gets `members-unavailable`, so it does not wait.
+   * A request or a change while a read runs gets one more read after it.
+   */
+  #readMembers(id: string): void {
+    if (this.#memberReads.has(id)) {
+      this.#memberReads.set(id, true);
+      return;
+    }
+    const ready = this.#ready.get(id);
+    const running = this.#running.get(id);
+    if (!ready || !running || !this.#published.has(id)) {
+      this.#send(id, { type: "members-unavailable" });
+      return;
+    }
+    this.#memberReads.set(id, false);
+    Effect.runFork(
+      Effect.forkIn(
+        this.#options.account.listMembers(ready.serverId).pipe(
+          Effect.map((members): LocalServerCommand => ({ type: "members", members })),
+          Effect.catch(({ cause }) =>
+            Effect.sync((): LocalServerCommand => {
+              this.#options.log.warn("The members of a server on this computer did not load.", cause);
+              return { type: "members-unavailable" };
+            }),
+          ),
+          Effect.flatMap((command) =>
+            Effect.sync(() => {
+              // A child that started again meanwhile asks again.
+              if (this.#running.get(id) === running) this.#send(id, command);
+            }),
+          ),
+          Effect.ensuring(
+            Effect.sync(() => {
+              const again = this.#memberReads.get(id) === true;
+              this.#memberReads.delete(id);
+              if (again) this.#readMembers(id);
+            }),
+          ),
+        ),
+        this.#scope,
+        { startImmediately: true },
+      ),
+    );
+  }
+
   /** Writes one command to the child's control pipe. A child that is gone gets nothing. */
   #send(id: string, command: LocalServerCommand): void {
     const running = this.#running.get(id);
@@ -401,6 +480,7 @@ export class LocalServers {
             this.#send(entry.id, { type: "publish", machineToken });
             this.#published.add(entry.id);
             this.#publishedAccountId = accountId;
+            this.#announcePublished();
           }),
         ),
         Effect.catch(({ cause }) =>
@@ -480,6 +560,10 @@ export class LocalServers {
     // read and dropped so that a full pipe cannot stop the child.
     if (child.stdout)
       createInterface({ input: child.stdout }).on("line", (line) => {
+        if (line === LOCAL_SERVER_MEMBERS_REQUEST) {
+          this.#readMembers(entry.id);
+          return;
+        }
         const value = parseReadyLine(line);
         if (value) Deferred.doneUnsafe(ready, Exit.succeed(value));
       });
@@ -552,6 +636,7 @@ export class LocalServers {
       this.#running.delete(entry.id);
       // The next child gets its machine token again when it starts.
       this.#published.delete(entry.id);
+      this.#announcePublished();
     }
     if (running.stopping || this.#stopped) return;
     this.#options.log.warn(`A server on this computer stopped (code ${code ?? "none"}, signal ${signal ?? "none"}).`);
@@ -621,6 +706,7 @@ export class LocalServers {
       if (this.#running.get(entry.id) === running) {
         this.#running.delete(entry.id);
         this.#published.delete(entry.id);
+        this.#announcePublished();
       }
     }
     if (only && this.#running.has(entry.id)) return;

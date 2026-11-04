@@ -77,4 +77,6 @@ export const messages = {
   "usage.panel.unsupported":
     "Этот хост не поддерживает аналитику агентов. Обновите хост, чтобы использовать этот раздел.",
   "usage.panel.loadFailed": "Не удалось загрузить использование. Проверьте подключение и диапазон дат.",
+  "usage.machine.label": "Нагрузка на машину. ЦП: {cpu}, память: {memory}",
+  "usage.machine.openStorage": "Открыть хранилище. Диск: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

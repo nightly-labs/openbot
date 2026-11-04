@@ -8,6 +8,8 @@ export const messages = {
   "notification.needsApprovalFor": "승인이 필요해요: {action}",
   "notification.finished": "작업을 마쳤어요.",
   "notification.failed": "오류로 중단됐어요.",
+  "notification.subagentFailed": "하위 에이전트가 오류로 중단됐어요.",
+  "notification.subagentFailedFor": "하위 에이전트가 오류로 중단됐어요: {task}",
   "notification.channelTitle": "{channel}의 {agent}",
   "notification.channelMessage": "메시지를 보냈어요.",
   "notification.usageLimit.title": "{provider} 계정이 한도에 도달했어요",

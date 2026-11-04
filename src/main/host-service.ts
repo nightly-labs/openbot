@@ -151,6 +151,11 @@ interface HostServiceOptions {
    * or writes them in the account directory.
    */
   localDevelopmentHost?: boolean;
+  /**
+   * A server on this computer: its owner is a password member that the desktop app logs in as, so a
+   * directory sync keeps the owner's row.
+   */
+  passwordOwner?: boolean;
   logDirectory?: string;
   removeLegacyRemoteDesktopCredential?: () => Effect.Effect<void, RemoteWorkflowError>;
   getSignedInUser: () => CentralAuthUser;
@@ -171,6 +176,7 @@ interface HostServiceOptions {
   createRemoteDesktopRuntime?: RemoteScreenGatewayCreateRuntime;
   getRemoteDesktopRuntimeCredentials?: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
   getRemoteDesktopDisplays?: () => RemoteDesktopDisplay[];
+  getRemoteDesktopDisplayScreenOrigin?: (displayId: string) => { x: number; y: number } | undefined;
   getRemoteDesktopIceServers?: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   /** Puts a remote desktop member's pasted text on this computer's clipboard. */
   writeRemoteDesktopClipboard?: (text: string) => void;
@@ -315,6 +321,7 @@ export class HostService extends EventEmitter<HostEvents> {
         options.getRemoteDesktopRuntimeCredentials ??
         (() => Effect.succeed({ username: "openbot", password: "development-runtime-not-for-release" })),
       ...(options.getRemoteDesktopDisplays ? { getDisplays: options.getRemoteDesktopDisplays } : {}),
+      getDisplayScreenOrigin: options.getRemoteDesktopDisplayScreenOrigin,
       getIceServers:
         options.getRemoteDesktopIceServers ??
         (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),
@@ -1619,7 +1626,9 @@ export class HostService extends EventEmitter<HostEvents> {
     by?: MemberAuditActor,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
     const before = this.#options.store.listStoredMembers();
-    const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members);
+    const closed = yield* this.#options.store.syncRemoteDirectory(hostId, members, {
+      keepOwner: this.#options.passwordOwner === true,
+    });
     yield* this.#auditMembers(hostId, before, by);
     for (const sessionId of closed) yield* this.#closeLocalSession(sessionId);
     // The presence change also sends the new member chat colors to each connected peer.
@@ -1627,6 +1636,20 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#api.refreshPresence();
     }
   });
+
+  /**
+   * A server on this computer: the desktop app read the account directory after it changed a member.
+   * The sync closes the sessions that the directory no longer allows.
+   */
+  readonly applyAccountDirectory = Effect.fn("HostService.applyAccountDirectory")(
+    function* (this: HostService, members: RemoteDirectoryMember[]): Effect.fn.Return<void, RemoteWorkflowError> {
+      const hostId = this.#options.store.getIdentity()?.serverId;
+      if (!hostId) return;
+      yield* this.#syncRemoteDirectory(hostId, members);
+      this.#api.refreshPresence();
+    },
+    (operation) => this.#memberWrites.withPermit(operation),
+  ).bind(this);
 
   /**
    * A member who joined after this host read the account directory connects with no name here, so
