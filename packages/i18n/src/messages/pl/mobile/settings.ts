@@ -82,7 +82,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animacje",
   "mobile.settings.animations.agentFaces": "Animowane twarze agentów",
   "mobile.settings.animations.agentFacesFooter":
-    "Awatary agentów poruszają twarzami, gdy agenci pracują i odpoczywają. Gdy to jest wyłączone, twarze są nieruchome.",
+    "Awatary agentów poruszają twarzami, gdy agenci pracują i odpoczywają. Gdy to jest wyłączone, twarze są nieruchome, a postacie na ekranie powitalnym i pustym ekranie głównym przestają się unosić.",
   "mobile.settings.animations.composerResize": "Kompaktowe pole wiadomości",
   "mobile.settings.animations.composerResizeFooter":
     "Pole wiadomości zmienia się w mały pasek, gdy klawiatura jest zamknięta. Gdy to jest wyłączone, pole ma pełny rozmiar.",

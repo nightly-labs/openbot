@@ -14,6 +14,8 @@ export const messages = {
   // A workflow output step that tells the user its result.
   "notification.workflowOutput": "一个工作流有了新结果。",
   "notification.failed": "因错误而停止。",
+  "notification.subagentFailed": "一个子助手因错误而停止。",
+  "notification.subagentFailedFor": "一个子助手因错误而停止：{task}",
   // The title of a notification about an agent in a channel: the agent and the channel name.
   "notification.channelTitle": "{channel} 中的 {agent}",
   // The body of a channel reply notification when the preview of agent words is off.

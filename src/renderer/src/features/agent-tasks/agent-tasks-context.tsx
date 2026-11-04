@@ -30,7 +30,11 @@ const AgentTasks = createSimpleContext({
       filesAccepted: () => local() || activeServerSupportsCapability("agent-thread-files-v1"),
       repliable: () => local() || activeServerSupportsCapability("agent-thread-replies-v1"),
       messageDeletable: () => local() || activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY),
-      reloadKey: () => agentStatus().phase,
+      // A server switch or reconnect reads the lists again, and so does a start of the agent.
+      reloadKey: () => {
+        const server = activeServer();
+        return `${server?.id ?? ""}:${server?.state ?? ""}:${agentStatus().phase}`;
+      },
     });
   },
 });

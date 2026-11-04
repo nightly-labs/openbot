@@ -77,7 +77,7 @@ export const messages = {
   "mobile.settings.animations.all": "Animasyonlar",
   "mobile.settings.animations.agentFaces": "Hareketli ajan yüzleri",
   "mobile.settings.animations.agentFacesFooter":
-    "Ajanlar çalışırken ve dinlenirken avatarlarının yüzleri hareket eder. Kapalıyken yüzler sabit kalır.",
+    "Ajanlar çalışırken ve dinlenirken avatarlarının yüzleri hareket eder. Kapalıyken yüzler sabit kalır, karşılama ekranındaki ve boş ana ekrandaki karakterler de süzülmeyi bırakır.",
   "mobile.settings.animations.composerResize": "Kompakt mesaj alanı",
   "mobile.settings.animations.composerResizeFooter":
     "Klavye kapalıyken mesaj alanı küçük bir çubuğa dönüşür. Kapalıyken alan tam boyutunda kalır.",

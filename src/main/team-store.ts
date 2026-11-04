@@ -932,6 +932,9 @@ export class TeamStore {
    * The directory is the authority for live sessions too: a session whose membership is gone,
    * disabled or has another role closes here, and the ids come back so the caller can close the
    * connections. The account service has already ended those sessions.
+   *
+   * `keepOwner` leaves the owner's row as it is. A server on this computer has a password owner, and
+   * the desktop app logs in to it with that username: the account's email in its place would lock it out.
    */
 
   readonly syncRemoteDirectory = Effect.fn("TeamStore.syncRemoteDirectory")(
@@ -939,6 +942,7 @@ export class TeamStore {
       this: TeamStore,
       serverId: string,
       remoteMembers: RemoteDirectoryMember[],
+      options: { keepOwner?: boolean } = {},
     ): Effect.fn.Return<string[], RemoteWorkflowError, TeamStoreFiles> {
       const state = yield* remoteDecode(() => this.#requireState());
       if (state.serverId !== serverId) {
@@ -946,7 +950,7 @@ export class TeamStore {
       }
       const remoteOwner = remoteMembers.find((member) => member.role === "owner");
       const localOwner = state.members.find((member) => member.role === "owner");
-      if (remoteOwner && localOwner && remoteOwner.membershipId !== localOwner.id) {
+      if (!options.keepOwner && remoteOwner && localOwner && remoteOwner.membershipId !== localOwner.id) {
         if (state.members.some((member) => member.id === remoteOwner.membershipId)) {
           return yield* new RemoteWorkflowError({
             cause: new TeamStoreError(sourceText("error.team.ownerMembershipConflict")),
@@ -960,6 +964,7 @@ export class TeamStore {
       }
       const remoteIds = new Set(remoteMembers.map((member) => member.membershipId));
       for (const remote of remoteMembers) {
+        if (options.keepOwner && remote.role === "owner") continue;
         const member = state.members.find((candidate) => candidate.id === remote.membershipId);
         if (!member) {
           if (remote.role === "owner")

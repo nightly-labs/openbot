@@ -149,9 +149,10 @@ export function createServerMembersSection(
   /**
    * Permanent links need a transport that carries the flag: local IPC or the account
    * plane. The frozen Team API projections strip it on legacy HTTP, where even two
-   * updated peers would silently mint single-use, so the tab stays hidden there.
+   * updated peers would silently mint single-use, so the tab stays hidden there. A server
+   * on this computer has a loopback address, but its invitations go to the account plane.
    */
-  const permanentSupported = () => local() || props.server.apiUrl === null;
+  const permanentSupported = () => local() || props.server.apiUrl === null || props.server.thisComputer === true;
   const canManage = () => configured() && serverRoleCanAdminister(props.server);
   const activeInvites = createMemo(() =>
     props.invites.filter(
