@@ -102,12 +102,7 @@ export function ConversationSideThread(props: { threadId: string }) {
       <TaskAnswerCard agentName={view.agent?.name ?? ""} onAnswer={() => movePanelThreadToChat(props.threadId)} />
     ) : undefined;
   /** Continue on a sign-in card goes to this thread, as the person's next message there. */
-  const mcpSignInCard = useThreadMcpSignInCard((body) => {
-    const side = thread();
-    if (!side) return false;
-    void side.onSend(body, [], null);
-    return true;
-  });
+  const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
   /** Branches this thread through an answer. The branch opens as a chat tab. */
   const branch = () => {
     if (!view.threads?.onBranch) return undefined;

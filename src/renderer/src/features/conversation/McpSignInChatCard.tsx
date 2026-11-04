@@ -2,7 +2,7 @@ import type { McpServerConfig } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { McpSignInCard, type McpSignInCardState } from "@openbot/ui/features/conversation/McpSignInCard";
 import { useText } from "@openbot/ui/text";
-import { createSignal } from "solid-js";
+import { createMemo, createSignal, Show } from "solid-js";
 import { useConversationViewScope } from "./conversation-scope";
 
 export interface McpSignInChatCardProps {
@@ -10,7 +10,7 @@ export interface McpSignInChatCardProps {
   signedIn: boolean;
   onSignIn?: ((trigger: HTMLElement | null) => void) | undefined;
   /** Sends the message that tells the agent to test again. False when it could not be sent now. */
-  onContinue: (body: string) => boolean;
+  onContinue: (body: string) => boolean | Promise<boolean>;
 }
 
 /**
@@ -41,8 +41,8 @@ export function McpSignInChatCard(props: McpSignInChatCardProps) {
           ? () => props.onSignIn?.(document.activeElement instanceof HTMLElement ? document.activeElement : null)
           : undefined
       }
-      onContinue={() => {
-        if (props.onContinue(t("chat.mcpSignIn.message", { name: props.config.name }))) setSent(true);
+      onContinue={async () => {
+        if (await props.onContinue(t("chat.mcpSignIn.message", { name: props.config.name }))) setSent(true);
       }}
     />
   );
@@ -52,22 +52,30 @@ export function McpSignInChatCard(props: McpSignInChatCardProps) {
  * The sign-in card of a side thread message, as the agent's own chat draws it. Continue goes to that
  * thread. Another message, or a row this client cannot read, keeps its row.
  */
-export function useThreadMcpSignInCard(onContinue: (body: string) => boolean) {
+export function useThreadMcpSignInCard(onContinue: (body: string) => Promise<boolean>) {
   const { props, mcpServers } = useConversationViewScope();
+  const config = (mcpServerId: string) =>
+    mcpServers().find((candidate) => candidate.id === mcpServerId && candidate.transport === "http");
+  // The http rows by id. A list read again with the same rows keeps each card, and what it shows.
+  const httpIds = createMemo(() =>
+    mcpServers()
+      .flatMap((candidate) => (candidate.transport === "http" ? [candidate.id] : []))
+      .join("\n"),
+  );
   return (message: AgentMessage) => {
     const marker = message.actionMarker;
-    if (marker?.kind !== "mcp-sign-in") return undefined;
-    const config = mcpServers().find(
-      (candidate) => candidate.id === marker.mcpServerId && candidate.transport === "http",
-    );
-    if (!config) return undefined;
+    if (marker?.kind !== "mcp-sign-in" || !httpIds().split("\n").includes(marker.mcpServerId)) return undefined;
     return (
-      <McpSignInChatCard
-        config={config}
-        signedIn={props.mcpSignedIn?.(config.id) ?? false}
-        onSignIn={props.onOpenMcpSignIn ? (trigger) => props.onOpenMcpSignIn?.(config.id, trigger) : undefined}
-        onContinue={onContinue}
-      />
+      <Show when={config(marker.mcpServerId)}>
+        {(row) => (
+          <McpSignInChatCard
+            config={row()}
+            signedIn={props.mcpSignedIn?.(row().id) ?? false}
+            onSignIn={props.onOpenMcpSignIn ? (trigger) => props.onOpenMcpSignIn?.(row().id, trigger) : undefined}
+            onContinue={onContinue}
+          />
+        )}
+      </Show>
     );
   };
 }

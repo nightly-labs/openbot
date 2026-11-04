@@ -210,12 +210,9 @@ export function ConversationThread() {
     return focus && focus.taskId === threads.open?.id ? focus : undefined;
   };
   /** Continue on a sign-in card goes to the open thread, as the person's next message there. */
-  const mcpSignInCard = useThreadMcpSignInCard((body) => {
-    const threads = props.threads;
-    if (!threads) return false;
-    void threads.onSend(body, [], null);
-    return true;
-  });
+  const mcpSignInCard = useThreadMcpSignInCard(
+    (body) => props.threads?.onSend(body, [], null) ?? Promise.resolve(false),
+  );
   /** The cards that the thread waits for: its browser takeover, and its question as a form. */
   const attention = () => {
     if (!hasAttention()) return undefined;

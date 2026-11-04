@@ -31,7 +31,8 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
       threads?.conversation,
       ...(threads?.side.tabs ?? []).map((tab) => threads?.side.thread(tab.id)?.conversation),
     ].flatMap((conversation) => conversation?.messages ?? []);
-    return [
+    // Sorted and without repeats, so a tab that moves or opens reads nothing again.
+    const ids = new Set([
       ...deps.props.messages.flatMap((message) =>
         message.actionMarker?.kind === "mcp-sign-in" ? [message.actionMarker.mcpServerId] : [],
       ),
@@ -39,7 +40,8 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
         const signIn = mcpSignInEvent(message);
         return signIn ? [signIn.mcpServerId] : [];
       }),
-    ].join(",");
+    ]);
+    return [...ids].sort().join(",");
   });
   const source = createMemo(() => {
     const server = deps.props.server;
