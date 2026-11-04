@@ -1532,11 +1532,12 @@ if (!hasSingleInstanceLock) {
         );
       // The island pages load beside the main window, not before it.
       reconcileDynamicIsland();
+      // `sendToRenderer` drops the server changes made while the window loads: the host list and the
+      // connection of the selected server. The renderer can have read the list before them. The frame
+      // still loads when `loadURL` resolves, so the list goes again when it stops loading (#5004).
+      mainWindow.webContents.on("did-stop-loading", () => forwardServers(remoteServers.list()));
       await windows.loadRenderer(mainWindow);
       performance.mark("openbot:renderer-loaded");
-      // `sendToRenderer` dropped the server changes made while the window loaded: the host list and
-      // the connection of the selected server. The renderer can have read the list before them.
-      forwardServers(remoteServers.list());
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       await Effect.runPromise(remoteServers.startEventConnections());
       screen.on("display-added", reconcileDynamicIsland);
