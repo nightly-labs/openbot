@@ -1100,17 +1100,19 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
 - **Connection entry.** The server is an HTTPS entry in `openbot-remote-servers-v1.json`. The
   directory sync keeps it. While the child is stopped, the entry has the address
   `http://127.0.0.1:0` and no token, so a client never reaches an old port.
-- **Lifetime.** The child ends when its stdin closes. Teardown step 57 stops all children before
-  the joined-server connections close (step 60). The sibling scan before an update leaves out the
-  child PIDs. After an unexpected exit, the desktop starts the child again after 5 seconds, at most
-  3 times in 10 minutes. The owner password is registered for redaction and is never logged.
+- **Lifetime.** The child ends when its control pipe closes: stdin, or fd 3 on Windows, where
+  Electron replaces `process.stdin` with a stream that only ends (#4868). Teardown step 57 stops
+  all children before the joined-server connections close (step 60). The sibling scan before an
+  update leaves out the child PIDs. After an unexpected exit, the desktop starts the child again
+  after 5 seconds, at most 3 times in 10 minutes. The owner password is registered for redaction
+  and is never logged.
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
   with `shell.trashItem`. It never deletes them.
 - **Rename.** The `host-admin` identity route, as on any joined server that the user owns.
 - **Account.** While the desktop app is signed in, `LocalServers` registers each running server for
   the account (`centralAuth.registerRemoteHost`), with the child's key, its name, and its owner member
   as the owner membership. The ready line carries that member id. The desktop app keeps the machine
-  token with its session and writes it to the child's standard input, one JSON line
+  token with its session and writes it to the child's control pipe, one JSON line
   (`local-server-child.ts`). The child keeps it in memory only (`CentralAuthManager.useHostCredential`)
   and calls `HostService.publishLocalServer`: it gets Signal tickets, meets devices, and sends push
   notifications and Live Activity updates with that token, as a published host does. Its Team API
