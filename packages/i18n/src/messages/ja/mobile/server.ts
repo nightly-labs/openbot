@@ -487,10 +487,6 @@ export const messages = {
   "mobile.server.connectors.addAgent": "エージェントを追加",
   "mobile.server.connectors.later": "後で",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "Bitwarden のログイン情報をブラウザーに入力します。デスクトップアプリで設定してください。",
-  "mobile.server.connectors.bitwarden.hostSummary":
-    "Bitwarden または Vaultwarden のログイン情報をブラウザーに入力します",
   "mobile.server.connectors.bitwarden.description":
     "{host} のブラウザーのログインを Bitwarden または Vaultwarden から入力します。",
   "mobile.server.connectors.bitwarden.howItWorks":
@@ -517,7 +513,6 @@ export const messages = {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "{host} は API キーとマスターパスワードを削除します。{host} のエージェントは Bitwarden からログインを入力できなくなります。",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "すべてのエージェントにリポジトリ、Issue、プルリクエストを提供",
   "mobile.server.connectors.github.description":
     "{host} のすべてのエージェントが、GitHub のリポジトリ、Issue、プルリクエスト、gh と git を使えます。",
   "mobile.server.connectors.github.unavailable": "このサーバーの OpenBot は GitHub を接続できません。",
@@ -548,7 +543,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "{host} から @{login} のサインインが削除され、すべてのエージェントが GitHub のツール、gh、git を使えなくなります。その後 GitHub が開き、OpenBot のアクセスを取り消せます。",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "OpenBot ブラウザーでのサインイン用の共有保管庫",
   "mobile.server.connectors.onePassword.description":
     "サービスアカウントを通じて専用の 1Password 保管庫を {host} 上の OpenBot と共有すると、{host} のエージェントがそのブラウザーでサイトにサインインできます。",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -568,12 +562,8 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} はトークンを削除します。保管庫とサービスアカウントは 1Password に残ります。不要になった場合は 1Password で削除してください。",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "Slack で @OpenBot をメンションします",
   "mobile.server.connectors.slack.description":
     "Slack で @OpenBot をメンションするか、ダイレクトメッセージを送ります。Slack Orchestrator が適切なエージェントに依頼して回答します。",
-  "mobile.server.connectors.slack.connected": "{workspace} · Slack Orchestrator が回答します",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · 回答するエージェントはまだいません",
-  "mobile.server.connectors.slack.many": { other: "ワークスペース {count} 件 · Slack Orchestrator が回答します" },
   "mobile.server.connectors.slack.attention": { other: "{count} 件のワークスペースに対応が必要です" },
   "mobile.server.connectors.slack.connect": "Slack を接続",
   "mobile.server.connectors.slack.connectFooter":
@@ -610,12 +600,8 @@ export const messages = {
     "この新しいエージェントは、{workspace} で @OpenBot に送られたすべてのメッセージに回答します。",
   "mobile.server.connectors.slack.installFailed": "Slack でインストールが完了しませんでした。もう一度お試しください。",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "Discord サーバーで @OpenBot をメンションします",
   "mobile.server.connectors.discord.description":
     "Discord サーバーのチャンネルで @OpenBot をメンションします。Discord Orchestrator が適切なエージェントに依頼して回答します。",
-  "mobile.server.connectors.discord.connected": "{workspace} · Discord Orchestrator が回答します",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · 回答するエージェントはまだいません",
-  "mobile.server.connectors.discord.many": { other: "Discord サーバー {count} 件 · Discord Orchestrator が回答します" },
   "mobile.server.connectors.discord.attention": { other: "{count} 件の Discord サーバーに対応が必要です" },
   "mobile.server.connectors.discord.connect": "Discord を接続",
   "mobile.server.connectors.discord.connectFooter":
@@ -651,11 +637,8 @@ export const messages = {
     "この新しいエージェントは、{workspace} で @OpenBot に送られたすべてのメッセージに回答します。",
   "mobile.server.connectors.discord.installFailed": "Discord で認証が完了しませんでした。もう一度お試しください。",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "OpenBot ボットを Telegram チャットに追加します",
   "mobile.server.connectors.telegram.description":
     "OpenBot ボットを Telegram グループに追加するか、ボットとのダイレクトチャットを開きます。Telegram Orchestrator が適切なエージェントに依頼して回答します。",
-  "mobile.server.connectors.telegram.connected": { other: "チャット {count} 件 · Telegram Orchestrator が回答します" },
-  "mobile.server.connectors.telegram.noAgent": { other: "チャット {count} 件 · 回答するエージェントはまだいません" },
   "mobile.server.connectors.telegram.attention": { other: "{count} 件のチャットに対応が必要です" },
   "mobile.server.connectors.telegram.groupTitle": "グループ",
   "mobile.server.connectors.telegram.directTitle": "ダイレクトチャット",
@@ -689,15 +672,8 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectDeleted":
     "これが最後のチャットのため、Telegram Orchestrator とその会話は OpenBot から削除されます。",
   "mobile.server.connectors.whatsapp.title": "WhatsApp",
-  "mobile.server.connectors.whatsapp.summary": "WhatsApp の自分のチャットと、許可した人",
   "mobile.server.connectors.whatsapp.description":
     "WhatsApp の番号をこのサーバーにリンクします。WhatsApp Orchestrator が適切なエージェントに依頼して回答します。",
-  "mobile.server.connectors.whatsapp.connected": {
-    other: "番号 {count} 件 · WhatsApp Orchestrator が回答します",
-  },
-  "mobile.server.connectors.whatsapp.noAgent": {
-    other: "番号 {count} 件 · 回答するエージェントはまだいません",
-  },
   "mobile.server.connectors.whatsapp.attention": {
     other: "{count} 件の番号に対応が必要です",
   },

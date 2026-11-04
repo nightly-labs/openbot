@@ -208,11 +208,7 @@ export function messagingInstallGrant(
 /** The text of one messaging platform. Slack and Discord share a page; Telegram has its own. */
 export const MESSAGING_TEXT = {
   slack: {
-    summary: "mobile.server.connectors.slack.summary",
     description: "mobile.server.connectors.slack.description",
-    connected: "mobile.server.connectors.slack.connected",
-    noAgent: "mobile.server.connectors.slack.noAgent",
-    many: "mobile.server.connectors.slack.many",
     attention: "mobile.server.connectors.slack.attention",
     connect: "mobile.server.connectors.slack.connect",
     connectFooter: "mobile.server.connectors.slack.connectFooter",
@@ -236,11 +232,7 @@ export const MESSAGING_TEXT = {
     installFailed: "mobile.server.connectors.slack.installFailed",
   },
   discord: {
-    summary: "mobile.server.connectors.discord.summary",
     description: "mobile.server.connectors.discord.description",
-    connected: "mobile.server.connectors.discord.connected",
-    noAgent: "mobile.server.connectors.discord.noAgent",
-    many: "mobile.server.connectors.discord.many",
     attention: "mobile.server.connectors.discord.attention",
     connect: "mobile.server.connectors.discord.connect",
     connectFooter: "mobile.server.connectors.discord.connectFooter",

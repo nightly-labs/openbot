@@ -471,8 +471,6 @@ export const messages = {
   "mobile.server.connectors.addAgent": "添加助手",
   "mobile.server.connectors.later": "稍后",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary": "用 Bitwarden 填充浏览器登录信息。请在桌面应用中设置。",
-  "mobile.server.connectors.bitwarden.hostSummary": "用 Bitwarden 或 Vaultwarden 填充浏览器登录信息",
   "mobile.server.connectors.bitwarden.description": "在 {host} 上用 Bitwarden 或 Vaultwarden 填充浏览器登录信息。",
   "mobile.server.connectors.bitwarden.howItWorks":
     "{host} 使用自己的 Bitwarden CLI 登录。请在你的保险库中创建一个名为 Shared with OpenBot 的文件夹，只把允许助手使用的登录信息放进去。在网页版保险库中打开“设置 › 安全 › 密钥”，查看你的 API 密钥。",
@@ -497,7 +495,6 @@ export const messages = {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "{host} 会删除 API 密钥和主密码。{host} 上的代理将无法再从 Bitwarden 填写登录信息。",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "所有助手都可使用仓库、Issue 和拉取请求",
   "mobile.server.connectors.github.description":
     "{host} 上的每个助手都可以使用你的 GitHub 仓库、Issue 和拉取请求，以及 gh 和 git。",
   "mobile.server.connectors.github.unavailable": "该服务器上的 OpenBot 无法连接 GitHub。",
@@ -526,7 +523,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "这会从 {host} 移除 @{login} 的登录信息，所有助手都将失去 GitHub 工具、gh 和 git。随后会打开 GitHub，你可以在那里撤销 OpenBot。",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "在 OpenBot 浏览器中登录所用的共享保险库",
   "mobile.server.connectors.onePassword.description":
     "通过服务账号把一个专用的 1Password 保险库共享给 {host} 上的 OpenBot，让 {host} 上的助手可以在其浏览器中登录网站。",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -548,12 +544,8 @@ export const messages = {
   // Slack: a workspace installs the one OpenBot app, and the Slack Orchestrator agent answers.
   // {workspace} is the Slack workspace name.
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "人们在 Slack 中提及 @OpenBot",
   "mobile.server.connectors.slack.description":
     "人们在 Slack 中提及 @OpenBot 或给它发私信。Slack 调度助手会找到合适的助手来回答。",
-  "mobile.server.connectors.slack.connected": "{workspace} · 由 Slack 调度助手回答",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · 还没有助手回答",
-  "mobile.server.connectors.slack.many": { other: "{count} 个工作区 · 由 Slack 调度助手回答" },
   "mobile.server.connectors.slack.attention": { other: "{count} 个工作区需要关注" },
   "mobile.server.connectors.slack.connect": "连接 Slack",
   "mobile.server.connectors.slack.connectFooter":
@@ -591,12 +583,8 @@ export const messages = {
   // Discord: a Discord server adds the one OpenBot bot. Always write "Discord server": "server" alone
   // is an OpenBot server. {workspace} is the Discord server name.
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "人们在 Discord 服务器中提及 @OpenBot",
   "mobile.server.connectors.discord.description":
     "人们在 Discord 服务器的频道中提及 @OpenBot。Discord 调度助手会找到合适的助手来回答。",
-  "mobile.server.connectors.discord.connected": "{workspace} · 由 Discord 调度助手回答",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · 还没有助手回答",
-  "mobile.server.connectors.discord.many": { other: "{count} 个 Discord 服务器 · 由 Discord 调度助手回答" },
   "mobile.server.connectors.discord.attention": { other: "{count} 个 Discord 服务器需要关注" },
   "mobile.server.connectors.discord.connect": "连接 Discord",
   "mobile.server.connectors.discord.connectFooter":
@@ -633,12 +621,9 @@ export const messages = {
   // Telegram: each chat adds the one OpenBot bot, and the Telegram Orchestrator answers all chats.
   // {chat} is the Telegram chat name.
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "把 OpenBot 机器人加入 Telegram 聊天",
   "mobile.server.connectors.telegram.description":
     "把 OpenBot 机器人加入 Telegram 群组，或与它开启私聊。Telegram 调度助手会找到合适的助手来回答。",
   // {count} is the number of linked Telegram chats.
-  "mobile.server.connectors.telegram.connected": { other: "{count} 个聊天 · 由 Telegram 调度助手回答" },
-  "mobile.server.connectors.telegram.noAgent": { other: "{count} 个聊天 · 还没有助手回答" },
   "mobile.server.connectors.telegram.attention": { other: "{count} 个聊天需要关注" },
   "mobile.server.connectors.telegram.groupTitle": "群组",
   "mobile.server.connectors.telegram.directTitle": "私聊",
@@ -668,17 +653,8 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectDeleted":
     "这是最后一个聊天，因此 Telegram 调度助手及其对话将从 OpenBot 中删除。",
   "mobile.server.connectors.whatsapp.title": "WhatsApp",
-  "mobile.server.connectors.whatsapp.summary": "WhatsApp 中你自己的聊天和你允许的人",
   "mobile.server.connectors.whatsapp.description":
     "把一个 WhatsApp 号码关联到这台服务器。WhatsApp 调度助手会找到合适的助手来回答。",
-  "mobile.server.connectors.whatsapp.connected": {
-    one: "{count} 个号码 · 由 WhatsApp 调度助手回答",
-    other: "{count} 个号码 · 由 WhatsApp 调度助手回答",
-  },
-  "mobile.server.connectors.whatsapp.noAgent": {
-    one: "{count} 个号码 · 还没有助手回答",
-    other: "{count} 个号码 · 还没有助手回答",
-  },
   "mobile.server.connectors.whatsapp.attention": {
     one: "{count} 个号码需要关注",
     other: "{count} 个号码需要关注",

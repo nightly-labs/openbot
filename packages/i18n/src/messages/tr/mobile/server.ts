@@ -496,9 +496,6 @@ export const messages = {
   "mobile.server.connectors.addAgent": "Ajan ekle",
   "mobile.server.connectors.later": "Daha sonra",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "Tarayıcı girişlerini Bitwarden'dan doldurur. Masaüstü uygulamasında kurun.",
-  "mobile.server.connectors.bitwarden.hostSummary": "Tarayıcı girişlerini Bitwarden veya Vaultwarden'dan doldurur",
   "mobile.server.connectors.bitwarden.description":
     "{host} üzerindeki tarayıcı girişlerini Bitwarden veya Vaultwarden'dan doldurun.",
   "mobile.server.connectors.bitwarden.howItWorks":
@@ -525,7 +522,6 @@ export const messages = {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "{host} API anahtarını ve ana parolayı kaldırır. {host} üzerindeki ajanlar artık Bitwarden'dan giriş bilgisi dolduramaz.",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "Her ajan için depolar, sorunlar ve çekme istekleri",
   "mobile.server.connectors.github.description":
     "{host} sunucusundaki her ajan GitHub depolarınızı, sorunlarınızı (issues), çekme isteklerinizi (pull requests), gh ve git araçlarını kullanabilir.",
   "mobile.server.connectors.github.unavailable": "Bu sunucudaki OpenBot GitHub'ı bağlayamıyor.",
@@ -558,7 +554,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "Bu işlem @{login} oturumunu {host} üzerinden kaldırır ve tüm ajanlar GitHub araçlarını, gh ve git erişimini kaybeder. Ardından OpenBot yetkisini kaldırabileceğiniz GitHub açılır.",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "OpenBot tarayıcısındaki girişler için paylaşılan bir kasa",
   "mobile.server.connectors.onePassword.description":
     "Ayrı bir 1Password kasasını bir hizmet hesabıyla {host} üzerindeki OpenBot ile paylaşın; böylece {host} üzerindeki ajanlar onun tarayıcısında sitelere oturum açabilir.",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -578,15 +573,8 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} belirteci unutur. Kasa ve hizmet hesabı 1Password'de kalır; artık gerekmiyorsa onları orada kaldırın.",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "Kullanıcılar Slack'te @OpenBot'tan bahseder",
   "mobile.server.connectors.slack.description":
     "Kullanıcılar Slack'te @OpenBot'tan bahseder veya doğrudan mesaj gönderir. Slack Düzenleyicisi doğru ajana sorar ve yanıtlar.",
-  "mobile.server.connectors.slack.connected": "{workspace} · Slack Düzenleyicisi yanıtlıyor",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · Henüz yanıt veren bir ajan yok",
-  "mobile.server.connectors.slack.many": {
-    one: "{count} çalışma alanı · Slack Düzenleyicisi yanıtlıyor",
-    other: "{count} çalışma alanı · Slack Düzenleyicisi yanıtlıyor",
-  },
   "mobile.server.connectors.slack.attention": {
     one: "{count} çalışma alanı için işlem gerekiyor",
     other: "{count} çalışma alanı için işlem gerekiyor",
@@ -628,15 +616,8 @@ export const messages = {
     "Bu yeni ajan, {workspace} içinde @OpenBot'a gönderilen her şeyi yanıtlar.",
   "mobile.server.connectors.slack.installFailed": "Slack yüklemeyi tamamlamadı. Tekrar deneyin.",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "Kullanıcılar bir Discord sunucusunda @OpenBot'tan bahseder",
   "mobile.server.connectors.discord.description":
     "Kullanıcılar bir Discord sunucusunun kanalında @OpenBot'tan bahseder. Discord Düzenleyicisi doğru ajana sorar ve yanıtlar.",
-  "mobile.server.connectors.discord.connected": "{workspace} · Discord Düzenleyicisi yanıtlıyor",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · Henüz yanıt veren bir ajan yok",
-  "mobile.server.connectors.discord.many": {
-    one: "{count} Discord sunucusu · Discord Düzenleyicisi yanıtlıyor",
-    other: "{count} Discord sunucusu · Discord Düzenleyicisi yanıtlıyor",
-  },
   "mobile.server.connectors.discord.attention": {
     one: "{count} Discord sunucusu için işlem gerekiyor",
     other: "{count} Discord sunucusu için işlem gerekiyor",
@@ -679,17 +660,8 @@ export const messages = {
     "Bu yeni ajan, {workspace} içinde @OpenBot'a gönderilen her şeyi yanıtlar.",
   "mobile.server.connectors.discord.installFailed": "Discord yetkilendirmeyi tamamlamadı. Tekrar deneyin.",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "OpenBot botunu bir Telegram sohbetine ekleyin",
   "mobile.server.connectors.telegram.description":
     "OpenBot botunu bir Telegram grubuna ekleyin veya botla doğrudan bir sohbet açın. Telegram Düzenleyicisi doğru ajana sorar ve yanıtlar.",
-  "mobile.server.connectors.telegram.connected": {
-    one: "{count} sohbet · Telegram Düzenleyicisi yanıtlıyor",
-    other: "{count} sohbet · Telegram Düzenleyicisi yanıtlıyor",
-  },
-  "mobile.server.connectors.telegram.noAgent": {
-    one: "{count} sohbet · Henüz yanıt veren bir ajan yok",
-    other: "{count} sohbet · Henüz yanıt veren bir ajan yok",
-  },
   "mobile.server.connectors.telegram.attention": {
     one: "{count} sohbet için işlem gerekiyor",
     other: "{count} sohbet için işlem gerekiyor",
@@ -729,17 +701,8 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectDeleted":
     "Bu son sohbet olduğundan Telegram Düzenleyicisi ve konuşmaları OpenBot'tan silinir.",
   "mobile.server.connectors.whatsapp.title": "WhatsApp",
-  "mobile.server.connectors.whatsapp.summary": "WhatsApp'ta kendi sohbetiniz ve izin verdiğiniz kişiler",
   "mobile.server.connectors.whatsapp.description":
     "Bir WhatsApp numarasını bu sunucuya bağlayın. WhatsApp Düzenleyicisi doğru ajana sorar ve yanıtlar.",
-  "mobile.server.connectors.whatsapp.connected": {
-    one: "{count} numara · WhatsApp Düzenleyicisi yanıtlıyor",
-    other: "{count} numara · WhatsApp Düzenleyicisi yanıtlıyor",
-  },
-  "mobile.server.connectors.whatsapp.noAgent": {
-    one: "{count} numara · Henüz yanıt veren bir ajan yok",
-    other: "{count} numara · Henüz yanıt veren bir ajan yok",
-  },
   "mobile.server.connectors.whatsapp.attention": {
     one: "{count} numara için işlem gerekiyor",
     other: "{count} numara için işlem gerekiyor",

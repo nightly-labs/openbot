@@ -490,10 +490,7 @@ export const messages = {
   "mobile.server.connectors.addAgent": "Agent toevoegen",
   "mobile.server.connectors.later": "Later",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "Vult browserlogins in vanuit Bitwarden. Stel dit in in de desktop-app.",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "Repository’s, issues en pull requests voor elke agent",
   "mobile.server.connectors.github.description":
     "Elke agent op {host} kan je GitHub-repository’s, issues en pull requests gebruiken, en gh en git.",
   "mobile.server.connectors.github.unavailable": "OpenBot op deze server kan GitHub niet verbinden.",
@@ -527,7 +524,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "Hiermee verwijder je de login van @{login} van {host} en verliest elke agent de GitHub-tools, gh en git. Daarna opent GitHub, waar je OpenBot kunt intrekken.",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "Een gedeelde kluis voor logins in de OpenBot-browser",
   "mobile.server.connectors.onePassword.description":
     "Deel via een serviceaccount een aparte 1Password-kluis met OpenBot op {host}, zodat agents op {host} in de browser bij sites kunnen inloggen.",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -547,15 +543,8 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} vergeet het token. De kluis en het serviceaccount blijven in 1Password; verwijder ze daar als je ze niet meer nodig hebt.",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "Mensen noemen @OpenBot in Slack",
   "mobile.server.connectors.slack.description":
     "Mensen noemen @OpenBot in Slack of sturen een direct bericht. De Slack Orchestrator vraagt het de juiste agent en antwoordt.",
-  "mobile.server.connectors.slack.connected": "{workspace} · Slack Orchestrator antwoordt",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · Nog geen agent die antwoordt",
-  "mobile.server.connectors.slack.many": {
-    one: "{count} werkruimte · Slack Orchestrator antwoordt",
-    other: "{count} werkruimten · Slack Orchestrator antwoordt",
-  },
   "mobile.server.connectors.slack.attention": {
     one: "{count} werkruimte heeft aandacht nodig",
     other: "{count} werkruimten hebben aandacht nodig",
@@ -598,15 +587,8 @@ export const messages = {
     "Deze nieuwe agent beantwoordt alles wat mensen in {workspace} naar @OpenBot sturen.",
   "mobile.server.connectors.slack.installFailed": "Slack heeft de installatie niet voltooid. Probeer het opnieuw.",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "Mensen noemen @OpenBot in een Discord-server",
   "mobile.server.connectors.discord.description":
     "Mensen noemen @OpenBot in een kanaal van een Discord-server. De Discord Orchestrator vraagt het de juiste agent en antwoordt.",
-  "mobile.server.connectors.discord.connected": "{workspace} · Discord Orchestrator antwoordt",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · Nog geen agent die antwoordt",
-  "mobile.server.connectors.discord.many": {
-    one: "{count} Discord-server · Discord Orchestrator antwoordt",
-    other: "{count} Discord-servers · Discord Orchestrator antwoordt",
-  },
   "mobile.server.connectors.discord.attention": {
     one: "{count} Discord-server heeft aandacht nodig",
     other: "{count} Discord-servers hebben aandacht nodig",
@@ -649,17 +631,8 @@ export const messages = {
     "Deze nieuwe agent beantwoordt alles wat mensen in {workspace} naar @OpenBot sturen.",
   "mobile.server.connectors.discord.installFailed": "Discord heeft de autorisatie niet voltooid. Probeer het opnieuw.",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "Voeg de OpenBot-bot toe aan een Telegram-chat",
   "mobile.server.connectors.telegram.description":
     "Voeg de OpenBot-bot toe aan een Telegram-groep of open een directe chat ermee. De Telegram Orchestrator vraagt het de juiste agent en antwoordt.",
-  "mobile.server.connectors.telegram.connected": {
-    one: "{count} chat · Telegram Orchestrator antwoordt",
-    other: "{count} chats · Telegram Orchestrator antwoordt",
-  },
-  "mobile.server.connectors.telegram.noAgent": {
-    one: "{count} chat · Nog geen agent die antwoordt",
-    other: "{count} chats · Nog geen agent die antwoordt",
-  },
   "mobile.server.connectors.telegram.attention": {
     one: "{count} chat heeft aandacht nodig",
     other: "{count} chats hebben aandacht nodig",
@@ -698,17 +671,8 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectDeleted":
     "Dit is de laatste chat, dus de Telegram Orchestrator en zijn gesprekken worden uit OpenBot verwijderd.",
   "mobile.server.connectors.whatsapp.title": "WhatsApp",
-  "mobile.server.connectors.whatsapp.summary": "Je eigen chat en de mensen die je toestaat in WhatsApp",
   "mobile.server.connectors.whatsapp.description":
     "Koppel een WhatsApp-nummer aan deze server. De WhatsApp Orchestrator vraagt de juiste agent en antwoordt.",
-  "mobile.server.connectors.whatsapp.connected": {
-    one: "{count} nummer · WhatsApp Orchestrator antwoordt",
-    other: "{count} nummers · WhatsApp Orchestrator antwoordt",
-  },
-  "mobile.server.connectors.whatsapp.noAgent": {
-    one: "{count} nummer · Nog geen agent antwoordt",
-    other: "{count} nummers · Nog geen agent antwoordt",
-  },
   "mobile.server.connectors.whatsapp.attention": {
     one: "{count} nummer heeft aandacht nodig",
     other: "{count} nummers hebben aandacht nodig",

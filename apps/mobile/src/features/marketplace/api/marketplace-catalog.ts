@@ -81,17 +81,26 @@ export function listMarketplaceSkills(
   return runTeamEffect(catalogFor(apiUrl).skills.list(query), signal);
 }
 
-/** Every page of a list, in order, as the desktop reads the next page with the cursor of the last one. */
+/**
+ * Every page of a list, in order, as the desktop reads the next page with the cursor of the last one. Only
+ * a failed first page fails the list: when a later page fails, the pages already read stay.
+ */
 async function allPages<Item>(
   read: (cursor: string | undefined) => Promise<{ items: Item[]; nextCursor: string | null | undefined }>,
+  signal?: AbortSignal,
 ): Promise<Item[]> {
-  const items: Item[] = [];
-  let cursor: string | undefined;
-  for (let page = 0; page < MARKETPLACE_PAGE_LIMIT; page += 1) {
-    const next = await read(cursor);
-    items.push(...next.items);
-    if (!next.nextCursor) break;
-    cursor = next.nextCursor;
+  const first = await read(undefined);
+  const items = [...first.items];
+  let cursor = first.nextCursor;
+  for (let page = 1; cursor && page < MARKETPLACE_PAGE_LIMIT; page += 1) {
+    try {
+      const next = await read(cursor);
+      items.push(...next.items);
+      cursor = next.nextCursor;
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      break;
+    }
   }
   return items;
 }
@@ -102,11 +111,13 @@ export function listAllMarketplaceAgents(
   query: MarketplaceAgentQuery,
   signal?: AbortSignal,
 ): Promise<MarketplaceAgentSummary[]> {
-  return allPages((cursor) =>
-    listMarketplaceAgents(apiUrl, { ...query, cursor }, signal).then((page) => ({
-      items: page.agents,
-      nextCursor: page.nextCursor,
-    })),
+  return allPages(
+    (cursor) =>
+      listMarketplaceAgents(apiUrl, { ...query, cursor }, signal).then((page) => ({
+        items: page.agents,
+        nextCursor: page.nextCursor,
+      })),
+    signal,
   );
 }
 
@@ -116,11 +127,13 @@ export function listAllMarketplaceSkills(
   query: MarketplaceSkillQuery,
   signal?: AbortSignal,
 ): Promise<MarketplaceSkillSummary[]> {
-  return allPages((cursor) =>
-    listMarketplaceSkills(apiUrl, { ...query, cursor }, signal).then((page) => ({
-      items: page.skills,
-      nextCursor: page.nextCursor,
-    })),
+  return allPages(
+    (cursor) =>
+      listMarketplaceSkills(apiUrl, { ...query, cursor }, signal).then((page) => ({
+        items: page.skills,
+        nextCursor: page.nextCursor,
+      })),
+    signal,
   );
 }
 

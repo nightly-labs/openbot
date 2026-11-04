@@ -493,10 +493,6 @@ export const messages = {
   "mobile.server.connectors.addAgent": "Adicionar agente",
   "mobile.server.connectors.later": "Mais tarde",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "Preenche logins do navegador a partir do Bitwarden. Configure no app para computador.",
-  "mobile.server.connectors.bitwarden.hostSummary":
-    "Preenche logins do navegador a partir do Bitwarden ou do Vaultwarden",
   "mobile.server.connectors.bitwarden.description":
     "Preencha logins do navegador em {host} a partir do Bitwarden ou do Vaultwarden.",
   "mobile.server.connectors.bitwarden.howItWorks":
@@ -523,7 +519,6 @@ export const messages = {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "{host} remove a chave de API e a senha mestra. Os agentes em {host} não podem mais preencher logins do Bitwarden.",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "Repositórios, issues e pull requests para todos os agentes",
   "mobile.server.connectors.github.description":
     "Todos os agentes em {host} podem usar seus repositórios, issues e pull requests do GitHub, além de gh e git.",
   "mobile.server.connectors.github.unavailable": "O OpenBot neste servidor não consegue conectar o GitHub.",
@@ -557,7 +552,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "Isso remove o login de @{login} de {host}, e todos os agentes perdem as ferramentas do GitHub, gh e git. Em seguida, o GitHub abre para você revogar o OpenBot.",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "Um cofre compartilhado para logins no navegador do OpenBot",
   "mobile.server.connectors.onePassword.description":
     "Compartilhe um cofre dedicado do 1Password com o OpenBot em {host} por meio de uma conta de serviço, para que os agentes em {host} possam entrar em sites no navegador dele.",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -577,15 +571,8 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} esquece o token. O cofre e a conta de serviço continuam no 1Password; remova-os lá se não precisar mais deles.",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "As pessoas mencionam @OpenBot no Slack",
   "mobile.server.connectors.slack.description":
     "As pessoas mencionam @OpenBot no Slack ou enviam uma mensagem direta para ele. O Orquestrador do Slack consulta o agente certo e responde.",
-  "mobile.server.connectors.slack.connected": "{workspace} · O Orquestrador do Slack responde",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · Nenhum agente responde ainda",
-  "mobile.server.connectors.slack.many": {
-    one: "{count} espaço de trabalho · O Orquestrador do Slack responde",
-    other: "{count} espaços de trabalho · O Orquestrador do Slack responde",
-  },
   "mobile.server.connectors.slack.attention": {
     one: "{count} espaço de trabalho precisa de atenção",
     other: "{count} espaços de trabalho precisam de atenção",
@@ -629,15 +616,8 @@ export const messages = {
     "Este novo agente responde a tudo que as pessoas enviam para @OpenBot em {workspace}.",
   "mobile.server.connectors.slack.installFailed": "O Slack não concluiu a instalação. Tente novamente.",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "As pessoas mencionam @OpenBot em um servidor do Discord",
   "mobile.server.connectors.discord.description":
     "As pessoas mencionam @OpenBot em um canal de um servidor do Discord. O Orquestrador do Discord consulta o agente certo e responde.",
-  "mobile.server.connectors.discord.connected": "{workspace} · O Orquestrador do Discord responde",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · Nenhum agente responde ainda",
-  "mobile.server.connectors.discord.many": {
-    one: "{count} servidor do Discord · O Orquestrador do Discord responde",
-    other: "{count} servidores do Discord · O Orquestrador do Discord responde",
-  },
   "mobile.server.connectors.discord.attention": {
     one: "{count} servidor do Discord precisa de atenção",
     other: "{count} servidores do Discord precisam de atenção",
@@ -681,17 +661,8 @@ export const messages = {
     "Este novo agente responde a tudo que as pessoas enviam para @OpenBot em {workspace}.",
   "mobile.server.connectors.discord.installFailed": "O Discord não concluiu a autorização. Tente novamente.",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "Adicione o bot do OpenBot a um chat do Telegram",
   "mobile.server.connectors.telegram.description":
     "Adicione o bot do OpenBot a um grupo do Telegram ou abra um chat direto com ele. O Orquestrador do Telegram consulta o agente certo e responde.",
-  "mobile.server.connectors.telegram.connected": {
-    one: "{count} chat · O Orquestrador do Telegram responde",
-    other: "{count} chats · O Orquestrador do Telegram responde",
-  },
-  "mobile.server.connectors.telegram.noAgent": {
-    one: "{count} chat · Nenhum agente responde ainda",
-    other: "{count} chats · Nenhum agente responde ainda",
-  },
   "mobile.server.connectors.telegram.attention": {
     one: "{count} chat precisa de atenção",
     other: "{count} chats precisam de atenção",
@@ -732,17 +703,8 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectDeleted":
     "Este é o último chat, então o Orquestrador do Telegram e as conversas dele são excluídos do OpenBot.",
   "mobile.server.connectors.whatsapp.title": "WhatsApp",
-  "mobile.server.connectors.whatsapp.summary": "Seu próprio chat e as pessoas que você permitir no WhatsApp",
   "mobile.server.connectors.whatsapp.description":
     "Vincule um número do WhatsApp a este servidor. O Orquestrador do WhatsApp consulta o agente certo e responde.",
-  "mobile.server.connectors.whatsapp.connected": {
-    one: "{count} número · O Orquestrador do WhatsApp responde",
-    other: "{count} números · O Orquestrador do WhatsApp responde",
-  },
-  "mobile.server.connectors.whatsapp.noAgent": {
-    one: "{count} número · Nenhum agente responde ainda",
-    other: "{count} números · Nenhum agente responde ainda",
-  },
   "mobile.server.connectors.whatsapp.attention": {
     one: "{count} número precisa de atenção",
     other: "{count} números precisam de atenção",

@@ -691,9 +691,6 @@ export const messages = {
   "mobile.server.connectors.addAgent": "إضافة وكيل",
   "mobile.server.connectors.later": "لاحقًا",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "يملأ بيانات تسجيل الدخول في المتصفح من Bitwarden. أعدّه في تطبيق سطح المكتب.",
-  "mobile.server.connectors.bitwarden.hostSummary": "يملأ بيانات تسجيل الدخول في المتصفح من Bitwarden أو Vaultwarden",
   "mobile.server.connectors.bitwarden.description":
     "املأ بيانات تسجيل الدخول في المتصفح على {host} من Bitwarden أو Vaultwarden.",
   "mobile.server.connectors.bitwarden.howItWorks":
@@ -720,7 +717,6 @@ export const messages = {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "يزيل {host} مفتاح API وكلمة المرور الرئيسية. لن يتمكن الوكلاء على {host} من ملء بيانات تسجيل الدخول من Bitwarden بعد الآن.",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "المستودعات والمشكلات وطلبات السحب لكل وكيل",
   "mobile.server.connectors.github.description":
     "يمكن لكل وكيل على {host} استخدام مستودعات GitHub ومشكلاتك وطلبات السحب، وكذلك gh وgit.",
   "mobile.server.connectors.github.unavailable": "لا يستطيع OpenBot على هذا الخادم ربط GitHub.",
@@ -756,7 +752,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "يزيل هذا تسجيل دخول @{login} من {host}، ويفقد كل وكيل أدوات GitHub وgh وgit. ثم يُفتح GitHub، حيث يمكنك إلغاء وصول OpenBot.",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "خزنة مشتركة لتسجيلات الدخول في متصفح OpenBot",
   "mobile.server.connectors.onePassword.description":
     "شارك خزنة 1Password مخصصة مع OpenBot على {host} عبر حساب خدمة، ليتمكن الوكلاء على {host} من تسجيل الدخول إلى المواقع في متصفحه.",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -782,19 +777,8 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectBody":
     "ينسى {host} الرمز المميز. تبقى الخزنة وحساب الخدمة في 1Password؛ أزلهما من هناك إذا لم تعد بحاجة إليهما.",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "يذكر الأشخاص @OpenBot في Slack",
   "mobile.server.connectors.slack.description":
     "يذكر الأشخاص @OpenBot في Slack أو يرسلون إليه رسالة مباشرة. يسأل Slack Orchestrator الوكيل المناسب ويرد.",
-  "mobile.server.connectors.slack.connected": "{workspace} · يرد Slack Orchestrator",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · لا يرد أي وكيل بعد",
-  "mobile.server.connectors.slack.many": {
-    zero: "لا مساحات عمل · يرد Slack Orchestrator",
-    one: "مساحة عمل واحدة · يرد Slack Orchestrator",
-    two: "مساحتا عمل · يرد Slack Orchestrator",
-    few: "{count} مساحات عمل · يرد Slack Orchestrator",
-    many: "{count} مساحة عمل · يرد Slack Orchestrator",
-    other: "{count} مساحة عمل · يرد Slack Orchestrator",
-  },
   "mobile.server.connectors.slack.attention": {
     zero: "لا توجد مساحات عمل تحتاج إلى انتباه",
     one: "مساحة عمل واحدة تحتاج إلى انتباه",
@@ -843,19 +827,8 @@ export const messages = {
     "يرد هذا الوكيل الجديد على كل ما يرسله الأشخاص إلى @OpenBot في {workspace}.",
   "mobile.server.connectors.slack.installFailed": "لم يُكمل Slack التثبيت. أعد المحاولة.",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "يذكر الأشخاص @OpenBot في خادم Discord",
   "mobile.server.connectors.discord.description":
     "يذكر الأشخاص @OpenBot في قناة على خادم Discord. يسأل Discord Orchestrator الوكيل المناسب ويرد.",
-  "mobile.server.connectors.discord.connected": "{workspace} · يرد Discord Orchestrator",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · لا يرد أي وكيل بعد",
-  "mobile.server.connectors.discord.many": {
-    zero: "لا خوادم Discord · يرد Discord Orchestrator",
-    one: "خادم Discord واحد · يرد Discord Orchestrator",
-    two: "خادما Discord · يرد Discord Orchestrator",
-    few: "{count} خوادم Discord · يرد Discord Orchestrator",
-    many: "{count} خادم Discord · يرد Discord Orchestrator",
-    other: "{count} خادم Discord · يرد Discord Orchestrator",
-  },
   "mobile.server.connectors.discord.attention": {
     zero: "لا توجد خوادم Discord تحتاج إلى انتباه",
     one: "خادم Discord واحد يحتاج إلى انتباه",
@@ -903,25 +876,8 @@ export const messages = {
     "يرد هذا الوكيل الجديد على كل ما يرسله الأشخاص إلى @OpenBot في {workspace}.",
   "mobile.server.connectors.discord.installFailed": "لم يُكمل Discord التفويض. أعد المحاولة.",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "أضف بوت OpenBot إلى دردشة Telegram",
   "mobile.server.connectors.telegram.description":
     "أضف بوت OpenBot إلى مجموعة Telegram أو افتح دردشة مباشرة معه. يسأل Telegram Orchestrator الوكيل المناسب ويرد.",
-  "mobile.server.connectors.telegram.connected": {
-    zero: "لا دردشات · يرد Telegram Orchestrator",
-    one: "دردشة واحدة · يرد Telegram Orchestrator",
-    two: "دردشتان · يرد Telegram Orchestrator",
-    few: "{count} دردشات · يرد Telegram Orchestrator",
-    many: "{count} دردشة · يرد Telegram Orchestrator",
-    other: "{count} دردشة · يرد Telegram Orchestrator",
-  },
-  "mobile.server.connectors.telegram.noAgent": {
-    zero: "لا دردشات · لا يرد أي وكيل بعد",
-    one: "دردشة واحدة · لا يرد أي وكيل بعد",
-    two: "دردشتان · لا يرد أي وكيل بعد",
-    few: "{count} دردشات · لا يرد أي وكيل بعد",
-    many: "{count} دردشة · لا يرد أي وكيل بعد",
-    other: "{count} دردشة · لا يرد أي وكيل بعد",
-  },
   "mobile.server.connectors.telegram.attention": {
     zero: "لا توجد دردشات تحتاج إلى انتباه",
     one: "دردشة واحدة تحتاج إلى انتباه",
@@ -966,25 +922,8 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectDeleted":
     "هذه آخر دردشة، لذا يُحذف Telegram Orchestrator ومحادثاته من OpenBot.",
   "mobile.server.connectors.whatsapp.title": "WhatsApp",
-  "mobile.server.connectors.whatsapp.summary": "دردشتك الخاصة والأشخاص الذين تسمح لهم في WhatsApp",
   "mobile.server.connectors.whatsapp.description":
     "اربط رقم WhatsApp بهذا الخادم. يسأل WhatsApp Orchestrator الوكيل المناسب ويجيب.",
-  "mobile.server.connectors.whatsapp.connected": {
-    zero: "لا أرقام · يجيب WhatsApp Orchestrator",
-    one: "رقم واحد · يجيب WhatsApp Orchestrator",
-    two: "رقمان · يجيب WhatsApp Orchestrator",
-    few: "{count} أرقام · يجيب WhatsApp Orchestrator",
-    many: "{count} رقمًا · يجيب WhatsApp Orchestrator",
-    other: "{count} رقم · يجيب WhatsApp Orchestrator",
-  },
-  "mobile.server.connectors.whatsapp.noAgent": {
-    zero: "لا أرقام · لا يجيب أي وكيل بعد",
-    one: "رقم واحد · لا يجيب أي وكيل بعد",
-    two: "رقمان · لا يجيب أي وكيل بعد",
-    few: "{count} أرقام · لا يجيب أي وكيل بعد",
-    many: "{count} رقمًا · لا يجيب أي وكيل بعد",
-    other: "{count} رقم · لا يجيب أي وكيل بعد",
-  },
   "mobile.server.connectors.whatsapp.attention": {
     zero: "لا أرقام تحتاج إلى انتباه",
     one: "رقم واحد يحتاج إلى انتباه",

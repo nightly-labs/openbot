@@ -48,7 +48,7 @@ function useDebounced(value: string, delay: number): string {
  */
 function useServerApps(serverId: string): MarketplaceListing[] {
   const { t } = useText();
-  const { rows } = useConnectorRows(serverId, null);
+  const rows = useConnectorRows(serverId);
   const { list: mcpServers } = useMcpServerList(serverId);
   return useMemo(
     () => [

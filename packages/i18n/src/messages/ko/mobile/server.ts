@@ -469,9 +469,6 @@ export const messages = {
   "mobile.server.connectors.addAgent": "에이전트 추가",
   "mobile.server.connectors.later": "나중에",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "Bitwarden으로 브라우저 로그인 정보를 입력해요. 데스크톱 앱에서 설정하세요.",
-  "mobile.server.connectors.bitwarden.hostSummary": "Bitwarden 또는 Vaultwarden으로 브라우저 로그인 정보를 입력해요",
   "mobile.server.connectors.bitwarden.description":
     "Bitwarden 또는 Vaultwarden에서 {host}의 브라우저 로그인 정보를 입력해요.",
   "mobile.server.connectors.bitwarden.howItWorks":
@@ -498,7 +495,6 @@ export const messages = {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "{host}에서 API 키와 마스터 비밀번호를 삭제해요. {host}의 에이전트가 더 이상 Bitwarden에서 로그인을 채울 수 없어요.",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "모든 에이전트가 저장소, 이슈, 풀 리퀘스트를 사용해요",
   "mobile.server.connectors.github.description":
     "{host}의 모든 에이전트가 GitHub 저장소, 이슈, 풀 리퀘스트와 gh, git을 사용할 수 있어요.",
   "mobile.server.connectors.github.unavailable": "이 서버의 OpenBot은 GitHub에 연결할 수 없어요.",
@@ -530,7 +526,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "{host}에서 @{login}의 로그인 정보가 삭제되고, 모든 에이전트가 GitHub 도구, gh, git을 사용할 수 없게 돼요. 이후 GitHub가 열리면 OpenBot 접근 권한을 취소할 수 있어요.",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "OpenBot 브라우저 로그인을 위한 공유 보관함",
   "mobile.server.connectors.onePassword.description":
     "서비스 계정을 통해 {host}의 OpenBot과 전용 1Password 보관함을 공유하면, {host}의 에이전트가 브라우저에서 사이트에 로그인할 수 있어요.",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -550,14 +545,8 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host}에서 토큰이 삭제돼요. 보관함과 서비스 계정은 1Password에 남아 있으니, 필요 없으면 1Password에서 삭제하세요.",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "Slack에서 @OpenBot을 멘션해요",
   "mobile.server.connectors.slack.description":
     "Slack에서 @OpenBot을 멘션하거나 다이렉트 메시지를 보낼 수 있어요. Slack Orchestrator가 알맞은 에이전트에게 물어보고 답변해요.",
-  "mobile.server.connectors.slack.connected": "{workspace} · Slack Orchestrator가 답변해요",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · 답변하는 에이전트가 아직 없어요",
-  "mobile.server.connectors.slack.many": {
-    other: "워크스페이스 {count}개 · Slack Orchestrator가 답변해요",
-  },
   "mobile.server.connectors.slack.attention": {
     other: "워크스페이스 {count}개 확인 필요",
   },
@@ -597,14 +586,8 @@ export const messages = {
     "이 새 에이전트가 {workspace}에서 @OpenBot에게 보내는 모든 요청에 답변해요.",
   "mobile.server.connectors.slack.installFailed": "Slack 설치가 완료되지 않았어요. 다시 시도해 주세요.",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "Discord 서버에서 @OpenBot을 멘션해요",
   "mobile.server.connectors.discord.description":
     "Discord 서버의 채널에서 @OpenBot을 멘션할 수 있어요. Discord Orchestrator가 알맞은 에이전트에게 물어보고 답변해요.",
-  "mobile.server.connectors.discord.connected": "{workspace} · Discord Orchestrator가 답변해요",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · 답변하는 에이전트가 아직 없어요",
-  "mobile.server.connectors.discord.many": {
-    other: "Discord 서버 {count}개 · Discord Orchestrator가 답변해요",
-  },
   "mobile.server.connectors.discord.attention": {
     other: "Discord 서버 {count}개 확인 필요",
   },
@@ -644,15 +627,8 @@ export const messages = {
     "이 새 에이전트가 {workspace}에서 @OpenBot에게 보내는 모든 요청에 답변해요.",
   "mobile.server.connectors.discord.installFailed": "Discord 승인이 완료되지 않았어요. 다시 시도해 주세요.",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "Telegram 채팅에 OpenBot 봇을 추가해요",
   "mobile.server.connectors.telegram.description":
     "Telegram 그룹에 OpenBot 봇을 추가하거나 봇과 1:1 채팅을 시작하세요. Telegram Orchestrator가 알맞은 에이전트에게 물어보고 답변해요.",
-  "mobile.server.connectors.telegram.connected": {
-    other: "채팅 {count}개 · Telegram Orchestrator가 답변해요",
-  },
-  "mobile.server.connectors.telegram.noAgent": {
-    other: "채팅 {count}개 · 답변하는 에이전트가 아직 없어요",
-  },
   "mobile.server.connectors.telegram.attention": {
     other: "채팅 {count}개 확인 필요",
   },
@@ -689,11 +665,8 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectDeleted":
     "마지막 채팅이므로 Telegram Orchestrator와 해당 대화가 OpenBot에서 삭제돼요.",
   "mobile.server.connectors.whatsapp.title": "WhatsApp",
-  "mobile.server.connectors.whatsapp.summary": "WhatsApp의 내 채팅 및 허용한 사람",
   "mobile.server.connectors.whatsapp.description":
     "WhatsApp 번호를 이 서버에 연결하세요. WhatsApp 오케스트레이터가 알맞은 에이전트에게 물어보고 답해요.",
-  "mobile.server.connectors.whatsapp.connected": { other: "번호 {count}개 · WhatsApp 오케스트레이터가 답변" },
-  "mobile.server.connectors.whatsapp.noAgent": { other: "번호 {count}개 · 아직 답변하는 에이전트 없음" },
   "mobile.server.connectors.whatsapp.attention": { other: "번호 {count}개 확인 필요" },
   "mobile.server.connectors.whatsapp.numbersTitle": "번호",
   "mobile.server.connectors.whatsapp.linkNumber": "번호 연결",

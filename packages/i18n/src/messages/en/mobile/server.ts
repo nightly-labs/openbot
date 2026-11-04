@@ -603,10 +603,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.addAgent": "Add agent",
   "mobile.server.connectors.later": "Later",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary": "Fills browser logins from Bitwarden. Set it up in the desktop app.",
   // Bitwarden of a joined server that signs in with its own Bitwarden CLI. Keep "Shared with
   // OpenBot" as the folder name that the user creates in Bitwarden.
-  "mobile.server.connectors.bitwarden.hostSummary": "Fills browser logins from Bitwarden or Vaultwarden",
   "mobile.server.connectors.bitwarden.description": "Fill browser logins on {host} from Bitwarden or Vaultwarden.",
   "mobile.server.connectors.bitwarden.howItWorks":
     "{host} signs in with its own Bitwarden CLI. In your vault, create a folder named Shared with OpenBot and put only the logins that agents may use in it. In the web vault, open Settings › Security › Keys and view your API key.",
@@ -632,7 +630,6 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "{host} removes the API key and the master password. Agents on {host} can no longer fill logins from Bitwarden.",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "Repositories, issues and pull requests for every agent",
   "mobile.server.connectors.github.description":
     "Every agent on {host} can use your GitHub repositories, issues and pull requests, and gh and git.",
   "mobile.server.connectors.github.unavailable": "OpenBot on this server cannot connect GitHub.",
@@ -665,7 +662,6 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.github.disconnectBody":
     "This removes the sign-in of @{login} from {host}, and every agent loses the GitHub tools, gh and git. Then GitHub opens, where you can revoke OpenBot.",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "A shared vault for sign-ins in the OpenBot browser",
   "mobile.server.connectors.onePassword.description":
     "Share a dedicated 1Password vault with OpenBot on {host} through a service account, so agents on {host} can sign in to sites in its browser.",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -688,15 +684,8 @@ export const messages = defineMessages("mobile.server", {
   // Slack: a workspace installs the one OpenBot app, and the Slack Orchestrator agent answers.
   // {workspace} is the Slack workspace name.
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "People mention @OpenBot in Slack",
   "mobile.server.connectors.slack.description":
     "People mention @OpenBot in Slack or send it a direct message. The Slack Orchestrator asks the right agent and answers.",
-  "mobile.server.connectors.slack.connected": "{workspace} · Slack Orchestrator answers",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · No agent answers yet",
-  "mobile.server.connectors.slack.many": {
-    one: "{count} workspace · Slack Orchestrator answers",
-    other: "{count} workspaces · Slack Orchestrator answers",
-  },
   "mobile.server.connectors.slack.attention": {
     one: "{count} workspace needs attention",
     other: "{count} workspaces need attention",
@@ -742,15 +731,8 @@ export const messages = defineMessages("mobile.server", {
   // Discord: a Discord server adds the one OpenBot bot. Always write "Discord server": "server" alone
   // is an OpenBot server. {workspace} is the Discord server name.
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "People mention @OpenBot in a Discord server",
   "mobile.server.connectors.discord.description":
     "People mention @OpenBot in a channel of a Discord server. The Discord Orchestrator asks the right agent and answers.",
-  "mobile.server.connectors.discord.connected": "{workspace} · Discord Orchestrator answers",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · No agent answers yet",
-  "mobile.server.connectors.discord.many": {
-    one: "{count} Discord server · Discord Orchestrator answers",
-    other: "{count} Discord servers · Discord Orchestrator answers",
-  },
   "mobile.server.connectors.discord.attention": {
     one: "{count} Discord server needs attention",
     other: "{count} Discord servers need attention",
@@ -796,18 +778,9 @@ export const messages = defineMessages("mobile.server", {
   // Telegram: each chat adds the one OpenBot bot, and the Telegram Orchestrator answers all chats.
   // {chat} is the Telegram chat name.
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "Add the OpenBot bot to a Telegram chat",
   "mobile.server.connectors.telegram.description":
     "Add the OpenBot bot to a Telegram group or open a direct chat with it. The Telegram Orchestrator asks the right agent and answers.",
   // {count} is the number of linked Telegram chats.
-  "mobile.server.connectors.telegram.connected": {
-    one: "{count} chat · Telegram Orchestrator answers",
-    other: "{count} chats · Telegram Orchestrator answers",
-  },
-  "mobile.server.connectors.telegram.noAgent": {
-    one: "{count} chat · No agent answers yet",
-    other: "{count} chats · No agent answers yet",
-  },
   "mobile.server.connectors.telegram.attention": {
     one: "{count} chat needs attention",
     other: "{count} chats need attention",
@@ -847,17 +820,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.telegram.disconnectDeleted":
     "This is the last chat, so the Telegram Orchestrator and its conversations are deleted from OpenBot.",
   "mobile.server.connectors.whatsapp.title": "WhatsApp",
-  "mobile.server.connectors.whatsapp.summary": "Your own chat and the people you allow in WhatsApp",
   "mobile.server.connectors.whatsapp.description":
     "Link a WhatsApp number to this server. The WhatsApp Orchestrator asks the right agent and answers.",
-  "mobile.server.connectors.whatsapp.connected": {
-    one: "{count} number · WhatsApp Orchestrator answers",
-    other: "{count} numbers · WhatsApp Orchestrator answers",
-  },
-  "mobile.server.connectors.whatsapp.noAgent": {
-    one: "{count} number · No agent answers yet",
-    other: "{count} numbers · No agent answers yet",
-  },
   "mobile.server.connectors.whatsapp.attention": {
     one: "{count} number needs attention",
     other: "{count} numbers need attention",
