@@ -86,12 +86,41 @@ export function registerMcpSecretValues(config: McpServerConfig): void {
 export function mcpSecretValues(configs: readonly McpServerConfig[]): string[] {
   const values = new Set<string>();
   for (const config of configs) {
-    for (const value of Object.values(mcpEnvironment(config))) values.add(value);
+    for (const [name, value] of Object.entries(mcpEnvironment(config))) {
+      if (!isUserProfileVariable(name)) values.add(value);
+    }
     for (const pair of config.headers) values.add(pair.value);
     for (const value of urlQueryValues(config.url)) values.add(value);
   }
   // A short value is left alone - masking a two-character value would hide ordinary words.
   return [...values].filter((value) => value.length >= 4);
+}
+
+/**
+ * The variables that name this computer's user, its folders, and its search path. The Computer Use
+ * server inherits `HOME`, `USER` and `TMPDIR` (#4863). None of them is a credential, and masking
+ * `HOME` changes each path an agent writes, so a Shared file link no longer opens. The list is
+ * exact: a credential under another name stays masked. Windows names are not case-sensitive.
+ */
+const USER_PROFILE_VARIABLES = new Set([
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "TMPDIR",
+  "PATH",
+  "SHELL",
+  "USERNAME",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "TEMP",
+  "TMP",
+  "SYSTEMROOT",
+  "WINDIR",
+]);
+
+export function isUserProfileVariable(name: string): boolean {
+  return USER_PROFILE_VARIABLES.has(name.toUpperCase());
 }
 
 /**

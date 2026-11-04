@@ -1,8 +1,14 @@
 // A provider record goes to the renderer and to history after this redaction. It must stay a valid
 // record, and a value that the MCP configuration knows must not reach either place.
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { registerSecretValue } from "@openbot/logging";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
-import { redactMcpRecord } from "./mcp-redaction";
+import { mcpSecretValues, redactMcpRecord } from "./mcp-redaction";
+import { createPiMcpExtension } from "./pi-mcp";
 
 describe("redactMcpRecord", () => {
   it("keeps JSON literals when a known value is `true` or `null`", () => {
@@ -29,5 +35,67 @@ describe("redactMcpRecord", () => {
     const redacted = JSON.stringify(redactMcpRecord({ output: "abcd1234efgh.sig_part-xyz" }, ["abcd1234efgh"]));
     expect(redacted).not.toContain("abcd1234efgh");
     expect(redacted).not.toContain("sig_part");
+  });
+});
+
+// The Computer Use server inherits HOME, USER and TMPDIR. Masking HOME broke each Shared file link
+// in a Pi or Muse transcript (#4863). A credential beside them must stay masked.
+describe("mcpSecretValues", () => {
+  const home = process.env.HOME ?? "/Users/someone";
+  const server: McpServerConfig = {
+    id: "computer-use",
+    name: "computer-use",
+    transport: "stdio",
+    enabled: true,
+    command: "cua-driver",
+    args: [],
+    env: [
+      { key: "API_TOKEN", value: "tok_9f8e7d6c5b4a" },
+      { key: "Path", value: "/opt/tools/bin" },
+    ],
+    envPassthrough: ["HOME"],
+    workingDirectory: "",
+    url: "",
+    headers: [{ key: "User", value: "header-value" }],
+  };
+
+  it("leaves the user's folders and search path unmasked", () => {
+    const values = mcpSecretValues([server]);
+    expect(values).toEqual(["tok_9f8e7d6c5b4a", "header-value"]);
+    const text = `Wrote ${home}/OpenBot/Shared/demo/report.md with tok_9f8e7d6c5b4a`;
+    expect(redactMcpRecord({ text }, values)).toEqual({
+      text: `Wrote ${home}/OpenBot/Shared/demo/report.md with •••`,
+    });
+  });
+
+  it("gives Pi each value but only the credentials as secrets", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "openbot-pi-mcp-test-"));
+    try {
+      const local = { servers: [], setThreadId: () => {}, reached: () => false, close: () => {} };
+      const extension = await Effect.runPromise(
+        createPiMcpExtension(
+          {
+            computer: {
+              type: "stdio",
+              command: "cua-driver",
+              args: [],
+              env: { HOME: home, API_TOKEN: "tok_9f8e7d6c5b4a" },
+            },
+            remote: { type: "http", url: "https://mcp.example.test", headers: { User: "header-value" } },
+          },
+          local,
+          directory,
+        ),
+      );
+      expect(extension.secrets).toEqual(["tok_9f8e7d6c5b4a", "header-value"]);
+      expect(extension.environment).toMatchObject({
+        OPENBOT_PI_MCP_VALUE_0: home,
+        OPENBOT_PI_MCP_VALUE_1: "tok_9f8e7d6c5b4a",
+        OPENBOT_PI_MCP_VALUE_2: "header-value",
+      });
+      await Effect.runPromise(extension.close());
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
