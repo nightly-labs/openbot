@@ -161,3 +161,28 @@ export function parseFinishedChatMarkdown(body: string) {
   parsedBodies.set(body, tokens);
   return tokens;
 }
+
+const SPACED_TOKENS = new Set(["paragraph", "heading", "list_item", "blockquote", "code", "space", "br", "blockMath"]);
+
+function plainText(tokens: readonly Token[]): string {
+  return tokens
+    .map((token) => {
+      const text =
+        token.type === "list"
+          ? plainText(token.items)
+          : token.type === "agentMention" || token.type === "skillMention"
+            ? `@${chatTagReferences(token.raw)[0]?.name ?? ""}`
+            : "tokens" in token && token.tokens
+              ? plainText(token.tokens)
+              : "text" in token && typeof token.text === "string"
+                ? token.text
+                : token.raw;
+      return SPACED_TOKENS.has(token.type) ? `${text} ` : text;
+    })
+    .join("");
+}
+
+/** The text of Markdown with no syntax, such as a link's label without its address, for a screen reader. */
+export function chatMarkdownPlainText(body: string): string {
+  return plainText(parseFinishedChatMarkdown(body)).replace(/\s+/g, " ").trim();
+}

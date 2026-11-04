@@ -11,6 +11,7 @@ import { type ReactNode, useState } from "react";
 import { Pressable, TextInput, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { chatMarkdownPlainText } from "@/features/chat/model/chat-markdown-parser";
 import { haptics } from "@/shared/lib/haptics";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
@@ -380,7 +381,7 @@ export function QuestionSecretComposer({
   ...colors
 }: SecureComposerColors & { controller: QuestionPromptController }) {
   const { t } = useText();
-  const label = controller.question?.question ?? "";
+  const label = chatMarkdownPlainText(controller.question?.question ?? "");
   const value = controller.draft;
   const ready = !controller.disabled && Boolean(value.trim());
   return (

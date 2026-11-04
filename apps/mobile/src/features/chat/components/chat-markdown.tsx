@@ -810,9 +810,12 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   agents = NO_AGENTS,
   finished = false,
   linkFavicons = true,
+  fontWeight,
 }: {
   body: string;
   color: ColorValue | undefined;
+  /** The weight of the text, such as the medium title of a question card. Bold text stays bold. */
+  fontWeight?: TextStyle["fontWeight"];
   compact?: boolean;
   streaming?: boolean;
   /** The text will not change, so its parse is shared across mounts. */
@@ -846,7 +849,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     () => ({
       selectable,
       type: compact ? "body-sm" : "body",
-      style: { color: color ?? codeColor },
+      style: fontWeight ? { color: color ?? codeColor, fontWeight } : { color: color ?? codeColor },
       codeColor,
       agents,
       mentionOffset: 4 * fontScale,
@@ -858,7 +861,20 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       linkFavicons,
       direction: layoutDirection(),
     }),
-    [linkFavicons, selectable, compact, color, codeColor, agents, fontScale, t, streaming, finished, animateTail],
+    [
+      linkFavicons,
+      selectable,
+      compact,
+      color,
+      fontWeight,
+      codeColor,
+      agents,
+      fontScale,
+      t,
+      streaming,
+      finished,
+      animateTail,
+    ],
   );
   return (
     <StreamRevealProvider>

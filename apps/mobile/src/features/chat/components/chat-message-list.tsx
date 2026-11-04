@@ -67,6 +67,7 @@ import { CHAT_ROW_GAP, type ChatMotion } from "@/features/chat/components/use-ch
 import { useFoldScrollAnchor } from "@/features/chat/components/use-fold-scroll-anchor";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { chatMarkdownPlainText } from "@/features/chat/model/chat-markdown-parser";
 import {
   type ChatBubbleMessage,
   type ChatMessage,
@@ -1090,7 +1091,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     if (!questionForm?.question || !promptId || announcedPromptId.current === promptId) return;
     announcedPromptId.current = promptId;
     AccessibilityInfo.announceForAccessibility(
-      t("mobile.chat.question.inputRequired", { question: questionForm.question.question }),
+      t("mobile.chat.question.inputRequired", { question: chatMarkdownPlainText(questionForm.question.question) }),
     );
   }, [questionForm?.messageId, questionForm?.question, t]);
   const announcedApprovals = useRef(new Set<string>());
