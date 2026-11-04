@@ -136,6 +136,17 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     } satisfies AppInfo,
   ],
   [
+    "app info drawn on the CPU",
+    decodeAppInfo,
+    {
+      name: "OpenBot",
+      version: "1.0.0",
+      platform: "linux",
+      variant: "production",
+      softwareRendering: true,
+    } satisfies AppInfo,
+  ],
+  [
     "setup state",
     decodeAppSetupState,
     { completed: true, preferredProvider: "codex", preferredModel: null } satisfies AppSetupState,
@@ -269,6 +280,11 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     "app info with an install ID that is not text",
     decodeAppInfo,
     { name: "OpenBot", version: "1.0.0", platform: "darwin", variant: "production", analyticsInstallId: 1 },
+  ],
+  [
+    "app info with a software rendering flag that is not a boolean",
+    decodeAppInfo,
+    { name: "OpenBot", version: "1.0.0", platform: "linux", variant: "production", softwareRendering: "yes" },
   ],
   // The key never comes back to the renderer, so a record that carries one fails closed.
   ["a voice server with its key", decodeVoiceServerSettings, { ...voiceServer, apiKey: "sk-secret" }],

@@ -155,13 +155,15 @@ import {
 
 export function decodeAppInfo(value: unknown): AppInfo {
   const info = decodeRecord(value, "app info");
-  const { platform, variant, analyticsCaptureUrl, analyticsInstallId } = info;
+  const { platform, variant, analyticsCaptureUrl, analyticsInstallId, softwareRendering } = info;
   if (!isOneOf(["darwin", "win32", "linux"] as const, platform)) throw new Error("Invalid platform.");
   if (!isOneOf(["production", "dev", "preview"] as const, variant)) throw new Error("Invalid variant.");
   if (analyticsCaptureUrl !== undefined && !isString(analyticsCaptureUrl))
     throw new Error("Invalid analytics capture URL.");
   if (analyticsInstallId !== undefined && !isString(analyticsInstallId))
     throw new Error("Invalid analytics install ID.");
+  if (softwareRendering !== undefined && !isBoolean(softwareRendering))
+    throw new Error("Invalid software rendering flag.");
   return {
     name: requiredString(info, "name"),
     version: requiredString(info, "version"),
@@ -169,6 +171,7 @@ export function decodeAppInfo(value: unknown): AppInfo {
     variant,
     ...(analyticsCaptureUrl === undefined ? {} : { analyticsCaptureUrl }),
     ...(analyticsInstallId === undefined ? {} : { analyticsInstallId }),
+    ...(softwareRendering === undefined ? {} : { softwareRendering }),
   };
 }
 
