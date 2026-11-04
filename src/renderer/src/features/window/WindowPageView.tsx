@@ -4,6 +4,7 @@ import { AgentUsagePanel, WorkflowsPage } from "../../lazy-views";
 import { SkillsMarketplace } from "../../WorkspaceOverlays";
 import { SchedulePanel } from "../schedule/SchedulePanel";
 import { useServers } from "../servers/servers-context";
+import { UsageMachine } from "../usage/UsageMachine";
 import { useUsage } from "../usage/usage-context";
 import { SettingsPage } from "./SettingsPage";
 import { type SettingsKind, useWindowPage } from "./window-page-context";
@@ -42,6 +43,7 @@ export function WindowPageView() {
                 hostName={hostName(serverId())}
                 agentId={usage.state.agentId}
                 onBack={usage.closeUsage}
+                machine={<UsageMachine serverId={serverId()} />}
               />
             </Loading>
           }
