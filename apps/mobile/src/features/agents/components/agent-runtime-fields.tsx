@@ -18,7 +18,12 @@ import { Platform } from "react-native";
 import { useUniwind } from "uniwind";
 import { AgentFastModeField, type AgentHostFieldsProps } from "@/features/agents/components/agent-host-fields";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { PLAN_LIMIT_RESET_FORMAT, planLimitWindowLabel, usePlanLimits } from "@/features/servers/model/plan-limits";
+import {
+  PLAN_LIMIT_RESET_FORMAT,
+  planLimitResetDate,
+  planLimitWindowLabel,
+  usePlanLimits,
+} from "@/features/servers/model/plan-limits";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import {
@@ -334,8 +339,8 @@ function useSpentLimitText(
     planLimitWindowKind(spentWindow.windowDurationMins).kind === "limit"
       ? t("mobile.agent.runtime.usageLimit")
       : t("mobile.agent.runtime.usageLimitWindow", { window: planLimitWindowLabel(spentWindow.windowDurationMins, t) });
-  const date = resetsAt === null ? null : new Date(resetsAt * 1_000);
-  return date && !Number.isNaN(date.getTime())
+  const date = planLimitResetDate(spentWindow);
+  return date
     ? t("mobile.agent.runtime.usageLimitResets", { limit, time: format.date(date, PLAN_LIMIT_RESET_FORMAT) })
     : limit;
 }

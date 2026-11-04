@@ -156,7 +156,7 @@ export const PLAN_LIMIT_RESET_FORMAT: Intl.DateTimeFormatOptions = {
 };
 
 /** When a window resets, or null when the host does not say. */
-export function planLimitResetDate(window: PlanLimitWindow): Date | null {
+export function planLimitResetDate(window: Pick<PlanLimitWindow, "resetsAt">): Date | null {
   if (window.resetsAt === null) return null;
   const date = new Date(window.resetsAt * 1_000);
   return Number.isNaN(date.getTime()) ? null : date;
