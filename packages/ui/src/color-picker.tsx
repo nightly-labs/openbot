@@ -142,7 +142,7 @@ const SPRING_STYLE = [
 const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** A preset swatch: its color and its accessible name. */
-export interface ColorPreset {
+interface ColorPreset {
   value: AvatarColor;
   label: string;
 }

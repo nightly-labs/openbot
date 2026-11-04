@@ -308,8 +308,6 @@ const Auth = createSimpleContext({
     });
     /** Null while the success animation holds, so the workspace mounts after it. */
     const visibleSignedInAccount = createMemo(() => (authSuccessVisible() ? null : signedInAccount()));
-    /** The chat color of the signed-in account, or null for none or while signed out. */
-    const chatColor = createMemo(() => signedInAccount()?.chatColor ?? null);
 
     return {
       centralAuth,
@@ -329,7 +327,6 @@ const Auth = createSimpleContext({
       logoutCentralAccount,
       updateAccountName,
       updateAccountAvatar,
-      chatColor,
       setChatColor,
       createMobileConnect,
       cancelMobileConnect: () => trackMobileConnect("cancelled", () => accountPort().auth.cancelMobileConnect()),

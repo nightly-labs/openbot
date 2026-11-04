@@ -57,11 +57,13 @@ function createChatColorPopup(value: () => AvatarColor | null, save: (value: Ava
   const [draft, setDraft] = createSignal<AvatarColor | null>(null);
   let close: (() => void) | undefined;
   let dot: HTMLSpanElement | undefined;
+  /** The value when the popup opened. A keyed row can unmount after its props moved to another agent. */
+  let opened: AvatarColor | null = null;
 
   const commit = () => {
     if (anchor() === null) return;
     const next = draft();
-    if (next !== value()) save(next);
+    if (next !== opened) save(next);
   };
 
   onSettled(() => commit);
@@ -74,7 +76,8 @@ function createChatColorPopup(value: () => AvatarColor | null, save: (value: Ava
     toggle: (trigger: HTMLElement) => {
       if (anchor()) close?.();
       else {
-        setDraft(value());
+        opened = value();
+        setDraft(opened);
         setAnchor({ trigger, dot });
       }
     },
