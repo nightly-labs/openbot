@@ -712,7 +712,7 @@ function computerUseCapability(state: ComputerUseState): CapabilityState {
 }
 
 /** The base cache path of electron-updater 6.8.9 (`getAppCacheDir`), which differs from Electron's. */
-function electronUpdaterCacheRoot(): string {
+export function electronUpdaterCacheRoot(): string {
   if (process.platform === "win32") return process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local");
   if (process.platform === "darwin") return join(homedir(), "Library", "Caches");
   return process.env.XDG_CACHE_HOME || join(homedir(), ".cache");

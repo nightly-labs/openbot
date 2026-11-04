@@ -198,6 +198,21 @@ On Windows, the same file is at `%APPDATA%\OpenBot\openbot.db`.
 Report the field the message names, together with the details below. The output holds your own file
 paths, so review it before you publish it.
 
+## OpenBot says a newer version saved your data
+
+An older OpenBot started after a newer one opened your data, for example from an old shortcut or a
+second installation. An older OpenBot cannot read data that a newer one updated, so it stops before
+it writes anything. Your data is intact.
+
+Do not follow the reset steps below, and do not move the folder. When in-app updates are available,
+OpenBot installs the latest version and opens again. If it cannot, install the latest version from
+[openbot.run/download](https://openbot.run/download).
+
+Then remove the older copy. On Windows, look for a second OpenBot in Settings → Apps, and pin the
+new OpenBot again if a taskbar or desktop shortcut opens the old one. Older versions show the
+message `OpenBot database version <n> is newer than this application supports (<m>).` The same
+steps apply.
+
 ## Routines do not run while the computer sleeps
 
 A routine runs only while the computer is awake and OpenBot is open.
