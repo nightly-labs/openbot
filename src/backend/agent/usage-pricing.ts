@@ -26,6 +26,16 @@ interface Price {
   long?: Rates & { from: number };
   /** From this UTC date (`YYYY-MM-DD`), these rates replace `short`. */
   change?: { on: string; short: Rates };
+  /**
+   * A provider that bills a lower rate at set hours of the day. `rates` replace the short rates
+   * outside `windows`, which are UTC hours `[from, to)` on the listed weekdays (0 is Sunday). A
+   * turn whose time cannot be read keeps the short rates, so the estimate stays conservative.
+   */
+  offPeak?: {
+    rates: Rates;
+    windows: ReadonlyArray<readonly [number, number]>;
+    weekdays: ReadonlyArray<number>;
+  };
 }
 // OpenAI: "Long context: >272K input tokens". Codex sets no cache lifetime, so a write is the
 // default 30-minute write. GPT-5.5 has no cache-write charge: a write bills as input.
@@ -48,6 +58,23 @@ const claude = (input: number, cached: number, output: number): Price => ({
 // Its cache lifetime is unknown, so a Claude update through it that writes the cache stays unpriced.
 const ANTIGRAVITY_VERIFIED = "2026-10-28";
 const DEEPSEEK_VERIFIED = "2026-11-02";
+// DeepSeek's peak hours, and the days they fall on. "Off-peak rates are half of the peak rates":
+// weekends are outside these weekdays and are therefore off-peak all day.
+const DEEPSEEK_PEAK_WINDOWS: ReadonlyArray<readonly [number, number]> = [
+  [1, 4],
+  [6, 10],
+];
+const DEEPSEEK_PEAK_WEEKDAYS = [1, 2, 3, 4, 5];
+const deepseek = (input: number, cached: number, output: number): Price => ({
+  source: DEEPSEEK,
+  verified: DEEPSEEK_VERIFIED,
+  short: { input, cached, cacheWrite: 0, output },
+  offPeak: {
+    rates: { input: input / 2, cached: cached / 2, cacheWrite: 0, output: output / 2 },
+    windows: DEEPSEEK_PEAK_WINDOWS,
+    weekdays: DEEPSEEK_PEAK_WEEKDAYS,
+  },
+});
 const antigravityClaude = (input: number, cached: number, output: number): Price => ({
   source: CLAUDE,
   verified: ANTIGRAVITY_VERIFIED,
@@ -140,23 +167,25 @@ const PRICES: Readonly<Record<string, Price>> = {
   "antigravity:claude-opus-5-5": antigravityClaude(4, 0.2, 20),
   "antigravity:claude-sonnet-5-5": antigravityClaude(2, 0.1, 10),
   // DeepSeek, read 2026-11-02: one rate for the whole 1M context, and no cache-write charge. It bills
-  // off-peak at half these rates (peak is 01:00-04:00 and 06:00-10:00 UTC, Monday-Friday, excluding
-  // Chinese public holidays). These are the peak rates, so an off-peak turn can cost up to half this.
-  "deepseek:deepseek-flash": {
-    source: DEEPSEEK,
-    verified: DEEPSEEK_VERIFIED,
-    short: { input: 0.3, cached: 0.006, cacheWrite: 0, output: 1.2 },
-  },
-  "deepseek:deepseek-v4-pro": {
-    source: DEEPSEEK,
-    verified: DEEPSEEK_VERIFIED,
-    short: { input: 1.32, cached: 0.044, cacheWrite: 0, output: 3.96 },
-  },
+  // off-peak at half these rates, in UTC hours: 01:00-04:00 and 06:00-10:00 are the peak, Monday to
+  // Friday, and every other hour is off-peak. Chinese public holidays are off-peak all day too, and
+  // are not modelled here, so a turn on one of those days is priced up to 2x high.
+  "deepseek:deepseek-flash": deepseek(0.3, 0.006, 1.2),
+  "deepseek:deepseek-v4-pro": deepseek(1.32, 0.044, 3.96),
 };
 
 function priceOf(provider: string, model: string): Price | undefined {
   // Claude Code names the 1M context window `[1m]`. It is priced at the model's standard rates.
   return PRICES[`${provider}:${provider === "claude" ? model.replace(/\[1m\]$/, "") : model}`];
+}
+// The machine's own time zone never enters: the schedule is in UTC, and so is every `occurredAt`.
+function isOffPeak(schedule: Price["offPeak"], occurredAt: string): boolean {
+  if (!schedule) return false;
+  const at = new Date(occurredAt);
+  if (Number.isNaN(at.getTime())) return false;
+  if (!schedule.weekdays.includes(at.getUTCDay())) return true;
+  const hour = at.getUTCHours() + at.getUTCMinutes() / 60 + at.getUTCSeconds() / 3600;
+  return !schedule.windows.some(([from, to]) => hour >= from && hour < to);
 }
 
 /** The standard input rate per million tokens, or null for a model with no known price. */
@@ -199,7 +228,16 @@ export function estimateUsageCost(
         ? "long"
         : null;
   const changed = price.change && occurredAt >= price.change.on ? price.change : null;
-  const rates = context === "short" ? (changed?.short ?? price.short) : context === "long" ? long : null;
+  // DeepSeek lists one rate for the whole context, so its off-peak rates are the short ones halved.
+  const offPeak = context === "short" && isOffPeak(price.offPeak, occurredAt);
+  const rates =
+    context === "short"
+      ? offPeak && price.offPeak
+        ? price.offPeak.rates
+        : (changed?.short ?? price.short)
+      : context === "long"
+        ? long
+        : null;
   if (!rates || (tokens.cacheCreation !== 0 && rates.cacheWrite === undefined)) return { cost: null, basis: null };
   return {
     cost:
@@ -212,6 +250,7 @@ export function estimateUsageCost(
       effectiveDate: changed?.on ?? price.verified ?? EFFECTIVE_DATE,
       model,
       context,
+      ...(price.offPeak === undefined ? {} : { period: offPeak ? "off-peak" : "peak" }),
       input: rates.input,
       cached: rates.cached,
       ...(rates.cacheWrite === undefined ? {} : { cacheWrite: rates.cacheWrite }),
